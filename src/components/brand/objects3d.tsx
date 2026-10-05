@@ -1,0 +1,309 @@
+/* CRUSH · objets 3D « premium » en SVG — port fidèle de maquettes/objets-3d-source.py */
+import { useId, type CSSProperties } from "react";
+
+type Stop = readonly [string, string];
+
+export const SPHERE_STOPS = {
+  nacre: [["0", "#FFFFFF"], ["0.38", "#F3F1F7"], ["0.78", "#CEC8DB"], ["1", "#A79FBC"]],
+  opale: [["0", "#FFFFFF"], ["0.16", "#DDFFF5"], ["0.4", "#A3D3FF"], ["0.64", "#E4B2FF"], ["0.86", "#FFC49B"], ["1", "#E39A86"]],
+  rose: [["0", "#FFE3F1"], ["0.3", "#FF94C8"], ["0.7", "#E8358A"], ["1", "#9E0E4E"]],
+  vert: [["0", "#D2FFEC"], ["0.3", "#53E8B4"], ["0.7", "#12C08A"], ["1", "#067554"]],
+  bleu: [["0", "#E2F0FF"], ["0.3", "#7DB9FF"], ["0.7", "#3D8BFF"], ["1", "#1A55C4"]],
+} satisfies Record<string, readonly Stop[]>;
+
+export type SphereKind = keyof typeof SPHERE_STOPS;
+
+function Stops({ stops }: { stops: readonly Stop[] }) {
+  return (
+    <>
+      {stops.map(([o, c]) => (
+        <stop key={o} offset={o} stopColor={c} />
+      ))}
+    </>
+  );
+}
+
+/** Identifiant SVG unique et sûr pour les url(#…) */
+function useSvgId(prefix: string) {
+  return prefix + useId().replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+type ObjProps = { size: number; className?: string; style?: CSSProperties };
+
+export function Sphere({ size, kind = "nacre", shadow = true, className, style }: ObjProps & { kind?: SphereKind; shadow?: boolean }) {
+  const u = useSvgId("sp");
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 100 100" className={className} style={{ overflow: "visible", flexShrink: 0, ...style }}>
+      <defs>
+        <radialGradient id={`${u}g`} cx="0.36" cy="0.3" r="0.78">
+          <Stops stops={SPHERE_STOPS[kind]} />
+        </radialGradient>
+        <radialGradient id={`${u}r`} cx="0.62" cy="0.92" r="0.5">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${u}s`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`${u}f`} x="-50%" y="-200%" width="200%" height="500%">
+          <feGaussianBlur stdDeviation="2.6" />
+        </filter>
+      </defs>
+      {shadow && <ellipse cx="50" cy="97" rx="30" ry="4.5" fill="rgba(60,40,80,0.22)" filter={`url(#${u}f)`} />}
+      <circle cx="50" cy="50" r="46" fill={`url(#${u}g)`} />
+      <circle cx="50" cy="50" r="46" fill={`url(#${u}r)`} />
+      <ellipse cx="35" cy="29" rx="17" ry="10" transform="rotate(-32 35 29)" fill={`url(#${u}s)`} />
+      <circle cx="29" cy="25" r="3.4" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z";
+
+/** Le logo officiel : la bulle rose en volume, deux points nacre et un point opale. */
+export function BubbleLogo({ size, dots = true, animated = false, className, style }: ObjProps & { dots?: boolean; animated?: boolean }) {
+  const u = useSvgId("bp");
+  const detail = size >= 44;
+  const dot = (cx: number, kind: "nacre" | "opale") => (
+    <g key={cx} transform={`translate(${cx - 13} 88)`}>
+      <ellipse cx="13" cy="27" rx="9" ry="2.6" fill="rgba(110,0,50,0.35)" filter={`url(#${u}d)`} />
+      <svg x="0" y="0" width="26" height="26" viewBox="0 0 100 100">
+        <defs>
+          <radialGradient id={`${u}${kind}${cx}`} cx="0.36" cy="0.3" r="0.78">
+            <Stops stops={SPHERE_STOPS[kind]} />
+          </radialGradient>
+        </defs>
+        <circle cx="50" cy="50" r="46" fill={`url(#${u}${kind}${cx})`} />
+        <ellipse cx="35" cy="29" rx="15" ry="9" transform="rotate(-32 35 29)" fill="#FFFFFF" opacity="0.85" />
+      </svg>
+    </g>
+  );
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="30 40 150 136" className={className} style={{ overflow: "visible", flexShrink: 0, ...style }}>
+      <defs>
+        <radialGradient id={`${u}b`} cx="0.3" cy="0.22" r="0.95">
+          <stop offset="0" stopColor="#FFD7EA" />
+          <stop offset="0.32" stopColor="#FF7DBA" />
+          <stop offset="0.72" stopColor="#E8358A" />
+          <stop offset="1" stopColor="#A50F55" />
+        </radialGradient>
+        <linearGradient id={`${u}h`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`${u}o`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.45" stopColor="#7A0035" stopOpacity="0" />
+          <stop offset="1" stopColor="#7A0035" stopOpacity="0.32" />
+        </linearGradient>
+        <filter id={`${u}c`} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
+        <filter id={`${u}d`} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="1.4" />
+        </filter>
+      </defs>
+      {detail && <ellipse cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
+      <path d={BUBBLE_BODY} fill={`url(#${u}b)`} />
+      <path d={BUBBLE_BODY} fill={`url(#${u}o)`} />
+      {detail && (
+        <path d="M66 141 Q100 151 140 142" fill="none" stroke="#FFC7E4" strokeWidth="3" strokeLinecap="round" opacity="0.65" filter={`url(#${u}d)`} />
+      )}
+      <path d="M64 62 H136 A34 34 0 0 1 163 76 C135 69 96 69 58 84 A38 38 0 0 1 64 62 Z" fill={`url(#${u}h)`} opacity="0.75" />
+      {detail && (
+        <>
+          <circle cx="150" cy="70" r="3.6" fill="#FFFFFF" opacity="0.9" />
+          <circle cx="158" cy="80" r="1.8" fill="#FFFFFF" opacity="0.7" />
+        </>
+      )}
+      {dots && <g data-dots={animated ? "" : undefined}>{[dot(70, "nacre"), dot(100, "nacre"), dot(130, "opale")]}</g>}
+    </svg>
+  );
+}
+
+export function Lock3D({ size, className, style }: ObjProps) {
+  const u = useSvgId("lk");
+  return (
+    <svg aria-hidden="true" width={size} height={Math.round(size * 1.08)} viewBox="0 0 120 130" className={className} style={{ overflow: "visible", ...style }}>
+      <defs>
+        <linearGradient id={`${u}c`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#7E8596" />
+          <stop offset="0.22" stopColor="#F5F7FB" />
+          <stop offset="0.45" stopColor="#AEB4C2" />
+          <stop offset="0.68" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#6F7688" />
+        </linearGradient>
+        <radialGradient id={`${u}g`} cx="0.28" cy="0.18" r="1">
+          <stop offset="0" stopColor="#FFF4C4" />
+          <stop offset="0.3" stopColor="#FFD866" />
+          <stop offset="0.7" stopColor="#F2A21C" />
+          <stop offset="1" stopColor="#B86A06" />
+        </radialGradient>
+        <linearGradient id={`${u}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`${u}o`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0.5" stopColor="#7A4300" stopOpacity="0" />
+          <stop offset="1" stopColor="#7A4300" stopOpacity="0.35" />
+        </linearGradient>
+        <linearGradient id={`${u}k`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#5A3405" />
+          <stop offset="1" stopColor="#2E1A02" />
+        </linearGradient>
+        <filter id={`${u}f`} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
+      </defs>
+      <ellipse cx="60" cy="126" rx="44" ry="5" fill="rgba(120,70,0,0.28)" filter={`url(#${u}f)`} />
+      <path d="M34 60 V40 a26 26 0 0 1 52 0 V60" fill="none" stroke="#5E6474" strokeWidth="15" strokeLinecap="round" transform="translate(0 2)" />
+      <path d="M34 60 V40 a26 26 0 0 1 52 0 V60" fill="none" stroke={`url(#${u}c)`} strokeWidth="13" strokeLinecap="round" />
+      <path d="M40 38 a20 20 0 0 1 14 -18" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+      <rect x="10" y="52" width="100" height="70" rx="24" fill={`url(#${u}g)`} />
+      <rect x="10" y="52" width="100" height="70" rx="24" fill={`url(#${u}o)`} />
+      <rect x="18" y="57" width="84" height="18" rx="9" fill={`url(#${u}b)`} />
+      <path d="M24 114 Q60 121 96 114" fill="none" stroke="#FFE6A3" strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
+      <circle cx="60" cy="84" r="9.5" fill={`url(#${u}k)`} />
+      <path d="M56 88 h8 l2 16 a2 2 0 0 1 -2 2 h-8 a2 2 0 0 1 -2 -2 z" fill={`url(#${u}k)`} />
+      <path d="M53.5 90 a9 9 0 0 0 13 0" fill="none" stroke="#FFE2A0" strokeWidth="1.6" opacity="0.6" />
+      <circle cx="26" cy="62" r="3" fill="#FFFFFF" opacity="0.9" />
+    </svg>
+  );
+}
+
+export function Bell3D({ size, className, style }: ObjProps) {
+  const u = useSvgId("bl");
+  return (
+    <svg aria-hidden="true" width={size} height={Math.round(size * 1.08)} viewBox="0 0 120 130" className={className} style={{ overflow: "visible", ...style }}>
+      <defs>
+        <radialGradient id={`${u}g`} cx="0.32" cy="0.22" r="0.95">
+          <stop offset="0" stopColor="#EAF4FF" />
+          <stop offset="0.3" stopColor="#8FC4FF" />
+          <stop offset="0.72" stopColor="#3D8BFF" />
+          <stop offset="1" stopColor="#1A4FB8" />
+        </radialGradient>
+        <linearGradient id={`${u}r`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#5FA2FF" />
+          <stop offset="1" stopColor="#1F55C2" />
+        </linearGradient>
+        <linearGradient id={`${u}h`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={`${u}p`} cx="0.36" cy="0.3" r="0.78">
+          <Stops stops={SPHERE_STOPS.rose} />
+        </radialGradient>
+        <radialGradient id={`${u}k`} cx="0.36" cy="0.3" r="0.78">
+          <Stops stops={SPHERE_STOPS.bleu} />
+        </radialGradient>
+        <filter id={`${u}f`} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
+      </defs>
+      <ellipse cx="60" cy="125" rx="40" ry="5" fill="rgba(20,60,140,0.25)" filter={`url(#${u}f)`} />
+      <path d="M14 46 q-6 12 0 24 M106 46 q6 12 0 24" fill="none" stroke="#8FC4FF" strokeWidth="3" strokeLinecap="round" opacity="0.7" />
+      <circle cx="60" cy="13" r="7" fill={`url(#${u}r)`} />
+      <circle cx="60" cy="104" r="11" fill={`url(#${u}k)`} />
+      <path d="M60 16 C37 16 27 34 27 54 V76 L17 90 H103 L93 76 V54 C93 34 83 16 60 16 Z" fill={`url(#${u}g)`} />
+      <rect x="14" y="86" width="92" height="13" rx="6.5" fill={`url(#${u}r)`} />
+      <rect x="20" y="87.5" width="80" height="3" rx="1.5" fill="#FFFFFF" opacity="0.45" />
+      <path d="M40 32 C34 42 33 56 34 68" fill="none" stroke={`url(#${u}h)`} strokeWidth="7" strokeLinecap="round" opacity="0.8" />
+      <circle cx="94" cy="26" r="15" fill={`url(#${u}p)`} />
+      <ellipse cx="89" cy="20" rx="5" ry="3" fill="#FFFFFF" opacity="0.7" />
+      <text x="94" y="31.5" textAnchor="middle" fontSize="16" fontWeight="900" fill="#FFFFFF" fontFamily="var(--font-nunito), sans-serif">
+        1
+      </text>
+    </svg>
+  );
+}
+
+export function CheckBadge({ size, className, style }: ObjProps) {
+  const u = useSvgId("ck");
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 100 100" className={className} style={{ overflow: "visible", ...style }}>
+      <defs>
+        <radialGradient id={`${u}g`} cx="0.36" cy="0.28" r="0.8">
+          <Stops stops={SPHERE_STOPS.vert} />
+        </radialGradient>
+        <radialGradient id={`${u}s`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`${u}f`} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+        <filter id={`${u}t`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="1.2" />
+        </filter>
+      </defs>
+      <ellipse cx="50" cy="98" rx="32" ry="4.5" fill="rgba(6,110,80,0.3)" filter={`url(#${u}f)`} />
+      <circle cx="50" cy="50" r="46" fill={`url(#${u}g)`} />
+      <ellipse cx="36" cy="27" rx="18" ry="10" transform="rotate(-30 36 27)" fill={`url(#${u}s)`} />
+      <path d="M30 53 L44 66 L71 37" fill="none" stroke="#065E44" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" transform="translate(0 3)" filter={`url(#${u}t)`} />
+      <path d="M30 53 L44 66 L71 37" fill="none" stroke="#FFFFFF" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Les billes : composition nacre et opale de la planche « Objets 3D ». */
+export function Marbles({ className }: { className?: string }) {
+  const items: { kind: SphereKind; left: number; top: number; size: number }[] = [
+    { kind: "opale", left: 0, top: 34, size: 46 },
+    { kind: "nacre", left: 62, top: 0, size: 30 },
+    { kind: "opale", left: 96, top: 54, size: 62 },
+    { kind: "nacre", left: 44, top: 98, size: 22 },
+    { kind: "nacre", left: 150, top: 20, size: 16 },
+  ];
+  return (
+    <div className={className} style={{ position: "relative", width: 180, height: 140 }}>
+      {items.map((it, i) => (
+        <span key={i} aria-hidden="true" data-float="" style={{ position: "absolute", left: it.left, top: it.top, width: it.size, height: it.size }}>
+          <Sphere size={it.size} kind={it.kind} shadow={false} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** La gerbe : coche verte et billes qui jaillissent (une réussite). */
+export function CheckBurst({ size = 84, pop = false, className }: { size?: number; pop?: boolean; className?: string }) {
+  const parts: { tx: number; ty: number; d: number; s: number; kind: SphereKind }[] = [
+    { tx: -130, ty: -30, d: 0.1, s: 24, kind: "opale" },
+    { tx: 120, ty: -40, d: 0.14, s: 20, kind: "nacre" },
+    { tx: -100, ty: 34, d: 0.18, s: 15, kind: "nacre" },
+    { tx: 140, ty: 26, d: 0.22, s: 28, kind: "opale" },
+    { tx: -150, ty: 4, d: 0.26, s: 12, kind: "nacre" },
+    { tx: 96, ty: -6, d: 0.3, s: 12, kind: "nacre" },
+    { tx: -84, ty: -50, d: 0.34, s: 18, kind: "nacre" },
+    { tx: 110, ty: 50, d: 0.38, s: 15, kind: "opale" },
+  ];
+  return (
+    <div className={className} style={{ position: "relative", width: 300, height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {parts.map((p, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          data-burst=""
+          style={
+            {
+              "--tx": `${p.tx}px`,
+              "--ty": `${p.ty}px`,
+              "--d": `${p.d}s`,
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              width: p.s,
+              height: p.s,
+              margin: `-${Math.floor(p.s / 2)}px 0 0 -${Math.floor(p.s / 2)}px`,
+            } as CSSProperties
+          }
+        >
+          <Sphere size={p.s} kind={p.kind} shadow={false} />
+        </span>
+      ))}
+      <span data-popin={pop ? "" : undefined} style={{ position: "relative", display: "flex" }}>
+        <CheckBadge size={size} />
+      </span>
+    </div>
+  );
+}

@@ -1,26 +1,212 @@
 @import "tailwindcss";
 
+/* CRUSH · Design system « Le jeu » — tokens repris de maquettes/design-tokens.css */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f4f2ed;
+  --paper-light: radial-gradient(120% 55% at 50% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 62%), #f4f2ed;
+  --white: #ffffff;
+  --plaque: #f1efea;
+  --line: #e6e3dc;
+
+  --ink: #121214;
+  --soft: #4b4a47;
+  --grey: #6b6862; /* texte secondaire : 4,96:1 sur le papier (l’ancien #8a8780 restait à 3,2:1) */
+
+  --toi: #3d8bff;
+  --elle: #ff4f9a;
+  --vrai: #12c08a;
+  --flou: #9b7bff;
+  --attente: #ffaa2c;
+
+  --rose-crush: linear-gradient(160deg, #ff9bcb, #e8358a);
+  --opale: radial-gradient(circle at 32% 28%, #ffffff 0%, #cffff0 18%, #8fc8ff 50%, #e6a8ff 78%, #ffd3a1 100%);
+  --gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 55%);
+
+  --shadow-card: 0 0 0 1px rgba(17, 17, 20, 0.05), 0 1px 2px rgba(17, 17, 20, 0.04), 0 14px 32px -14px rgba(17, 17, 20, 0.16);
+  --shadow-ink: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 2px rgba(17, 17, 20, 0.22), 0 10px 22px -8px rgba(17, 17, 20, 0.45);
+  --shadow-ink-pressed: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 #000000, 0 6px 12px rgba(17, 17, 20, 0.12);
+  --shadow-soft: inset 0 0 0 1px rgba(17, 17, 20, 0.08), inset 0 1px 0 #ffffff, 0 1px 2px rgba(17, 17, 20, 0.05), 0 8px 18px -10px rgba(17, 17, 20, 0.22);
+  --ring-selected: inset 0 0 0 2px #121214, 0 1px 2px rgba(17, 17, 20, 0.08), 0 14px 28px -14px rgba(17, 17, 20, 0.45);
+  --ring-thin: inset 0 0 0 1px rgba(17, 17, 20, 0.09);
+  --shadow-play: inset 0 0 0 1.5px rgba(61, 139, 255, 0.55), 0 14px 28px -16px rgba(61, 139, 255, 0.7);
+
+  --btn-ink-bg: linear-gradient(180deg, #2a2a30, #121214);
+
+  --t-pop: 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
+  --t-rise: 0.45s ease-out;
+  --t-fill: 0.7s ease-out;
+  --t-float: 4s ease-in-out infinite;
+
+  /* Survol : reliefs doux (jamais de socle décalé dur) */
+  --ease-pop: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --shadow-soft-hover: inset 0 0 0 1px rgba(17, 17, 20, 0.1), inset 0 1px 0 #ffffff, 0 2px 4px rgba(17, 17, 20, 0.06), 0 18px 30px -14px rgba(17, 17, 20, 0.28);
+  --shadow-soft-press: inset 0 0 0 1px rgba(17, 17, 20, 0.1), inset 0 1px 0 #ffffff, 0 1px 1px rgba(17, 17, 20, 0.06), 0 4px 10px -8px rgba(17, 17, 20, 0.2);
+  --shadow-card-hover: 0 0 0 1px rgba(17, 17, 20, 0.07), 0 2px 4px rgba(17, 17, 20, 0.05), 0 22px 40px -16px rgba(17, 17, 20, 0.24);
+  --ring-selected-hover: inset 0 0 0 2px #121214, 0 2px 4px rgba(17, 17, 20, 0.1), 0 20px 34px -14px rgba(17, 17, 20, 0.5);
+  --shadow-ink-hover: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 2px 4px rgba(17, 17, 20, 0.22), 0 16px 28px -10px rgba(17, 17, 20, 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-plaque: var(--plaque);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-grey: var(--grey);
+  --color-toi: var(--toi);
+  --color-elle: var(--elle);
+  --color-vrai: var(--vrai);
+  /* Texte en couleur (et surfaces qui portent du texte blanc) : mêmes teintes, assez foncées pour 4,5:1 */
+  --color-toi-ink: #1a66db;
+  --color-elle-ink: #c81d6b;
+  --color-vrai-ink: #087a56;
+  --color-flou: var(--flou);
+  --color-attente: var(--attente);
+  /* teintes secondaires relevées dans les maquettes */
+  --color-bubble-her: #efeeea;
+  --color-bubble-me: #1a66db;
+  --color-muted: #8a8780;
+  --color-track: #e1ded7;
+  --color-sep: #efede8;
+  --color-skeleton: #e7e4dd;
+  --color-segment: #e9e6df;
+  --color-disabled: #d9d6cf;
+
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-message: var(--font-figtree), system-ui, sans-serif;
+
+  --radius-card: 24px;
+  --radius-tile: 22px;
+  --radius-field: 20px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-ink: var(--shadow-ink);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-selected: var(--ring-selected);
+  --shadow-thin: var(--ring-thin);
+  --shadow-play: var(--shadow-play);
+
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    /* Les maquettes n’imposent pas d’interligne : on garde la valeur « normal » de Nunito. */
+    line-height: normal;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--paper-light);
+    background-color: var(--paper);
+    background-repeat: no-repeat;
+    color: var(--ink);
+    font-family: var(--font-nunito), system-ui, sans-serif;
+    font-weight: 700;
+    overflow-x: hidden;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: inherit;
+    opacity: 0.55;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--toi);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ———— Mouvements (repris des maquettes) ———— */
+/* `translate` et non `transform` : sur les points SVG du logo, `transform` écraserait leur position */
+@keyframes dDot { 0%, 60%, 100% { translate: 0 0; opacity: 0.45; } 30% { translate: 0 -3px; opacity: 1; } }
+[data-dots] > * { animation: dDot 1.3s ease-in-out infinite; }
+[data-dots] > *:nth-child(2) { animation-delay: 0.15s; }
+[data-dots] > *:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dPop { 0% { opacity: 0; transform: scale(0.85) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
+[data-pop] { animation: dPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0.2s); }
+
+@keyframes dFloat { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-6px) rotate(var(--r, 0deg)); } }
+[data-float] { animation: dFloat 4s ease-in-out infinite; }
+
+@keyframes dRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+[data-rise] { animation: dRise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: var(--d, 0s); }
+
+@keyframes jPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(61, 151, 255, 0.45); } 50% { box-shadow: 0 0 0 10px rgba(61, 151, 255, 0); } }
+[data-pulse] { animation: jPulse 1.8s ease-in-out infinite; }
+
+@keyframes jGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+[data-grow] { transform-origin: left center; animation: jGrow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+
+@keyframes fBurst { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 60% { opacity: 1; } 100% { opacity: 1; transform: translate(var(--tx), var(--ty)) scale(1); } }
+[data-burst] { animation: fBurst 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0.1s); }
+
+/* Lecture (écran 08) */
+@keyframes crFeed { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+[data-feed] { animation: crFeed 14s linear infinite; }
+@keyframes crScan { 0% { top: -46px; } 100% { top: 230px; } }
+[data-scan] { animation: crScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes crPopIn { 0% { opacity: 0; transform: scale(0.6) rotate(var(--r, 0deg)); } 70% { opacity: 1; transform: scale(1.06) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
+[data-popin] { animation: crPopIn 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0s); }
+
+/* Panneaux et toasts */
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheetIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+/* Code faux : les cases tremblent une fois */
+@keyframes codeShake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* ———— Survol des boîtes cliquables ————
+   Défini une fois ici (hors couche, donc prioritaire sur les ombres utilitaires).
+   Survol seulement avec une souris ; la pression (« il s’enfonce d’1 px ») partout. */
+.lift { transition: translate 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease-out; }
+.lift:is([aria-checked="true"], [aria-pressed="true"]) { --lift-hover: var(--ring-selected-hover); --lift-press: var(--ring-selected); }
+.lift-card { --lift-hover: var(--shadow-card-hover); --lift-press: var(--shadow-card); }
+.lift-ink { --lift-hover: var(--shadow-ink-hover); --lift-press: var(--shadow-ink-pressed); }
+.lift-badge, .lift-pop, .lift-chev { transition: transform 0.45s var(--ease-pop), translate 0.45s var(--ease-pop), color 0.2s ease-out, stroke 0.2s ease-out; }
+.lift:focus-visible { translate: 0 -2px; box-shadow: var(--lift-hover, var(--shadow-soft-hover)); }
+@media (hover: hover) and (pointer: fine) {
+  .lift:not(:disabled):hover { translate: 0 -2px; box-shadow: var(--lift-hover, var(--shadow-soft-hover)); transition: translate 0.45s var(--ease-pop), box-shadow 0.3s ease-out; }
+  .lift.lift-sm:not(:disabled):hover { translate: 0 -1px; }
+  .lift:hover .lift-badge { transform: translateY(-1px) rotate(-5deg) scale(1.06); }
+  .lift:hover .lift-pop { transform: scale(1.06); }
+  .lift:hover .lift-chev, .row-hover:hover .lift-chev { translate: 3px 0; color: var(--ink); stroke: var(--ink); }
+  .row-hover:hover::before { opacity: 1; }
+  .back-nudge:hover svg { translate: -3px 0; }
+  .arrow-nudge:hover .arrow { translate: 3px 0; }
+}
+.lift:not(:disabled):active { translate: 0 1px; box-shadow: var(--lift-press, var(--shadow-soft-press)); transition-duration: 80ms; }
+.lift:disabled, .lift[aria-disabled="true"] { translate: none; }
+/* Lignes cliquables dans une carte : un voile très léger */
+.row-hover { position: relative; isolation: isolate; }
+.row-hover::before { content: ""; position: absolute; inset: 2px -10px; z-index: -1; border-radius: 14px; background: rgba(17, 17, 20, 0.04); opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; }
+.back-nudge svg, .arrow-nudge .arrow { display: inline-block; transition: translate 0.45s var(--ease-pop); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover, .lift:focus-visible, .lift:active { translate: none !important; }
+  .lift:hover .lift-badge, .lift:hover .lift-pop { transform: none !important; }
+  .lift:hover .lift-chev, .row-hover:hover .lift-chev, .back-nudge:hover svg, .arrow-nudge:hover .arrow { translate: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition: none !important;
+  }
+  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan] { animation: none !important; }
 }

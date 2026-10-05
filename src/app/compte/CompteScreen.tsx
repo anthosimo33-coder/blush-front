@@ -1,0 +1,179 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { invalidate, setQueryData, useQuery } from "@/lib/query";
+import { cancelSubscription, deleteAccount, deleteStory, getAccount, setPaused, type Account } from "@/services/api";
+import { OFFERS } from "@/mocks/daily";
+import { PEOPLE, STORY } from "@/mocks/story";
+import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { Switch } from "@/components/ui/controls";
+import { Icon } from "@/components/ui/icons";
+import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
+import { Tag } from "@/components/ui/messages";
+import { Sheet } from "@/components/ui/surfaces";
+import { AppScreen } from "@/components/shell/AppScreen";
+import { MobileTopBar } from "@/components/shell/Screen";
+import { resetJourney } from "@/state/journey";
+
+type Confirm = "stop" | "keep" | "story" | "all" | null;
+
+/* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
+export function CompteScreen() {
+  const router = useRouter();
+  const { data: account } = useQuery("account", getAccount);
+  const [confirm, setConfirm] = useState<Confirm>(null);
+  const [busy, setBusy] = useState(false);
+  const sub = account?.subscription;
+  const plus = sub?.plan === "crushplus";
+
+  const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
+
+  const run = async (fn: () => Promise<void>, after: () => void) => {
+    setBusy(true);
+    await fn();
+    setBusy(false);
+    setConfirm(null);
+    after();
+  };
+
+  return (
+    <AppScreen
+      srTitle="Mon compte"
+      aside={null}
+      mainWidth={600}
+      frameWidth={600}
+      contentGap={0}
+      mobileTop={<MobileTopBar back={() => router.back()} title="Mon compte" />}
+      desktopBack={{ target: () => router.back(), trailing: "Mon compte" }}
+    >
+      {/* Toi, en haut, comme en tête des Réglages */}
+      <div className="flex flex-col items-center pt-2 text-center">
+        <span
+          aria-hidden="true"
+          className="flex size-[76px] items-center justify-center rounded-full text-[30px] font-black text-white"
+          style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), #3D8BFF" }}
+        >
+          {PEOPLE.hugo.initial}
+        </span>
+        <div className="mt-3 text-[24px] font-black leading-none tracking-[-0.01em]">{PEOPLE.hugo.name}</div>
+        {account?.email && <div className="mt-1.5 text-[14px] font-extrabold text-grey">{account.email}</div>}
+      </div>
+
+      {/* Tes histoires : celle en cours, et de quoi en commencer une autre */}
+      <InsetGroup title="Tes histoires" id="histoires" className="mt-7">
+        {!account?.storyDeleted && (
+          <InsetRow
+            leading={
+              <Avatar tone="elle" size={36} fontSize={15} className="lift-pop">
+                {PEOPLE.sophie.initial}
+              </Avatar>
+            }
+            title={`${PEOPLE.sophie.name} et toi`}
+            sub={STORY.period}
+            href="/app"
+            chevron
+          />
+        )}
+        <InsetRow leading={<RowIcon icon="plus" tone="vrai" />} title={<span className="text-toi-ink">Nouvelle histoire</span>} sub="Une autre conv, un autre rapport" href="/commencer" />
+      </InsetGroup>
+
+      {/* L’abonnement */}
+      <InsetGroup title="Ton abonnement" id="abonnement" className="mt-6">
+        <div className="flex min-h-[76px] items-center gap-3 px-4 py-3.5">
+          {sub && (
+            <>
+              <RowIcon icon="bolt" tone={plus ? "ink" : "grey"} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-2 text-[16px] font-black">
+                  {plus ? "CRUSH+" : sub.plan === "rapport" ? OFFERS[1].title : "Ton rapport"}
+                  {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
+                </span>
+                <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFERS[1].note : null}</span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end">
+                <span className="text-[18px] font-black leading-none tracking-[-0.01em]">{sub.priceLabel.split(" / ")[0]}</span>
+                {sub.priceLabel.includes(" / ") && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {sub.priceLabel.split(" / ")[1]}</span>}
+              </span>
+            </>
+          )}
+        </div>
+        {plus && sub && (
+          <InsetRow
+            title="Mettre en pause"
+            sub="Ton histoire reste gardée, rien n’est facturé"
+            trailing={
+              <Switch
+                checked={sub.paused}
+                label="Mettre en pause"
+                onChange={async (v) => {
+                  patch({ paused: v });
+                  await setPaused(v);
+                }}
+              />
+            }
+          />
+        )}
+        {plus && sub?.active && <InsetRow title="Arrêter CRUSH+" sub="En un geste, effectif lundi" onClick={() => setConfirm("stop")} chevron />}
+        {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
+      </InsetGroup>
+
+      {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
+      <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne sont jamais utilisées pour entraîner une IA. Hébergement en Europe.">
+        <InsetRow leading={<RowIcon icon="lock" />} title="Ce que CRUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
+        <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Supprimer l’histoire avec Sophie" sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
+        <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
+      </InsetGroup>
+
+      {/* ⚠ Panneaux de confirmation absents des maquettes : textes repris des libellés de l’écran */}
+      <Sheet open={confirm !== null} onClose={() => setConfirm(null)} labelledBy="confirm-title">
+        {confirm === "keep" && (
+          <>
+            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+              Ce que CRUSH garde
+            </h2>
+            <p className="m-0 text-[15px] font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
+            <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
+              <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
+              100 % privé : ta conv est supprimée dès que ton rapport est prêt.
+            </p>
+            <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Tes convs ne servent jamais à entraîner une IA. Hébergement en Europe. Tu peux tout effacer à tout moment.</p>
+            <Button variant="secondary" onClick={() => setConfirm(null)}>
+              Fermer
+            </Button>
+          </>
+        )}
+        {(confirm === "stop" || confirm === "story" || confirm === "all") && (
+          <>
+            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+              {confirm === "stop" ? "Arrêter CRUSH+ ?" : confirm === "story" ? "Supprimer l’histoire avec Sophie ?" : "Tout effacer ?"}
+            </h2>
+            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+              {confirm === "stop" ? "En un geste, effectif lundi." : confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
+            </p>
+            <Button
+              aria-busy={busy}
+              onClick={() =>
+                busy
+                  ? undefined
+                  : confirm === "stop"
+                    ? run(cancelSubscription, () => invalidate("account"))
+                    : run(confirm === "story" ? deleteStory : deleteAccount, () => {
+                        resetJourney();
+                        invalidate("account", "report", "fiche", "question");
+                        router.push("/commencer");
+                      })
+              }
+            >
+              {confirm === "stop" ? "Arrêter CRUSH+" : confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
+            </Button>
+            <Button variant="link" onClick={() => setConfirm(null)}>
+              Annuler
+            </Button>
+          </>
+        )}
+      </Sheet>
+    </AppScreen>
+  );
+}
