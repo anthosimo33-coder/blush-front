@@ -67,7 +67,7 @@ export function QuestionScreen() {
         </Card>
       )}
 
-      {busy && <TypingDots label="CRUSH lit votre conv" />}
+      {busy && <TypingDots label="CRUSH analyse votre conv" />}
 
       {answer && (
         <>

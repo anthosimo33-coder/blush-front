@@ -16,7 +16,7 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
   },
   groupe: {
     title: "C’est une conversation de groupe.",
-    text: "CRUSH lit seulement les conversations à deux. Exporte votre discussion privée.",
+    text: "CRUSH analyse seulement les conversations à deux. Exporte votre discussion privée.",
     action: "Choisir une autre conv",
     href: "/commencer",
     back: "/commencer",
@@ -29,9 +29,9 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
     back: "/importer/ok",
   },
   lecture: {
-    title: "La lecture n’a pas abouti.",
-    text: "Rien n’est perdu : ta conv est toujours là. Relance la lecture.",
-    action: "Relancer la lecture",
+    title: "L’analyse n’a pas abouti.",
+    text: "Rien n’est perdu : ta conv est toujours là. Relance l’analyse.",
+    action: "Relancer l’analyse",
     href: "/lecture?relance=1",
     back: "/email",
   },

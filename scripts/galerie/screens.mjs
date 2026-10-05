@@ -103,8 +103,8 @@ export const STATES = [
     },
     note: "Démo\u00a0: le code 000000 est refusé, tout autre code à 6 chiffres passe.",
   },
-  { id: "08", section: "parcours", title: "Lecture", state: "En cours", route: "/lecture", journey: J, server: { analysisStartedAgo: 1700 }, motion: true, wait: 250, note: "Proposition : la bulle écrit au centre d’un anneau qui se remplit, à la place de la fenêtre de conv (écart à la maquette)." },
-  { id: "08b", section: "parcours", title: "Lecture", state: "Terminée", route: "/lecture", journey: J, server: { analysisStartedAt: 1 }, wait: 2200, ref: "08-lecture", note: "Proposition : à la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette)." },
+  { id: "08", section: "parcours", title: "Analyse", state: "En cours", route: "/lecture", journey: J, server: { analysisStartedAgo: 1700 }, motion: true, wait: 250, note: "Proposition : la bulle écrit au centre d’un anneau qui se remplit, à la place de la fenêtre de conv (écart à la maquette)." },
+  { id: "08b", section: "parcours", title: "Analyse", state: "Terminée", route: "/lecture", journey: J, server: { analysisStartedAt: 1 }, wait: 2200, ref: "08-lecture", note: "Proposition : à la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette)." },
 
   /* ———— Rapport ———— */
   { id: "09", section: "rapport", title: "Rapport, aperçu gratuit", state: "Page entière", route: "/rapport", journey: J, server: FREE, full: true, ref: "09-rapport-apercu-gratuit" },

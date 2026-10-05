@@ -77,7 +77,7 @@ export function HomeScreen() {
   };
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[] }, fromCapture = false) =>
-    exchange(mine, "CRUSH lit sa réponse", async () => {
+    exchange(mine, "CRUSH analyse sa réponse", async () => {
       return { from: "crush", result: await sendToCrush(payload), fromCapture };
     });
 

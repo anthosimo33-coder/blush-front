@@ -47,7 +47,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       footer={
         <>
           <Button onClick={picker.open} disabled={busy} aria-busy={busy}>
-            {busy ? <TypingDots color="#FFFFFF" label="Lecture du fichier" /> : "Choisir le fichier enregistré"}
+            {busy ? <TypingDots color="#FFFFFF" label="Analyse du fichier" /> : "Choisir le fichier enregistré"}
           </Button>
           <FileInput inputRef={picker.ref} accept=".zip,.txt,application/zip,text/plain" onFiles={onFiles} label="Fichier de la conversation exportée" />
         </>

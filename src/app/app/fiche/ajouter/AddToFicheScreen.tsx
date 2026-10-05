@@ -15,7 +15,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { FicheExtraction, FicheFact } from "@/types";
 
-/* Écran 17 — Ajouter à sa fiche : CRUSH lit une capture (bio, post) ; tu gardes ce que tu veux, dans une liste à cocher. */
+/* Écran 17 — Ajouter à sa fiche : CRUSH analyse une capture (bio, post) ; tu gardes ce que tu veux, dans une liste à cocher. */
 export function AddToFicheScreen() {
   const router = useRouter();
   const [file] = useState(() => takePendingFile());
@@ -79,7 +79,7 @@ export function AddToFicheScreen() {
         >
           {!preview && "photo"}
         </div>
-        {data ? <div className="text-[15px] font-extrabold leading-[1.45]">{data.quote}</div> : <TypingDots label="CRUSH lit ta capture" />}
+        {data ? <div className="text-[15px] font-extrabold leading-[1.45]">{data.quote}</div> : <TypingDots label="CRUSH analyse ta capture" />}
       </div>
 
       {/* Ce que CRUSH en retient : une liste à cocher, tout est coché au départ */}

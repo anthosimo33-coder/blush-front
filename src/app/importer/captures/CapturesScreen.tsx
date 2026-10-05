@@ -124,20 +124,20 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             </RowIcon>
           }
           title="Plus rapide : enregistre ton écran"
-          sub="Remonte la conv en scrollant, on lit tout."
+          sub="Remonte la conv en scrollant, on analyse tout."
           onClick={rec.open}
           chevron
         />
       </InsetGroup>
 
       <div aria-live="polite" className="min-h-6">
-        {busy && <TypingDots label="Lecture des captures" />}
+        {busy && <TypingDots label="Analyse des captures" />}
         {!busy && result && (
           <div data-rise="" className="flex items-center gap-2 text-[14px] font-black">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
               <Icon name="check" size={13} color="#FFFFFF" stroke={3.4} />
             </span>
-            {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`} · {result.messages} messages lus
+            {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`} · {result.messages} messages analysés
           </div>
         )}
       </div>
