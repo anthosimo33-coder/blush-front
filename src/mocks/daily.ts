@@ -1,4 +1,4 @@
-import type { Fiche, FicheExtraction, Offer, Reply, Subscription } from "@/types";
+import type { Fiche, FicheExtraction, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
 import { PEOPLE } from "./story";
 
 export const OFFERS: Offer[] = [
@@ -36,6 +36,19 @@ export const REPLY: Reply = {
   meaningProof: "Le 23 février, elle a écrit presque la même chose. Et elle est venue le samedi.",
   best: "Courage pour jeudi. Samedi pour fêter ça ?",
   why: "Elle t’a parlé de son exam et a laissé une porte ouverte avec « on verra ».",
+};
+
+/**
+ * La réponse de CRUSH à un vocal (simulation). En vrai, le back-end transcrit le vocal puis répond à ce qui est dit.
+ * ⚠ Texte absent des maquettes : à valider.
+ */
+export const VOICE_ANSWER: QuestionAnswer = {
+  question: "Ton vocal",
+  title: "Je t’ai écouté. Propose-lui samedi, en face.",
+  evidenceLabel: "Pourquoi",
+  evidence: "C’est elle qui propose le plus (4 plans en un mois), et elle te répond en 4 min le soir. Elle attend que tu fasses le pas.",
+  confidence: "probable",
+  limits: "CRUSH ne voit que vos messages.",
 };
 
 export const FICHE: Fiche = {

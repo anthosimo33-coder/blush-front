@@ -19,7 +19,7 @@ import type {
   Story,
   Subscription,
 } from "@/types";
-import { FICHE, FICHE_EXTRACTION, REPLY, SUBSCRIPTIONS } from "@/mocks/daily";
+import { FICHE, FICHE_EXTRACTION, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
 import { QUESTION_ANSWER, REPORT, SOBER_REPORT } from "@/mocks/report";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP, STORY } from "@/mocks/story";
 import { delay, mockServer } from "@/mocks/server";
@@ -162,6 +162,13 @@ export async function sendToCrush(input: { text?: string; files?: File[] }): Pro
   const text = input.text?.trim();
   if (text && text.endsWith("?")) return { kind: "answer", answer: { ...QUESTION_ANSWER, question: text } };
   return { kind: "analysis", reply: REPLY };
+}
+
+/** Un vocal pour CRUSH. Simulation : en vrai, le back-end le transcrit, puis CRUSH répond à ce qui est dit. */
+export async function sendVoiceToCrush(input: { audio: Blob; seconds: number }): Promise<CrushAnswer> {
+  void input.audio;
+  await delay(1400);
+  return { kind: "answer", answer: VOICE_ANSWER };
 }
 
 /* ———— Sa fiche ———— */

@@ -63,7 +63,7 @@ async function shoot(browser, st, key) {
     hasTouch: touch,
     isMobile: touch,
   });
-  await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  await ctx.grantPermissions(["clipboard-read", "clipboard-write", "microphone"], { origin: BASE });
   await ctx.addInitScript(
     ({ journey, server }) => {
       try {
@@ -109,7 +109,8 @@ async function main() {
   fs.mkdirSync(path.join(OUT, "img"), { recursive: true });
   fs.mkdirSync(path.join(OUT, "ref"), { recursive: true });
 
-  const browser = await chromium.launch({ executablePath: chromePath() });
+  /* Micro factice (un bip) : les états « vocal » s’enregistrent sans vrai micro ni question d’autorisation */
+  const browser = await chromium.launch({ executablePath: chromePath(), args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
   const jobs = [];
   for (const st of STATES) {
     if (ONLY && !ONLY.includes(st.id)) continue;

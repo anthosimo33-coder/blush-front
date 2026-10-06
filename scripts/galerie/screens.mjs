@@ -181,7 +181,7 @@ export const STATES = [
   { id: "18b", section: "rapport", title: "Mode sobre", state: "Besoin d’en parler", route: "/rapport", server: { verdict: "difficile" }, steps: click("Besoin d’en parler à quelqu’un ?"), sheet: true, note: "Ressources d’aide à valider." },
 
   /* ———— Au quotidien ———— */
-  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec CRUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette)." },
+  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec CRUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, CRUSH en grand comme un personnage (sa bulle flotte et s’anime quand il répond)\u00a0: un toucher ouvre «\u00a0Ce que CRUSH voit\u00a0». À droite, Sophie comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. L’heure sous chaque message et la date à chaque nouveau jour, comme dans Messages." },
   {
     id: "13b", section: "quotidien", title: "Accueil", state: "Après sa réponse", route: "/app", server: PLUS,
     steps: async (page) => {
@@ -193,7 +193,7 @@ export const STATES = [
     sheet: true,
   },
   { id: "13c", section: "quotidien", title: "Accueil", state: "Menu « + »", route: "/app", server: PLUS, steps: click("Ajouter des captures ou un export", { wait: 600 }), sheet: true },
-  { id: "13d", section: "quotidien", title: "Accueil", state: "Détails du contact", route: "/app", server: PLUS, steps: async (page) => { await page.locator("button[aria-haspopup=dialog]:visible").first().click(); await page.waitForTimeout(800); }, sheet: true },
+  { id: "13d", section: "quotidien", title: "Accueil", state: "Ce que CRUSH voit", route: "/app", server: PLUS, steps: async (page) => { await page.locator("button[aria-haspopup=dialog]:visible").first().click(); await page.waitForTimeout(800); }, sheet: true },
   {
     id: "13e", section: "quotidien", title: "Accueil", state: "Après « Copier »", route: "/app", server: PLUS,
     steps: async (page) => {
@@ -206,6 +206,24 @@ export const STATES = [
     ref: "14-son-message-et-ta-reponse",
     note: "Après «\u00a0Copier\u00a0», la coche «\u00a0Copié\u00a0» suffit.",
     sheet: true,
+  },
+  {
+    id: "13f", section: "quotidien", title: "Accueil", state: "Vocal en cours", route: "/app", server: PLUS, sheet: true,
+    steps: async (page) => {
+      await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
+      await page.waitForTimeout(2600);
+    },
+    note: "Nouveau\u00a0: champ vide, le bouton noir à l’onde lance un vocal (le micro est demandé la première fois). Le point rouge, le temps, l’onde qui suit la voix\u00a0; la corbeille jette, la flèche envoie.",
+  },
+  {
+    id: "13g", section: "quotidien", title: "Accueil", state: "Vocal envoyé", route: "/app", server: PLUS, sheet: true,
+    steps: async (page) => {
+      await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
+      await page.waitForTimeout(2200);
+      await page.getByRole("button", { name: "Envoyer le vocal" }).click();
+      await page.waitForTimeout(2600);
+    },
+    note: "Le vocal se réécoute dans ta bulle\u00a0; CRUSH y répond (réponse simulée\u00a0: en vrai, le vocal est transcrit puis CRUSH répond à ce qui est dit). Textes à valider.",
   },
   { id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche", note: "Proposition\u00a0: fiche à la manière de Contacts, chaque info avec sa source (écart à la maquette)." },
   { id: "16b", section: "quotidien", title: "Sa fiche", state: "Modifier", route: "/app/fiche", server: PLUS, steps: click("Modifier", { exact: true }), note: "Mode modification absent des maquettes." },
