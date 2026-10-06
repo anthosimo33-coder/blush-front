@@ -1,0 +1,490 @@
+"use client";
+
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { cn } from "@/lib/cn";
+import { copyText } from "@/lib/hooks";
+import { formatCount } from "@/lib/format";
+import { useQuery } from "@/lib/query";
+import { getReport, type ReportPayload } from "@/services/api";
+import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
+import { Icon } from "@/components/ui/icons";
+import { Toast } from "@/components/ui/surfaces";
+import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
+
+const INK = "#121214";
+
+/*
+ * La révélation du verdict : juste après l’analyse, une scène sombre et une carte à la fois, comme des stories.
+ * Les chiffres, le verdict, qui fait quoi, le moment où tout a basculé, puis « à toi de jouer » et le rapport.
+ * Tout vient des chapitres offerts (1 et 2) : rien de payant n’est montré avant le paiement.
+ * Un toucher à droite (ou →) avance, à gauche (ou ←) recule ; « Passer » mène droit au rapport.
+ * ⚠ Proposition absente des maquettes : textes à valider.
+ */
+
+type Card =
+  | { id: "chiffres" }
+  | { id: "verdict"; confidence?: { level: Confidence; text: string } }
+  | { id: "duel"; rows: ScoreRow[]; meaning?: string }
+  | { id: "moment"; kicker?: string; title: string; essential?: string; messages: Message[]; fact?: string }
+  | { id: "jouer"; text?: string; quote?: string };
+
+function blockOf<K extends ChapterBlock["kind"]>(c: Chapter | undefined, kind: K) {
+  return c?.blocks.find((b): b is Extract<ChapterBlock, { kind: K }> => b.kind === kind);
+}
+
+/** Les cartes, tirées des chapitres 1 et 2 ; une carte sans contenu est simplement sautée. */
+function cardsOf({ report }: ReportPayload): Card[] {
+  const [c1, c2] = [1, 2].map((n) => report.chapters.find((c) => c.number === n && !c.locked));
+  const scores = blockOf(c1, "scores");
+  const seen = blockOf(c2, "seen");
+  const cards: Card[] = [{ id: "chiffres" }, { id: "verdict", confidence: blockOf(c1, "confidence") }];
+  if (scores) cards.push({ id: "duel", rows: scores.rows, meaning: blockOf(c1, "meaning")?.text });
+  if (c2 && seen?.messages?.length)
+    cards.push({ id: "moment", kicker: c2.kicker, title: c2.title, essential: blockOf(c2, "essential")?.text, messages: seen.messages, fact: seen.factsAfter?.[0] });
+  cards.push({ id: "jouer", text: blockOf(c2, "play")?.text, quote: seen?.messages?.find((m) => m.from === "elle")?.text });
+  return cards;
+}
+
+/* Le fond respire avec chaque carte : trois lueurs (rose au centre, bleu en bas à gauche, rose en haut à droite) */
+const GLOWS: Record<Card["id"], [number, number, number]> = {
+  chiffres: [0.55, 0.25, 0],
+  verdict: [1, 0, 0.3],
+  duel: [0.2, 0.8, 0.8],
+  moment: [0.3, 0, 0.9],
+  jouer: [0.2, 1, 0.2],
+};
+
+const CONFIDENCE: Record<Confidence, string> = { sur: "Sûr", probable: "Probable", verifier: "À vérifier" };
+
+const delay = (s: number) => ({ "--d": `${s}s` }) as CSSProperties;
+
+/*
+ * On entre et on sort de la scène par un chargement complet : Safari reteinte alors ses barres (sombres ici, claires au rapport).
+ * En navigation interne, la barre du bas garderait la couleur de la page d’avant. `replace` : « Retour » depuis le rapport ne revient pas ici.
+ */
+const toReport = () => window.location.replace("/rapport");
+const leave = (e: MouseEvent<HTMLAnchorElement>) => {
+  e.preventDefault();
+  toReport();
+};
+
+export function VerdictReveal({ initial, story }: { initial: ReportPayload; story: Story }) {
+  const { data } = useQuery("report", getReport, initial);
+  const payload = data ?? initial;
+  const cards = cardsOf(payload);
+  const last = cards.length - 1;
+  const [at, setAt] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const press = useRef<{ x: number; y: number } | null>(null);
+  /* Un glissé vient d’avancer : le « clic » qui le suit ne compte pas */
+  const swiped = useRef(false);
+  const card = cards[Math.min(at, last)];
+  const { verdict } = payload.report;
+
+  /* Verdict dur : pas de mise en scène, le rapport passe en mode sobre */
+  useEffect(() => {
+    if (payload.sober) toReport();
+  }, [payload.sober]);
+
+  /* Rien ne défile derrière la scène */
+  useEffect(() => {
+    const html = document.documentElement;
+    const before = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = before;
+    };
+  }, []);
+
+  /* Chaque nouvelle carte est annoncée : le focus va sur son titre */
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+  }, [at]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setAt((i) => Math.min(last, i + 1));
+      else if (e.key === "ArrowLeft") setAt((i) => Math.max(0, i - 1));
+      else if (e.key === "Escape") toReport();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [last]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const go = (to: number) => setAt(Math.max(0, Math.min(last, to)));
+
+  /* Un glissé du doigt : vers la gauche on avance, vers la droite on recule */
+  const onPointerUp = (e: PointerEvent<HTMLElement>) => {
+    const p = press.current;
+    press.current = null;
+    if (!p || (e.target as HTMLElement).closest("a, button")) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    swiped.current = Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy);
+    if (swiped.current) go(at + (dx < 0 ? 1 : -1));
+  };
+
+  /* Un toucher : à gauche on recule, ailleurs on avance */
+  const onTap = (e: MouseEvent<HTMLElement>) => {
+    if (swiped.current) {
+      swiped.current = false;
+      return;
+    }
+    if ((e.target as HTMLElement).closest("a, button")) return;
+    go(e.clientX < window.innerWidth * 0.3 ? at - 1 : at + 1);
+  };
+
+  const share = async () => {
+    /* Prénoms masqués dans tout ce qui se partage (comme dans le rapport) */
+    const text = `${verdict.emoji} ${verdict.title} ${verdict.subtitle}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "CRUSH", text });
+        return;
+      }
+    } catch {
+      return;
+    }
+    if (await copyText(text)) setToast("Copié.");
+  };
+
+  if (payload.sober) return <div className="fixed inset-0 bg-paper" />;
+
+  const step = <span className="sr-only">{`Étape ${at + 1} sur ${cards.length} : `}</span>;
+  const glow = GLOWS[card.id];
+
+  return (
+    <main
+      onPointerDown={(e) => {
+        press.current = { x: e.clientX, y: e.clientY };
+      }}
+      onPointerUp={onPointerUp}
+      onClick={onTap}
+      className="fixed inset-0 z-[60] flex cursor-pointer touch-manipulation select-none flex-col overflow-hidden bg-ink text-white"
+    >
+      {/* Sombre jusque sous les barres du navigateur, dès le premier affichage (Safari les teinte d’après la page) */}
+      <style>{`html,body{background:${INK}!important}`}</style>
+      <h1 className="sr-only">Ton verdict</h1>
+
+      {/* Les lueurs du fond */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(60%_45%_at_50%_38%,rgba(255,79,154,0.42),transparent_70%)]" style={{ opacity: glow[0] }} />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_12%_78%,rgba(61,139,255,0.34),transparent_70%)]" style={{ opacity: glow[1] }} />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_88%_20%,rgba(255,79,154,0.3),transparent_70%)]" style={{ opacity: glow[2] }} />
+
+      {/* La scène est noire dès le premier affichage (Safari teinte ses barres d’après lui) ; seul le contenu apparaît en fondu */}
+      <div data-stage="" className="relative mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))] lg:px-6 lg:pb-10 lg:pt-8">
+        {/* Les traits du haut, comme des stories */}
+        <div aria-hidden="true" className="flex gap-1.5">
+          {cards.map((c, i) => (
+            <span key={c.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/20">
+              {i <= at && <span key={i === at ? `en-cours-${at}` : "lu"} data-vfill={i === at ? "" : undefined} className="block h-full rounded-full bg-white" />}
+            </span>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="flex items-center gap-2 text-[14px] font-black tracking-[-0.01em]">
+            <BubbleLogo size={26} />
+            CRUSH
+          </span>
+          <a href="/rapport" onClick={leave} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+            Passer
+          </a>
+        </div>
+
+        {/* La carte : son contenu arrive par étapes */}
+        <div key={card.id} data-vcard="" className="flex min-h-0 flex-1 flex-col justify-center py-5 [@media(max-height:600px)]:py-3">
+          {card.id === "chiffres" && <Numbers story={story} heading={heading} step={step} />}
+          {card.id === "verdict" && (
+            <div className="flex flex-col items-center text-center">
+              <p data-rise="" style={delay(0.05)} className="m-0 text-[15px] font-black text-elle">
+                Le verdict
+              </p>
+              <div className="relative mt-4 flex size-[150px] items-center justify-center lg:size-[190px] [@media(max-height:600px)]:size-[110px]">
+                <span aria-hidden="true" data-vglow="" className="absolute -inset-14 rounded-full [background:radial-gradient(circle,rgba(255,79,154,0.55),rgba(255,79,154,0)_66%)]" />
+                <PearlBurst />
+                <span aria-hidden="true" data-drop="" className="relative text-[110px] leading-none lg:text-[140px] [@media(max-height:600px)]:text-[80px]">
+                  {verdict.emoji}
+                </span>
+              </div>
+              <h2 ref={heading} tabIndex={-1} className="m-0 mt-4 text-[40px] font-black leading-[1.02] tracking-[-0.03em] outline-none [text-wrap:balance] lg:text-[54px] [@media(max-height:600px)]:text-[32px]">
+                {step}
+                <Words text={verdict.title} from={0.85} />
+              </h2>
+              <p data-rise="" style={delay(1.45)} className="m-0 mt-3 max-w-[340px] text-[19px] font-extrabold leading-[1.35] text-white/75 lg:text-[21px]">
+                {verdict.subtitle}
+              </p>
+              {card.confidence && (
+                <p data-rise="" style={delay(1.75)} className="m-0 mt-6 flex items-center gap-2 text-[14px] font-extrabold text-white/70 [@media(max-height:600px)]:mt-4">
+                  <span className="rounded-full bg-vrai px-2.5 py-1 text-[12px] font-black leading-none text-ink">{CONFIDENCE[card.confidence.level]}</span>
+                  {card.confidence.text}
+                </p>
+              )}
+            </div>
+          )}
+          {card.id === "duel" && (
+            <div className="flex flex-col">
+              <h2 ref={heading} tabIndex={-1} data-rise="" className="m-0 text-[15px] font-black text-white/70 outline-none">
+                {step}
+                Entre vous deux
+              </h2>
+              <div data-rise="" style={delay(0.1)} className="mt-4 flex justify-between text-[13px] font-black">
+                <span className="flex items-center gap-1.5 text-toi">
+                  <span className="size-2 rounded-full bg-toi" />
+                  Toi
+                </span>
+                <span className="flex items-center gap-1.5 text-elle">
+                  Elle
+                  <span className="size-2 rounded-full bg-elle" />
+                </span>
+              </div>
+              <ul className="m-0 mt-3 flex list-none flex-col gap-4 p-0 [@media(max-height:600px)]:gap-2.5">
+                {card.rows.map((r, i) => (
+                  <li key={r.label} data-rise="" style={delay(0.25 + i * 0.14)}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[16px] font-black leading-tight">{r.label}</span>
+                      <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner}</span>
+                    </div>
+                    <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
+                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, "--d": `${0.45 + i * 0.14}s` } as CSSProperties} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
+                    </div>
+                    {(r.captionLeft || r.captionRight) && (
+                      <div className="mt-1.5 flex justify-between gap-3 text-[12.5px] font-extrabold text-white/60 [@media(max-height:600px)]:hidden">
+                        <span>{r.captionLeft}</span>
+                        <span>{r.captionRight}</span>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {card.meaning && (
+                <p data-rise="" style={delay(0.95)} className="m-0 mt-7 text-[24px] font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
+                  {card.meaning}
+                </p>
+              )}
+            </div>
+          )}
+          {card.id === "moment" && (
+            <div className="flex flex-col">
+              {card.kicker && (
+                <p data-rise="" className="m-0 text-[15px] font-black text-elle">
+                  {card.kicker}
+                </p>
+              )}
+              <h2 ref={heading} tabIndex={-1} data-rise="" style={delay(0.05)} className="m-0 mt-1.5 text-[32px] font-black leading-[1.05] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[40px] [@media(max-height:600px)]:text-[26px]">
+                {step}
+                {card.title}
+              </h2>
+              {/* La scène rejouée : elle écrit, puis toi */}
+              <div className="mt-6 flex flex-col gap-2 [@media(max-height:600px)]:mt-4">
+                {card.messages.map((m, i) => (
+                  <Replay key={i} message={m} at={0.55 + i * 1.05} />
+                ))}
+              </div>
+              {card.essential && (
+                <p data-rise="" style={delay(0.55 + card.messages.length * 1.05 + 0.15)} className="m-0 mt-6 text-[22px] font-black leading-[1.25] tracking-[-0.01em] [text-wrap:balance] lg:text-[26px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[19px]">
+                  {card.essential}
+                </p>
+              )}
+              {card.fact && (
+                <p data-rise="" style={delay(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-[14px] font-extrabold leading-[1.4] text-white/70">
+                  <span aria-hidden="true" className="mt-[5px] size-2 shrink-0 rounded-full bg-vrai" />
+                  {card.fact}
+                </p>
+              )}
+            </div>
+          )}
+          {card.id === "jouer" && (
+            <div className="flex flex-col">
+              <p data-rise="" className="m-0 flex items-center gap-1.5 text-[15px] font-black text-toi">
+                <Icon name="bolt" size={16} color="#3D8BFF" stroke={2.4} />À toi de jouer
+              </p>
+              {card.quote && (
+                <span data-rise="" style={delay(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-[16px] font-bold leading-[1.3] text-white/85">
+                  {card.quote}
+                </span>
+              )}
+              <h2 ref={heading} tabIndex={-1} data-rise="" style={delay(0.35)} className="m-0 mt-5 text-[34px] font-black leading-[1.08] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[44px] [@media(max-height:600px)]:text-[28px]">
+                {step}
+                {card.text ?? "Ton rapport est prêt."}
+              </h2>
+            </div>
+          )}
+        </div>
+
+        {/* En bas : reculer, avancer ; à la fin, le rapport */}
+        {at < last ? (
+          <div className="flex items-center justify-between gap-3">
+            {at > 0 ? (
+              <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
+                <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
+              </button>
+            ) : (
+              <span aria-hidden="true" className="size-11" />
+            )}
+            {at === 0 && (
+              <span aria-hidden="true" className="text-[14px] font-extrabold text-white/70">
+                <span className="lg:hidden">Touche pour voir le verdict</span>
+                <span className="hidden lg:inline">Clique pour voir le verdict</span>
+              </span>
+            )}
+            <button type="button" onClick={() => go(at + 1)} aria-label="Suivant" className="lift lift-sm flex size-14 items-center justify-center rounded-full bg-white shadow-[0_10px_30px_-10px_rgba(255,79,154,0.6)]">
+              <Icon name="arrow" size={22} color={INK} stroke={2.8} className="arrow-nudge" />
+            </button>
+          </div>
+        ) : (
+          <div data-rise="" style={delay(0.7)} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
+                <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
+              </button>
+              <a href="/rapport" onClick={leave} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-[18px] font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
+                Voir mon rapport
+                <Icon name="arrow" size={20} color={INK} stroke={2.8} />
+              </a>
+            </div>
+            <button type="button" onClick={share} className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-[15px] font-black text-white/80 transition-colors hover:text-white">
+              <Icon name="share" size={16} color="currentColor" stroke={2.4} />
+              Partager mon verdict
+            </button>
+          </div>
+        )}
+      </div>
+
+      {toast && <Toast className="absolute bottom-28 left-1/2 w-max -translate-x-1/2">{toast}</Toast>}
+    </main>
+  );
+}
+
+/** Carte 1 : le nombre de messages défile jusqu’au vrai total, puis la durée, les applis, les vocaux. */
+function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HTMLHeadingElement | null>; step: ReactNode }) {
+  const shown = useCountUp(story.totalMessages, 1300, 350);
+  const apps = story.sources.length;
+  const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(Boolean) as string[];
+  return (
+    <div className="flex flex-col items-center text-center">
+      <p data-rise="" className="m-0 text-[15px] font-black text-white/70">
+        CRUSH a analysé
+      </p>
+      <h2 ref={heading} tabIndex={-1} className="m-0 mt-1 outline-none">
+        {step}
+        <span className="sr-only">{`${formatCount(story.totalMessages)} messages, du premier au dernier.`}</span>
+        <span aria-hidden="true" className="block text-[clamp(64px,24vw,124px)] font-black leading-[0.95] tracking-[-0.045em] tabular-nums">
+          {formatCount(shown)}
+        </span>
+        <span aria-hidden="true" data-rise="" style={delay(0.2)} className="mt-3 block text-[22px] font-black leading-[1.2] lg:text-[26px]">
+          messages, du premier au dernier.
+        </span>
+      </h2>
+      <ul className="m-0 mt-7 flex list-none flex-wrap justify-center gap-2 p-0">
+        {facts.map((f, i) => (
+          <li key={f} data-rise="" style={delay(1.35 + i * 0.12)} className="rounded-full bg-white/10 px-3.5 py-2 text-[14px] font-black">
+            {f}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Le titre arrive mot par mot. */
+function Words({ text, from }: { text: string; from: number }) {
+  return (
+    <>
+      {text.split(" ").map((w, i) => (
+        <Fragment key={i}>
+          {i > 0 && " "}
+          <span data-word="" className="inline-block" style={delay(from + i * 0.08)}>
+            {w}
+          </span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** Les perles jaillissent quand l’emoji se pose. */
+function PearlBurst() {
+  const parts: { tx: number; ty: number; s: number; kind: SphereKind }[] = [
+    { tx: -118, ty: -46, s: 22, kind: "opale" },
+    { tx: 112, ty: -58, s: 18, kind: "nacre" },
+    { tx: -96, ty: 42, s: 14, kind: "nacre" },
+    { tx: 128, ty: 30, s: 26, kind: "opale" },
+    { tx: -140, ty: 0, s: 11, kind: "nacre" },
+    { tx: 70, ty: -92, s: 12, kind: "rose" },
+    { tx: -60, ty: -96, s: 15, kind: "nacre" },
+    { tx: 92, ty: 74, s: 14, kind: "rose" },
+  ];
+  return (
+    <>
+      {parts.map((p, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          data-burst=""
+          className="absolute left-1/2 top-1/2"
+          style={{ "--tx": `${p.tx}px`, "--ty": `${p.ty}px`, "--d": `${0.62 + i * 0.03}s`, width: p.s, height: p.s, margin: `-${p.s / 2}px 0 0 -${p.s / 2}px` } as CSSProperties}
+        >
+          <Sphere size={p.s} kind={p.kind} shadow={false} />
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** Un message rejoué : les trois points, puis la bulle (la vraie phrase, dans la police des messages). */
+function Replay({ message, at }: { message: Message; at: number }) {
+  const elle = message.from === "elle";
+  return (
+    <div className={cn("relative flex flex-col", elle ? "items-start" : "items-end")}>
+      <span aria-hidden="true" data-once="" style={delay(at)} className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}>
+        <span data-dots="" className="flex items-center gap-1">
+          {[0, 1, 2].map((d) => (
+            <span key={d} className={cn("size-[7px] rounded-full", elle ? "bg-[#8A8780]" : "bg-white")} />
+          ))}
+        </span>
+      </span>
+      <span
+        data-msg=""
+        style={delay(at + 0.7)}
+        className={cn(
+          "max-w-[84%] rounded-[22px] px-4 py-2.5 font-message text-[17px] font-bold leading-[1.3]",
+          elle ? "origin-bottom-left rounded-bl-[6px] bg-white text-ink" : "origin-bottom-right rounded-br-[6px] bg-toi-ink text-white",
+        )}
+      >
+        {message.text}
+      </span>
+      {message.caption && (
+        <span data-rise="" style={delay(at + 0.85)} className="mt-1 px-1 text-[12px] font-extrabold text-white/60">
+          {message.caption}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Un nombre qui défile jusqu’à sa valeur (tout de suite en mouvement réduit). */
+function useCountUp(target: number, ms: number, wait: number) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let raf = 0;
+    let start = 0;
+    const tick = (t: number) => {
+      if (reduce) return setValue(target);
+      if (!start) start = t + wait;
+      const p = Math.min(1, Math.max(0, (t - start) / ms));
+      setValue(Math.round(target * (1 - Math.pow(1 - p, 4))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms, wait]);
+  return value;
+}

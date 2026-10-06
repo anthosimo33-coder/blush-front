@@ -85,7 +85,16 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         <div className="flex h-[60px] flex-col items-center justify-center">
           {done ? (
             <div data-popin="" className="w-full" style={{ "--d": "0.5s" } as CSSProperties}>
-              <ButtonLink href="/rapport" arrow>
+              {/* D’abord la révélation du verdict, qui mène au rapport. Chargement complet : Safari teinte ses barres pour la scène sombre */}
+              <ButtonLink
+                href="/rapport/verdict"
+                arrow
+                onClick={(e) => {
+                  e.preventDefault();
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un vrai chargement pour que Safari reteinte ses barres
+                  window.location.assign("/rapport/verdict");
+                }}
+              >
                 Voir mon rapport
               </ButtonLink>
             </div>

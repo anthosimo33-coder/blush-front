@@ -159,6 +159,27 @@
 [data-scan-bar] { animation: ficheScan 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 [data-new] { animation: factNew 2.8s ease-out both; }
 
+/* ———— La révélation du verdict : une scène sombre, une carte à la fois ———— */
+@keyframes vStage { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vCard { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes vFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes vDrop { 0% { opacity: 0; transform: translateY(-70px) scale(0.4) rotate(-20deg); } 55% { opacity: 1; transform: translateY(0) scale(1.14) rotate(5deg); } 75% { transform: scale(0.95) rotate(-2deg); } 100% { opacity: 1; transform: none; } }
+@keyframes vGlow { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes vWord { from { opacity: 0; transform: translateY(0.45em); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes vBar { from { width: 50%; } }
+@keyframes vOnce { 0% { opacity: 0; transform: scale(0.85); } 18%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(0.95); } }
+@keyframes vMsg { from { opacity: 0; transform: translateY(10px) scale(0.92); } to { opacity: 1; transform: none; } }
+[data-stage] { animation: vStage 0.7s ease-out both; }
+[data-vcard] { animation: vCard 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[data-vfill] { transform-origin: left; animation: vFill 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[data-drop] { animation: vDrop 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) 0.25s both; }
+[data-vglow] { animation: vGlow 3.2s ease-in-out infinite; }
+[data-word] { animation: vWord 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+[data-bar] { width: var(--w); animation: vBar 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+/* les trois points ne font que passer : cachés au repos */
+[data-once] { opacity: 0; animation: vOnce 0.75s ease-out both; animation-delay: var(--d, 0s); }
+[data-msg] { animation: vMsg 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) both; animation-delay: var(--d, 0s); }
+
 @keyframes dPop { 0% { opacity: 0; transform: scale(0.85) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
 [data-pop] { animation: dPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0.2s); }
 

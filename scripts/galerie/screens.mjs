@@ -164,6 +164,36 @@ export const STATES = [
   { id: "08b", section: "parcours", title: "Analyse", state: "Terminée", route: "/lecture", journey: J, server: { analysisStartedAt: 1 }, wait: 2200, ref: "08-lecture", note: "Proposition : à la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette)." },
 
   /* ———— Rapport ———— */
+  {
+    id: "V1", section: "rapport", title: "Révélation du verdict", state: "Les chiffres", route: "/rapport/verdict", journey: J, server: FREE, sheet: true,
+    note: "Proposition (le rapport ne change pas)\u00a0: juste après l’analyse, «\u00a0Voir mon rapport\u00a0» ouvre une scène sombre, une carte à la fois, comme des stories. Toucher à droite ou glisser pour avancer, «\u00a0Passer\u00a0» pour aller droit au rapport. Tout vient des chapitres offerts (1 et 2)\u00a0: rien de payant n’est montré. Ici\u00a0: le nombre de messages défile jusqu’au vrai total. Textes à valider.",
+  },
+  {
+    id: "V2", section: "rapport", title: "Révélation du verdict", state: "Le verdict", route: "/rapport/verdict", journey: J, server: FREE, sheet: true,
+    steps: click("Suivant", { wait: 500 }),
+    note: "L’emoji tombe et rebondit, les perles jaillissent, le titre arrive mot par mot, puis la phrase et la confiance (figé ici).",
+  },
+  {
+    id: "V3", section: "rapport", title: "Révélation du verdict", state: "Entre vous deux", route: "/rapport/verdict", journey: J, server: FREE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 2; i++) await click("Suivant", { wait: 400 })(page);
+    },
+    note: "Qui fait quoi\u00a0: les barres se remplissent une à une, puis ce que ça veut dire.",
+  },
+  {
+    id: "V4", section: "rapport", title: "Révélation du verdict", state: "Le moment où tout a basculé", route: "/rapport/verdict", journey: J, server: FREE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 3; i++) await click("Suivant", { wait: 400 })(page);
+    },
+    note: "La scène rejouée\u00a0: elle écrit (les trois points), sa bulle arrive, puis ta réponse.",
+  },
+  {
+    id: "V5", section: "rapport", title: "Révélation du verdict", state: "À toi de jouer", route: "/rapport/verdict", journey: J, server: FREE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 4; i++) await click("Suivant", { wait: 400 })(page);
+    },
+    note: "La dernière carte\u00a0: ton prochain pas, puis «\u00a0Voir mon rapport\u00a0» (le rapport habituel) et «\u00a0Partager mon verdict\u00a0» (prénoms masqués).",
+  },
   { id: "09", section: "rapport", title: "Rapport, aperçu gratuit", state: "Page entière", route: "/rapport", journey: J, server: FREE, full: true, ref: "09-rapport-apercu-gratuit" },
   { id: "10", section: "rapport", title: "Paiement", route: "/rapport?paiement=1", journey: J, server: FREE, sheet: true, wait: 900, ref: "10-paiement" },
   { id: "10b", section: "rapport", title: "Paiement réussi", state: "Rapport complet", route: "/rapport/debloque?offre=rapport", journey: J, server: { plan: "rapport", verdict: "normal" }, wait: 1600, note: "Nouvel écran, animé (la gerbe). Textes à valider." },
