@@ -1,4 +1,5 @@
-import type { Fiche, FicheFact, FicheSource, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
+import type { CrushAnswer, Fiche, FicheFact, FicheSource, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
+import { QUESTION_ANSWER } from "./report";
 import { PEOPLE } from "./story";
 
 export const OFFERS: Offer[] = [
@@ -50,6 +51,33 @@ export const VOICE_ANSWER: QuestionAnswer = {
   confidence: "probable",
   limits: "CRUSH ne voit que vos messages.",
 };
+
+/** Son dernier message, tel que CRUSH l’a lu dans votre conv. */
+const LAST_MESSAGE: Reply = { ...REPLY, incoming: { ...REPLY.incoming, caption: "Sophie · son dernier message" } };
+
+/**
+ * Les questions toutes prêtes du chat, celles que promet la landing, avec la réponse de CRUSH (simulation).
+ * ⚠ Absent des maquettes : textes à valider.
+ */
+export const QUICK_QUESTIONS: { question: string; answer: CrushAnswer }[] = [
+  { question: "Ça veut dire quoi ?", answer: { kind: "analysis", reply: LAST_MESSAGE, quoted: true } },
+  { question: "Je lui réponds quoi ?", answer: { kind: "best", reply: LAST_MESSAGE } },
+  { question: "Elle voit quelqu’un d’autre ?", answer: { kind: "answer", answer: { ...QUESTION_ANSWER, question: "Elle voit quelqu’un d’autre ?" } } },
+  {
+    question: "On en est où ?",
+    answer: {
+      kind: "level",
+      answer: {
+        question: "On en est où ?",
+        title: "Vous êtes à deux doigts, et ça se réchauffe.",
+        evidenceLabel: "Ce qu’on voit",
+        evidence: "C’est elle qui a posé la question, le 2 mars, et c’est elle qui relance, 7 fois sur 10. Il manque juste que l’un de vous le dise.",
+        confidence: "sur",
+        limits: "12 preuves dans votre conv",
+      },
+    },
+  },
+];
 
 export const FICHE: Fiche = {
   person: PEOPLE.sophie,

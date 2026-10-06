@@ -5,9 +5,10 @@
 import type {
   AnalysisProgress,
   AppKind,
+  CrushAnswer,
   Fiche,
-  FicheUpdate,
   FicheFact,
+  FicheUpdate,
   Goal,
   Guess,
   Plan,
@@ -19,7 +20,7 @@ import type {
   Story,
   Subscription,
 } from "@/types";
-import { FICHE, FICHE_FINDINGS, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
+import { FICHE, FICHE_FINDINGS, QUICK_QUESTIONS, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
 import { QUESTION_ANSWER, QUESTION_IDEAS, REPORT, SOBER_REPORT } from "@/mocks/report";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP, STORY } from "@/mocks/story";
 import { delay, mockServer } from "@/mocks/server";
@@ -166,13 +167,20 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
  * Le chat de l’accueil. Simulation : un texte qui finit par « ? » est une question pour CRUSH,
  * tout le reste (texte collé, captures, export) est lu comme sa réponse à elle.
  */
-export type CrushAnswer = { kind: "analysis"; reply: Reply } | { kind: "answer"; answer: QuestionAnswer };
+export type { CrushAnswer };
+
+/** Les questions toutes prêtes du chat (celles que promet la landing). */
+export async function getQuickQuestions(): Promise<string[]> {
+  return QUICK_QUESTIONS.map((q) => q.question);
+}
 
 export async function sendToCrush(input: { text?: string; files?: File[] }): Promise<CrushAnswer> {
   void input.files;
   await delay(2000);
   const text = input.text?.trim();
-  if (text && text.endsWith("?")) return { kind: "answer", answer: { ...QUESTION_ANSWER, question: text } };
+  const quick = text ? QUICK_QUESTIONS.find((q) => sameQuestion(q.question, text)) : undefined;
+  if (quick) return quick.answer;
+  if (text && text.endsWith("?")) return { kind: "answer", answer: answerTo(text) };
   return { kind: "analysis", reply: REPLY };
 }
 

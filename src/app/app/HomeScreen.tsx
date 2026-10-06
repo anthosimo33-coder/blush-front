@@ -60,7 +60,7 @@ function useOpenedAt() {
  * dans les détails du contact (comme la fiche d’un contact dans Messages).
  * Mobile : plein écran. Desktop : une fenêtre de conv.
  */
-export function HomeScreen() {
+export function HomeScreen({ quick = [] }: { quick?: string[] }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
   const [msgs, setMsgs] = useState<Msg[]>(INTRO);
@@ -71,6 +71,8 @@ export function HomeScreen() {
   const thread = useRef<HTMLDivElement>(null);
   const urls = useRef<string[]>([]);
   const typed = text.trim().length > 0;
+  /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
+  const [asked, setAsked] = useState<string[]>([]);
   /* CRUSH « écrit » : sa bulle s’anime en haut de la conv */
   const busy = msgs.some((m) => "reading" in m);
   const opened = useOpenedAt();
@@ -106,6 +108,12 @@ export function HomeScreen() {
       return { from: "crush", result: await sendToCrush(payload), fromCapture };
     });
 
+  /* Une question toute prête part tout de suite, comme si tu l’avais écrite */
+  const sendQuick = (q: string) => {
+    setAsked((a) => [...a, q]);
+    ask({ id: id(), from: "toi", text: q }, { text: q });
+  };
+
   const sendText = (e: FormEvent) => {
     e.preventDefault();
     const t = text.trim();
@@ -139,6 +147,7 @@ export function HomeScreen() {
   const voice = useVoiceRecorder({ onError: micRefused, onLimit: () => void sendVoice() });
   /* La barre d’enregistrement n’apparaît qu’une fois le micro ouvert (pendant la question d’autorisation, rien ne bouge) */
   const recording = voice.phase === "recording";
+  const quickLeft = quick.filter((q) => !asked.includes(q));
 
   const sendVoice = async () => {
     const clip = await voice.stop(true);
@@ -206,6 +215,28 @@ export function HomeScreen() {
           onSubmit={sendText}
           className="sticky bottom-0 z-10 -mb-6 mt-auto border-t border-[rgba(17,17,20,0.06)] bg-[rgba(244,242,237,0.88)] px-[18px] pb-[max(14px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:static lg:mb-0 lg:bg-white lg:px-6 lg:py-4 lg:backdrop-blur-none"
         >
+          {/* Les questions toutes prêtes, au-dessus du champ (rien pendant que tu écris, que CRUSH répond ou que tu enregistres) */}
+          {quickLeft.length > 0 && !typed && !busy && !menu && voice.phase === "idle" && (
+            <div
+              role="group"
+              aria-label="Questions toutes prêtes"
+              className="-mx-[18px] mb-2.5 flex gap-2 overflow-x-auto px-[18px] pb-px [mask-image:linear-gradient(90deg,#000_calc(100%_-_28px),transparent)] [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:gap-1.5 lg:overflow-visible lg:px-0 lg:[mask-image:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {quickLeft.map((q, i) => (
+                <button
+                  key={q}
+                  type="button"
+                  value={q}
+                  onClick={(e) => sendQuick(e.currentTarget.value)}
+                  data-popin=""
+                  style={{ "--d": `${i * 0.05}s` } as CSSProperties}
+                  className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-toi-ink lg:px-3 shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[box-shadow,background-color,color] duration-200 active:bg-toi-ink active:text-white lg:bg-[#F3F7FF] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_#1A66DB]"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2.5">
             {recording ? (
               /* En plein vocal : la corbeille remplace le « + » */
@@ -547,6 +578,41 @@ function bubblesOf(m: Msg): BubbleNode[] {
       },
     ];
   const r = m.result;
+  /* Le message qu’il a lu (une capture, ou son dernier message pour « ça veut dire quoi ? ») */
+  const incoming = (reply: Reply) => ({
+    className: "pb-2.5 pt-3",
+    body: (
+      <MessageBubble from="elle" caption={reply.incoming.caption}>
+        {reply.incoming.text}
+      </MessageBubble>
+    ),
+  });
+  if (r.kind === "best") return [incoming(r.reply), { body: <BestReply reply={r.reply} /> }];
+  if (r.kind === "level")
+    return [
+      {
+        body: (
+          <span className="flex items-start gap-2.5">
+            <span aria-hidden="true" className="text-[30px] leading-none">
+              {REPORT.verdict.emoji}
+            </span>
+            <span className="text-[17px] font-black leading-[1.3]">{r.answer.title}</span>
+          </span>
+        ),
+      },
+      {
+        body: (
+          <span className="flex flex-col gap-3">
+            <LevelStepper className="pt-1" />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-black text-grey">{r.answer.evidenceLabel}</span>
+              <span className="text-[14px] font-extrabold leading-[1.45]">{r.answer.evidence}</span>
+            </span>
+            <ConfidenceLine level={r.answer.confidence}>{r.answer.limits}</ConfidenceLine>
+          </span>
+        ),
+      },
+    ];
   if (r.kind === "answer")
     return [
       {
@@ -563,19 +629,8 @@ function bubblesOf(m: Msg): BubbleNode[] {
       },
     ];
   return [
-    /* Sur une capture, CRUSH montre d’abord le message qu’il a lu */
-    ...(m.fromCapture
-      ? [
-          {
-            className: "pb-2.5 pt-3",
-            body: (
-              <MessageBubble from="elle" caption={r.reply.incoming.caption}>
-                {r.reply.incoming.text}
-              </MessageBubble>
-            ),
-          },
-        ]
-      : []),
+    /* Sur une capture (ou une question sur son dernier message), CRUSH montre d’abord le message qu’il a lu */
+    ...(m.fromCapture || r.quoted ? [incoming(r.reply)] : []),
     {
       body: (
         <span className="flex flex-col gap-1">
@@ -766,7 +821,7 @@ function LevelStepper({ className }: { className?: string }) {
               {done && <Icon name="check" size={9} color="#FFFFFF" stroke={4} />}
               {now && <span className="size-1.5 rounded-full bg-white" />}
             </span>
-            <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
+            <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
               {l.label}
               <span className="sr-only">{done ? " : réussi" : now ? " : niveau en cours" : " : à venir"}</span>
             </span>

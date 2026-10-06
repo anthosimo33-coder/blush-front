@@ -152,6 +152,17 @@ export type QuestionAnswer = {
   limits: string;
 };
 
+/**
+ * La réponse de CRUSH dans le chat : l’analyse d’un message (ce qu’il veut dire et ta meilleure réponse),
+ * la meilleure réponse seule, une réponse à une question, ou où vous en êtes (avec les niveaux).
+ * `quoted` : CRUSH montre d’abord le message qu’il a lu.
+ */
+export type CrushAnswer =
+  | { kind: "analysis"; reply: Reply; quoted?: boolean }
+  | { kind: "best"; reply: Reply }
+  | { kind: "answer"; answer: QuestionAnswer }
+  | { kind: "level"; answer: QuestionAnswer };
+
 export type Reply = {
   messageId: string;
   incoming: Message;

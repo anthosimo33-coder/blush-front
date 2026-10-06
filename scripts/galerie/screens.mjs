@@ -253,7 +253,7 @@ export const STATES = [
   { id: "18b", section: "rapport", title: "Mode sobre", state: "Besoin d’en parler", route: "/rapport", server: { verdict: "difficile" }, steps: click("Besoin d’en parler à quelqu’un ?"), sheet: true, note: "Ressources d’aide à valider." },
 
   /* ———— Au quotidien ———— */
-  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec CRUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, CRUSH en grand comme un personnage (sa bulle flotte et s’anime quand il répond)\u00a0: un toucher ouvre «\u00a0Ce que CRUSH voit\u00a0». À droite, Sophie comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. L’heure sous chaque message et la date à chaque nouveau jour, comme dans Messages." },
+  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec CRUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, CRUSH en grand comme un personnage (sa bulle flotte et s’anime quand il répond)\u00a0: un toucher ouvre «\u00a0Ce que CRUSH voit\u00a0». À droite, Sophie comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. L’heure sous chaque message et la date à chaque nouveau jour, comme dans Messages. Proposition\u00a0: au-dessus du champ, les 4 questions que promet la landing, en un toucher (l’accueil sans elles est en 13z, sur ?version=actuelle)." },
   {
     id: "13b", section: "quotidien", title: "Accueil", state: "Après sa réponse", route: "/app", server: PLUS,
     steps: async (page) => {
@@ -307,6 +307,17 @@ export const STATES = [
     },
     note: "Nouveau\u00a0: quand CRUSH écrit, son logo arrive d’un bond dans la conv, respire, et ses trois perles s’allument l’une après l’autre, comme les trois points de Messages, en rose. La grande bulle du haut s’anime en même temps. À la réponse, la bulle se replie et la réponse monte.",
   },
+  {
+    id: "13i", section: "quotidien", title: "Accueil", state: "« On en est où ? »", route: "/app", server: PLUS, sheet: true,
+    steps: click("On en est où", { wait: 2600 }),
+    note: "Proposition\u00a0: une question toute prête part en un toucher, comme si tu l’avais écrite, puis sort de la rangée. «\u00a0On en est où\u00a0?\u00a0»\u00a0: le verdict, les 4 niveaux, la preuve. Textes à valider.",
+  },
+  {
+    id: "13j", section: "quotidien", title: "Accueil", state: "« Je lui réponds quoi ? »", route: "/app", server: PLUS, sheet: true,
+    steps: click("Je lui réponds quoi", { wait: 2600 }),
+    note: "CRUSH montre son dernier message, puis ta meilleure réponse, à copier. «\u00a0Ça veut dire quoi\u00a0?\u00a0» ajoute ce que ça veut dire\u00a0; «\u00a0Elle voit quelqu’un d’autre\u00a0?\u00a0» répond avec vos messages.",
+  },
+  { id: "13z", section: "quotidien", title: "Accueil", state: "Actuel (sans les questions)", route: "/app?version=actuelle", server: PLUS, note: "L’accueil sans les questions toutes prêtes, gardé pour comparer." },
   {
     id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche",
     note: "Refonte\u00a0: un seul geste pour la remplir, «\u00a0Complète sa fiche\u00a0» (des captures ou un export\u00a0; sur ordinateur, on peut aussi les glisser sur la page). CRUSH trouve les infos et les range lui-même, chacune avec sa source\u00a0: plus de tuiles «\u00a0Sa bio / Un post / Une note\u00a0», plus d’écran à cocher (l’ancien écran 17). Nouvelle rubrique «\u00a0À savoir\u00a0» pour ce qu’il trouve\u00a0; «\u00a0Tes notes\u00a0» restent les tiennes. Textes à valider.",
