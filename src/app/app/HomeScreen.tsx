@@ -11,7 +11,7 @@ import { STORY } from "@/mocks/story";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
-import { FileInput, TypingDots } from "@/components/ui/FileInput";
+import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Bubble as MessageBubble, ConfidenceLine, Tag } from "@/components/ui/messages";
 import { LEVELS } from "@/components/ui/progress";
@@ -23,12 +23,12 @@ import { RecordingBar, useVoiceRecorder, VoiceNote, type VoiceClip, type VoiceEr
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
 
-/** `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). */
-type Stamp = { at?: number; seed?: { day: number; h: number; m: number } };
+/** `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la réponse qui remplace « CRUSH écrit ». */
+type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answered?: boolean };
 
 type Msg = (
   | { id: number; from: "crush"; intro: "next" | "hint" }
-  | { id: number; from: "crush"; reading: string }
+  | { id: number; from: "crush"; reading: string; leaving?: boolean }
   | { id: number; from: "crush"; result: CrushAnswer; fromCapture?: boolean }
   | { id: number; from: "toi"; text: string }
   | { id: number; from: "toi"; images: string[] }
@@ -93,7 +93,12 @@ export function HomeScreen() {
     const sent = Date.now();
     setMsgs((m) => [...m, { ...mine, at: sent }, { id: readingId, from: "crush", reading: label, at: sent }]);
     const next = await answer();
-    setMsgs((m) => m.map((x) => (x.id === readingId ? ({ ...next, id: readingId, at: Date.now() } as Msg) : x)));
+    /* « CRUSH écrit » se replie d’abord vers sa pointe, puis la réponse monte à sa place */
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMsgs((m) => m.map((x) => (x.id === readingId ? { ...x, leaving: true } : x)));
+      await new Promise((r) => setTimeout(r, 190));
+    }
+    setMsgs((m) => m.map((x) => (x.id === readingId ? ({ ...next, id: readingId, at: Date.now(), answered: true } as Msg) : x)));
   };
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[] }, fromCapture = false) =>
@@ -331,7 +336,7 @@ type Pos = "single" | "first" | "middle" | "last";
 /** Une ligne de la conv : la date d’un nouveau jour, ou un groupe de bulles d’un même expéditeur (l’heure dessous). */
 type Row =
   | { kind: "day"; key: string; at: number | null }
-  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; typing: boolean; items: { key: string; node: BubbleNode }[] };
+  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; landed: boolean; items: { key: string; node: BubbleNode }[] };
 
 /** L’heure d’un message. L’intro se cale sur l’ouverture de l’écran (inconnue au rendu serveur : l’heure reste vide). */
 function timeOf(m: Msg, opened: number | null) {
@@ -351,13 +356,14 @@ function rowsOf(msgs: Msg[], opened: number | null) {
     /* Chaque nouveau jour s’annonce par sa date, comme dans Messages */
     if (prev === undefined || (at !== null && prev !== null && dayStart(at) !== dayStart(prev))) rows.push({ kind: "day", key: `jour-${m.id}`, at });
     prev = at;
-    const items = bubblesOf(m).map((node, k) => ({ key: `${m.id}-${k}`, node }));
+    /* « CRUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent */
+    const items = bubblesOf(m).map((node, k) => ({ key: node.tone === "typing" ? `${m.id}-ecrit` : `${m.id}-${k}`, node }));
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
       last.items.push(...items);
       last.at = at;
-      last.typing = "reading" in m;
-    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, typing: "reading" in m, items });
+      last.landed = !!m.answered;
+    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, landed: !!m.answered, items });
   }
   return rows;
 }
@@ -400,36 +406,72 @@ function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
             )}
           </p>
         ) : (
-          <div key={r.key} className="flex flex-col gap-[3px]">
-            {r.items.map((it, i) => {
-              const n = r.items.length;
-              const pos: Pos = n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle";
-              return r.from === "crush" ? (
-                <div key={it.key} data-rise="" className="flex items-end gap-2" style={{ "--d": `${i * 0.06}s` } as CSSProperties}>
-                  {i === n - 1 ? <BubbleLogo size={34} className="-mb-0.5 shrink-0" /> : <span aria-hidden="true" className="w-[34px] shrink-0" />}
-                  <BubbleShape side="crush" pos={pos} node={it.node} />
-                </div>
-              ) : (
-                <div key={it.key} data-rise="" className="flex justify-end">
-                  <BubbleShape side="toi" pos={pos} node={it.node} />
-                </div>
-              );
-            })}
-            {/* L’heure sous le dernier message du groupe (rien pendant que CRUSH écrit) */}
-            {!r.typing && (
-              <span className={cn("mt-0.5 h-3.5 text-[11px] font-bold leading-[14px] text-grey", r.from === "crush" ? "pl-[46px]" : "pr-1.5 text-right")}>
-                {r.at === null ? "\u00a0" : <time dateTime={new Date(r.at).toISOString()}>{clock(r.at)}</time>}
-              </span>
-            )}
-          </div>
+          <Group key={r.key} row={r} />
         ),
       )}
     </div>
   );
 }
 
+/** Les bulles d’un même expéditeur : l’avatar de CRUSH sous la dernière, l’heure dessous (ou « CRUSH écrit » à la place). */
+function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
+  const typing = row.items.find((it) => it.node.tone === "typing");
+  const bubbles = row.items.filter((it) => it !== typing);
+  const n = bubbles.length;
+  return (
+    <div className="flex flex-col gap-[3px]">
+      {bubbles.map((it, i) => {
+        const pos: Pos = n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle";
+        return row.from === "crush" ? (
+          <div key={it.key} data-rise="" className="flex items-end gap-2" style={{ "--d": `${i * 0.06}s` } as CSSProperties}>
+            {i === n - 1 ? (
+              /* Juste après « CRUSH écrit », sa petite bulle arrive d’un bond avec la réponse */
+              <span data-land={row.landed ? "" : undefined} className="-mb-0.5 block shrink-0">
+                <BubbleLogo size={34} />
+              </span>
+            ) : (
+              <span aria-hidden="true" className="w-[34px] shrink-0" />
+            )}
+            <BubbleShape side="crush" pos={pos} node={it.node} />
+          </div>
+        ) : (
+          <div key={it.key} data-rise="" className="flex justify-end">
+            <BubbleShape side="toi" pos={pos} node={it.node} />
+          </div>
+        );
+      })}
+      {typing ? (
+        <div key={typing.key} className="flex items-end pt-1">
+          {typing.node.body}
+        </div>
+      ) : (
+        <span className={cn("mt-0.5 h-3.5 text-[11px] font-bold leading-[14px] text-grey", row.from === "crush" ? "pl-[46px]" : "pr-1.5 text-right")}>
+          {row.at === null ? "\u00a0" : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * CRUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
+ * l’une après l’autre, comme les points de Messages, en rose. La grande bulle du haut s’anime en même temps.
+ */
+function CrushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
+  return (
+    <span role="status" className="block">
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="block">
+        <span className="block">
+          <BubbleLogo size={62} animated />
+        </span>
+      </span>
+    </span>
+  );
+}
+
 /** Une bulle : sa forme vient de sa place dans le groupe, son style de son contenu. */
-type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string };
+type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare" | "typing"; className?: string };
 
 function BubbleShape({ side, pos, node }: { side: "crush" | "toi"; pos: Pos; node: BubbleNode }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
@@ -481,7 +523,7 @@ function bubblesOf(m: Msg): BubbleNode[] {
             ),
           },
         ];
-  if ("reading" in m) return [{ className: "py-3.5", body: <TypingDots label={m.reading} /> }];
+  if ("reading" in m) return [{ tone: "typing", body: <CrushTyping label={m.reading} leaving={m.leaving} /> }];
   if ("notice" in m) return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
   if ("voice" in m) return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
   if ("text" in m) return [{ body: <span className="whitespace-pre-wrap text-[16px] font-bold leading-[1.4]">{m.text}</span> }];

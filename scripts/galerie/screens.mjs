@@ -225,6 +225,16 @@ export const STATES = [
     },
     note: "Le vocal se réécoute dans ta bulle\u00a0; CRUSH y répond (réponse simulée\u00a0: en vrai, le vocal est transcrit puis CRUSH répond à ce qui est dit). Textes à valider.",
   },
+  {
+    id: "13h", section: "quotidien", title: "Accueil", state: "CRUSH écrit", route: "/app", server: PLUS, sheet: true, motion: true,
+    steps: async (page) => {
+      await page.getByRole("textbox", { name: /Écris à CRUSH/ }).fill("je suis crevée cette semaine, on verra");
+      await page.keyboard.press("Enter");
+      /* Pile quand la première perle s’allume (vague de 1,2 s, la réponse arrive à 2 s) */
+      await page.waitForTimeout(1480);
+    },
+    note: "Nouveau\u00a0: quand CRUSH écrit, son logo arrive d’un bond dans la conv, respire, et ses trois perles s’allument l’une après l’autre, comme les trois points de Messages, en rose. La grande bulle du haut s’anime en même temps. À la réponse, la bulle se replie et la réponse monte.",
+  },
   { id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche", note: "Proposition\u00a0: fiche à la manière de Contacts, chaque info avec sa source (écart à la maquette)." },
   { id: "16b", section: "quotidien", title: "Sa fiche", state: "Modifier", route: "/app/fiche", server: PLUS, steps: click("Modifier", { exact: true }), note: "Mode modification absent des maquettes." },
   {

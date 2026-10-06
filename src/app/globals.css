@@ -135,6 +135,24 @@
 [data-dots] > *:nth-child(2) { animation-delay: 0.15s; }
 [data-dots] > *:nth-child(3) { animation-delay: 0.3s; }
 
+/* ———— CRUSH écrit : son logo s’anime comme les trois points de Messages ———— */
+/* La vague : chaque perle à son tour monte un peu, grossit et s’éclaire, son ombre se resserre ; le halo rose respire */
+@keyframes pearlWave { 0%, 66%, 100% { transform: translateY(0) scale(1); opacity: 0.55; } 33% { transform: translateY(-18%) scale(1.16); opacity: 1; } }
+@keyframes pearlShade { 0%, 66%, 100% { transform: scale(1); opacity: 1; } 33% { transform: scale(0.55); opacity: 0.35; } }
+@keyframes logoGlow { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+[data-live] [data-pearl], [data-live] [data-shade] { transform-box: fill-box; transform-origin: center; animation: pearlWave 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite backwards; animation-delay: calc(var(--i, 0) * 0.3s); }
+[data-live] [data-shade] { animation-name: pearlShade; }
+[data-live] [data-glow] { animation: logoGlow 2.4s ease-in-out infinite; }
+/* Dans la conv : la bulle arrive d’un bond depuis sa pointe et respire ; à la réponse, elle se replie vers sa pointe */
+@keyframes typingIn { 0% { transform: scale(0.25); opacity: 0; } 55% { transform: scale(1.08); opacity: 1; } 78% { transform: scale(0.97); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes typingOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.35); opacity: 0; } }
+@keyframes typingBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@keyframes logoLand { 0% { transform: scale(0.55); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+[data-typing] { transform-origin: 9% 89%; animation: typingIn 0.6s cubic-bezier(0.2, 0.8, 0.25, 1) 0.2s both; }
+[data-typing="out"] { animation: typingOut 0.19s cubic-bezier(0.3, 0, 0.8, 0.15) both; }
+[data-typing] > * { transform-origin: 9% 89%; animation: typingBreathe 2.4s ease-in-out 0.8s infinite; }
+[data-land] { transform-origin: 9% 89%; animation: logoLand 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: var(--d, 0s); }
+
 @keyframes dPop { 0% { opacity: 0; transform: scale(0.85) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
 [data-pop] { animation: dPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0.2s); }
 
@@ -227,5 +245,5 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap] { animation: none !important; }
+  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land] { animation: none !important; }
 }

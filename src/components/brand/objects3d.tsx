@@ -61,26 +61,40 @@ export function Sphere({ size, kind = "nacre", shadow = true, className, style }
 
 const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z";
 
-/** Le logo officiel : la bulle rose en volume, deux points nacre et un point opale. */
+/**
+ * Le logo officiel : la bulle rose en volume, deux points nacre et un point opale.
+ * `animated` : CRUSH écrit. Les perles s’allument l’une après l’autre, comme les trois points de Messages (globals.css).
+ */
 export function BubbleLogo({ size, dots = true, animated = false, className, style }: ObjProps & { dots?: boolean; animated?: boolean }) {
   const u = useSvgId("bp");
   const detail = size >= 44;
-  const dot = (cx: number, kind: "nacre" | "opale") => (
-    <g key={cx} transform={`translate(${cx - 13} 88)`}>
-      <ellipse cx="13" cy="27" rx="9" ry="2.6" fill="rgba(110,0,50,0.35)" filter={`url(#${u}d)`} />
-      <svg x="0" y="0" width="26" height="26" viewBox="0 0 100 100">
-        <defs>
-          <radialGradient id={`${u}${kind}${cx}`} cx="0.36" cy="0.3" r="0.78">
-            <Stops stops={SPHERE_STOPS[kind]} />
-          </radialGradient>
-        </defs>
-        <circle cx="50" cy="50" r="46" fill={`url(#${u}${kind}${cx})`} />
-        <ellipse cx="35" cy="29" rx="15" ry="9" transform="rotate(-32 35 29)" fill="#FFFFFF" opacity="0.85" />
-      </svg>
+  /* La perle et son ombre bougent séparément : quand la perle monte, son ombre se resserre */
+  const dot = (cx: number, kind: "nacre" | "opale", i: number) => (
+    <g key={cx} transform={`translate(${cx - 13} 88)`} style={{ "--i": i } as CSSProperties}>
+      <ellipse data-shade="" cx="13" cy="27" rx="9" ry="2.6" fill="rgba(110,0,50,0.35)" filter={`url(#${u}d)`} />
+      <g data-pearl="">
+        <svg x="0" y="0" width="26" height="26" viewBox="0 0 100 100">
+          <defs>
+            <radialGradient id={`${u}${kind}${cx}`} cx="0.36" cy="0.3" r="0.78">
+              <Stops stops={SPHERE_STOPS[kind]} />
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="46" fill={`url(#${u}${kind}${cx})`} />
+          <ellipse cx="35" cy="29" rx="15" ry="9" transform="rotate(-32 35 29)" fill="#FFFFFF" opacity="0.85" />
+        </svg>
+      </g>
     </g>
   );
   return (
-    <svg aria-hidden="true" width={size} height={size} viewBox="30 40 150 136" className={className} style={{ overflow: "visible", flexShrink: 0, ...style }}>
+    <svg
+      aria-hidden="true"
+      data-live={animated ? "" : undefined}
+      width={size}
+      height={size}
+      viewBox="30 40 150 136"
+      className={className}
+      style={{ overflow: "visible", flexShrink: 0, ...style }}
+    >
       <defs>
         <radialGradient id={`${u}b`} cx="0.3" cy="0.22" r="0.95">
           <stop offset="0" stopColor="#FFD7EA" />
@@ -103,7 +117,7 @@ export function BubbleLogo({ size, dots = true, animated = false, className, sty
           <feGaussianBlur stdDeviation="1.4" />
         </filter>
       </defs>
-      {detail && <ellipse cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
+      {detail && <ellipse data-glow="" cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
       <path d={BUBBLE_BODY} fill={`url(#${u}b)`} />
       <path d={BUBBLE_BODY} fill={`url(#${u}o)`} />
       {detail && (
@@ -116,7 +130,7 @@ export function BubbleLogo({ size, dots = true, animated = false, className, sty
           <circle cx="158" cy="80" r="1.8" fill="#FFFFFF" opacity="0.7" />
         </>
       )}
-      {dots && <g data-dots={animated ? "" : undefined}>{[dot(70, "nacre"), dot(100, "nacre"), dot(130, "opale")]}</g>}
+      {dots && <g>{[dot(70, "nacre", 0), dot(100, "nacre", 1), dot(130, "opale", 2)]}</g>}
     </svg>
   );
 }

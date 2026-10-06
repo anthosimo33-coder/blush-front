@@ -158,7 +158,7 @@ export type CrushAnswer = { kind: "analysis"; reply: Reply } | { kind: "answer";
 
 export async function sendToCrush(input: { text?: string; files?: File[] }): Promise<CrushAnswer> {
   void input.files;
-  await delay(1100);
+  await delay(2000);
   const text = input.text?.trim();
   if (text && text.endsWith("?")) return { kind: "answer", answer: { ...QUESTION_ANSWER, question: text } };
   return { kind: "analysis", reply: REPLY };
@@ -167,7 +167,7 @@ export async function sendToCrush(input: { text?: string; files?: File[] }): Pro
 /** Un vocal pour CRUSH. Simulation : en vrai, le back-end le transcrit, puis CRUSH répond à ce qui est dit. */
 export async function sendVoiceToCrush(input: { audio: Blob; seconds: number }): Promise<CrushAnswer> {
   void input.audio;
-  await delay(1400);
+  await delay(2200);
   return { kind: "answer", answer: VOICE_ANSWER };
 }
 
