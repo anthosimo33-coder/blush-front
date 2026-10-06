@@ -9,14 +9,14 @@ import { askQuestion, getQuestion } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
-import { Bubble as MessageBubble, ConfidenceLine, CrushTyping } from "@/components/ui/messages";
+import { Bubble as MessageBubble, ConfidenceLine, BlushTyping } from "@/components/ui/messages";
 import { AppScreen, useAccess } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
 
 /*
- * Écran 12 — Ta question, en conversation avec CRUSH (proposition ; l’écran actuel reste sur ?version=actuelle).
- * CRUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
+ * Écran 12 — Ta question, en conversation avec BLUSH (proposition ; l’écran actuel reste sur ?version=actuelle).
+ * BLUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
  * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * ⚠ Absent des maquettes : textes à valider.
  */
@@ -24,7 +24,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const { data: answer, loading } = useQuery("question", getQuestion);
   const { plan } = useAccess();
   const [draft, setDraft] = useState("");
-  /* La question en route : CRUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
+  /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
   const first = useRef(true);
   const question = answer?.question ?? asking?.question ?? null;
@@ -59,7 +59,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const composer = (
     <form onSubmit={submit}>
       <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214,0_10px_26px_-16px_rgba(17,17,20,0.35)]">
-        <span className="sr-only">Ta question à CRUSH</span>
+        <span className="sr-only">Ta question à BLUSH</span>
         <textarea
           rows={1}
           maxLength={200}
@@ -88,14 +88,14 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     </form>
   );
 
-  /* Après la réponse : le rapport ; et pour aller plus loin, le chat (CRUSH+) */
+  /* Après la réponse : le rapport ; et pour aller plus loin, le chat (BLUSH+) */
   const after = (
     <div data-rise="" className="flex flex-col items-center gap-1">
       <ButtonLink href="/rapport" arrow>
         Retour au rapport
       </ButtonLink>
       <Link href="/app" className="relative inline-flex min-h-11 items-center px-1 text-[15px] font-black text-soft no-underline transition-colors hover:text-ink">
-        {plan === "crushplus" ? "Continuer dans ton chat avec CRUSH" : "Toutes tes questions, avec CRUSH+"}
+        {plan === "blushplus" ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
       </Link>
     </div>
   );
@@ -113,7 +113,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       desktopBack={{ target: "/rapport", trailing: "Ta question" }}
       footer={!ready ? undefined : answer ? after : asking ? null : composer}
     >
-      {/* CRUSH en grand ; sa bulle s’anime quand il écrit */}
+      {/* BLUSH en grand ; sa bulle s’anime quand il écrit */}
       <div className="flex flex-col items-center pt-1 text-center">
         <span data-float="" className="block" style={{ "--r": "-3deg" } as CSSProperties}>
           <span className="block drop-shadow-[0_14px_16px_rgba(232,53,138,0.24)]">
@@ -129,8 +129,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
       {/* La conv, posée en bas, près du champ */}
       <div className="flex flex-1 flex-col justify-end gap-5 pb-2 pt-4 lg:pt-6">
-        <div role="log" aria-label="Ta conversation avec CRUSH" aria-live="polite" className="flex flex-col gap-4">
-          <CrushSays
+        <div role="log" aria-label="Ta conversation avec BLUSH" aria-live="polite" className="flex flex-col gap-4">
+          <BlushSays
             bubbles={[
               <span key="a" className="text-[17px] font-black leading-[1.3]">
                 Une question sur vous deux&nbsp;? Pose-la-moi.
@@ -147,11 +147,11 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           )}
           {asking && (
             <div className="flex items-end pt-1">
-              <CrushTyping label="CRUSH analyse votre conv" leaving={asking.leaving} />
+              <BlushTyping label="BLUSH analyse votre conv" leaving={asking.leaving} />
             </div>
           )}
           {answer && (
-            <CrushSays
+            <BlushSays
               bubbles={[
                 <span key="titre" className="text-[19px] font-black leading-[1.25] tracking-[-0.01em]">
                   {answer.title}
@@ -205,8 +205,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   );
 }
 
-/** Les bulles de CRUSH, groupées comme dans le chat de l’accueil : sa petite bulle à côté de la dernière. */
-function CrushSays({ bubbles }: { bubbles: ReactNode[] }) {
+/** Les bulles de BLUSH, groupées comme dans le chat de l’accueil : sa petite bulle à côté de la dernière. */
+function BlushSays({ bubbles }: { bubbles: ReactNode[] }) {
   const n = bubbles.length;
   return (
     <div className="flex flex-col gap-[3px]">

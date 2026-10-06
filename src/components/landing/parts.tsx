@@ -125,7 +125,7 @@ export function LandingFrame({ children }: { children: ReactNode }) {
   );
 }
 
-/* ———— Ensuite, avec CRUSH+ : le message qui fait cogiter, et ce qu’on demande à CRUSH ———— */
+/* ———— Ensuite, avec BLUSH+ : le message qui fait cogiter, et ce qu’on demande à BLUSH ———— */
 
 /* Les messages qu’on relit dix fois : ils flottent autour du titre (grand écran) */
 const OVERTHINK: { text: string; at: string; r: number; d: string }[] = [
@@ -135,24 +135,24 @@ const OVERTHINK: { text: string; at: string; r: number; d: string }[] = [
   { text: "dsl j’avais pas vu", at: "right-[7%] top-[78%]", r: -3, d: "1.8s" },
 ];
 
-/* Ce qu’on demande à CRUSH, en très grand ; la réponse s’ouvre sous la question */
+/* Ce qu’on demande à BLUSH, en très grand ; la réponse s’ouvre sous la question */
 const ASKS: { q: string; answer: () => ReactNode }[] = [
   {
     q: "ça veut dire quoi ?",
     answer: () => (
       <>
         <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-[15px] font-bold text-white">je suis crevée cette semaine, on verra</span>
-        <FromCrush>
+        <FromBlush>
           <span className="text-[12px] font-black text-grey">Ce que ça veut dire</span>
           <span className="text-[17px] font-black leading-[1.3]">Elle est partante, mais fatiguée.</span>
-        </FromCrush>
+        </FromBlush>
       </>
     ),
   },
   {
     q: "je lui réponds quoi ?",
     answer: () => (
-      <FromCrush>
+      <FromBlush>
         <span className="flex items-center justify-between gap-2">
           <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
           <Tag tone="recommandee" />
@@ -162,36 +162,36 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
           <Icon name="copy" size={13} color="#121214" stroke={2.6} />
           Copier
         </span>
-      </FromCrush>
+      </FromBlush>
     ),
   },
   {
     q: "elle voit quelqu’un d’autre ?",
     answer: () => (
-      <FromCrush>
+      <FromBlush>
         <span className="text-[17px] font-black leading-[1.3]">{QUESTION_ANSWER.title}</span>
         <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{QUESTION_ANSWER.evidence}</span>
         <ConfidenceLine level={QUESTION_ANSWER.confidence} className="mt-1">
           {QUESTION_ANSWER.limits}
         </ConfidenceLine>
-      </FromCrush>
+      </FromBlush>
     ),
   },
   {
     q: "on en est où ?",
     answer: () => (
-      <FromCrush>
+      <FromBlush>
         <span className="text-[17px] font-black leading-[1.3]">
           {REPORT.verdict.emoji} {REPORT.verdict.short} · <span className="text-vrai-ink">{REPORT.trend}</span>
         </span>
         <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{REPORT.nextStep}</span>
-      </FromCrush>
+      </FromBlush>
     ),
   },
 ];
 
-/** CRUSH+ en un bloc noir : le titre géant, les messages qui font cogiter, puis les questions qu’on lui pose. */
-export function CrushPlus() {
+/** BLUSH+ en un bloc noir : le titre géant, les messages qui font cogiter, puis les questions qu’on lui pose. */
+export function BlushPlus() {
   const [open, setOpen] = useState(0);
   const [touched, setTouched] = useState(false);
   return (
@@ -225,7 +225,7 @@ export function CrushPlus() {
               </span>
             ))}
             <span data-reveal="" className="text-[13px] font-black text-white/60">
-              Ensuite, avec CRUSH+
+              Ensuite, avec BLUSH+
             </span>
             {/* Mobile : les messages qui font cogiter, en autocollants au-dessus du titre */}
             <span aria-hidden="true" className="mt-5 flex flex-wrap justify-center gap-2 lg:hidden">
@@ -245,7 +245,7 @@ export function CrushPlus() {
               message&nbsp;?
             </h2>
             <p data-reveal="" className="m-0 mt-6 max-w-[440px] text-[17px] font-extrabold leading-[1.5] text-white/70 [text-wrap:balance] lg:mt-7 lg:text-[19px]">
-              Colle-le dans CRUSH, envoie une capture ou un nouvel export. Puis demande-lui&nbsp;:
+              Colle-le dans BLUSH, envoie une capture ou un nouvel export. Puis demande-lui&nbsp;:
             </p>
           </div>
 
@@ -416,8 +416,8 @@ function BigHand() {
   );
 }
 
-/** Une réponse de CRUSH : la bulle qui écrit, puis la réponse dans une bulle couleur papier. */
-function FromCrush({ children }: { children: ReactNode }) {
+/** Une réponse de BLUSH : la bulle qui écrit, puis la réponse dans une bulle couleur papier. */
+function FromBlush({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-end gap-2">
       <BubbleLogo size={28} className="mb-0.5 shrink-0" />
@@ -474,7 +474,7 @@ export function Reviews({ items, slots }: { items: Testimonial[]; slots: boolean
   );
 }
 
-/* ———— Ce que CRUSH promet, en faits ———— */
+/* ———— Ce que BLUSH promet, en faits ———— */
 export function Facts() {
   const facts = [
     { value: "40 s", label: "pour analyser votre conv" },
@@ -487,7 +487,7 @@ export function Facts() {
         <SectionHead
           id="faits-titre"
           title="Rapide. Complet. Discret."
-          sub="Et honnête : CRUSH ne garantit rien sur ce que l’autre ressent. Il dit ce que montrent vos messages, et à quel point il en est sûr."
+          sub="Et honnête : BLUSH ne garantit rien sur ce que l’autre ressent. Il dit ce que montrent vos messages, et à quel point il en est sûr."
         />
         <ul className="m-0 mt-10 grid w-full max-w-[1000px] list-none grid-cols-2 gap-3 p-0 lg:mt-14 lg:grid-cols-4 lg:gap-5">
           {facts.map((f, i) => (

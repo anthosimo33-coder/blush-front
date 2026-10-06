@@ -90,11 +90,11 @@ export function Styleguide() {
         <div className="max-w-[760px]">
           <div className="flex items-center gap-2.5 text-[14px] font-black tracking-[0.06em] text-grey">
             <BubbleLogo size={22} />
-            CRUSH · DESIGN SYSTEM
+            BLUSH · DESIGN SYSTEM
           </div>
           <h1 className="m-0 mt-3.5 text-[44px] font-black leading-[1.02] tracking-[-0.03em] md:text-[56px]">Le jeu</h1>
           <p className="m-0 mt-2.5 text-[19px] font-bold leading-[1.5] text-soft">
-            L’interface de CRUSH : un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai.
+            L’interface de BLUSH : un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai.
           </p>
           <p className="m-0 mt-5 text-[21px] font-black">De « on se parle » à « on est ensemble ».</p>
         </div>
@@ -134,7 +134,7 @@ export function Styleguide() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             { name: "Opale", bg: "linear-gradient(90deg, #8FC8FF 0%, #CFFFF0 25%, #8FC8FF 55%, #E6A8FF 85%, #FFD3A1 100%)", text: "Le troisième point du logo et les billes. Jamais sur du texte." },
-            { name: "Rose CRUSH", bg: "var(--rose-crush)", text: "La couleur du logo : la bulle rose en volume." },
+            { name: "Rose BLUSH", bg: "var(--rose-blush)", text: "La couleur du logo : la bulle rose en volume." },
             { name: "Nacre", bg: "linear-gradient(90deg, #FFFFFF 0%, #F3F1F7 45%, #CEC8DB 100%)", text: "Les billes neutres qui accompagnent l’opale." },
           ].map((m) => (
             <div key={m.name} className="flex flex-col gap-2.5">
@@ -307,7 +307,7 @@ export function Styleguide() {
         </Row>
       </Section>
 
-      <Section title="Messages et preuves" sub="Chaque affirmation de CRUSH s’appuie sur un vrai message, daté.">
+      <Section title="Messages et preuves" sub="Chaque affirmation de BLUSH s’appuie sur un vrai message, daté.">
         <Row gap={24}>
           <Spec label="SES MESSAGES" width={340} note="Gris, à gauche, avec la date.">
             <div className="flex flex-col">
@@ -443,7 +443,7 @@ export function Styleguide() {
       </Section>
 
       {/* 05 Logo */}
-      <Section title="Le logo" sub="La bulle rose, avec « crush » en encre sur fond clair, en blanc sur fond encre.">
+      <Section title="Le logo" sub="La bulle rose, avec « blush » en encre sur fond clair, en blanc sur fond encre.">
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="flex h-60 items-center justify-center">
             <Logo size={92} fontSize={64} />
@@ -472,7 +472,7 @@ export function Styleguide() {
       <Section title="Objets 3D et logo" sub="Le logo est la bulle rose. En plus du logo, un seul objet en volume par écran, pour marquer un moment. Jamais en mode sobre.">
         <div className="grid grid-cols-2 gap-6 md:grid-cols-5">
           {[
-            { name: "La bulle", text: "Le logo de CRUSH, en volume. Le troisième point est en opale.", node: <div data-float="" style={{ ["--r" as string]: "-6deg" }}><BubbleLogo size={140} /></div> },
+            { name: "La bulle", text: "Le logo de BLUSH, en volume. Le troisième point est en opale.", node: <div data-float="" style={{ ["--r" as string]: "-6deg" }}><BubbleLogo size={140} /></div> },
             { name: "Les billes", text: "Les trois points du logo, en volume. Nacre et opale.", node: <Marbles /> },
             { name: "Le cadenas", text: "La suite payante du rapport.", node: <div data-float=""><Lock3D size={110} /></div> },
             { name: "La cloche", text: "La relance du samedi.", node: <div data-float=""><Bell3D size={110} /></div> },
@@ -508,7 +508,7 @@ export function Styleguide() {
       </Section>
 
       {/* 07 Mode sobre */}
-      <Section title="Mode sobre" sub="Quand le verdict est dur, CRUSH sort du jeu. Même structure, mais tout ce qui est ludique disparaît.">
+      <Section title="Mode sobre" sub="Quand le verdict est dur, BLUSH sort du jeu. Même structure, mais tout ce qui est ludique disparaît.">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             ["Pas de couleur de sens", "Ni bleu, ni rose, ni vert. Encre et papier seulement."],
@@ -534,7 +534,7 @@ export function Styleguide() {
             ["Bleu toi, rose elle, vert la vérité", "Toujours le même sens, partout."],
             ["On devine, puis on sait", "Chaque révélation commence par une question. Tu réponds, la conv tranche."],
             ["Chaque affirmation a sa preuve", "Un vrai message, daté, dans une bulle."],
-            ["La confiance est affichée", "Sûr, probable, à vérifier. CRUSH dit ce qu’il ne peut pas savoir."],
+            ["La confiance est affichée", "Sûr, probable, à vérifier. BLUSH dit ce qu’il ne peut pas savoir."],
             ["Toujours un prochain pas", "Chaque écran finit sur une action concrète."],
             ["Un objet 3D au maximum, en plus du logo", "Pour marquer un moment, jamais pour décorer."],
             ["Le mode sobre quand c’est dur", "Pas de jeu sur une mauvaise nouvelle."],

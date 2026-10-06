@@ -8,9 +8,9 @@ import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import type { Plan } from "@/types";
 import { AccountPill, Screen } from "./Screen";
 
-const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, crushplus: 2 };
+const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, blushplus: 2 };
 
-/** Droits d’accès simulés : gratuit (ch. 1-2), rapport (ch. 1-8 + une question), CRUSH+ (en plus : accueil, aide, fiche). */
+/** Droits d’accès simulés : gratuit (ch. 1-2), rapport (ch. 1-8 + une question), BLUSH+ (en plus : accueil, aide, fiche). */
 export function useAccess() {
   const { data } = useQuery("account", getAccount);
   const plan = data?.subscription.plan;
@@ -43,7 +43,7 @@ export function AppScreen({
       {requires && (
         <PaywallSheet
           open={blocked}
-          only={requires === "crushplus" && access.plan === "rapport" ? "crushplus" : undefined}
+          only={requires === "blushplus" && access.plan === "rapport" ? "blushplus" : undefined}
           onClose={() => router.push("/rapport")}
           next={pathname}
         />

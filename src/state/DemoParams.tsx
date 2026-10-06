@@ -4,7 +4,7 @@
  * États de démo par paramètre d’URL :
  *   ?verdict=difficile        → mode sobre à la place du rapport
  *   ?erreur=fichier|groupe|courte|lecture|capture → écran d’erreur
- *   ?plan=gratuit|rapport|crushplus → droits d’accès
+ *   ?plan=gratuit|rapport|blushplus → droits d’accès
  */
 import { useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
@@ -13,7 +13,7 @@ import { invalidate } from "@/lib/query";
 import type { DemoError, Plan } from "@/types";
 import { ErrorScreen } from "@/components/screens/ErrorScreen";
 
-const PLANS: Plan[] = ["gratuit", "rapport", "crushplus"];
+const PLANS: Plan[] = ["gratuit", "rapport", "blushplus"];
 const ERRORS: DemoError[] = ["fichier", "groupe", "courte", "lecture", "capture"];
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;

@@ -20,7 +20,7 @@ export function HistoireScreen({ story }: { story: Story }) {
       contentGap={22}
       head={
         <>
-          <div className="text-[13px] font-black text-vrai-ink">CRUSH a tout remis dans l’ordre</div>
+          <div className="text-[13px] font-black text-vrai-ink">BLUSH a tout remis dans l’ordre</div>
           <ScreenTitle size={30}>Votre histoire, d’un bout à l’autre.</ScreenTitle>
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-[52px] font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(story.totalMessages)}</span>

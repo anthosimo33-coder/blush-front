@@ -5,7 +5,7 @@ import { QuestionScreen } from "./QuestionScreen";
 
 export const metadata: Metadata = { title: "Ta question" };
 
-/* Proposition : la question en conversation avec CRUSH. L’écran actuel reste visible avec ?version=actuelle, pour comparer. */
+/* Proposition : la question en conversation avec BLUSH. L’écran actuel reste visible avec ?version=actuelle, pour comparer. */
 export default async function Page({ searchParams }: PageProps<"/rapport/question">) {
   const { version } = await searchParams;
   if (version === "actuelle") return <QuestionScreen />;

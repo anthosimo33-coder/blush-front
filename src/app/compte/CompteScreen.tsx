@@ -26,7 +26,7 @@ export function CompteScreen() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   const sub = account?.subscription;
-  const plus = sub?.plan === "crushplus";
+  const plus = sub?.plan === "blushplus";
 
   const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
@@ -87,7 +87,7 @@ export function CompteScreen() {
               <RowIcon icon="bolt" tone={plus ? "ink" : "grey"} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-[16px] font-black">
-                  {plus ? "CRUSH+" : sub.plan === "rapport" ? OFFERS[1].title : "Ton rapport"}
+                  {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFERS[1].title : "Ton rapport"}
                   {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
                 </span>
                 <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFERS[1].note : null}</span>
@@ -115,13 +115,13 @@ export function CompteScreen() {
             }
           />
         )}
-        {plus && sub?.active && <InsetRow title="Arrêter CRUSH+" sub="En un geste, effectif lundi" onClick={() => setConfirm("stop")} chevron />}
+        {plus && sub?.active && <InsetRow title="Arrêter BLUSH+" sub="En un geste, effectif lundi" onClick={() => setConfirm("stop")} chevron />}
         {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
       </InsetGroup>
 
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
       <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne sont jamais utilisées pour entraîner une IA. Hébergement en Europe.">
-        <InsetRow leading={<RowIcon icon="lock" />} title="Ce que CRUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
+        <InsetRow leading={<RowIcon icon="lock" />} title="Ce que BLUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Supprimer l’histoire avec Sophie" sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
@@ -131,7 +131,7 @@ export function CompteScreen() {
         {confirm === "keep" && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              Ce que CRUSH garde
+              Ce que BLUSH garde
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
             <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
@@ -147,7 +147,7 @@ export function CompteScreen() {
         {(confirm === "stop" || confirm === "story" || confirm === "all") && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              {confirm === "stop" ? "Arrêter CRUSH+ ?" : confirm === "story" ? "Supprimer l’histoire avec Sophie ?" : "Tout effacer ?"}
+              {confirm === "stop" ? "Arrêter BLUSH+ ?" : confirm === "story" ? "Supprimer l’histoire avec Sophie ?" : "Tout effacer ?"}
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
               {confirm === "stop" ? "En un geste, effectif lundi." : confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
@@ -166,7 +166,7 @@ export function CompteScreen() {
                       })
               }
             >
-              {confirm === "stop" ? "Arrêter CRUSH+" : confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
+              {confirm === "stop" ? "Arrêter BLUSH+" : confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
             </Button>
             <Button variant="link" onClick={() => setConfirm(null)}>
               Annuler

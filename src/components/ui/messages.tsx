@@ -34,10 +34,10 @@ export function Bubble({
 }
 
 /**
- * CRUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
+ * BLUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
  * l’une après l’autre, comme les points de Messages, en rose (globals.css). `leaving` : elle se replie avant la réponse.
  */
-export function CrushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
+export function BlushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
   return (
     <span role="status" className="block">
       <span className="sr-only">{label}</span>

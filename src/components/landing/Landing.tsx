@@ -2,11 +2,11 @@
 
 import { ConvsDemo } from "./ConvsDemo";
 import { Hero } from "./Hero";
-import { CrushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReviews } from "./parts";
+import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReviews } from "./parts";
 
 /*
- * La landing (/) : la promesse en bulles, les convs qui défilent (on en touche une, CRUSH montre son verdict),
- * CRUSH+ en bloc noir, les avis (seulement s’il y en a de vrais, mocks/landing.ts), les faits, le dernier appel.
+ * La landing (/) : la promesse en bulles, les convs qui défilent (on en touche une, BLUSH montre son verdict),
+ * BLUSH+ en bloc noir, les avis (seulement s’il y en a de vrais, mocks/landing.ts), les faits, le dernier appel.
  */
 export function Landing() {
   const reviews = useReviews();
@@ -16,7 +16,7 @@ export function Landing() {
       <Hero>
         <ConvsDemo />
       </Hero>
-      <CrushPlus />
+      <BlushPlus />
       <Reviews {...reviews} />
       <Facts />
       <FinalCta />

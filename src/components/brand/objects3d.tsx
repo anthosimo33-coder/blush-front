@@ -1,4 +1,4 @@
-/* CRUSH · objets 3D « premium » en SVG — port fidèle de maquettes/objets-3d-source.py */
+/* BLUSH · objets 3D « premium » en SVG — port fidèle de maquettes/objets-3d-source.py */
 import { useId, type CSSProperties } from "react";
 
 type Stop = readonly [string, string];
@@ -63,7 +63,7 @@ const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 
 
 /**
  * Le logo officiel : la bulle rose en volume, deux points nacre et un point opale.
- * `animated` : CRUSH écrit. Les perles s’allument l’une après l’autre, comme les trois points de Messages (globals.css).
+ * `animated` : BLUSH écrit. Les perles s’allument l’une après l’autre, comme les trois points de Messages (globals.css).
  */
 export function BubbleLogo({ size, dots = true, animated = false, className, style }: ObjProps & { dots?: boolean; animated?: boolean }) {
   const u = useSvgId("bp");

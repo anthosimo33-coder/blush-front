@@ -11,11 +11,11 @@ import { Screen } from "@/components/shell/Screen";
 const UNLOCKED = {
   rapport: [
     { title: "Les 6 chapitres qui restent", sub: "Ta lecture reprend au chapitre 3" },
-    { title: "Ta question à CRUSH", sub: "Une question incluse avec ton rapport" },
+    { title: "Ta question à BLUSH", sub: "Une question incluse avec ton rapport" },
   ],
-  crushplus: [
+  blushplus: [
     { title: "Le rapport complet", sub: "Les 6 chapitres qui restent" },
-    { title: "Le chat avec CRUSH", sub: "Envoie sa réponse : CRUSH t’aide à répondre" },
+    { title: "Le chat avec BLUSH", sub: "Envoie sa réponse : BLUSH t’aide à répondre" },
     { title: "Sa fiche", sub: "Ce qu’elle t’a dit, toujours sous la main" },
   ],
 } as const;
@@ -24,9 +24,9 @@ const UNLOCKED = {
  * Paiement réussi : un moment, pas une facture. La gerbe (« une réussite » dans le design system),
  * le titre, ce qui vient de s’ouvrir, puis un seul bouton pour reprendre.
  */
-export function UnlockedScreen({ offer, next }: { offer: "crushplus" | "rapport"; next: string | null }) {
+export function UnlockedScreen({ offer, next }: { offer: "blushplus" | "rapport"; next: string | null }) {
   const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
-  const plus = offer === "crushplus";
+  const plus = offer === "blushplus";
   return (
     <Screen
       centered
@@ -52,10 +52,10 @@ export function UnlockedScreen({ offer, next }: { offer: "crushplus" | "rapport"
           </div>
         </div>
         <h1 data-rise="" style={{ "--d": "0.2s" } as CSSProperties} className="m-0 mt-5 text-[32px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[40px]">
-          {plus ? "Bienvenue dans CRUSH+." : "C’est débloqué."}
+          {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
         </h1>
         <p data-rise="" style={{ "--d": "0.3s" } as CSSProperties} className="m-0 mt-3 max-w-[380px] text-[16px] font-extrabold leading-[1.45] text-soft">
-          {plus ? "Ton rapport complet, et CRUSH à tes côtés à chaque message." : "Les 8 chapitres sont à toi, pour toujours."}
+          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : "Les 8 chapitres sont à toi, pour toujours."}
         </p>
 
         <div data-rise="" style={{ "--d": "0.45s" } as CSSProperties} className="mt-8 w-full text-left">

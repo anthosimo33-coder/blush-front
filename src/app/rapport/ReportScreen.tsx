@@ -25,7 +25,7 @@ import type { Chapter, ChapterBlock, Story } from "@/types";
 import { SoberReport } from "./SoberReport";
 
 /** Où tu t’étais arrêté (ce navigateur seulement). */
-const RESUME_KEY = "crush.rapport.reprise.v1";
+const RESUME_KEY = "blush.rapport.reprise.v1";
 
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
@@ -143,7 +143,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
     const text = `${report.verdict.emoji} ${report.verdict.title} ${report.verdict.subtitle}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "CRUSH", text });
+        await navigator.share({ title: "BLUSH", text });
         return;
       }
     } catch {
@@ -348,7 +348,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
           <InsetGroup>
             <InsetRow
               leading={<RowIcon icon="bolt" tone="toi" />}
-              title="Poser ma question à CRUSH"
+              title="Poser ma question à BLUSH"
               sub={access === "rapport" ? "Une question incluse avec ton rapport" : undefined}
               href="/rapport/question"
               chevron
@@ -426,7 +426,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </InsetGroup>
         {full && (
           <InsetGroup>
-            <InsetRow leading={<RowIcon icon="bolt" tone="toi" />} title="Poser ma question à CRUSH" href="/rapport/question" chevron />
+            <InsetRow leading={<RowIcon icon="bolt" tone="toi" />} title="Poser ma question à BLUSH" href="/rapport/question" chevron />
           </InsetGroup>
         )}
       </Sheet>

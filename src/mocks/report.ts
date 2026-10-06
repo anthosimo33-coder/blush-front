@@ -193,11 +193,11 @@ export const QUESTION_ANSWER: QuestionAnswer = {
   evidenceLabel: "Ce qui va dans ce sens",
   evidence: "Elle te parle tous les soirs entre 22 h et 1 h, 6 jours sur 7. Ses week-ends, elle te les raconte.",
   confidence: "probable",
-  limits: "CRUSH ne voit que vos messages.",
+  limits: "BLUSH ne voit que vos messages.",
 };
 
 /**
- * Des questions toutes prêtes, tirées du rapport, avec la réponse de CRUSH (simulation : en vrai, le back-end répond).
+ * Des questions toutes prêtes, tirées du rapport, avec la réponse de BLUSH (simulation : en vrai, le back-end répond).
  * Chaque réponse reprend des faits du rapport. ⚠ Absent des maquettes : textes à valider.
  */
 export const QUESTION_IDEAS: QuestionAnswer[] = [
@@ -217,7 +217,7 @@ export const QUESTION_IDEAS: QuestionAnswer[] = [
     evidenceLabel: "Ce qu’on voit",
     evidence: "Après 22 h, c’est elle qui relance, 7 fois sur 10. Et le soir, elle te répond en 4 min.",
     confidence: "probable",
-    limits: "CRUSH ne voit que vos messages.",
+    limits: "BLUSH ne voit que vos messages.",
   },
   {
     question: "Comment lui proposer samedi sans la brusquer ?",
@@ -225,6 +225,6 @@ export const QUESTION_IDEAS: QuestionAnswer[] = [
     evidenceLabel: "Ce qu’on voit",
     evidence: "4 plans sur 5 viennent d’elle. Quand tu proposes une date et une heure, elle répond en moins de 10 minutes.",
     confidence: "probable",
-    limits: "CRUSH ne voit que vos messages.",
+    limits: "BLUSH ne voit que vos messages.",
   },
 ];

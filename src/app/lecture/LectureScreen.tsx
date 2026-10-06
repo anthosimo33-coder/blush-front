@@ -122,7 +122,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       }
     >
       <p className="sr-only" role="status" aria-live="polite">
-        {p.done ? "Ton rapport est prêt." : "CRUSH analyse votre conv."}
+        {p.done ? "Ton rapport est prêt." : "BLUSH analyse votre conv."}
       </p>
 
       <div className="isolate flex flex-1 flex-col items-center justify-center pb-6 text-center lg:flex-none lg:pb-0 lg:pt-[max(24px,calc(50dvh_-_310px))]">
@@ -144,7 +144,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
 
         <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
           {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
-          CRUSH analyse tes
+          BLUSH analyse tes
           <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : count}</span> messages,
           <br />
           du premier au dernier.
@@ -209,7 +209,7 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
 function Discoveries({ shown, className }: { shown: number; className?: string }) {
   return (
-    <ul className={cn("m-0 flex min-h-[34px] list-none flex-wrap justify-center gap-2.5 p-0", className)} aria-label="Ce que CRUSH remarque">
+    <ul className={cn("m-0 flex min-h-[34px] list-none flex-wrap justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">
       {READING_DISCOVERIES.map((d, i) =>
         shown > i ? (
           <li

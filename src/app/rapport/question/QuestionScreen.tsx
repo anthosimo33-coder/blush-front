@@ -40,7 +40,7 @@ export function QuestionScreen() {
         ) : (
           /* ⚠ État de saisie absent des maquettes */
           <Button onClick={submit} disabled={!draft.trim() && !busy} aria-busy={busy}>
-            {busy ? <TypingDots color="#FFFFFF" label="CRUSH réfléchit" /> : "Poser ma question"}
+            {busy ? <TypingDots color="#FFFFFF" label="BLUSH réfléchit" /> : "Poser ma question"}
           </Button>
         )
       }
@@ -67,12 +67,12 @@ export function QuestionScreen() {
         </Card>
       )}
 
-      {busy && <TypingDots label="CRUSH analyse votre conv" />}
+      {busy && <TypingDots label="BLUSH analyse votre conv" />}
 
       {answer && (
         <>
           <div data-rise="" className="text-[13px] font-black text-vrai-ink">
-            La réponse de CRUSH
+            La réponse de BLUSH
           </div>
           <h2 className="m-0 mt-1.5 text-[28px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">{answer.title}</h2>
           <Card className="flex flex-col gap-1.5 px-4 py-3.5" >

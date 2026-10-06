@@ -22,7 +22,7 @@ const ACCEPT = "image/*,.zip,.txt,application/zip,text/plain";
 const isImage = (f: File) => f.type.startsWith("image/");
 const accepted = (f: File) => isImage(f) || /\.(zip|txt)$/i.test(f.name) || f.type === "application/zip" || f.type === "text/plain";
 
-/** Ce que CRUSH analyse, dit simplement : « ta capture », « tes 3 captures », « votre conv », ou les deux. */
+/** Ce que BLUSH analyse, dit simplement : « ta capture », « tes 3 captures », « votre conv », ou les deux. */
 function whatOf(files: File[]) {
   const images = files.filter(isImage).length;
   return [images === 1 ? "ta capture" : images > 1 ? `tes ${images} captures` : null, images < files.length ? "votre conv" : null].filter(Boolean).join(" et ");
@@ -37,7 +37,7 @@ type Job =
 
 /*
  * Écran 16 — Sa fiche, à la manière d’une fiche Contacts. Un seul geste pour la remplir : ajouter des captures
- * ou un export (ou les glisser sur la page). CRUSH y trouve les infos et les range lui-même, chacune avec sa source ;
+ * ou un export (ou les glisser sur la page). BLUSH y trouve les infos et les range lui-même, chacune avec sa source ;
  * ce qui vient d’arriver est marqué d’un point rose. « Modifier » pour retirer une info ou ajouter la tienne.
  * Rien n’est cherché ailleurs.
  */
@@ -112,7 +112,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
 
   return (
     <AppScreen
-      requires="crushplus"
+      requires="blushplus"
       aside={null}
       mainWidth={CARD_W}
       frameWidth={CARD_W}
@@ -148,7 +148,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
         </p>
       </div>
 
-      {/* Un seul geste pour la remplir ; pendant l’analyse, CRUSH écrit à sa place */}
+      {/* Un seul geste pour la remplir ; pendant l’analyse, BLUSH écrit à sa place */}
       <div aria-live="polite" className="mt-6 flex flex-col gap-3">
         {job.step === "reading" ? (
           <Reading what={job.what} thumbs={job.thumbs} file={job.file} />
@@ -159,7 +159,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
       </div>
       <FileInput inputRef={picker.ref} accept={ACCEPT} multiple onFiles={(f) => void add(f)} label="Captures ou export à ajouter à sa fiche" />
 
-      {/* Ce que CRUSH sait d’elle : une liste par rubrique, la source de chaque info à droite */}
+      {/* Ce que BLUSH sait d’elle : une liste par rubrique, la source de chaque info à droite */}
       <div className="mt-7 flex flex-col gap-6">
         {FICHE_SECTIONS.map((sec) => {
           const items = fiche.facts.filter((f) => f.section === sec.id);
@@ -225,7 +225,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
           >
             <BubbleLogo size={92} animated />
             <p className="m-0 mt-3 text-[24px] font-black leading-[1.15] tracking-[-0.02em]">Dépose tes captures ou ton export</p>
-            <p className="m-0 text-[15px] font-extrabold text-grey">CRUSH trouve les infos et les range dans sa fiche.</p>
+            <p className="m-0 text-[15px] font-extrabold text-grey">BLUSH trouve les infos et les range dans sa fiche.</p>
           </div>
         </div>
       )}
@@ -233,7 +233,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
   );
 }
 
-/** Le geste pour remplir sa fiche : une carte, la bulle de CRUSH, un « + ». */
+/** Le geste pour remplir sa fiche : une carte, la bulle de BLUSH, un « + ». */
 function AddButton({ onClick, dimmed }: { onClick: () => void; dimmed: boolean }) {
   return (
     <button
@@ -246,7 +246,7 @@ function AddButton({ onClick, dimmed }: { onClick: () => void; dimmed: boolean }
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[16px] font-black leading-[1.25]">Complète sa fiche</span>
         <span className="text-[13px] font-extrabold leading-[1.35] text-grey">
-          Ajoute des captures ou un export, CRUSH range tout.<span className="hidden lg:inline"> Tu peux aussi les glisser ici.</span>
+          Ajoute des captures ou un export, BLUSH range tout.<span className="hidden lg:inline"> Tu peux aussi les glisser ici.</span>
         </span>
       </span>
       <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)] group-hover:rotate-90">
@@ -256,13 +256,13 @@ function AddButton({ onClick, dimmed }: { onClick: () => void; dimmed: boolean }
   );
 }
 
-/** Pendant l’analyse : la bulle de CRUSH écrit, et un trait rose balaie les captures en éventail, comme un scanner. */
+/** Pendant l’analyse : la bulle de BLUSH écrit, et un trait rose balaie les captures en éventail, comme un scanner. */
 function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file: boolean }) {
   return (
     <div role="status" className="relative flex items-center gap-3.5 overflow-hidden rounded-[22px] bg-white py-3.5 pl-3 pr-4 shadow-card">
       <BubbleLogo size={50} animated />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[16px] font-black leading-[1.25]">CRUSH analyse {what}</span>
+        <span className="text-[16px] font-black leading-[1.25]">BLUSH analyse {what}</span>
         <span className="text-[13px] font-extrabold leading-[1.35] text-grey">Il range ce qu’il trouve.</span>
       </span>
       <span aria-hidden="true" className="relative flex shrink-0 items-center py-1 pl-3 pr-1">
@@ -284,7 +284,7 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
   );
 }
 
-/** Ce que CRUSH a trouvé et où il l’a rangé. Ce qu’il savait déjà est dit, pas doublé. « Annuler » retire tout. */
+/** Ce que BLUSH a trouvé et où il l’a rangé. Ce qu’il savait déjà est dit, pas doublé. « Annuler » retire tout. */
 function Found({ what, update, onUndo, onClose }: { what: string; update: FicheUpdate; onUndo: () => void; onClose: () => void }) {
   const n = update.added.length;
   const title = n === 0 ? "Rien de nouveau" : n === 1 ? "1 nouvelle info rangée" : `${n} nouvelles infos rangées`;
@@ -299,7 +299,7 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
           <h2 id="trouve-titre" className="m-0 text-[16px] font-black leading-[1.25]">
             {title}
           </h2>
-          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">{n > 0 ? `Trouvées dans ${what}.` : `CRUSH savait déjà tout ce qu’il y a dans ${what}.`}</span>
+          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">{n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`}</span>
         </span>
         <button type="button" onClick={onClose} aria-label="Fermer le résumé" className="-mr-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full">
           <Icon name="close" size={16} color="#8A8780" stroke={2.6} />

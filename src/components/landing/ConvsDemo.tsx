@@ -21,12 +21,12 @@ const ROWS = [0, 1, 2].map((i) => ({
   offset: [0, 150, 70][i],
 }));
 
-/** Les convs qui défilent : on en choisit une, CRUSH montre son verdict (landings A et C). */
+/** Les convs qui défilent : on en choisit une, BLUSH montre son verdict (landings A et C). */
 export function ConvsDemo() {
   const [picked, setPicked] = useState<LandingConv | null>(null);
   return (
     <div className="mt-14 lg:mt-20">
-      <h2 className="sr-only">Des exemples de convs&nbsp;: choisis-en une pour voir le verdict de CRUSH</h2>
+      <h2 className="sr-only">Des exemples de convs&nbsp;: choisis-en une pour voir le verdict de BLUSH</h2>
       <div className="flex flex-col">
         {ROWS.map((r, i) => (
           <ConvRow key={i} {...r} onPick={setPicked} />
@@ -82,7 +82,7 @@ function ConvList({ convs, onPick, copy = false }: { convs: LandingConv[]; onPic
               <span className="truncate text-[16px] font-black leading-tight">{c.name}</span>
               <span className="truncate text-[13px] font-extrabold leading-tight text-grey">{c.label}</span>
             </span>
-            <span className="sr-only">&nbsp;: voir le verdict de CRUSH</span>
+            <span className="sr-only">&nbsp;: voir le verdict de BLUSH</span>
           </button>
         </li>
       ))}
@@ -127,7 +127,7 @@ function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => vo
         </div>
         <IconButton icon="close" label="Fermer" onClick={onClose} iconSize={18} />
       </div>
-      <span className="text-[13px] font-black text-grey lg:hidden">Le verdict de CRUSH · exemple fictif</span>
+      <span className="text-[13px] font-black text-grey lg:hidden">Le verdict de BLUSH · exemple fictif</span>
       <div className="hidden items-center justify-between gap-3 lg:flex">
         <span className="flex items-center gap-2.5">
           <span aria-hidden="true" className="flex size-[38px] items-center justify-center rounded-full bg-ink text-[16px] font-black text-white shadow-ink">

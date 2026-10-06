@@ -9,14 +9,14 @@ export const SECTIONS = [
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de votre conv (écrans 01 à 08)" },
   { id: "rapport", title: "Rapport", sub: "Aperçu gratuit, paiement, rapport complet, question, mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13, 16 et 20)" },
-  { id: "etats", title: "États", sub: "Accès CRUSH+, écrans d’erreur, survol à la souris" },
+  { id: "etats", title: "États", sub: "Accès BLUSH+, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
 
 const J = { me: "hugo", guess: "flou", goal: "ensemble", exportFileName: "Discussion avec Sophie.zip", exportApp: "whatsapp", app: "whatsapp" };
 const JE = { ...J, email: "hugo@email.fr" };
 const FREE = { plan: "gratuit", verdict: "normal" };
-const PLUS = { plan: "crushplus", verdict: "normal" };
+const PLUS = { plan: "blushplus", verdict: "normal" };
 
 const click = (name, opts = {}) => async (page) => {
   await page.getByRole(opts.role ?? "button", { name, exact: opts.exact ?? false }).first().click();
@@ -91,9 +91,9 @@ async function addBio(page, wait) {
 }
 
 export const STATES = [
-  { id: "LC", section: "landing", title: "Landing", state: "Page entière", route: "/", full: true, note: "Le titre en bulles, les convs qui défilent (figées ici\u00a0; on en touche une, CRUSH montre son verdict), CRUSH+ en bloc noir, les avis s’il y en a de vrais, les faits. Textes à valider." },
+  { id: "LC", section: "landing", title: "Landing", state: "Page entière", route: "/", full: true, note: "Le titre en bulles, les convs qui défilent (figées ici\u00a0; on en touche une, BLUSH montre son verdict), BLUSH+ en bloc noir, les avis s’il y en a de vrais, les faits. Textes à valider." },
   {
-    id: "LCc", section: "landing", title: "Landing", state: "CRUSH+ (bloc noir)", route: "/", sheet: true, touch: true,
+    id: "LCc", section: "landing", title: "Landing", state: "BLUSH+ (bloc noir)", route: "/", sheet: true, touch: true,
     steps: async (page, key) => {
       if (key === "d") {
         await page.evaluate(() => {
@@ -112,9 +112,9 @@ export const STATES = [
       }
       await page.waitForTimeout(600);
     },
-    note: "Inspiré de la section de ngl\u00a0: le titre géant, la grosse main en guise de curseur (sur mobile, elle montre qu’on peut toucher), les messages qui font cogiter autour, la cloche 3D du design system, puis les questions qu’on pose à CRUSH en très grand. On en touche une, sa réponse s’ouvre dessous.",
+    note: "Inspiré de la section de ngl\u00a0: le titre géant, la grosse main en guise de curseur (sur mobile, elle montre qu’on peut toucher), les messages qui font cogiter autour, la cloche 3D du design system, puis les questions qu’on pose à BLUSH en très grand. On en touche une, sa réponse s’ouvre dessous.",
   },
-  { id: "LCb", section: "landing", title: "Landing", state: "Une conv choisie", route: "/", sheet: true, steps: async (page) => { await page.getByRole("button", { name: /^Inès/ }).first().click(); await page.waitForTimeout(900); }, note: "On touche une conv\u00a0: CRUSH montre son verdict comme au début d’un vrai rapport (exemple fictif)." },
+  { id: "LCb", section: "landing", title: "Landing", state: "Une conv choisie", route: "/", sheet: true, steps: async (page) => { await page.getByRole("button", { name: /^Inès/ }).first().click(); await page.waitForTimeout(900); }, note: "On touche une conv\u00a0: BLUSH montre son verdict comme au début d’un vrai rapport (exemple fictif)." },
   {
     id: "LD", section: "landing", title: "Landing", state: "Avis (emplacements)", route: "/?apercu=avis", sheet: true,
     steps: async (page) => {
@@ -197,7 +197,7 @@ export const STATES = [
   { id: "09", section: "rapport", title: "Rapport, aperçu gratuit", state: "Page entière", route: "/rapport", journey: J, server: FREE, full: true, ref: "09-rapport-apercu-gratuit" },
   { id: "10", section: "rapport", title: "Paiement", route: "/rapport?paiement=1", journey: J, server: FREE, sheet: true, wait: 900, ref: "10-paiement" },
   { id: "10b", section: "rapport", title: "Paiement réussi", state: "Rapport complet", route: "/rapport/debloque?offre=rapport", journey: J, server: { plan: "rapport", verdict: "normal" }, wait: 1600, note: "Nouvel écran, animé (la gerbe). Textes à valider." },
-  { id: "10c", section: "rapport", title: "Paiement réussi", state: "CRUSH+", route: "/rapport/debloque?offre=crushplus", journey: J, server: { plan: "crushplus", verdict: "normal" }, wait: 1600, note: "Nouvel écran, animé (la gerbe). Textes à valider." },
+  { id: "10c", section: "rapport", title: "Paiement réussi", state: "BLUSH+", route: "/rapport/debloque?offre=blushplus", journey: J, server: { plan: "blushplus", verdict: "normal" }, wait: 1600, note: "Nouvel écran, animé (la gerbe). Textes à valider." },
   { id: "11", section: "rapport", title: "Rapport complet", state: "Page entière", route: "/rapport", journey: J, server: { plan: "rapport", verdict: "normal" }, full: true, ref: "11-rapport-complet" },
   {
     id: "11b", section: "rapport", title: "Rapport complet", state: "En lisant", route: "/rapport", journey: J, server: { plan: "rapport", verdict: "normal" }, sheet: true,
@@ -219,7 +219,7 @@ export const STATES = [
   {
     id: "11d", section: "rapport", title: "Rapport complet", state: "Reprendre", route: "/rapport", journey: J, server: { plan: "rapport", verdict: "normal" }, sheet: true,
     steps: async (page) => {
-      await page.evaluate(() => localStorage.setItem("crush.rapport.reprise.v1", JSON.stringify({ chapter: 5 })));
+      await page.evaluate(() => localStorage.setItem("blush.rapport.reprise.v1", JSON.stringify({ chapter: 5 })));
       await page.reload({ waitUntil: "networkidle" });
       await page.waitForTimeout(900);
     },
@@ -227,7 +227,7 @@ export const STATES = [
   },
   {
     id: "12p", section: "rapport", title: "Ta question", state: "Proposition · les idées", route: "/rapport/question", server: { plan: "rapport" },
-    note: "Proposition\u00a0: la question en conversation avec CRUSH (l’écran actuel suit, en 12 et 12b, sur ?version=actuelle). CRUSH t’accueille, propose 4 questions tirées du rapport, comme des réponses toutes prêtes. «\u00a01 question incluse\u00a0» pour le plan rapport. Textes à valider.",
+    note: "Proposition\u00a0: la question en conversation avec BLUSH (l’écran actuel suit, en 12 et 12b, sur ?version=actuelle). BLUSH t’accueille, propose 4 questions tirées du rapport, comme des réponses toutes prêtes. «\u00a01 question incluse\u00a0» pour le plan rapport. Textes à valider.",
   },
   {
     id: "12q", section: "rapport", title: "Ta question", state: "Proposition · idée choisie", route: "/rapport/question", server: { plan: "rapport" },
@@ -235,16 +235,16 @@ export const STATES = [
     note: "Un toucher met la question dans le champ, sans l’envoyer\u00a0: la question incluse ne part pas par erreur. On peut la modifier, ou retoucher l’idée pour la retirer.",
   },
   {
-    id: "12r", section: "rapport", title: "Ta question", state: "Proposition · CRUSH écrit", route: "/rapport/question", server: { plan: "rapport" }, motion: true,
+    id: "12r", section: "rapport", title: "Ta question", state: "Proposition · BLUSH écrit", route: "/rapport/question", server: { plan: "rapport" }, motion: true,
     steps: async (page) => {
       await click("on est quoi", { wait: 300 })(page);
       await click("Poser ma question", { wait: 1100 })(page);
     },
-    note: "Ta question part en bulle bleue\u00a0; CRUSH écrit (sa bulle et la grande bulle du haut s’animent).",
+    note: "Ta question part en bulle bleue\u00a0; BLUSH écrit (sa bulle et la grande bulle du haut s’animent).",
   },
   {
     id: "12s", section: "rapport", title: "Ta question", state: "Proposition · la réponse", route: "/rapport/question", server: { plan: "rapport", questionAsked: "Que voulait dire son «\u00a0on est quoi\u00a0» du 2 mars\u00a0?" }, full: true,
-    note: "La réponse en bulles\u00a0: l’essentiel en grand, puis la preuve (son vrai message), l’explication et la confiance. Ensuite\u00a0: «\u00a0Retour au rapport\u00a0», et «\u00a0Toutes tes questions, avec CRUSH+\u00a0» (avec CRUSH+\u00a0: «\u00a0Continuer dans ton chat\u00a0»). Chaque idée a sa propre réponse, tirée du rapport.",
+    note: "La réponse en bulles\u00a0: l’essentiel en grand, puis la preuve (son vrai message), l’explication et la confiance. Ensuite\u00a0: «\u00a0Retour au rapport\u00a0», et «\u00a0Toutes tes questions, avec BLUSH+\u00a0» (avec BLUSH+\u00a0: «\u00a0Continuer dans ton chat\u00a0»). Chaque idée a sa propre réponse, tirée du rapport.",
   },
   { id: "12", section: "rapport", title: "Ta question", state: "Actuel · saisie", route: "/rapport/question?version=actuelle", server: { plan: "rapport" }, note: "L’écran actuel, gardé pour comparer. État de saisie absent des maquettes." },
   { id: "12b", section: "rapport", title: "Ta question", state: "Actuel · réponse", route: "/rapport/question?version=actuelle", server: { plan: "rapport", questionAsked: "Est-ce qu’elle voit quelqu’un d’autre ?" }, ref: "12-ta-question" },
@@ -253,23 +253,23 @@ export const STATES = [
   { id: "18b", section: "rapport", title: "Mode sobre", state: "Besoin d’en parler", route: "/rapport", server: { verdict: "difficile" }, steps: click("Besoin d’en parler à quelqu’un ?"), sheet: true, note: "Ressources d’aide à valider." },
 
   /* ———— Au quotidien ———— */
-  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec CRUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, CRUSH en grand comme un personnage (sa bulle flotte et s’anime quand il répond)\u00a0: un toucher ouvre «\u00a0Ce que CRUSH voit\u00a0». À droite, Sophie comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. L’heure sous chaque message et la date à chaque nouveau jour, comme dans Messages. Proposition\u00a0: au-dessus du champ, les 4 questions que promet la landing, en un toucher (l’accueil sans elles est en 13z, sur ?version=actuelle)." },
+  { id: "13", section: "quotidien", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, ref: "13-accueil", note: "Proposition\u00a0: l’accueil devient le chat avec BLUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, BLUSH en grand comme un personnage (sa bulle flotte et s’anime quand il répond)\u00a0: un toucher ouvre «\u00a0Ce que BLUSH voit\u00a0». À droite, Sophie comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. L’heure sous chaque message et la date à chaque nouveau jour, comme dans Messages. Proposition\u00a0: au-dessus du champ, les 4 questions que promet la landing, en un toucher (l’accueil sans elles est en 13z, sur ?version=actuelle)." },
   {
     id: "13b", section: "quotidien", title: "Accueil", state: "Après sa réponse", route: "/app", server: PLUS,
     steps: async (page) => {
-      await page.getByRole("textbox", { name: /Écris à CRUSH/ }).fill("je suis crevée cette semaine, on verra");
+      await page.getByRole("textbox", { name: /Écris à BLUSH/ }).fill("je suis crevée cette semaine, on verra");
       await page.keyboard.press("Enter");
       await page.waitForTimeout(1900);
     },
-    note: "Simulation\u00a0: une question (qui finit par «\u00a0?\u00a0») reçoit une réponse de CRUSH, le reste est lu comme sa réponse à elle.",
+    note: "Simulation\u00a0: une question (qui finit par «\u00a0?\u00a0») reçoit une réponse de BLUSH, le reste est lu comme sa réponse à elle.",
     sheet: true,
   },
   { id: "13c", section: "quotidien", title: "Accueil", state: "Menu « + »", route: "/app", server: PLUS, steps: click("Ajouter des captures ou un export", { wait: 600 }), sheet: true },
-  { id: "13d", section: "quotidien", title: "Accueil", state: "Ce que CRUSH voit", route: "/app", server: PLUS, steps: async (page) => { await page.locator("button[aria-haspopup=dialog]:visible").first().click(); await page.waitForTimeout(800); }, sheet: true },
+  { id: "13d", section: "quotidien", title: "Accueil", state: "Ce que BLUSH voit", route: "/app", server: PLUS, steps: async (page) => { await page.locator("button[aria-haspopup=dialog]:visible").first().click(); await page.waitForTimeout(800); }, sheet: true },
   {
     id: "13e", section: "quotidien", title: "Accueil", state: "Après « Copier »", route: "/app", server: PLUS,
     steps: async (page) => {
-      await page.getByRole("textbox", { name: /Écris à CRUSH/ }).fill("je suis crevée cette semaine, on verra");
+      await page.getByRole("textbox", { name: /Écris à BLUSH/ }).fill("je suis crevée cette semaine, on verra");
       await page.keyboard.press("Enter");
       await page.waitForTimeout(1900);
       await page.getByRole("button", { name: "Copier", exact: true }).click();
@@ -295,17 +295,17 @@ export const STATES = [
       await page.getByRole("button", { name: "Envoyer le vocal" }).click();
       await page.waitForTimeout(2600);
     },
-    note: "Le vocal se réécoute dans ta bulle\u00a0; CRUSH y répond (réponse simulée\u00a0: en vrai, le vocal est transcrit puis CRUSH répond à ce qui est dit). Textes à valider.",
+    note: "Le vocal se réécoute dans ta bulle\u00a0; BLUSH y répond (réponse simulée\u00a0: en vrai, le vocal est transcrit puis BLUSH répond à ce qui est dit). Textes à valider.",
   },
   {
-    id: "13h", section: "quotidien", title: "Accueil", state: "CRUSH écrit", route: "/app", server: PLUS, sheet: true, motion: true,
+    id: "13h", section: "quotidien", title: "Accueil", state: "BLUSH écrit", route: "/app", server: PLUS, sheet: true, motion: true,
     steps: async (page) => {
-      await page.getByRole("textbox", { name: /Écris à CRUSH/ }).fill("je suis crevée cette semaine, on verra");
+      await page.getByRole("textbox", { name: /Écris à BLUSH/ }).fill("je suis crevée cette semaine, on verra");
       await page.keyboard.press("Enter");
       /* Pile quand la première perle s’allume (vague de 1,2 s, la réponse arrive à 2 s) */
       await page.waitForTimeout(1480);
     },
-    note: "Nouveau\u00a0: quand CRUSH écrit, son logo arrive d’un bond dans la conv, respire, et ses trois perles s’allument l’une après l’autre, comme les trois points de Messages, en rose. La grande bulle du haut s’anime en même temps. À la réponse, la bulle se replie et la réponse monte.",
+    note: "Nouveau\u00a0: quand BLUSH écrit, son logo arrive d’un bond dans la conv, respire, et ses trois perles s’allument l’une après l’autre, comme les trois points de Messages, en rose. La grande bulle du haut s’anime en même temps. À la réponse, la bulle se replie et la réponse monte.",
   },
   {
     id: "13i", section: "quotidien", title: "Accueil", state: "« On en est où ? »", route: "/app", server: PLUS, sheet: true,
@@ -315,29 +315,29 @@ export const STATES = [
   {
     id: "13j", section: "quotidien", title: "Accueil", state: "« Je lui réponds quoi ? »", route: "/app", server: PLUS, sheet: true,
     steps: click("Je lui réponds quoi", { wait: 2600 }),
-    note: "CRUSH montre son dernier message, puis ta meilleure réponse, à copier. «\u00a0Ça veut dire quoi\u00a0?\u00a0» ajoute ce que ça veut dire\u00a0; «\u00a0Elle voit quelqu’un d’autre\u00a0?\u00a0» répond avec vos messages.",
+    note: "BLUSH montre son dernier message, puis ta meilleure réponse, à copier. «\u00a0Ça veut dire quoi\u00a0?\u00a0» ajoute ce que ça veut dire\u00a0; «\u00a0Elle voit quelqu’un d’autre\u00a0?\u00a0» répond avec vos messages.",
   },
   { id: "13z", section: "quotidien", title: "Accueil", state: "Actuel (sans les questions)", route: "/app?version=actuelle", server: PLUS, note: "L’accueil sans les questions toutes prêtes, gardé pour comparer." },
   {
     id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche",
-    note: "Refonte\u00a0: un seul geste pour la remplir, «\u00a0Complète sa fiche\u00a0» (des captures ou un export\u00a0; sur ordinateur, on peut aussi les glisser sur la page). CRUSH trouve les infos et les range lui-même, chacune avec sa source\u00a0: plus de tuiles «\u00a0Sa bio / Un post / Une note\u00a0», plus d’écran à cocher (l’ancien écran 17). Nouvelle rubrique «\u00a0À savoir\u00a0» pour ce qu’il trouve\u00a0; «\u00a0Tes notes\u00a0» restent les tiennes. Textes à valider.",
+    note: "Refonte\u00a0: un seul geste pour la remplir, «\u00a0Complète sa fiche\u00a0» (des captures ou un export\u00a0; sur ordinateur, on peut aussi les glisser sur la page). BLUSH trouve les infos et les range lui-même, chacune avec sa source\u00a0: plus de tuiles «\u00a0Sa bio / Un post / Une note\u00a0», plus d’écran à cocher (l’ancien écran 17). Nouvelle rubrique «\u00a0À savoir\u00a0» pour ce qu’il trouve\u00a0; «\u00a0Tes notes\u00a0» restent les tiennes. Textes à valider.",
   },
   { id: "16b", section: "quotidien", title: "Sa fiche", state: "Modifier", route: "/app/fiche", server: PLUS, steps: click("Modifier", { exact: true }), note: "Retirer une info fausse, ou ajouter la tienne dans une rubrique." },
   {
-    id: "16c", section: "quotidien", title: "Sa fiche", state: "CRUSH analyse", route: "/app/fiche", server: PLUS, motion: true,
+    id: "16c", section: "quotidien", title: "Sa fiche", state: "BLUSH analyse", route: "/app/fiche", server: PLUS, motion: true,
     steps: (page) => addBio(page, 1000),
-    note: "Pendant l’analyse, la bulle de CRUSH écrit et un trait rose balaie la capture. La simulation lit toujours sa bio Hinge.",
+    note: "Pendant l’analyse, la bulle de BLUSH écrit et un trait rose balaie la capture. La simulation lit toujours sa bio Hinge.",
   },
   {
     id: "16d", section: "quotidien", title: "Sa fiche", state: "Infos rangées", route: "/app/fiche", server: PLUS, full: true,
     steps: (page) => addBio(page, 900),
-    note: "Ce que CRUSH a trouvé et où il l’a rangé\u00a0; ce qu’il savait déjà n’est pas doublé. Les nouvelles infos portent un point rose (et s’éclairent en rose à leur arrivée). «\u00a0Annuler\u00a0» retire tout.",
+    note: "Ce que BLUSH a trouvé et où il l’a rangé\u00a0; ce qu’il savait déjà n’est pas doublé. Les nouvelles infos portent un point rose (et s’éclairent en rose à leur arrivée). «\u00a0Annuler\u00a0» retire tout.",
   },
   { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", server: PLUS, ref: "20-mon-compte" },
   { id: "20b", section: "quotidien", title: "Mon compte", state: "Supprimer l’histoire", route: "/compte", server: PLUS, steps: click("Supprimer l’histoire avec Sophie"), sheet: true, note: "Confirmation absente des maquettes." },
 
   /* ———— États ———— */
-  { id: "E1", section: "etats", title: "Accès CRUSH+", state: "Plan « rapport » sur l’accueil", route: "/app", server: { plan: "rapport" }, sheet: true, wait: 1000, note: "Panneau absent des maquettes." },
+  { id: "E1", section: "etats", title: "Accès BLUSH+", state: "Plan « rapport » sur l’accueil", route: "/app", server: { plan: "rapport" }, sheet: true, wait: 1000, note: "Panneau absent des maquettes." },
   { id: "E2", section: "etats", title: "Erreur", state: "Fichier illisible", route: "/importer/ok?erreur=fichier" },
   { id: "E3", section: "etats", title: "Erreur", state: "Conversation de groupe", route: "/importer/ok?erreur=groupe" },
   { id: "E4", section: "etats", title: "Erreur", state: "Conv trop courte", route: "/importer/ok?erreur=courte" },

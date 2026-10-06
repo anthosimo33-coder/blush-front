@@ -1,12 +1,12 @@
-import type { CrushAnswer, Fiche, FicheFact, FicheSource, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
+import type { BlushAnswer, Fiche, FicheFact, FicheSource, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
 import { QUESTION_ANSWER } from "./report";
 import { PEOPLE } from "./story";
 
 export const OFFERS: Offer[] = [
   {
-    id: "crushplus",
-    title: "CRUSH+ · le rapport et l’aide à chaque message",
-    titleDesktop: "CRUSH+ · rapport et aide à chaque message",
+    id: "blushplus",
+    title: "BLUSH+ · le rapport et l’aide à chaque message",
+    titleDesktop: "BLUSH+ · rapport et aide à chaque message",
     price: "7,99 € / semaine",
     note: "Sans engagement · le rapport s’enrichit à chaque message",
     noteDesktop: "Sans engagement",
@@ -40,7 +40,7 @@ export const REPLY: Reply = {
 };
 
 /**
- * La réponse de CRUSH à un vocal (simulation). En vrai, le back-end transcrit le vocal puis répond à ce qui est dit.
+ * La réponse de BLUSH à un vocal (simulation). En vrai, le back-end transcrit le vocal puis répond à ce qui est dit.
  * ⚠ Texte absent des maquettes : à valider.
  */
 export const VOICE_ANSWER: QuestionAnswer = {
@@ -49,17 +49,17 @@ export const VOICE_ANSWER: QuestionAnswer = {
   evidenceLabel: "Pourquoi",
   evidence: "C’est elle qui propose le plus (4 plans en un mois), et elle te répond en 4 min le soir. Elle attend que tu fasses le pas.",
   confidence: "probable",
-  limits: "CRUSH ne voit que vos messages.",
+  limits: "BLUSH ne voit que vos messages.",
 };
 
-/** Son dernier message, tel que CRUSH l’a lu dans votre conv. */
+/** Son dernier message, tel que BLUSH l’a lu dans votre conv. */
 const LAST_MESSAGE: Reply = { ...REPLY, incoming: { ...REPLY.incoming, caption: "Sophie · son dernier message" } };
 
 /**
- * Les questions toutes prêtes du chat, celles que promet la landing, avec la réponse de CRUSH (simulation).
+ * Les questions toutes prêtes du chat, celles que promet la landing, avec la réponse de BLUSH (simulation).
  * ⚠ Absent des maquettes : textes à valider.
  */
-export const QUICK_QUESTIONS: { question: string; answer: CrushAnswer }[] = [
+export const QUICK_QUESTIONS: { question: string; answer: BlushAnswer }[] = [
   { question: "Ça veut dire quoi ?", answer: { kind: "analysis", reply: LAST_MESSAGE, quoted: true } },
   { question: "Je lui réponds quoi ?", answer: { kind: "best", reply: LAST_MESSAGE } },
   { question: "Elle voit quelqu’un d’autre ?", answer: { kind: "answer", answer: { ...QUESTION_ANSWER, question: "Elle voit quelqu’un d’autre ?" } } },
@@ -108,7 +108,7 @@ export const FICHE_SECTIONS: { id: FicheFact["section"]; title: string }[] = [
 ];
 
 /**
- * Ce que CRUSH trouve dans ce que tu ajoutes à sa fiche (simulation) : une capture de sa bio, ou un nouvel export de votre conv.
+ * Ce que BLUSH trouve dans ce que tu ajoutes à sa fiche (simulation) : une capture de sa bio, ou un nouvel export de votre conv.
  * En vrai, le back-end analyse les fichiers. ⚠ Absent des maquettes : à valider.
  */
 export const FICHE_FINDINGS: Record<"captures" | "export", { sourceLabel: string; source: FicheSource; facts: Pick<FicheFact, "section" | "text">[] }> = {
@@ -132,7 +132,7 @@ export const FICHE_FINDINGS: Record<"captures" | "export", { sourceLabel: string
 };
 
 export const SUBSCRIPTIONS: Record<Subscription["plan"], Subscription> = {
-  crushplus: { plan: "crushplus", priceLabel: "7,99 € / semaine", renewLabel: "Renouvelé lundi · sans engagement", stopLabel: "En un geste, effectif lundi", active: true, paused: false },
+  blushplus: { plan: "blushplus", priceLabel: "7,99 € / semaine", renewLabel: "Renouvelé lundi · sans engagement", stopLabel: "En un geste, effectif lundi", active: true, paused: false },
   rapport: { plan: "rapport", priceLabel: "8,99 €", renewLabel: "Payé une fois · à toi pour toujours", stopLabel: "", active: true, paused: false },
   gratuit: { plan: "gratuit", priceLabel: "Aperçu gratuit", renewLabel: "Chapitres 1 et 2", stopLabel: "", active: false, paused: false },
 };

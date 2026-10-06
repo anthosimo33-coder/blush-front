@@ -19,7 +19,7 @@ export type MockServerState = {
   storyDeleted: boolean;
 };
 
-const KEY = "crush.mock-server.v1";
+const KEY = "blush.mock-server.v1";
 
 const DEFAULTS: MockServerState = {
   plan: "gratuit",

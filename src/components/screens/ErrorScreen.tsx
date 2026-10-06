@@ -16,7 +16,7 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
   },
   groupe: {
     title: "C’est une conversation de groupe.",
-    text: "CRUSH analyse seulement les conversations à deux. Exporte votre discussion privée.",
+    text: "BLUSH analyse seulement les conversations à deux. Exporte votre discussion privée.",
     action: "Choisir une autre conv",
     href: "/commencer",
     back: "/commencer",

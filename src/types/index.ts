@@ -1,10 +1,10 @@
-/* Types du domaine CRUSH — contrat avec le futur back-end. */
+/* Types du domaine BLUSH — contrat avec le futur back-end. */
 
 export type AppKind = "whatsapp" | "imessage" | "instagram" | "hinge" | "autre";
 export type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 export type Side = "toi" | "elle" | "pareil";
-export type Plan = "gratuit" | "rapport" | "crushplus";
+export type Plan = "gratuit" | "rapport" | "blushplus";
 export type Guess = "parle" | "vus" | "flou";
 export type Goal = "ensemble" | "reciproque" | "comprendre";
 export type LevelId = "parle" | "voit" | "dit" | "ensemble";
@@ -103,7 +103,7 @@ export type Report = {
   nextStep: string;
 };
 
-/** Landing : une conv d’exemple du bandeau qui défile, et le verdict qu’en tire CRUSH (exemple fictif). */
+/** Landing : une conv d’exemple du bandeau qui défile, et le verdict qu’en tire BLUSH (exemple fictif). */
 export type LandingConv = {
   id: string;
   /** Le nom tel qu’il est enregistré dans le téléphone. */
@@ -153,11 +153,11 @@ export type QuestionAnswer = {
 };
 
 /**
- * La réponse de CRUSH dans le chat : l’analyse d’un message (ce qu’il veut dire et ta meilleure réponse),
+ * La réponse de BLUSH dans le chat : l’analyse d’un message (ce qu’il veut dire et ta meilleure réponse),
  * la meilleure réponse seule, une réponse à une question, ou où vous en êtes (avec les niveaux).
- * `quoted` : CRUSH montre d’abord le message qu’il a lu.
+ * `quoted` : BLUSH montre d’abord le message qu’il a lu.
  */
-export type CrushAnswer =
+export type BlushAnswer =
   | { kind: "analysis"; reply: Reply; quoted?: boolean }
   | { kind: "best"; reply: Reply }
   | { kind: "answer"; answer: QuestionAnswer }
@@ -193,7 +193,7 @@ export type Fiche = {
   summaryShort: string;
 };
 
-/** Ce que CRUSH a trouvé dans des captures ou un export, déjà rangé dans sa fiche. */
+/** Ce que BLUSH a trouvé dans des captures ou un export, déjà rangé dans sa fiche. */
 export type FicheUpdate = {
   fiche: Fiche;
   added: FicheFact[];

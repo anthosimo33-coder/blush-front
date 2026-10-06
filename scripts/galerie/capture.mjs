@@ -1,5 +1,5 @@
 /*
- * Galerie des écrans CRUSH — capture tous les états puis génère la page.
+ * Galerie des écrans BLUSH — capture tous les états puis génère la page.
  *
  *   npm run galerie                         (serveur déjà lancé sur http://localhost:3100)
  *   BASE=http://localhost:3300 npm run galerie
@@ -67,13 +67,13 @@ async function shoot(browser, st, key) {
   await ctx.addInitScript(
     ({ journey, server }) => {
       try {
-        if (journey) sessionStorage.setItem("crush.journey.v1", JSON.stringify(journey));
+        if (journey) sessionStorage.setItem("blush.journey.v1", JSON.stringify(journey));
         const s = { ...server };
         if (s.analysisStartedAgo) {
           s.analysisStartedAt = Date.now() - s.analysisStartedAgo;
           delete s.analysisStartedAgo;
         }
-        if (Object.keys(s).length) sessionStorage.setItem("crush.mock-server.v1", JSON.stringify(s));
+        if (Object.keys(s).length) sessionStorage.setItem("blush.mock-server.v1", JSON.stringify(s));
       } catch {
         /* rien */
       }

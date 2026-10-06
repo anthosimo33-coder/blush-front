@@ -40,7 +40,7 @@ export const JOURNEY_DEFAULTS: JourneyState = {
   ficheCaptureName: null,
 };
 
-const KEY = "crush.journey.v1";
+const KEY = "blush.journey.v1";
 let state: JourneyState = JOURNEY_DEFAULTS;
 let loaded = false;
 const listeners = new Set<() => void>();

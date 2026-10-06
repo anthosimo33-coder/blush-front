@@ -1,7 +1,7 @@
 import type { LandingConv, Testimonial } from "@/types";
 
 /*
- * Landing : les convs qui défilent sous le titre, et le verdict que CRUSH montre quand on en choisit une.
+ * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
  * ⚠ Exemples fictifs, écrits pour la landing (à valider). Mêmes sens d’emojis :
  * 🤏 à deux doigts · 🔥 partant·e · 🤔 hésite · 🧊 s’éloigne.
  */
@@ -203,5 +203,5 @@ export const TESTIMONIALS: Testimonial[] = [];
 export const TESTIMONIAL_SLOTS: Testimonial[] = Array.from({ length: 3 }, () => ({
   name: "Prénom",
   label: "Sa situation",
-  text: "Ici, un vrai avis, publié avec l’accord de la personne. Deux ou trois phrases sur ce que CRUSH lui a appris.",
+  text: "Ici, un vrai avis, publié avec l’accord de la personne. Deux ou trois phrases sur ce que BLUSH lui a appris.",
 }));

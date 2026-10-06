@@ -10,7 +10,7 @@ import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
 
 /*
- * Écrans 18-19 — Mode sobre : quand le verdict est dur, CRUSH sort du jeu.
+ * Écrans 18-19 — Mode sobre : quand le verdict est dur, BLUSH sort du jeu.
  * Pas de couleur de sens, pas de 3D, pas de score, pas de logo en volume. Encre et papier seulement.
  */
 const QUIT_HREF = "/commencer"; /* « Quitter vite » mène à l’écran 01, comme dans la maquette */

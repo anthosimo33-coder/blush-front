@@ -145,7 +145,7 @@ export function LockRow({ number, title, last = false, onClick }: { number: numb
 const FLOW = [
   { title: "Ta conv", sub: "Export ou captures" },
   { title: "Qui est qui", sub: "Et ce que tu veux" },
-  { title: "Ton email", sub: "Puis CRUSH analyse votre histoire" },
+  { title: "Ton email", sub: "Puis BLUSH analyse votre histoire" },
 ];
 
 export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {

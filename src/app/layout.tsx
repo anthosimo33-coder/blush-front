@@ -22,7 +22,7 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: { default: "CRUSH", template: "%s · CRUSH" },
+  title: { default: "BLUSH", template: "%s · BLUSH" },
   description: "Passe de « on se parle » à « on est ensemble ».",
   robots: { index: false },
 };

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
-import { sendToCrush, sendVoiceToCrush, type CrushAnswer } from "@/services/api";
+import { sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
 import { REPORT } from "@/mocks/report";
 import { FICHE } from "@/mocks/daily";
 import { STORY } from "@/mocks/story";
@@ -13,7 +13,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { Bubble as MessageBubble, ConfidenceLine, CrushTyping, Tag } from "@/components/ui/messages";
+import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
 import { LEVELS } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -23,18 +23,18 @@ import { RecordingBar, useVoiceRecorder, VoiceNote, type VoiceClip, type VoiceEr
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
 
-/** `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la réponse qui remplace « CRUSH écrit ». */
+/** `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la réponse qui remplace « BLUSH écrit ». */
 type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answered?: boolean };
 
 type Msg = (
-  | { id: number; from: "crush"; intro: "next" | "hint" }
-  | { id: number; from: "crush"; reading: string; leaving?: boolean }
-  | { id: number; from: "crush"; result: CrushAnswer; fromCapture?: boolean }
+  | { id: number; from: "blush"; intro: "next" | "hint" }
+  | { id: number; from: "blush"; reading: string; leaving?: boolean }
+  | { id: number; from: "blush"; result: BlushAnswer; fromCapture?: boolean }
   | { id: number; from: "toi"; text: string }
   | { id: number; from: "toi"; images: string[] }
   | { id: number; from: "toi"; file: { name: string; size: number } }
   | { id: number; from: "toi"; voice: Pick<VoiceClip, "url" | "seconds" | "peaks"> }
-  | { id: number; from: "crush"; notice: string }
+  | { id: number; from: "blush"; notice: string }
 ) &
   Stamp;
 
@@ -42,8 +42,8 @@ type Msg = (
 type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
 
 const INTRO: Msg[] = [
-  { id: -2, from: "crush", intro: "next", seed: { day: -1, h: 21, m: 40 } },
-  { id: -1, from: "crush", intro: "hint", seed: { day: -1, h: 21, m: 41 } },
+  { id: -2, from: "blush", intro: "next", seed: { day: -1, h: 21, m: 40 } },
+  { id: -1, from: "blush", intro: "hint", seed: { day: -1, h: 21, m: 41 } },
 ];
 
 /* L’heure d’ouverture de l’écran, lue dans le navigateur seulement : rien au rendu serveur, donc pas d’écart à l’hydratation */
@@ -55,7 +55,7 @@ function useOpenedAt() {
 }
 
 /*
- * Écran 13 — Accueil. Au quotidien, tout passe par le chat avec CRUSH : écrire, ajouter des captures,
+ * Écran 13 — Accueil. Au quotidien, tout passe par le chat avec BLUSH : écrire, ajouter des captures,
  * importer un nouvel export. Le rapport et sa fiche restent à un toucher,
  * dans les détails du contact (comme la fiche d’un contact dans Messages).
  * Mobile : plein écran. Desktop : une fenêtre de conv.
@@ -73,7 +73,7 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
   const typed = text.trim().length > 0;
   /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
   const [asked, setAsked] = useState<string[]>([]);
-  /* CRUSH « écrit » : sa bulle s’anime en haut de la conv */
+  /* BLUSH « écrit » : sa bulle s’anime en haut de la conv */
   const busy = msgs.some((m) => "reading" in m);
   const opened = useOpenedAt();
 
@@ -89,13 +89,13 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
 
   const id = () => nextId.current++;
 
-  /** Ton message part, CRUSH tape « … », puis sa réponse remplace les trois points. */
+  /** Ton message part, BLUSH tape « … », puis sa réponse remplace les trois points. */
   const exchange = async (mine: Msg, label: string, answer: () => Promise<NewMsg>) => {
     const readingId = id();
     const sent = Date.now();
-    setMsgs((m) => [...m, { ...mine, at: sent }, { id: readingId, from: "crush", reading: label, at: sent }]);
+    setMsgs((m) => [...m, { ...mine, at: sent }, { id: readingId, from: "blush", reading: label, at: sent }]);
     const next = await answer();
-    /* « CRUSH écrit » se replie d’abord vers sa pointe, puis la réponse monte à sa place */
+    /* « BLUSH écrit » se replie d’abord vers sa pointe, puis la réponse monte à sa place */
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setMsgs((m) => m.map((x) => (x.id === readingId ? { ...x, leaving: true } : x)));
       await new Promise((r) => setTimeout(r, 190));
@@ -104,8 +104,8 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
   };
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[] }, fromCapture = false) =>
-    exchange(mine, "CRUSH analyse sa réponse", async () => {
-      return { from: "crush", result: await sendToCrush(payload), fromCapture };
+    exchange(mine, "BLUSH analyse sa réponse", async () => {
+      return { from: "blush", result: await sendToBlush(payload), fromCapture };
     });
 
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite */
@@ -130,13 +130,13 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
 
   const sendExport = ([file]: File[]) => ask({ id: id(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
 
-  /* Le vocal : le micro est demandé au premier toucher ; sans micro, CRUSH le dit dans la conv */
+  /* Le vocal : le micro est demandé au premier toucher ; sans micro, BLUSH le dit dans la conv */
   const micRefused = (e: VoiceError) =>
     setMsgs((m) => [
       ...m,
       {
         id: id(),
-        from: "crush",
+        from: "blush",
         at: Date.now(),
         notice:
           e === "denied"
@@ -152,27 +152,27 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
   const sendVoice = async () => {
     const clip = await voice.stop(true);
     if (clip === "empty") {
-      setMsgs((m) => [...m, { id: id(), from: "crush", at: Date.now(), notice: "Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi." }]);
+      setMsgs((m) => [...m, { id: id(), from: "blush", at: Date.now(), notice: "Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi." }]);
       return;
     }
     if (!clip) return;
     urls.current.push(clip.url);
-    exchange({ id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } }, "CRUSH écoute ton vocal", async () => ({
-      from: "crush",
-      result: await sendVoiceToCrush({ audio: clip.blob, seconds: clip.seconds }),
+    exchange({ id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } }, "BLUSH écoute ton vocal", async () => ({
+      from: "blush",
+      result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }),
     }));
   };
 
   return (
     <AppScreen
-      requires="crushplus"
+      requires="blushplus"
       aside={null}
       mainWidth={WINDOW_W}
       frameWidth={WINDOW_W}
       contentGap={0}
       desktopTopPad={0}
       mobileTop={
-        /* En haut : CRUSH en grand au centre (sa bulle flotte et s’anime quand il répond), Sophie à droite comme un contact.
+        /* En haut : BLUSH en grand au centre (sa bulle flotte et s’anime quand il répond), Sophie à droite comme un contact.
            Le fond s’efface vers le bas : les messages passent dessous en douceur. */
         <header className="pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden">
           <span aria-hidden="true" className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]" />
@@ -180,7 +180,7 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
             <div className="pointer-events-auto mt-3 flex">
               <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
             </div>
-            <CrushTitle big busy={busy} onClick={() => setDetails(true)} />
+            <BlushTitle big busy={busy} onClick={() => setDetails(true)} />
             <div className="mt-2 flex justify-end">
               <SophieButton />
             </div>
@@ -188,12 +188,12 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
         </header>
       }
     >
-      <h1 className="sr-only">Ta conv avec CRUSH</h1>
+      <h1 className="sr-only">Ta conv avec BLUSH</h1>
       <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
-        {/* Desktop : la barre de la fenêtre, comme sur mobile (CRUSH au centre, Sophie à droite) */}
+        {/* Desktop : la barre de la fenêtre, comme sur mobile (BLUSH au centre, Sophie à droite) */}
         <div className="hidden h-[112px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[rgba(17,17,20,0.06)] px-5 lg:grid">
           <span aria-hidden="true" />
-          <CrushTitle busy={busy} onClick={() => setDetails(true)} />
+          <BlushTitle busy={busy} onClick={() => setDetails(true)} />
           <div className="flex justify-end">
             <SophieButton />
           </div>
@@ -203,19 +203,19 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
         <div
           ref={thread}
           role="log"
-          aria-label="Ta conv avec CRUSH"
+          aria-label="Ta conv avec BLUSH"
           aria-live="polite"
           className="flex flex-1 flex-col justify-end px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6"
         >
           <Thread msgs={msgs} opened={opened} />
         </div>
 
-        {/* La barre de saisie : « + » pour des captures ou un export, ou un message à CRUSH */}
+        {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
         <form
           onSubmit={sendText}
           className="sticky bottom-0 z-10 -mb-6 mt-auto border-t border-[rgba(17,17,20,0.06)] bg-[rgba(244,242,237,0.88)] px-[18px] pb-[max(14px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:static lg:mb-0 lg:bg-white lg:px-6 lg:py-4 lg:backdrop-blur-none"
         >
-          {/* Les questions toutes prêtes, au-dessus du champ (rien pendant que tu écris, que CRUSH répond ou que tu enregistres) */}
+          {/* Les questions toutes prêtes, au-dessus du champ (rien pendant que tu écris, que BLUSH répond ou que tu enregistres) */}
           {quickLeft.length > 0 && !typed && !busy && !menu && voice.phase === "idle" && (
             <div
               role="group"
@@ -278,11 +278,11 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
               </div>
             ) : (
               <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214] lg:bg-[#F4F2ED] lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_#121214]">
-                <span className="sr-only">Écris à CRUSH, ou colle sa réponse</span>
+                <span className="sr-only">Écris à BLUSH, ou colle sa réponse</span>
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Écris à CRUSH"
+                  placeholder="Écris à BLUSH"
                   enterKeyHint="send"
                   className="min-w-0 flex-1 bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-grey"
                 />
@@ -316,17 +316,17 @@ export function HomeScreen({ quick = [] }: { quick?: string[] }) {
   );
 }
 
-/* ———— En-tête : CRUSH en grand, comme le personnage de la conv (sa bulle, son nom en pastille) ———— */
-function CrushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: () => void; big?: boolean }) {
+/* ———— En-tête : BLUSH en grand, comme le personnage de la conv (sa bulle, son nom en pastille) ———— */
+function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: () => void; big?: boolean }) {
   return (
-    <button type="button" onClick={onClick} aria-haspopup="dialog" aria-label="CRUSH, ce qu’il voit de vous deux" className="group pointer-events-auto flex flex-col items-center px-1 text-ink">
+    <button type="button" onClick={onClick} aria-haspopup="dialog" aria-label="BLUSH, ce qu’il voit de vous deux" className="group pointer-events-auto flex flex-col items-center px-1 text-ink">
       <span data-float="" className="block" style={{ "--r": "-3deg" } as CSSProperties}>
         <span className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] transition-transform duration-300 [transition-timing-function:var(--ease-pop)] group-hover:scale-105 group-active:scale-95">
           <BubbleLogo size={big ? 88 : 64} animated={busy} />
         </span>
       </span>
       <span className={cn("inline-flex items-center gap-1 rounded-full bg-white font-black leading-none tracking-[-0.02em] shadow-[0_0_0_1px_rgba(17,17,20,0.08),0_6px_14px_-6px_rgba(17,17,20,0.3)]", big ? "-mt-1 h-[30px] pl-3.5 pr-2 text-[15px]" : "-mt-1 h-[26px] pl-2.5 pr-1.5 text-[14px]")}>
-        crush
+        blush
         <Icon name="chevron" size={big ? 13 : 12} color="#8A8780" stroke={3} />
       </span>
     </button>
@@ -387,7 +387,7 @@ function rowsOf(msgs: Msg[], opened: number | null) {
     /* Chaque nouveau jour s’annonce par sa date, comme dans Messages */
     if (prev === undefined || (at !== null && prev !== null && dayStart(at) !== dayStart(prev))) rows.push({ kind: "day", key: `jour-${m.id}`, at });
     prev = at;
-    /* « CRUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent */
+    /* « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent */
     const items = bubblesOf(m).map((node, k) => ({ key: node.tone === "typing" ? `${m.id}-ecrit` : `${m.id}-${k}`, node }));
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
@@ -444,7 +444,7 @@ function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
   );
 }
 
-/** Les bulles d’un même expéditeur : l’avatar de CRUSH sous la dernière, l’heure dessous (ou « CRUSH écrit » à la place). */
+/** Les bulles d’un même expéditeur : l’avatar de BLUSH sous la dernière, l’heure dessous (ou « BLUSH écrit » à la place). */
 function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
   const typing = row.items.find((it) => it.node.tone === "typing");
   const bubbles = row.items.filter((it) => it !== typing);
@@ -453,17 +453,17 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
     <div className="flex flex-col gap-[3px]">
       {bubbles.map((it, i) => {
         const pos: Pos = n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle";
-        return row.from === "crush" ? (
+        return row.from === "blush" ? (
           <div key={it.key} data-rise="" className="flex items-end gap-2" style={{ "--d": `${i * 0.06}s` } as CSSProperties}>
             {i === n - 1 ? (
-              /* Juste après « CRUSH écrit », sa petite bulle arrive d’un bond avec la réponse */
+              /* Juste après « BLUSH écrit », sa petite bulle arrive d’un bond avec la réponse */
               <span data-land={row.landed ? "" : undefined} className="-mb-0.5 block shrink-0">
                 <BubbleLogo size={34} />
               </span>
             ) : (
               <span aria-hidden="true" className="w-[34px] shrink-0" />
             )}
-            <BubbleShape side="crush" pos={pos} node={it.node} />
+            <BubbleShape side="blush" pos={pos} node={it.node} />
           </div>
         ) : (
           <div key={it.key} data-rise="" className="flex justify-end">
@@ -476,7 +476,7 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
           {typing.node.body}
         </div>
       ) : (
-        <span className={cn("mt-0.5 h-3.5 text-[11px] font-bold leading-[14px] text-grey", row.from === "crush" ? "pl-[46px]" : "pr-1.5 text-right")}>
+        <span className={cn("mt-0.5 h-3.5 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "pr-1.5 text-right")}>
           {row.at === null ? "\u00a0" : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
         </span>
       )}
@@ -487,10 +487,10 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
 /** Une bulle : sa forme vient de sa place dans le groupe, son style de son contenu. */
 type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare" | "typing"; className?: string };
 
-function BubbleShape({ side, pos, node }: { side: "crush" | "toi"; pos: Pos; node: BubbleNode }) {
+function BubbleShape({ side, pos, node }: { side: "blush" | "toi"; pos: Pos; node: BubbleNode }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
   const corners =
-    side === "crush"
+    side === "blush"
       ? { single: "", first: "rounded-bl-[6px]", middle: "rounded-l-[6px]", last: "rounded-tl-[6px]" }[pos]
       : { single: "", first: "rounded-br-[6px]", middle: "rounded-r-[6px]", last: "rounded-tr-[6px]" }[pos];
   return (
@@ -532,12 +532,12 @@ function bubblesOf(m: Msg): BubbleNode[] {
             body: (
               <span className="flex flex-col gap-1">
                 <span className="text-[16px] font-black leading-[1.3]">Elle vient de répondre ?</span>
-                <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse : capture, export ou texte. CRUSH reconnaît tout seul.</span>
+                <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse : capture, export ou texte. BLUSH reconnaît tout seul.</span>
               </span>
             ),
           },
         ];
-  if ("reading" in m) return [{ tone: "typing", body: <CrushTyping label={m.reading} leaving={m.leaving} /> }];
+  if ("reading" in m) return [{ tone: "typing", body: <BlushTyping label={m.reading} leaving={m.leaving} /> }];
   if ("notice" in m) return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
   if ("voice" in m) return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
   if ("text" in m) return [{ body: <span className="whitespace-pre-wrap text-[16px] font-bold leading-[1.4]">{m.text}</span> }];
@@ -629,7 +629,7 @@ function bubblesOf(m: Msg): BubbleNode[] {
       },
     ];
   return [
-    /* Sur une capture (ou une question sur son dernier message), CRUSH montre d’abord le message qu’il a lu */
+    /* Sur une capture (ou une question sur son dernier message), BLUSH montre d’abord le message qu’il a lu */
     ...(m.fromCapture || r.quoted ? [incoming(r.reply)] : []),
     {
       body: (
@@ -737,7 +737,7 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <IconButton icon="close" label="Fermer" onClick={onClose} className="!absolute right-0 top-0" />
         <span className="flex items-center gap-1.5 text-[13px] font-black text-grey">
           <BubbleLogo size={22} />
-          Ce que CRUSH voit
+          Ce que BLUSH voit
         </span>
         <Avatar tone="elle" size={72} fontSize={28}>
           {FICHE.person.initial}

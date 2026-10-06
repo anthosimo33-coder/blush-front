@@ -1,11 +1,11 @@
 /**
- * Couche de service CRUSH — le seul point de contact avec les données.
+ * Couche de service BLUSH — le seul point de contact avec les données.
  * Aujourd’hui : renvoie les mocks. Demain : brancher le vrai back-end ne touche que ce fichier.
  */
 import type {
   AnalysisProgress,
   AppKind,
-  CrushAnswer,
+  BlushAnswer,
   Fiche,
   FicheFact,
   FicheUpdate,
@@ -164,17 +164,17 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
 }
 
 /**
- * Le chat de l’accueil. Simulation : un texte qui finit par « ? » est une question pour CRUSH,
+ * Le chat de l’accueil. Simulation : un texte qui finit par « ? » est une question pour BLUSH,
  * tout le reste (texte collé, captures, export) est lu comme sa réponse à elle.
  */
-export type { CrushAnswer };
+export type { BlushAnswer };
 
 /** Les questions toutes prêtes du chat (celles que promet la landing). */
 export async function getQuickQuestions(): Promise<string[]> {
   return QUICK_QUESTIONS.map((q) => q.question);
 }
 
-export async function sendToCrush(input: { text?: string; files?: File[] }): Promise<CrushAnswer> {
+export async function sendToBlush(input: { text?: string; files?: File[] }): Promise<BlushAnswer> {
   void input.files;
   await delay(2000);
   const text = input.text?.trim();
@@ -184,8 +184,8 @@ export async function sendToCrush(input: { text?: string; files?: File[] }): Pro
   return { kind: "analysis", reply: REPLY };
 }
 
-/** Un vocal pour CRUSH. Simulation : en vrai, le back-end le transcrit, puis CRUSH répond à ce qui est dit. */
-export async function sendVoiceToCrush(input: { audio: Blob; seconds: number }): Promise<CrushAnswer> {
+/** Un vocal pour BLUSH. Simulation : en vrai, le back-end le transcrit, puis BLUSH répond à ce qui est dit. */
+export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
   void input.audio;
   await delay(2200);
   return { kind: "answer", answer: VOICE_ANSWER };
@@ -205,7 +205,7 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
 }
 
 /**
- * Des captures ou un export pour sa fiche : CRUSH y trouve des infos sur elle et les range lui-même, dans la bonne rubrique.
+ * Des captures ou un export pour sa fiche : BLUSH y trouve des infos sur elle et les range lui-même, dans la bonne rubrique.
  * Ce qu’il savait déjà n’est pas doublé (sa nouvelle source s’ajoute). Rien n’est cherché ailleurs.
  * Simulation : une capture donne sa bio Hinge, un export de nouveaux messages de votre conv.
  */

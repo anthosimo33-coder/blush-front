@@ -17,7 +17,7 @@ import type { AppKind } from "@/types";
 
 type Shot = { id: string; file: File; url: string | null };
 
-/* Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (CRUSH retrie aussi par date). Ou un enregistrement d’écran. */
+/* Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement d’écran. */
 export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode: boolean }) {
   const router = useRouter();
   const [journey] = useJourney();
@@ -106,7 +106,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
           <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video ? undefined : shots.open} />
           {items.length > 1 && !result?.video && (
             <p id="ordre-aide" className="m-0 text-[13px] font-extrabold leading-[1.45] text-grey">
-              Maintiens une capture et glisse-la pour changer l’ordre. CRUSH les remettra aussi dans l’ordre des dates.
+              Maintiens une capture et glisse-la pour changer l’ordre. BLUSH les remettra aussi dans l’ordre des dates.
             </p>
           )}
           <p aria-live="polite" className="sr-only">

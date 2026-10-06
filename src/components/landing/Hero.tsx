@@ -23,7 +23,7 @@ export function Hero({ children }: { children?: ReactNode }) {
           </span>
         </h1>
         <p className="m-0 mt-6 max-w-[600px] text-[18px] font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
-          Importe votre conv. CRUSH te dit où vous en êtes, preuves à l’appui, et t’aide à passer à l’étape suivante.
+          Importe votre conv. BLUSH te dit où vous en êtes, preuves à l’appui, et t’aide à passer à l’étape suivante.
         </p>
         <CtaButton className="mt-8 lg:mt-10" />
         <span className="mt-3.5 text-[14px] font-extrabold text-grey">Aperçu gratuit · Sans mot de passe</span>

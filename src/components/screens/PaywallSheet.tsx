@@ -13,8 +13,8 @@ import { Sheet } from "@/components/ui/surfaces";
 import type { Offer, Plan } from "@/types";
 
 /**
- * Écran 10 — Paiement : CRUSH+ (conseillé) ou le rapport complet, un seul bouton « Débloquer ».
- * `only="crushplus"` sert de porte d’entrée aux fonctions CRUSH+ (accueil, aide à chaque message, fiche).
+ * Écran 10 — Paiement : BLUSH+ (conseillé) ou le rapport complet, un seul bouton « Débloquer ».
+ * `only="blushplus"` sert de porte d’entrée aux fonctions BLUSH+ (accueil, aide à chaque message, fiche).
  */
 export function PaywallSheet({
   open,
@@ -34,7 +34,7 @@ export function PaywallSheet({
 }) {
   const router = useRouter();
   const offers = only ? OFFERS.filter((o) => o.id === only) : OFFERS;
-  const [selected, setSelected] = useState<Offer["id"]>(only ?? "crushplus");
+  const [selected, setSelected] = useState<Offer["id"]>(only ?? "blushplus");
   const [busy, setBusy] = useState(false);
 
   const pay = async () => {
@@ -50,7 +50,7 @@ export function PaywallSheet({
   return (
     <Sheet open={open} onClose={onClose} labelledBy="paywall-title">
       <h2 id="paywall-title" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
-        {only ? "CRUSH+" : PAYWALL.title(otherName)}
+        {only ? "BLUSH+" : PAYWALL.title(otherName)}
       </h2>
       {!only && <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">{PAYWALL.subtitle}</p>}
       {/* Les offres, comme un choix d’abonnement sur iPhone : un rond à cocher, le prix aligné à droite */}

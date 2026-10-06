@@ -146,7 +146,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     const text = `${verdict.emoji} ${verdict.title} ${verdict.subtitle}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "CRUSH", text });
+        await navigator.share({ title: "BLUSH", text });
         return;
       }
     } catch {
@@ -191,7 +191,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
         <div className="mt-3 flex items-center justify-between">
           <span className="flex items-center gap-2 text-[14px] font-black tracking-[-0.01em]">
             <BubbleLogo size={26} />
-            CRUSH
+            BLUSH
           </span>
           <a href="/rapport" onClick={leave} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
             Passer
@@ -370,7 +370,7 @@ function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HT
   return (
     <div className="flex flex-col items-center text-center">
       <p data-rise="" className="m-0 text-[15px] font-black text-white/70">
-        CRUSH a analysé
+        BLUSH a analysé
       </p>
       <h2 ref={heading} tabIndex={-1} className="m-0 mt-1 outline-none">
         {step}

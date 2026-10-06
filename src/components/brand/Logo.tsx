@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { BubbleLogo } from "./objects3d";
 
-/** Logo officiel : la bulle rose en volume suivie de « crush » en minuscules, Nunito 900. */
+/** Logo officiel : la bulle rose en volume suivie de « blush » en minuscules, Nunito 900. */
 export function Logo({
   size = 32,
   fontSize = 22,
@@ -24,12 +24,12 @@ export function Logo({
       style={{ fontSize, letterSpacing: "-0.03em" }}
     >
       <BubbleLogo size={size} animated={animated} />
-      crush
+      blush
     </span>
   );
   if (!href) return mark;
   return (
-    <Link href={href} aria-label="crush, accueil" className="relative block no-underline after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']">
+    <Link href={href} aria-label="blush, accueil" className="relative block no-underline after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']">
       {mark}
     </Link>
   );
