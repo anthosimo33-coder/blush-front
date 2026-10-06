@@ -225,8 +225,29 @@ export const STATES = [
     },
     note: "Au retour, on propose de reprendre là où tu t’étais arrêté (sans sauter tout seul).",
   },
-  { id: "12", section: "rapport", title: "Ta question", state: "Saisie", route: "/rapport/question", server: { plan: "rapport" }, note: "État de saisie absent des maquettes." },
-  { id: "12b", section: "rapport", title: "Ta question", state: "Réponse", route: "/rapport/question", server: { plan: "rapport", questionAsked: "Est-ce qu’elle voit quelqu’un d’autre ?" }, ref: "12-ta-question" },
+  {
+    id: "12p", section: "rapport", title: "Ta question", state: "Proposition · les idées", route: "/rapport/question", server: { plan: "rapport" },
+    note: "Proposition\u00a0: la question en conversation avec CRUSH (l’écran actuel suit, en 12 et 12b, sur ?version=actuelle). CRUSH t’accueille, propose 4 questions tirées du rapport, comme des réponses toutes prêtes. «\u00a01 question incluse\u00a0» pour le plan rapport. Textes à valider.",
+  },
+  {
+    id: "12q", section: "rapport", title: "Ta question", state: "Proposition · idée choisie", route: "/rapport/question", server: { plan: "rapport" },
+    steps: click("on est quoi", { wait: 500 }),
+    note: "Un toucher met la question dans le champ, sans l’envoyer\u00a0: la question incluse ne part pas par erreur. On peut la modifier, ou retoucher l’idée pour la retirer.",
+  },
+  {
+    id: "12r", section: "rapport", title: "Ta question", state: "Proposition · CRUSH écrit", route: "/rapport/question", server: { plan: "rapport" }, motion: true,
+    steps: async (page) => {
+      await click("on est quoi", { wait: 300 })(page);
+      await click("Poser ma question", { wait: 1100 })(page);
+    },
+    note: "Ta question part en bulle bleue\u00a0; CRUSH écrit (sa bulle et la grande bulle du haut s’animent).",
+  },
+  {
+    id: "12s", section: "rapport", title: "Ta question", state: "Proposition · la réponse", route: "/rapport/question", server: { plan: "rapport", questionAsked: "Que voulait dire son «\u00a0on est quoi\u00a0» du 2 mars\u00a0?" }, full: true,
+    note: "La réponse en bulles\u00a0: l’essentiel en grand, puis la preuve (son vrai message), l’explication et la confiance. Ensuite\u00a0: «\u00a0Retour au rapport\u00a0», et «\u00a0Toutes tes questions, avec CRUSH+\u00a0» (avec CRUSH+\u00a0: «\u00a0Continuer dans ton chat\u00a0»). Chaque idée a sa propre réponse, tirée du rapport.",
+  },
+  { id: "12", section: "rapport", title: "Ta question", state: "Actuel · saisie", route: "/rapport/question?version=actuelle", server: { plan: "rapport" }, note: "L’écran actuel, gardé pour comparer. État de saisie absent des maquettes." },
+  { id: "12b", section: "rapport", title: "Ta question", state: "Actuel · réponse", route: "/rapport/question?version=actuelle", server: { plan: "rapport", questionAsked: "Est-ce qu’elle voit quelqu’un d’autre ?" }, ref: "12-ta-question" },
   { id: "18", section: "rapport", title: "Mode sobre, le verdict", route: "/rapport", server: { verdict: "difficile" }, ref: "18-sobre-verdict-difficile" },
   { id: "19", section: "rapport", title: "Mode sobre, passer à autre chose", route: "/rapport", server: { verdict: "difficile" }, steps: click("Et maintenant ?"), ref: "19-sobre-passer-a-autre-chose" },
   { id: "18b", section: "rapport", title: "Mode sobre", state: "Besoin d’en parler", route: "/rapport", server: { verdict: "difficile" }, steps: click("Besoin d’en parler à quelqu’un ?"), sheet: true, note: "Ressources d’aide à valider." },

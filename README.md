@@ -12,7 +12,7 @@ npm run build && npm start
 
 | Dossier | Rôle |
 |---|---|
-| `src/app/` | La landing (`/`), une route par écran (01 à 20), plus `/styleguide`. L'écran 14 (son message) vit désormais dans le chat de l'accueil (`/app`) ; l'écran 15 (relire ma réponse) a été retiré ; l'écran 17 (ajouter à sa fiche) se fait dans la fiche elle-même (`/app/fiche`), où CRUSH range tout seul ce qu'il trouve. Proposition : après l'analyse, `/rapport/verdict` révèle le verdict en cartes (comme des stories) avant le rapport, qui ne change pas. Chaque `page.tsx` charge ses données via la couche de service, puis affiche l'écran client (`*Screen.tsx`). |
+| `src/app/` | La landing (`/`), une route par écran (01 à 20), plus `/styleguide`. L'écran 14 (son message) vit désormais dans le chat de l'accueil (`/app`) ; l'écran 15 (relire ma réponse) a été retiré ; l'écran 17 (ajouter à sa fiche) se fait dans la fiche elle-même (`/app/fiche`), où CRUSH range tout seul ce qu'il trouve. Proposition : après l'analyse, `/rapport/verdict` révèle le verdict en cartes (comme des stories) avant le rapport, qui ne change pas. Proposition : « Ta question » (`/rapport/question`) se pose en conversation avec CRUSH, avec des idées tirées du rapport ; l'écran actuel reste sur `?version=actuelle`. Chaque `page.tsx` charge ses données via la couche de service, puis affiche l'écran client (`*Screen.tsx`). |
 | `src/components/ui/` | Composants du design system : Button, Chip, Segmented, Switch, tuiles, cartes, Bubble, ProofCard, Tag, ScoreBar, LevelPath, ProgressDots, LockRow, blocs du rapport, Sheet, Toast, EmailField. |
 | `src/components/brand/` | Logo et objets 3D en SVG, portés depuis `maquettes/objets-3d-source.py` : bulle, sphères nacre et opale, cadenas, cloche, coche. |
 | `src/components/landing/` | La landing : le titre en bulles, les convs qui défilent (on en touche une, son verdict s’ouvre), CRUSH+ en bloc noir (avec la grosse main en guise de curseur), les avis, les faits. Ses textes et ses convs d’exemple sont dans `src/mocks/landing.ts`. |
@@ -40,6 +40,6 @@ Ces états restent en mémoire pendant la session. Pour tout remettre à zéro, 
 
 ## Brancher le back-end
 
-Il suffit de remplacer le corps des fonctions de `src/services/api.ts` : `uploadExport`, `uploadScreenshots`, `getStory`, `startAnalysis`, `getAnalysisProgress`, `getReport`, `unlock`, `sendToCrush`, `analyzeMessage`, `askQuestion`, `getFiche`, `updateFiche`, `addToFiche`, `sendLoginCode`, `verifyLoginCode`, `getAccount`, `deleteStory`, etc. Leurs signatures sont déjà typées.
+Il suffit de remplacer le corps des fonctions de `src/services/api.ts` : `uploadExport`, `uploadScreenshots`, `getStory`, `startAnalysis`, `getAnalysisProgress`, `getReport`, `unlock`, `sendToCrush`, `analyzeMessage`, `askQuestion`, `getQuestionIdeas`, `getFiche`, `updateFiche`, `addToFiche`, `sendLoginCode`, `verifyLoginCode`, `getAccount`, `deleteStory`, etc. Leurs signatures sont déjà typées.
 
 `getReport()` renvoie déjà les chapitres non payés verrouillés et sans contenu (`locked: true`) : l'interface sait les afficher. `mocks/server.ts` et `state/DemoParams.tsx` ne servent qu'à la démo.

@@ -146,6 +146,8 @@ export type QuestionAnswer = {
   title: string;
   evidenceLabel: string;
   evidence: string;
+  /** Le vrai message sur lequel s’appuie la réponse, s’il y en a un. */
+  message?: Message;
   confidence: Confidence;
   limits: string;
 };

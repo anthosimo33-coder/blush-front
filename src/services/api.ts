@@ -20,7 +20,7 @@ import type {
   Subscription,
 } from "@/types";
 import { FICHE, FICHE_FINDINGS, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
-import { QUESTION_ANSWER, REPORT, SOBER_REPORT } from "@/mocks/report";
+import { QUESTION_ANSWER, QUESTION_IDEAS, REPORT, SOBER_REPORT } from "@/mocks/report";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP, STORY } from "@/mocks/story";
 import { delay, mockServer } from "@/mocks/server";
 
@@ -131,15 +131,27 @@ export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscript
 
 /* ———— Question incluse ———— */
 
+/* Simulation : une question toute prête reçoit sa réponse ; une question libre, la réponse type */
+const sameQuestion = (a: string, b: string) => {
+  const norm = (q: string) => q.toLowerCase().replace(/[’']/g, "'").replace(/[\s\u00a0\u202f]+/g, " ").trim();
+  return norm(a) === norm(b);
+};
+const answerTo = (question: string): QuestionAnswer => ({ ...(QUESTION_IDEAS.find((a) => sameQuestion(a.question, question)) ?? QUESTION_ANSWER), question });
+
+/** Des idées de questions, tirées du rapport. */
+export async function getQuestionIdeas(): Promise<string[]> {
+  return QUESTION_IDEAS.map((a) => a.question);
+}
+
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  await delay(1200);
+  await delay(2000);
   mockServer.set({ questionAsked: question });
-  return { ...QUESTION_ANSWER, question };
+  return answerTo(question);
 }
 
 export async function getQuestion(): Promise<QuestionAnswer | null> {
   const q = mockServer.get().questionAsked;
-  return q ? { ...QUESTION_ANSWER, question: q } : null;
+  return q ? answerTo(q) : null;
 }
 
 /* ———— Au quotidien ———— */

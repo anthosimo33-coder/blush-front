@@ -13,7 +13,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { Bubble as MessageBubble, ConfidenceLine, Tag } from "@/components/ui/messages";
+import { Bubble as MessageBubble, ConfidenceLine, CrushTyping, Tag } from "@/components/ui/messages";
 import { LEVELS } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -450,23 +450,6 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
         </span>
       )}
     </div>
-  );
-}
-
-/**
- * CRUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
- * l’une après l’autre, comme les points de Messages, en rose. La grande bulle du haut s’anime en même temps.
- */
-function CrushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
-  return (
-    <span role="status" className="block">
-      <span className="sr-only">{label}</span>
-      <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="block">
-        <span className="block">
-          <BubbleLogo size={62} animated />
-        </span>
-      </span>
-    </span>
   );
 }
 

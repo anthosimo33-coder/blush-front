@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { BubbleLogo } from "@/components/brand/objects3d";
 import type { Confidence } from "@/types";
 
 /* ———— Bulle : elle grise à gauche, toi bleue à droite. Figtree uniquement ici. ———— */
@@ -29,6 +30,23 @@ export function Bubble({
       </span>
       {caption !== undefined && <span className="text-[12px] font-extrabold text-grey">{caption}</span>}
     </div>
+  );
+}
+
+/**
+ * CRUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
+ * l’une après l’autre, comme les points de Messages, en rose (globals.css). `leaving` : elle se replie avant la réponse.
+ */
+export function CrushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
+  return (
+    <span role="status" className="block">
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="block">
+        <span className="block">
+          <BubbleLogo size={62} animated />
+        </span>
+      </span>
+    </span>
   );
 }
 

@@ -195,3 +195,36 @@ export const QUESTION_ANSWER: QuestionAnswer = {
   confidence: "probable",
   limits: "CRUSH ne voit que vos messages.",
 };
+
+/**
+ * Des questions toutes prêtes, tirées du rapport, avec la réponse de CRUSH (simulation : en vrai, le back-end répond).
+ * Chaque réponse reprend des faits du rapport. ⚠ Absent des maquettes : textes à valider.
+ */
+export const QUESTION_IDEAS: QuestionAnswer[] = [
+  QUESTION_ANSWER,
+  {
+    question: "Que voulait dire son « on est quoi » du 2 mars ?",
+    title: "Elle te demandait où vous en étiez, en gardant une porte de sortie.",
+    evidenceLabel: "Ce qu’on voit",
+    message: { from: "elle", text: "au fait on est quoi toi et moi mdr", caption: "Sophie · 2 mars, 23:41" },
+    evidence: "Son « mdr » permettait d’en rire si tu ne suivais pas. Après ton « mdr », ses messages passent de 31 mots en moyenne à 14.",
+    confidence: "sur",
+    limits: "messages exacts, horodatés",
+  },
+  {
+    question: "Pourquoi elle relance toujours après 22 h ?",
+    title: "C’est son moment pour toi, une fois sa journée finie.",
+    evidenceLabel: "Ce qu’on voit",
+    evidence: "Après 22 h, c’est elle qui relance, 7 fois sur 10. Et le soir, elle te répond en 4 min.",
+    confidence: "probable",
+    limits: "CRUSH ne voit que vos messages.",
+  },
+  {
+    question: "Comment lui proposer samedi sans la brusquer ?",
+    title: "Avec un jour et une heure, simplement.",
+    evidenceLabel: "Ce qu’on voit",
+    evidence: "4 plans sur 5 viennent d’elle. Quand tu proposes une date et une heure, elle répond en moins de 10 minutes.",
+    confidence: "probable",
+    limits: "CRUSH ne voit que vos messages.",
+  },
+];
