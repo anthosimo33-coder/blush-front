@@ -1,0 +1,3 @@
+# Ce qui ne part pas sur Vercel : la galerie de revue et ses captures, et les fichiers d’environnement locaux
+.galerie
+.env*
