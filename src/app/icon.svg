@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="23 26 164 164">
+  <!-- La bulle du logo (BubbleLogo, objects3d.tsx) sans les détails trop fins pour un onglet -->
+  <defs>
+    <radialGradient id="b" cx="0.3" cy="0.22" r="0.95">
+      <stop offset="0" stop-color="#FFD7EA"/>
+      <stop offset="0.32" stop-color="#FF7DBA"/>
+      <stop offset="0.72" stop-color="#E8358A"/>
+      <stop offset="1" stop-color="#A50F55"/>
+    </radialGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="o" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.45" stop-color="#7A0035" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7A0035" stop-opacity="0.32"/>
+    </linearGradient>
+    <radialGradient id="n" cx="0.36" cy="0.3" r="0.78">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.38" stop-color="#F3F1F7"/>
+      <stop offset="0.78" stop-color="#CEC8DB"/>
+      <stop offset="1" stop-color="#A79FBC"/>
+    </radialGradient>
+    <radialGradient id="p" cx="0.36" cy="0.3" r="0.78">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.16" stop-color="#DDFFF5"/>
+      <stop offset="0.4" stop-color="#A3D3FF"/>
+      <stop offset="0.64" stop-color="#E4B2FF"/>
+      <stop offset="0.86" stop-color="#FFC49B"/>
+      <stop offset="1" stop-color="#E39A86"/>
+    </radialGradient>
+  </defs>
+  <path d="M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z" fill="url(#b)"/>
+  <path d="M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z" fill="url(#o)"/>
+  <path d="M64 62 H136 A34 34 0 0 1 163 76 C135 69 96 69 58 84 A38 38 0 0 1 64 62 Z" fill="url(#h)" opacity="0.75"/>
+  <circle cx="70" cy="101" r="11.96" fill="url(#n)"/>
+  <circle cx="100" cy="101" r="11.96" fill="url(#n)"/>
+  <circle cx="130" cy="101" r="11.96" fill="url(#p)"/>
+  <ellipse cx="66.1" cy="95.54" rx="3.9" ry="2.34" transform="rotate(-32 66.1 95.54)" fill="#FFFFFF" opacity="0.85"/>
+  <ellipse cx="96.1" cy="95.54" rx="3.9" ry="2.34" transform="rotate(-32 96.1 95.54)" fill="#FFFFFF" opacity="0.85"/>
+  <ellipse cx="126.1" cy="95.54" rx="3.9" ry="2.34" transform="rotate(-32 126.1 95.54)" fill="#FFFFFF" opacity="0.85"/>
+</svg>
