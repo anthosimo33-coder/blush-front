@@ -32,8 +32,9 @@ export function Sheet({
     if (!d) return;
     if (open && !d.open) {
       d.showModal();
-      /* Le focus va sur le panneau (annoncé par son titre), pas sur la première option */
-      requestAnimationFrame(() => panel.current?.focus());
+      /* Le focus va sur le panneau (annoncé par son titre), pas sur la première option.
+         preventScroll : sinon Safari (iPhone) fait défiler la feuille pendant qu’elle monte, et elle reste coincée en haut */
+      requestAnimationFrame(() => panel.current?.focus({ preventScroll: true }));
       document.documentElement.style.overflow = "hidden";
     }
     if (!open && d.open) d.close();
@@ -53,7 +54,7 @@ export function Sheet({
       onClose={() => {
         document.documentElement.style.overflow = "";
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden bg-transparent p-0 text-ink backdrop:bg-transparent"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-clip bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
       {open && (
         <>

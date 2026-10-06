@@ -440,7 +440,7 @@ function formatSize(bytes: number) {
 function AddMenu({ onClose, onPick }: { onClose: () => void; onPick: (what: "shots" | "export") => void }) {
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    first.current?.focus();
+    first.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
