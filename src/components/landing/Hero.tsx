@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Container, CtaButton } from "./parts";
 
-/* Le héros : « on se parle » reçu, « on est ensemble » envoyé, puis (children) les convs qui défilent. */
+/* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
 
 const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[1100px] -translate-x-1/2 bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]";
 
@@ -16,14 +16,14 @@ export function Hero({ children }: { children?: ReactNode }) {
       <Container className="flex flex-col items-center text-center">
         <h1 className="m-0 text-[38px] font-black leading-[1.26] tracking-[-0.035em] sm:text-[58px] lg:text-[74px]">
           <span className="block">
-            De <Said>on se parle</Said>
+            Ta conv <Said>en dit plus</Said>
           </span>{" "}
           <span className="block">
-            à <Said me>on est ensemble</Said>.
+            <Said me>que tu crois</Said>.
           </span>
         </h1>
         <p className="m-0 mt-6 max-w-[600px] text-[18px] font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
-          Importe votre conv. BLUSH te dit où vous en êtes, preuves à l’appui, et t’aide à passer à l’étape suivante.
+          Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
         </p>
         <CtaButton className="mt-8 lg:mt-10" />
         <span className="mt-3.5 text-[14px] font-extrabold text-grey">Aperçu gratuit · Sans mot de passe</span>
