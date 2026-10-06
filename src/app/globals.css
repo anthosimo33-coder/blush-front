@@ -173,6 +173,25 @@
    Défini une fois ici (hors couche, donc prioritaire sur les ombres utilitaires).
    Survol seulement avec une souris ; la pression (« il s’enfonce d’1 px ») partout. */
 .lift { transition: translate 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease-out; }
+/* Landing : les blocs apparaissent au défilement (le survol « lift » garde ses propres transitions) */
+[data-reveal] { transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms), translate 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease-out; }
+.reveal-ready [data-reveal]:not([data-shown]) { opacity: 0; transform: translateY(18px); }
+/* Landing : les convs défilent en boucle (la copie prend le relais) et s’arrêtent au survol ou au clavier */
+@keyframes lpMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+[data-marquee] { animation: lpMarquee var(--marquee-s, 60s) linear infinite; }
+[data-marquee][data-reverse] { animation-direction: reverse; }
+.marquee:hover [data-marquee], .marquee:focus-within [data-marquee] { animation-play-state: paused; }
+/* Au clavier, la rangée revient à sa place et se fait glisser : la conv qui a le focus reste toujours visible */
+.marquee:has(:focus-visible) { overflow-x: auto; }
+.marquee:has(:focus-visible) [data-marquee] { animation: none; }
+/* Landing : la grosse main de la section CRUSH+ (souris seulement) et son « tape ici » sur écran tactile */
+[data-hand="on"], [data-hand="on"] * { cursor: none !important; }
+.big-hand { opacity: 0; transition: opacity 0.2s ease-out; }
+.big-hand[data-on] { opacity: 1; }
+.big-hand > * { transform-origin: 42% 10%; transition: transform 0.16s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.big-hand[data-press] > * { transform: scale(0.86) rotate(-8deg); transition-duration: 0.08s; }
+@keyframes lpTap { 0%, 55%, 100% { transform: rotate(-12deg) scale(1); } 70% { transform: rotate(-12deg) scale(0.86); } }
+[data-tap] { animation: lpTap 2.2s ease-in-out infinite; }
 .lift:is([aria-checked="true"], [aria-pressed="true"]) { --lift-hover: var(--ring-selected-hover); --lift-press: var(--ring-selected); }
 .lift-card { --lift-hover: var(--shadow-card-hover); --lift-press: var(--shadow-card); }
 .lift-ink { --lift-hover: var(--shadow-ink-hover); --lift-press: var(--shadow-ink-pressed); }
@@ -208,5 +227,5 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan] { animation: none !important; }
+  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap] { animation: none !important; }
 }

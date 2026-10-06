@@ -53,11 +53,15 @@ function jpegFromPng(src, dest) {
 
 async function shoot(browser, st, key) {
   const vp = VP[key];
+  /* `touch` : le mobile est capturé comme un vrai écran tactile (pas de survol, pointeur grossier) */
+  const touch = !!st.touch && key === "m";
   const ctx = await browser.newContext({
     viewport: { width: vp.width, height: vp.height },
     deviceScaleFactor: vp.dsf,
     reducedMotion: st.motion ? "no-preference" : "reduce",
     locale: "fr-FR",
+    hasTouch: touch,
+    isMobile: touch,
   });
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
   await ctx.addInitScript(
@@ -92,7 +96,8 @@ async function shoot(browser, st, key) {
     const full = !st.sheet;
     const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, window.innerHeight)) : vp.height;
     const rel = `img/${key}-${st.id}-${STAMP}.jpg`;
-    await page.screenshot({ path: path.join(OUT, rel), type: "jpeg", quality: 85, fullPage: full });
+    /* Au-delà de ~16 000 px, le navigateur recolle mal l’image : on capture alors en pixels CSS */
+    await page.screenshot({ path: path.join(OUT, rel), type: "jpeg", quality: 85, fullPage: full, scale: h * vp.dsf > 15000 ? "css" : "device" });
     return { src: rel, w: vp.width, h };
   } finally {
     await ctx.close();
@@ -165,7 +170,8 @@ async function main() {
     generatedAt: now.toISOString(),
     generatedLabel: `${part("day")} ${part("month")} à ${part("hour")} h ${part("minute")}`,
     sections: SECTIONS,
-    states: STATES.map(({ steps, journey, server, hover, motion, wait, ...s }) => ({ ...s, shots: shots[s.id] ?? previous(s.id), ref: refs[s.id] ?? null })),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- on retire du manifeste ce qui ne sert qu’à la capture
+    states: STATES.map(({ steps, journey, server, hover, motion, wait, touch, ...s }) => ({ ...s, shots: shots[s.id] ?? previous(s.id), ref: refs[s.id] ?? null })),
     planches,
   };
 

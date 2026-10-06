@@ -103,6 +103,32 @@ export type Report = {
   nextStep: string;
 };
 
+/** Landing : une conv d’exemple du bandeau qui défile, et le verdict qu’en tire CRUSH (exemple fictif). */
+export type LandingConv = {
+  id: string;
+  /** Le nom tel qu’il est enregistré dans le téléphone. */
+  name: string;
+  /** Ce que la personne est pour toi (« Ton crush »). */
+  label: string;
+  app: AppKind;
+  /** La pastille : l’icône de l’appli, ou l’initiale (rose : l’autre personne). */
+  avatar: "app" | "initial";
+  verdict: Pick<Verdict, "emoji" | "title" | "subtitle">;
+  /** La preuve : un de ses messages, daté. */
+  proof: { text: string; caption: string };
+  confidence: Confidence;
+  proofs: number;
+  next: string;
+};
+
+/** Landing : un vrai avis, publié avec l’accord de la personne. */
+export type Testimonial = {
+  name: string;
+  /** Sa situation (« Situationship »). */
+  label: string;
+  text: string;
+};
+
 /** Le mode sobre (verdict difficile). */
 export type SoberReport = {
   intro: string;

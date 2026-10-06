@@ -5,6 +5,7 @@
  */
 
 export const SECTIONS = [
+  { id: "landing", title: "Landing", sub: "La page d’accueil du site (/), avant le parcours" },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de votre conv (écrans 01 à 08)" },
   { id: "rapport", title: "Rapport", sub: "Aperçu gratuit, paiement, rapport complet, question, mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13 à 17 et 20)" },
@@ -69,6 +70,41 @@ async function pickCaptures(page) {
 }
 
 export const STATES = [
+  { id: "LC", section: "landing", title: "Landing", state: "Page entière", route: "/", full: true, note: "Le titre en bulles, les convs qui défilent (figées ici\u00a0; on en touche une, CRUSH montre son verdict), CRUSH+ en bloc noir, les avis s’il y en a de vrais, les faits. Textes à valider." },
+  {
+    id: "LCc", section: "landing", title: "Landing", state: "CRUSH+ (bloc noir)", route: "/", sheet: true, touch: true,
+    steps: async (page, key) => {
+      if (key === "d") {
+        await page.evaluate(() => {
+          const el = document.querySelector('section[aria-labelledby="quotidien-titre"]');
+          if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 64);
+        });
+        await page.waitForTimeout(400);
+        /* La grosse main, posée sur le titre comme sur ngl */
+        const b = await page.locator("#quotidien-titre").boundingBox();
+        await page.mouse.move(b.x + b.width * 0.64, b.y + b.height * 0.7);
+      } else {
+        await page.evaluate(() => {
+          const el = document.getElementById("demande-1-q");
+          if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 420);
+        });
+      }
+      await page.waitForTimeout(600);
+    },
+    note: "Inspiré de la section de ngl\u00a0: le titre géant, la grosse main en guise de curseur (sur mobile, elle montre qu’on peut toucher), les messages qui font cogiter autour, la cloche 3D du design system, puis les questions qu’on pose à CRUSH en très grand. On en touche une, sa réponse s’ouvre dessous.",
+  },
+  { id: "LCb", section: "landing", title: "Landing", state: "Une conv choisie", route: "/", sheet: true, steps: async (page) => { await page.getByRole("button", { name: /^Inès/ }).first().click(); await page.waitForTimeout(900); }, note: "On touche une conv\u00a0: CRUSH montre son verdict comme au début d’un vrai rapport (exemple fictif)." },
+  {
+    id: "LD", section: "landing", title: "Landing", state: "Avis (emplacements)", route: "/?apercu=avis", sheet: true,
+    steps: async (page) => {
+      await page.evaluate(() => {
+        const el = document.getElementById("avis-titre");
+        if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 110);
+      });
+      await page.waitForTimeout(500);
+    },
+    note: "La section n’apparaît que s’il y a de vrais avis (avec l’accord des personnes). Ici, des emplacements pour juger la mise en page.",
+  },
   /* ———— Entrée ———— */
   { id: "01", section: "parcours", title: "Vous vous parlez où ?", route: "/commencer", ref: "01-vous-vous-parlez-ou" },
   { id: "02", section: "parcours", title: "Exporter", state: "WhatsApp", route: "/importer/export?app=whatsapp", ref: "02-exporter" },

@@ -68,7 +68,8 @@ export function Sheet({
               ref={panel}
               tabIndex={-1}
               className={cn(
-                "pointer-events-auto relative flex outline-none max-h-[92dvh] w-full flex-col gap-3 overflow-y-auto bg-white px-[22px] pb-6 pt-2.5 md:max-w-[560px]",
+                /* [&>*]:shrink-0 : quand le contenu dépasse l’écran, le panneau défile ; rien ne s’écrase (bouton aplati, carte rognée) */
+                "pointer-events-auto relative flex outline-none max-h-[92dvh] w-full flex-col gap-3 overflow-y-auto bg-white px-[22px] pb-6 pt-2.5 md:max-w-[560px] [&>*]:shrink-0",
                 "rounded-t-[30px] shadow-[0_-20px_50px_rgba(17,17,20,0.18)] [animation:sheetUp_0.35s_cubic-bezier(0.2,0.8,0.2,1)_both]",
                 "lg:w-[640px] lg:max-w-[640px] lg:gap-4 lg:rounded-[32px] lg:p-[30px] lg:shadow-[0_30px_80px_rgba(17,17,20,0.25)] lg:[animation:sheetIn_0.3s_cubic-bezier(0.2,0.8,0.2,1)_both]",
                 className,
