@@ -8,7 +8,7 @@ export const SECTIONS = [
   { id: "landing", title: "Landing", sub: "La page d’accueil du site (/), avant le parcours" },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de votre conv (écrans 01 à 08)" },
   { id: "rapport", title: "Rapport", sub: "Aperçu gratuit, paiement, rapport complet, question, mode sobre (09 à 12, 18 et 19)" },
-  { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13 à 17 et 20)" },
+  { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13, 16 et 20)" },
   { id: "etats", title: "États", sub: "Accès CRUSH+, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
@@ -67,6 +67,27 @@ async function pickCaptures(page) {
   }
   await page.locator('input[type=file][accept="image/*"]').setInputFiles(files);
   await page.waitForTimeout(1300);
+}
+
+/* Une capture d’exemple de sa bio Hinge, pour la fiche. */
+async function sampleBio(context) {
+  const p = await context.newPage();
+  await p.setViewportSize({ width: 390, height: 760 });
+  await p.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
+    body{margin:0;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;background:#fff;color:#111}
+    .photo{height:420px;background:linear-gradient(160deg,#FFC48F,#FF9AA8 50%,#B79CFF)} .in{padding:22px}
+    .n{font-size:30px;font-weight:700}.s{color:#8e8e93;margin-top:4px}
+    .bio{margin-top:20px;padding:18px;border-radius:14px;background:#f5f5f7;font-size:19px;line-height:1.35}
+  </style></head><body><div class="photo"></div><div class="in"><div class="n">Sophie, 27</div><div class="s">Lyon</div>
+  <div class="bio">Grimpeuse du dimanche, Lyonnaise depuis toujours. Je cherche quelqu’un qui me fait rire.</div></div></body></html>`);
+  const buf = await p.screenshot({ type: "png" });
+  await p.close();
+  return buf;
+}
+
+async function addBio(page, wait) {
+  await page.locator("input[type=file]").setInputFiles({ name: "bio-hinge.png", mimeType: "image/png", buffer: await sampleBio(page.context()) });
+  await page.waitForTimeout(wait);
 }
 
 export const STATES = [
@@ -235,24 +256,21 @@ export const STATES = [
     },
     note: "Nouveau\u00a0: quand CRUSH écrit, son logo arrive d’un bond dans la conv, respire, et ses trois perles s’allument l’une après l’autre, comme les trois points de Messages, en rose. La grande bulle du haut s’anime en même temps. À la réponse, la bulle se replie et la réponse monte.",
   },
-  { id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche", note: "Proposition\u00a0: fiche à la manière de Contacts, chaque info avec sa source (écart à la maquette)." },
-  { id: "16b", section: "quotidien", title: "Sa fiche", state: "Modifier", route: "/app/fiche", server: PLUS, steps: click("Modifier", { exact: true }), note: "Mode modification absent des maquettes." },
   {
-    id: "16c",
-    section: "quotidien",
-    title: "Sa fiche",
-    state: "+ une note",
-    route: "/app/fiche",
-    server: PLUS,
-    steps: async (page) => {
-      await click("Une note")(page);
-      await page.locator("#note-text").fill("Préfère les textos le soir");
-      await page.waitForTimeout(300);
-    },
-    sheet: true,
-    note: "Panneau absent des maquettes.",
+    id: "16", section: "quotidien", title: "Sa fiche", route: "/app/fiche", server: PLUS, ref: "16-sa-fiche",
+    note: "Refonte\u00a0: un seul geste pour la remplir, «\u00a0Complète sa fiche\u00a0» (des captures ou un export\u00a0; sur ordinateur, on peut aussi les glisser sur la page). CRUSH trouve les infos et les range lui-même, chacune avec sa source\u00a0: plus de tuiles «\u00a0Sa bio / Un post / Une note\u00a0», plus d’écran à cocher (l’ancien écran 17). Nouvelle rubrique «\u00a0À savoir\u00a0» pour ce qu’il trouve\u00a0; «\u00a0Tes notes\u00a0» restent les tiennes. Textes à valider.",
   },
-  { id: "17", section: "quotidien", title: "Ajouter à sa fiche", route: "/app/fiche/ajouter", server: PLUS, wait: 1300, ref: "17-ajouter-a-sa-fiche" },
+  { id: "16b", section: "quotidien", title: "Sa fiche", state: "Modifier", route: "/app/fiche", server: PLUS, steps: click("Modifier", { exact: true }), note: "Retirer une info fausse, ou ajouter la tienne dans une rubrique." },
+  {
+    id: "16c", section: "quotidien", title: "Sa fiche", state: "CRUSH analyse", route: "/app/fiche", server: PLUS, motion: true,
+    steps: (page) => addBio(page, 1000),
+    note: "Pendant l’analyse, la bulle de CRUSH écrit et un trait rose balaie la capture. La simulation lit toujours sa bio Hinge.",
+  },
+  {
+    id: "16d", section: "quotidien", title: "Sa fiche", state: "Infos rangées", route: "/app/fiche", server: PLUS, full: true,
+    steps: (page) => addBio(page, 900),
+    note: "Ce que CRUSH a trouvé et où il l’a rangé\u00a0; ce qu’il savait déjà n’est pas doublé. Les nouvelles infos portent un point rose (et s’éclairent en rose à leur arrivée). «\u00a0Annuler\u00a0» retire tout.",
+  },
   { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", server: PLUS, ref: "20-mon-compte" },
   { id: "20b", section: "quotidien", title: "Mon compte", state: "Supprimer l’histoire", route: "/compte", server: PLUS, steps: click("Supprimer l’histoire avec Sophie"), sheet: true, note: "Confirmation absente des maquettes." },
 

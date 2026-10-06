@@ -153,6 +153,12 @@
 [data-typing] > * { transform-origin: 9% 89%; animation: typingBreathe 2.4s ease-in-out 0.8s infinite; }
 [data-land] { transform-origin: 9% 89%; animation: logoLand 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: var(--d, 0s); }
 
+/* ———— Sa fiche : CRUSH analyse ce que tu ajoutes, puis ce qui arrive s’éclaire en rose ———— */
+@keyframes ficheScan { 0% { top: 0; opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+@keyframes factNew { 0%, 30% { background-color: rgba(255, 79, 154, 0.13); } 100% { background-color: rgba(255, 79, 154, 0); } }
+[data-scan-bar] { animation: ficheScan 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+[data-new] { animation: factNew 2.8s ease-out both; }
+
 @keyframes dPop { 0% { opacity: 0; transform: scale(0.85) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
 [data-pop] { animation: dPop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0.2s); }
 
@@ -245,5 +251,6 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land] { animation: none !important; }
+  [data-dots] > *, [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-scan-bar] { animation: none !important; visibility: hidden; }
 }

@@ -6,7 +6,7 @@ import type {
   AnalysisProgress,
   AppKind,
   Fiche,
-  FicheExtraction,
+  FicheUpdate,
   FicheFact,
   Goal,
   Guess,
@@ -19,7 +19,7 @@ import type {
   Story,
   Subscription,
 } from "@/types";
-import { FICHE, FICHE_EXTRACTION, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
+import { FICHE, FICHE_FINDINGS, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
 import { QUESTION_ANSWER, REPORT, SOBER_REPORT } from "@/mocks/report";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP, STORY } from "@/mocks/story";
 import { delay, mockServer } from "@/mocks/server";
@@ -174,20 +174,46 @@ export async function sendVoiceToCrush(input: { audio: Blob; seconds: number }):
 /* ———— Sa fiche ———— */
 
 export async function getFiche(): Promise<Fiche> {
-  return { ...FICHE, facts: mockServer.get().ficheFacts };
+  const s = mockServer.get();
+  return { ...FICHE, facts: s.ficheFacts, updatedLabel: s.ficheUpdated ? "mise à jour aujourd’hui" : FICHE.updatedLabel };
 }
 
 export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
   mockServer.set({ ficheFacts: facts });
   await delay(250);
-  return { ...FICHE, facts };
+  return getFiche();
 }
 
-/** Lit une capture (bio, post) et propose ce qui peut aller dans sa fiche. Rien n’est cherché ailleurs. */
-export async function extractFromCapture(file: File | null): Promise<FicheExtraction> {
-  void file;
-  await delay(700);
-  return FICHE_EXTRACTION;
+/**
+ * Des captures ou un export pour sa fiche : CRUSH y trouve des infos sur elle et les range lui-même, dans la bonne rubrique.
+ * Ce qu’il savait déjà n’est pas doublé (sa nouvelle source s’ajoute). Rien n’est cherché ailleurs.
+ * Simulation : une capture donne sa bio Hinge, un export de nouveaux messages de votre conv.
+ */
+export async function addToFiche(files: File[]): Promise<FicheUpdate> {
+  await delay(2200);
+  const images = files.filter((f) => f.type.startsWith("image/")).length;
+  const kinds = [...(images > 0 ? (["captures"] as const) : []), ...(images < files.length ? (["export"] as const) : [])];
+  const facts = [...mockServer.get().ficheFacts];
+  const added: FicheFact[] = [];
+  const confirmed: FicheFact[] = [];
+  for (const kind of kinds) {
+    const found = FICHE_FINDINGS[kind];
+    for (const f of found.facts) {
+      const i = facts.findIndex((x) => x.section === f.section && x.text === f.text);
+      if (i >= 0) {
+        const same = facts[i];
+        if (!same.sourceLabel.split(" · ").includes(found.sourceLabel))
+          facts[i] = { ...same, sourceLabel: `${same.sourceLabel} · ${found.sourceLabel}`, sources: [...new Set([...same.sources, found.source])] };
+        confirmed.push(facts[i]);
+      } else {
+        const fact: FicheFact = { id: `t${Date.now()}-${added.length}`, section: f.section, text: f.text, sourceLabel: found.sourceLabel, sources: [found.source] };
+        facts.push(fact);
+        added.push(fact);
+      }
+    }
+  }
+  mockServer.set({ ficheFacts: facts, ficheUpdated: true });
+  return { fiche: await getFiche(), added, confirmed };
 }
 
 /* ———— Compte ———— */
@@ -215,7 +241,7 @@ export async function cancelSubscription(): Promise<void> {
 /** Supprime l’histoire : le rapport, la fiche et les captures. */
 export async function deleteStory(): Promise<void> {
   await delay(500);
-  mockServer.set({ storyDeleted: true, ficheFacts: FICHE.facts, questionAsked: null, analysisStartedAt: null });
+  mockServer.set({ storyDeleted: true, ficheFacts: FICHE.facts, ficheUpdated: false, questionAsked: null, analysisStartedAt: null });
 }
 
 /** Tout effacer : le compte et toutes les histoires. */

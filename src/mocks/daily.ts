@@ -1,4 +1,4 @@
-import type { Fiche, FicheExtraction, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
+import type { Fiche, FicheFact, FicheSource, Offer, QuestionAnswer, Reply, Subscription } from "@/types";
 import { PEOPLE } from "./story";
 
 export const OFFERS: Offer[] = [
@@ -58,6 +58,7 @@ export const FICHE: Fiche = {
   summary: "Son exam est jeudi · elle t’en a parlé 3 fois",
   summaryShort: "Son exam est jeudi",
   facts: [
+    { id: "f9", section: "infos", text: "Travaille dans un labo", sourceLabel: "conv", sources: ["conv"] },
     { id: "f1", section: "aime", text: "le libanais", sourceLabel: "conv", sources: ["conv"] },
     { id: "f2", section: "aime", text: "l’escalade", sourceLabel: "sa bio Hinge", sources: ["capture"] },
     { id: "f3", section: "aime", text: "sa série du moment", sourceLabel: "conv", sources: ["conv"] },
@@ -69,23 +70,37 @@ export const FICHE: Fiche = {
   ],
 };
 
-export const FICHE_SECTIONS = [
-  { id: "aime", title: "Elle aime", display: "chips" },
-  { id: "gens", title: "Les gens de sa vie", display: "line" },
-  { id: "dates", title: "Dates à retenir", display: "line" },
-  { id: "notes", title: "Tes notes", display: "line" },
-] as const;
+/** Les rubriques de sa fiche, dans l’ordre. « Tes notes » : ce que tu ajoutes toi-même. */
+export const FICHE_SECTIONS: { id: FicheFact["section"]; title: string }[] = [
+  { id: "infos", title: "À savoir" },
+  { id: "aime", title: "Elle aime" },
+  { id: "gens", title: "Les gens de sa vie" },
+  { id: "dates", title: "Dates à retenir" },
+  { id: "notes", title: "Tes notes" },
+];
 
-export const FICHE_EXTRACTION: FicheExtraction = {
-  sourceApp: "hinge",
-  sourceLabel: "Capture · profil Hinge",
-  quote: "« Grimpeuse du dimanche, Lyonnaise depuis toujours. Je cherche quelqu’un qui me fait rire. »",
-  factSourceLabel: "sa bio Hinge",
-  items: [
-    { id: "x1", text: "Aime l’escalade", section: "aime", fact: "l’escalade" },
-    { id: "x2", text: "Vit à Lyon", section: "notes", fact: "Vit à Lyon" },
-    { id: "x3", text: "« Cherche quelqu’un qui la fait rire »", section: "notes", fact: "« Cherche quelqu’un qui la fait rire »" },
-  ],
+/**
+ * Ce que CRUSH trouve dans ce que tu ajoutes à sa fiche (simulation) : une capture de sa bio, ou un nouvel export de votre conv.
+ * En vrai, le back-end analyse les fichiers. ⚠ Absent des maquettes : à valider.
+ */
+export const FICHE_FINDINGS: Record<"captures" | "export", { sourceLabel: string; source: FicheSource; facts: Pick<FicheFact, "section" | "text">[] }> = {
+  captures: {
+    sourceLabel: "sa bio Hinge",
+    source: "capture",
+    facts: [
+      { section: "infos", text: "Vit à Lyon" },
+      { section: "infos", text: "« Cherche quelqu’un qui la fait rire »" },
+      { section: "aime", text: "l’escalade" },
+    ],
+  },
+  export: {
+    sourceLabel: "conv",
+    source: "conv",
+    facts: [
+      { section: "aime", text: "les marchés de Noël" },
+      { section: "dates", text: "Exam jeudi" },
+    ],
+  },
 };
 
 export const SUBSCRIPTIONS: Record<Subscription["plan"], Subscription> = {

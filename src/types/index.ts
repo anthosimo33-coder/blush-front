@@ -164,7 +164,7 @@ export type FicheSource = "conv" | "capture" | "note";
 
 export type FicheFact = {
   id: string;
-  section: "aime" | "gens" | "dates" | "notes";
+  section: "infos" | "aime" | "gens" | "dates" | "notes";
   text: string;
   /** Libellé de provenance (« conv · sa bio Hinge », « ajouté par toi »). */
   sourceLabel: string;
@@ -180,13 +180,12 @@ export type Fiche = {
   summaryShort: string;
 };
 
-export type FicheExtraction = {
-  sourceApp: AppKind;
-  sourceLabel: string;
-  /** Provenance affichée sur la fiche (« sa bio Hinge »). */
-  factSourceLabel: string;
-  quote: string;
-  items: { id: string; text: string; section: FicheFact["section"]; fact: string }[];
+/** Ce que CRUSH a trouvé dans des captures ou un export, déjà rangé dans sa fiche. */
+export type FicheUpdate = {
+  fiche: Fiche;
+  added: FicheFact[];
+  /** Ce qu’il savait déjà : l’info reste une seule fois, sa nouvelle source s’ajoute. */
+  confirmed: FicheFact[];
 };
 
 export type Subscription = {

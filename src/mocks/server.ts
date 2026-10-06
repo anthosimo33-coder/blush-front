@@ -14,6 +14,8 @@ export type MockServerState = {
   paused: boolean;
   cancelled: boolean;
   ficheFacts: FicheFact[];
+  /** Quelque chose a été ajouté à sa fiche pendant la session (« mise à jour aujourd’hui »). */
+  ficheUpdated: boolean;
   storyDeleted: boolean;
 };
 
@@ -28,6 +30,7 @@ const DEFAULTS: MockServerState = {
   paused: false,
   cancelled: false,
   ficheFacts: FICHE.facts,
+  ficheUpdated: false,
   storyDeleted: false,
 };
 
