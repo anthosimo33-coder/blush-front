@@ -16,7 +16,8 @@ export const MODELE = "claude-opus-5-5";
 /* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
 const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
 
-export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null };
+/** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. */
+export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number };
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
 
 /** En mode factice (tests, dev sans coût) : une fonction qui rend une sortie pour une requête. */
@@ -63,14 +64,14 @@ const cout = (u: Usage) =>
 export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { storyId, etiquette }: { storyId?: string; etiquette?: string } = {}): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
     const ok = schema.safeParse(factice(req));
-    return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn" };
+    return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
   }
   const reglage = REGLAGES[req.tache];
   const params = {
     model: MODELE,
     max_tokens: reglage.maxTokens,
     thinking: { type: "adaptive" as const },
-    output_config: { effort: reglage.effort, format: zodOutputFormat(schema) },
+    output_config: { effort: req.effort ?? reglage.effort, format: zodOutputFormat(schema) },
     system: [{ type: "text" as const, text: SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
     messages: [
       {
@@ -83,8 +84,8 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
   /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP */
   const message = reglage.flux ? await anthropic().messages.stream(params).finalMessage() : await anthropic().messages.create(params);
   await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut });
-  if (message.stop_reason === "refusal") return { sortie: null, refus: true, stop: message.stop_reason };
-  return { sortie: lireSortie(message, schema), refus: false, stop: message.stop_reason };
+  if (message.stop_reason === "refusal") return { sortie: null, refus: true, stop: message.stop_reason, cout: cout(message.usage) };
+  return { sortie: lireSortie(message, schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
 }
 
 async function noterUsage(u: Usage, { storyId, tache, ms }: { storyId?: string; tache: string; ms: number }) {
