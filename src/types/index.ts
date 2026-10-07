@@ -216,6 +216,8 @@ export type FicheUpdate = {
   added: FicheFact[];
   /** Ce qu’il savait déjà : l’info reste une seule fois, sa nouvelle source s’ajoute. */
   confirmed: FicheFact[];
+  /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, un bug. */
+  problem?: "capture" | "fichier" | "autre_conv" | "trop" | "bug";
 };
 
 export type Subscription = {
