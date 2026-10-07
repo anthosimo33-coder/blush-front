@@ -68,6 +68,12 @@ En dev, le code de connexion s’affiche dans les logs du serveur.
 
 Les tests tournent sur la base `blush_test` : `createdb blush_test`, puis les migrations, puis `npm test`.
 
+Avant une mise en ligne, un test de fumée avec le **vrai** modèle (environ 1 $). Une conv de test courte traverse tout le back-end, puis tout est effacé. Mesuré le 7 octobre : 194 s et 1,07 $ pour les 6 appels.
+
+```bash
+NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npx tsx scripts/essai-vrai-modele.mts
+```
+
 ## Mise en ligne
 
 1. **La base :** créer une base Neon (Vercel, onglet Storage, région Francfort), puis lancer les migrations :

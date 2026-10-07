@@ -16,7 +16,7 @@
     "test": "vitest run",
     "db:generer": "drizzle-kit generate",
     "db:migrer": "drizzle-kit migrate",
-    "acces": "tsx scripts/acces.ts"
+    "acces": "tsx scripts/acces.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
