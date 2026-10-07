@@ -3,7 +3,8 @@ import { cn } from "@/lib/cn";
 import type { ChapterBlock } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { PlayCard } from "./cards";
-import { Bubble, ConfidenceLine, Fact, Tag } from "./messages";
+import { ConfidenceLine, Fact, Tag } from "./messages";
+import { ClampedBubble } from "./clamp";
 import { ScoreCard } from "./progress";
 
 /* ———— En-tête de chapitre : pastille encre + surtitre + titre ———— */
@@ -44,9 +45,7 @@ export function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }:
       {messages && messages.length > 0 && (
         <div className="flex flex-col gap-2">
           {messages.map((m, i) => (
-            <Bubble key={i} from={m.from} caption={m.caption ?? (m.from === "toi" ? "" : undefined)}>
-              {m.text}
-            </Bubble>
+            <ClampedBubble key={i} from={m.from} caption={m.caption ?? (m.from === "toi" ? "" : undefined)} text={m.text} />
           ))}
         </div>
       )}
@@ -71,11 +70,7 @@ function Timeline({ items }: Extract<ChapterBlock, { kind: "timeline" }>) {
         <div key={it.title} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
           <div className="text-[13px] font-black text-grey">{it.title}</div>
           <div className="text-[14px] font-extrabold leading-[1.45]">{it.text}</div>
-          {it.message && (
-            <Bubble from={it.message.from} caption="">
-              {it.message.text}
-            </Bubble>
-          )}
+          {it.message && <ClampedBubble from={it.message.from} caption="" text={it.message.text} />}
         </div>
       ))}
     </>
@@ -143,6 +138,80 @@ function Plan({ items }: Extract<ChapterBlock, { kind: "plan" }>) {
   );
 }
 
+/* ———— Le rapport raconté ———— */
+/** Des paragraphes séparés par un saut de ligne. */
+function Paragraphs({ text, className }: { text: string; className: string }) {
+  return (
+    <>
+      {text.split(/\n+/).filter(Boolean).map((p, i) => (
+        <p key={i} className={cn("m-0", className)}>
+          {p}
+        </p>
+      ))}
+    </>
+  );
+}
+
+function Lead({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Paragraphs text={text} className="text-[18px] font-extrabold leading-[1.5] tracking-[-0.005em]" />
+    </div>
+  );
+}
+
+function Story({ text, messages }: Extract<ChapterBlock, { kind: "story" }>) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Paragraphs text={text} className="text-[16px] font-bold leading-[1.6] text-ink" />
+      {messages && messages.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
+          {messages.map((m, i) => (
+            <ClampedBubble key={i} from={m.from} caption={m.caption} text={m.text} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Punchline({ text }: { text: string }) {
+  return <p className="m-0 rounded-card bg-ink px-4 py-3.5 text-[18px] font-black leading-[1.3] tracking-[-0.01em] text-white shadow-ink">{text}</p>;
+}
+
+function Stop({ items }: Extract<ChapterBlock, { kind: "stop" }>) {
+  return (
+    <>
+      {items.map((s) => (
+        <div key={s.title} className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
+          <div className="flex items-center gap-2.5">
+            <span aria-hidden="true" className="flex size-[34px] shrink-0 items-center justify-center rounded-[17px] bg-[rgba(255,79,154,0.14)] text-[16px]">
+              ✋
+            </span>
+            <span className="text-[15px] font-black">{s.title}</span>
+          </div>
+          <div className="text-[14px] font-bold leading-[1.45] text-soft">{s.text}</div>
+          {s.messages?.map((m, i) => (
+            <ClampedBubble key={i} from={m.from} caption={m.caption} text={m.text} />
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function Ending({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-card bg-white p-4 shadow-selected">
+      <div className="flex items-center gap-2.5">
+        <BubbleLogo size={36} />
+        <span className="text-[13px] font-black text-grey">Le mot de la fin</span>
+      </div>
+      <Paragraphs text={text} className="text-[16px] font-extrabold leading-[1.55]" />
+    </div>
+  );
+}
+
 /** Rend un bloc de chapitre. `renderQuestion` permet à l’écran de brancher le bouton « Copier ». */
 export function Block({ block, renderQuestion }: { block: ChapterBlock; renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode }) {
   switch (block.kind) {
@@ -168,6 +237,16 @@ export function Block({ block, renderQuestion }: { block: ChapterBlock; renderQu
       return <Plan {...block} />;
     case "question":
       return renderQuestion ? <>{renderQuestion(block)}</> : null;
+    case "lead":
+      return <Lead text={block.text} />;
+    case "story":
+      return <Story {...block} />;
+    case "punchline":
+      return <Punchline text={block.text} />;
+    case "stop":
+      return <Stop {...block} />;
+    case "ending":
+      return <Ending text={block.text} />;
   }
 }
 

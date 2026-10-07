@@ -30,6 +30,7 @@ import { IconButton } from "@/components/ui/Button";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
+import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -41,7 +42,46 @@ export type HomeContact = {
   report: Pick<Report, "verdict" | "level" | "trend" | "nextStep">;
   fiche: Pick<Fiche, "person" | "summaryShort">;
   period: string;
+  /** Où mène sa fiche (l’aperçu a la sienne). */
+  ficheHref?: string;
 };
+
+/** Les questions toutes prêtes, masquées par l’utilisateur (retenu sur cet appareil). */
+const QUICK_HIDDEN = "blush.quick-hidden";
+const quickListeners = new Set<() => void>();
+let quickMemo: boolean | null = null;
+
+function quickHiddenNow() {
+  if (quickMemo === null) {
+    try {
+      quickMemo = localStorage.getItem(QUICK_HIDDEN) === "1";
+    } catch {
+      quickMemo = false;
+    }
+  }
+  return quickMemo;
+}
+
+function setQuickHidden(hidden: boolean) {
+  try {
+    localStorage.setItem(QUICK_HIDDEN, hidden ? "1" : "0");
+  } catch {
+    /* Stockage refusé : le choix vaut pour la visite */
+  }
+  quickMemo = hidden;
+  quickListeners.forEach((l) => l());
+}
+
+function useQuickHidden() {
+  return useSyncExternalStore(
+    (l) => {
+      quickListeners.add(l);
+      return () => quickListeners.delete(l);
+    },
+    quickHiddenNow,
+    () => false,
+  );
+}
 
 const ContactContext = createContext<HomeContact | null>(null);
 
@@ -139,10 +179,35 @@ function useOpenedAt() {
  * 4 l’envoi façon Messages, 5 les perles deviennent la réponse, 6 glisse pour l’heure, 7 glisse pour creuser,
  * 8 l’en-tête qui se replie, 9 la bulle s’ouvre, 10 Sophie en glissé (page.tsx et la fiche), 11 le niveau qui monte.
  */
-export function HomeScreen({ quick = [], contact, motion = true, arrive = false }: { quick?: string[]; contact: HomeContact; motion?: boolean; arrive?: boolean }) {
+export function HomeScreen({
+  quick = [],
+  answers = {},
+  liveUrl,
+  script = [],
+  contact,
+  motion = true,
+  arrive = false,
+}: {
+  quick?: string[];
+  /** Des réponses déjà prêtes, par question (l’aperçu des vraies réponses du chat). */
+  answers?: Record<string, BlushAnswer>;
+  /** En local : l’adresse qui pose ce que tu écris au vrai chat (l’aperçu). */
+  liveUrl?: string;
+  /** En local : des échanges déjà joués, posés dans la conv dès l’ouverture (l’aperçu des vraies réponses). */
+  script?: { mine?: string; answer: BlushAnswer }[];
+  contact: HomeContact;
+  motion?: boolean;
+  arrive?: boolean;
+}) {
   const shots = useFilePicker();
   const exp = useFilePicker();
-  const [msgs, setMsgs] = useState<Msg[]>(INTRO);
+  const [msgs, setMsgs] = useState<Msg[]>(() => [
+    ...INTRO,
+    ...script.flatMap((ex, k): Msg[] => [
+      ...(ex.mine ? [{ id: -100 - 2 * k, from: "toi" as const, text: ex.mine, seed: { day: -1, h: 22, m: 2 * k } }] : []),
+      { id: -101 - 2 * k, from: "blush", result: ex.answer, seed: { day: -1, h: 22, m: 2 * k + 1 } },
+    ]),
+  ]);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
   const [details, setDetails] = useState(false);
@@ -168,6 +233,9 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
   const typed = text.trim().length > 0;
   /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
   const [asked, setAsked] = useState<string[]>([]);
+  /* Les questions toutes prêtes se masquent d’un geste, et reviennent par « Idées de questions » (retenu sur cet appareil) */
+  const quickHidden = useQuickHidden();
+  const hideQuick = setQuickHidden;
   /* BLUSH « écrit » : sa bulle s’anime en haut de la conv */
   const busy = msgs.some((m) => "reading" in m);
   const opened = useOpenedAt();
@@ -268,7 +336,13 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
   const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }, fromCapture = false) => {
     play("envoi");
     return exchange(mine, "BLUSH analyse sa réponse", async () => {
-      return { from: "blush", result: await sendToBlush(payload), fromCapture };
+      const ready = payload.text ? answers[payload.text] : undefined;
+      const result = ready
+        ? await new Promise<BlushAnswer>((ok) => setTimeout(() => ok(ready), 1600))
+        : liveUrl && payload.text && !payload.files
+          ? await askLive(liveUrl, payload.text, historyOf(msgs))
+          : await sendToBlush(payload);
+      return { from: "blush", result, fromCapture };
     });
   };
 
@@ -436,7 +510,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
               aria-label="Ta conv avec BLUSH"
               aria-live="polite"
               className={cn(
-                "flex flex-1 flex-col justify-end px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6",
+                "flex flex-1 flex-col px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6",
                 motion && "overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden",
               )}
             >
@@ -467,7 +541,17 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
                 </div>
               )}
               {/* Les questions toutes prêtes, au-dessus du champ (rien pendant que tu écris, que BLUSH répond, que tu enregistres ou que tu creuses) */}
-              {quickLeft.length > 0 && !typed && !busy && !menu && !about && voice.phase === "idle" && (
+              {quickLeft.length > 0 && !typed && !busy && !menu && !about && voice.phase === "idle" && quickHidden && (
+                <button
+                  type="button"
+                  onClick={() => hideQuick(false)}
+                  className="mb-2.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-extrabold text-toi-ink shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] lg:bg-[#F3F7FF]"
+                >
+                  <Icon name="sparkle" size={14} color="currentColor" />
+                  Idées de questions
+                </button>
+              )}
+              {quickLeft.length > 0 && !typed && !busy && !menu && !about && voice.phase === "idle" && !quickHidden && (
                 <div
                   role="group"
                   aria-label="Questions toutes prêtes"
@@ -487,6 +571,14 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
                       {q}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    aria-label="Masquer les idées de questions"
+                    onClick={() => hideQuick(true)}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-grey transition-colors [@media(hover:hover)]:hover:text-ink"
+                  >
+                    <Icon name="close" size={16} color="currentColor" stroke={2.4} />
+                  </button>
                 </div>
               )}
               <div className="flex items-center gap-2.5">
@@ -834,7 +926,7 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
  * `shared` : 10 · c’est cet avatar (celui qu’on voit, mobile ou desktop) qui passe sur la fiche pendant le glissé.
  */
 function SophieButton({ shared = false }: { shared?: boolean }) {
-  const { report, fiche } = useContact();
+  const { report, fiche, ficheHref = "/app/fiche" } = useContact();
   const { on } = useHomeMotion();
   const { levels, index: idx, temperature } = scaleOf(report.level);
   const share = (idx + 1) / levels.length;
@@ -849,7 +941,7 @@ function SophieButton({ shared = false }: { shared?: boolean }) {
   );
   return (
     <Link
-      href="/app/fiche"
+      href={ficheHref}
       prefetch={on ? true : undefined}
       transitionTypes={on ? ["nav-forward"] : undefined}
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
@@ -962,7 +1054,8 @@ const Thread = memo(function Thread({ msgs, opened }: { msgs: Msg[]; opened: num
   /* « Aujourd’hui » se compte depuis le message le plus récent (une conv ouverte avant minuit reste juste) */
   const now = Math.max(opened ?? 0, ...rows.map((r) => (r.kind === "event" ? 0 : (r.at ?? 0))));
   return (
-    <div data-thread="" className="flex flex-col gap-4">
+    /* mt-auto pose les messages en bas sans justify-end, qui rend le haut d’une conv longue inaccessible au défilement */
+    <div data-thread="" className="mt-auto flex flex-col gap-4">
       {rows.map((r) =>
         r.kind === "day" ? (
           <p key={r.key} data-row={r.key} data-a={arriving && r.key === INTRO_DAY ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
@@ -1209,6 +1302,33 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
       </MessageBubble>
     ),
   });
+  /* La réponse en bulles : chaque bulle, puis les messages qu’elle cite, comme dans un vrai fil */
+  if (r.kind === "bubbles")
+    return [
+      /* Le message qu’il a reçu, montré d’abord */
+      ...(r.incoming ?? []).map(
+        (msg): BubbleNode => ({
+          className: "pb-2.5 pt-3",
+          quote: msg.text,
+          body: (
+            <MessageBubble from={msg.from} caption={msg.caption}>
+              {msg.text}
+            </MessageBubble>
+          ),
+        }),
+      ),
+      ...r.bubbles.flatMap((b): BubbleNode[] => [
+        { quote: b.text, body: <span className="text-[16px] font-bold leading-[1.4]">{b.text}</span> },
+        ...(b.messages ?? []).map((msg) => ({
+          className: "pb-2.5 pt-3",
+          quote: msg.text,
+          body: <ClampedBubble from={msg.from} caption={msg.caption} text={msg.text} limit={25} />,
+        })),
+      ]),
+      ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
+      ...(r.ask ? [{ quote: r.ask, body: <span className="text-[16px] font-bold leading-[1.4]">{r.ask}</span> }] : []),
+      ...(r.react ? [{ quote: r.react, body: <span className="text-[16px] font-bold leading-[1.4]">{r.react}</span> }] : []),
+    ];
   if (r.kind === "best") return [incoming(r.reply), { quote: r.reply.best, body: <BestReply reply={r.reply} shine={shine} /> }];
   if (r.kind === "level")
     return [
@@ -1308,6 +1428,45 @@ function BestReply({ reply, shine = false }: { reply: Reply; shine?: boolean }) 
   );
 }
 
+/** L’aperçu en local : ta question part au vrai chat, avec le fil déjà échangé (tes messages, et ce que BLUSH a répondu). */
+async function askLive(url: string, text: string, history: { from: "toi" | "blush"; text: string }[]): Promise<BlushAnswer> {
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, history }) });
+  return (await r.json()) as BlushAnswer;
+}
+
+function historyOf(msgs: Msg[]): { from: "toi" | "blush"; text: string }[] {
+  return msgs
+    .flatMap((m): { from: "toi" | "blush"; text: string }[] => {
+      if (m.from === "toi" && "text" in m) return [{ from: "toi", text: m.text }];
+      if (m.from === "blush" && "result" in m && m.result.kind === "bubbles") return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
+      return [];
+    })
+    .slice(-6);
+}
+
+/** Les messages à lui envoyer, une bulle chacun, à copier en un geste. */
+function SendReply({ lines, why, shine = false }: { lines: string[]; why?: string; shine?: boolean }) {
+  return (
+    <span className="flex flex-col gap-2">
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
+        <Tag tone="recommandee" />
+      </span>
+      <span className="flex flex-col items-start gap-[3px]">
+        {lines.map((l, i) => (
+          <span key={i} data-shine={shine && i === 0 ? "" : undefined} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold leading-[1.35] text-white">
+            {l}
+          </span>
+        ))}
+      </span>
+      {why && <span className="text-[13px] font-extrabold leading-[1.45] text-grey">{why}</span>}
+      <span className="mt-1 flex">
+        <CopyPill text={lines.join("\n")} label="Copier" />
+      </span>
+    </span>
+  );
+}
+
 function formatSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} ko` : `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
 }
@@ -1402,7 +1561,7 @@ function shown(el: HTMLElement | SVGElement, on: boolean) {
 
 /* ———— Les détails du contact : où vous en êtes, le rapport, sa fiche ———— */
 function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { report, fiche, period } = useContact();
+  const { report, fiche, period, ficheHref = "/app/fiche" } = useContact();
   const { on } = useHomeMotion();
   const logoRef = useRef<HTMLSpanElement>(null);
   const avRef = useRef<HTMLSpanElement>(null);
@@ -1505,7 +1664,7 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
       <div className="flex flex-col overflow-hidden rounded-[20px] bg-white shadow-card">
         <DetailRow href="/rapport" icon={<span className="text-[20px] leading-none">{report.verdict.emoji}</span>} title="Le rapport de votre histoire" sub={period} />
         <DetailRow
-          href="/app/fiche"
+          href={ficheHref}
           icon={
             <Avatar tone="elle" size={36} fontSize={15}>
               {fiche.person.initial}

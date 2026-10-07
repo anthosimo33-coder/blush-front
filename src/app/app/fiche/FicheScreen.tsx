@@ -42,8 +42,10 @@ type Job =
  * ce qui vient d’arriver est marqué d’un point rose. « Modifier » pour retirer une info ou ajouter la tienne.
  * Rien n’est cherché ailleurs.
  */
-export function FicheScreen({ initial }: { initial: Fiche }) {
-  const { data } = useQuery("fiche", getFiche, initial);
+export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?: boolean }) {
+  /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas la fiche de démo */
+  const key = fixed ? "fiche-apercu" : "fiche";
+  const { data } = useQuery(key, getFiche, initial, { fetch: !fixed });
   const fiche = data ?? initial;
   const [editing, setEditing] = useState(false);
   const [job, setJob] = useState<Job>({ step: "idle" });
@@ -65,7 +67,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
   }, []);
 
   const save = async (facts: FicheFact[]) => {
-    setQueryData("fiche", { ...fiche, facts });
+    setQueryData(key, { ...fiche, facts });
     await updateFiche(facts);
   };
 
@@ -79,7 +81,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
     setEditing(false);
     setJob({ step: "reading", what, thumbs, file: files.some((f) => !isImage(f)) });
     const update = await addToFiche(files);
-    setQueryData("fiche", update.fiche);
+    setQueryData(key, update.fiche);
     setFresh((ids) => [...ids, ...update.added.map((f) => f.id)]);
     setJob({ step: "done", what, update, before });
     /* Un toucher par info rangée, chacun un cran plus haut */

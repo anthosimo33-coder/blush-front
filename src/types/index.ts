@@ -72,7 +72,13 @@ export type ChapterBlock =
   | { kind: "duo"; title: string; text: string; trophies: { title: string; text: string; side: "toi" | "elle" }[] }
   | { kind: "scenarios"; items: { title: string; text: string; tag: "probable" | "meilleur" }[] }
   | { kind: "plan"; items: { when: string; title: string; text: string }[] }
-  | { kind: "question"; label: string; text: string };
+  | { kind: "question"; label: string; text: string }
+  /* Le rapport raconté (prompt 05) : l’ouverture, un moment du récit avec ses messages, la chute d’un chapitre, ce qu’on arrête, le mot de la fin. */
+  | { kind: "lead"; text: string }
+  | { kind: "story"; text: string; messages?: Message[] }
+  | { kind: "punchline"; text: string }
+  | { kind: "stop"; items: { title: string; text: string; messages?: Message[] }[] }
+  | { kind: "ending"; text: string };
 
 export type Chapter = {
   number: number;
@@ -164,6 +170,9 @@ export type BlushAnswer = (
   | { kind: "best"; reply: Reply }
   | { kind: "answer"; answer: QuestionAnswer }
   | { kind: "level"; answer: QuestionAnswer }
+  /* La réponse en bulles, comme un pote qui écrit : chaque bulle suivie des messages qu’elle cite, puis, s’il y a lieu,
+     les messages à envoyer, une question (quand la suite dépend de lui) ou un geste (liker son message). */
+  | { kind: "bubbles"; incoming?: Message[]; bubbles: { text: string; messages?: Message[] }[]; send?: string[]; why?: string; ask?: string; react?: string }
 ) & {
   /** Le nouveau niveau (ou la nouvelle température) que ce message vous fait atteindre. Une fois par niveau. */
   levelUp?: LevelId;

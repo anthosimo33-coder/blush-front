@@ -18,7 +18,8 @@ export function setQueryData<T>(key: string, data: T) {
   listeners.get(key)?.forEach((l) => l(data));
 }
 
-export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T) {
+/** `fetch: false` : la donnée reste celle donnée au départ (un aperçu figé), sans relire la couche de service. */
+export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T, { fetch = true }: { fetch?: boolean } = {}) {
   const [data, setData] = useState<T | undefined>(() => (cache.has(key) ? (cache.get(key) as T) : initial));
   const [version, setVersion] = useState(0);
   const fnRef = useRef(fn);
@@ -37,6 +38,7 @@ export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T) {
   }, [key]);
 
   useEffect(() => {
+    if (!fetch) return;
     let alive = true;
     fnRef.current().then((d) => {
       if (!alive) return;
@@ -46,7 +48,7 @@ export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T) {
     return () => {
       alive = false;
     };
-  }, [key, version]);
+  }, [key, version, fetch]);
 
   return { data, loading: data === undefined, refresh: () => invalidate(key) };
 }

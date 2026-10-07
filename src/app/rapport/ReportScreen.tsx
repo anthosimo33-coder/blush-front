@@ -30,9 +30,10 @@ const RESUME_KEY = "blush.rapport.reprise.v1";
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
-export function ReportScreen({ initial, story, openPaywall }: { initial: ReportPayload; story: Story; openPaywall: boolean }) {
+export function ReportScreen({ initial, story, openPaywall, fixed = false }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean }) {
   const { data } = useQuery("report", getReport, initial);
-  const payload = data ?? initial;
+  /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
+  const payload = fixed ? initial : (data ?? initial);
   if (payload.sober) return <SoberReport data={payload.sober} />;
   return <ReportBody payload={payload} story={story} openPaywall={openPaywall} />;
 }
