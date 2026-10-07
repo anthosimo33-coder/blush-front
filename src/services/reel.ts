@@ -2,7 +2,8 @@
  * Les appels au vrai back-end, depuis le navigateur (routes /api). Les cookies de session sont httpOnly :
  * le navigateur les envoie, il ne les lit pas.
  */
-import type { AnalysisProgress, BlushAnswer, Fiche, FicheFact, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
+import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
+import { preparerCaptures } from "./preparer-captures";
 import type { Account, ReportPayload } from "./api";
 import { ExportIllisible, preparerExport } from "./preparer-export";
 
@@ -38,10 +39,22 @@ export const reel = {
     }
     return (await appel<{ source: Source }>("/api/import", { method: "POST", body: fd })).source;
   },
+  /** Les captures, réduites dans le navigateur, puis lues par BLUSH (une seule fois, pour toutes). */
+  async uploadScreenshots(files: File[], opts: { app: AppKind; mode: "first" | "add" }): Promise<{ source: Source; messagesRead: number }> {
+    const fd = new FormData();
+    try {
+      (await preparerCaptures(files)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
+    } catch {
+      throw new ErreurApi("capture", 422);
+    }
+    fd.append("app", opts.app);
+    fd.append("mode", opts.mode);
+    return appel<{ source: Source; messagesRead: number }>("/api/captures", { method: "POST", body: fd });
+  },
   getStory: () => appel<Story>("/api/histoire"),
   sendLoginCode: (email: string) => appel<{ email: string }>("/api/auth/code", envoi("POST", { email })),
   verifyLoginCode: (email: string, code: string) => appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code })),
-  startAnalysis: (input: { me: string; guess: Guess; goal: Goal; pronom: "il" | "elle" }) => appel<{ jobId: string }>("/api/analyse", envoi("POST", input)),
+  startAnalysis: (input: { me: string; guess: Guess; goal: Goal; pronom: "il" | "elle"; prenom?: string }) => appel<{ jobId: string }>("/api/analyse", envoi("POST", input)),
   getAnalysisProgress: () => appel<AnalysisProgress>("/api/analyse"),
   getReport: () => appel<ReportPayload>("/api/rapport"),
   unlock: (offre: Exclude<Plan, "gratuit">) => appel<Subscription>("/api/debloquer", envoi("POST", { offre })),

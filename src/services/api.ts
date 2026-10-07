@@ -67,6 +67,7 @@ export async function uploadScreenshots(
   files: File[],
   opts: { app: AppKind; mode: "first" | "add" },
 ): Promise<{ source: Source; messagesRead: number }> {
+  if (BACKEND) return reel.uploadScreenshots(files, opts);
   await delay(500);
   const base = opts.app === "hinge" ? SOURCE_HINGE : SOURCE_INSTAGRAM;
   return {
@@ -106,8 +107,11 @@ export async function createAccount(email: string): Promise<{ email: string }> {
   return { email };
 }
 
-export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null }, opts: { restart?: boolean } = {}): Promise<{ jobId: string }> {
-  if (BACKEND) return reel.startAnalysis({ me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il" });
+export async function startAnalysis(
+  input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null; prenom?: string | null },
+  opts: { restart?: boolean } = {},
+): Promise<{ jobId: string }> {
+  if (BACKEND) return reel.startAnalysis({ me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) });
   const s = mockServer.get();
   if (!s.analysisStartedAt || opts.restart) {
     mockServer.set({ analysisStartedAt: Date.now() });

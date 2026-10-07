@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKEND } from "@/services/mode";
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -55,15 +56,18 @@ export function ConvOkScreen({ source }: { source: Source }) {
         </div>
       </div>
 
-      <InsetGroup title="Vous vous parliez ailleurs avant ?" id="ailleurs">
-        <InsetRow
-          leading={<RowIcon icon="photo" tone="elle" />}
-          title="Ajouter des captures"
-          sub="Du début (Hinge, Insta) : ton rapport sera plus juste."
-          href="/importer/captures?mode=ajout"
-          chevron
-        />
-      </InsetGroup>
+      {/* Back-end v1 : réunir un export et des captures arrive plus tard */}
+      {!BACKEND && (
+        <InsetGroup title="Vous vous parliez ailleurs avant ?" id="ailleurs">
+          <InsetRow
+            leading={<RowIcon icon="photo" tone="elle" />}
+            title="Ajouter des captures"
+            sub="Du début (Hinge, Insta) : ton rapport sera plus juste."
+            href="/importer/captures?mode=ajout"
+            chevron
+          />
+        </InsetGroup>
+      )}
 
       <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />

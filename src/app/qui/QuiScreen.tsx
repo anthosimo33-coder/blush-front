@@ -35,11 +35,12 @@ const COUPLE_GOALS: GoalTile[] = [
 const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS : GOALS);
 
 /* Écran 06 — Qui est qui, la devinette, ce que tu veux. */
-export function QuiScreen({ people }: { people: [Person, Person] }) {
+/** `captures` : la conv vient de captures, où l’utilisateur n’est que « Moi » (à droite) : on lui demande son prénom. */
+export function QuiScreen({ people, captures = false }: { people: [Person, Person]; captures?: boolean }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const goals = goalsFor(j.guess);
-  const ready = !!(j.me && j.pronom && j.guess && j.goal);
+  const ready = !!((captures ? j.prenom.trim() : j.me) && j.pronom && j.guess && j.goal);
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : "/importer/captures";
@@ -58,6 +59,20 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
       }
     >
 
+      {captures ? (
+        /* ⚠ Absent des maquettes : à valider. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
+        <label className="flex flex-col gap-2">
+          <span className="text-[13px] font-black text-grey">Ton prénom (sur tes captures avec {people[1].name}, tu es à droite)</span>
+          <input
+            value={j.prenom}
+            onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}
+            autoComplete="given-name"
+            maxLength={40}
+            placeholder="Ton prénom"
+            className="h-[60px] rounded-field bg-white px-[18px] text-[17px] font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_#121214]"
+          />
+        </label>
+      ) : (
       <div role="radiogroup" aria-label="Qui es-tu dans cette conv ?" className="flex gap-3">
         {people.map((p, i) => {
           const me = j.me === p.id;
@@ -90,6 +105,7 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
           );
         })}
       </div>
+      )}
 
       {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. ⚠ Absent des maquettes : à valider */}
       <div id="pronom-label" className="text-[13px] font-black text-grey">
