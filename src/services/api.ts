@@ -27,7 +27,7 @@ import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } f
 import { demoStory, storyIdFor } from "@/mocks/stories";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
-import { reel } from "./reel";
+import { ErreurApi, reel } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
@@ -176,12 +176,15 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
 }
 
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
+  if (BACKEND) return enQuestion(question, await envoyerAuChat(question));
   await delay(2000);
   mockServer.set({ questionAsked: question });
   return answerTo(question);
 }
 
 export async function getQuestion(): Promise<QuestionAnswer | null> {
+  /* Back-end : la question passe par le chat, son historique est sur l’accueil */
+  if (BACKEND) return null;
   const q = mockServer.get().questionAsked;
   return q ? answerTo(q) : null;
 }
@@ -214,6 +217,10 @@ const NEXT_LEVEL: Partial<Record<LevelId, LevelId>> = { parle: "voit", voit: "di
  * ⚠ Textes du passage de niveau absents des maquettes : à valider.
  */
 export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }): Promise<BlushAnswer> {
+  if (BACKEND) {
+    if (input.files?.length || !input.text?.trim()) return bulle("les captures et les exports dans le chat arrivent très vite. en attendant, colle-moi son message en texte");
+    return envoyerAuChat(input.about ? `(à propos de « ${input.about} ») ${input.text.trim()}` : input.text.trim());
+  }
   void input.files;
   void input.about;
   await delay(2000);
@@ -241,19 +248,52 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
 
 /** Un vocal pour BLUSH. Simulation : en vrai, le back-end le transcrit, puis BLUSH répond à ce qui est dit. */
 export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
+  if (BACKEND) return bulle("les vocaux arrivent très vite. écris-moi en attendant, je te réponds pareil");
   void input.audio;
   await delay(2200);
   return { kind: "answer", answer: opened().voiceAnswer };
 }
 
+/* Back-end : une réponse de BLUSH en une bulle (ce qui n’est pas encore branché, ou une erreur dite simplement) */
+const bulle = (text: string): BlushAnswer => ({ kind: "bubbles", bubbles: [{ text }] });
+
+async function envoyerAuChat(texte: string): Promise<BlushAnswer> {
+  try {
+    return await reel.sendToBlush(texte);
+  } catch (e) {
+    const code = e instanceof ErreurApi ? e.code : "";
+    if (code === "trop") return bulle("on a beaucoup parlé aujourd’hui, on reprend demain ?");
+    if (code === "pas_pret") return bulle("je finis d’écrire ton rapport, repasse dans deux minutes");
+    if (code === "acces") return bulle("le chat avec moi, c’est dans BLUSH+");
+    return bulle("j’ai eu un bug, renvoie-moi ça");
+  }
+}
+
+/** La question du rapport, posée au chat : sa première bulle devient le titre, les autres la preuve. */
+function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
+  const bulles = r.kind === "bubbles" ? r.bubbles : [];
+  const message = bulles.flatMap((b) => b.messages ?? [])[0];
+  return {
+    question,
+    title: bulles[0]?.text ?? "",
+    evidenceLabel: "Ce que je vois",
+    evidence: bulles.slice(1).map((b) => b.text).join(" · "),
+    ...(message ? { message } : {}),
+    confidence: "probable",
+    limits: r.kind === "bubbles" && r.ask ? r.ask : "",
+  };
+}
+
 /* ———— Sa fiche ———— */
 
 export async function getFiche(storyId?: string): Promise<Fiche> {
+  if (BACKEND) return reel.getFiche();
   const s = mockServer.get();
   return { ...FICHE, ...opened(storyId).fiche, facts: s.ficheFacts, updatedLabel: s.ficheUpdated ? "mise à jour aujourd’hui" : FICHE.updatedLabel };
 }
 
 export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
+  if (BACKEND) return reel.updateFiche(facts);
   mockServer.set({ ficheFacts: facts });
   await delay(250);
   return getFiche();
@@ -265,6 +305,8 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
  * Simulation : une capture donne sa bio Hinge, un export de nouveaux messages de votre conv.
  */
 export async function addToFiche(files: File[]): Promise<FicheUpdate> {
+  /* Back-end v1 : les captures pour sa fiche arrivent avec la lecture des captures (prompt 01) */
+  if (BACKEND) return { fiche: await reel.getFiche(), added: [], confirmed: [] };
   await delay(2200);
   const images = files.filter((f) => f.type.startsWith("image/")).length;
   const kinds = [...(images > 0 ? (["captures"] as const) : []), ...(images < files.length ? (["export"] as const) : [])];

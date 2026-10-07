@@ -194,7 +194,7 @@ export function HomeScreen({
   /** En local : l’adresse qui pose ce que tu écris au vrai chat (l’aperçu). */
   liveUrl?: string;
   /** En local : des échanges déjà joués, posés dans la conv dès l’ouverture (l’aperçu des vraies réponses). */
-  script?: { mine?: string; answer: BlushAnswer }[];
+  script?: { mine?: string; answer: BlushAnswer; at?: number }[];
   contact: HomeContact;
   motion?: boolean;
   arrive?: boolean;
@@ -204,8 +204,9 @@ export function HomeScreen({
   const [msgs, setMsgs] = useState<Msg[]>(() => [
     ...INTRO,
     ...script.flatMap((ex, k): Msg[] => [
-      ...(ex.mine ? [{ id: -100 - 2 * k, from: "toi" as const, text: ex.mine, seed: { day: -1, h: 22, m: 2 * k } }] : []),
-      { id: -101 - 2 * k, from: "blush", result: ex.answer, seed: { day: -1, h: 22, m: 2 * k + 1 } },
+      /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
+      ...(ex.mine ? [{ id: -100 - 2 * k, from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
+      { id: -101 - 2 * k, from: "blush", result: ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
     ]),
   ]);
   const [text, setText] = useState("");

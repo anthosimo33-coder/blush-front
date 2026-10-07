@@ -2,7 +2,7 @@
  * Les appels au vrai back-end, depuis le navigateur (routes /api). Les cookies de session sont httpOnly :
  * le navigateur les envoie, il ne les lit pas.
  */
-import type { AnalysisProgress, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
+import type { AnalysisProgress, BlushAnswer, Fiche, FicheFact, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
 import type { Account, ReportPayload } from "./api";
 
 /** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
@@ -43,4 +43,7 @@ export const reel = {
   setPaused: (paused: boolean) => appel<{ ok: true }>("/api/compte", envoi("POST", { paused })),
   deleteStory: () => appel<{ ok: true }>("/api/histoire", envoi("DELETE")),
   deleteAccount: () => appel<{ ok: true }>("/api/compte", envoi("DELETE")),
+  sendToBlush: (texte: string) => appel<BlushAnswer>("/api/chat", envoi("POST", { texte })),
+  getFiche: () => appel<Fiche>("/api/fiche"),
+  updateFiche: (facts: FicheFact[]) => appel<Fiche>("/api/fiche", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ facts }) }),
 };

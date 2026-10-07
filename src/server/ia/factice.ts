@@ -48,6 +48,25 @@ export function fournisseurFactice(req: Requete): unknown {
       chapitres: null,
     };
   if (req.tache === "05-rapport") return { plan: null, chapitres: (demande.includes("1 à 4") ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) };
+  if (req.tache === "07-memoire" && demande.includes("Moment : la mise à jour."))
+    return { alerte: null, rien_de_neuf: true, memoire: null, fiche: null, niveau: null, questions: null };
+  if (req.tache === "10-chat")
+    return {
+      alerte: null,
+      type: demande.includes("on s’est vus") ? "nouvelle" : "question",
+      coup: null,
+      mode: "jeu",
+      confiance: "probable",
+      lecture: [
+        { texte: "elle te cherche 👀", preuves: p.slice(0, 1) },
+        { texte: "et toi tu fais le mec occupé", preuves: [] },
+      ],
+      a_envoyer: null,
+      question: "tu lui as répondu quoi ?",
+      reaction: null,
+      pourquoi: null,
+      niveau_atteint: null,
+    };
   if (req.tache === "07-memoire")
     return {
       alerte: null,
