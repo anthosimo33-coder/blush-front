@@ -4,9 +4,9 @@ import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore, type SobreAffiche } from "@prompts/lib/front";
-import { citees, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
-import { introuvables, preuvesChapitres, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
-import { Etape05, Sortie04, Sortie05, Sortie07, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { appliquerMaj, citees, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
+import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
+import { Etape05, Maj07, Sortie04, Sortie05, Sortie07, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
@@ -165,8 +165,10 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const suivant = { n: avant.suivant };
   const nouveau = rendreNouveau(ech, h, lignes, suivant);
   const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, avant.editions);
-  const etat = await appelVerifie(req, Sortie07, (m) => (m.rien_de_neuf ? [] : preuvesMemoire(m)), lignes, story.id, "memoire_maj");
-  if (etat.rien_de_neuf || !etat.memoire || !etat.fiche) return;
+  /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
+  const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
+  if (maj.rien_de_neuf) return;
+  const etat = appliquerMaj(avant.etat, maj);
   const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
   const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: avant.editions } : {}) };
   await db()
