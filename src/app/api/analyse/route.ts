@@ -7,7 +7,7 @@ import { definirQui } from "@/server/histoires";
 import { etatDesTaches, planifier } from "@/server/taches";
 
 /* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 const Qui = z.object({
   me: z.enum(["p0", "p1"]),
