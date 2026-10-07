@@ -180,7 +180,7 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
 }
 
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  if (BACKEND) return enQuestion(question, await envoyerAuChat(question));
+  if (BACKEND) return enQuestion(question, await envoyerAuChat(() => reel.sendToBlush(question)));
   await delay(2000);
   mockServer.set({ questionAsked: question });
   return answerTo(question);
@@ -222,8 +222,10 @@ const NEXT_LEVEL: Partial<Record<LevelId, LevelId>> = { parle: "voit", voit: "di
  */
 export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }): Promise<BlushAnswer> {
   if (BACKEND) {
-    if (input.files?.length || !input.text?.trim()) return bulle("les captures et les exports dans le chat arrivent très vite. en attendant, colle-moi son message en texte");
-    return envoyerAuChat(input.about ? `(à propos de « ${input.about} ») ${input.text.trim()}` : input.text.trim());
+    if (input.files?.length) return envoyerAuChat(() => reel.sendFilesToBlush(input.files!, input.text?.trim()));
+    const texte = input.text?.trim();
+    if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
+    return envoyerAuChat(() => reel.sendToBlush(input.about ? `(à propos de « ${input.about} ») ${texte}` : texte));
   }
   void input.files;
   void input.about;
@@ -252,7 +254,7 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
 
 /** Un vocal pour BLUSH. Simulation : en vrai, le back-end le transcrit, puis BLUSH répond à ce qui est dit. */
 export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
-  if (BACKEND) return bulle("les vocaux arrivent très vite. écris-moi en attendant, je te réponds pareil");
+  if (BACKEND) return envoyerAuChat(() => reel.sendVoiceToBlush(input.audio));
   void input.audio;
   await delay(2200);
   return { kind: "answer", answer: opened().voiceAnswer };
@@ -261,15 +263,26 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }):
 /* Back-end : une réponse de BLUSH en une bulle (ce qui n’est pas encore branché, ou une erreur dite simplement) */
 const bulle = (text: string): BlushAnswer => ({ kind: "bubbles", bubbles: [{ text }] });
 
-async function envoyerAuChat(texte: string): Promise<BlushAnswer> {
+/* ⚠ Textes des erreurs du chat (captures, export, vocal) : à valider */
+const ERREURS_CHAT: Record<string, string> = {
+  trop: "on a beaucoup parlé aujourd’hui, on reprend demain ?",
+  pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
+  acces: "le chat avec moi, c’est dans BLUSH+",
+  capture: "j’arrive pas à lire tes captures. renvoie-les en entier, sans les rogner",
+  fichier: "j’arrive pas à ouvrir ce fichier. envoie-moi l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram",
+  autre_conv: "c’est pas votre conv ça 👀 envoie-moi l’export de la vôtre",
+  rien_de_neuf: "j’ai déjà tout ça : rien de nouveau depuis ton import",
+  vocal_bientot: "les vocaux arrivent très vite. écris-moi en attendant, je te réponds pareil",
+  vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies ?",
+  vocal: "ton vocal est trop long pour moi, fais-en un plus court",
+  transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
+};
+
+async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<BlushAnswer> {
   try {
-    return await reel.sendToBlush(texte);
+    return await envoyer();
   } catch (e) {
-    const code = e instanceof ErreurApi ? e.code : "";
-    if (code === "trop") return bulle("on a beaucoup parlé aujourd’hui, on reprend demain ?");
-    if (code === "pas_pret") return bulle("je finis d’écrire ton rapport, repasse dans deux minutes");
-    if (code === "acces") return bulle("le chat avec moi, c’est dans BLUSH+");
-    return bulle("j’ai eu un bug, renvoie-moi ça");
+    return bulle(ERREURS_CHAT[e instanceof ErreurApi ? e.code : ""] ?? "j’ai eu un bug, renvoie-moi ça");
   }
 }
 
@@ -309,8 +322,8 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
  * Simulation : une capture donne sa bio Hinge, un export de nouveaux messages de votre conv.
  */
 export async function addToFiche(files: File[]): Promise<FicheUpdate> {
-  /* Back-end v1 : les captures pour sa fiche arrivent avec la lecture des captures (prompt 01) */
-  if (BACKEND) return { fiche: await reel.getFiche(), added: [], confirmed: [] };
+  /* Rien de lisible, ou une erreur : la fiche reste comme avant (l’écran dit « Rien de nouveau ») */
+  if (BACKEND) return reel.addToFiche(files).catch(async () => ({ fiche: await reel.getFiche(), added: [], confirmed: [] }));
   await delay(2200);
   const images = files.filter((f) => f.type.startsWith("image/")).length;
   const kinds = [...(images > 0 ? (["captures"] as const) : []), ...(images < files.length ? (["export"] as const) : [])];

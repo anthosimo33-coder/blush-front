@@ -1,7 +1,9 @@
 import "server-only";
 import { desc, eq } from "drizzle-orm";
+import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { bullesAffichees, messagesAffiches } from "@prompts/lib/front";
+import type { Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import type { BlushAnswer, LevelId } from "@/types";
@@ -17,9 +19,15 @@ import { aujourdhuiParis } from "./temps";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
 
-type MessageToi = { texte: string };
+/**
+ * Ce qu’il a envoyé : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un export,
+ * des captures), gardés pour la suite du fil ; `affiche`, ce que l’historique réaffiche (« (3 captures) »).
+ */
+type MessageToi = { texte: string; lignes?: string[]; affiche?: string };
 type MessageBlush = { reponse: BlushAnswer; resume: string };
 const ECHANGES_DANS_LE_FIL = 6;
+/** Des messages envoyés avec un échange, le fil garde les derniers. */
+const LIGNES_DANS_LE_FIL = 15;
 
 
 /** L’historique du chat, du plus ancien au plus récent : ce que l’accueil réaffiche, en paires (sa question, la réponse). */
@@ -28,28 +36,53 @@ export async function historique(storyId: string, limite = 40): Promise<{ mine: 
   const paires: { mine: string; answer: BlushAnswer; at: number }[] = [];
   for (let i = 0; i < lignes.length - 1; i++) {
     if (lignes[i].role !== "toi" || lignes[i + 1].role !== "blush") continue;
-    paires.push({ mine: dechiffrer<MessageToi>(lignes[i].data).texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
+    const toi = dechiffrer<MessageToi>(lignes[i].data);
+    paires.push({ mine: toi.affiche ?? toi.texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
   }
   return paires;
 }
 
 async function fil(storyId: string): Promise<Fil> {
   const lignes = (await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, storyId)).orderBy(desc(schema.chatMessages.id)).limit(ECHANGES_DANS_LE_FIL * 2)).reverse();
-  return lignes.map((l) => (l.role === "toi" ? { de: "toi" as const, texte: dechiffrer<MessageToi>(l.data).texte } : { de: "blush" as const, texte: dechiffrer<MessageBlush>(l.data).resume }));
+  return lignes.map((l) => {
+    if (l.role !== "toi") return { de: "blush" as const, texte: dechiffrer<MessageBlush>(l.data).resume };
+    const toi = dechiffrer<MessageToi>(l.data);
+    return { de: "toi" as const, texte: toi.texte, ...(toi.lignes?.length ? { lignes: toi.lignes } : {}) };
+  });
 }
 
 const resume = (r: ReponseChat) => [...r.lecture.map((b) => b.texte), ...(r.a_envoyer ?? []), r.question ?? "", r.reaction ?? ""].filter(Boolean).join(" / ");
 const texteDe = (r: ReponseChat) => [resume(r), r.pourquoi ?? ""].join(" ");
 
-/** Une réponse de BLUSH, en bulles. Elle enregistre l’échange et, s’il apporte du neuf, programme la mise à jour de la mémoire. */
-export async function repondre(story: Ligne, memoire: DonneesMemoire, dit: string): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
+/** Ce qu’il écrit quand il envoie des messages sans un mot : la demande qu’on a testée sur les évals. */
+const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
+
+/**
+ * Une réponse de BLUSH, en bulles. `ajout` : les messages de leur conv (ou son profil) qu’il vient d’envoyer, et
+ * ce que l’historique en réaffiche. Elle enregistre l’échange et, s’il apporte du neuf, programme la mise à jour de la mémoire.
+ */
+export async function repondre(story: Ligne, memoire: DonneesMemoire, ditBrut: string, ajout?: { ajout: Ajout; affiche: string }): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
-  const lignes = new Map(memoire.lignes);
+  const nouvelles = ajout?.ajout.lignes ?? [];
+  const lignes = new Map([...memoire.lignes, ...nouvelles.map((l) => [l.slice(0, l.indexOf(" ")), l] as [string, string])]);
+  const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
   const jour = aujourdhuiParis();
-  const req = requeteChat({ h, aujourdhui: jour.t, chiffres: ctx.chiffres, fin: ctx.fin, etat: memoire.etat, lignes, editions: memoire.editions, style: ctx.style, fil: await fil(story.id), dit });
+  const req = requeteChat({
+    h,
+    aujourdhui: jour.t,
+    chiffres: ctx.chiffres,
+    fin: ctx.fin,
+    etat: memoire.etat,
+    lignes,
+    editions: memoire.editions,
+    style: ctx.style,
+    fil: await fil(story.id),
+    dit,
+    ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
+  });
 
   let sortie: ReponseChat | null = null;
   for (let essai = 0; essai < 2 && !sortie; essai++) {
@@ -73,12 +106,17 @@ export async function repondre(story: Ligne, memoire: DonneesMemoire, dit: strin
   await db()
     .insert(schema.chatMessages)
     .values([
-      { storyId: story.id, role: "toi", data: chiffrer({ texte: dit } satisfies MessageToi) },
+      {
+        storyId: story.id,
+        role: "toi",
+        data: chiffrer({ texte: dit, ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}) } satisfies MessageToi),
+      },
       { storyId: story.id, role: "blush", data: chiffrer({ reponse, resume: fuite ? REFUS_FUITE.join(" / ") : resume(sortie) } satisfies MessageBlush) },
     ]);
 
-  /* Une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour après la réponse */
-  const majMemoire = !fuite && (["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint);
-  if (majMemoire) await planifier(story.id, "memoire_maj", { date: jour.iso, dit, reponse: sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []) });
+  /* Des messages ajoutés, une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour après la réponse */
+  const majMemoire = !fuite && (nouvelles.length > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint);
+  const echange: Echange = { date: jour.iso, dit, reponse: sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []), ...(nouvelles.length ? { lignes: nouvelles } : {}) };
+  if (majMemoire) await planifier(story.id, "memoire_maj", echange);
   return { reponse, majMemoire };
 }

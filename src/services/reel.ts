@@ -2,7 +2,7 @@
  * Les appels au vrai back-end, depuis le navigateur (routes /api). Les cookies de session sont httpOnly :
  * le navigateur les envoie, il ne les lit pas.
  */
-import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
+import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, FicheUpdate, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
 import { preparerCaptures } from "./preparer-captures";
 import type { Account, ReportPayload } from "./api";
 import { ExportIllisible, preparerExport } from "./preparer-export";
@@ -27,6 +27,18 @@ const envoi = (methode: "POST" | "DELETE", corps?: unknown): RequestInit => ({
   method: methode,
   ...(corps === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(corps) }),
 });
+
+/** Des captures (réduites dans le navigateur) ou un export (compressé) dans un formulaire, sous `cle`. */
+async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
+  const images = files.filter((f) => f.type.startsWith("image/"));
+  try {
+    if (images.length) (await preparerCaptures(images)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
+    else fd.append("export", await preparerExport(files[0]), "export.json.gz");
+  } catch (e) {
+    throw new ErreurApi(images.length ? "capture" : e instanceof ExportIllisible && e.code !== "plusieurs" ? e.code : "fichier", 422);
+  }
+  return fd;
+}
 
 export const reel = {
   async uploadExport(file: File): Promise<Source> {
@@ -63,6 +75,22 @@ export const reel = {
   deleteStory: () => appel<{ ok: true }>("/api/histoire", envoi("DELETE")),
   deleteAccount: () => appel<{ ok: true }>("/api/compte", envoi("DELETE")),
   sendToBlush: (texte: string) => appel<BlushAnswer>("/api/chat", envoi("POST", { texte })),
+  /** Des captures (leur conv, son profil) ou un nouvel export, envoyés à BLUSH dans le chat, avec ou sans un mot. */
+  async sendFilesToBlush(files: File[], texte?: string): Promise<BlushAnswer> {
+    const fd = await avecFichiers(new FormData(), files);
+    if (texte) fd.append("texte", texte);
+    return appel<BlushAnswer>("/api/chat", { method: "POST", body: fd });
+  },
+  /** Un vocal : transcrit côté serveur, puis lu par BLUSH comme un message. */
+  sendVoiceToBlush(audio: Blob): Promise<BlushAnswer> {
+    const fd = new FormData();
+    fd.append("vocal", audio, `vocal.${audio.type.includes("webm") ? "webm" : audio.type.includes("ogg") ? "ogg" : "m4a"}`);
+    return appel<BlushAnswer>("/api/chat", { method: "POST", body: fd });
+  },
+  /** Des captures ou un export pour sa fiche : la fiche mise à jour et les infos qui viennent d’arriver. */
+  async addToFiche(files: File[]): Promise<FicheUpdate> {
+    return appel<FicheUpdate>("/api/fiche", { method: "POST", body: await avecFichiers(new FormData(), files) });
+  },
   getFiche: () => appel<Fiche>("/api/fiche"),
   updateFiche: (facts: FicheFact[]) => appel<Fiche>("/api/fiche", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ facts }) }),
 };
