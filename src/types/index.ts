@@ -23,6 +23,8 @@ export type Person = {
   id: string;
   name: string;
   initial: string;
+  /** Back-end : son pronom (BLUSH accompagne un garçon qui parle à une fille, ou l’inverse). Sans : « elle ». */
+  pronoun?: "il" | "elle";
 };
 
 /** Une source importée : un export ou un lot de captures. */

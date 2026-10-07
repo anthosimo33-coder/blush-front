@@ -103,4 +103,28 @@ export const EXPORT_STEPS = {
       android: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
     },
   },
+  /* ⚠ Textes Instagram absents des maquettes : à valider (et le délai : Instagram prépare le fichier puis prévient par email). */
+  instagram: {
+    menu: { contact: "Espace Comptes", items: ["Mot de passe et sécurité", "Télécharger vos informations", "Préférences publicitaires"], highlight: 1 },
+    steps: {
+      all: [
+        "Ton profil, puis ☰ et Espace Comptes",
+        "Vos informations et autorisations, puis Télécharger vos informations",
+        "Choisis seulement Messages, au format JSON",
+        "Quand Instagram te prévient, choisis le fichier reçu",
+      ],
+      ios: [
+        "Ton profil, puis ☰ et Espace Comptes",
+        "Vos informations et autorisations, puis Télécharger vos informations",
+        "Choisis seulement Messages, au format JSON",
+        "Quand Instagram te prévient, choisis le fichier reçu",
+      ],
+      android: [
+        "Ton profil, puis ☰ et Espace Comptes",
+        "Vos informations et autorisations, puis Télécharger vos informations",
+        "Choisis seulement Messages, au format JSON",
+        "Quand Instagram te prévient, choisis le fichier reçu",
+      ],
+    },
+  },
 } as const;

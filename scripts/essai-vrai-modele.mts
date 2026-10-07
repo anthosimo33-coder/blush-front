@@ -10,12 +10,12 @@ import { executerChaine, type DonneesRapport, type DonneesVerdict, type DonneesM
 import { repondre } from "@/server/chat";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { definirQui, importer, rattacherBrouillon } from "@/server/histoires";
+import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
 import { planifier } from "@/server/taches";
 
 const email = `vrai-modele-${Date.now()}@blush.test`;
 const f = new File([readFileSync("prompts/evals/convs/11-conv-courte.txt")], "11.txt", { type: "text/plain" });
-const { id, meta, secret } = await importer(f);
+const { id, meta, secret } = await importer(await depuisFichier(f));
 const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
 await rattacherBrouillon(u, secret);
 await definirQui(id, { moi: meta.participants.findIndex((p) => p.prenom === "Julie") as 0 | 1, pronom: "elle", devinette: "parle", objectif: "comprendre" });

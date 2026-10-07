@@ -4,6 +4,7 @@
  */
 import type { AnalysisProgress, BlushAnswer, Fiche, FicheFact, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
 import type { Account, ReportPayload } from "./api";
+import { ExportIllisible, preparerExport } from "./preparer-export";
 
 /** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
 export class ErreurApi extends Error {
@@ -29,7 +30,12 @@ const envoi = (methode: "POST" | "DELETE", corps?: unknown): RequestInit => ({
 export const reel = {
   async uploadExport(file: File): Promise<Source> {
     const fd = new FormData();
-    fd.append("fichier", file);
+    try {
+      fd.append("export", await preparerExport(file), "export.json.gz");
+    } catch (e) {
+      /* « plusieurs » : un export Instagram complet. Pour l’instant, on demande le fichier de la bonne conv */
+      throw new ErreurApi(e instanceof ExportIllisible ? (e.code === "plusieurs" ? "fichier" : e.code) : "fichier", 422);
+    }
     return (await appel<{ source: Source }>("/api/import", { method: "POST", body: fd })).source;
   },
   getStory: () => appel<Story>("/api/histoire"),

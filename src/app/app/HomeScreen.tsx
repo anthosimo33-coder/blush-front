@@ -1,5 +1,6 @@
 "use client";
 
+import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import {
   createContext,
@@ -991,7 +992,7 @@ type Row =
   | { kind: "group"; key: string; from: Msg["from"]; at: number | null; landed: boolean; items: Item[] };
 
 /** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot), le mouvement. */
-type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean };
+type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean; autre?: "il" | "elle" };
 
 /** L’heure d’un message. L’intro se cale sur l’ouverture de l’écran (inconnue au rendu serveur : l’heure reste vide). */
 function timeOf(m: Msg, opened: number | null) {
@@ -1049,9 +1050,9 @@ function dayLabel(at: number, now: number) {
 
 /* Mémorisée : taper une lettre ou parler (le niveau du micro, 14 fois par seconde) ne recalcule pas toute la conv */
 const Thread = memo(function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
-  const { report } = useContact();
+  const { report, fiche } = useContact();
   const { on, arriving } = useHomeMotion();
-  const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, motion: on });
+  const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, motion: on, autre: fiche.person.pronoun });
   /* « Aujourd’hui » se compte depuis le message le plus récent (une conv ouverte avant minuit reste juste) */
   const now = Math.max(opened ?? 0, ...rows.map((r) => (r.kind === "event" ? 0 : (r.at ?? 0))));
   return (
@@ -1233,7 +1234,7 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
           {
             body: (
               <span className="flex flex-col gap-1">
-                <span className="text-[16px] font-black leading-[1.3]">Elle vient de répondre ?</span>
+                <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre ?</span>
                 <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse : capture, export ou texte. BLUSH reconnaît tout seul.</span>
               </span>
             ),
