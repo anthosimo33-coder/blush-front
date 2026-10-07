@@ -66,6 +66,24 @@ export async function aRelancer(storyId: string): Promise<Tache[]> {
     .orderBy(schema.tasks.createdAt);
 }
 
+/**
+ * Une autre exécution tient-elle déjà une tâche de l’histoire ? Elle enchaînera aussi les suivantes : on la laisse
+ * faire (deux mises à jour de la mémoire en même temps perdraient l’une des deux).
+ */
+export async function occupee(storyId: string): Promise<boolean> {
+  const [t] = await db()
+    .select({ id: schema.tasks.id })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "en_cours"), sql`${schema.tasks.heartbeatAt} >= now() - make_interval(secs => ${PERIME_S})`))
+    .limit(1);
+  return !!t;
+}
+
+export async function statutDe(id: string): Promise<string | null> {
+  const [t] = await db().select({ status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.id, id));
+  return t?.status ?? null;
+}
+
 /** Les tâches d’une histoire, par genre (la plus récente de chaque). */
 export async function etatDesTaches(storyId: string, genres: Genre[]): Promise<Partial<Record<Genre, Tache>>> {
   const lignes = await db()

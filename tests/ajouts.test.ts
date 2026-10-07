@@ -1,0 +1,162 @@
+import { readFileSync } from "node:fs";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { blocAjout, estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter } from "@prompts/lib/ajouts";
+import type { Message } from "@prompts/lib/conv";
+import type { Requete } from "@prompts/lib/contextes";
+import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
+import type { Captures, Memoire } from "@prompts/lib/schemas";
+import { ajouterALaFiche, depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
+import { executerChaine } from "@/server/analyse";
+import { historique, repondre } from "@/server/chat";
+import { db, schema } from "@/server/db";
+import { ficheDe, memoireDe } from "@/server/donnees";
+import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
+import { definirFactice } from "@/server/ia/claude";
+import { fournisseurFactice } from "@/server/ia/factice";
+import { transcrire } from "@/server/ia/transcription";
+import { planifier } from "@/server/taches";
+
+const lireConv = (f: string) => readFileSync(`prompts/evals/convs/${f}`, "utf8");
+const texte01 = lireConv("01-a-deux-doigts.txt");
+const h = { utilisateur: { prenom: "Hugo", pronom: "il" as const, nomExport: "Hugo" }, autre: { prenom: "Sophie", pronom: "elle" as const, nomExport: "Sophie" } };
+/* La suite de leur conv, après l’import : un message de lui, puis deux d’elle */
+const suite = ["[14/03/2026 10:02:11] Hugo: alors cette semaine ?", "[14/03/2026 18:40:00] Sophie: ça va mieux", "[14/03/2026 18:40:30] Sophie: samedi ça te dit toujours ?"].join("\n");
+/* Le dernier message de la conv 01 : « je suis crevée cette semaine, on verra » */
+const fin01 = Date.UTC(2026, 2, 12, 22, 51, 36);
+
+describe("lib/ajouts", () => {
+  it("un nouvel export : seulement les messages d’après le dernier lu, et seulement leur conv", () => {
+    const m = messagesDeLExport(`${texte01}\n${suite}`, h, fin01) as Message[];
+    expect(m.map((x) => [x.role, x.texte])).toEqual([
+      ["toi", "alors cette semaine ?"],
+      ["autre", "ça va mieux"],
+      ["autre", "samedi ça te dit toujours ?"],
+    ]);
+    /* Son nom d’affichage a changé : on la retrouve par son prénom */
+    expect((messagesDeLExport(`${texte01}\n${suite}`.replaceAll("] Sophie:", "] Sophie 🌸:"), h, fin01) as Message[]).map((x) => x.role)).toEqual(["toi", "autre", "autre"]);
+    expect(messagesDeLExport(lireConv("02-reciproque.txt"), h, fin01)).toBe("autre_conv");
+  });
+
+  it("numérote à la suite, marque sa dernière rafale, et range son profil à part", () => {
+    const m = messagesDeLExport(`${texte01}\n${suite}`, h, fin01) as Message[];
+    const a = numeroter(m, ["24 ans, étudiante en droit"], h, { debut: 1074, aujourdhui: "2026-03-15" });
+    expect(a.lignes).toEqual([
+      "m1074 2026-03-14 sam. 10:02 Hugo : alors cette semaine ?",
+      "m1075 2026-03-14 sam. 18:40 Sophie : ça va mieux",
+      "m1076 2026-03-14 sam. 18:40 Sophie : samedi ça te dit toujours ?",
+      "m1077 2026-03-15 dim. --:-- profil de Sophie : 24 ans, étudiante en droit",
+    ]);
+    expect(a.cibles).toEqual(["m1075", "m1076"]);
+    expect(a.lignes.map(estLigneProfil)).toEqual([false, false, false, true]);
+    expect(blocAjout(a).map((l) => l.slice(0, 8))).toEqual(["  m1074 ", "→ m1075 ", "→ m1076 ", "  m1077 "]);
+    expect(blocAjout(a, 2)[0]).toBe("[… 1 messages plus anciens …]");
+    expect(resumeAjout(a, "captures", 2)).toBe("(2 captures : 3 nouveaux messages, son profil)");
+
+    /* À l’affichage : son profil n’est pas une bulle, mais il est la source d’une info de sa fiche */
+    const lignes = new Map(a.lignes.map((l) => [l.slice(0, 5), l]));
+    expect(messagesAffiches(lignes, "Hugo").has("m1077")).toBe(false);
+    expect(messagesAffiches(lignes, "Hugo").get("m1076")).toMatchObject({ from: "elle", caption: "Sophie · 14/03 18:40" });
+    const etat = { fiche: { faits: [{ section: "infos", texte: "24 ans", preuves: ["m1077"], statut: "nouveau" }] } } as unknown as Memoire;
+    expect(faitsAffiches(etat, lignes)[0]).toMatchObject({ sourceLabel: "son profil · 15 mars", sources: ["capture"] });
+  });
+
+  it("des captures : ce qui est avant le dernier message lu ne revient pas (le jour même, on garde)", () => {
+    const msg = (de: "moi" | "autre", texte: string) => ({ de, texte, media: null, coupe: false, reaction: null });
+    const c: Captures = {
+      appli: "instagram",
+      autre: "Sophie",
+      captures: [{ numero: 1, place: 1, hors_sujet: false }],
+      blocs: [
+        { repere: { date: "2026-03-10", heure: "09:00" }, messages: [msg("autre", "vieux")] },
+        { repere: { date: "2026-03-12", heure: "23:30" }, messages: [msg("moi", "le soir même")] },
+        { repere: { date: "2026-03-14", heure: "18:40" }, messages: [msg("autre", "ça va mieux")] },
+      ],
+      profil: [],
+      doutes: [],
+    };
+    expect(messagesDesCaptures(c, h, { aujourdhui: "2026-03-15", apres: fin01 }).map((m) => [m.role, m.texte])).toEqual([
+      ["toi", "le soir même"],
+      ["autre", "ça va mieux"],
+    ]);
+  });
+});
+
+describe("après l’import : le chat et sa fiche", () => {
+  const email = `ajouts-${Date.now()}@blush.test`;
+  const requetes: Requete[] = [];
+  const derniere = (tache: Requete["tache"]) =>
+    requetes
+      .filter((r) => r.tache === tache)
+      .at(-1)!
+      .blocs.flatMap((b) => ("texte" in b ? [b.texte] : []))
+      .join("\n");
+  let id = "";
+  const story = async () => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0];
+  const image = { media: "image/jpeg" as const, base64: "AAAA" };
+
+  beforeAll(async () => {
+    definirFactice((req) => (requetes.push(req), fournisseurFactice(req)));
+    const imp = await importer(await depuisFichier(new File([texte01], "01.txt", { type: "text/plain" })));
+    id = imp.id;
+    const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
+    await rattacherBrouillon(u, imp.secret);
+    await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
+    await planifier(id, "verdict");
+    await executerChaine(id);
+  });
+  afterAll(async () => {
+    await db().delete(schema.users).where(eq(schema.users.email, email));
+    definirFactice(null);
+  });
+
+  it("un nouvel export dans le chat : ses messages marqués, l’historique résumé, la mémoire qui les relit", async () => {
+    const memoire = (await memoireDe(id))!;
+    const ajout = await depuisExport(await story(), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
+    expect(ajout.messages).toBe(3);
+    expect(ajout.lignes[0].startsWith(`m${String(memoire.suivant).padStart(4, "0")} `)).toBe(true);
+
+    const { reponse, majMemoire } = await repondre(await story(), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
+    expect(reponse.kind).toBe("bubbles");
+    expect(majMemoire).toBe(true);
+    const chat = derniere("10-chat");
+    expect(chat).toContain(`→ ${ajout.lignes[2]}`);
+    expect(chat).toContain("Hugo (à toi) : ça veut dire quoi ? je lui réponds quoi ?");
+    expect((await historique(id)).at(-1)?.mine).toBe("(ton export : 3 nouveaux messages)");
+
+    await executerChaine(id);
+    expect(derniere("07-memoire")).toContain(`ajouté à la conv :\n${ajout.lignes.join("\n")}`);
+
+    /* Le même export, renvoyé : le curseur a avancé, rien de neuf */
+    await expect(depuisExport(await story(), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({ code: "rien_de_neuf" });
+  });
+
+  it("le message suivant garde dans le fil les messages qu’il avait envoyés", async () => {
+    await repondre(await story(), (await memoireDe(id))!, "je lui dis oui direct ?");
+    expect(derniere("10-chat")).toMatch(/ {2}m\d{4} 2026-03-14 sam\. 18:40 Sophie : samedi ça te dit toujours \?\nHugo \(à toi\) : ça veut dire quoi \?/);
+  });
+
+  it("des captures : leurs messages et son profil, numérotés après l’export", async () => {
+    const memoire = (await memoireDe(id))!;
+    const ajout = await depuisCaptures(await story(), memoire, [image]);
+    expect(ajout.messages).toBe(24);
+    expect(ajout.profil).toBe(1);
+    expect(ajout.lignes[0].startsWith(`m${String(memoire.suivant + 3).padStart(4, "0")} `)).toBe(true);
+    expect(derniere("01-captures")).toContain("autre personne : Sophie");
+  });
+
+  it("pour sa fiche : son profil devient une info, avec sa source", async () => {
+    const avant = new Set((await ficheDe(await story())).facts.map((f) => f.text));
+    const ajout = await depuisCaptures(await story(), (await memoireDe(id))!, [image]);
+    const r = await ajouterALaFiche(await story(), avant, ajout);
+    expect(r.added.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
+    expect(r.fiche.facts.length).toBeGreaterThan(avant.size);
+  });
+
+  it("un vocal est transcrit (ici, le modèle factice), puis lu comme un message", async () => {
+    const t = await transcrire(new File([new Uint8Array(16)], "vocal.webm", { type: "audio/webm" }));
+    expect(t).toContain("samedi");
+    await repondre(await story(), (await memoireDe(id))!, `(vocal) ${t}`);
+    expect(derniere("10-chat")).toContain(`Hugo (à toi) : (vocal) ${t}`);
+  });
+});

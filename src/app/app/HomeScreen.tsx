@@ -660,7 +660,7 @@ export function HomeScreen({
                 )}
               </div>
               <FileInput inputRef={shots.ref} accept="image/*" multiple onFiles={sendImages} label="Captures d’écran de sa réponse" />
-              <FileInput inputRef={exp.ref} accept=".zip,.txt,application/zip,text/plain" onFiles={sendExport} label="Export de votre conv" />
+              <FileInput inputRef={exp.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={sendExport} label="Export de votre conv" />
             </form>
           </div>
 

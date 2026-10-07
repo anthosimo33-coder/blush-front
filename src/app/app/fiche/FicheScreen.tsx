@@ -19,10 +19,10 @@ import type { Fiche, FicheFact, FicheUpdate } from "@/types";
 /** Largeur de la fiche sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const CARD_W = 600;
 
-/** Ce que la fiche accepte : des captures (images) ou un export de votre conv (.zip, .txt). */
-const ACCEPT = "image/*,.zip,.txt,application/zip,text/plain";
+/** Ce que la fiche accepte : des captures (images) ou un export de votre conv (WhatsApp .zip ou .txt, Instagram .html ou .json). */
+const ACCEPT = "image/*,.zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html";
 const isImage = (f: File) => f.type.startsWith("image/");
-const accepted = (f: File) => isImage(f) || /\.(zip|txt)$/i.test(f.name) || f.type === "application/zip" || f.type === "text/plain";
+const accepted = (f: File) => isImage(f) || /\.(zip|txt|json|html)$/i.test(f.name) || ["application/zip", "text/plain", "application/json", "text/html"].includes(f.type);
 
 /** Ce que BLUSH analyse, dit simplement : « ta capture », « tes 3 captures », « votre conv », ou les deux. */
 function whatOf(files: File[]) {

@@ -18,18 +18,22 @@ const chapitre = (numero: number, p: string[]) => ({
 });
 
 export function fournisseurFactice(req: Requete): unknown {
-  /* Lire des captures : une transcription fixe de 24 messages, sur deux jours */
-  if (req.tache === "01-captures")
+  /* Lire des captures : une transcription fixe de 24 messages, l’avant-veille et la veille du jour de la requête, et une ligne de son profil */
+  if (req.tache === "01-captures") {
+    const auj = Date.parse(`${textes(req)[0].match(/aujourd’hui : \S+ (\d{4}-\d{2}-\d{2})/)?.[1] ?? "2026-09-09"}T00:00:00Z`);
+    const veille = (k: number) => new Date(auj - k * 86400e3).toISOString().slice(0, 10);
     return {
       appli: "instagram",
       autre: "Elias",
       captures: req.blocs.filter((b) => "image" in b).map((_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
       blocs: [
-        { repere: { date: "2026-09-06", heure: "13:12" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
-        { repere: { date: "2026-09-08", heure: "21:05" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
+        { repere: { date: veille(2), heure: "13:12" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
+        { repere: { date: veille(1), heure: "21:05" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
       ],
+      profil: ["Étudiante en droit à Lyon"],
       doutes: [],
     };
+  }
   const p = ids(req);
   const demande = textes(req).at(-1)!;
   if (req.tache === "04-verdict")
@@ -71,7 +75,11 @@ export function fournisseurFactice(req: Requete): unknown {
       ton_mode: null,
       conseils: null,
       a_venir: null,
-      faits_ajoutes: [{ section: "notes", texte: "Adore les soirées improvisées", preuves: [] }],
+      faits_ajoutes: [
+        { section: "notes", texte: "Adore les soirées improvisées", preuves: [] },
+        /* Une ligne de son profil arrivée avec des captures : elle rejoint sa fiche, avec sa preuve */
+        ...[...demande.matchAll(/^(m\d{4,}) \S+ \S+ --:-- profil de [^:]+ : (.*)$/gm)].map((m) => ({ section: "infos", texte: m[2], preuves: [m[1]] })),
+      ],
       faits_retires: [],
       portrait: null,
       phrase: null,
