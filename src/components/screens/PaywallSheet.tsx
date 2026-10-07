@@ -1,5 +1,6 @@
 "use client";
 
+import { ErreurApi } from "@/services/reel";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
@@ -37,9 +38,18 @@ export function PaywallSheet({
   const [selected, setSelected] = useState<Offer["id"]>(only ?? "blushplus");
   const [busy, setBusy] = useState(false);
 
+  const [later, setLater] = useState(false);
+
   const pay = async () => {
     setBusy(true);
-    await unlock(selected);
+    try {
+      await unlock(selected);
+    } catch (e) {
+      /* Back-end v1, sans paiement : l’accès est réservé à la bêta */
+      setBusy(false);
+      if (e instanceof ErreurApi && e.code === "bientot") setLater(true);
+      return;
+    }
     invalidate("report", "account");
     setBusy(false);
     /* Le parent ferme le panneau : fermer n’est pas annuler. Puis le moment « C’est débloqué ». */
@@ -92,6 +102,11 @@ export function PaywallSheet({
         })}
       </div>
       <div className="flex flex-col gap-3 lg:w-[360px] lg:gap-4 lg:self-center">
+        {later && (
+          <p role="status" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-soft">
+            Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.
+          </p>
+        )}
         <Button arrow={!busy} onClick={busy ? undefined : pay} aria-busy={busy}>
           {busy ? <TypingDots color="#FFFFFF" label="Paiement en cours" /> : "Débloquer"}
         </Button>

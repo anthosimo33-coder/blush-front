@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { getQuestionIdeas, getStory } from "@/services/api";
+import { redirect } from "next/navigation";
+import { getQuestionIdeas, getStory } from "@/services/serveur";
 import { currentStoryId } from "@/services/session.server";
 import { QuestionChat } from "./QuestionChat";
 import { QuestionScreen } from "./QuestionScreen";
@@ -12,5 +13,6 @@ export default async function Page({ searchParams }: PageProps<"/rapport/questio
   if (version === "actuelle") return <QuestionScreen />;
   const storyId = await currentStoryId();
   const [ideas, story] = await Promise.all([getQuestionIdeas(storyId), getStory(storyId)]);
+  if (!story) redirect("/commencer");
   return <QuestionChat ideas={ideas} story={story} />;
 }

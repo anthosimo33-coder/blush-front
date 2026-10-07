@@ -42,3 +42,6 @@ next-env.d.ts
 
 # galerie des écrans (générée)
 /.galerie/
+
+# Les textes des prompts, générés depuis le sous-module (scripts/prompts.mjs)
+/src/server/ia/textes.generated.ts

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { getReport, getStory } from "@/services/api";
+import { redirect } from "next/navigation";
+import { getReport, getStory } from "@/services/serveur";
 import { currentStoryId } from "@/services/session.server";
 import { VerdictReveal } from "./VerdictReveal";
 
@@ -12,5 +13,7 @@ export const viewport: Viewport = { themeColor: "#121214" };
 export default async function Page() {
   const storyId = await currentStoryId();
   const [initial, story] = await Promise.all([getReport(storyId), getStory(storyId)]);
+  if (!story) redirect("/commencer");
+  if (!initial) redirect("/lecture");
   return <VerdictReveal initial={initial} story={story} />;
 }
