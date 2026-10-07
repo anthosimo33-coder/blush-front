@@ -49,7 +49,23 @@ export function fournisseurFactice(req: Requete): unknown {
     };
   if (req.tache === "05-rapport") return { plan: null, chapitres: (demande.includes("1 à 4") ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) };
   if (req.tache === "07-memoire" && demande.includes("Moment : la mise à jour."))
-    return { alerte: null, rien_de_neuf: true, memoire: null, fiche: null, niveau: null, questions: null };
+    return {
+      alerte: null,
+      rien_de_neuf: false,
+      ou_on_en_est: "Ils se sont vus hier, d’après lui.",
+      moments_ajoutes: [{ quand: "2026-03-14", quoi: "D’après lui, ils se sont vus et c’était trop bien.", preuves: [] }],
+      son_mode: null,
+      ton_mode: null,
+      conseils: null,
+      a_venir: null,
+      faits_ajoutes: [{ section: "notes", texte: "Adore les soirées improvisées", preuves: [] }],
+      faits_retires: [],
+      portrait: null,
+      phrase: null,
+      phrase_courte: null,
+      niveau: null,
+      questions: null,
+    };
   if (req.tache === "10-chat")
     return {
       alerte: null,
