@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKEND } from "@/services/mode";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
@@ -378,13 +379,16 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
               href="/rapport/question"
               chevron
             />
-            <InsetRow
-              leading={<RowIcon icon="photo" tone="elle" />}
-              title="Ajouter le début"
-              sub="Votre histoire commence avant WhatsApp ? Ajoute des captures (Hinge, Insta) : ton rapport sera encore plus juste."
-              href="/importer/captures?mode=ajout"
-              chevron
-            />
+            {/* Back-end v1 : réunir un export et des captures arrive plus tard */}
+            {!BACKEND && (
+              <InsetRow
+                leading={<RowIcon icon="photo" tone="elle" />}
+                title="Ajouter le début"
+                sub="Votre histoire commence avant WhatsApp ? Ajoute des captures (Hinge, Insta) : ton rapport sera encore plus juste."
+                href="/importer/captures?mode=ajout"
+                chevron
+              />
+            )}
           </InsetGroup>
         </>
       )}

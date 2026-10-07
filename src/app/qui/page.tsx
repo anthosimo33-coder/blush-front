@@ -8,5 +8,5 @@ export const metadata: Metadata = { title: "Qui est qui" };
 export default async function Page() {
   const story = await getStory();
   if (!story) redirect("/commencer");
-  return <QuiScreen people={story.participants} />;
+  return <QuiScreen people={story.participants} captures={story.sources[0]?.mode === "captures"} />;
 }

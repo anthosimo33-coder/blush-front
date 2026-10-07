@@ -5,6 +5,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
 import { uploadScreenshots } from "@/services/api";
+import { BACKEND } from "@/services/mode";
+import { ErreurApi } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -36,11 +38,20 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   /* Les aperçus sont créés une fois par fichier (déplacer une capture ne les recharge pas) */
   useEffect(() => () => all.current.forEach((s) => s.url && URL.revokeObjectURL(s.url)), []);
 
+  /* Back-end : une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=) */
+  const echec = (code: string) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
+
   const handle = async (picked: File[], video: boolean) => {
     const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null }));
     if (video) items.forEach((s) => s.url && URL.revokeObjectURL(s.url));
     const next = video ? added : [...items, ...added];
+    /* Back-end v1 : pas encore d’enregistrement d’écran ; et la lecture ne part qu’une fois, au clic sur Continuer */
+    if (BACKEND && video) return echec("capture");
     setItems(next);
+    if (BACKEND) {
+      setResult({ count: next.length, messages: -1, video: false });
+      return;
+    }
     setBusy(true);
     const r = await uploadScreenshots(
       next.map((s) => s.file),
@@ -74,6 +85,24 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     });
   };
 
+  /* Back-end : BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite */
+  const continuer = async () => {
+    if (!BACKEND) return router.push(next);
+    setBusy(true);
+    try {
+      const r = await uploadScreenshots(
+        items.map((s) => s.file),
+        { app: captureApp, mode: addMode ? "add" : "first" },
+      );
+      setJourney({ captureNames: items.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
+      setResult({ count: items.length, messages: r.messagesRead, video: false });
+      router.push(next);
+    } catch (e) {
+      setBusy(false);
+      echec(e instanceof ErreurApi && ["courte", "groupe"].includes(e.code) ? e.code : "capture");
+    }
+  };
+
   const back = addMode ? "/importer/ok" : "/commencer";
   const next = addMode ? "/importer/histoire" : "/qui";
 
@@ -90,8 +119,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       }
       footer={
         items.length ? (
-          <Button arrow onClick={() => router.push(next)} disabled={busy}>
-            Continuer
+          <Button arrow onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
+            {busy && BACKEND ? <TypingDots color="#FFFFFF" label="BLUSH lit tes captures" /> : "Continuer"}
           </Button>
         ) : (
           /* ⚠ Libellé avant sélection absent des maquettes */
@@ -137,7 +166,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
               <Icon name="check" size={13} color="#FFFFFF" stroke={3.4} />
             </span>
-            {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`} · {result.messages} messages analysés
+            {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`}
+            {result.messages >= 0 ? ` · ${result.messages} messages analysés` : " prêtes"}
           </div>
         )}
       </div>

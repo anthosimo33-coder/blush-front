@@ -42,7 +42,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     (async () => {
       /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
       const cur = readJourney();
-      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
+      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
       restartRef.current = false;
       if (!alive) return;
       setJourney({ jobId });
