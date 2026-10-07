@@ -2,26 +2,30 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
-import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
+import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore, type SobreAffiche } from "@prompts/lib/front";
-import { citees } from "@prompts/lib/memoire";
+import { citees, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
 import { Etape05, Sortie04, Sortie05, Sortie07, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } from "./histoires";
+import { ErreurTache } from "./erreurs";
+import { aujourdhuiParis } from "./temps";
 import { appeler } from "./ia/claude";
-import { aRelancer, battre, echouer, finir, planifier, prendre, type Genre, type Tache } from "./taches";
+import { aRelancer, battre, echouer, entreeDe, finir, planifier, prendre, type Genre, type Tache } from "./taches";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
 export type DonneesVerdict = { sortie: Verdict; scores: LigneScore[] };
 export type DonneesRapport = { sortie: Rapport; chapitres: ChapitreAffiche[]; sobre: SobreAffiche | null; lecture: { free: string; full: string } };
-/** La mémoire, sa banque de messages (les lignes citées), et le prochain identifiant libre pour les messages ajoutés. */
-export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number };
+/**
+ * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
+ * et ce que l’utilisateur a corrigé lui-même dans sa fiche.
+ */
+export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
 
-export class ErreurTache extends Error {}
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -150,11 +154,33 @@ async function memoire(story: Ligne) {
   if (contexteDe(story)) await db().update(schema.stories).set({ conv: null, convPurgedAt: new Date(), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
 }
 
+/** Après un échange qui apporte du neuf : la mémoire se met à jour (ou dit « rien de neuf », le cas le plus fréquent). */
+async function memoireMaj(story: Ligne, t: Tache) {
+  const ech = entreeDe<Echange>(t);
+  const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
+  if (!ech || !ligne) throw new ErreurTache("memoire_absente");
+  const avant = dechiffrer<DonneesMemoire>(ligne.data);
+  const h = histoireDe(metaDe(story));
+  const lignes = new Map(avant.lignes);
+  const suivant = { n: avant.suivant };
+  const nouveau = rendreNouveau(ech, h, lignes, suivant);
+  const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, avant.editions);
+  const etat = await appelVerifie(req, Sortie07, (m) => (m.rien_de_neuf ? [] : preuvesMemoire(m)), lignes, story.id, "memoire_maj");
+  if (etat.rien_de_neuf || !etat.memoire || !etat.fiche) return;
+  const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
+  const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: avant.editions } : {}) };
+  await db()
+    .update(schema.memories)
+    .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
+    .where(eq(schema.memories.storyId, story.id));
+}
+
 const ETAPES: Partial<Record<Genre, (story: Ligne, t: Tache) => Promise<void>>> = {
   verdict,
   rapport_plan: rapportPlan,
   rapport_chapitres: rapportChapitres,
   memoire,
+  memoire_maj: memoireMaj,
 };
 
 /** Une étape a-t-elle encore l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */

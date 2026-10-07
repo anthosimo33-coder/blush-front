@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executerChaine, type DonneesMemoire, type DonneesRapport } from "@/server/analyse";
+import { historique, repondre } from "@/server/chat";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { definirQui, ErreurImport, importer, metaDe, rattacherBrouillon, storyAffichee } from "@/server/histoires";
@@ -66,5 +67,15 @@ describe("de l’import à la mémoire", () => {
     expect(fin.conv).toBeNull();
     expect(fin.convPurgedAt).not.toBeNull();
     expect(metaDe(fin).moi).toBe(moi);
+
+    /* Le chat, sur la mémoire : des bulles avec leurs preuves, l’échange gardé, la mémoire mise à jour s’il y a du neuf */
+    const { reponse, majMemoire } = await repondre(fin, memoire, "on s’est vus hier, c’était trop bien");
+    expect(reponse.kind).toBe("bubbles");
+    expect(reponse.kind === "bubbles" && reponse.bubbles[0].messages?.length).toBe(1);
+    expect(majMemoire).toBe(true);
+    expect(await historique(id)).toHaveLength(1);
+    await executerChaine(id);
+    const [maj] = await db().select().from(schema.tasks).where(eq(schema.tasks.kind, "memoire_maj"));
+    expect(maj.status).toBe("fini");
   });
 });

@@ -1,8 +1,9 @@
 import "server-only";
-import type { Fiche, Story } from "@/types";
+import type { BlushAnswer, Fiche, Story } from "@/types";
 import * as demo from "./api";
 import type { ReportPayload } from "./api";
 import { BACKEND } from "./mode";
+import { historique } from "@/server/chat";
 import { contexteRequete, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
 
 /*
@@ -36,4 +37,11 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
   if (!BACKEND) return demo.getQuestionIdeas(storyId);
   const { story } = await contexteRequete();
   return story ? questionsDe(story.id) : [];
+}
+
+/** Les échanges déjà eus avec BLUSH, à réafficher sur l’accueil. Rien en démo. */
+export async function getChat(): Promise<{ mine: string; answer: BlushAnswer; at: number }[]> {
+  if (!BACKEND) return [];
+  const { utilisateur, story } = await contexteRequete();
+  return utilisateur && story ? historique(story.id) : [];
 }
