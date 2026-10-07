@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PROMPTS = ["00-socle.md", "04-verdict.md", "05-rapport.md", "07-memoire.md", "10-chat.md"];
+const PROMPTS = ["00-socle.md", "01-captures.md", "04-verdict.md", "05-rapport.md", "07-memoire.md", "10-chat.md"];
 
 /* Des phrases assez longues pour n’appartenir qu’aux prompts */
 const phrases = PROMPTS.flatMap((f) =>

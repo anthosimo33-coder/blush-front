@@ -51,7 +51,7 @@ export function CodeScreen() {
       return;
     }
     await createAccount(email);
-    const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
+    const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
     set({ jobId });
     router.push("/lecture");
   };

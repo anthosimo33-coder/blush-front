@@ -2,7 +2,8 @@ import "server-only";
 import type { Requete } from "@prompts/lib/contextes";
 
 /* Un modèle factice (BLUSH_IA_FACTICE=1, pour les tests et le dev sans coût) : des sorties valides, qui citent de vrais identifiants de la conv. */
-const ids = (req: Requete) => [...new Set(req.blocs.map((b) => b.texte).join("\n").match(/^m\d{4,}(?= )/gm) ?? [])];
+const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
+const ids = (req: Requete) => [...new Set(textes(req).join("\n").match(/^m\d{4,}(?= )/gm) ?? [])];
 
 const chapitre = (numero: number, p: string[]) => ({
   numero,
@@ -17,8 +18,20 @@ const chapitre = (numero: number, p: string[]) => ({
 });
 
 export function fournisseurFactice(req: Requete): unknown {
+  /* Lire des captures : une transcription fixe de 24 messages, sur deux jours */
+  if (req.tache === "01-captures")
+    return {
+      appli: "instagram",
+      autre: "Elias",
+      captures: req.blocs.filter((b) => "image" in b).map((_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
+      blocs: [
+        { repere: { date: "2026-09-06", heure: "13:12" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
+        { repere: { date: "2026-09-08", heure: "21:05" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
+      ],
+      doutes: [],
+    };
   const p = ids(req);
-  const demande = req.blocs.at(-1)!.texte;
+  const demande = textes(req).at(-1)!;
   if (req.tache === "04-verdict")
     return {
       alerte: null,

@@ -4,6 +4,7 @@ import { gunzipSync, strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
 import { detecterFormat, erreurImport, lire, participantsDe, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
+import type { TexteCaptures } from "@prompts/lib/captures";
 import type { Story } from "@/types";
 import { chiffrer, dechiffrer, empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
@@ -20,12 +21,15 @@ export class ErreurImport extends Error {
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
-  appli: Appli;
-  format: Exclude<Format, "captures">;
+  /** L’appli d’où vient la conv : un export (WhatsApp, Instagram), ou des captures (Instagram, Hinge, autre). */
+  appli: Appli | "hinge" | "autre";
+  format: Format;
   fichier: string;
   /** Les deux participants, du plus bavard au moins bavard, avec leur nom dans l’export. */
   participants: { nom: string; prenom: string; messages: number }[];
   resume: { debut: string; fin: string; total: number; vocaux: number };
+  /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
+  captures?: number;
   /** Rempli sur « Qui es-tu ? » : l’index de l’utilisateur dans `participants`, son pronom, sa devinette, son objectif. */
   moi?: 0 | 1;
   pronom?: Pronom;
@@ -108,6 +112,38 @@ export async function importer({ nom, appli, texte }: ExportLu & { nom: string }
   return { id: ligne.id, meta, secret };
 }
 
+/** Des captures, lues par le prompt 01 (src/server/captures.ts) : une histoire brouillon, comme un export. */
+export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: TexteCaptures }): Promise<{ id: string; meta: Meta; secret: string }> {
+  const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
+  const lu = lire(t.texte, { utilisateur: personne("Moi"), autre: personne(t.autre), format: "captures" });
+  const err = erreurImport(lu, "captures");
+  if (err) throw new ErreurImport(err);
+  const compte = (nom: string) => lu.messages.filter((m) => m.nom === nom).length;
+  const meta: Meta = {
+    appli,
+    format: "captures",
+    fichier: `${t.captures} captures`,
+    captures: t.captures,
+    participants: [
+      { nom: "Moi", prenom: "Moi", messages: compte("Moi") },
+      { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre) },
+    ],
+    resume: {
+      debut: new Date(lu.messages[0].t).toISOString().slice(0, 10),
+      fin: new Date(lu.messages.at(-1)!.t).toISOString().slice(0, 10),
+      total: lu.messages.length,
+      vocaux: lu.messages.filter((m) => m.media === "vocal").length,
+    },
+    moi: 0,
+  };
+  const secret = jeton();
+  const [ligne] = await db()
+    .insert(schema.stories)
+    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrer(t.texte) })
+    .returning({ id: schema.stories.id });
+  return { id: ligne.id, meta, secret };
+}
+
 /** L’histoire ouverte : la plus récente du compte, sinon le brouillon du cookie. */
 export async function histoireOuverte(utilisateur: Utilisateur | null, secretBrouillon: string | undefined): Promise<Ligne | null> {
   if (utilisateur) {
@@ -150,13 +186,17 @@ export function histoireDe(meta: Meta): Histoire {
   };
 }
 
-export async function definirQui(id: string, qui: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">>): Promise<Meta> {
+export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
   const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
-  const meta = { ...metaDe(ligne), ...qui };
+  const avant = metaDe(ligne);
+  /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
+  const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;
+  const meta = { ...avant, ...qui, participants };
   await db().update(schema.stories).set({ meta: chiffrer(meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
   return meta;
 }
 
+const APPLIS: Record<Meta["appli"], string> = { whatsapp: "WhatsApp", instagram: "Instagram", hinge: "Hinge", autre: "Captures" };
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
 
@@ -174,7 +214,11 @@ export function storyAffichee(id: string, meta: Meta): Story {
       { id: "p0", name: a.prenom, initial: a.prenom[0]?.toUpperCase() ?? "?", ...pronom(0) },
       { id: "p1", name: b.prenom, initial: b.prenom[0]?.toUpperCase() ?? "?", ...pronom(1) },
     ],
-    sources: [{ id: "s1", app: meta.appli, mode: "export", fileName: meta.fichier, label: `${meta.appli === "instagram" ? "Instagram" : "WhatsApp"} · ${dateCourte(debut)}`, period: periode, messageCount: total, voiceCount: vocaux }],
+    sources: [
+      meta.captures
+        ? { id: "s1", app: meta.appli, mode: "captures", screenshotCount: meta.captures, label: `${APPLIS[meta.appli]} · ${meta.captures} captures`, period: periode, messageCount: total, voiceCount: vocaux }
+        : { id: "s1", app: meta.appli, mode: "export", fileName: meta.fichier, label: `${APPLIS[meta.appli]} · ${dateCourte(debut)}`, period: periode, messageCount: total, voiceCount: vocaux },
+    ],
     totalMessages: total,
     voiceCount: vocaux,
     period: periode,

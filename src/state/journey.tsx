@@ -19,6 +19,8 @@ export type JourneyState = {
   me: string | null;
   /** Tu es un garçon (il) ou une fille (elle) : les prompts en ont besoin ; l’autre est l’opposé. */
   pronom: "il" | "elle" | null;
+  /** Des captures : son prénom (il n’y apparaît que comme « Moi »). */
+  prenom: string;
   guess: Guess | null;
   goal: Goal | null;
   email: string;
@@ -36,6 +38,7 @@ export const JOURNEY_DEFAULTS: JourneyState = {
   capturesAdded: false,
   me: null,
   pronom: null,
+  prenom: "",
   guess: null,
   goal: null,
   email: "",

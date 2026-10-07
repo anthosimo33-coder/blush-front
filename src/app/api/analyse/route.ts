@@ -14,6 +14,8 @@ const Qui = z.object({
   pronom: z.enum(["il", "elle"]),
   guess: z.enum(["parle", "vus", "flou", "ensemble"]),
   goal: z.enum(["ensemble", "reciproque", "comprendre", "mieux", "point"]),
+  /** Des captures : son prénom (il n’y est que « Moi ») */
+  prenom: z.string().trim().min(1).max(40).optional(),
 });
 
 /** Lance la lecture : « Qui es-tu ? » est rempli, le verdict part. Relancer ne refait rien de ce qui est fait. */
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
   if (!qui.success) return erreur("qui", 422);
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
-    await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal });
+    await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal, ...(qui.data.prenom ? { prenom: qui.data.prenom } : {}) });
     await planifier(story.id, "verdict");
   }
   after(() => executerChaine(story.id));

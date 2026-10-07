@@ -37,6 +37,8 @@ function anthropic() {
 }
 
 const SYSTEMES: Record<Tache, string> = {
+  /* Lire des captures : on transcrit, on ne parle pas. Pas besoin de la voix de BLUSH (le socle) */
+  "01-captures": TEXTES["01-captures"].trim(),
   "04-verdict": systeme(TEXTES.socle, TEXTES["04-verdict"]),
   "05-rapport": systeme(TEXTES.socle, TEXTES["05-rapport"]),
   "07-memoire": systeme(TEXTES.socle, TEXTES["07-memoire"]),
@@ -76,7 +78,11 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
     messages: [
       {
         role: "user" as const,
-        content: req.blocs.map((b) => ({ type: "text" as const, text: b.texte, ...(b.cache ? { cache_control: { type: "ephemeral" as const } } : {}) })),
+        content: req.blocs.map((b) =>
+          "image" in b
+            ? { type: "image" as const, source: { type: "base64" as const, media_type: b.image.media, data: b.image.base64 } }
+            : { type: "text" as const, text: b.texte, ...(b.cache ? { cache_control: { type: "ephemeral" as const } } : {}) },
+        ),
       },
     ],
   };
