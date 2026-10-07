@@ -10,7 +10,7 @@
     "galerie": "node scripts/galerie/capture.mjs",
     "fluidite": "node scripts/fluidite/fluidite.mjs",
     "predev": "node scripts/prompts.mjs",
-    "prebuild": "node scripts/prompts.mjs",
+    "prebuild": "node scripts/prompts.mjs && node scripts/migrer.mjs",
     "postbuild": "node scripts/verifier-fuite.mjs",
     "pretest": "node scripts/prompts.mjs",
     "test": "vitest run",

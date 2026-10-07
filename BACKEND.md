@@ -83,16 +83,15 @@ NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_
 
 ## Mise en ligne
 
-1. **La base :** créer une base Neon (Vercel, onglet Storage, région Francfort), puis lancer les migrations :
-   ```bash
-   DATABASE_URL=<url Neon> npm run db:migrer
-   ```
-2. **Les variables :** les mettre sur Vercel, en production.
-3. **Le déploiement :** depuis un dossier où le sous-module `prompts/` est présent :
+Déjà fait (production, sur Vercel) : `BLUSH_CLE` (une copie locale dans `~/.blush/BLUSH_CLE`, à ranger dans un gestionnaire de mots de passe : la perdre rend les données illisibles), `CRON_SECRET`, `BLUSH_EMAIL_FROM` (`BLUSH <bonjour@askblush.com>`). Les variables sont « sensibles » : Vercel ne les rend plus, même à nous.
+
+1. **La base :** créer une base Neon depuis Vercel (projet blush-front, onglet Storage, région Francfort, « Connect »). Vercel ajoute `DATABASE_URL` tout seul. Les tables se créent au build (`scripts/migrer.mjs`, lancé par `prebuild` sur Vercel) : pas besoin de l’URL en local.
+2. **Les variables qui restent :** `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (une clé à part, avec un plafond de dépenses), `BLUSH_ACCES_LIBRE` (les emails des testeurs), puis `NEXT_PUBLIC_BLUSH_BACKEND=1` en dernier : il allume le back-end au build.
+3. **Le déploiement :** depuis un dossier où le sous-module `prompts/` est présent (pas d’intégration Git ; `.vercelignore` garde `prompts/evals` en local) :
    ```bash
    vercel deploy --prod
    ```
-4. **Donner l’accès à un ami pendant la bêta :**
+4. **Donner l’accès à un ami pendant la bêta :** ajouter son email à `BLUSH_ACCES_LIBRE` puis redéployer, ou, avec l’URL de la base :
    ```bash
    DATABASE_URL=<url> npm run acces -- ami@exemple.fr blushplus
    ```
