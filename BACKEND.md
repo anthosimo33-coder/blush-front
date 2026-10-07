@@ -6,7 +6,8 @@ Le back-end vit dans ce projet Next.js. Il s’allume avec `NEXT_PUBLIC_BLUSH_BA
 
 | Étape | Route | Où |
 |---|---|---|
-| Import d’un export WhatsApp (.zip ou .txt) en histoire brouillon, avant l’email | `POST /api/import` | `src/server/histoires.ts` |
+| Import d’un export (WhatsApp .zip ou .txt, Instagram message_1.html ou .json) en histoire brouillon, avant l’email. Le navigateur n’envoie que le texte de la conv, compressé (`src/services/preparer-export.ts`) | `POST /api/import` | `src/server/histoires.ts`, `prompts/lib/export.ts`, `prompts/lib/instagram.ts` |
+| Des captures d’écran, réduites par le navigateur puis lues par le prompt 01, en histoire brouillon | `POST /api/captures` | `src/server/captures.ts`, `prompts/lib/captures.ts` |
 | Code de connexion à 6 chiffres, session en cookie httpOnly | `POST /api/auth/code`, `/api/auth/verifier`, `/api/auth/deconnexion` | `src/server/auth.ts` |
 | La lecture : le verdict, puis (avec l’accès) le plan du rapport, ses deux moitiés et la mémoire | `POST/GET /api/analyse` | `src/server/analyse.ts`, `src/server/taches.ts` |
 | Le rapport (le verdict seul sans accès) | `GET /api/rapport` | `src/server/donnees.ts` |
@@ -67,6 +68,8 @@ NEXT_PUBLIC_BLUSH_BACKEND=1 DATABASE_URL=postgres://localhost:5432/blush_dev BLU
 En dev, le code de connexion s’affiche dans les logs du serveur.
 
 Les tests tournent sur la base `blush_test` : `createdb blush_test`, puis les migrations, puis `npm test`.
+
+Pour mesurer les prompts avec le vrai modèle, il y a aussi `scripts/essai-memoire.mts` (les mises à jour de la mémoire, échange par échange) et `scripts/essai-captures.mts` (la lecture des captures, comparée mot pour mot aux captures fabriquées par `prompts/evals/captures/fabriquer.mjs`).
 
 Avant une mise en ligne, un test de fumée avec le **vrai** modèle (environ 1 $). Une conv de test courte traverse tout le back-end, puis tout est effacé. Mesuré le 7 octobre : 194 s et 1,07 $ pour les 6 appels.
 
