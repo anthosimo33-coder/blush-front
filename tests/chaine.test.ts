@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executerChaine, type DonneesMemoire, type DonneesRapport } from "@/server/analyse";
 import { historique, repondre } from "@/server/chat";
@@ -76,7 +76,7 @@ describe("de l’import à la mémoire", () => {
     expect(majMemoire).toBe(true);
     expect(await historique(id)).toHaveLength(1);
     await executerChaine(id);
-    const [maj] = await db().select().from(schema.tasks).where(eq(schema.tasks.kind, "memoire_maj"));
+    const [maj] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj.status).toBe("fini");
   });
 });

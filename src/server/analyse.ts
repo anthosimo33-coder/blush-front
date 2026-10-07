@@ -14,7 +14,7 @@ import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } fro
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler } from "./ia/claude";
-import { aRelancer, battre, echouer, entreeDe, finir, planifier, prendre, type Genre, type Tache } from "./taches";
+import { aRelancer, battre, echouer, entreeDe, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
@@ -67,7 +67,7 @@ async function verdict(story: Ligne) {
   const { h, lu, rendu } = relire(story);
   const sortie = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict");
   const donnees: DonneesVerdict = { sortie, scores: scores(chiffresDe(h, lu.messages)) };
-  const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin };
+  const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t };
   await db()
     .insert(schema.verdicts)
     .values({ storyId: story.id, data: chiffrer(donnees) })
@@ -217,6 +217,7 @@ async function executer(t: Tache) {
  * Deux appels en même temps ne font jamais deux fois la même tâche : `prendre` est atomique.
  */
 export async function executerChaine(storyId: string, budgetMs = 600_000): Promise<void> {
+  if (await occupee(storyId)) return;
   const debut = Date.now();
   while (Date.now() - debut < budgetMs) {
     const [t] = await aRelancer(storyId);
@@ -225,4 +226,19 @@ export async function executerChaine(storyId: string, budgetMs = 600_000): Promi
     if (!pris) return;
     await executer(pris);
   }
+}
+
+/**
+ * Attend qu’une tâche soit finie, en faisant tourner la chaîne (ou en laissant finir celle qui tourne déjà).
+ * Renvoie son statut, ou null si le délai est passé (elle finira au prochain passage).
+ */
+export async function attendreTache(storyId: string, tacheId: string, delaiMs = 240_000): Promise<string | null> {
+  const fin = Date.now() + delaiMs;
+  while (Date.now() < fin) {
+    await executerChaine(storyId, fin - Date.now());
+    const statut = await statutDe(tacheId);
+    if (statut !== "attente" && statut !== "en_cours") return statut;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return null;
 }

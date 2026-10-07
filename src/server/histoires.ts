@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { gunzipSync, strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
 import { detecterFormat, erreurImport, lire, participantsDe, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
+import { prenomDe } from "@prompts/lib/ajouts";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
 import type { Story } from "@/types";
@@ -37,13 +38,15 @@ export type Meta = {
   objectif?: Objectif;
 };
 
-/** Ce qu’on garde de la conv une fois effacée, chiffré dans `stories.context`. */
-export type Contexte = { chiffres: string; style: string; fin: string };
+/**
+ * Ce qu’on garde de la conv une fois effacée, chiffré dans `stories.context`. `dernier` : l’heure du dernier
+ * message lu (celle de l’export, sans fuseau), d’où repartent les messages ajoutés ensuite.
+ */
+export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number };
 
 export type Ligne = typeof schema.stories.$inferSelect;
 
-/** Le prénom d’un nom d’export (« Hugo S » → « Hugo », « Inès 🌸 » → « Inès »). */
-export const prenomDe = (nom: string) => nom.match(/\p{L}[\p{L}'’-]*/u)?.[0] ?? nom.trim();
+export { prenomDe };
 
 /** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */
 export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string }> {

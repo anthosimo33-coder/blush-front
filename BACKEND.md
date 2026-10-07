@@ -12,8 +12,9 @@ Le back-end vit dans ce projet Next.js. Il s’allume avec `NEXT_PUBLIC_BLUSH_BA
 | La lecture : le verdict, puis (avec l’accès) le plan du rapport, ses deux moitiés et la mémoire | `POST/GET /api/analyse` | `src/server/analyse.ts`, `src/server/taches.ts` |
 | Le rapport (le verdict seul sans accès) | `GET /api/rapport` | `src/server/donnees.ts` |
 | Débloquer (v1 sans paiement : les emails de `BLUSH_ACCES_LIBRE`) | `POST /api/debloquer` | |
-| Le chat, d’après la mémoire ; l’historique ; la mise à jour de la mémoire | `POST/GET /api/chat` | `src/server/chat.ts` |
+| Le chat, d’après la mémoire ; l’historique ; la mise à jour de la mémoire. On y envoie du texte, des captures (leur conv ou son profil), un nouvel export, ou un vocal (transcrit par Mistral) | `POST/GET /api/chat` | `src/server/chat.ts`, `src/server/ajouts.ts`, `src/server/ia/transcription.ts` |
 | Sa fiche, et les corrections de l’utilisateur | `GET/PUT /api/fiche` | |
+| Des captures ou un export ajoutés à sa fiche : lus, puis la mémoire mise à jour tout de suite | `POST /api/fiche` | `src/server/ajouts.ts` |
 | Le compte, la pause, les suppressions | `/api/compte`, `/api/histoire` | |
 | La purge de nuit (Vercel Cron) | `GET /api/cron/purge` | `src/server/purge.ts` |
 
@@ -51,6 +52,7 @@ Les pages serveur lisent les données via `src/services/serveur.ts`, et le navig
 | `BLUSH_CLE` | La clé de chiffrement : `openssl rand -base64 32`. **À garder précieusement** : la perdre rend les données illisibles |
 | `ANTHROPIC_API_KEY` | La clé de l’API Claude. `ANTHROPIC_WORKSPACE_ID` si la clé n’a pas de workspace |
 | `RESEND_API_KEY`, `BLUSH_EMAIL_FROM` | L’envoi des codes. Il faut un domaine vérifié chez Resend |
+| `MISTRAL_API_KEY` | La transcription des vocaux (Mistral, Voxtral). Sans elle, le chat répond que les vocaux arrivent bientôt |
 | `BLUSH_ACCES_LIBRE` | La bêta sans paiement : des emails séparés par des virgules, ou `*` |
 | `CRON_SECRET` | Le secret de la purge de nuit (16 caractères au moins) |
 | `BLUSH_IA_FACTICE` | `1` en dev et en tests : un modèle factice, sans aucun coût |
@@ -69,7 +71,9 @@ En dev, le code de connexion s’affiche dans les logs du serveur.
 
 Les tests tournent sur la base `blush_test` : `createdb blush_test`, puis les migrations, puis `npm test`.
 
-Pour mesurer les prompts avec le vrai modèle, il y a aussi `scripts/essai-memoire.mts` (les mises à jour de la mémoire, échange par échange) et `scripts/essai-captures.mts` (la lecture des captures, comparée mot pour mot aux captures fabriquées par `prompts/evals/captures/fabriquer.mjs`).
+Pour mesurer les prompts avec le vrai modèle, il y a aussi `scripts/essai-memoire.mts` (les mises à jour de la mémoire, échange par échange), `scripts/essai-captures.mts` (la lecture des captures, comparée mot pour mot aux captures fabriquées par `prompts/evals/captures/fabriquer.mjs` ; un profil fictif avec `prompts/evals/captures/profil.mjs`) et `scripts/essai-ajouts.mts` (des messages et un profil envoyés après l’import : la réponse du chat, puis la mise à jour de la mémoire).
+
+Les messages ajoutés après l’import prennent des numéros à la suite de la conv (`stories.next_message`, réservés d’un coup), et `context.dernier` garde l’heure du dernier message lu : un export renvoyé n’apporte que ce qui est nouveau.
 
 Avant une mise en ligne, un test de fumée avec le **vrai** modèle (environ 1 $). Une conv de test courte traverse tout le back-end, puis tout est effacé. Mesuré le 7 octobre : 194 s et 1,07 $ pour les 6 appels.
 

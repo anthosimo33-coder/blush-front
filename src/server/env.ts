@@ -16,6 +16,8 @@ const Env = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Quand la clé n’est rattachée à aucun workspace. */
   ANTHROPIC_WORKSPACE_ID: z.string().min(1).optional(),
+  /** La transcription des vocaux (Mistral). Sans clé, le chat répond que les vocaux arrivent bientôt. */
+  MISTRAL_API_KEY: z.string().min(1).optional(),
   /** Sans clé Resend, le code de connexion s’affiche dans les logs (dev seulement). */
   RESEND_API_KEY: z.string().min(1).optional(),
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@blush.app>"),

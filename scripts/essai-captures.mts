@@ -37,6 +37,7 @@ if (sansVerite) {
     console.log(b.repere ? `== ${b.repere.date} ${b.repere.heure ?? ""}` : "== (sans repère)");
     for (const m of b.messages) console.log(`  ${m.de === "moi" ? "moi  " : "autre"} : ${m.media ? `[${m.media}] ` : ""}${m.texte}${m.coupe ? "  ⟨coupé⟩" : ""}${m.reaction ? `  ${m.reaction}` : ""}`);
   }
+  console.log(`profil : ${c.profil.length ? `\n  ${c.profil.join("\n  ")}` : "rien"}`);
   process.exit(0);
 }
 /* Comparaison mot pour mot, dans l’ordre (plus longue sous-suite commune) */
@@ -76,6 +77,7 @@ console.log(`ordre d’envoi ${ordre.join(",")} · ${Math.round((Date.now() - t0
 console.log(`messages : ${L[0][0]} / ${A.length} retrouvés mot pour mot · ${lus.length} écrits · manquants ${manques.length} · en trop ${enTrop.length}`);
 console.log(`repères : ${reperes.filter((r) => reperesVrais.includes(r)).length} / ${reperesVrais.length} justes (${reperes.join(" | ")})`);
 console.log(`réactions : ${reactions} / 2 · places : ${c.captures.map((x) => `${x.numero}→${x.place}`).join(" ")} · autre : ${c.autre} · doutes : ${c.doutes.join(" ; ") || "aucun"}`);
+console.log(`profil : ${c.profil.length ? c.profil.join(" | ") : "rien"} (attendu : rien)`);
 console.log(`relu par la lecture : ${lu.messages.length} messages, ${lu.problemes.length} problème(s)`);
 for (const m of manques) console.log(`  − manque : ${m}`);
 for (const m of enTrop) console.log(`  + en trop : ${m}`);
