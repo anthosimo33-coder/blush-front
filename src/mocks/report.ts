@@ -4,6 +4,7 @@ export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
   parle: { tile: "On se parle", quote: "« on se parle »" },
   vus: { tile: "On s’est vus", quote: "« on s’est vus »" },
   flou: { tile: "C’est flou", quote: "« c’est flou »" },
+  ensemble: { tile: "En couple", quote: "« en couple »" },
 };
 
 export const REPORT: Report = {

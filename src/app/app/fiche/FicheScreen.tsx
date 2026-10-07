@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
 import { setQueryData, useQuery } from "@/lib/query";
@@ -120,7 +120,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
       contentGap={0}
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
-          <Link href="/app" aria-label="Retour" className="flex size-11 items-center justify-center">
+          <Link href="/app" transitionTypes={["nav-back"]} aria-label="Retour" className="flex size-11 items-center justify-center">
             <Icon name="back" size={24} color="#121214" stroke={2.6} />
           </Link>
           <span className="text-[14px] font-black text-grey">Sa fiche</span>
@@ -130,7 +130,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+        <Link href="/app" transitionTypes={["nav-back"]} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
           <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
           Retour
         </Link>
@@ -139,9 +139,12 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
 
       {/* Elle, en grand */}
       <div className="flex flex-col items-center pt-2 text-center lg:pt-0">
-        <Avatar tone="elle" size={96} fontSize={38}>
-          {fiche.person.initial}
-        </Avatar>
+        {/* Le même avatar que sur l’accueil : à l’aller, il passe d’un écran à l’autre (« Sophie, en glissé ») ; au retour, il repart avec la fiche */}
+        <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
+          <Avatar tone="elle" size={96} fontSize={38}>
+            {fiche.person.initial}
+          </Avatar>
+        </ViewTransition>
         <h1 className="m-0 mt-3.5 text-[30px] font-black leading-none tracking-[-0.02em]">{fiche.person.name}</h1>
         <p className="m-0 mt-2 text-[14px] font-extrabold text-grey">
           {fiche.portrait} · {fiche.updatedLabel}

@@ -5,10 +5,14 @@
  *   ?verdict=difficile        → mode sobre à la place du rapport
  *   ?erreur=fichier|groupe|courte|lecture|capture → écran d’erreur
  *   ?plan=gratuit|rapport|blushplus → droits d’accès
+ *   ?histoire=couple|rencontre → l’histoire en couple, ou celle des maquettes
  */
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
 import { mockServer } from "@/mocks/server";
+import { DEMO_STORY_IDS } from "@/mocks/stories";
+import { readStoryCookie, writeStoryCookie } from "@/services/session";
+import { readJourney, setJourney } from "@/state/journey";
 import { invalidate } from "@/lib/query";
 import type { DemoError, Plan } from "@/types";
 import { ErrorScreen } from "@/components/screens/ErrorScreen";
@@ -20,9 +24,11 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 
 export function DemoParams() {
   const params = useSearchParams();
+  const router = useRouter();
   const plan = params.get("plan");
   const verdict = params.get("verdict");
   const erreur = params.get("erreur");
+  const histoire = params.get("histoire");
 
   useIsoLayoutEffect(() => {
     let changed = false;
@@ -34,8 +40,20 @@ export function DemoParams() {
       mockServer.set({ verdict: verdict === "difficile" ? "difficile" : "normal" });
       changed = true;
     }
+    /* Une autre histoire : les pages serveur la relisent (cookie), les données en cache aussi */
+    const storyId = histoire === "couple" || histoire === "rencontre" ? DEMO_STORY_IDS[histoire] : null;
+    if (storyId) {
+      /* Le parcours suit : « En couple » choisi pour l’histoire en couple, décoché sinon */
+      const couple = histoire === "couple";
+      if (couple !== (readJourney().guess === "ensemble")) setJourney(couple ? { guess: "ensemble", goal: "mieux" } : { guess: null, goal: null });
+      if (readStoryCookie() !== storyId) {
+        writeStoryCookie(storyId);
+        invalidate("report", "account", "fiche", "question");
+        router.refresh();
+      }
+    }
     if (changed) invalidate("report", "account");
-  }, [plan, verdict]);
+  }, [plan, verdict, histoire, router]);
 
   const error = erreur && ERRORS.includes(erreur as DemoError) ? (erreur as DemoError) : null;
 

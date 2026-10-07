@@ -64,6 +64,10 @@ async function shoot(browser, st, key) {
     isMobile: touch,
   });
   await ctx.grantPermissions(["clipboard-read", "clipboard-write", "microphone"], { origin: BASE });
+  /* `story` : l’histoire ouverte (cookie de session), lue par les pages côté serveur dès le premier rendu */
+  if (st.story) await ctx.addCookies([{ name: "blush-story", value: st.story, url: BASE }]);
+  /* L’arrivée de l’accueil (une fois par jour) est déjà jouée : la capture montre l’écran posé */
+  await ctx.addCookies([{ name: "blush-arrivee", value: "1", url: BASE }]);
   await ctx.addInitScript(
     ({ journey, server }) => {
       try {
@@ -172,7 +176,7 @@ async function main() {
     generatedLabel: `${part("day")} ${part("month")} à ${part("hour")} h ${part("minute")}`,
     sections: SECTIONS,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- on retire du manifeste ce qui ne sert qu’à la capture
-    states: STATES.map(({ steps, journey, server, hover, motion, wait, touch, ...s }) => ({ ...s, shots: shots[s.id] ?? previous(s.id), ref: refs[s.id] ?? null })),
+    states: STATES.map(({ steps, journey, server, hover, motion, wait, touch, story, ...s }) => ({ ...s, shots: shots[s.id] ?? previous(s.id), ref: refs[s.id] ?? null })),
     planches,
   };
 

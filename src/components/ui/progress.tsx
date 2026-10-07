@@ -55,29 +55,50 @@ export function ScoreCard({ rows, className }: { rows: ScoreRow[]; className?: s
 }
 
 /* ———— Chemin des niveaux ———— */
-export const LEVELS: { id: LevelId; label: string }[] = [
+type Level = { id: LevelId; label: string };
+
+/** Avant d’être ensemble : des étapes, qu’on franchit l’une après l’autre. */
+export const LEVELS: Level[] = [
   { id: "parle", label: "On se parle" },
   { id: "voit", label: "On se voit" },
   { id: "dit", label: "On se le dit" },
   { id: "ensemble", label: "On est ensemble" },
 ];
 
+/** En couple : une température, du plus froid au plus chaud. On y est quelque part, sans étape à franchir. */
+export const TEMPERATURE: Level[] = [
+  { id: "eloigne", label: "On s’éloigne" },
+  { id: "coince", label: "Ça coince" },
+  { id: "va", label: "Ça va" },
+  { id: "soudes", label: "On est soudés" },
+];
+
+/** L’échelle d’un niveau : les étapes, ou la température en couple. */
+export function scaleOf(level: LevelId) {
+  const temperature = TEMPERATURE.some((l) => l.id === level);
+  const levels = temperature ? TEMPERATURE : LEVELS;
+  return { levels, index: levels.findIndex((l) => l.id === level), temperature };
+}
+
+/** Les étapes (franchies en vert, la tienne en bleu, les suivantes verrouillées), ou la température (juste où vous êtes). */
 export function LevelPath({ current, className }: { current: LevelId; className?: string }) {
-  const idx = LEVELS.findIndex((l) => l.id === current);
-  const pct = (n: number) => `${Math.round((n / (LEVELS.length - 1)) * 100)}%`;
+  const { levels, index: idx, temperature } = scaleOf(current);
+  const pct = (n: number) => `${Math.round((n / (levels.length - 1)) * 100)}%`;
   return (
     <div className={cn("relative flex justify-between", className)}>
       <div
         aria-hidden="true"
         className="absolute inset-x-[38px] top-6 h-1 rounded-sm"
         style={{
-          background: `linear-gradient(90deg, #12C08A 0%, #12C08A ${pct(idx - 1)}, #3D8BFF ${pct(idx - 1)}, #3D8BFF ${pct(idx)}, #E6E3DC ${pct(idx)})`,
+          background: temperature
+            ? "#E6E3DC"
+            : `linear-gradient(90deg, #12C08A 0%, #12C08A ${pct(idx - 1)}, #3D8BFF ${pct(idx - 1)}, #3D8BFF ${pct(idx)}, #E6E3DC ${pct(idx)})`,
         }}
       />
       <ol className="contents">
-        {LEVELS.map((l, i) => {
-          const done = i < idx;
+        {levels.map((l, i) => {
           const now = i === idx;
+          const done = !temperature && i < idx;
           return (
             <li
               key={l.id}
@@ -89,12 +110,12 @@ export function LevelPath({ current, className }: { current: LevelId; className?
                 className={cn("flex size-[50px] items-center justify-center rounded-[25px]", done && "bg-vrai-ink", now && "bg-toi-ink", !done && !now && "bg-white shadow-thin")}
               >
                 {done && <Icon name="check" size={20} color="#FFFFFF" stroke={3.2} />}
-                {now && <span className="text-[18px] font-black text-white">{i + 1}</span>}
-                {!done && !now && <Icon name="lock" size={18} color="#B4B1A9" />}
+                {now && (temperature ? <span className="size-3 rounded-full bg-white" /> : <span className="text-[18px] font-black text-white">{i + 1}</span>)}
+                {!done && !now && !temperature && <Icon name="lock" size={18} color="#B4B1A9" />}
               </span>
               <span className={cn("text-[13px] font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
                 {l.label}
-                <span className="sr-only">{done ? " : réussi" : now ? " : niveau en cours" : " : à venir"}</span>
+                <span className="sr-only">{now ? (temperature ? " : vous en êtes là" : " : niveau en cours") : done ? " : réussi" : temperature ? "" : " : à venir"}</span>
               </span>
             </li>
           );

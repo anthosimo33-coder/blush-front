@@ -69,12 +69,8 @@ export const READING_FEED: Message[] = [
   { from: "toi", text: "je suis libre 🙃" },
 ];
 
-/** Les trois découvertes qui apparaissent pendant la lecture. */
-export const READING_DISCOVERIES = [
-  { text: "Elle relance après 22 h", color: "#FF4F9A", rotate: -2 },
-  { text: "« le libanais » × 9", color: "#3D8BFF", rotate: 1.5 },
-  { text: "2 mars, 23 h 41", color: "#12C08A", rotate: -1 },
-];
+/** Ce que BLUSH remarque pendant la lecture (écran 08) : elle, un mot à vous, le moment. */
+export const READING_DISCOVERIES = ["Elle relance après 22 h", "« le libanais » × 9", "2 mars, 23 h 41"];
 
 export const READING_STEPS = [
   "Votre histoire, du premier au dernier message",

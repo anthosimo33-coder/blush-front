@@ -214,6 +214,117 @@
 /* Code faux : les cases tremblent une fois */
 @keyframes codeShake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
+/* ———— L’accueil en mouvement ————
+   De vrais ressorts : chaque courbe linear() vient d’une simulation physique (raideur, amortissement).
+   « soft » se pose sans rebond, « pop » dépasse un peu, « bounce » rebondit franchement. */
+:root {
+  --spring-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring-soft-d: 600ms;
+  --spring-pop: cubic-bezier(0.3, 1.35, 0.5, 1);
+  --spring-pop-d: 567ms;
+  --spring-bounce: cubic-bezier(0.3, 1.6, 0.5, 1);
+  --spring-bounce-d: 925ms;
+}
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --spring-soft: linear(0, 0.037, 0.104, 0.188, 0.277, 0.366, 0.45, 0.527, 0.597, 0.659, 0.712, 0.759, 0.799, 0.833, 0.861, 0.885, 0.906, 0.922, 0.936, 0.948, 0.957, 0.965, 0.972, 0.977, 0.981, 0.985, 0.988, 0.99, 0.992, 0.993, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.999, 1);
+    --spring-pop: linear(0, 0.066, 0.19, 0.341, 0.498, 0.646, 0.774, 0.88, 0.96, 1.017, 1.053, 1.073, 1.08, 1.078, 1.07, 1.059, 1.046, 1.034, 1.023, 1.013, 1.006, 1.001, 0.997, 0.995, 0.994, 0.994, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999, 0.999, 1, 1);
+    --spring-bounce: linear(0, 0.106, 0.316, 0.566, 0.804, 0.999, 1.133, 1.205, 1.223, 1.202, 1.156, 1.1, 1.047, 1.003, 0.972, 0.955, 0.95, 0.955, 0.964, 0.977, 0.989, 0.999, 1.006, 1.01, 1.011, 1.01, 1.008, 1.005, 1.003, 1, 0.999, 0.998, 0.998, 0.998, 0.998, 0.999, 0.999, 1);
+  }
+}
+
+/* 1 · L’arrivée (une fois par jour) : BLUSH se pose d’un bond et fait coucou, l’anneau de Sophie se dessine,
+   puis il écrit son conseil mot par mot. Rien n’attend : on peut écrire pendant. */
+@keyframes arDrop { from { opacity: 0; transform: translateY(-54px) scale(0.3) rotate(-18deg); } to { opacity: 1; transform: none; } }
+@keyframes arPop { from { opacity: 0; transform: translateY(-20px) scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes arGrow { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+@keyframes arBadge { from { opacity: 0; transform: scale(0) rotate(-45deg); } to { opacity: 1; transform: none; } }
+@keyframes arUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@keyframes arFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes arRing { from { stroke-dasharray: 0 132; } }
+@keyframes arAura { 0% { opacity: 0; transform: scale(0.4); } 35% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes arHello { 0%, 100% { transform: none; } 38% { transform: translateY(-24%) scale(1.22); } }
+@keyframes arHelloShade { 0%, 100% { transform: none; opacity: 1; } 38% { transform: scale(0.55); opacity: 0.35; } }
+@keyframes arGhost { 0% { opacity: 0; transform: scale(0.25); } 14% { opacity: 1; transform: scale(1.08); } 22% { transform: scale(1); } 86% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.35); } }
+@keyframes arWord { from { opacity: 0; filter: blur(5px); transform: translateY(0.35em); } to { opacity: 1; filter: blur(0); transform: none; } }
+.home-arrive [data-a="logo"] { animation: arDrop var(--spring-bounce-d) var(--spring-bounce) 0.15s both; }
+.home-arrive [data-a="logo"] [data-pearl], .home-arrive [data-a="logo"] [data-shade] { transform-box: fill-box; transform-origin: center; animation: arHello 0.72s cubic-bezier(0.45, 0, 0.55, 1) calc(0.55s + var(--i, 0) * 0.11s) both; }
+.home-arrive [data-a="logo"] [data-shade] { animation-name: arHelloShade; }
+.home-arrive [data-a="aura"] { animation: arAura 2s cubic-bezier(0.2, 0.7, 0.3, 1) 0.15s both; }
+.home-arrive [data-a="pill"] { animation: arPop var(--spring-pop-d) var(--spring-pop) 0.39s both; }
+.home-arrive [data-a="acc"] { animation: arGrow var(--spring-pop-d) var(--spring-pop) 0.5s both; }
+.home-arrive [data-a="av"] { animation: arGrow var(--spring-bounce-d) var(--spring-bounce) 0.55s both; }
+.home-arrive [data-a="ring"] { animation: arRing 1.1s cubic-bezier(0.25, 0.8, 0.25, 1) 0.67s both; }
+.home-arrive [data-a="nm"] { animation: arFade 0.42s ease-out 0.7s both; }
+.home-arrive [data-a="badge"] { animation: arBadge var(--spring-bounce-d) var(--spring-bounce) 1.45s both; }
+.home-arrive [data-a="composer"] { animation: arUp var(--spring-soft-d) var(--spring-soft) 0.67s both; }
+.home-arrive [data-a="day"] { animation: arFade 0.5s ease-out 1s both; }
+.home-arrive [data-a="ghost"] { transform-origin: 9% 89%; animation: arGhost 1.05s linear 1.05s both; }
+/* Les bulles de l’intro et les pastilles gardent le nom de leur animation habituelle (dRise, crPopIn) : à la fin de l’arrivée, elle ne rejoue pas */
+.home-arrive [data-a="intro"] { animation: dRise var(--spring-pop-d) var(--spring-pop) calc(2.1s + var(--i, 0) * 0.13s) both; }
+.home-arrive [data-a="intro-av"] { transform-origin: 9% 89%; animation: arGrow var(--spring-bounce-d) var(--spring-bounce) 2.25s both; }
+.home-arrive [data-a="w"] { display: inline-block; animation: arWord 0.48s cubic-bezier(0.2, 0.8, 0.2, 1) calc(2.24s + var(--i, 0) * 0.06s) both; }
+.home-arrive [data-a="intro-tm"] { animation: arFade 0.4s ease-out 2.7s both; }
+.home-arrive [data-a="chip"] { animation: crPopIn var(--spring-pop-d) var(--spring-pop) calc(2.9s + var(--i, 0) * 0.06s) both; }
+
+/* 2 · BLUSH t’écoute : la bulle se penche vers toi pendant que tu écris ; en vocal, les perles suivent ta voix */
+[data-blush-logo] { transition: transform var(--spring-pop-d) var(--spring-pop), scale 0.3s var(--ease-pop), filter 0.4s ease-out; }
+[data-blush-logo][data-lean] { transform: rotate(-7deg) translateY(4px) scale(1.05); filter: drop-shadow(0 18px 22px rgba(232, 53, 138, 0.42)); }
+[data-blush-logo] [data-pearl], [data-blush-logo] [data-shade] { transform-box: fill-box; transform-origin: center; }
+[data-listen] [data-pearl], [data-listen] [data-shade] { transition: transform 0.09s linear; }
+
+/* 5 · Les perles deviennent la réponse : les bulles se déplient depuis l’avatar, de bas en haut ; la meilleure réponse brille une fois */
+@keyframes unfold { 0% { clip-path: inset(calc(100% - 26px) calc(100% - 26px) 0 0 round 13px); transform: scale(0.94); opacity: 0; } 20% { opacity: 1; } 100% { clip-path: inset(-40px -40px -40px -40px round 0); transform: none; opacity: 1; } }
+@keyframes unfoldIn { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
+@keyframes shine { to { transform: translateX(130%); } }
+[data-unfold] { transform-origin: 0 100%; animation: unfold var(--spring-soft-d) var(--spring-soft) var(--d, 0s) backwards; }
+[data-unfold] > * { animation: unfoldIn 0.42s ease-out calc(var(--d, 0s) + 0.13s) backwards; }
+[data-shine] { position: relative; overflow: hidden; }
+[data-shine]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 25%, rgba(255, 255, 255, 0.55) 50%, transparent 75%); transform: translateX(-130%); animation: shine 1s cubic-bezier(0.3, 0, 0.2, 1) 0.95s forwards; }
+/* 3 · 4 · Une bulle qui vole jusqu’à sa place : la vraie reste cachée jusqu’à l’atterrissage */
+[data-flown] { animation: none !important; }
+.flight { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-sizing: border-box; }
+.flight-text { display: flex; align-items: center; overflow: hidden; white-space: nowrap; font-family: var(--font-nunito), system-ui, sans-serif; line-height: 1.4; }
+.flight > svg { width: 100% !important; height: 100% !important; }
+
+/* 6 · Glisse pour l’heure : l’heure de chaque bulle attend hors champ, à droite */
+.swipe-time { position: absolute; top: 50%; right: -60px; translate: 0 -50%; font-size: 11px; font-weight: 700; line-height: 1; color: var(--grey); white-space: nowrap; pointer-events: none; }
+/* 7 · Glisse pour creuser : la flèche apparaît derrière la bulle, puis vire au rose quand ça suffit */
+[data-dig-icon] { position: absolute; left: 46px; top: 50%; z-index: 0; display: flex; width: 30px; height: 30px; align-items: center; justify-content: center; border-radius: 50%; background: #E6E3DC; color: var(--soft); opacity: 0; transform: translateY(-50%) scale(0.4); transition: background-color 0.15s, color 0.15s; pointer-events: none; }
+[data-dig-icon][data-armed] { background: #E8358A; color: #FFFFFF; }
+@keyframes quoteIn { from { grid-template-rows: 0fr; opacity: 0; margin-bottom: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+[data-quote-strip] { display: grid; grid-template-rows: 1fr; animation: quoteIn var(--spring-soft-d) var(--spring-soft) both; }
+
+/* 8 · L’en-tête qui se replie quand tu remontes dans l’historique (--c : 0 en bas de la conv, 1 replié) */
+.home-head { --c: 0; }
+.home-head [data-c="bg"] { bottom: calc(var(--c) * 78px); }
+.home-head [data-c="logo"] { transform: translate(calc(var(--c) * -40px), calc(var(--c) * -16px)) scale(calc(1 - var(--c) * 0.58)); }
+.home-head [data-c="pill"] { transform: translate(calc(var(--c) * 22px), calc(var(--c) * -71px)) scale(calc(1 - var(--c) * 0.08)); }
+.home-head [data-c="acc"] { transform: translateY(calc(var(--c) * -4px)) scale(calc(1 - var(--c) * 0.1)); }
+.home-head [data-c="so"] { transform: translateY(calc(var(--c) * -4px)) scale(calc(1 - var(--c) * 0.2)); }
+.home-head [data-c="nm"] { opacity: calc(1 - var(--c) * 1.8); }
+
+/* 11 · Le niveau qui monte : l’anneau se remplit, des éclats partent de Sophie */
+[data-ring-fill] { transition: stroke-dasharray 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.level-spark { position: fixed; z-index: 60; border-radius: 50%; pointer-events: none; }
+
+/* 10 · Sophie, en glissé : sa fiche arrive par la droite, l’accueil recule à gauche, son avatar passe d’un écran à l’autre.
+   Le retour fait l’inverse. Le retour en glissant du bord reste celui de Safari (aucune animation en plus). */
+::view-transition { pointer-events: none; }
+@keyframes vtFromRight { from { transform: translateX(100%); } }
+@keyframes vtToLeft { to { transform: translateX(-30%); filter: brightness(0.86); } }
+@keyframes vtFromLeft { from { transform: translateX(-30%); filter: brightness(0.86); } }
+@keyframes vtToRight { to { transform: translateX(100%); } }
+::view-transition-new(.push-in) { animation: vtFromRight var(--spring-soft-d) var(--spring-soft) both; box-shadow: -14px 0 34px -14px rgba(17, 17, 20, 0.3); }
+::view-transition-old(.push-out) { animation: vtToLeft var(--spring-soft-d) var(--spring-soft) both; }
+::view-transition-new(.pop-in) { animation: vtFromLeft var(--spring-soft-d) var(--spring-soft) both; }
+::view-transition-old(.pop-out) { animation: vtToRight var(--spring-soft-d) var(--spring-soft) both; box-shadow: -14px 0 34px -14px rgba(17, 17, 20, 0.3); }
+::view-transition-group(.push-in), ::view-transition-group(.pop-out) { z-index: 2; }
+::view-transition-group(.avatar-morph) { z-index: 3; animation-duration: var(--spring-soft-d); animation-timing-function: var(--spring-soft); }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*), ::view-transition-new(*), ::view-transition-group(*) { animation-duration: 0s !important; animation-delay: 0s !important; }
+}
+
 /* ———— Survol des boîtes cliquables ————
    Défini une fois ici (hors couche, donc prioritaire sur les ombres utilitaires).
    Survol seulement avec une souris ; la pression (« il s’enfonce d’1 px ») partout. */

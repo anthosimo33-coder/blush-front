@@ -32,6 +32,8 @@ const PATHS = {
   pause: ["M8.5 5.5v13", "M15.5 5.5v13"],
   wave: ["M4 10.5v3", "M8 7.5v9", "M12 4.5v15", "M16 8v8", "M20 10.5v3"],
   alert: "M12 8v5M12 16.5v.5M10.3 3.9L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  reply: ["M10 9l-5 5 5 5", "M5 14h9a5 5 0 0 0 5-5V5"],
+  sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

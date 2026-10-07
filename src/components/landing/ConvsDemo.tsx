@@ -13,11 +13,12 @@ import { Sheet } from "@/components/ui/surfaces";
 import type { LandingConv } from "@/types";
 import { APP_NAME, CTA } from "./parts";
 
-/* Trois rangées de cinq convs, chacune à son rythme ; la deuxième part dans l’autre sens */
+/* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
 const ROWS = [0, 1, 2].map((i) => ({
-  convs: LANDING_CONVS.slice(i * 5, i * 5 + 5),
+  convs: LANDING_CONVS.slice(i * 6, i * 6 + 6),
   reverse: i === 1,
-  seconds: [64, 76, 70][i],
+  /* Même vitesse qu’à cinq convs par rangée : la durée suit la longueur */
+  seconds: [77, 91, 84][i],
   offset: [0, 150, 70][i],
 }));
 

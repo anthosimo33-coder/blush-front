@@ -361,6 +361,11 @@ export function Styleguide() {
               <LevelPath current="dit" />
             </Card>
           </Spec>
+          <Spec label="TEMPÉRATURE (EN COUPLE)" width={380} note="Pas d’étape à franchir : juste où vous êtes, du plus froid au plus chaud.">
+            <Card className="px-3 py-[18px]">
+              <LevelPath current="coince" />
+            </Card>
+          </Spec>
           <Spec label="PROGRESSION DU PARCOURS">
             <Card className="flex h-16 items-center gap-6 px-5">
               <ProgressDots current={1} />

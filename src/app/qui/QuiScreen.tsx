@@ -16,19 +16,32 @@ const GUESSES: { id: Guess; icon: IconName; color: string }[] = [
   { id: "parle", icon: "imessage", color: "#3D8BFF" },
   { id: "vus", icon: "people", color: "#12C08A" },
   { id: "flou", icon: "cloud", color: "#9B7BFF" },
+  { id: "ensemble", icon: "heart", color: "#FF4F9A" },
 ];
 
-const GOALS: { id: Goal; label: string; icon: IconName; color: string }[] = [
+type GoalTile = { id: Goal; label: string; icon: IconName; color: string };
+
+/* Ce que tu veux : avant d’être ensemble, ou en couple. ⚠ Objectifs en couple absents des maquettes : à valider. */
+const GOALS: GoalTile[] = [
   { id: "ensemble", label: "Qu’on soit ensemble", icon: "heart", color: "#FF4F9A" },
   { id: "reciproque", label: "Savoir si c’est réciproque", icon: "swap", color: "#3D8BFF" },
   { id: "comprendre", label: "Juste comprendre", icon: "eye", color: "#FFAA2C" },
 ];
+const COUPLE_GOALS: GoalTile[] = [
+  { id: "mieux", label: "Que ça aille mieux", icon: "bolt", color: "#FF4F9A" },
+  { id: "point", label: "Savoir où on en est", icon: "swap", color: "#3D8BFF" },
+  { id: "comprendre", label: "Juste comprendre", icon: "eye", color: "#FFAA2C" },
+];
+const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS : GOALS);
 
 /* Écran 06 — Qui est qui, la devinette, ce que tu veux. */
 export function QuiScreen({ people }: { people: [Person, Person] }) {
   const router = useRouter();
   const [j, set] = useJourney();
+  const goals = goalsFor(j.guess);
   const ready = !!(j.me && j.guess && j.goal);
+  /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
+  const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : "/importer/captures";
 
   return (
@@ -83,7 +96,7 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
       </div>
       <div role="radiogroup" aria-labelledby="guess-label" className="flex gap-2.5">
         {GUESSES.map((g) => (
-          <ChoiceTile key={g.id} icon={g.icon} color={g.color} label={GUESS_LABELS[g.id].tile} selected={j.guess === g.id} onClick={() => set({ guess: g.id })} />
+          <ChoiceTile key={g.id} icon={g.icon} color={g.color} label={GUESS_LABELS[g.id].tile} selected={j.guess === g.id} onClick={() => pickGuess(g.id)} />
         ))}
       </div>
 
@@ -91,7 +104,7 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
         Ce que tu veux
       </div>
       <div role="radiogroup" aria-labelledby="goal-label" className="flex gap-2.5">
-        {GOALS.map((g) => (
+        {goals.map((g) => (
           <ChoiceTile key={g.id} icon={g.icon} color={g.color} label={g.label} selected={j.goal === g.id} onClick={() => set({ goal: g.id })} />
         ))}
       </div>

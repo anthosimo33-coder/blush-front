@@ -61,6 +61,9 @@ function getSnapshot() {
   return state;
 }
 
+/** L’état du parcours tel qu’il est maintenant (hors rendu : dans un effet, avant la fin de l’hydratation). */
+export const readJourney = getSnapshot;
+
 function getServerSnapshot() {
   return JOURNEY_DEFAULTS;
 }

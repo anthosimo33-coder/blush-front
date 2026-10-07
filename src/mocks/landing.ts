@@ -2,8 +2,9 @@ import type { LandingConv, Testimonial } from "@/types";
 
 /*
  * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
- * ⚠ Exemples fictifs, écrits pour la landing (à valider). Mêmes sens d’emojis :
+ * ⚠ Exemples fictifs, écrits pour la landing (à valider). Mêmes sens d’emojis :
  * 🤏 à deux doigts · 🔥 partant·e · 🤔 hésite · 🧊 s’éloigne.
+ * En couple (Mon cœur, Chéri, Julien) : 🔥 toujours le feu · 🤏 il manque un petit rien · 🤔 un truc coince · 🧊 vous vous éloignez.
  */
 export const LANDING_CONVS: LandingConv[] = [
   /* ———— Rangée 1 ———— */
@@ -18,6 +19,18 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 9,
     next: "Choisis le bar, et propose-lui un soir précis.",
+  },
+  {
+    id: "coeur",
+    name: "Mon cœur",
+    label: "Ta copine",
+    app: "whatsapp",
+    avatar: "initial",
+    verdict: { emoji: "🤔", title: "Un truc coince.", subtitle: "Elle dit « c’est pas grave ». Ses messages disent le contraire." },
+    proof: { text: "c’est pas grave, vas-y avec tes potes", caption: "28 févr., 19 h 41" },
+    confidence: "sur",
+    proofs: 11,
+    next: "Propose-lui une soirée rien qu’à vous deux, avec un jour précis.",
   },
   {
     id: "theo",
@@ -80,6 +93,18 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 3,
     next: "Dis oui, et fixe la date toi-même.",
+  },
+  {
+    id: "cheri",
+    name: "Chéri",
+    label: "Ton copain",
+    app: "imessage",
+    avatar: "initial",
+    verdict: { emoji: "🔥", title: "Toujours le feu.", subtitle: "Il parle de vos projets sans que tu lui demandes." },
+    proof: { text: "faut qu’on parte quelque part cet été toi et moi", caption: "9 mars, 22 h 03" },
+    confidence: "sur",
+    proofs: 8,
+    next: "Réponds avec une date et une destination.",
   },
   {
     id: "margaux",
@@ -154,6 +179,18 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 5,
     next: "Monte, et apporte de quoi boire.",
+  },
+  {
+    id: "julien",
+    name: "Julien",
+    label: "Ton mec",
+    app: "whatsapp",
+    avatar: "initial",
+    verdict: { emoji: "🤏", title: "Il manque un petit rien.", subtitle: "Vous vous écrivez tous les jours, mais plus que pour vous organiser." },
+    proof: { text: "tu peux prendre le pain en rentrant", caption: "11 mars, 18 h 12" },
+    confidence: "probable",
+    proofs: 6,
+    next: "Envoie-lui un message qui n’a rien à voir avec l’organisation.",
   },
   {
     id: "alice",

@@ -11,6 +11,7 @@ import type {
   FicheUpdate,
   Goal,
   Guess,
+  LevelId,
   Plan,
   QuestionAnswer,
   Reply,
@@ -20,10 +21,11 @@ import type {
   Story,
   Subscription,
 } from "@/types";
-import { FICHE, FICHE_FINDINGS, QUICK_QUESTIONS, REPLY, SUBSCRIPTIONS, VOICE_ANSWER } from "@/mocks/daily";
-import { QUESTION_ANSWER, QUESTION_IDEAS, REPORT, SOBER_REPORT } from "@/mocks/report";
-import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP, STORY } from "@/mocks/story";
+import { FICHE, FICHE_FINDINGS, SUBSCRIPTIONS } from "@/mocks/daily";
+import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } from "@/mocks/story";
+import { demoStory, storyIdFor } from "@/mocks/stories";
 import { delay, mockServer } from "@/mocks/server";
+import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
   email: string | null;
@@ -40,6 +42,12 @@ export type ReportPayload = {
 
 /* Durée simulée de la lecture (environ 6 s). */
 const ANALYSIS_MS = 6000;
+
+/**
+ * L’histoire ouverte. Dans le navigateur, elle vient du cookie de session ;
+ * côté serveur, la page la lit (currentStoryId) et la passe en `storyId`.
+ */
+const opened = (storyId?: string) => demoStory(storyId ?? readStoryCookie());
 
 /* ———— Import ———— */
 
@@ -61,8 +69,8 @@ export async function uploadScreenshots(
   };
 }
 
-export async function getStory(): Promise<Story> {
-  return STORY;
+export async function getStory(storyId?: string): Promise<Story> {
+  return opened(storyId).story;
 }
 
 /* ———— Compte et analyse ———— */
@@ -88,9 +96,12 @@ export async function createAccount(email: string): Promise<{ email: string }> {
 }
 
 export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal }, opts: { restart?: boolean } = {}): Promise<{ jobId: string }> {
-  void input;
   const s = mockServer.get();
-  if (!s.analysisStartedAt || opts.restart) mockServer.set({ analysisStartedAt: Date.now() });
+  if (!s.analysisStartedAt || opts.restart) {
+    mockServer.set({ analysisStartedAt: Date.now() });
+    /* Simulation : la nouvelle analyse ouvre l’histoire qui correspond à ce que tu as dit (en couple, ou pas encore) */
+    writeStoryCookie(storyIdFor(input.guess));
+  }
   return { jobId: "job-001" };
 }
 
@@ -101,24 +112,26 @@ export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgre
   const total = reduced ? 600 : ANALYSIS_MS;
   const t = Math.min(1, (Date.now() - started) / total);
   const ease = (x: number) => 1 - Math.pow(1 - x, 3);
+  const { story, discoveries } = opened();
   return {
     progress: Math.min(1, t / 0.93),
-    messagesRead: Math.round(STORY.totalMessages * ease(Math.min(1, t / 0.7))),
+    messagesRead: Math.round(story.totalMessages * ease(Math.min(1, t / 0.7))),
     stepsDone: [0.13, 0.33, 0.53, 0.77].filter((s) => t >= s).length,
-    discoveries: [0.17, 0.33, 0.5].filter((s) => t >= s).length,
+    discoveries: discoveries.slice(0, [0.17, 0.33, 0.5].filter((s) => t >= s).length),
     done: t >= 1,
   };
 }
 
 /** Le rapport, avec les droits d’accès. Les chapitres non payés arrivent verrouillés, sans contenu. */
-export async function getReport(): Promise<ReportPayload> {
+export async function getReport(storyId?: string): Promise<ReportPayload> {
   const s = mockServer.get();
+  const { report, sober } = opened(storyId);
   const full = s.plan !== "gratuit";
-  const chapters = REPORT.chapters.map((c) => (c.free || full ? c : { ...c, locked: true, blocks: [] }));
+  const chapters = report.chapters.map((c) => (c.free || full ? c : { ...c, locked: true, blocks: [] }));
   const difficult = s.verdict === "difficile";
   return {
-    report: { ...REPORT, chapters, verdict: { ...REPORT.verdict, difficult } },
-    sober: difficult ? SOBER_REPORT : null,
+    report: { ...report, chapters, verdict: { ...report.verdict, difficult } },
+    sober: difficult ? sober : null,
     access: s.plan,
   };
 }
@@ -137,11 +150,14 @@ const sameQuestion = (a: string, b: string) => {
   const norm = (q: string) => q.toLowerCase().replace(/[’']/g, "'").replace(/[\s\u00a0\u202f]+/g, " ").trim();
   return norm(a) === norm(b);
 };
-const answerTo = (question: string): QuestionAnswer => ({ ...(QUESTION_IDEAS.find((a) => sameQuestion(a.question, question)) ?? QUESTION_ANSWER), question });
+const answerTo = (question: string): QuestionAnswer => {
+  const { questionIdeas, questionAnswer } = opened();
+  return { ...(questionIdeas.find((a) => sameQuestion(a.question, question)) ?? questionAnswer), question };
+};
 
 /** Des idées de questions, tirées du rapport. */
-export async function getQuestionIdeas(): Promise<string[]> {
-  return QUESTION_IDEAS.map((a) => a.question);
+export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
+  return opened(storyId).questionIdeas.map((a) => a.question);
 }
 
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
@@ -160,7 +176,7 @@ export async function getQuestion(): Promise<QuestionAnswer | null> {
 export async function analyzeMessage(file: File | null): Promise<Reply> {
   void file;
   await delay(900);
-  return REPLY;
+  return opened().reply;
 }
 
 /**
@@ -170,32 +186,56 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
 export type { BlushAnswer };
 
 /** Les questions toutes prêtes du chat (celles que promet la landing). */
-export async function getQuickQuestions(): Promise<string[]> {
-  return QUICK_QUESTIONS.map((q) => q.question);
+export async function getQuickQuestions(storyId?: string): Promise<string[]> {
+  return opened(storyId).quickQuestions.map((q) => q.question);
 }
 
-export async function sendToBlush(input: { text?: string; files?: File[] }): Promise<BlushAnswer> {
+/** Le cran suivant de chaque échelle (les étapes, ou la température en couple). */
+const NEXT_LEVEL: Partial<Record<LevelId, LevelId>> = { parle: "voit", voit: "dit", dit: "ensemble", eloigne: "coince", coince: "va", va: "soudes" };
+
+/**
+ * `about` : le point d’une réponse de BLUSH que tu creuses (tu l’as glissée vers la droite) ; ta question porte dessus.
+ * Simulation : un message qui annonce un cap (« on est ensemble », « en couple », « je t’aime »…) vous fait passer au niveau suivant.
+ * ⚠ Textes du passage de niveau absents des maquettes : à valider.
+ */
+export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }): Promise<BlushAnswer> {
   void input.files;
+  void input.about;
   await delay(2000);
   const text = input.text?.trim();
-  const quick = text ? QUICK_QUESTIONS.find((q) => sameQuestion(q.question, text)) : undefined;
+  const { quickQuestions, reply, report } = opened();
+  const quick = text ? quickQuestions.find((q) => sameQuestion(q.question, text)) : undefined;
   if (quick) return quick.answer;
+  const levelUp = NEXT_LEVEL[report.level];
+  if (text && levelUp && /ensemble|en couple|officiel|je t[’']aime|soud[ée]s/i.test(text))
+    return {
+      kind: "answer",
+      levelUp,
+      answer: {
+        question: text,
+        title: "Vous passez un cap.",
+        evidenceLabel: "Ce qui change",
+        evidence: "Ce qu’elle vient de te dire, elle ne l’avait jamais dit. Vous changez de niveau.",
+        confidence: "probable",
+        limits: "Je me fie à ce que tu me racontes : envoie-moi la capture pour que j’en sois sûr.",
+      },
+    };
   if (text && text.endsWith("?")) return { kind: "answer", answer: answerTo(text) };
-  return { kind: "analysis", reply: REPLY };
+  return { kind: "analysis", reply };
 }
 
 /** Un vocal pour BLUSH. Simulation : en vrai, le back-end le transcrit, puis BLUSH répond à ce qui est dit. */
 export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
   void input.audio;
   await delay(2200);
-  return { kind: "answer", answer: VOICE_ANSWER };
+  return { kind: "answer", answer: opened().voiceAnswer };
 }
 
 /* ———— Sa fiche ———— */
 
-export async function getFiche(): Promise<Fiche> {
+export async function getFiche(storyId?: string): Promise<Fiche> {
   const s = mockServer.get();
-  return { ...FICHE, facts: s.ficheFacts, updatedLabel: s.ficheUpdated ? "mise à jour aujourd’hui" : FICHE.updatedLabel };
+  return { ...FICHE, ...opened(storyId).fiche, facts: s.ficheFacts, updatedLabel: s.ficheUpdated ? "mise à jour aujourd’hui" : FICHE.updatedLabel };
 }
 
 export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
@@ -268,4 +308,5 @@ export async function deleteStory(): Promise<void> {
 export async function deleteAccount(): Promise<void> {
   await delay(500);
   mockServer.reset();
+  writeStoryCookie(null);
 }

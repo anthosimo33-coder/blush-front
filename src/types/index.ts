@@ -5,9 +5,11 @@ export type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 export type Side = "toi" | "elle" | "pareil";
 export type Plan = "gratuit" | "rapport" | "blushplus";
-export type Guess = "parle" | "vus" | "flou";
-export type Goal = "ensemble" | "reciproque" | "comprendre";
-export type LevelId = "parle" | "voit" | "dit" | "ensemble";
+export type Guess = "parle" | "vus" | "flou" | "ensemble";
+/** Avant d’être ensemble : ensemble, reciproque, comprendre. En couple : mieux, point, comprendre. */
+export type Goal = "ensemble" | "reciproque" | "comprendre" | "mieux" | "point";
+/** Avant d’être ensemble, les étapes : parle → voit → dit → ensemble. En couple, la température : eloigne → coince → va → soudes. */
+export type LevelId = "parle" | "voit" | "dit" | "ensemble" | "eloigne" | "coince" | "va" | "soudes";
 
 /** Un vrai message, toujours daté. */
 export type Message = {
@@ -157,11 +159,15 @@ export type QuestionAnswer = {
  * la meilleure réponse seule, une réponse à une question, ou où vous en êtes (avec les niveaux).
  * `quoted` : BLUSH montre d’abord le message qu’il a lu.
  */
-export type BlushAnswer =
+export type BlushAnswer = (
   | { kind: "analysis"; reply: Reply; quoted?: boolean }
   | { kind: "best"; reply: Reply }
   | { kind: "answer"; answer: QuestionAnswer }
-  | { kind: "level"; answer: QuestionAnswer };
+  | { kind: "level"; answer: QuestionAnswer }
+) & {
+  /** Le nouveau niveau (ou la nouvelle température) que ce message vous fait atteindre. Une fois par niveau. */
+  levelUp?: LevelId;
+};
 
 export type Reply = {
   messageId: string;
@@ -224,7 +230,8 @@ export type AnalysisProgress = {
   progress: number;
   messagesRead: number;
   stepsDone: number;
-  discoveries: number;
+  /** Ce que BLUSH a déjà remarqué pendant la lecture (« Elle relance après 22 h »). */
+  discoveries: string[];
   done: boolean;
   failed?: boolean;
 };

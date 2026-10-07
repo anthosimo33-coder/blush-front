@@ -4,16 +4,16 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
 import { getAnalysisProgress, startAnalysis } from "@/services/api";
-import { READING_DISCOVERIES, READING_STEPS } from "@/mocks/story";
+import { READING_STEPS } from "@/mocks/story";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
-import { useJourney } from "@/state/journey";
+import { readJourney, setJourney } from "@/state/journey";
 import type { AnalysisProgress } from "@/types";
 
-const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: 0, done: false };
+const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
 
 /** reading : la bulle écrit, l’anneau se remplit · leaving : l’anneau s’efface · done : la gerbe marque la fin. */
 type Phase = "reading" | "leaving" | "done";
@@ -24,7 +24,6 @@ type Phase = "reading" | "leaving" | "done";
  * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ».
  */
 export function LectureScreen({ total, restart }: { total: number; restart: boolean }) {
-  const [j, set] = useJourney();
   const reduced = useReducedMotion();
   const [p, setP] = useState<AnalysisProgress>(START);
   const [phase, setPhase] = useState<Phase>("reading");
@@ -36,10 +35,12 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     let first = true;
     let timer: ReturnType<typeof setTimeout>;
     (async () => {
-      const { jobId } = await startAnalysis({ me: j.me ?? "hugo", guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" }, { restart: restartRef.current });
+      /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
+      const cur = readJourney();
+      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
       restartRef.current = false;
       if (!alive) return;
-      set({ jobId });
+      setJourney({ jobId });
       const tick = async () => {
         const next = await getAnalysisProgress(jobId);
         if (!alive) return;
@@ -67,12 +68,12 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       alive = false;
       clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- lancé une seule fois à l’arrivée sur l’écran
+    /* Lancé une seule fois, à l’arrivée sur l’écran */
   }, []);
 
   const done = phase === "done";
   const step = p.done ? READING_STEPS.length - 1 : Math.min(p.stepsDone, READING_STEPS.length - 1);
-  const shown = reduced && p.done ? { ...p, messagesRead: total, discoveries: READING_DISCOVERIES.length } : p;
+  const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
 
   return (
     <Screen
@@ -150,7 +151,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
           du premier au dernier.
         </h1>
 
-        <Discoveries shown={done ? READING_DISCOVERIES.length : shown.discoveries} className="mt-6" />
+        <Discoveries items={shown.discoveries} className="mt-6" />
       </div>
     </Screen>
   );
@@ -206,23 +207,31 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
   );
 }
 
+/* Les autocollants, dans l’ordre des découvertes : elle (rose), un mot à vous (bleu), le moment (vert). */
+const STICKERS = [
+  { color: "#FF4F9A", rotate: -2 },
+  { color: "#3D8BFF", rotate: 1.5 },
+  { color: "#12C08A", rotate: -1 },
+];
+
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
-function Discoveries({ shown, className }: { shown: number; className?: string }) {
+function Discoveries({ items, className }: { items: string[]; className?: string }) {
   return (
     <ul className={cn("m-0 flex min-h-[34px] list-none flex-wrap justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">
-      {READING_DISCOVERIES.map((d, i) =>
-        shown > i ? (
+      {items.map((text, i) => {
+        const d = STICKERS[i % STICKERS.length];
+        return (
           <li
-            key={d.text}
+            key={text}
             data-popin=""
             className="inline-flex h-[34px] items-center gap-[7px] whitespace-nowrap rounded-[17px] bg-white px-3 text-[13px] font-black shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
             style={{ "--r": `${d.rotate}deg`, "--d": `${i * 0.08}s`, transform: `rotate(${d.rotate}deg)` } as CSSProperties}
           >
             <span aria-hidden="true" className="size-2 rounded-full" style={{ background: d.color }} />
-            {d.text}
+            {text}
           </li>
-        ) : null,
-      )}
+        );
+      })}
     </ul>
   );
 }

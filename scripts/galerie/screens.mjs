@@ -9,6 +9,7 @@ export const SECTIONS = [
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de votre conv (écrans 01 à 08)" },
   { id: "rapport", title: "Rapport", sub: "Aperçu gratuit, paiement, rapport complet, question, mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13, 16 et 20)" },
+  { id: "couple", title: "En couple", sub: "La même conv, lue comme un couple ensemble depuis janvier (« En couple » à l’écran 06, ou ?histoire=couple)" },
   { id: "etats", title: "États", sub: "Accès BLUSH+, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
@@ -16,6 +17,9 @@ export const SECTIONS = [
 const J = { me: "hugo", guess: "flou", goal: "ensemble", exportFileName: "Discussion avec Sophie.zip", exportApp: "whatsapp", app: "whatsapp" };
 const JE = { ...J, email: "hugo@email.fr" };
 const FREE = { plan: "gratuit", verdict: "normal" };
+/* L’histoire en couple : « En couple » choisi, et son cookie de session */
+const JC = { ...J, guess: "ensemble", goal: "mieux" };
+const COUPLE = "story-hugo-sophie-couple";
 const PLUS = { plan: "blushplus", verdict: "normal" };
 
 const click = (name, opts = {}) => async (page) => {
@@ -115,6 +119,7 @@ export const STATES = [
     note: "Inspiré de la section de ngl\u00a0: le titre géant, la grosse main en guise de curseur (sur mobile, elle montre qu’on peut toucher), les messages qui font cogiter autour, la cloche 3D du design system, puis les questions qu’on pose à BLUSH en très grand. On en touche une, sa réponse s’ouvre dessous.",
   },
   { id: "LCb", section: "landing", title: "Landing", state: "Une conv choisie", route: "/", sheet: true, steps: async (page) => { await page.getByRole("button", { name: /^Inès/ }).first().click(); await page.waitForTimeout(900); }, note: "On touche une conv\u00a0: BLUSH montre son verdict comme au début d’un vrai rapport (exemple fictif)." },
+  { id: "LCk", section: "landing", title: "Landing", state: "Une conv de couple choisie", route: "/", sheet: true, steps: async (page) => { await page.getByRole("button", { name: /^Mon cœur/ }).first().click(); await page.waitForTimeout(900); }, note: "Nouveau : un couple dans chaque rangée (Mon cœur, Chéri, Julien), avec les verdicts en couple. Exemples fictifs, textes à valider." },
   {
     id: "LD", section: "landing", title: "Landing", state: "Avis (emplacements)", route: "/?apercu=avis", sheet: true,
     steps: async (page) => {
@@ -337,6 +342,49 @@ export const STATES = [
   { id: "20b", section: "quotidien", title: "Mon compte", state: "Supprimer l’histoire", route: "/compte", server: PLUS, steps: click("Supprimer l’histoire avec Sophie"), sheet: true, note: "Confirmation absente des maquettes." },
 
   /* ———— États ———— */
+  /* ———— En couple ———— */
+  { id: "C06", section: "couple", title: "Qui est qui", state: "En couple", route: "/qui", journey: JC, note: "Nouveau : « En couple » à côté de « On se parle / On s’est vus / C’est flou ». Les objectifs changent alors : « Que ça aille mieux », « Savoir où on en est », « Juste comprendre ». C’est ce choix qui ouvre l’histoire en couple. Textes à valider." },
+  { id: "C08", section: "couple", title: "Analyse", state: "Terminée", route: "/lecture", journey: JC, server: { analysisStartedAt: 1 }, story: COUPLE, wait: 2200, note: "Ce que BLUSH remarque, en couple : elle, toi, le moment." },
+  {
+    id: "CV2", section: "couple", title: "Révélation du verdict", state: "Le verdict", route: "/rapport/verdict", journey: JC, server: FREE, story: COUPLE, sheet: true,
+    steps: click("Suivant", { wait: 500 }),
+    note: "Les verdicts en couple, avec les mêmes emojis : 🔥 toujours le feu · 🤏 il manque un petit rien · 🤔 un truc coince · 🧊 vous vous éloignez (mode sobre). Textes à valider.",
+  },
+  {
+    id: "CV3", section: "couple", title: "Révélation du verdict", state: "Entre vous deux", route: "/rapport/verdict", journey: JC, server: FREE, story: COUPLE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 2; i++) await click("Suivant", { wait: 400 })(page);
+    },
+    note: "Qui fait quoi, en couple : qui propose, qui annule, qui raconte sa journée.",
+  },
+  {
+    id: "CV4", section: "couple", title: "Révélation du verdict", state: "Le moment où tout a basculé", route: "/rapport/verdict", journey: JC, server: FREE, story: COUPLE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 3; i++) await click("Suivant", { wait: 400 })(page);
+    },
+  },
+  {
+    id: "CV5", section: "couple", title: "Révélation du verdict", state: "À toi de jouer", route: "/rapport/verdict", journey: JC, server: FREE, story: COUPLE, sheet: true,
+    steps: async (page) => {
+      for (let i = 0; i < 4; i++) await click("Suivant", { wait: 400 })(page);
+    },
+  },
+  { id: "C09", section: "couple", title: "Rapport, aperçu gratuit", state: "Page entière", route: "/rapport", journey: JC, server: FREE, story: COUPLE, full: true },
+  { id: "C11", section: "couple", title: "Rapport complet", state: "Page entière", route: "/rapport", journey: JC, server: { plan: "rapport", verdict: "normal" }, story: COUPLE, full: true, note: "Les mêmes 8 chapitres, écrits pour un couple. Textes à valider." },
+  { id: "C12", section: "couple", title: "Ta question", state: "Les idées", route: "/rapport/question", server: { plan: "rapport" }, story: COUPLE },
+  { id: "C18", section: "couple", title: "Mode sobre", state: "Elle prend ses distances", route: "/rapport", server: { verdict: "difficile" }, story: COUPLE, note: "Le mode sobre en couple : pas « c’est fini », mais « il faut en parler, maintenant ». Textes à valider." },
+  { id: "C13", section: "couple", title: "Accueil", state: "Le chat", route: "/app", server: PLUS, story: COUPLE, note: "Sophie en contact : l’anneau suit la température. Les questions toutes prêtes en couple : « Elle m’en veut ? » à la place de « Elle voit quelqu’un d’autre ? »." },
+  { id: "C13d", section: "couple", title: "Accueil", state: "Ce que BLUSH voit", route: "/app", server: PLUS, story: COUPLE, steps: async (page) => { await page.locator("button[aria-haspopup=dialog]:visible").first().click(); await page.waitForTimeout(800); }, sheet: true, note: "Nouveau : la température (On s’éloigne → Ça coince → Ça va → On est soudés) remplace les étapes. Pas de coche ni de cadenas : juste où vous êtes." },
+  {
+    id: "C13i", section: "couple", title: "Accueil", state: "« On en est où ? »", route: "/app", server: PLUS, story: COUPLE, sheet: true,
+    steps: click("On en est où", { wait: 2600 }),
+  },
+  {
+    id: "C13k", section: "couple", title: "Accueil", state: "« Elle m’en veut ? »", route: "/app", server: PLUS, story: COUPLE, sheet: true,
+    steps: click("Elle m’en veut", { wait: 2600 }),
+  },
+  { id: "C16", section: "couple", title: "Sa fiche", route: "/app/fiche", server: PLUS, story: COUPLE, note: "La même fiche, avec le portrait et le rappel de cette histoire." },
+
   { id: "E1", section: "etats", title: "Accès BLUSH+", state: "Plan « rapport » sur l’accueil", route: "/app", server: { plan: "rapport" }, sheet: true, wait: 1000, note: "Panneau absent des maquettes." },
   { id: "E2", section: "etats", title: "Erreur", state: "Fichier illisible", route: "/importer/ok?erreur=fichier" },
   { id: "E3", section: "etats", title: "Erreur", state: "Conversation de groupe", route: "/importer/ok?erreur=groupe" },
