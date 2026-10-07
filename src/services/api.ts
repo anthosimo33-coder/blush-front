@@ -260,18 +260,18 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }):
   return { kind: "answer", answer: opened().voiceAnswer };
 }
 
-/* Back-end : une réponse de BLUSH en une bulle (ce qui n’est pas encore branché, ou une erreur dite simplement) */
-const bulle = (text: string): BlushAnswer => ({ kind: "bubbles", bubbles: [{ text }] });
+/* Back-end : une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
+const bulle = (texte: string | string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
 
 /* ⚠ Textes des erreurs du chat (captures, export, vocal) : à valider */
-const ERREURS_CHAT: Record<string, string> = {
+const ERREURS_CHAT: Record<string, string | string[]> = {
   trop: "on a beaucoup parlé aujourd’hui, on reprend demain ?",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
   capture: "j’arrive pas à lire tes captures. renvoie-les en entier, sans les rogner",
-  fichier: "j’arrive pas à ouvrir ce fichier. envoie-moi l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram",
+  fichier: ["j’arrive pas à ouvrir ce fichier", "envoie-moi l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram"],
   autre_conv: "c’est pas votre conv ça 👀 envoie-moi l’export de la vôtre",
-  rien_de_neuf: "j’ai déjà tout ça : rien de nouveau depuis ton import",
+  rien_de_neuf: "j’ai déjà tout ça : rien de nouveau depuis la dernière fois",
   vocal_bientot: "les vocaux arrivent très vite. écris-moi en attendant, je te réponds pareil",
   vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies ?",
   vocal: "ton vocal est trop long pour moi, fais-en un plus court",
@@ -322,8 +322,13 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
  * Simulation : une capture donne sa bio Hinge, un export de nouveaux messages de votre conv.
  */
 export async function addToFiche(files: File[]): Promise<FicheUpdate> {
-  /* Rien de lisible, ou une erreur : la fiche reste comme avant (l’écran dit « Rien de nouveau ») */
-  if (BACKEND) return reel.addToFiche(files).catch(async () => ({ fiche: await reel.getFiche(), added: [], confirmed: [] }));
+  /* Rien de lisible, ou une erreur : la fiche reste comme avant, et l’écran dit pourquoi (« rien de neuf » n’est pas une erreur) */
+  if (BACKEND)
+    return reel.addToFiche(files).catch(async (e: unknown) => {
+      const code = e instanceof ErreurApi ? e.code : "";
+      const problem = code === "rien_de_neuf" ? undefined : code === "capture" || code === "fichier" || code === "autre_conv" || code === "trop" ? code : "bug";
+      return { fiche: await reel.getFiche(), added: [], confirmed: [], ...(problem ? { problem } : {}) };
+    });
   await delay(2200);
   const images = files.filter((f) => f.type.startsWith("image/")).length;
   const kinds = [...(images > 0 ? (["captures"] as const) : []), ...(images < files.length ? (["export"] as const) : [])];

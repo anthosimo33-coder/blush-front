@@ -1,3 +1,5 @@
-# Ce qui ne part pas sur Vercel : la galerie de revue et ses captures, et les fichiers d’environnement locaux
+# Ce qui ne part pas sur Vercel : la galerie de revue et ses captures, les fichiers d’environnement locaux,
+# et le banc de test des prompts (ses résultats contiennent des convs) : le build n’en a pas besoin
 .galerie
 .env*
+prompts/evals
