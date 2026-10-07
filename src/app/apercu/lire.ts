@@ -12,7 +12,7 @@ export type Apercu = {
   home: {
     quick: string[];
     answers: Record<string, BlushAnswer>;
-    script?: { mine?: string; answer: BlushAnswer }[];
+    script?: { mine?: string; answer: BlushAnswer; at?: number }[];
     fiche: Pick<Fiche, "person" | "summaryShort">;
   } | null;
 };
