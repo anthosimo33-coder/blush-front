@@ -15,7 +15,8 @@
     "pretest": "node scripts/prompts.mjs",
     "test": "vitest run",
     "db:generer": "drizzle-kit generate",
-    "db:migrer": "drizzle-kit migrate"
+    "db:migrer": "drizzle-kit migrate",
+    "acces": "tsx scripts/acces.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

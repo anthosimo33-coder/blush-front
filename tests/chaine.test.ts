@@ -79,3 +79,14 @@ describe("de l’import à la mémoire", () => {
     expect(maj.status).toBe("fini");
   });
 });
+
+describe("purge", () => {
+  it("efface les brouillons de plus de 24 h", async () => {
+    const { purger } = await import("@/server/purge");
+    const { id } = await importer(conv("02-reciproque.txt"));
+    await db().update(schema.stories).set({ createdAt: new Date(Date.now() - 2 * 86400e3) }).where(eq(schema.stories.id, id));
+    const r = await purger();
+    expect(r.brouillons).toBeGreaterThanOrEqual(1);
+    expect(await db().select().from(schema.stories).where(eq(schema.stories.id, id))).toHaveLength(0);
+  });
+});

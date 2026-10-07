@@ -21,6 +21,8 @@ const Env = z.object({
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@blush.app>"),
   /** Bêta sans paiement : emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde. */
   BLUSH_ACCES_LIBRE: z.string().default(""),
+  /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
+  CRON_SECRET: z.string().min(16).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])
