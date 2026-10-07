@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKEND } from "@/services/mode";
 import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
 import { FlowSteps } from "@/components/ui/progress";
@@ -11,7 +12,10 @@ import type { AppKind } from "@/types";
 const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide?: boolean }[] = [
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
   { app: "imessage", title: "iMessage", subtitle: "Export depuis un Mac", href: "/importer/export?app=imessage" },
-  { app: "instagram", title: "Instagram", subtitle: "Captures d’écran", href: "/importer/captures?app=instagram" },
+  /* Avec le back-end, Instagram passe par son export (la lecture des captures arrive ensuite) */
+  BACKEND
+    ? { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" }
+    : { app: "instagram", title: "Instagram", subtitle: "Captures d’écran", href: "/importer/captures?app=instagram" },
   { app: "hinge", title: "Hinge", subtitle: "Captures d’écran", href: "/importer/captures?app=hinge" },
   { app: "autre", title: "Autre appli", subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
 ];

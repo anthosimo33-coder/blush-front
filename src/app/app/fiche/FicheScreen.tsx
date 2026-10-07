@@ -1,5 +1,6 @@
 "use client";
 
+import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
@@ -29,7 +30,8 @@ function whatOf(files: File[]) {
   return [images === 1 ? "ta capture" : images > 1 ? `tes ${images} captures` : null, images < files.length ? "votre conv" : null].filter(Boolean).join(" et ");
 }
 
-const sectionTitle = (id: FicheFact["section"]) => FICHE_SECTIONS.find((s) => s.id === id)?.title ?? "";
+/* « Elle aime », ou « Il aime » quand c’est une fille qui utilise BLUSH */
+const sectionTitle = (id: FicheFact["section"], pronoun?: "il" | "elle") => (id === "aime" ? `${IlOuElle(pronoun)} aime` : (FICHE_SECTIONS.find((s) => s.id === id)?.title ?? ""));
 
 type Job =
   | { step: "idle" }
@@ -176,7 +178,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
           return (
             <section key={sec.id} aria-labelledby={`sec-${sec.id}`} className="flex flex-col gap-2">
               <h2 id={`sec-${sec.id}`} className="m-0 pl-4 text-[13px] font-black text-grey">
-                {sec.title}
+                {sectionTitle(sec.id, fiche.person.pronoun)}
               </h2>
               <ul className="m-0 flex list-none flex-col overflow-hidden rounded-[20px] bg-white p-0 shadow-card">
                 {items.map((f, i) => {
@@ -321,7 +323,7 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
               <span aria-hidden="true" className={cn("size-[7px] shrink-0 rounded-full", isNew ? "bg-elle" : "bg-[#D9D6CF]")} />
               <span className={cn("min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35]", !isNew && "text-soft")}>{f.text}</span>
               {isNew ? (
-                <span className="shrink-0 rounded-full bg-[#F4F2ED] px-2.5 py-1 text-[12px] font-black leading-none text-soft">{sectionTitle(f.section)}</span>
+                <span className="shrink-0 rounded-full bg-[#F4F2ED] px-2.5 py-1 text-[12px] font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
               ) : (
                 <span className="shrink-0 text-[12.5px] font-extrabold text-grey">déjà dans sa fiche</span>
               )}

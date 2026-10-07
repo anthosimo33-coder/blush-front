@@ -10,7 +10,7 @@ import type { AppKind, Goal, Guess } from "@/types";
 export type JourneyState = {
   /** Appli choisie à l’écran 01 */
   app: AppKind | null;
-  exportApp: "whatsapp" | "imessage";
+  exportApp: "whatsapp" | "imessage" | "instagram";
   exportFileName: string | null;
   captureNames: string[];
   captureApp: AppKind | null;

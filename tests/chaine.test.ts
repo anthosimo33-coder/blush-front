@@ -5,12 +5,13 @@ import { executerChaine, type DonneesMemoire, type DonneesRapport } from "@/serv
 import { historique, repondre } from "@/server/chat";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { definirQui, ErreurImport, importer, metaDe, rattacherBrouillon, storyAffichee } from "@/server/histoires";
+import { definirQui, depuisFichier, ErreurImport, importer as importerLu, metaDe, rattacherBrouillon, storyAffichee } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { planifier } from "@/server/taches";
 import { fournisseurFactice } from "@/server/ia/factice";
 
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
+const importer = async (f: File) => importerLu(await depuisFichier(f));
 const email = `test-${Date.now()}@blush.test`;
 
 beforeAll(() => definirFactice(fournisseurFactice));
