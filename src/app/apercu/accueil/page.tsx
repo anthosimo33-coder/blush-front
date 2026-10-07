@@ -17,8 +17,8 @@ export default async function Page({ searchParams }: PageProps<"/apercu/accueil"
   if (!a?.data.home) notFound();
   const { payload, story, home } = a.data;
   const { verdict, level, trend, nextStep } = payload.report;
-  /* Le chat en direct ne connaît que la mémoire configurée dans BLUSH_DEMANDER (une seule conv) */
-  const live = process.env.BLUSH_DEMANDER && (a.cas === null || a.cas === "perso") ? "/apercu/demander" : undefined;
+  /* Le vrai chat, en direct, sur la mémoire de cette conv (BLUSH_DEMANDER dit où sont les mémoires) */
+  const live = process.env.BLUSH_DEMANDER ? `/apercu/demander${a.cas ? `?cas=${a.cas}` : ""}` : undefined;
   return (
     <div className="[background:var(--paper-light)]">
       <HomeScreen
