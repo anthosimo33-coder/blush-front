@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/cards";
 import { Chip } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
+import { TypingDots } from "@/components/ui/FileInput";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { LockRow } from "@/components/ui/progress";
 import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
@@ -31,11 +32,34 @@ const RESUME_KEY = "blush.rapport.reprise.v1";
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
 export function ReportScreen({ initial, story, openPaywall, fixed = false }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean }) {
-  const { data } = useQuery("report", getReport, initial);
+  const { data, refresh } = useQuery("report", getReport, initial);
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
   const payload = fixed ? initial : (data ?? initial);
+  /* Le rapport s’écrit encore (back-end) : on repasse toutes les 4 secondes jusqu’à ce qu’il soit là */
+  useEffect(() => {
+    if (!payload.generating || fixed) return;
+    const t = setInterval(refresh, 4000);
+    return () => clearInterval(t);
+  }, [payload.generating, fixed, refresh]);
   if (payload.sober) return <SoberReport data={payload.sober} />;
-  return <ReportBody payload={payload} story={story} openPaywall={openPaywall} />;
+  return (
+    <>
+      <ReportBody payload={payload} story={story} openPaywall={openPaywall} />
+      {payload.generating && <Writing />}
+    </>
+  );
+}
+
+/** Pendant que BLUSH écrit le rapport (2 à 3 minutes) : une pastille en bas de l’écran. ⚠ Texte à valider */
+function Writing() {
+  return (
+    <div role="status" className="fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
+      <span className="flex items-center gap-2.5 rounded-full bg-ink px-4 py-2.5 text-[14px] font-extrabold text-white shadow-card">
+        <TypingDots color="#FFFFFF" label="BLUSH écrit ton rapport" />
+        BLUSH écrit ton rapport, 2 à 3 minutes
+      </span>
+    </div>
+  );
 }
 
 /**

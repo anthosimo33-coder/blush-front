@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { ViewTransition } from "react";
-import { getFiche, getQuickQuestions, getReport, getStory } from "@/services/api";
+import { redirect } from "next/navigation";
+import { getFiche, getQuickQuestions, getReport, getStory } from "@/services/serveur";
 import { currentStoryId } from "@/services/session.server";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
@@ -20,7 +21,10 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   const storyId = await currentStoryId();
   /* ?arrivee=1 rejoue l’arrivée sans attendre le lendemain (pour la revoir, ou la montrer) */
   const arrived = arrivee !== "1" && (await cookies()).has(ARRIVAL_COOKIE);
-  const [quick, { report }, fiche, story] = await Promise.all([getQuickQuestions(storyId), getReport(storyId), getFiche(storyId), getStory(storyId)]);
+  const [quick, payload, fiche, story] = await Promise.all([getQuickQuestions(storyId), getReport(storyId), getFiche(storyId), getStory(storyId)]);
+  if (!story) redirect("/commencer");
+  if (!payload || !fiche) redirect("/rapport");
+  const { report } = payload;
   const screen = (
     <HomeScreen
       quick={version === "actuelle" ? [] : quick}
