@@ -65,9 +65,18 @@ const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 
  * Le logo officiel : la bulle rose en volume, deux points nacre et un point opale.
  * `animated` : BLUSH écrit. Les perles s’allument l’une après l’autre, comme les trois points de Messages (globals.css).
  */
-export function BubbleLogo({ size, dots = true, animated = false, className, style }: ObjProps & { dots?: boolean; animated?: boolean }) {
+export function BubbleLogo({
+  size,
+  dots = true,
+  animated = false,
+  layered = false,
+  glow = true,
+  className,
+  style,
+}: ObjProps & { dots?: boolean; animated?: boolean; layered?: boolean; glow?: boolean }) {
   const u = useSvgId("bp");
   const detail = size >= 44;
+  if (layered && dots) return <LayeredBubbleLogo size={size} animated={animated} detail={detail} className={className} style={style} />;
   /* La perle et son ombre bougent séparément : quand la perle monte, son ombre se resserre */
   const dot = (cx: number, kind: "nacre" | "opale", i: number) => (
     <g key={cx} transform={`translate(${cx - 13} 88)`} style={{ "--i": i } as CSSProperties}>
@@ -117,7 +126,7 @@ export function BubbleLogo({ size, dots = true, animated = false, className, sty
           <feGaussianBlur stdDeviation="1.4" />
         </filter>
       </defs>
-      {detail && <ellipse data-glow="" cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
+      {detail && glow && <ellipse data-glow="" cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
       <path d={BUBBLE_BODY} fill={`url(#${u}b)`} />
       <path d={BUBBLE_BODY} fill={`url(#${u}o)`} />
       {detail && (
@@ -132,6 +141,59 @@ export function BubbleLogo({ size, dots = true, animated = false, className, sty
       )}
       {dots && <g>{[dot(70, "nacre", 0), dot(100, "nacre", 1), dot(130, "opale", 2)]}</g>}
     </svg>
+  );
+}
+
+/**
+ * Le même logo, perles, ombres et halo en calques HTML posés au même endroit.
+ * Une animation dans un SVG repeint tout le logo à chaque image sur le fil principal (et saccade quand le téléphone est occupé) ;
+ * en calques, la vague de « BLUSH écrit », les sauts quand tu tapes et le halo se jouent sur le compositeur.
+ */
+function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProps & { animated: boolean; detail: boolean }) {
+  const u = useSvgId("bl");
+  /* Le viewBox (30 40 150 136) remplit la largeur et se centre en hauteur */
+  const k = size / 150;
+  const oy = (size - 136 * k) / 2;
+  const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+  const pearl = (cx: number, kind: "nacre" | "opale", i: number) => (
+    <span key={cx} style={{ "--i": i } as CSSProperties}>
+      <span
+        data-shade=""
+        className="absolute rounded-full"
+        style={{ left: px((cx - 30 - 9) * k), top: px((115 - 40 - 2.6) * k + oy), width: px(18 * k), height: px(5.2 * k), background: "rgba(110,0,50,0.35)", filter: `blur(${px(1.4 * k)})` }}
+      />
+      <span data-pearl="" className="absolute block" style={{ left: px((cx - 13 - 30) * k), top: px((88 - 40) * k + oy), width: px(26 * k), height: px(26 * k) }}>
+        <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ display: "block", overflow: "visible" }}>
+          <defs>
+            <radialGradient id={`${u}${kind}${cx}`} cx="0.36" cy="0.3" r="0.78">
+              <Stops stops={SPHERE_STOPS[kind]} />
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="46" fill={`url(#${u}${kind}${cx})`} />
+          <ellipse cx="35" cy="29" rx="15" ry="9" transform="rotate(-32 35 29)" fill="#FFFFFF" opacity="0.85" />
+        </svg>
+      </span>
+    </span>
+  );
+  return (
+    <span
+      aria-hidden="true"
+      data-live={animated ? "" : undefined}
+      className={["relative block shrink-0", className].filter(Boolean).join(" ")}
+      style={{ width: size, height: size, ...style }}
+    >
+      {detail && (
+        <span
+          data-glow=""
+          className="absolute rounded-full"
+          style={{ left: px((102 - 52 - 30) * k), top: px((168 - 6 - 40) * k + oy), width: px(104 * k), height: px(12 * k), background: "rgba(190,20,100,0.28)", filter: `blur(${px(5 * k)})` }}
+        />
+      )}
+      <BubbleLogo size={size} dots={false} glow={false} style={{ position: "absolute", left: 0, top: 0 }} />
+      {pearl(70, "nacre", 0)}
+      {pearl(100, "nacre", 1)}
+      {pearl(130, "opale", 2)}
+    </span>
   );
 }
 

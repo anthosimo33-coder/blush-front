@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   createContext,
+  memo,
   use,
   useEffect,
   useLayoutEffect,
@@ -19,7 +20,7 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
-import { bumpPearl, flipFrom, fly, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type Box, type Spring } from "@/lib/motion";
+import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -109,11 +110,11 @@ const INTRO_DAY = "jour--2";
  * 3 · 4 · Une bulle qui vole jusqu’à sa place : depuis la pastille touchée, ou depuis le champ.
  * 5 · La bulle qui écrit vole jusqu’à l’avatar de la réponse.
  */
-type Flight = { kind: "text"; bubble: string; text: string; from: Box; start: Keyframe } | { kind: "logo"; bubble: string; from: Box };
+type Flight = { kind: "text"; bubble: string; text: string; from: Box; start: BubbleLook } | { kind: "logo"; bubble: string; from: Box };
 
-const CHIP_START: Keyframe = { backgroundColor: "#FFFFFF", color: "#1A66DB", fontSize: "14px", fontWeight: "800", paddingLeft: "14px", borderRadius: "18px", boxShadow: "inset 0 0 0 1.5px rgba(26, 102, 219, 0.28)" };
-const FIELD_START: Keyframe = { backgroundColor: "rgba(26, 102, 219, 0)", color: "#121214", fontSize: "16px", fontWeight: "800", paddingLeft: "16px", borderRadius: "20px", boxShadow: "inset 0 0 0 1.5px rgba(26, 102, 219, 0)" };
-const BUBBLE_END: Keyframe = { backgroundColor: "#1A66DB", color: "#FFFFFF", fontSize: "16px", fontWeight: "700", paddingLeft: "16px", borderRadius: "20px", boxShadow: "inset 0 0 0 1.5px rgba(26, 102, 219, 0)" };
+const CHIP_LOOK: BubbleLook = { background: "#FFFFFF", ring: "inset 0 0 0 1.5px rgba(26, 102, 219, 0.28)", radius: 999, color: "#1A66DB", size: 14, weight: 800, pad: 14 };
+const FIELD_LOOK: BubbleLook = { background: "rgba(26, 102, 219, 0)", radius: 20, color: "#121214", size: 16, weight: 800, pad: 16 };
+const BUBBLE_LOOK: BubbleLook = { background: "#1A66DB", radius: 20, color: "#FFFFFF", size: 16, weight: 700, pad: 16 };
 
 /** La feuille « Ce que BLUSH voit » monte en 0,35 s : le logo et l’avatar y volent au même rythme. */
 const SHEET_IN: Spring = { duration: 380, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
@@ -265,7 +266,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
   const sendQuick = (q: string, chip?: HTMLElement) => {
     setAsked((a) => [...a, q]);
     const mine = id();
-    if (motion && chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: `${mine}-0`, text: q, from: chip.getBoundingClientRect(), start: CHIP_START };
+    if (motion && chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: `${mine}-0`, text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
     ask({ id: mine, from: "toi", text: q }, { text: q });
   };
 
@@ -279,7 +280,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
     if (motion && field && !about && !prefersReducedMotion()) {
       const r = field.getBoundingClientRect();
       const w = textWidth(t, field);
-      if (w <= r.width) flight.current = { kind: "text", bubble: `${mine}-0`, text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_START };
+      if (w <= r.width) flight.current = { kind: "text", bubble: `${mine}-0`, text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
     }
     const point = about ?? undefined;
     setText("");
@@ -572,10 +573,7 @@ function launch(box: HTMLElement, f: Flight) {
       return;
     }
     target.style.visibility = "hidden";
-    const el = document.createElement("span");
-    el.className = "flight-text";
-    el.textContent = f.text;
-    void fly(el, f.from, to, { spring: spring("soft"), start: f.start, end: BUBBLE_END }).then(() => {
+    void flyText(f.text, f.from, to, f.start, BUBBLE_LOOK, { spring: spring("soft") }).then(() => {
       target.style.visibility = "";
     });
     return;
@@ -586,10 +584,7 @@ function launch(box: HTMLElement, f: Flight) {
   const to = avatar.getBoundingClientRect();
   avatar.style.visibility = "hidden";
   const el = logo.cloneNode(true) as SVGSVGElement;
-  /* Elle écrit encore un instant en vol, puis se pose */
-  el.setAttribute("data-live", "");
-  window.setTimeout(() => el.removeAttribute("data-live"), 170);
-  void fly(el, f.from, to, { spring: spring("pop") }).then(() => {
+  void flyBox(el, f.from, to, { spring: spring("pop") }).then(() => {
     avatar.style.visibility = "";
   });
 }
@@ -605,10 +600,9 @@ function celebrate() {
   }
   const sophie = visible<HTMLElement>("[data-sophie]");
   if (!sophie) return;
-  sophie.animate(
-    [{ filter: "drop-shadow(0 0 0 rgba(18, 192, 138, 0))" }, { filter: "drop-shadow(0 0 9px rgba(18, 192, 138, 0.75))", offset: 0.4 }, { filter: "drop-shadow(0 0 0 rgba(18, 192, 138, 0))" }],
-    { duration: 1300, easing: "ease-out" },
-  );
+  sophie
+    .querySelector("[data-glow-ring]")
+    ?.animate([{ opacity: 0, transform: "scale(0.9)" }, { opacity: 1, transform: "scale(1.05)", offset: 0.4 }, { opacity: 0, transform: "scale(1.18)" }], { duration: 1300, easing: "ease-out" });
   sophie.querySelector("[data-sophie-avatar]")?.animate([{ scale: 1 }, { scale: 1.16, offset: 0.35 }, { scale: 1 }], { duration: 620, easing: "cubic-bezier(0.3, 1.4, 0.5, 1)" });
   sophie
     .querySelector("[data-badge]")
@@ -794,7 +788,7 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
       <span data-c="logo" className="relative block">
         <span data-float="" className="block" style={{ "--r": "-3deg" } as CSSProperties}>
           <span data-a="logo" data-blush-logo="" className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] group-hover:scale-105 group-active:scale-95">
-            <BubbleLogo size={big ? 88 : 64} animated={busy} />
+            <BubbleLogo size={big ? 88 : 64} animated={busy} layered />
           </span>
         </span>
       </span>
@@ -835,11 +829,14 @@ function SophieButton({ shared = false }: { shared?: boolean }) {
   return (
     <Link
       href="/app/fiche"
+      prefetch={on ? true : undefined}
       transitionTypes={on ? ["nav-forward"] : undefined}
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
       className="group pointer-events-auto flex flex-col items-center gap-1 text-ink no-underline"
     >
       <span data-sophie="" data-c="so" className="relative flex size-12 items-center justify-center transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">
+        {/* 11 · Le halo vert quand un niveau tombe (un calque à part : il s’anime sur le compositeur) */}
+        <span aria-hidden="true" data-glow-ring="" className="pointer-events-none absolute -inset-1 rounded-full opacity-0 shadow-[0_0_14px_3px_rgba(18,192,138,0.7)]" />
         <svg aria-hidden="true" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
           <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />
           <circle data-a="ring" data-ring-fill="" cx="24" cy="24" r="21" fill="none" stroke="#12C08A" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${ring * share} ${ring}`} />
@@ -936,7 +933,8 @@ function dayLabel(at: number, now: number) {
   return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
 
-function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
+/* Mémorisée : taper une lettre ou parler (le niveau du micro, 14 fois par seconde) ne recalcule pas toute la conv */
+const Thread = memo(function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
   const { report } = useContact();
   const { on, arriving } = useHomeMotion();
   const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, motion: on });
@@ -963,7 +961,7 @@ function Thread({ msgs, opened }: { msgs: Msg[]; opened: number | null }) {
       )}
     </div>
   );
-}
+});
 
 /** 11 · Un niveau franchi pendant la visite : un repère au milieu de la conv (⚠ texte à valider). */
 function LevelEvent({ row, level }: { row: string; level: LevelId }) {
@@ -1034,7 +1032,7 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
       })}
       {intro && (
         <span aria-hidden="true" data-a="ghost" className="pointer-events-none absolute bottom-[18px] left-0 block">
-          <BubbleLogo size={62} animated />
+          <BubbleLogo size={62} animated layered />
         </span>
       )}
       {typing ? (
@@ -1348,21 +1346,29 @@ function recede(state: "in" | "out" | "reset", timing?: Spring) {
   page.getAnimations().forEach((a) => a.cancel());
   if (state === "reset" || window.matchMedia(DESKTOP).matches) {
     document.body.style.removeProperty("background");
+    page.parentElement?.style.removeProperty("background");
     page.style.removeProperty("background");
     page.style.removeProperty("background-color");
+    page.style.removeProperty("clip-path");
     return;
   }
   const y = window.scrollY - page.offsetTop;
   const vh = window.innerHeight;
   const below = Math.max(0, page.offsetHeight - y - vh);
-  /* Accroché en haut : la carte touche la barre d’état de Safari (qui garde sa couleur), le noir n’apparaît que sur les côtés */
+  /* Accroché en haut : la carte touche la barre d’état de Safari (qui garde sa couleur), le noir n’apparaît que sur les côtés.
+     La découpe arrondie est posée d’un coup, seule l’échelle s’anime : le compositeur la joue seul, même sur une longue conv */
   page.style.transformOrigin = `50% ${y}px`;
   page.style.background = "var(--paper-light)";
   page.style.backgroundColor = "var(--paper)";
-  const rest: Keyframe = { transform: "none", clipPath: `inset(${y}px 0 ${below}px 0 round 0px)` };
-  const back: Keyframe = { transform: "scale(0.94)", clipPath: `inset(${y}px 0 ${below}px 0 round 24px)` };
+  page.style.clipPath = `inset(${y}px 0 ${below}px 0 round 24px)`;
+  const rest: Keyframe = { transform: "none" };
+  const back: Keyframe = { transform: "scale(0.94)" };
   page.animate(state === "in" ? [rest, back] : [back, rest], { duration: timing?.duration ?? 300, easing: timing?.easing, fill: state === "in" ? "forwards" : "none" });
-  if (state === "in") document.body.style.background = "#000";
+  /* Le noir autour : sur la page et sur son cadre (qui a son propre fond pour le glissé vers la fiche) */
+  if (state === "in") {
+    document.body.style.background = "#000";
+    page.parentElement?.style.setProperty("background", "#000");
+  }
 }
 
 /** Cache ou remontre un élément sans changer la mise en page (pendant qu’un double vole à sa place). */
@@ -1377,7 +1383,7 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const logoRef = useRef<HTMLSpanElement>(null);
   const avRef = useRef<HTMLSpanElement>(null);
   /* 9 · Ce qui a quitté l’en-tête pour la feuille : la bulle et l’avatar de Sophie, et d’où ils venaient (pour y revenir) */
-  const moved = useRef<{ src: HTMLElement; from: Box; target: HTMLElement | SVGElement; font?: [string, string] }[]>([]);
+  const moved = useRef<{ src: HTMLElement; from: Box; target: HTMLElement | SVGElement }[]>([]);
   const closing = useRef(false);
 
   useEffect(() => {
@@ -1391,8 +1397,8 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
     const av = avBox?.firstElementChild as HTMLElement | null | undefined;
     if (!logoBox || !avBox || !panel || !still || !dialog || !logo || !av) return;
     const pairs = [
-      { src: visible<HTMLElement>("[data-blush-logo]"), measure: logoBox, target: logo as SVGElement, font: undefined },
-      { src: visible<HTMLElement>("[data-sophie-avatar]"), measure: avBox, target: av, font: ["15px", "28px"] as [string, string] },
+      { src: visible<HTMLElement>("[data-blush-logo]"), measure: logoBox, target: logo as SVGElement },
+      { src: visible<HTMLElement>("[data-sophie-avatar]"), measure: avBox, target: av },
     ];
     moved.current = [];
     for (const p of pairs) {
@@ -1403,10 +1409,10 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
       shown(p.src, false);
       shown(p.target, false);
       const target = p.target;
-      void fly(clone, from, to, { spring: SHEET_IN, host: dialog, start: p.font ? { fontSize: p.font[0] } : {}, end: p.font ? { fontSize: p.font[1] } : {}, settle: 1 }).then(() => {
+      void flyBox(clone, from, to, { spring: SHEET_IN, host: dialog, settle: 1 }).then(() => {
         if (!closing.current) shown(target, true);
       });
-      moved.current.push({ src: p.src, from, target: p.target, font: p.font });
+      moved.current.push({ src: p.src, from, target: p.target });
     }
     recede("in", SHEET_IN);
     return () => {
@@ -1438,7 +1444,7 @@ function ContactSheet({ open, onClose }: { open: boolean; onClose: () => void })
       const from = m.target.getBoundingClientRect();
       const clone = m.target.cloneNode(true) as HTMLElement | SVGElement;
       shown(m.target, false);
-      void fly(clone, from, m.from, { spring: SHEET_OUT, host: dialog, start: m.font ? { fontSize: m.font[1] } : {}, end: m.font ? { fontSize: m.font[0] } : {}, settle: 1 });
+      void flyBox(clone, from, m.from, { spring: SHEET_OUT, host: dialog, settle: 1 });
     }
     recede("out", SHEET_OUT);
     window.setTimeout(onClose, SHEET_OUT.duration);
@@ -1528,7 +1534,7 @@ function LevelStepper({ className }: { className?: string }) {
         return (
           <li key={l.id} className="relative flex flex-col items-center gap-1.5 text-center" aria-current={now ? "step" : undefined}>
             <span
-              data-pulse={now ? "" : undefined}
+              data-beat={now ? "" : undefined}
               className={cn(
                 "flex size-4 items-center justify-center rounded-full",
                 done && "bg-vrai-ink",

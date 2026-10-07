@@ -43,7 +43,7 @@ export function BlushTyping({ label, leaving = false }: { label: string; leaving
       <span className="sr-only">{label}</span>
       <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="block">
         <span className="block">
-          <BubbleLogo size={62} animated />
+          <BubbleLogo size={62} animated layered />
         </span>
       </span>
     </span>

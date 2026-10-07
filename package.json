@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "galerie": "node scripts/galerie/capture.mjs"
+    "galerie": "node scripts/galerie/capture.mjs",
+    "fluidite": "node scripts/fluidite/fluidite.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

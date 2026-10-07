@@ -1,7 +1,8 @@
 /*
  * Le mouvement de l’accueil : les ressorts (définis dans globals.css), un élément qui vole d’un endroit à un autre,
  * et le FLIP (ce qui bouge à cause d’un ajout glisse jusqu’à sa nouvelle place au lieu de sauter).
- * Tout passe par Web Animations : rien ne bloque, et « Réduire les animations » coupe tout.
+ * Tout passe par Web Animations et n’anime que transform et opacity : le compositeur les joue seul,
+ * fluides même quand le téléphone est occupé (rendu de la réponse, chargement). « Réduire les animations » coupe tout.
  */
 
 export type Spring = { easing: string; duration: number };
@@ -27,28 +28,83 @@ function toMs(value: string) {
 
 const px = (n: number) => `${Math.round(n * 10) / 10}px`;
 
-/**
- * Fait voler `el` (posé en position fixe dans `host`) du rectangle `from` au rectangle `to`, puis le retire.
- * `start` et `end` ajoutent des propriétés animées (couleur, rayon, taille du texte…).
- * La promesse se résout un peu avant la fin du ressort, quand il ne bouge presque plus : la vraie bulle reprend la main.
- */
-export function fly(el: HTMLElement | SVGElement, from: Box, to: Box, opts: { spring: Spring; host?: Element; start?: Keyframe; end?: Keyframe; settle?: number }) {
-  const { spring: sp, host = document.body, start = {}, end = {}, settle = 0.82 } = opts;
-  el.classList.add("flight");
-  host.append(el);
-  el.animate(
-    [
-      { left: px(from.left), top: px(from.top), width: px(from.width), height: px(from.height), ...start },
-      { left: px(to.left), top: px(to.top), width: px(to.width), height: px(to.height), ...end },
-    ],
-    { duration: sp.duration, easing: sp.easing, fill: "both" },
-  );
+/** Le déplacement d’un rectangle vers un autre, en transform (l’origine en haut à gauche). */
+function boxTransform(b: Box, base: Box) {
+  return `translate(${px(b.left - base.left)}, ${px(b.top - base.top)}) scale(${b.width / base.width}, ${b.height / base.height})`;
+}
+
+/** Retire l’élément quand le ressort ne bouge presque plus : la vraie bulle reprend la main. */
+function landed(el: Element, sp: Spring, settle: number) {
   return new Promise<void>((resolve) =>
     window.setTimeout(() => {
       el.remove();
       resolve();
     }, Math.round(sp.duration * settle)),
   );
+}
+
+/**
+ * Fait voler `el` (un double, posé en position fixe dans `host`) du rectangle `from` au rectangle `to`, rien qu’en transform.
+ * Le double garde la taille du plus grand des deux rectangles : il rétrécit sans flou au lieu de grossir pixelisé.
+ */
+export function flyBox(el: HTMLElement | SVGElement, from: Box, to: Box, opts: { spring: Spring; host?: Element; settle?: number }) {
+  const { spring: sp, host = document.body, settle = 0.82 } = opts;
+  const base = from.width * from.height >= to.width * to.height ? from : to;
+  el.classList.add("flight");
+  Object.assign(el.style, { left: px(base.left), top: px(base.top), width: px(base.width), height: px(base.height), transformOrigin: "0 0" });
+  host.append(el);
+  el.animate([{ transform: boxTransform(from, base) }, { transform: boxTransform(to, base) }], { duration: sp.duration, easing: sp.easing, fill: "both" });
+  return landed(el, sp, settle);
+}
+
+/** Un look de bulle de texte : son fond, son texte, et où commence le texte (marge gauche). */
+export type BubbleLook = { background: string; ring?: string; radius: number; color: string; size: number; weight: number; pad: number };
+
+/**
+ * Une bulle de texte qui vole d’un look à un autre (la pastille ou le champ → ta bulle bleue).
+ * Deux fonds et deux textes superposés : chacun ne fait que glisser, changer d’échelle et de transparence,
+ * donc tout se joue sur le compositeur (animer la taille, la couleur ou la police repeindrait chaque image).
+ */
+export function flyText(text: string, from: Box, to: Box, a: BubbleLook, b: BubbleLook, opts: { spring: Spring; settle?: number }) {
+  const { spring: sp, settle = 0.82 } = opts;
+  const frame = { duration: sp.duration, easing: sp.easing, fill: "both" as const };
+  const fade = { duration: Math.round(sp.duration * 0.45), easing: "ease-out", fill: "both" as const };
+  const root = document.createElement("span");
+  root.className = "flight";
+  Object.assign(root.style, { left: "0px", top: "0px", width: "0px", height: "0px" });
+  const layer = (look: BubbleLook, on: boolean) => {
+    const bg = document.createElement("span");
+    Object.assign(bg.style, { position: "absolute", left: px(to.left), top: px(to.top), width: px(to.width), height: px(to.height), borderRadius: px(look.radius), background: look.background, boxShadow: look.ring ?? "none", transformOrigin: "0 0" });
+    root.append(bg);
+    bg.animate([{ transform: boxTransform(from, to) }, { transform: "none" }], frame);
+    bg.animate([{ opacity: on ? 0 : 1 }, { opacity: on ? 1 : 0 }], fade);
+    /* Le texte, posé à sa place d’arrivée dans la taille d’arrivée : au départ, il est à la place et à la taille du départ */
+    const t = document.createElement("span");
+    t.textContent = text;
+    Object.assign(t.style, {
+      position: "absolute",
+      left: px(to.left + b.pad),
+      top: px(to.top + to.height / 2),
+      translate: "0 -50%",
+      whiteSpace: "nowrap",
+      fontFamily: "var(--font-nunito), system-ui, sans-serif",
+      fontSize: px(b.size),
+      lineHeight: "1.4",
+      fontWeight: String(look.weight),
+      color: look.color,
+      transformOrigin: "0 50%",
+    });
+    root.append(t);
+    const scale = a.size / b.size;
+    const dx = from.left + a.pad - (to.left + b.pad);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    t.animate([{ transform: `translate(${px(dx)}, ${px(dy)}) scale(${scale})` }, { transform: "none" }], frame);
+    t.animate([{ opacity: on ? 0 : 1 }, { opacity: on ? 1 : 0 }], fade);
+  };
+  layer(a, false);
+  layer(b, true);
+  document.body.append(root);
+  return landed(root, sp, settle);
 }
 
 /** Où chaque élément est à l’écran, avant un changement. */
@@ -61,15 +117,22 @@ export function snapshotTops(els: Iterable<HTMLElement>, key: (el: HTMLElement) 
   return tops;
 }
 
-/** FLIP : chaque élément déjà là repart de son ancienne place et rejoint la nouvelle sur un ressort. */
+/**
+ * FLIP : chaque élément déjà là repart de son ancienne place et rejoint la nouvelle sur un ressort.
+ * Seulement ce qui est (ou était) à l’écran : le reste de l’historique saute sans qu’on le voie.
+ * Mode « replace » (le seul que le compositeur sait jouer) : ces lignes n’ont pas d’autre transform animé.
+ */
 export function flipFrom(before: Map<string, number>, els: Iterable<HTMLElement>, key: (el: HTMLElement) => string | undefined, sp: Spring) {
+  const vh = window.innerHeight;
+  const seen = (top: number, height: number) => top + height > -80 && top < vh + 80;
   for (const el of els) {
     const k = key(el);
     const top = k === undefined ? undefined : before.get(k);
     if (top === undefined) continue;
-    const dy = top - el.getBoundingClientRect().top;
-    if (Math.abs(dy) < 0.5) continue;
-    el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], { duration: sp.duration, easing: sp.easing, composite: "add" });
+    const r = el.getBoundingClientRect();
+    const dy = top - r.top;
+    if (Math.abs(dy) < 0.5 || (!seen(r.top, r.height) && !seen(top, r.height))) continue;
+    el.animate([{ transform: `translateY(${px(dy)})` }, { transform: "translateY(0)" }], { duration: sp.duration, easing: sp.easing });
   }
 }
 
@@ -98,8 +161,8 @@ export function visible<T extends Element>(selector: string, root: ParentNode = 
 /** Les perles du logo et leurs ombres, dans l’ordre (nacre, nacre, opale). */
 export function pearlsOf(logo: Element) {
   return {
-    pearls: [...logo.querySelectorAll<SVGGElement>("[data-pearl]")],
-    shades: [...logo.querySelectorAll<SVGEllipseElement>("[data-shade]")],
+    pearls: [...logo.querySelectorAll<HTMLElement | SVGElement>("[data-pearl]")],
+    shades: [...logo.querySelectorAll<HTMLElement | SVGElement>("[data-shade]")],
   };
 }
 

@@ -120,7 +120,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
       contentGap={0}
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
-          <Link href="/app" transitionTypes={["nav-back"]} aria-label="Retour" className="flex size-11 items-center justify-center">
+          <Link href="/app" prefetch transitionTypes={["nav-back"]} aria-label="Retour" className="flex size-11 items-center justify-center">
             <Icon name="back" size={24} color="#121214" stroke={2.6} />
           </Link>
           <span className="text-[14px] font-black text-grey">Sa fiche</span>
@@ -130,7 +130,7 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" transitionTypes={["nav-back"]} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+        <Link href="/app" prefetch transitionTypes={["nav-back"]} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
           <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
           Retour
         </Link>
