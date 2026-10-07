@@ -3,8 +3,10 @@ import type { BlushAnswer, Fiche, Story } from "@/types";
 import * as demo from "./api";
 import type { ReportPayload } from "./api";
 import { BACKEND } from "./mode";
+import { PEOPLE, STORY } from "@/mocks/story";
 import { historique } from "@/server/chat";
 import { contexteRequete, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
+import { metaDe, storyAffichee } from "@/server/histoires";
 
 /*
  * Les données des pages serveur. Avec le back-end, elles viennent de la base, d’après les cookies de la requête ;
@@ -44,4 +46,15 @@ export async function getChat(): Promise<{ mine: string; answer: BlushAnswer; at
   if (!BACKEND) return [];
   const { utilisateur, story } = await contexteRequete();
   return utilisateur && story ? historique(story.id) : [];
+}
+
+/** Toi et elle, pour « Mon compte ». Démo : Hugo et Sophie. */
+export async function getNomsDuCompte(): Promise<{ me: Story["participants"][number]; other: Story["participants"][number]; period: string } | null> {
+  if (!BACKEND) return { me: PEOPLE.hugo, other: PEOPLE.sophie, period: STORY.period };
+  const { utilisateur, story } = await contexteRequete();
+  if (!utilisateur || !story) return null;
+  const meta = metaDe(story);
+  const affichee = storyAffichee(story.id, meta);
+  const moi = meta.moi ?? 0;
+  return { me: affichee.participants[moi], other: affichee.participants[1 - moi], period: affichee.period };
 }

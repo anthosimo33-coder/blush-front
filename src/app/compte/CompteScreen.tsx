@@ -6,7 +6,6 @@ import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { cancelSubscription, deleteAccount, deleteStory, getAccount, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/mocks/daily";
-import { PEOPLE, STORY } from "@/mocks/story";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/controls";
@@ -17,11 +16,14 @@ import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
+import type { Person } from "@/types";
 
 type Confirm = "stop" | "keep" | "story" | "all" | null;
 
 /* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
-export function CompteScreen() {
+export type NomsDuCompte = { me: Person; other: Person; period: string };
+
+export function CompteScreen({ noms }: { noms: NomsDuCompte | null }) {
   const router = useRouter();
   const { data: account } = useQuery("account", getAccount);
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -57,23 +59,23 @@ export function CompteScreen() {
           className="flex size-[76px] items-center justify-center rounded-full text-[30px] font-black text-white"
           style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), #3D8BFF" }}
         >
-          {PEOPLE.hugo.initial}
+          {noms?.me.initial ?? account?.email?.[0]?.toUpperCase()}
         </span>
-        <div className="mt-3 text-[24px] font-black leading-none tracking-[-0.01em]">{PEOPLE.hugo.name}</div>
+        {noms && <div className="mt-3 text-[24px] font-black leading-none tracking-[-0.01em]">{noms.me.name}</div>}
         {account?.email && <div className="mt-1.5 text-[14px] font-extrabold text-grey">{account.email}</div>}
       </div>
 
       {/* Tes histoires : celle en cours, et de quoi en commencer une autre */}
       <InsetGroup title="Tes histoires" id="histoires" className="mt-7">
-        {!account?.storyDeleted && (
+        {!account?.storyDeleted && noms && (
           <InsetRow
             leading={
               <Avatar tone="elle" size={36} fontSize={15} className="lift-pop">
-                {PEOPLE.sophie.initial}
+                {noms.other.initial}
               </Avatar>
             }
-            title={`${PEOPLE.sophie.name} et toi`}
-            sub={STORY.period}
+            title={`${noms.other.name} et toi`}
+            sub={noms.period}
             href="/app"
             chevron
           />
@@ -142,7 +144,7 @@ export function CompteScreen() {
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
       <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne sont jamais utilisées pour entraîner une IA. Hébergement en Europe.">
         <InsetRow leading={<RowIcon icon="lock" />} title="Ce que BLUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
-        <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Supprimer l’histoire avec Sophie" sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
+        <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title={`Supprimer l’histoire avec ${noms?.other.name ?? "elle"}`} sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
 
@@ -167,7 +169,7 @@ export function CompteScreen() {
         {(confirm === "stop" || confirm === "story" || confirm === "all") && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              {confirm === "stop" ? "Arrêter BLUSH+ ?" : confirm === "story" ? "Supprimer l’histoire avec Sophie ?" : "Tout effacer ?"}
+              {confirm === "stop" ? "Arrêter BLUSH+ ?" : confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"} ?` : "Tout effacer ?"}
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
               {confirm === "stop" ? "En un geste, effectif lundi." : confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
