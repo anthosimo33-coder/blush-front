@@ -82,7 +82,8 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     const what = whatOf(files);
     setEditing(false);
     setJob({ step: "reading", what, thumbs, file: files.some((f) => !isImage(f)) });
-    const update = await addToFiche(files);
+    /* Sans réseau, même la fiche ne se relit pas : on garde celle qu’on a, et l’écran dit que ça n’a pas marché */
+    const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], confirmed: [], problem: "bug" }));
     setQueryData(key, update.fiche);
     setFresh((ids) => [...ids, ...update.added.map((f) => f.id)]);
     setJob({ step: "done", what, update, before });
@@ -296,21 +297,32 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
 }
 
 /** Ce que BLUSH a trouvé et où il l’a rangé. Ce qu’il savait déjà est dit, pas doublé. « Annuler » retire tout. */
+/* ⚠ Textes des erreurs de la fiche : à valider */
+function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string, name: string): { title: string; detail: string } {
+  const one = what === "ta capture";
+  if (problem === "capture") return { title: `BLUSH n’arrive pas à lire ${what}`, detail: one ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner." };
+  if (problem === "fichier") return { title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram." };
+  if (problem === "autre_conv") return { title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${name}.` };
+  if (problem === "trop") return { title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." };
+  return { title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." };
+}
+
 function Found({ what, update, onUndo, onClose }: { what: string; update: FicheUpdate; onUndo: () => void; onClose: () => void }) {
   const n = update.added.length;
-  const title = n === 0 ? "Rien de nouveau" : n === 1 ? "1 nouvelle info rangée" : `${n} nouvelles infos rangées`;
+  const problem = update.problem ? problemText(update.problem, what, update.fiche.person.name) : null;
+  const title = problem?.title ?? (n === 0 ? "Rien de nouveau" : n === 1 ? "1 nouvelle info rangée" : `${n} nouvelles infos rangées`);
   const rows = [...update.added.map((f) => ({ f, isNew: true })), ...update.confirmed.map((f) => ({ f, isNew: false }))];
   return (
     <section data-rise="" aria-labelledby="trouve-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">
       <div className="flex items-start gap-3 px-4 pb-3 pt-3.5">
         <span aria-hidden="true" className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", n > 0 ? "bg-vrai-ink" : "bg-[#F1EFEA]")}>
-          <Icon name="check" size={16} color={n > 0 ? "#FFFFFF" : "#4B4A47"} stroke={3.2} />
+          <Icon name={problem ? "alert" : "check"} size={16} color={n > 0 ? "#FFFFFF" : "#4B4A47"} stroke={problem ? 2.6 : 3.2} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h2 id="trouve-titre" className="m-0 text-[16px] font-black leading-[1.25]">
             {title}
           </h2>
-          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">{n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`}</span>
+          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">{problem?.detail ?? (n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`)}</span>
         </span>
         <button type="button" onClick={onClose} aria-label="Fermer le résumé" className="-mr-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full">
           <Icon name="close" size={16} color="#8A8780" stroke={2.6} />

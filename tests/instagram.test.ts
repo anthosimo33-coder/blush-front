@@ -17,7 +17,7 @@ const json = JSON.stringify({
 
 const html = `<html><body><header><time datetime="2026-10-07T06:15Z">Le Mardi 6 octobre 2026 à 23:15 (UTC)</time></header><main>
 <div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">Dozo</h2><div class="_3-95 _a6-p"><div><div></div><div>ah merde</div><div></div><div></div></div></div><div class="_3-94 _a6-o">sep 11, 2026 9:52 am</div></div>
-<div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">charlyse :)</h2><div class="_3-95 _a6-p"><div><div></div><div></div><div></div><div></div><div><div><audio src="x/audio/1.ogg" controls="1"><a href="x/audio/1.ogg">x/audio/1.ogg</a></audio></div></div><div><ul class="_a6-q"><li><span>❤Dozo</span></li></ul></div></div></div><div class="_3-94 _a6-o">sep 11, 2026 9:51 am</div></div>
+<div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">ines :)</h2><div class="_3-95 _a6-p"><div><div></div><div></div><div></div><div></div><div><div><audio src="x/audio/1.ogg" controls="1"><a href="x/audio/1.ogg">x/audio/1.ogg</a></audio></div></div><div><ul class="_a6-q"><li><span>❤Dozo</span></li></ul></div></div></div><div class="_3-94 _a6-o">sep 11, 2026 9:51 am</div></div>
 </main></body></html>`;
 
 describe("export Instagram", () => {
@@ -29,11 +29,11 @@ describe("export Instagram", () => {
 
   it("relit le HTML : heures ramenées à Paris d’après l’en-tête, vocal reconnu, réactions et deux-points retirés", () => {
     const r = depuisInstagramHtml(html);
-    expect(r.texte.split("\n")).toEqual(["[11/09/2026 18:51:00] charlyse ): audio omitted", "[11/09/2026 18:52:00] Dozo: ah merde"]);
+    expect(r.texte.split("\n")).toEqual(["[11/09/2026 18:51:00] ines ): audio omitted", "[11/09/2026 18:52:00] Dozo: ah merde"]);
     const f = detecterFormat(r.texte)!;
     expect(f).toBe("whatsapp-ios");
     const p = participantsDe(r.texte, f as "whatsapp-ios");
-    const lu = lire(r.texte, { utilisateur: { prenom: "Dozo", pronom: "il", nomExport: "Dozo" }, autre: { prenom: "Charlyse", pronom: "elle", nomExport: "charlyse )" }, format: f });
+    const lu = lire(r.texte, { utilisateur: { prenom: "Dozo", pronom: "il", nomExport: "Dozo" }, autre: { prenom: "Inès", pronom: "elle", nomExport: "ines )" }, format: f });
     expect(p).toHaveLength(2);
     expect(lu.messages.map((m) => m.media ?? m.texte)).toEqual(["vocal", "ah merde"]);
     expect(erreurImport(lu)).toBe("courte");
