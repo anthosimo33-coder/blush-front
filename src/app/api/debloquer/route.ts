@@ -8,7 +8,7 @@ import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { SUBSCRIPTIONS } from "@/mocks/daily";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 /**
  * Débloquer le rapport. v1, sans paiement : seulement pour les emails de la bêta (BLUSH_ACCES_LIBRE).
