@@ -1,7 +1,7 @@
 import { contexteRequete, rapportDe, relancer } from "@/server/donnees";
 import { erreur, json } from "@/server/http";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 /** Le rapport (ou le verdict seul, sans accès). `generating` : il s’écrit encore ; le front repasse dans quelques secondes. */
 export async function GET() {

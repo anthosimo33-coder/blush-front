@@ -194,6 +194,12 @@ async function aAcces(story: Ligne): Promise<boolean> {
 
 /* ———— L’exécution ———— */
 
+/**
+ * Une fonction Vercel vit 5 minutes au plus (plan gratuit) et une étape tient sous 3 minutes : on ne commence pas
+ * d’étape après 100 secondes, pour qu’elle finisse avant d’être coupée.
+ */
+export const BUDGET_CHAINE_MS = 100_000;
+
 async function executer(t: Tache) {
   const coeur = setInterval(() => void battre(t.id).catch(() => {}), 20_000);
   try {
@@ -213,10 +219,11 @@ async function executer(t: Tache) {
 }
 
 /**
- * Enchaîne les tâches d’une histoire tant qu’il en reste, dans le temps imparti (le reste repart au prochain passage).
- * Deux appels en même temps ne font jamais deux fois la même tâche : `prendre` est atomique.
+ * Enchaîne les tâches d’une histoire tant qu’il en reste, dans le temps imparti (le reste repart au prochain passage :
+ * le suivi de la lecture et du rapport relance la chaîne). Deux appels en même temps ne font jamais deux fois la même
+ * tâche : `prendre` est atomique.
  */
-export async function executerChaine(storyId: string, budgetMs = 600_000): Promise<void> {
+export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_MS): Promise<void> {
   if (await occupee(storyId)) return;
   const debut = Date.now();
   while (Date.now() - debut < budgetMs) {
@@ -232,10 +239,10 @@ export async function executerChaine(storyId: string, budgetMs = 600_000): Promi
  * Attend qu’une tâche soit finie, en faisant tourner la chaîne (ou en laissant finir celle qui tourne déjà).
  * Renvoie son statut, ou null si le délai est passé (elle finira au prochain passage).
  */
-export async function attendreTache(storyId: string, tacheId: string, delaiMs = 240_000): Promise<string | null> {
+export async function attendreTache(storyId: string, tacheId: string, delaiMs = 200_000): Promise<string | null> {
   const fin = Date.now() + delaiMs;
   while (Date.now() < fin) {
-    await executerChaine(storyId, fin - Date.now());
+    await executerChaine(storyId, Math.min(BUDGET_CHAINE_MS, fin - Date.now()));
     const statut = await statutDe(tacheId);
     if (statut !== "attente" && statut !== "en_cours") return statut;
     await new Promise((r) => setTimeout(r, 2000));
