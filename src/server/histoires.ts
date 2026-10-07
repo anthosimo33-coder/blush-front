@@ -1,14 +1,16 @@
 import "server-only";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { unzipSync, strFromU8 } from "fflate";
+import { gunzipSync, strFromU8, unzipSync } from "fflate";
+import { z } from "zod";
 import { detecterFormat, erreurImport, lire, participantsDe, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
+import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { Story } from "@/types";
 import { chiffrer, dechiffrer, empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
 
-/** Un export WhatsApp « sans médias » pèse quelques Mo au plus. */
-export const TAILLE_MAX = 20 * 1024 * 1024;
+/** Le texte d’une conv, même très longue, tient sous cette taille (une fois décompressé). */
+export const TAILLE_MAX = 40 * 1024 * 1024;
 
 export class ErreurImport extends Error {
   constructor(readonly code: "fichier" | "groupe" | "courte") {
@@ -18,7 +20,7 @@ export class ErreurImport extends Error {
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
-  appli: "whatsapp";
+  appli: Appli;
   format: Exclude<Format, "captures">;
   fichier: string;
   /** Les deux participants, du plus bavard au moins bavard, avec leur nom dans l’export. */
@@ -39,26 +41,44 @@ export type Ligne = typeof schema.stories.$inferSelect;
 /** Le prénom d’un nom d’export (« Anthony S » → « Anthony », « Charlyse 🌸 » → « Charlyse »). */
 export const prenomDe = (nom: string) => nom.match(/\p{L}[\p{L}'’-]*/u)?.[0] ?? nom.trim();
 
-/** Le texte d’un export : un .txt, ou le _chat.txt d’un .zip. */
-export async function texteDe(fichier: File): Promise<string> {
+/** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */
+export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string }> {
   if (fichier.size > TAILLE_MAX || fichier.size === 0) throw new ErreurImport("fichier");
   const octets = new Uint8Array(await fichier.arrayBuffer());
-  const estZip = octets[0] === 0x50 && octets[1] === 0x4b;
-  if (!estZip) return strFromU8(octets);
-  let contenu: Record<string, Uint8Array>;
+  let fichiers = [{ nom: fichier.name, contenu: "" }];
+  if (octets[0] === 0x50 && octets[1] === 0x4b) {
+    try {
+      const contenu = unzipSync(octets, { filter: (f) => estFichierUtile(f.name) && f.originalSize < TAILLE_MAX });
+      fichiers = Object.entries(contenu).map(([nom, o]) => ({ nom, contenu: strFromU8(o) }));
+    } catch {
+      throw new ErreurImport("fichier");
+    }
+  } else fichiers[0].contenu = strFromU8(octets);
+  const parties = choisirParties(fichiers);
+  const lu = parties && parties !== "plusieurs" ? lireExport(parties) : null;
+  if (!lu) throw new ErreurImport("fichier");
+  return { ...lu, nom: fichier.name };
+}
+
+const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(50) });
+
+/** Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici. */
+export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string }> {
+  if (paquet.size > 4.5 * 1024 * 1024 || paquet.size === 0) throw new ErreurImport("fichier");
   try {
-    contenu = unzipSync(octets, { filter: (f) => f.name.toLowerCase().endsWith(".txt") && f.originalSize < TAILLE_MAX });
+    const octets = gunzipSync(new Uint8Array(await paquet.arrayBuffer()));
+    if (octets.length > TAILLE_MAX) throw new ErreurImport("fichier");
+    const p = Paquet.parse(JSON.parse(strFromU8(octets)));
+    const lu = lireExport(p.parties);
+    if (!lu) throw new ErreurImport("fichier");
+    return { ...lu, nom: p.nom };
   } catch {
     throw new ErreurImport("fichier");
   }
-  const nom = Object.keys(contenu).find((n) => n.endsWith("_chat.txt")) ?? Object.keys(contenu)[0];
-  if (!nom) throw new ErreurImport("fichier");
-  return strFromU8(contenu[nom]);
 }
 
 /** Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. */
-export async function importer(fichier: File): Promise<{ id: string; meta: Meta; secret: string }> {
-  const texte = await texteDe(fichier);
+export async function importer({ nom, appli, texte }: ExportLu & { nom: string }): Promise<{ id: string; meta: Meta; secret: string }> {
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
   const noms = participantsDe(texte, format);
@@ -69,9 +89,9 @@ export async function importer(fichier: File): Promise<{ id: string; meta: Meta;
   const err = erreurImport(lu);
   if (err) throw new ErreurImport(err);
   const meta: Meta = {
-    appli: "whatsapp",
+    appli,
     format,
-    fichier: fichier.name.slice(0, 200),
+    fichier: nom.slice(0, 200),
     participants: noms.map((n) => ({ nom: n.nom, prenom: prenomDe(n.nom), messages: n.messages })),
     resume: {
       debut: new Date(lu.messages[0].t).toISOString().slice(0, 10),
@@ -146,13 +166,15 @@ export function storyAffichee(id: string, meta: Meta): Story {
   const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
   const jours = Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / 86400e3));
   const [a, b] = meta.participants;
+  /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
+  const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : meta.pronom === "il" ? ("elle" as const) : ("il" as const) });
   return {
     id,
     participants: [
-      { id: "p0", name: a.prenom, initial: a.prenom[0]?.toUpperCase() ?? "?" },
-      { id: "p1", name: b.prenom, initial: b.prenom[0]?.toUpperCase() ?? "?" },
+      { id: "p0", name: a.prenom, initial: a.prenom[0]?.toUpperCase() ?? "?", ...pronom(0) },
+      { id: "p1", name: b.prenom, initial: b.prenom[0]?.toUpperCase() ?? "?", ...pronom(1) },
     ],
-    sources: [{ id: "s1", app: "whatsapp", mode: "export", fileName: meta.fichier, label: `WhatsApp · ${dateCourte(debut)}`, period: periode, messageCount: total, voiceCount: vocaux }],
+    sources: [{ id: "s1", app: meta.appli, mode: "export", fileName: meta.fichier, label: `${meta.appli === "instagram" ? "Instagram" : "WhatsApp"} · ${dateCourte(debut)}`, period: periode, messageCount: total, voiceCount: vocaux }],
     totalMessages: total,
     voiceCount: vocaux,
     period: periode,

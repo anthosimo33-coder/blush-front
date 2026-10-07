@@ -56,7 +56,7 @@ const opened = (storyId?: string) => demoStory(storyId ?? readStoryCookie());
 
 /* ———— Import ———— */
 
-export async function uploadExport(file: File, app: Extract<AppKind, "whatsapp" | "imessage">): Promise<Source> {
+export async function uploadExport(file: File, app: Extract<AppKind, "whatsapp" | "imessage" | "instagram">): Promise<Source> {
   if (BACKEND) return reel.uploadExport(file);
   await delay(500);
   mockServer.set({ analysisStartedAt: null });

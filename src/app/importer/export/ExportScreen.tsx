@@ -17,7 +17,7 @@ import { Sheet } from "@/components/ui/surfaces";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
 
-type ExportApp = "whatsapp" | "imessage";
+type ExportApp = "whatsapp" | "imessage" | "instagram";
 type Menu = { contact: string; items: readonly string[]; highlight: number };
 
 /* Écran 02 — Exporter : l’appli, l’écran à reconnaître (téléphone ou Mac), les étapes en frise, puis le fichier. */
@@ -59,7 +59,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           <Button onClick={picker.open} disabled={busy} aria-busy={busy}>
             {busy ? <TypingDots color="#FFFFFF" label="Analyse du fichier" /> : "Choisir le fichier enregistré"}
           </Button>
-          <FileInput inputRef={picker.ref} accept=".zip,.txt,application/zip,text/plain" onFiles={onFiles} label="Fichier de la conversation exportée" />
+          <FileInput inputRef={picker.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={onFiles} label="Fichier de la conversation exportée" />
         </>
       }
     >
@@ -74,6 +74,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         options={[
           { value: "whatsapp", label: "WhatsApp" },
           { value: "imessage", label: "iMessage" },
+          { value: "instagram", label: "Instagram" },
         ]}
       />
 
@@ -84,7 +85,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
             aria-hidden="true"
             className="pointer-events-none absolute left-1/2 top-[45%] -z-10 size-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]"
           />
-          {app === "whatsapp" ? <PhoneScreen menu={data.menu} /> : <MacScreen menu={data.menu} />}
+          {app === "imessage" ? <MacScreen menu={data.menu} /> : <PhoneScreen menu={data.menu} />}
           <button
             type="button"
             onClick={() => setVideo(true)}
@@ -106,7 +107,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         </h2>
         {/* ⚠ La vidéo de démonstration n’est pas fournie : emplacement prêt à recevoir le fichier. */}
         <div className="mx-auto flex aspect-[9/16] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-[28px] bg-ink pt-10">
-          {app === "whatsapp" ? <PhoneScreen menu={data.menu} /> : <MacScreen menu={data.menu} />}
+          {app === "imessage" ? <MacScreen menu={data.menu} /> : <PhoneScreen menu={data.menu} />}
         </div>
         <Button variant="secondary" onClick={() => setVideo(false)}>
           Fermer
