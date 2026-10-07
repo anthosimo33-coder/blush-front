@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Le banc de test des prompts (scripts .mjs) et le module généré des textes.
+    "prompts/evals/**",
+    "src/server/ia/textes.generated.ts",
   ]),
 ]);
 

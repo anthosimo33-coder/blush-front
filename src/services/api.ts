@@ -1,6 +1,7 @@
 /**
  * Couche de service BLUSH — le seul point de contact avec les données.
- * Aujourd’hui : renvoie les mocks. Demain : brancher le vrai back-end ne touche que ce fichier.
+ * Avec NEXT_PUBLIC_BLUSH_BACKEND=1, chaque fonction branchée appelle le vrai back-end (reel.ts) ;
+ * sinon, elle renvoie les mocks (le site de démo, la galerie). Les pages serveur passent par serveur.ts.
  */
 import type {
   AnalysisProgress,
@@ -25,6 +26,8 @@ import { FICHE, FICHE_FINDINGS, SUBSCRIPTIONS } from "@/mocks/daily";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } from "@/mocks/story";
 import { demoStory, storyIdFor } from "@/mocks/stories";
 import { delay, mockServer } from "@/mocks/server";
+import { BACKEND } from "./mode";
+import { reel } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
@@ -38,6 +41,8 @@ export type ReportPayload = {
   /** Présent quand le verdict est dur : le rapport bascule en mode sobre. */
   sober: SoberReport | null;
   access: Plan;
+  /** Back-end : le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
+  generating?: boolean;
 };
 
 /* Durée simulée de la lecture (environ 6 s). */
@@ -52,6 +57,7 @@ const opened = (storyId?: string) => demoStory(storyId ?? readStoryCookie());
 /* ———— Import ———— */
 
 export async function uploadExport(file: File, app: Extract<AppKind, "whatsapp" | "imessage">): Promise<Source> {
+  if (BACKEND) return reel.uploadExport(file);
   await delay(500);
   mockServer.set({ analysisStartedAt: null });
   return { ...SOURCE_WHATSAPP, app, fileName: file.name };
@@ -70,6 +76,7 @@ export async function uploadScreenshots(
 }
 
 export async function getStory(storyId?: string): Promise<Story> {
+  if (BACKEND) return reel.getStory();
   return opened(storyId).story;
 }
 
@@ -77,12 +84,14 @@ export async function getStory(storyId?: string): Promise<Story> {
 
 /** Envoie le code à 6 chiffres par email (simulation : rien ne part). */
 export async function sendLoginCode(email: string): Promise<{ email: string }> {
+  if (BACKEND) return reel.sendLoginCode(email);
   await delay(500);
   return { email };
 }
 
 /** Vérifie le code reçu. Simulation : tout code à 6 chiffres passe, sauf 000000 (pour montrer l’erreur). */
 export async function verifyLoginCode(email: string, code: string): Promise<{ ok: boolean }> {
+  if (BACKEND) return reel.verifyLoginCode(email, code);
   void email;
   await delay(600);
   return { ok: /^\d{6}$/.test(code) && code !== "000000" };
@@ -90,12 +99,15 @@ export async function verifyLoginCode(email: string, code: string): Promise<{ ok
 
 /** Crée le compte sans mot de passe. */
 export async function createAccount(email: string): Promise<{ email: string }> {
+  /* Back-end : le compte est créé par la vérification du code */
+  if (BACKEND) return { email };
   await delay(400);
   mockServer.set({ email });
   return { email };
 }
 
-export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal }, opts: { restart?: boolean } = {}): Promise<{ jobId: string }> {
+export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null }, opts: { restart?: boolean } = {}): Promise<{ jobId: string }> {
+  if (BACKEND) return reel.startAnalysis({ me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il" });
   const s = mockServer.get();
   if (!s.analysisStartedAt || opts.restart) {
     mockServer.set({ analysisStartedAt: Date.now() });
@@ -106,6 +118,7 @@ export async function startAnalysis(input: { me: string; guess: Guess; goal: Goa
 }
 
 export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgress> {
+  if (BACKEND) return reel.getAnalysisProgress();
   void jobId;
   const started = mockServer.get().analysisStartedAt ?? Date.now();
   const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -124,6 +137,7 @@ export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgre
 
 /** Le rapport, avec les droits d’accès. Les chapitres non payés arrivent verrouillés, sans contenu. */
 export async function getReport(storyId?: string): Promise<ReportPayload> {
+  if (BACKEND) return reel.getReport();
   const s = mockServer.get();
   const { report, sober } = opened(storyId);
   const full = s.plan !== "gratuit";
@@ -138,6 +152,7 @@ export async function getReport(storyId?: string): Promise<ReportPayload> {
 
 /** Simule le paiement. */
 export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscription> {
+  if (BACKEND) return reel.unlock(offer);
   await delay(900);
   mockServer.set({ plan: offer, paused: false, cancelled: false });
   return SUBSCRIPTIONS[offer];
@@ -279,6 +294,7 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
 /* ———— Compte ———— */
 
 export async function getAccount(): Promise<Account> {
+  if (BACKEND) return reel.getAccount();
   const s = mockServer.get();
   const sub = SUBSCRIPTIONS[s.plan];
   return {
@@ -289,23 +305,28 @@ export async function getAccount(): Promise<Account> {
 }
 
 export async function setPaused(paused: boolean): Promise<void> {
+  if (BACKEND) return void (await reel.setPaused(paused));
   await delay(200);
   mockServer.set({ paused });
 }
 
 export async function cancelSubscription(): Promise<void> {
+  /* Back-end v1 : pas de paiement, donc rien à résilier */
+  if (BACKEND) return;
   await delay(500);
   mockServer.set({ cancelled: true });
 }
 
 /** Supprime l’histoire : le rapport, la fiche et les captures. */
 export async function deleteStory(): Promise<void> {
+  if (BACKEND) return void (await reel.deleteStory());
   await delay(500);
   mockServer.set({ storyDeleted: true, ficheFacts: FICHE.facts, ficheUpdated: false, questionAsked: null, analysisStartedAt: null });
 }
 
 /** Tout effacer : le compte et toutes les histoires. */
 export async function deleteAccount(): Promise<void> {
+  if (BACKEND) return void (await reel.deleteAccount());
   await delay(500);
   mockServer.reset();
   writeStoryCookie(null);

@@ -39,7 +39,7 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const goals = goalsFor(j.guess);
-  const ready = !!(j.me && j.guess && j.goal);
+  const ready = !!(j.me && j.pronom && j.guess && j.goal);
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : "/importer/captures";
@@ -89,6 +89,15 @@ export function QuiScreen({ people }: { people: [Person, Person] }) {
             </button>
           );
         })}
+      </div>
+
+      {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. ⚠ Absent des maquettes : à valider */}
+      <div id="pronom-label" className="text-[13px] font-black text-grey">
+        Tu es
+      </div>
+      <div role="radiogroup" aria-labelledby="pronom-label" className="flex gap-2.5">
+        <ChoiceTile icon="user" color="#3D8BFF" label="Un garçon" selected={j.pronom === "il"} onClick={() => set({ pronom: "il" })} />
+        <ChoiceTile icon="user" color="#FF4F9A" label="Une fille" selected={j.pronom === "elle"} onClick={() => set({ pronom: "elle" })} />
       </div>
 
       <div id="guess-label" className="text-[13px] font-black text-grey">

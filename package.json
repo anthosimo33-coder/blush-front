@@ -8,22 +8,38 @@
     "start": "next start",
     "lint": "eslint",
     "galerie": "node scripts/galerie/capture.mjs",
-    "fluidite": "node scripts/fluidite/fluidite.mjs"
+    "fluidite": "node scripts/fluidite/fluidite.mjs",
+    "predev": "node scripts/prompts.mjs",
+    "prebuild": "node scripts/prompts.mjs",
+    "postbuild": "node scripts/verifier-fuite.mjs",
+    "pretest": "node scripts/prompts.mjs",
+    "test": "vitest run",
+    "db:generer": "drizzle-kit generate",
+    "db:migrer": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "drizzle-orm": "^0.45.3",
+    "fflate": "^0.8.3",
     "next": "16.3.8",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "playwright-core": "1.58",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKEND } from "@/services/mode";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
@@ -41,7 +42,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     (async () => {
       /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
       const cur = readJourney();
-      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
+      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
       restartRef.current = false;
       if (!alive) return;
       setJourney({ jobId });
@@ -53,7 +54,8 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         first = false;
         if (!next.done) {
           live.current = true;
-          timer = setTimeout(tick, 150);
+          /* La démo s’anime toutes les 150 ms ; le vrai back-end, on le lit chaque seconde */
+          timer = setTimeout(tick, BACKEND ? 1000 : 150);
           return;
         }
         /* Lecture déjà finie à l’arrivée, ou mouvement réduit : la fin s’affiche directement. */

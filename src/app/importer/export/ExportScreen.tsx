@@ -1,5 +1,6 @@
 "use client";
 
+import { ErreurApi } from "@/services/reel";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -32,7 +33,16 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
   const onFiles = async ([file]: File[]) => {
     setBusy(true);
-    const source = await uploadExport(file, app);
+    let source;
+    try {
+      source = await uploadExport(file, app);
+    } catch (e) {
+      /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (DemoParams, ?erreur=) */
+      setBusy(false);
+      const code = e instanceof ErreurApi && ["fichier", "groupe", "courte"].includes(e.code) ? e.code : "lecture";
+      router.replace(`/importer/export?app=${app}&erreur=${code}`, { scroll: false });
+      return;
+    }
     setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false });
     router.push("/importer/ok");
   };

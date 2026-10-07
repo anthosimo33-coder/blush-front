@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Les prompts (sous-module) ne contiennent aucune classe : Tailwind ne les lit pas */
+@source not "../../prompts";
 
 /* BLUSH · Design system « Le jeu » — tokens repris de maquettes/design-tokens.css */
 :root {

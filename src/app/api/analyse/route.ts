@@ -1,0 +1,43 @@
+import { after } from "next/server";
+import { z } from "zod";
+import { executerChaine } from "@/server/analyse";
+import { contexteRequete, progression, relancer } from "@/server/donnees";
+import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { definirQui } from "@/server/histoires";
+import { etatDesTaches, planifier } from "@/server/taches";
+
+/* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
+export const maxDuration = 800;
+
+const Qui = z.object({
+  me: z.enum(["p0", "p1"]),
+  pronom: z.enum(["il", "elle"]),
+  guess: z.enum(["parle", "vus", "flou", "ensemble"]),
+  goal: z.enum(["ensemble", "reciproque", "comprendre", "mieux", "point"]),
+});
+
+/** Lance la lecture : « Qui es-tu ? » est rempli, le verdict part. Relancer ne refait rien de ce qui est fait. */
+export async function POST(req: Request) {
+  if (!memeOrigine(req)) return erreur("origine", 403);
+  const { utilisateur, story } = await contexteRequete();
+  if (!utilisateur) return erreur("connexion", 401);
+  if (!story) return erreur("aucune", 404);
+  const qui = Qui.safeParse(await corps(req));
+  if (!qui.success) return erreur("qui", 422);
+  const { verdict } = await etatDesTaches(story.id, ["verdict"]);
+  if (!verdict || verdict.status === "echec") {
+    await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal });
+    await planifier(story.id, "verdict");
+  }
+  after(() => executerChaine(story.id));
+  return json({ jobId: story.id });
+}
+
+/** La progression de la lecture. Relance au passage une tâche abandonnée. */
+export async function GET() {
+  const { utilisateur, story } = await contexteRequete();
+  if (!utilisateur) return erreur("connexion", 401);
+  if (!story) return erreur("aucune", 404);
+  await relancer(story.id);
+  return json(await progression(story));
+}
