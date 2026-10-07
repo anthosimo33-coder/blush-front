@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
+import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useQuery } from "@/lib/query";
 import { getReport, type ReportPayload } from "@/services/api";
@@ -102,6 +103,22 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     heading.current?.focus({ preventScroll: true });
   }, [at]);
 
+  /* Le verdict : un souffle grave, puis l’accord de ce verdict quand l’emoji se pose (le mode sobre n’a pas de scène, donc pas de son).
+     Le bouton son, comme une story : touché, la scène joue même en mode silencieux. ⚠ Proposition, textes à valider */
+  const sons = useSoundsEnabled();
+  const [loud, setLoud] = useState(false);
+  const onVerdict = card.id === "verdict";
+  useEffect(() => {
+    if (onVerdict && !payload.sober) play("verdict", verdict.emoji);
+  }, [onVerdict, payload.sober, verdict.emoji]);
+  useEffect(() => () => setForceSound(false), []);
+  const toggleLoud = () => {
+    const on = !loud;
+    setLoud(on);
+    setForceSound(on);
+    if (on && onVerdict) play("verdict", verdict.emoji);
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") setAt((i) => Math.min(last, i + 1));
@@ -193,9 +210,25 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
             <BubbleLogo size={26} />
             BLUSH
           </span>
-          <a href="/rapport" onClick={leave} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
-            Passer
-          </a>
+          <span className="flex items-center gap-4">
+            {sons && (
+              <button
+                type="button"
+                onClick={toggleLoud}
+                aria-pressed={loud}
+                aria-label="Le son, même en mode silencieux"
+                className={cn(
+                  "relative flex size-8 items-center justify-center rounded-full transition-colors after:absolute after:-inset-2 after:content-['']",
+                  loud ? "bg-white text-ink" : "text-white/70 hover:text-white",
+                )}
+              >
+                <Icon name="sound" size={18} stroke={2.4} />
+              </button>
+            )}
+            <a href="/rapport" onClick={leave} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+              Passer
+            </a>
+          </span>
         </div>
 
         {/* La carte : son contenu arrive par étapes */}

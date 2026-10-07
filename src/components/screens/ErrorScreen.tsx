@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoError } from "@/types";
+import { useSoundOnce } from "@/lib/sound";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
@@ -46,6 +47,8 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
 
 export function ErrorScreen({ kind }: { kind: DemoError }) {
   const c = ERROR_COPY[kind];
+  /* Une erreur se dit doucement : deux touchers sourds, sans buzzer */
+  useSoundOnce("non");
   return (
     <div role="alertdialog" aria-modal="true" aria-labelledby="error-title" aria-describedby="error-text" className="fixed inset-0 z-50 overflow-y-auto [background:var(--paper-light)] bg-paper">
       <Screen mobileTop={<MobileTopBar back={c.back} />} desktopBack={{ target: c.back }} centered mainWidth={520} frameWidth={520} footer={<ButtonLink href={c.href}>{c.action}</ButtonLink>}>

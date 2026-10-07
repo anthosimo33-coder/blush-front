@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
 import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
+import { play } from "@/lib/sound";
 import { sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -153,6 +154,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
   const [cheer, setCheer] = useState(0);
   /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie) */
   const [arriving, setArriving] = useState(arrive);
+  const signed = useRef(false);
   const nextId = useRef(1);
   const thread = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLElement>(null);
@@ -176,6 +178,9 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
   useEffect(() => {
     if (!arrive) return;
     markArrivalPlayed();
+    /* La signature tombe avec le « coucou » des perles (0,85 s, une perle toutes les 0,11 s). Ouverte à froid, Safari la garde muette */
+    if (!signed.current) play("signature", 0.85, 0.11);
+    signed.current = true;
     const t = window.setTimeout(() => setArriving(false), 3700);
     return () => window.clearTimeout(t);
   }, [arrive]);
@@ -231,6 +236,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
     if (next.temperature !== now.temperature || next.index <= now.index) return;
     levelNow.current = to;
     setLevel(to);
+    play("niveau", next.temperature);
     update((m) => [...m, { id: id(), from: "event", level: to, at: Date.now() }]);
     setCheer((c) => c + 1);
   };
@@ -253,14 +259,18 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
       }
     }
     update((m) => m.map((x) => (x.id === readingId ? ({ ...next, id: readingId, at: Date.now(), answered: true } as Msg) : x)));
+    /* Un pop quand la réponse remplace les perles, deux avec ta meilleure réponse. Rien si tu écris déjà la suite */
+    if (!input.current?.value) play("reponse", "result" in next && (next.result.kind === "analysis" || next.result.kind === "best"));
     const up = "result" in next ? next.result.levelUp : undefined;
     if (up) window.setTimeout(() => levelUp(up), 700);
   };
 
-  const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }, fromCapture = false) =>
-    exchange(mine, "BLUSH analyse sa réponse", async () => {
+  const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }, fromCapture = false) => {
+    play("envoi");
+    return exchange(mine, "BLUSH analyse sa réponse", async () => {
       return { from: "blush", result: await sendToBlush(payload), fromCapture };
     });
+  };
 
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite. 3 · La pastille elle-même devient ta bulle */
   const sendQuick = (q: string, chip?: HTMLElement) => {
@@ -322,6 +332,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
       return;
     }
     if (!clip) return;
+    play("vocalEnvoye");
     urls.current.push(clip.url);
     exchange({ id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } }, "BLUSH écoute ton vocal", async () => ({
       from: "blush",
@@ -371,6 +382,7 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
 
   /* 7 · Glisse pour creuser : la réponse glissée se cale au-dessus du champ, et le clavier s’ouvre */
   const dig = (quote: string) => {
+    play("creuser");
     setAbout(quote);
     input.current?.focus({ preventScroll: true });
   };
@@ -483,7 +495,10 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
                   <button
                     type="button"
                     aria-label="Annuler le vocal"
-                    onClick={() => void voice.stop(false)}
+                    onClick={() => {
+                      play("vocalJete");
+                      void voice.stop(false);
+                    }}
                     data-popin=""
                     className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-[#F4F2ED] lg:shadow-none"
                   >
@@ -536,7 +551,10 @@ export function HomeScreen({ quick = [], contact, motion = true, arrive = false 
                       <button
                         type="button"
                         aria-label="Enregistrer un vocal"
-                        onClick={() => void voice.start()}
+                        onClick={() => {
+                          play("vocalDebut");
+                          void voice.start();
+                        }}
                         disabled={voice.phase === "starting"}
                         aria-busy={voice.phase === "starting" || undefined}
                         className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform active:scale-95 disabled:animate-pulse"
@@ -727,7 +745,10 @@ function useThreadGestures(ref: RefObject<HTMLElement | null>, enabled: boolean,
       if (armed !== g.armed) {
         g.armed = armed;
         g.icon?.toggleAttribute("data-armed", armed);
-        if (armed) g.icon?.animate([{ scale: 1 }, { scale: 1.3 }, { scale: 1 }], { duration: 260 });
+        if (armed) {
+          g.icon?.animate([{ scale: 1 }, { scale: 1.3 }, { scale: 1 }], { duration: 260 });
+          play("cran");
+        }
       }
     };
     const end = (e: PointerEvent, cancelled: boolean) => {

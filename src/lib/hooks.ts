@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { play } from "@/lib/sound";
 
 const RM = "(prefers-reduced-motion: reduce)";
 
@@ -37,8 +38,14 @@ export function useFilePicker() {
   return { ref, open: () => ref.current?.click() };
 }
 
-/** Copie un texte dans le presse-papier (avec repli si l’API n’est pas disponible). */
+/** Copie un texte dans le presse-papier (avec repli si l’API n’est pas disponible). Un clic et un toucher confirment, partout pareil. */
 export async function copyText(text: string) {
+  const ok = await writeClipboard(text);
+  if (ok) play("copier");
+  return ok;
+}
+
+async function writeClipboard(text: string) {
   try {
     await navigator.clipboard.writeText(text);
     return true;

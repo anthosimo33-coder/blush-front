@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type R
 import { cn } from "@/lib/cn";
 import { formatCount } from "@/lib/format";
 import { setQueryData, useQuery } from "@/lib/query";
+import { play } from "@/lib/sound";
 import { askQuestion, getQuestion } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -47,6 +48,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     if (!q || asking || answer) return;
     setDraft("");
     setAsking({ question: q, leaving: false });
+    play("envoi");
     const a = await askQuestion(q);
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setAsking({ question: q, leaving: true });
@@ -54,6 +56,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     }
     setQueryData("question", a);
     setAsking(null);
+    play("reponse");
   };
 
   const composer = (

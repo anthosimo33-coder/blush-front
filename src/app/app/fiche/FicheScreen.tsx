@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from 
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
 import { setQueryData, useQuery } from "@/lib/query";
+import { play } from "@/lib/sound";
 import { addToFiche, getFiche, updateFiche } from "@/services/api";
 import { FICHE_SECTIONS } from "@/mocks/daily";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -81,12 +82,15 @@ export function FicheScreen({ initial }: { initial: Fiche }) {
     setQueryData("fiche", update.fiche);
     setFresh((ids) => [...ids, ...update.added.map((f) => f.id)]);
     setJob({ step: "done", what, update, before });
+    /* Un toucher par info rangée, chacun un cran plus haut */
+    play("ficheRangee", update.added.length);
   };
 
   /* « Annuler » : la fiche revient comme avant l’ajout */
   const undo = async () => {
     if (job.step !== "done") return;
     const gone = new Set(job.update.added.map((f) => f.id));
+    play("ficheAnnulee", gone.size);
     setFresh((ids) => ids.filter((id) => !gone.has(id)));
     setJob({ step: "idle" });
     await save(job.before);

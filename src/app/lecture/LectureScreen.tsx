@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
+import { play } from "@/lib/sound";
 import { getAnalysisProgress, startAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/mocks/story";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
@@ -29,6 +30,9 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
   const [phase, setPhase] = useState<Phase>("reading");
   const count = useCountUp(p.messagesRead, reduced);
   const restartRef = useRef(restart);
+  /* Vrai dès qu’on voit la lecture se faire : une analyse déjà finie à l’arrivée ne rejoue pas ses sons */
+  const live = useRef(false);
+  const heard = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -48,6 +52,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         const arrivedDone = first;
         first = false;
         if (!next.done) {
+          live.current = true;
           timer = setTimeout(tick, 150);
           return;
         }
@@ -70,6 +75,16 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     };
     /* Lancé une seule fois, à l’arrivée sur l’écran */
   }, []);
+
+  /* Chaque découverte, un toucher un cran plus haut ; la coche, la signature sur un accord chaud */
+  const found = p.discoveries.length;
+  useEffect(() => {
+    if (live.current && found > heard.current) play("decouverte", found - 1);
+    heard.current = found;
+  }, [found]);
+  useEffect(() => {
+    if (phase === "done" && live.current) play("analyseFinie");
+  }, [phase]);
 
   const done = phase === "done";
   const step = p.done ? READING_STEPS.length - 1 : Math.min(p.stepsDone, READING_STEPS.length - 1);

@@ -3,6 +3,7 @@ import { Figtree, Nunito } from "next/font/google";
 import { Suspense } from "react";
 import { JourneyProvider } from "@/state/journey";
 import { DemoParams } from "@/state/DemoParams";
+import { SoundBoot } from "@/components/shell/SoundBoot";
 import "./globals.css";
 
 /* Nunito pour toute l’interface (titres en 900, texte en 700-800) */
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <JourneyProvider>
           <div id="app-root">{children}</div>
+          <SoundBoot />
           <Suspense fallback={null}>
             <DemoParams />
           </Suspense>

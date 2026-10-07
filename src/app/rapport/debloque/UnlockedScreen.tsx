@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { OFFERS } from "@/mocks/daily";
+import { useSoundOnce } from "@/lib/sound";
 import { CheckBurst } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
@@ -27,6 +28,8 @@ const UNLOCKED = {
 export function UnlockedScreen({ offer, next }: { offer: "blushplus" | "rapport"; next: string | null }) {
   const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
   const plus = offer === "blushplus";
+  /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
+  useSoundOnce("debloque");
   return (
     <Screen
       centered

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { setRecording } from "@/lib/sound";
 import { Icon } from "@/components/ui/icons";
 
 /*
@@ -68,6 +69,8 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       return;
     }
     setPhase("starting");
+    /* Safari doit pouvoir ouvrir le micro : les sons de BLUSH lui rendent la session audio le temps du vocal */
+    setRecording(true);
     /* Le contexte audio naît pendant le toucher : sur iPhone, sinon, il reste muet */
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     const ctx = AC ? new AC() : null;
@@ -76,6 +79,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       ctx?.close().catch(() => {});
+      setRecording(false);
       setPhase("idle");
       handlers.current.onError("denied");
       return;
@@ -86,6 +90,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     } catch {
       stream.getTracks().forEach((t) => t.stop());
       ctx?.close().catch(() => {});
+      setRecording(false);
       setPhase("idle");
       handlers.current.onError("unsupported");
       return;
@@ -169,6 +174,7 @@ function release(s: Session) {
   clearInterval(s.timer);
   s.stream.getTracks().forEach((t) => t.stop());
   s.ctx?.close().catch(() => {});
+  setRecording(false);
 }
 
 /** Ramène tous les niveaux relevés à `n` barres (le plus fort de chaque tranche). */

@@ -7,6 +7,7 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { formatCount } from "@/lib/format";
+import { useSoundOnce } from "@/lib/sound";
 import { useJourney } from "@/state/journey";
 import type { Source } from "@/types";
 
@@ -16,6 +17,8 @@ import type { Source } from "@/types";
  */
 export function ConvOkScreen({ source }: { source: Source }) {
   const [j] = useJourney();
+  /* Ta conv est bien arrivée : le « oui » */
+  useSoundOnce("oui");
   const back = `/importer/export?app=${j.exportApp}`;
   const fileName = j.exportFileName ?? source.fileName;
   return (

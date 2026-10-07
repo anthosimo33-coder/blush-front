@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { play } from "@/lib/sound";
 import { createAccount, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -41,6 +42,7 @@ export function CodeScreen() {
     if (value.length !== LENGTH || busy) return;
     setBusy(true);
     const { ok } = await verifyLoginCode(email, value);
+    play(ok ? "oui" : "non");
     if (!ok) {
       setBusy(false);
       setWrong(true);

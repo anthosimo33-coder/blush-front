@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
+import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { cancelSubscription, deleteAccount, deleteStory, getAccount, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/mocks/daily";
 import { PEOPLE, STORY } from "@/mocks/story";
@@ -27,6 +28,7 @@ export function CompteScreen() {
   const [busy, setBusy] = useState(false);
   const sub = account?.subscription;
   const plus = sub?.plan === "blushplus";
+  const sons = useSoundsEnabled();
 
   const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
@@ -117,6 +119,24 @@ export function CompteScreen() {
         )}
         {plus && sub?.active && <InsetRow title="Arrêter BLUSH+" sub="En un geste, effectif lundi" onClick={() => setConfirm("stop")} chevron />}
         {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
+      </InsetGroup>
+
+      {/* Un seul réglage pour les sons et les vibrations (⚠ textes à valider) */}
+      <InsetGroup title="L’app" id="app" className="mt-6" footer="En mode silencieux, BLUSH se tait de lui-même.">
+        <InsetRow
+          leading={<RowIcon icon="sound" tone="elle" />}
+          title="Sons et vibrations"
+          trailing={
+            <Switch
+              checked={sons}
+              label="Sons et vibrations"
+              onChange={(v) => {
+                setSoundsEnabled(v);
+                if (v) play("oui");
+              }}
+            />
+          }
+        />
       </InsetGroup>
 
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
