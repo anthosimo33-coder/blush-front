@@ -1342,16 +1342,19 @@ function AddMenu({ onClose, onPick }: { onClose: () => void; onPick: (what: "sho
  */
 function recede(state: "in" | "out" | "reset", timing?: Spring) {
   const page = document.querySelector<HTMLElement>(".home-page");
-  if (!page) return;
-  page.getAnimations().forEach((a) => a.cancel());
-  if (state === "reset" || window.matchMedia(DESKTOP).matches) {
+  /* Le fond noir vit sur <body> : on l’enlève toujours, même quand l’accueil a déjà disparu
+     (depuis la feuille, on part vers le rapport ou sa fiche : l’accueil est retiré avant ce nettoyage) */
+  if (state === "reset" || !page || window.matchMedia(DESKTOP).matches) {
     document.body.style.removeProperty("background");
+    if (!page) return;
+    page.getAnimations().forEach((a) => a.cancel());
     page.parentElement?.style.removeProperty("background");
     page.style.removeProperty("background");
     page.style.removeProperty("background-color");
     page.style.removeProperty("clip-path");
     return;
   }
+  page.getAnimations().forEach((a) => a.cancel());
   const y = window.scrollY - page.offsetTop;
   const vh = window.innerHeight;
   const below = Math.max(0, page.offsetHeight - y - vh);
