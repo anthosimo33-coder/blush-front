@@ -1,9 +1,12 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const dynamic = "force-dynamic";
 
-type Config = { lanceur: string; cas: string; memoire: string; cle: string; workspace?: string };
+/* `memoires` : le dossier des mémoires des convs de test (une par conv, `01.json`…) */
+type Config = { lanceur: string; cas: string; memoire: string; memoires?: string; cle: string; workspace?: string };
 
 /**
  * En local seulement : pose une question au vrai chat (prompt 10), à partir de la mémoire (prompt 07),
@@ -13,6 +16,11 @@ export async function POST(req: Request) {
   const chemin = process.env.BLUSH_DEMANDER;
   if (process.env.NODE_ENV === "production" || !chemin) return new Response(null, { status: 404 });
   const conf = JSON.parse(await readFile(chemin, "utf8")) as Config;
+  /* Ta conv (?cas=perso, ou sans cas) : sa mémoire et son cas, gardés hors du projet. Une conv de test : sa mémoire, à la date de la conv. */
+  const id = new URL(req.url).searchParams.get("cas");
+  const test = id && id !== "perso" ? (/^\d{2}$/.test(id) && conf.memoires ? join(conf.memoires, `${id}.json`) : null) : undefined;
+  if (test === null || (test && !existsSync(test))) return new Response(null, { status: 404 });
+  const quelle = test ? ["--memoire", test, "--aujourdhui", "fin"] : ["--cas-perso", conf.cas, "--memoire", conf.memoire];
   const { text, history = [] } = (await req.json()) as { text: string; history?: { from: "toi" | "blush"; text: string }[] };
   const env = {
     ...process.env,
@@ -20,7 +28,7 @@ export async function POST(req: Request) {
     ...(conf.workspace ? { ANTHROPIC_WORKSPACE_ID: (await readFile(conf.workspace, "utf8")).trim() } : {}),
   };
   const sortie = await new Promise<string>((ok, ko) => {
-    const p = spawn(process.execPath, [conf.lanceur, "10", "--cas-perso", conf.cas, "--memoire", conf.memoire, "--demande", text, "--historique", JSON.stringify(history)], { env });
+    const p = spawn(process.execPath, [conf.lanceur, "10", ...quelle, "--demande", text, "--historique", JSON.stringify(history)], { env });
     let s = "";
     p.stdout.on("data", (d) => (s += d));
     p.stderr.on("data", (d) => (s += d));
