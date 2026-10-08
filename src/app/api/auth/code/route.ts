@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!peutEntrer(email.data)) {
     if (!(await sousLaLimite(`attente:${ipDe(req)}`, LIMITES.attenteParIp))) return erreur("trop", 429);
     await inscrire(email.data, "connexion");
-    const brouillon = await histoireOuverte(null, await lireBrouillon());
+    const brouillon = await histoireOuverte(null, { brouillon: await lireBrouillon() });
     if (brouillon) await supprimerHistoire(brouillon.id);
     await effacerBrouillon();
     return erreur("beta", 403);

@@ -9,6 +9,8 @@ export const LIMITES = {
   verificationParIp: { max: 30, fenetreS: 3600 },
   importParIp: { max: 20, fenetreS: 3600 },
   chatParCompte: { max: 150, fenetreS: 86400 },
+  /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
+  analyseParCompte: { max: 5, fenetreS: 86400 },
   /** Les alertes par mail à l’équipe. */
   alertesParJour: { max: 30, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */

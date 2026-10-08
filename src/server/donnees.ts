@@ -1,32 +1,81 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, inArray, max } from "drizzle-orm";
 import { after } from "next/server";
+import { cache } from "react";
 import { SUBSCRIPTIONS } from "@/mocks/daily";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05 } from "@prompts/lib/schemas";
-import type { AnalysisProgress, Chapter, Fiche, Plan, Story } from "@/types";
+import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story } from "@/types";
 import { executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
-import { lireBrouillon, lireSession } from "./cookies";
+import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
-import { contexteDe, histoireOuverte, metaDe, storyAffichee, type Ligne } from "./histoires";
+import { contexteDe, histoireOuverte, histoiresDuCompte, metaDe, storyAffichee, type Ligne } from "./histoires";
 import { aRelancer, etatDesTaches } from "./taches";
+import { jourRelatif } from "./temps";
 import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
 
 /*
  * Les données des écrans, dans les types du front. Utilisées par les pages serveur et par les routes /api.
  */
 
-export async function contexteRequete(): Promise<{ utilisateur: Utilisateur | null; story: Ligne | null }> {
+/**
+ * Qui fait la requête, et son histoire ouverte (voir histoireOuverte). `parcours` : les écrans et routes de l’import,
+ * qui suivent d’abord la conv en train d’être importée. Mémorisé le temps d’un rendu : une page qui lit plusieurs
+ * données (l’accueil en lit six) ne refait pas ces requêtes à chaque fois.
+ */
+export const contexteRequete = cache(async (parcours = false): Promise<{ utilisateur: Utilisateur | null; story: Ligne | null }> => {
   const utilisateur = await utilisateurDeSession(await lireSession());
-  const story = await histoireOuverte(utilisateur, await lireBrouillon());
+  const story = await histoireOuverte(utilisateur, { brouillon: await lireBrouillon(), choisie: await lireChoisie() }, { parcours });
   return { utilisateur, story };
+});
+
+export async function storyCourante(parcours = false): Promise<Story | null> {
+  const { story } = await contexteRequete(parcours);
+  return story ? storyAffichee(story.id, metaDe(story)) : null;
 }
 
-export async function storyCourante(): Promise<Story | null> {
-  const { story } = await contexteRequete();
-  return story ? storyAffichee(story.id, metaDe(story)) : null;
+/**
+ * Les convs du compte, pour « Tes convs » : l’autre personne, où vous en êtes (une fois le verdict écrit), et quand
+ * BLUSH en a parlé pour la dernière fois. La plus active d’abord. `ouverte` : celle que montre l’accueil.
+ */
+export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): Promise<ConvSummary[]> {
+  const lignes = await histoiresDuCompte(utilisateur.id);
+  if (!lignes.length) return [];
+  const ids = lignes.map((l) => l.id);
+  const [verdicts, derniers] = await Promise.all([
+    db().select().from(schema.verdicts).where(inArray(schema.verdicts.storyId, ids)),
+    db()
+      .select({ storyId: schema.chatMessages.storyId, at: max(schema.chatMessages.createdAt) })
+      .from(schema.chatMessages)
+      .where(inArray(schema.chatMessages.storyId, ids))
+      .groupBy(schema.chatMessages.storyId),
+  ]);
+  const sortieDe = new Map(verdicts.map((v) => [v.storyId, dechiffrer<DonneesVerdict>(v.data).sortie]));
+  const parleDe = new Map(derniers.map((d) => [d.storyId, d.at]));
+  const maintenant = new Date();
+  return lignes
+    .map((l) => {
+      const meta = metaDe(l);
+      const autre = meta.participants[1 - (meta.moi ?? 0)].prenom;
+      const sortie = sortieDe.get(l.id);
+      const verdict = sortie ? verdictAffiche(sortie) : null;
+      const parle = parleDe.get(l.id);
+      const quand = parle && parle > l.createdAt ? parle : l.createdAt;
+      const conv: ConvSummary = {
+        storyId: l.id,
+        person: { id: "p-autre", name: autre, initial: autre[0]?.toUpperCase() ?? "?" },
+        verdict: verdict ? { emoji: verdict.emoji, title: verdict.title } : null,
+        level: sortie?.niveau ?? null,
+        trend: sortie?.tendance ?? "",
+        lastLabel: jourRelatif(quand, maintenant),
+        current: l.id === ouverte?.id,
+      };
+      return { quand, conv };
+    })
+    .sort((a, b) => b.quand.getTime() - a.quand.getTime())
+    .map((x) => x.conv);
 }
 
 /** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. */

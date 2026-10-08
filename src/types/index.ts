@@ -46,8 +46,9 @@ export type Source = {
 export type ConvSummary = {
   storyId: string;
   person: Person;
-  verdict: Pick<Verdict, "emoji" | "title">;
-  level: LevelId;
+  /** null : BLUSH est encore en train de la lire. */
+  verdict: Pick<Verdict, "emoji" | "title"> | null;
+  level: LevelId | null;
   trend: string;
   /** « aujourd’hui », « hier », « lun. » */
   lastLabel: string;
