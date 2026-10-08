@@ -55,7 +55,8 @@ async function appelVerifie<S extends z.ZodType>(
 ): Promise<z.infer<S>> {
   for (let essai = 0; essai < 2; essai++) {
     const a = await appeler(req, format, { storyId, etiquette, surAvance });
-    if (a.refus) throw new ErreurTache("refus");
+    /* Un refus qui tient malgré le repli : sa catégorie va dans le code d’erreur (et dans l’alerte) */
+    if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
     if (!a.sortie) continue;
     if (!introuvables(ids(a.sortie), lignes).length || essai === 1) return a.sortie;
   }
@@ -286,7 +287,7 @@ async function executer(t: Tache): Promise<boolean> {
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
     console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
     /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
-    const definitif = code === "refus";
+    const definitif = code.startsWith("refus");
     await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
     if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);

@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
 import { db, schema } from "../db";
@@ -19,8 +19,8 @@ const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
 /** Ce que le modèle a déjà écrit : sa réflexion (en caractères), sa réponse (en caractères, et le texte lui-même). */
 export type Avance = { reflexion: number; texte: number; ecrit: string };
 
-/** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. */
-export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number };
+/** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. `categorie` : celle d’un refus. */
+export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number; categorie?: string | null };
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
 
 /** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
@@ -54,8 +54,13 @@ const SYSTEMES: Record<Tache, string> = {
 /** Les textes système, pour le garde-fou anti-fuite (src/server/ia/garde.ts). */
 export const textesSysteme = () => Object.values(SYSTEMES);
 
-function lireSortie<S extends z.ZodType>(message: Anthropic.Message, schema: S): z.infer<S> | null {
-  const texte = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+/** Le texte de la réponse. Après un repli sur un autre modèle (bloc « fallback »), seul ce que ce modèle a écrit compte. */
+function lireSortie<S extends z.ZodType>(content: { type: string; text?: string }[], schema: S): z.infer<S> | null {
+  const repli = content.map((b) => b.type).lastIndexOf("fallback");
+  const texte = content
+    .slice(repli + 1)
+    .flatMap((b) => (b.type === "text" && b.text ? [b.text] : []))
+    .join("");
   try {
     const ok = schema.safeParse(JSON.parse(texte));
     return ok.success ? ok.data : null;
@@ -68,6 +73,14 @@ const cout = (u: Usage) =>
   ((u.input_tokens ?? 0) * PRIX.entree + (u.output_tokens ?? 0) * PRIX.sortie + (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache + (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
   1e6;
 
+/*
+ * Le repli d’Anthropic (bêta) : quand un filtre de sécurité refuse une requête, souvent à tort, l’API la rejoue
+ * d’elle-même sur le modèle qu’Anthropic recommande pour ce cas, dans le même appel. Si l’API refusait l’option,
+ * on s’en passe et tout marche comme avant.
+ */
+const BETA_REPLI = "server-side-fallback-2026-07-01";
+let repliDisponible = true;
+
 /**
  * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts.
  * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment).
@@ -79,16 +92,16 @@ export async function appeler<S extends z.ZodType>(
 ): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
     const brut = factice(req);
-    if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0 };
+    if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: null };
     const ok = schema.safeParse(brut);
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
   }
   const reglage = REGLAGES[req.tache];
-  const params = {
+  const base = {
     model: MODELE,
     max_tokens: reglage.maxTokens,
     thinking: { type: "adaptive" as const },
-    output_config: { effort: req.effort ?? reglage.effort, format: zodOutputFormat(schema) },
+    output_config: { effort: req.effort ?? reglage.effort, format: betaZodOutputFormat(schema) },
     system: [{ type: "text" as const, text: SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
     messages: [
       {
@@ -102,12 +115,13 @@ export async function appeler<S extends z.ZodType>(
     ],
   };
   const debut = Date.now();
-  /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP. Une sortie suivie aussi */
-  let message: Anthropic.Message;
-  if (reglage.flux || surAvance) {
-    const flux = anthropic().messages.stream(params);
+  const envoyer = async (avecRepli: boolean) => {
+    const params = avecRepli ? { ...base, fallbacks: "default" as const, betas: [BETA_REPLI] } : base;
+    /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP. Une sortie suivie aussi */
+    if (!reglage.flux && !surAvance) return anthropic().beta.messages.create(params);
+    const flux = anthropic().beta.messages.stream(params);
     if (surAvance) {
-      const a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
+      let a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
       /* Le suivi ne doit jamais faire échouer la réponse : une erreur ici est ignorée */
       const suivre = () => {
         try {
@@ -116,6 +130,10 @@ export async function appeler<S extends z.ZodType>(
           /* rien */
         }
       };
+      /* Un repli sur un autre modèle : il repart de zéro, la jauge aussi */
+      flux.on("streamEvent", (ev) => {
+        if (ev.type === "content_block_start" && ev.content_block.type === "fallback") a = { reflexion: 0, texte: 0, ecrit: "" };
+      });
       flux.on("thinking", (d) => {
         a.reflexion += d.length;
         suivre();
@@ -126,21 +144,35 @@ export async function appeler<S extends z.ZodType>(
         suivre();
       });
     }
-    message = await flux.finalMessage();
-  } else message = await anthropic().messages.create(params);
-  await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut });
-  if (message.stop_reason === "refusal") return { sortie: null, refus: true, stop: message.stop_reason, cout: cout(message.usage) };
-  return { sortie: lireSortie(message, schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
+    return flux.finalMessage();
+  };
+  let message: Awaited<ReturnType<typeof envoyer>>;
+  try {
+    message = await envoyer(repliDisponible);
+  } catch (e) {
+    if (!(repliDisponible && e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
+    console.error("repli d’Anthropic refusé par l’API : on s’en passe");
+    repliDisponible = false;
+    message = await envoyer(false);
+  }
+  await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut, modele: message.model });
+  if (message.stop_reason === "refusal") {
+    /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête : jamais de contenu */
+    const categorie = message.stop_details?.category ?? null;
+    console.warn(`refus du modèle (${req.tache}) : ${categorie ?? "sans catégorie"} · ${(message as { _request_id?: string | null })._request_id ?? ""}`);
+    return { sortie: null, refus: true, stop: message.stop_reason, cout: cout(message.usage), categorie };
+  }
+  return { sortie: lireSortie(message.content as { type: string; text?: string }[], schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
 }
 
-async function noterUsage(u: Usage, { storyId, tache, ms }: { storyId?: string; tache: string; ms: number }) {
+async function noterUsage(u: Usage, { storyId, tache, ms, modele }: { storyId?: string; tache: string; ms: number; modele: string }) {
   try {
     await db()
       .insert(schema.aiUsage)
       .values({
         storyId: storyId ?? null,
         task: tache,
-        model: MODELE,
+        model: modele,
         inputTokens: u.input_tokens ?? 0,
         outputTokens: u.output_tokens ?? 0,
         cacheReadTokens: u.cache_read_input_tokens ?? 0,
