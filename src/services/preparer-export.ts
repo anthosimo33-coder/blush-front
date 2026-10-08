@@ -3,11 +3,11 @@
  * (le .txt WhatsApp, ou les message_N d’Instagram), et on le compresse. Les photos et vocaux ne partent jamais,
  * et l’envoi reste petit (Vercel refuse plus de 4,5 Mo).
  */
-import { gzipSync, strFromU8, strToU8, unzip } from "fflate";
+import { gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 
-const dezipper = (octets: Uint8Array) =>
-  new Promise<Record<string, Uint8Array>>((ok, ko) => unzip(octets, { filter: (f) => estFichierUtile(f.name) && f.originalSize < 50 * 1024 * 1024 }, (e, r) => (e ? ko(e) : ok(r))));
+/** Un fichier de texte plus gros n’est pas une conv */
+const TAILLE_MAX = 50 * 1024 * 1024;
 
 export class ExportIllisible extends Error {
   constructor(readonly code: "fichier" | "plusieurs") {
@@ -38,29 +38,84 @@ export async function analyserExport(fichier: File): Promise<{ type: "un"; paque
   return { type: "plusieurs", convs: resumes, paquetDe: (id) => paquet(fichier.name, convs[+id].parties) };
 }
 
-async function lireFichiers(fichier: File): Promise<Partie[]> {
-  const octets = new Uint8Array(await fichier.arrayBuffer());
-  if (octets[0] === 0x50 && octets[1] === 0x4b) {
-    const contenu = await dezipper(octets).catch(() => {
-      throw new ExportIllisible("fichier");
-    });
-    return Object.entries(contenu).map(([nom, o]) => ({ nom, contenu: strFromU8(o) }));
-  }
-  return [{ nom: fichier.name, contenu: strFromU8(octets) }];
-}
-
 /** Le fichier choisi devient un petit paquet compressé : { parties: [{ nom, contenu }] } en gzip. */
 export async function preparerExport(fichier: File): Promise<Blob> {
-  const octets = new Uint8Array(await fichier.arrayBuffer());
-  const estZip = octets[0] === 0x50 && octets[1] === 0x4b;
-  let fichiers: Partie[];
-  if (estZip) {
-    const contenu = await dezipper(octets).catch(() => {
+  const parties = choisirParties(await lireFichiers(fichier));
+  if (parties === "plusieurs" || !parties) throw new ExportIllisible(parties === "plusieurs" ? "plusieurs" : "fichier");
+  return paquet(fichier.name, parties);
+}
+
+export async function lireFichiers(fichier: Blob & { name: string }): Promise<Partie[]> {
+  const debut = await octets(fichier, 0, 2);
+  if (debut[0] === 0x50 && debut[1] === 0x4b) {
+    return lireZip(fichier).catch(() => {
       throw new ExportIllisible("fichier");
     });
-    fichiers = Object.entries(contenu).map(([nom, o]) => ({ nom, contenu: strFromU8(o) }));
-  } else fichiers = [{ nom: fichier.name, contenu: strFromU8(octets) }];
-  const parties = choisirParties(fichiers);
-  if (parties === "plusieurs" || !parties) throw new ExportIllisible(parties === "plusieurs" ? "plusieurs" : "fichier");
-  return new Blob([gzipSync(strToU8(JSON.stringify({ nom: fichier.name, parties })))], { type: "application/gzip" });
+  }
+  if (fichier.size >= TAILLE_MAX) throw new ExportIllisible("fichier");
+  return [{ nom: fichier.name, contenu: strFromU8(await octets(fichier, 0, fichier.size)) }];
+}
+
+const octets = async (fichier: Blob, de: number, a: number) => new Uint8Array(await fichier.slice(de, a).arrayBuffer());
+
+/**
+ * Les fichiers de texte d’un .zip, lus dans le fichier sans le charger : sa table des matières (à la fin), puis les
+ * octets de chaque .txt ou message_N. Un export avec médias pèse des centaines de Mo : le charger en entier (et le
+ * copier pour le décompresser à côté) faisait recharger la page à Safari sur iPhone, sans que rien ne parte.
+ */
+async function lireZip(fichier: Blob): Promise<Partie[]> {
+  /* La fin du zip (22 octets, plus un commentaire de 64 Ko au plus) dit où est sa table des matières */
+  const base = Math.max(0, fichier.size - 22 - 0xffff);
+  const queue = await octets(fichier, base, fichier.size);
+  const q = new DataView(queue.buffer);
+  let fin = queue.length - 22;
+  while (fin >= 0 && q.getUint32(fin, true) !== 0x06054b50) fin--;
+  if (fin < 0) throw new Error("zip sans fin");
+  let nombre = q.getUint16(fin + 10, true);
+  let taille = q.getUint32(fin + 12, true);
+  let position = q.getUint32(fin + 16, true);
+  /* Zip64 (plus de 4 Go, ou plus de 65 535 fichiers) : les vraies valeurs sont dans un enregistrement à part */
+  if (nombre === 0xffff || taille === 0xffffffff || position === 0xffffffff) {
+    const repere = new DataView((await octets(fichier, base + fin - 20, base + fin)).buffer);
+    if (repere.getUint32(0, true) !== 0x07064b50) throw new Error("zip64 sans repère");
+    const ou = Number(repere.getBigUint64(8, true));
+    const z = new DataView((await octets(fichier, ou, ou + 56)).buffer);
+    if (z.getUint32(0, true) !== 0x06064b50) throw new Error("zip64 sans fin");
+    nombre = Number(z.getBigUint64(32, true));
+    taille = Number(z.getBigUint64(40, true));
+    position = Number(z.getBigUint64(48, true));
+  }
+
+  const table = await octets(fichier, position, position + taille);
+  const t = new DataView(table.buffer);
+  const parties: Partie[] = [];
+  for (let p = 0, k = 0; k < nombre; k++) {
+    if (t.getUint32(p, true) !== 0x02014b50) throw new Error("entrée illisible");
+    const drapeaux = t.getUint16(p + 8, true);
+    const methode = t.getUint16(p + 10, true);
+    let compresse = t.getUint32(p + 20, true);
+    let complet = t.getUint32(p + 24, true);
+    let local = t.getUint32(p + 42, true);
+    const [ln, le, lc] = [t.getUint16(p + 28, true), t.getUint16(p + 30, true), t.getUint16(p + 32, true)];
+    /* Le nom en UTF-8 si le drapeau le dit, sinon octet par octet (comme fflate) */
+    const nom = strFromU8(table.subarray(p + 46, p + 46 + ln), !(drapeaux & 0x800));
+    /* Zip64 : les valeurs à 0xFFFFFFFF sont dans le champ extra 0x0001, dans cet ordre */
+    for (let e = p + 46 + ln; e + 4 <= p + 46 + ln + le; e += 4 + t.getUint16(e + 2, true)) {
+      if (t.getUint16(e, true) !== 1) continue;
+      let x = e + 4;
+      const suivant = () => Number(t.getBigUint64((x += 8) - 8, true));
+      if (complet === 0xffffffff) complet = suivant();
+      if (compresse === 0xffffffff) compresse = suivant();
+      if (local === 0xffffffff) local = suivant();
+    }
+    p += 46 + ln + le + lc;
+    /* Ni les photos et vocaux, ni un fichier chiffré ou compressé autrement */
+    if (!estFichierUtile(nom) || complet >= TAILLE_MAX || drapeaux & 1 || (methode !== 0 && methode !== 8)) continue;
+    const tete = new DataView((await octets(fichier, local, local + 30)).buffer);
+    if (tete.getUint32(0, true) !== 0x04034b50) throw new Error("entrée introuvable");
+    const de = local + 30 + tete.getUint16(26, true) + tete.getUint16(28, true);
+    const brut = await octets(fichier, de, de + compresse);
+    parties.push({ nom, contenu: strFromU8(methode === 0 ? brut : inflateSync(brut)) });
+  }
+  return parties;
 }
