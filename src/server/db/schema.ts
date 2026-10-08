@@ -145,6 +145,21 @@ export const tasks = pgTable(
   (t) => [index("tasks_story_idx").on(t.storyId, t.kind)],
 );
 
+/**
+ * Un verdict partagé : le lien public (/v/<id>) qui montre le verdict seul, prénoms masqués, jamais la conv.
+ * Un lien par histoire ; le désactiver efface la ligne (le lien ne montre plus rien), supprimer l’histoire aussi.
+ */
+export const shares = pgTable("shares", {
+  id: text("id").primaryKey(),
+  storyId: uuid("story_id")
+    .notNull()
+    .unique()
+    .references(() => stories.id, { onDelete: "cascade" }),
+  /** Ce que montre le lien (l’emoji, le titre et le sous-titre du verdict, prénoms masqués), chiffré. */
+  data: chiffre("data").notNull(),
+  createdAt: quand("created_at").notNull().defaultNow(),
+});
+
 /** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
 export const waitlist = pgTable("waitlist", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -41,6 +41,13 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
 }
 
 export const reel = {
+  /** Le lien de partage du verdict (son identifiant) : le créer (toujours le même), le désactiver. */
+  async creerLienPartage(): Promise<string> {
+    return (await appel<{ id: string }>("/api/partage", envoi("POST"))).id;
+  },
+  async desactiverLienPartage(): Promise<void> {
+    await appel("/api/partage", envoi("DELETE"));
+  },
   /**
    * Un export : lu et réduit dans le navigateur. Un export Instagram complet : `choisir` fait choisir la conv
    * (null : on a renoncé, erreur « annule »), et seule celle-là part.

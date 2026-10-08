@@ -43,6 +43,13 @@
       "when": 1791461917281,
       "tag": "0005_chapitres_prets",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791463469499,
+      "tag": "0006_partages",
+      "breakpoints": true
     }
   ]
 }

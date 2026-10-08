@@ -2,14 +2,13 @@
 
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
-import { copyText } from "@/lib/hooks";
 import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useQuery } from "@/lib/query";
 import { getReport, type ReportPayload } from "@/services/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
-import { Toast } from "@/components/ui/surfaces";
+import { PartageSheet } from "../Partage";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
 
 const INK = "#121214";
@@ -75,7 +74,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   const cards = cardsOf(payload);
   const last = cards.length - 1;
   const [at, setAt] = useState(0);
-  const [toast, setToast] = useState<string | null>(null);
+  const [partage, setPartage] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const press = useRef<{ x: number; y: number } | null>(null);
   /* Un glissé vient d’avancer : le « clic » qui le suit ne compte pas */
@@ -121,6 +120,8 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      /* La fenêtre de partage ouverte garde ses touches (Échap la ferme, sans quitter le verdict) */
+      if (document.querySelector("dialog[open]")) return;
       if (e.key === "ArrowRight") setAt((i) => Math.min(last, i + 1));
       else if (e.key === "ArrowLeft") setAt((i) => Math.max(0, i - 1));
       else if (e.key === "Escape") toReport();
@@ -128,12 +129,6 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [last]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const go = (to: number) => setAt(Math.max(0, Math.min(last, to)));
 
@@ -156,20 +151,6 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     }
     if ((e.target as HTMLElement).closest("a, button")) return;
     go(e.clientX < window.innerWidth * 0.3 ? at - 1 : at + 1);
-  };
-
-  const share = async () => {
-    /* Prénoms masqués dans tout ce qui se partage (comme dans le rapport) */
-    const text = `${verdict.emoji} ${verdict.title} ${verdict.subtitle}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "BLUSH", text });
-        return;
-      }
-    } catch {
-      return;
-    }
-    if (await copyText(text)) setToast("Copié.");
   };
 
   if (payload.sober) return <div className="fixed inset-0 bg-paper" />;
@@ -382,7 +363,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 <Icon name="arrow" size={20} color={INK} stroke={2.8} />
               </a>
             </div>
-            <button type="button" onClick={share} className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-[15px] font-black text-white/80 transition-colors hover:text-white">
+            <button type="button" onClick={() => setPartage(true)} aria-haspopup="dialog" className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-[15px] font-black text-white/80 transition-colors hover:text-white">
               <Icon name="share" size={16} color="currentColor" stroke={2.4} />
               Partager mon verdict
             </button>
@@ -390,7 +371,10 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
         )}
       </div>
 
-      {toast && <Toast className="absolute bottom-28 left-1/2 w-max -translate-x-1/2">{toast}</Toast>}
+      {/* Les touchers dans la fenêtre de partage n’avancent pas les cartes du verdict */}
+      <div className="contents" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+        <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />
+      </div>
     </main>
   );
 }
