@@ -62,3 +62,28 @@ async function writeClipboard(text: string) {
     return ok;
   }
 }
+
+/**
+ * L’élément d’identifiant `id` est-il à l’écran ? (Une pastille flottante s’efface quand ce qu’elle montre est déjà visible.)
+ * Faux tant que l’élément n’existe pas.
+ */
+export function useEnVue(id: string): boolean {
+  const [vu, setVu] = useState(false);
+  useEffect(() => {
+    let obs: IntersectionObserver | null = null;
+    /* L’élément peut arriver après le premier rendu (le rapport se met à jour) : on le cherche à chaque passage */
+    const brancher = () => {
+      const el = document.getElementById(id);
+      if (!el || obs) return;
+      obs = new IntersectionObserver(([e]) => setVu(e.isIntersecting), { threshold: 0.15 });
+      obs.observe(el);
+    };
+    brancher();
+    const t = window.setInterval(brancher, 1000);
+    return () => {
+      window.clearInterval(t);
+      obs?.disconnect();
+    };
+  }, [id]);
+  return vu;
+}
