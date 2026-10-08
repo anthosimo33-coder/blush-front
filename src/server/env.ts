@@ -21,6 +21,8 @@ const Env = z.object({
   /** Sans clé Resend, le code de connexion s’affiche dans les logs (dev seulement). */
   RESEND_API_KEY: z.string().min(1).optional(),
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@blush.app>"),
+  /** L’adresse du site : les images des mails viennent de là. */
+  BLUSH_URL: z.string().url().default("https://www.askblush.com"),
   /** Bêta sans paiement : emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde. */
   BLUSH_ACCES_LIBRE: z.string().default(""),
   /** Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). */
