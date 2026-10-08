@@ -8,7 +8,7 @@ import { play } from "@/lib/sound";
 import { getAnalysisProgress, startAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/mocks/story";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
-import { ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
@@ -34,6 +34,14 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
   /* Vrai dès qu’on voit la lecture se faire : une analyse déjà finie à l’arrivée ne rejoue pas ses sons */
   const live = useRef(false);
   const heard = useRef(0);
+  /* La lecture a échoué (le serveur a tout essayé) : on le dit, et on propose de relancer. `run` relance l’effet */
+  const [failed, setFailed] = useState(false);
+  const [run, setRun] = useState(0);
+  const retry = () => {
+    setFailed(false);
+    setP(START);
+    setRun((r) => r + 1);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -52,6 +60,10 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         setP(next);
         const arrivedDone = first;
         first = false;
+        if (next.failed) {
+          setFailed(true);
+          return;
+        }
         if (!next.done) {
           live.current = true;
           /* La démo s’anime toutes les 150 ms ; le vrai back-end, on le lit chaque seconde */
@@ -75,8 +87,8 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       alive = false;
       clearTimeout(timer);
     };
-    /* Lancé une seule fois, à l’arrivée sur l’écran */
-  }, []);
+    /* Lancé à l’arrivée sur l’écran, puis à chaque « Relancer » */
+  }, [run]);
 
   /* Chaque découverte, un toucher un cran plus haut ; la coche, la signature sur un accord chaud */
   const found = p.discoveries.length;
@@ -101,7 +113,11 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       footer={
         /* Même hauteur que le bouton : rien ne bouge quand il remplace l’étape en cours */
         <div className="flex h-[60px] flex-col items-center justify-center">
-          {done ? (
+          {failed ? (
+            <Button arrow onClick={retry}>
+              Relancer la lecture
+            </Button>
+          ) : done ? (
             <div data-popin="" className="w-full" style={{ "--d": "0.5s" } as CSSProperties}>
               {/* D’abord la révélation du verdict, qui mène au rapport. Chargement complet : Safari teinte ses barres pour la scène sombre */}
               <ButtonLink
@@ -160,13 +176,22 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
           )}
         </div>
 
-        <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
-          {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
-          BLUSH analyse tes
-          <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : count}</span> messages,
-          <br />
-          du premier au dernier.
-        </h1>
+        {failed ? (
+          /* ⚠ Texte à valider */
+          <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]" role="alert">
+            Ça a coincé de notre côté.
+            <br />
+            Ta conv est bien là.
+          </h1>
+        ) : (
+          <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
+            {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
+            BLUSH analyse tes
+            <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : count}</span> messages,
+            <br />
+            du premier au dernier.
+          </h1>
+        )}
 
         <Discoveries items={shown.discoveries} className="mt-6" />
       </div>
@@ -213,7 +238,8 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
             pathLength={50}
             strokeDasharray="50"
             strokeDashoffset={50 - arc.shown}
-            className={cn("transition-[stroke-dashoffset] duration-200 ease-linear", arc.shown === 0 && "opacity-0")}
+            /* Le serveur est lu chaque seconde : l’anneau glisse d’une valeur à l’autre sans à-coups */
+            className={cn("transition-[stroke-dashoffset] duration-[900ms] ease-linear", arc.shown === 0 && "opacity-0")}
           />
         ))}
       </svg>

@@ -16,6 +16,9 @@ export const MODELE = "claude-opus-5-5";
 /* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
 const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
 
+/** Ce que le modèle a déjà écrit, en caractères : sa réflexion, puis sa réponse. */
+export type Avance = { reflexion: number; texte: number };
+
 /** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. */
 export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number };
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
@@ -62,8 +65,15 @@ const cout = (u: Usage) =>
   ((u.input_tokens ?? 0) * PRIX.entree + (u.output_tokens ?? 0) * PRIX.sortie + (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache + (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
   1e6;
 
-/** Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts. */
-export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { storyId, etiquette }: { storyId?: string; etiquette?: string } = {}): Promise<Appel<z.infer<S>>> {
+/**
+ * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts.
+ * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment).
+ */
+export async function appeler<S extends z.ZodType>(
+  req: Requete,
+  schema: S,
+  { storyId, etiquette, surAvance }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void } = {},
+): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
     const ok = schema.safeParse(factice(req));
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
@@ -87,8 +97,17 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
     ],
   };
   const debut = Date.now();
-  /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP */
-  const message = reglage.flux ? await anthropic().messages.stream(params).finalMessage() : await anthropic().messages.create(params);
+  /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP. Une sortie suivie aussi */
+  let message: Anthropic.Message;
+  if (reglage.flux || surAvance) {
+    const flux = anthropic().messages.stream(params);
+    if (surAvance) {
+      const a: Avance = { reflexion: 0, texte: 0 };
+      flux.on("thinking", (d) => surAvance({ ...a, reflexion: (a.reflexion += d.length) }));
+      flux.on("text", (d) => surAvance({ ...a, texte: (a.texte += d.length) }));
+    }
+    message = await flux.finalMessage();
+  } else message = await anthropic().messages.create(params);
   await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut });
   if (message.stop_reason === "refusal") return { sortie: null, refus: true, stop: message.stop_reason, cout: cout(message.usage) };
   return { sortie: lireSortie(message, schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
