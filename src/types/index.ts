@@ -215,6 +215,8 @@ export type BlushAnswer = (
   vocal?: { audio: string; duree: number; peaks: number[] };
   /** Le chat est en vocal après cette réponse (il a demandé à BLUSH de lui parler en vocal). */
   modeVocal?: boolean;
+  /** Back-end : l’échange (l’id de ton message) auquel cette réponse appartient, pour la partager en image. */
+  echange?: number;
 };
 
 export type Reply = {

@@ -21,6 +21,8 @@ export const CLES = {
   lienEssai: "lien_essai",
   /** Une conv importée par quelqu’un venu d’un verdict partagé. */
   importPartage: "import_partage",
+  /** Une image « Partager en image » (une réponse du chat, la chute d’un chapitre). */
+  imagePartagee: "image_partagee",
 } as const;
 export type Cle = (typeof CLES)[keyof typeof CLES];
 

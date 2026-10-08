@@ -461,6 +461,18 @@ export async function creerLienPartage(): Promise<string> {
   return `${window.location.origin}/v/${id}`;
 }
 
+/** Ce qu’on partage en image : une réponse de BLUSH (son échange), ou la chute d’un chapitre (sa place). */
+export type CibleImage = { type: "reponse"; echange: number } | { type: "moment"; chapitre: number; bloc: number };
+
+/** L’image « Partager en image » (story), dessinée par le serveur d’après le contenu du compte. En démo : un exemple. */
+export async function imagePartage(cible: CibleImage): Promise<Blob> {
+  const r = BACKEND
+    ? await fetch("/api/partage/image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cible), credentials: "same-origin" })
+    : await fetch(`/apercu/carte?type=${cible.type}`);
+  if (!r.ok) throw new ErreurApi("image", r.status);
+  return r.blob();
+}
+
 export async function desactiverLienPartage(): Promise<void> {
   if (BACKEND) return reel.desactiverLienPartage();
   await delay(300);

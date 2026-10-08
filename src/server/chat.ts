@@ -152,7 +152,7 @@ export async function repondre(
         modeVocal,
       };
 
-  await db()
+  const gardes = await db()
     .insert(schema.chatMessages)
     .values([
       {
@@ -161,11 +161,13 @@ export async function repondre(
         data: chiffrer({ texte: dit, ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}) } satisfies MessageToi),
       },
       { storyId: story.id, role: "blush", data: chiffrer({ reponse, resume: fuite ? REFUS_FUITE.join(" / ") : resume(sortie) } satisfies MessageBlush) },
-    ]);
+    ])
+    .returning({ id: schema.chatMessages.id, role: schema.chatMessages.role });
 
   /* Des messages ajoutés, une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour après la réponse */
   const majMemoire = !fuite && (nouvelles.length > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint);
   const echange: Echange = { date: jour.iso, dit, reponse: sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []), ...(nouvelles.length ? { lignes: nouvelles } : {}) };
   if (majMemoire) await planifier(story.id, "memoire_maj", echange);
-  return { reponse, majMemoire };
+  /* L’échange (l’id de ton message) part avec la réponse : de quoi la partager en image ensuite */
+  return { reponse: { ...reponse, echange: gardes.find((g) => g.role === "toi")?.id }, majMemoire };
 }
