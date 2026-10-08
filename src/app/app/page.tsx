@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Accueil" };
  * ?arrivee=1 la rejoue.
  */
 export default async function Page({ searchParams }: PageProps<"/app">) {
-  const { version, anim, arrivee } = await searchParams;
+  const { version, anim, arrivee, depuis } = await searchParams;
   const motion = anim !== "avant";
   const storyId = await currentStoryId();
   /* ?arrivee=1 rejoue l’arrivée sans attendre le lendemain (pour la revoir, ou la montrer) */
@@ -32,6 +32,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
       contact={{ report: { verdict: report.verdict, level: report.level, trend: report.trend, nextStep: report.nextStep }, fiche: { person: fiche.person, summaryShort: fiche.summaryShort }, period: story.period }}
       motion={motion}
       arrive={motion && !arrived}
+      fromReport={depuis === "rapport"}
     />
   );
   if (!motion) return screen;

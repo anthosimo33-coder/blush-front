@@ -24,6 +24,7 @@ import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import { useJourney } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
+import { ChatBubble } from "./ChatBubble";
 import { SoberReport } from "./SoberReport";
 
 /** Où tu t’étais arrêté (ce navigateur seulement). */
@@ -228,13 +229,16 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         ))}
       </ol>
       {full && (
-        <Link href="/rapport/question" className="row-hover mt-2 flex items-center gap-2.5 border-t border-[rgba(17,17,20,0.06)] pt-3 text-ink no-underline">
-          <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
-            <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
-          </span>
-          <span className="flex-1 text-[14px] font-black">Ta question</span>
-          <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
-        </Link>
+        /* Le trait est hors de la ligne cliquable : le voile du survol reste centré sur elle, comme pour les chapitres */
+        <div className="mt-2 border-t border-[rgba(17,17,20,0.06)] pt-1.5">
+          <Link href="/rapport/question" className="row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline">
+            <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
+              <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
+            </span>
+            <span className="flex-1 text-[14px] font-black">Ta question</span>
+            <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
+          </Link>
+        </div>
       )}
     </nav>
   );
@@ -308,8 +312,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         <dl className="m-0 mt-1 grid grid-cols-4 gap-2 border-t-2 border-sep pt-3.5 lg:hidden">
           {[
             [formatCount(story.totalMessages), "messages"],
-            [String(story.sources.length), "applis"],
-            [String(story.voiceCount), "vocaux"],
+            [String(story.sources.length), story.sources.length === 1 ? "appli" : "applis"],
+            [String(story.voiceCount), story.voiceCount === 1 ? "vocal" : "vocaux"],
             [full ? report.readingTime.full : report.readingTime.free, "de lecture"],
           ].map(([value, label]) => (
             <div key={label} className="flex min-w-0 flex-col-reverse gap-0.5">
@@ -320,8 +324,12 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </dl>
         <div className="hidden flex-wrap gap-2 lg:flex">
           <Chip>{formatCount(story.totalMessages)} messages</Chip>
-          <Chip>{story.sources.length} applis</Chip>
-          <Chip>{story.voiceCount} vocaux</Chip>
+          <Chip>
+            {story.sources.length} {story.sources.length === 1 ? "appli" : "applis"}
+          </Chip>
+          <Chip>
+            {story.voiceCount} {story.voiceCount === 1 ? "vocal" : "vocaux"}
+          </Chip>
           <Chip>{full ? report.readingTime.full : report.readingTime.free}</Chip>
         </div>
       </Card>
@@ -392,6 +400,9 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
           </InsetGroup>
         </>
       )}
+
+      {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
+      {payload.access === "blushplus" && !payload.generating && <ChatBubble raised={!!resume} />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (
