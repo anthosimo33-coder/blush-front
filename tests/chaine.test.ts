@@ -104,7 +104,7 @@ describe("de l’import à la mémoire", () => {
     expect(reponse.kind).toBe("bubbles");
     expect(reponse.kind === "bubbles" && reponse.bubbles[0].messages?.length).toBe(1);
     expect(majMemoire).toBe(true);
-    expect(await historique(id)).toHaveLength(1);
+    expect((await historique(id)).echanges).toHaveLength(1);
     await executerChaine(id);
     const [maj] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj.status).toBe("fini");
@@ -130,7 +130,7 @@ describe("de l’import à la mémoire", () => {
     expect(stop.reponse.vocal).toBeUndefined();
     expect((await relire()).chatVocal).toBe(false);
     /* L’historique garde les vocaux (pour les réécouter) */
-    expect((await historique(id)).filter((p) => p.answer.vocal).length).toBe(3);
+    expect((await historique(id)).echanges.filter((p) => p.answer.vocal).length).toBe(3);
   });
 });
 

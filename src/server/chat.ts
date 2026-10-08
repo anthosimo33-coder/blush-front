@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { bullesAffichees, messagesAffiches } from "@prompts/lib/front";
@@ -33,15 +33,25 @@ const LIGNES_DANS_LE_FIL = 15;
 
 
 /** L’historique du chat, du plus ancien au plus récent : ce que l’accueil réaffiche, en paires (sa question, la réponse). */
-export async function historique(storyId: string, limite = 40): Promise<{ mine: string; answer: BlushAnswer; at: number }[]> {
-  const lignes = (await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, storyId)).orderBy(desc(schema.chatMessages.id)).limit(limite)).reverse();
-  const paires: { mine: string; answer: BlushAnswer; at: number }[] = [];
+/** Un échange avec BLUSH, tel que l’accueil le réaffiche : `id` (celui de ton message) sert à charger ceux d’avant. */
+export type EchangeAffiche = { id: number; mine: string; answer: BlushAnswer; at: number };
+
+/**
+ * L’historique du chat, du plus ancien au plus récent : les derniers messages, ou ceux d’avant `avant` (l’id d’un
+ * échange déjà affiché). Rien n’est jamais effacé tant que la conv existe : on charge simplement par morceaux.
+ * `plus` : il en reste d’autres, plus anciens. Un message de BLUSH coupé de sa question (au bord d’un morceau)
+ * revient avec elle dans le morceau d’avant.
+ */
+export async function historique(storyId: string, { avant, limite = 40 }: { avant?: number; limite?: number } = {}): Promise<{ echanges: EchangeAffiche[]; plus: boolean }> {
+  const ou = avant ? and(eq(schema.chatMessages.storyId, storyId), lt(schema.chatMessages.id, avant)) : eq(schema.chatMessages.storyId, storyId);
+  const lignes = (await db().select().from(schema.chatMessages).where(ou).orderBy(desc(schema.chatMessages.id)).limit(limite)).reverse();
+  const echanges: EchangeAffiche[] = [];
   for (let i = 0; i < lignes.length - 1; i++) {
     if (lignes[i].role !== "toi" || lignes[i + 1].role !== "blush") continue;
     const toi = dechiffrer<MessageToi>(lignes[i].data);
-    paires.push({ mine: toi.affiche ?? toi.texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
+    echanges.push({ id: lignes[i].id, mine: toi.affiche ?? toi.texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
   }
-  return paires;
+  return { echanges, plus: lignes.length === limite };
 }
 
 async function fil(storyId: string): Promise<Fil> {
