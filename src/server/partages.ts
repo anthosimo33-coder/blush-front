@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { verdictAffiche } from "@prompts/lib/front";
 import type { DonneesVerdict } from "./analyse";
 import { chiffrer, dechiffrer } from "./chiffrement";
+import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { metaDe, type Ligne } from "./histoires";
 
@@ -61,6 +62,7 @@ export async function partagerVerdict(story: Ligne): Promise<string> {
       set: { storyId: story.id },
     })
     .returning({ id: schema.shares.id });
+  await compter(CLES.lienCree);
   return cree.id;
 }
 

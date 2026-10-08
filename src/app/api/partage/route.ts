@@ -1,3 +1,4 @@
+import { CLES, compter } from "@/server/compteurs";
 import { contexteRequete } from "@/server/donnees";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { arreterPartage, ErreurPartage, lienDe, partagerVerdict } from "@/server/partages";
@@ -21,7 +22,9 @@ export async function POST(req: Request) {
   const { story, reponse } = await histoire(req);
   if (!story) return reponse;
   try {
-    return json({ id: await partagerVerdict(story) });
+    const id = await partagerVerdict(story);
+    await compter(CLES.partageOuvert);
+    return json({ id });
   } catch (e) {
     if (e instanceof ErreurPartage) return erreur(e.code, 409);
     throw e;

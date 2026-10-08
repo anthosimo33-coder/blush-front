@@ -50,6 +50,13 @@
       "when": 1791463469499,
       "tag": "0006_partages",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791470200341,
+      "tag": "0007_compteurs",
+      "breakpoints": true
     }
   ]
 }

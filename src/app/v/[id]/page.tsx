@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { after } from "next/server";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
-import { CtaButton } from "@/components/landing/parts";
+import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { CLES, compter, estUnRobot } from "@/server/compteurs";
 import { verdictDuLien } from "./verdict";
 
 /*
@@ -43,7 +46,10 @@ function Bulle({ moi = false, angle, children }: { moi?: boolean; angle: number;
 }
 
 export default async function Page({ params }: PageProps<"/v/[id]">) {
-  const v = await verdictDuLien((await params).id);
+  const { id } = await params;
+  const v = await verdictDuLien(id);
+  /* Une visite, si c’est une personne (les robots d’aperçu de WhatsApp ou iMessage ne comptent pas) */
+  if (v && id !== "demo" && !estUnRobot((await headers()).get("user-agent"))) after(() => compter(CLES.lienVu));
   return (
     <main className="relative isolate flex min-h-dvh flex-col items-center overflow-x-clip bg-paper px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] lg:pt-10">
       <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[900px] -translate-x-1/2 bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]" />
@@ -81,7 +87,9 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
         <section className="mt-6 flex flex-col items-center gap-3 rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-card lg:px-7">
           <h2 className="m-0 text-[24px] font-black leading-[1.12] tracking-[-0.025em] [text-wrap:balance]">Ta conv en dit plus que tu crois.</h2>
           <p className="m-0 text-[15px] font-bold leading-[1.45] text-soft [text-wrap:balance]">Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.</p>
-          <CtaButton className="mt-1 w-full whitespace-nowrap !px-5" />
+          <ButtonLink href={`/v/${id}/essayer`} arrow className="mt-1 whitespace-nowrap">
+            Analyser ma conv
+          </ButtonLink>
         </section>
         {v && (
           <p className="m-0 mt-4 flex items-start justify-center gap-1.5 px-1 text-center text-[12.5px] font-extrabold leading-[1.45] text-grey">
