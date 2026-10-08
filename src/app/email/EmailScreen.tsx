@@ -34,13 +34,12 @@ export function EmailScreen() {
       router.push("/email/code");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
-      setProblem(
-        code === "beta"
-          ? "BLUSH est en bêta privée : ton email n’est pas encore sur la liste. Demande à la personne qui t’a invité de t’ajouter."
-          : code === "trop"
-            ? "Trop de codes demandés. Réessaie dans une heure."
-            : "Le code n’est pas parti. Réessaie dans un instant.",
-      );
+      /* Bêta fermée, email pas invité : il est inscrit sur la liste d’attente, l’écran de la liste le lui dit */
+      if (code === "beta") {
+        router.push("/attente?inscrit=1");
+        return;
+      }
+      setProblem(code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
       setBusy(false);
     }
   };

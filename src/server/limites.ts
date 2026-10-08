@@ -9,6 +9,10 @@ export const LIMITES = {
   verificationParIp: { max: 30, fenetreS: 3600 },
   importParIp: { max: 20, fenetreS: 3600 },
   chatParCompte: { max: 150, fenetreS: 86400 },
+  /** Les alertes par mail à l’équipe. */
+  alertesParJour: { max: 30, fenetreS: 86400 },
+  /** Les inscriptions à la liste d’attente. */
+  attenteParIp: { max: 10, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
 } as const;

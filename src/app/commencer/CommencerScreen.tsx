@@ -1,8 +1,10 @@
 "use client";
 
 import { BACKEND } from "@/services/mode";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
+import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
@@ -20,7 +22,7 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide
   { app: "autre", title: "Autre appli", subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
 ];
 
-export function CommencerScreen() {
+export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
   const router = useRouter();
   return (
     <Screen
@@ -39,6 +41,19 @@ export function CommencerScreen() {
         ))}
       </nav>
       <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis ? Commence par la principale, tu ajouteras le reste juste après.</p>
+      {fermee && (
+        /* ⚠ Texte à valider */
+        <Link href="/attente" className="row-hover flex items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-ink no-underline shadow-soft">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[rgba(255,79,154,0.12)]">
+            <Icon name="lock" size={17} color="#C81D6B" stroke={2.4} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px] font-black">Bêta privée, sur invitation</span>
+            <span className="text-[13px] font-extrabold text-grey">Pas encore invité ? Rejoins la liste d’attente.</span>
+          </span>
+          <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
+        </Link>
+      )}
     </Screen>
   );
 }

@@ -15,7 +15,8 @@ import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } fro
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
-import { aRelancer, battre, echouer, entreeDe, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
+import { alerter } from "./alertes";
+import { aRelancer, battre, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
@@ -250,6 +251,8 @@ async function executer(t: Tache): Promise<boolean> {
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
     console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
     await echouer(t, code);
+    /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
+    if (t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
     return false;
   } finally {
     clearInterval(coeur);
