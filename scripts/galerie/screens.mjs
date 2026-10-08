@@ -9,6 +9,7 @@ export const SECTIONS = [
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de votre conv (écrans 01 à 08)" },
   { id: "rapport", title: "Rapport", sub: "Aperçu gratuit, paiement, rapport complet, question, mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Accueil, aide à chaque message, sa fiche, compte (13, 16 et 20)" },
+  { id: "convs", title: "Plusieurs convs", sub: "Proposition\u00a0: un compte, plusieurs convs. La liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre (?convs=plusieurs)" },
   { id: "couple", title: "En couple", sub: "La même conv, lue comme un couple ensemble depuis janvier (« En couple » à l’écran 06, ou ?histoire=couple)" },
   { id: "etats", title: "États", sub: "Accès BLUSH+, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
@@ -340,6 +341,25 @@ export const STATES = [
   },
   { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", server: PLUS, ref: "20-mon-compte" },
   { id: "20b", section: "quotidien", title: "Mon compte", state: "Supprimer l’histoire", route: "/compte", server: PLUS, steps: click("Supprimer l’histoire avec Sophie"), sheet: true, note: "Confirmation absente des maquettes." },
+
+  /* ———— Plusieurs convs (proposition) ———— */
+  {
+    id: "M1", section: "convs", title: "Tes convs", state: "La liste", route: "/app/convs?convs=plusieurs", server: PLUS,
+    note: "Proposition\u00a0: quand le compte a plusieurs convs, une liste comme dans Messages. Pour chaque personne\u00a0: l’anneau de votre niveau et le verdict en badge (comme sur l’accueil), le verdict, la tendance, et quand BLUSH en a parlé pour la dernière fois. Un toucher ouvre sa conv, qui s’ouvrira aussi la fois suivante. «\u00a0Mon compte\u00a0» passe ici, en haut à gauche. En bas, «\u00a0Analyser une autre conv\u00a0». Inès et Camille sont fictives, textes à valider.",
+  },
+  {
+    id: "M2", section: "convs", title: "Accueil", state: "Avec plusieurs convs", route: "/app?convs=plusieurs", server: PLUS,
+    note: "En haut à gauche, à la place de «\u00a0Mon compte\u00a0»\u00a0: le retour à «\u00a0Tes convs\u00a0», avec les autres personnes en petit (deux au plus, puis «\u00a0+n\u00a0»). Sur ordinateur, il prend la place de «\u00a0Ton rapport\u00a0» dans la barre de la fenêtre (le rapport reste dans «\u00a0Ce que BLUSH voit\u00a0»). Avec une seule conv, rien ne change.",
+  },
+  {
+    id: "M3", section: "convs", title: "Accueil", state: "Inès choisie", route: "/app/convs?convs=plusieurs", server: PLUS, sheet: true,
+    steps: async (page) => {
+      await page.getByRole("link", { name: /^Inès/ }).first().click();
+      await page.waitForURL("**/app");
+      await page.waitForTimeout(1600);
+    },
+    note: "Inès choisie dans la liste\u00a0: son accueil arrive par la droite, avec son verdict et son prochain pas\u00a0; le retour en haut à gauche montre Sophie et Camille. Simulation\u00a0: au-delà de l’en-tête et de l’intro, ses réponses reprennent celles de Sophie.",
+  },
 
   /* ———— États ———— */
   /* ———— En couple ———— */
