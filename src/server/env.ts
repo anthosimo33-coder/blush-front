@@ -32,6 +32,8 @@ const Env = z.object({
     .transform((v) => v === "1"),
   /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */
   BLUSH_ALERTES: z.string().optional(),
+  /** Qui peut ouvrir le tableau de bord (/admin) : un ou des emails, séparés par des virgules. Par défaut, ceux de BLUSH_ALERTES. */
+  BLUSH_ADMINS: z.string().optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
   CRON_SECRET: z.string().min(16).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. */
@@ -60,6 +62,16 @@ export function env(): Env {
 
 /** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
+
+/** Cet email peut-il ouvrir le tableau de bord ? */
+export function estAdmin(email: string): boolean {
+  const { BLUSH_ADMINS, BLUSH_ALERTES } = env();
+  return (BLUSH_ADMINS ?? BLUSH_ALERTES ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
 
 /** L’email a-t-il BLUSH+ d’office (bêta sans paiement) ? */
 export function accesLibre(email: string): boolean {

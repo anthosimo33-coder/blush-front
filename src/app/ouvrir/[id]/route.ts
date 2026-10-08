@@ -1,0 +1,22 @@
+import { and, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { utilisateurDeSession } from "@/server/auth";
+import { lireSession, poserChoisie } from "@/server/cookies";
+import { db, schema } from "@/server/db";
+
+/**
+ * Le lien du mail « ton rapport est prêt » : il ouvre le rapport de cette conv-là (elle devient la conv ouverte),
+ * si elle est bien au compte connecté. Sinon, le rapport habituel (qui renvoie vers la connexion au besoin).
+ */
+export async function GET(req: Request, { params }: RouteContext<"/ouvrir/[id]">) {
+  const { id } = await params;
+  const utilisateur = await utilisateurDeSession(await lireSession());
+  if (utilisateur && /^[0-9a-f-]{36}$/.test(id)) {
+    const [s] = await db()
+      .select({ id: schema.stories.id })
+      .from(schema.stories)
+      .where(and(eq(schema.stories.id, id), eq(schema.stories.userId, utilisateur.id)));
+    if (s) await poserChoisie(s.id);
+  }
+  return NextResponse.redirect(new URL("/rapport", req.url));
+}
