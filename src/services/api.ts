@@ -302,7 +302,10 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
   try {
     return await envoyer();
   } catch (e) {
-    return bulle(ERREURS_CHAT[e instanceof ErreurApi ? e.code : ""] ?? "j’ai eu un bug, renvoie-moi ça");
+    const code = e instanceof ErreurApi ? e.code : "";
+    /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug */
+    if (code.startsWith("refus")) return bulle(["là-dessus je peux pas t’aider", "reformule, ou envoie-moi autre chose"]);
+    return bulle(ERREURS_CHAT[code] ?? "j’ai eu un bug, renvoie-moi ça");
   }
 }
 
