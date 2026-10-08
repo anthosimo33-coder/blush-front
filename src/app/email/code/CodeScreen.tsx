@@ -116,7 +116,7 @@ export function CodeScreen() {
                 key={i}
                 className={cn(
                   "flex h-[60px] items-center justify-center rounded-[16px] bg-white text-[26px] font-black tabular-nums text-ink transition-shadow",
-                  wrong ? "shadow-[inset_0_0_0_2px_#D93036]" : active ? "shadow-[inset_0_0_0_2px_#121214]" : "shadow-soft",
+                  wrong ? "shadow-[inset_0_0_0_2px_#D93036]" : active ? "shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]" : "shadow-soft",
                 )}
               >
                 {digit ?? (active ? <span className="h-7 w-0.5 rounded-full bg-ink motion-safe:animate-pulse" /> : null)}

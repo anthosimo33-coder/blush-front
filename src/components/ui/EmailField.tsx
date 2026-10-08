@@ -33,7 +33,10 @@ export function EmailField({
       <span
         className={cn(
           "flex h-[60px] items-center gap-3 rounded-field bg-white pl-[18px] pr-2 transition-shadow",
-          invalid ? "shadow-[inset_0_0_0_2px_#E5484D]" : "shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] focus-within:shadow-[inset_0_0_0_2px_#121214]",
+          /* Au focus, le liseré rose de BLUSH et un léger halo */
+          invalid
+            ? "shadow-[inset_0_0_0_2px_#E5484D]"
+            : "shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] focus-within:shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]",
         )}
       >
         <Icon name="mail" size={20} color="#8A8780" stroke={2} />
@@ -54,7 +57,7 @@ export function EmailField({
           onKeyDown={(e) => {
             if (e.key === "Enter") onEnter?.();
           }}
-          className="h-full min-w-0 flex-1 border-none bg-transparent text-[17px] font-extrabold text-ink outline-none focus-visible:outline-none"
+          className="h-full min-w-0 flex-1 border-none bg-transparent text-[17px] font-extrabold text-ink outline-none focus-visible:outline-none [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_#FFFFFF]"
         />
       </span>
       {invalid && errorText && (
