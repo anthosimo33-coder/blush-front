@@ -88,7 +88,7 @@ export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: stri
 export async function importer({ nom, appli, texte }: ExportLu & { nom: string }): Promise<{ id: string; meta: Meta; secret: string }> {
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
-  const noms = participantsDe(texte, format);
+  const noms = participantsDe(texte);
   if (noms.length > 2) throw new ErreurImport("groupe");
   if (noms.length < 2) throw new ErreurImport("courte");
   const personne = (k: number) => ({ prenom: prenomDe(noms[k].nom), pronom: "il" as const, nomExport: noms[k].nom });
