@@ -38,10 +38,10 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
   const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
   const payload = fixed ? initial : (data ?? initial);
-  /* Le rapport s’écrit encore (back-end) : on repasse toutes les 4 secondes jusqu’à ce qu’il soit là */
+  /* Le rapport s’écrit encore (back-end) : on repasse toutes les 2 secondes (la jauge suit) jusqu’à ce qu’il soit là */
   useEffect(() => {
     if (!payload.generating || fixed) return;
-    const t = setInterval(refresh, 4000);
+    const t = setInterval(refresh, 2000);
     return () => clearInterval(t);
   }, [payload.generating, fixed, refresh]);
   /* Mode sobre : le chat reste à portée aussi (c’est là qu’on a le plus besoin de parler), dans une bulle sobre */

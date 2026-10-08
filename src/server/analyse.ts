@@ -79,22 +79,43 @@ const lireRapport = async (storyId: string) => {
  */
 export const avanceVerdict = (a: Avance) => Math.min(98, Math.round(a.texte > 0 ? 70 + 28 * Math.min(1, a.texte / 700) : 15 + 55 * (1 - Math.exp(-a.reflexion / 2500))));
 
-/** Écrit l’avancée d’une tâche en base, au plus une fois par seconde, sans jamais reculer. */
-function suivreAvance(tacheId: string, calcul: (a: Avance) => number): (a: Avance) => void {
+/** Les chapitres déjà commencés dans ce que le modèle a écrit (chaque chapitre de sa réponse commence par son numéro). */
+export const chapitresCommences = (ecrit: string) => [...ecrit.matchAll(/"numero"\s*:\s*(\d+)/g)].map((m) => +m[1]);
+
+/** Le plan du rapport (0 à 100) : sa réflexion jusqu’à 50, puis ses huit chapitres, un par un, jusqu’à 98. */
+export const avancePlan = (a: Avance) =>
+  Math.min(98, Math.round(a.texte > 0 ? 50 + 48 * Math.min(1, chapitresCommences(a.ecrit).length / 8) : 50 * (1 - Math.exp(-a.reflexion / 2500))));
+
+/** Une moitié du rapport (chapitres 1 à 4, ou 5 à 8) : où elle en est (0 à 1), ses chapitres écrits, celui en cours. */
+export type AvanceMoitie = { progres: number; ecrits: number[]; enCours: number | null };
+export function avanceMoitie(a: Avance, premier: 1 | 5): AvanceMoitie {
+  const nums = chapitresCommences(a.ecrit).filter((n) => n >= premier && n < premier + 4);
+  /* Avant le premier chapitre, il réfléchit : on s’approche de 45 % sans l’atteindre */
+  if (!nums.length) return { progres: 0.45 * (1 - Math.exp(-a.reflexion / 3000)), ecrits: [], enCours: a.texte > 0 ? premier : null };
+  /* Un chapitre fait environ 2 000 caractères : on avance dans celui en cours, sans jamais le finir avant le suivant */
+  const dansLeChapitre = a.ecrit.length - a.ecrit.lastIndexOf('"numero"');
+  return { progres: Math.min(0.98, 0.45 + (0.55 * (nums.length - 1 + Math.min(0.95, dansLeChapitre / 2000))) / 4), ecrits: nums.slice(0, -1), enCours: nums.at(-1)! };
+}
+
+/** Écrit l’avancée d’une tâche en base (et son détail), au plus une fois par seconde, sans jamais reculer. */
+function ecrireAvance(tacheId: string): (progres: number, detail?: unknown) => void {
   let derniere = 0;
-  let ecrite = 0;
-  return (a) => {
-    const p = calcul(a);
+  let ecrite = -1;
+  return (p, detail) => {
     if (p <= ecrite || Date.now() - derniere < 1000) return;
     derniere = Date.now();
     ecrite = p;
     void db()
       .update(schema.tasks)
-      .set({ progress: sql`greatest(${schema.tasks.progress}, ${p})` })
+      .set({ progress: sql`greatest(${schema.tasks.progress}, ${p})`, ...(detail === undefined ? {} : { detail }) })
       .where(eq(schema.tasks.id, tacheId))
       .catch(() => {});
   };
 }
+const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
+  const ecrire = ecrireAvance(tacheId);
+  return (a: Avance) => ecrire(calcul(a));
+};
 
 async function verdict(story: Ligne, t: Tache) {
   const { h, lu, rendu } = relire(story);
@@ -114,7 +135,7 @@ async function verdict(story: Ligne, t: Tache) {
 }
 
 /** Le rapport, étape 1 : le plan. En mode sobre, le rapport entier en un appel. */
-async function rapportPlan(story: Ligne) {
+async function rapportPlan(story: Ligne, t: Tache) {
   const { rendu } = relire(story);
   const v = await lireVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
@@ -124,7 +145,15 @@ async function rapportPlan(story: Ligne) {
     if (await aAcces(story)) await planifier(story.id, "memoire");
     return;
   }
-  const etape = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN), Etape05, (e) => (e.plan ? preuvesPlan(e.plan) : []), rendu.lignes, story.id, "rapport_plan");
+  const etape = await appelVerifie(
+    requeteRapport(rendu, v.sortie, DEMANDE_PLAN),
+    Etape05,
+    (e) => (e.plan ? preuvesPlan(e.plan) : []),
+    rendu.lignes,
+    story.id,
+    "rapport_plan",
+    suivreAvance(t.id, avancePlan),
+  );
   if (!etape.plan) throw new ErreurTache("plan_vide");
   await db()
     .insert(schema.reports)
@@ -134,14 +163,20 @@ async function rapportPlan(story: Ligne) {
 }
 
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
-async function rapportChapitres(story: Ligne) {
+async function rapportChapitres(story: Ligne, t: Tache) {
   const { rendu } = relire(story);
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
   const plan = dechiffrer<Plan>(ligne.plan);
+  /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre (la lecture du rapport l’affiche) */
+  const detail: { a: AvanceMoitie; b: AvanceMoitie } = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
+  const ecrire = ecrireAvance(t.id);
   const moitie = (quels: "1 à 4" | "5 à 8") =>
-    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, (e) => preuvesChapitres(e.chapitres), rendu.lignes, story.id, "rapport_chapitres");
+    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, (e) => preuvesChapitres(e.chapitres), rendu.lignes, story.id, "rapport_chapitres", (av) => {
+      detail[quels === "1 à 4" ? "a" : "b"] = avanceMoitie(av, quels === "1 à 4" ? 1 : 5);
+      ecrire(Math.round(50 * (detail.a.progres + detail.b.progres)), detail);
+    });
   const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
   if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
   const r: Rapport = {

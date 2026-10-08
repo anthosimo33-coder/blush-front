@@ -16,6 +16,7 @@ import { FlowSteps } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
+import { ChoixConv, type ConvInstagram } from "./ChoixConv";
 
 type ExportApp = "whatsapp" | "imessage" | "instagram";
 type Menu = { contact: string; items: readonly string[]; highlight: number };
@@ -28,6 +29,13 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [app, setApp] = useState<ExportApp>(initialApp);
   const [video, setVideo] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
+  const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
+  const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
+  const fermerChoix = (id: string | null) => {
+    choix?.repondre(id);
+    setChoix(null);
+  };
   const data = EXPORT_STEPS[app];
   const steps = device === "ios" ? data.steps.ios : device === "android" ? data.steps.android : data.steps.all;
 
@@ -35,10 +43,12 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
     setBusy(true);
     let source;
     try {
-      source = await uploadExport(file, app);
+      source = await uploadExport(file, app, choisir);
     } catch (e) {
       /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (DemoParams, ?erreur=) */
       setBusy(false);
+      /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
+      if (e instanceof ErreurApi && e.code === "annule") return;
       const code = e instanceof ErreurApi && ["fichier", "groupe", "courte"].includes(e.code) ? e.code : "lecture";
       router.replace(`/importer/export?app=${app}&erreur=${code}`, { scroll: false });
       return;
@@ -113,6 +123,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           Fermer
         </Button>
       </Sheet>
+
+      <ChoixConv open={!!choix} convs={choix?.convs ?? []} onChoisir={(id) => fermerChoix(id)} onClose={() => fermerChoix(null)} />
     </Screen>
   );
 }
