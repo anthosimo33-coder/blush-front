@@ -30,6 +30,8 @@ const Env = z.object({
     .enum(["0", "1"])
     .default("0")
     .transform((v) => v === "1"),
+  /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */
+  BLUSH_ALERTES: z.string().optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
   CRON_SECRET: z.string().min(16).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. */

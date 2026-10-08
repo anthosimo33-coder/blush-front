@@ -1,3 +1,4 @@
+import { resumerLaVeille } from "@/server/alertes";
 import { env } from "@/server/env";
 import { erreur, json } from "@/server/http";
 import { purger } from "@/server/purge";
@@ -6,5 +7,8 @@ import { purger } from "@/server/purge";
 export async function GET(req: Request) {
   const secret = env().CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return erreur("interdit", 401);
-  return json(await purger());
+  const purge = await purger();
+  /* Et le résumé de la veille, pour l’équipe */
+  await resumerLaVeille();
+  return json(purge);
 }
