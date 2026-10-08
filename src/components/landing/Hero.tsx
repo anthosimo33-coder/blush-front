@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { Container, CtaButton } from "./parts";
+import { Container, CtaButton, useCta } from "./parts";
 
 /* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
 
@@ -10,6 +10,7 @@ const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[110
 
 /** `children` : ce qui suit dans le héros (les convs qui défilent). */
 export function Hero({ children }: { children?: ReactNode }) {
+  const cta = useCta();
   return (
     <section className={cn("relative isolate pt-14 lg:pt-24", children ? "pb-10 lg:pb-14" : "pb-12 lg:pb-16")}>
       <span aria-hidden="true" className={GLOW} />
@@ -26,7 +27,7 @@ export function Hero({ children }: { children?: ReactNode }) {
           Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
         </p>
         <CtaButton className="mt-8 lg:mt-10" />
-        <span className="mt-3.5 text-[14px] font-extrabold text-grey">Aperçu gratuit · Sans mot de passe</span>
+        <span className="mt-3.5 text-[14px] font-extrabold text-grey">{cta.note}</span>
       </Container>
       {children}
     </section>

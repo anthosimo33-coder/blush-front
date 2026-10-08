@@ -18,6 +18,13 @@ const nextConfig: NextConfig = {
       { source: "/app/brouillon", destination: "/app", permanent: false },
     ];
   },
+  /*
+   * Qui revient connecté (cookie de session, src/server/cookies.ts) voit la landing de src/app/retour, à la même
+   * adresse : ses boutons mènent à son accueil. Sans le cookie, / reste la page statique.
+   */
+  async rewrites() {
+    return { beforeFiles: [{ source: "/", has: [{ type: "cookie", key: "blush-session" }], destination: "/retour" }], afterFiles: [], fallback: [] };
+  },
   async headers() {
     return [{ source: "/(.*)", headers: SECURITE }];
   },
