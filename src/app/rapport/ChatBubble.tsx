@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { useEnVue } from "@/lib/hooks";
 
 /* Le chat a-t-il déjà été ouvert une fois sur cet appareil ? Retenu dans le navigateur (une simple commodité) */
 const CLE = "blush.chat.ouvert.v1";
@@ -49,13 +50,18 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
   const vu = useChatOuvert();
   /* En mode sobre, rien ne s’agite */
   const ouvert = vu || sobre;
+  /* Le bouton « Parler à BLUSH » du bas du rapport est à l’écran : la bulle s’efface pour ne pas passer dessus */
+  const cachee = useEnVue("cta-chat");
   return (
     <Link
       href="/app?depuis=rapport"
       onClick={marquerChatOuvert}
       aria-label="Parler à BLUSH"
+      aria-hidden={cachee || undefined}
+      tabIndex={cachee ? -1 : undefined}
       className={cn(
-        "group fixed right-4 z-40 flex items-center gap-2.5 no-underline lg:bottom-8 lg:right-8",
+        "group fixed right-4 z-40 flex items-center gap-2.5 no-underline transition-[opacity,translate] duration-300 lg:bottom-8 lg:right-8",
+        cachee && "pointer-events-none translate-y-3 opacity-0",
         raised ? "bottom-[calc(max(20px,env(safe-area-inset-bottom))+72px)]" : "bottom-[max(20px,env(safe-area-inset-bottom))]",
       )}
     >

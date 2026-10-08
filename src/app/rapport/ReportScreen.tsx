@@ -24,7 +24,7 @@ import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import { useJourney } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
 import { SoberReport } from "./SoberReport";
 
@@ -299,10 +299,13 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       mobileGap={18}
       stickyFooter={false}
       footer={
+        /* Le rapport écrit : on continue avec BLUSH, dans le chat. Pendant l’écriture, le chat n’est pas encore prêt */
         full ? (
-          <ButtonLink href="/app" arrow>
-            C’est parti
-          </ButtonLink>
+          payload.generating ? undefined : (
+            <ButtonLink id="cta-chat" href="/app?depuis=rapport" onClick={marquerChatOuvert} arrow>
+              Parler à BLUSH
+            </ButtonLink>
+          )
         ) : (
           <Button arrow onClick={() => setPaywall(true)}>
             Lire la suite
@@ -384,7 +387,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         <>
           <ChapterRule />
           <div className="text-[13px] font-black text-grey">La suite de ton rapport s’écrit · {locked.length} chapitres</div>
-          <div className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
+          <div id="suite-ecriture" className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
             {locked.map((c, k) => (
               <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === locked.length - 1} />
             ))}
