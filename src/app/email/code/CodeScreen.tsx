@@ -19,8 +19,9 @@ const RESEND_AFTER = 30;
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
  * du téléphone marchent), affiché en 6 cases. Le code complet valide tout seul.
+ * `connexion` : on se reconnecte (un autre appareil) ; le bon code ouvre ses convs, sans relancer de lecture.
  */
-export function CodeScreen() {
+export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const [code, setCode] = useState("");
@@ -50,6 +51,10 @@ export function CodeScreen() {
       input.current?.focus();
       return;
     }
+    if (connexion) {
+      router.push("/app");
+      return;
+    }
     await createAccount(email);
     const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
     set({ jobId });
@@ -65,9 +70,9 @@ export function CodeScreen() {
 
   return (
     <Screen
-      mobileTop={<MobileTopBar back="/email" progress={3} />}
-      desktopBack={{ target: "/email" }}
-      aside={<FlowSteps step={3} />}
+      mobileTop={<MobileTopBar back={connexion ? "/connexion" : "/email"} progress={connexion ? undefined : 3} />}
+      desktopBack={{ target: connexion ? "/connexion" : "/email" }}
+      aside={connexion ? undefined : <FlowSteps step={3} />}
       contentGap={22}
       head={
         <>
@@ -79,7 +84,7 @@ export function CodeScreen() {
       }
       footer={
         <Button arrow={!busy} disabled={code.length !== LENGTH || busy} aria-busy={busy} onClick={() => verify(code)}>
-          {busy ? <TypingDots color="#FFFFFF" label="Création de ton rapport" /> : "Créer mon rapport"}
+          {busy ? <TypingDots color="#FFFFFF" label={connexion ? "Ouverture de tes convs" : "Création de ton rapport"} /> : connexion ? "Retrouver mes convs" : "Créer mon rapport"}
         </Button>
       }
     >
@@ -139,7 +144,7 @@ export function CodeScreen() {
         <button type="button" onClick={resend} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-toi-ink disabled:text-grey">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
-        <Link href="/email" className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-ink no-underline">
+        <Link href={connexion ? "/connexion" : "/email"} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-ink no-underline">
           Changer d’email
         </Link>
       </div>
