@@ -43,11 +43,14 @@ export async function finir(id: string): Promise<void> {
   await db().update(schema.tasks).set({ status: "fini", error: null, updatedAt: new Date() }).where(eq(schema.tasks.id, id));
 }
 
-/** Un échec : la tâche repart en attente, sauf au dernier essai. `code` ne contient jamais de contenu. */
-export async function echouer(t: Tache, code: string): Promise<void> {
+/**
+ * Un échec : la tâche repart en attente, sauf au dernier essai, ou si réessayer ne changerait rien (`definitif` :
+ * le modèle a refusé). `code` ne contient jamais de contenu.
+ */
+export async function echouer(t: Tache, code: string, definitif = false): Promise<void> {
   await db()
     .update(schema.tasks)
-    .set({ status: t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), updatedAt: new Date() })
+    .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), updatedAt: new Date() })
     .where(eq(schema.tasks.id, t.id));
 }
 
