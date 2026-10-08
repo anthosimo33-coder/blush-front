@@ -117,6 +117,25 @@ export type Verdict = {
   difficult: boolean;
 };
 
+/** Une ligne du vocal de BLUSH : ce qu’elle dit, quand (en secondes), mot par mot, et le message de leur conv qu’elle cite. */
+export type VocalLigne = {
+  texte: string;
+  /** Une punchline : affichée en rose pendant qu’elle la dit. */
+  punch: boolean;
+  debut: number;
+  fin: number;
+  mots: { t: string; debut: number }[];
+  recu?: Message;
+};
+
+/**
+ * Le vocal du rapport (la story en haut). `en_cours` : BLUSH l’enregistre. `pret` : l’audio et ses sous-titres minutés.
+ * `voix` : celle de l’A/B test, A ou B.
+ */
+export type VocalRapport =
+  | { etat: "en_cours" }
+  | { etat: "pret"; audio: string; duree: number; voix: "A" | "B"; sobre: boolean; lignes: VocalLigne[] };
+
 export type Report = {
   storyId: string;
   verdict: Verdict;

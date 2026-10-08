@@ -28,6 +28,7 @@ import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
 import { PartageEtConfidentialite } from "./Partage";
 import { SoberReport } from "./SoberReport";
+import { VocalDuRapport } from "./Vocal";
 
 /** Où tu t’étais arrêté (ce navigateur seulement). */
 const RESUME_KEY = "blush.rapport.reprise.v1";
@@ -39,17 +40,21 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
   const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
   const payload = fixed ? initial : (data ?? initial);
-  /* Le rapport s’écrit encore (back-end) : on repasse toutes les 2 secondes (la jauge suit) jusqu’à ce qu’il soit là */
+  /* Le rapport s’écrit encore (back-end), ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
+  const attendre = !!payload.generating || payload.vocal?.etat === "en_cours";
   useEffect(() => {
-    if (!payload.generating || fixed) return;
+    if (!attendre || fixed) return;
     const t = setInterval(refresh, 2000);
     return () => clearInterval(t);
-  }, [payload.generating, fixed, refresh]);
+  }, [attendre, fixed, refresh]);
   /* Mode sobre : le chat reste à portée aussi (c’est là qu’on a le plus besoin de parler), dans une bulle sobre */
   if (payload.sober)
     return (
       <>
-        <SoberReport data={payload.sober} />
+        <SoberReport
+          data={payload.sober}
+          vocal={payload.vocal ? <VocalDuRapport vocal={payload.vocal} sobre ecrit={!!payload.generating} titre={`${story.participants[0].name} & ${story.participants[1].name}`} fin={{ titre: payload.sober.title, sousTitre: payload.sober.reassurance, action: "Lire la suite" }} /> : undefined}
+        />
         {payload.access === "blushplus" && !payload.generating && <ChatBubble sobre />}
       </>
     );
@@ -300,6 +305,16 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         )
       }
     >
+      {/* Le vocal de BLUSH : la première chose du rapport */}
+      {payload.vocal && (
+        <VocalDuRapport
+          vocal={payload.vocal}
+          ecrit={!!payload.generating}
+          titre={`${story.participants[0].name} & ${story.participants[1].name}`}
+          fin={{ emoji: report.verdict.emoji, titre: report.verdict.title, sousTitre: report.verdict.subtitle, action: "Lire mon rapport" }}
+        />
+      )}
+
       {/* En-tête du rapport */}
       <Card className="flex flex-col gap-2.5 p-[18px]">
         <div className="flex items-center justify-between">

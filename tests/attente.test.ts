@@ -32,7 +32,7 @@ describe("les alertes", () => {
     await resumerLaVeille();
     const resume = log.mock.calls.flat().join("\n");
     expect(resume).toContain("Nouveaux sur la liste d’attente : ");
-    expect(resume).toMatch(/Coût de Claude : \d+\.\d{2} \$/);
+    expect(resume).toMatch(/Coût de l’IA : \d+\.\d{2} \$/);
     log.mockRestore();
   });
 });

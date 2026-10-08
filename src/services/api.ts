@@ -21,10 +21,12 @@ import type {
   Source,
   Story,
   Subscription,
+  VocalRapport,
 } from "@/types";
 import { FICHE, FICHE_FINDINGS, SUBSCRIPTIONS } from "@/mocks/daily";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } from "@/mocks/story";
-import { demoStory, storyIdFor } from "@/mocks/stories";
+import { DEMO_STORY_IDS, demoStory, storyIdFor } from "@/mocks/stories";
+import { vocalDemo } from "@/mocks/vocal";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
@@ -58,6 +60,8 @@ export type ReportPayload = {
   generating?: boolean;
   /** Pendant l’écriture : où en est BLUSH, chapitre par chapitre. */
   ecriture?: EcritureRapport;
+  /** Le vocal de BLUSH, en haut du rapport : prêt, ou en train de s’enregistrer. */
+  vocal?: VocalRapport;
 };
 
 /* Durée simulée de la lecture (environ 6 s). */
@@ -163,15 +167,23 @@ export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgre
 export async function getReport(storyId?: string): Promise<ReportPayload> {
   if (BACKEND) return reel.getReport();
   const s = mockServer.get();
-  const { report, sober } = opened(storyId);
+  const { report, sober, story } = opened(storyId);
   const full = s.plan !== "gratuit";
   const chapters = report.chapters.map((c) => (c.free || full ? c : { ...c, locked: true, blocks: [] }));
   const difficult = s.verdict === "difficile";
+  /* Le vocal : avec le rapport (ou sa version sobre, offerte), sur l’histoire des maquettes seulement */
+  const vocal = (full || difficult) && story.id === DEMO_STORY_IDS.rencontre ? vocalDemo(difficult) : undefined;
   return {
     report: { ...report, chapters, verdict: { ...report.verdict, difficult } },
     sober: difficult ? sober : null,
     access: s.plan,
+    ...(vocal ? { vocal } : {}),
   };
+}
+
+/** Un moment de l’écoute du vocal, pour comparer les deux voix (A/B test). En démo, rien n’est noté. */
+export function noterEcouteVocal(evenement: "debut" | "fin" | "reecoute" | "ferme", position: number): void {
+  if (BACKEND) void reel.ecouteVocal(evenement, position);
 }
 
 /** Simule le paiement. */
