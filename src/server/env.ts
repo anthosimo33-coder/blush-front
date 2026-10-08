@@ -23,6 +23,11 @@ const Env = z.object({
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@blush.app>"),
   /** Bêta sans paiement : emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde. */
   BLUSH_ACCES_LIBRE: z.string().default(""),
+  /** Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). */
+  BLUSH_BETA_FERMEE: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((v) => v === "1"),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
   CRON_SECRET: z.string().min(16).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. */
@@ -48,6 +53,9 @@ export function env(): Env {
   cache = lu.data;
   return cache;
 }
+
+/** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
+export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
 
 /** L’email a-t-il BLUSH+ d’office (bêta sans paiement) ? */
 export function accesLibre(email: string): boolean {
