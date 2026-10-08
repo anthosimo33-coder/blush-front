@@ -9,6 +9,7 @@ import { definirQui, depuisFichier, ErreurImport, importer as importerLu, metaDe
 import { definirFactice } from "@/server/ia/claude";
 import { planifier } from "@/server/taches";
 import { fournisseurFactice } from "@/server/ia/factice";
+import { audioDe, noterEcoute, statsVocal, vocalPret } from "@/server/vocal";
 
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
 const importer = async (f: File) => importerLu(await depuisFichier(f));
@@ -49,6 +50,7 @@ describe("de l’import à la mémoire", () => {
       ["verdict", "fini"],
       ["rapport_plan", "fini"],
       ["rapport_chapitres", "fini"],
+      ["vocal", "fini"],
       ["memoire", "fini"],
     ]);
     const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, id));
@@ -59,6 +61,24 @@ describe("de l’import à la mémoire", () => {
     /* Les preuves deviennent des messages datés */
     const recit = rapport.chapitres[1].blocks.find((b) => b.kind === "story");
     expect(recit && "messages" in recit && recit.messages?.[0]?.caption).toMatch(/· \d{2}\/\d{2}/);
+
+    /* Le vocal, fait pendant les chapitres : le script minuté et l’audio, chiffrés, la voix de l’A/B test en clair */
+    const vocal = await vocalPret(id);
+    expect(vocal?.voix).toBe("A");
+    expect(vocal?.lignes.length).toBeGreaterThan(2);
+    expect(vocal?.lignes.some((l) => l.punch)).toBe(true);
+    expect(vocal?.lignes.some((l) => l.recu?.caption)).toBe(true);
+    expect(vocal?.lignes.every((l, k, ls) => l.debut <= l.fin && (k === 0 || ls[k - 1].debut <= l.debut))).toBe(true);
+    const audio = await audioDe(id);
+    expect(audio?.subarray(0, 2).toString("hex")).toBe("fffb");
+    const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, id));
+    expect(brut.data.toString("utf8")).not.toContain("Lis la suite");
+    /* L’A/B test : l’écoute est notée sans contenu, et les chiffres sortent par voix */
+    await noterEcoute(id, "debut", 0);
+    await noterEcoute(id, "fin", brut.dureeMs);
+    const stats = (await statsVocal()).find((s) => s.voix === "A");
+    expect(stats?.ecoutes).toBeGreaterThanOrEqual(1);
+    expect(stats?.finis).toBeGreaterThanOrEqual(1);
 
     const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, id));
     const memoire = dechiffrer<DonneesMemoire>(m.data);

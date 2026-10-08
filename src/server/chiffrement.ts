@@ -33,6 +33,22 @@ export function dechiffrer<T>(donnee: Buffer | Uint8Array): T {
   return JSON.parse(Buffer.concat([d.update(b.subarray(29)), d.final()]).toString("utf8")) as T;
 }
 
+/** Le même chiffrement pour des octets bruts (l’audio du vocal), sans passer par le JSON. */
+export function chiffrerOctets(octets: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", cles().chiffrement, iv);
+  const corps = Buffer.concat([c.update(octets), c.final()]);
+  return Buffer.concat([Buffer.from([VERSION]), iv, c.getAuthTag(), corps]);
+}
+
+export function dechiffrerOctets(donnee: Buffer | Uint8Array): Buffer {
+  const b = Buffer.from(donnee);
+  if (b[0] !== VERSION) throw new Error(`Version de chiffrement inconnue : ${b[0]}`);
+  const d = createDecipheriv("aes-256-gcm", cles().chiffrement, b.subarray(1, 13));
+  d.setAuthTag(b.subarray(13, 29));
+  return Buffer.concat([d.update(b.subarray(29)), d.final()]);
+}
+
 /** Empreinte d’un secret (jeton, code) : on ne garde que ça en base. */
 export function empreinte(secret: string): string {
   return createHmac("sha256", cles().hachage).update(secret).digest("base64url");

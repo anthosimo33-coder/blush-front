@@ -4,15 +4,17 @@ import { after } from "next/server";
 import { cache } from "react";
 import { SUBSCRIPTIONS } from "@/mocks/daily";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
-import type { Plan as Plan05 } from "@prompts/lib/schemas";
-import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story } from "@/types";
+import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
+import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story, VocalRapport } from "@/types";
 import { executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import { contexteDe, histoireOuverte, histoiresDuCompte, metaDe, storyAffichee, type Ligne } from "./histoires";
-import { aRelancer, etatDesTaches } from "./taches";
+import { aRelancer, etatDesTaches, planifier } from "./taches";
+import { voixDisponible } from "./ia/voix";
+import { vocalPret } from "./vocal";
 import { jourRelatif } from "./temps";
 import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
 
@@ -199,6 +201,7 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
   }
   const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
   const ecriture = ouvert && !donnees ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;
+  const vocal = ouvert ? await vocalDuRapport(story, sortie, !!donnees) : undefined;
 
   return {
     report: {
@@ -215,7 +218,25 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente, et où en est l’écriture */
     generating: ouvert && !donnees,
     ...(ecriture ? { ecriture } : {}),
+    ...(vocal ? { vocal } : {}),
   };
+}
+
+/**
+ * Le vocal du rapport : prêt, en train de s’enregistrer (sa tâche attend ou tourne, ou le rapport s’écrit encore), ou
+ * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture.
+ */
+async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boolean): Promise<VocalRapport | undefined> {
+  const pret = await vocalPret(story.id);
+  if (pret) return pret;
+  if (!voixDisponible() || verdict.alerte) return undefined;
+  const { vocal: t } = await etatDesTaches(story.id, ["vocal"]);
+  if (t?.status === "echec" || t?.status === "fini") return undefined;
+  if (!t && rapportFini) {
+    await planifier(story.id, "vocal");
+    after(() => executerChaine(story.id));
+  }
+  return { etat: "en_cours" };
 }
 
 export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account {

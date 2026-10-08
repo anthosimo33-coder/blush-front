@@ -154,6 +154,26 @@
 [data-live] [data-pearl], [data-live] [data-shade] { transform-box: fill-box; transform-origin: center; animation: pearlWave 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite backwards; animation-delay: calc(var(--i, 0) * 0.3s); }
 [data-live] [data-shade] { animation-name: pearlShade; }
 [data-live] [data-glow] { animation: logoGlow 2.4s ease-in-out infinite; }
+
+/* ———— Le vocal de BLUSH (src/app/rapport/Vocal.tsx) ———— */
+[data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade] { animation: vocalParle 0.42s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 0.12s); animation-duration: calc(0.37s + var(--i, 0) * 0.06s); }
+[data-vocal-parle] [data-shade] { animation-name: vocalOmbre; }
+@keyframes vocalParle { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(-24%); } 65% { transform: translateY(-7%); } }
+@keyframes vocalOmbre { 0%, 100% { transform: scale(1); opacity: 1; } 35% { transform: scale(0.6); opacity: 0.45; } }
+[data-vocal-halo] { animation: vocalHalo 2.4s ease-in-out infinite; }
+@keyframes vocalHalo { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.08); } }
+[data-vocal-pop] { animation: vocalPop 0.38s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes vocalPop { from { opacity: 0; transform: translateY(10px) scale(0.94); } to { opacity: 1; transform: none; } }
+[data-vocal-story] { animation: vocalOuvre 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+@keyframes vocalOuvre { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+[data-vocal-nouveau] { animation: vocalBouge 1.1s ease-in-out 0.8s 2; transform-origin: 20% 80%; }
+@keyframes vocalBouge { 0%, 100% { rotate: 0deg; } 18% { rotate: -1.6deg; } 36% { rotate: 1.3deg; } 54% { rotate: -0.8deg; } 72% { rotate: 0.4deg; } }
+[data-vocal-eq] { animation: vocalEq 0.9s ease-in-out infinite alternate; transform-origin: center; }
+@keyframes vocalEq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+[data-vocal-rec] { animation: vocalRec 1.2s ease-in-out infinite; }
+@keyframes vocalRec { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+[data-vocal-respire] > * { animation: vocalRespire 2.4s ease-in-out infinite; }
+@keyframes vocalRespire { 0%, 100% { opacity: 0.45; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
 /* Dans la conv : la bulle arrive d’un bond depuis sa pointe et respire ; à la réponse, elle se replie vers sa pointe */
 @keyframes typingIn { 0% { transform: scale(0.25); opacity: 0; } 55% { transform: scale(1.08); opacity: 1; } 78% { transform: scale(0.97); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes typingOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.35); opacity: 0; } }
@@ -430,6 +450,6 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
   [data-scan-bar] { animation: none !important; visibility: hidden; }
 }

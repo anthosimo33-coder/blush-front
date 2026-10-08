@@ -2,11 +2,11 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
-import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
+import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore, type SobreAffiche } from "@prompts/lib/front";
-import { appliquerMaj, citees, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
-import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
-import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie07, type Chapitre, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { appliquerMaj, citees, rapportCourt, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
+import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
+import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { chiffrer, dechiffrer } from "./chiffrement";
@@ -20,6 +20,8 @@ import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import { aRelancer, battre, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
+import { ErreurVoix, voixDisponible } from "./ia/voix";
+import { enregistrerVocal, vocalExiste } from "./vocal";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
@@ -162,6 +164,8 @@ async function rapportPlan(story: Ligne, t: Tache) {
   if (v.sortie.mode_sobre) {
     const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport");
     await garderRapport(story, r, rendu.lignes, v.scores);
+    /* Le vocal doux, avant la mémoire */
+    if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
     if (await aAcces(story)) await planifier(story.id, "memoire");
     return;
   }
@@ -180,6 +184,8 @@ async function rapportPlan(story: Ligne, t: Tache) {
     .values({ storyId: story.id, plan: chiffrer(etape.plan) })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { plan: chiffrer(etape.plan), updatedAt: new Date() } });
   await planifier(story.id, "rapport_chapitres");
+  /* Le vocal s’écrit pendant les chapitres (voir rapportChapitres) ; cette tâche ne sert que s’il n’a pas pu s’y faire */
+  if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
 }
 
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
@@ -212,8 +218,15 @@ async function rapportChapitres(story: Ligne, t: Tache) {
       nouveaux.forEach((c) => prets.set(c.numero, c));
       if (nouveaux.length) garderPrets();
     });
+  /*
+   * Le vocal s’écrit en même temps, sur le plan : il est prêt avant les chapitres. Son échec n’arrête pas le rapport
+   * (la tâche « vocal », planifiée après, le refera).
+   */
+  const enParallele = vocal(story, v.sortie, { plan }, choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), false).catch((e) =>
+    console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache || e instanceof ErreurVoix ? e.message : (e as Error).name}`),
+  );
   const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
-  await enregistrement;
+  await Promise.all([enregistrement, enParallele]);
   if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
   const r: Rapport = {
     alerte: plan.alerte,
@@ -257,6 +270,42 @@ async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre:
   } catch (e) {
     console.error(`mail du rapport non envoyé (${story.id}) :`, e instanceof Error ? e.message : "erreur");
   }
+}
+
+/** Les messages de la conv qui ont ces identifiants (ceux qu’on laisse citer). */
+const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flatMap((id) => (lignes.has(id) ? [[id, lignes.get(id)!] as const] : [])));
+
+/**
+ * Le vocal du rapport : le script (prompt 06, sur le verdict et le plan ou le rapport en court, jamais la conv entière),
+ * puis la voix (src/server/vocal.ts). Aucun vocal quand il y a une alerte.
+ */
+async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | { court: string }, lignes: Map<string, string>, sobre: boolean) {
+  if (!voixDisponible() || verdict.alerte || (await vocalExiste(story.id))) return;
+  const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
+  const script = await appelVerifie(req, Sortie06, preuvesVocal, lignes, story.id, "vocal");
+  if (script.alerte) return;
+  await enregistrerVocal(story, script, lignes, sobre);
+}
+
+/**
+ * La tâche « vocal » : quand il n’a pas pu se faire pendant l’écriture, en mode sobre, ou pour un rapport écrit avant
+ * le vocal. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon de la mémoire.
+ */
+async function vocalTache(story: Ligne) {
+  if (!voixDisponible() || (await vocalExiste(story.id))) return;
+  const v = await lireVerdict(story.id);
+  const ligne = await lireRapport(story.id);
+  if (!v) throw new ErreurTache("verdict_absent");
+  if (!ligne?.data) throw new ErreurTache("rapport_absent");
+  const r = dechiffrer<DonneesRapport>(ligne.data).sortie;
+  let lignes: Map<string, string>;
+  if (convDe(story)) lignes = choisir(relire(story).rendu.lignes, [...preuvesRapport(r), ...preuvesVerdict(v.sortie)]);
+  else {
+    const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
+    lignes = new Map(m ? dechiffrer<DonneesMemoire>(m.data).lignes : []);
+  }
+  const sobre = r.sobre ? `\nmode sobre : ${r.sobre.intro} ${r.sobre.titre} ${r.sobre.faits} ${r.sobre.reassurance}` : "";
+  await vocal(story, v.sortie, { court: rapportCourt(r) + sobre }, lignes, r.mode_sobre || v.sortie.mode_sobre);
 }
 
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
@@ -307,6 +356,7 @@ const ETAPES: Partial<Record<Genre, (story: Ligne, t: Tache) => Promise<void>>> 
   rapport_chapitres: rapportChapitres,
   memoire,
   memoire_maj: memoireMaj,
+  vocal: vocalTache,
 };
 
 /** Une étape a-t-elle encore l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */

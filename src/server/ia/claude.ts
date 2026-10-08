@@ -48,6 +48,7 @@ const SYSTEMES: Record<Tache, string> = {
   "01-captures": TEXTES["01-captures"].trim(),
   "04-verdict": systeme(TEXTES.socle, TEXTES["04-verdict"]),
   "05-rapport": systeme(TEXTES.socle, TEXTES["05-rapport"]),
+  "06-vocal": systeme(TEXTES.socle, TEXTES["06-vocal"]),
   "07-memoire": systeme(TEXTES.socle, TEXTES["07-memoire"]),
   "10-chat": systeme(TEXTES.socle, TEXTES["10-chat"]),
 };

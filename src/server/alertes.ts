@@ -3,6 +3,7 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "./db";
 import { env } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
+import { statsVocal } from "./vocal";
 
 /*
  * Les alertes de l’équipe, par mail (BLUSH_ALERTES) : un échec définitif, et chaque nuit le résumé de la veille.
@@ -35,6 +36,7 @@ export async function alerter(sujet: string, lignes: string[]): Promise<void> {
 }
 
 const dollars = (micros: number) => `${(micros / 1e6).toFixed(2)} $`;
+const part = (n: number, sur: number) => (sur ? `${Math.round((n / sur) * 100)} %` : "–");
 
 /** Le résumé des dernières 24 heures (appelé par la tâche de nuit). Rien ne s’envoie s’il ne s’est rien passé. */
 export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
@@ -58,6 +60,7 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
       .where(gte(schema.aiUsage.createdAt, depuis))
       .groupBy(schema.aiUsage.task);
     const total = couts.reduce((s, c) => s + (c.micros ?? 0), 0);
+    const voix = await statsVocal();
     if (!histoires && !messages && !couts.length && !attente && !echecs) return;
     await envoyer(`BLUSH · la veille : ${histoires} import${histoires > 1 ? "s" : ""}, ${dollars(total)}`, [
       `Imports : ${histoires}`,
@@ -66,8 +69,18 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
       `Échecs définitifs : ${echecs}`,
       `Nouveaux sur la liste d’attente : ${attente}`,
       "",
-      `Coût de Claude : ${dollars(total)}`,
+      `Coût de l’IA : ${dollars(total)}`,
       ...couts.sort((a, b) => (b.micros ?? 0) - (a.micros ?? 0)).map((c) => `  ${c.tache} : ${dollars(c.micros ?? 0)} (${c.appels} appel${c.appels > 1 ? "s" : ""})`),
+      ...(voix.length
+        ? [
+            "",
+            "A/B test des voix du vocal, depuis le début :",
+            ...voix.map(
+              (v) =>
+                `  Voix ${v.voix} (${v.voix === "A" ? "E2" : "L2, Harmonie"}) : ${v.vocaux} vocaux, ${v.ecoutes} écoutés, ${v.finis} jusqu’au bout (${part(v.finis, v.ecoutes)}), ${v.reecoutes} réécoutés${v.jusqua == null ? "" : `, écoutés en moyenne à ${Math.round(v.jusqua * 100)} %`}`,
+            ),
+          ]
+        : []),
     ]);
   } catch (e) {
     console.error("résumé non envoyé", (e as Error).message);
