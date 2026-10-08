@@ -30,7 +30,7 @@ import { vocalDemo } from "@/mocks/vocal";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
-import { ErreurApi, reel } from "./reel";
+import { ErreurApi, reel, type AvanceVideo } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
@@ -98,6 +98,14 @@ export async function uploadScreenshots(
     source: { ...base, app: opts.app, screenshotCount: files.length },
     messagesRead: opts.mode === "first" ? SCREENSHOTS_RESULT.messagesRead : base.messageCount,
   };
+}
+
+/** Un enregistrement d’écran de la conv (sa première importation) : ses écrans sont tirés dans le navigateur, puis lus. */
+export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
+  if (BACKEND) return reel.uploadRecording(file, app, onAvance);
+  onAvance?.({ etape: "lecture", faits: 0, total: 1 });
+  await delay(800);
+  return { source: { ...SOURCE_INSTAGRAM, app, screenshotCount: 1 }, messagesRead: SCREENSHOTS_RESULT.messagesRead };
 }
 
 export async function getStory(storyId?: string): Promise<Story> {
@@ -238,6 +246,7 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
  * tout le reste (texte collé, captures, export) est lu comme sa réponse à elle.
  */
 export type { BlushAnswer };
+export type { AvanceVideo };
 
 /** Les questions toutes prêtes du chat (celles que promet la landing). */
 export async function getQuickQuestions(storyId?: string): Promise<string[]> {

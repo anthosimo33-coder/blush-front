@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
-import { uploadScreenshots } from "@/services/api";
+import { uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { BACKEND } from "@/services/mode";
 import { ErreurApi } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
@@ -18,8 +18,20 @@ import type { AppKind } from "@/types";
 
 
 type Shot = { id: string; file: File; url: string | null };
+const NB = "\u00a0";
 
-/* Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement d’écran. */
+/* Les applis lues par captures côté serveur (les autres passent par « autre ») */
+const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
+
+/** Où en est un enregistrement, dit simplement : la vidéo regardée dans le téléphone, puis lue par BLUSH. */
+const texteAvance = (a: AvanceVideo) =>
+  a.etape === "video" ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NB}%` : a.total > 1 ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}` : "BLUSH lit ta conv";
+
+/*
+ * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement
+ * d’écran : le téléphone en tire les écrans de la conv (la vidéo ne part pas), puis BLUSH les lit. Pour iMessage (pas
+ * d’export possible), l’enregistrement est le chemin principal.
+ */
 export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode: boolean }) {
   const router = useRouter();
   const [journey] = useJourney();
@@ -28,8 +40,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [items, setItems] = useState<Shot[]>([]);
   const [result, setResult] = useState<{ count: number; messages: number; video: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [avance, setAvance] = useState<AvanceVideo | null>(null);
   const [announce, setAnnounce] = useState("");
   const captureApp = app ?? journey.app ?? "instagram";
+  const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
   useEffect(() => {
     all.current = items;
@@ -42,14 +56,17 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const echec = (code: string) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
   const handle = async (picked: File[], video: boolean) => {
-    const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null }));
-    if (video) items.forEach((s) => s.url && URL.revokeObjectURL(s.url));
-    const next = video ? added : [...items, ...added];
-    /* Back-end v1 : pas encore d’enregistrement d’écran ; et la lecture ne part qu’une fois, au clic sur Continuer */
-    if (BACKEND && video) return echec("capture");
+    const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: URL.createObjectURL(file) }));
+    /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
+    const replace = video || !!result?.video;
+    if (replace) items.forEach((s) => s.url && URL.revokeObjectURL(s.url));
+    const next = replace ? added : [...items, ...added];
+    /* Back-end : l’enregistrement sert à la première importation (pas encore pour compléter une conv) */
+    if (BACKEND && video && addMode) return echec("capture");
     setItems(next);
+    /* Back-end : la lecture ne part qu’une fois, au clic sur Continuer */
     if (BACKEND) {
-      setResult({ count: next.length, messages: -1, video: false });
+      setResult({ count: next.length, messages: -1, video });
       return;
     }
     setBusy(true);
@@ -89,17 +106,21 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const continuer = async () => {
     if (!BACKEND) return router.push(next);
     setBusy(true);
+    const video = !!result?.video;
     try {
-      const r = await uploadScreenshots(
-        items.map((s) => s.file),
-        { app: captureApp, mode: addMode ? "add" : "first" },
-      );
+      const r = video
+        ? await uploadRecording(items[0].file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", setAvance)
+        : await uploadScreenshots(
+            items.map((s) => s.file),
+            { app: captureApp, mode: addMode ? "add" : "first" },
+          );
       setJourney({ captureNames: items.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
-      setResult({ count: items.length, messages: r.messagesRead, video: false });
+      setResult({ count: items.length, messages: r.messagesRead, video });
       router.push(next);
     } catch (e) {
       setBusy(false);
-      echec(e instanceof ErreurApi && ["courte", "groupe"].includes(e.code) ? e.code : "capture");
+      setAvance(null);
+      echec(e instanceof ErreurApi && ["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
     }
   };
 
@@ -113,15 +134,28 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       aside={<FlowSteps step={1} />}
       head={
         <>
-          <ScreenTitle>Choisis tes captures.</ScreenTitle>
-          <Lead size={14}>Instagram et Hinge ne permettent pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.</Lead>
+          <ScreenTitle>{enregistrement ? "Filme ta conv." : "Choisis tes captures."}</ScreenTitle>
+          <Lead size={14}>
+            {enregistrement
+              ? "iMessage ne permet pas d’exporter. Enregistre ton écran en remontant la conv : BLUSH lit tout, message par message."
+              : "Instagram et Hinge ne permettent pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle."}
+          </Lead>
         </>
       }
       footer={
         items.length ? (
-          <Button arrow onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
-            {busy && BACKEND ? <TypingDots color="#FFFFFF" label="BLUSH lit tes captures" /> : "Continuer"}
+          <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
+            {busy && BACKEND ? (
+              <span className="flex items-center gap-2.5">
+                <TypingDots color="#FFFFFF" label={avance ? texteAvance(avance) : "BLUSH lit tes captures"} />
+                {avance && <span className="text-[16px] tabular-nums">{texteAvance(avance)}</span>}
+              </span>
+            ) : (
+              "Continuer"
+            )}
           </Button>
+        ) : enregistrement ? (
+          <Button onClick={rec.open}>Choisir mon enregistrement</Button>
         ) : (
           /* ⚠ Libellé avant sélection absent des maquettes */
           <Button onClick={shots.open}>Choisir mes captures</Button>
@@ -129,7 +163,13 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       }
     >
       {items.length === 0 ? (
-        <Dropzone onPick={shots.open} onFiles={(f) => handle(f, false)} />
+        enregistrement ? (
+          <CommentFilmer onPick={rec.open} />
+        ) : (
+          <Dropzone onPick={shots.open} onFiles={(f) => handle(f, false)} />
+        )
+      ) : result?.video ? (
+        <CarteEnregistrement shot={items[0]} onChange={rec.open} />
       ) : (
         <div className="flex flex-col gap-2.5">
           <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video ? undefined : shots.open} />
@@ -146,28 +186,33 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
 
       {/* L’autre façon d’ajouter la conv, en ligne discrète comme sur l’écran suivant */}
       <InsetGroup>
-        <InsetRow
-          leading={
-            <RowIcon tone="elle">
-              <span className="size-3.5 rounded-[7px] bg-elle" />
-            </RowIcon>
-          }
-          title="Plus rapide : enregistre ton écran"
-          sub="Remonte la conv en scrollant, on analyse tout."
-          onClick={rec.open}
-          chevron
-        />
+        {enregistrement ? (
+          <InsetRow leading={<RowIcon icon="photo" tone="toi" />} title="Ou choisis des captures d’écran" sub="Pour une conv courte, quelques captures suffisent." onClick={shots.open} chevron />
+        ) : (
+          <InsetRow
+            leading={
+              <RowIcon tone="elle">
+                <span className="size-3.5 rounded-[7px] bg-elle" />
+              </RowIcon>
+            }
+            title="Plus rapide : enregistre ton écran"
+            sub="Remonte la conv doucement en filmant ton écran : BLUSH lit tout."
+            onClick={rec.open}
+            chevron
+          />
+        )}
       </InsetGroup>
 
       <div aria-live="polite" className="min-h-6">
-        {busy && <TypingDots label="Analyse des captures" />}
-        {!busy && result && (
+        {/* L’avancée d’un enregistrement s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
+        {busy && (avance ? <span className="sr-only">{texteAvance(avance)}</span> : <TypingDots label="Analyse des captures" />)}
+        {!busy && result && !result.video && (
           <div data-rise="" className="flex items-center gap-2 text-[14px] font-black">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
               <Icon name="check" size={13} color="#FFFFFF" stroke={3.4} />
             </span>
             {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`}
-            {result.messages >= 0 ? ` · ${result.messages} messages analysés` : " prêtes"}
+            {result.messages >= 0 ? ` · ${result.messages} messages analysés` : result.video ? " prêt" : result.count > 1 ? " prêtes" : " prête"}
           </div>
         )}
       </div>
@@ -324,7 +369,7 @@ function ReorderGrid({
               )}
               style={lifted ? { touchAction: "none" } : undefined}
             >
-              <Thumb selected number={i + 1} image={s.url}>
+              <Thumb selected number={i + 1} image={s.url} video={s.file.type.startsWith("video/")}>
                 {!s.url && (
                   <>
                     <Bar side="l" width={70} />
@@ -361,7 +406,19 @@ function ReorderGrid({
   );
 }
 
-function Thumb({ children, selected, number, dark, image }: { children?: React.ReactNode; selected?: boolean; number?: number; dark?: boolean; image?: string | null }) {
+function Thumb({ children, selected, number, dark, image, video }: { children?: React.ReactNode; selected?: boolean; number?: number; dark?: boolean; image?: string | null; video?: boolean }) {
+  /* Un enregistrement : sa première image (l’ancre #t pour que Safari en affiche une), et le signe lecture */
+  if (video && image)
+    return (
+      <div className={cn("relative h-[108px] overflow-hidden rounded-2xl bg-[#111114]", selected ? "shadow-selected" : "shadow-thin")}>
+        <video src={`${image}#t=0.6`} muted playsInline preload="metadata" className="absolute inset-0 size-full object-cover object-top" />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-9 items-center justify-center rounded-full bg-[rgba(17,17,20,0.6)]">
+            <Icon name="play" size={15} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />
+          </span>
+        </span>
+      </div>
+    );
   return (
     <div
       className={cn(
@@ -381,6 +438,84 @@ function Thumb({ children, selected, number, dark, image }: { children?: React.R
 
 function Bar({ side, width, dark }: { side: "l" | "r"; width: number; dark?: boolean }) {
   return <span className={cn("h-[11px] rounded-md", side === "l" ? "self-start" : "self-end", side === "r" ? "bg-toi" : dark ? "bg-[#2A2A30]" : "bg-skeleton")} style={{ width: `${width}%` }} />;
+}
+
+/** Le bouton d’enregistrement de l’écran du Centre de contrôle : un rond blanc cerclé, un point rouge. */
+function BoutonRec() {
+  return (
+    <span aria-label="le bouton d’enregistrement" role="img" className="mx-0.5 inline-flex size-[1.15em] items-center justify-center rounded-full border-2 border-current align-[-0.2em]">
+      <span className="size-[0.5em] rounded-full bg-[#FF3B30]" />
+    </span>
+  );
+}
+
+/** L’enregistrement choisi : son aperçu, sa durée, et de quoi en changer. */
+function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange: () => void }) {
+  const [duree, setDuree] = useState<number | null>(null);
+  return (
+    <div className="flex items-center gap-4 rounded-card bg-white p-3.5 shadow-soft">
+      <span className="relative h-[112px] w-[64px] shrink-0 overflow-hidden rounded-[14px] bg-[#111114]">
+        {shot.url && (
+          <video src={`${shot.url}#t=0.6`} muted playsInline preload="metadata" onLoadedMetadata={(e) => setDuree(e.currentTarget.duration)} className="absolute inset-0 size-full object-cover object-top" />
+        )}
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.6)]">
+            <Icon name="play" size={12} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />
+          </span>
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[16px] font-black">Ton enregistrement</span>
+        <span className="text-[13px] font-extrabold text-grey">
+          {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}${NB}min ` : ""}${Math.round(duree % 60)}${NB}s · ` : ""}prêt
+        </span>
+      </span>
+      <button type="button" onClick={onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink">
+        Changer
+      </button>
+    </div>
+  );
+}
+
+/** iMessage : comment filmer sa conv sur iPhone, en quatre gestes, puis la choisir. */
+function CommentFilmer({ onPick }: { onPick: () => void }) {
+  const etapes: ReactNode[] = [
+    "Ouvre votre conv dans Messages",
+    <>
+      Ouvre le Centre de contrôle, et touche <BoutonRec /> (Enregistrement de l’écran)
+    </>,
+    "Reviens sur la conv, et remonte-la doucement jusqu’au début",
+    "Arrête l’enregistrement, puis choisis-le ici",
+  ];
+  return (
+    <div className="flex flex-col gap-3">
+      <button type="button" onClick={onPick} className="lift flex flex-col gap-4 rounded-card bg-white p-5 text-left text-ink shadow-soft">
+        <span className="flex items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[rgba(255,90,96,0.12)]">
+            <span className="size-4 rounded-full bg-[#FF5A60] shadow-[0_0_0_4px_rgba(255,90,96,0.22)]" />
+          </span>
+          <span className="flex flex-col">
+            <span className="text-[17px] font-black">Enregistre ton écran</span>
+            <span className="text-[13px] font-extrabold text-grey">Toute votre conv, en une minute</span>
+          </span>
+        </span>
+        <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+          {etapes.map((e, k) => (
+            <li key={k} className="flex items-start gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-black text-white">{k + 1}</span>
+              <span className="pt-0.5 text-[14px] font-extrabold leading-[1.4]">{e}</span>
+            </li>
+          ))}
+        </ol>
+      </button>
+      <p className="m-0 flex items-start gap-2 px-1 text-[12.5px] font-extrabold leading-[1.45] text-grey">
+        <Icon name="lock" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
+        <span>
+          La vidéo reste sur ton téléphone : seuls les écrans de la conv partent, lus une fois puis oubliés. Pas de bouton <BoutonRec /> ? Ajoute-le dans Réglages, Centre de contrôle.
+        </span>
+      </p>
+    </div>
+  );
 }
 
 /** Zone d’ajout (avant sélection) : un vrai appel à déposer, pas de fausses captures. Accepte aussi le glisser-déposer. */

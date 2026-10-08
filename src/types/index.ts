@@ -284,4 +284,4 @@ export type AnalysisProgress = {
   failReason?: "refus" | "panne";
 };
 
-export type DemoError = "fichier" | "groupe" | "courte" | "lecture" | "capture";
+export type DemoError = "fichier" | "groupe" | "courte" | "lecture" | "capture" | "video" | "longue";

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { AppliCaptures } from "@/server/appli-captures";
 import { ErreurCaptures, imagesDe, lireCaptures } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
@@ -9,7 +9,7 @@ import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 /* La lecture de 20 captures prend jusqu’à une minute */
 export const maxDuration = 180;
 
-const Appli = z.enum(["instagram", "hinge", "autre"]);
+const Appli = AppliCaptures;
 
 /**
  * Des captures d’écran de la conv (réduites par le navigateur) : BLUSH les lit (prompt 01) et en fait une histoire
