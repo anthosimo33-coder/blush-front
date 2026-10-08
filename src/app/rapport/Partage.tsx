@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import { creerLienPartage, desactiverLienPartage } from "@/services/api";
@@ -19,19 +19,55 @@ const N = " ";
 /* Le fond de la carte (le papier de la landing), le temps que l’image arrive */
 const PAPIER = "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), #F4F2ED";
 
+/* « Partager mon verdict » sonne (dring dring) tant qu’on ne l’a jamais ouvert, sur ce navigateur */
+const CLE_OUVERT = "blush.partage.ouvert.v1";
+const abonnes = new Set<() => void>();
+const dejaOuvert = () => {
+  try {
+    return localStorage.getItem(CLE_OUVERT) === "1";
+  } catch {
+    return true;
+  }
+};
+function marquerPartageOuvert() {
+  try {
+    localStorage.setItem(CLE_OUVERT, "1");
+  } catch {
+    /* Stockage refusé (navigation privée) : le bouton sonnera encore, sans gravité */
+  }
+  abonnes.forEach((f) => f());
+}
+const usePartageOuvert = () =>
+  useSyncExternalStore(
+    (f) => {
+      abonnes.add(f);
+      return () => abonnes.delete(f);
+    },
+    dejaOuvert,
+    /* Côté serveur : calme, le bouton ne sonne qu’une fois le navigateur lu */
+    () => true,
+  );
+
 /** Sous l’en-tête du rapport : partager son verdict, et la promesse de confidentialité (avec le détail à un toucher). */
 export function PartageEtConfidentialite({ verdict }: { verdict: Pick<Verdict, "emoji" | "title"> }) {
   const [partage, setPartage] = useState(false);
   const [confidentialite, setConfidentialite] = useState(false);
+  const sonne = !usePartageOuvert();
   return (
     <div className="flex flex-col gap-3">
       <button
         type="button"
-        onClick={() => setPartage(true)}
+        onClick={() => {
+          setPartage(true);
+          marquerPartageOuvert();
+        }}
         aria-haspopup="dialog"
+        data-dring={sonne ? "" : undefined}
         className="lift lift-sm inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[26px] bg-white px-5 text-[16px] font-black text-ink shadow-soft"
       >
-        <Icon name="share" size={17} color="#121214" stroke={2.4} />
+        <span data-dring-icone={sonne ? "" : undefined} className="flex">
+          <Icon name="share" size={17} color="#121214" stroke={2.4} />
+        </span>
         Partager mon verdict
       </button>
       <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
@@ -92,13 +128,17 @@ function GlypheMessages() {
 function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: IconName; nom: string; fond: string; href?: string; onClick?: () => void; pret: boolean; children?: ReactNode }) {
   const contenu = (
     <>
-      <span className="flex size-14 items-center justify-center rounded-full shadow-[0_10px_20px_-10px_rgba(17,17,20,0.5)]" style={{ background: fond }}>
+      <span
+        className="flex size-14 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07),0_10px_20px_-10px_rgba(17,17,20,0.5)] transition-[translate,box-shadow] duration-300 [transition-timing-function:var(--ease-pop)] group-hover:-translate-y-0.5 group-hover:shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07),0_16px_26px_-12px_rgba(17,17,20,0.55)] group-active:translate-y-px group-active:duration-75 motion-reduce:translate-none"
+        style={{ background: fond }}
+      >
         {children ?? <Icon name={icone} size={22} color="#FFFFFF" stroke={2.3} />}
       </span>
       <span className="text-[13px] font-black text-ink">{nom}</span>
     </>
   );
-  const classe = cn("lift lift-sm flex flex-col items-center gap-2 no-underline", !pret && "pointer-events-none opacity-40");
+  /* Le survol soulève le rond, pas toute la case (sinon un carré blanc apparaît autour) */
+  const classe = cn("group flex flex-col items-center gap-2 rounded-2xl no-underline outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink", !pret && "pointer-events-none opacity-40");
   return href ? (
     <a href={pret ? href : undefined} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" aria-disabled={!pret} className={classe}>
       {contenu}
@@ -232,7 +272,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
         </p>
       ) : (
         <div className="grid grid-cols-4 gap-2 px-1 pt-1">
-          <Action icone="link" nom={copie ? "Copié" : "Copier"} fond="var(--gloss), #FFFFFF" pret={pret} onClick={async () => url && setCopie(await copyText(avecLien))}>
+          <Action icone="link" nom={copie ? "Copié" : "Copier"} fond="var(--gloss), #FFFFFF" pret={pret} onClick={async () => url && setCopie(await copyText(url))}>
             {copie ? <Icon name="check" size={22} color="#087A56" stroke={3} /> : <Icon name="link" size={22} color="#121214" stroke={2.3} />}
           </Action>
           <Action icone="whatsapp" nom="WhatsApp" fond="var(--gloss), #25D366" pret={pret} href={`https://wa.me/?text=${encodeURIComponent(avecLien)}`}>
