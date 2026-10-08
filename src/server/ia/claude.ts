@@ -16,8 +16,8 @@ export const MODELE = "claude-opus-5-5";
 /* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
 const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
 
-/** Ce que le modèle a déjà écrit, en caractères : sa réflexion, puis sa réponse. */
-export type Avance = { reflexion: number; texte: number };
+/** Ce que le modèle a déjà écrit : sa réflexion (en caractères), sa réponse (en caractères, et le texte lui-même). */
+export type Avance = { reflexion: number; texte: number; ecrit: string };
 
 /** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. */
 export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number };
@@ -102,9 +102,24 @@ export async function appeler<S extends z.ZodType>(
   if (reglage.flux || surAvance) {
     const flux = anthropic().messages.stream(params);
     if (surAvance) {
-      const a: Avance = { reflexion: 0, texte: 0 };
-      flux.on("thinking", (d) => surAvance({ ...a, reflexion: (a.reflexion += d.length) }));
-      flux.on("text", (d) => surAvance({ ...a, texte: (a.texte += d.length) }));
+      const a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
+      /* Le suivi ne doit jamais faire échouer la réponse : une erreur ici est ignorée */
+      const suivre = () => {
+        try {
+          surAvance({ ...a });
+        } catch {
+          /* rien */
+        }
+      };
+      flux.on("thinking", (d) => {
+        a.reflexion += d.length;
+        suivre();
+      });
+      flux.on("text", (d) => {
+        a.texte += d.length;
+        a.ecrit += d;
+        suivre();
+      });
     }
     message = await flux.finalMessage();
   } else message = await anthropic().messages.create(params);

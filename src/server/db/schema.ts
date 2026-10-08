@@ -1,4 +1,4 @@
-import { bigserial, boolean, customType, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -134,6 +134,8 @@ export const tasks = pgTable(
     error: text("error"),
     /** L’avancée de 0 à 100, d’après ce que le modèle a déjà écrit (le verdict, suivi en direct par la lecture). */
     progress: integer("progress").notNull().default(0),
+    /** Le détail de l’avancée (les chapitres du rapport : écrits, en cours), des numéros seulement, jamais de contenu. */
+    detail: jsonb("detail"),
     heartbeatAt: quand("heartbeat_at"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),

@@ -5,7 +5,7 @@
 import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, FicheUpdate, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
 import { preparerCaptures } from "./preparer-captures";
 import type { Account, ReportPayload } from "./api";
-import { ExportIllisible, preparerExport } from "./preparer-export";
+import { analyserExport, ExportIllisible, preparerExport, type ConvInstagram } from "./preparer-export";
 
 /** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
 export class ErreurApi extends Error {
@@ -41,13 +41,23 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
 }
 
 export const reel = {
-  async uploadExport(file: File): Promise<Source> {
+  /**
+   * Un export : lu et réduit dans le navigateur. Un export Instagram complet : `choisir` fait choisir la conv
+   * (null : on a renoncé, erreur « annule »), et seule celle-là part.
+   */
+  async uploadExport(file: File, choisir?: (convs: ConvInstagram[]) => Promise<string | null>): Promise<Source> {
     const fd = new FormData();
+    let pret: Awaited<ReturnType<typeof analyserExport>>;
     try {
-      fd.append("export", await preparerExport(file), "export.json.gz");
+      pret = await analyserExport(file);
     } catch (e) {
-      /* « plusieurs » : un export Instagram complet. Pour l’instant, on demande le fichier de la bonne conv */
-      throw new ErreurApi(e instanceof ExportIllisible ? (e.code === "plusieurs" ? "fichier" : e.code) : "fichier", 422);
+      throw new ErreurApi(e instanceof ExportIllisible ? "fichier" : "fichier", 422);
+    }
+    if (pret.type === "un") fd.append("export", pret.paquet, "export.json.gz");
+    else {
+      const id = choisir ? await choisir(pret.convs) : null;
+      if (id == null) throw new ErreurApi("annule", 0);
+      fd.append("export", pret.paquetDe(id), "export.json.gz");
     }
     return (await appel<{ source: Source }>("/api/import", { method: "POST", body: fd })).source;
   },

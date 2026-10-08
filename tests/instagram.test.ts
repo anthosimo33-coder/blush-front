@@ -49,3 +49,31 @@ describe("export Instagram", () => {
     expect(lireExport([{ nom: "message_1.json", contenu: json }])?.appli).toBe("instagram");
   });
 });
+
+describe("un export Instagram complet", () => {
+  const conv = (titre: string, noms: string[], n: number, debut: number) =>
+    JSON.stringify({
+      title: titre,
+      participants: noms.map((name) => ({ name })),
+      messages: Array.from({ length: n }, (_, k) => ({ sender_name: noms[k % noms.length], timestamp_ms: debut + (n - k) * 60_000, content: `message ${k}` })),
+    });
+  const fichiers = [
+    { nom: "your_instagram_activity/messages/inbox/ines_1/message_1.json", contenu: conv("Inès", ["Inès", "Léo"], 120, Date.UTC(2026, 8, 20)) },
+    { nom: "your_instagram_activity/messages/inbox/maxime_2/message_1.json", contenu: conv("maxime.drn", ["maxime.drn", "Léo"], 30, Date.UTC(2026, 7, 1)) },
+    { nom: "your_instagram_activity/messages/inbox/groupe_3/message_1.json", contenu: conv("Les zinzins", ["A", "B", "Léo"], 60, Date.UTC(2026, 9, 1)) },
+  ];
+
+  it("se range par conv, chacune avec son nom, son nombre de messages, sa dernière date, et les groupes repérés", async () => {
+    const { choisirParties, convsInstagram, resumeConvInstagram } = await import("@prompts/lib/export");
+    expect(choisirParties(fichiers)).toBe("plusieurs");
+    const convs = convsInstagram(fichiers);
+    expect(convs).toHaveLength(3);
+    const resumes = convs.map((c) => resumeConvInstagram(c.parties)!);
+    expect(resumes.map((r) => [r.nom, r.messages, r.groupe])).toEqual([
+      ["Inès", 120, false],
+      ["maxime.drn", 30, false],
+      ["Les zinzins", 60, true],
+    ]);
+    expect(resumes[0].derniere).toMatch(/^2026-09-2\d$/);
+  });
+});
