@@ -2,99 +2,99 @@
  "hugo-A": {
   "etat": "pret",
   "audio": "/demo/vocal-hugo-a.mp3",
-  "duree": 27.76,
+  "duree": 28.32,
   "voix": "A",
   "sobre": false,
   "lignes": [
    {
     "texte": "Bon, Hugo, il faut qu’on parle.",
     "punch": false,
-    "debut": 0.8,
-    "fin": 3.04,
+    "debut": 0.88,
+    "fin": 2.88,
     "mots": [
      {
       "t": "Bon,",
-      "debut": 0.8
+      "debut": 0.88
      },
      {
       "t": "Hugo,",
-      "debut": 1.4
+      "debut": 1.36
      },
      {
       "t": "il",
-      "debut": 2.24
+      "debut": 2.16
      },
      {
       "t": "faut",
-      "debut": 2.35
+      "debut": 2.27
      },
      {
       "t": "qu’on",
-      "debut": 2.48
+      "debut": 2.4
      },
      {
       "t": "parle.",
-      "debut": 2.72
+      "debut": 2.64
      }
     ]
    },
    {
     "texte": "À vingt-trois heures quarante et une, Sophie t’écrit : « au fait on est quoi toi et moi ».",
     "punch": false,
-    "debut": 3.52,
-    "fin": 7.44,
+    "debut": 3.35,
+    "fin": 7.2,
     "mots": [
      {
       "t": "À",
-      "debut": 3.52
+      "debut": 3.35
      },
      {
       "t": "vingt-trois",
-      "debut": 3.6
+      "debut": 3.44
      },
      {
       "t": "heures",
-      "debut": 4
+      "debut": 3.84
      },
      {
       "t": "quarante",
-      "debut": 4.16
+      "debut": 4.03
      },
      {
       "t": "et",
-      "debut": 4.44
+      "debut": 4.32
      },
      {
       "t": "une,",
-      "debut": 4.56
+      "debut": 4.44
      },
      {
       "t": "Sophie",
-      "debut": 4.88
+      "debut": 4.72
      },
      {
       "t": "t’écrit :",
-      "debut": 5.16
+      "debut": 5
      },
      {
       "t": "« au",
-      "debut": 5.89
+      "debut": 5.74
      },
      {
       "t": "fait",
-      "debut": 6
+      "debut": 5.84
      },
      {
       "t": "on",
-      "debut": 6.24
+      "debut": 6.16
      },
      {
       "t": "est",
-      "debut": 6.4
+      "debut": 6.32
      },
      {
       "t": "quoi",
-      "debut": 6.56
+      "debut": 6.48
      },
      {
       "t": "toi",
@@ -118,32 +118,32 @@
    {
     "texte": "Et toi, tu lui réponds : « mdr ».",
     "punch": false,
-    "debut": 7.52,
-    "fin": 10.32,
+    "debut": 7.66,
+    "fin": 10.4,
     "mots": [
      {
       "t": "Et",
-      "debut": 7.52
+      "debut": 7.66
      },
      {
       "t": "toi,",
-      "debut": 7.8
+      "debut": 7.76
      },
      {
       "t": "tu",
-      "debut": 8.16
+      "debut": 8.24
      },
      {
       "t": "lui",
-      "debut": 8.29
+      "debut": 8.36
      },
      {
       "t": "réponds :",
-      "debut": 8.48
+      "debut": 8.56
      },
      {
       "t": "« mdr ».",
-      "debut": 9.2
+      "debut": 9.28
      }
     ],
     "recu": {
@@ -155,128 +155,128 @@
    {
     "texte": "Tu lui as vraiment répondu MDR, frérot ?!",
     "punch": true,
-    "debut": 11.47,
-    "fin": 14.36,
+    "debut": 11.68,
+    "fin": 14.72,
     "mots": [
      {
       "t": "Tu",
-      "debut": 11.47
-     },
-     {
-      "t": "lui",
-      "debut": 11.56
-     },
-     {
-      "t": "as",
       "debut": 11.68
      },
      {
-      "t": "vraiment",
+      "t": "lui",
       "debut": 11.8
      },
      {
+      "t": "as",
+      "debut": 11.92
+     },
+     {
+      "t": "vraiment",
+      "debut": 12.08
+     },
+     {
       "t": "répondu",
-      "debut": 12.24
+      "debut": 12.48
      },
      {
       "t": "MDR,",
-      "debut": 12.8
+      "debut": 13.12
      },
      {
       "t": "frérot ?!",
-      "debut": 13.52
+      "debut": 13.84
      }
     ]
    },
    {
     "texte": "Après, elle te dit que sa sœur veut te rencontrer.",
     "punch": false,
-    "debut": 14.4,
-    "fin": 16.8,
+    "debut": 14.8,
+    "fin": 16.96,
     "mots": [
      {
       "t": "Après,",
-      "debut": 14.4
+      "debut": 14.8
      },
      {
       "t": "elle",
-      "debut": 14.88
+      "debut": 15.28
      },
      {
       "t": "te",
-      "debut": 15
+      "debut": 15.44
      },
      {
       "t": "dit",
-      "debut": 15.12
+      "debut": 15.56
      },
      {
       "t": "que",
-      "debut": 15.24
+      "debut": 15.68
      },
      {
       "t": "sa",
-      "debut": 15.36
+      "debut": 15.84
      },
      {
       "t": "sœur",
-      "debut": 15.6
+      "debut": 16
      },
      {
       "t": "veut",
-      "debut": 15.8
+      "debut": 16.2
      },
      {
       "t": "te",
-      "debut": 15.96
+      "debut": 16.36
      },
      {
       "t": "rencontrer.",
-      "debut": 16.08
+      "debut": 16.48
      }
     ]
    },
    {
     "texte": "Et toi, tu lui sors : « haha grave un jour ».",
     "punch": false,
-    "debut": 16.95,
-    "fin": 19.84,
+    "debut": 17.35,
+    "fin": 20.37,
     "mots": [
      {
       "t": "Et",
-      "debut": 16.95
+      "debut": 17.35
      },
      {
       "t": "toi,",
-      "debut": 17.04
+      "debut": 17.44
      },
      {
       "t": "tu",
-      "debut": 17.36
+      "debut": 17.84
      },
      {
       "t": "lui",
-      "debut": 17.48
+      "debut": 18
      },
      {
       "t": "sors :",
-      "debut": 17.73
+      "debut": 18.2
      },
      {
       "t": "« haha",
-      "debut": 18.22
+      "debut": 18.78
      },
      {
       "t": "grave",
-      "debut": 18.64
+      "debut": 19.2
      },
      {
       "t": "un",
-      "debut": 19.12
+      "debut": 19.68
      },
      {
       "t": "jour ».",
-      "debut": 19.28
+      "debut": 19.92
      }
     ],
     "recu": {
@@ -288,96 +288,96 @@
    {
     "texte": "Tu lui promets « un jour », sérieusement ?!",
     "punch": true,
-    "debut": 19.91,
-    "fin": 22.73,
+    "debut": 20.55,
+    "fin": 23.12,
     "mots": [
      {
       "t": "Tu",
-      "debut": 19.91
+      "debut": 20.55
      },
      {
       "t": "lui",
-      "debut": 20
+      "debut": 20.64
      },
      {
       "t": "promets",
-      "debut": 20.28
+      "debut": 20.88
      },
      {
       "t": "« un",
-      "debut": 20.8
+      "debut": 21.47
      },
      {
       "t": "jour »,",
-      "debut": 21.12
+      "debut": 21.68
      },
      {
       "t": "sérieusement ?!",
-      "debut": 21.64
+      "debut": 22.2
      }
     ]
    },
    {
     "texte": "Samedi, au libanais, tu lui poses LA question.",
     "punch": true,
-    "debut": 23.04,
-    "fin": 26.32,
+    "debut": 23.35,
+    "fin": 26.6,
     "mots": [
      {
       "t": "Samedi,",
-      "debut": 23.04
+      "debut": 23.35
      },
      {
       "t": "au",
-      "debut": 23.48
+      "debut": 24
      },
      {
       "t": "libanais,",
-      "debut": 23.6
+      "debut": 24.16
      },
      {
       "t": "tu",
-      "debut": 24.32
+      "debut": 24.8
      },
      {
       "t": "lui",
-      "debut": 24.44
+      "debut": 24.92
      },
      {
       "t": "poses",
-      "debut": 24.88
+      "debut": 25.12
      },
      {
       "t": "LA",
-      "debut": 25.2
+      "debut": 25.68
      },
      {
       "t": "question.",
-      "debut": 25.52
+      "debut": 26.2
      }
     ]
    },
    {
     "texte": "Allez, lis la suite.",
     "punch": false,
-    "debut": 26.4,
-    "fin": 27.76,
+    "debut": 26.95,
+    "fin": 28.32,
     "mots": [
      {
       "t": "Allez,",
-      "debut": 26.4
+      "debut": 26.95
      },
      {
       "t": "lis",
-      "debut": 26.96
+      "debut": 27.44
      },
      {
       "t": "la",
-      "debut": 27.08
+      "debut": 27.6
      },
      {
       "t": "suite.",
-      "debut": 27.2
+      "debut": 27.76
      }
     ]
    }
@@ -386,55 +386,55 @@
  "hugo-B": {
   "etat": "pret",
   "audio": "/demo/vocal-hugo-b.mp3",
-  "duree": 26.72,
+  "duree": 26.24,
   "voix": "B",
   "sobre": false,
   "lignes": [
    {
     "texte": "Bon, Hugo, il faut qu’on parle.",
     "punch": false,
-    "debut": 0.92,
-    "fin": 2.88,
+    "debut": 0.72,
+    "fin": 2.96,
     "mots": [
      {
       "t": "Bon,",
-      "debut": 0.92
+      "debut": 0.72
      },
      {
       "t": "Hugo,",
-      "debut": 1.32
+      "debut": 1.28
      },
      {
       "t": "il",
-      "debut": 2.12
+      "debut": 2.16
      },
      {
       "t": "faut",
-      "debut": 2.24
+      "debut": 2.28
      },
      {
       "t": "qu’on",
-      "debut": 2.36
+      "debut": 2.4
      },
      {
       "t": "parle.",
-      "debut": 2.56
+      "debut": 2.64
      }
     ]
    },
    {
     "texte": "À vingt-trois heures quarante et une, Sophie t’écrit : « au fait on est quoi toi et moi ».",
     "punch": false,
-    "debut": 3.35,
+    "debut": 3.44,
     "fin": 7.12,
     "mots": [
      {
       "t": "À",
-      "debut": 3.35
+      "debut": 3.44
      },
      {
       "t": "vingt-trois",
-      "debut": 3.44
+      "debut": 3.52
      },
      {
       "t": "heures",
@@ -442,15 +442,15 @@
      },
      {
       "t": "quarante",
-      "debut": 4
+      "debut": 4.04
      },
      {
       "t": "et",
-      "debut": 4.24
+      "debut": 4.32
      },
      {
       "t": "une,",
-      "debut": 4.4
+      "debut": 4.48
      },
      {
       "t": "Sophie",
@@ -458,7 +458,7 @@
      },
      {
       "t": "t’écrit :",
-      "debut": 5
+      "debut": 5.04
      },
      {
       "t": "« au",
@@ -470,15 +470,15 @@
      },
      {
       "t": "on",
-      "debut": 6.08
+      "debut": 6.16
      },
      {
       "t": "est",
-      "debut": 6.24
+      "debut": 6.32
      },
      {
       "t": "quoi",
-      "debut": 6.4
+      "debut": 6.48
      },
      {
       "t": "toi",
@@ -486,7 +486,7 @@
      },
      {
       "t": "et",
-      "debut": 6.8
+      "debut": 6.84
      },
      {
       "t": "moi ».",
@@ -503,7 +503,7 @@
     "texte": "Et toi, tu lui réponds : « mdr ».",
     "punch": false,
     "debut": 7.58,
-    "fin": 10.16,
+    "fin": 10,
     "mots": [
      {
       "t": "Et",
@@ -519,7 +519,7 @@
      },
      {
       "t": "lui",
-      "debut": 8.21
+      "debut": 8.2
      },
      {
       "t": "réponds :",
@@ -527,7 +527,7 @@
      },
      {
       "t": "« mdr ».",
-      "debut": 9.12
+      "debut": 9.04
      }
     ],
     "recu": {
@@ -539,128 +539,128 @@
    {
     "texte": "Tu lui as vraiment répondu MDR, frérot ?!",
     "punch": true,
-    "debut": 10.96,
-    "fin": 13.88,
+    "debut": 10.75,
+    "fin": 13.48,
     "mots": [
      {
       "t": "Tu",
-      "debut": 10.96
+      "debut": 10.75
      },
      {
       "t": "lui",
-      "debut": 11.07
+      "debut": 10.83
      },
      {
       "t": "as",
-      "debut": 11.2
+      "debut": 10.96
      },
      {
       "t": "vraiment",
-      "debut": 11.32
+      "debut": 11.08
      },
      {
       "t": "répondu",
-      "debut": 11.68
+      "debut": 11.44
      },
      {
       "t": "MDR,",
-      "debut": 12.32
+      "debut": 12
      },
      {
       "t": "frérot ?!",
-      "debut": 12.96
+      "debut": 12.56
      }
     ]
    },
    {
     "texte": "Après, elle te dit que sa sœur veut te rencontrer.",
     "punch": false,
-    "debut": 13.92,
-    "fin": 16.2,
+    "debut": 13.52,
+    "fin": 15.68,
     "mots": [
      {
       "t": "Après,",
-      "debut": 13.92
+      "debut": 13.52
      },
      {
       "t": "elle",
-      "debut": 14.4
+      "debut": 13.92
      },
      {
       "t": "te",
-      "debut": 14.56
+      "debut": 14.08
      },
      {
       "t": "dit",
-      "debut": 14.68
+      "debut": 14.2
      },
      {
       "t": "que",
-      "debut": 14.76
+      "debut": 14.28
      },
      {
       "t": "sa",
-      "debut": 14.88
+      "debut": 14.4
      },
      {
       "t": "sœur",
-      "debut": 15.04
+      "debut": 14.52
      },
      {
       "t": "veut",
-      "debut": 15.24
+      "debut": 14.68
      },
      {
       "t": "te",
-      "debut": 15.33
+      "debut": 14.83
      },
      {
       "t": "rencontrer.",
-      "debut": 15.44
+      "debut": 14.88
      }
     ]
    },
    {
     "texte": "Et toi, tu lui sors : « haha grave un jour ».",
     "punch": false,
-    "debut": 16.39,
-    "fin": 19.07,
+    "debut": 15.76,
+    "fin": 18.56,
     "mots": [
      {
       "t": "Et",
-      "debut": 16.39
+      "debut": 15.76
      },
      {
       "t": "toi,",
-      "debut": 16.52
+      "debut": 15.92
      },
      {
       "t": "tu",
-      "debut": 16.72
+      "debut": 16.24
      },
      {
       "t": "lui",
-      "debut": 16.85
+      "debut": 16.36
      },
      {
       "t": "sors :",
-      "debut": 17.04
+      "debut": 16.56
      },
      {
       "t": "« haha",
-      "debut": 17.5
+      "debut": 17.1
      },
      {
       "t": "grave",
-      "debut": 17.92
+      "debut": 17.44
      },
      {
       "t": "un",
-      "debut": 18.32
+      "debut": 17.92
      },
      {
       "t": "jour ».",
-      "debut": 18.56
+      "debut": 18.12
      }
     ],
     "recu": {
@@ -672,96 +672,96 @@
    {
     "texte": "Tu lui promets « un jour », sérieusement ?!",
     "punch": true,
-    "debut": 19.28,
-    "fin": 22.09,
+    "debut": 18.64,
+    "fin": 21.37,
     "mots": [
      {
       "t": "Tu",
-      "debut": 19.28
+      "debut": 18.64
      },
      {
       "t": "lui",
-      "debut": 19.4
+      "debut": 18.76
      },
      {
       "t": "promets",
-      "debut": 19.68
+      "debut": 19.04
      },
      {
       "t": "« un",
-      "debut": 20.32
+      "debut": 19.6
      },
      {
       "t": "jour »,",
-      "debut": 20.56
+      "debut": 19.84
      },
      {
       "t": "sérieusement ?!",
-      "debut": 21.12
+      "debut": 20.32
      }
     ]
    },
    {
     "texte": "Samedi, au libanais, tu lui poses LA question.",
     "punch": true,
-    "debut": 22.16,
-    "fin": 25.48,
+    "debut": 21.43,
+    "fin": 24.72,
     "mots": [
      {
       "t": "Samedi,",
-      "debut": 22.16
+      "debut": 21.43
      },
      {
       "t": "au",
-      "debut": 22.85
+      "debut": 22.04
      },
      {
       "t": "libanais,",
-      "debut": 22.96
+      "debut": 22.16
      },
      {
       "t": "tu",
-      "debut": 23.6
+      "debut": 22.84
      },
      {
       "t": "lui",
-      "debut": 23.72
+      "debut": 22.96
      },
      {
       "t": "poses",
-      "debut": 23.92
+      "debut": 23.32
      },
      {
       "t": "LA",
-      "debut": 24.4
+      "debut": 23.6
      },
      {
       "t": "question.",
-      "debut": 25.04
+      "debut": 23.92
      }
     ]
    },
    {
     "texte": "Allez, lis la suite.",
     "punch": false,
-    "debut": 25.59,
-    "fin": 26.72,
+    "debut": 24.86,
+    "fin": 26.24,
     "mots": [
      {
       "t": "Allez,",
-      "debut": 25.59
+      "debut": 24.86
      },
      {
       "t": "lis",
-      "debut": 25.92
+      "debut": 25.36
      },
      {
       "t": "la",
-      "debut": 26.08
+      "debut": 25.48
      },
      {
       "t": "suite.",
-      "debut": 26.24
+      "debut": 25.6
      }
     ]
    }
@@ -770,7 +770,7 @@
  "sobre-A": {
   "etat": "pret",
   "audio": "/demo/vocal-sobre-a.mp3",
-  "duree": 17.52,
+  "duree": 18,
   "voix": "A",
   "sobre": true,
   "lignes": [
@@ -778,7 +778,7 @@
     "texte": "Hé, Hugo. Je vais être honnête avec toi.",
     "punch": false,
     "debut": 0.08,
-    "fin": 2.64,
+    "fin": 3,
     "mots": [
      {
       "t": "Hé,",
@@ -786,283 +786,283 @@
      },
      {
       "t": "Hugo.",
-      "debut": 0.48
+      "debut": 0.56
      },
      {
       "t": "Je",
-      "debut": 1.44
+      "debut": 1.52
      },
      {
       "t": "vais",
-      "debut": 1.6
+      "debut": 1.68
      },
      {
       "t": "être",
-      "debut": 1.76
+      "debut": 1.84
      },
      {
       "t": "honnête",
-      "debut": 1.89
+      "debut": 1.97
      },
      {
       "t": "avec",
-      "debut": 2.16
+      "debut": 2.24
      },
      {
       "t": "toi.",
-      "debut": 2.4
+      "debut": 2.48
      }
     ]
    },
    {
     "texte": "Sophie ne ressent pas la même chose que toi.",
     "punch": false,
-    "debut": 3.12,
-    "fin": 5.04,
+    "debut": 3.28,
+    "fin": 5.32,
     "mots": [
      {
       "t": "Sophie",
-      "debut": 3.12
+      "debut": 3.28
      },
      {
       "t": "ne",
-      "debut": 3.48
+      "debut": 3.64
      },
      {
       "t": "ressent",
-      "debut": 3.6
+      "debut": 3.76
      },
      {
       "t": "pas",
-      "debut": 4
-     },
-     {
-      "t": "la",
       "debut": 4.12
      },
      {
-      "t": "même",
+      "t": "la",
       "debut": 4.24
      },
      {
-      "t": "chose",
+      "t": "même",
       "debut": 4.4
      },
      {
+      "t": "chose",
+      "debut": 4.56
+     },
+     {
       "t": "que",
-      "debut": 4.64
+      "debut": 4.76
      },
      {
       "t": "toi.",
-      "debut": 4.8
+      "debut": 4.88
      }
     ]
    },
    {
     "texte": "Elle te répond encore, mais elle ne te relance plus depuis trois semaines.",
     "punch": false,
-    "debut": 5.51,
-    "fin": 9.04,
+    "debut": 5.6,
+    "fin": 9.76,
     "mots": [
      {
       "t": "Elle",
-      "debut": 5.51
+      "debut": 5.6
      },
      {
       "t": "te",
-      "debut": 5.68
+      "debut": 5.76
      },
      {
       "t": "répond",
-      "debut": 5.84
+      "debut": 5.92
      },
      {
       "t": "encore,",
-      "debut": 6.16
+      "debut": 6.24
      },
      {
       "t": "mais",
-      "debut": 7
+      "debut": 7.12
      },
      {
       "t": "elle",
-      "debut": 7.16
+      "debut": 7.68
      },
      {
       "t": "ne",
-      "debut": 7.24
+      "debut": 7.84
      },
      {
       "t": "te",
-      "debut": 7.36
-     },
-     {
-      "t": "relance",
-      "debut": 7.52
-     },
-     {
-      "t": "plus",
       "debut": 7.92
      },
      {
-      "t": "depuis",
+      "t": "relance",
       "debut": 8.08
      },
      {
+      "t": "plus",
+      "debut": 8.48
+     },
+     {
+      "t": "depuis",
+      "debut": 8.64
+     },
+     {
       "t": "trois",
-      "debut": 8.4
+      "debut": 8.96
      },
      {
       "t": "semaines.",
-      "debut": 8.64
+      "debut": 9.2
      }
     ]
    },
    {
     "texte": "Et ça, ça ne dit rien de ce que tu vaux. Ça dit juste où elle en est.",
     "punch": false,
-    "debut": 9.49,
-    "fin": 13.28,
+    "debut": 10.05,
+    "fin": 14.08,
     "mots": [
      {
       "t": "Et",
-      "debut": 9.49
+      "debut": 10.05
      },
      {
       "t": "ça,",
-      "debut": 9.6
+      "debut": 10.16
      },
      {
       "t": "ça",
-      "debut": 10.12
+      "debut": 10.72
      },
      {
       "t": "ne",
-      "debut": 10.24
-     },
-     {
-      "t": "dit",
-      "debut": 10.4
-     },
-     {
-      "t": "rien",
-      "debut": 10.64
-     },
-     {
-      "t": "de",
       "debut": 10.84
      },
      {
-      "t": "ce",
+      "t": "dit",
       "debut": 10.96
      },
      {
-      "t": "que",
-      "debut": 11.01
-     },
-     {
-      "t": "tu",
+      "t": "rien",
       "debut": 11.12
      },
      {
-      "t": "vaux.",
-      "debut": 11.32
+      "t": "de",
+      "debut": 11.4
      },
      {
-      "t": "Ça",
+      "t": "ce",
+      "debut": 11.48
+     },
+     {
+      "t": "que",
+      "debut": 11.56
+     },
+     {
+      "t": "tu",
+      "debut": 11.68
+     },
+     {
+      "t": "vaux.",
       "debut": 11.88
      },
      {
+      "t": "Ça",
+      "debut": 12.48
+     },
+     {
       "t": "dit",
-      "debut": 12
-     },
-     {
-      "t": "juste",
-      "debut": 12.24
-     },
-     {
-      "t": "où",
       "debut": 12.64
      },
      {
-      "t": "elle",
+      "t": "juste",
       "debut": 12.8
      },
      {
+      "t": "où",
+      "debut": 13.28
+     },
+     {
+      "t": "elle",
+      "debut": 13.44
+     },
+     {
       "t": "en",
-      "debut": 12.96
+      "debut": 13.6
      },
      {
       "t": "est.",
-      "debut": 13.12
+      "debut": 13.76
      }
     ]
    },
    {
     "texte": "Lis la suite quand tu es prêt. Et après, je suis là, on en parle.",
     "punch": false,
-    "debut": 13.68,
-    "fin": 17.52,
+    "debut": 14.32,
+    "fin": 18,
     "mots": [
      {
       "t": "Lis",
-      "debut": 13.68
+      "debut": 14.32
      },
      {
       "t": "la",
-      "debut": 13.84
+      "debut": 14.48
      },
      {
       "t": "suite",
-      "debut": 14
-     },
-     {
-      "t": "quand",
-      "debut": 14.28
-     },
-     {
-      "t": "tu",
-      "debut": 14.44
-     },
-     {
-      "t": "es",
-      "debut": 14.56
-     },
-     {
-      "t": "prêt.",
       "debut": 14.68
      },
      {
+      "t": "quand",
+      "debut": 14.84
+     },
+     {
+      "t": "tu",
+      "debut": 15
+     },
+     {
+      "t": "es",
+      "debut": 15.12
+     },
+     {
+      "t": "prêt.",
+      "debut": 15.24
+     },
+     {
       "t": "Et",
-      "debut": 15.2
+      "debut": 15.76
      },
      {
       "t": "après,",
-      "debut": 15.48
+      "debut": 16.04
      },
      {
       "t": "je",
-      "debut": 16
+      "debut": 16.48
      },
      {
       "t": "suis",
-      "debut": 16.16
+      "debut": 16.64
      },
      {
       "t": "là,",
-      "debut": 16.4
-     },
-     {
-      "t": "on",
-      "debut": 16.68
-     },
-     {
-      "t": "en",
       "debut": 16.8
      },
      {
+      "t": "on",
+      "debut": 17.2
+     },
+     {
+      "t": "en",
+      "debut": 17.36
+     },
+     {
       "t": "parle.",
-      "debut": 16.96
+      "debut": 17.52
      }
     ]
    }
@@ -1071,7 +1071,7 @@
  "sobre-B": {
   "etat": "pret",
   "audio": "/demo/vocal-sobre-b.mp3",
-  "duree": 17.76,
+  "duree": 17.92,
   "voix": "B",
   "sobre": true,
   "lignes": [
@@ -1079,7 +1079,7 @@
     "texte": "Hé, Hugo. Je vais être honnête avec toi.",
     "punch": false,
     "debut": 0.08,
-    "fin": 2.64,
+    "fin": 2.72,
     "mots": [
      {
       "t": "Hé,",
@@ -1091,127 +1091,127 @@
      },
      {
       "t": "Je",
-      "debut": 1.44
+      "debut": 1.52
      },
      {
       "t": "vais",
-      "debut": 1.6
+      "debut": 1.68
      },
      {
       "t": "être",
-      "debut": 1.76
+      "debut": 1.84
      },
      {
       "t": "honnête",
-      "debut": 1.89
+      "debut": 1.97
      },
      {
       "t": "avec",
-      "debut": 2.2
+      "debut": 2.28
      },
      {
       "t": "toi.",
-      "debut": 2.44
+      "debut": 2.52
      }
     ]
    },
    {
     "texte": "Sophie ne ressent pas la même chose que toi.",
     "punch": false,
-    "debut": 3.12,
-    "fin": 5.12,
+    "debut": 3.36,
+    "fin": 5.4,
     "mots": [
      {
       "t": "Sophie",
-      "debut": 3.12
+      "debut": 3.36
      },
      {
       "t": "ne",
-      "debut": 3.52
+      "debut": 3.72
      },
      {
       "t": "ressent",
-      "debut": 3.68
+      "debut": 3.84
      },
      {
       "t": "pas",
-      "debut": 4
+      "debut": 4.2
      },
      {
       "t": "la",
-      "debut": 4.12
+      "debut": 4.32
      },
      {
       "t": "même",
-      "debut": 4.24
+      "debut": 4.48
      },
      {
       "t": "chose",
-      "debut": 4.44
-     },
-     {
-      "t": "que",
       "debut": 4.64
      },
      {
+      "t": "que",
+      "debut": 4.88
+     },
+     {
       "t": "toi.",
-      "debut": 4.8
+      "debut": 5.08
      }
     ]
    },
    {
     "texte": "Elle te répond encore, mais elle ne te relance plus depuis trois semaines.",
     "punch": false,
-    "debut": 5.59,
-    "fin": 9.52,
+    "debut": 5.67,
+    "fin": 9.68,
     "mots": [
      {
       "t": "Elle",
-      "debut": 5.59
+      "debut": 5.67
      },
      {
       "t": "te",
-      "debut": 5.68
-     },
-     {
-      "t": "répond",
       "debut": 5.84
      },
      {
+      "t": "répond",
+      "debut": 6
+     },
+     {
       "t": "encore,",
-      "debut": 6.28
+      "debut": 6.32
      },
      {
       "t": "mais",
-      "debut": 7.12
+      "debut": 7.2
      },
      {
       "t": "elle",
-      "debut": 7.6
+      "debut": 7.68
      },
      {
       "t": "ne",
-      "debut": 7.72
+      "debut": 7.8
      },
      {
       "t": "te",
-      "debut": 7.84
+      "debut": 7.92
      },
      {
       "t": "relance",
-      "debut": 8
+      "debut": 8.08
      },
      {
       "t": "plus",
-      "debut": 8.4
+      "debut": 8.48
      },
      {
       "t": "depuis",
-      "debut": 8.56
+      "debut": 8.64
      },
      {
       "t": "trois",
-      "debut": 8.8
+      "debut": 8.88
      },
      {
       "t": "semaines.",
@@ -1222,16 +1222,16 @@
    {
     "texte": "Et ça, ça ne dit rien de ce que tu vaux. Ça dit juste où elle en est.",
     "punch": false,
-    "debut": 9.97,
-    "fin": 13.76,
+    "debut": 10.05,
+    "fin": 13.96,
     "mots": [
      {
       "t": "Et",
-      "debut": 9.97
+      "debut": 10.05
      },
      {
       "t": "ça,",
-      "debut": 10.08
+      "debut": 10.16
      },
      {
       "t": "ça",
@@ -1259,7 +1259,7 @@
      },
      {
       "t": "que",
-      "debut": 11.55
+      "debut": 11.49
      },
      {
       "t": "tu",
@@ -1271,7 +1271,7 @@
      },
      {
       "t": "Ça",
-      "debut": 12.44
+      "debut": 12.4
      },
      {
       "t": "dit",
@@ -1279,11 +1279,11 @@
      },
      {
       "t": "juste",
-      "debut": 12.8
+      "debut": 12.84
      },
      {
       "t": "où",
-      "debut": 13.12
+      "debut": 13.16
      },
      {
       "t": "elle",
@@ -1303,7 +1303,7 @@
     "texte": "Lis la suite quand tu es prêt. Et après, je suis là, on en parle.",
     "punch": false,
     "debut": 14.24,
-    "fin": 17.76,
+    "fin": 17.92,
     "mots": [
      {
       "t": "Lis",
@@ -1311,7 +1311,7 @@
      },
      {
       "t": "la",
-      "debut": 14.4
+      "debut": 14.44
      },
      {
       "t": "suite",
@@ -1335,38 +1335,174 @@
      },
      {
       "t": "Et",
-      "debut": 15.68
+      "debut": 15.72
      },
      {
       "t": "après,",
-      "debut": 15.92
+      "debut": 15.84
      },
      {
       "t": "je",
-      "debut": 16.4
+      "debut": 16.48
      },
      {
       "t": "suis",
-      "debut": 16.56
+      "debut": 16.64
      },
      {
       "t": "là,",
-      "debut": 16.72
+      "debut": 16.8
      },
      {
       "t": "on",
-      "debut": 17
+      "debut": 17.16
      },
      {
       "t": "en",
-      "debut": 17.12
+      "debut": 17.28
      },
      {
       "t": "parle.",
-      "debut": 17.28
+      "debut": 17.44
      }
     ]
    }
+  ]
+ },
+ "chat-A": {
+  "audio": "/demo/vocal-chat-a.mp3",
+  "duree": 12.2,
+  "peaks": [
+   0.95,
+   0.69,
+   0.66,
+   0.54,
+   0.49,
+   0.55,
+   0.55,
+   0.75,
+   0.65,
+   0.51,
+   0.62,
+   0.73,
+   0.54,
+   0.55,
+   0.79,
+   0.71,
+   0.63,
+   0.38,
+   0.53,
+   0.78,
+   0.54,
+   0.72,
+   0.58,
+   0.34,
+   0.59,
+   0.6,
+   0.62,
+   0.63
+  ]
+ },
+ "chat-B": {
+  "audio": "/demo/vocal-chat-b.mp3",
+  "duree": 11.4,
+  "peaks": [
+   0.89,
+   0.65,
+   0.72,
+   0.63,
+   0.47,
+   0.61,
+   0.68,
+   0.65,
+   0.71,
+   0.48,
+   0.73,
+   0.53,
+   0.45,
+   0.82,
+   0.54,
+   0.64,
+   0.33,
+   0.37,
+   0.5,
+   0.74,
+   0.52,
+   0.47,
+   0.7,
+   0.34,
+   0.5,
+   0.75,
+   0.71,
+   0.33
+  ]
+ },
+ "mode-A": {
+  "audio": "/demo/vocal-mode-a.mp3",
+  "duree": 4.3,
+  "peaks": [
+   0.84,
+   0.54,
+   0.15,
+   0.36,
+   0.46,
+   0.42,
+   0.15,
+   0.36,
+   0.36,
+   0.6,
+   0.43,
+   0.36,
+   0.36,
+   0.56,
+   0.34,
+   0.15,
+   0.52,
+   0.69,
+   0.61,
+   0.58,
+   0.39,
+   0.68,
+   0.56,
+   0.38,
+   0.47,
+   0.61,
+   0.15,
+   0.15
+  ]
+ },
+ "mode-B": {
+  "audio": "/demo/vocal-mode-b.mp3",
+  "duree": 4.1,
+  "peaks": [
+   0.81,
+   0.36,
+   0.15,
+   0.41,
+   0.43,
+   0.34,
+   0.15,
+   0.48,
+   0.36,
+   0.72,
+   0.65,
+   0.36,
+   0.36,
+   0.49,
+   0.15,
+   0.15,
+   0.63,
+   0.6,
+   0.61,
+   0.47,
+   0.46,
+   0.41,
+   0.39,
+   0.4,
+   0.59,
+   0.34,
+   0.15,
+   0.15
   ]
  }
 }

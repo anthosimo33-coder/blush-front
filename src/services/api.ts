@@ -26,7 +26,7 @@ import type {
 import { FICHE, FICHE_FINDINGS, SUBSCRIPTIONS } from "@/mocks/daily";
 import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } from "@/mocks/story";
 import { DEMO_STORY_IDS, demoStory, storyIdFor } from "@/mocks/stories";
-import { vocalDemo } from "@/mocks/vocal";
+import { chatVocalDemo, vocalDemo } from "@/mocks/vocal";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
@@ -189,6 +189,11 @@ export async function getReport(storyId?: string): Promise<ReportPayload> {
   };
 }
 
+/** Le chat de nouveau à l’écrit (« Repasser à l’écrit »). En démo, rien à garder. */
+export function modeVocalChat(actif: boolean): void {
+  if (BACKEND) void reel.modeVocal(actif);
+}
+
 /** Un moment de l’écoute du vocal, pour comparer les deux voix (A/B test). En démo, rien n’est noté. */
 export function noterEcouteVocal(evenement: "debut" | "fin" | "reecoute" | "ferme", position: number): void {
   if (BACKEND) void reel.ecouteVocal(evenement, position);
@@ -275,6 +280,10 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
   const { quickQuestions, reply, report } = opened();
   const quick = text ? quickQuestions.find((q) => sameQuestion(q.question, text)) : undefined;
   if (quick) return quick.answer;
+  /* Le chat en vocal : « parle-moi en vocal » le lance, « écris-moi » le coupe */
+  if (text && /vocal/i.test(text) && /parle|envoie|réponds|reponds/i.test(text))
+    return { kind: "bubbles", bubbles: [{ text: "ok chef, je passe en vocal" }, { text: "mais tu m’écoutes jusqu’au bout hein" }], vocal: chatVocalDemo("mode"), modeVocal: true };
+  if (text && /[ée]cris[- ]moi|à l[’']écrit|a l[’']ecrit/i.test(text)) return { kind: "bubbles", bubbles: [{ text: "ok, je repasse à l’écrit" }], modeVocal: false };
   const levelUp = NEXT_LEVEL[report.level];
   if (text && levelUp && /ensemble|en couple|officiel|je t[’']aime|soud[ée]s/i.test(text))
     return {
@@ -297,8 +306,20 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
 export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
   if (BACKEND) return envoyerAuChat(() => reel.sendVoiceToBlush(input.audio));
   void input.audio;
-  await delay(2200);
-  return { kind: "answer", answer: opened().voiceAnswer };
+  await delay(2600);
+  /* Tu lui parles en vocal, elle te répond en vocal (sur l’histoire des maquettes ; les autres gardent leur réponse écrite) */
+  const { story, voiceAnswer } = opened();
+  if (story.id !== DEMO_STORY_IDS.rencontre) return { kind: "answer", answer: voiceAnswer };
+  return {
+    kind: "bubbles",
+    bubbles: [
+      { text: "attends, elle t’a écrit ça", messages: [{ from: "elle", text: "je suis crevée cette semaine, on verra", caption: "Sophie · son dernier message" }] },
+      { text: "et toi t’as cru que c’était mort, avoue" },
+      { text: "en vrai elle est partante, juste fatiguée" },
+    ],
+    send: ["courage pour jeudi. samedi pour fêter ça ?"],
+    vocal: chatVocalDemo("chat"),
+  };
 }
 
 /* Back-end : une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */

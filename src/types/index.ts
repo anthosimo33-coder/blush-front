@@ -211,6 +211,10 @@ export type BlushAnswer = (
 ) & {
   /** Le nouveau niveau (ou la nouvelle température) que ce message vous fait atteindre. Une fois par niveau. */
   levelUp?: LevelId;
+  /** La réponse dite en vocal : l’audio, sa durée (en secondes) et son onde. Ses bulles ne s’affichent pas. */
+  vocal?: { audio: string; duree: number; peaks: number[] };
+  /** Le chat est en vocal après cette réponse (il a demandé à BLUSH de lui parler en vocal). */
+  modeVocal?: boolean;
 };
 
 export type Reply = {
