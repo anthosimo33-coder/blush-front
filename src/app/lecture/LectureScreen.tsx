@@ -113,7 +113,12 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       footer={
         /* Même hauteur que le bouton : rien ne bouge quand il remplace l’étape en cours */
         <div className="flex h-[60px] flex-col items-center justify-center">
-          {failed ? (
+          {failed && p.failReason === "refus" ? (
+            /* Un refus revient à chaque essai : on propose une autre conv, pas de relancer */
+            <ButtonLink href="/commencer" arrow>
+              Essayer une autre conv
+            </ButtonLink>
+          ) : failed ? (
             <Button arrow onClick={retry}>
               Relancer la lecture
             </Button>
@@ -176,7 +181,15 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
           )}
         </div>
 
-        {failed ? (
+        {failed && p.failReason === "refus" ? (
+          /* ⚠ Texte à valider */
+          <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
+            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
+            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+              Claude, l’IA qui lit les convs pour BLUSH, a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’il ne traite pas. Rien n’est perdu : tu peux en essayer une autre.
+            </p>
+          </div>
+        ) : failed ? (
           /* ⚠ Texte à valider */
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]" role="alert">
             Ça a coincé de notre côté.
