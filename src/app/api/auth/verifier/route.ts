@@ -1,4 +1,5 @@
 import { Email, ouvrirSession, verifierCode } from "@/server/auth";
+import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, lireBrouillon, poserSession } from "@/server/cookies";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { rattacherBrouillon } from "@/server/histoires";
@@ -11,6 +12,7 @@ export async function POST(req: Request) {
   const b = await corps<{ email: string; code: string }>(req);
   const email = Email.safeParse(b.email);
   if (!email.success || typeof b.code !== "string") return json({ ok: false });
+  if (!peutEntrer(email.data)) return erreur("beta", 403);
   const utilisateur = await verifierCode(email.data, b.code.trim());
   if (!utilisateur) return json({ ok: false });
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
