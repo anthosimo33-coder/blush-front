@@ -16,9 +16,9 @@ const Env = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Quand la clé n’est rattachée à aucun workspace. */
   ANTHROPIC_WORKSPACE_ID: z.string().min(1).optional(),
-  /** La transcription des vocaux (Mistral). Sans clé, le chat répond que les vocaux arrivent bientôt. */
+  /** La transcription des vocaux par Mistral, prioritaire si sa clé est là ; sinon ElevenLabs (sa clé, plus bas). Sans aucune des deux, le chat répond que les vocaux arrivent bientôt. */
   MISTRAL_API_KEY: z.string().min(1).optional(),
-  /** La voix du vocal du rapport (ElevenLabs). Sans clé ou sans voix A, le rapport n’a pas de vocal. */
+  /** La voix de BLUSH (ElevenLabs), et la transcription de ses vocaux sans clé Mistral. Sans clé ou sans voix A, pas de vocal. */
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   /** Les voix de l’A/B test (leurs identifiants ElevenLabs). Sans voix B, tout le monde a la A. */
   BLUSH_VOIX_A: z.string().min(1).optional(),

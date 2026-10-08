@@ -48,7 +48,7 @@ export function ConfidentialiteScreen() {
           Il lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Anthropic ne s’en sert pas pour entraîner ses modèles.
         </Ligne>
         <Ligne icone="sound" ton="elle" titre="La voix de BLUSH">
-          Pour le vocal de ton rapport, ElevenLabs reçoit seulement son texte (des prénoms et quelques phrases), jamais ta conv entière.
+          Pour les vocaux de BLUSH (ton rapport, ses réponses dans le chat), ElevenLabs reçoit seulement leur texte, jamais ta conv entière. Tes vocaux à toi passent aussi par ElevenLabs, le temps d’être transcrits : BLUSH ne garde pas le son, seulement le texte, chiffré.
         </Ligne>
         <Ligne icone="eye" titre="Personne d’autre">
           Personne chez BLUSH ne lit ta conv. Et la personne avec qui tu parles n’est jamais contactée.
@@ -60,7 +60,7 @@ export function ConfidentialiteScreen() {
           Tout ce qui vient de ta conv (le texte, ton rapport, sa fiche, le chat) est chiffré avec une clé gardée à part. Sans elle, c’est illisible.
         </Ligne>
         <Ligne icone="cloud" titre="Où ça vit">
-          Le site et la base de données sont à Francfort, en Allemagne. L’analyse par Claude passe par les serveurs d’Anthropic, et la voix du vocal par ceux d’ElevenLabs, aux États-Unis.
+          Le site et la base de données sont à Francfort, en Allemagne. L’analyse par Claude passe par les serveurs d’Anthropic, et les vocaux par ceux d’ElevenLabs, aux États-Unis.
         </Ligne>
         <Ligne icone="heart" ton="elle" titre="Ce que tu confies au chat">
           Même ce qui est intime (ta santé, ta vie amoureuse) reste dans la mémoire de BLUSH, chiffré, et n’est montré qu’à toi.
@@ -81,7 +81,7 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Anthropic" sub="Claude, l’IA qui lit ta conv, aux États-Unis" />
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
-        <InsetRow title="ElevenLabs" sub="La voix du vocal de ton rapport, aux États-Unis" />
+        <InsetRow title="ElevenLabs" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt)" />
         <InsetRow leading={<RowIcon icon="mail" tone="toi" />} title={<span className="text-toi-ink">Une question{N}? Écris-nous</span>} sub="bonjour@askblush.com" href="mailto:bonjour@askblush.com" chevron />
       </InsetGroup>
