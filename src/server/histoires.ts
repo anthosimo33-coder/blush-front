@@ -42,7 +42,7 @@ export type Meta = {
  * Ce qu’on garde de la conv une fois effacée, chiffré dans `stories.context`. `dernier` : l’heure du dernier
  * message lu (celle de l’export, sans fuseau), d’où repartent les messages ajoutés ensuite.
  */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number };
+export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number; trouvailles?: string[] };
 
 export type Ligne = typeof schema.stories.$inferSelect;
 
