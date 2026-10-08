@@ -16,6 +16,9 @@ import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
 import { alerter } from "./alertes";
+import { envoyerMail } from "./email";
+import { env } from "./env";
+import { mailRapport } from "./mail-rapport";
 import { aRelancer, battre, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 
 /* ———— Ce qu’on garde, chiffré ———— */
@@ -233,11 +236,27 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     sobre: sobreAffiche(r),
     lecture: { free: tempsDeLecture(chapitres.filter((c) => c.free)), full: tempsDeLecture(chapitres) },
   };
+  const [avant] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
   /* Le rapport assemblé : les chapitres gardés au fil de l’écriture ne servent plus */
   await db()
     .insert(schema.reports)
     .values({ storyId: story.id, data: chiffrer(donnees) })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { data: chiffrer(donnees), partiel: null, updatedAt: new Date() } });
+  /* La première fois seulement (pas à une relance) : le mail « ton rapport est prêt » */
+  if (!avant?.pret) await prevenirRapportPret(story, donnees, h.autre.pronom);
+}
+
+/** Le mail « ton rapport est prêt », avec le lien qui ouvre cette conv-là. Un mail raté ne fait pas échouer le rapport. */
+async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre: "il" | "elle") {
+  if (!story.userId) return;
+  try {
+    const [u] = await db().select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, story.userId));
+    if (!u) return;
+    const base = env().BLUSH_URL;
+    await envoyerMail(u.email, mailRapport({ base, lien: `${base}/ouvrir/${story.id}`, chapitres: donnees.chapitres.length, lecture: donnees.lecture.full, autre, sobre: !!donnees.sobre }));
+  } catch (e) {
+    console.error(`mail du rapport non envoyé (${story.id}) :`, e instanceof Error ? e.message : "erreur");
+  }
 }
 
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */

@@ -1,4 +1,4 @@
-import { bigserial, boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -159,6 +159,20 @@ export const shares = pgTable("shares", {
   data: chiffre("data").notNull(),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
+
+/**
+ * Des compteurs par jour (heure de Paris), pour le tableau de bord : ce que les tables ne gardent pas, comme les
+ * visites d’un lien partagé. Un nom et un nombre, jamais de contenu, ni d’email, ni d’adresse IP.
+ */
+export const counters = pgTable(
+  "counters",
+  {
+    day: date("day").notNull(),
+    key: text("key").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.key] })],
+);
 
 /** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
 export const waitlist = pgTable("waitlist", {

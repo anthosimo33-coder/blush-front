@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ErreurCaptures, imagesDe, lireCaptures } from "@/server/captures";
+import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     const t = await lireCaptures(await imagesDe(fichiers), appli.success ? appli.data : "autre");
     const { id, meta, secret } = await importerCaptures({ appli: appli.success ? appli.data : "autre", t });
     await poserBrouillon(secret);
+    await compterImportVenuDuPartage();
     const story = storyAffichee(id, meta);
     return json({ source: story.sources[0], messagesRead: t.messages, story });
   } catch (e) {
