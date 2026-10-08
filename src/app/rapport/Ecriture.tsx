@@ -18,7 +18,7 @@ const pct = (p: number) => `${Math.round(Math.min(1, Math.max(0, p)) * 100)}${"�
 export function enCours(e: EcritureRapport): string {
   if (e.etape === "plan") return "Il prépare le plan";
   const n = e.chapitres.filter((c) => c.etat === "en_cours").map((c) => c.number);
-  if (!n.length) return "Il relit tout";
+  if (!n.length) return e.progres < 0.95 ? "Il prépare les chapitres" : "Il assemble ton rapport";
   return n.length === 1 ? `Chapitre ${n[0]} en cours` : `Chapitres ${n.slice(0, -1).join(", ")} et ${n.at(-1)} en cours`;
 }
 

@@ -6,7 +6,7 @@ import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj,
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore, type SobreAffiche } from "@prompts/lib/front";
 import { appliquerMaj, citees, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
-import { Etape05, Maj07, Sortie04, Sortie05, Sortie07, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie07, type Chapitre, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { chiffrer, dechiffrer } from "./chiffrement";
@@ -86,6 +86,22 @@ export const chapitresCommences = (ecrit: string) => [...ecrit.matchAll(/"numero
 /** Le plan du rapport (0 à 100) : sa réflexion jusqu’à 50, puis ses huit chapitres, un par un, jusqu’à 98. */
 export const avancePlan = (a: Avance) =>
   Math.min(98, Math.round(a.texte > 0 ? 50 + 48 * Math.min(1, chapitresCommences(a.ecrit).length / 8) : 50 * (1 - Math.exp(-a.reflexion / 2500))));
+
+/**
+ * Les chapitres déjà finis dans ce que le modèle a écrit : un chapitre est fini quand le suivant commence (le dernier,
+ * à la fin de la réponse). Chacun est relu par son schéma : un morceau mal formé est simplement ignoré.
+ */
+export function chapitresFinis(ecrit: string): Chapitre[] {
+  const debuts = [...ecrit.matchAll(/\{\s*"numero"\s*:/g)].map((m) => m.index!);
+  return debuts.slice(0, -1).flatMap((d, k) => {
+    try {
+      const ok = Chapitre05.safeParse(JSON.parse(ecrit.slice(d, debuts[k + 1]).replace(/[\s,]+$/, "")));
+      return ok.success ? [ok.data] : [];
+    } catch {
+      return [];
+    }
+  });
+}
 
 /** Une moitié du rapport (chapitres 1 à 4, ou 5 à 8) : où elle en est (0 à 1), ses chapitres écrits, celui en cours. */
 export type AvanceMoitie = { progres: number; ecrits: number[]; enCours: number | null };
@@ -173,12 +189,28 @@ async function rapportChapitres(story: Ligne, t: Tache) {
   /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre (la lecture du rapport l’affiche) */
   const detail: { a: AvanceMoitie; b: AvanceMoitie } = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
   const ecrire = ecrireAvance(t.id);
+  /* Chaque chapitre fini est gardé tout de suite, prêt à lire : on n’attend pas la fin du rapport (écritures l’une après l’autre) */
+  const h = histoireDe(metaDe(story));
+  const messages = messagesAffiches(rendu.lignes, h.utilisateur.prenom);
+  const prets = new Map<number, Chapitre>();
+  let enregistrement = Promise.resolve();
+  const garderPrets = () => {
+    const affiches = chapitresAffiches({ chapitres: [...prets.values()].sort((x, y) => x.numero - y.numero) } as Rapport, messages, v.scores);
+    enregistrement = enregistrement
+      .then(() => db().update(schema.reports).set({ partiel: chiffrer(affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
+      .then(() => undefined, () => undefined);
+  };
   const moitie = (quels: "1 à 4" | "5 à 8") =>
     appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, (e) => preuvesChapitres(e.chapitres), rendu.lignes, story.id, "rapport_chapitres", (av) => {
-      detail[quels === "1 à 4" ? "a" : "b"] = avanceMoitie(av, quels === "1 à 4" ? 1 : 5);
+      const premier = quels === "1 à 4" ? 1 : 5;
+      detail[premier === 1 ? "a" : "b"] = avanceMoitie(av, premier);
       ecrire(Math.round(50 * (detail.a.progres + detail.b.progres)), detail);
+      const nouveaux = chapitresFinis(av.ecrit).filter((c) => c.numero >= premier && c.numero < premier + 4 && !prets.has(c.numero));
+      nouveaux.forEach((c) => prets.set(c.numero, c));
+      if (nouveaux.length) garderPrets();
     });
   const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
+  await enregistrement;
   if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
   const r: Rapport = {
     alerte: plan.alerte,
@@ -201,10 +233,11 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     sobre: sobreAffiche(r),
     lecture: { free: tempsDeLecture(chapitres.filter((c) => c.free)), full: tempsDeLecture(chapitres) },
   };
+  /* Le rapport assemblé : les chapitres gardés au fil de l’écriture ne servent plus */
   await db()
     .insert(schema.reports)
     .values({ storyId: story.id, data: chiffrer(donnees) })
-    .onConflictDoUpdate({ target: schema.reports.storyId, set: { data: chiffrer(donnees), updatedAt: new Date() } });
+    .onConflictDoUpdate({ target: schema.reports.storyId, set: { data: chiffrer(donnees), partiel: null, updatedAt: new Date() } });
 }
 
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
