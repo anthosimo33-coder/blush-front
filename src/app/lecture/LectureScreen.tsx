@@ -50,9 +50,15 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     (async () => {
       /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
       const cur = readJourney();
-      const { jobId } = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current });
-      restartRef.current = false;
+      /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
+      const lance = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(() => null);
       if (!alive) return;
+      if (!lance) {
+        setFailed(true);
+        return;
+      }
+      const { jobId } = lance;
+      restartRef.current = false;
       setJourney({ jobId });
       const tick = async () => {
         const next = await getAnalysisProgress(jobId);

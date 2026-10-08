@@ -4,7 +4,7 @@ import { executerChaine } from "@/server/analyse";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { contexteRequete, progression, relancer } from "@/server/donnees";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
-import { definirQui, rattacherBrouillon } from "@/server/histoires";
+import { definirQui, metaDe, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { etatDesTaches, planifier } from "@/server/taches";
 
@@ -30,7 +30,10 @@ export async function POST(req: Request) {
   if (!utilisateur) return erreur("connexion", 401);
   if (!story) return erreur("aucune", 404);
   const qui = Qui.safeParse(await corps(req));
-  if (!qui.success) return erreur("qui", 422);
+  /* Une relance depuis un autre onglet (le parcours du navigateur est perdu) : « Qui es-tu ? » est déjà en base */
+  const meta = metaDe(story);
+  const deja = meta.moi != null && !!meta.pronom && !!meta.devinette && !!meta.objectif;
+  if (!qui.success && !deja) return erreur("qui", 422);
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
     /* Chaque lecture coûte : un nombre de nouvelles convs par jour et par compte */
@@ -40,7 +43,7 @@ export async function POST(req: Request) {
       await effacerBrouillon();
     }
     await poserChoisie(story.id);
-    await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal, ...(qui.data.prenom ? { prenom: qui.data.prenom } : {}) });
+    if (qui.success) await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal, ...(qui.data.prenom ? { prenom: qui.data.prenom } : {}) });
     await planifier(story.id, "verdict");
   }
   after(() => executerChaine(story.id));
