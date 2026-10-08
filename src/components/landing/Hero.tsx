@@ -33,7 +33,7 @@ export function Hero({ children }: { children?: ReactNode }) {
   );
 }
 
-/** Une expression du titre dans une bulle : reçue (blanche, à gauche) ou envoyée par toi (bleue, qui arrive après). */
+/** Une expression du titre dans une bulle : reçue (rose BLUSH, à gauche) ou envoyée par toi (bleue, qui arrive après). */
 function Said({ me = false, children }: { me?: boolean; children: string }) {
   const r = me ? 1.5 : -2;
   return (
@@ -43,7 +43,7 @@ function Said({ me = false, children }: { me?: boolean; children: string }) {
         "mx-[0.04em] inline-block whitespace-nowrap px-[0.34em] pb-[0.12em] pt-[0.04em] align-[0.06em] text-[0.86em] leading-[1.1]",
         me
           ? "rounded-[0.5em_0.5em_0.16em_0.5em] bg-bubble-me text-white shadow-[0_20px_36px_-18px_rgba(26,102,219,0.7)]"
-          : "rounded-[0.5em_0.5em_0.5em_0.16em] bg-white text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_18px_34px_-18px_rgba(17,17,20,0.35)]",
+          : "rounded-[0.5em_0.5em_0.5em_0.16em] text-white [background:var(--rose-blush)] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_18px_34px_-18px_rgba(232,53,138,0.75)]",
       )}
       style={{ transform: `rotate(${r}deg)`, "--r": `${r}deg`, "--d": "0.45s" } as CSSProperties}
     >
