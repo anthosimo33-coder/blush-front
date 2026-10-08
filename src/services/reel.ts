@@ -9,6 +9,9 @@ import { analyserExport, ExportIllisible, preparerExport, type ConvInstagram } f
 import { imagesDeLaVideo, lotsDe, VideoIllisible } from "./preparer-video";
 
 /** Où en est la lecture d’un enregistrement d’écran : la vidéo regardée dans le navigateur, puis ses lots lus par BLUSH. */
+/** Un morceau de l’historique du chat (du plus ancien au plus récent), et s’il en reste de plus anciens. */
+export type HistoriqueChat = { echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean };
+
 export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number };
 
 /** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
@@ -128,6 +131,8 @@ export const reel = {
   deleteStory: () => appel<{ ok: true }>("/api/histoire", envoi("DELETE")),
   deleteAccount: () => appel<{ ok: true }>("/api/compte", envoi("DELETE")),
   sendToBlush: (texte: string) => appel<BlushAnswer>("/api/chat", envoi("POST", { texte })),
+  /** L’historique du chat : les derniers échanges, ou ceux d’avant un échange déjà affiché. */
+  historiqueChat: (avant?: number) => appel<HistoriqueChat>(`/api/chat${avant ? `?avant=${avant}` : ""}`),
   /** Des captures (leur conv, son profil) ou un nouvel export, envoyés à BLUSH dans le chat, avec ou sans un mot. */
   async sendFilesToBlush(files: File[], texte?: string): Promise<BlushAnswer> {
     const fd = await avecFichiers(new FormData(), files);

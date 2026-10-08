@@ -52,10 +52,10 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
 }
 
 /** Les échanges déjà eus avec BLUSH, à réafficher sur l’accueil. Rien en démo. */
-export async function getChat(): Promise<{ mine: string; answer: BlushAnswer; at: number }[]> {
-  if (!BACKEND) return [];
+export async function getChat(): Promise<{ echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean }> {
+  if (!BACKEND) return { echanges: [], plus: false };
   const { utilisateur, story } = await contexteRequete();
-  return utilisateur && story ? historique(story.id) : [];
+  return utilisateur && story ? historique(story.id) : { echanges: [], plus: false };
 }
 
 /** Toi et elle, pour « Mon compte ». Démo : Hugo et Sophie. */

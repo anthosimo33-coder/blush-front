@@ -28,7 +28,8 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   const screen = (
     <HomeScreen
       quick={version === "actuelle" ? [] : quick}
-      script={chat}
+      script={chat.echanges}
+      plusAnciens={chat.plus}
       contact={{ report: { verdict: report.verdict, level: report.level, trend: report.trend, nextStep: report.nextStep }, fiche: { person: fiche.person, summaryShort: fiche.summaryShort }, period: story.period }}
       motion={motion}
       arrive={motion && !arrived}

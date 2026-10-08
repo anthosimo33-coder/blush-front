@@ -122,7 +122,7 @@ describe("après l’import : le chat et sa fiche", () => {
     const chat = derniere("10-chat");
     expect(chat).toContain(`→ ${ajout.lignes[2]}`);
     expect(chat).toContain("Hugo (à toi) : ça veut dire quoi ? je lui réponds quoi ?");
-    expect((await historique(id)).at(-1)?.mine).toBe("(ton export : 3 nouveaux messages)");
+    expect((await historique(id)).echanges.at(-1)?.mine).toBe("(ton export : 3 nouveaux messages)");
 
     await executerChaine(id);
     expect(derniere("07-memoire")).toContain(`ajouté à la conv :\n${ajout.lignes.join("\n")}`);
