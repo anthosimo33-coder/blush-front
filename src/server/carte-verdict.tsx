@@ -16,19 +16,19 @@ export const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 10
 export type Format = keyof typeof TAILLES;
 
 /* Des chemins écrits en entier : le build n’embarque que ces trois fichiers dans la fonction (pas tout le projet) */
-const ressources = Promise.all([
+export const ressources = Promise.all([
   readFile(join(process.cwd(), "assets/fonts/Nunito-Black.ttf")),
   readFile(join(process.cwd(), "assets/fonts/Nunito-ExtraBold.ttf")),
   readFile(join(process.cwd(), "public/mail/bulle.png")),
 ]);
 
-const ENCRE = "#121214";
-const DOUX = "#4B4A47";
-const PAPIER =
+export const ENCRE = "#121214";
+export const DOUX = "#4B4A47";
+export const PAPIER =
   "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), radial-gradient(45% 40% at 100% 100%, rgba(255,79,154,0.16), rgba(255,79,154,0) 70%), radial-gradient(45% 40% at 0% 100%, rgba(61,139,255,0.12), rgba(61,139,255,0) 70%), #F4F2ED";
 
 /** Une bulle de conv : reçue (BLUSH, rose, la pointe à gauche) ou envoyée (toi, bleue, la pointe à droite). */
-function Bulle({ moi = false, taille, angle, children }: { moi?: boolean; taille: number; angle: number; children: ReactNode }) {
+export function Bulle({ moi = false, taille, angle, children }: { moi?: boolean; taille: number; angle: number; children: ReactNode }) {
   const r = taille * 0.92;
   const style: CSSProperties = {
     display: "flex",

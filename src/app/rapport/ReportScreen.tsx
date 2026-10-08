@@ -9,6 +9,7 @@ import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
 import { useQuery } from "@/lib/query";
 import { getReport, type ReportPayload } from "@/services/api";
+import { BubbleLogo } from "@/components/brand/objects3d";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/cards";
@@ -26,7 +27,8 @@ import { useJourney } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
-import { PartageEtConfidentialite } from "./Partage";
+import { PartageEtConfidentialite, PartageImageSheet } from "./Partage";
+import type { CibleImage } from "@/services/api";
 import { SoberReport } from "./SoberReport";
 import { VocalDuRapport } from "./Vocal";
 
@@ -126,6 +128,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const [paywall, setPaywall] = useState(openPaywall);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /* « Partager en image » : la chute d’un chapitre en story */
+  const [image, setImage] = useState<CibleImage | null>(null);
   const [resume, setResume] = useState<number | null>(null);
 
   const { report, access } = payload;
@@ -249,6 +253,11 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
           </Link>
         </div>
       )}
+      {/* Le sommaire suit la lecture : l’adresse du site est sur chaque capture du rapport (ordinateur) */}
+      <span className="mt-3 flex items-center gap-1.5 border-t border-[rgba(17,17,20,0.06)] pt-3 text-[12px] font-black text-grey">
+        <BubbleLogo size={15} />
+        askblush.com
+      </span>
     </nav>
   );
 
@@ -262,17 +271,20 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
               <Icon name="back" size={24} color="#121214" stroke={2.6} />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">
+              {/* L’adresse du site : la barre reste en haut, elle est sur chaque capture du rapport */}
+              <span className="flex items-center gap-1 text-[11.5px] font-black leading-tight text-grey">
+                <BubbleLogo size={13} />
+                askblush.com
+              </span>
               {currentChapter ? (
-                <>
-                  <span className="text-[11.5px] font-extrabold leading-tight text-grey">
-                    Chapitre {currentChapter.number} sur {chapters.length}
+                <span key={currentChapter.number} data-rise="" className="max-w-full truncate text-[14px] font-black leading-tight text-ink">
+                  <span className="font-extrabold text-grey">
+                    {currentChapter.number}/{chapters.length} ·{" "}
                   </span>
-                  <span key={currentChapter.number} data-rise="" className="max-w-full truncate text-[14px] font-black leading-tight text-ink">
-                    {currentChapter.tocTitle}
-                  </span>
-                </>
+                  {currentChapter.tocTitle}
+                </span>
               ) : (
-                <span className="text-[14px] font-black text-grey">{label}</span>
+                <span className="text-[14px] font-black leading-tight text-ink">{label}</span>
               )}
             </button>
             <button type="button" aria-label="Sommaire du rapport" aria-haspopup="dialog" onClick={() => setMenu(true)} className="flex size-11 items-center justify-center">
@@ -362,7 +374,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       {free.map((c, i) => (
         <Fragment key={c.number}>
           {i > 0 && <ChapterRule />}
-          <ChapterSection chapter={c} renderQuestion={renderQuestion}>
+          <ChapterSection chapter={c} renderQuestion={renderQuestion} onShare={(bloc) => setImage({ type: "moment", chapitre: c.number, bloc })}>
             {c.number === 1 && (
               <>
                 <div className="flex items-start gap-2.5">
@@ -500,6 +512,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
 
       {toast && <Toast className="fixed inset-x-4 top-3 lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{toast}</Toast>}
 
+      <PartageImageSheet cible={image} onClose={() => setImage(null)} />
+
       <PaywallSheet
         open={paywall}
         onClose={() => setPaywall(false)}
@@ -552,16 +566,18 @@ function ChapterSection({
   chapter,
   children,
   renderQuestion,
+  onShare,
 }: {
   chapter: Chapter;
   children?: React.ReactNode;
   renderQuestion: Parameters<typeof Blocks>[0]["renderQuestion"];
+  onShare?: (bloc: number) => void;
 }) {
   return (
     <section id={`chapitre-${chapter.number}`} aria-labelledby={`chapitre-${chapter.number}-titre`} className={cn("flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5")}>
       <ChapterHeader number={chapter.number} kicker={chapter.kicker} title={chapter.title} id={`chapitre-${chapter.number}-titre`} />
       {children}
-      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} />
+      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare} />
     </section>
   );
 }

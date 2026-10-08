@@ -105,6 +105,8 @@ describe("de l’import à la mémoire", () => {
     expect(reponse.kind === "bubbles" && reponse.bubbles[0].messages?.length).toBe(1);
     expect(majMemoire).toBe(true);
     expect((await historique(id)).echanges).toHaveLength(1);
+    /* La réponse porte son échange (pour la partager en image), le même que dans l’historique */
+    expect(reponse.echange).toBe((await historique(id)).echanges[0].id);
     await executerChaine(id);
     const [maj] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj.status).toBe("fini");

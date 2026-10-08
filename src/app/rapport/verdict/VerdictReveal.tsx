@@ -187,9 +187,10 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
           ))}
         </div>
         <div className="mt-3 flex items-center justify-between">
+          {/* L’adresse du site, toujours dans le cadre : elle est sur chaque capture des cartes */}
           <span className="flex items-center gap-2 text-[14px] font-black tracking-[-0.01em]">
             <BubbleLogo size={26} />
-            BLUSH
+            askblush.com
           </span>
           <span className="flex items-center gap-4">
             {sons && (
