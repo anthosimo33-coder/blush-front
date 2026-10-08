@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
+import { pagePrecedente } from "@/lib/navigation";
 import type { AppKind } from "@/types";
 
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
@@ -27,7 +28,8 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
   const router = useRouter();
   return (
     <Screen
-      mobileTop={<MobileTopBar back={() => router.back()} progress={1} />}
+      /* Retour : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici directement, l’accueil */
+      mobileTop={<MobileTopBar back={() => (pagePrecedente() ? router.back() : router.push("/"))} progress={1} />}
       aside={<FlowSteps step={1} />}
       head={
         <>
