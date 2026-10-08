@@ -25,6 +25,7 @@ import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import { useJourney } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
 import { ChatBubble } from "./ChatBubble";
+import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
 import { SoberReport } from "./SoberReport";
 
 /** Où tu t’étais arrêté (ce navigateur seulement). */
@@ -34,7 +35,7 @@ const RESUME_KEY = "blush.rapport.reprise.v1";
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
 export function ReportScreen({ initial, story, openPaywall, fixed = false }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean }) {
-  const { data, refresh } = useQuery("report", getReport, initial);
+  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
   const payload = fixed ? initial : (data ?? initial);
   /* Le rapport s’écrit encore (back-end) : on repasse toutes les 4 secondes jusqu’à ce qu’il soit là */
@@ -54,7 +55,7 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
   return (
     <>
       <ReportBody payload={payload} story={story} openPaywall={openPaywall} />
-      {payload.generating && <Writing />}
+      {payload.generating && (payload.ecriture ? <PastilleEcriture ecriture={payload.ecriture} /> : <Writing />)}
     </>
   );
 }
@@ -123,6 +124,9 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
 
   const { report, access } = payload;
   const full = access !== "gratuit";
+  /* Le rapport s’écrit : les chapitres à venir ne mènent pas au paiement, ils montrent où en est l’écriture */
+  const ecriture = payload.generating ? payload.ecriture : undefined;
+  const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   const [me, other] = j.me === story.participants[1].id ? [story.participants[1], story.participants[0]] : story.participants;
   const chapters = report.chapters;
   const free = chapters.filter((c) => !c.locked);
@@ -207,11 +211,17 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const toc = (
     <nav aria-label="Sommaire" className="flex flex-col gap-0.5 rounded-card bg-white p-[18px] shadow-card">
       <div className="text-[13px] font-black text-grey">Sommaire</div>
-      <ReadingBar progress={progress} className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />
+      {ecriture ? <BarreEcriture ecriture={ecriture} /> : <ReadingBar progress={progress} className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />}
       <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
         {chapters.map((c) => (
           <li key={c.number}>
-            {c.locked ? (
+            {c.locked && payload.generating ? (
+              <div className="flex w-full items-center gap-2.5 py-[7px] text-left">
+                <ChapterBadge number={c.number} state="locked" />
+                <span className={cn("flex-1 text-[14px] font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
+                <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />
+              </div>
+            ) : c.locked ? (
               <button type="button" onClick={() => setPaywall(true)} className="row-hover flex w-full items-center gap-2.5 py-[7px] text-left">
                 <ChapterBadge number={c.number} state="locked" />
                 <span className="flex-1 text-[14px] font-black text-grey">{c.tocTitle}</span>
@@ -370,7 +380,19 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </Fragment>
       ))}
 
-      {locked.length > 0 && (
+      {locked.length > 0 && payload.generating && (
+        <>
+          <ChapterRule />
+          <div className="text-[13px] font-black text-grey">La suite de ton rapport s’écrit · {locked.length} chapitres</div>
+          <div className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
+            {locked.map((c, k) => (
+              <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === locked.length - 1} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {locked.length > 0 && !payload.generating && (
         <>
           <ChapterRule />
           <div className="text-[13px] font-black text-grey">La suite de ton rapport · {locked.length} chapitres</div>
