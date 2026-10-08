@@ -72,7 +72,11 @@ const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\
  * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour 35 %, les deux moitiés pour 65 %), l’état
  * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois fait.
  */
-async function ecritureDe(storyId: string, titres: Map<number, string>, autre: string): Promise<EcritureRapport | undefined> {
+/* Les durées habituelles des étapes (mesurées sur les rapports de test) : le plan, puis les deux moitiés en même temps */
+const PLAN_S = 55;
+const CHAPITRES_S = 100;
+
+async function ecritureDe(storyId: string, titres: Map<number, string>, autre: string, prets: Set<number>): Promise<EcritureRapport | undefined> {
   const { rapport_plan: tp, rapport_chapitres: tc } = await etatDesTaches(storyId, ["rapport_plan", "rapport_chapitres"]);
   if (!tp) return undefined;
   const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
@@ -81,16 +85,22 @@ async function ecritureDe(storyId: string, titres: Map<number, string>, autre: s
   const pChap = fini ? 1 : detail ? (detail.a.progres + detail.b.progres) / 2 : 0;
   const progres = Math.min(0.99, 0.35 * pPlan + 0.65 * pChap);
   const etat = (n: number): EtatChapitre => {
-    if (fini) return "ecrit";
+    if (fini || prets.has(n)) return "ecrit";
     const m = n <= 4 ? detail?.a : detail?.b;
     if (!m) return "attente";
     return m.ecrits.includes(n) || (m.enCours != null && n < m.enCours) ? "ecrit" : m.enCours === n ? "en_cours" : "attente";
   };
-  const ecoule = (Date.now() - tp.createdAt.getTime()) / 1000;
+  /*
+   * Le temps qui reste : pendant le plan, sa part restante plus les chapitres ; ensuite, au rythme observé des chapitres
+   * une fois qu’ils ont pris un peu d’avance (au début, leur durée habituelle). `updatedAt` : le début de l’essai en cours.
+   */
+  const enCoursDepuis = tc?.status === "en_cours" ? (Date.now() - tc.updatedAt.getTime()) / 1000 : 0;
+  const restant =
+    tp.status !== "fini" ? (1 - pPlan) * PLAN_S + CHAPITRES_S : pChap > 0.25 && enCoursDepuis > 0 ? (enCoursDepuis * (1 - pChap)) / pChap : (1 - pChap) * CHAPITRES_S;
   return {
     etape: tp.status === "fini" ? "chapitres" : "plan",
     progres,
-    restant: progres > 0.06 ? duree((ecoule * (1 - progres)) / progres) : null,
+    restant: duree(restant),
     chapitres: [2, 3, 4, 5, 6, 7, 8].map((n) => ({ number: n, title: titres.get(n) ?? (ROLES[n - 2] || autre), etat: etat(n) })),
   };
 }
@@ -126,8 +136,20 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     const t = titres.get(k + 2) ?? (titre || autre);
     return { number: k + 2, title: t, tocTitle: t, free: false, locked: true, blocks: [] };
   });
-  const chapters = ouvert && donnees ? donnees.chapitres : [verdictLibre, ...verrouilles];
-  const ecriture = ouvert && !donnees ? await ecritureDe(story.id, titres, autre) : undefined;
+  /*
+   * Pendant l’écriture, les chapitres déjà finis se lisent tout de suite, dans l’ordre : un chapitre prêt en avance
+   * attend (dans la liste, « Prêt ») que ceux d’avant le soient aussi. Le chapitre 1 complet remplace le verdict seul.
+   */
+  const partiels = new Map((ouvert && !donnees && r?.partiel ? dechiffrer<Chapter[]>(r.partiel) : []).map((c) => [c.number, c]));
+  let suite = true;
+  const enEcriture: Chapter[] = [partiels.get(1) ? { ...partiels.get(1)!, free: true, locked: false } : verdictLibre];
+  for (const c of verrouilles) {
+    const pret = partiels.get(c.number);
+    suite = suite && !!pret;
+    enEcriture.push(pret && suite ? { ...pret, free: true, locked: false } : c);
+  }
+  const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
+  const ecriture = ouvert && !donnees ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;
 
   return {
     report: {

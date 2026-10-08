@@ -84,6 +84,8 @@ export const reports = pgTable("reports", {
   /** Le plan (étape 1), puis le rapport assemblé. */
   plan: chiffre("plan"),
   data: chiffre("data"),
+  /** Pendant l’écriture : les chapitres déjà finis, prêts à lire (effacés une fois le rapport assemblé). */
+  partiel: chiffre("partiel"),
   createdAt: quand("created_at").notNull().defaultNow(),
   updatedAt: quand("updated_at").notNull().defaultNow(),
 });
