@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
+import { useEnVue } from "@/lib/hooks";
 import type { EcritureRapport, EtatChapitre } from "@/services/api";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -91,8 +92,17 @@ export function LigneEcriture({ number, title, etat, last = false }: { number: n
 export function PastilleEcriture({ ecriture }: { ecriture: EcritureRapport }) {
   const r = 13;
   const c = 2 * Math.PI * r;
+  /* La liste « La suite s’écrit » est à l’écran : elle dit déjà tout, la pastille s’efface pour ne pas flotter dessus */
+  const cachee = useEnVue("suite-ecriture");
   return (
-    <div role="status" className="pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-50 flex justify-center px-4 lg:bottom-8">
+    <div
+      role="status"
+      aria-hidden={cachee || undefined}
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-50 flex justify-center px-4 transition-[opacity,translate] duration-300 lg:bottom-8",
+        cachee && "translate-y-3 opacity-0",
+      )}
+    >
       <span className="flex max-w-[420px] items-center gap-3 rounded-full bg-ink py-2 pl-2 pr-5 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]">
         <span className="relative flex size-[34px] shrink-0 items-center justify-center">
           <svg viewBox="0 0 34 34" className="absolute inset-0 -rotate-90" aria-hidden="true">
