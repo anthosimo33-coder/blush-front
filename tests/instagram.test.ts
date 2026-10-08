@@ -32,7 +32,7 @@ describe("export Instagram", () => {
     expect(r.texte.split("\n")).toEqual(["[11/09/2026 18:51:00] ines ): audio omitted", "[11/09/2026 18:52:00] Dozo: ah merde"]);
     const f = detecterFormat(r.texte)!;
     expect(f).toBe("whatsapp-ios");
-    const p = participantsDe(r.texte, f as "whatsapp-ios");
+    const p = participantsDe(r.texte);
     const lu = lire(r.texte, { utilisateur: { prenom: "Dozo", pronom: "il", nomExport: "Dozo" }, autre: { prenom: "Inès", pronom: "elle", nomExport: "ines )" }, format: f });
     expect(p).toHaveLength(2);
     expect(lu.messages.map((m) => m.media ?? m.texte)).toEqual(["vocal", "ah merde"]);
