@@ -94,7 +94,7 @@ export const EXPORT_STEPS = {
       android: ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"],
     },
   },
-  /* ⚠ Faux : Messages sur Mac n’a pas de commande « Exporter la conversation », et le serveur ne lit pas d’export iMessage (seulement WhatsApp et Instagram). À revoir. */
+  /* Plus proposé : Messages sur Mac n’a pas de commande « Exporter la conversation ». iMessage passe par l’enregistrement d’écran (/importer/captures?app=imessage). */
   imessage: {
     menu: { contact: "Sophie", items: ["Afficher le contact", "Exporter la conversation", "Supprimer la conversation"], highlight: 1 },
     steps: {

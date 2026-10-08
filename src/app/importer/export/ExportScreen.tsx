@@ -83,7 +83,6 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         }}
         options={[
           { value: "whatsapp", label: "WhatsApp" },
-          { value: "imessage", label: "iMessage" },
           { value: "instagram", label: "Instagram" },
         ]}
       />

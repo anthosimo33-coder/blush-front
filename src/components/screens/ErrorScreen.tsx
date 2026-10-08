@@ -43,6 +43,20 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
     href: "/importer/captures",
     back: "/importer/captures",
   },
+  video: {
+    title: "Je n’arrive pas à lire cette vidéo.",
+    text: "Choisis l’enregistrement tel quel, depuis ton iPhone : sans le recadrer ni le monter.",
+    action: "Choisir une autre vidéo",
+    href: "/importer/captures",
+    back: "/importer/captures",
+  },
+  longue: {
+    title: "Ton enregistrement est trop long.",
+    text: "Refais-le plus court : remonte un peu plus vite, ou arrête-toi là où votre histoire commence vraiment.",
+    action: "Refaire un enregistrement",
+    href: "/importer/captures",
+    back: "/importer/captures",
+  },
 };
 
 export function ErrorScreen({ kind }: { kind: DemoError }) {

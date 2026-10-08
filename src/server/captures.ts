@@ -1,7 +1,7 @@
 import "server-only";
 import { versTexteCaptures, type TexteCaptures } from "@prompts/lib/captures";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
-import { Sortie01 } from "@prompts/lib/schemas";
+import { Sortie01, type Captures } from "@prompts/lib/schemas";
 import { ErreurImport } from "./histoires";
 import { appeler } from "./ia/claude";
 import { aujourdhuiParis } from "./temps";
@@ -27,10 +27,19 @@ export async function imagesDe(fichiers: File[]): Promise<Image[]> {
  * Rien de lisible (que des captures hors sujet) : l’erreur « capture », que le front sait afficher.
  */
 export async function lireCaptures(images: Image[], appli: string): Promise<TexteCaptures> {
-  const jour = aujourdhuiParis();
-  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: jour.t, images }), Sortie01, { etiquette: "captures" });
+  return enTexte(await lireLot(images, appli));
+}
+
+/** La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). */
+export async function lireLot(images: Image[], appli: string): Promise<Captures> {
+  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette: "captures" });
   if (!a.sortie) throw new ErreurImport("fichier");
-  const t = versTexteCaptures(a.sortie, { aujourdhui: jour.iso });
+  return a.sortie;
+}
+
+/** Une lecture au format « captures » que la lecture de la conv connaît. Rien de lisible : l’erreur « capture ». */
+export function enTexte(c: Captures): TexteCaptures {
+  const t = versTexteCaptures(c, { aujourdhui: aujourdhuiParis().iso });
   if (!t.messages) throw new ErreurCaptures();
   return t;
 }

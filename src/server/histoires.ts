@@ -22,8 +22,8 @@ export class ErreurImport extends Error {
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
-  /** L’appli d’où vient la conv : un export (WhatsApp, Instagram), ou des captures (Instagram, Hinge, autre). */
-  appli: Appli | "hinge" | "autre";
+  /** L’appli d’où vient la conv : un export (WhatsApp, Instagram), ou des captures (Instagram, Hinge, iMessage, autre). */
+  appli: Appli | "hinge" | "imessage" | "autre";
   format: Format;
   fichier: string;
   /** Les deux participants, du plus bavard au moins bavard, avec leur nom dans l’export. */
@@ -235,7 +235,7 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
   return meta;
 }
 
-const APPLIS: Record<Meta["appli"], string> = { whatsapp: "WhatsApp", instagram: "Instagram", hinge: "Hinge", autre: "Captures" };
+const APPLIS: Record<Meta["appli"], string> = { whatsapp: "WhatsApp", instagram: "Instagram", hinge: "Hinge", imessage: "iMessage", autre: "Captures" };
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
 
