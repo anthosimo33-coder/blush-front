@@ -36,6 +36,18 @@ export type Account = {
   storyDeleted: boolean;
 };
 
+/** Un chapitre pendant l’écriture du rapport : en attente, en train de s’écrire, ou prêt. */
+export type EtatChapitre = "attente" | "en_cours" | "ecrit";
+/** Pendant que le rapport s’écrit (back-end) : la vraie avancée, lue sur ce que le modèle écrit. */
+export type EcritureRapport = {
+  etape: "plan" | "chapitres";
+  /** De 0 à 1 : le plan jusqu’à 0,3, puis les chapitres. */
+  progres: number;
+  chapitres: { number: number; title: string; etat: EtatChapitre }[];
+  /** Le temps qui reste, estimé (« 1 min »), ou null tant qu’on ne sait pas. */
+  restant: string | null;
+};
+
 export type ReportPayload = {
   report: Report;
   /** Présent quand le verdict est dur : le rapport bascule en mode sobre. */
@@ -43,6 +55,8 @@ export type ReportPayload = {
   access: Plan;
   /** Back-end : le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
   generating?: boolean;
+  /** Pendant l’écriture : où en est BLUSH, chapitre par chapitre. */
+  ecriture?: EcritureRapport;
 };
 
 /* Durée simulée de la lecture (environ 6 s). */
