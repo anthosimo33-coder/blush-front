@@ -117,16 +117,25 @@ export function LandingFrame({ retour = null, children }: { retour?: Retour; chi
 
 function Frame({ children }: { children: ReactNode }) {
   const cta = useCta();
+  const retour = useContext(RetourContext);
   return (
     <div className="min-h-dvh overflow-x-clip">
       <header className="sticky top-0 z-40 border-b border-[rgba(17,17,20,0.05)] bg-[rgba(244,242,237,0.82)] backdrop-blur-xl">
         <Container className="flex h-16 items-center justify-between">
           <Logo size={30} fontSize={22} href="/" />
-          {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
-          <Link href={cta.href} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
-            {cta.header}
-            <Icon name="arrow" size={15} color="#121214" stroke={2.6} className="arrow" />
-          </Link>
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Déjà un compte, sur un autre appareil : on retrouve ses convs avec son email */}
+            {!retour && (
+              <Link href="/connexion" className="relative inline-flex h-10 items-center px-2.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink">
+                Se connecter
+              </Link>
+            )}
+            {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
+            <Link href={cta.href} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
+              {cta.header}
+              <Icon name="arrow" size={15} color="#121214" stroke={2.6} className="arrow" />
+            </Link>
+          </div>
         </Container>
       </header>
       <main>{children}</main>
@@ -140,8 +149,8 @@ function Frame({ children }: { children: ReactNode }) {
             <Link href={cta.href} className="text-soft no-underline hover:text-ink">
               {cta.label}
             </Link>
-            <Link href="/compte" className="text-soft no-underline hover:text-ink">
-              Mon compte
+            <Link href={retour ? "/compte" : "/connexion"} className="text-soft no-underline hover:text-ink">
+              {retour ? "Mon compte" : "Se connecter"}
             </Link>
             <Link href="/confidentialite" className="text-soft no-underline hover:text-ink">
               Confidentialité
