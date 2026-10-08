@@ -392,6 +392,22 @@
 }
 [data-nudge] { animation: blushNudge 4s ease-in-out 1.2s infinite; transform-origin: 50% 85%; }
 
+/* « Partager mon verdict » : il sonne comme un téléphone (deux sonneries, puis un silence) tant qu’on ne l’a jamais ouvert */
+@keyframes blushDring {
+  0%, 12%, 16%, 28%, 100% { transform: rotate(0deg); }
+  1.5%, 4.5%, 7.5%, 17.5%, 20.5%, 23.5% { transform: rotate(-1.3deg); }
+  3%, 6%, 9%, 19%, 22%, 25% { transform: rotate(1.3deg); }
+  10.5%, 26.5% { transform: rotate(-0.6deg); }
+}
+@keyframes blushDringIcone {
+  0%, 12%, 16%, 28%, 100% { transform: rotate(0deg) scale(1); }
+  1.5%, 4.5%, 7.5%, 17.5%, 20.5%, 23.5% { transform: rotate(-16deg) scale(1.12); }
+  3%, 6%, 9%, 19%, 22%, 25% { transform: rotate(16deg) scale(1.12); }
+  10.5%, 26.5% { transform: rotate(-6deg) scale(1.05); }
+}
+[data-dring] { animation: blushDring 5s linear 1.5s infinite; }
+[data-dring-icone] { animation: blushDringIcone 5s linear 1.5s infinite; }
+
 /* Un chapitre qui s’écrit : ses lignes se remplissent, l’une après l’autre */
 @keyframes ecrit { 0% { width: 0; } 70%, 100% { width: 100%; } }
 [data-ecrit] { animation: ecrit 1.8s ease-in-out var(--k, 0s) infinite; }
@@ -414,6 +430,6 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-dots] > *, [data-nudge], [data-ecrit], [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
   [data-scan-bar] { animation: none !important; visibility: hidden; }
 }
