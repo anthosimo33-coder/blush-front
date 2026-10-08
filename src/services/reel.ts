@@ -6,6 +6,10 @@ import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, FicheUpd
 import { preparerCaptures } from "./preparer-captures";
 import type { Account, ReportPayload } from "./api";
 import { analyserExport, ExportIllisible, preparerExport, type ConvInstagram } from "./preparer-export";
+import { imagesDeLaVideo, lotsDe, VideoIllisible } from "./preparer-video";
+
+/** Où en est la lecture d’un enregistrement d’écran : la vidéo regardée dans le navigateur, puis ses lots lus par BLUSH. */
+export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number };
 
 /** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
 export class ErreurApi extends Error {
@@ -41,6 +45,35 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
 }
 
 export const reel = {
+  /**
+   * Un enregistrement d’écran : le navigateur en tire les écrans de la conv (la vidéo ne part pas), BLUSH les lit
+   * par lots (trois à la fois), puis les lectures sont rassemblées en une histoire brouillon, comme des captures.
+   */
+  async uploadRecording(file: File, app: AppKind, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
+    let images: Blob[];
+    try {
+      images = await imagesDeLaVideo(file, (p) => onAvance?.({ etape: "video", p }));
+    } catch (e) {
+      throw new ErreurApi(e instanceof VideoIllisible ? e.code : "video", 422);
+    }
+    const lots = lotsDe(images);
+    const lus: unknown[] = new Array(lots.length);
+    let faits = 0;
+    onAvance?.({ etape: "lecture", faits, total: lots.length });
+    let suivant = 0;
+    const lecteur = async () => {
+      while (suivant < lots.length) {
+        const k = suivant++;
+        const fd = new FormData();
+        lots[k].forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
+        fd.append("app", app);
+        lus[k] = (await appel<{ lot: unknown }>("/api/captures/lot", { method: "POST", body: fd })).lot;
+        onAvance?.({ etape: "lecture", faits: ++faits, total: lots.length });
+      }
+    };
+    await Promise.all([lecteur(), lecteur(), lecteur()]);
+    return appel<{ source: Source; messagesRead: number }>("/api/captures/video", envoi("POST", { app, lots: lus }));
+  },
   /** Le lien de partage du verdict (son identifiant) : le créer (toujours le même), le désactiver. */
   async creerLienPartage(): Promise<string> {
     return (await appel<{ id: string }>("/api/partage", envoi("POST"))).id;

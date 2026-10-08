@@ -35,8 +35,8 @@ export function ConfidentialiteScreen() {
         <Ligne icone="file" ton="toi" titre="Le texte de votre conv">
           Ton export est ouvert sur ton appareil{N}: seuls les messages partent. Les photos, les vidéos et les vocaux ne quittent jamais ton téléphone.
         </Ligne>
-        <Ligne icone="photo" ton="elle" titre="Ou des captures">
-          Elles sont lues une fois pour en tirer le texte, puis oubliées{N}: on ne garde aucune image.
+        <Ligne icone="photo" ton="elle" titre="Ou des captures, ou un enregistrement de l’écran">
+          Les captures sont lues une fois pour en tirer le texte, puis oubliées{N}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{N}: seuls les écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
         </Ligne>
         <Ligne icone="mail" titre="Ton email">
           Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, pas de pub, jamais partagé.

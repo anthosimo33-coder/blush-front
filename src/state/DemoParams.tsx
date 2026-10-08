@@ -20,7 +20,7 @@ import type { DemoError, Plan } from "@/types";
 import { ErrorScreen } from "@/components/screens/ErrorScreen";
 
 const PLANS: Plan[] = ["gratuit", "rapport", "blushplus"];
-const ERRORS: DemoError[] = ["fichier", "groupe", "courte", "lecture", "capture"];
+const ERRORS: DemoError[] = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"];
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 

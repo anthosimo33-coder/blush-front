@@ -13,7 +13,8 @@ import type { AppKind } from "@/types";
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
 const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide?: boolean }[] = [
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
-  { app: "imessage", title: "iMessage", subtitle: "Export depuis un Mac", href: "/importer/export?app=imessage" },
+  /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
+  { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
   /* Avec le back-end, Instagram passe par son export (la lecture des captures arrive ensuite) */
   BACKEND
     ? { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" }

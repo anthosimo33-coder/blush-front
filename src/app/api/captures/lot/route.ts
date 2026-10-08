@@ -1,0 +1,26 @@
+import { AppliCaptures } from "@/server/appli-captures";
+import { imagesDe, lireLot } from "@/server/captures";
+import { erreur, json, memeOrigine } from "@/server/http";
+import { ErreurImport } from "@/server/histoires";
+import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+
+/* Un lot d’une douzaine d’images : jusqu’à une minute de lecture */
+export const maxDuration = 180;
+
+/**
+ * Un lot d’images tirées d’un enregistrement d’écran (dans le navigateur) : BLUSH les lit (prompt 01) et rend
+ * sa lecture brute. Les images ne sont gardées nulle part. Les lots sont ensuite rassemblés (/api/captures/video).
+ */
+export async function POST(req: Request) {
+  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!(await sousLaLimite(`lot:${ipDe(req)}`, LIMITES.lotParIp))) return erreur("trop", 429);
+  const fd = await req.formData().catch(() => null);
+  const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
+  const appli = AppliCaptures.safeParse(fd?.get("app"));
+  try {
+    return json({ lot: await lireLot(await imagesDe(fichiers), appli.success ? appli.data : "autre") });
+  } catch (e) {
+    if (e instanceof ErreurImport) return erreur(e.code, 422);
+    throw e;
+  }
+}

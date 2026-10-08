@@ -15,6 +15,8 @@ export const LIMITES = {
   alertesParJour: { max: 30, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */
   attenteParIp: { max: 10, fenetreS: 3600 },
+  /** Les lots d’images d’un enregistrement d’écran (une dizaine par enregistrement), chacun lu par le modèle. */
+  lotParIp: { max: 60, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
 } as const;
