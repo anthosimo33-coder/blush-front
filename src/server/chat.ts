@@ -87,7 +87,7 @@ export async function repondre(story: Ligne, memoire: DonneesMemoire, ditBrut: s
   let sortie: ReponseChat | null = null;
   for (let essai = 0; essai < 2 && !sortie; essai++) {
     const a = await appeler(req, Sortie10, { storyId: story.id, etiquette: "chat" });
-    if (a.refus) throw new ErreurTache("refus");
+    if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
     if (a.sortie && (!introuvables(preuvesChat(a.sortie), lignes).length || essai === 1)) sortie = a.sortie;
   }
   if (!sortie) throw new ErreurTache("sortie_illisible");

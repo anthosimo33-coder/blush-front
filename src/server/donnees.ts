@@ -55,7 +55,7 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
     stepsDone: fini ? 4 : etape,
     discoveries: decouvertes(story, p),
     done: fini,
-    ...(echec ? { failed: true, failReason: verdict?.error === "refus" ? ("refus" as const) : ("panne" as const) } : {}),
+    ...(echec ? { failed: true, failReason: verdict?.error?.startsWith("refus") ? ("refus" as const) : ("panne" as const) } : {}),
   };
 }
 
