@@ -247,6 +247,8 @@ export type AnalysisProgress = {
   discoveries: string[];
   done: boolean;
   failed?: boolean;
+  /** Pourquoi : « refus » (le modèle a refusé de lire cette conv, réessayer n’y changerait rien), sinon une panne. */
+  failReason?: "refus" | "panne";
 };
 
 export type DemoError = "fichier" | "groupe" | "courte" | "lecture" | "capture";

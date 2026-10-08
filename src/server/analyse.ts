@@ -285,9 +285,11 @@ async function executer(t: Tache): Promise<boolean> {
     const code = e instanceof ErreurTache ? e.message : `erreur:${(e as Error).name}`;
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
     console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
-    await echouer(t, code);
+    /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
+    const definitif = code === "refus";
+    await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
-    if (t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
+    if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
     return false;
   } finally {
     clearInterval(coeur);

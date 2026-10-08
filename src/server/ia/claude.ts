@@ -23,6 +23,9 @@ export type Avance = { reflexion: number; texte: number; ecrit: string };
 export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number };
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
 
+/** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
+export const REFUS_FACTICE = "@@refus@@";
+
 /** En mode factice (tests, dev sans coût) : une fonction qui rend une sortie pour une requête. */
 type Factice = (req: Requete) => unknown;
 let factice: Factice = fournisseurFactice;
@@ -75,7 +78,9 @@ export async function appeler<S extends z.ZodType>(
   { storyId, etiquette, surAvance }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void } = {},
 ): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
-    const ok = schema.safeParse(factice(req));
+    const brut = factice(req);
+    if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0 };
+    const ok = schema.safeParse(brut);
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
   }
   const reglage = REGLAGES[req.tache];

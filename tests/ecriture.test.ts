@@ -74,3 +74,27 @@ describe("le rapport pendant son écriture", () => {
     expect(r.report.chapters[1].tocTitle).toBe("Ch. 2");
   });
 });
+
+describe("un refus du modèle", () => {
+  const email = `refus-${Date.now()}@blush.test`;
+  afterAll(async () => {
+    await db().delete(schema.users).where(eq(schema.users.email, email));
+    definirFactice(null);
+  });
+
+  it("n’est essayé qu’une fois, et la lecture dit pourquoi", async () => {
+    const { REFUS_FACTICE } = await import("@/server/ia/claude");
+    const { progression } = await import("@/server/donnees");
+    definirFactice((req) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req)));
+    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/02-reciproque.txt")], "02.txt", { type: "text/plain" })));
+    const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
+    await rattacherBrouillon(u, imp.secret);
+    await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "parle", objectif: "comprendre" });
+    await planifier(imp.id, "verdict");
+    await executerChaine(imp.id);
+    const [t] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict")));
+    expect([t.status, t.attempts, t.error]).toEqual(["echec", 1, "refus"]);
+    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, imp.id));
+    expect(await progression(story)).toMatchObject({ failed: true, failReason: "refus", done: false });
+  });
+});
