@@ -2,13 +2,29 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import { cheminDe, pagePrecedente } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/icons";
 import { ProgressDots } from "@/components/ui/progress";
 
 export type BackTarget = string | (() => void);
+
+/**
+ * Un « Retour » vers une adresse : si c’est la page d’où l’on vient, on revient en arrière (l’historique reste
+ * propre, et le retour suivant mène bien plus loin) ; sinon, le lien l’ouvre.
+ */
+function useRetour(target: string) {
+  const router = useRouter();
+  return (e: MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    if (pagePrecedente() === cheminDe(target)) {
+      e.preventDefault();
+      router.back();
+    }
+  };
+}
 
 /* ———— Barre du haut mobile : retour · titre · progression ———— */
 export function MobileTopBar({
@@ -35,11 +51,12 @@ export function MobileTopBar({
 
 function BackButton({ target }: { target: BackTarget }) {
   const router = useRouter();
+  const retour = useRetour(typeof target === "string" ? target : "");
   const glyph = <Icon name="back" size={24} color="#121214" stroke={2.6} />;
   const cls = "flex size-11 items-center justify-center";
   if (typeof target === "string")
     return (
-      <Link href={target} aria-label="Retour" className={cls}>
+      <Link href={target} onClick={retour} aria-label="Retour" className={cls}>
         {glyph}
       </Link>
     );
@@ -65,6 +82,7 @@ export function DesktopHeader({ right, className }: { right?: ReactNode; classNa
 
 /** Lien « Retour » au-dessus du titre (desktop). */
 export function DesktopBack({ target, label = "Retour", trailing }: { target: BackTarget; label?: string; trailing?: string }) {
+  const retour = useRetour(typeof target === "string" ? target : "");
   const content = (
     <>
       <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
@@ -77,7 +95,7 @@ export function DesktopBack({ target, label = "Retour", trailing }: { target: Ba
     /* Toujours 14 px entre « Retour » et le titre, quel que soit l’espacement du contenu */
     <div className="hidden items-center gap-4 lg:flex" style={{ marginBottom: "calc(14px - var(--gap))" }}>
       {typeof target === "string" ? (
-        <Link href={target} className={cls}>
+        <Link href={target} onClick={retour} className={cls}>
           {content}
         </Link>
       ) : (

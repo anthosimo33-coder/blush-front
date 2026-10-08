@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { JourneyProvider } from "@/state/journey";
 import { DemoParams } from "@/state/DemoParams";
 import { SoundBoot } from "@/components/shell/SoundBoot";
+import { SuiviNavigation } from "@/lib/navigation";
 import "./globals.css";
 
 /* Nunito pour toute l’interface (titres en 900, texte en 700-800) */
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <JourneyProvider>
           <div id="app-root">{children}</div>
           <SoundBoot />
+          <SuiviNavigation />
           <Suspense fallback={null}>
             <DemoParams />
           </Suspense>
