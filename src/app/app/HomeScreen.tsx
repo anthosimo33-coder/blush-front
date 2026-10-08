@@ -33,6 +33,7 @@ import { IconButton } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { marquerChatOuvert } from "../rapport/ChatBubble";
+import { PartageImageSheet } from "../rapport/Partage";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
@@ -153,7 +154,7 @@ function echangesEnMsgs(script: EchangeScript[]): Msg[] {
     return [
       /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
       ...(ex.mine ? [{ id, from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
-      { id: id - 1, from: "blush" as const, result: ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
+      { id: id - 1, from: "blush" as const, result: ex.id ? { ...ex.answer, echange: ex.id } : ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
     ];
   });
 }
@@ -243,6 +244,8 @@ export function HomeScreen({
   const derniers = useRef(msgs);
   const devant = useRef<{ desk: boolean; h: number; y: number } | null>(null);
   const haut = useRef<HTMLDivElement>(null);
+  /* « Partager en image » : la réponse choisie */
+  const [image, setImage] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
   const [details, setDetails] = useState(false);
@@ -680,7 +683,9 @@ export function HomeScreen({
                   )}
                 </div>
               )}
-              <Thread msgs={msgs} opened={opened} />
+              <PartagerContext value={setImage}>
+                <Thread msgs={msgs} opened={opened} />
+              </PartagerContext>
             </div>
 
             {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
@@ -843,6 +848,8 @@ export function HomeScreen({
                 )}
               </div>
               <FileInput inputRef={shots.ref} accept="image/*" multiple onFiles={sendImages} label="Captures d’écran de sa réponse" />
+              {/* « Partager en image » : la réponse choisie, en story */}
+              <PartageImageSheet cible={image ? { type: "reponse", echange: image } : null} onClose={() => setImage(null)} />
               <FileInput inputRef={exp.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={sendExport} label="Export de votre conv" />
             </form>
           </div>
@@ -1098,7 +1105,8 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
             big ? "h-[30px] pl-3.5 pr-2 text-[15px]" : "h-[26px] pl-2.5 pr-1.5 text-[14px]",
           )}
         >
-          blush
+          {/* L’adresse du site : toujours en haut de la conv, elle est sur chaque capture du chat */}
+          askblush.com
           <Icon name="chevron" size={big ? 13 : 12} color="#8A8780" stroke={3} />
         </span>
       </span>
@@ -1205,7 +1213,7 @@ type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean }
 type Row =
   | { kind: "day"; key: string; at: number | null }
   | { kind: "event"; key: string; level: LevelId }
-  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; landed: boolean; items: Item[] };
+  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; landed: boolean; items: Item[]; echange?: number };
 
 /** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot), le mouvement. */
 type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean; autre?: "il" | "elle" };
@@ -1234,12 +1242,15 @@ function rowsOf(msgs: Msg[], opened: number | null, env: BubbleEnv) {
     prev = at;
     /* « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent */
     const items = bubblesOf(m, env).map((node, k) => ({ key: node.tone === "typing" ? `${m.id}-ecrit` : `${m.id}-${k}`, node, at, fresh: !!m.answered }));
+    /* La réponse de BLUSH garde son échange : de quoi la partager en image */
+    const echange = "result" in m && m.result.kind === "bubbles" ? m.result.echange : undefined;
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
       last.items.push(...items);
       last.at = at;
       last.landed = !!m.answered;
-    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, landed: !!m.answered, items });
+      if (echange) last.echange = echange;
+    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, landed: !!m.answered, items, echange });
   }
   return rows;
 }
@@ -1308,9 +1319,13 @@ function LevelEvent({ row, level }: { row: string; level: LevelId }) {
   );
 }
 
+/** « Partager en image » une réponse de BLUSH (son échange). */
+const PartagerContext = createContext<(echange: number) => void>(() => {});
+
 /** Les bulles d’un même expéditeur : l’avatar de BLUSH sous la dernière, l’heure dessous (ou « BLUSH écrit » à la place). */
 function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
   const { on, arriving } = useHomeMotion();
+  const partager = use(PartagerContext);
   /* 1 · L’arrivée : BLUSH écrit un instant, puis l’intro se pose */
   const intro = arriving && row.key === INTRO_GROUP;
   const typing = row.items.find((it) => it.node.tone === "typing");
@@ -1372,8 +1387,19 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
           {typing.node.body}
         </div>
       ) : (
-        <span data-a={intro ? "intro-tm" : undefined} className={cn("mt-0.5 h-3.5 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "pr-1.5 text-right")}>
+        <span data-a={intro ? "intro-tm" : undefined} className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}>
           {row.at === null ? " " : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
+          {/* La réponse se partage en image (story), prénoms masqués */}
+          {row.from === "blush" && row.echange && (
+            <button
+              type="button"
+              onClick={() => partager(row.echange!)}
+              className="relative inline-flex items-center gap-1 font-black text-grey transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']"
+            >
+              <Icon name="share" size={11} color="currentColor" stroke={2.8} />
+              Partager
+            </button>
+          )}
         </span>
       )}
     </div>

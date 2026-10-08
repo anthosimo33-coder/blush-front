@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { ChapterBlock } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
+import { Icon } from "./icons";
 import { PlayCard } from "./cards";
 import { ConfidenceLine, Fact, Tag } from "./messages";
 import { ClampedBubble } from "./clamp";
@@ -175,8 +176,23 @@ function Story({ text, messages }: Extract<ChapterBlock, { kind: "story" }>) {
   );
 }
 
-function Punchline({ text }: { text: string }) {
-  return <p className="m-0 rounded-card bg-ink px-4 py-3.5 text-[18px] font-black leading-[1.3] tracking-[-0.01em] text-white shadow-ink">{text}</p>;
+function Punchline({ text, onShare }: { text: string; onShare?: () => void }) {
+  return (
+    <div className="relative rounded-card bg-ink px-4 py-3.5 text-white shadow-ink">
+      <p className={cn("m-0 text-[18px] font-black leading-[1.3] tracking-[-0.01em]", onShare && "pr-10")}>{text}</p>
+      {/* La chute se partage en image (story), prénoms masqués */}
+      {onShare && (
+        <button
+          type="button"
+          onClick={onShare}
+          aria-label="Partager cette phrase en image"
+          className="absolute right-2 top-2 flex size-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 after:absolute after:-inset-1 after:content-['']"
+        >
+          <Icon name="share" size={16} color="#FFFFFF" stroke={2.4} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 function Stop({ items }: Extract<ChapterBlock, { kind: "stop" }>) {
@@ -213,7 +229,7 @@ function Ending({ text }: { text: string }) {
 }
 
 /** Rend un bloc de chapitre. `renderQuestion` permet à l’écran de brancher le bouton « Copier ». */
-export function Block({ block, renderQuestion }: { block: ChapterBlock; renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode }) {
+export function Block({ block, renderQuestion, onShare }: { block: ChapterBlock; renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode; onShare?: () => void }) {
   switch (block.kind) {
     case "essential":
       return <Essential>{block.text}</Essential>;
@@ -242,7 +258,7 @@ export function Block({ block, renderQuestion }: { block: ChapterBlock; renderQu
     case "story":
       return <Story {...block} />;
     case "punchline":
-      return <Punchline text={block.text} />;
+      return <Punchline text={block.text} onShare={onShare} />;
     case "stop":
       return <Stop {...block} />;
     case "ending":
@@ -250,11 +266,12 @@ export function Block({ block, renderQuestion }: { block: ChapterBlock; renderQu
   }
 }
 
-export function Blocks({ blocks, className, renderQuestion }: { blocks: ChapterBlock[]; className?: string; renderQuestion?: Parameters<typeof Block>[0]["renderQuestion"] }) {
+/** `onShare` : partager un bloc en image (aujourd’hui, la chute d’un chapitre), d’après sa place dans le chapitre. */
+export function Blocks({ blocks, className, renderQuestion, onShare }: { blocks: ChapterBlock[]; className?: string; renderQuestion?: Parameters<typeof Block>[0]["renderQuestion"]; onShare?: (index: number) => void }) {
   return (
     <div className={cn("contents", className)}>
       {blocks.map((b, i) => (
-        <Block key={i} block={b} renderQuestion={renderQuestion} />
+        <Block key={i} block={b} renderQuestion={renderQuestion} onShare={onShare && b.kind === "punchline" ? () => onShare(i) : undefined} />
       ))}
     </div>
   );
