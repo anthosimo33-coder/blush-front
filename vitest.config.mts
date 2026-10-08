@@ -17,6 +17,7 @@ export default defineConfig({
       DATABASE_URL: "postgres://localhost:5432/blush_test",
       BLUSH_CLE: "dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtMzI=",
       BLUSH_IA_FACTICE: "1",
+      BLUSH_ALERTES: "equipe@blush.test",
     },
   },
 });

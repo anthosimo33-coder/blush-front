@@ -6,6 +6,7 @@ import { imagesDe } from "@/server/captures";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { contexteRequete, ficheDe, memoireDe } from "@/server/donnees";
+import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, ErreurImport } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
@@ -75,7 +76,10 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof ErreurAjout) return erreur(e.code, 422);
     if (e instanceof ErreurImport) return erreur("fichier", 422);
-    if (e instanceof ErreurTache) return erreur(e.message, 502);
+    if (e instanceof ErreurTache) {
+      await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.message}`]);
+      return erreur(e.message, 502);
+    }
     throw e;
   }
 }

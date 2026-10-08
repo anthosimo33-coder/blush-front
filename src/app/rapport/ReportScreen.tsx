@@ -43,7 +43,14 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
     const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
   }, [payload.generating, fixed, refresh]);
-  if (payload.sober) return <SoberReport data={payload.sober} />;
+  /* Mode sobre : le chat reste à portée aussi (c’est là qu’on a le plus besoin de parler), dans une bulle sobre */
+  if (payload.sober)
+    return (
+      <>
+        <SoberReport data={payload.sober} />
+        {payload.access === "blushplus" && !payload.generating && <ChatBubble sobre />}
+      </>
+    );
   return (
     <>
       <ReportBody payload={payload} story={story} openPaywall={openPaywall} />

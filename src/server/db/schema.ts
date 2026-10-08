@@ -141,6 +141,16 @@ export const tasks = pgTable(
   (t) => [index("tasks_story_idx").on(t.storyId, t.kind)],
 );
 
+/** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
+export const waitlist = pgTable("waitlist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  emailHash: text("email_hash").notNull().unique(),
+  email: chiffre("email").notNull(),
+  /** D’où vient l’inscription : « accueil » (la page de la liste), « connexion » (refusé à l’écran email). */
+  source: text("source").notNull(),
+  createdAt: quand("created_at").notNull().defaultNow(),
+});
+
 /** Les limites (codes envoyés, imports, messages au chat) : une fenêtre et un compteur par clé. */
 export const rateLimits = pgTable("rate_limits", {
   key: text("key").primaryKey(),
