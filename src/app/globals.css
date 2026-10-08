@@ -124,6 +124,15 @@
     opacity: 0.55;
   }
 
+  /* Le remplissage automatique du navigateur peint le champ en bleu : le champ garde son fond et notre encre */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--ink);
+    caret-color: var(--ink);
+    transition: background-color 100000s ease-in-out 0s;
+  }
+
   :focus-visible {
     outline: 3px solid var(--toi);
     outline-offset: 2px;
