@@ -82,8 +82,8 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     title: "Le verdict",
     tocTitle: "Le verdict",
     free: true,
+    /* Le sous-titre est déjà sous le titre du verdict (en-tête du chapitre) : pas une seconde fois ici */
     blocks: [
-      ...(sortie.sous_titre ? [{ kind: "lead" as const, text: sortie.sous_titre }] : []),
       { kind: "scores", rows: scores },
       ...(sortie.devinette ? [{ kind: "meaning" as const, text: sortie.devinette }] : []),
       ...(sortie.confiance ? [{ kind: "confidence" as const, level: sortie.confiance === "a_verifier" ? ("verifier" as const) : sortie.confiance, text: sortie.confiance_texte ?? "" }] : []),

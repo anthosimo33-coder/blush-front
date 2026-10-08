@@ -30,6 +30,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { marquerChatOuvert } from "../rapport/ChatBubble";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
@@ -188,6 +189,7 @@ export function HomeScreen({
   contact,
   motion = true,
   arrive = false,
+  fromReport = false,
 }: {
   quick?: string[];
   /** Des réponses déjà prêtes, par question (l’aperçu des vraies réponses du chat). */
@@ -199,6 +201,8 @@ export function HomeScreen({
   contact: HomeContact;
   motion?: boolean;
   arrive?: boolean;
+  /** Arrivé par la bulle du rapport : sur mobile, le retour au rapport remplace le bouton du compte. */
+  fromReport?: boolean;
 }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
@@ -244,6 +248,9 @@ export function HomeScreen({
   const desktop = useDesktop();
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
   const moving = useMemo(() => ({ on: motion, arriving, desktop }), [motion, arriving, desktop]);
+
+  /* Le chat est ouvert : la bulle du rapport arrête de s’agiter */
+  useEffect(() => marquerChatOuvert(), []);
 
   useEffect(() => {
     if (!arrive) return;
@@ -483,7 +490,11 @@ export function HomeScreen({
               <div className="relative grid grid-cols-[1fr_auto_1fr] items-start px-4 pb-5 pt-[max(6px,env(safe-area-inset-top))]">
                 <div data-c="acc" className="pointer-events-auto mt-3 flex">
                   <span data-a="acc" className="flex">
-                    <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
+                    {fromReport ? (
+                      <IconButton href="/rapport" icon="back" label="Revenir au rapport" iconSize={19} className="!size-10 !shadow-soft" />
+                    ) : (
+                      <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
+                    )}
                   </span>
                 </div>
                 <BlushTitle big busy={busy} onClick={() => setDetails(true)} />
@@ -498,7 +509,13 @@ export function HomeScreen({
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             {/* Desktop : la barre de la fenêtre, comme sur mobile (BLUSH au centre, Sophie à droite) */}
             <div className="hidden h-[112px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[rgba(17,17,20,0.06)] px-5 lg:grid">
-              <span aria-hidden="true" />
+              {/* Le rapport, à un clic : la place à gauche de la barre était vide */}
+              <span className="flex">
+                <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
+                  <Icon name="back" size={16} color="#121214" stroke={2.6} />
+                  Ton rapport
+                </Link>
+              </span>
               <BlushTitle busy={busy} onClick={() => setDetails(true)} />
               <div className="flex justify-end">
                 <SophieButton shared={desktop === true} />
