@@ -64,6 +64,17 @@ export function fournisseurFactice(req: Requete): unknown {
       },
       chapitres: null,
     };
+  if (req.tache === "06-vocal")
+    return {
+      alerte: null,
+      lignes: [
+        { jeu: "sighs dramatically", texte: "Bon. Faut qu’on parle.", punch: false, preuve: null },
+        { jeu: "in disbelief", texte: "Elle t’écrit ça, et toi tu réponds ça.", punch: false, preuve: p[1] ?? null },
+        { jeu: "bursts out laughing", texte: "MDR ?!", punch: true, preuve: null },
+        { jeu: "serious, slower", texte: "Samedi, tu lui poses LA question.", punch: true, preuve: null },
+        { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
+      ],
+    };
   if (req.tache === "05-rapport") return { plan: null, chapitres: (demande.includes("1 à 4") ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) };
   if (req.tache === "07-memoire" && demande.includes("Moment : la mise à jour."))
     return {

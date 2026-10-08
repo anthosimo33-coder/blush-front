@@ -69,7 +69,7 @@ export function ConfidentialiteScreen() {
           Dès que ton rapport et la mémoire de BLUSH sont prêts. Un import jamais lié à un compte est effacé au bout de 24{N}h.
         </Ligne>
         <Ligne icone="list" titre="Ce qui reste, tant que tu le gardes">
-          Ton rapport, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{N}: tout part, vraiment.
+          Ton rapport, son vocal, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{N}: tout part, vraiment.
         </Ligne>
       </InsetGroup>
 
@@ -77,6 +77,8 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Anthropic" sub="Claude, l’IA qui lit ta conv, aux États-Unis" />
+        {/* ⚠ À valider : ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv */}
+        <InsetRow title="ElevenLabs" sub="La voix du vocal de ton rapport, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code de connexion)" />
         <InsetRow leading={<RowIcon icon="mail" tone="toi" />} title={<span className="text-toi-ink">Une question{N}? Écris-nous</span>} sub="bonjour@askblush.com" href="mailto:bonjour@askblush.com" chevron />
       </InsetGroup>

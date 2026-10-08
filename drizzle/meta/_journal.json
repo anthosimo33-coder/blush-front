@@ -57,6 +57,13 @@
       "when": 1791470200341,
       "tag": "0007_compteurs",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791470804230,
+      "tag": "0008_vocal",
+      "breakpoints": true
     }
   ]
 }

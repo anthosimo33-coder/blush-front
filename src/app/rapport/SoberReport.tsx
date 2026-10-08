@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setPaused } from "@/services/api";
 import { invalidate } from "@/lib/query";
 import { Icon } from "@/components/ui/icons";
@@ -42,7 +42,8 @@ function SoberLink({ children, onClick }: { children: string; onClick: () => voi
   );
 }
 
-export function SoberReport({ data }: { data: SoberData }) {
+/** `vocal` : le vocal doux de BLUSH, au-dessus de la nouvelle (src/app/rapport/Vocal.tsx). */
+export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNode }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [help, setHelp] = useState(false);
@@ -76,6 +77,7 @@ export function SoberReport({ data }: { data: SoberData }) {
           <>
             <div className="flex flex-1 flex-col gap-3.5 px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
               <div className="flex-1 lg:flex-none" />
+              {vocal && <div className="mb-3">{vocal}</div>}
               <p className="m-0 text-[20px] font-extrabold leading-[1.45] text-soft">{data.intro}</p>
               <h1 ref={titleRef} tabIndex={-1} className="m-0 text-[36px] font-black leading-[1.08] tracking-[-0.02em] outline-none">
                 {data.title}

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DOSSIER = join(RACINE, "prompts");
-export const FICHIERS = { socle: "00-socle.md", "01-captures": "01-captures.md", "04-verdict": "04-verdict.md", "05-rapport": "05-rapport.md", "07-memoire": "07-memoire.md", "10-chat": "10-chat.md" };
+export const FICHIERS = { socle: "00-socle.md", "01-captures": "01-captures.md", "04-verdict": "04-verdict.md", "05-rapport": "05-rapport.md", "06-vocal": "06-vocal.md", "07-memoire": "07-memoire.md", "10-chat": "10-chat.md" };
 
 if (!existsSync(join(DOSSIER, FICHIERS.socle))) {
   console.error("prompts/ est vide : lance `git submodule update --init` (le dépôt privé blush-prompts).");

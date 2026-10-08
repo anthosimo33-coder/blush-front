@@ -125,7 +125,7 @@ export const tasks = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    /** verdict | rapport_plan | rapport_chapitres | memoire | memoire_maj */
+    /** verdict | rapport_plan | rapport_chapitres | vocal | memoire | memoire_maj */
     kind: text("kind").notNull(),
     /** attente | en_cours | fini | echec */
     status: text("status").notNull().default("attente"),
@@ -172,6 +172,39 @@ export const counters = pgTable(
     count: integer("count").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.day, t.key] })],
+);
+
+/**
+ * Le vocal du rapport : le script minuté (ce que dit BLUSH, quand, les messages qu’elle cite) et l’audio, chiffrés.
+ * `voix` : celle de l’A/B test (A ou B), en clair, comme la durée : ils ne disent rien de l’histoire.
+ */
+export const vocals = pgTable("vocals", {
+  storyId: uuid("story_id")
+    .primaryKey()
+    .references(() => stories.id, { onDelete: "cascade" }),
+  voix: text("voix").notNull(),
+  data: chiffre("data").notNull(),
+  audio: chiffre("audio").notNull(),
+  dureeMs: integer("duree_ms").notNull(),
+  createdAt: quand("created_at").notNull().defaultNow(),
+});
+
+/** Comment on écoute le vocal, pour comparer les deux voix : des événements, une position, jamais de contenu. */
+export const vocalEcoutes = pgTable(
+  "vocal_ecoutes",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    voix: text("voix").notNull(),
+    /** debut | fin | reecoute | ferme */
+    evenement: text("evenement").notNull(),
+    /** Où en était l’écoute, en millisecondes. */
+    positionMs: integer("position_ms").notNull().default(0),
+    createdAt: quand("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("vocal_ecoutes_voix_idx").on(t.voix, t.evenement)],
 );
 
 /** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
