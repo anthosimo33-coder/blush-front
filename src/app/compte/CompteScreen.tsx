@@ -143,7 +143,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
         {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
       </InsetGroup>
 
-      {/* Un seul réglage pour les sons et les vibrations (⚠ textes à valider) */}
+      {/* Un seul réglage pour les sons et les vibrations (textes relus le 8 octobre) */}
       <InsetGroup title="L’app" id="app" className="mt-6" footer="En mode silencieux, BLUSH se tait de lui-même.">
         <InsetRow
           leading={<RowIcon icon="sound" tone="elle" />}

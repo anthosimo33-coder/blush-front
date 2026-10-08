@@ -297,7 +297,7 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
 }
 
 /** Ce que BLUSH a trouvé et où il l’a rangé. Ce qu’il savait déjà est dit, pas doublé. « Annuler » retire tout. */
-/* ⚠ Textes des erreurs de la fiche : à valider */
+/* Les erreurs de la fiche (textes relus le 8 octobre) */
 function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string, name: string): { title: string; detail: string } {
   const one = what === "ta capture";
   if (problem === "capture") return { title: `BLUSH n’arrive pas à lire ${what}`, detail: one ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner." };

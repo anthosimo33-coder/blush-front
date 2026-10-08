@@ -25,7 +25,7 @@ const GUESSES: { id: Guess; icon: IconName; color: string }[] = [
 
 type GoalTile = { id: Goal; label: string; icon: IconName; color: string };
 
-/* Ce que tu veux : avant d’être ensemble, ou en couple. ⚠ Objectifs en couple absents des maquettes : à valider. */
+/* Ce que tu veux : avant d’être ensemble, ou en couple. Objectifs en couple absents des maquettes, relus le 8 octobre. */
 const GOALS: GoalTile[] = [
   { id: "ensemble", label: "Qu’on soit ensemble", icon: "heart", color: "#FF4F9A" },
   { id: "reciproque", label: "Savoir si c’est réciproque", icon: "swap", color: "#3D8BFF" },
@@ -47,7 +47,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const router = useRouter();
   const [j, set] = useJourney();
   const [busy, setBusy] = useState(false);
-  /* La lecture n’est pas partie : pourquoi, dit simplement (⚠ textes à valider) */
+  /* La lecture n’est pas partie : pourquoi, dit simplement (textes relus le 8 octobre) */
   const [problem, setProblem] = useState<string | null>(null);
   const goals = goalsFor(j.guess);
   const ready = !!((captures ? j.prenom.trim() : j.me) && j.pronom && j.guess && j.goal);
@@ -93,7 +93,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
     >
 
       {captures ? (
-        /* ⚠ Absent des maquettes : à valider. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
+        /* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
         <label className="flex flex-col gap-2">
           <span className="text-[13px] font-black text-grey">Ton prénom (sur tes captures avec {people[1].name}, tu es à droite)</span>
           <input
@@ -140,7 +140,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       </div>
       )}
 
-      {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. ⚠ Absent des maquettes : à valider */}
+      {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. Absent des maquettes, relu le 8 octobre */}
       <div id="pronom-label" className="text-[13px] font-black text-grey">
         Tu es
       </div>

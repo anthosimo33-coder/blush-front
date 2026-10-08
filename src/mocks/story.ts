@@ -94,7 +94,7 @@ export const EXPORT_STEPS = {
       android: ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"],
     },
   },
-  /* ⚠ Textes iMessage absents des maquettes : à valider. */
+  /* ⚠ Faux : Messages sur Mac n’a pas de commande « Exporter la conversation », et le serveur ne lit pas d’export iMessage (seulement WhatsApp et Instagram). À revoir. */
   imessage: {
     menu: { contact: "Sophie", items: ["Afficher le contact", "Exporter la conversation", "Supprimer la conversation"], highlight: 1 },
     steps: {
@@ -103,7 +103,7 @@ export const EXPORT_STEPS = {
       android: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
     },
   },
-  /* ⚠ Textes Instagram absents des maquettes : à valider (et le délai : Instagram prépare le fichier puis prévient par email). */
+  /* Textes Instagram relus le 8 octobre (le délai : Instagram prépare le fichier puis prévient par email). */
   instagram: {
     menu: { contact: "Espace Comptes", items: ["Mot de passe et sécurité", "Télécharger vos informations", "Préférences publicitaires"], highlight: 1 },
     steps: {

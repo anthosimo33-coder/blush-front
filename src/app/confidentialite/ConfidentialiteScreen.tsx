@@ -8,7 +8,7 @@ import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
 /*
  * Ce que BLUSH fait de ta conv, en mots simples. Les faits suivent le code (src/server : chiffrement, purge,
- * hébergement à Francfort). ⚠ Textes à valider, et à faire relire par un juriste avant d’ouvrir au public.
+ * hébergement à Francfort). Textes relus le 8 octobre. ⚠ À faire relire par un juriste avant d’ouvrir au public.
  */
 const N = " ";
 
@@ -39,13 +39,16 @@ export function ConfidentialiteScreen() {
           Elles sont lues une fois pour en tirer le texte, puis oubliées{N}: on ne garde aucune image.
         </Ligne>
         <Ligne icone="mail" titre="Ton email">
-          Pour t’envoyer ton code de connexion. Pas de mot de passe, pas de pub, jamais partagé.
+          Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, pas de pub, jamais partagé.
         </Ligne>
       </InsetGroup>
 
       <InsetGroup title="Qui la lit" id="lecture" className="mt-6">
         <Ligne icone="sparkle" ton="toi" titre="Claude, l’IA d’Anthropic">
           Il lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Anthropic ne s’en sert pas pour entraîner ses modèles.
+        </Ligne>
+        <Ligne icone="sound" ton="elle" titre="La voix de BLUSH">
+          Pour le vocal de ton rapport, ElevenLabs reçoit seulement son texte (des prénoms et quelques phrases), jamais ta conv entière.
         </Ligne>
         <Ligne icone="eye" titre="Personne d’autre">
           Personne chez BLUSH ne lit ta conv. Et la personne avec qui tu parles n’est jamais contactée.
@@ -57,7 +60,7 @@ export function ConfidentialiteScreen() {
           Tout ce qui vient de ta conv (le texte, ton rapport, sa fiche, le chat) est chiffré avec une clé gardée à part. Sans elle, c’est illisible.
         </Ligne>
         <Ligne icone="cloud" titre="Où ça vit">
-          Le site et la base de données sont à Francfort, en Allemagne. L’analyse par Claude passe par les serveurs d’Anthropic, aux États-Unis.
+          Le site et la base de données sont à Francfort, en Allemagne. L’analyse par Claude passe par les serveurs d’Anthropic, et la voix du vocal par ceux d’ElevenLabs, aux États-Unis.
         </Ligne>
         <Ligne icone="heart" ton="elle" titre="Ce que tu confies au chat">
           Même ce qui est intime (ta santé, ta vie amoureuse) reste dans la mémoire de BLUSH, chiffré, et n’est montré qu’à toi.
@@ -66,7 +69,7 @@ export function ConfidentialiteScreen() {
 
       <InsetGroup title="Combien de temps" id="duree" className="mt-6">
         <Ligne icone="trash" titre="La conv brute, effacée après ton rapport">
-          Dès que ton rapport et la mémoire de BLUSH sont prêts. Un import jamais lié à un compte est effacé au bout de 24{N}h.
+          Dès que ton rapport et la mémoire de BLUSH sont prêts, sinon au bout de 30{N}jours. Une conv jamais lue est effacée au bout de 24{N}h.
         </Ligne>
         <Ligne icone="list" titre="Ce qui reste, tant que tu le gardes">
           Ton rapport, son vocal, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{N}: tout part, vraiment.
@@ -77,9 +80,9 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Anthropic" sub="Claude, l’IA qui lit ta conv, aux États-Unis" />
-        {/* ⚠ À valider : ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv */}
+        {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="ElevenLabs" sub="La voix du vocal de ton rapport, aux États-Unis" />
-        <InsetRow title="Resend" sub="L’envoi des mails (ton code de connexion)" />
+        <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt)" />
         <InsetRow leading={<RowIcon icon="mail" tone="toi" />} title={<span className="text-toi-ink">Une question{N}? Écris-nous</span>} sub="bonjour@askblush.com" href="mailto:bonjour@askblush.com" chevron />
       </InsetGroup>
     </Screen>

@@ -11,7 +11,7 @@ import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Scre
 /*
  * La bêta fermée : BLUSH est sur invitation. On laisse son email, on est prévenu quand une place se libère.
  * Arrivé refusé de l’écran email (`inscrit`), on est déjà sur la liste, et on sait que sa conv n’a pas été gardée.
- * ⚠ Textes à valider.
+ * Textes relus le 8 octobre (voix de BLUSH).
  */
 export function AttenteScreen({ inscrit }: { inscrit: boolean }) {
   const router = useRouter();

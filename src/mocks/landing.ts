@@ -2,7 +2,7 @@ import type { LandingConv, Testimonial } from "@/types";
 
 /*
  * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
- * ⚠ Exemples fictifs, écrits pour la landing (à valider). Mêmes sens d’emojis :
+ * Exemples fictifs, écrits pour la landing (textes relus le 8 octobre, voix de BLUSH). Mêmes sens d’emojis :
  * 🤏 à deux doigts · 🔥 partant·e · 🤔 hésite · 🧊 s’éloigne.
  * En couple (Mon cœur, Chéri, Julien) : 🔥 toujours le feu · 🤏 il manque un petit rien · 🤔 un truc coince · 🧊 vous vous éloignez.
  */
@@ -92,7 +92,7 @@ export const LANDING_CONVS: LandingConv[] = [
     proof: { text: "on devrait se faire un verre un de ces quatre… enfin si t’as le temps", caption: "4 avr., 18 h 31" },
     confidence: "probable",
     proofs: 3,
-    next: "Dis oui, et fixe la date toi-même.",
+    next: "Dis oui, et glisse-lui que t’es libre jeudi soir. Laisse-le fixer le reste.",
   },
   {
     id: "cheri",
@@ -128,7 +128,7 @@ export const LANDING_CONVS: LandingConv[] = [
     proof: { text: "tu me fais trop rire toi, c’est dangereux", caption: "15 mars, 21 h 46" },
     confidence: "sur",
     proofs: 8,
-    next: "Passe du DM au verre : propose-lui ce week-end.",
+    next: "Renvoie-lui la balle sur le même ton. Le verre, c’est à lui de le proposer.",
   },
   {
     id: "chloe",
@@ -152,7 +152,7 @@ export const LANDING_CONVS: LandingConv[] = [
     proof: { text: "haha peut-être, on verra", caption: "7 mars, 22 h 58" },
     confidence: "probable",
     proofs: 3,
-    next: "Pose-lui une question simple : « un verre jeudi ? »",
+    next: "Glisse-lui que t’es libre jeudi, et laisse-le proposer.",
   },
 
   /* ———— Rangée 3 ———— */
@@ -226,7 +226,7 @@ export const LANDING_CONVS: LandingConv[] = [
     proof: { text: "ah oui pardon j’avais pas vu", caption: "27 févr., 14 h 52" },
     confidence: "sur",
     proofs: 6,
-    next: "Fais une dernière proposition claire. Sans réponse, passe à autre chose.",
+    next: "Like son message, et passe à autre chose. Si elle revient, ce sera pour de vrai.",
   },
 ];
 
