@@ -33,15 +33,29 @@ export async function relancer(storyId: string): Promise<void> {
   if ((await aRelancer(storyId)).length) after(() => executerChaine(storyId));
 }
 
-/** La lecture (le verdict) : sa progression, estimée sur le temps écoulé tant qu’elle tourne. */
+/**
+ * La lecture (le verdict) : sa vraie progression, écrite par le verdict pendant que le modèle répond (réflexion
+ * jusqu’à 70 %, puis l’écriture du verdict). Avant ses premiers mots, le modèle lit la conv : on avance doucement
+ * jusqu’à 15 %. Les étapes affichées suivent ces phases ; le compteur de messages est plein quand l’écriture commence.
+ */
 export async function progression(story: Ligne): Promise<AnalysisProgress> {
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   const total = story.messageCount;
   const fini = verdict?.status === "fini";
   const echec = verdict?.status === "echec";
-  const ecoule = verdict ? (Date.now() - verdict.createdAt.getTime()) / 1000 : 0;
-  const p = fini ? 1 : Math.min(0.95, ecoule / 50);
-  return { progress: p, messagesRead: Math.round(p * total), stepsDone: Math.min(4, Math.floor(p * 4.4)), discoveries: decouvertes(story, p), done: fini, ...(echec ? { failed: true } : {}) };
+  /* Le début de l’essai en cours : `prendre` met updatedAt à jour (le battement de cœur ne touche que heartbeatAt) */
+  const ecoule = verdict ? (Date.now() - verdict.updatedAt.getTime()) / 1000 : 0;
+  const lecture = verdict?.status === "en_cours" ? Math.min(0.15, 0.03 + ecoule / 60) : 0.02;
+  const p = fini ? 1 : Math.max(lecture, (verdict?.progress ?? 0) / 100);
+  const etape = p < 0.35 ? 0 : p < 0.55 ? 1 : p < 0.7 ? 2 : 3;
+  return {
+    progress: p,
+    messagesRead: Math.round(Math.min(1, p / 0.7) * total),
+    stepsDone: fini ? 4 : etape,
+    discoveries: decouvertes(story, p),
+    done: fini,
+    ...(echec ? { failed: true } : {}),
+  };
 }
 
 /** Pendant la lecture : les mots qui reviennent le plus, calculés par le code (« « libanais » ×9 »). */

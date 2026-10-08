@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
@@ -13,7 +13,7 @@ import { db, schema } from "./db";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
-import { appeler } from "./ia/claude";
+import { appeler, type Avance } from "./ia/claude";
 import { aRelancer, battre, echouer, entreeDe, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 
 /* ———— Ce qu’on garde, chiffré ———— */
@@ -42,9 +42,17 @@ function relire(story: Ligne) {
  * Un appel dont chaque preuve doit exister. Une sortie illisible ou une preuve introuvable : on rejoue une fois.
  * Au second essai, les preuves introuvables sont simplement ignorées à l’affichage.
  */
-async function appelVerifie<S extends z.ZodType>(req: Requete, format: S, ids: (s: z.infer<S>) => string[], lignes: Map<string, string>, storyId: string, etiquette: string): Promise<z.infer<S>> {
+async function appelVerifie<S extends z.ZodType>(
+  req: Requete,
+  format: S,
+  ids: (s: z.infer<S>) => string[],
+  lignes: Map<string, string>,
+  storyId: string,
+  etiquette: string,
+  surAvance?: (a: Avance) => void,
+): Promise<z.infer<S>> {
   for (let essai = 0; essai < 2; essai++) {
-    const a = await appeler(req, format, { storyId, etiquette });
+    const a = await appeler(req, format, { storyId, etiquette, surAvance });
     if (a.refus) throw new ErreurTache("refus");
     if (!a.sortie) continue;
     if (!introuvables(ids(a.sortie), lignes).length || essai === 1) return a.sortie;
@@ -63,9 +71,32 @@ const lireRapport = async (storyId: string) => {
 
 /* ———— Les étapes ———— */
 
-async function verdict(story: Ligne) {
+/**
+ * L’avancée du verdict (0 à 100) d’après ce que le modèle a déjà écrit : sa réflexion (sa longueur varie : on s’en
+ * approche sans l’atteindre, jusqu’à 70), puis le verdict lui-même (environ 700 caractères), jusqu’à 98.
+ */
+export const avanceVerdict = (a: Avance) => Math.min(98, Math.round(a.texte > 0 ? 70 + 28 * Math.min(1, a.texte / 700) : 15 + 55 * (1 - Math.exp(-a.reflexion / 2500))));
+
+/** Écrit l’avancée d’une tâche en base, au plus une fois par seconde, sans jamais reculer. */
+function suivreAvance(tacheId: string, calcul: (a: Avance) => number): (a: Avance) => void {
+  let derniere = 0;
+  let ecrite = 0;
+  return (a) => {
+    const p = calcul(a);
+    if (p <= ecrite || Date.now() - derniere < 1000) return;
+    derniere = Date.now();
+    ecrite = p;
+    void db()
+      .update(schema.tasks)
+      .set({ progress: sql`greatest(${schema.tasks.progress}, ${p})` })
+      .where(eq(schema.tasks.id, tacheId))
+      .catch(() => {});
+  };
+}
+
+async function verdict(story: Ligne, t: Tache) {
   const { h, lu, rendu } = relire(story);
-  const sortie = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict");
+  const sortie = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
   const donnees: DonneesVerdict = { sortie, scores: scores(chiffresDe(h, lu.messages)) };
   const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t };
   await db()
@@ -200,7 +231,8 @@ async function aAcces(story: Ligne): Promise<boolean> {
  */
 export const BUDGET_CHAINE_MS = 100_000;
 
-async function executer(t: Tache) {
+/** Exécute une tâche. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
+async function executer(t: Tache): Promise<boolean> {
   const coeur = setInterval(() => void battre(t.id).catch(() => {}), 20_000);
   try {
     const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
@@ -208,11 +240,13 @@ async function executer(t: Tache) {
     if (!story || !etape) throw new ErreurTache("tache_inconnue");
     await etape(story, t);
     await finir(t.id);
+    return true;
   } catch (e) {
     const code = e instanceof ErreurTache ? e.message : `erreur:${(e as Error).name}`;
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
     console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
     await echouer(t, code);
+    return false;
   } finally {
     clearInterval(coeur);
   }
@@ -231,7 +265,8 @@ export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_M
     if (!t) return;
     const pris = await prendre(t.id);
     if (!pris) return;
-    await executer(pris);
+    /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
+    if (!(await executer(pris))) await new Promise((r) => setTimeout(r, 3000 * pris.attempts));
   }
 }
 

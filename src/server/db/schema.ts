@@ -132,6 +132,8 @@ export const tasks = pgTable(
     input: chiffre("input"),
     /** Le code d’erreur, jamais de contenu. */
     error: text("error"),
+    /** L’avancée de 0 à 100, d’après ce que le modèle a déjà écrit (le verdict, suivi en direct par la lecture). */
+    progress: integer("progress").notNull().default(0),
     heartbeatAt: quand("heartbeat_at"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
