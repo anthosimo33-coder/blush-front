@@ -2,7 +2,7 @@
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
  * parle en bulles roses, comme sur la landing. Rien de la conv : ni prénom, ni verdict, ni message (le mail
  * peut s’afficher sur l’écran verrouillé). En mode sobre, pas de vanne. En tableaux et en styles en ligne.
- * ⚠ Textes à valider.
+ * Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const POLICE = "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";

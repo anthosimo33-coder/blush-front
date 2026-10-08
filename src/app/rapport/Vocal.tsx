@@ -14,7 +14,7 @@ import type { VocalRapport } from "@/types";
  * Le vocal de BLUSH, en haut du rapport : une tuile, puis une story plein écran. Elle parle, les perles du logo
  * parlent avec elle, les sous-titres s’allument mot à mot et les messages qu’elle cite apparaissent en bulles.
  * En mode sobre : encre et papier seulement, pas de logo en volume, pas de punchline en couleur.
- * ⚠ Textes à valider.
+ * Textes relus le 8 octobre (voix de BLUSH).
  */
 
 type Pret = Extract<VocalRapport, { etat: "pret" }>;

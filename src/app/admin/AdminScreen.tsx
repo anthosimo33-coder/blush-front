@@ -8,7 +8,7 @@ import type { Chiffre, Periode, StatsAdmin } from "@/server/stats";
 /*
  * Le tableau de bord de BLUSH : que des nombres (aucune conv, aucun message, aucun email). Une lecture d’un coup
  * d’œil en haut (les chiffres clés et leur tendance), puis le parcours d’une conv, l’activité jour par jour,
- * le partage, les coûts, la santé et la bêta. ⚠ Textes à valider.
+ * le partage, les coûts, la santé et la bêta. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const N = " ";

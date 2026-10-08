@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/icons";
 
 /*
  * Pendant que BLUSH écrit le rapport : la vraie avancée, lue sur ce que le modèle écrit (le plan, puis les deux
- * moitiés du rapport en même temps, chapitre par chapitre). ⚠ Textes à valider.
+ * moitiés du rapport en même temps, chapitre par chapitre). Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const DEGRADE = "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)";

@@ -182,7 +182,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         </div>
 
         {failed && p.failReason === "refus" ? (
-          /* ⚠ Texte à valider */
+          /* Texte relu le 8 octobre */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
@@ -190,7 +190,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
             </p>
           </div>
         ) : failed ? (
-          /* ⚠ Texte à valider */
+          /* Texte relu le 8 octobre */
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]" role="alert">
             Ça a coincé de notre côté.
             <br />
