@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /* Les titres d’attente, tant que le plan n’est pas fait (ceux du back-end) */
 const ROLES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "Elle", "Toi", "Votre duo", "Ton prochain pas"];
 
-/** En local seulement : le rapport pendant son écriture, à trois moments (?etat=plan | chapitres | presque). */
+/** En local seulement : le rapport pendant son écriture, à trois moments (?etat=plan | chapitres | presque | lecture). */
 export default async function Page({ searchParams }: PageProps<"/apercu/ecriture">) {
   if (process.env.NODE_ENV === "production") notFound();
   const { etat = "chapitres" } = await searchParams;
@@ -20,7 +20,10 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
     plan: { etape: "plan", progres: 0.14, restant: "2 min", e: ["attente", "attente", "attente", "attente", "attente", "attente", "attente"] },
     chapitres: { etape: "chapitres", progres: 0.58, restant: "1 min", e: ["ecrit", "en_cours", "attente", "ecrit", "en_cours", "attente", "attente"] },
     presque: { etape: "chapitres", progres: 0.93, restant: "10 s", e: ["ecrit", "ecrit", "ecrit", "ecrit", "ecrit", "ecrit", "en_cours"] },
+    /* Les chapitres 2 et 3 déjà finis se lisent ; le 5, prêt en avance, attend que le 4 le soit */
+    lecture: { etape: "chapitres", progres: 0.64, restant: "50 s", e: ["ecrit", "ecrit", "en_cours", "ecrit", "en_cours", "attente", "attente"] },
   };
+  const lisibles = etat === "lecture" ? [2, 3] : [];
   const s = etats[typeof etat === "string" && etat in etats ? etat : "chapitres"];
   const ecriture: EcritureRapport = {
     etape: s.etape,
@@ -29,7 +32,13 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
     chapitres: suite.map((c, k) => ({ number: c.number, title: s.etape === "plan" ? (ROLES[k] ?? c.tocTitle) : c.tocTitle, etat: s.e[k] ?? "attente" })),
   };
   const payload: ReportPayload = {
-    report: { ...report, chapters: [{ ...report.chapters[0], free: true, locked: false }, ...suite.map((c, k) => ({ ...c, tocTitle: ecriture.chapitres[k].title, locked: true, blocks: [] }))] },
+    report: {
+      ...report,
+      chapters: [
+        { ...report.chapters[0], free: true, locked: false },
+        ...suite.map((c, k) => (lisibles.includes(c.number) ? { ...c, free: true, locked: false } : { ...c, tocTitle: ecriture.chapitres[k].title, locked: true, blocks: [] })),
+      ],
+    },
     sober: null,
     access: "blushplus",
     generating: true,

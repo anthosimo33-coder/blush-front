@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { avanceMoitie, avancePlan, chapitresCommences, executerChaine } from "@/server/analyse";
+import { avanceMoitie, avancePlan, chapitresCommences, chapitresFinis, executerChaine } from "@/server/analyse";
+import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { rapportDe } from "@/server/donnees";
 import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
@@ -23,6 +24,10 @@ describe("l’avancée du rapport, lue sur ce que le modèle écrit", () => {
     /* Avant le premier chapitre : la réflexion, sous 45 % */
     expect(avanceMoitie(avance("", 50_000), 5).progres).toBeLessThan(0.45);
     expect(avanceMoitie(avance("", 50_000), 5).enCours).toBeNull();
+    /* Un chapitre est fini quand le suivant commence : seul le 1 l’est ici */
+    const ch = (n: number) => `{"numero":${n},"titre":"T${n}","titre_court":"C${n}","surtitre":null,"blocs":[{"type":"chute","texte":"fin ${n}","preuves":[],"titre":null,"niveau":null,"items":null}]}`;
+    expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)},${ch(2).slice(0, 40)}`).map((c) => c.numero)).toEqual([1]);
+    expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)}, ${ch(2)},${ch(3).slice(0, 20)}`).map((c) => c.titre)).toEqual(["T1", "T2"]);
     /* Le plan : sa réflexion jusqu’à 50, puis ses chapitres */
     expect(avancePlan(avance("", 2500))).toBeLessThan(50);
     expect(avancePlan(avance('{"chapitres":[{"numero":1},{"numero":2},{"numero":3},{"numero":4}'))).toBe(74);
@@ -72,6 +77,27 @@ describe("le rapport pendant son écriture", () => {
     /* Les titres viennent du plan (le modèle factice les appelle « Ch. N »), dans le sommaire aussi */
     expect(r.ecriture?.chapitres[0].title).toBe("Ch. 2");
     expect(r.report.chapters[1].tocTitle).toBe("Ch. 2");
+  });
+
+  it("donne à lire les chapitres finis, dans l’ordre : un chapitre prêt en avance attend ceux d’avant", async () => {
+    const pret = (n: number) => ({ number: n, title: `Prêt ${n}`, tocTitle: `Prêt ${n}`, free: false, blocks: [{ kind: "punchline", text: `fin ${n}` }] });
+    await db().update(schema.reports).set({ partiel: chiffrer([pret(2), pret(3), pret(6)]) }).where(eq(schema.reports.storyId, id));
+    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+    const [u] = await db().select().from(schema.users).where(eq(schema.users.email, email));
+    const r = (await rapportDe(story, { ...u, plan: "blushplus" } as never))!;
+    expect(r.report.chapters.map((c) => [c.number, !c.locked])).toEqual([
+      [1, true],
+      [2, true],
+      [3, true],
+      [4, false],
+      [5, false],
+      [6, false],
+      [7, false],
+      [8, false],
+    ]);
+    expect(r.report.chapters[2].title).toBe("Prêt 3");
+    /* Le 6 est prêt mais attend : la liste le marque « écrit » */
+    expect(r.ecriture?.chapitres.find((c) => c.number === 6)?.etat).toBe("ecrit");
   });
 });
 
