@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
-/* Écrans d’erreur : un titre, une phrase, une action. ⚠ Textes absents des maquettes, à valider. */
+/* Écrans d’erreur : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
 export const ERROR_COPY: Record<DemoError, { title: string; text: string; action: string; href: string; back: string }> = {
   fichier: {
     title: "On n’arrive pas à lire ce fichier.",

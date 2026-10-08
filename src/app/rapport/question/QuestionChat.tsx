@@ -19,7 +19,7 @@ import type { Story } from "@/types";
  * Écran 12 — Ta question, en conversation avec BLUSH (proposition ; l’écran actuel reste sur ?version=actuelle).
  * BLUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
  * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
- * ⚠ Absent des maquettes : textes à valider.
+ * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
 export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
   const { data: answer, loading } = useQuery("question", getQuestion);
@@ -136,10 +136,10 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           <BlushSays
             bubbles={[
               <span key="a" className="text-[17px] font-black leading-[1.3]">
-                Une question sur vous deux&nbsp;? Pose-la-moi.
+                une question sur vous deux&nbsp;? balance
               </span>,
               <span key="b" className="text-[14px] font-extrabold leading-[1.45] text-soft">
-                Je te réponds avec vos {formatCount(story.totalMessages)} messages, preuves à l’appui.
+                je te réponds avec vos {formatCount(story.totalMessages)} messages, preuves à l’appui
               </span>,
             ]}
           />

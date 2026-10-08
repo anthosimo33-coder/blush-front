@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 
 /*
  * L’export Instagram complet contient toutes les convs : on laisse choisir la bonne, dans le navigateur.
- * Seule celle-là part chez BLUSH, les autres ne quittent jamais le téléphone. ⚠ Textes à valider.
+ * Seule celle-là part chez BLUSH, les autres ne quittent jamais le téléphone. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 export type { ConvInstagram } from "@/services/preparer-export";

@@ -51,14 +51,14 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
         </span>
       </p>
       {fermee && (
-        /* ⚠ Texte à valider */
+        /* Texte relu le 8 octobre */
         <Link href="/attente" className="row-hover flex items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-ink no-underline shadow-soft">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[rgba(255,79,154,0.12)]">
             <Icon name="lock" size={17} color="#C81D6B" stroke={2.4} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-[15px] font-black">Bêta privée, sur invitation</span>
-            <span className="text-[13px] font-extrabold text-grey">Pas encore invité ? Rejoins la liste d’attente.</span>
+            <span className="text-[13px] font-extrabold text-grey">Pas encore d’invitation ? Rejoins la liste d’attente.</span>
           </span>
           <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
         </Link>

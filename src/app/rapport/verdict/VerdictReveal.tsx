@@ -18,7 +18,7 @@ const INK = "#121214";
  * Les chiffres, le verdict, qui fait quoi, le moment où tout a basculé, puis « à toi de jouer » et le rapport.
  * Tout vient des chapitres offerts (1 et 2) : rien de payant n’est montré avant le paiement.
  * Un toucher à droite (ou →) avance, à gauche (ou ←) recule ; « Passer » mène droit au rapport.
- * ⚠ Proposition absente des maquettes : textes à valider.
+ * Proposition absente des maquettes, textes relus le 8 octobre.
  */
 
 type Card =
@@ -103,7 +103,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   }, [at]);
 
   /* Le verdict : un souffle grave, puis l’accord de ce verdict quand l’emoji se pose (le mode sobre n’a pas de scène, donc pas de son).
-     Le bouton son, comme une story : touché, la scène joue même en mode silencieux. ⚠ Proposition, textes à valider */
+     Le bouton son, comme une story : touché, la scène joue même en mode silencieux. Proposition, textes relus le 8 octobre */
   const sons = useSoundsEnabled();
   const [loud, setLoud] = useState(false);
   const onVerdict = card.id === "verdict";

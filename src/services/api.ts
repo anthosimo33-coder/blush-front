@@ -295,18 +295,18 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }):
 /* Back-end : une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
 const bulle = (texte: string | string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
 
-/* ⚠ Textes des erreurs du chat (captures, export, vocal) : à valider */
+/* Les erreurs du chat (captures, export, vocal), dans la voix de BLUSH : une idée par bulle */
 const ERREURS_CHAT: Record<string, string | string[]> = {
-  trop: "on a beaucoup parlé aujourd’hui, on reprend demain ?",
+  trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
-  capture: "j’arrive pas à lire tes captures. renvoie-les en entier, sans les rogner",
+  capture: ["j’arrive pas à lire tes captures", "renvoie-les en entier, sans les rogner"],
   fichier: ["j’arrive pas à ouvrir ce fichier", "envoie-moi l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram"],
   autre_conv: "c’est pas votre conv ça 👀 envoie-moi l’export de la vôtre",
-  rien_de_neuf: "j’ai déjà tout ça : rien de nouveau depuis la dernière fois",
-  vocal_bientot: "les vocaux arrivent très vite. écris-moi en attendant, je te réponds pareil",
+  rien_de_neuf: "ça, je l’ai déjà 😌 rien de nouveau depuis la dernière fois",
+  vocal_bientot: ["les vocaux, ça arrive très vite", "écris-moi en attendant, je te réponds pareil"],
   vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies ?",
-  vocal: "ton vocal est trop long pour moi, fais-en un plus court",
+  vocal: "ton vocal est trop long, même pour moi 😭 fais-moi la version courte",
   transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
 };
 

@@ -66,7 +66,7 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
   );
 }
 
-/** Pendant que BLUSH écrit le rapport (2 à 3 minutes) : une pastille en bas de l’écran. ⚠ Texte à valider */
+/** Pendant que BLUSH écrit le rapport (2 à 3 minutes) : une pastille en bas de l’écran. Texte relu le 8 octobre */
 function Writing() {
   return (
     <div role="status" className="fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">

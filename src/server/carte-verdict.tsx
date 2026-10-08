@@ -9,7 +9,7 @@ import type { VerdictPartage } from "./partages";
  * L’image d’un verdict partagé, dessinée côté serveur : la carte de l’aperçu du lien (WhatsApp, iMessage),
  * et la version story (1080 × 1920, pour Instagram). L’habit de la landing : le papier crème et sa lueur,
  * l’encre en Nunito 900, BLUSH qui parle dans des bulles roses, et la réponse de celui qui regarde, en bleu.
- * Rien d’autre que le verdict : ni prénom, ni message. ⚠ Textes à valider.
+ * Rien d’autre que le verdict : ni prénom, ni message. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 export const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 1080, height: 1920 } } as const;

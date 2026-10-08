@@ -19,7 +19,7 @@ export function EmailScreen() {
   const [j, set] = useJourney();
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
-  /* Le code n’est pas parti : pourquoi, dit simplement (⚠ textes à valider) */
+  /* Le code n’est pas parti : pourquoi, dit simplement (textes relus le 8 octobre) */
   const [problem, setProblem] = useState<string | null>(null);
   const valid = EMAIL_RE.test(j.email.trim());
 

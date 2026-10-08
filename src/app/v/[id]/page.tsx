@@ -12,7 +12,7 @@ import { verdictDuLien } from "./verdict";
 /*
  * Un verdict partagé, tel que le voient les potes, dans l’habit de la landing : BLUSH parle en bulles roses,
  * le verdict en grand, et la réponse de celui qui regarde, en bleu, mène à BLUSH.
- * Le verdict seul (prénoms masqués) : jamais un message, jamais un chapitre. ⚠ Textes à valider.
+ * Le verdict seul (prénoms masqués) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promise<Metadata> {

@@ -45,7 +45,7 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
 
 function ConvRow({ conv }: { conv: ConvSummary }) {
   const up = conv.trend.startsWith("↗");
-  /* Pas encore de verdict : BLUSH lit la conv (⚠ texte à valider) */
+  /* Pas encore de verdict : BLUSH lit la conv (texte relu le 8 octobre) */
   const where = conv.verdict?.title ?? "BLUSH lit votre conv…";
   return (
     <Link

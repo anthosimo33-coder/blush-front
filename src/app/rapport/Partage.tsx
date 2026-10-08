@@ -12,7 +12,7 @@ import type { Verdict } from "@/types";
 
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
- * prénoms masqués : jamais un message, jamais un chapitre. ⚠ Textes à valider.
+ * prénoms masqués : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const N = " ";
@@ -324,7 +324,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
         <InsetRow
           leading={<RowIcon icon="trash" />}
           title="Effacée dès ton rapport écrit"
-          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, au bout de 30${N}jours. Sans compte, au bout de 24${N}h.`}
+          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, au bout de 30${N}jours. Jamais lue, au bout de 24${N}h.`}
           className={ligne}
         />
         <InsetRow

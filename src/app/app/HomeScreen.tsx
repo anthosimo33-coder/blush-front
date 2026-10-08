@@ -551,7 +551,7 @@ export function HomeScreen({
               data-a="composer"
               className="sticky bottom-0 z-10 -mb-6 mt-auto border-t border-[rgba(17,17,20,0.06)] bg-[rgba(244,242,237,0.88)] px-[18px] pb-[max(14px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:static lg:mb-0 lg:bg-white lg:px-6 lg:py-4 lg:backdrop-blur-none"
             >
-              {/* 7 · Le point creusé, au-dessus du champ : ta question porte dessus (⚠ textes à valider) */}
+              {/* 7 · Le point creusé, au-dessus du champ : ta question porte dessus (textes relus le 8 octobre) */}
               {about && (
                 <div data-quote-strip="" className="mb-2.5">
                   <div className="min-h-0 overflow-hidden">
@@ -1138,7 +1138,7 @@ const Thread = memo(function Thread({ msgs, opened }: { msgs: Msg[]; opened: num
   );
 });
 
-/** 11 · Un niveau franchi pendant la visite : un repère au milieu de la conv (⚠ texte à valider). */
+/** 11 · Un niveau franchi pendant la visite : un repère au milieu de la conv (texte relu le 8 octobre). */
 function LevelEvent({ row, level }: { row: string; level: LevelId }) {
   const { levels, index, temperature } = scaleOf(level);
   return (
