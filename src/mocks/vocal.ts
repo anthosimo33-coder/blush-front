@@ -11,3 +11,12 @@ export function vocalDemo(sobre: boolean): Pret {
   const b = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("voix") === "b";
   return VOCAUX[`${sobre ? "sobre" : "hugo"}-${b ? "B" : "A"}`];
 }
+
+type VocalChat = NonNullable<import("@/types").BlushAnswer["vocal"]>;
+const CHAT = demo as unknown as Record<"chat-A" | "chat-B" | "mode-A" | "mode-B", VocalChat>;
+
+/** Démo du chat en vocal : la réponse à son vocal (sur le dernier message de Sophie), et « je passe en vocal ». */
+export function chatVocalDemo(quoi: "chat" | "mode"): VocalChat {
+  const b = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("voix") === "b";
+  return CHAT[`${quoi}-${b ? "B" : "A"}`];
+}

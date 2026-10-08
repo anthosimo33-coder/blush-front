@@ -6,14 +6,16 @@ import { bullesAffichees, messagesAffiches } from "@prompts/lib/front";
 import type { Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
+import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, LevelId } from "@/types";
 import type { DonneesMemoire } from "./analyse";
 import { ErreurTache } from "./erreurs";
-import { chiffrer, dechiffrer } from "./chiffrement";
+import { chiffrer, chiffrerOctets, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { appeler, textesSysteme } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
+import { dire, ErreurVoix, voixDisponible, voixPour } from "./ia/voix";
 import { planifier } from "./taches";
 import { aujourdhuiParis } from "./temps";
 
@@ -58,10 +60,40 @@ const texteDe = (r: ReponseChat) => [resume(r), r.pourquoi ?? ""].join(" ");
 const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
 
 /**
+ * La réponse dite en vocal, par la voix de l’A/B test du compte : l’audio est gardé chiffré, la réponse garde son
+ * adresse. Pas de vocal quand il y a une alerte (les ressources d’aide restent écrites). Si la voix échoue, la réponse
+ * reste écrite.
+ */
+async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["vocal"] | null> {
+  if (!voixDisponible() || !r.dit?.length || r.alerte) return null;
+  try {
+    const voix = voixPour(story.userId ?? story.id);
+    const { texte } = texteDit(r.dit.map((l) => ({ jeu: l.jeu, texte: l.texte, punch: false, preuve: null })));
+    const { audio, alignement } = await dire(texte, voix, { sobre: r.mode === "sobre" || r.mode === "doux", storyId: story.id });
+    const duree = Math.max(0.5, ...alignement.character_end_times_seconds);
+    const [v] = await db()
+      .insert(schema.chatVocals)
+      .values({ storyId: story.id, voix, audio: chiffrerOctets(audio), dureeMs: Math.round(duree * 1000) })
+      .returning({ id: schema.chatVocals.id });
+    return { audio: `/api/vocal/chat/${v.id}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
+  } catch (e) {
+    console.error(`chat en vocal : ${e instanceof ErreurVoix ? e.message : (e as Error).name}`);
+    return null;
+  }
+}
+
+/**
  * Une réponse de BLUSH, en bulles. `ajout` : les messages de leur conv (ou son profil) qu’il vient d’envoyer, et
  * ce que l’historique en réaffiche. Elle enregistre l’échange et, s’il apporte du neuf, programme la mise à jour de la mémoire.
+ * `parVocal` : il a envoyé un vocal, BLUSH répond en vocal. Elle répond aussi en vocal tant qu’il le lui a demandé.
  */
-export async function repondre(story: Ligne, memoire: DonneesMemoire, ditBrut: string, ajout?: { ajout: Ajout; affiche: string }): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
+export async function repondre(
+  story: Ligne,
+  memoire: DonneesMemoire,
+  ditBrut: string,
+  ajout?: { ajout: Ajout; affiche: string },
+  { parVocal = false }: { parVocal?: boolean } = {},
+): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
   const ctx = contexteDe(story);
@@ -82,6 +114,7 @@ export async function repondre(story: Ligne, memoire: DonneesMemoire, ditBrut: s
     fil: await fil(story.id),
     dit,
     ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
+    vocal: (parVocal || story.chatVocal) && voixDisponible(),
   });
 
   let sortie: ReponseChat | null = null;
@@ -96,11 +129,17 @@ export async function repondre(story: Ligne, memoire: DonneesMemoire, ditBrut: s
   const fuite = recopieLesPrompts(texteDe(sortie), textesSysteme);
   if (fuite) console.warn(`garde-fou : réponse remplacée (histoire ${story.id})`);
   const avant = memoire.etat.niveau?.niveau ?? null;
+  /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
+  const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;
+  if (modeVocal !== story.chatVocal) await db().update(schema.stories).set({ chatVocal: modeVocal }).where(eq(schema.stories.id, story.id));
+  const vocal = !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" ? await direReponse(story, sortie) : null;
   const reponse: BlushAnswer = fuite
-    ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })) }
+    ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })), modeVocal }
     : {
         ...bullesAffichees(sortie, messagesAffiches(lignes, h.utilisateur.prenom)),
         ...(sortie.niveau_atteint && sortie.niveau_atteint !== avant ? { levelUp: sortie.niveau_atteint as LevelId } : {}),
+        ...(vocal ? { vocal } : {}),
+        modeVocal,
       };
 
   await db()

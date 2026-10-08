@@ -120,6 +120,7 @@ export const reel = {
   getAnalysisProgress: () => appel<AnalysisProgress>("/api/analyse"),
   getReport: () => appel<ReportPayload>("/api/rapport"),
   /** Un moment de l’écoute du vocal (A/B test des voix). Sans réponse attendue : un échec ne gêne pas l’écoute. */
+  modeVocal: (actif: boolean) => appel<{ modeVocal: boolean }>("/api/chat/vocal", envoi("POST", { actif })).catch(() => {}),
   ecouteVocal: (evenement: "debut" | "fin" | "reecoute" | "ferme", position: number) => appel<{ ok: true }>("/api/vocal/ecoute", envoi("POST", { evenement, position })).catch(() => {}),
   unlock: (offre: Exclude<Plan, "gratuit">) => appel<Subscription>("/api/debloquer", envoi("POST", { offre })),
   getAccount: () => appel<Account>("/api/compte"),

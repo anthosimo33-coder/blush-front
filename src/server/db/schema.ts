@@ -62,6 +62,8 @@ export const stories = pgTable(
     conv: chiffre("conv"),
     context: chiffre("context"),
     convPurgedAt: quand("conv_purged_at"),
+    /** Le chat en vocal : il a demandé à BLUSH de lui parler en vocal (jusqu’à ce qu’il repasse à l’écrit). */
+    chatVocal: boolean("chat_vocal").notNull().default(false),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },
@@ -188,6 +190,22 @@ export const vocals = pgTable("vocals", {
   dureeMs: integer("duree_ms").notNull(),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
+
+/** Les réponses du chat dites en vocal : l’audio, chiffré (le texte est dans le message du chat). */
+export const chatVocals = pgTable(
+  "chat_vocals",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storyId: uuid("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    voix: text("voix").notNull(),
+    audio: chiffre("audio").notNull(),
+    dureeMs: integer("duree_ms").notNull(),
+    createdAt: quand("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("chat_vocals_story_idx").on(t.storyId)],
+);
 
 /** Comment on écoute le vocal, pour comparer les deux voix : des événements, une position, jamais de contenu. */
 export const vocalEcoutes = pgTable(

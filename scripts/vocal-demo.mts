@@ -9,7 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { minuter, texteDit, type Alignement, type LigneScript } from "@/lib/vocal";
+import { minuter, ondeDe, texteDit, type Alignement, type LigneScript } from "@/lib/vocal";
 
 const RACINE = join(import.meta.dirname, "..");
 const ALIGNEMENTS = join(RACINE, "scripts/vocal-demo.alignements.json");
@@ -54,6 +54,16 @@ const CAS: Record<"hugo" | "sobre", { sobre: boolean; lignes: LigneScript[] }> =
   },
 };
 
+/* Le chat en vocal : la réponse à son vocal, et « je passe en vocal » quand il le demande */
+const CHAT: Record<"chat" | "mode", LigneScript[]> = {
+  chat: [
+    l("in disbelief", "Attends, elle t’a écrit : « je suis crevée cette semaine, on verra »."),
+    l("laughing", "Et toi, t’as cru que c’était mort, avoue."),
+    l(null, "En vrai, elle est partante, elle est juste fatiguée. Je t’ai mis la réponse juste en dessous."),
+  ],
+  mode: [l("mischievously", "Ok chef, je passe en vocal. Mais tu m’écoutes jusqu’au bout, hein.")],
+};
+
 async function dire(texte: string, voix: string, sobre: boolean) {
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voix}/with-timestamps?output_format=mp3_44100_96`, {
     method: "POST",
@@ -84,6 +94,20 @@ for (const [nom, cas] of Object.entries(CAS)) {
     const lignes = minuter(cas.lignes, alignement).map((x, k) => (cas.lignes[k].preuve ? { ...x, recu: RECUS[cas.lignes[k].preuve!] } : x));
     const duree = Math.max(...alignement.character_end_times_seconds);
     sortie[`${nom}-${v}`] = { etat: "pret", audio: `/demo/${fichier}`, duree: Math.round(duree * 100) / 100, voix: v, sobre: cas.sobre, lignes };
+    console.log(`${fichier} : ${duree.toFixed(1)} s`);
+  }
+}
+for (const [nom, lignes] of Object.entries(CHAT)) {
+  for (const [v, id] of Object.entries(VOIX)) {
+    const fichier = `vocal-${nom}-${v.toLowerCase()}.mp3`;
+    let alignement = gardes[fichier];
+    if (!reminuter) {
+      const dit = await dire(texteDit(lignes).texte, id!, false);
+      writeFileSync(join(RACINE, "public/demo", fichier), dit.audio);
+      alignement = gardes[fichier] = dit.alignement;
+    }
+    const duree = Math.max(...alignement.character_end_times_seconds);
+    sortie[`${nom}-${v}`] = { audio: `/demo/${fichier}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
     console.log(`${fichier} : ${duree.toFixed(1)} s`);
   }
 }

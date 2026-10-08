@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
 import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
+import { modeVocalChat, sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -37,7 +37,7 @@ import { scaleOf } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import type { ConvSummary, Fiche, LevelId, Reply, Report } from "@/types";
-import { RecordingBar, useVoiceRecorder, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
+import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 
 /** Ce que l’accueil montre de votre histoire : elle comme un contact, le verdict, où vous en êtes, ton prochain pas. */
 export type HomeContact = {
@@ -127,7 +127,7 @@ type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answer
 /** `about` : le point d’une réponse de BLUSH que tu creuses (glissé vers la droite). `event` : un repère dans la conv (un niveau franchi). */
 type Msg = (
   | { id: number; from: "blush"; intro: "next" | "hint" }
-  | { id: number; from: "blush"; reading: string; leaving?: boolean }
+  | { id: number; from: "blush"; reading: string; leaving?: boolean; vocal?: boolean }
   | { id: number; from: "blush"; result: BlushAnswer; fromCapture?: boolean }
   | { id: number; from: "toi"; text: string; about?: string }
   | { id: number; from: "toi"; images: string[] }
@@ -222,6 +222,8 @@ export function HomeScreen({
   const [details, setDetails] = useState(false);
   /* 7 · Le point creusé : ta prochaine question porte dessus */
   const [about, setAbout] = useState<string | null>(null);
+  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (la dernière réponse le dit) */
+  const [modeVocal, setModeVocal] = useState(() => !!script.at(-1)?.answer.modeVocal);
   /* 11 · Où vous en êtes : un message peut vous faire passer un cap pendant la visite */
   const [level, setLevel] = useState(contact.report.level);
   const levelNow = useRef(contact.report.level);
@@ -322,10 +324,10 @@ export function HomeScreen({
   };
 
   /** Ton message part, BLUSH tape « … », puis sa réponse remplace les trois points. */
-  const exchange = async (mine: Msg, label: string, answer: () => Promise<NewMsg>) => {
+  const exchange = async (mine: Msg, label: string, answer: () => Promise<NewMsg>, vocal = false) => {
     const readingId = id();
     const sent = Date.now();
-    update((m) => [...m, { ...mine, at: sent }, { id: readingId, from: "blush", reading: label, at: sent }]);
+    update((m) => [...m, { ...mine, at: sent }, { id: readingId, from: "blush", reading: label, vocal, at: sent }]);
     const next = await answer();
     if (!prefersReducedMotion()) {
       if (motion) {
@@ -341,13 +343,14 @@ export function HomeScreen({
     update((m) => m.map((x) => (x.id === readingId ? ({ ...next, id: readingId, at: Date.now(), answered: true } as Msg) : x)));
     /* Un pop quand la réponse remplace les perles, deux avec ta meilleure réponse. Rien si tu écris déjà la suite */
     if (!input.current?.value) play("reponse", "result" in next && (next.result.kind === "analysis" || next.result.kind === "best"));
+    if ("result" in next && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
     const up = "result" in next ? next.result.levelUp : undefined;
     if (up) window.setTimeout(() => levelUp(up), 700);
   };
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }, fromCapture = false) => {
     play("envoi");
-    return exchange(mine, "BLUSH analyse sa réponse", async () => {
+    return exchange(mine, modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse", async () => {
       const ready = payload.text ? answers[payload.text] : undefined;
       const result = ready
         ? await new Promise<BlushAnswer>((ok) => setTimeout(() => ok(ready), 1600))
@@ -355,7 +358,7 @@ export function HomeScreen({
           ? await askLive(liveUrl, payload.text, historyOf(msgs))
           : await sendToBlush(payload);
       return { from: "blush", result, fromCapture };
-    });
+    }, modeVocal);
   };
 
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite. 3 · La pastille elle-même devient ta bulle */
@@ -420,10 +423,13 @@ export function HomeScreen({
     if (!clip) return;
     play("vocalEnvoye");
     urls.current.push(clip.url);
-    exchange({ id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } }, "BLUSH écoute ton vocal", async () => ({
-      from: "blush",
-      result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }),
-    }));
+    /* Tu lui parles en vocal : elle te répond en vocal */
+    exchange(
+      { id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
+      "BLUSH enregistre un vocal",
+      async () => ({ from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }) }),
+      true,
+    );
   };
 
   /* 2 · BLUSH t’écoute : chaque lettre fait sauter une perle, et la bulle se penche vers toi */
@@ -568,6 +574,25 @@ export function HomeScreen({
                   </div>
                 </div>
               )}
+              {/* Le chat en vocal : BLUSH te répond en vocal, jusqu’à ce que tu repasses à l’écrit */}
+              {modeVocal && (
+                <div className="mb-2.5 flex">
+                  <span role="status" className="inline-flex h-[34px] items-center gap-2 rounded-full bg-[#FFE6F2] pl-3 pr-1.5 shadow-[inset_0_0_0_1px_rgba(232,53,138,0.22)]">
+                    <Icon name="sound" size={16} color="#C81D6B" />
+                    <span className="text-[13px] font-black text-[#A3135A]">BLUSH te répond en vocal</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModeVocal(false);
+                        modeVocalChat(false);
+                      }}
+                      className="h-[26px] rounded-full bg-white px-2.5 text-[12px] font-black text-ink shadow-[0_1px_2px_rgba(17,17,20,0.1)]"
+                    >
+                      Repasser à l’écrit
+                    </button>
+                  </span>
+                </div>
+              )}
               {/* Les questions toutes prêtes, au-dessus du champ (rien pendant que tu écris, que BLUSH répond, que tu enregistres ou que tu creuses) */}
               {quickLeft.length > 0 && !typed && !busy && !menu && !about && voice.phase === "idle" && quickHidden && (
                 <button
@@ -658,7 +683,7 @@ export function HomeScreen({
                       ref={input}
                       value={text}
                       onChange={onType}
-                      placeholder={about ? "Ta question sur ce point" : "Écris à BLUSH"}
+                      placeholder={about ? "Ta question sur ce point" : modeVocal ? "Écris ou parle à BLUSH" : "Écris à BLUSH"}
                       enterKeyHint="send"
                       className="min-w-0 flex-1 bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-grey"
                     />
@@ -1299,7 +1324,7 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
             ),
           },
         ];
-  if ("reading" in m) return [{ tone: "typing", body: <BlushTyping label={m.reading} leaving={m.leaving} /> }];
+  if ("reading" in m) return [{ tone: "typing", body: <BlushTyping label={m.reading} leaving={m.leaving} vocal={m.vocal} /> }];
   if ("notice" in m) return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
   if ("voice" in m) return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
   if ("text" in m)
@@ -1363,6 +1388,26 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
       </MessageBubble>
     ),
   });
+  /* Une réponse dite en vocal : la bulle vocale à la place des bulles écrites ; les messages qu’elle cite et la réponse à envoyer restent */
+  if (r.kind === "bubbles" && r.vocal)
+    return [
+      ...(r.incoming ?? []).map(
+        (msg): BubbleNode => ({
+          className: "pb-2.5 pt-3",
+          quote: msg.text,
+          body: (
+            <MessageBubble from={msg.from} caption={msg.caption}>
+              {msg.text}
+            </MessageBubble>
+          ),
+        }),
+      ),
+      { className: "py-2.5 pl-2.5 pr-3.5", quote: r.bubbles.map((b) => b.text).join(" "), body: <VocalBlush vocal={r.vocal} /> },
+      ...r.bubbles.flatMap((b) =>
+        (b.messages ?? []).map((msg) => ({ className: "pb-2.5 pt-3", quote: msg.text, body: <ClampedBubble from={msg.from} caption={msg.caption} text={msg.text} limit={25} /> })),
+      ),
+      ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
+    ];
   /* La réponse en bulles : chaque bulle, puis les messages qu’elle cite, comme dans un vrai fil */
   if (r.kind === "bubbles")
     return [

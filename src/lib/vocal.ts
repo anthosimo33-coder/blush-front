@@ -68,6 +68,24 @@ export function minuter(lignes: LigneScript[], al: Alignement): Omit<VocalLigne,
   });
 }
 
+/**
+ * L’onde d’un vocal (`n` barres de 0,15 à 1) : là où elle parle, la barre monte, dans un silence elle retombe. La
+ * densité de la parole varie peu d’une barre à l’autre : les lettres de chaque tranche lui donnent un relief stable.
+ */
+export function ondeDe(al: Alignement, n = 28): number[] {
+  const fin = Math.max(0.1, ...al.character_end_times_seconds);
+  const compte = Array.from({ length: n }, () => 0);
+  const lettres = Array.from({ length: n }, () => 0);
+  al.characters.forEach((c, i) => {
+    if (!/\S/.test(c)) return;
+    const k = Math.min(n - 1, Math.floor((al.character_start_times_seconds[i] / fin) * n));
+    compte[k]++;
+    lettres[k] = (lettres[k] * 31 + c.charCodeAt(0)) % 997;
+  });
+  const max = Math.max(1, ...compte);
+  return compte.map((x, k) => (x ? Math.round((0.3 + 0.35 * (x / max) + 0.35 * (lettres[k] / 997)) * 100) / 100 : 0.15));
+}
+
 /** La ligne dite à l’instant `t` : la dernière commencée (entre deux lignes, la précédente reste affichée). */
 export function ligneA(lignes: Pick<VocalLigne, "debut">[], t: number): number {
   let i = 0;

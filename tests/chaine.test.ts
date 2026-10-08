@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executerChaine, type DonneesMemoire, type DonneesRapport } from "@/server/analyse";
 import { historique, repondre } from "@/server/chat";
-import { chiffrer, dechiffrer } from "@/server/chiffrement";
+import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, ErreurImport, importer as importerLu, metaDe, rattacherBrouillon, storyAffichee } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
@@ -108,6 +108,29 @@ describe("de l’import à la mémoire", () => {
     await executerChaine(id);
     const [maj] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj.status).toBe("fini");
+
+    /* Le chat en vocal : il envoie un vocal, elle répond en vocal (l’audio chiffré, à son adresse), sans changer de mode */
+    const relire = async () => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0];
+    const parVocal = await repondre(await relire(), memoire, "(vocal) elle m’a écrit tard hier", undefined, { parVocal: true });
+    expect(parVocal.reponse.vocal?.audio).toMatch(/^\/api\/vocal\/chat\/\d+$/);
+    expect(parVocal.reponse.vocal?.peaks).toHaveLength(28);
+    expect(parVocal.reponse.modeVocal).toBe(false);
+    const [audioChat] = await db().select().from(schema.chatVocals).where(eq(schema.chatVocals.storyId, id));
+    expect(dechiffrerOctets(audioChat.audio).subarray(0, 2).toString("hex")).toBe("fffb");
+    /* Il demande qu’elle lui parle en vocal : elle confirme en vocal, et la suite reste en vocal, même quand il écrit */
+    const active = await repondre(await relire(), memoire, "parle-moi en vocal stp");
+    expect(active.reponse.modeVocal).toBe(true);
+    expect(active.reponse.vocal).toBeDefined();
+    expect((await relire()).chatVocal).toBe(true);
+    const suite = await repondre(await relire(), memoire, "et là je lui dis quoi ?");
+    expect(suite.reponse.vocal).toBeDefined();
+    /* Il repasse à l’écrit : la réponse est écrite */
+    const stop = await repondre(await relire(), memoire, "écris-moi stp");
+    expect(stop.reponse.modeVocal).toBe(false);
+    expect(stop.reponse.vocal).toBeUndefined();
+    expect((await relire()).chatVocal).toBe(false);
+    /* L’historique garde les vocaux (pour les réécouter) */
+    expect((await historique(id)).filter((p) => p.answer.vocal).length).toBe(3);
   });
 });
 

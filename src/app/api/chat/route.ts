@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       const t = await transcrire(envoi.vocal);
       if (t === null) return erreur("vocal_bientot", 503);
       if (!t) return erreur("vocal_vide", 422);
-      r = await repondre(story, memoire, `(vocal) ${t}`.slice(0, LONGUEUR_MAX));
+      r = await repondre(story, memoire, `(vocal) ${t}`.slice(0, LONGUEUR_MAX), undefined, { parVocal: true });
     } else if (envoi.captures.length) {
       const ajout = await depuisCaptures(story, memoire, await imagesDe(envoi.captures));
       r = await repondre(story, memoire, envoi.texte, { ajout, affiche: resumeAjout(ajout, "captures", envoi.captures.length) });

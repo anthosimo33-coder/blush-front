@@ -24,3 +24,23 @@ export async function corps<T = Record<string, unknown>>(req: Request): Promise<
     return {};
   }
 }
+
+/**
+ * Un audio (MP3) à lire dans le navigateur. Son adresse change avec lui : le navigateur peut le garder. Safari lit
+ * l’audio par morceaux : on répond aux demandes de plage (Range).
+ */
+export function reponseAudio(req: Request, audio: Buffer): Response {
+  const entetes = { "content-type": "audio/mpeg", "accept-ranges": "bytes", "cache-control": "private, max-age=31536000, immutable" };
+  const plage = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
+  if (plage && (plage[1] || plage[2])) {
+    const total = audio.length;
+    const debut = plage[1] ? +plage[1] : Math.max(0, total - +plage[2]);
+    const fin = plage[1] && plage[2] ? Math.min(+plage[2], total - 1) : total - 1;
+    if (debut >= total || debut > fin) return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}` } });
+    return new Response(new Uint8Array(audio.subarray(debut, fin + 1)), {
+      status: 206,
+      headers: { ...entetes, "content-range": `bytes ${debut}-${fin}/${total}`, "content-length": String(fin - debut + 1) },
+    });
+  }
+  return new Response(new Uint8Array(audio), { headers: { ...entetes, "content-length": String(audio.length) } });
+}
