@@ -1,7 +1,7 @@
 /**
- * L’histoire ouverte, comme le ferait une session : un cookie, lu par les pages côté serveur
- * (src/services/session.server.ts) et par src/services/api.ts dans le navigateur.
- * Simulation : le back-end fixera l’histoire à la fin de l’analyse.
+ * L’histoire ouverte : un cookie, lu par les pages côté serveur (src/services/session.server.ts) et par
+ * src/services/api.ts dans le navigateur. Avec le back-end, c’est la conv choisie dans « Tes convs » (le serveur la pose
+ * aussi quand une nouvelle conv est lue, et vérifie qu’elle est bien au compte : src/server/histoires.ts).
  */
 export const STORY_COOKIE = "blush-story";
 
@@ -14,7 +14,7 @@ export function readStoryCookie(): string | undefined {
 export function writeStoryCookie(storyId: string | null) {
   if (typeof document === "undefined") return;
   document.cookie = storyId
-    ? `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; samesite=lax`
+    ? `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; max-age=31536000; samesite=lax`
     : `${STORY_COOKIE}=; path=/; max-age=0; samesite=lax`;
 }
 

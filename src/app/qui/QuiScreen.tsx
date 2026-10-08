@@ -1,9 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { startAnalysis } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { TypingDots } from "@/components/ui/FileInput";
 import { ChoiceTile, SelectedCheck } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
@@ -35,15 +39,37 @@ const COUPLE_GOALS: GoalTile[] = [
 const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS : GOALS);
 
 /* Écran 06 — Qui est qui, la devinette, ce que tu veux. */
-/** `captures` : la conv vient de captures, où l’utilisateur n’est que « Moi » (à droite) : on lui demande son prénom. */
-export function QuiScreen({ people, captures = false }: { people: [Person, Person]; captures?: boolean }) {
+/**
+ * `captures` : la conv vient de captures, où l’utilisateur n’est que « Moi » (à droite) : on lui demande son prénom.
+ * `connecte` : déjà un compte (une autre conv) : pas d’écran email, la lecture part d’ici.
+ */
+export function QuiScreen({ people, captures = false, connecte = false }: { people: [Person, Person]; captures?: boolean; connecte?: boolean }) {
   const router = useRouter();
   const [j, set] = useJourney();
+  const [busy, setBusy] = useState(false);
+  /* La lecture n’est pas partie : pourquoi, dit simplement (⚠ textes à valider) */
+  const [problem, setProblem] = useState<string | null>(null);
   const goals = goalsFor(j.guess);
   const ready = !!((captures ? j.prenom.trim() : j.me) && j.pronom && j.guess && j.goal);
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : "/importer/captures";
+
+  const next = async () => {
+    if (!connecte) return router.push("/email");
+    if (busy) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
+      set({ jobId });
+      router.push("/lecture");
+    } catch (e) {
+      const code = e instanceof ErreurApi ? e.code : "";
+      setProblem(code === "trop" ? "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain." : "La lecture n’a pas pu partir. Réessaie dans un instant.");
+      setBusy(false);
+    }
+  };
 
   return (
     <Screen
@@ -53,9 +79,16 @@ export function QuiScreen({ people, captures = false }: { people: [Person, Perso
       contentGap={12}
       head={<ScreenTitle size={30}>Qui es-tu dans cette conv ?</ScreenTitle>}
       footer={
-        <Button arrow disabled={!ready} onClick={() => router.push("/email")}>
-          Continuer
-        </Button>
+        <>
+          {problem && (
+            <p role="alert" className="m-0 mb-3 text-center text-[14px] font-extrabold text-[#D93036]">
+              {problem}
+            </p>
+          )}
+          <Button arrow={!busy} disabled={!ready || busy} aria-busy={busy} onClick={next}>
+            {busy ? <TypingDots color="#FFFFFF" label="BLUSH commence la lecture" /> : connecte ? "Lancer la lecture" : "Continuer"}
+          </Button>
+        </>
       }
     >
 

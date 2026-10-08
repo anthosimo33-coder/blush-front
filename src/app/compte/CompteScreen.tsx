@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
-import { cancelSubscription, deleteAccount, deleteStory, getAccount, setPaused, type Account } from "@/services/api";
+import { cancelSubscription, deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/mocks/daily";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -16,14 +16,15 @@ import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
-import type { Person } from "@/types";
+import type { ConvSummary, Person } from "@/types";
 
 type Confirm = "stop" | "keep" | "story" | "all" | null;
 
 /* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
 export type NomsDuCompte = { me: Person; other: Person; period: string };
 
-export function CompteScreen({ noms }: { noms: NomsDuCompte | null }) {
+/** `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`). */
+export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; convs?: ConvSummary[] }) {
   const router = useRouter();
   const { data: account } = useQuery("account", getAccount);
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -65,9 +66,28 @@ export function CompteScreen({ noms }: { noms: NomsDuCompte | null }) {
         {account?.email && <div className="mt-1.5 text-[14px] font-extrabold text-grey">{account.email}</div>}
       </div>
 
-      {/* Tes histoires : celle en cours, et de quoi en commencer une autre */}
+      {/* Tes histoires : celle en cours (ou toutes, s’il y en a plusieurs), et de quoi en commencer une autre */}
       <InsetGroup title="Tes histoires" id="histoires" className="mt-7">
-        {!account?.storyDeleted && noms && (
+        {convs.length > 1 &&
+          convs.map((c) => (
+            <InsetRow
+              key={c.storyId}
+              leading={
+                <Avatar tone="elle" size={36} fontSize={15} className="lift-pop">
+                  {c.person.initial}
+                </Avatar>
+              }
+              title={`${c.person.name} et toi`}
+              sub={c.current ? "Ouverte sur l’accueil" : c.lastLabel}
+              onClick={() => {
+                openConv(c.storyId);
+                invalidate("report", "account", "fiche", "question");
+                router.push("/app");
+              }}
+              chevron
+            />
+          ))}
+        {convs.length <= 1 && !account?.storyDeleted && noms && (
           <InsetRow
             leading={
               <Avatar tone="elle" size={36} fontSize={15} className="lift-pop">
@@ -185,7 +205,8 @@ export function CompteScreen({ noms }: { noms: NomsDuCompte | null }) {
                     : run(confirm === "story" ? deleteStory : deleteAccount, () => {
                         resetJourney();
                         invalidate("account", "report", "fiche", "question");
-                        router.push("/commencer");
+                        /* Une autre conv reste : elle s’ouvre à la place */
+                        router.push(confirm === "story" && convs.length > 1 ? "/app" : "/commencer");
                       })
               }
             >

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { getNomsDuCompte } from "@/services/serveur";
+import { getConvs, getNomsDuCompte } from "@/services/serveur";
 import { CompteScreen } from "./CompteScreen";
 
 export const metadata: Metadata = { title: "Mon compte" };
 
 export default async function Page() {
-  return <CompteScreen noms={await getNomsDuCompte()} />;
+  const [noms, convs] = await Promise.all([getNomsDuCompte(), getConvs()]);
+  return <CompteScreen noms={noms} convs={convs} />;
 }

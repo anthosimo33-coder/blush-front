@@ -1,11 +1,11 @@
 import { Email, ouvrirSession, verifierCode } from "@/server/auth";
 import { peutEntrer } from "@/server/env";
-import { effacerBrouillon, lireBrouillon, poserSession } from "@/server/cookies";
+import { effacerBrouillon, lireBrouillon, poserChoisie, poserSession } from "@/server/cookies";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { rattacherBrouillon } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 
-/** Le code reçu par email : bon, il ouvre la session et rattache la conv importée au compte. */
+/** Le code reçu par email : bon, il ouvre la session et rattache la conv importée au compte (c’est elle qui s’ouvre). */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   if (!(await sousLaLimite(`verif:${ipDe(req)}`, LIMITES.verificationParIp))) return erreur("trop", 429);
@@ -17,7 +17,8 @@ export async function POST(req: Request) {
   if (!utilisateur) return json({ ok: false });
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);
-  await rattacherBrouillon(utilisateur, await lireBrouillon());
+  const rattachee = await rattacherBrouillon(utilisateur, await lireBrouillon());
   await effacerBrouillon();
+  if (rattachee) await poserChoisie(rattachee);
   return json({ ok: true, email: utilisateur.email });
 }

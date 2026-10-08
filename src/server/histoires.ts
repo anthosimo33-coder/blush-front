@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { gunzipSync, strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
 import { detecterFormat, erreurImport, lire, participantsDe, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
@@ -147,28 +147,64 @@ export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: 
   return { id: ligne.id, meta, secret };
 }
 
-/** L’histoire ouverte : la plus récente du compte, sinon le brouillon du cookie. */
-export async function histoireOuverte(utilisateur: Utilisateur | null, secretBrouillon: string | undefined): Promise<Ligne | null> {
-  if (utilisateur) {
-    const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.userId, utilisateur.id)).orderBy(desc(schema.stories.createdAt)).limit(1);
+/** Les cookies qui désignent une histoire : le brouillon (une conv importée, pas encore lue), la conv choisie dans « Tes convs ». */
+export type Designation = { brouillon?: string; choisie?: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Une histoire du compte a-t-elle été lue (sa lecture lancée) ? Les tâches restent après coup : leur présence suffit. */
+const lue = sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.tasks.storyId} = ${schema.stories.id})`;
+
+/**
+ * L’histoire ouverte.
+ * - Le parcours d’import (`parcours`) regarde d’abord le brouillon : la conv qu’on est en train d’importer. Ailleurs
+ *   (l’accueil, le rapport…), une conv importée puis laissée en plan ne prend pas la place de celle qu’on suit.
+ * - Sinon, la conv du compte choisie dans « Tes convs » (si elle est bien à lui), ou la plus récente déjà lue.
+ * Sans compte : le brouillon seul.
+ */
+export async function histoireOuverte(utilisateur: Utilisateur | null, { brouillon, choisie }: Designation, { parcours = false } = {}): Promise<Ligne | null> {
+  if (brouillon && (parcours || !utilisateur)) {
+    const ligne = await brouillonDe(brouillon);
+    if (ligne || !utilisateur) return ligne;
+  }
+  if (!utilisateur) return null;
+  if (choisie && UUID.test(choisie)) {
+    const [ligne] = await db()
+      .select()
+      .from(schema.stories)
+      .where(and(eq(schema.stories.id, choisie), eq(schema.stories.userId, utilisateur.id)));
     if (ligne) return ligne;
   }
-  if (!secretBrouillon) return null;
-  const secret = secretBrouillon;
-  const [brouillon] = await db()
+  const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.userId, utilisateur.id)).orderBy(desc(lue), desc(schema.stories.createdAt)).limit(1);
+  return ligne ?? null;
+}
+
+/** Le brouillon d’un cookie, tant qu’il n’a pas de compte. */
+export async function brouillonDe(secret: string): Promise<Ligne | null> {
+  const [ligne] = await db()
     .select()
     .from(schema.stories)
     .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)));
-  return brouillon ?? null;
+  return ligne ?? null;
 }
 
-/** À la connexion : le brouillon du cookie devient l’histoire du compte. */
-export async function rattacherBrouillon(utilisateur: Utilisateur, secret: string | undefined): Promise<void> {
-  if (!secret) return;
-  await db()
+/** Les histoires du compte déjà lues, la plus récente d’abord (celles laissées avant la lecture n’y sont pas). */
+export async function histoiresDuCompte(userId: string): Promise<Ligne[]> {
+  return db().select().from(schema.stories).where(and(eq(schema.stories.userId, userId), lue)).orderBy(desc(schema.stories.createdAt));
+}
+
+/**
+ * Le brouillon du cookie devient une histoire du compte : à la connexion, ou quand un compte déjà connecté lance la
+ * lecture d’une nouvelle conv. Renvoie son identifiant (null : pas de brouillon).
+ */
+export async function rattacherBrouillon(utilisateur: Utilisateur, secret: string | undefined): Promise<string | null> {
+  if (!secret) return null;
+  const [ligne] = await db()
     .update(schema.stories)
     .set({ userId: utilisateur.id, draftToken: null, updatedAt: new Date() })
-    .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)));
+    .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)))
+    .returning({ id: schema.stories.id });
+  return ligne?.id ?? null;
 }
 
 export const metaDe = (ligne: Ligne) => dechiffrer<Meta>(ligne.meta);
