@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { setRecording } from "@/lib/sound";
+import { setForceSound, setRecording } from "@/lib/sound";
 import { Icon } from "@/components/ui/icons";
 
 /*
@@ -257,6 +257,74 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
         ))}
       </span>
       <span className="text-[13px] font-black tabular-nums text-white/90">{formatClock(clip.seconds)}</span>
+    </span>
+  );
+}
+
+/* Un seul vocal de BLUSH à la fois : en lancer un arrête celui qui jouait */
+let enCours: HTMLAudioElement | null = null;
+
+/**
+ * La réponse de BLUSH dite en vocal, dans sa bulle blanche : le bouton rose, l’onde (la partie écoutée en rose) et la
+ * durée. Comme une story, elle s’entend même quand le téléphone est en silencieux.
+ */
+export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; peaks: number[] } }) {
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [t, setT] = useState(0);
+
+  useEffect(
+    () => () => {
+      if (audio.current && enCours === audio.current) {
+        audio.current.pause();
+        setForceSound(false);
+      }
+    },
+    [],
+  );
+
+  const toggle = () => {
+    let a = audio.current;
+    if (!a) {
+      const el = new Audio(vocal.audio);
+      el.preload = "auto";
+      el.ontimeupdate = () => setT(el.currentTime);
+      el.onplay = () => setPlaying(true);
+      el.onpause = () => setPlaying(false);
+      el.onended = () => {
+        setPlaying(false);
+        setT(0);
+        setForceSound(false);
+      };
+      audio.current = el;
+      a = el;
+    }
+    if (a.paused) {
+      if (enCours && enCours !== a) enCours.pause();
+      enCours = a;
+      setForceSound(true);
+      a.play().catch(() => setPlaying(false));
+    } else a.pause();
+  };
+
+  const duree = vocal.duree || 1;
+  return (
+    <span className="flex min-w-[220px] items-center gap-2.5">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? "Mettre le vocal de BLUSH en pause" : `Écouter le vocal de BLUSH (${formatClock(Math.round(duree))})`}
+        className="flex size-[42px] shrink-0 items-center justify-center rounded-full shadow-[0_6px_14px_-6px_rgba(200,29,107,0.7)]"
+        style={{ background: "linear-gradient(160deg, #FF94C8 0%, #E8358A 60%, #C81D6B 100%)" }}
+      >
+        {playing ? <Icon name="pause" size={15} color="#FFFFFF" stroke={3.2} /> : <Icon name="play" size={15} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />}
+      </button>
+      <span aria-hidden="true" className="flex h-7 flex-1 items-center justify-between gap-[2px]">
+        {vocal.peaks.map((p, i) => (
+          <span key={i} className={cn("w-[3px] rounded-full", (i + 0.5) / vocal.peaks.length <= t / duree ? "bg-[#E8358A]" : "bg-[#D9D6CF]")} style={{ height: 5 + p * 22 }} />
+        ))}
+      </span>
+      <span className="shrink-0 text-[13px] font-black tabular-nums text-grey">{formatClock(playing || t > 0 ? t : Math.round(duree))}</span>
     </span>
   );
 }

@@ -98,7 +98,11 @@ export function fournisseurFactice(req: Requete): unknown {
       niveau: null,
       questions: null,
     };
-  if (req.tache === "10-chat")
+  if (req.tache === "10-chat") {
+    /* Le vocal : « parle-moi en vocal » l’active, « écris-moi » l’arrête ; <vocal> dit que la réponse part en vocal */
+    const dernier = demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1) ?? "";
+    const modeVocal = dernier.includes("parle-moi en vocal") ? "activer" : dernier.includes("écris-moi") ? "arreter" : null;
+    const enVocal = modeVocal === "activer" || (modeVocal !== "arreter" && demande.includes("<vocal>"));
     return {
       alerte: null,
       type: demande.includes("on s’est vus") ? "nouvelle" : "question",
@@ -114,7 +118,15 @@ export function fournisseurFactice(req: Requete): unknown {
       reaction: null,
       pourquoi: null,
       niveau_atteint: null,
+      mode_vocal: modeVocal,
+      dit: enVocal
+        ? [
+            { jeu: "in disbelief", texte: "Attends, elle te cherche, là." },
+            { jeu: "laughing", texte: "Et toi, tu fais le mec occupé. Tu lui as répondu quoi ?" },
+          ]
+        : null,
     };
+  }
   if (req.tache === "07-memoire")
     return {
       alerte: null,

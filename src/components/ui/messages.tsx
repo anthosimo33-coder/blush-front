@@ -37,14 +37,21 @@ export function Bubble({
  * BLUSH écrit : sa bulle (le logo) arrive d’un bond, respire doucement, et ses trois perles s’allument
  * l’une après l’autre, comme les points de Messages, en rose (globals.css). `leaving` : elle se replie avant la réponse.
  */
-export function BlushTyping({ label, leaving = false }: { label: string; leaving?: boolean }) {
+export function BlushTyping({ label, leaving = false, vocal = false }: { label: string; leaving?: boolean; vocal?: boolean }) {
   return (
     <span role="status" className="block">
       <span className="sr-only">{label}</span>
-      <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="block">
+      <span aria-hidden="true" data-typing={leaving ? "out" : ""} className="flex items-end gap-2">
         <span className="block">
           <BubbleLogo size={62} animated layered />
         </span>
+        {/* La réponse part en vocal : « BLUSH enregistre », comme dans une messagerie */}
+        {vocal && (
+          <span className="mb-2 flex h-10 items-center gap-2 rounded-[20px] bg-white pl-3 pr-3.5 shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]">
+            <span data-vocal-rec="" className="size-[9px] rounded-full bg-[#E5484D]" />
+            <span className="text-[14px] font-black text-ink">enregistre un vocal…</span>
+          </span>
+        )}
       </span>
     </span>
   );
