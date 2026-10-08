@@ -3,13 +3,13 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executerChaine, type DonneesMemoire, type DonneesRapport } from "@/server/analyse";
 import { historique, repondre } from "@/server/chat";
-import { dechiffrer } from "@/server/chiffrement";
+import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, ErreurImport, importer as importerLu, metaDe, rattacherBrouillon, storyAffichee } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { planifier } from "@/server/taches";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { audioDe, noterEcoute, statsVocal, vocalPret } from "@/server/vocal";
+import { audioDe, noterEcoute, statsVocal, vocalAJour, vocalPret, type DonneesVocal } from "@/server/vocal";
 
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
 const importer = async (f: File) => importerLu(await depuisFichier(f));
@@ -89,6 +89,15 @@ describe("de l’import à la mémoire", () => {
     expect(fin.conv).toBeNull();
     expect(fin.convPurgedAt).not.toBeNull();
     expect(metaDe(fin).moi).toBe(moi);
+
+    /* Une nouvelle version du script : le vocal se refait (la conv effacée, sur le rapport et la mémoire), à une nouvelle adresse */
+    const ancien = dechiffrer<DonneesVocal>(brut.data);
+    await db().update(schema.vocals).set({ data: chiffrer({ ...ancien, version: 1 }) }).where(eq(schema.vocals.storyId, id));
+    expect(await vocalAJour(id)).toBe(false);
+    await planifier(id, "vocal");
+    await executerChaine(id);
+    expect(await vocalAJour(id)).toBe(true);
+    expect((await vocalPret(id))?.audio).not.toBe(vocal?.audio);
 
     /* Le chat, sur la mémoire : des bulles avec leurs preuves, l’échange gardé, la mémoire mise à jour s’il y a du neuf */
     const { reponse, majMemoire } = await repondre(fin, memoire, "on s’est vus hier, c’était trop bien");
