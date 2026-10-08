@@ -404,6 +404,20 @@ export async function cancelSubscription(): Promise<void> {
   mockServer.set({ cancelled: true });
 }
 
+/**
+ * Le lien public du verdict (/v/<id>) : le verdict seul, prénoms masqués, jamais la conv. Toujours le même lien
+ * tant qu’on ne le désactive pas. En démo : le lien « demo ».
+ */
+export async function creerLienPartage(): Promise<string> {
+  const id = BACKEND ? await reel.creerLienPartage() : (await delay(300), "demo");
+  return `${window.location.origin}/v/${id}`;
+}
+
+export async function desactiverLienPartage(): Promise<void> {
+  if (BACKEND) return reel.desactiverLienPartage();
+  await delay(300);
+}
+
 /** Supprime l’histoire : le rapport, la fiche et les captures. */
 export async function deleteStory(): Promise<void> {
   if (BACKEND) return void (await reel.deleteStory());

@@ -26,6 +26,7 @@ import { useJourney } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
+import { PartageEtConfidentialite } from "./Partage";
 import { SoberReport } from "./SoberReport";
 
 /** Où tu t’étais arrêté (ce navigateur seulement). */
@@ -175,20 +176,6 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       document.getElementById(`chapitre-${n}`)?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
     });
   }, []);
-
-  const share = async () => {
-    /* Prénoms masqués dans tout ce qui se partage */
-    const text = `${report.verdict.emoji} ${report.verdict.title} ${report.verdict.subtitle}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "BLUSH", text });
-        return;
-      }
-    } catch {
-      return;
-    }
-    if (await copyText(text)) setToast("Copié.");
-  };
 
   const renderQuestion = (b: Extract<ChapterBlock, { kind: "question" }>) => (
     <Card className="flex flex-col gap-2 p-3.5">
@@ -354,6 +341,9 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </div>
       </Card>
 
+      {/* Partager son verdict (le verdict seul, prénoms masqués), et ce que BLUSH fait de ta conv */}
+      <PartageEtConfidentialite verdict={report.verdict} />
+
       {free.map((c, i) => (
         <Fragment key={c.number}>
           {i > 0 && <ChapterRule />}
@@ -370,16 +360,6 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
               </>
             )}
           </ChapterSection>
-          {c.number === 1 && (
-            <button
-              type="button"
-              onClick={share}
-              className="lift lift-sm inline-flex h-10 items-center gap-2 self-start rounded-[20px] bg-white px-4 text-[14px] font-black text-ink shadow-soft"
-            >
-              <Icon name="share" size={16} color="#121214" stroke={2.4} />
-              Partager mon verdict
-            </button>
-          )}
         </Fragment>
       ))}
 
