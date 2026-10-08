@@ -23,6 +23,8 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
+  /* Les images des liens partagés (/v/…) en adresse complète : celle du site en ligne, l’adresse locale en dev */
+  metadataBase: process.env.VERCEL ? new URL(process.env.BLUSH_URL ?? "https://www.askblush.com") : undefined,
   title: { default: "BLUSH", template: "%s · BLUSH" },
   description: "Ta conv en dit plus que tu crois.",
   robots: { index: false },
