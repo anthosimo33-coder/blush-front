@@ -1,0 +1,23 @@
+import type { Metadata } from "next";
+import { ViewTransition } from "react";
+import { redirect } from "next/navigation";
+import { getConvs } from "@/services/serveur";
+import { ConvsScreen } from "./ConvsScreen";
+
+export const metadata: Metadata = { title: "Tes convs" };
+
+/*
+ * Proposition « plusieurs convs » (démo : ?convs=plusieurs). Une seule conv : pas de liste, on va droit à l’accueil.
+ * La liste est au-dessus de l’accueil : il arrive par la droite quand on choisit une conv, et y repart au retour.
+ */
+export default async function Page({ searchParams }: PageProps<"/app/convs">) {
+  const convs = await getConvs((await searchParams).convs);
+  if (convs.length < 2) redirect("/app");
+  return (
+    <ViewTransition enter={{ "nav-back": "pop-in", default: "none" }} exit={{ "nav-forward": "push-out", default: "none" }} default="none">
+      <div className="[background:var(--paper-light)]">
+        <ConvsScreen convs={convs} />
+      </div>
+    </ViewTransition>
+  );
+}
