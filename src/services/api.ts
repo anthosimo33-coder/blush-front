@@ -153,6 +153,15 @@ export async function startAnalysis(
   return { jobId: "job-001" };
 }
 
+/**
+ * L’écran de lecture : la lecture de la conv ouverte, lancée depuis « Qui es-tu ? » ou à relancer. Avec le back-end, le
+ * parcours du navigateur ne part pas : « Qui es-tu ? » est en base (sinon, erreur « qui »), et des réponses d’une autre
+ * fois ne lancent pas une autre conv. Démo : comme startAnalysis.
+ */
+export async function resumeAnalysis(input: Parameters<typeof startAnalysis>[0], opts: { restart?: boolean } = {}): Promise<{ jobId: string }> {
+  return BACKEND ? reel.resumeAnalysis() : startAnalysis(input, opts);
+}
+
 export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgress> {
   if (BACKEND) return reel.getAnalysisProgress();
   void jobId;

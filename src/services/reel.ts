@@ -120,6 +120,8 @@ export const reel = {
   sendLoginCode: (email: string) => appel<{ email: string }>("/api/auth/code", envoi("POST", { email })),
   verifyLoginCode: (email: string, code: string) => appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code })),
   startAnalysis: (input: { me: string; guess: Guess; goal: Goal; pronom: "il" | "elle"; prenom?: string }) => appel<{ jobId: string }>("/api/analyse", envoi("POST", input)),
+  /** Sans « Qui es-tu ? » : la lecture de la conv qu’on suit (lancée, ou à relancer). */
+  resumeAnalysis: () => appel<{ jobId: string }>("/api/analyse", envoi("POST", {})),
   getAnalysisProgress: () => appel<AnalysisProgress>("/api/analyse"),
   getReport: () => appel<ReportPayload>("/api/rapport"),
   /** Un moment de l’écoute du vocal (A/B test des voix). Sans réponse attendue : un échec ne gêne pas l’écoute. */

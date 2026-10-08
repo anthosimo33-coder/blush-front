@@ -1,11 +1,13 @@
 "use client";
 
 import { BACKEND } from "@/services/mode";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
 import { play } from "@/lib/sound";
-import { getAnalysisProgress, startAnalysis } from "@/services/api";
+import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
 import { READING_STEPS } from "@/mocks/story";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -26,6 +28,7 @@ type Phase = "reading" | "leaving" | "done";
  * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ».
  */
 export function LectureScreen({ total, restart }: { total: number; restart: boolean }) {
+  const router = useRouter();
   const reduced = useReducedMotion();
   const [p, setP] = useState<AnalysisProgress>(START);
   const [phase, setPhase] = useState<Phase>("reading");
@@ -51,8 +54,15 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
       const cur = readJourney();
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
-      const lance = await startAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(() => null);
+      const lance = await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
+        (e: unknown) => (e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : null),
+      );
       if (!alive) return;
+      /* La conv ouverte n’est pas passée par « Qui es-tu ? » (la page le vérifie déjà avant) : rien à relancer, c’est là qu’on va */
+      if (lance === "qui") {
+        router.replace("/qui");
+        return;
+      }
       if (!lance) {
         setFailed(true);
         return;
@@ -94,7 +104,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       clearTimeout(timer);
     };
     /* Lancé à l’arrivée sur l’écran, puis à chaque « Relancer » */
-  }, [run]);
+  }, [run, router]);
 
   /* Chaque découverte, un toucher un cran plus haut ; la coche, la signature sur un accord chaud */
   const found = p.discoveries.length;

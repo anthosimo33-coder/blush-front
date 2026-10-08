@@ -9,7 +9,7 @@ import { demoConvs } from "@/mocks/stories";
 import { PEOPLE, STORY } from "@/mocks/story";
 import { historique } from "@/server/chat";
 import { contexteRequete, convsDe, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
-import { metaDe, storyAffichee } from "@/server/histoires";
+import { metaDe, quiRempli, storyAffichee } from "@/server/histoires";
 import { currentStoryId } from "./session.server";
 
 /*
@@ -20,6 +20,16 @@ import { currentStoryId } from "./session.server";
 /** `parcours` : les écrans de l’import, qui montrent la conv en train d’être importée (voir histoireOuverte). */
 export async function getStory(storyId?: string, { parcours = false } = {}): Promise<Story | null> {
   return BACKEND ? storyCourante(parcours) : demo.getStory(storyId);
+}
+
+/**
+ * La conv ouverte attend encore « Qui es-tu ? » : importée, puis laissée avant (et ouverte par une connexion, par
+ * exemple). Sa lecture ne peut pas partir sans : l’écran de lecture renvoie à /qui. Démo : jamais.
+ */
+export async function quiAttendu(): Promise<boolean> {
+  if (!BACKEND) return false;
+  const { story } = await contexteRequete();
+  return !!story && !quiRempli(metaDe(story));
 }
 
 /** Déjà connecté : une nouvelle conv passe alors de « Qui es-tu ? » à la lecture, sans l’écran email. Démo : non. */

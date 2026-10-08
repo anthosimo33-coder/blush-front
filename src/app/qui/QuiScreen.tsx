@@ -53,7 +53,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const ready = !!((captures ? j.prenom.trim() : j.me) && j.pronom && j.guess && j.goal);
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
-  const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : "/importer/captures";
+  /* Arrivé sans le parcours de cet onglet (importée dans un autre, puis ouverte par une connexion) : d’après la conv */
+  const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : captures ? "/importer/captures" : "/importer/ok";
 
   const next = async () => {
     if (!connecte) return router.push("/email");
