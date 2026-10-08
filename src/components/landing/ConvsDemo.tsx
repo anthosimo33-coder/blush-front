@@ -11,7 +11,7 @@ import { Icon } from "@/components/ui/icons";
 import { Bubble, ConfidenceLine } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import type { LandingConv } from "@/types";
-import { APP_NAME, CTA } from "./parts";
+import { APP_NAME, useCta } from "./parts";
 
 /* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
 const ROWS = [0, 1, 2].map((i) => ({
@@ -113,6 +113,7 @@ function ConvAvatar({ conv, size }: { conv: LandingConv; size: number }) {
  * Grand écran : « 1 Le verdict », comme le chapitre 1 du rapport.
  */
 function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => void }) {
+  const cta = useCta();
   return (
     /* Écrans très courts (iPhone SE 2016) : espacements, carte et bouton se resserrent encore pour tout faire tenir */
     <div className="flex flex-col gap-2.5 lg:gap-4 [@media(max-height:600px)]:gap-1.5">
@@ -157,8 +158,8 @@ function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => vo
       <PlayCard title="Ton prochain pas" className="[@media(max-height:600px)]:py-2.5">
         {conv.next}
       </PlayCard>
-      <ButtonLink href={CTA} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
-        Analyser ma conv
+      <ButtonLink href={cta.href} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
+        {cta.label}
       </ButtonLink>
       <p className="m-0 hidden text-center text-[13px] font-extrabold text-grey lg:block">Exemple fictif. Ton rapport, lui, part de vos vrais messages.</p>
     </div>

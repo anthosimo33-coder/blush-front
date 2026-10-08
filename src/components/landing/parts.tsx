@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { TESTIMONIAL_SLOTS, TESTIMONIALS } from "@/mocks/landing";
 import { QUESTION_ANSWER, REPORT } from "@/mocks/report";
@@ -16,6 +16,21 @@ import type { AppKind, Testimonial } from "@/types";
 /* Les morceaux de la landing. */
 
 export const CTA = "/commencer";
+
+/**
+ * Qui revient : connecté, avec une conv déjà lue (src/app/retour). La landing l’envoie alors vers son accueil plutôt
+ * que vers le parcours. `autre` : le prénom de l’autre, une fois « Qui es-tu ? » rempli.
+ */
+export type Retour = { autre: string | null } | null;
+const RetourContext = createContext<Retour>(null);
+
+/** Le bouton principal de la landing, et la ligne dessous : analyser sa conv, ou la retrouver. */
+export function useCta() {
+  const retour = useContext(RetourContext);
+  return retour
+    ? { href: "/app", label: "Retrouver ma conv", note: retour.autre ? `Ta conv avec ${retour.autre} t’attend` : "Ta conv t’attend", header: "Ouvrir BLUSH" }
+    : { href: CTA, label: "Analyser ma conv", note: "Aperçu gratuit · Sans mot de passe", header: "Commencer" };
+}
 export const APP_NAME: Record<AppKind, string> = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" };
 
 /** Les blocs apparaissent en douceur au défilement (rien ne bouge si l’appareil demande moins d’animations). */
@@ -63,15 +78,16 @@ export function Container({ children, className }: { children: ReactNode; classN
 }
 
 export function CtaButton({ className }: { className?: string }) {
+  const cta = useCta();
   return (
     <Link
-      href={CTA}
+      href={cta.href}
       className={cn(
         "arrow-nudge lift lift-ink lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-[18px] font-black text-white no-underline shadow-ink [background:var(--btn-ink-bg)]",
         className,
       )}
     >
-      Analyser ma conv
+      {cta.label}
       <Icon name="arrow" size={19} color="#FFFFFF" stroke={2.6} className="arrow" />
     </Link>
   );
@@ -90,16 +106,25 @@ export function SectionHead({ id, kicker, title, sub, align = "center" }: { id: 
   );
 }
 
-/** L’habillage d’une landing : la barre du haut, le contenu, le pied de page. */
-export function LandingFrame({ children }: { children: ReactNode }) {
+/** L’habillage d’une landing : la barre du haut, le contenu, le pied de page. `retour` : qui revient (voir useCta). */
+export function LandingFrame({ retour = null, children }: { retour?: Retour; children: ReactNode }) {
+  return (
+    <RetourContext value={retour}>
+      <Frame>{children}</Frame>
+    </RetourContext>
+  );
+}
+
+function Frame({ children }: { children: ReactNode }) {
+  const cta = useCta();
   return (
     <div className="min-h-dvh overflow-x-clip">
       <header className="sticky top-0 z-40 border-b border-[rgba(17,17,20,0.05)] bg-[rgba(244,242,237,0.82)] backdrop-blur-xl">
         <Container className="flex h-16 items-center justify-between">
           <Logo size={30} fontSize={22} href="/" />
           {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
-          <Link href={CTA} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
-            Commencer
+          <Link href={cta.href} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
+            {cta.header}
             <Icon name="arrow" size={15} color="#121214" stroke={2.6} className="arrow" />
           </Link>
         </Container>
@@ -112,8 +137,8 @@ export function LandingFrame({ children }: { children: ReactNode }) {
             <span className="text-[13px] font-extrabold text-grey">© 2026</span>
           </div>
           <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-extrabold">
-            <Link href={CTA} className="text-soft no-underline hover:text-ink">
-              Analyser ma conv
+            <Link href={cta.href} className="text-soft no-underline hover:text-ink">
+              {cta.label}
             </Link>
             <Link href="/compte" className="text-soft no-underline hover:text-ink">
               Mon compte
@@ -527,6 +552,7 @@ function FactTile({ index, children }: { index: number; children: ReactNode }) {
 
 /* ———— Le dernier appel ———— */
 export function FinalCta() {
+  const cta = useCta();
   return (
     <section className="pb-20 pt-6 lg:pb-28 lg:pt-10">
       <Container>
@@ -534,7 +560,7 @@ export function FinalCta() {
           <BubbleLogo size={68} animated />
           <h2 className="m-0 mt-6 max-w-[640px] text-[36px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-[56px]">Ta conv a déjà la réponse.</h2>
           <CtaButton className="mt-8" />
-          <span className="mt-3.5 text-[14px] font-extrabold text-grey">Aperçu gratuit · Sans mot de passe</span>
+          <span className="mt-3.5 text-[14px] font-extrabold text-grey">{cta.note}</span>
         </div>
       </Container>
     </section>

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Importe ta conv. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.",
 };
 
-/* La landing : son bouton « Analyser ma conv » mène au parcours (/commencer). */
+/* La landing : son bouton « Analyser ma conv » mène au parcours (/commencer). Qui revient connecté voit src/app/retour. */
 export default function Home() {
   return <Landing />;
 }

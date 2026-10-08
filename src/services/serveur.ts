@@ -58,3 +58,12 @@ export async function getNomsDuCompte(): Promise<{ me: Story["participants"][num
   const moi = meta.moi ?? 0;
   return { me: affichee.participants[moi], other: affichee.participants[1 - moi], period: affichee.period };
 }
+
+/** Sur la landing, qui revient : connecté, avec une histoire (null sinon), et le prénom de l’autre. Démo : Sophie. */
+export async function getRetour(): Promise<{ autre: string | null } | null> {
+  if (!BACKEND) return { autre: PEOPLE.sophie.name };
+  const { utilisateur, story } = await contexteRequete();
+  if (!utilisateur || !story) return null;
+  const meta = metaDe(story);
+  return { autre: meta.moi == null ? null : meta.participants[1 - meta.moi].prenom };
+}
