@@ -194,6 +194,21 @@ export async function histoiresDuCompte(userId: string): Promise<Ligne[]> {
 }
 
 /**
+ * À la connexion, le brouillon de ce navigateur. Un compte qui n’a encore aucune conv lue le reçoit, et c’est lui qui
+ * s’ouvre : son identifiant revient. Sinon il reste un brouillon (null) : une conv importée puis laissée avant « Qui es-tu ? »
+ * ne prend pas la place de celle qu’on suit. Le parcours d’import la retrouve, et sa lecture la rattache (POST /api/analyse).
+ */
+export async function brouillonALaConnexion(utilisateur: Utilisateur, secret: string | undefined): Promise<string | null> {
+  if (!secret) return null;
+  const [dejaLue] = await db()
+    .select({ id: schema.stories.id })
+    .from(schema.stories)
+    .where(and(eq(schema.stories.userId, utilisateur.id), lue))
+    .limit(1);
+  return dejaLue ? null : rattacherBrouillon(utilisateur, secret);
+}
+
+/**
  * Le brouillon du cookie devient une histoire du compte : à la connexion, ou quand un compte déjà connecté lance la
  * lecture d’une nouvelle conv. Renvoie son identifiant (null : pas de brouillon).
  */
@@ -211,9 +226,13 @@ export const metaDe = (ligne: Ligne) => dechiffrer<Meta>(ligne.meta);
 export const contexteDe = (ligne: Ligne) => (ligne.context ? dechiffrer<Contexte>(ligne.context) : null);
 export const convDe = (ligne: Ligne) => (ligne.conv ? dechiffrer<string>(ligne.conv) : null);
 
+/** « Qui es-tu ? » est rempli (en base) : la lecture peut partir sans le parcours du navigateur. */
+export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> =>
+  meta.moi != null && !!meta.pronom && !!meta.devinette && !!meta.objectif;
+
 /** Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom opposé (BLUSH : un garçon et une fille). */
 export function histoireDe(meta: Meta): Histoire {
-  if (meta.moi == null || !meta.pronom || !meta.devinette || !meta.objectif) throw new Error("« Qui es-tu ? » n’est pas rempli");
+  if (!quiRempli(meta)) throw new Error("« Qui es-tu ? » n’est pas rempli");
   const [moi, autre] = [meta.participants[meta.moi], meta.participants[1 - meta.moi]];
   return {
     utilisateur: { prenom: moi.prenom, pronom: meta.pronom, nomExport: moi.nom },
