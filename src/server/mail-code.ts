@@ -2,7 +2,7 @@
  * Le mail du code de connexion, aux couleurs de BLUSH : la bulle, le code dans un liseré rose (comme le champ
  * au focus), une version sombre pour Apple Mail. En tableaux et en styles en ligne : ce que tous les mails lisent.
  * Gmail ignore la police et le mode sombre déclarés : il retombe sur une police système et ses propres couleurs.
- * ⚠ Textes à valider.
+ * Textes validés le 8 octobre.
  */
 
 const POLICE = "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
