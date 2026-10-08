@@ -6,6 +6,7 @@ import {
   createContext,
   memo,
   use,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -23,12 +24,13 @@ import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
 import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { modeVocalChat, sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
+import { getChatHistory, modeVocalChat, sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
+import { BACKEND } from "@/services/mode";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
-import { FileInput } from "@/components/ui/FileInput";
+import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { marquerChatOuvert } from "../rapport/ChatBubble";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
@@ -138,6 +140,26 @@ type Msg = (
 ) &
   Stamp;
 
+/** Un échange de l’historique (back-end : avec son id et sa vraie heure ; aperçu : sans). */
+type EchangeScript = { id?: number; mine?: string; answer: BlushAnswer; at?: number };
+
+/**
+ * Les échanges de l’historique, en messages de la conv. Avec un id (back-end), leurs identifiants en dérivent :
+ * stables d’un chargement à l’autre, et les morceaux plus anciens se posent devant sans doublon.
+ */
+function echangesEnMsgs(script: EchangeScript[]): Msg[] {
+  return script.flatMap((ex, k): Msg[] => {
+    const id = ex.id ? -1_000_000 - 2 * ex.id : -100 - 2 * k;
+    return [
+      /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
+      ...(ex.mine ? [{ id, from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
+      { id: id - 1, from: "blush" as const, result: ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
+    ];
+  });
+}
+/** Les messages de l’historique (pas ceux de la visite, ni l’intro). */
+const DE_L_HISTORIQUE = (m: Msg) => m.id <= -1_000_000;
+
 /** Un message sans son identifiant (il est attribué au moment de l’ajouter à la conv). */
 type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
 
@@ -186,6 +208,7 @@ export function HomeScreen({
   answers = {},
   liveUrl,
   script = [],
+  plusAnciens = false,
   contact,
   motion = true,
   arrive = false,
@@ -198,7 +221,9 @@ export function HomeScreen({
   /** En local : l’adresse qui pose ce que tu écris au vrai chat (l’aperçu). */
   liveUrl?: string;
   /** En local : des échanges déjà joués, posés dans la conv dès l’ouverture (l’aperçu des vraies réponses). */
-  script?: { mine?: string; answer: BlushAnswer; at?: number }[];
+  script?: EchangeScript[];
+  /** Back-end : l’historique a des échanges plus anciens que ceux de `script` (chargés en remontant la conv). */
+  plusAnciens?: boolean;
   contact: HomeContact;
   motion?: boolean;
   arrive?: boolean;
@@ -209,14 +234,15 @@ export function HomeScreen({
 }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
-  const [msgs, setMsgs] = useState<Msg[]>(() => [
-    ...INTRO,
-    ...script.flatMap((ex, k): Msg[] => [
-      /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
-      ...(ex.mine ? [{ id: -100 - 2 * k, from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
-      { id: -101 - 2 * k, from: "blush", result: ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
-    ]),
-  ]);
+  const [msgs, setMsgs] = useState<Msg[]>(() => [...INTRO, ...echangesEnMsgs(script)]);
+  /* L’historique se charge par morceaux : y en a-t-il de plus anciens, et le plus ancien déjà affiché */
+  const [plus, setPlus] = useState(plusAnciens);
+  const [anciens, setAnciens] = useState(false);
+  const plusAncien = useRef<number | null>(script[0]?.id ?? null);
+  const chargement = useRef(false);
+  const derniers = useRef(msgs);
+  const devant = useRef<{ desk: boolean; h: number; y: number } | null>(null);
+  const haut = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
   const [details, setDetails] = useState(false);
@@ -277,6 +303,14 @@ export function HomeScreen({
     shown.current = msgs;
     const box = thread.current;
     if (!box) return;
+    /* Des messages plus anciens posés devant : on garde la conv là où on la lisait */
+    const d = devant.current;
+    if (d) {
+      devant.current = null;
+      if (d.desk) box.scrollTop = box.scrollHeight - d.h + d.y;
+      else window.scrollTo({ top: document.documentElement.scrollHeight - d.h + d.y });
+      return;
+    }
     const desk = window.matchMedia(DESKTOP).matches;
     const reduced = prefersReducedMotion();
     const toBottom = (behavior: ScrollBehavior) =>
@@ -295,6 +329,92 @@ export function HomeScreen({
   }, [msgs, motion]);
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+
+  useEffect(() => {
+    derniers.current = msgs;
+  }, [msgs]);
+
+  /*
+   * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
+   * (sans les derniers échanges), et un onglet laissé ouvert peut dater. Rien n’est remplacé si la visite a déjà
+   * ajouté des messages (les siens sont les plus récents).
+   */
+  useEffect(() => {
+    if (!BACKEND) return;
+    let fini = false;
+    const recharger = () =>
+      getChatHistory()
+        .then((h) => {
+          if (fini || derniers.current.some((m) => m.id > 0)) return;
+          const affiches = derniers.current.filter(DE_L_HISTORIQUE).map((m) => m.id);
+          const frais = echangesEnMsgs(h.echanges);
+          /* Le même historique que celui affiché : rien ne bouge */
+          if (affiches.join() === frais.map((m) => m.id).join()) return;
+          plusAncien.current = h.echanges[0]?.id ?? null;
+          setPlus(h.plus);
+          setMsgs([...INTRO, ...frais]);
+          /* Le mode vocal suit la réponse la plus récente */
+          setModeVocal(!!h.echanges.at(-1)?.answer.modeVocal);
+        })
+        .catch(() => {});
+    recharger();
+    /* Revenu sur la page par le bouton retour du navigateur (la page gardée en mémoire) */
+    const auRetour = (e: PageTransitionEvent) => {
+      if (e.persisted) recharger();
+    };
+    window.addEventListener("pageshow", auRetour);
+    return () => {
+      fini = true;
+      window.removeEventListener("pageshow", auRetour);
+    };
+  }, []);
+
+  /** Les échanges d’avant le plus ancien affiché, posés devant (la conv garde sa place). */
+  const chargerAnciens = useCallback(async () => {
+    const avant = plusAncien.current;
+    if (!BACKEND || !avant || chargement.current) return;
+    chargement.current = true;
+    setAnciens(true);
+    try {
+      const h = await getChatHistory(avant);
+      if (h.echanges.length) {
+        plusAncien.current = h.echanges[0].id;
+        const box = thread.current;
+        const desk = window.matchMedia(DESKTOP).matches;
+        devant.current = desk && box ? { desk, h: box.scrollHeight, y: box.scrollTop } : { desk: false, h: document.documentElement.scrollHeight, y: window.scrollY };
+        setMsgs((prev) => {
+          const deja = new Set(prev.map((m) => m.id));
+          const intro = prev.filter((m) => "intro" in m);
+          return [...intro, ...echangesEnMsgs(h.echanges).filter((m) => !deja.has(m.id)), ...prev.filter((m) => !("intro" in m))];
+        });
+      }
+      setPlus(h.plus && h.echanges.length > 0);
+    } catch {
+      /* Réseau coupé : le bouton reste là, on réessaiera */
+    } finally {
+      chargement.current = false;
+      setAnciens(false);
+    }
+  }, []);
+
+  /* En remontant tout en haut de la conv, les échanges plus anciens arrivent d’eux-mêmes (pas dès l’ouverture) */
+  useEffect(() => {
+    const el = haut.current;
+    if (!BACKEND || !plus || !el) return;
+    let pret = false;
+    const t = window.setTimeout(() => (pret = true), 1000);
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting && pret) void chargerAnciens();
+      },
+      { rootMargin: "240px 0px 0px 0px" },
+    );
+    obs.observe(el);
+    return () => {
+      window.clearTimeout(t);
+      obs.disconnect();
+    };
+  }, [plus, chargerAnciens]);
 
   useHeaderCollapse(head, motion);
 
@@ -548,6 +668,18 @@ export function HomeScreen({
                 motion && "overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden",
               )}
             >
+              {/* L’historique plus ancien : il arrive en remontant, ou d’un toucher */}
+              {plus && (
+                <div ref={haut} className="flex min-h-11 justify-center pb-4">
+                  {anciens ? (
+                    <TypingDots label="Chargement des messages plus anciens" />
+                  ) : (
+                    <button type="button" onClick={() => void chargerAnciens()} className="rounded-full px-3 text-[13px] font-black text-grey transition-colors hover:text-ink">
+                      Voir les messages plus anciens
+                    </button>
+                  )}
+                </div>
+              )}
               <Thread msgs={msgs} opened={opened} />
             </div>
 

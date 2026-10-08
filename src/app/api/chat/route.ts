@@ -85,9 +85,10 @@ export async function POST(req: Request) {
   }
 }
 
-/** L’historique, pour réafficher la conv avec BLUSH. */
-export async function GET() {
+/** L’historique, pour réafficher la conv avec BLUSH : les derniers échanges, ou ceux d’avant `?avant=` (un id d’échange). */
+export async function GET(req: Request) {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
-  return json(story ? await historique(story.id) : []);
+  const avant = Number(new URL(req.url).searchParams.get("avant"));
+  return json(story ? await historique(story.id, Number.isInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
 }

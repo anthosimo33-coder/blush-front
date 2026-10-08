@@ -30,7 +30,7 @@ import { chatVocalDemo, vocalDemo } from "@/mocks/vocal";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
-import { ErreurApi, reel, type AvanceVideo } from "./reel";
+import { ErreurApi, reel, type AvanceVideo, type HistoriqueChat } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
@@ -251,7 +251,13 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
  * tout le reste (texte collé, captures, export) est lu comme sa réponse à elle.
  */
 export type { BlushAnswer };
-export type { AvanceVideo };
+export type { AvanceVideo, HistoriqueChat };
+
+/** L’historique du chat (back-end) : les derniers échanges, ou ceux d’avant `avant`. En démo, il n’y en a pas. */
+export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
+  if (BACKEND) return reel.historiqueChat(avant);
+  return { echanges: [], plus: false };
+}
 
 /** Les questions toutes prêtes du chat (celles que promet la landing). */
 export async function getQuickQuestions(storyId?: string): Promise<string[]> {
