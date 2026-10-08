@@ -8,6 +8,7 @@ import { appliquerMaj, citees, rendreNouveau, type EditionsFiche, type Echange }
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie07, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
+import { trouvailles } from "@prompts/lib/trouvailles";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } from "./histoires";
@@ -96,9 +97,12 @@ function suivreAvance(tacheId: string, calcul: (a: Avance) => number): (a: Avanc
 
 async function verdict(story: Ligne, t: Tache) {
   const { h, lu, rendu } = relire(story);
+  const chiffres = chiffresDe(h, lu.messages);
+  /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
+  const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t, trouvailles: trouvailles(chiffres, h, lu.messages) };
+  await db().update(schema.stories).set({ context: chiffrer(contexte), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
   const sortie = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
-  const donnees: DonneesVerdict = { sortie, scores: scores(chiffresDe(h, lu.messages)) };
-  const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t };
+  const donnees: DonneesVerdict = { sortie, scores: scores(chiffres) };
   await db()
     .insert(schema.verdicts)
     .values({ storyId: story.id, data: chiffrer(donnees) })

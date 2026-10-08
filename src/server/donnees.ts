@@ -58,12 +58,9 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
   };
 }
 
-/** Pendant la lecture : les mots qui reviennent le plus, calculés par le code (« « libanais » ×9 »). */
+/** Pendant la lecture : les trouvailles calculées par le code (lib/trouvailles.ts), une de plus tous les 20 %. */
 function decouvertes(story: Ligne, p: number): string[] {
-  const ctx = contexteDe(story);
-  const ligne = ctx?.chiffres.split("\n").find((l) => l.startsWith("mots qui reviennent"));
-  const mots = [...(ligne?.matchAll(/« ([^»]{5,}) » ×(\d+)/g) ?? [])].map((m) => `« ${m[1]} » × ${m[2]}`);
-  return mots.slice(0, Math.min(3, Math.floor(p * 4)));
+  return (contexteDe(story)?.trouvailles ?? []).slice(0, Math.min(3, Math.floor(p * 5)));
 }
 
 const ROLES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "", "Toi", "Votre duo", "Ton prochain pas"];

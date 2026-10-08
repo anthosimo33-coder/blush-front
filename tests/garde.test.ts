@@ -36,3 +36,21 @@ describe("l’avancée du verdict", () => {
     expect(avanceVerdict({ reflexion: 4000, texte: 5000 })).toBe(98);
   });
 });
+
+describe("les trouvailles de la lecture", () => {
+  it("disent qui ouvre et relance, leur mot à eux sans mot banal ni prénom, et rien de plat", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { chiffrer, lire } = await import("@prompts/lib/conv");
+    const { trouvailles } = await import("@prompts/lib/trouvailles");
+    const h = { utilisateur: { prenom: "Léo", pronom: "il" as const, nomExport: "Léo" }, autre: { prenom: "Inès", pronom: "elle" as const, nomExport: "Inès" }, format: "whatsapp-ios" as const };
+    const cas = JSON.parse(readFileSync("prompts/evals/cas.json", "utf8")) as { id: string; fichier: string; utilisateur: typeof h.utilisateur; autre: typeof h.autre }[];
+    const c03 = cas.find((c) => c.id === "03")!;
+    const h03 = { ...h, utilisateur: c03.utilisateur, autre: c03.autre };
+    const lu = lire(readFileSync(`prompts/evals/${c03.fichier}`, "utf8"), h03);
+    const t = trouvailles(chiffrer(h03, lu.messages), h03, lu.messages);
+    expect(t).toHaveLength(3);
+    expect(t[0]).toMatch(/^Tu relances \d+ fois plus qu’elle$/);
+    expect(t.join(" ")).toContain("« patate »");
+    expect(t.every((x) => x.length <= 45)).toBe(true);
+  });
+});

@@ -267,10 +267,11 @@ function Discoveries({ items, className }: { items: string[]; className?: string
           <li
             key={text}
             data-popin=""
-            className="inline-flex h-[34px] items-center gap-[7px] whitespace-nowrap rounded-[17px] bg-white px-3 text-[13px] font-black shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
+            /* Une trouvaille longue passe sur deux lignes plutôt que de déborder sur un petit écran */
+            className="inline-flex min-h-[34px] max-w-full items-center gap-[7px] rounded-[17px] bg-white px-3 py-[7px] text-left text-[13px] font-black leading-[1.25] shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
             style={{ "--r": `${d.rotate}deg`, "--d": `${i * 0.08}s`, transform: `rotate(${d.rotate}deg)` } as CSSProperties}
           >
-            <span aria-hidden="true" className="size-2 rounded-full" style={{ background: d.color }} />
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: d.color }} />
             {text}
           </li>
         );
