@@ -43,7 +43,8 @@ describe("de l’import à la mémoire", () => {
     await planifier(id, "verdict");
     await executerChaine(id);
 
-    const taches = await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, id));
+    /* Triées par création : sans tri, Postgres les rend dans l’ordre où elles ont été mises à jour */
+    const taches = await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, id)).orderBy(schema.tasks.createdAt);
     expect(taches.map((t) => [t.kind, t.status])).toEqual([
       ["verdict", "fini"],
       ["rapport_plan", "fini"],
