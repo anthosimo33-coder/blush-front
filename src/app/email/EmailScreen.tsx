@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { sendLoginCode } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
 import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -17,6 +18,8 @@ export function EmailScreen() {
   const [j, set] = useJourney();
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* Le code n’est pas parti : pourquoi, dit simplement (⚠ textes à valider) */
+  const [problem, setProblem] = useState<string | null>(null);
   const valid = EMAIL_RE.test(j.email.trim());
 
   const submit = async () => {
@@ -25,8 +28,21 @@ export function EmailScreen() {
       return;
     }
     setBusy(true);
-    await sendLoginCode(j.email.trim());
-    router.push("/email/code");
+    setProblem(null);
+    try {
+      await sendLoginCode(j.email.trim());
+      router.push("/email/code");
+    } catch (e) {
+      const code = e instanceof ErreurApi ? e.code : "";
+      setProblem(
+        code === "beta"
+          ? "BLUSH est en bêta privée : ton email n’est pas encore sur la liste. Demande à la personne qui t’a invité de t’ajouter."
+          : code === "trop"
+            ? "Trop de codes demandés. Réessaie dans une heure."
+            : "Le code n’est pas parti. Réessaie dans un instant.",
+      );
+      setBusy(false);
+    }
   };
 
   return (
@@ -57,10 +73,13 @@ export function EmailScreen() {
       >
         <EmailField
           value={j.email}
-          onChange={(v) => set({ email: v })}
+          onChange={(v) => {
+            set({ email: v });
+            setProblem(null);
+          }}
           onBlur={() => setTouched(true)}
-          invalid={touched && j.email.length > 0 && !valid}
-          errorText="Vérifie ton email : il manque quelque chose."
+          invalid={!!problem || (touched && j.email.length > 0 && !valid)}
+          errorText={problem ?? "Vérifie ton email : il manque quelque chose."}
         />
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
