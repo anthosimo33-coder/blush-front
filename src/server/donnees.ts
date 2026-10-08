@@ -14,7 +14,7 @@ import { db, schema } from "./db";
 import { contexteDe, histoireOuverte, histoiresDuCompte, metaDe, storyAffichee, type Ligne } from "./histoires";
 import { aRelancer, etatDesTaches, planifier } from "./taches";
 import { voixDisponible } from "./ia/voix";
-import { vocalPret } from "./vocal";
+import { vocalLu } from "./vocal";
 import { jourRelatif } from "./temps";
 import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
 
@@ -224,18 +224,21 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
 
 /**
  * Le vocal du rapport : prêt, en train de s’enregistrer (sa tâche attend ou tourne, ou le rapport s’écrit encore), ou
- * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture.
+ * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
+ * et un vocal d’une ancienne version du script se refait (une fois : si ça échoue, l’ancien reste).
  */
 async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boolean): Promise<VocalRapport | undefined> {
-  const pret = await vocalPret(story.id);
-  if (pret) return pret;
-  if (!voixDisponible() || verdict.alerte) return undefined;
+  const v = await vocalLu(story.id);
+  if (v?.aJour) return v.pret;
+  if (!voixDisponible() || verdict.alerte) return v?.pret;
+  /* La dernière tâche « vocal » : celle qui tourne, ou la dernière tentative */
   const { vocal: t } = await etatDesTaches(story.id, ["vocal"]);
-  if (t?.status === "echec" || t?.status === "fini") return undefined;
-  if (!t && rapportFini) {
-    await planifier(story.id, "vocal");
-    after(() => executerChaine(story.id));
-  }
+  if (t?.status === "attente" || t?.status === "en_cours") return { etat: "en_cours" };
+  const tenteDepuis = !!t && (!v || t.createdAt > v.fait);
+  if (tenteDepuis) return v?.pret;
+  if (!rapportFini) return { etat: "en_cours" };
+  await planifier(story.id, "vocal");
+  after(() => executerChaine(story.id));
   return { etat: "en_cours" };
 }
 

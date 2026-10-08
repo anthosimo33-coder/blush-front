@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { messagesAffiches } from "@prompts/lib/front";
 import type { Vocal } from "@prompts/lib/schemas";
 import { minuter, texteDit } from "@/lib/vocal";
@@ -13,11 +13,32 @@ import { dire, voixPour, type Voix } from "./ia/voix";
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
  * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres.
  */
-export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[] };
+export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version?: number };
 
-export async function vocalExiste(storyId: string): Promise<boolean> {
-  const [n] = await db().select({ n: count() }).from(schema.vocals).where(eq(schema.vocals.storyId, storyId));
-  return (n?.n ?? 0) > 0;
+/**
+ * La version du script (prompt 06). Quand le prompt change, on l’augmente : les vocaux faits avant se refont à leur
+ * prochaine ouverture. 2 : des phrases complètes, et chaque message cité annoncé (« elle t’a écrit : … »).
+ */
+export const VERSION_VOCAL = 2;
+
+/** Le vocal de l’histoire, s’il est fait : ce qu’en voit le front, s’il est à la version du script, et quand il a été fait. */
+export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRapport, { etat: "pret" }>; aJour: boolean; fait: Date } | null> {
+  const [v] = await db()
+    .select({ voix: schema.vocals.voix, data: schema.vocals.data, dureeMs: schema.vocals.dureeMs, createdAt: schema.vocals.createdAt })
+    .from(schema.vocals)
+    .where(eq(schema.vocals.storyId, storyId));
+  if (!v) return null;
+  const d = dechiffrer<DonneesVocal>(v.data);
+  return {
+    pret: { etat: "pret", audio: `/api/vocal/audio?v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix as Voix, sobre: d.sobre, lignes: d.lignes },
+    aJour: (d.version ?? 1) >= VERSION_VOCAL,
+    fait: v.createdAt,
+  };
+}
+
+/** Un vocal à la version du script existe-t-il déjà ? (Sinon, la tâche le fait, ou le refait.) */
+export async function vocalAJour(storyId: string): Promise<boolean> {
+  return (await vocalLu(storyId))?.aJour ?? false;
 }
 
 /**
@@ -25,7 +46,7 @@ export async function vocalExiste(storyId: string): Promise<boolean> {
  * cité s’affiche en bulle pendant qu’elle en parle. Un vocal déjà fait n’est pas refait (deux tâches en même temps).
  */
 export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<string, string>, sobre: boolean): Promise<void> {
-  if (!script.lignes.length || (await vocalExiste(story.id))) return;
+  if (!script.lignes.length || (await vocalAJour(story.id))) return;
   const voix: Voix = voixPour(story.userId ?? story.id);
   const { texte } = texteDit(script.lignes);
   const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id });
@@ -36,22 +57,18 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
     return recu ? { ...l, recu } : l;
   });
   const fin = Math.max(...alignement.character_end_times_seconds, ...minutees.map((l) => l.fin));
-  const donnees: DonneesVocal = { sobre, lignes: minutees };
+  const donnees: DonneesVocal = { sobre, lignes: minutees, version: VERSION_VOCAL };
+  const valeurs = { voix, data: chiffrer(donnees), audio: chiffrerOctets(audio), dureeMs: Math.round(fin * 1000), createdAt: new Date() };
+  /* Un vocal d’une version plus ancienne est remplacé (sa nouvelle date change l’adresse de l’audio) */
   await db()
     .insert(schema.vocals)
-    .values({ storyId: story.id, voix, data: chiffrer(donnees), audio: chiffrerOctets(audio), dureeMs: Math.round(fin * 1000) })
-    .onConflictDoNothing();
+    .values({ storyId: story.id, ...valeurs })
+    .onConflictDoUpdate({ target: schema.vocals.storyId, set: valeurs });
 }
 
 /** Le vocal tel que l’affiche le front, s’il est fait. L’adresse de l’audio change avec lui (le navigateur le garde en cache). */
 export async function vocalPret(storyId: string): Promise<Extract<VocalRapport, { etat: "pret" }> | null> {
-  const [v] = await db()
-    .select({ voix: schema.vocals.voix, data: schema.vocals.data, dureeMs: schema.vocals.dureeMs, createdAt: schema.vocals.createdAt })
-    .from(schema.vocals)
-    .where(eq(schema.vocals.storyId, storyId));
-  if (!v) return null;
-  const d = dechiffrer<DonneesVocal>(v.data);
-  return { etat: "pret", audio: `/api/vocal/audio?v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix as Voix, sobre: d.sobre, lignes: d.lignes };
+  return (await vocalLu(storyId))?.pret ?? null;
 }
 
 /** L’audio du vocal (MP3), déchiffré. */

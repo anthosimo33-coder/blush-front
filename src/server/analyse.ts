@@ -21,7 +21,7 @@ import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import { aRelancer, battre, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
-import { enregistrerVocal, vocalExiste } from "./vocal";
+import { enregistrerVocal, vocalAJour } from "./vocal";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
@@ -280,7 +280,7 @@ const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flat
  * puis la voix (src/server/vocal.ts). Aucun vocal quand il y a une alerte.
  */
 async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | { court: string }, lignes: Map<string, string>, sobre: boolean) {
-  if (!voixDisponible() || verdict.alerte || (await vocalExiste(story.id))) return;
+  if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
   const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
   const script = await appelVerifie(req, Sortie06, preuvesVocal, lignes, story.id, "vocal");
   if (script.alerte) return;
@@ -292,7 +292,7 @@ async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | {
  * le vocal. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon de la mémoire.
  */
 async function vocalTache(story: Ligne) {
-  if (!voixDisponible() || (await vocalExiste(story.id))) return;
+  if (!voixDisponible() || (await vocalAJour(story.id))) return;
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
