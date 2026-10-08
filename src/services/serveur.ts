@@ -8,7 +8,7 @@ import { CONVS_COOKIE } from "@/mocks/convs";
 import { demoConvs } from "@/mocks/stories";
 import { PEOPLE, STORY } from "@/mocks/story";
 import { historique } from "@/server/chat";
-import { contexteRequete, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
+import { contexteRequete, convsDe, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
 import { metaDe, storyAffichee } from "@/server/histoires";
 import { currentStoryId } from "./session.server";
 
@@ -17,8 +17,14 @@ import { currentStoryId } from "./session.server";
  * sans, des mocks (comme avant). null : rien à montrer (pas d’histoire, pas connecté, pas encore prêt).
  */
 
-export async function getStory(storyId?: string): Promise<Story | null> {
-  return BACKEND ? storyCourante() : demo.getStory(storyId);
+/** `parcours` : les écrans de l’import, qui montrent la conv en train d’être importée (voir histoireOuverte). */
+export async function getStory(storyId?: string, { parcours = false } = {}): Promise<Story | null> {
+  return BACKEND ? storyCourante(parcours) : demo.getStory(storyId);
+}
+
+/** Déjà connecté : une nouvelle conv passe alors de « Qui es-tu ? » à la lecture, sans l’écran email. Démo : non. */
+export async function estConnecte(): Promise<boolean> {
+  return BACKEND && !!(await contexteRequete(true)).utilisateur;
 }
 
 export async function getReport(storyId?: string): Promise<ReportPayload | null> {
@@ -73,12 +79,15 @@ export async function getRetour(): Promise<{ autre: string | null } | null> {
 }
 
 /**
- * Les convs du compte, pour la liste « Tes convs » (proposition). Une seule : pas de liste, l’accueil reste comme avant.
- * Back-end : une conv par compte en v1, donc rien à lister. Démo : Sophie, Inès et Camille avec ?convs=plusieurs
- * (`demande`, le paramètre de l’adresse, compte dès le premier rendu ; ensuite, c’est le cookie posé par DemoParams).
+ * Les convs du compte, pour la liste « Tes convs ». Une seule : pas de liste, l’accueil reste comme avant.
+ * Démo : Sophie, Inès et Camille avec ?convs=plusieurs (`demande`, le paramètre de l’adresse, compte dès le premier
+ * rendu ; ensuite, c’est le cookie posé par DemoParams).
  */
 export async function getConvs(demande?: string | string[]): Promise<ConvSummary[]> {
-  if (BACKEND) return [];
+  if (BACKEND) {
+    const { utilisateur, story } = await contexteRequete();
+    return utilisateur ? convsDe(utilisateur, story) : [];
+  }
   const plusieurs = demande === "plusieurs" || (demande !== "une" && (await cookies()).get(CONVS_COOKIE)?.value === "plusieurs");
   return plusieurs ? demoConvs(await currentStoryId()) : [];
 }

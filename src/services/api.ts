@@ -425,10 +425,8 @@ export async function deleteStory(): Promise<void> {
   mockServer.set({ storyDeleted: true, ficheFacts: FICHE.facts, ficheUpdated: false, questionAsked: null, analysisStartedAt: null });
 }
 
-/** Ouvre une autre conv du compte (proposition « plusieurs convs ») : l’accueil s’ouvre sur elle, maintenant et les fois suivantes. */
+/** Ouvre une autre conv du compte : l’accueil s’ouvre sur elle, maintenant et les fois suivantes (sur cet appareil). */
 export function openConv(storyId: string) {
-  /* Back-end : une conv par compte en v1, il n’y a rien d’autre à ouvrir */
-  if (BACKEND) return;
   writeStoryCookie(storyId);
 }
 

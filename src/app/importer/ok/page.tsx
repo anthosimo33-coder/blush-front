@@ -6,7 +6,7 @@ import { ConvOkScreen } from "./ConvOkScreen";
 export const metadata: Metadata = { title: "Ta conv est ajoutée" };
 
 export default async function Page() {
-  const story = await getStory();
+  const story = await getStory(undefined, { parcours: true });
   if (!story) redirect("/commencer");
   const source = story.sources.find((s) => s.mode === "export") ?? story.sources[0];
   return <ConvOkScreen source={source} />;

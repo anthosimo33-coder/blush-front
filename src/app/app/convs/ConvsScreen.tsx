@@ -45,6 +45,8 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
 
 function ConvRow({ conv }: { conv: ConvSummary }) {
   const up = conv.trend.startsWith("↗");
+  /* Pas encore de verdict : BLUSH lit la conv (⚠ texte à valider) */
+  const where = conv.verdict?.title ?? "BLUSH lit votre conv…";
   return (
     <Link
       href="/app"
@@ -55,19 +57,19 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
         openConv(conv.storyId);
         invalidate("report", "account", "fiche", "question");
       }}
-      aria-label={`${conv.person.name} : ${conv.verdict.title} ${conv.trend}, ${conv.lastLabel}`}
+      aria-label={`${conv.person.name} : ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"
     >
       <span className="transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">
-        <ContactRing initial={conv.person.initial} level={conv.level} emoji={conv.verdict.emoji} />
+        <ContactRing initial={conv.person.initial} level={conv.level} emoji={conv.verdict?.emoji ?? null} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate text-[17px] font-black leading-tight">{conv.person.name}</span>
           <span className="shrink-0 text-[13px] font-extrabold text-grey">{conv.lastLabel}</span>
         </span>
-        <span className="mt-0.5 truncate text-[14px] font-extrabold leading-[1.35] text-soft">{conv.verdict.title}</span>
-        <span className={cn("mt-1 text-[12.5px] font-black leading-none", up ? "text-vrai-ink" : "text-grey")}>{conv.trend}</span>
+        <span className="mt-0.5 truncate text-[14px] font-extrabold leading-[1.35] text-soft">{where}</span>
+        {conv.trend && <span className={cn("mt-1 text-[12.5px] font-black leading-none", up ? "text-vrai-ink" : "text-grey")}>{conv.trend}</span>}
       </span>
       <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />
     </Link>

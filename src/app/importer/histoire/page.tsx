@@ -6,7 +6,7 @@ import { HistoireScreen } from "./HistoireScreen";
 export const metadata: Metadata = { title: "Votre histoire réunie" };
 
 export default async function Page() {
-  const story = await getStory();
+  const story = await getStory(undefined, { parcours: true });
   if (!story) redirect("/commencer");
   return <HistoireScreen story={story} />;
 }
