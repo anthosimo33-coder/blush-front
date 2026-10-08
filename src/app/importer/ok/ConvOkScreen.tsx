@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { BACKEND } from "@/services/mode";
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
@@ -71,7 +72,7 @@ export function ConvOkScreen({ source }: { source: Source }) {
 
       <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        100 % privé : ta conv est supprimée dès que ton rapport est prêt.
+        100 % privé : ta conv est supprimée dès que ton rapport est prêt. <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">Comment ça marche</Link>
       </p>
     </Screen>
   );

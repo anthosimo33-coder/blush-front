@@ -12,7 +12,8 @@ import { cn } from "@/lib/cn";
  * Seule celle-là part chez BLUSH, les autres ne quittent jamais le téléphone. ⚠ Textes à valider.
  */
 
-export type ConvInstagram = { id: string; nom: string; messages: number; derniere: string; groupe: boolean };
+export type { ConvInstagram } from "@/services/preparer-export";
+import type { ConvInstagram } from "@/services/preparer-export";
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const quand = (iso: string) => `${+iso.slice(8, 10)}${" "}${MOIS[+iso.slice(5, 7) - 1]}`;
@@ -54,7 +55,7 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
               </Avatar>
             }
             title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
-            sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}${" "}messages · jusqu’au ${quand(c.derniere)}`}
+            sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}${" "}messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
             chevron={!c.groupe}
             onClick={c.groupe ? undefined : () => onChoisir(c.id)}
           />

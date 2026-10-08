@@ -27,6 +27,7 @@ import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } f
 import { demoStory, storyIdFor } from "@/mocks/stories";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
+import type { ConvInstagram } from "./preparer-export";
 import { ErreurApi, reel } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
@@ -70,8 +71,13 @@ const opened = (storyId?: string) => demoStory(storyId ?? readStoryCookie());
 
 /* ———— Import ———— */
 
-export async function uploadExport(file: File, app: Extract<AppKind, "whatsapp" | "imessage" | "instagram">): Promise<Source> {
-  if (BACKEND) return reel.uploadExport(file);
+export async function uploadExport(
+  file: File,
+  app: Extract<AppKind, "whatsapp" | "imessage" | "instagram">,
+  /** Un export Instagram complet : de quoi faire choisir la conv (voir src/services/reel.ts). */
+  choisir?: (convs: ConvInstagram[]) => Promise<string | null>,
+): Promise<Source> {
+  if (BACKEND) return reel.uploadExport(file, choisir);
   await delay(500);
   mockServer.set({ analysisStartedAt: null });
   return { ...SOURCE_WHATSAPP, app, fileName: file.name };

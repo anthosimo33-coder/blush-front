@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { sendLoginCode } from "@/services/api";
@@ -83,7 +84,7 @@ export function EmailScreen() {
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Pas de mot de passe, pas de spam. Ton email n’est jamais partagé.
+        Pas de mot de passe, pas de spam. Ton email n’est jamais partagé. <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">Ce que BLUSH fait de ta conv</Link>
       </p>
     </Screen>
   );

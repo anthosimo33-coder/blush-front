@@ -118,6 +118,9 @@ export function LandingFrame({ children }: { children: ReactNode }) {
             <Link href="/compte" className="text-soft no-underline hover:text-ink">
               Mon compte
             </Link>
+            <Link href="/confidentialite" className="text-soft no-underline hover:text-ink">
+              Confidentialité
+            </Link>
           </nav>
         </Container>
       </footer>

@@ -142,7 +142,8 @@ export function CompteScreen({ noms }: { noms: NomsDuCompte | null }) {
       </InsetGroup>
 
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
-      <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne sont jamais utilisées pour entraîner une IA. Hébergement en Europe.">
+      <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne servent jamais à entraîner une IA, et tout ce qui en vient est chiffré.">
+        <InsetRow leading={<RowIcon icon="eye" tone="vrai" />} title="Ta conv, en sécurité" sub="Ce qui part, qui la lit, combien de temps" href="/confidentialite" chevron />
         <InsetRow leading={<RowIcon icon="lock" />} title="Ce que BLUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title={`Supprimer l’histoire avec ${noms?.other.name ?? "elle"}`} sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />

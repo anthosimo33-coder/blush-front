@@ -2,9 +2,10 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
 import { SUBSCRIPTIONS } from "@/mocks/daily";
-import type { Account, ReportPayload } from "@/services/api";
+import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
+import type { Plan as Plan05 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, Fiche, Plan, Story } from "@/types";
-import { executerChaine, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
+import { executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
 import { lireBrouillon, lireSession } from "./cookies";
@@ -65,6 +66,35 @@ function decouvertes(story: Ligne, p: number): string[] {
 
 const ROLES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "", "Toi", "Votre duo", "Ton prochain pas"];
 
+const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\u00a0s` : `${Math.max(1, Math.round(s / 60))}\u00a0min`);
+
+/**
+ * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour 35 %, les deux moitiés pour 65 %), l’état
+ * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois fait.
+ */
+async function ecritureDe(storyId: string, titres: Map<number, string>, autre: string): Promise<EcritureRapport | undefined> {
+  const { rapport_plan: tp, rapport_chapitres: tc } = await etatDesTaches(storyId, ["rapport_plan", "rapport_chapitres"]);
+  if (!tp) return undefined;
+  const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
+  const detail = (tc?.detail ?? null) as { a: AvanceMoitie; b: AvanceMoitie } | null;
+  const fini = tc?.status === "fini";
+  const pChap = fini ? 1 : detail ? (detail.a.progres + detail.b.progres) / 2 : 0;
+  const progres = Math.min(0.99, 0.35 * pPlan + 0.65 * pChap);
+  const etat = (n: number): EtatChapitre => {
+    if (fini) return "ecrit";
+    const m = n <= 4 ? detail?.a : detail?.b;
+    if (!m) return "attente";
+    return m.ecrits.includes(n) || (m.enCours != null && n < m.enCours) ? "ecrit" : m.enCours === n ? "en_cours" : "attente";
+  };
+  const ecoule = (Date.now() - tp.createdAt.getTime()) / 1000;
+  return {
+    etape: tp.status === "fini" ? "chapitres" : "plan",
+    progres,
+    restant: progres > 0.06 ? duree((ecoule * (1 - progres)) / progres) : null,
+    chapitres: [2, 3, 4, 5, 6, 7, 8].map((n) => ({ number: n, title: titres.get(n) ?? (ROLES[n - 2] || autre), etat: etat(n) })),
+  };
+}
+
 /** Le rapport tel que l’affiche le front. Sans accès : le verdict et les chapitres verrouillés. */
 export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
@@ -89,8 +119,15 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
       ...(sortie.confiance ? [{ kind: "confidence" as const, level: sortie.confiance === "a_verifier" ? ("verifier" as const) : sortie.confiance, text: sortie.confiance_texte ?? "" }] : []),
     ],
   };
-  const verrouilles: Chapter[] = ROLES.map((titre, k) => ({ number: k + 2, title: titre || autre, tocTitle: titre || autre, free: false, locked: true, blocks: [] }));
+  /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
+  const plan = ouvert && !donnees && r?.plan ? dechiffrer<Plan05>(r.plan) : null;
+  const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
+  const verrouilles: Chapter[] = ROLES.map((titre, k) => {
+    const t = titres.get(k + 2) ?? (titre || autre);
+    return { number: k + 2, title: t, tocTitle: t, free: false, locked: true, blocks: [] };
+  });
   const chapters = ouvert && donnees ? donnees.chapitres : [verdictLibre, ...verrouilles];
+  const ecriture = ouvert && !donnees ? await ecritureDe(story.id, titres, autre) : undefined;
 
   return {
     report: {
@@ -104,8 +141,9 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     },
     sober: ouvert ? (donnees?.sobre ?? null) : null,
     access,
-    /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente */
+    /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente, et où en est l’écriture */
     generating: ouvert && !donnees,
+    ...(ecriture ? { ecriture } : {}),
   };
 }
 

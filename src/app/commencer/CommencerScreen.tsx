@@ -41,6 +41,15 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
         ))}
       </nav>
       <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis ? Commence par la principale, tu ajouteras le reste juste après.</p>
+      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
+        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
+        <span>
+          Ta conv est chiffrée, lue par Claude, et effacée après ton rapport.{" "}
+          <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
+            Comment ça marche
+          </Link>
+        </span>
+      </p>
       {fermee && (
         /* ⚠ Texte à valider */
         <Link href="/attente" className="row-hover flex items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-ink no-underline shadow-soft">
