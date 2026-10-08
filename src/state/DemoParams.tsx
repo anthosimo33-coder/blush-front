@@ -6,10 +6,12 @@
  *   ?erreur=fichier|groupe|courte|lecture|capture → écran d’erreur
  *   ?plan=gratuit|rapport|blushplus → droits d’accès
  *   ?histoire=couple|rencontre → l’histoire en couple, ou celle des maquettes
+ *   ?convs=plusieurs|une      → le compte a trois convs (Sophie, Inès, Camille), ou une seule
  */
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
 import { mockServer } from "@/mocks/server";
+import { CONVS_COOKIE } from "@/mocks/convs";
 import { DEMO_STORY_IDS } from "@/mocks/stories";
 import { readStoryCookie, writeStoryCookie } from "@/services/session";
 import { readJourney, setJourney } from "@/state/journey";
@@ -29,6 +31,7 @@ export function DemoParams() {
   const verdict = params.get("verdict");
   const erreur = params.get("erreur");
   const histoire = params.get("histoire");
+  const convs = params.get("convs");
 
   useIsoLayoutEffect(() => {
     let changed = false;
@@ -52,8 +55,11 @@ export function DemoParams() {
         router.refresh();
       }
     }
+    /* Les pages serveur lisent déjà le paramètre ; le cookie le garde pour les pages suivantes */
+    if (convs === "plusieurs") document.cookie = `${CONVS_COOKIE}=plusieurs; path=/; samesite=lax`;
+    if (convs === "une") document.cookie = `${CONVS_COOKIE}=; path=/; max-age=0; samesite=lax`;
     if (changed) invalidate("report", "account");
-  }, [plan, verdict, histoire, router]);
+  }, [plan, verdict, histoire, convs, router]);
 
   const error = erreur && ERRORS.includes(erreur as DemoError) ? (erreur as DemoError) : null;
 

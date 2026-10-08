@@ -1,12 +1,16 @@
 import "server-only";
-import type { BlushAnswer, Fiche, Story } from "@/types";
+import type { BlushAnswer, ConvSummary, Fiche, Story } from "@/types";
 import * as demo from "./api";
 import type { ReportPayload } from "./api";
 import { BACKEND } from "./mode";
+import { cookies } from "next/headers";
+import { CONVS_COOKIE } from "@/mocks/convs";
+import { demoConvs } from "@/mocks/stories";
 import { PEOPLE, STORY } from "@/mocks/story";
 import { historique } from "@/server/chat";
 import { contexteRequete, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
 import { metaDe, storyAffichee } from "@/server/histoires";
+import { currentStoryId } from "./session.server";
 
 /*
  * Les données des pages serveur. Avec le back-end, elles viennent de la base, d’après les cookies de la requête ;
@@ -66,4 +70,15 @@ export async function getRetour(): Promise<{ autre: string | null } | null> {
   if (!utilisateur || !story) return null;
   const meta = metaDe(story);
   return { autre: meta.moi == null ? null : meta.participants[1 - meta.moi].prenom };
+}
+
+/**
+ * Les convs du compte, pour la liste « Tes convs » (proposition). Une seule : pas de liste, l’accueil reste comme avant.
+ * Back-end : une conv par compte en v1, donc rien à lister. Démo : Sophie, Inès et Camille avec ?convs=plusieurs
+ * (`demande`, le paramètre de l’adresse, compte dès le premier rendu ; ensuite, c’est le cookie posé par DemoParams).
+ */
+export async function getConvs(demande?: string | string[]): Promise<ConvSummary[]> {
+  if (BACKEND) return [];
+  const plusieurs = demande === "plusieurs" || (demande !== "une" && (await cookies()).get(CONVS_COOKIE)?.value === "plusieurs");
+  return plusieurs ? demoConvs(await currentStoryId()) : [];
 }

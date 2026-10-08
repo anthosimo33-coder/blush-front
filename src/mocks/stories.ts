@@ -1,4 +1,4 @@
-import type { BlushAnswer, Fiche, Guess, QuestionAnswer, Reply, Report, SoberReport, Story } from "@/types";
+import type { BlushAnswer, ConvSummary, Fiche, Guess, QuestionAnswer, Reply, Report, SoberReport, Story } from "@/types";
 import {
   COUPLE_FICHE,
   COUPLE_QUESTION_ANSWER,
@@ -11,6 +11,7 @@ import {
   COUPLE_STORY_ID,
   COUPLE_VOICE_ANSWER,
 } from "./couple";
+import { AUTRES_CONVS, type AutreConv } from "./convs";
 import { FICHE, QUICK_QUESTIONS, REPLY, VOICE_ANSWER } from "./daily";
 import { QUESTION_ANSWER, QUESTION_IDEAS, REPORT, SOBER_REPORT } from "./report";
 import { READING_DISCOVERIES, STORY } from "./story";
@@ -26,7 +27,7 @@ export type DemoStory = {
   voiceAnswer: QuestionAnswer;
   quickQuestions: { question: string; answer: BlushAnswer }[];
   discoveries: string[];
-  fiche: Pick<Fiche, "portrait" | "summary" | "summaryShort">;
+  fiche: Pick<Fiche, "portrait" | "summary" | "summaryShort"> & Partial<Pick<Fiche, "person">>;
 };
 
 /** Hugo et Sophie, avant d’être ensemble (les maquettes). */
@@ -57,12 +58,40 @@ const COUPLE: DemoStory = {
   fiche: COUPLE_FICHE,
 };
 
+/** Une autre conv du compte (proposition « plusieurs convs », voir convs.ts) : celle de Sophie, avec une autre personne. */
+function autre(c: AutreConv): DemoStory {
+  return {
+    ...RENCONTRE,
+    story: { ...STORY, id: c.id, participants: [STORY.participants[0], c.person] },
+    report: { ...REPORT, storyId: c.id, verdict: c.verdict, level: c.level, trend: c.trend, nextStep: c.nextStep },
+    fiche: { ...RENCONTRE.fiche, person: c.person, summaryShort: c.summaryShort, summary: c.summaryShort },
+  };
+}
+
+const AUTRES = AUTRES_CONVS.map(autre);
+
 /** Les histoires de démo par leur nom d’URL (?histoire=rencontre|couple). */
 export const DEMO_STORY_IDS = { rencontre: RENCONTRE.story.id, couple: COUPLE.story.id } as const;
 
 /** L’histoire de démo ouverte ; par défaut, celle des maquettes. */
 export function demoStory(storyId: string | undefined): DemoStory {
-  return [RENCONTRE, COUPLE].find((s) => s.story.id === storyId) ?? RENCONTRE;
+  return [RENCONTRE, COUPLE, ...AUTRES].find((s) => s.story.id === storyId) ?? RENCONTRE;
+}
+
+/** Les convs du compte de démo quand il en a plusieurs : Sophie (celle des maquettes, ou en couple), Inès, Camille. */
+export function demoConvs(storyId: string | undefined): ConvSummary[] {
+  const ouverte = demoStory(storyId);
+  const sophie = ouverte === COUPLE ? COUPLE : RENCONTRE;
+  const resume = (d: DemoStory, lastLabel: string): ConvSummary => ({
+    storyId: d.story.id,
+    person: d.story.participants[1],
+    verdict: { emoji: d.report.verdict.emoji, title: d.report.verdict.title },
+    level: d.report.level,
+    trend: d.report.trend,
+    lastLabel,
+    current: d === ouverte,
+  });
+  return [resume(sophie, "aujourd’hui"), ...AUTRES.map((d, i) => resume(d, AUTRES_CONVS[i].lastLabel))];
 }
 
 /** Simulation de l’analyse : « On est ensemble » ouvre l’histoire en couple. */

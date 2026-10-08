@@ -42,6 +42,19 @@ export type Source = {
   voiceCount?: number;
 };
 
+/** Une conv du compte, telle que la liste « Tes convs » la montre : qui, où vous en êtes, quand BLUSH en a parlé pour la dernière fois. */
+export type ConvSummary = {
+  storyId: string;
+  person: Person;
+  verdict: Pick<Verdict, "emoji" | "title">;
+  level: LevelId;
+  trend: string;
+  /** « aujourd’hui », « hier », « lun. » */
+  lastLabel: string;
+  /** Celle qui s’ouvre sur l’accueil (la dernière ouverte). */
+  current: boolean;
+};
+
 export type Story = {
   id: string;
   participants: [Person, Person];

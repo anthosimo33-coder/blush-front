@@ -36,7 +36,7 @@ import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
-import type { Fiche, LevelId, Reply, Report } from "@/types";
+import type { ConvSummary, Fiche, LevelId, Reply, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 
 /** Ce que l’accueil montre de votre histoire : elle comme un contact, le verdict, où vous en êtes, ton prochain pas. */
@@ -190,6 +190,7 @@ export function HomeScreen({
   motion = true,
   arrive = false,
   fromReport = false,
+  others = [],
 }: {
   quick?: string[];
   /** Des réponses déjà prêtes, par question (l’aperçu des vraies réponses du chat). */
@@ -203,6 +204,8 @@ export function HomeScreen({
   arrive?: boolean;
   /** Arrivé par la bulle du rapport : sur mobile, le retour au rapport remplace le bouton du compte. */
   fromReport?: boolean;
+  /** Proposition « plusieurs convs » : les autres convs du compte. En haut à gauche, un bouton ramène à leur liste. */
+  others?: ConvSummary[];
 }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
@@ -492,6 +495,8 @@ export function HomeScreen({
                   <span data-a="acc" className="flex">
                     {fromReport ? (
                       <IconButton href="/rapport" icon="back" label="Revenir au rapport" iconSize={19} className="!size-10 !shadow-soft" />
+                    ) : others.length > 0 ? (
+                      <ConvsButton others={others} />
                     ) : (
                       <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
                     )}
@@ -509,12 +514,16 @@ export function HomeScreen({
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             {/* Desktop : la barre de la fenêtre, comme sur mobile (BLUSH au centre, Sophie à droite) */}
             <div className="hidden h-[112px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[rgba(17,17,20,0.06)] px-5 lg:grid">
-              {/* Le rapport, à un clic : la place à gauche de la barre était vide */}
+              {/* Le rapport, à un clic : la place à gauche de la barre était vide. Avec plusieurs convs, le retour à leur liste */}
               <span className="flex">
-                <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
-                  <Icon name="back" size={16} color="#121214" stroke={2.6} />
-                  Ton rapport
-                </Link>
+                {others.length > 0 ? (
+                  <ConvsButton others={others} flat />
+                ) : (
+                  <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
+                    <Icon name="back" size={16} color="#121214" stroke={2.6} />
+                    Ton rapport
+                  </Link>
+                )}
               </span>
               <BlushTitle busy={busy} onClick={() => setDetails(true)} />
               <div className="flex justify-end">
@@ -937,6 +946,39 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
         </span>
       </span>
     </button>
+  );
+}
+
+/**
+ * Proposition « plusieurs convs » : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
+ * pour qu’on voie d’un coup d’œil qu’il y a d’autres convs. `flat` : dans la barre de la fenêtre (desktop), sans ombre.
+ */
+function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: boolean }) {
+  const { on } = useHomeMotion();
+  const shown = others.slice(0, 2);
+  const more = others.length - shown.length;
+  return (
+    <Link
+      href="/app/convs"
+      transitionTypes={on ? ["nav-back"] : undefined}
+      aria-label={`Tes convs (${others.map((o) => o.person.name).join(", ")})`}
+      className={cn(
+        "back-nudge pointer-events-auto flex h-10 items-center gap-1 rounded-full pl-2 pr-1.5 no-underline",
+        flat ? "transition-colors hover:bg-[rgba(17,17,20,0.05)]" : "lift lift-sm lift-card bg-white shadow-soft",
+      )}
+    >
+      <Icon name="back" size={17} color="#121214" stroke={2.6} />
+      <span aria-hidden="true" className="flex">
+        {shown.map((o, i) => (
+          <span key={o.storyId} className={cn("rounded-full shadow-[0_0_0_2px_#FFFFFF]", i > 0 && "-ml-2")}>
+            <Avatar tone="elle" size={26} fontSize={11}>
+              {o.person.initial}
+            </Avatar>
+          </span>
+        ))}
+        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-[#F1EFEA] text-[11px] font-black text-soft shadow-[0_0_0_2px_#FFFFFF]">+{more}</span>}
+      </span>
+    </Link>
   );
 }
 
