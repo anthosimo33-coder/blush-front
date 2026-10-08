@@ -5,6 +5,7 @@ import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
 import { db, schema } from "../db";
 import { env } from "../env";
+import { alerter } from "../alertes";
 import { fournisseurFactice } from "./factice";
 import { TEXTES } from "./textes.generated";
 
@@ -156,6 +157,13 @@ export async function appeler<S extends z.ZodType>(
     message = await envoyer(false);
   }
   await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut, modele: message.model });
+  /* Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le contenu) */
+  const repli = message.content.find((b) => b.type === "fallback");
+  if (repli?.type === "fallback") {
+    const lignes = [`Tâche ${req.tache}`, `Catégorie du refus : ${repli.trigger.category ?? "aucune (refus sans catégorie)"}`, `De ${repli.from.model} vers ${repli.to.model}`, ...(storyId ? [`Histoire ${storyId}`] : [])];
+    console.warn(`repli : ${lignes.join(" · ")}`);
+    await alerter("repli sur un autre modèle", lignes);
+  }
   if (message.stop_reason === "refusal") {
     /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête : jamais de contenu */
     const categorie = message.stop_details?.category ?? null;
