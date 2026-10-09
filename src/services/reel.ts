@@ -152,7 +152,8 @@ export const reel = {
   /** « Relancer l’écriture » d’un rapport en échec : le rapport tel qu’il repart. */
   relancerRapport: () => appel<ReportPayload>("/api/rapport", envoi("POST")),
   /** Un moment de l’écoute du vocal (A/B test des voix). Sans réponse attendue : un échec ne gêne pas l’écoute. */
-  modeVocal: (actif: boolean) => appel<{ modeVocal: boolean }>("/api/chat/vocal", envoi("POST", { actif })).catch(() => {}),
+  /* keepalive : « Repasser à l’écrit » part même si la page se recharge ou se ferme juste après */
+  modeVocal: (actif: boolean) => appel<{ modeVocal: boolean }>("/api/chat/vocal", { ...envoi("POST", { actif }), keepalive: true }).catch(() => {}),
   /* keepalive : l’écoute fermée en quittant la page part quand même */
   ecouteVocal: (evenement: "debut" | "fin" | "reecoute" | "ferme", position: number) =>
     appel<{ ok: true }>("/api/vocal/ecoute", { ...envoi("POST", { evenement, position }), keepalive: true }).catch(() => {}),
