@@ -8,7 +8,7 @@ import { prenomDe } from "@prompts/lib/ajouts";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
 import type { Story } from "@/types";
-import { chiffrer, dechiffrer, empreinte, jeton } from "./chiffrement";
+import { chiffrer, chiffrerCompresse, dechiffrer, empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
 
@@ -134,7 +134,7 @@ export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: s
   const secret = jeton();
   const [ligne] = await db()
     .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrer(texte) })
+    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrerCompresse(texte) })
     .returning({ id: schema.stories.id });
   return { id: ligne.id, meta, secret };
 }
@@ -166,7 +166,7 @@ export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: 
   const secret = jeton();
   const [ligne] = await db()
     .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrer(t.texte) })
+    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrerCompresse(t.texte) })
     .returning({ id: schema.stories.id });
   return { id: ligne.id, meta, secret };
 }

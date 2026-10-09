@@ -30,7 +30,7 @@ import { ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { depuisFichier, importer, type Meta } from "@/server/histoires";
+import { convDe, depuisFichier, importer, type Ligne, type Meta } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { suiteSure } from "@/lib/suite";
@@ -89,6 +89,17 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
     const inconnue = Buffer.from(compresse);
     inconnue[0] = 9;
     expect(() => dechiffrer(inconnue)).toThrow(/Version de chiffrement inconnue/);
+  });
+
+  it("un export importé est gardé compressé, et relu tel quel", async () => {
+    const f = "01-a-deux-doigts.txt";
+    const lu = await depuisFichier(new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" }));
+    const { id } = await importer(lu);
+    const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+    expect(ligne.conv![0]).toBe(2);
+    expect(ligne.conv!.length).toBeLessThan(Buffer.byteLength(lu.texte) / 2);
+    expect(convDe(ligne as Ligne)).toBe(lu.texte);
+    await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });
 });
 
