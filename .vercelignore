@@ -3,3 +3,10 @@
 .galerie
 .env*
 prompts/evals
+# Les résultats des tests de bout en bout (traces, captures, boîte à mails des tests), et leur build empaqueté par la CI
+test-results
+playwright-report*
+blob-report
+build-e2e.tar
+# La CLI Vercel de la mise en production : elle déploie, elle ne fait pas partie du site
+scripts/deployer

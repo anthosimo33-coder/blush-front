@@ -12,6 +12,15 @@
 
 # testing
 /coverage
+# les tests de bout en bout : résultats, traces, rapports, boîte à mails (npm run e2e)
+/test-results/
+/playwright-report*/
+/blob-report/
+/playwright/.cache/
+# le build des tests de bout en bout empaqueté par la CI : il contient les prompts, côté serveur
+/build-e2e.tar
+# la CLI Vercel de la mise en production (npm ci --prefix scripts/deployer)
+/scripts/deployer/node_modules/
 
 # next.js
 /.next/

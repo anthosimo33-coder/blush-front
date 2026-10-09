@@ -1,0 +1,207 @@
+# La CI de BLUSH. Chaque push (toutes les branches) et chaque pull request passent les vérifications (types, lint,
+# tests, migrations, build du back-end et sa vérification des prompts), puis les tests de bout en bout dans Chromium et
+# WebKit. On ne déploie plus depuis un dossier local.
+#
+# La mise en production est un geste, jamais l’effet d’un push : « Run workflow » sur main (onglet Actions), ou
+# `gh workflow run CI --ref main`. Ce lancement refait toutes les vérifications sur la tête de main, puis déploie. Le
+# dépôt est privé, sur GitHub Free : ni règle de branche, ni relecteur obligatoire, ni secret d’environnement ; c’est
+# ce lancement à la main qui tient lieu d’accord.
+#
+# Ce qu’elle attend du dépôt (README.md, « La CI ») :
+#   - le secret PROMPTS_TOKEN : un jeton GitHub (fine-grained) qui lit blush-front et blush-prompts (le sous-module) ;
+#   - le secret VERCEL_TOKEN : un jeton Vercel qui déploie le projet blush-front.
+# Les actions sont épinglées à un commit (leur version en commentaire) : une étiquette déplacée ne change rien ici.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  # La mise en production (job deployer), lancée à la main sur main
+  workflow_dispatch:
+
+# Un nouveau push remplace le run de la même branche encore en cours. Sur main, le run en cours va jusqu’au bout : seul
+# celui qui attend son tour est remplacé par le plus récent. Les lancements à la main ont leur propre file : un push
+# n’annule jamais une mise en production demandée.
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && 'production' || 'verifications' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    name: Vérifications et build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # La base des tests unitaires : créée puis migrée par tests/preparer-la-base.ts
+      DATABASE_URL_TEST: postgres://postgres:postgres@localhost:5432/blush_test
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Le code, avec le sous-module privé prompts/
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          token: ${{ secrets.PROMPTS_TOKEN }}
+          persist-credentials: false
+
+      - name: Node (la version de Vercel, .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types, lint, migrations et tests (npm run check)
+        run: npm run check
+
+      - name: Build du back-end (prebuild, next build, puis la vérification des prompts)
+        run: npm run e2e:build
+
+      - name: Le build, pour les tests de bout en bout
+        run: tar -cf build-e2e.tar --exclude=.next/cache .next
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-e2e
+          path: build-e2e.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  e2e:
+    name: E2E (${{ matrix.navigateur }})
+    needs: verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      # Les deux navigateurs vont au bout : un échec dans l’un ne cache pas l’état de l’autre
+      fail-fast: false
+      matrix:
+        include:
+          - navigateur: chromium
+            projets: --project=chromium --project=chromium-beta
+          - navigateur: webkit
+            projets: --project=webkit-iphone --project=webkit-iphone-beta
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # Le serveur Postgres des tests (tests/e2e/serveur.mjs y recrée blush_e2e à chaque lancement)
+      E2E_POSTGRES: postgres://postgres:postgres@localhost:5432
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      # Pas de sous-module ici : le build reçu contient déjà les prompts, côté serveur
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Le navigateur, en cache (sa version suit package-lock.json)
+        id: navigateurs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.navigateur }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Le navigateur et ses bibliothèques système
+        if: steps.navigateurs.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps ${{ matrix.navigateur }}
+
+      - name: Les bibliothèques système du navigateur (le navigateur vient du cache)
+        if: steps.navigateurs.outputs.cache-hit == 'true'
+        run: npx playwright install-deps ${{ matrix.navigateur }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-e2e
+
+      - name: Le build du job « verifier »
+        run: tar -xf build-e2e.tar && rm build-e2e.tar
+
+      - name: Les tests de bout en bout
+        run: npm run e2e -- ${{ matrix.projets }}
+
+      - name: Le rapport et les traces, en cas d’échec
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-${{ matrix.navigateur }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  deployer:
+    name: Mise en production (Vercel)
+    # Seulement lancée à la main, sur main : un push ne met jamais en production
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: [verifier, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Pas d’environnement GitHub : un dépôt privé sur GitHub Free n’en a pas. Vercel garde l’historique des mises en production
+    # Une mise en production à la fois, dans l’ordre des lancements
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    env:
+      # Le projet Vercel (les mêmes que .vercel/project.json, qui n’est pas commité) : des identifiants, pas des secrets
+      VERCEL_ORG_ID: team_K67R5gXFJUCr6pCA4YLkgwwH
+      VERCEL_PROJECT_ID: prj_rbFHQuTvI4cqSUdmeuDEUTUDZmjZ
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      # « Re-run » d’un ancien lancement redéploierait son commit : seule la tête de main part en production
+      - name: Le commit est toujours la tête de main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tete="$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)"
+          test "$tete" = "$GITHUB_SHA" || { echo "::error::$GITHUB_SHA n’est plus la tête de main ($tete) : lance un nouveau « Run workflow » sur main"; exit 1; }
+
+      # Le sous-module part avec le code : Vercel construit sur ses serveurs, avec ses variables (et y migre la base)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          token: ${{ secrets.PROMPTS_TOKEN }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # La CLI Vercel depuis son lockfile (versions et empreintes figées), sans ses scripts d’installation, et sans le
+      # jeton : rien de ce qui s’installe ne le voit passer
+      - name: La CLI Vercel (scripts/deployer)
+        run: npm ci --prefix scripts/deployer --ignore-scripts --no-audit --no-fund
+
+      - name: vercel deploy --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: scripts/deployer/node_modules/.bin/vercel deploy --prod --yes --token "$VERCEL_TOKEN"

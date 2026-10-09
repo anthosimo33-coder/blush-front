@@ -8,7 +8,7 @@ import { env } from "../env";
 import { alerter } from "../alertes";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
-import { fournisseurFactice } from "./factice";
+import { fournisseurFactice, REFUS_FACTICE } from "./factice";
 import { TEXTES } from "./textes.generated";
 
 /*
@@ -30,7 +30,7 @@ type Usage = { input_tokens?: number | null; output_tokens?: number | null; cach
 export const TEMPS_MIN_APPEL = 20_000;
 
 /** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
-export const REFUS_FACTICE = "@@refus@@";
+export { REFUS_FACTICE };
 
 /** En mode factice (tests, dev sans coût) : une fonction qui rend une sortie pour une requête. */
 type Factice = (req: Requete) => unknown;

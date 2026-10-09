@@ -13,8 +13,13 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    /*
+     * La base des tests : DATABASE_URL_TEST (en CI, celle du service Postgres), ou blush_test en local. Un clone neuf ou
+     * la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, puis la migre (drizzle/).
+     */
+    globalSetup: ["tests/preparer-la-base.ts"],
     env: {
-      DATABASE_URL: "postgres://localhost:5432/blush_test",
+      DATABASE_URL: process.env.DATABASE_URL_TEST || "postgres://localhost:5432/blush_test",
       BLUSH_CLE: "dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtMzI=",
       BLUSH_IA_FACTICE: "1",
       BLUSH_ALERTES: "equipe@blush.test",
