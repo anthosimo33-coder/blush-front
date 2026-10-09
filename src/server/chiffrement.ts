@@ -1,13 +1,18 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { env } from "./env";
 
 /*
  * Tout ce qui contient la conv (la conv brute, le verdict, le rapport, la mémoire, la fiche, le chat)
  * est chiffré avant d’entrer dans la base : AES-256-GCM, avec une clé qui n’y est jamais.
  * Format : [version 1 octet][iv 12][tag 16][texte chiffré]. La version permet de changer de clé plus tard.
+ * Version 2 (`COMPRESSE`) : le même, sur le JSON compressé d’abord (la conv brute, voir chiffrerCompresse).
  */
 const VERSION = 1;
+const COMPRESSE = 2;
+/* Ce qu’une donnée compressée peut redevenir au plus : bien au-delà de la plus longue conv acceptée (histoires.ts, TAILLE_MAX) */
+const DECOMPRESSE_MAX = 256 * 1024 * 1024;
 
 function cles() {
   const maitre = Buffer.from(env().BLUSH_CLE, "base64");
@@ -25,12 +30,25 @@ export function chiffrer(valeur: unknown): Buffer {
   return Buffer.concat([Buffer.from([VERSION]), iv, c.getAuthTag(), corps]);
 }
 
+/**
+ * Comme `chiffrer`, après avoir compressé le JSON. Pour la conv brute : un chiffré ne se compresse plus, et sans ça un
+ * texte très répétitif, envoyé compressé (quelques Ko), prenait sa pleine taille en base (des dizaines de Mo). Une vraie
+ * conv y prend aussi plusieurs fois moins de place. `dechiffrer` relit les deux formats.
+ */
+export function chiffrerCompresse(valeur: unknown): Buffer {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", cles().chiffrement, iv);
+  const corps = Buffer.concat([c.update(deflateRawSync(Buffer.from(JSON.stringify(valeur), "utf8"))), c.final()]);
+  return Buffer.concat([Buffer.from([COMPRESSE]), iv, c.getAuthTag(), corps]);
+}
+
 export function dechiffrer<T>(donnee: Buffer | Uint8Array): T {
   const b = Buffer.from(donnee);
-  if (b[0] !== VERSION) throw new Error(`Version de chiffrement inconnue : ${b[0]}`);
+  if (b[0] !== VERSION && b[0] !== COMPRESSE) throw new Error(`Version de chiffrement inconnue : ${b[0]}`);
   const d = createDecipheriv("aes-256-gcm", cles().chiffrement, b.subarray(1, 13));
   d.setAuthTag(b.subarray(13, 29));
-  return JSON.parse(Buffer.concat([d.update(b.subarray(29)), d.final()]).toString("utf8")) as T;
+  const clair = Buffer.concat([d.update(b.subarray(29)), d.final()]);
+  return JSON.parse((b[0] === COMPRESSE ? inflateRawSync(clair, { maxOutputLength: DECOMPRESSE_MAX }) : clair).toString("utf8")) as T;
 }
 
 /** Le même chiffrement pour des octets bruts (l’audio du vocal), sans passer par le JSON. */

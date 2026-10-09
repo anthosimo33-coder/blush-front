@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
+import { connexionPuis } from "@/lib/suite";
 import { uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { BACKEND } from "@/services/mode";
 import { ErreurApi } from "@/services/reel";
@@ -137,6 +138,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       router.push(next);
     } catch (e) {
       if (!monte.current) return;
+      /* Bêta fermée : BLUSH ne lit des captures que pour un compte (la session a pu expirer sur cet écran). La connexion, puis retour ici */
+      if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
       echec(e instanceof ErreurApi && ["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");

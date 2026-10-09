@@ -28,6 +28,17 @@ export const LIMITES = {
   lotParIp: { max: 60, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
+  /**
+   * Bêta ouverte : les lectures de captures et de lots par des visiteurs sans compte, pour tous et par jour. Chacune fait
+   * travailler le modèle payant avant l’email : changer d’adresse IP ne doit pas faire grimper la facture sans fin.
+   */
+  capturesAnonymesParJour: { max: 50, fenetreS: 86400 },
+  lotsAnonymesParJour: { max: 200, fenetreS: 86400 },
+  /** Les mêmes lectures pour un compte connecté, par jour (un compte gratuit suffirait sinon à passer outre le plafond). */
+  capturesParCompte: { max: 30, fenetreS: 86400 },
+  lotsParCompte: { max: 150, fenetreS: 86400 },
+  /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
+  ficheParCompte: { max: 60, fenetreS: 86400 },
 } as const;
 
 /**

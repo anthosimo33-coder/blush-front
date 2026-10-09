@@ -1,5 +1,5 @@
 import { AppliCaptures } from "@/server/appli-captures";
-import { imagesDe, lireLot } from "@/server/captures";
+import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { ErreurImport } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
@@ -19,7 +19,11 @@ async function traiter(req: Request) {
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
   try {
-    return json({ lot: await lireLot(await imagesDe(fichiers), appli.success ? appli.data : "autre") });
+    const images = await imagesDe(fichiers);
+    /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
+    const permis = await lecturePermise("lots");
+    if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
+    return json({ lot: await lireLot(images, appli.success ? appli.data : "autre") });
   } catch (e) {
     if (e instanceof ErreurImport) return erreur(e.code, 422);
     throw e;
