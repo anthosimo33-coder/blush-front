@@ -9,15 +9,15 @@ import { Icon } from "@/components/ui/icons";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 
 /*
- * La bêta fermée : BLUSH est sur invitation. On laisse son email, on est prévenu quand une place se libère.
- * Arrivé refusé de l’écran email (`inscrit`), on est déjà sur la liste, et on sait que sa conv n’a pas été gardée.
+ * La bêta fermée : BLUSH est sur invitation. On laisse son email : un mail le confirme (l’inscription a pu venir de
+ * quelqu’un d’autre, il permet de se retirer), et un autre arrive quand une place se libère.
  * Textes relus le 8 octobre (voix de BLUSH).
  */
-export function AttenteScreen({ inscrit }: { inscrit: boolean }) {
+export function AttenteScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
-  const [etat, setEtat] = useState<"saisie" | "envoi" | "fait" | "erreur">(inscrit ? "fait" : "saisie");
+  const [etat, setEtat] = useState<"saisie" | "envoi" | "fait" | "erreur">("saisie");
   const valid = EMAIL_RE.test(email.trim());
 
   const envoyer = async () => {
@@ -42,9 +42,7 @@ export function AttenteScreen({ inscrit }: { inscrit: boolean }) {
             </span>
             <ScreenTitle>Tu es sur la liste.</ScreenTitle>
             <Lead size={15} weight={800}>
-              {inscrit
-                ? "BLUSH est en bêta privée et ton email n’est pas encore invité. On t’a mis sur la liste d’attente : on t’écrit dès que ta place est prête. Ta conv n’a pas été gardée."
-                : "On t’écrit dès que ta place est prête. D’ici là, garde ta conv sous le coude."}
+              On vient de t’écrire pour te le confirmer. On te réécrit dès que ta place est prête.
             </Lead>
           </>
         }
@@ -96,7 +94,7 @@ export function AttenteScreen({ inscrit }: { inscrit: boolean }) {
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Un seul mail, le jour où ta place est prête. Ton email n’est jamais partagé.
+        Un mail pour confirmer, puis un autre le jour où ta place est prête. Ton email n’est jamais partagé.
       </p>
     </Screen>
   );
