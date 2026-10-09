@@ -25,7 +25,7 @@ vi.mock("@/server/env", async (original) => {
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
-import type { DonneesMemoire } from "@/server/analyse";
+import { editionsBornees, type DonneesMemoire } from "@/server/analyse";
 import { ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
@@ -226,6 +226,15 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
     const supprimees = dechiffrer<DonneesMemoire>(ligne.data).editions!.supprimees;
     expect(supprimees).toHaveLength(100);
     expect(supprimees.at(-1)).toBe("Fait 0");
+  });
+
+  it("une mémoire écrite avant la borne : le modèle ne reçoit que les 100 plus récentes", () => {
+    const longue = { parToi: ["a"], supprimees: Array.from({ length: 150 }, (_, k) => `ancien ${k}`) };
+    expect(editionsBornees(longue)!.supprimees).toEqual(longue.supprimees.slice(50));
+    expect(editionsBornees(longue)!.parToi).toEqual(["a"]);
+    const courte = { parToi: [], supprimees: ["x"] };
+    expect(editionsBornees(courte)).toBe(courte);
+    expect(editionsBornees(undefined)).toBeUndefined();
   });
 
   it("au-delà de la limite du jour : « trop »", async () => {

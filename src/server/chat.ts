@@ -8,7 +8,7 @@ import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, LevelId } from "@/types";
-import type { DonneesMemoire } from "./analyse";
+import { editionsBornees, type DonneesMemoire } from "./analyse";
 import { ErreurTache } from "./erreurs";
 import { chiffrer, chiffrerOctets, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
@@ -121,7 +121,7 @@ export async function repondre(
     fin: ctx.fin,
     etat: memoire.etat,
     lignes,
-    editions: memoire.editions,
+    editions: editionsBornees(memoire.editions),
     style: ctx.style,
     fil: await fil(story.id),
     dit,

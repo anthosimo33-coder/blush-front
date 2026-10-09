@@ -10,6 +10,7 @@ import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { addToFiche, getFiche, updateFiche } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
 import { FICHE_SECTIONS } from "@/mocks/daily";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -98,9 +99,14 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
       (f) => {
         if (n === dernier.current) setQueryData(key, f);
       },
-      () => {
+      (e) => {
         if (n !== dernier.current) return;
-        setSouci("Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.");
+        /* La limite du jour (PUT /api/fiche) : réessayer tout de suite n’y changerait rien */
+        setSouci(
+          e instanceof ErreurApi && e.code === "trop"
+            ? "Tu as beaucoup modifié sa fiche aujourd’hui : ta dernière modification n’a pas été enregistrée. Réessaie demain."
+            : "Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.",
+        );
         invalidate(key);
       },
     );

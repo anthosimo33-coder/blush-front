@@ -15,9 +15,14 @@ import { useJourney } from "@/state/journey";
 /*
  * Se connecter : retrouver ses convs sur un autre appareil. L’email du compte, un code (pas de mot de passe),
  * et tout est là. Textes relus le 8 octobre (voix de BLUSH).
+ * Venu de l’import (`suite` sous /importer/ : en bêta fermée, les captures se lisent pour un compte connecté) : un premier
+ * accès, pas un retour. Le texte le dit, le retour mène au choix de l’appli, et le lien « Analyser ma conv » (qui ramènerait
+ * ici) disparaît. Textes à valider.
  */
 export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
   const router = useRouter();
+  const depuisImport = !!suite?.startsWith("/importer/");
+  const retour = depuisImport ? "/commencer" : "/";
   const [j, set] = useJourney();
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,15 +48,24 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
 
   return (
     <Screen
-      mobileTop={<MobileTopBar back="/" />}
-      desktopBack={{ target: "/" }}
+      mobileTop={<MobileTopBar back={retour} />}
+      desktopBack={{ target: retour }}
       head={
-        <>
-          <ScreenTitle>Retrouve tes convs.</ScreenTitle>
-          <Lead size={15} weight={800}>
-            Entre l’email de ton compte{" "}: on t’envoie un code, et tout est là, sur cet appareil aussi.
-          </Lead>
-        </>
+        depuisImport ? (
+          <>
+            <ScreenTitle>D’abord, ton email.</ScreenTitle>
+            <Lead size={15} weight={800}>
+              BLUSH est en bêta privée{" "}: on t’envoie un code, puis tu envoies ta conv.
+            </Lead>
+          </>
+        ) : (
+          <>
+            <ScreenTitle>Retrouve tes convs.</ScreenTitle>
+            <Lead size={15} weight={800}>
+              Entre l’email de ton compte{" "}: on t’envoie un code, et tout est là, sur cet appareil aussi.
+            </Lead>
+          </>
+        )
       }
       footer={
         <Button arrow={!busy} disabled={!valid || busy} aria-busy={busy} onClick={submit}>
@@ -81,12 +95,14 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
         Pas de mot de passe{" "}: un code suffit, sur chaque nouvel appareil. Tes convs restent chiffrées.
       </p>
-      <p className="m-0 text-[14px] font-extrabold text-grey">
-        Pas encore de compte{" "}?{" "}
-        <Link href="/commencer" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
-          Analyser ma conv
-        </Link>
-      </p>
+      {!depuisImport && (
+        <p className="m-0 text-[14px] font-extrabold text-grey">
+          Pas encore de compte{" "}?{" "}
+          <Link href="/commencer" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
+            Analyser ma conv
+          </Link>
+        </p>
+      )}
     </Screen>
   );
 }
