@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: RouteContext<"/ouvrir/[id]">
   const { id } = await params;
   const utilisateur = await utilisateurDeSession(await lireSession());
   if (!utilisateur) return NextResponse.redirect(new URL(connexionPuis(`/ouvrir/${encodeURIComponent(id)}`), req.url));
-  if (utilisateur && /^[0-9a-f-]{36}$/.test(id)) {
+  if (utilisateur && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     const [s] = await db()
       .select({ id: schema.stories.id })
       .from(schema.stories)

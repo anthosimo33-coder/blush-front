@@ -91,7 +91,7 @@ export async function GET(req: Request) {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
   const avant = Number(new URL(req.url).searchParams.get("avant"));
-  return json(story ? await historique(story.id, Number.isInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
+  return json(story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
 }
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */

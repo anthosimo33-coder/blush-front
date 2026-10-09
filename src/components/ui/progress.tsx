@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { IlOuElle } from "@/lib/pronom";
@@ -201,17 +200,5 @@ export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {
         })}
       </ol>
     </div>
-  );
-}
-
-/** Lien texte avec flèche (« Revoir le rapport → »). */
-export function ArrowLink({ href, children, className }: { href: string; children: string; className?: string }) {
-  return (
-    <Link href={href} className={cn("arrow-nudge inline-flex min-h-11 items-center gap-1 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink", className)}>
-      {children}
-      <span className="arrow" aria-hidden="true">
-        →
-      </span>
-    </Link>
   );
 }

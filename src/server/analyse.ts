@@ -53,8 +53,9 @@ function relire(story: Ligne) {
 }
 
 /**
- * Un appel dont chaque preuve doit exister. Une sortie illisible ou une preuve introuvable : on rejoue une fois.
- * Au second essai, les preuves introuvables sont simplement ignorées à l’affichage.
+ * Un appel dont chaque preuve doit exister. Une sortie illisible, une preuve introuvable, ou une sortie incomplète
+ * (`complet` : ce que l’étape attend, comme des chapitres) : on rejoue une fois. Au second essai, les preuves
+ * introuvables sont simplement ignorées à l’affichage, et une sortie incomplète est rendue telle quelle.
  */
 async function appelVerifie<S extends z.ZodType>(
   req: Requete,
@@ -65,12 +66,15 @@ async function appelVerifie<S extends z.ZodType>(
   etiquette: string,
   surAvance?: (a: Avance) => void,
   signal?: AbortSignal,
+  complet?: (s: z.infer<S>) => boolean,
 ): Promise<z.infer<S>> {
   for (let essai = 0; essai < 2; essai++) {
     const a = await appeler(req, format, { storyId, etiquette, surAvance, signal });
     /* Un refus qui tient malgré le repli : sa catégorie va dans le code d’erreur (et dans l’alerte) */
     if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
     if (!a.sortie) continue;
+    /* Il manque ce que l’étape attend : on rejoue cet appel seul (pas toute l’étape), si le temps le permet */
+    if (complet && !complet(a.sortie) && essai === 0 && tempsRestant() >= TEMPS_RELANCE) continue;
     /* Des preuves introuvables : on rejoue, si le temps le permet (sinon, elles sont ignorées à l’affichage, comme au second essai) */
     if (!introuvables(ids(a.sortie), lignes).length || essai === 1 || tempsRestant() < TEMPS_RELANCE) return a.sortie;
   }
@@ -176,7 +180,9 @@ async function rapportPlan(story: Ligne, t: Tache) {
   const v = await lireVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (v.sortie.mode_sobre) {
-    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport");
+    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport", undefined, undefined, (x) => !!x.sobre);
+    /* Le rapport sobre sans sa partie sobre : un écran vide. On le refait plutôt que de le garder */
+    if (!r.sobre) throw new ErreurTache("sobre_vide");
     await garderRapport(story, r, rendu.lignes, v.scores);
     /* Le vocal doux, avant la mémoire */
     if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
@@ -191,6 +197,8 @@ async function rapportPlan(story: Ligne, t: Tache) {
     story.id,
     "rapport_plan",
     suivreAvance(t.id, avancePlan),
+    undefined,
+    (e) => !!e.plan,
   );
   if (!etape.plan) throw new ErreurTache("plan_vide");
   await db()
@@ -243,6 +251,7 @@ async function rapportChapitres(story: Ligne, t: Tache) {
         if (nouveaux.length) garderPrets();
       },
       abandon.signal,
+      (e) => !!e.chapitres?.length,
     ).catch((e: unknown) => {
       abandon.abort();
       throw e;
@@ -261,13 +270,16 @@ async function rapportChapitres(story: Ligne, t: Tache) {
   try {
     const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
     await enregistrement;
-    if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
+    /* Chaque moitié ne garde que ses chapitres (1 à 4, 5 à 8), une fois chacun : un chapitre en double ou hors de sa moitié ne s’affiche pas deux fois */
+    const garder = (cs: Chapitre[] | null, de: number) => [...new Map((cs ?? []).filter((c) => c.numero >= de && c.numero < de + 4).map((c) => [c.numero, c])).values()];
+    const [ca, cb] = [garder(a.chapitres, 1), garder(b.chapitres, 5)];
+    if (!ca.length || !cb.length) throw new ErreurTache("chapitres_vides");
     const r: Rapport = {
       alerte: plan.alerte,
       mode_sobre: v.sortie.mode_sobre,
       decouvertes: plan.decouvertes,
       these: plan.these,
-      chapitres: [...a.chapitres, ...b.chapitres].sort((x, y) => x.numero - y.numero),
+      chapitres: [...ca, ...cb].sort((x, y) => x.numero - y.numero),
       sobre: null,
     };
     await garderRapport(story, r, rendu.lignes, v.scores);

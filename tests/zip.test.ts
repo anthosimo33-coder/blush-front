@@ -1,6 +1,7 @@
+import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { deflateSync, strToU8, zipSync } from "fflate";
-import { ExportIllisible, lireFichiers } from "@/services/preparer-export";
+import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
 
 const chat = "[12/09/2026 18:58:00] Léa: t’es dispo jeudi ?\n[12/09/2026 19:00:00] Malik: à demain alors 😊\n".repeat(2000);
 const fichier = (octets: Uint8Array, nom: string) => new File([octets as BlobPart], nom);
@@ -73,6 +74,37 @@ describe("lire un export zippé dans le navigateur", () => {
     const parties = await lireFichiers(zip);
     expect(parties).toEqual([{ nom: "_chat.txt", contenu: chat }]);
     expect(zip.size).toBeGreaterThan(2_000_000_000);
+    expect(lu.max).toBeLessThan(200_000);
+  });
+
+  /* Le chemin que prend vraiment l’import (reel.ts) : analyserExport, puis le paquet envoyé */
+  const contenuDe = async (paquet: Blob) => (JSON.parse(gunzipSync(Buffer.from(await paquet.arrayBuffer())).toString("utf8")) as { parties: { nom: string; contenu: string }[] }).parties;
+
+  it("à l’import, un export WhatsApp avec médias : seul _chat.txt part, le zip n’est jamais lu en entier", async () => {
+    const { fichier: zip, lu } = zipVirtuel([
+      { nom: "_chat.txt", donnees: deflateSync(strToU8(chat)), methode: 8, complet: strToU8(chat).length },
+      { nom: "00000012-VIDEO-2026-09-12-18-58-00.mp4", virtuel: 2_000_000_000 },
+      { nom: "00000013-PHOTO-2026-09-12-19-00-00.jpg", virtuel: 300_000_000 },
+    ]);
+    const pret = await analyserExport(zip);
+    if (pret.type !== "un") throw new Error("une conv attendue");
+    expect(await contenuDe(pret.paquet)).toEqual([{ nom: "_chat.txt", contenu: chat }]);
+    expect(lu.max).toBeLessThan(200_000);
+  });
+
+  it("à l’import, un export Instagram complet avec médias : les convs proposées, puis celle choisie, sans lire le zip en entier", async () => {
+    const conv = (nom: string, n: number) => strToU8(JSON.stringify({ participants: [{ name: nom }, { name: "Moi" }], messages: Array.from({ length: n }, (_, k) => ({ sender_name: k % 2 ? "Moi" : nom, timestamp_ms: 1_790_000_000_000 - k * 60e3, content: `${nom} ${k}` })) }));
+    const { fichier: zip, lu } = zipVirtuel([
+      { nom: "your_instagram_activity/messages/inbox/lea_1/message_1.json", donnees: conv("Léa", 30) },
+      { nom: "your_instagram_activity/messages/inbox/lea_1/videos/1.mp4", virtuel: 2_000_000_000 },
+      { nom: "your_instagram_activity/messages/inbox/ines_2/message_1.json", donnees: conv("Inès", 12) },
+      { nom: "your_instagram_activity/messages/inbox/ines_2/photos/1.jpg", virtuel: 300_000_000 },
+    ]);
+    const pret = await analyserExport(zip);
+    if (pret.type !== "plusieurs") throw new Error("plusieurs convs attendues");
+    const ines = pret.convs.find((c) => c.messages === 12)!;
+    const parties = await contenuDe(await pret.paquetDe(ines.id));
+    expect(parties.map((p) => p.nom)).toEqual(["your_instagram_activity/messages/inbox/ines_2/message_1.json"]);
     expect(lu.max).toBeLessThan(200_000);
   });
 

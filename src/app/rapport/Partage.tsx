@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
-import { creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
+import { compterImagePartagee, creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
 import { BACKEND } from "@/services/mode";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
@@ -163,6 +163,8 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
   const [image, setImage] = useState(false);
   const [copie, setCopie] = useState(false);
   const [story, setStory] = useState<File | null>(null);
+  /* L’image story n’a pas pu se préparer : le bouton le dit au toucher, au lieu de rester grisé sans raison */
+  const [storyRatee, setStoryRatee] = useState(false);
   const [fait, setFait] = useState<string | null>(null);
   const [essai, setEssai] = useState(0);
 
@@ -184,7 +186,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
     fetch(`${url}/image?format=story`)
       .then((r) => (r.ok ? r.blob() : Promise.reject()))
       .then((b) => !fini && setStory(new File([b], "verdict-blush.png", { type: "image/png" })))
-      .catch(() => {});
+      .catch(() => !fini && setStoryRatee(true));
     return () => {
       fini = true;
     };
@@ -284,7 +286,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
           <Action icone="imessage" nom="Messages" fond="var(--gloss), #34C759" pret={pret} href={`sms:?&body=${encodeURIComponent(avecLien)}`}>
             <GlypheMessages />
           </Action>
-          <Action icone="instagram" nom="Story" fond="var(--gloss), linear-gradient(45deg, #FFAA2C, #FF4F9A 55%, #9B7BFF)" pret={pret && !!story} onClick={enStory} />
+          <Action icone="instagram" nom="Story" fond="var(--gloss), linear-gradient(45deg, #FFAA2C, #FF4F9A 55%, #9B7BFF)" pret={pret && (!!story || storyRatee)} onClick={story ? enStory : () => setFait("L’image story n’a pas pu se préparer. Réessaie dans un instant.")} />
         </div>
       )}
 
@@ -381,6 +383,18 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
     return () => clearTimeout(t);
   }, [fait]);
 
+  /* L’image gardée en mémoire (son adresse blob) est libérée quand la feuille disparaît */
+  const derniere = useRef<string | null>(null);
+  useEffect(() => {
+    derniere.current = image?.url ?? null;
+  }, [image]);
+  useEffect(
+    () => () => {
+      if (derniere.current) URL.revokeObjectURL(derniere.current);
+    },
+    [],
+  );
+
   const fermer = () => {
     setProbleme(null);
     setFait(null);
@@ -391,8 +405,9 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
     if (!pret) return;
     try {
       await navigator.share({ files: [image.fichier] });
+      compterImagePartagee();
     } catch {
-      /* Fenêtre de partage fermée : rien à faire */
+      /* Fenêtre de partage fermée : rien à faire, rien à compter */
     }
   };
   const enregistrer = () => {
@@ -401,6 +416,7 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
     a.href = image.url;
     a.download = "blush.png";
     a.click();
+    compterImagePartagee();
     setFait("Image enregistrée.");
   };
 

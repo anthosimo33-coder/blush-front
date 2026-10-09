@@ -230,10 +230,6 @@
 [data-burst] { animation: fBurst 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0.1s); }
 
 /* Lecture (écran 08) */
-@keyframes crFeed { from { transform: translateY(0); } to { transform: translateY(-50%); } }
-[data-feed] { animation: crFeed 14s linear infinite; }
-@keyframes crScan { 0% { top: -46px; } 100% { top: 230px; } }
-[data-scan] { animation: crScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 @keyframes crPopIn { 0% { opacity: 0; transform: scale(0.6) rotate(var(--r, 0deg)); } 70% { opacity: 1; transform: scale(1.06) rotate(var(--r, 0deg)); } 100% { opacity: 1; transform: scale(1) rotate(var(--r, 0deg)); } }
 [data-popin] { animation: crPopIn 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d, 0s); }
 
@@ -429,8 +425,9 @@
 [data-dring-icone] { animation: blushDringIcone 5s linear 1.5s infinite; }
 
 /* Un chapitre qui s’écrit : ses lignes se remplissent, l’une après l’autre */
-@keyframes ecrit { 0% { width: 0; } 70%, 100% { width: 100%; } }
-[data-ecrit] { animation: ecrit 1.8s ease-in-out var(--k, 0s) infinite; }
+/* Une échelle plutôt qu’une largeur : l’animation tourne pendant les 2 à 3 minutes de l’écriture, sans recalculer la page */
+@keyframes ecrit { 0% { transform: scaleX(0); } 70%, 100% { transform: scaleX(1); } }
+[data-ecrit] { transform-origin: left; animation: ecrit 1.8s ease-in-out var(--k, 0s) infinite; }
 
 /* Lignes cliquables dans une carte : un voile très léger */
 .row-hover { position: relative; isolation: isolate; }
@@ -450,6 +447,6 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-feed], [data-scan], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
   [data-scan-bar] { animation: none !important; visibility: hidden; }
 }

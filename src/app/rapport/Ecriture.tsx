@@ -32,7 +32,8 @@ export function BarreEcriture({ ecriture }: { ecriture: EcritureRapport }) {
         <span className="text-[13px] font-black tabular-nums text-ink">{pct(ecriture.progres)}</span>
       </div>
       <span className="h-[5px] overflow-hidden rounded-full bg-[#ECE9E2]">
-        <span className="block h-full rounded-full transition-[width] duration-[900ms] ease-linear" style={{ width: pct(ecriture.progres).replace(" ", ""), background: DEGRADE }} />
+        {/* Une échelle plutôt qu’une largeur : la barre avance sans recalculer la page */}
+        <span className="block h-full w-full origin-left rounded-full transition-transform duration-[900ms] ease-linear" style={{ transform: `scaleX(${Math.min(1, Math.max(0, ecriture.progres))})`, background: DEGRADE }} />
       </span>
       <span className="text-[12px] font-extrabold text-grey">
         {enCours(ecriture)}
@@ -72,8 +73,8 @@ export function LigneEcriture({ number, title, etat, last = false }: { number: n
               {etat !== "attente" && (
                 <span
                   data-ecrit={etat === "en_cours" ? "" : undefined}
-                  className="absolute inset-y-0 left-0 rounded"
-                  style={{ width: etat === "ecrit" ? "100%" : undefined, background: etat === "ecrit" ? "rgba(18,192,138,0.35)" : DEGRADE, "--k": `${k * 0.6}s` } as CSSProperties}
+                  className="absolute inset-0 rounded"
+                  style={{ background: etat === "ecrit" ? "rgba(18,192,138,0.35)" : DEGRADE, "--k": `${k * 0.6}s` } as CSSProperties}
                 />
               )}
             </span>

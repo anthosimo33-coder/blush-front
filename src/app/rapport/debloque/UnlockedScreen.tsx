@@ -8,24 +8,37 @@ import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Screen } from "@/components/shell/Screen";
 
-/* Ce que l’offre vient d’ouvrir, dit simplement. */
-const UNLOCKED = {
-  rapport: [
-    { title: "Les 6 chapitres qui restent", sub: "Ta lecture reprend au chapitre 3" },
-    { title: "Ta question à BLUSH", sub: "Une question incluse avec ton rapport" },
-  ],
-  blushplus: [
-    { title: "Le rapport complet", sub: "Les 6 chapitres qui restent" },
-    { title: "Le chat avec BLUSH", sub: "Envoie sa réponse : BLUSH t’aide à répondre" },
-    { title: "Sa fiche", sub: "Ce qu’elle t’a dit, toujours sous la main" },
-  ],
-} as const;
+/* Ce que l’offre vient d’ouvrir, dit simplement : combien de chapitres restent, d’où la lecture reprend. */
+const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: number, autre?: "il" | "elle") =>
+  offre === "rapport"
+    ? [
+        { title: `Les ${restants} chapitres qui restent`, sub: `Ta lecture reprend au chapitre ${reprise}` },
+        { title: "Ta question à BLUSH", sub: "Une question incluse avec ton rapport" },
+      ]
+    : [
+        { title: "Le rapport complet", sub: `Les ${restants} chapitres qui restent` },
+        { title: "Le chat avec BLUSH", sub: "Envoie sa réponse : BLUSH t’aide à répondre" },
+        { title: "Sa fiche", sub: `Ce qu’${autre === "il" ? "il" : "elle"} t’a dit, toujours sous la main` },
+      ];
 
 /*
  * Paiement réussi : un moment, pas une facture. La gerbe (« une réussite » dans le design system),
  * le titre, ce qui vient de s’ouvrir, puis un seul bouton pour reprendre.
  */
-export function UnlockedScreen({ offer, next }: { offer: "blushplus" | "rapport"; next: string | null }) {
+export function UnlockedScreen({
+  offer,
+  next,
+  restants = 6,
+  reprise = 3,
+  autre,
+}: {
+  offer: "blushplus" | "rapport";
+  next: string | null;
+  /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
+  restants?: number;
+  reprise?: number;
+  autre?: "il" | "elle";
+}) {
   const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
   const plus = offer === "blushplus";
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
@@ -38,7 +51,7 @@ export function UnlockedScreen({ offer, next }: { offer: "blushplus" | "rapport"
       desktopTopPad={0}
       footer={
         <div data-popin="" style={{ "--d": "0.7s" } as CSSProperties}>
-          <ButtonLink href={next ?? "/rapport#chapitre-3"} arrow>
+          <ButtonLink href={next ?? `/rapport#chapitre-${reprise}`} arrow>
             {next ? "Continuer" : "Lire la suite"}
           </ButtonLink>
         </div>
@@ -63,7 +76,7 @@ export function UnlockedScreen({ offer, next }: { offer: "blushplus" | "rapport"
 
         <div data-rise="" style={{ "--d": "0.45s" } as CSSProperties} className="mt-8 w-full text-left">
           <InsetGroup>
-            {UNLOCKED[offer].map((it) => (
+            {ouvert(offer, restants, reprise, autre).map((it) => (
               <InsetRow key={it.title} leading={<RowIcon icon="check" tone="vrai" />} title={it.title} sub={it.sub} />
             ))}
           </InsetGroup>

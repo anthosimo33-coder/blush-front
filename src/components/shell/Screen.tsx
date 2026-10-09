@@ -109,7 +109,8 @@ export function DesktopBack({ target, label = "Retour", trailing }: { target: Ba
 }
 
 /** Pastille « Mon compte » (desktop, écrans du quotidien). */
-export function AccountPill({ initial = "H" }: { initial?: string }) {
+/** « Mon compte » sur ordinateur : l’initiale de ton email (le temps de la connaître, une silhouette). */
+export function AccountPill({ initial }: { initial?: string }) {
   return (
     <Link
       href="/compte"
@@ -120,7 +121,7 @@ export function AccountPill({ initial = "H" }: { initial?: string }) {
         className="flex size-8 items-center justify-center rounded-full text-[14px] font-black text-white"
         style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), #3D8BFF" }}
       >
-        {initial}
+        {initial ?? <Icon name="user" size={16} color="#FFFFFF" stroke={2.4} />}
       </span>
       Mon compte
     </Link>

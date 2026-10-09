@@ -9,7 +9,20 @@ import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoire
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { fusionnerLots } from "@/server/video";
 
-const Envoi = z.object({ app: AppliCaptures, lots: z.array(Sortie01).min(1).max(10) });
+/*
+ * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
+ * contenir, pour qu’un envoi forgé ne coûte pas des secondes de calcul ni des Mo en base. Un enregistrement réel en
+ * est loin (une dizaine de lots d’une douzaine d’écrans, un peu plus quand des écrans lourds les font couper).
+ */
+const MESSAGES_MAX = 3000;
+const TEXTE_MAX = 4000;
+const Envoi = z
+  .object({ app: AppliCaptures, lots: z.array(Sortie01).min(1).max(20) })
+  .refine(({ lots }) => {
+    const blocs = lots.flatMap((l) => l.blocs);
+    const messages = blocs.flatMap((b) => b.messages);
+    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
+  });
 
 /**
  * Un enregistrement d’écran, lu lot par lot (/api/captures/lot) : les lectures sont rassemblées (sans les messages

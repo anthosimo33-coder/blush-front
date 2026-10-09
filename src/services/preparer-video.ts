@@ -173,12 +173,21 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
   }
 }
 
-/** Les lots à lire : une douzaine d’images, chaque lot reprenant la dernière image du précédent (pour recoller les messages). */
-export function lotsDe<T>(images: T[], taille = 12): T[][] {
+/**
+ * Les lots à lire : une douzaine d’images, chaque lot reprenant la dernière image du précédent (pour recoller les
+ * messages). `poids` et `max` : un lot ne dépasse pas non plus ce poids (Vercel refuse un envoi de plus de 4,5 Mo).
+ */
+export function lotsDe<T>(images: T[], taille = 12, poids: (x: T) => number = () => 0, max = Infinity): T[][] {
   const lots: T[][] = [];
-  for (let i = 0; i < images.length; i += taille - 1) {
-    lots.push(images.slice(i, i + taille));
-    if (i + taille >= images.length) break;
+  let i = 0;
+  while (i < images.length) {
+    let j = i;
+    let total = 0;
+    while (j < images.length && j - i < taille && (j === i || total + poids(images[j]) <= max)) total += poids(images[j++]);
+    lots.push(images.slice(i, j));
+    if (j >= images.length) break;
+    /* Le lot suivant reprend la dernière image de celui-ci (sauf un lot d’une seule image : on avance) */
+    i = j - 1 > i ? j - 1 : j;
   }
   return lots;
 }

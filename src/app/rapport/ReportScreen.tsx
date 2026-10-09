@@ -34,8 +34,13 @@ import type { CibleImage } from "@/services/api";
 import { SoberReport } from "./SoberReport";
 import { VocalDuRapport } from "./Vocal";
 
-/** Où tu t’étais arrêté (ce navigateur seulement). */
-const RESUME_KEY = "blush.rapport.reprise.v1";
+/** Où tu t’étais arrêté, conv par conv (ce navigateur seulement). */
+const RESUME_KEY = "blush.rapport.reprise.v2";
+type Reprises = Record<string, number>;
+const lireReprises = (): Reprises => {
+  const brut = JSON.parse(localStorage.getItem(RESUME_KEY) ?? "{}") as unknown;
+  return brut && typeof brut === "object" ? (brut as Reprises) : {};
+};
 
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
@@ -194,25 +199,25 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   useEffect(() => {
     if (window.location.hash || window.scrollY > 200) return;
     try {
-      const saved = Number(JSON.parse(localStorage.getItem(RESUME_KEY) ?? "null")?.chapter);
+      const saved = Number(lireReprises()[report.storyId]);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du stockage local à l’arrivée
       if (saved >= 2 && openKey.split(",").map(Number).includes(saved)) setResume(saved);
     } catch {
       /* stockage indisponible : pas de reprise */
     }
-  }, [openKey]);
+  }, [openKey, report.storyId]);
 
   /* On garde le chapitre en cours ; la proposition de reprise s’efface dès qu’on lit plus loin */
   useEffect(() => {
     if (!current) return;
     try {
-      localStorage.setItem(RESUME_KEY, JSON.stringify({ chapter: current }));
+      localStorage.setItem(RESUME_KEY, JSON.stringify({ ...lireReprises(), [report.storyId]: current }));
     } catch {
       /* rien */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- la reprise devient inutile une fois la lecture repartie
     if (current >= 2) setResume(null);
-  }, [current]);
+  }, [current, report.storyId]);
 
   const goTo = useCallback((n: number) => {
     setMenu(false);
@@ -563,6 +568,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         open={paywall}
         onClose={() => setPaywall(false)}
         otherName={other.name}
+        chapitres={locked.length || undefined}
         onUnlocked={() => setPaywall(false)}
       />
     </Screen>

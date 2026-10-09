@@ -9,6 +9,7 @@ import { noterEcouteVocal } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import type { VocalRapport } from "@/types";
+import { bloquerDefilement } from "@/lib/defilement";
 
 /*
  * Le vocal de BLUSH, en haut du rapport : une tuile, puis une story plein écran. Elle parle, les perles du logo
@@ -85,6 +86,14 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
   const [termine, setTermine] = useState(false);
   const [t, setT] = useState(0);
   const [nouveau, setNouveau] = useState(false);
+  /* Le son se charge (réseau lent) : le logo ne « parle » pas dans le vide. Le son ne vient pas (réseau coupé) : on le dit */
+  const [attente, setAttente] = useState(false);
+  const [coupe, setCoupe] = useState(false);
+  /* Où en est l’écoute, pour la noter « fermée avant la fin » si on quitte la page (les états ne se lisent pas au démontage) */
+  const enCours = useRef(false);
+  useEffect(() => {
+    enCours.current = ouvert && !termine;
+  }, [ouvert, termine]);
 
   /* La tuile bouge tant que ce vocal n’a jamais été écouté (lu après le premier rendu : le stockage n’existe pas côté serveur) */
   useEffect(() => {
@@ -104,22 +113,37 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     return () => cancelAnimationFrame(raf);
   }, [joue]);
 
-  /* On quitte le rapport : le son s’arrête, et les sons de BLUSH retrouvent le mode silencieux */
-  useEffect(
-    () => () => {
+  /* On quitte le rapport (ou la page) : l’écoute en cours est notée fermée, le son s’arrête, les sons de BLUSH retrouvent le mode silencieux */
+  useEffect(() => {
+    const quitter = () => {
+      if (enCours.current && audio.current) noterEcouteVocal("ferme", audio.current.currentTime);
+      enCours.current = false;
+    };
+    window.addEventListener("pagehide", quitter);
+    return () => {
+      window.removeEventListener("pagehide", quitter);
+      quitter();
       audio.current?.pause();
       setForceSound(false);
-    },
-    [],
-  );
+    };
+  }, []);
 
   /* L’élément audio naît dans le toucher (sinon Safari refuse de jouer) et lit le fichier au fil de l’eau */
   const lecteur = () => {
-    if (audio.current) return audio.current;
+    /* Un élément en erreur ne repart pas : on en refait un (le réseau est peut-être revenu) */
+    if (audio.current && !audio.current.error) return audio.current;
     const a = new Audio(vocal.audio);
     a.preload = "auto";
     a.onplay = () => setJoue(true);
     a.onpause = () => setJoue(false);
+    a.onwaiting = a.onstalled = () => setAttente(true);
+    a.onplaying = () => setAttente(false);
+    a.onerror = () => {
+      setJoue(false);
+      setAttente(false);
+      setCoupe(true);
+      setForceSound(false);
+    };
     a.onended = () => {
       setJoue(false);
       setTermine(true);
@@ -132,6 +156,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
   };
 
   const jouer = (depuis?: number) => {
+    setCoupe(false);
     const a = lecteur();
     if (depuis !== undefined) {
       a.currentTime = depuis;
@@ -157,6 +182,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
   const fermer = () => {
     const a = audio.current;
     if (a && !termine) noterEcouteVocal("ferme", a.currentTime);
+    enCours.current = false;
     a?.pause();
     setForceSound(false);
     setOuvert(false);
@@ -211,8 +237,9 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
             fin={fin}
             sobre={sobre}
             t={t}
-            joue={joue}
+            joue={joue && !attente}
             termine={termine}
+            coupe={coupe}
             onFermer={fermer}
             onBasculer={basculer}
             onReculer={reculer}
@@ -234,6 +261,7 @@ function Story({
   t,
   joue,
   termine,
+  coupe,
   onFermer,
   onBasculer,
   onReculer,
@@ -246,6 +274,8 @@ function Story({
   t: number;
   joue: boolean;
   termine: boolean;
+  /** Le son ne vient pas (réseau coupé) : on le dit, lecture le relance. */
+  coupe: boolean;
   onFermer: () => void;
   onBasculer: () => void;
   onReculer: () => void;
@@ -266,9 +296,7 @@ function Story({
 
   /* La page derrière ne défile plus ; Échap ferme ; la barre de Safari prend la couleur de la story */
   useEffect(() => {
-    const html = document.documentElement;
-    const avantOverflow = html.style.overflow;
-    html.style.overflow = "hidden";
+    const liberer = bloquerDefilement();
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     const avantCouleur = meta?.content;
     if (meta) meta.content = sobre ? "#17171A" : "#0E0E10";
@@ -278,7 +306,7 @@ function Story({
     };
     window.addEventListener("keydown", touche);
     return () => {
-      html.style.overflow = avantOverflow;
+      liberer();
       if (meta && avantCouleur) meta.content = avantCouleur;
       window.removeEventListener("keydown", touche);
     };
@@ -300,7 +328,8 @@ function Story({
       <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col">
         <div className="flex flex-col gap-1.5 px-4 pt-3">
           <div className="h-[3px] overflow-hidden rounded-full bg-white/20">
-            <div className="h-full rounded-full bg-white" style={{ width: `${Math.min(100, (t / vocal.duree) * 100)}%` }} />
+            {/* Une échelle plutôt qu’une largeur : la barre avance sans recalculer la page à chaque image */}
+            <div className="h-full w-full origin-left rounded-full bg-white" style={{ transform: `scaleX(${Math.min(1, t / vocal.duree)})` }} />
           </div>
           <div className="flex h-11 items-center gap-2">
             {!sobre && <BubbleLogo size={24} />}
@@ -365,7 +394,9 @@ function Story({
                   </div>
                 )}
               </div>
-              <p className="m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-[16px] font-extrabold leading-[1.35] text-white/45 [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[14px]">{avant?.texte}</p>
+              <p role={coupe ? "alert" : undefined} className={cn("m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-[16px] font-extrabold leading-[1.35] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[14px]", coupe ? "text-white" : "text-white/45")}>
+                {coupe ? "Le vocal ne charge pas. Vérifie ta connexion, puis relance-le." : avant?.texte}
+              </p>
               {ligne && (
                 <p
                   key={k}

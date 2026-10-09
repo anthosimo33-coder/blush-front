@@ -15,6 +15,7 @@ export function useAccess() {
   const { data } = useQuery("account", getAccount);
   const plan = data?.subscription.plan;
   return {
+    initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,
     loaded: !!data,
     plan: plan ?? "gratuit",
     can: (need: Plan) => (plan ? RANK[plan] >= RANK[need] : false),
@@ -44,7 +45,7 @@ export function AppScreen({
   const blocked = !!requires && access.loaded && !access.can(requires);
   return (
     <>
-      <Screen desktopHeaderRight={<AccountPill />} mainWidth={600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
+      <Screen desktopHeaderRight={<AccountPill initial={access.initiale} />} mainWidth={600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
         {children}
       </Screen>
       {requires && (

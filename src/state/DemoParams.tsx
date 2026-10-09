@@ -18,6 +18,7 @@ import { readJourney, setJourney } from "@/state/journey";
 import { invalidate } from "@/lib/query";
 import type { DemoError, Plan } from "@/types";
 import { ErrorScreen } from "@/components/screens/ErrorScreen";
+import { BACKEND } from "@/services/mode";
 
 const PLANS: Plan[] = ["gratuit", "rapport", "blushplus"];
 const ERRORS: DemoError[] = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"];
@@ -34,6 +35,8 @@ export function DemoParams() {
   const convs = params.get("convs");
 
   useIsoLayoutEffect(() => {
+    /* Avec le vrai back-end, ces paramètres de démo ne touchent à rien (un lien ?histoire=couple changeait la conv ouverte). `?erreur=` reste : le vrai parcours s’en sert */
+    if (BACKEND) return;
     let changed = false;
     if (plan && PLANS.includes(plan as Plan)) {
       mockServer.set({ plan: plan as Plan });

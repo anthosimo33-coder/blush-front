@@ -13,7 +13,7 @@ import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
-import { contexteDe, histoireOuverte, histoiresDuCompte, metaDe, storyAffichee, type Ligne } from "./histoires";
+import { contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne } from "./histoires";
 import { aRelancer, etatDesTaches, planifier } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
@@ -71,7 +71,7 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
       const quand = parle && parle > l.createdAt ? parle : l.createdAt;
       const conv: ConvSummary = {
         storyId: l.id,
-        person: { id: "p-autre", name: autre, initial: autre[0]?.toUpperCase() ?? "?" },
+        person: { id: "p-autre", name: autre, initial: initialeDe(autre) },
         verdict: verdict ? { emoji: verdict.emoji, title: verdict.title } : null,
         level: sortie?.niveau ?? null,
         trend: sortie?.tendance ?? "",
@@ -301,7 +301,7 @@ export async function memoireDe(storyId: string): Promise<DonneesMemoire | null>
 export async function ficheDe(story: Ligne): Promise<Fiche> {
   const meta = metaDe(story);
   const autre = meta.participants[1 - (meta.moi ?? 0)];
-  const person = { id: "p-autre", name: autre.prenom, initial: autre.prenom[0]?.toUpperCase() ?? "?", pronoun: meta.pronom === "elle" ? ("il" as const) : ("elle" as const) };
+  const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: meta.pronom === "elle" ? ("il" as const) : ("elle" as const) };
   const m = await memoireDe(story.id);
   const fiche = m?.etat.fiche;
   if (!m || !fiche) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
