@@ -1,12 +1,14 @@
 import "server-only";
 import { eq, inArray, max } from "drizzle-orm";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import { cache } from "react";
 import { SUBSCRIPTIONS } from "@/mocks/daily";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story, VocalRapport } from "@/types";
-import { executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
+import { ENTETE_CONV } from "@/services/session";
+import { cloreLesAbandons, executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
@@ -29,7 +31,9 @@ import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
  */
 export const contexteRequete = cache(async (parcours = false): Promise<{ utilisateur: Utilisateur | null; story: Ligne | null }> => {
   const utilisateur = await utilisateurDeSession(await lireSession());
-  const story = await histoireOuverte(utilisateur, { brouillon: await lireBrouillon(), choisie: await lireChoisie() }, { parcours });
+  /* Un appel du navigateur désigne la conv de sa page (src/services/session.ts) ; une page qui se rend n’a pas cet en-tête */
+  const affichee = (await headers()).get(ENTETE_CONV);
+  const story = await histoireOuverte(utilisateur, { brouillon: await lireBrouillon(), choisie: await lireChoisie(), affichee }, { parcours });
   return { utilisateur, story };
 });
 
@@ -80,8 +84,9 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
     .map((x) => x.conv);
 }
 
-/** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. */
+/** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. Celles coupées à leur dernier essai passent en échec. */
 export async function relancer(storyId: string): Promise<void> {
+  await cloreLesAbandons(storyId);
   if ((await aRelancer(storyId)).length) after(() => executerChaine(storyId));
 }
 
@@ -156,6 +161,17 @@ async function ecritureDe(storyId: string, titres: Map<number, string>, autre: s
   };
 }
 
+/** Les étapes du rapport (et la mémoire qui le suit) : celles qu’une relance peut reprendre. */
+export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"] as const;
+
+/** L’écriture du rapport a-t-elle échoué pour de bon ? `refus` : le modèle refuse, une relance n’y changerait rien. */
+async function echecDuRapport(storyId: string): Promise<"panne" | "refus" | undefined> {
+  const { rapport_plan, rapport_chapitres } = await etatDesTaches(storyId, ["rapport_plan", "rapport_chapitres"]);
+  const t = [rapport_plan, rapport_chapitres].find((x) => x?.status === "echec");
+  if (!t) return undefined;
+  return t.error?.startsWith("refus") ? "refus" : "panne";
+}
+
 /** Le rapport tel que l’affiche le front. Sans accès : le verdict et les chapitres verrouillés. */
 export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
@@ -200,7 +216,8 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     enEcriture.push(pret && suite ? { ...pret, free: true, locked: false } : c);
   }
   const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
-  const ecriture = ouvert && !donnees ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;
+  const echec = ouvert && !donnees ? await echecDuRapport(story.id) : undefined;
+  const ecriture = ouvert && !donnees && !echec ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;
   const vocal = ouvert ? await vocalDuRapport(story, sortie, !!donnees) : undefined;
 
   return {
@@ -216,7 +233,8 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     sober: ouvert ? (donnees?.sobre ?? null) : null,
     access,
     /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente, et où en est l’écriture */
-    generating: ouvert && !donnees,
+    generating: ouvert && !donnees && !echec,
+    ...(echec ? { echec } : {}),
     ...(ecriture ? { ecriture } : {}),
     ...(vocal ? { vocal } : {}),
   };

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { play } from "@/lib/sound";
 import { createAccount, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
+import { connexionPuis } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -16,12 +18,20 @@ import { useJourney } from "@/state/journey";
 const LENGTH = 6;
 const RESEND_AFTER = 30;
 
+/** Ce qui a empêché la vérification, dit simplement (un mauvais code a son propre message). */
+const souciDe = (e: unknown) =>
+  e instanceof ErreurApi && e.code === "trop"
+    ? "Trop d’essais d’un coup. Attends quelques minutes, puis réessaie."
+    : e instanceof ErreurApi && e.code === "beta"
+      ? "Cet email n’est pas encore dans la bêta."
+      : "Ça n’a pas pu partir. Vérifie ta connexion et réessaie.";
+
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
  * du téléphone marchent), affiché en 6 cases. Le code complet valide tout seul.
  * `connexion` : on se reconnecte (un autre appareil) ; le bon code ouvre ses convs, sans relancer de lecture.
  */
-export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
+export function CodeScreen({ connexion = false, suite = "/app" }: { connexion?: boolean; suite?: string }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const [code, setCode] = useState("");
@@ -29,8 +39,12 @@ export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
   const [wrong, setWrong] = useState(false);
   const [wait, setWait] = useState(RESEND_AFTER);
   const [resent, setResent] = useState(false);
+  /* Autre chose qu’un mauvais code : trop d’essais, pas de réseau */
+  const [souci, setSouci] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const email = j.email.trim();
+  /* Revenir changer d’email garde la page où l’on allait */
+  const retour = !connexion ? "/email" : suite === "/app" ? "/connexion" : connexionPuis(suite);
 
   /* Le bouton « Renvoyer le code » se libère au bout de 30 secondes */
   useEffect(() => {
@@ -42,7 +56,16 @@ export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
   const verify = async (value: string) => {
     if (value.length !== LENGTH || busy) return;
     setBusy(true);
-    const { ok } = await verifyLoginCode(email, value);
+    setSouci(null);
+    let ok: boolean;
+    try {
+      ({ ok } = await verifyLoginCode(email, value));
+    } catch (e) {
+      play("non");
+      setBusy(false);
+      setSouci(souciDe(e));
+      return;
+    }
     play(ok ? "oui" : "non");
     if (!ok) {
       setBusy(false);
@@ -52,26 +75,39 @@ export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
       return;
     }
     if (connexion) {
-      router.push("/app");
+      /* La page où l’on allait. Le lien du mail (/ouvrir/…) est une route, pas une page : un vrai chargement */
+      if (suite.startsWith("/ouvrir/")) window.location.assign(suite);
+      else router.push(suite);
       return;
     }
-    await createAccount(email);
-    const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
-    set({ jobId });
-    router.push("/lecture");
+    try {
+      await createAccount(email);
+      const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
+      set({ jobId });
+      router.push("/lecture");
+    } catch {
+      /* Le code est bon (déjà utilisé), la session ouverte : « Qui es-tu ? » relance la lecture d’ici, et dit pourquoi elle bloque */
+      router.push("/qui");
+    }
   };
 
   const resend = async () => {
     setWait(RESEND_AFTER);
     setWrong(false);
-    await sendLoginCode(email);
-    setResent(true);
+    setSouci(null);
+    setResent(false);
+    try {
+      await sendLoginCode(email);
+      setResent(true);
+    } catch (e) {
+      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
+    }
   };
 
   return (
     <Screen
-      mobileTop={<MobileTopBar back={connexion ? "/connexion" : "/email"} progress={connexion ? undefined : 3} />}
-      desktopBack={{ target: connexion ? "/connexion" : "/email" }}
+      mobileTop={<MobileTopBar back={retour} progress={connexion ? undefined : 3} />}
+      desktopBack={{ target: retour }}
       aside={connexion ? undefined : <FlowSteps step={3} />}
       contentGap={22}
       head={
@@ -137,14 +173,15 @@ export function CodeScreen({ connexion = false }: { connexion?: boolean }) {
             Ce code ne marche pas. Vérifie-le, ou demande-en un nouveau.
           </p>
         )}
-        {!wrong && resent && <p className="m-0 text-[14px] font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
+        {!wrong && souci && <p className="m-0 text-[14px] font-extrabold text-[#D93036]">{souci}</p>}
+        {!wrong && !souci && resent && <p className="m-0 text-[14px] font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <button type="button" onClick={resend} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-toi-ink disabled:text-grey">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
-        <Link href={connexion ? "/connexion" : "/email"} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-ink no-underline">
+        <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-ink no-underline">
           Changer d’email
         </Link>
       </div>

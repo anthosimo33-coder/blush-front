@@ -16,7 +16,7 @@ import { useJourney } from "@/state/journey";
  * Se connecter : retrouver ses convs sur un autre appareil. L’email du compte, un code (pas de mot de passe),
  * et tout est là. Textes relus le 8 octobre (voix de BLUSH).
  */
-export function ConnexionScreen() {
+export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const [touched, setTouched] = useState(false);
@@ -33,7 +33,7 @@ export function ConnexionScreen() {
     setProblem(null);
     try {
       await sendLoginCode(j.email.trim());
-      router.push("/connexion/code");
+      router.push(suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
       /* Bêta fermée, email pas invité (donc sans compte) : il est sur la liste d’attente, l’écran de la liste le lui dit */

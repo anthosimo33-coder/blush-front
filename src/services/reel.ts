@@ -4,7 +4,8 @@
  */
 import type { AnalysisProgress, AppKind, BlushAnswer, Fiche, FicheFact, FicheUpdate, Guess, Goal, Plan, Source, Story, Subscription } from "@/types";
 import { preparerCaptures } from "./preparer-captures";
-import type { Account, ReportPayload } from "./api";
+import { ENTETE_CONV, lireConvDeLaPage } from "./session";
+import type { Account, ReportPayload, VerdictMontre } from "./api";
 import { analyserExport, ExportIllisible, preparerExport, type ConvInstagram } from "./preparer-export";
 import { imagesDeLaVideo, lotsDe, VideoIllisible } from "./preparer-video";
 
@@ -24,8 +25,16 @@ export class ErreurApi extends Error {
   }
 }
 
+/** Les en-têtes d’un appel, avec la conv de la page (voir ENTETE_CONV). */
+export function avecConv(entetes?: HeadersInit): Headers {
+  const h = new Headers(entetes);
+  const conv = lireConvDeLaPage();
+  if (conv) h.set(ENTETE_CONV, conv);
+  return h;
+}
+
 async function appel<T>(chemin: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(chemin, { credentials: "same-origin", cache: "no-store", ...init });
+  const r = await fetch(chemin, { credentials: "same-origin", cache: "no-store", ...init, headers: avecConv(init.headers) });
   const corps = (await r.json().catch(() => ({}))) as { erreur?: string };
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
   return corps as T;
@@ -78,9 +87,7 @@ export const reel = {
     return appel<{ source: Source; messagesRead: number }>("/api/captures/video", envoi("POST", { app, lots: lus }));
   },
   /** Le lien de partage du verdict (son identifiant) : le créer (toujours le même), le désactiver. */
-  async creerLienPartage(): Promise<string> {
-    return (await appel<{ id: string }>("/api/partage", envoi("POST"))).id;
-  },
+  creerLienPartage: () => appel<{ id: string; verdict: VerdictMontre | null }>("/api/partage", envoi("POST")),
   async desactiverLienPartage(): Promise<void> {
     await appel("/api/partage", envoi("DELETE"));
   },
@@ -124,6 +131,8 @@ export const reel = {
   resumeAnalysis: () => appel<{ jobId: string }>("/api/analyse", envoi("POST", {})),
   getAnalysisProgress: () => appel<AnalysisProgress>("/api/analyse"),
   getReport: () => appel<ReportPayload>("/api/rapport"),
+  /** « Relancer l’écriture » d’un rapport en échec : le rapport tel qu’il repart. */
+  relancerRapport: () => appel<ReportPayload>("/api/rapport", envoi("POST")),
   /** Un moment de l’écoute du vocal (A/B test des voix). Sans réponse attendue : un échec ne gêne pas l’écoute. */
   modeVocal: (actif: boolean) => appel<{ modeVocal: boolean }>("/api/chat/vocal", envoi("POST", { actif })).catch(() => {}),
   ecouteVocal: (evenement: "debut" | "fin" | "reecoute" | "ferme", position: number) => appel<{ ok: true }>("/api/vocal/ecoute", envoi("POST", { evenement, position })).catch(() => {}),

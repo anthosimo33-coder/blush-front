@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 
@@ -52,6 +52,36 @@ export async function echouer(t: Tache, code: string, definitif = false): Promis
     .update(schema.tasks)
     .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), updatedAt: new Date() })
     .where(eq(schema.tasks.id, t.id));
+}
+
+/**
+ * Les tâches coupées à leur dernier essai (l’instance arrêtée en pleine étape : `echouer` n’a jamais tourné) passent
+ * en échec. Sans ça, elles resteraient « en cours » pour toujours : plus rien ne les reprend, et rien ne le dit.
+ */
+export async function clore(storyId: string): Promise<Tache[]> {
+  return db()
+    .update(schema.tasks)
+    .set({ status: "echec", error: "coupee", updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.tasks.storyId, storyId),
+        eq(schema.tasks.status, "en_cours"),
+        gte(schema.tasks.attempts, ESSAIS_MAX),
+        lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`),
+      ),
+    )
+    .returning();
+}
+
+/** Remet en attente, pour un nouvel essai complet, les tâches en échec de ces genres (la plus récente de chacun). */
+export async function reprendre(storyId: string, genres: Genre[]): Promise<number> {
+  const etat = await etatDesTaches(storyId, genres);
+  const ids = Object.values(etat)
+    .filter((t) => t.status === "echec")
+    .map((t) => t.id);
+  if (!ids.length) return 0;
+  await db().update(schema.tasks).set({ status: "attente", attempts: 0, error: null, updatedAt: new Date() }).where(inArray(schema.tasks.id, ids));
+  return ids.length;
 }
 
 /** Les tâches d’une histoire à (re)lancer : en attente, ou abandonnées. */
