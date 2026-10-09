@@ -1,11 +1,17 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { serveurDeTest } from "./env";
 import { STORY_COOKIE } from "@/services/session";
 
 /* Les deux cookies du back-end : la session, et le brouillon (une conv importée avant l’email). httpOnly : le navigateur ne les lit pas. */
 const SESSION = "blush-session";
 const BROUILLON = "blush-brouillon";
-const options = (expires: Date) => ({ httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", expires });
+/*
+ * Secure en production (Vercel compris), sauf sur le serveur des tests de bout en bout, qui sert http://localhost : le
+ * WebKit de Linux (celui de la CI) y refuse un cookie Secure, et la session ne tiendrait pas.
+ */
+export const cookieSecurise = () => process.env.NODE_ENV === "production" && !serveurDeTest();
+const options = (expires: Date) => ({ httpOnly: true, secure: cookieSecurise(), sameSite: "lax" as const, path: "/", expires });
 
 export const lireSession = async () => (await cookies()).get(SESSION)?.value;
 /** Une session dans la requête, sans la vérifier (ce qui ne fait qu’adapter l’affichage). */
@@ -22,5 +28,5 @@ export const effacerBrouillon = async () => (await cookies()).delete(BROUILLON);
  */
 export const lireChoisie = async () => (await cookies()).get(STORY_COOKIE)?.value;
 export const poserChoisie = async (id: string) =>
-  (await cookies()).set(STORY_COOKIE, id, { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 365 * 86400 });
+  (await cookies()).set(STORY_COOKIE, id, { httpOnly: false, secure: cookieSecurise(), sameSite: "lax", path: "/", maxAge: 365 * 86400 });
 export const effacerChoisie = async () => (await cookies()).delete(STORY_COOKIE);
