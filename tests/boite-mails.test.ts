@@ -67,3 +67,33 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(readdirSync(boite)).toHaveLength(0);
   });
 });
+
+describe("les cookies Secure", () => {
+  const securise = async () => {
+    vi.resetModules();
+    return (await import("@/server/cookies")).cookieSecurise();
+  };
+
+  it("en production : Secure, même avec le modèle factice ou la boîte seuls", async () => {
+    vi.stubEnv("BLUSH_BOITE_MAILS", undefined);
+    expect(await securise()).toBe(true);
+    vi.stubEnv("BLUSH_BOITE_MAILS", boite);
+    vi.stubEnv("BLUSH_IA_FACTICE", "0");
+    expect(await securise()).toBe(true);
+  });
+
+  it("sur Vercel : toujours Secure, même si les variables des tests y traînent", async () => {
+    vi.stubEnv("VERCEL", "1");
+    expect(await securise()).toBe(true);
+  });
+
+  it("sur le serveur des tests de bout en bout (http://localhost) : pas Secure, sans quoi le WebKit de Linux refuse la session", async () => {
+    expect(await securise()).toBe(false);
+  });
+
+  it("en dev : pas Secure, comme avant", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("BLUSH_BOITE_MAILS", undefined);
+    expect(await securise()).toBe(false);
+  });
+});
