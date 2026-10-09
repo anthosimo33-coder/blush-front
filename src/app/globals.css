@@ -4,6 +4,10 @@
 
 /* BLUSH · Design system « Le jeu » — tokens repris de maquettes/design-tokens.css */
 :root {
+  /* Les polices (src/app/polices.ts) : les alphabets rares d’abord, le latin et sa police de repli en dernier */
+  --font-nunito: var(--font-nunito-cyrillique-ext), var(--font-nunito-cyrillique), var(--font-nunito-vietnamien), var(--font-nunito-latin-ext), var(--font-nunito-latin);
+  --font-figtree: var(--font-figtree-latin-ext), var(--font-figtree-latin);
+
   --paper: #f4f2ed;
   --paper-light: radial-gradient(120% 55% at 50% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 62%), #f4f2ed;
   --white: #ffffff;
