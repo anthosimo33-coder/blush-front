@@ -1,4 +1,5 @@
-import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -144,7 +145,16 @@ export const tasks = pgTable(
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("tasks_story_idx").on(t.storyId, t.kind)],
+  (t) => [
+    index("tasks_story_idx").on(t.storyId, t.kind),
+    /*
+     * Une seule étape de la chaîne en attente ou en cours par histoire : deux déblocages, deux onglets ou deux relances
+     * en même temps ne font pas écrire (et payer) deux rapports. Les mises à jour de la mémoire, elles, s’empilent.
+     */
+    uniqueIndex("tasks_une_par_etape")
+      .on(t.storyId, t.kind)
+      .where(sql`${t.status} in ('attente', 'en_cours') and ${t.kind} in ('verdict', 'rapport_plan', 'rapport_chapitres', 'vocal', 'memoire')`),
+  ],
 );
 
 /**

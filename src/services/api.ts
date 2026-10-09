@@ -241,8 +241,12 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
   return opened(storyId).questionIdeas.map((a) => a.question);
 }
 
+/**
+ * La question du rapport. Back-end : elle passe par le chat ; une erreur (le rapport s’écrit encore, plus de réseau)
+ * remonte telle quelle, pour que l’écran garde la question et le dise (voir souciQuestion), au lieu d’en faire une réponse.
+ */
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  if (BACKEND) return enQuestion(question, await envoyerAuChat(() => reel.sendToBlush(question)));
+  if (BACKEND) return enQuestion(question, await reel.sendToBlush(question));
   await delay(2000);
   mockServer.set({ questionAsked: question });
   return answerTo(question);
@@ -362,6 +366,14 @@ const ERREURS_CHAT: Record<string, string | string[]> = {
   vocal: "ton vocal est trop long, même pour moi 😭 fais-moi la version courte",
   transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
 };
+
+/** Pourquoi une question n’a pas pu partir, dit par BLUSH, en une phrase (le code d’erreur du serveur). */
+export function souciQuestion(e: unknown): string {
+  const code = e instanceof ErreurApi ? e.code : "";
+  if (code.startsWith("refus")) return "là-dessus je peux pas t’aider, reformule ta question";
+  const m = ERREURS_CHAT[code];
+  return m ? (Array.isArray(m) ? m.join(", ") : m) : "j’ai eu un bug, renvoie-moi ta question";
+}
 
 async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<BlushAnswer> {
   try {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, setQueryData } from "@/lib/query";
-import { askQuestion, getQuestion } from "@/services/api";
+import { askQuestion, getQuestion, souciQuestion } from "@/services/api";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/cards";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -15,13 +15,19 @@ export function QuestionScreen() {
   const { data: answer, loading } = useQuery("question", getQuestion);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [souci, setSouci] = useState<string | null>(null);
   const asked = answer?.question ?? (busy ? draft : null);
 
   const submit = async () => {
     if (!draft.trim() || busy) return;
     setBusy(true);
-    const a = await askQuestion(draft.trim());
-    setQueryData("question", a);
+    setSouci(null);
+    try {
+      setQueryData("question", await askQuestion(draft.trim()));
+    } catch (e) {
+      /* La question reste dans le champ, et on dit pourquoi elle n’est pas partie */
+      setSouci(souciQuestion(e));
+    }
     setBusy(false);
   };
 
@@ -48,6 +54,11 @@ export function QuestionScreen() {
       <label htmlFor="question" className="text-[13px] font-black text-grey">
         Ta question
       </label>
+      {souci && (
+        <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
+          {souci}
+        </p>
+      )}
       {asked ? (
         <Card className="flex flex-col gap-2 px-4 py-3.5">
           <div className="text-[17px] font-black leading-[1.45]">{asked}</div>

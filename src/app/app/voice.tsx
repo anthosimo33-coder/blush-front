@@ -44,6 +44,8 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
   const [seconds, setSeconds] = useState(0);
   const [levels, setLevels] = useState<number[]>([]);
   const session = useRef<Session | null>(null);
+  /* L’écran est-il toujours là ? Le micro s’ouvre après un temps : si on a quitté l’écran entre-temps, on le referme */
+  const monte = useRef(true);
   const handlers = useRef({ onError, onLimit });
 
   useEffect(() => {
@@ -51,16 +53,17 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
   }, [onError, onLimit]);
 
   /* On coupe le micro si on quitte l’écran en plein enregistrement */
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
       const s = session.current;
       if (!s) return;
       if (s.recorder.state !== "inactive") s.recorder.stop();
       release(s);
       session.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const start = async () => {
     if (phase !== "idle") return;
@@ -69,6 +72,8 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       return;
     }
     setPhase("starting");
+    /* Un vocal qui joue (de BLUSH ou le tien) s’arrête : on ne s’enregistre pas par-dessus */
+    enCours?.pause();
     /* Safari doit pouvoir ouvrir le micro : les sons de BLUSH lui rendent la session audio le temps du vocal */
     setRecording(true);
     /* Le contexte audio naît pendant le toucher : sur iPhone, sinon, il reste muet */
@@ -82,6 +87,13 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       setRecording(false);
       setPhase("idle");
       handlers.current.onError("denied");
+      return;
+    }
+    /* L’écran a été quitté pendant que le micro s’ouvrait : on le referme tout de suite, rien ne s’enregistre */
+    if (!monte.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      ctx?.close().catch(() => {});
+      setRecording(false);
       return;
     }
     let recorder: MediaRecorder;
@@ -224,6 +236,8 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
     if (!a) {
       const el = new Audio(clip.url);
       el.ontimeupdate = () => setProgress(el.currentTime / (Number.isFinite(el.duration) && el.duration > 0 ? el.duration : clip.seconds));
+      /* Arrêté d’ailleurs (un autre vocal lancé, un enregistrement) : le bouton revient sur lecture */
+      el.onpause = () => setPlaying(false);
       el.onended = () => {
         setPlaying(false);
         setProgress(0);
@@ -232,6 +246,8 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
       a = el;
     }
     if (a.paused) {
+      if (enCours && enCours !== a) enCours.pause();
+      enCours = a;
       a.play()
         .then(() => setPlaying(true))
         .catch(() => setPlaying(false));
@@ -261,7 +277,7 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
   );
 }
 
-/* Un seul vocal de BLUSH à la fois : en lancer un arrête celui qui jouait */
+/* Un seul vocal à la fois (de BLUSH ou le tien) : en lancer un arrête celui qui jouait */
 let enCours: HTMLAudioElement | null = null;
 
 /**
@@ -290,11 +306,18 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
       el.preload = "auto";
       el.ontimeupdate = () => setT(el.currentTime);
       el.onplay = () => setPlaying(true);
-      el.onpause = () => setPlaying(false);
+      /*
+       * En pause (à la main, ou par un autre vocal) : les sons de l’appli reviennent en « ambient », muets en mode
+       * silencieux. Seulement s’il était le vocal en cours : celui qui le remplace garde sa session « lecture ».
+       */
+      el.onpause = () => {
+        setPlaying(false);
+        if (enCours === el) setForceSound(false);
+      };
       el.onended = () => {
         setPlaying(false);
         setT(0);
-        setForceSound(false);
+        if (enCours === el) setForceSound(false);
       };
       audio.current = el;
       a = el;
@@ -303,7 +326,11 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
       if (enCours && enCours !== a) enCours.pause();
       enCours = a;
       setForceSound(true);
-      a.play().catch(() => setPlaying(false));
+      const el = a;
+      a.play().catch(() => {
+        setPlaying(false);
+        if (enCours === el) setForceSound(false);
+      });
     } else a.pause();
   };
 

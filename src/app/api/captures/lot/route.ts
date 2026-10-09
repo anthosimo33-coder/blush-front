@@ -3,6 +3,7 @@ import { imagesDe, lireLot } from "@/server/captures";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { ErreurImport } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { avecEcheance } from "@/server/echeance";
 
 /* Un lot d’une douzaine d’images : jusqu’à une minute de lecture */
 export const maxDuration = 180;
@@ -11,7 +12,7 @@ export const maxDuration = 180;
  * Un lot d’images tirées d’un enregistrement d’écran (dans le navigateur) : BLUSH les lit (prompt 01) et rend
  * sa lecture brute. Les images ne sont gardées nulle part. Les lots sont ensuite rassemblés (/api/captures/video).
  */
-export async function POST(req: Request) {
+async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   if (!(await sousLaLimite(`lot:${ipDe(req)}`, LIMITES.lotParIp))) return erreur("trop", 429);
   const fd = await req.formData().catch(() => null);
@@ -23,4 +24,9 @@ export async function POST(req: Request) {
     if (e instanceof ErreurImport) return erreur(e.code, 422);
     throw e;
   }
+}
+
+/** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
+export function POST(req: Request) {
+  return avecEcheance(170_000, () => traiter(req));
 }

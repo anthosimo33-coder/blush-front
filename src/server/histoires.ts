@@ -1,8 +1,9 @@
 import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { gunzipSync, strFromU8, unzipSync } from "fflate";
+import { gunzipSync } from "node:zlib";
+import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
-import { detecterFormat, erreurImport, lire, participantsDe, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
+import { detecterFormat, erreurImport, lire, participantsDe, principaux, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
 import { prenomDe } from "@prompts/lib/ajouts";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
@@ -13,6 +14,8 @@ import type { Utilisateur } from "./auth";
 
 /** Le texte d’une conv, même très longue, tient sous cette taille (une fois décompressé). */
 export const TAILLE_MAX = 40 * 1024 * 1024;
+/** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
+const FICHIERS_MAX = 200;
 
 export class ErreurImport extends Error {
   constructor(readonly code: "fichier" | "groupe" | "courte") {
@@ -31,6 +34,8 @@ export type Meta = {
   resume: { debut: string; fin: string; total: number; vocaux: number };
   /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
   captures?: number;
+  /** L’export était trop long pour partir en entier : seule sa partie la plus récente a été gardée (de `resume.debut` à la fin). */
+  coupe?: boolean;
   /** Rempli sur « Qui es-tu ? » : l’index de l’utilisateur dans `participants`, son pronom, sa devinette, son objectif. */
   moi?: 0 | 1;
   pronom?: Pronom;
@@ -54,8 +59,18 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
   const octets = new Uint8Array(await fichier.arrayBuffer());
   let fichiers = [{ nom: fichier.name, contenu: "" }];
   if (octets[0] === 0x50 && octets[1] === 0x4b) {
+    /* Une archive piégée (quelques Mo qui en font des Go) : on compte ce qu’on décompresse, au total, avant de le faire */
+    let total = 0;
+    let nombre = 0;
     try {
-      const contenu = unzipSync(octets, { filter: (f) => estFichierUtile(f.name) && f.originalSize < TAILLE_MAX });
+      const contenu = unzipSync(octets, {
+        filter: (f) => {
+          if (!estFichierUtile(f.name)) return false;
+          total += f.originalSize;
+          if (++nombre > FICHIERS_MAX || total > TAILLE_MAX) throw new ErreurImport("fichier");
+          return true;
+        },
+      });
       fichiers = Object.entries(contenu).map(([nom, o]) => ({ nom, contenu: strFromU8(o) }));
     } catch {
       throw new ErreurImport("fichier");
@@ -67,32 +82,36 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
   return { ...lu, nom: fichier.name };
 }
 
-const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(50) });
+const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(50), coupe: z.boolean().optional() });
 
-/** Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici. */
-export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string }> {
+/**
+ * Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici.
+ * `coupe` : la conv était trop longue pour partir en entier, le navigateur n’a gardé que sa partie la plus récente.
+ */
+export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string; coupe?: boolean }> {
   if (paquet.size > 4.5 * 1024 * 1024 || paquet.size === 0) throw new ErreurImport("fichier");
   try {
-    const octets = gunzipSync(new Uint8Array(await paquet.arrayBuffer()));
-    if (octets.length > TAILLE_MAX) throw new ErreurImport("fichier");
-    const p = Paquet.parse(JSON.parse(strFromU8(octets)));
+    /* La décompression s’arrête d’elle-même à TAILLE_MAX : un paquet piégé ne remplit pas la mémoire du serveur */
+    const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TAILLE_MAX });
+    const p = Paquet.parse(JSON.parse(octets.toString("utf8")));
     const lu = lireExport(p.parties);
     if (!lu) throw new ErreurImport("fichier");
-    return { ...lu, nom: p.nom };
+    return { ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}) };
   } catch {
     throw new ErreurImport("fichier");
   }
 }
 
 /** Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. */
-export async function importer({ nom, appli, texte }: ExportLu & { nom: string }): Promise<{ id: string; meta: Meta; secret: string }> {
+export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta; secret: string }> {
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
-  const noms = participantsDe(texte);
+  /* Un nom qui n’apparaît qu’à peine (un message collé d’un autre) ne fait pas une conv de groupe : ses lignes restent du texte */
+  const noms = principaux(participantsDe(texte));
   if (noms.length > 2) throw new ErreurImport("groupe");
   if (noms.length < 2) throw new ErreurImport("courte");
   const personne = (k: number) => ({ prenom: prenomDe(noms[k].nom), pronom: "il" as const, nomExport: noms[k].nom });
-  const lu = lire(texte, { utilisateur: personne(0), autre: personne(1), format });
+  const lu = lire(texte, { utilisateur: personne(0), autre: personne(1), format }, { autresEnTexte: true });
   const err = erreurImport(lu);
   if (err) throw new ErreurImport(err);
   const meta: Meta = {
@@ -106,6 +125,7 @@ export async function importer({ nom, appli, texte }: ExportLu & { nom: string }
       total: lu.messages.length,
       vocaux: lu.messages.filter((m) => m.media === "vocal").length,
     },
+    ...(coupe ? { coupe: true } : {}),
   };
   const secret = jeton();
   const [ligne] = await db()
@@ -288,13 +308,26 @@ export function storyAffichee(id: string, meta: Meta): Story {
     sources: [
       meta.captures
         ? { id: "s1", app: meta.appli, mode: "captures", screenshotCount: meta.captures, label: `${APPLIS[meta.appli]} · ${meta.captures} captures`, period: periode, messageCount: total, voiceCount: vocaux }
-        : { id: "s1", app: meta.appli, mode: "export", fileName: meta.fichier, label: `${APPLIS[meta.appli]} · ${dateCourte(debut)}`, period: periode, messageCount: total, voiceCount: vocaux },
+        : {
+            id: "s1",
+            app: meta.appli,
+            mode: "export",
+            fileName: meta.fichier,
+            label: `${APPLIS[meta.appli]} · ${dateCourte(debut)}`,
+            period: periode,
+            messageCount: total,
+            voiceCount: vocaux,
+            /* Une conv trop longue, coupée : combien de mois BLUSH en lit */
+            ...(meta.coupe ? { moisLus: Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / (30.44 * 86400e3))) } : {}),
+          },
     ],
     totalMessages: total,
     voiceCount: vocaux,
     period: periode,
     durationLabel: `${jours} jour${jours > 1 ? "s" : ""}`,
     updatedLabel: "aujourd’hui",
+    /* Qui est l’utilisateur : le rapport ouvert depuis le mail (un autre onglet, sans parcours) met les bons avatars */
+    ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),
   };
 }
 

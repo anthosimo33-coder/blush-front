@@ -1,11 +1,11 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
 import { envoyerCodeParEmail } from "./email";
-import { accesLibre } from "./env";
+import { accesLibre, peutEntrer } from "./env";
 
 const SESSION_JOURS = 90;
 const CODE_MINUTES = 10;
@@ -33,14 +33,23 @@ export async function envoyerCode(email: string): Promise<void> {
 
 /** Vérifie le code. Bon : crée le compte s’il n’existe pas et le renvoie. */
 export async function verifierCode(email: string, code: string): Promise<Utilisateur | null> {
-  const [ligne] = await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email));
-  if (!ligne || ligne.expiresAt < new Date() || ligne.attempts >= CODE_ESSAIS) return null;
-  await db()
+  /*
+   * L’essai est compté avant de comparer, en une seule requête : des essais envoyés en même temps ne passent pas tous
+   * sous la limite (lire puis écrire laissait chacun voir le même compte).
+   */
+  const [ligne] = await db()
     .update(schema.loginCodes)
-    .set({ attempts: ligne.attempts + 1 })
-    .where(eq(schema.loginCodes.email, email));
+    .set({ attempts: sql`${schema.loginCodes.attempts} + 1` })
+    .where(and(eq(schema.loginCodes.email, email), lt(schema.loginCodes.attempts, CODE_ESSAIS), gt(schema.loginCodes.expiresAt, new Date())))
+    .returning({ codeHash: schema.loginCodes.codeHash });
+  if (!ligne) return null;
   if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return null;
-  await db().delete(schema.loginCodes).where(eq(schema.loginCodes.email, email));
+  /* Le code ne sert qu’une fois : deux bons essais en même temps, un seul ouvre la session */
+  const [pris] = await db()
+    .delete(schema.loginCodes)
+    .where(and(eq(schema.loginCodes.email, email), eq(schema.loginCodes.codeHash, ligne.codeHash)))
+    .returning({ email: schema.loginCodes.email });
+  if (!pris) return null;
 
   const [existant] = await db().select().from(schema.users).where(eq(schema.users.email, email));
   const utilisateur =
@@ -66,7 +75,10 @@ export async function ouvrirSession(userId: string): Promise<{ secret: string; e
   return { secret, expiresAt };
 }
 
-/** Le compte d’une session, ou null. */
+/**
+ * Le compte d’une session, ou null. Bêta fermée : un email retiré de la liste n’entre plus, même avec une session
+ * ouverte avant (elle dure 90 jours). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
+ */
 export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   if (!secret) return null;
   const [ligne] = await db()
@@ -74,7 +86,7 @@ export async function utilisateurDeSession(secret: string | undefined): Promise<
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
     .where(and(eq(schema.sessions.id, empreinte(secret)), gt(schema.sessions.expiresAt, new Date())));
-  return ligne?.user ?? null;
+  return ligne && peutEntrer(ligne.user.email) ? ligne.user : null;
 }
 
 export async function fermerSession(secret: string): Promise<void> {

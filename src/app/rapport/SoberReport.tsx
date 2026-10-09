@@ -8,6 +8,7 @@ import { invalidate } from "@/lib/query";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
+import { pagePrecedente } from "@/lib/navigation";
 
 /*
  * Écrans 18-19 — Mode sobre : quand le verdict est dur, BLUSH sort du jeu.
@@ -53,7 +54,8 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
     titleRef.current?.focus();
   }, [step]);
 
-  const back = () => (step === 2 ? setStep(1) : router.back());
+  /* Ouvert directement (le lien du mail) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
+  const back = () => (step === 2 ? setStep(1) : pagePrecedente() ? router.back() : router.push("/app"));
 
   return (
     <div className="flex min-h-dvh justify-center bg-paper">

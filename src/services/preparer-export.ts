@@ -5,6 +5,7 @@
  */
 import { gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
+import { BLOC_HTML } from "@prompts/lib/instagram";
 
 /** Un fichier de texte plus gros n’est pas une conv */
 const TAILLE_MAX = 50 * 1024 * 1024;
@@ -18,7 +19,60 @@ export class ExportIllisible extends Error {
 /** Une conv d’un export Instagram complet, telle qu’on la propose au choix. */
 export type ConvInstagram = { id: string; nom: string; messages: number; derniere: string; groupe: boolean };
 
-const paquet = (nom: string, parties: Partie[]) => new Blob([gzipSync(strToU8(JSON.stringify({ nom, parties })))], { type: "application/gzip" });
+/** Ce que Vercel accepte au plus dans un envoi (4,5 Mo), moins une marge pour le formulaire. */
+const ENVOI_MAX = 4.2 * 1024 * 1024;
+
+const compresser = (nom: string, parties: Partie[], coupe: boolean) => gzipSync(strToU8(JSON.stringify({ nom, parties, ...(coupe ? { coupe: true } : {}) })));
+
+/**
+ * Le paquet compressé. Une conv trop longue pour partir (plus de 15 Mo de texte environ : des années de messages)
+ * garde sa partie la plus récente, celle qui tient (`coupe` : l’écran suivant dit combien de mois BLUSH lit).
+ */
+function paquet(nom: string, parties: Partie[]): Blob {
+  let gz = compresser(nom, parties, false);
+  let garde = parties;
+  for (let essai = 0; gz.length > ENVOI_MAX && essai < 6; essai++) {
+    garde = garderLaFin(garde, (ENVOI_MAX * 0.92) / gz.length);
+    gz = compresser(nom, garde, true);
+  }
+  if (gz.length > ENVOI_MAX) throw new ExportIllisible("fichier");
+  return new Blob([gz], { type: "application/gzip" });
+}
+
+/**
+ * La part la plus récente d’une conv, environ `part` de sa taille (de 0 à 1) : les plus anciens messages partent.
+ * WhatsApp : un .txt, du plus ancien au plus récent ; on coupe au début d’un message. Instagram : message_1 est le plus
+ * récent, et chaque fichier va du plus récent au plus ancien ; les fichiers les plus anciens partent d’abord.
+ */
+export function garderLaFin(parties: Partie[], part: number): Partie[] {
+  if (parties.length === 1 && /\.txt$/i.test(parties[0].nom)) {
+    const c = parties[0].contenu;
+    /* Le premier début de message (une ligne qui commence par une date) après la coupe */
+    const debut = /\n(?=\[?\d{1,4}[./-]\d{1,2}[./-]\d{2,4})/g;
+    debut.lastIndex = Math.floor(c.length * (1 - part));
+    const m = debut.exec(c);
+    return [{ ...parties[0], contenu: c.slice(m ? m.index + 1 : debut.lastIndex) }];
+  }
+  let reste = parties.reduce((n, p) => n + p.contenu.length, 0) * part;
+  const gardees: Partie[] = [];
+  for (const p of parties) {
+    if (reste <= 0) break;
+    gardees.push(p.contenu.length <= reste ? p : couperInstagram(p, reste / p.contenu.length));
+    reste -= p.contenu.length;
+  }
+  return gardees;
+}
+
+/** Les messages les plus récents d’un fichier d’Instagram (JSON ou HTML), environ `part` d’entre eux. */
+function couperInstagram(p: Partie, part: number): Partie {
+  if (/\.json$/i.test(p.nom)) {
+    const j = JSON.parse(p.contenu) as { messages?: unknown[] };
+    const messages = j.messages ?? [];
+    return { ...p, contenu: JSON.stringify({ ...j, messages: messages.slice(0, Math.max(1, Math.floor(messages.length * part))) }) };
+  }
+  const [tete, ...blocs] = p.contenu.split(BLOC_HTML);
+  return { ...p, contenu: [tete, ...blocs.slice(0, Math.max(1, Math.floor(blocs.length * part)))].join(BLOC_HTML) };
+}
 
 /**
  * Le fichier choisi, prêt à partir : un paquet, ou (un export Instagram complet) la liste de ses convs à choisir,

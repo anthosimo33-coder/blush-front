@@ -40,6 +40,8 @@ export type Source = {
   period: string;
   messageCount: number;
   voiceCount?: number;
+  /** Un export trop long pour partir en entier : BLUSH n’en lit que les derniers mois (combien). */
+  moisLus?: number;
 };
 
 /** Une conv du compte, telle que la liste « Tes convs » la montre : qui, où vous en êtes, quand BLUSH en a parlé pour la dernière fois. */
@@ -66,6 +68,8 @@ export type Story = {
   period: string;
   durationLabel: string;
   updatedLabel: string;
+  /** Back-end : qui est l’utilisateur (une fois « Qui es-tu ? » rempli). Sans, l’écran se fie au parcours de l’onglet. */
+  me?: Person["id"];
 };
 
 export type ScoreRow = {

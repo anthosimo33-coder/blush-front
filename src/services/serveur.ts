@@ -8,7 +8,7 @@ import { CONVS_COOKIE } from "@/mocks/convs";
 import { demoConvs } from "@/mocks/stories";
 import { PEOPLE, STORY } from "@/mocks/story";
 import { historique } from "@/server/chat";
-import { contexteRequete, convsDe, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
+import { contexteRequete, convsDe, ficheDe, finDeLecture, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
 import { metaDe, quiRempli, storyAffichee } from "@/server/histoires";
 import { currentStoryId } from "./session.server";
 import { connexionPuis } from "@/lib/suite";
@@ -70,11 +70,16 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
   return story ? questionsDe(story.id) : [];
 }
 
-/** Les échanges déjà eus avec BLUSH, à réafficher sur l’accueil. Rien en démo. */
-export async function getChat(): Promise<{ echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean }> {
+/**
+ * Les échanges déjà eus avec BLUSH, à réafficher sur l’accueil, et l’heure de l’intro (quand la lecture s’est finie,
+ * l’heure du verdict). Rien en démo.
+ */
+export async function getChat(): Promise<{ echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean; introAt?: number }> {
   if (!BACKEND) return { echanges: [], plus: false };
   const { utilisateur, story } = await contexteRequete();
-  return utilisateur && story ? historique(story.id) : { echanges: [], plus: false };
+  if (!utilisateur || !story) return { echanges: [], plus: false };
+  const [h, introAt] = await Promise.all([historique(story.id), finDeLecture(story.id)]);
+  return { ...h, ...(introAt ? { introAt } : {}) };
 }
 
 /** Toi et elle, pour « Mon compte ». Démo : Hugo et Sophie. */

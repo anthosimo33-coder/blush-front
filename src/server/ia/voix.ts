@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Alignement } from "@/lib/vocal";
 import { db, schema } from "../db";
 import { env } from "../env";
+import { delaiAppel, tempsRestant } from "../echeance";
 
 /*
  * La voix de BLUSH (ElevenLabs) : le seul endroit qui lui parle. Elle reçoit le script du vocal (des prénoms et des
@@ -43,6 +44,8 @@ export async function dire(texte: string, voix: Voix, { sobre, storyId }: { sobr
   if (!id) throw new ErreurVoix("voix_absente");
   const debut = Date.now();
   for (let essai = 0; ; essai++) {
+    /* Plus le temps avant l’échéance de la fonction : la voix ne part pas (le rapport, lui, est gardé ; la réponse du chat reste écrite) */
+    if (tempsRestant() < 15_000) throw new ErreurVoix("voix_delai");
     const r = await fetch(`${API}/v1/text-to-speech/${id}/with-timestamps?output_format=${FORMAT}`, {
       method: "POST",
       headers: { "xi-api-key": e.ELEVENLABS_API_KEY, "content-type": "application/json" },
@@ -51,7 +54,7 @@ export async function dire(texte: string, voix: Voix, { sobre, storyId }: { sobr
         model_id: MODELE_VOIX,
         voice_settings: sobre ? { stability: 0.5, similarity_boost: 0.75, style: 0.2 } : { stability: 0, similarity_boost: 0.75, style: 0.6 },
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(delaiAppel(120_000, 3_000)),
     }).catch(() => null);
     if (r?.ok) {
       const corps = (await r.json()) as { audio_base64: string; alignment?: Alignement; normalized_alignment?: Alignement };

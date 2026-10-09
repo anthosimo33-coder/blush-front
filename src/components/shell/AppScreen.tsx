@@ -27,10 +27,17 @@ export function useAccess() {
  */
 export function AppScreen({
   requires,
+  autre,
   aside = null,
   children,
   ...props
-}: { requires?: Exclude<Plan, "gratuit">; aside?: ReactNode | null; children: ReactNode } & Omit<ComponentProps<typeof Screen>, "aside" | "children">) {
+}: {
+  requires?: Exclude<Plan, "gratuit">;
+  /** Le prénom de l’autre personne, pour le paiement (« toi et Léa »). */
+  autre?: string;
+  aside?: ReactNode | null;
+  children: ReactNode;
+} & Omit<ComponentProps<typeof Screen>, "aside" | "children">) {
   const router = useRouter();
   const pathname = usePathname();
   const access = useAccess();
@@ -46,6 +53,7 @@ export function AppScreen({
           only={requires === "blushplus" && access.plan === "rapport" ? "blushplus" : undefined}
           onClose={() => router.push("/rapport")}
           next={pathname}
+          otherName={autre}
         />
       )}
     </>
