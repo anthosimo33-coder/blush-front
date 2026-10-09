@@ -223,6 +223,7 @@ export function HomeScreen({
   liveUrl,
   script = [],
   plusAnciens = false,
+  modeVocalInitial,
   contact,
   motion = true,
   arrive = false,
@@ -239,6 +240,8 @@ export function HomeScreen({
   script?: EchangeScript[];
   /** Back-end : l’historique a des échanges plus anciens que ceux de `script` (chargés en remontant la conv). */
   plusAnciens?: boolean;
+  /** Back-end : le mode vocal du chat, tel qu’il est en base (« Repasser à l’écrit » compris). */
+  modeVocalInitial?: boolean;
   contact: HomeContact;
   motion?: boolean;
   arrive?: boolean;
@@ -268,8 +271,8 @@ export function HomeScreen({
   const [details, setDetails] = useState(false);
   /* 7 · Le point creusé : ta prochaine question porte dessus */
   const [about, setAbout] = useState<string | null>(null);
-  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (la dernière réponse le dit) */
-  const [modeVocal, setModeVocal] = useState(() => !!script.at(-1)?.answer.modeVocal);
+  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (le serveur le sait ; en démo, la dernière réponse) */
+  const [modeVocal, setModeVocal] = useState(() => modeVocalInitial ?? !!script.at(-1)?.answer.modeVocal);
   /* 11 · Où vous en êtes : un message peut vous faire passer un cap pendant la visite */
   const [level, setLevel] = useState(contact.report.level);
   const levelNow = useRef(contact.report.level);
@@ -366,7 +369,10 @@ export function HomeScreen({
     const recharger = () =>
       getChatHistory()
         .then((h) => {
-          if (fini || derniers.current.some((m) => m.id > 0)) return;
+          if (fini) return;
+          /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
+          if (h.modeVocal !== undefined) setModeVocal(h.modeVocal);
+          if (derniers.current.some((m) => m.id > 0)) return;
           const affiches = derniers.current.filter(DE_L_HISTORIQUE).map((m) => m.id);
           const frais = echangesEnMsgs(h.echanges);
           /* Le même historique que celui affiché : rien ne bouge */
@@ -374,8 +380,6 @@ export function HomeScreen({
           plusAncien.current = h.echanges[0]?.id ?? null;
           setPlus(h.plus);
           setMsgs((m) => [...m.filter((x) => "intro" in x), ...frais]);
-          /* Le mode vocal suit la réponse la plus récente */
-          setModeVocal(!!h.echanges.at(-1)?.answer.modeVocal);
         })
         .catch(() => {});
     recharger();

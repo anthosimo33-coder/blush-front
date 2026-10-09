@@ -74,7 +74,7 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
  * Les échanges déjà eus avec BLUSH, à réafficher sur l’accueil, et l’heure de l’intro (quand la lecture s’est finie,
  * l’heure du verdict). Rien en démo.
  */
-export async function getChat(): Promise<{ echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean; introAt?: number }> {
+export async function getChat(): Promise<{ echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean; modeVocal?: boolean; introAt?: number }> {
   if (!BACKEND) return { echanges: [], plus: false };
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur || !story) return { echanges: [], plus: false };

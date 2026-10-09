@@ -126,6 +126,13 @@ describe("de l’import à la mémoire", () => {
     expect((await relire()).chatVocal).toBe(true);
     const suite = await repondre(await relire(), memoire, "et là je lui dis quoi ?");
     expect(suite.reponse.vocal).toBeDefined();
+    /* « Repasser à l’écrit », le bouton (sans nouvelle réponse) : l’historique dit le mode de la base, pas celui de la dernière réponse */
+    expect((await historique(id)).modeVocal).toBe(true);
+    await db().update(schema.stories).set({ chatVocal: false }).where(eq(schema.stories.id, id));
+    const apresBouton = await historique(id);
+    expect(apresBouton.echanges.at(-1)?.answer.modeVocal).toBe(true);
+    expect(apresBouton.modeVocal).toBe(false);
+    await db().update(schema.stories).set({ chatVocal: true }).where(eq(schema.stories.id, id));
     /* Il repasse à l’écrit : la réponse est écrite */
     const stop = await repondre(await relire(), memoire, "écris-moi stp");
     expect(stop.reponse.modeVocal).toBe(false);
