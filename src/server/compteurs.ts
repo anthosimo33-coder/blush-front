@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { cookieSecurise } from "./cookies";
 import { db, schema } from "./db";
 
 /*
@@ -44,7 +45,7 @@ export const estUnRobot = (agent: string | null) =>
 /* Venu d’un verdict partagé : retenu 30 jours, pour compter son import (une marque, pas un identifiant) */
 const VENU = "blush-venu";
 export const marquerVenuDuPartage = async () =>
-  (await cookies()).set(VENU, "partage", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+  (await cookies()).set(VENU, "partage", { httpOnly: true, secure: cookieSecurise(), sameSite: "lax", path: "/", maxAge: 30 * 86400 });
 
 /** Après un import : s’il vient d’un verdict partagé, on le compte (une fois). */
 export async function compterImportVenuDuPartage(): Promise<void> {

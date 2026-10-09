@@ -79,6 +79,12 @@ export function env(): Env {
 /** Le dossier où les mails sont écrits au lieu de partir (tests de bout en bout), ou null : ils partent par Resend. */
 export const boiteAMails = () => boiteDe(env());
 
+/**
+ * Le serveur des tests de bout en bout : `next start` sur http://localhost, avec le modèle factice et la boîte à mails.
+ * Jamais sur Vercel. Lu directement dans process.env, sans env() : les cookies le demandent avant toute autre variable.
+ */
+export const serveurDeTest = () => !process.env.VERCEL && process.env.BLUSH_IA_FACTICE === "1" && !!process.env.BLUSH_BOITE_MAILS;
+
 /** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
 
