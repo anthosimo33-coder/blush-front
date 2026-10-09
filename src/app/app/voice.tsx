@@ -213,7 +213,8 @@ export function RecordingBar({ seconds, levels, onSend }: { seconds: number; lev
       </span>
       <span aria-hidden="true" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">
         {bars.map((l, i) => (
-          <span key={i} className="w-[3px] shrink-0 rounded-full bg-ink transition-[height] duration-75" style={{ height: 3 + l * 22, opacity: l === 0 ? 0.18 : 0.85 }} />
+          /* Une échelle plutôt qu’une hauteur : 14 fois par seconde pendant l’enregistrement, sans recalculer la page */
+          <span key={i} className="h-[25px] w-[3px] shrink-0 rounded-full bg-ink transition-transform duration-75" style={{ transform: `scaleY(${(3 + l * 22) / 25})`, opacity: l === 0 ? 0.18 : 0.85 }} />
         ))}
       </span>
       <button type="button" onClick={onSend} aria-label="Envoyer le vocal" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">

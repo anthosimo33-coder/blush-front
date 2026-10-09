@@ -29,12 +29,15 @@ export const ID_PARTAGE = /^[a-zA-Z0-9]{12}$/;
 
 const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Les noms à masquer dans ce qui se partage : prénoms et noms d’export, sans le « Moi » des captures (le mot, pas un nom). */
+export const prenomsDe = (story: Ligne) => [...new Set(metaDe(story).participants.flatMap((p) => [p.prenom, p.nom]))].filter((n) => n !== "Moi");
+
 /** Les prénoms deviennent des initiales (« Léa t’attend » → « L. t’attend »), comme le duo du rapport. Le point qui suit est repris (« Hugo. » → « H. »). */
 export function masquerPrenoms(texte: string, prenoms: string[]): string {
   return prenoms
     .filter((p) => p.trim().length > 1)
     .sort((a, b) => b.length - a.length)
-    .reduce((t, p) => t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${echapper(p.trim())}(?![\\p{L}\\p{N}])\\.?`, "giu"), `${p.trim()[0].toUpperCase()}.`), texte);
+    .reduce((t, p) => t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${echapper(p.trim())}(?![\\p{L}\\p{N}])\\.?`, "giu"), `${[...p.trim()][0].toUpperCase()}.`), texte);
 }
 
 /** Le lien de partage de l’histoire, créé s’il n’existe pas encore. */
@@ -47,7 +50,7 @@ export async function partagerVerdict(story: Ligne): Promise<string> {
   /* Une situation difficile ne se partage pas */
   if (sortie.mode_sobre) throw new ErreurPartage("sobre");
   const verdict = verdictAffiche(sortie);
-  const prenoms = metaDe(story).participants.flatMap((p) => [p.prenom, p.nom]);
+  const prenoms = prenomsDe(story);
   const montre: VerdictPartage = {
     emoji: verdict.emoji,
     title: masquerPrenoms(verdict.title, prenoms),

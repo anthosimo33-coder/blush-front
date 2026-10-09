@@ -232,7 +232,8 @@ export const vocalEcoutes = pgTable(
     positionMs: integer("position_ms").notNull().default(0),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
-  (t) => [index("vocal_ecoutes_voix_idx").on(t.voix, t.evenement)],
+  /* Par histoire aussi : supprimer une histoire efface ses écoutes, sans parcourir toute la table */
+  (t) => [index("vocal_ecoutes_voix_idx").on(t.voix, t.evenement), index("vocal_ecoutes_story_idx").on(t.storyId)],
 );
 
 /** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
@@ -253,7 +254,9 @@ export const rateLimits = pgTable("rate_limits", {
 });
 
 /** Ce que coûte chaque appel au modèle. Aucun contenu. */
-export const aiUsage = pgTable("ai_usage", {
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
   task: text("task").notNull(),
@@ -266,4 +269,7 @@ export const aiUsage = pgTable("ai_usage", {
   costMicros: integer("cost_micros").notNull().default(0),
   ms: integer("ms").notNull().default(0),
   createdAt: quand("created_at").notNull().defaultNow(),
-});
+  },
+  /* Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue */
+  (t) => [index("ai_usage_story_idx").on(t.storyId)],
+);

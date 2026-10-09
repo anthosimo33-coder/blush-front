@@ -513,7 +513,7 @@ export function Styleguide() {
       </Section>
 
       {/* 07 Mode sobre */}
-      <Section title="Mode sobre" sub="Quand le verdict est dur, BLUSH sort du jeu. Même structure, mais tout ce qui est ludique disparaît.">
+      <Section title="Mode sobre" sub="Quand il y a une alerte (danger, détresse, mineur), BLUSH sort du jeu. Même structure, mais tout ce qui est ludique disparaît.">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             ["Pas de couleur de sens", "Ni bleu, ni rose, ni vert. Encre et papier seulement."],

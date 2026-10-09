@@ -3,13 +3,11 @@ import { z } from "zod";
 import type { DonneesRapport } from "@/server/analyse";
 import { carteMoment, carteReponse } from "@/server/carte-partage";
 import { dechiffrer } from "@/server/chiffrement";
-import { CLES, compter } from "@/server/compteurs";
 import { db, schema } from "@/server/db";
 import { contexteRequete } from "@/server/donnees";
-import { metaDe } from "@/server/histoires";
 import { erreur, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
-import { masquerPrenoms } from "@/server/partages";
+import { masquerPrenoms, prenomsDe } from "@/server/partages";
 import type { BlushAnswer, Chapter } from "@/types";
 
 const Cible = z.discriminatedUnion("type", [
@@ -32,7 +30,7 @@ export async function POST(req: Request) {
   if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop", 429);
   const cible = Cible.safeParse(await req.json().catch(() => null));
   if (!cible.success) return erreur("cible", 422);
-  const prenoms = metaDe(story).participants.flatMap((p) => [p.prenom, p.nom]);
+  const prenoms = prenomsDe(story);
   const masquer = (t: string) => masquerPrenoms(t, prenoms);
   const c = cible.data;
 
@@ -53,7 +51,6 @@ export async function POST(req: Request) {
     const question = dechiffrer<{ texte: string; affiche?: string }>(toi.data);
     const r = dechiffrer<{ reponse: BlushAnswer }>(blush.data).reponse;
     if (r.kind !== "bubbles") return erreur("introuvable", 404);
-    await compter(CLES.imagePartagee);
     return carteReponse({
       question: masquer((question.affiche ?? question.texte).replace(/^\(vocal\)\s*/, "")),
       bulles: [...r.bubbles.map((b) => b.text), ...(r.ask ? [r.ask] : [])].map(masquer),
@@ -65,6 +62,5 @@ export async function POST(req: Request) {
   const chapitre = chapitres.find((ch) => ch.number === c.chapitre);
   const bloc = chapitre?.blocks[c.bloc];
   if (!chapitre || bloc?.kind !== "punchline") return erreur("introuvable", 404);
-  await compter(CLES.imagePartagee);
   return carteMoment({ surtitre: masquer(`Chapitre ${chapitre.number} · ${chapitre.tocTitle}`), texte: masquer(bloc.text) });
 }

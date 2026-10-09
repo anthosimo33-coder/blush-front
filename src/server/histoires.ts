@@ -302,8 +302,8 @@ export function storyAffichee(id: string, meta: Meta): Story {
   return {
     id,
     participants: [
-      { id: "p0", name: a.prenom, initial: a.prenom[0]?.toUpperCase() ?? "?", ...pronom(0) },
-      { id: "p1", name: b.prenom, initial: b.prenom[0]?.toUpperCase() ?? "?", ...pronom(1) },
+      { id: "p0", name: a.prenom, initial: initialeDe(a.prenom), ...pronom(0) },
+      { id: "p1", name: b.prenom, initial: initialeDe(b.prenom), ...pronom(1) },
     ],
     sources: [
       meta.captures
@@ -330,6 +330,9 @@ export function storyAffichee(id: string, meta: Meta): Story {
     ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),
   };
 }
+
+/** L’initiale d’un nom : son premier caractère entier (un emoji n’est pas coupé en deux), en majuscule. */
+export const initialeDe = (nom: string) => [...nom.trim()][0]?.toUpperCase() ?? "?";
 
 /** Efface l’histoire et tout ce qui en vient (verdict, rapport, mémoire, chat, tâches : en cascade). */
 export async function supprimerHistoire(id: string): Promise<void> {

@@ -505,6 +505,11 @@ export async function imagePartage(cible: CibleImage): Promise<Blob> {
   return r.blob();
 }
 
+/** Une image vraiment partagée ou enregistrée (« Partager en image ») : comptée côté serveur. Rien en démo. */
+export function compterImagePartagee(): void {
+  if (BACKEND) void reel.compterImagePartagee();
+}
+
 export async function desactiverLienPartage(): Promise<void> {
   if (BACKEND) return reel.desactiverLienPartage();
   await delay(300);

@@ -77,19 +77,38 @@ function couperInstagram(p: Partie, part: number): Partie {
 /**
  * Le fichier choisi, prêt à partir : un paquet, ou (un export Instagram complet) la liste de ses convs à choisir,
  * et de quoi faire le paquet de celle qu’on choisit. Les autres convs ne quittent jamais le navigateur.
+ * Un export complet compte des dizaines de convs : on les lit une à une (le temps d’en faire le résumé), sans les
+ * garder toutes en mémoire, et la conv choisie est relue dans le zip au moment de partir (Safari sur iPhone
+ * recharge la page quand la mémoire déborde).
  */
-export async function analyserExport(fichier: File): Promise<{ type: "un"; paquet: Blob } | { type: "plusieurs"; convs: ConvInstagram[]; paquetDe: (id: string) => Blob }> {
-  const fichiers = await lireFichiers(fichier);
-  const parties = choisirParties(fichiers);
-  if (!parties) throw new ExportIllisible("fichier");
-  if (parties !== "plusieurs") return { type: "un", paquet: paquet(fichier.name, parties) };
-  const convs = convsInstagram(fichiers);
-  const resumes = convs.flatMap((c, k) => {
-    const r = resumeConvInstagram(c.parties);
-    return r && r.messages > 0 ? [{ id: String(k), ...r }] : [];
+export async function analyserExport(fichier: File): Promise<{ type: "un"; paquet: Blob } | { type: "plusieurs"; convs: ConvInstagram[]; paquetDe: (id: string) => Promise<Blob> }> {
+  if (!(await estUnZip(fichier))) {
+    const parties = choisirParties(await lireFichiers(fichier));
+    if (!parties || parties === "plusieurs") throw new ExportIllisible("fichier");
+    return { type: "un", paquet: paquet(fichier.name, parties) };
+  }
+  const entrees = await entreesZip(fichier).catch(() => {
+    throw new ExportIllisible("fichier");
   });
+  const lire = (noms: string[]) =>
+    Promise.all(noms.map(async (nom) => ({ nom, contenu: await lireEntree(fichier, entrees.find((e) => e.nom === nom)!) }))).catch(() => {
+      throw new ExportIllisible("fichier");
+    });
+  /* Les noms suffisent pour savoir ce qu’est l’export ; on ne lit d’avance que les .txt (WhatsApp, petits) */
+  const txt = await lire(entrees.filter((e) => /\.txt$/i.test(e.nom)).map((e) => e.nom));
+  const noms = [...txt, ...entrees.filter((e) => !/\.txt$/i.test(e.nom)).map((e) => ({ nom: e.nom, contenu: "" }))];
+  const choix = choisirParties(noms);
+  if (!choix) throw new ExportIllisible("fichier");
+  const contenus = (parties: Partie[]) => (parties.some((p) => /\.txt$/i.test(p.nom)) ? Promise.resolve(parties) : lire(parties.map((p) => p.nom)));
+  if (choix !== "plusieurs") return { type: "un", paquet: paquet(fichier.name, await contenus(choix)) };
+  const convs = convsInstagram(noms);
+  const resumes: ConvInstagram[] = [];
+  for (const [k, c] of convs.entries()) {
+    const r = resumeConvInstagram(await contenus(c.parties));
+    if (r && r.messages > 0) resumes.push({ id: String(k), ...r });
+  }
   if (!resumes.length) throw new ExportIllisible("fichier");
-  return { type: "plusieurs", convs: resumes, paquetDe: (id) => paquet(fichier.name, convs[+id].parties) };
+  return { type: "plusieurs", convs: resumes, paquetDe: async (id) => paquet(fichier.name, await contenus(convs[+id].parties)) };
 }
 
 /** Le fichier choisi devient un petit paquet compressé : { parties: [{ nom, contenu }] } en gzip. */
@@ -99,9 +118,13 @@ export async function preparerExport(fichier: File): Promise<Blob> {
   return paquet(fichier.name, parties);
 }
 
-export async function lireFichiers(fichier: Blob & { name: string }): Promise<Partie[]> {
+const estUnZip = async (fichier: Blob) => {
   const debut = await octets(fichier, 0, 2);
-  if (debut[0] === 0x50 && debut[1] === 0x4b) {
+  return debut[0] === 0x50 && debut[1] === 0x4b;
+};
+
+export async function lireFichiers(fichier: Blob & { name: string }): Promise<Partie[]> {
+  if (await estUnZip(fichier)) {
     return lireZip(fichier).catch(() => {
       throw new ExportIllisible("fichier");
     });
@@ -118,6 +141,17 @@ const octets = async (fichier: Blob, de: number, a: number) => new Uint8Array(aw
  * copier pour le décompresser à côté) faisait recharger la page à Safari sur iPhone, sans que rien ne parte.
  */
 async function lireZip(fichier: Blob): Promise<Partie[]> {
+  const entrees = await entreesZip(fichier);
+  const parties: Partie[] = [];
+  for (const e of entrees) parties.push({ nom: e.nom, contenu: await lireEntree(fichier, e) });
+  return parties;
+}
+
+/** Un fichier utile d’un zip : où ses octets commencent, comment ils sont compressés. */
+type EntreeZip = { nom: string; methode: number; compresse: number; local: number };
+
+/** La table des matières d’un zip : ses fichiers de texte utiles (.txt, message_N), sans rien en lire. */
+async function entreesZip(fichier: Blob): Promise<EntreeZip[]> {
   /* La fin du zip (22 octets, plus un commentaire de 64 Ko au plus) dit où est sa table des matières */
   const base = Math.max(0, fichier.size - 22 - 0xffff);
   const queue = await octets(fichier, base, fichier.size);
@@ -142,7 +176,7 @@ async function lireZip(fichier: Blob): Promise<Partie[]> {
 
   const table = await octets(fichier, position, position + taille);
   const t = new DataView(table.buffer);
-  const parties: Partie[] = [];
+  const entrees: EntreeZip[] = [];
   for (let p = 0, k = 0; k < nombre; k++) {
     if (t.getUint32(p, true) !== 0x02014b50) throw new Error("entrée illisible");
     const drapeaux = t.getUint16(p + 8, true);
@@ -165,11 +199,16 @@ async function lireZip(fichier: Blob): Promise<Partie[]> {
     p += 46 + ln + le + lc;
     /* Ni les photos et vocaux, ni un fichier chiffré ou compressé autrement */
     if (!estFichierUtile(nom) || complet >= TAILLE_MAX || drapeaux & 1 || (methode !== 0 && methode !== 8)) continue;
-    const tete = new DataView((await octets(fichier, local, local + 30)).buffer);
-    if (tete.getUint32(0, true) !== 0x04034b50) throw new Error("entrée introuvable");
-    const de = local + 30 + tete.getUint16(26, true) + tete.getUint16(28, true);
-    const brut = await octets(fichier, de, de + compresse);
-    parties.push({ nom, contenu: strFromU8(methode === 0 ? brut : inflateSync(brut)) });
+    entrees.push({ nom, methode, compresse, local });
   }
-  return parties;
+  return entrees;
+}
+
+/** Le texte d’un fichier du zip, lu à sa place dans le fichier. */
+async function lireEntree(fichier: Blob, e: EntreeZip): Promise<string> {
+  const tete = new DataView((await octets(fichier, e.local, e.local + 30)).buffer);
+  if (tete.getUint32(0, true) !== 0x04034b50) throw new Error("entrée introuvable");
+  const de = e.local + 30 + tete.getUint16(26, true) + tete.getUint16(28, true);
+  const brut = await octets(fichier, de, de + e.compresse);
+  return strFromU8(e.methode === 0 ? brut : inflateSync(brut));
 }

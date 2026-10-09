@@ -7,7 +7,7 @@ import { AppTile } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
-import { setJourney } from "@/state/journey";
+import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { pagePrecedente } from "@/lib/navigation";
 import type { AppKind } from "@/types";
 
@@ -26,6 +26,12 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide
 
 export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
   const router = useRouter();
+  /* Choisir une appli, c’est commencer une nouvelle conv : les réponses de la précédente (qui est qui, ce que tu veux) repartent de zéro. L’email reste */
+  const nouvelleConv = (app: AppKind) => {
+    const { email } = readJourney();
+    resetJourney();
+    setJourney({ app, email });
+  };
   return (
     <Screen
       /* Retour : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici directement, l’accueil */
@@ -40,7 +46,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
     >
       <nav aria-label="Ton appli" className="grid grid-cols-2 gap-3">
         {TILES.map((t) => (
-          <AppTile key={t.app} {...t} onClick={() => setJourney({ app: t.app })} />
+          <AppTile key={t.app} {...t} onClick={() => nouvelleConv(t.app)} />
         ))}
       </nav>
       <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis ? Commence par la principale, tu ajouteras le reste juste après.</p>

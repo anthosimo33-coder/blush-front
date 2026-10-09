@@ -20,6 +20,9 @@ import type { AppKind } from "@/types";
 type Shot = { id: string; file: File; url: string | null };
 const NB = "\u00a0";
 
+/* Au plus 20 captures dans un envoi (le serveur n’en lit pas plus : src/server/captures.ts) */
+const CAPTURES_MAX = 20;
+
 /* Les applis lues par captures côté serveur (les autres passent par « autre ») */
 const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
 
@@ -42,6 +45,16 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [busy, setBusy] = useState(false);
   const [avance, setAvance] = useState<AvanceVideo | null>(null);
   const [announce, setAnnounce] = useState("");
+  /* Plus de 20 captures choisies : on garde les 20 premières, et on le dit */
+  const [trop, setTrop] = useState(false);
+  /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
+  const monte = useRef(true);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
   const captureApp = app ?? journey.app ?? "instagram";
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
@@ -60,7 +73,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
     const replace = video || !!result?.video;
     if (replace) items.forEach((s) => s.url && URL.revokeObjectURL(s.url));
-    const next = replace ? added : [...items, ...added];
+    const toutes = replace ? added : [...items, ...added];
+    const next = video ? toutes : toutes.slice(0, CAPTURES_MAX);
+    toutes.slice(next.length).forEach((s) => s.url && URL.revokeObjectURL(s.url));
+    setTrop(!video && toutes.length > CAPTURES_MAX);
     /* Back-end : l’enregistrement sert à la première importation (pas encore pour compléter une conv) */
     if (BACKEND && video && addMode) return echec("capture");
     setItems(next);
@@ -85,6 +101,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     const next = items.filter((s) => s.id !== id);
     setItems(next);
     setAnnounce("Capture retirée.");
+    setTrop(false);
     if (!next.length) setResult(null);
     else setResult((r) => (r ? { ...r, count: next.length } : r));
   };
@@ -114,10 +131,12 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             items.map((s) => s.file),
             { app: captureApp, mode: addMode ? "add" : "first" },
           );
+      if (!monte.current) return;
       setJourney({ captureNames: items.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
       setResult({ count: items.length, messages: r.messagesRead, video });
       router.push(next);
     } catch (e) {
+      if (!monte.current) return;
       setBusy(false);
       setAvance(null);
       echec(e instanceof ErreurApi && ["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
@@ -173,6 +192,11 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       ) : (
         <div className="flex flex-col gap-2.5">
           <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video ? undefined : shots.open} />
+          {trop && (
+            <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
+              {CAPTURES_MAX} captures au plus{"\u00a0"}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
+            </p>
+          )}
           {items.length > 1 && !result?.video && (
             <p id="ordre-aide" className="m-0 text-[13px] font-extrabold leading-[1.45] text-grey">
               Maintiens une capture et glisse-la pour changer l’ordre. BLUSH les remettra aussi dans l’ordre des dates.

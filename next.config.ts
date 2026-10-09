@@ -8,6 +8,11 @@ const SECURITE = [
   /* Le micro sert aux vocaux ; rien d’autre */
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  /*
+   * Une politique de contenu minimale, qui ne touche pas aux scripts de Next : la page ne s’affiche pas dans un cadre
+   * d’un autre site, et ni <base>, ni <object>, ni un formulaire ne peuvent viser ailleurs.
+   */
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
 ];
 
 const nextConfig: NextConfig = {

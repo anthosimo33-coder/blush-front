@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "./icons";
+import { bloquerDefilement } from "@/lib/defilement";
 
 /**
  * Sheet : panneau du bas sur mobile, fenêtre centrée sur desktop.
@@ -26,6 +27,8 @@ export function Sheet({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  /* Le défilement bloqué par cette feuille (src/lib/defilement.ts) : libéré à sa fermeture, quelle qu’elle soit */
+  const liberer = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const d = ref.current;
@@ -35,11 +38,12 @@ export function Sheet({
       /* Le focus va sur le panneau (annoncé par son titre), pas sur la première option.
          preventScroll : sinon Safari (iPhone) fait défiler la feuille pendant qu’elle monte, et elle reste coincée en haut */
       requestAnimationFrame(() => panel.current?.focus({ preventScroll: true }));
-      document.documentElement.style.overflow = "hidden";
+      liberer.current = bloquerDefilement();
     }
     if (!open && d.open) d.close();
     return () => {
-      document.documentElement.style.overflow = "";
+      liberer.current?.();
+      liberer.current = null;
     };
   }, [open]);
 
@@ -52,7 +56,8 @@ export function Sheet({
         onClose();
       }}
       onClose={() => {
-        document.documentElement.style.overflow = "";
+        liberer.current?.();
+        liberer.current = null;
       }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-clip bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
