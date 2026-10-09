@@ -27,6 +27,12 @@ const Faits = z
   .array(z.object({ section: z.enum(["infos", "aime", "gens", "dates", "notes"]), text: z.string().trim().min(1).max(200) }).passthrough())
   .max(60);
 
+/*
+ * Les infos qu’il a retirées : la mémoire les garde pour ne pas les remettre, et le chat les envoie au modèle à chaque
+ * message. Les plus récentes seulement : sans borne, chaque correction allongeait (et renchérissait) tous les messages.
+ */
+const SUPPRIMEES_MAX = 100;
+
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
  * ce qu’il supprime, elle ne le remet pas. On n’écrit que sur la mémoire qu’on a lue : si une mise à jour l’a changée
@@ -39,6 +45,7 @@ export async function PUT(req: Request) {
   if (!story) return erreur("aucune", 404);
   const faits = Faits.safeParse((await corps<{ facts: unknown }>(req)).facts);
   if (!faits.success) return erreur("faits", 422);
+  if (!(await sousLaLimite(`fiche:${utilisateur.id}`, LIMITES.ficheParCompte))) return erreur("trop", 429);
   for (let essai = 0; essai < 3; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
@@ -49,7 +56,7 @@ export async function PUT(req: Request) {
     const textes = new Set(nouveaux.map((n) => n.texte));
     const editions = {
       parToi: [...new Set([...(m.editions?.parToi ?? []).filter((t) => textes.has(t)), ...nouveaux.filter((n) => !textesAvant.has(n.texte)).map((n) => n.texte)])],
-      supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)),
+      supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)).slice(-SUPPRIMEES_MAX),
     };
     const donnees: DonneesMemoire = { ...m, etat: { ...m.etat, fiche: { ...m.etat.fiche, faits: nouveaux } }, editions };
     const ecrite = await db()

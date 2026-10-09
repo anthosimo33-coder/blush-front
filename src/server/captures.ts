@@ -2,9 +2,37 @@ import "server-only";
 import { versTexteCaptures, type TexteCaptures } from "@prompts/lib/captures";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import { Sortie01, type Captures } from "@prompts/lib/schemas";
+import { utilisateurDeSession } from "./auth";
+import { lireSession } from "./cookies";
+import { env } from "./env";
 import { ErreurImport } from "./histoires";
 import { appeler } from "./ia/claude";
+import { LIMITES, sousLaLimite } from "./limites";
 import { aujourdhuiParis } from "./temps";
+
+const PLAFONDS = {
+  captures: { anonymes: "capturesAnonymesParJour", compte: "capturesParCompte" },
+  lots: { anonymes: "lotsAnonymesParJour", compte: "lotsParCompte" },
+} as const;
+
+/**
+ * Peut-on lire des captures (`quoi` : « captures », ou les « lots » d’un enregistrement d’écran) pour cette requête ? Le
+ * modèle payant les lit avant l’email. À appeler une fois l’envoi vérifié, juste avant de lire : un envoi invalide ne
+ * compte pas. `null` : la règle de la bêta seule (rien ne sera lu par le modèle).
+ * - Bêta fermée, sans compte : « connexion ». Qui n’est pas invité ne pourrait pas lancer la lecture ensuite : on ne paie
+ *   pas pour lui, et l’invité se connecte d’abord (l’écran des captures l’y envoie).
+ * - Un compte connecté : sous sa limite du jour, sinon « trop ».
+ * - Bêta ouverte, sans compte : sous un plafond pour tous et par jour, sinon « trop ».
+ * Les limites par IP de la route s’appliquent en plus.
+ */
+export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promise<"ok" | "connexion" | "trop"> {
+  const utilisateur = await utilisateurDeSession(await lireSession());
+  if (!utilisateur && env().BLUSH_BETA_FERMEE) return "connexion";
+  if (!quoi) return "ok";
+  const { anonymes, compte } = PLAFONDS[quoi];
+  const ok = utilisateur ? await sousLaLimite(`${compte}:${utilisateur.id}`, LIMITES[compte]) : await sousLaLimite(anonymes, LIMITES[anonymes]);
+  return ok ? "ok" : "trop";
+}
 
 /** Combien de captures à la fois, et leur taille (déjà réduites par le navigateur). */
 export const CAPTURES_MAX = 20;
