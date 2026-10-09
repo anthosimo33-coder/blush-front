@@ -132,7 +132,16 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       }
       footer={
         <Button arrow={!busy} disabled={code.length !== LENGTH || busy} aria-busy={busy} onClick={() => verify(code)}>
-          {busy ? <TypingDots color="#FFFFFF" label={connexion ? "Ouverture de tes convs" : "Création de ton rapport"} /> : connexion ? "Retrouver mes convs" : "Créer mon rapport"}
+          {busy ? (
+            <TypingDots color="#FFFFFF" label={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"} />
+          ) : !connexion ? (
+            "Créer mon rapport"
+          ) : suite.startsWith("/importer/") ? (
+            /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv (texte à valider) */
+            "Continuer"
+          ) : (
+            "Retrouver mes convs"
+          )}
         </Button>
       }
     >

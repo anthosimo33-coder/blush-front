@@ -48,6 +48,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [announce, setAnnounce] = useState("");
   /* Plus de 20 captures choisies : on garde les 20 premières, et on le dit */
   const [trop, setTrop] = useState(false);
+  /* Une limite atteinte (« trop ») : les captures restent là, le message dit d’attendre */
+  const [attente, setAttente] = useState(false);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useRef(true);
   useEffect(() => {
@@ -78,6 +80,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     const next = video ? toutes : toutes.slice(0, CAPTURES_MAX);
     toutes.slice(next.length).forEach((s) => s.url && URL.revokeObjectURL(s.url));
     setTrop(!video && toutes.length > CAPTURES_MAX);
+    setAttente(false);
     /* Back-end : l’enregistrement sert à la première importation (pas encore pour compléter une conv) */
     if (BACKEND && video && addMode) return echec("capture");
     setItems(next);
@@ -124,6 +127,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const continuer = async () => {
     if (!BACKEND) return router.push(next);
     setBusy(true);
+    setAttente(false);
     const video = !!result?.video;
     try {
       const r = video
@@ -142,6 +146,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
+      if (e instanceof ErreurApi && e.code === "trop") return setAttente(true);
       echec(e instanceof ErreurApi && ["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
     }
   };
@@ -233,6 +238,11 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       <div aria-live="polite" className="min-h-6">
         {/* L’avancée d’un enregistrement s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
         {busy && (avance ? <span className="sr-only">{texteAvance(avance)}</span> : <TypingDots label="Analyse des captures" />)}
+        {!busy && attente && (
+          <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">
+            BLUSH a lu beaucoup de captures d’un coup{"\u00a0"}: réessaie un peu plus tard. Tes captures restent là.
+          </p>
+        )}
         {!busy && result && !result.video && (
           <div data-rise="" className="flex items-center gap-2 text-[14px] font-black">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
