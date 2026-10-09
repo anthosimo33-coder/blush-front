@@ -28,9 +28,15 @@ test("« parle-moi en vocal » : BLUSH répond en vocal ; « Repasser à l’éc
 
   await test.step("le vocal vient du serveur, en MP3 ; là où le navigateur le lit, il se met en pause d’un toucher", async () => {
     const audio = await reponseAuGeste(page, { chemin: /^\/api\/vocal\/chat\/\d+$/, methode: "GET" }, () => vocal.click());
-    expect([200, 206]).toContain(audio.status());
-    expect(audio.headers()["content-type"]).toBe("audio/mpeg");
-    if (await litLeMp3(page, new URL(audio.url()).pathname)) {
+    const chemin = new URL(audio.url()).pathname;
+    /*
+     * Le toucher a demandé le vocal ; ce que le serveur sert se vérifie par une requête de la même session : le WebKit de
+     * Linux (la CI) charge les médias hors de son réseau habituel, et Playwright y lit un statut 0
+     */
+    const fichier = await page.request.get(chemin);
+    expect(fichier.status()).toBe(200);
+    expect(fichier.headers()["content-type"]).toBe("audio/mpeg");
+    if (await litLeMp3(page, chemin)) {
       const pause = fil.getByRole("button", { name: "Mettre le vocal de BLUSH en pause" });
       await expect(pause).toBeVisible();
       await pause.click();
