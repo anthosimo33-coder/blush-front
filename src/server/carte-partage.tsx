@@ -6,7 +6,7 @@ import { Bulle, DOUX, ENCRE, PAPIER, ressources } from "./carte-verdict";
  * « Partager en image » : un moment de BLUSH en story (1080 × 1920), dans l’habit de la carte du verdict.
  * - une réponse de BLUSH dans le chat : ta question en bleu, ses bulles en blanc ;
  * - un moment du rapport (la chute d’un chapitre) : la phrase en grand, et d’où elle vient.
- * Les prénoms sont masqués avant d’arriver ici. Textes relus le 8 octobre (voix de BLUSH).
+ * Le prénom de l’autre est masqué avant d’arriver ici (le tien reste). Textes relus le 8 octobre (voix de BLUSH).
  */
 
 export const TAILLE_STORY = { width: 1080, height: 1920 } as const;

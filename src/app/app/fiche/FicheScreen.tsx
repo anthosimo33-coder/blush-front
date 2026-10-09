@@ -2,9 +2,11 @@
 
 import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
+import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { addToFiche, getFiche, updateFiche } from "@/services/api";
@@ -56,6 +58,17 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
   const [over, setOver] = useState(false);
   const picker = useFilePicker();
   const urls = useRef<string[]>([]);
+  const router = useRouter();
+  /*
+   * « Retour » : venu de l’accueil, on y revient par l’historique, comme le geste retour (sinon le retour suivant
+   * rouvrirait la fiche). Un retour par l’historique ne glisse pas : Next ne lui donne pas de type de transition.
+   * Arrivé ici autrement, le lien ouvre l’accueil, en glissant.
+   */
+  const retour = (e: { preventDefault: () => void }) => {
+    if (pagePrecedente() !== "/app") return;
+    e.preventDefault();
+    router.back();
+  };
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -150,7 +163,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
       contentGap={0}
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
-          <Link href="/app" prefetch transitionTypes={["nav-back"]} aria-label="Retour" className="flex size-11 items-center justify-center">
+          <Link href="/app" prefetch transitionTypes={["nav-back"]} onNavigate={retour} aria-label="Retour" className="flex size-11 items-center justify-center">
             <Icon name="back" size={24} color="#121214" stroke={2.6} />
           </Link>
           <span className="text-[14px] font-black text-grey">Sa fiche</span>
@@ -160,7 +173,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" prefetch transitionTypes={["nav-back"]} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+        <Link href="/app" prefetch transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
           <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
           Retour
         </Link>

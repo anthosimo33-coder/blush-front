@@ -13,7 +13,7 @@ import type { Verdict } from "@/types";
 
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
- * prénoms masqués : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
+ * le prénom de l’autre masqué (le tien reste) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const N = " ";
@@ -156,7 +156,7 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
  * Le lien est créé à l’ouverture (toujours le même), et se désactive d’un toucher.
  */
 export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClose: () => void; verdict: Pick<Verdict, "emoji" | "title"> }) {
-  /* Le lien, et le verdict tel qu’il le montre (prénoms masqués, par le serveur) : le texte partagé reprend celui-là */
+  /* Le lien, et le verdict tel qu’il le montre (le prénom de l’autre masqué, par le serveur) : le texte partagé reprend celui-là */
   const [lien, setLien] = useState<{ url: string; verdict: VerdictMontre | null } | null>(null);
   const url = lien?.url ?? null;
   const [probleme, setProbleme] = useState(false);
@@ -198,7 +198,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
     return () => clearTimeout(t);
   }, [copie, fait]);
 
-  /* Le verdict partagé : celui du lien, prénoms masqués. La démo n’a pas de vrai lien : son verdict tel quel */
+  /* Le verdict partagé : celui du lien, le prénom de l’autre masqué. La démo n’a pas de vrai lien : son verdict tel quel */
   const montre = lien?.verdict ?? (BACKEND ? null : verdict);
   /* Ce qu’on écrit à ses potes avec le lien : comme on le dirait (l’aperçu du lien fait le reste) */
   const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict : ${montre.emoji} « ${montre.title} »` : "j’ai fait lire notre conv à BLUSH 💀";
@@ -295,7 +295,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
         <p className="m-0 flex-1 text-[13px] font-extrabold leading-[1.45] text-soft">
           {fait ?? (
             <>
-              Le lien montre ce verdict, rien d’autre{N}: ni vos messages, ni vos prénoms.{" "}
+              Le lien montre ce verdict, rien d’autre{N}: ni vos messages, ni son prénom.{" "}
               {url && (
                 <button
                   type="button"
@@ -335,7 +335,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
         <InsetRow
           leading={<RowIcon icon="eye" tone="elle" />}
           title="Rien ne sort sans toi"
-          sub="La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, prénoms masqués."
+          sub="La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom."
           className={ligne}
         />
       </InsetGroup>
@@ -349,7 +349,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
 
 /**
  * « Partager en image » : l’image en story (une réponse de BLUSH, la chute d’un chapitre), telle qu’elle partira,
- * puis la partager (Instagram, WhatsApp…) ou l’enregistrer. Les prénoms sont masqués par le serveur.
+ * puis la partager (Instagram, WhatsApp…) ou l’enregistrer. Le prénom de l’autre est masqué par le serveur.
  */
 export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null; onClose: () => void }) {
   const [image, setImage] = useState<{ cle: string; fichier: File; url: string } | null>(null);
@@ -460,7 +460,7 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
       )}
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="shield" size={16} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-        Les prénoms sont remplacés par leurs initiales. Parfait pour ta story.
+        Son prénom devient une initiale, le tien reste. Parfait pour ta story.
       </p>
     </Sheet>
   );

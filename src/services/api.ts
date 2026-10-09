@@ -482,7 +482,7 @@ export async function cancelSubscription(): Promise<void> {
 }
 
 /**
- * Le lien public du verdict (/v/<id>) : le verdict seul, prénoms masqués, jamais la conv. Toujours le même lien
+ * Le lien public du verdict (/v/<id>) : le verdict seul, le prénom de l’autre masqué, jamais la conv. Toujours le même lien
  * tant qu’on ne le désactive pas. En démo : le lien « demo ».
  */
 export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre | null }> {
@@ -490,7 +490,7 @@ export async function creerLienPartage(): Promise<{ url: string; verdict: Verdic
   return { url: `${window.location.origin}/v/${id}`, verdict };
 }
 
-/** Le verdict tel que le montre un lien partagé : les prénoms en initiales (« C. t’attend »). */
+/** Le verdict tel que le montre un lien partagé : le prénom de l’autre en initiale, le tien en clair (« C. t’attend, Hugo »). */
 export type VerdictMontre = { emoji: string; title: string };
 
 /** Ce qu’on partage en image : une réponse de BLUSH (son échange), ou la chute d’un chapitre (sa place). */

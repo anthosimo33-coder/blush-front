@@ -12,7 +12,7 @@ import { verdictDuLien } from "./verdict";
 /*
  * Un verdict partagé, tel que le voient les potes, dans l’habit de la landing : BLUSH parle en bulles roses,
  * le verdict en grand, et la réponse de celui qui regarde, en bleu, mène à BLUSH.
- * Le verdict seul (prénoms masqués) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
+ * Le verdict seul (le prénom de l’autre masqué) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promise<Metadata> {
@@ -94,7 +94,7 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
         {v && (
           <p className="m-0 mt-4 flex items-start justify-center gap-1.5 px-1 text-center text-[12.5px] font-extrabold leading-[1.45] text-grey">
             <Icon name="shield" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-            Leur conv reste privée{" "}: seul le verdict est partagé, prénoms masqués.
+            Leur conv reste privée{" "}: seul le verdict est partagé, sans le prénom de l’autre.
           </p>
         )}
       </div>

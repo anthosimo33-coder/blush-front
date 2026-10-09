@@ -410,7 +410,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </div>
       </Card>
 
-      {/* Partager son verdict (le verdict seul, prénoms masqués), et ce que BLUSH fait de ta conv */}
+      {/* Partager son verdict (le verdict seul, le prénom de l’autre masqué), et ce que BLUSH fait de ta conv */}
       <PartageEtConfidentialite verdict={report.verdict} />
 
       {free.map((c, i) => (

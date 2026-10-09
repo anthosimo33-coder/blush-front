@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   try {
     const id = await partagerVerdict(story);
     await compter(CLES.partageOuvert);
-    /* Le verdict tel que le montre le lien (prénoms masqués) : c’est lui que le texte partagé reprend */
+    /* Le verdict tel que le montre le lien (le prénom de l’autre masqué) : c’est lui que le texte partagé reprend */
     return json({ id, verdict: await verdictPartage(id) });
   } catch (e) {
     if (e instanceof ErreurPartage) return erreur(e.code, 409);
