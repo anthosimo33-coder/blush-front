@@ -1,5 +1,5 @@
 import { AppliCaptures } from "@/server/appli-captures";
-import { ErreurCaptures, imagesDe, lireCaptures } from "@/server/captures";
+import { ErreurCaptures, imagesDe, lecturePermise, lireCaptures } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, json, memeOrigine } from "@/server/http";
@@ -24,7 +24,11 @@ async function traiter(req: Request) {
   const appli = Appli.safeParse(fd?.get("app"));
   if (fd?.get("mode") === "add") return erreur("capture", 422);
   try {
-    const t = await lireCaptures(await imagesDe(fichiers), appli.success ? appli.data : "autre");
+    const images = await imagesDe(fichiers);
+    /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
+    const permis = await lecturePermise("captures");
+    if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
+    const t = await lireCaptures(images, appli.success ? appli.data : "autre");
     const { id, meta, secret } = await importerCaptures({ appli: appli.success ? appli.data : "autre", t });
     await poserBrouillon(secret);
     await compterImportVenuDuPartage();

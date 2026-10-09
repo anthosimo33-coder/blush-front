@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sortie01 } from "@prompts/lib/schemas";
 import { AppliCaptures } from "@/server/appli-captures";
-import { enTexte, ErreurCaptures } from "@/server/captures";
+import { enTexte, ErreurCaptures, lecturePermise } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
@@ -16,12 +16,27 @@ import { fusionnerLots } from "@/server/video";
  */
 const MESSAGES_MAX = 3000;
 const TEXTE_MAX = 4000;
+/* Tous les messages ensemble : un enregistrement réel en compte une centaine de Ko */
+const TEXTE_TOTAL_MAX = 2_000_000;
+/*
+ * Chaque chaîne a sa borne. Le nom de l’autre (`autre`) est recopié devant chacun de ses messages : sans borne, un envoi
+ * de quelques centaines de Ko devenait des centaines de Mo en mémoire.
+ */
+const Lot = Sortie01.extend({
+  appli: z.string().max(40).nullable(),
+  autre: z.string().max(80).nullable(),
+  captures: Sortie01.shape.captures.max(40),
+  profil: z.array(z.string().max(1000)).max(50),
+  doutes: z.array(z.string().max(1000)).max(50),
+});
 const Envoi = z
-  .object({ app: AppliCaptures, lots: z.array(Sortie01).min(1).max(20) })
+  .object({ app: AppliCaptures, lots: z.array(Lot).min(1).max(20) })
   .refine(({ lots }) => {
     const blocs = lots.flatMap((l) => l.blocs);
     const messages = blocs.flatMap((b) => b.messages);
-    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
+    const total = messages.reduce((n, m) => n + m.texte.length, 0);
+    const reperes = blocs.every((b) => !b.repere || (b.repere.date.length <= 20 && (b.repere.heure?.length ?? 0) <= 20));
+    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && total <= TEXTE_TOTAL_MAX && reperes && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
   });
 
 /**
@@ -31,6 +46,9 @@ const Envoi = z
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop", 429);
+  /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
+  const permis = await lecturePermise(null);
+  if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
   const envoi = Envoi.safeParse(await corps(req));
   if (!envoi.success) return erreur("fichier", 422);
   const { app, lots } = envoi.data;

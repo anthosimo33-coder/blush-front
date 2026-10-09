@@ -16,6 +16,8 @@ import type { Utilisateur } from "./auth";
 export const TAILLE_MAX = 40 * 1024 * 1024;
 /** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
 const FICHIERS_MAX = 200;
+/** Le nom d’un des deux participants, tel que l’export l’écrit. */
+const NOM_MAX = 100;
 
 export class ErreurImport extends Error {
   constructor(readonly code: "fichier" | "groupe" | "courte") {
@@ -110,6 +112,8 @@ export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: s
   const noms = principaux(participantsDe(texte));
   if (noms.length > 2) throw new ErreurImport("groupe");
   if (noms.length < 2) throw new ErreurImport("courte");
+  /* Un nom de contact est court : un nom démesuré (ou fait de caractères de contrôle) gonflerait ce qu’on garde de la conv */
+  if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
   const personne = (k: number) => ({ prenom: prenomDe(noms[k].nom), pronom: "il" as const, nomExport: noms[k].nom });
   const lu = lire(texte, { utilisateur: personne(0), autre: personne(1), format }, { autresEnTexte: true });
   const err = erreurImport(lu);
