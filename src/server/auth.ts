@@ -31,8 +31,8 @@ export async function envoyerCode(email: string): Promise<void> {
   await envoyerCodeParEmail(email, code);
 }
 
-/** Vérifie le code. Bon : crée le compte s’il n’existe pas et le renvoie. */
-export async function verifierCode(email: string, code: string): Promise<Utilisateur | null> {
+/** Prend le code : bon, il est consommé (il ne sert qu’une fois). Faux sinon : mauvais, expiré, ou trop d’essais. */
+export async function prendreCode(email: string, code: string): Promise<boolean> {
   /*
    * L’essai est compté avant de comparer, en une seule requête : des essais envoyés en même temps ne passent pas tous
    * sous la limite (lire puis écrire laissait chacun voir le même compte).
@@ -42,15 +42,23 @@ export async function verifierCode(email: string, code: string): Promise<Utilisa
     .set({ attempts: sql`${schema.loginCodes.attempts} + 1` })
     .where(and(eq(schema.loginCodes.email, email), lt(schema.loginCodes.attempts, CODE_ESSAIS), gt(schema.loginCodes.expiresAt, new Date())))
     .returning({ codeHash: schema.loginCodes.codeHash });
-  if (!ligne) return null;
-  if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return null;
+  if (!ligne) return false;
+  if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return false;
   /* Le code ne sert qu’une fois : deux bons essais en même temps, un seul ouvre la session */
   const [pris] = await db()
     .delete(schema.loginCodes)
     .where(and(eq(schema.loginCodes.email, email), eq(schema.loginCodes.codeHash, ligne.codeHash)))
     .returning({ email: schema.loginCodes.email });
-  if (!pris) return null;
+  return !!pris;
+}
 
+/** Vérifie le code. Bon : crée le compte s’il n’existe pas et le renvoie. */
+export async function verifierCode(email: string, code: string): Promise<Utilisateur | null> {
+  return (await prendreCode(email, code)) ? compteDe(email) : null;
+}
+
+/** Le compte de cet email, créé s’il n’existe pas. */
+export async function compteDe(email: string): Promise<Utilisateur> {
   const [existant] = await db().select().from(schema.users).where(eq(schema.users.email, email));
   const utilisateur =
     existant ??

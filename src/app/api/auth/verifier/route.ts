@@ -1,4 +1,4 @@
-import { Email, ouvrirSession, verifierCode } from "@/server/auth";
+import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
 import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, lireBrouillon, poserChoisie, poserSession } from "@/server/cookies";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
@@ -15,9 +15,11 @@ export async function POST(req: Request) {
   const b = await corps<{ email: string; code: string }>(req);
   const email = Email.safeParse(b.email);
   if (!email.success || typeof b.code !== "string") return json({ ok: false });
+  /* Le code d’abord : sans le bon, la réponse est la même, invité ou pas (un email hors de la bêta n’en reçoit jamais) */
+  if (!(await prendreCode(email.data, b.code.trim()))) return json({ ok: false });
+  /* Bêta fermée : un email retiré de la liste après l’envoi de son code (seul celui qui a le code l’apprend) */
   if (!peutEntrer(email.data)) return erreur("beta", 403);
-  const utilisateur = await verifierCode(email.data, b.code.trim());
-  if (!utilisateur) return json({ ok: false });
+  const utilisateur = await compteDe(email.data);
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);
   const rattachee = await brouillonALaConnexion(utilisateur, await lireBrouillon());
