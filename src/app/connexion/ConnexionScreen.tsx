@@ -36,11 +36,6 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       router.push(suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
-      /* Bêta fermée, email pas invité (donc sans compte) : il est sur la liste d’attente, l’écran de la liste le lui dit */
-      if (code === "beta") {
-        router.push("/attente?inscrit=1");
-        return;
-      }
       setProblem(code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
       setBusy(false);
     }

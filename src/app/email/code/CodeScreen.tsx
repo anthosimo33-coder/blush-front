@@ -31,8 +31,10 @@ const souciDe = (e: unknown) =>
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
  * du téléphone marchent), affiché en 6 cases. Le code complet valide tout seul.
  * `connexion` : on se reconnecte (un autre appareil) ; le bon code ouvre ses convs, sans relancer de lecture.
+ * `fermee` : la bêta est fermée. Tout le monde arrive ici, invité ou pas (personne ne peut savoir si un email est invité) :
+ * l’invité a reçu son code, les autres le mail de la liste d’attente. L’écran le dit sans savoir lequel.
  */
-export function CodeScreen({ connexion = false, suite = "/app" }: { connexion?: boolean; suite?: string }) {
+export function CodeScreen({ connexion = false, suite = "/app", fermee = false }: { connexion?: boolean; suite?: string; fermee?: boolean }) {
   const router = useRouter();
   const [j, set] = useJourney();
   const [code, setCode] = useState("");
@@ -123,7 +125,8 @@ export function CodeScreen({ connexion = false, suite = "/app" }: { connexion?: 
         <>
           <ScreenTitle>Entre ton code.</ScreenTitle>
           <Lead size={15} weight={800}>
-            On vient de l’envoyer à <span className="font-black text-ink">{email || "ton email"}</span>.
+            {fermee ? "On vient d’écrire à " : "On vient de l’envoyer à "}
+            <span className="font-black text-ink">{email || "ton email"}</span>.
           </Lead>
         </>
       }
@@ -199,6 +202,7 @@ export function CodeScreen({ connexion = false, suite = "/app" }: { connexion?: 
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
         Pas de mot de passe : ce code suffit. Il expire au bout de 10 minutes.
       </p>
+      {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail ? BLUSH est en bêta privée : ton email est sur la liste d’attente, le mail t’explique tout.</p>}
     </Screen>
   );
 }
