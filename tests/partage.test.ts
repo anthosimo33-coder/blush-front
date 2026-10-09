@@ -8,7 +8,7 @@ import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, importer, rattacherBrouillon, type Ligne } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { arreterPartage, ErreurPartage, lienDe, masquerPrenoms, partagerVerdict, verdictPartage } from "@/server/partages";
+import { arreterPartage, ErreurPartage, lienDe, masqueDe, masquerPrenoms, partagerVerdict, verdictPartage } from "@/server/partages";
 import { planifier } from "@/server/taches";
 
 describe("les prénoms dans ce qui se partage", () => {
@@ -17,6 +17,28 @@ describe("les prénoms dans ce qui se partage", () => {
     expect(masquerPrenoms("sophie t’attend. Huguette aussi.", ["Hugo", "Sophie"])).toBe("S. t’attend. Huguette aussi.");
     /* Le nom complet de l’export d’abord, puis le prénom seul */
     expect(masquerPrenoms("Inès Martin, ou Inès.", ["Inès", "Inès Martin"])).toBe("I., ou I.");
+  });
+
+  it("gardent en clair ceux à garder, même composés d’un nom masqué ; un nom des deux côtés reste masqué", () => {
+    expect(masquerPrenoms("Sophie attend que tu parles, Hugo.", ["Sophie"], ["Hugo"])).toBe("S. attend que tu parles, Hugo.");
+    expect(masquerPrenoms("Marie t’attend, Jean-Marie.", ["Marie"], ["Jean-Marie"])).toBe("M. t’attend, Jean-Marie.");
+    expect(masquerPrenoms("Alex attend Alex.", ["Alex"], ["Alex"])).toBe("A. attend A.");
+  });
+
+  it("le masque d’une histoire : l’autre en initiale, ton prénom en clair ; sans « Qui es-tu ? », tout le monde masqué", () => {
+    const histoire = (meta: object) => ({ meta: chiffrer(meta) }) as Ligne;
+    const deux = [
+      { nom: "Hugo Lemaire", prenom: "Hugo", messages: 10 },
+      { nom: "Sophie B", prenom: "Sophie", messages: 9 },
+    ];
+    expect(masqueDe(histoire({ participants: deux, moi: 0 }))("Sophie B attend Hugo Lemaire.")).toBe("S. attend Hugo Lemaire.");
+    expect(masqueDe(histoire({ participants: deux }))("Sophie attend Hugo.")).toBe("S. attend H.");
+    /* Des captures : tu es « Moi », ton prénom vient de « Qui es-tu ? » */
+    const captures = [
+      { nom: "Moi", prenom: "Karim", messages: 10 },
+      { nom: "Inès", prenom: "Inès", messages: 9 },
+    ];
+    expect(masqueDe(histoire({ participants: captures, moi: 0 }))("Inès attend Karim, dis-moi.")).toBe("I. attend Karim, dis-moi.");
   });
 });
 
@@ -46,17 +68,25 @@ describe("le lien de partage du verdict", () => {
     definirFactice(null);
   });
 
-  it("montre le verdict seul, prénoms masqués, et reste le même lien", async () => {
+  it("montre le verdict seul, le prénom de l’autre masqué (le tien en clair), et reste le même lien", async () => {
     const id = await partagerVerdict(story);
     expect(id).toMatch(/^[a-zA-Z0-9]{12}$/);
     expect(await partagerVerdict(story)).toBe(id);
     expect(await lienDe(story.id)).toBe(id);
     const v = await verdictPartage(id);
     expect(Object.keys(v!).sort()).toEqual(["emoji", "subtitle", "title"]);
-    expect(v!.subtitle).toBe("S. attend que tu parles, H.");
+    expect(v!.subtitle).toBe("S. attend que tu parles, Hugo.");
     /* Rien en clair dans la base */
     const [ligne] = await db().select().from(schema.shares).where(eq(schema.shares.id, id));
     expect(ligne.data.toString("utf8")).not.toContain("attend");
+  });
+
+  it("repartagé, le même lien montre le verdict tel qu’on le masque aujourd’hui", async () => {
+    const id = await partagerVerdict(story);
+    /* Un lien d’avant : ton prénom y était masqué aussi */
+    await db().update(schema.shares).set({ data: chiffrer({ emoji: "🤔", title: "x", subtitle: "S. attend que tu parles, H." }) }).where(eq(schema.shares.id, id));
+    expect(await partagerVerdict(story)).toBe(id);
+    expect((await verdictPartage(id))!.subtitle).toBe("S. attend que tu parles, Hugo.");
   });
 
   it("se désactive : le lien ne montre plus rien, et le suivant est un autre lien", async () => {

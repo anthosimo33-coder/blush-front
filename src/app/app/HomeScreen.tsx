@@ -192,6 +192,13 @@ const BUBBLE_LOOK: BubbleLook = { background: "#1A66DB", radius: 20, color: "#FF
 const SHEET_IN: Spring = { duration: 380, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
 const SHEET_OUT: Spring = { duration: 300, easing: "cubic-bezier(0.3, 0, 0.2, 1)" };
 
+/*
+ * L’arrivée du jour s’est jouée depuis l’ouverture de l’appli. Revenu par l’historique (le geste retour, « Retour » sur sa
+ * fiche), l’accueil remonte depuis le cache de Next, avec le `arrive` d’avant le cookie : sans ce drapeau, l’arrivée et
+ * sa signature se rejoueraient. Rien au rendu serveur ni à l’hydratation (le module est neuf) : pas d’écart.
+ */
+let arriveeJouee = false;
+
 /* L’heure d’ouverture de l’écran, lue dans le navigateur seulement : rien au rendu serveur, donc pas d’écart à l’hydratation */
 let openedAt: number | null = null;
 const readOpenedAt = () => (openedAt ??= Date.now());
@@ -267,8 +274,8 @@ export function HomeScreen({
   const [level, setLevel] = useState(contact.report.level);
   const levelNow = useRef(contact.report.level);
   const [cheer, setCheer] = useState(0);
-  /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie) */
-  const [arriving, setArriving] = useState(arrive);
+  /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie), et une seule fois depuis l’ouverture de l’appli */
+  const [arriving, setArriving] = useState(() => arrive && !arriveeJouee);
   const signed = useRef(false);
   const nextId = useRef(1);
   const thread = useRef<HTMLDivElement>(null);
@@ -297,14 +304,15 @@ export function HomeScreen({
   useEffect(() => marquerChatOuvert(), []);
 
   useEffect(() => {
-    if (!arrive) return;
+    if (!arriving) return;
+    arriveeJouee = true;
     markArrivalPlayed();
     /* La signature tombe avec le « coucou » des perles (0,85 s, une perle toutes les 0,11 s). Ouverte à froid, Safari la garde muette */
     if (!signed.current) play("signature", 0.85, 0.11);
     signed.current = true;
     const t = window.setTimeout(() => setArriving(false), 3700);
     return () => window.clearTimeout(t);
-  }, [arrive]);
+  }, [arriving]);
 
   /*
    * Chaque nouveau message fait défiler la conv jusqu’en bas (la page sur mobile, la fenêtre sur desktop).
@@ -1411,7 +1419,7 @@ function Group({ row }: { row: Extract<Row, { kind: "group" }> }) {
       ) : (
         <span data-a={intro ? "intro-tm" : undefined} className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}>
           {row.at === null ? " " : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
-          {/* La réponse se partage en image (story), prénoms masqués */}
+          {/* La réponse se partage en image (story), le prénom de l’autre masqué */}
           {row.from === "blush" && row.echange && (
             <button
               type="button"
