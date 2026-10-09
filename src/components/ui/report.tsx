@@ -181,7 +181,7 @@ function Punchline({ text, onShare }: { text: string; onShare?: () => void }) {
   return (
     <div className="relative rounded-card bg-ink px-4 py-3.5 text-white shadow-ink">
       <p className={cn("m-0 text-[18px] font-black leading-[1.3] tracking-[-0.01em]", onShare && "pr-10")}>{text}</p>
-      {/* La chute se partage en image (story), prénoms masqués */}
+      {/* La chute se partage en image (story), le prénom de l’autre masqué */}
       {onShare && (
         <button
           type="button"

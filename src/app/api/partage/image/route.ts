@@ -7,7 +7,7 @@ import { db, schema } from "@/server/db";
 import { contexteRequete } from "@/server/donnees";
 import { erreur, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
-import { masquerPrenoms, prenomsDe } from "@/server/partages";
+import { masqueDe } from "@/server/partages";
 import type { BlushAnswer, Chapter } from "@/types";
 
 const Cible = z.discriminatedUnion("type", [
@@ -20,7 +20,7 @@ const Cible = z.discriminatedUnion("type", [
 /**
  * « Partager en image » : un moment de BLUSH (une réponse du chat, la chute d’un chapitre) dessiné en story.
  * Le contenu est relu ici, dans le compte (jamais pris de la requête : pas de fausse image « askblush.com »),
- * et les prénoms sont masqués.
+ * et le prénom de l’autre est masqué (le tien reste).
  */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
@@ -30,8 +30,7 @@ export async function POST(req: Request) {
   if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop", 429);
   const cible = Cible.safeParse(await req.json().catch(() => null));
   if (!cible.success) return erreur("cible", 422);
-  const prenoms = prenomsDe(story);
-  const masquer = (t: string) => masquerPrenoms(t, prenoms);
+  const masquer = masqueDe(story);
   const c = cible.data;
 
   if (c.type === "reponse") {

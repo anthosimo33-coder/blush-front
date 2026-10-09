@@ -9,8 +9,8 @@ import { db, schema } from "./db";
 import { metaDe, type Ligne } from "./histoires";
 
 /*
- * Le partage du verdict : un lien public (/v/<id>) qui montre l’emoji, le titre et le sous-titre du verdict,
- * prénoms masqués. Jamais un message, jamais un chapitre. Un lien par histoire ; le désactiver l’efface.
+ * Le partage du verdict : un lien public (/v/<id>) qui montre l’emoji, le titre et le sous-titre du verdict, le prénom
+ * de l’autre masqué (le tien reste). Jamais un message, jamais un chapitre. Un lien par histoire ; le désactiver l’efface.
  */
 
 /** Ce que montre un lien partagé. */
@@ -29,41 +29,52 @@ export const ID_PARTAGE = /^[a-zA-Z0-9]{12}$/;
 
 const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Les noms à masquer dans ce qui se partage : prénoms et noms d’export, sans le « Moi » des captures (le mot, pas un nom). */
-export const prenomsDe = (story: Ligne) => [...new Set(metaDe(story).participants.flatMap((p) => [p.prenom, p.nom]))].filter((n) => n !== "Moi");
-
-/** Les prénoms deviennent des initiales (« Charlyse t’attend » → « C. t’attend »), comme le duo du rapport. Le point qui suit est repris (« Hugo. » → « H. »). */
-export function masquerPrenoms(texte: string, prenoms: string[]): string {
-  return prenoms
-    .filter((p) => p.trim().length > 1)
-    .sort((a, b) => b.length - a.length)
-    .reduce((t, p) => t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${echapper(p.trim())}(?![\\p{L}\\p{N}])\\.?`, "giu"), `${[...p.trim()][0].toUpperCase()}.`), texte);
+/**
+ * Les noms à masquer deviennent des initiales (« Charlyse t’attend » → « C. t’attend »), comme le duo du rapport ; le point
+ * qui suit est repris (« Hugo. » → « H. »). Ceux à garder restent tels quels, même quand ils en contiennent un (« Jean-Marie »
+ * garde son « Marie ») ; un nom à la fois à masquer et à garder est masqué.
+ */
+export function masquerPrenoms(texte: string, masquer: string[], garder: string[] = []): string {
+  const cle = (n: string) => n.trim().toLowerCase();
+  const masques = new Set(masquer.map(cle));
+  const noms = [...new Set([...masquer, ...garder].map((n) => n.trim()))].filter((n) => n.length > 1).sort((a, b) => b.length - a.length);
+  if (!noms.length) return texte;
+  /* En une passe, le plus long d’abord : le nom complet de l’export avant le prénom seul */
+  const nom = new RegExp(`(?<![\\p{L}\\p{N}])(${noms.map(echapper).join("|")})(?![\\p{L}\\p{N}])\\.?`, "giu");
+  return texte.replace(nom, (m, n: string) => (masques.has(cle(n)) ? `${[...n][0].toUpperCase()}.` : m));
 }
 
-/** Le lien de partage de l’histoire, créé s’il n’existe pas encore. */
+/**
+ * Le masque de ce qui se partage : l’autre devient une initiale (son prénom et son nom d’export), ton prénom reste en
+ * clair, c’est toi qui partages. Sans « Qui es-tu ? », on ne sait pas qui est qui : tous les noms sont masqués.
+ * Le « Moi » des captures est le mot, pas un nom.
+ */
+export function masqueDe(story: Ligne): (texte: string) => string {
+  const { participants, moi } = metaDe(story);
+  const unNom = (n: string) => n !== "Moi";
+  const autres = participants.filter((_, k) => k !== moi).flatMap((p) => [p.prenom, p.nom].filter(unNom));
+  const toi = moi == null ? [] : [participants[moi].prenom].filter(unNom);
+  return (texte) => masquerPrenoms(texte, autres, toi);
+}
+
+/** Le lien de partage de l’histoire, créé s’il n’existe pas encore. Ce qu’il montre est refait à chaque partage. */
 export async function partagerVerdict(story: Ligne): Promise<string> {
-  const [deja] = await db().select({ id: schema.shares.id }).from(schema.shares).where(eq(schema.shares.storyId, story.id));
-  if (deja) return deja.id;
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
   if (!v) throw new ErreurPartage("pas_pret");
   const { sortie } = dechiffrer<DonneesVerdict>(v.data);
   /* Une situation difficile ne se partage pas */
   if (sortie.mode_sobre) throw new ErreurPartage("sobre");
   const verdict = verdictAffiche(sortie);
-  const prenoms = prenomsDe(story);
-  const montre: VerdictPartage = {
-    emoji: verdict.emoji,
-    title: masquerPrenoms(verdict.title, prenoms),
-    subtitle: masquerPrenoms(verdict.subtitle, prenoms),
-  };
+  const masquer = masqueDe(story);
+  const data = chiffrer({ emoji: verdict.emoji, title: masquer(verdict.title), subtitle: masquer(verdict.subtitle) } satisfies VerdictPartage);
+  /* Déjà partagé : le même lien, masqué comme aujourd’hui (un lien créé avant le 9 octobre masquait aussi ton prénom) */
+  const [deja] = await db().update(schema.shares).set({ data }).where(eq(schema.shares.storyId, story.id)).returning({ id: schema.shares.id });
+  if (deja) return deja.id;
   const [cree] = await db()
     .insert(schema.shares)
-    .values({ id: nouvelId(), storyId: story.id, data: chiffrer(montre) })
+    .values({ id: nouvelId(), storyId: story.id, data })
     /* Deux ouvertures en même temps : un seul lien */
-    .onConflictDoUpdate({
-      target: schema.shares.storyId,
-      set: { storyId: story.id },
-    })
+    .onConflictDoUpdate({ target: schema.shares.storyId, set: { data } })
     .returning({ id: schema.shares.id });
   await compter(CLES.lienCree);
   return cree.id;

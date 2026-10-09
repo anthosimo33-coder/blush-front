@@ -158,7 +158,7 @@ export const tasks = pgTable(
 );
 
 /**
- * Un verdict partagé : le lien public (/v/<id>) qui montre le verdict seul, prénoms masqués, jamais la conv.
+ * Un verdict partagé : le lien public (/v/<id>) qui montre le verdict seul, le prénom de l’autre masqué, jamais la conv.
  * Un lien par histoire ; le désactiver efface la ligne (le lien ne montre plus rien), supprimer l’histoire aussi.
  */
 export const shares = pgTable("shares", {
@@ -167,7 +167,7 @@ export const shares = pgTable("shares", {
     .notNull()
     .unique()
     .references(() => stories.id, { onDelete: "cascade" }),
-  /** Ce que montre le lien (l’emoji, le titre et le sous-titre du verdict, prénoms masqués), chiffré. */
+  /** Ce que montre le lien (l’emoji, le titre et le sous-titre du verdict, le prénom de l’autre masqué), chiffré. */
   data: chiffre("data").notNull(),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
