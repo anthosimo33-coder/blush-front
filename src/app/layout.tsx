@@ -1,27 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Nunito } from "next/font/google";
 import { Suspense } from "react";
 import { JourneyProvider } from "@/state/journey";
 import { DemoParams } from "@/state/DemoParams";
 import { SoundBoot } from "@/components/shell/SoundBoot";
 import { SuiviNavigation } from "@/lib/navigation";
+import { classesDesPolices } from "./polices";
 import "./globals.css";
-
-/* Nunito pour toute l’interface (titres en 900, texte en 700-800) */
-const nunito = Nunito({
-  variable: "--font-nunito",
-  subsets: ["latin"],
-  weight: ["600", "700", "800", "900"],
-  display: "swap",
-});
-
-/* Figtree uniquement pour les bulles de vrais messages */
-const figtree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
-  weight: ["700", "800"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   /* Les images des liens partagés (/v/…) en adresse complète : celle du site en ligne, l’adresse locale en dev */
@@ -40,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fr" className={`${nunito.variable} ${figtree.variable} antialiased`}>
+    <html lang="fr" className={`${classesDesPolices} antialiased`}>
       <body>
         <JourneyProvider>
           <div id="app-root">{children}</div>
