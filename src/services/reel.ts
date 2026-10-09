@@ -11,7 +11,7 @@ import { imagesDeLaVideo, lotsDe, VideoIllisible } from "./preparer-video";
 
 /** Où en est la lecture d’un enregistrement d’écran : la vidéo regardée dans le navigateur, puis ses lots lus par BLUSH. */
 /** Un morceau de l’historique du chat (du plus ancien au plus récent), et s’il en reste de plus anciens. */
-export type HistoriqueChat = { echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean };
+export type HistoriqueChat = { echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean; modeVocal?: boolean };
 
 export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number };
 
