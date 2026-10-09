@@ -3,7 +3,8 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
-import { creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage } from "@/services/api";
+import { creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
+import { BACKEND } from "@/services/mode";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
@@ -155,7 +156,9 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
  * Le lien est créé à l’ouverture (toujours le même), et se désactive d’un toucher.
  */
 export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClose: () => void; verdict: Pick<Verdict, "emoji" | "title"> }) {
-  const [url, setUrl] = useState<string | null>(null);
+  /* Le lien, et le verdict tel qu’il le montre (prénoms masqués, par le serveur) : le texte partagé reprend celui-là */
+  const [lien, setLien] = useState<{ url: string; verdict: VerdictMontre | null } | null>(null);
+  const url = lien?.url ?? null;
   const [probleme, setProbleme] = useState(false);
   const [image, setImage] = useState(false);
   const [copie, setCopie] = useState(false);
@@ -167,7 +170,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
     if (!open || url) return;
     let fini = false;
     creerLienPartage()
-      .then((u) => !fini && setUrl(u))
+      .then((l) => !fini && setLien(l))
       .catch(() => !fini && setProbleme(true));
     return () => {
       fini = true;
@@ -193,8 +196,10 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
     return () => clearTimeout(t);
   }, [copie, fait]);
 
+  /* Le verdict partagé : celui du lien, prénoms masqués. La démo n’a pas de vrai lien : son verdict tel quel */
+  const montre = lien?.verdict ?? (BACKEND ? null : verdict);
   /* Ce qu’on écrit à ses potes avec le lien : comme on le dirait (l’aperçu du lien fait le reste) */
-  const texte = `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict : ${verdict.emoji} « ${verdict.title} »`;
+  const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict : ${montre.emoji} « ${montre.title} »` : "j’ai fait lire notre conv à BLUSH 💀";
   const avecLien = url ? `${texte}${"\n"}${url}` : "";
   const pret = !!url;
 
@@ -220,7 +225,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
   const desactiver = async () => {
     try {
       await desactiverLienPartage();
-      setUrl(null);
+      setLien(null);
       setStory(null);
       setImage(false);
       onClose();
@@ -240,7 +245,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
             // eslint-disable-next-line @next/next/no-img-element -- l’image dessinée par le serveur, telle quelle
             <img
               src={`${url}/image`}
-              alt={`${verdict.emoji} ${verdict.title}`}
+              alt={montre ? `${montre.emoji} ${montre.title}` : "Le verdict partagé"}
               onLoad={() => setImage(true)}
               className={cn("absolute inset-0 size-full object-cover transition-opacity duration-300", image ? "opacity-100" : "opacity-0")}
             />
@@ -252,9 +257,7 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
           )}
         </div>
         <figcaption className="flex flex-col gap-0.5 px-4 py-3">
-          <span className="line-clamp-2 text-[15px] font-black leading-[1.3] text-ink">
-            {verdict.emoji} {verdict.title}
-          </span>
+          <span className="line-clamp-2 min-h-[20px] text-[15px] font-black leading-[1.3] text-ink">{montre && `${montre.emoji} ${montre.title}`}</span>
           <span className="text-[13px] font-extrabold text-grey">askblush.com</span>
         </figcaption>
       </figure>

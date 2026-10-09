@@ -7,8 +7,9 @@ import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
-import { useQuery } from "@/lib/query";
-import { getReport, type ReportPayload } from "@/services/api";
+import { setQueryData, useQuery } from "@/lib/query";
+import { getReport, relancerRapport, type ReportPayload } from "@/services/api";
+import { ErreurApi } from "@/services/reel";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -65,6 +66,39 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false }: { i
       <ReportBody payload={payload} story={story} openPaywall={openPaywall} />
       {payload.generating && (payload.ecriture ? <PastilleEcriture ecriture={payload.ecriture} /> : <Writing />)}
     </>
+  );
+}
+
+/**
+ * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
+ * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer.
+ */
+function EchecEcriture({ raison }: { raison: "panne" | "refus" }) {
+  const [busy, setBusy] = useState(false);
+  const [souci, setSouci] = useState<string | null>(null);
+  const relancer = async () => {
+    setBusy(true);
+    setSouci(null);
+    try {
+      setQueryData("report", await relancerRapport());
+    } catch (e) {
+      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain." : "Ça n’a pas pu repartir. Vérifie ta connexion et réessaie.");
+    }
+    setBusy(false);
+  };
+  return (
+    <Card className="flex flex-col gap-2 p-[18px]">
+      <div role="alert" className="text-[17px] font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
+      <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+        {raison === "refus" ? "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste." : "BLUSH a buté en l’écrivant. Ta conv est toujours là : relance, et tout repart de zéro."}
+      </p>
+      {souci && <p className="m-0 text-[14px] font-extrabold leading-[1.4] text-ink">{souci}</p>}
+      {raison === "panne" && (
+        <Button className="mt-1" onClick={relancer} disabled={busy} aria-busy={busy}>
+          {busy ? <TypingDots color="#FFFFFF" label="Relance de l’écriture" /> : "Relancer l’écriture"}
+        </Button>
+      )}
+    </Card>
   );
 }
 
@@ -211,11 +245,11 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
         {chapters.map((c) => (
           <li key={c.number}>
-            {c.locked && payload.generating ? (
+            {c.locked && (payload.generating || payload.echec) ? (
               <div className="flex w-full items-center gap-2.5 py-[7px] text-left">
                 <ChapterBadge number={c.number} state="locked" />
                 <span className={cn("flex-1 text-[14px] font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
-                <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />
+                {!payload.echec && <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />}
               </div>
             ) : c.locked ? (
               <button type="button" onClick={() => setPaywall(true)} className="row-hover flex w-full items-center gap-2.5 py-[7px] text-left">
@@ -305,7 +339,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       footer={
         /* Le rapport écrit : on continue avec BLUSH, dans le chat. Pendant l’écriture, le chat n’est pas encore prêt */
         full ? (
-          payload.generating ? undefined : (
+          payload.generating || payload.echec ? undefined : (
             <ButtonLink id="cta-chat" href="/app?depuis=rapport" onClick={marquerChatOuvert} arrow>
               Parler à BLUSH
             </ButtonLink>
@@ -402,7 +436,14 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </>
       )}
 
-      {locked.length > 0 && !payload.generating && (
+      {locked.length > 0 && payload.echec && (
+        <>
+          <ChapterRule />
+          <EchecEcriture raison={payload.echec} />
+        </>
+      )}
+
+      {locked.length > 0 && !payload.generating && !payload.echec && (
         <>
           <ChapterRule />
           <div className="text-[13px] font-black text-grey">La suite de ton rapport · {locked.length} chapitres</div>
@@ -441,7 +482,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       )}
 
       {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
-      {payload.access === "blushplus" && !payload.generating && <ChatBubble raised={!!resume} />}
+      {payload.access === "blushplus" && !payload.generating && !payload.echec && <ChatBubble raised={!!resume} />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (

@@ -1,5 +1,7 @@
 "use client";
 
+import { usePathname, useSearchParams } from "next/navigation";
+import { BACKEND } from "@/services/mode";
 import type { DemoError } from "@/types";
 import { useSoundOnce } from "@/lib/sound";
 import { ButtonLink } from "@/components/ui/Button";
@@ -59,8 +61,42 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
   },
 };
 
-export function ErrorScreen({ kind }: { kind: DemoError }) {
+type Copie = (typeof ERROR_COPY)[DemoError];
+
+/**
+ * Le texte et les liens d’une erreur, d’après l’écran où elle arrive : réessayer garde son appli (`?app=`) et son mode.
+ * Une conv trop courte : sur des captures, en choisir plus (20 messages suffisent) ; sur un export, avec le back-end,
+ * passer aux captures (réunir un export et des captures arrive plus tard, voir ConvOkScreen).
+ */
+function copieDe(kind: DemoError, chemin: string, params: URLSearchParams): Copie {
   const c = ERROR_COPY[kind];
+  const reste = new URLSearchParams(params);
+  reste.delete("erreur");
+  const requete = reste.toString();
+  const ici = requete ? `${chemin}?${requete}` : chemin;
+  const app = params.get("app");
+  if (kind === "courte" && chemin === "/importer/captures")
+    return {
+      ...c,
+      text: "Il faut au moins 20 messages pour un verdict juste. Ajoute des captures, depuis le début de votre conv, ou reviens dans quelques jours.",
+      action: "Choisir plus de captures",
+      href: ici,
+      back: ici,
+    };
+  if (kind === "courte" && BACKEND)
+    return {
+      ...c,
+      text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
+      action: "Envoyer des captures",
+      href: app ? `/importer/captures?app=${encodeURIComponent(app)}` : "/importer/captures",
+      back: ici,
+    };
+  if (kind === "fichier" || kind === "capture" || kind === "video" || kind === "longue") return { ...c, href: ici, back: ici };
+  return c;
+}
+
+export function ErrorScreen({ kind }: { kind: DemoError }) {
+  const c = copieDe(kind, usePathname(), useSearchParams());
   /* Une erreur se dit doucement : deux touchers sourds, sans buzzer */
   useSoundOnce("non");
   return (

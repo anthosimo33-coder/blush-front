@@ -18,6 +18,8 @@ import { readJourney, setJourney } from "@/state/journey";
 import type { AnalysisProgress } from "@/types";
 
 const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
+/** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */
+const RATES_MAX = 8;
 
 /** reading : la bulle écrit, l’anneau se remplit · leaving : l’anneau s’efface · done : la gerbe marque la fin. */
 type Phase = "reading" | "leaving" | "done";
@@ -55,9 +57,14 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       const cur = readJourney();
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
       const lance = await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
-        (e: unknown) => (e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : null),
+        (e: unknown) => (e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : null),
       );
       if (!alive) return;
+      /* Plus de session (expirée, ou ouverte ailleurs) : on se reconnecte, la lecture reprend ensuite */
+      if (lance === "connexion") {
+        router.replace("/connexion?suite=/lecture");
+        return;
+      }
       /* La conv ouverte n’est pas passée par « Qui es-tu ? » (la page le vérifie déjà avant) : rien à relancer, c’est là qu’on va */
       if (lance === "qui") {
         router.replace("/qui");
@@ -70,9 +77,28 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       const { jobId } = lance;
       restartRef.current = false;
       setJourney({ jobId });
+      let rates = 0;
       const tick = async () => {
-        const next = await getAnalysisProgress(jobId);
+        let next: AnalysisProgress;
+        try {
+          next = await getAnalysisProgress(jobId);
+        } catch (e) {
+          if (!alive) return;
+          if (e instanceof ErreurApi && e.status === 401) {
+            router.replace("/connexion?suite=/lecture");
+            return;
+          }
+          rates += 1;
+          /* La conv a disparu, ou le serveur ne répond plus depuis un moment : l’écran d’échec, avec « Relancer » */
+          if ((e instanceof ErreurApi && e.status === 404) || rates >= RATES_MAX) {
+            setFailed(true);
+            return;
+          }
+          timer = setTimeout(tick, Math.min(8000, 1000 * 2 ** (rates - 1)));
+          return;
+        }
         if (!alive) return;
+        rates = 0;
         setP(next);
         const arrivedDone = first;
         first = false;

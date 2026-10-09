@@ -30,7 +30,7 @@ export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRap
   if (!v) return null;
   const d = dechiffrer<DonneesVocal>(v.data);
   return {
-    pret: { etat: "pret", audio: `/api/vocal/audio?v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix as Voix, sobre: d.sobre, lignes: d.lignes },
+    pret: { etat: "pret", audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix as Voix, sobre: d.sobre, lignes: d.lignes },
     aJour: (d.version ?? 1) >= VERSION_VOCAL,
     fait: v.createdAt,
   };

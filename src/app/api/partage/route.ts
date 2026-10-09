@@ -1,7 +1,7 @@
 import { CLES, compter } from "@/server/compteurs";
 import { contexteRequete } from "@/server/donnees";
 import { erreur, json, memeOrigine } from "@/server/http";
-import { arreterPartage, ErreurPartage, lienDe, partagerVerdict } from "@/server/partages";
+import { arreterPartage, ErreurPartage, lienDe, partagerVerdict, verdictPartage } from "@/server/partages";
 
 /** Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
 async function histoire(req?: Request) {
@@ -24,7 +24,8 @@ export async function POST(req: Request) {
   try {
     const id = await partagerVerdict(story);
     await compter(CLES.partageOuvert);
-    return json({ id });
+    /* Le verdict tel que le montre le lien (prénoms masqués) : c’est lui que le texte partagé reprend */
+    return json({ id, verdict: await verdictPartage(id) });
   } catch (e) {
     if (e instanceof ErreurPartage) return erreur(e.code, 409);
     throw e;

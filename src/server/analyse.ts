@@ -19,7 +19,7 @@ import { alerter } from "./alertes";
 import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
-import { aRelancer, battre, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
+import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
@@ -40,7 +40,12 @@ function relire(story: Ligne) {
   const conv = convDe(story);
   if (!conv) throw new ErreurTache("conv_effacee");
   const meta = metaDe(story);
-  const h = histoireDe(meta);
+  /*
+   * « Aujourd’hui », pour la lecture : le jour de l’import (à Paris), celui où la conv a été prise. Sans lui, la lecture
+   * se croirait au lendemain du dernier message : un silence de plusieurs jours deviendrait « hier ». Le même jour
+   * d’un essai à l’autre, et pour le verdict, le rapport et la mémoire.
+   */
+  const h = { ...histoireDe(meta), aujourdhui: aujourdhuiParis(story.createdAt).iso };
   const lu = lire(conv, h);
   return { meta, h, lu, rendu: rendre(h, lu) };
 }
@@ -405,6 +410,7 @@ async function executer(t: Tache): Promise<boolean> {
  * tâche : `prendre` est atomique.
  */
 export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_MS): Promise<void> {
+  await cloreLesAbandons(storyId);
   if (await occupee(storyId)) return;
   const debut = Date.now();
   while (Date.now() - debut < budgetMs) {
@@ -415,6 +421,11 @@ export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_M
     /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
     if (!(await executer(pris))) await new Promise((r) => setTimeout(r, 3000 * pris.attempts));
   }
+}
+
+/** Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre échec. */
+export async function cloreLesAbandons(storyId: string): Promise<void> {
+  for (const t of await clore(storyId)) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, "Erreur : coupée à chaque essai (délai dépassé)", `Essais : ${t.attempts}`]);
 }
 
 /**

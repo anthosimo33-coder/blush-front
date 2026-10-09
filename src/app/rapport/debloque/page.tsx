@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UnlockedScreen } from "./UnlockedScreen";
+import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
 
@@ -8,5 +9,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const offer = sp.offre === "rapport" ? "rapport" : "blushplus";
   /* Où reprendre après : seulement une adresse interne */
   const next = typeof sp.suite === "string" && sp.suite.startsWith("/") && !sp.suite.startsWith("//") ? sp.suite : null;
-  return <UnlockedScreen offer={offer} next={next} />;
+  return (
+    <>
+      <ConvDeLaPage />
+      <UnlockedScreen offer={offer} next={next} />
+    </>
+  );
 }

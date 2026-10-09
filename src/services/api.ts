@@ -30,7 +30,7 @@ import { chatVocalDemo, vocalDemo } from "@/mocks/vocal";
 import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
-import { ErreurApi, reel, type AvanceVideo, type HistoriqueChat } from "./reel";
+import { avecConv, ErreurApi, reel, type AvanceVideo, type HistoriqueChat } from "./reel";
 import { readStoryCookie, writeStoryCookie } from "./session";
 
 export type Account = {
@@ -62,6 +62,8 @@ export type ReportPayload = {
   ecriture?: EcritureRapport;
   /** Le vocal de BLUSH, en haut du rapport : prêt, ou en train de s’enregistrer. */
   vocal?: VocalRapport;
+  /** Back-end : l’écriture a échoué pour de bon (la panne : on peut la relancer ; le refus du modèle : rien à relancer). */
+  echec?: "panne" | "refus";
 };
 
 /* Durée simulée de la lecture (environ 6 s). */
@@ -199,6 +201,12 @@ export async function getReport(storyId?: string): Promise<ReportPayload> {
 }
 
 /** Le chat de nouveau à l’écrit (« Repasser à l’écrit »). En démo, rien à garder. */
+/** Back-end : relance l’écriture d’un rapport en échec. La démo n’échoue jamais : le rapport tel quel. */
+export async function relancerRapport(): Promise<ReportPayload> {
+  if (BACKEND) return reel.relancerRapport();
+  return getReport();
+}
+
 export function modeVocalChat(actif: boolean): void {
   if (BACKEND) void reel.modeVocal(actif);
 }
@@ -465,10 +473,13 @@ export async function cancelSubscription(): Promise<void> {
  * Le lien public du verdict (/v/<id>) : le verdict seul, prénoms masqués, jamais la conv. Toujours le même lien
  * tant qu’on ne le désactive pas. En démo : le lien « demo ».
  */
-export async function creerLienPartage(): Promise<string> {
-  const id = BACKEND ? await reel.creerLienPartage() : (await delay(300), "demo");
-  return `${window.location.origin}/v/${id}`;
+export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre | null }> {
+  const { id, verdict } = BACKEND ? await reel.creerLienPartage() : (await delay(300), { id: "demo", verdict: null });
+  return { url: `${window.location.origin}/v/${id}`, verdict };
 }
+
+/** Le verdict tel que le montre un lien partagé : les prénoms en initiales (« C. t’attend »). */
+export type VerdictMontre = { emoji: string; title: string };
 
 /** Ce qu’on partage en image : une réponse de BLUSH (son échange), ou la chute d’un chapitre (sa place). */
 export type CibleImage = { type: "reponse"; echange: number } | { type: "moment"; chapitre: number; bloc: number };
@@ -476,7 +487,7 @@ export type CibleImage = { type: "reponse"; echange: number } | { type: "moment"
 /** L’image « Partager en image » (story), dessinée par le serveur d’après le contenu du compte. En démo : un exemple. */
 export async function imagePartage(cible: CibleImage): Promise<Blob> {
   const r = BACKEND
-    ? await fetch("/api/partage/image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cible), credentials: "same-origin" })
+    ? await fetch("/api/partage/image", { method: "POST", headers: avecConv({ "content-type": "application/json" }), body: JSON.stringify(cible), credentials: "same-origin" })
     : await fetch(`/apercu/carte?type=${cible.type}`);
   if (!r.ok) throw new ErreurApi("image", r.status);
   return r.blob();
