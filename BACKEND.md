@@ -69,7 +69,29 @@ NEXT_PUBLIC_BLUSH_BACKEND=1 DATABASE_URL=postgres://localhost:5432/blush_dev BLU
 
 En dev, le code de connexion s’affiche dans les logs du serveur.
 
-Les tests tournent sur la base `blush_test` : `createdb blush_test`, puis les migrations, puis `npm test`.
+Les tests tournent sur la base `blush_test`, ou celle de `DATABASE_URL_TEST` : `npm test` la crée si elle manque et la migre (`tests/preparer-la-base.ts`), sans jamais l’effacer. `blush_test` sert à tous les dossiers du projet sur la machine : sans `DATABASE_URL_TEST`, elle n’est migrée que si elle vient d’être créée, et une migration qui lui manque arrête les tests (prendre alors `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom>`). `npm run check` lance tout ce que la CI vérifie avant le build : les types, le lint, la cohérence des migrations (`scripts/verifier-migrations.mjs` : le journal de `drizzle/`, puis `drizzle-kit check`) et les tests.
+
+### Les tests de bout en bout
+
+Les vrais parcours, dans Chromium (ordinateur) et WebKit (iPhone), contre le back-end et le modèle factice, sur une base recréée à chaque lancement (`blush_e2e`). Sans Resend, le serveur des tests écrit chaque mail en JSON dans `test-results/boite-mails-<port>` (`BLUSH_BOITE_MAILS`, ignorée sur Vercel) : les tests y lisent les codes.
+
+```bash
+npx playwright install chromium webkit   # une fois
+npm run e2e:build                        # le build du back-end, après chaque changement de l’appli
+npm run e2e                              # ou : npm run e2e -- --project=webkit-iphone, npm run e2e:ui
+```
+
+- Plusieurs suites en même temps : `E2E_PORT=3500 E2E_DB=blush_e2e_b npm run e2e` (le port suivant sert la bêta fermée). `E2E_WORKERS` change le nombre de workers (3 en local, 2 en CI).
+- Les fichiers `*.beta.spec.ts` tournent sur ce second serveur, en bêta fermée (`BLUSH_BETA_FERMEE=1`).
+- Les tests s’écrivent avec `tests/e2e/aide`, et importent tout de `./aide` (`test`, `expect` et les réglages des serveurs compris) : des exports fictifs, la boîte à mails, les gestes du parcours (`jusquAuCode`, `seConnecter`, `saisirLeCodeRecu`), la base. Jamais une vraie conv.
+- Le décor d’un test (un compte, sa conv lue) se prépare par les routes /api : `lectureFaite` (un compte gratuit), `lectureBlushPlus` (un invité, toute la chaîne écrite). Le parcours à l’écran a ses propres tests (`parcours-temoin`, `import*`).
+- Le modèle factice a des déclencheurs, des marqueurs inventés à glisser dans une conv (`exportWhatsApp(testInfo, { ajout })`) : `ALERTE_FACTICE` (le mode sobre), `REFUS_FACTICE` (un refus du modèle), et dans le chat « je lui envoie quoi », « on est ensemble », « parle-moi en vocal » (`src/server/ia/factice.ts`).
+- Une page chargée en entier ne répond aux gestes qu’une fois hydratée : `goto`, `reload`, `goBack` et `goForward` l’attendent d’eux-mêmes (`aide/page.ts`). Après un geste qui recharge toute la page (le verdict, qui part par `window.location`), `pagePrete(page)` ; sur une page qui lit le compte, `ouvrir(page, adresse)`. Jamais de nouvel essai : un test qui ne passe qu’une fois sur deux attend le mauvais signal.
+- Une requête attendue part avec son geste : `reponseAuGeste(page, { chemin }, geste)`. Aucune attente des aides ne dure plus que `RESEAU` (30 s, celle d’un `expect`), sauf le dessin d’une image (`DESSIN`) et la lecture de captures (`LECTURE_DES_CAPTURES`) ; `test.slow()` seulement pour un test qui enchaîne plusieurs parcours. Une attente fixe seulement pour dire que rien n’arrive (`DEFILEMENT_DOUX`, la relecture des compteurs du partage).
+- Un autre appareil (un pote, le mail ouvert ailleurs) : la fixture `autreAppareil`, refermée à la fin du test. Chromium a un micro factice, autorisé d’office (`playwright.config.ts`).
+- Un invité (`nouvelInvite`) repart d’un compte et d’une boîte à mails vides ; un email libre (`emailLibre`) est neuf à chaque test.
+- Dans Chromium, `response.json()` n’aboutit jamais quand la page ne lit pas elle-même le corps de sa requête : vérifier alors `status()`.
+- Après un échec : la trace et la capture dans `test-results/<port>`, le rapport avec `npx playwright show-report`.
 
 Pour mesurer les prompts avec le vrai modèle, il y a aussi `scripts/essai-memoire.mts` (les mises à jour de la mémoire, échange par échange), `scripts/essai-captures.mts` (la lecture des captures, comparée mot pour mot aux captures fabriquées par `prompts/evals/captures/fabriquer.mjs` ; un profil fictif avec `prompts/evals/captures/profil.mjs`) et `scripts/essai-ajouts.mts` (des messages et un profil envoyés après l’import : la réponse du chat, puis la mise à jour de la mémoire).
 
@@ -87,11 +109,8 @@ Déjà fait (production, sur Vercel) : `BLUSH_CLE` (une copie locale dans `~/.bl
 
 1. **La base :** créer une base Neon depuis Vercel (projet blush-front, onglet Storage, région Francfort, « Connect »). Vercel ajoute `DATABASE_URL` tout seul. Les tables se créent au build (`scripts/migrer.mjs`, lancé par `prebuild` sur Vercel) : pas besoin de l’URL en local.
 2. **Les variables qui restent :** `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (une clé à part, avec un plafond de dépenses), `BLUSH_ACCES_LIBRE` (les emails des testeurs), puis `NEXT_PUBLIC_BLUSH_BACKEND=1` en dernier : il allume le back-end au build.
-3. **Le déploiement :** depuis un dossier où le sous-module `prompts/` est présent (pas d’intégration Git ; `.vercelignore` garde `prompts/evals` en local) :
-   ```bash
-   vercel deploy --prod
-   ```
-4. **Donner l’accès à un ami pendant la bêta :** ajouter son email à `BLUSH_ACCES_LIBRE` puis redéployer, ou, avec l’URL de la base :
+3. **Le déploiement :** par la CI seulement, et toujours à la main : « Run workflow » sur `main` (onglet Actions de `blush-front`), ou `gh workflow run CI --ref main`. Ce lancement refait les vérifications et les tests de bout en bout sur la tête de `main`, puis `vercel deploy --prod` depuis GitHub (le sous-module `prompts/` compris ; `.vercelignore` garde `prompts/evals` hors de Vercel). Un push sur `main` ne déploie rien. Plus jamais `vercel deploy` depuis un dossier local. Pas d’intégration Git côté Vercel : `vercel.json` coupe ses déploiements automatiques, au cas où le dépôt y serait relié un jour.
+4. **Donner l’accès à un ami pendant la bêta :** ajouter son email à `BLUSH_ACCES_LIBRE`, puis relancer la mise en production (un nouveau « Run workflow » sur `main` : un « Re-run » d’un ancien lancement s’arrête si `main` a avancé depuis), ou, avec l’URL de la base :
    ```bash
    DATABASE_URL=<url> npm run acces -- ami@exemple.fr blushplus
    ```

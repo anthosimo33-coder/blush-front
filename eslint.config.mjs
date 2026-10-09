@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Le banc de test des prompts (scripts .mjs) et le module généré des textes.
     "prompts/evals/**",
     "src/server/ia/textes.generated.ts",
+    // Les résultats des tests de bout en bout (le rapport HTML de Playwright embarque son propre code).
+    "test-results/**",
+    "playwright-report*/**",
   ]),
 ]);
 

@@ -41,14 +41,23 @@ const Env = z.object({
   BLUSH_ADMINS: z.string().optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
   CRON_SECRET: z.string().min(16).optional(),
-  /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. */
+  /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])
     .default("0")
     .transform((v) => v === "1"),
+  /** Tests de bout en bout (tests/e2e) : les mails sont écrits dans ce dossier au lieu de partir. Avec le modèle factice seulement. */
+  BLUSH_BOITE_MAILS: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof Env>;
+
+/*
+ * Le modèle factice et la boîte à mails des tests n’existent jamais sur Vercel, même si leurs variables y traînent : la
+ * production appelle toujours le vrai modèle, et ses mails partent toujours par Resend. La boîte va avec le modèle
+ * factice (jamais allumé en production) : sans lui, elle est ignorée, et Resend reste exigé.
+ */
+const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (process.env.VERCEL || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
 
 let cache: Env | null = null;
 
@@ -59,11 +68,16 @@ export function env(): Env {
     const champs = lu.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ");
     throw new Error(`Variables d’environnement invalides : ${champs}`);
   }
+  if (process.env.VERCEL) lu.data.BLUSH_IA_FACTICE = false;
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");
-  if (process.env.NODE_ENV === "production" && !lu.data.RESEND_API_KEY) throw new Error("RESEND_API_KEY manque en production");
+  /* `next start` des tests de bout en bout tourne en production, sans Resend : leurs mails vont dans la boîte */
+  if (process.env.NODE_ENV === "production" && !lu.data.RESEND_API_KEY && !boiteDe(lu.data)) throw new Error("RESEND_API_KEY manque en production");
   cache = lu.data;
   return cache;
 }
+
+/** Le dossier où les mails sont écrits au lieu de partir (tests de bout en bout), ou null : ils partent par Resend. */
+export const boiteAMails = () => boiteDe(env());
 
 /** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
