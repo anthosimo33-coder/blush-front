@@ -67,8 +67,9 @@ export function Meaning({ children, label = "Ce que ça veut dire" }: { children
 function Timeline({ items }: Extract<ChapterBlock, { kind: "timeline" }>) {
   return (
     <>
-      {items.map((it) => (
-        <div key={it.title} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
+      {/* La place dans la liste fait partie de la clé : le modèle peut écrire deux fois le même titre */}
+      {items.map((it, i) => (
+        <div key={`${i}-${it.title}`} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
           <div className="text-[13px] font-black text-grey">{it.title}</div>
           <div className="text-[14px] font-extrabold leading-[1.45]">{it.text}</div>
           {it.message && <ClampedBubble from={it.message.from} caption="" text={it.message.text} />}
@@ -110,8 +111,8 @@ function Duo({ title, text, trophies }: Extract<ChapterBlock, { kind: "duo" }>) 
 function Scenarios({ items }: Extract<ChapterBlock, { kind: "scenarios" }>) {
   return (
     <>
-      {items.map((s) => (
-        <div key={s.title} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
+      {items.map((s, i) => (
+        <div key={`${i}-${s.title}`} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[15px] font-black">{s.title}</span>
             <Tag tone={s.tag} />
@@ -126,8 +127,8 @@ function Scenarios({ items }: Extract<ChapterBlock, { kind: "scenarios" }>) {
 function Plan({ items }: Extract<ChapterBlock, { kind: "plan" }>) {
   return (
     <ol className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
-      {items.map((p) => (
-        <li key={p.when} className="flex gap-3 border-b border-[rgba(17,17,20,0.07)] py-2.5">
+      {items.map((p, i) => (
+        <li key={`${i}-${p.when}`} className="flex gap-3 border-b border-[rgba(17,17,20,0.07)] py-2.5">
           <span className="w-[78px] shrink-0 text-[13px] font-black text-toi-ink">{p.when}</span>
           <div>
             <div className="text-[15px] font-black">{p.title}</div>

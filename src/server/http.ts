@@ -26,11 +26,11 @@ export async function corps<T = Record<string, unknown>>(req: Request): Promise<
 }
 
 /**
- * Un audio (MP3) à lire dans le navigateur. Son adresse change avec lui : le navigateur peut le garder. Safari lit
- * l’audio par morceaux : on répond aux demandes de plage (Range).
+ * Un audio (MP3) à lire dans le navigateur. Il cite la conv : le navigateur ne le garde pas (sur un appareil partagé,
+ * il ne resterait pas lisible après la déconnexion). Safari lit l’audio par morceaux : on répond aux plages (Range).
  */
 export function reponseAudio(req: Request, audio: Buffer): Response {
-  const entetes = { "content-type": "audio/mpeg", "accept-ranges": "bytes", "cache-control": "private, max-age=31536000, immutable" };
+  const entetes = { "content-type": "audio/mpeg", "accept-ranges": "bytes", "cache-control": "private, no-store" };
   const plage = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
   if (plage && (plage[1] || plage[2])) {
     const total = audio.length;

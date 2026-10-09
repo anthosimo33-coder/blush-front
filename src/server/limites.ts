@@ -1,5 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
+import { empreinte } from "./chiffrement";
 import { db, schema } from "./db";
 
 /** Les limites anti-abus : combien de fois, sur quelle fenêtre. */
@@ -11,6 +12,8 @@ export const LIMITES = {
   chatParCompte: { max: 150, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
+  /** Les moments d’écoute du vocal notés pour l’A/B test des voix. */
+  ecouteParCompte: { max: 200, fenetreS: 86400 },
   /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
   relanceParCompte: { max: 3, fenetreS: 86400 },
   /** Les alertes par mail à l’équipe. */
@@ -32,7 +35,8 @@ export const LIMITES = {
 export async function sousLaLimite(cle: string, { max, fenetreS }: { max: number; fenetreS: number }): Promise<boolean> {
   const [ligne] = await db()
     .insert(schema.rateLimits)
-    .values({ key: cle, windowStart: new Date(), count: 1 })
+    /* L’empreinte de la clé : une adresse IP ou un email n’est jamais gardé en clair */
+    .values({ key: empreinte(`limite:${cle}`), windowStart: new Date(), count: 1 })
     .onConflictDoUpdate({
       target: schema.rateLimits.key,
       set: {

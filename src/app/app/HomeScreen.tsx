@@ -2,6 +2,7 @@
 
 import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   createContext,
   memo,
@@ -22,6 +23,7 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
+import { pagePrecedente } from "@/lib/navigation";
 import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { getChatHistory, modeVocalChat, sendToBlush, sendVoiceToBlush, type BlushAnswer } from "@/services/api";
@@ -240,6 +242,7 @@ export function HomeScreen({
   /** Back-end : quand la lecture s’est finie (l’heure de l’intro de BLUSH). */
   introAt?: number;
 }) {
+  const router = useRouter();
   const shots = useFilePicker();
   const exp = useFilePicker();
   const [msgs, setMsgs] = useState<Msg[]>(() => [...introDe(introAt), ...echangesEnMsgs(script)]);
@@ -631,7 +634,13 @@ export function HomeScreen({
                 <div data-c="acc" className="pointer-events-auto mt-3 flex">
                   <span data-a="acc" className="flex">
                     {fromReport ? (
-                      <IconButton href="/rapport" icon="back" label="Revenir au rapport" iconSize={19} className="!size-10 !shadow-soft" />
+                      <IconButton
+                        onClick={() => (pagePrecedente() === "/rapport" ? router.back() : router.push("/rapport"))}
+                        icon="back"
+                        label="Revenir au rapport"
+                        iconSize={19}
+                        className="!size-10 !shadow-soft"
+                      />
                     ) : others.length > 0 ? (
                       <ConvsButton others={others} />
                     ) : (

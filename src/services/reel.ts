@@ -68,18 +68,34 @@ export const reel = {
     } catch (e) {
       throw new ErreurApi(e instanceof VideoIllisible ? e.code : "video", 422);
     }
-    const lots = lotsDe(images);
+    /* Des lots d’une douzaine d’écrans, et de 4 Mo au plus (des écrans sombres ou des photos pèsent plus lourd) */
+    const lots = lotsDe(images, 12, (b) => b.size, 4 * 1024 * 1024);
     const lus: unknown[] = new Array(lots.length);
     let faits = 0;
     onAvance?.({ etape: "lecture", faits, total: lots.length });
     let suivant = 0;
+    /* Un lot qui échoue encore après un nouvel essai : les autres s’arrêtent (pas d’appels payés pour rien) */
+    const arret = new AbortController();
+    const lireLot = async (k: number) => {
+      const fd = new FormData();
+      lots[k].forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
+      fd.append("app", app);
+      return (await appel<{ lot: unknown }>("/api/captures/lot", { method: "POST", body: fd, signal: arret.signal })).lot;
+    };
     const lecteur = async () => {
-      while (suivant < lots.length) {
+      while (suivant < lots.length && !arret.signal.aborted) {
         const k = suivant++;
-        const fd = new FormData();
-        lots[k].forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
-        fd.append("app", app);
-        lus[k] = (await appel<{ lot: unknown }>("/api/captures/lot", { method: "POST", body: fd })).lot;
+        try {
+          lus[k] = await lireLot(k).catch(async (e: unknown) => {
+            /* Une erreur passagère (réseau, serveur) : un nouvel essai, le reste n’est pas à refaire */
+            if (arret.signal.aborted || (e instanceof ErreurApi && e.status < 500 && e.code !== "erreur")) throw e;
+            await new Promise((r) => setTimeout(r, 1500));
+            return lireLot(k);
+          });
+        } catch (e) {
+          arret.abort();
+          throw e;
+        }
         onAvance?.({ etape: "lecture", faits: ++faits, total: lots.length });
       }
     };
@@ -87,6 +103,8 @@ export const reel = {
     return appel<{ source: Source; messagesRead: number }>("/api/captures/video", envoi("POST", { app, lots: lus }));
   },
   /** Le lien de partage du verdict (son identifiant) : le créer (toujours le même), le désactiver. */
+  /** Une image partagée pour de bon (pas seulement préparée) : le compteur du partage. */
+  compterImagePartagee: () => appel<{ ok: true }>("/api/partage/compte", envoi("POST")).catch(() => {}),
   creerLienPartage: () => appel<{ id: string; verdict: VerdictMontre | null }>("/api/partage", envoi("POST")),
   async desactiverLienPartage(): Promise<void> {
     await appel("/api/partage", envoi("DELETE"));
@@ -107,7 +125,7 @@ export const reel = {
     else {
       const id = choisir ? await choisir(pret.convs) : null;
       if (id == null) throw new ErreurApi("annule", 0);
-      fd.append("export", pret.paquetDe(id), "export.json.gz");
+      fd.append("export", await pret.paquetDe(id), "export.json.gz");
     }
     return (await appel<{ source: Source }>("/api/import", { method: "POST", body: fd })).source;
   },
@@ -135,7 +153,9 @@ export const reel = {
   relancerRapport: () => appel<ReportPayload>("/api/rapport", envoi("POST")),
   /** Un moment de l’écoute du vocal (A/B test des voix). Sans réponse attendue : un échec ne gêne pas l’écoute. */
   modeVocal: (actif: boolean) => appel<{ modeVocal: boolean }>("/api/chat/vocal", envoi("POST", { actif })).catch(() => {}),
-  ecouteVocal: (evenement: "debut" | "fin" | "reecoute" | "ferme", position: number) => appel<{ ok: true }>("/api/vocal/ecoute", envoi("POST", { evenement, position })).catch(() => {}),
+  /* keepalive : l’écoute fermée en quittant la page part quand même */
+  ecouteVocal: (evenement: "debut" | "fin" | "reecoute" | "ferme", position: number) =>
+    appel<{ ok: true }>("/api/vocal/ecoute", { ...envoi("POST", { evenement, position }), keepalive: true }).catch(() => {}),
   unlock: (offre: Exclude<Plan, "gratuit">) => appel<Subscription>("/api/debloquer", envoi("POST", { offre })),
   getAccount: () => appel<Account>("/api/compte"),
   setPaused: (paused: boolean) => appel<{ ok: true }>("/api/compte", envoi("POST", { paused })),

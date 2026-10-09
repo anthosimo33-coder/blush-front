@@ -8,7 +8,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PROMPTS = ["00-socle.md", "01-captures.md", "04-verdict.md", "05-rapport.md", "07-memoire.md", "10-chat.md"];
+import { FICHIERS } from "./fichiers-prompts.mjs";
+
+/* Tous les prompts copiés côté serveur (scripts/prompts.mjs) : un prompt ajouté y est cherché aussi */
+const PROMPTS = Object.values(FICHIERS);
 
 /* Des phrases assez longues pour n’appartenir qu’aux prompts */
 const phrases = PROMPTS.flatMap((f) =>

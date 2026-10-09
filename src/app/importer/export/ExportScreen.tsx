@@ -2,7 +2,7 @@
 
 import { ErreurApi } from "@/services/reel";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDevice, useFilePicker } from "@/lib/hooks";
 import { uploadExport } from "@/services/api";
@@ -31,6 +31,14 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [busy, setBusy] = useState(false);
   /* L’envoi n’a pas pu se faire (le réseau, trop d’imports d’un coup) : on le dit ici, la conv n’est pas en cause */
   const [souci, setSouci] = useState<string | null>(null);
+  /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
+  const monte = useRef(true);
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      monte.current = false;
+    };
+  }, []);
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
@@ -48,6 +56,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
     try {
       source = await uploadExport(file, app, choisir);
     } catch (e) {
+      if (!monte.current) return;
       /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (DemoParams, ?erreur=) */
       setBusy(false);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
@@ -60,6 +69,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       setSouci(e instanceof ErreurApi && e.code === "trop" ? "Beaucoup d’imports d’un coup. Réessaie dans une heure." : "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.");
       return;
     }
+    if (!monte.current) return;
     setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false });
     router.push("/importer/ok");
   };

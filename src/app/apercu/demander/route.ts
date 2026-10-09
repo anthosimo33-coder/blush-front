@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { memeOrigine } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ type Config = { lanceur: string; cas: string; memoire: string; memoires?: string
 export async function POST(req: Request) {
   const chemin = process.env.BLUSH_DEMANDER;
   if (process.env.NODE_ENV === "production" || !chemin) return new Response(null, { status: 404 });
+  /* Elle appelle le vrai modèle avec ta clé : une page d’un autre site ne doit pas pouvoir la déclencher */
+  if (!memeOrigine(req)) return new Response(null, { status: 403 });
   const conf = JSON.parse(await readFile(chemin, "utf8")) as Config;
   /* Ta conv (?cas=perso, ou sans cas) : sa mémoire et son cas, gardés hors du projet. Une conv de test : sa mémoire, à la date de la conv. */
   const id = new URL(req.url).searchParams.get("cas");

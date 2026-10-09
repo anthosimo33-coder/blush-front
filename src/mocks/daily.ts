@@ -25,7 +25,8 @@ export const OFFERS: Offer[] = [
 
 export const PAYWALL = {
   title: (other?: string) => (other ? `La suite parle de vous deux : toi et ${other}.` : "La suite parle de vous deux."),
-  subtitle: "6 chapitres, ton plan et les phrases pour lui parler.",
+  /** Le nombre de chapitres qui restent, quand on le sait (le rapport ouvert) ; sinon, la suite, sans compter. */
+  subtitle: (chapitres?: number) => (chapitres ? `${chapitres} chapitres, ton plan et les phrases pour lui parler.` : "La suite de ton rapport, ton plan et les phrases pour lui parler."),
   payments: "Apple Pay, Google Pay ou carte · paiement sécurisé",
 };
 

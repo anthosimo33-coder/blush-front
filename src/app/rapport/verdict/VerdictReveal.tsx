@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/icons";
 import { PartageSheet } from "../Partage";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
 import { IlOuElle } from "@/lib/pronom";
+import { bloquerDefilement } from "@/lib/defilement";
 
 const INK = "#121214";
 
@@ -90,15 +91,8 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     if (payload.sober) toReport();
   }, [payload.sober]);
 
-  /* Rien ne défile derrière la scène */
-  useEffect(() => {
-    const html = document.documentElement;
-    const before = html.style.overflow;
-    html.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = before;
-    };
-  }, []);
+  /* Rien ne défile derrière la scène (même quand la feuille de partage s’ouvre puis se ferme par-dessus) */
+  useEffect(() => bloquerDefilement(), []);
 
   /* Chaque nouvelle carte est annoncée : le focus va sur son titre */
   useEffect(() => {

@@ -22,6 +22,7 @@ export function PaywallSheet({
   onClose,
   onUnlocked,
   otherName,
+  chapitres,
   only,
   next,
 }: {
@@ -29,6 +30,8 @@ export function PaywallSheet({
   onClose: () => void;
   onUnlocked?: (plan: Exclude<Plan, "gratuit">) => void;
   otherName?: string;
+  /** Combien de chapitres restent à lire (le rapport ouvert) : sans, la suite est dite sans compter. */
+  chapitres?: number;
   only?: Offer["id"];
   /** Où reprendre après la page « C’est débloqué » (par défaut : la suite du rapport). */
   next?: string;
@@ -39,15 +42,19 @@ export function PaywallSheet({
   const [busy, setBusy] = useState(false);
 
   const [later, setLater] = useState(false);
+  /* Autre chose que « bientôt » (le réseau, le serveur) : on le dit, le bouton se libère */
+  const [souci, setSouci] = useState(false);
 
   const pay = async () => {
     setBusy(true);
+    setSouci(false);
     try {
       await unlock(selected);
     } catch (e) {
       /* Back-end v1, sans paiement : l’accès est réservé à la bêta */
       setBusy(false);
       if (e instanceof ErreurApi && e.code === "bientot") setLater(true);
+      else setSouci(true);
       return;
     }
     invalidate("report", "account");
@@ -62,7 +69,7 @@ export function PaywallSheet({
       <h2 id="paywall-title" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
         {only ? "BLUSH+" : PAYWALL.title(otherName)}
       </h2>
-      {!only && <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">{PAYWALL.subtitle}</p>}
+      {!only && <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">{PAYWALL.subtitle(chapitres)}</p>}
       {/* Les offres, comme un choix d’abonnement sur iPhone : un rond à cocher, le prix aligné à droite */}
       <div role="radiogroup" aria-label="Ton offre" className="flex flex-col gap-2.5">
         {offers.map((o) => {
@@ -105,6 +112,11 @@ export function PaywallSheet({
         {later && (
           <p role="status" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-soft">
             Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.
+          </p>
+        )}
+        {souci && (
+          <p role="alert" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-[#D93036]">
+            Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.
           </p>
         )}
         <Button arrow={!busy} onClick={busy ? undefined : pay} aria-busy={busy}>
