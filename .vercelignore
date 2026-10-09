@@ -1,8 +1,11 @@
 # Ce qui ne part pas sur Vercel : la galerie de revue et ses captures, les fichiers d’environnement locaux,
-# et le banc de test des prompts (ses résultats contiennent des convs) : le build n’en a pas besoin
+# le banc de test des prompts (ses résultats contiennent des convs) et les notes des prompts (la voix, le README) :
+# le build n’en a pas besoin. Il ne lit que les prompts numérotés et prompts/lib (scripts/fichiers-prompts.mjs, @prompts/lib)
 .galerie
 .env*
 prompts/evals
+prompts/voix
+prompts/README.md
 # Les résultats des tests de bout en bout (traces, captures, boîte à mails des tests), et leur build empaqueté par la CI
 test-results
 playwright-report*
