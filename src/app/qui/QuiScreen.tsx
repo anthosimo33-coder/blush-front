@@ -82,7 +82,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       footer={
         <>
           {problem && (
-            <p role="alert" className="m-0 mb-3 text-center text-[14px] font-extrabold text-[#D93036]">
+            <p role="alert" className="m-0 mb-3 rounded-[16px] bg-white px-4 py-3 text-center text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
               {problem}
             </p>
           )}

@@ -229,7 +229,18 @@ function Ending({ text }: { text: string }) {
 }
 
 /** Rend un bloc de chapitre. `renderQuestion` permet à l’écran de brancher le bouton « Copier ». */
-export function Block({ block, renderQuestion, onShare }: { block: ChapterBlock; renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode; onShare?: () => void }) {
+/** `autre` : le pronom de l’autre personne, pour la légende des scores (« Il » ou « Elle »). */
+export function Block({
+  block,
+  renderQuestion,
+  onShare,
+  autre,
+}: {
+  block: ChapterBlock;
+  renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode;
+  onShare?: () => void;
+  autre?: "il" | "elle";
+}) {
   switch (block.kind) {
     case "essential":
       return <Essential>{block.text}</Essential>;
@@ -242,7 +253,7 @@ export function Block({ block, renderQuestion, onShare }: { block: ChapterBlock;
     case "confidence":
       return <ConfidenceLine level={block.level}>{block.text}</ConfidenceLine>;
     case "scores":
-      return <ScoreCard rows={block.rows} />;
+      return <ScoreCard rows={block.rows} autre={autre} />;
     case "timeline":
       return <Timeline {...block} />;
     case "duo":
@@ -267,11 +278,23 @@ export function Block({ block, renderQuestion, onShare }: { block: ChapterBlock;
 }
 
 /** `onShare` : partager un bloc en image (aujourd’hui, la chute d’un chapitre), d’après sa place dans le chapitre. */
-export function Blocks({ blocks, className, renderQuestion, onShare }: { blocks: ChapterBlock[]; className?: string; renderQuestion?: Parameters<typeof Block>[0]["renderQuestion"]; onShare?: (index: number) => void }) {
+export function Blocks({
+  blocks,
+  className,
+  renderQuestion,
+  onShare,
+  autre,
+}: {
+  blocks: ChapterBlock[];
+  className?: string;
+  renderQuestion?: Parameters<typeof Block>[0]["renderQuestion"];
+  onShare?: (index: number) => void;
+  autre?: "il" | "elle";
+}) {
   return (
     <div className={cn("contents", className)}>
       {blocks.map((b, i) => (
-        <Block key={i} block={b} renderQuestion={renderQuestion} onShare={onShare && b.kind === "punchline" ? () => onShare(i) : undefined} />
+        <Block key={i} block={b} renderQuestion={renderQuestion} onShare={onShare && b.kind === "punchline" ? () => onShare(i) : undefined} autre={autre} />
       ))}
     </div>
   );

@@ -10,6 +10,7 @@ import { depuisPaquet, ErreurImport } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
 import { LIMITES, sousLaLimite } from "@/server/limites";
+import { avecEcheance } from "@/server/echeance";
 
 /* La réponse prend 10 à 20 secondes (une minute avec des captures à lire) ; la mise à jour de la mémoire tourne après */
 export const maxDuration = 300;
@@ -42,7 +43,7 @@ async function lireEnvoi(req: Request): Promise<Envoi | null> {
  * Ce qu’il envoie à BLUSH : un texte, des captures (de leur conv ou de son profil), un nouvel export, ou un vocal.
  * Réservé à BLUSH+, une fois la mémoire faite (après le rapport).
  */
-export async function POST(req: Request) {
+async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
@@ -91,4 +92,9 @@ export async function GET(req: Request) {
   if (!utilisateur) return erreur("connexion", 401);
   const avant = Number(new URL(req.url).searchParams.get("avant"));
   return json(story ? await historique(story.id, Number.isInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
+}
+
+/** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
+export function POST(req: Request) {
+  return avecEcheance(285_000, () => traiter(req));
 }

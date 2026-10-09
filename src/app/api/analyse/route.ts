@@ -36,8 +36,9 @@ export async function POST(req: Request) {
   if (!qui.success && !quiRempli(metaDe(story))) return erreur("qui", 422);
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
-    /* Chaque lecture coûte : un nombre de nouvelles convs par jour et par compte */
+    /* Chaque lecture coûte : un nombre de nouvelles convs par jour et par compte, et quelques relances après un échec */
     if (!verdict && !(await sousLaLimite(`analyse:${utilisateur.id}`, LIMITES.analyseParCompte))) return erreur("trop", 429);
+    if (verdict && !(await sousLaLimite(`relance:verdict:${utilisateur.id}`, LIMITES.relanceParCompte))) return erreur("trop", 429);
     if (!story.userId) {
       await rattacherBrouillon(utilisateur, await lireBrouillon());
       await effacerBrouillon();

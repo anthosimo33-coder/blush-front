@@ -37,7 +37,7 @@ Les pages serveur lisent les données via `src/services/serveur.ts`, et le navig
 - **La conv brute ne reste pas :**
   - elle est effacée dès le rapport et la mémoire faits ;
   - un brouillon jamais rattaché à un compte est effacé au bout de 24 h ;
-  - une conv qui n’est pas allée jusqu’au rapport est effacée au bout de 30 jours.
+  - une conv sans rapport reste gardée (chiffrée) jusqu’au déblocage ; une conv dont le rapport est écrit mais la mémoire jamais faite est effacée au bout de 30 jours.
 - **Les suppressions effacent vraiment tout,** en cascade.
 - **Les logs ne contiennent aucun contenu,** seulement des codes d’erreur et les coûts (`ai_usage`).
 - **Les cookies sont httpOnly,** et toute requête qui modifie quelque chose doit venir de l’appli elle-même (contrôle d’origine).

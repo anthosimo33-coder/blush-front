@@ -24,7 +24,7 @@ export const OFFERS: Offer[] = [
 ];
 
 export const PAYWALL = {
-  title: (other: string) => `La suite parle de vous deux : toi et ${other}.`,
+  title: (other?: string) => (other ? `La suite parle de vous deux : toi et ${other}.` : "La suite parle de vous deux."),
   subtitle: "6 chapitres, ton plan et les phrases pour lui parler.",
   payments: "Apple Pay, Google Pay ou carte · paiement sécurisé",
 };

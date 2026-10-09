@@ -6,7 +6,8 @@ import { cn } from "@/lib/cn";
 import { formatCount } from "@/lib/format";
 import { setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
-import { askQuestion, getQuestion } from "@/services/api";
+import { askQuestion, getQuestion, souciQuestion } from "@/services/api";
+import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -27,6 +28,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
+  /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
+  const [souci, setSouci] = useState<string | null>(null);
   const first = useRef(true);
   const question = answer?.question ?? asking?.question ?? null;
   const typed = draft.trim().length > 0;
@@ -47,9 +50,19 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     const q = draft.trim();
     if (!q || asking || answer) return;
     setDraft("");
+    setSouci(null);
     setAsking({ question: q, leaving: false });
     play("envoi");
-    const a = await askQuestion(q);
+    let a: QuestionAnswer;
+    try {
+      a = await askQuestion(q);
+    } catch (e) {
+      setAsking(null);
+      setDraft(q);
+      setSouci(souciQuestion(e));
+      play("non");
+      return;
+    }
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setAsking({ question: q, leaving: true });
       await new Promise((r) => setTimeout(r, 190));
@@ -60,14 +73,22 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   };
 
   const composer = (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      {souci && (
+        <p role="alert" className="m-0 rounded-[16px] bg-white px-4 py-3 text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
+          {souci}
+        </p>
+      )}
       <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214,0_10px_26px_-16px_rgba(17,17,20,0.35)]">
         <span className="sr-only">Ta question à BLUSH</span>
         <textarea
           rows={1}
           maxLength={200}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setSouci(null);
+          }}
           onKeyDown={(e) => {
             /* Entrée envoie, Maj + Entrée passe à la ligne */
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -106,6 +127,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   return (
     <AppScreen
       requires="rapport"
+      autre={(story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).name}
       srTitle="Ta question"
       aside={null}
       mainWidth={600}

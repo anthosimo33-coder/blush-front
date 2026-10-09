@@ -327,7 +327,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
         <InsetRow
           leading={<RowIcon icon="trash" />}
           title="Effacée dès ton rapport écrit"
-          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, au bout de 30${N}jours. Jamais lue, au bout de 24${N}h.`}
+          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24${N}h.`}
           className={ligne}
         />
         <InsetRow

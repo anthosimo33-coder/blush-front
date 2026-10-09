@@ -5,6 +5,7 @@ import { poserBrouillon } from "@/server/cookies";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { avecEcheance } from "@/server/echeance";
 
 /* La lecture de 20 captures prend jusqu’à une minute */
 export const maxDuration = 180;
@@ -15,7 +16,7 @@ const Appli = AppliCaptures;
  * Des captures d’écran de la conv (réduites par le navigateur) : BLUSH les lit (prompt 01) et en fait une histoire
  * brouillon, avant l’email, comme un export.
  */
-export async function POST(req: Request) {
+async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop", 429);
   const fd = await req.formData().catch(() => null);
@@ -34,4 +35,9 @@ export async function POST(req: Request) {
     if (e instanceof ErreurImport) return erreur(e.code, 422);
     throw e;
   }
+}
+
+/** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
+export function POST(req: Request) {
+  return avecEcheance(170_000, () => traiter(req));
 }

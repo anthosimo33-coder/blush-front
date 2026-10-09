@@ -17,6 +17,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
+import { pagePrecedente } from "@/lib/navigation";
 
 type Confirm = "stop" | "keep" | "story" | "all" | null;
 
@@ -33,11 +34,27 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
   const plus = sub?.plan === "blushplus";
   const sons = useSoundsEnabled();
 
+  /* Ouvert directement (un lien, un nouvel onglet) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
+  const retour = () => (pagePrecedente() ? router.back() : router.push("/app"));
   const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
+  /* Un geste qui n’a pas abouti (réseau, serveur) : on le dit dans la feuille, et le bouton se libère pour réessayer */
+  const [souci, setSouci] = useState<string | null>(null);
+  const [souciPause, setSouciPause] = useState(false);
+  const fermer = () => {
+    setConfirm(null);
+    setSouci(null);
+  };
   const run = async (fn: () => Promise<void>, after: () => void) => {
     setBusy(true);
-    await fn();
+    setSouci(null);
+    try {
+      await fn();
+    } catch {
+      setBusy(false);
+      setSouci("Ça n’a pas marché. Vérifie ta connexion et réessaie.");
+      return;
+    }
     setBusy(false);
     setConfirm(null);
     after();
@@ -50,8 +67,8 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
       mainWidth={600}
       frameWidth={600}
       contentGap={0}
-      mobileTop={<MobileTopBar back={() => router.back()} title="Mon compte" />}
-      desktopBack={{ target: () => router.back(), trailing: "Mon compte" }}
+      mobileTop={<MobileTopBar back={retour} title="Mon compte" />}
+      desktopBack={{ target: retour, trailing: "Mon compte" }}
     >
       {/* Toi, en haut, comme en tête des Réglages */}
       <div className="flex flex-col items-center pt-2 text-center">
@@ -126,14 +143,21 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
         {plus && sub && (
           <InsetRow
             title="Mettre en pause"
-            sub="Ton histoire reste gardée, rien n’est facturé"
+            sub={souciPause ? "Pas enregistré : vérifie ta connexion et réessaie." : "Ton histoire reste gardée, rien n’est facturé"}
             trailing={
               <Switch
                 checked={sub.paused}
                 label="Mettre en pause"
                 onChange={async (v) => {
                   patch({ paused: v });
-                  await setPaused(v);
+                  setSouciPause(false);
+                  try {
+                    await setPaused(v);
+                  } catch {
+                    /* Le serveur n’a rien enregistré : l’interrupteur revient où il était */
+                    patch({ paused: !v });
+                    setSouciPause(true);
+                  }
                 }}
               />
             }
@@ -170,7 +194,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
       </InsetGroup>
 
       {/* ⚠ Panneaux de confirmation absents des maquettes : textes repris des libellés de l’écran */}
-      <Sheet open={confirm !== null} onClose={() => setConfirm(null)} labelledBy="confirm-title">
+      <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">
         {confirm === "keep" && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
@@ -182,7 +206,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
               100 % privé : ta conv est supprimée dès que ton rapport est prêt.
             </p>
             <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Tes convs ne servent jamais à entraîner une IA. Hébergement en Europe. Tu peux tout effacer à tout moment.</p>
-            <Button variant="secondary" onClick={() => setConfirm(null)}>
+            <Button variant="secondary" onClick={fermer}>
               Fermer
             </Button>
           </>
@@ -195,6 +219,11 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
               {confirm === "stop" ? "En un geste, effectif lundi." : confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
             </p>
+            {souci && (
+              <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
+                {souci}
+              </p>
+            )}
             <Button
               aria-busy={busy}
               onClick={() =>
@@ -212,7 +241,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
             >
               {confirm === "stop" ? "Arrêter BLUSH+" : confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
             </Button>
-            <Button variant="link" onClick={() => setConfirm(null)}>
+            <Button variant="link" onClick={fermer}>
               Annuler
             </Button>
           </>

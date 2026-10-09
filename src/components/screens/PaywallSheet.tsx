@@ -21,7 +21,7 @@ export function PaywallSheet({
   open,
   onClose,
   onUnlocked,
-  otherName = "Sophie",
+  otherName,
   only,
   next,
 }: {

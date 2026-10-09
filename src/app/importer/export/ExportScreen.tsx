@@ -29,6 +29,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [app, setApp] = useState<ExportApp>(initialApp);
   const [video, setVideo] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* L’envoi n’a pas pu se faire (le réseau, trop d’imports d’un coup) : on le dit ici, la conv n’est pas en cause */
+  const [souci, setSouci] = useState<string | null>(null);
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
@@ -41,6 +43,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
   const onFiles = async ([file]: File[]) => {
     setBusy(true);
+    setSouci(null);
     let source;
     try {
       source = await uploadExport(file, app, choisir);
@@ -49,8 +52,12 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       setBusy(false);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
       if (e instanceof ErreurApi && e.code === "annule") return;
-      const code = e instanceof ErreurApi && ["fichier", "groupe", "courte"].includes(e.code) ? e.code : "lecture";
-      router.replace(`/importer/export?app=${app}&erreur=${code}`, { scroll: false });
+      /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
+      if (e instanceof ErreurApi && ["fichier", "groupe", "courte"].includes(e.code)) {
+        router.replace(`/importer/export?app=${app}&erreur=${e.code}`, { scroll: false });
+        return;
+      }
+      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Beaucoup d’imports d’un coup. Réessaie dans une heure." : "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.");
       return;
     }
     setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false });
@@ -66,6 +73,12 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       head={<ScreenTitle>Exporte votre conv.</ScreenTitle>}
       footer={
         <>
+          {/* Une carte opaque : le haut du pied d’écran est un dégradé, le texte de la page passerait derrière */}
+          {souci && (
+            <p role="alert" className="m-0 mb-3 rounded-[16px] bg-white px-4 py-3 text-center text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
+              {souci}
+            </p>
+          )}
           <Button onClick={picker.open} disabled={busy} aria-busy={busy}>
             {busy ? <TypingDots color="#FFFFFF" label="Analyse du fichier" /> : "Choisir le fichier enregistré"}
           </Button>
