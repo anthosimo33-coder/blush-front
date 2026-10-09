@@ -34,6 +34,16 @@ export type DonneesRapport = { sortie: Rapport; chapitres: ChapitreAffiche[]; so
  */
 export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
 
+/** Les infos qu’il a retirées de sa fiche que la mémoire garde : les plus récentes (PUT /api/fiche coupe la liste). */
+export const SUPPRIMEES_MAX = 100;
+
+/**
+ * Ses corrections de la fiche, telles que le modèle les reçoit : une mémoire écrite avant la borne peut garder une
+ * liste plus longue, qui renchérirait chaque message du chat et chaque mise à jour.
+ */
+export const editionsBornees = (e?: EditionsFiche): EditionsFiche | undefined =>
+  e && e.supprimees.length > SUPPRIMEES_MAX ? { ...e, supprimees: e.supprimees.slice(-SUPPRIMEES_MAX) } : e;
+
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -392,13 +402,13 @@ async function memoireMaj(story: Ligne, t: Tache) {
     const lignes = new Map(avant.lignes);
     const suivant = { n: avant.suivant };
     const nouveau = rendreNouveau(ech, h, lignes, suivant);
-    const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, avant.editions);
+    const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
     /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
     const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
     if (maj.rien_de_neuf) return;
     const etat = appliquerMaj(avant.etat, maj);
     const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
-    const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: avant.editions } : {}) };
+    const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
     const ecrite = await db()
       .update(schema.memories)
       .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })

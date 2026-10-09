@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout } from "@/server/ajouts";
-import type { DonneesMemoire } from "@/server/analyse";
+import { SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -26,12 +26,6 @@ export async function GET() {
 const Faits = z
   .array(z.object({ section: z.enum(["infos", "aime", "gens", "dates", "notes"]), text: z.string().trim().min(1).max(200) }).passthrough())
   .max(60);
-
-/*
- * Les infos qu’il a retirées : la mémoire les garde pour ne pas les remettre, et le chat les envoie au modèle à chaque
- * message. Les plus récentes seulement : sans borne, chaque correction allongeait (et renchérissait) tous les messages.
- */
-const SUPPRIMEES_MAX = 100;
 
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
