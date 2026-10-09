@@ -5,6 +5,18 @@
  */
 export const STORY_COOKIE = "blush-story";
 
+/**
+ * La conv que montre la page ouverte dans cet onglet (posée par src/components/shell/ConvDeLaPage.tsx). Chaque appel
+ * au serveur la désigne dans cet en-tête : un geste (supprimer, écrire à BLUSH, corriger sa fiche) vise la conv à
+ * l’écran, même si un autre onglet en a ouvert une autre entre-temps (le cookie, lui, est commun aux onglets).
+ */
+export const ENTETE_CONV = "x-blush-conv";
+let convDeLaPage: string | null = null;
+export const poserConvDeLaPage = (id: string | null) => {
+  convDeLaPage = id;
+};
+export const lireConvDeLaPage = () => convDeLaPage;
+
 export function readStoryCookie(): string | undefined {
   if (typeof document === "undefined") return undefined;
   const hit = document.cookie.split("; ").find((c) => c.startsWith(`${STORY_COOKIE}=`));

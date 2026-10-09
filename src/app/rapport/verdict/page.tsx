@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
-import { getReport, getStory } from "@/services/serveur";
+import { getReport, getStory, sansHistoire } from "@/services/serveur";
 import { currentStoryId } from "@/services/session.server";
 import { VerdictReveal } from "./VerdictReveal";
+import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "Ton verdict" };
 
@@ -13,7 +14,12 @@ export const viewport: Viewport = { themeColor: "#121214" };
 export default async function Page() {
   const storyId = await currentStoryId();
   const [initial, story] = await Promise.all([getReport(storyId), getStory(storyId)]);
-  if (!story) redirect("/commencer");
+  if (!story) redirect(await sansHistoire("/rapport"));
   if (!initial) redirect("/lecture");
-  return <VerdictReveal initial={initial} story={story} />;
+  return (
+    <>
+      <ConvDeLaPage />
+      <VerdictReveal initial={initial} story={story} />
+    </>
+  );
 }

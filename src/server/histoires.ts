@@ -147,8 +147,11 @@ export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: 
   return { id: ligne.id, meta, secret };
 }
 
-/** Les cookies qui désignent une histoire : le brouillon (une conv importée, pas encore lue), la conv choisie dans « Tes convs ». */
-export type Designation = { brouillon?: string; choisie?: string };
+/**
+ * Ce qui désigne une histoire : le brouillon (une conv importée, pas encore lue), la conv choisie dans « Tes convs »
+ * (deux cookies), et la conv que montre la page d’où part la requête (`affichee`, l’en-tête ENTETE_CONV).
+ */
+export type Designation = { brouillon?: string; choisie?: string; affichee?: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -157,17 +160,27 @@ const lue = sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.ta
 
 /**
  * L’histoire ouverte.
+ * - Un geste parti d’une page (un appel du navigateur) vise la conv que montre cette page (`affichee`).
  * - Le parcours d’import (`parcours`) regarde d’abord le brouillon : la conv qu’on est en train d’importer. Ailleurs
  *   (l’accueil, le rapport…), une conv importée puis laissée en plan ne prend pas la place de celle qu’on suit.
  * - Sinon, la conv du compte choisie dans « Tes convs » (si elle est bien à lui), ou la plus récente déjà lue.
  * Sans compte : le brouillon seul.
  */
-export async function histoireOuverte(utilisateur: Utilisateur | null, { brouillon, choisie }: Designation, { parcours = false } = {}): Promise<Ligne | null> {
+export async function histoireOuverte(utilisateur: Utilisateur | null, { brouillon, choisie, affichee }: Designation, { parcours = false } = {}): Promise<Ligne | null> {
   if (brouillon && (parcours || !utilisateur)) {
     const ligne = await brouillonDe(brouillon);
     if (ligne || !utilisateur) return ligne;
   }
   if (!utilisateur) return null;
+  /* La conv à l’écran : celle-là, ou rien (supprimée entre-temps, ou pas à ce compte). Jamais une autre à sa place */
+  if (affichee && !parcours) {
+    if (!UUID.test(affichee)) return null;
+    const [ligne] = await db()
+      .select()
+      .from(schema.stories)
+      .where(and(eq(schema.stories.id, affichee), eq(schema.stories.userId, utilisateur.id)));
+    return ligne ?? null;
+  }
   if (choisie && UUID.test(choisie)) {
     const [ligne] = await db()
       .select()

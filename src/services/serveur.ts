@@ -11,6 +11,7 @@ import { historique } from "@/server/chat";
 import { contexteRequete, convsDe, ficheDe, questionsDe, rapportDe, storyCourante } from "@/server/donnees";
 import { metaDe, quiRempli, storyAffichee } from "@/server/histoires";
 import { currentStoryId } from "./session.server";
+import { connexionPuis } from "@/lib/suite";
 
 /*
  * Les données des pages serveur. Avec le back-end, elles viennent de la base, d’après les cookies de la requête ;
@@ -30,6 +31,14 @@ export async function quiAttendu(): Promise<boolean> {
   if (!BACKEND) return false;
   const { story } = await contexteRequete();
   return !!story && !quiRempli(metaDe(story));
+}
+
+/**
+ * Rien à montrer sur une page d’une conv (accueil, rapport…) : sans compte connecté (le lien du mail ouvert dans un autre
+ * navigateur, une session expirée), la connexion, qui ramène ensuite à `suite`. Connecté sans conv : commencer.
+ */
+export async function sansHistoire(suite: string): Promise<string> {
+  return BACKEND && !(await contexteRequete()).utilisateur ? connexionPuis(suite) : "/commencer";
 }
 
 /** Déjà connecté : une nouvelle conv passe alors de « Qui es-tu ? » à la lecture, sans l’écran email. Démo : non. */

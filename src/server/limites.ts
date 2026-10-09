@@ -11,6 +11,8 @@ export const LIMITES = {
   chatParCompte: { max: 150, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
+  /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
+  relanceParCompte: { max: 3, fenetreS: 86400 },
   /** Les alertes par mail à l’équipe. */
   alertesParJour: { max: 30, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */
