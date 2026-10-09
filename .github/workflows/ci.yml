@@ -35,17 +35,6 @@ jobs:
     name: Vérifications et build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     env:
       # La base des tests unitaires : créée puis migrée par tests/preparer-la-base.ts
       DATABASE_URL_TEST: postgres://postgres:postgres@localhost:5432/blush_test
@@ -63,6 +52,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      # Le Postgres 16 déjà installé sur l’image ubuntu-24.04 : pas d’image Docker à tirer (Docker Hub limite les
+      # téléchargements anonymes depuis les machines de GitHub)
+      - name: Postgres 16 (celui du runner)
+        run: |
+          sudo systemctl start postgresql.service
+          until pg_isready -h localhost -p 5432; do sleep 1; done
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
 
       - run: npm ci
 
@@ -96,17 +93,6 @@ jobs:
             projets: --project=chromium --project=chromium-beta
           - navigateur: webkit
             projets: --project=webkit-iphone --project=webkit-iphone-beta
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     env:
       # Le serveur Postgres des tests (tests/e2e/serveur.mjs y recrée blush_e2e à chaque lancement)
       E2E_POSTGRES: postgres://postgres:postgres@localhost:5432
@@ -145,6 +131,14 @@ jobs:
 
       - name: Le build du job « verifier »
         run: tar -xf build-e2e.tar && rm build-e2e.tar
+
+      # Le Postgres 16 déjà installé sur l’image ubuntu-24.04 : pas d’image Docker à tirer (Docker Hub limite les
+      # téléchargements anonymes depuis les machines de GitHub)
+      - name: Postgres 16 (celui du runner)
+        run: |
+          sudo systemctl start postgresql.service
+          until pg_isready -h localhost -p 5432; do sleep 1; done
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
 
       - name: Les tests de bout en bout
         run: npm run e2e -- ${{ matrix.projets }}
