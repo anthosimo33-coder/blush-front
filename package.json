@@ -10,10 +10,14 @@
     "galerie": "node scripts/galerie/capture.mjs",
     "fluidite": "node scripts/fluidite/fluidite.mjs",
     "predev": "node scripts/prompts.mjs",
-    "prebuild": "node scripts/prompts.mjs && node scripts/migrer.mjs",
+    "prebuild": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && node scripts/migrer.mjs",
     "postbuild": "node scripts/verifier-fuite.mjs",
-    "pretest": "node scripts/prompts.mjs",
+    "pretest": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs",
     "test": "vitest run",
+    "check": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && next typegen && tsc --noEmit && eslint . && vitest run",
+    "e2e:build": "node tests/e2e/construire.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "db:generer": "drizzle-kit generate",
     "db:migrer": "drizzle-kit migrate",
     "acces": "tsx scripts/acces.mts"
@@ -30,6 +34,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -37,7 +42,7 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "playwright-core": "1.58",
+    "playwright-core": "1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

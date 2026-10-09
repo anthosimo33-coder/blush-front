@@ -5,6 +5,19 @@ import type { Requete } from "@prompts/lib/contextes";
 const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
 const ids = (req: Requete) => [...new Set(textes(req).join("\n").match(/^m\d{4,}(?= )/gm) ?? [])];
 
+/** Ce qu’une sortie factice rend pour simuler un refus du modèle (src/server/ia/claude.ts le traite comme un vrai refus). */
+export const REFUS_FACTICE = "@@refus@@";
+
+/*
+ * Les déclencheurs, pour les tests de bout en bout (tests/e2e/aide/exports.ts les écrit dans une conv) : des marqueurs
+ * inventés, qui font prendre au modèle factice un chemin qu’il ne prend jamais sinon. Le modèle factice n’existe pas
+ * sur Vercel (src/server/env.ts) : la production ne les lit jamais.
+ */
+/** Dans la conv : le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts). */
+export const ALERTE_FACTICE = "#factice-alerte";
+/** Dans la conv : le modèle refuse de la lire (le verdict). Dans un message au chat : il refuse d’y répondre. */
+export const REFUS_DANS_LE_TEXTE = "#factice-refus";
+
 const chapitre = (numero: number, p: string[]) => ({
   numero,
   titre: `Chapitre ${numero}`,
@@ -36,6 +49,44 @@ export function fournisseurFactice(req: Requete): unknown {
   }
   const p = ids(req);
   const demande = textes(req).at(-1)!;
+  const tout = textes(req).join("\n");
+  if (req.tache === "04-verdict" && tout.includes(REFUS_DANS_LE_TEXTE)) return REFUS_FACTICE;
+  /* Une alerte : pas d’emoji, pas de niveau, un pas pour soi (prompts/04-verdict.md, « La sécurité d’abord ») */
+  if (req.tache === "04-verdict" && tout.includes(ALERTE_FACTICE))
+    return {
+      alerte: "danger",
+      mode_sobre: true,
+      emoji: null,
+      court: null,
+      titre: "Ce que tu vis n’est pas normal.",
+      sous_titre: "Et ce n’est pas ta faute.",
+      preuves: [p[2]],
+      confiance: null,
+      confiance_texte: null,
+      niveau: null,
+      niveau_pourquoi: null,
+      tendance: null,
+      prochain_pas: "Cette semaine, parles-en à quelqu’un de confiance.",
+      devinette: null,
+    };
+  /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec une alerte ») */
+  if (req.tache === "05-rapport" && tout.includes(ALERTE_FACTICE))
+    return {
+      alerte: "danger",
+      mode_sobre: true,
+      decouvertes: [],
+      these: "Ce que tu vis compte.",
+      chapitres: null,
+      sobre: {
+        intro: "On va parler doucement.",
+        titre: "Ce que tu vis n’est pas normal.",
+        faits: "Dans votre conv, il revient sans cesse sur tes sorties.",
+        preuves: [p[3]],
+        reassurance: "Tu n’y es pour rien.",
+        gestes: ["Parles-en à quelqu’un de confiance.", "Garde une trace de ce qui t’inquiète.", "Appelle une ligne d’écoute si ça pèse trop."],
+        brouillon: "J’ai besoin de temps pour moi.",
+      },
+    };
   if (req.tache === "04-verdict")
     return {
       alerte: null,
@@ -101,8 +152,11 @@ export function fournisseurFactice(req: Requete): unknown {
   if (req.tache === "10-chat") {
     /* Le vocal : « parle-moi en vocal » l’active, « écris-moi » l’arrête ; <vocal> dit que la réponse part en vocal */
     const dernier = demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1) ?? "";
+    if (dernier.includes(REFUS_DANS_LE_TEXTE)) return REFUS_FACTICE;
     const modeVocal = dernier.includes("parle-moi en vocal") ? "activer" : dernier.includes("écris-moi") ? "arreter" : null;
     const enVocal = modeVocal === "activer" || (modeVocal !== "arreter" && demande.includes("<vocal>"));
+    /* « je lui envoie quoi » : la phrase à lui envoyer ; « on est ensemble » : un niveau de franchi */
+    const aEnvoyer = dernier.includes("je lui envoie quoi");
     return {
       alerte: null,
       type: demande.includes("on s’est vus") ? "nouvelle" : "question",
@@ -113,11 +167,11 @@ export function fournisseurFactice(req: Requete): unknown {
         { texte: "elle te cherche 👀", preuves: p.slice(0, 1) },
         { texte: "et toi tu fais le mec occupé", preuves: [] },
       ],
-      a_envoyer: null,
+      a_envoyer: aEnvoyer ? ["samedi, 20 h ?"] : null,
       question: "tu lui as répondu quoi ?",
       reaction: null,
-      pourquoi: null,
-      niveau_atteint: null,
+      pourquoi: aEnvoyer ? "un jour, une heure : elle n’a qu’à dire oui" : null,
+      niveau_atteint: dernier.includes("on est ensemble") ? "ensemble" : null,
       mode_vocal: modeVocal,
       dit: enVocal
         ? [

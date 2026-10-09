@@ -2,24 +2,28 @@
 /**
  * Après le build : aucune phrase des prompts ne doit se trouver dans ce que reçoit le navigateur
  * (.next/static, et les pages et données prérendues). Sinon, le build échoue.
+ * Il échoue aussi quand la vérification ne vérifierait rien : pas de .next/static (pas de build), aucun fichier lu, ou
+ * moins de MIN_PHRASES phrases tirées des prompts (un sous-module vide, des prompts réécrits autrement).
+ * `node scripts/verifier-fuite.mjs [dossier .next]` : un autre build que .next/ (les tests du script).
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
 import { FICHIERS } from "./fichiers-prompts.mjs";
 
-/* Tous les prompts copiés côté serveur (scripts/prompts.mjs) : un prompt ajouté y est cherché aussi */
-const PROMPTS = Object.values(FICHIERS);
+const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
+/** Moins de phrases que ça : les prompts n’ont pas été lus comme il faut, la vérification ne prouverait rien. */
+export const MIN_PHRASES = 20;
 
-/* Des phrases assez longues pour n’appartenir qu’aux prompts */
-const phrases = PROMPTS.flatMap((f) =>
-  readFileSync(join(RACINE, "prompts", f), "utf8")
-    .split(/\n|(?<=[.!?])\s/)
-    .map((l) => l.replace(/[*`#>|-]/g, "").trim())
-    .filter((l) => l.length >= 70),
-);
+/** Les phrases des prompts copiés côté serveur (scripts/prompts.mjs), assez longues pour n’appartenir qu’à eux. */
+export function phrasesDesPrompts() {
+  return Object.values(FICHIERS).flatMap((f) =>
+    readFileSync(join(RACINE, "prompts", f), "utf8")
+      .split(/\n|(?<=[.!?])\s/)
+      .map((l) => l.replace(/[*`#>|-]/g, "").trim())
+      .filter((l) => l.length >= 70),
+  );
+}
 
 function* fichiers(dossier, filtre) {
   let entrees = [];
@@ -35,15 +39,36 @@ function* fichiers(dossier, filtre) {
   }
 }
 
-const cibles = [...fichiers(join(RACINE, ".next/static"), (p) => /\.(js|css|json|txt|html)$/.test(p)), ...fichiers(join(RACINE, ".next/server/app"), (p) => /\.(html|rsc|body|meta)$/.test(p))];
-const fuites = [];
-for (const f of cibles) {
-  const contenu = readFileSync(f, "utf8");
-  const trouvee = phrases.find((ph) => contenu.includes(ph) || contenu.includes(JSON.stringify(ph).slice(1, -1)));
-  if (trouvee) fuites.push(`${f.slice(RACINE.length + 1)} : « ${trouvee.slice(0, 60)}… »`);
+/** Vérifie un build : renvoie ses problèmes (vide : rien ne fuit), et ce qui a été lu. */
+export function verifier(dossierNext) {
+  const phrases = phrasesDesPrompts();
+  if (!existsSync(join(dossierNext, "static"))) return { problemes: [`${join(dossierNext, "static")} manque : pas de build à vérifier`], cibles: 0, phrases: phrases.length };
+  if (phrases.length < MIN_PHRASES) return { problemes: [`${phrases.length} phrases tirées des prompts (${MIN_PHRASES} au moins) : prompts/ est-il bien là ?`], cibles: 0, phrases: phrases.length };
+  const cibles = [...fichiers(join(dossierNext, "static"), (p) => /\.(js|css|json|txt|html)$/.test(p)), ...fichiers(join(dossierNext, "server/app"), (p) => /\.(html|rsc|body|meta)$/.test(p))];
+  if (!cibles.length) return { problemes: [`aucun fichier envoyé au navigateur dans ${dossierNext} : rien n’a été vérifié`], cibles: 0, phrases: phrases.length };
+  const problemes = [];
+  for (const f of cibles) {
+    const contenu = readFileSync(f, "utf8");
+    const trouvee = phrases.find((ph) => contenu.includes(ph) || contenu.includes(JSON.stringify(ph).slice(1, -1)));
+    if (trouvee) problemes.push(`fuite des prompts : ${f.slice(dossierNext.length + 1)} : « ${trouvee.slice(0, 60)}… »`);
+  }
+  return { problemes, cibles: cibles.length, phrases: phrases.length };
 }
-if (fuites.length) {
-  console.error(`✗ Fuite des prompts dans ce que reçoit le navigateur :\n${fuites.join("\n")}`);
-  process.exit(1);
+
+/* Lancé comme script (après `next build`, ou à la main), même par un lien symbolique : on compare les chemins réels */
+const lanceCommeScript = () => {
+  try {
+    return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (lanceCommeScript()) {
+  const dossierNext = resolve(process.argv[2] ?? join(RACINE, ".next"));
+  const { problemes, cibles, phrases } = verifier(dossierNext);
+  if (problemes.length) {
+    console.error(`✗ Vérification des prompts dans ce que reçoit le navigateur :\n${problemes.join("\n")}`);
+    process.exit(1);
+  }
+  console.log(`✓ Aucune phrase des prompts dans ${cibles} fichiers envoyés au navigateur (${phrases} phrases cherchées).`);
 }
-console.log(`✓ Aucune phrase des prompts dans ${cibles.length} fichiers envoyés au navigateur (${phrases.length} phrases cherchées).`);
