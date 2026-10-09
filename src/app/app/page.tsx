@@ -31,6 +31,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
       quick={version === "actuelle" ? [] : quick}
       script={chat.echanges}
       plusAnciens={chat.plus}
+      modeVocalInitial={chat.modeVocal}
       contact={{ report: { verdict: report.verdict, level: report.level, trend: report.trend, nextStep: report.nextStep }, fiche: { person: fiche.person, summaryShort: fiche.summaryShort }, period: story.period }}
       motion={motion}
       arrive={motion && !arrived}

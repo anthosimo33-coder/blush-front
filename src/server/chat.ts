@@ -42,7 +42,7 @@ export type EchangeAffiche = { id: number; mine: string; answer: BlushAnswer; at
  * `plus` : il en reste d’autres, plus anciens. Un message de BLUSH coupé de sa question (au bord d’un morceau)
  * revient avec elle dans le morceau d’avant.
  */
-export async function historique(storyId: string, { avant, limite = 40 }: { avant?: number; limite?: number } = {}): Promise<{ echanges: EchangeAffiche[]; plus: boolean }> {
+export async function historique(storyId: string, { avant, limite = 40 }: { avant?: number; limite?: number } = {}): Promise<{ echanges: EchangeAffiche[]; plus: boolean; modeVocal: boolean }> {
   const ou = avant ? and(eq(schema.chatMessages.storyId, storyId), lt(schema.chatMessages.id, avant)) : eq(schema.chatMessages.storyId, storyId);
   const lignes = (await db().select().from(schema.chatMessages).where(ou).orderBy(desc(schema.chatMessages.id)).limit(limite)).reverse();
   const echanges: EchangeAffiche[] = [];
@@ -51,7 +51,9 @@ export async function historique(storyId: string, { avant, limite = 40 }: { avan
     const toi = dechiffrer<MessageToi>(lignes[i].data);
     echanges.push({ id: lignes[i].id, mine: toi.affiche ?? toi.texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
   }
-  return { echanges, plus: lignes.length === limite };
+  /* Le mode vocal, tel qu’il est en base : « Repasser à l’écrit » le coupe sans nouvelle réponse */
+  const [s] = await db().select({ chatVocal: schema.stories.chatVocal }).from(schema.stories).where(eq(schema.stories.id, storyId));
+  return { echanges, plus: lignes.length === limite, modeVocal: !!s?.chatVocal };
 }
 
 async function fil(storyId: string): Promise<Fil> {
