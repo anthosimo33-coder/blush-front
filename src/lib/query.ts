@@ -33,6 +33,12 @@ export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T, { fe
   const [data, setData] = useState<T | undefined>(() => (initial !== undefined ? initial : cache.has(key) ? (cache.get(key) as T) : undefined));
   const [error, setError] = useState(false);
   const [version, setVersion] = useState(0);
+  /*
+   * Une lecture en route (depuis quand) : une relecture demandée pendant ce temps (le suivi du rapport, toutes les 2 s)
+   * attend sa réponse au lieu de la jeter. Sur un réseau lent, la réponse arrive quand même. Au-delà de 15 s, on n’attend plus.
+   */
+  const enRoute = useRef(0);
+  const aRelire = useRef(false);
   const fnRef = useRef(fn);
   useEffect(() => {
     fnRef.current = fn;
@@ -41,7 +47,11 @@ export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T, { fe
   useEffect(() => {
     let set = listeners.get(key);
     if (!set) listeners.set(key, (set = new Set()));
-    const l: Listener = (d) => (d === undefined ? setVersion((v) => v + 1) : setData(d as T));
+    const l: Listener = (d) => {
+      if (d !== undefined) return setData(d as T);
+      if (enRoute.current && Date.now() - enRoute.current < 15_000) aRelire.current = true;
+      else setVersion((v) => v + 1);
+    };
     set.add(l);
     return () => {
       set.delete(l);
@@ -51,14 +61,29 @@ export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T, { fe
   useEffect(() => {
     if (!fetch) return;
     let alive = true;
+    enRoute.current = Date.now();
+    const fin = () => {
+      if (!alive) return;
+      enRoute.current = 0;
+      /* Une relecture a été demandée pendant la lecture : elle part maintenant */
+      if (aRelire.current) {
+        aRelire.current = false;
+        setVersion((v) => v + 1);
+      }
+    };
     fnRef.current().then(
       (d) => {
         if (!alive) return;
         cache.set(key, d);
         setData(d);
         setError(false);
+        fin();
       },
-      () => alive && setError(true),
+      () => {
+        if (!alive) return;
+        setError(true);
+        fin();
+      },
     );
     return () => {
       alive = false;

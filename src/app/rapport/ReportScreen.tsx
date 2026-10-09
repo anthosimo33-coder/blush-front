@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
+import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
 import { setQueryData, useQuery } from "@/lib/query";
@@ -171,7 +172,9 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   /* Le rapport s’écrit : les chapitres à venir ne mènent pas au paiement, ils montrent où en est l’écriture */
   const ecriture = payload.generating ? payload.ecriture : undefined;
   const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
-  const [me, other] = j.me === story.participants[1].id ? [story.participants[1], story.participants[0]] : story.participants;
+  /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
+  const moi = story.me ?? j.me;
+  const [me, other] = moi === story.participants[1].id ? [story.participants[1], story.participants[0]] : story.participants;
   const chapters = report.chapters;
   const free = chapters.filter((c) => !c.locked);
   const locked = chapters.filter((c) => c.locked);
@@ -275,7 +278,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
           </li>
         ))}
       </ol>
-      {full && (
+      {full && !payload.generating && !payload.echec && (
         /* Le trait est hors de la ligne cliquable : le voile du survol reste centré sur elle, comme pour les chapitres */
         <div className="mt-2 border-t border-[rgba(17,17,20,0.06)] pt-1.5">
           <Link href="/rapport/question" className="row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline">
@@ -301,7 +304,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         /* Mobile : la barre reste en haut — le chapitre en cours, la progression, et le sommaire à un toucher */
         <header className="sticky top-0 z-30 shrink-0 bg-[rgba(244,242,237,0.88)] backdrop-blur-xl lg:hidden">
           <div className="grid h-[58px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 px-2">
-            <button type="button" aria-label="Retour" onClick={() => router.back()} className="flex size-11 items-center justify-center">
+            <button type="button" aria-label="Retour" onClick={() => (pagePrecedente() ? router.back() : router.push("/app"))} className="flex size-11 items-center justify-center">
               <Icon name="back" size={24} color="#121214" stroke={2.6} />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">
@@ -408,7 +411,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       {free.map((c, i) => (
         <Fragment key={c.number}>
           {i > 0 && <ChapterRule />}
-          <ChapterSection chapter={c} renderQuestion={renderQuestion} onShare={(bloc) => setImage({ type: "moment", chapitre: c.number, bloc })}>
+          <ChapterSection chapter={c} renderQuestion={renderQuestion} onShare={(bloc) => setImage({ type: "moment", chapitre: c.number, bloc })} autre={other.pronoun}>
             {c.number === 1 && (
               <>
                 <div className="flex items-start gap-2.5">
@@ -455,7 +458,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </>
       )}
 
-      {full && (
+      {/* Après la lecture : ta question passe par le chat, prêt une fois le rapport écrit (pas pendant l’écriture, ni après un échec) */}
+      {full && !payload.generating && !payload.echec && (
         <>
           <ChapterRule />
           {/* Après la lecture : ta question d’abord (bien visible), puis compléter le début de l’histoire */}
@@ -608,17 +612,19 @@ function ChapterSection({
   children,
   renderQuestion,
   onShare,
+  autre,
 }: {
   chapter: Chapter;
   children?: React.ReactNode;
   renderQuestion: Parameters<typeof Blocks>[0]["renderQuestion"];
   onShare?: (bloc: number) => void;
+  autre?: "il" | "elle";
 }) {
   return (
     <section id={`chapitre-${chapter.number}`} aria-labelledby={`chapitre-${chapter.number}-titre`} className={cn("flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5")}>
       <ChapterHeader number={chapter.number} kicker={chapter.kicker} title={chapter.title} id={`chapitre-${chapter.number}-titre`} />
       {children}
-      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare} />
+      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare} autre={autre} />
     </section>
   );
 }

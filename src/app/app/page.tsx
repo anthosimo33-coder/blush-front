@@ -36,6 +36,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
       arrive={motion && !arrived}
       fromReport={depuis === "rapport"}
       others={all.filter((c) => !c.current)}
+      introAt={chat.introAt}
     />
   );
   if (!motion)

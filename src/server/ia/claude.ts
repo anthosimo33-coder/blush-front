@@ -6,6 +6,8 @@ import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contex
 import { db, schema } from "../db";
 import { env } from "../env";
 import { alerter } from "../alertes";
+import { delaiAppel, tempsRestant } from "../echeance";
+import { ErreurTache } from "../erreurs";
 import { fournisseurFactice } from "./factice";
 import { TEXTES } from "./textes.generated";
 
@@ -23,6 +25,9 @@ export type Avance = { reflexion: number; texte: number; ecrit: string };
 /** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. `categorie` : celle d’un refus. */
 export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number; categorie?: string | null };
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
+
+/** Moins de temps que ça avant l’échéance (src/server/echeance.ts) : l’appel ne part pas, il serait coupé avant de répondre. */
+export const TEMPS_MIN_APPEL = 20_000;
 
 /** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
 export const REFUS_FACTICE = "@@refus@@";
@@ -86,18 +91,22 @@ let repliDisponible = true;
 /**
  * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts.
  * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment).
+ * `signal` : l’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué).
+ * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps.
  */
 export async function appeler<S extends z.ZodType>(
   req: Requete,
   schema: S,
-  { storyId, etiquette, surAvance }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void } = {},
+  { storyId, etiquette, surAvance, signal }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void; signal?: AbortSignal } = {},
 ): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
+    if (signal?.aborted) throw new ErreurTache("annule");
     const brut = factice(req);
     if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: null };
     const ok = schema.safeParse(brut);
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
   }
+  if (tempsRestant() < TEMPS_MIN_APPEL) throw new ErreurTache("delai");
   const reglage = REGLAGES[req.tache];
   const base = {
     model: MODELE,
@@ -117,11 +126,16 @@ export async function appeler<S extends z.ZodType>(
     ],
   };
   const debut = Date.now();
+  /* Le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste (600 s et 2 tentatives sans échéance) */
+  const options = () => {
+    const reste = tempsRestant();
+    return { timeout: delaiAppel(600_000), maxRetries: reste === Infinity ? 2 : reste > 150_000 ? 1 : 0, ...(signal ? { signal } : {}) };
+  };
   const envoyer = async (avecRepli: boolean) => {
     const params = avecRepli ? { ...base, fallbacks: "default" as const, betas: [BETA_REPLI] } : base;
-    /* Les longues sorties (rapport, mémoire) passent en flux : pas de délai d’attente HTTP. Une sortie suivie aussi */
-    if (!reglage.flux && !surAvance) return anthropic().beta.messages.create(params);
-    const flux = anthropic().beta.messages.stream(params);
+    /* Les longues sorties (rapport, mémoire) passent en flux. Une sortie suivie aussi */
+    if (!reglage.flux && !surAvance) return anthropic().beta.messages.create(params, options());
+    const flux = anthropic().beta.messages.stream(params, options());
     if (surAvance) {
       let a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
       /* Le suivi ne doit jamais faire échouer la réponse : une erreur ici est ignorée */

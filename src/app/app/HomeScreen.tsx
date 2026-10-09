@@ -164,9 +164,13 @@ const DE_L_HISTORIQUE = (m: Msg) => m.id <= -1_000_000;
 /** Un message sans son identifiant (il est attribué au moment de l’ajouter à la conv). */
 type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
 
-const INTRO: Msg[] = [
-  { id: -2, from: "blush", intro: "next", seed: { day: -1, h: 21, m: 40 } },
-  { id: -1, from: "blush", intro: "hint", seed: { day: -1, h: 21, m: 41 } },
+/**
+ * L’intro de BLUSH (ton prochain pas, puis « elle vient de répondre ? »). Back-end : à l’heure où ta lecture s’est
+ * finie (`at`), avant tout l’historique. Démo : hier soir, comme dans les maquettes.
+ */
+const introDe = (at?: number): Msg[] => [
+  { id: -2, from: "blush", intro: "next", ...(at ? { at } : { seed: { day: -1, h: 21, m: 40 } }) },
+  { id: -1, from: "blush", intro: "hint", ...(at ? { at: at + 60_000 } : { seed: { day: -1, h: 21, m: 41 } }) },
 ];
 /** Le groupe de l’intro (les clés des lignes viennent de rowsOf) : c’est lui que l’arrivée du jour écrit. */
 const INTRO_GROUP = "-2-0";
@@ -215,6 +219,7 @@ export function HomeScreen({
   arrive = false,
   fromReport = false,
   others = [],
+  introAt,
 }: {
   quick?: string[];
   /** Des réponses déjà prêtes, par question (l’aperçu des vraies réponses du chat). */
@@ -232,10 +237,12 @@ export function HomeScreen({
   fromReport?: boolean;
   /** Proposition « plusieurs convs » : les autres convs du compte. En haut à gauche, un bouton ramène à leur liste. */
   others?: ConvSummary[];
+  /** Back-end : quand la lecture s’est finie (l’heure de l’intro de BLUSH). */
+  introAt?: number;
 }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
-  const [msgs, setMsgs] = useState<Msg[]>(() => [...INTRO, ...echangesEnMsgs(script)]);
+  const [msgs, setMsgs] = useState<Msg[]>(() => [...introDe(introAt), ...echangesEnMsgs(script)]);
   /* L’historique se charge par morceaux : y en a-t-il de plus anciens, et le plus ancien déjà affiché */
   const [plus, setPlus] = useState(plusAnciens);
   const [anciens, setAnciens] = useState(false);
@@ -355,7 +362,7 @@ export function HomeScreen({
           if (affiches.join() === frais.map((m) => m.id).join()) return;
           plusAncien.current = h.echanges[0]?.id ?? null;
           setPlus(h.plus);
-          setMsgs([...INTRO, ...frais]);
+          setMsgs((m) => [...m.filter((x) => "intro" in x), ...frais]);
           /* Le mode vocal suit la réponse la plus récente */
           setModeVocal(!!h.echanges.at(-1)?.answer.modeVocal);
         })
@@ -608,6 +615,7 @@ export function HomeScreen({
       <MotionContext value={moving}>
         <AppScreen
           requires="blushplus"
+          autre={contact.fiche.person.name}
           aside={null}
           mainWidth={WINDOW_W}
           frameWidth={WINDOW_W}
@@ -1218,10 +1226,15 @@ type Row =
 /** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot), le mouvement. */
 type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean; autre?: "il" | "elle" };
 
-/** L’heure d’un message. L’intro se cale sur l’ouverture de l’écran (inconnue au rendu serveur : l’heure reste vide). */
+/**
+ * L’heure d’un message, seulement dans le navigateur (`opened` est vide au rendu serveur) : le serveur est à l’heure
+ * UTC, le téléphone à la sienne, et des heures différentes feraient refaire tout l’écran à l’hydratation.
+ * L’intro de la démo se cale sur l’ouverture de l’écran.
+ */
 function timeOf(m: Msg, opened: number | null) {
+  if (opened === null) return null;
   if (m.at) return m.at;
-  if (!m.seed || opened === null) return null;
+  if (!m.seed) return null;
   const d = new Date(opened);
   d.setDate(d.getDate() + m.seed.day);
   d.setHours(m.seed.h, m.seed.m, 0, 0);

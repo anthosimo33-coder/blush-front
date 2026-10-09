@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
@@ -15,6 +15,7 @@ import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } fro
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
+import { avecEcheance, tempsRestant } from "./echeance";
 import { alerter } from "./alertes";
 import { envoyerMail } from "./email";
 import { env } from "./env";
@@ -46,7 +47,8 @@ function relire(story: Ligne) {
    * d’un essai à l’autre, et pour le verdict, le rapport et la mémoire.
    */
   const h = { ...histoireDe(meta), aujourdhui: aujourdhuiParis(story.createdAt).iso };
-  const lu = lire(conv, h);
+  /* Comme à l’import : un message collé d’un autre reste du texte */
+  const lu = lire(conv, h, { autresEnTexte: true });
   return { meta, h, lu, rendu: rendre(h, lu) };
 }
 
@@ -62,16 +64,21 @@ async function appelVerifie<S extends z.ZodType>(
   storyId: string,
   etiquette: string,
   surAvance?: (a: Avance) => void,
+  signal?: AbortSignal,
 ): Promise<z.infer<S>> {
   for (let essai = 0; essai < 2; essai++) {
-    const a = await appeler(req, format, { storyId, etiquette, surAvance });
+    const a = await appeler(req, format, { storyId, etiquette, surAvance, signal });
     /* Un refus qui tient malgré le repli : sa catégorie va dans le code d’erreur (et dans l’alerte) */
     if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
     if (!a.sortie) continue;
-    if (!introuvables(ids(a.sortie), lignes).length || essai === 1) return a.sortie;
+    /* Des preuves introuvables : on rejoue, si le temps le permet (sinon, elles sont ignorées à l’affichage, comme au second essai) */
+    if (!introuvables(ids(a.sortie), lignes).length || essai === 1 || tempsRestant() < TEMPS_RELANCE) return a.sortie;
   }
   throw new ErreurTache("sortie_illisible");
 }
+
+/** Le temps qu’il faut encore pour rejouer un appel dont des preuves sont introuvables. */
+const TEMPS_RELANCE = 90_000;
 
 const lireVerdict = async (storyId: string) => {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
@@ -150,14 +157,16 @@ async function verdict(story: Ligne, t: Tache) {
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
   const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t, trouvailles: trouvailles(chiffres, h, lu.messages) };
   await db().update(schema.stories).set({ context: chiffrer(contexte), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  const sortie = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
+  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
+  /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
+  const sortie: Verdict = { ...brute, mode_sobre: !!brute.alerte };
   const donnees: DonneesVerdict = { sortie, scores: scores(chiffres) };
   await db()
     .insert(schema.verdicts)
     .values({ storyId: story.id, data: chiffrer(donnees) })
     .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data: chiffrer(donnees), createdAt: new Date() } });
   await db().update(schema.stories).set({ context: chiffrer(contexte), status: "prete", updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  /* Le rapport s’écrit dès qu’on a l’accès. Un verdict dur (mode sobre) a sa version douce, offerte : on ne fait pas payer une mauvaise nouvelle */
+  /* Le rapport s’écrit dès qu’on a l’accès. Une alerte (mode sobre) a sa version douce, offerte : on ne fait pas payer une situation de danger */
   if (sortie.mode_sobre || (await aAcces(story))) await planifier(story.id, "rapport_plan");
 }
 
@@ -214,14 +223,29 @@ async function rapportChapitres(story: Ligne, t: Tache) {
       .then(() => db().update(schema.reports).set({ partiel: chiffrer(affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
       .then(() => undefined, () => undefined);
   };
+  /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
+  const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
-    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, (e) => preuvesChapitres(e.chapitres), rendu.lignes, story.id, "rapport_chapitres", (av) => {
-      const premier = quels === "1 à 4" ? 1 : 5;
-      detail[premier === 1 ? "a" : "b"] = avanceMoitie(av, premier);
-      ecrire(Math.round(50 * (detail.a.progres + detail.b.progres)), detail);
-      const nouveaux = chapitresFinis(av.ecrit).filter((c) => c.numero >= premier && c.numero < premier + 4 && !prets.has(c.numero));
-      nouveaux.forEach((c) => prets.set(c.numero, c));
-      if (nouveaux.length) garderPrets();
+    appelVerifie(
+      requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)),
+      Etape05,
+      (e) => preuvesChapitres(e.chapitres),
+      rendu.lignes,
+      story.id,
+      "rapport_chapitres",
+      (av) => {
+        if (abandon.signal.aborted) return;
+        const premier = quels === "1 à 4" ? 1 : 5;
+        detail[premier === 1 ? "a" : "b"] = avanceMoitie(av, premier);
+        ecrire(Math.round(50 * (detail.a.progres + detail.b.progres)), detail);
+        const nouveaux = chapitresFinis(av.ecrit).filter((c) => c.numero >= premier && c.numero < premier + 4 && !prets.has(c.numero));
+        nouveaux.forEach((c) => prets.set(c.numero, c));
+        if (nouveaux.length) garderPrets();
+      },
+      abandon.signal,
+    ).catch((e: unknown) => {
+      abandon.abort();
+      throw e;
     });
   /*
    * Le vocal s’écrit en même temps, sur le plan : il est prêt avant les chapitres. Son échec n’arrête pas le rapport
@@ -230,19 +254,27 @@ async function rapportChapitres(story: Ligne, t: Tache) {
   const enParallele = vocal(story, v.sortie, { plan }, choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), false).catch((e) =>
     console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache || e instanceof ErreurVoix ? e.message : (e as Error).name}`),
   );
-  const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
-  await Promise.all([enregistrement, enParallele]);
-  if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
-  const r: Rapport = {
-    alerte: plan.alerte,
-    mode_sobre: plan.mode_sobre,
-    decouvertes: plan.decouvertes,
-    these: plan.these,
-    chapitres: [...a.chapitres, ...b.chapitres].sort((x, y) => x.numero - y.numero),
-    sobre: null,
-  };
-  await garderRapport(story, r, rendu.lignes, v.scores);
-  await planifier(story.id, "memoire");
+  /*
+   * Les chapitres sont gardés dès qu’ils sont écrits, sans attendre le vocal : une voix lente ne fait plus perdre (et
+   * repayer) un rapport fini. Le vocal, lui, finit toujours avant la fin de la tâche : jamais deux vocaux en même temps.
+   */
+  try {
+    const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
+    await enregistrement;
+    if (!a.chapitres || !b.chapitres) throw new ErreurTache("chapitres_vides");
+    const r: Rapport = {
+      alerte: plan.alerte,
+      mode_sobre: v.sortie.mode_sobre,
+      decouvertes: plan.decouvertes,
+      these: plan.these,
+      chapitres: [...a.chapitres, ...b.chapitres].sort((x, y) => x.numero - y.numero),
+      sobre: null,
+    };
+    await garderRapport(story, r, rendu.lignes, v.scores);
+    await planifier(story.id, "memoire");
+  } finally {
+    await enParallele;
+  }
 }
 
 async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: LigneScore[]) {
@@ -327,32 +359,42 @@ async function memoire(story: Ligne) {
   await db()
     .insert(schema.memories)
     .values({ storyId: story.id, data: chiffrer(donnees) })
-    .onConflictDoUpdate({ target: schema.memories.storyId, set: { data: chiffrer(donnees), updatedAt: new Date() } });
+    .onConflictDoUpdate({ target: schema.memories.storyId, set: { data: chiffrer(donnees), version: sql`${schema.memories.version} + 1`, updatedAt: new Date() } });
   /* Le rapport et la mémoire sont faits : la conv brute n’a plus de raison d’être gardée */
   if (contexteDe(story)) await db().update(schema.stories).set({ conv: null, convPurgedAt: new Date(), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
 }
 
-/** Après un échange qui apporte du neuf : la mémoire se met à jour (ou dit « rien de neuf », le cas le plus fréquent). */
+/**
+ * Après un échange qui apporte du neuf : la mémoire se met à jour (ou dit « rien de neuf », le cas le plus fréquent).
+ * Elle n’écrit que sur la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend 20 à
+ * 60 s), elle recommence sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
+ */
 async function memoireMaj(story: Ligne, t: Tache) {
   const ech = entreeDe<Echange>(t);
-  const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
-  if (!ech || !ligne) throw new ErreurTache("memoire_absente");
-  const avant = dechiffrer<DonneesMemoire>(ligne.data);
+  if (!ech) throw new ErreurTache("memoire_absente");
   const h = histoireDe(metaDe(story));
-  const lignes = new Map(avant.lignes);
-  const suivant = { n: avant.suivant };
-  const nouveau = rendreNouveau(ech, h, lignes, suivant);
-  const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, avant.editions);
-  /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-  const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
-  if (maj.rien_de_neuf) return;
-  const etat = appliquerMaj(avant.etat, maj);
-  const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
-  const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: avant.editions } : {}) };
-  await db()
-    .update(schema.memories)
-    .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
-    .where(eq(schema.memories.storyId, story.id));
+  for (let essai = 0; essai < 2; essai++) {
+    const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
+    if (!ligne) throw new ErreurTache("memoire_absente");
+    const avant = dechiffrer<DonneesMemoire>(ligne.data);
+    const lignes = new Map(avant.lignes);
+    const suivant = { n: avant.suivant };
+    const nouveau = rendreNouveau(ech, h, lignes, suivant);
+    const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, avant.editions);
+    /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
+    const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
+    if (maj.rien_de_neuf) return;
+    const etat = appliquerMaj(avant.etat, maj);
+    const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
+    const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: avant.editions } : {}) };
+    const ecrite = await db()
+      .update(schema.memories)
+      .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
+      .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
+      .returning({ version: schema.memories.version });
+    if (ecrite.length) return;
+  }
+  throw new ErreurTache("memoire_changee");
 }
 
 const ETAPES: Partial<Record<Genre, (story: Ligne, t: Tache) => Promise<void>>> = {
@@ -378,6 +420,8 @@ async function aAcces(story: Ligne): Promise<boolean> {
  * d’étape après 100 secondes, pour qu’elle finisse avant d’être coupée.
  */
 export const BUDGET_CHAINE_MS = 100_000;
+/** L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction (300 s). */
+export const ECHEANCE_CHAINE_MS = 285_000;
 
 /** Exécute une tâche. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
 async function executer(t: Tache): Promise<boolean> {
@@ -413,14 +457,16 @@ export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_M
   await cloreLesAbandons(storyId);
   if (await occupee(storyId)) return;
   const debut = Date.now();
-  while (Date.now() - debut < budgetMs) {
-    const [t] = await aRelancer(storyId);
-    if (!t) return;
-    const pris = await prendre(t.id);
-    if (!pris) return;
-    /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
-    if (!(await executer(pris))) await new Promise((r) => setTimeout(r, 3000 * pris.attempts));
-  }
+  await avecEcheance(ECHEANCE_CHAINE_MS, async () => {
+    while (Date.now() - debut < budgetMs) {
+      const [t] = await aRelancer(storyId);
+      if (!t) return;
+      const pris = await prendre(t.id);
+      if (!pris) return;
+      /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
+      if (!(await executer(pris))) await new Promise((r) => setTimeout(r, 3000 * pris.attempts));
+    }
+  });
 }
 
 /** Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre échec. */

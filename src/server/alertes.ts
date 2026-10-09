@@ -4,6 +4,7 @@ import { db, schema } from "./db";
 import { env } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
+import { delaiAppel } from "./echeance";
 
 /*
  * Les alertes de l’équipe, par mail (BLUSH_ALERTES) : un échec définitif, et chaque nuit le résumé de la veille.
@@ -21,6 +22,7 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
     method: "POST",
     headers: { authorization: `Bearer ${RESEND_API_KEY}`, "content-type": "application/json" },
     body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: BLUSH_ALERTES.split(",").map((e) => e.trim()), subject: sujet, text: lignes.join("\n") }),
+    signal: AbortSignal.timeout(delaiAppel(15_000, 2_000)),
   });
   if (!r.ok) console.error(`alerte non envoyée : Resend ${r.status}`);
 }

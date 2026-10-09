@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
-import { setQueryData, useQuery } from "@/lib/query";
+import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { addToFiche, getFiche, updateFiche } from "@/services/api";
 import { FICHE_SECTIONS } from "@/mocks/daily";
@@ -68,9 +68,29 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     return () => window.removeEventListener("dragenter", enter);
   }, []);
 
-  const save = async (facts: FicheFact[]) => {
+  /*
+   * La fiche change tout de suite à l’écran, puis part au serveur. Les enregistrements partent l’un après l’autre (deux
+   * retraits rapides arrivent dans l’ordre) ; un enregistrement raté le dit, et la fiche revient à ce que le serveur garde.
+   */
+  const [souci, setSouci] = useState<string | null>(null);
+  const file = useRef<Promise<unknown>>(Promise.resolve());
+  const dernier = useRef(0);
+  const save = (facts: FicheFact[]) => {
     setQueryData(key, { ...fiche, facts });
-    await updateFiche(facts);
+    setSouci(null);
+    const n = ++dernier.current;
+    const envoi = file.current.then(() => updateFiche(facts));
+    file.current = envoi.catch(() => {});
+    return envoi.then(
+      (f) => {
+        if (n === dernier.current) setQueryData(key, f);
+      },
+      () => {
+        if (n !== dernier.current) return;
+        setSouci("Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.");
+        invalidate(key);
+      },
+    );
   };
 
   const add = async (picked: File[]) => {
@@ -122,6 +142,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
   return (
     <AppScreen
       requires="blushplus"
+      autre={fiche.person.name}
       aside={null}
       mainWidth={CARD_W}
       frameWidth={CARD_W}
@@ -168,6 +189,11 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
           <AddButton onClick={picker.open} dimmed={editing} />
         )}
         {job.step === "done" && <Found what={job.what} update={job.update} onUndo={undo} onClose={() => setJob({ step: "idle" })} />}
+        {souci && (
+          <p role="alert" className="m-0 px-1 text-[14px] font-extrabold text-[#D93036]">
+            {souci}
+          </p>
+        )}
       </div>
       <FileInput inputRef={picker.ref} accept={ACCEPT} multiple onFiles={(f) => void add(f)} label="Captures ou export à ajouter à sa fiche" />
 

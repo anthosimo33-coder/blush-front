@@ -10,6 +10,7 @@ import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3
 import { Icon } from "@/components/ui/icons";
 import { PartageSheet } from "../Partage";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
+import { IlOuElle } from "@/lib/pronom";
 
 const INK = "#121214";
 
@@ -81,6 +82,8 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   const swiped = useRef(false);
   const card = cards[Math.min(at, last)];
   const { verdict } = payload.report;
+  /* L’autre personne : « Il » ou « Elle » dans le duel (d’après son pronom, une fois « Qui es-tu ? » rempli) */
+  const autre = IlOuElle((story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).pronoun);
 
   /* Verdict dur : pas de mise en scène, le rapport passe en mode sobre */
   useEffect(() => {
@@ -255,7 +258,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                   Toi
                 </span>
                 <span className="flex items-center gap-1.5 text-elle">
-                  Elle
+                  {autre}
                   <span className="size-2 rounded-full bg-elle" />
                 </span>
               </div>
@@ -264,7 +267,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                   <li key={r.label} data-rise="" style={delay(0.25 + i * 0.14)}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-[16px] font-black leading-tight">{r.label}</span>
-                      <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner}</span>
+                      <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
                     </div>
                     <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
                       <span data-bar="" style={{ "--w": `${r.toiPercent}%`, "--d": `${0.45 + i * 0.14}s` } as CSSProperties} className="block h-full rounded-full border-r-2 border-ink bg-toi" />

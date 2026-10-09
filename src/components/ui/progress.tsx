@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
+import { IlOuElle } from "@/lib/pronom";
 import type { LevelId, ScoreRow } from "@/types";
 import { Icon } from "./icons";
 import { Dot } from "./messages";
@@ -9,17 +10,19 @@ import { Dot } from "./messages";
 const SIDE_COLOR = { toi: "#1A66DB", elle: "#C81D6B", pareil: "#087A56" } as const;
 
 /* ———— Barre de score toi / elle ———— */
-export function ScoreBar({ row, delay = 0 }: { row: ScoreRow; delay?: number }) {
+/** `autre` : le pronom de l’autre personne (« il » quand une utilisatrice parle d’un garçon) ; « elle » par défaut. */
+export function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: "il" | "elle" }) {
+  const lui = IlOuElle(autre).toLowerCase();
   return (
     <div className="flex flex-col gap-2 py-2.5 lg:gap-1.5 lg:py-2">
       <div className="flex justify-between gap-3 text-[15px] font-black">
         <span>{row.label}</span>
-        <span style={{ color: SIDE_COLOR[row.winner] }}>{row.winner}</span>
+        <span style={{ color: SIDE_COLOR[row.winner] }}>{row.winner === "elle" ? lui : row.winner}</span>
       </div>
       <div
         className="flex h-3.5 overflow-hidden rounded-[7px] bg-[rgba(255,79,154,0.35)]"
         role="img"
-        aria-label={`${row.label} : toi ${row.toiPercent} %, elle ${100 - row.toiPercent} %`}
+        aria-label={`${row.label} : toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`}
       >
         <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, "--d": `${delay}s` } as CSSProperties} />
       </div>
@@ -34,7 +37,7 @@ export function ScoreBar({ row, delay = 0 }: { row: ScoreRow; delay?: number }) 
 }
 
 /** Carte de scores avec la légende « ● Toi / Elle ● ». */
-export function ScoreCard({ rows, className }: { rows: ScoreRow[]; className?: string }) {
+export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; className?: string; autre?: "il" | "elle" }) {
   return (
     <div className={cn("flex flex-col rounded-card bg-white px-4 py-3.5 shadow-card", className)}>
       <div className="flex justify-between text-[12px] font-black">
@@ -43,12 +46,12 @@ export function ScoreCard({ rows, className }: { rows: ScoreRow[]; className?: s
           Toi
         </span>
         <span className="inline-flex items-center gap-1 text-elle-ink">
-          Elle
+          {IlOuElle(autre)}
           <Dot color="#FF4F9A" size={8} />
         </span>
       </div>
       {rows.map((r, i) => (
-        <ScoreBar key={r.label} row={r} delay={0.1 + i * 0.12} />
+        <ScoreBar key={r.label} row={r} delay={0.1 + i * 0.12} autre={autre} />
       ))}
     </div>
   );

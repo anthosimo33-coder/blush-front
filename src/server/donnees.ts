@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, inArray, max } from "drizzle-orm";
+import { eq, inArray, max, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -84,6 +84,12 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
     .map((x) => x.conv);
 }
 
+/** Quand la lecture s’est finie (l’heure du verdict), en millisecondes : l’heure de l’intro de BLUSH sur l’accueil. */
+export async function finDeLecture(storyId: string): Promise<number | null> {
+  const [v] = await db().select({ at: schema.verdicts.createdAt }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
+  return v?.at.getTime() ?? null;
+}
+
 /** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. Celles coupées à leur dernier essai passent en échec. */
 export async function relancer(storyId: string): Promise<void> {
   await cloreLesAbandons(storyId);
@@ -161,6 +167,24 @@ async function ecritureDe(storyId: string, titres: Map<number, string>, autre: s
   };
 }
 
+/**
+ * Avec l’accès, ce qui doit s’écrire et n’a jamais été lancé : le rapport (l’accès donné à la main, ou débloqué depuis
+ * une autre conv), la mémoire (après un rapport sobre offert, puis l’accès). Rien sans la conv brute (effacée au bout
+ * de 30 jours). La chaîne repart après la réponse.
+ */
+export async function assurerLaSuite(story: Ligne, acces: boolean): Promise<void> {
+  if (!acces || !story.conv) return;
+  const { verdict, rapport_plan, memoire } = await etatDesTaches(story.id, ["verdict", "rapport_plan", "memoire"]);
+  if (verdict?.status !== "fini") return;
+  if (!rapport_plan) await planifier(story.id, "rapport_plan");
+  else if (!memoire) {
+    const [r] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
+    if (!r?.pret) return;
+    await planifier(story.id, "memoire");
+  } else return;
+  after(() => executerChaine(story.id));
+}
+
 /** Les étapes du rapport (et la mémoire qui le suit) : celles qu’une relance peut reprendre. */
 export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"] as const;
 
@@ -215,6 +239,8 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     suite = suite && !!pret;
     enEcriture.push(pret && suite ? { ...pret, free: true, locked: false } : c);
   }
+  /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant */
+  if (access !== "gratuit" && (!donnees || donnees.sobre)) await assurerLaSuite(story, true);
   const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
   const echec = ouvert && !donnees ? await echecDuRapport(story.id) : undefined;
   const ecriture = ouvert && !donnees && !echec ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;

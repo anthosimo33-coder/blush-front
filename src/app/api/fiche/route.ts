@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout } from "@/server/ajouts";
 import type { DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
-import { chiffrer } from "@/server/chiffrement";
+import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { contexteRequete, ficheDe, memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
@@ -11,6 +11,7 @@ import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, ErreurImport } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
+import { avecEcheance } from "@/server/echeance";
 
 /* Lire les captures, puis mettre la mémoire à jour : jusqu’à deux minutes */
 export const maxDuration = 300;
@@ -28,7 +29,8 @@ const Faits = z
 
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
- * ce qu’il supprime, elle ne le remet pas.
+ * ce qu’il supprime, elle ne le remet pas. On n’écrit que sur la mémoire qu’on a lue : si une mise à jour l’a changée
+ * entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à jour a appris n’est effacé).
  */
 export async function PUT(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
@@ -37,26 +39,34 @@ export async function PUT(req: Request) {
   if (!story) return erreur("aucune", 404);
   const faits = Faits.safeParse((await corps<{ facts: unknown }>(req)).facts);
   if (!faits.success) return erreur("faits", 422);
-  const m = await memoireDe(story.id);
-  if (!m?.etat.fiche) return erreur("pas_pret", 409);
-  const avant = m.etat.fiche.faits;
-  const nouveaux = faits.data.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
-  const textesAvant = new Set(avant.map((a) => a.texte));
-  const textes = new Set(nouveaux.map((n) => n.texte));
-  const editions = {
-    parToi: [...new Set([...(m.editions?.parToi ?? []).filter((t) => textes.has(t)), ...nouveaux.filter((n) => !textesAvant.has(n.texte)).map((n) => n.texte)])],
-    supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)),
-  };
-  const donnees: DonneesMemoire = { ...m, etat: { ...m.etat, fiche: { ...m.etat.fiche, faits: nouveaux } }, editions };
-  await db().update(schema.memories).set({ data: chiffrer(donnees), updatedAt: new Date() }).where(eq(schema.memories.storyId, story.id));
-  return json(await ficheDe(story));
+  for (let essai = 0; essai < 3; essai++) {
+    const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
+    const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
+    if (!ligne || !m?.etat.fiche) return erreur("pas_pret", 409);
+    const avant = m.etat.fiche.faits;
+    const nouveaux = faits.data.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
+    const textesAvant = new Set(avant.map((a) => a.texte));
+    const textes = new Set(nouveaux.map((n) => n.texte));
+    const editions = {
+      parToi: [...new Set([...(m.editions?.parToi ?? []).filter((t) => textes.has(t)), ...nouveaux.filter((n) => !textesAvant.has(n.texte)).map((n) => n.texte)])],
+      supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)),
+    };
+    const donnees: DonneesMemoire = { ...m, etat: { ...m.etat, fiche: { ...m.etat.fiche, faits: nouveaux } }, editions };
+    const ecrite = await db()
+      .update(schema.memories)
+      .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
+      .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
+      .returning({ version: schema.memories.version });
+    if (ecrite.length) return json(await ficheDe(story));
+  }
+  return erreur("occupe", 409);
 }
 
 /**
  * Des captures (son profil, leur conv) ou un nouvel export, pour sa fiche : BLUSH les lit, met sa mémoire à jour
  * tout de suite, et renvoie la fiche avec les infos qui viennent d’arriver.
  */
-export async function POST(req: Request) {
+async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
@@ -82,4 +92,9 @@ export async function POST(req: Request) {
     }
     throw e;
   }
+}
+
+/** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
+export function POST(req: Request) {
+  return avecEcheance(285_000, () => traiter(req));
 }

@@ -57,6 +57,16 @@ export function ConvOkScreen({ source }: { source: Source }) {
         </div>
       </div>
 
+      {/* Une conv trop longue pour partir en entier : le navigateur n’en a gardé que la partie la plus récente, on le dit */}
+      {source.moisLus && (
+        <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-[14px] font-extrabold leading-[1.45] text-soft">
+          <Icon name="clock" size={17} color="#4B4A47" style={{ marginTop: 1 }} />
+          <span>
+            Votre conv est très longue{"\u00a0"}: BLUSH lit {source.moisLus > 1 ? `vos ${source.moisLus} derniers mois` : "votre dernier mois"}, ce qui compte le plus pour savoir où vous en êtes.
+          </span>
+        </p>
+      )}
+
       {/* Back-end v1 : réunir un export et des captures arrive plus tard */}
       {!BACKEND && (
         <InsetGroup title="Vous vous parliez ailleurs avant ?" id="ailleurs">

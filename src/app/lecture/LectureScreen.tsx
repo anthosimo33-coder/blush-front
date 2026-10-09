@@ -41,9 +41,12 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
   const heard = useRef(0);
   /* La lecture a échoué (le serveur a tout essayé) : on le dit, et on propose de relancer. `run` relance l’effet */
   const [failed, setFailed] = useState(false);
+  /* Trop de relances aujourd’hui (chaque lecture coûte) : on le dit, plutôt qu’un bouton qui ne fait rien */
+  const [trop, setTrop] = useState(false);
   const [run, setRun] = useState(0);
   const retry = () => {
     setFailed(false);
+    setTrop(false);
     setP(START);
     setRun((r) => r + 1);
   };
@@ -57,9 +60,15 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
       const cur = readJourney();
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
       const lance = await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
-        (e: unknown) => (e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : null),
+        (e: unknown) =>
+          e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : e instanceof ErreurApi && e.code === "trop" ? ("trop" as const) : null,
       );
       if (!alive) return;
+      if (lance === "trop") {
+        setTrop(true);
+        setFailed(true);
+        return;
+      }
       /* Plus de session (expirée, ou ouverte ailleurs) : on se reconnecte, la lecture reprend ensuite */
       if (lance === "connexion") {
         router.replace("/connexion?suite=/lecture");
@@ -228,16 +237,19 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-              Claude, l’IA qui lit les convs pour BLUSH, a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’il ne traite pas. Rien n’est perdu : tu peux en essayer une autre.
+              L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu : tu peux en essayer une autre.
             </p>
           </div>
         ) : failed ? (
           /* Texte relu le 8 octobre */
-          <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]" role="alert">
-            Ça a coincé de notre côté.
-            <br />
-            Ta conv est bien là.
-          </h1>
+          <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
+            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
+              Ça a coincé de notre côté.
+              <br />
+              Ta conv est bien là.
+            </h1>
+            {trop && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain : ta conv t’attend.</p>}
+          </div>
         ) : (
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
             {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
