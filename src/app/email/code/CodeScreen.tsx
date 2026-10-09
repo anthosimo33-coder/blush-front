@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { play } from "@/lib/sound";
 import { createAccount, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
+import { BACKEND } from "@/services/mode";
 import { ErreurApi } from "@/services/reel";
 import { connexionPuis } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
@@ -78,6 +79,14 @@ export function CodeScreen({ connexion = false, suite = "/app" }: { connexion?: 
       /* La page où l’on allait. Le lien du mail (/ouvrir/…) est une route, pas une page : un vrai chargement */
       if (suite.startsWith("/ouvrir/")) window.location.assign(suite);
       else router.push(suite);
+      return;
+    }
+    /*
+     * Back-end : sans les réponses de « Qui es-tu ? » (le parcours de cet onglet perdu), la lecture viserait la conv déjà
+     * suivie, pas celle qu’on importe. « Qui es-tu ? » les redemande, et lance la lecture de la bonne conv.
+     */
+    if (BACKEND && !(j.me && j.pronom && j.guess && j.goal)) {
+      router.push("/qui");
       return;
     }
     try {
