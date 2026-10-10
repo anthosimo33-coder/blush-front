@@ -1,8 +1,19 @@
 {
   "name": "blush-mise-en-production",
   "private": true,
-  "description": "La CLI Vercel de la mise en production (.github/workflows/ci.yml, job deployer), installée par npm ci depuis son package-lock.json : versions et empreintes figées.",
+  "description": "La CLI Vercel de la mise en production (.github/workflows/ci.yml, job deployer), installée par npm ci depuis son package-lock.json : versions et empreintes figées. Une version d’au moins deux semaines ; les « overrides » forcent les correctifs de sécurité de ses dépendances, sans changer de version majeure.",
   "dependencies": {
-    "vercel": "56.1.0"
+    "vercel": "60.1.1"
+  },
+  "overrides": {
+    "tar": "7.5.22",
+    "minimatch@^10.0.0": "10.2.6",
+    "js-yaml@^4.0.0": "4.3.2",
+    "path-to-regexp@^6.0.0": "6.3.0",
+    "path-to-regexp@^8.0.0": "8.4.2",
+    "smol-toml": "1.9.0",
+    "ajv@^8.0.0": "8.20.0",
+    "@tootallnate/once": "2.0.1",
+    "undici@^5.0.0": "5.29.0"
   }
 }
