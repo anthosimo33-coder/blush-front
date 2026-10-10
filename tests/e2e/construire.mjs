@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * `npm run e2e:build` : le build de production que servent les tests de bout en bout, puis sa marque
  * (.next/e2e-build.json). Le serveur des tests (tests/e2e/serveur.mjs) refuse tout autre build : un build refait depuis
  * autrement (un simple `npm run build`, qui verrait Vercel, la base ou la bêta fermée du shell).

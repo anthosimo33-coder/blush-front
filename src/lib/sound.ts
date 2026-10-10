@@ -9,7 +9,7 @@ import { auRepos } from "./repos";
  * - Un son suit toujours un geste, ou BLUSH qui te répond. Jamais pour attirer ton attention.
  * - Il se mélange à ta musique sans la couper, et l’interrupteur silencieux le coupe (session audio « ambient »).
  *   Seule la révélation du verdict, quand on touche son bouton son, joue même en silencieux (« playback »).
- * - Un verdict dur (mode sobre) ne sonne pas : la scène n’existe pas.
+ * - Le mode sobre (une alerte de danger) ne sonne pas : la scène n’existe pas.
  * - Chaque son qui suit un geste a sa vibration. Un seul réglage pour les deux : « Sons et vibrations », dans Mon compte.
  * Partitions et essais à l’oreille : https://claude.ai/artifact/5hiJBPv1egEEpVbwqY2WC5
  */

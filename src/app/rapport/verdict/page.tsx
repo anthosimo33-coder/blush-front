@@ -14,7 +14,7 @@ export default async function Page() {
   const [initial, story] = await Promise.all([getReport(), getStory()]);
   if (!story) redirect(await sansHistoire("/rapport"));
   if (!initial) redirect("/lecture");
-  /* Verdict dur : pas de scène, le rapport en mode sobre, tout de suite (l’effet de VerdictReveal reste en secours) */
+  /* Mode sobre (une alerte de danger) : pas de scène, le rapport tout de suite (l’effet de VerdictReveal reste en secours) */
   if (initial.sober) redirect("/rapport");
   return (
     <>

@@ -11,12 +11,12 @@ import type { SoberReport as SoberData } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
 
 /*
- * Écrans 18-19 — Mode sobre : quand le verdict est dur, BLUSH sort du jeu.
+ * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH sort du jeu.
  * Pas de couleur de sens, pas de 3D, pas de score, pas de logo en volume. Encre et papier seulement.
  */
 const QUIT_HREF = "/commencer"; /* « Quitter vite » mène à l’écran 01, comme dans la maquette */
 
-/* ⚠ Ressources d’aide absentes des maquettes : à valider. */
+/* TODO(produit): ressources d’aide absentes des maquettes, à valider. */
 const HELP = [
   { name: "Fil Santé Jeunes", detail: "Anonyme et gratuit, tous les jours de 9 h à 23 h", tel: "0800235236", label: "0 800 235 236" },
   { name: "SOS Amitié", detail: "À l’écoute 24 h sur 24", tel: "0972394050", label: "09 72 39 40 50" },

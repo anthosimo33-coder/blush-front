@@ -231,8 +231,9 @@ export const LANDING_CONVS: LandingConv[] = [
 ];
 
 /**
- * Les avis affichés sur la landing. Vide : la section n’apparaît pas.
- * ⚠ Uniquement de vrais avis, avec l’accord écrit des personnes. Jamais d’avis inventé.
+ * Les avis affichés sur la landing. Vide : la section n’apparaît pas. Uniquement de vrais avis, avec l’accord écrit
+ * des personnes : jamais d’avis inventé.
+ * TODO(produit): recueillir les premiers avis (et leur accord écrit) pour montrer la section.
  */
 export const TESTIMONIALS: Testimonial[] = [];
 

@@ -108,8 +108,7 @@ export function DesktopBack({ target, label = "Retour", trailing }: { target: Ba
   );
 }
 
-/** Pastille « Mon compte » (desktop, écrans du quotidien). */
-/** « Mon compte » sur ordinateur : l’initiale de ton email (le temps de la connaître, une silhouette). */
+/** La pastille « Mon compte » sur ordinateur (écrans du quotidien) : l’initiale de ton email (le temps de la connaître, une silhouette). */
 export function AccountPill({ initial }: { initial?: string }) {
   return (
     <Link

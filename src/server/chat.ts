@@ -32,7 +32,6 @@ const ECHANGES_DANS_LE_FIL = 6;
 /** Des messages envoyés avec un échange, le fil garde les derniers. */
 const LIGNES_DANS_LE_FIL = 15;
 
-
 /** L’historique du chat (ce que l’accueil réaffiche) vit à part, sans le modèle : src/server/historique.ts. */
 export { historique, type EchangeAffiche } from "./historique";
 

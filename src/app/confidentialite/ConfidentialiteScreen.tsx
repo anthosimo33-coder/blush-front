@@ -8,7 +8,8 @@ import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
 /*
  * Ce que BLUSH fait de ta conv, en mots simples. Les faits suivent le code (src/server : chiffrement, purge,
- * hébergement à Francfort). Textes relus le 8 octobre. ⚠ À faire relire par un juriste avant d’ouvrir au public.
+ * hébergement à Francfort). Textes relus le 8 octobre.
+ * TODO(produit): à faire relire par un juriste avant d’ouvrir au public.
  */
 const N = " ";
 

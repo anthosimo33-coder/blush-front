@@ -150,14 +150,14 @@ function decouvertes(story: Ligne, p: number): string[] {
 
 const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\u00a0s` : `${Math.max(1, Math.round(s / 60))}\u00a0min`);
 
-/**
- * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour 35 %, les deux moitiés pour 65 %), l’état
- * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois fait.
- */
 /* Les durées habituelles des étapes (mesurées sur les rapports de test) : le plan, puis les deux moitiés en même temps */
 const PLAN_S = 55;
 const CHAPITRES_S = 100;
 
+/**
+ * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour 35 %, les deux moitiés pour 65 %), l’état
+ * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois fait.
+ */
 function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: string, prets: Set<number>): EcritureRapport | undefined {
   const { rapport_plan: tp, rapport_chapitres: tc } = taches;
   if (!tp) return undefined;

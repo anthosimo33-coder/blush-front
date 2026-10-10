@@ -1,4 +1,4 @@
-/**
+/*
  * Couche de service BLUSH, dans le navigateur : le seul point de contact avec les données, par les routes /api du
  * back-end. Les cookies de session sont httpOnly : le navigateur les envoie, il ne les lit pas. Les pages serveur
  * passent par serveur.ts.
@@ -56,7 +56,7 @@ export type EcritureRapport = {
 
 export type ReportPayload = {
   report: Report;
-  /** Présent quand le verdict est dur : le rapport bascule en mode sobre. */
+  /** Le mode sobre : présent quand la conv lève une alerte de danger (détresse, mineur), le rapport court et doux. */
   sober: SoberReport | null;
   access: Plan;
   /** Le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-/**
+/*
  * Test de fumée avec le VRAI modèle (environ 1 \$) : une conv de test courte traverse tout le back-end
  * (verdict, rapport, mémoire, chat) sur la base de DATABASE_URL, puis tout est effacé. Avant une mise en ligne :
  *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npx tsx scripts/essai-vrai-modele.mts

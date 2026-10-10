@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * Après le build : aucune phrase des prompts ne doit se trouver dans ce que reçoit le navigateur
  * (.next/static, et les pages et données prérendues). Sinon, le build échoue.
  * Il échoue aussi quand la vérification ne vérifierait rien : pas de .next/static (pas de build), aucun fichier lu, ou

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * `npm run dev` : l’appli en local, avec son back-end, sur une base Postgres de ce poste et le modèle factice.
  * 1. les fichiers .env du projet, comme `next dev` (.env.development.local, .env.local, .env.development, .env) ; ce
  *    qu’ils ne donnent pas : la base blush_dev de ce poste et le modèle factice (BLUSH_IA_FACTICE=1). Ce qu’on donne dans

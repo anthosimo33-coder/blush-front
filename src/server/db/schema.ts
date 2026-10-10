@@ -71,7 +71,7 @@ export const stories = pgTable(
   (t) => [index("stories_user_idx").on(t.userId)],
 );
 
-/** Les sorties du modèle, chiffrées : le verdict, le rapport, la mémoire (avec sa fiche et ses messages gardés). */
+/** Le verdict de l’histoire (prompt 04) et ses scores, chiffrés. */
 export const verdicts = pgTable("verdicts", {
   storyId: uuid("story_id")
     .primaryKey()
@@ -80,6 +80,7 @@ export const verdicts = pgTable("verdicts", {
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 
+/** Le rapport (prompt 05), chiffré : son plan, puis le rapport assemblé. */
 export const reports = pgTable("reports", {
   storyId: uuid("story_id")
     .primaryKey()
@@ -93,6 +94,7 @@ export const reports = pgTable("reports", {
   updatedAt: quand("updated_at").notNull().defaultNow(),
 });
 
+/** La mémoire (prompt 07), chiffrée, avec sa fiche et les messages qu’elle cite. `version` : contre les écritures croisées. */
 export const memories = pgTable("memories", {
   storyId: uuid("story_id")
     .primaryKey()
@@ -118,8 +120,9 @@ export const chatMessages = pgTable(
 );
 
 /**
- * Les tâches longues (le verdict, le plan du rapport, ses chapitres, la mémoire, une mise à jour de la mémoire),
- * exécutées après la réponse HTTP. `heartbeatAt` périmé = tâche abandonnée, qu’on peut relancer.
+ * Les tâches longues (le verdict, le plan du rapport, ses chapitres, le vocal, la mémoire, une mise à jour de la
+ * mémoire), exécutées après la réponse HTTP. `heartbeatAt` périmé = tâche abandonnée, qu’on peut relancer (BACKEND.md,
+ * « Les tâches »).
  */
 export const tasks = pgTable(
   "tasks",

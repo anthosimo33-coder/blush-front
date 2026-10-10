@@ -1,6 +1,6 @@
 "use client";
 
-/**
+/*
  * État du parcours côté interface (choix, fichiers, devinette…).
  * Gardé dans sessionStorage : il survit au rechargement de la page.
  */

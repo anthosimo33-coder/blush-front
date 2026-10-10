@@ -219,7 +219,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         ) : enregistrement ? (
           <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>
         ) : (
-          /* ⚠ Libellé avant sélection absent des maquettes */
+          /* TODO(produit): libellé avant sélection absent des maquettes, à valider */
           <Button onClick={shots.open}>Choisir mes captures</Button>
         )
       }

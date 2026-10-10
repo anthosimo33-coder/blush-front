@@ -229,8 +229,10 @@ function Ending({ text }: { text: string }) {
   );
 }
 
-/** Rend un bloc de chapitre. `renderQuestion` permet à l’écran de brancher le bouton « Copier ». */
-/** `autre` : le pronom de l’autre personne, pour la légende des scores (« Il » ou « Elle »). */
+/**
+ * Rend un bloc de chapitre. `renderQuestion` permet à l’écran de brancher le bouton « Copier » ; `autre` : le pronom de
+ * l’autre personne, pour la légende des scores (« Il » ou « Elle »).
+ */
 export function Block({
   block,
   renderQuestion,

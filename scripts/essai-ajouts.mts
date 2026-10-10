@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-/**
+/*
  * Des messages et un profil envoyés après l’import, avec le VRAI modèle (quelques centimes) : la réponse du chat
  * (prompt 10), puis la mise à jour de la mémoire (prompt 07), sur une mémoire déjà créée (un résultat du 07).
  *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \

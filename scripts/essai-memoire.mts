@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-/**
+/*
  * La mise à jour de la mémoire avec le VRAI modèle, échange par échange (quelques centimes) : on part d’une mémoire
  * déjà créée (un résultat du 07), et on mesure ce que coûte chaque mise à jour.
  *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \

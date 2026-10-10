@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-/**
+/*
  * Le prompt 01 (lire des captures) avec le VRAI modèle, comparé mot pour mot à la vérité (prompts/evals/captures/fabriquer.mjs).
  *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \
  *     npx tsx scripts/essai-captures.mts <dossier des captures> [ordre=1,2,3…]

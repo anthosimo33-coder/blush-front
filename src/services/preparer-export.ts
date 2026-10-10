@@ -1,4 +1,4 @@
-/**
+/*
  * Dans le navigateur, avant l’envoi : on ouvre l’export (.zip ou fichier seul), on ne garde que le texte de la conv
  * (le .txt WhatsApp, ou les message_N d’Instagram), et on le compresse. Les photos et vocaux ne partent jamais,
  * et l’envoi reste petit (Vercel refuse plus de 4,5 Mo).

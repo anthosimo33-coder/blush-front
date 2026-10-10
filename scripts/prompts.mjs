@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * Copie les prompts (sous-module prompts/) dans un module serveur, src/server/ia/textes.generated.ts.
  * Il n’est importé que derrière `import "server-only"` : les prompts ne partent jamais vers le navigateur
  * (scripts/verifier-fuite.mjs le contrôle après chaque build). Le fichier généré n’est pas commité.

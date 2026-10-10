@@ -69,7 +69,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   /* L’autre personne : « Il » ou « Elle » dans le duel (d’après son pronom, une fois « Qui es-tu ? » rempli) */
   const autre = IlOuElle((story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).pronoun);
 
-  /* Verdict dur : pas de mise en scène, le rapport passe en mode sobre */
+  /* Le mode sobre (une alerte de danger) : pas de mise en scène, le rapport tout de suite */
   useEffect(() => {
     if (payload.sober) toReport();
   }, [payload.sober]);

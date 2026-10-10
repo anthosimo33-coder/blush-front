@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * Avant chaque build et chaque `npm test` : les migrations de drizzle/ sont-elles cohérentes ? La production les applique
  * au build (scripts/migrer.mjs), dans l’ordre du journal, et drizzle n’applique qu’une migration plus récente (`when`) que
  * la dernière passée : une migration mal rangée serait sautée sans un mot. Le build échoue plutôt.

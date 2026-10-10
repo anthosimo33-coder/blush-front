@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-/**
+/*
  * Donner (ou retirer) l’accès à un compte, sans paiement (la bêta) :
  *   DATABASE_URL=… npm run acces -- ami@exemple.fr blushplus
  *   DATABASE_URL=… npm run acces -- ami@exemple.fr gratuit

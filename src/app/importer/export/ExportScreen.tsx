@@ -160,7 +160,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         <h2 id="video-title" className="m-0 text-[22px] font-black leading-[1.1] tracking-[-0.02em]">
           Voir la vidéo (30 s)
         </h2>
-        {/* ⚠ La vidéo de démonstration n’est pas fournie : emplacement prêt à recevoir le fichier. */}
+        {/* TODO(produit): la vidéo de démonstration n’est pas fournie ; l’emplacement est prêt à recevoir le fichier. */}
         <div className="mx-auto flex aspect-[9/16] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-[28px] bg-ink pt-10">
           {app === "imessage" ? <MacScreen menu={data.menu} /> : <PhoneScreen menu={data.menu} />}
         </div>

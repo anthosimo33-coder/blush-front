@@ -117,7 +117,7 @@ export type Verdict = {
   short: string;
   title: string;
   subtitle: string;
-  /** Verdict négatif : le rapport bascule en mode sobre. */
+  /** Plus lu : le mode sobre ne vient que d’une alerte de danger (ReportPayload.sober, src/services/api.ts). */
   difficult: boolean;
 };
 
@@ -176,7 +176,7 @@ export type Testimonial = {
   text: string;
 };
 
-/** Le mode sobre (verdict difficile). */
+/** Le mode sobre, sur une alerte de danger (détresse, mineur) : un rapport court et doux, offert, jamais partagé. */
 export type SoberReport = {
   intro: string;
   title: string;

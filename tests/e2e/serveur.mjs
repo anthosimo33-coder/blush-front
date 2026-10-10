@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+/*
  * Un serveur des tests de bout en bout, lancé par Playwright (webServer de playwright.config.ts) :
  * 1. il vérifie que .next est le build fait par `npm run e2e:build` ;
  * 2. le premier serveur (E2E_PREPARER=1) recrée la base des tests, y applique les migrations de drizzle/, et vide la
