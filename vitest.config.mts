@@ -1,5 +1,34 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
+
+/*
+ * Les tests sans base : des règles pures (tests/unit), les lectures de conv de prompts/lib, les scripts de vérification.
+ * Ils forment le projet `unit`, lancé seul par `npm run test:unit`, sans Postgres. Les autres fichiers de tests/ gardent
+ * leur nom : la liste les désigne. Un test qui touche à la base va dans le projet `db`, ailleurs que dans cette liste.
+ */
+const SANS_BASE = [
+  "boite-mails",
+  "chapitres",
+  "chiffrement",
+  "conv-gardee",
+  "defilement",
+  "documentation",
+  "erreurs-api",
+  "formats",
+  "garde",
+  "instagram",
+  "lecture",
+  "lint",
+  "memoire",
+  "query",
+  "verifier-fuite",
+  "verifier-migrations",
+  "verifier-typo",
+  "vocabulaire",
+  "vocal",
+  "zip",
+].map((nom) => `tests/${nom}.test.ts`);
+const UNITAIRES = [...SANS_BASE, "tests/unit/**/*.test.ts"];
 
 export default defineConfig({
   resolve: {
@@ -13,17 +42,28 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
-    /*
-     * La base des tests : DATABASE_URL_TEST (en CI, celle du service Postgres), ou blush_test en local. Un clone neuf ou
-     * la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, puis la migre (drizzle/).
-     */
-    globalSetup: ["tests/preparer-la-base.ts"],
+    /* Les deux projets ont les mêmes variables : env() les lit toutes, même sans jamais ouvrir la base */
     env: {
       DATABASE_URL: process.env.DATABASE_URL_TEST || "postgres://localhost:5432/blush_test",
       BLUSH_CLE: "dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtMzI=",
       BLUSH_IA_FACTICE: "1",
       BLUSH_ALERTES: "equipe@blush.test",
     },
+    projects: [
+      { extends: true, test: { name: "unit", include: UNITAIRES } },
+      {
+        extends: true,
+        test: {
+          name: "db",
+          include: ["tests/**/*.test.ts"],
+          exclude: [...configDefaults.exclude, ...UNITAIRES],
+          /*
+           * La base des tests : DATABASE_URL_TEST (en CI, celle du service Postgres), ou blush_test en local. Un clone neuf
+           * ou la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, puis la migre (drizzle/).
+           */
+          globalSetup: ["tests/preparer-la-base.ts"],
+        },
+      },
+    ],
   },
 });

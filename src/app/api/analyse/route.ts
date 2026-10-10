@@ -6,6 +6,7 @@ import { contexteRequete, progression, relancer } from "@/server/donnees";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES, sousLaLimite } from "@/server/limites";
+import { PRENOM_MAX } from "@/lib/limites";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { GOALS, GUESSES, PRONOMS } from "@/types";
 
@@ -18,7 +19,7 @@ const Qui = z.object({
   guess: z.enum(GUESSES),
   goal: z.enum(GOALS),
   /** Des captures : son prénom (il n’y est que « Moi ») */
-  prenom: z.string().trim().min(1).max(40).optional(),
+  prenom: z.string().trim().min(1).max(PRENOM_MAX).optional(),
 });
 
 /**

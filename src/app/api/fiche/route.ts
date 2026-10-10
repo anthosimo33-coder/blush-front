@@ -13,6 +13,7 @@ import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
+import { peut } from "@/lib/acces";
 import { SECTIONS_FICHE, type Fiche } from "@/types";
 import { codePublic } from "@/types/erreurs-api";
 
@@ -87,7 +88,7 @@ async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion");
-  if (utilisateur.plan !== "blushplus") return erreur("acces");
+  if (!peut(utilisateur.plan, "fiche")) return erreur("acces");
   if (!story) return erreur("aucune");
   const fd = await req.formData().catch(() => null);
   const captures = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);

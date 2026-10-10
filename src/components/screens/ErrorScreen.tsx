@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ErreurParcours } from "@/lib/messages-erreur";
+import { MIN_MESSAGES, MIN_MESSAGES_CAPTURES } from "@prompts/lib/conv";
 import { useSoundOnce } from "@/lib/sound";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -26,7 +27,7 @@ const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: 
   /* Sur un export ; sur des captures, copieDe la change */
   courte: {
     title: "Votre conv est encore trop courte.",
-    text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent\u00a0: envoie celles de votre conv, ou reviens dans quelques jours.",
+    text: `Un export doit avoir au moins ${MIN_MESSAGES} messages pour un verdict juste. En captures, ${MIN_MESSAGES_CAPTURES} suffisent\u00a0: envoie celles de votre conv, ou reviens dans quelques jours.`,
     action: "Envoyer des captures",
     href: "/importer/captures",
     back: "/importer/export",
@@ -65,8 +66,8 @@ type Copie = (typeof ERROR_COPY)[ErreurParcours];
 
 /**
  * Le texte et les liens d’une erreur, d’après l’écran où elle arrive : réessayer garde son appli (`?app=`) et son mode.
- * Une conv trop courte : sur des captures, en choisir plus (20 messages suffisent) ; sur un export, passer aux captures
- * (réunir un export et des captures arrive plus tard).
+ * Une conv trop courte : sur des captures, en choisir plus (il en faut moins : MIN_MESSAGES_CAPTURES) ; sur un export,
+ * passer aux captures (réunir un export et des captures arrive plus tard).
  */
 function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchParams): Copie {
   const c = ERROR_COPY[kind];
@@ -78,7 +79,7 @@ function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchParams):
   if (kind === "courte" && chemin === "/importer/captures")
     return {
       ...c,
-      text: "Il faut au moins 20 messages pour un verdict juste. Ajoute des captures, depuis le début de votre conv, ou reviens dans quelques jours.",
+      text: `Il faut au moins ${MIN_MESSAGES_CAPTURES} messages pour un verdict juste. Ajoute des captures, depuis le début de votre conv, ou reviens dans quelques jours.`,
       action: "Choisir plus de captures",
       href: ici,
       back: ici,

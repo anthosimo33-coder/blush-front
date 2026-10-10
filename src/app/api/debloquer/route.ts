@@ -6,6 +6,7 @@ import { assurerLaSuite, contexteRequete } from "@/server/donnees";
 import { accesLibre } from "@/server/env";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
+import { peut } from "@/lib/acces";
 
 export const maxDuration = 300;
 
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
   if (!utilisateur) return erreur("connexion");
   const { offre } = await corps<{ offre: "rapport" | "blushplus" }>(req);
   if (offre !== "rapport" && offre !== "blushplus") return erreur("offre");
-  if (utilisateur.plan === "gratuit") {
+  if (!peut(utilisateur.plan, "rapport")) {
     if (!accesLibre(utilisateur.email)) return erreur("bientot");
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, utilisateur.id));
   }

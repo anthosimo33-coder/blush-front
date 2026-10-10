@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
+import { CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { codeDe, erreurDeParcours, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
@@ -21,9 +22,6 @@ import { ErreurApi } from "@/types/erreurs-api";
 
 
 type Shot = { id: string; file: File; url: string | null };
-
-/* Au plus 20 captures dans un envoi (le serveur n’en lit pas plus : src/server/captures.ts) */
-const CAPTURES_MAX = 20;
 
 /* Les applis lues par captures côté serveur (les autres passent par « autre ») */
 const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
@@ -161,7 +159,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             { app: captureApp, mode: addMode ? "add" : "first", onAvance: setAvance },
           );
       if (!monte.current) return;
-      setJourney({ ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
+      /* Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom (vientDeCaptures) */
+      setJourney({ ...(addMode ? { capturesAdded: true } : { app: captureApp, exportFileName: null }), me: "p0" });
       setResult({ count: items.length, messages: r.messagesRead, video });
       router.push(next);
     } catch (e) {

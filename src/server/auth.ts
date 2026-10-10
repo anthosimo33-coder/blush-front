@@ -6,9 +6,9 @@ import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
 import { envoyerCodeParEmail } from "./email";
 import { accesLibre, peutEntrer } from "./env";
+import { CODE_MINUTES } from "@/lib/limites";
 
 const SESSION_JOURS = 90;
-const CODE_MINUTES = 10;
 const CODE_ESSAIS = 5;
 
 export const Email = z

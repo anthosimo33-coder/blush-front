@@ -27,6 +27,7 @@ import type {
 } from "@/types";
 import { ErreurApi, type CodeErreur } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
+import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
 import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";
@@ -291,7 +292,7 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
    * lots de douze lus trois à la fois (environ 35 s au lieu de 49 pour 45 s de vidéo), pour un peu plus d’images lues
    * deux fois (celles qui recollent deux lots).
    */
-  const lots = lotsDe(images, 6, (b) => b.size, 4 * 1024 * 1024);
+  const lots = lotsDe(images, 6, (b) => b.size, ENVOI_IMAGES_MAX);
   const lus: unknown[] = new Array(lots.length);
   let faits = 0;
   onAvance?.({ etape: "lecture", faits, total: lots.length });
@@ -430,7 +431,7 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, 
   const audio = input.audio;
   return envoyerAuChat(() => {
     const fd = new FormData();
-    fd.append("vocal", audio, `vocal.${audio.type.includes("webm") ? "webm" : audio.type.includes("ogg") ? "ogg" : "m4a"}`);
+    fd.append("vocal", audio, `vocal.${extensionAudio(audio.type)}`);
     return chat({ method: "POST", body: fd }, suivi);
   });
 }

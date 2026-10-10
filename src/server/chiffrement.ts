@@ -11,7 +11,7 @@ import { env } from "./env";
  */
 const VERSION = 1;
 const COMPRESSE = 2;
-/* Ce qu’une donnée compressée peut redevenir au plus : bien au-delà de la plus longue conv acceptée (histoires.ts, TAILLE_MAX) */
+/* Ce qu’une donnée compressée peut redevenir au plus : bien au-delà de la plus longue conv acceptée (TEXTE_CONV_MAX, src/lib/limites.ts) */
 const DECOMPRESSE_MAX = 256 * 1024 * 1024;
 
 function deriver() {

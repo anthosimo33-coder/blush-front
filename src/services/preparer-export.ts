@@ -7,9 +7,7 @@ import "client-only";
 import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
-
-/** Un fichier de texte plus gros n’est pas une conv */
-const TAILLE_MAX = 50 * 1024 * 1024;
+import { ENVOI_EXPORT_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 
 export class ExportIllisible extends Error {
   constructor(readonly code: "fichier" | "plusieurs") {
@@ -19,9 +17,6 @@ export class ExportIllisible extends Error {
 
 /** Une conv d’un export Instagram complet, telle qu’on la propose au choix. */
 export type ConvInstagram = { id: string; nom: string; messages: number; derniere: string; groupe: boolean };
-
-/** Ce que Vercel accepte au plus dans un envoi (4,5 Mo), moins une marge pour le formulaire. */
-const ENVOI_MAX = 4.2 * 1024 * 1024;
 
 /* Un morceau de texte mis en JSON et encodé d’un coup : environ 3 ms sur un Mac, avant de rendre la main */
 const MORCEAU = 1 << 20;
@@ -82,7 +77,7 @@ function compresser(octets: Uint8Array): Promise<Uint8Array> {
 }
 
 /* Au-delà de cette taille, la conv ne tiendra sans doute pas : son taux de compression est d’abord mesuré sur sa fin */
-const ESTIMER_AU_DELA = ENVOI_MAX * 3;
+const ESTIMER_AU_DELA = ENVOI_EXPORT_MAX * 3;
 const ECHANTILLON = 1024 * 1024;
 
 /**
@@ -97,19 +92,19 @@ async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
   let brut = await enOctets(nom, garde, false);
   if (brut.length > ESTIMER_AU_DELA) {
     const estime = brut.length * ((await compresser(brut.slice(-ECHANTILLON))).length / ECHANTILLON);
-    if (estime > ENVOI_MAX) {
-      garde = garderLaFin(garde, (ENVOI_MAX * 0.9) / estime);
+    if (estime > ENVOI_EXPORT_MAX) {
+      garde = garderLaFin(garde, (ENVOI_EXPORT_MAX * 0.9) / estime);
       coupe = true;
       brut = await enOctets(nom, garde, true);
     }
   }
   let gz = await compresser(brut);
-  for (let essai = 0; gz.length > ENVOI_MAX && essai < 6; essai++) {
-    garde = garderLaFin(garde, (ENVOI_MAX * 0.92) / gz.length);
+  for (let essai = 0; gz.length > ENVOI_EXPORT_MAX && essai < 6; essai++) {
+    garde = garderLaFin(garde, (ENVOI_EXPORT_MAX * 0.92) / gz.length);
     coupe = true;
     gz = await compresser(await enOctets(nom, garde, coupe));
   }
-  if (gz.length > ENVOI_MAX) throw new ExportIllisible("fichier");
+  if (gz.length > ENVOI_EXPORT_MAX) throw new ExportIllisible("fichier");
   return new Blob([gz as BlobPart], { type: "application/gzip" });
 }
 
@@ -221,7 +216,7 @@ export async function lireFichiers(fichier: Blob & { name: string }): Promise<Pa
       throw new ExportIllisible("fichier");
     });
   }
-  if (fichier.size >= TAILLE_MAX) throw new ExportIllisible("fichier");
+  if (fichier.size > TEXTE_CONV_MAX) throw new ExportIllisible("fichier");
   return [{ nom: fichier.name, contenu: strFromU8(await octets(fichier, 0, fichier.size)) }];
 }
 
@@ -290,7 +285,7 @@ async function entreesZip(fichier: Blob): Promise<EntreeZip[]> {
     }
     p += 46 + ln + le + lc;
     /* Ni les photos et vocaux, ni un fichier chiffré ou compressé autrement */
-    if (!estFichierUtile(nom) || complet >= TAILLE_MAX || drapeaux & 1 || (methode !== 0 && methode !== 8)) continue;
+    if (!estFichierUtile(nom) || complet > TEXTE_CONV_MAX || drapeaux & 1 || (methode !== 0 && methode !== 8)) continue;
     entrees.push({ nom, methode, compresse, local });
   }
   return entrees;

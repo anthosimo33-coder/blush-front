@@ -4,7 +4,8 @@ import type { Account, HistoriqueChat, ReportPayload } from "./api";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, contexteRequete, convsDe, ficheDe, finDeLecture, questionsDe, rapportDe, storyCourante, utilisateurCourant } from "@/server/donnees";
-import { histoiresDuCompte, metaDe, quiRempli, storyAffichee } from "@/server/histoires";
+import { histoiresDuCompte, metaDe, personnesDe, quiRempli, storyAffichee } from "@/server/histoires";
+import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
 
 /*
@@ -97,10 +98,9 @@ export async function getChat(): Promise<HistoriqueChat & { introAt?: number }> 
 export async function getNomsDuCompte(): Promise<{ me: Story["participants"][number]; other: Story["participants"][number]; period: string } | null> {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur || !story) return null;
-  const meta = metaDe(story);
-  const affichee = storyAffichee(story.id, meta);
-  const moi = meta.moi ?? 0;
-  return { me: affichee.participants[moi], other: affichee.participants[1 - moi], period: affichee.period };
+  const affichee = storyAffichee(story.id, metaDe(story));
+  const { moi, autre } = moiEtAutre(affichee);
+  return { me: moi, other: autre, period: affichee.period };
 }
 
 /**
@@ -112,7 +112,8 @@ export async function getRetour(): Promise<{ autre: string | null; destination: 
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur || !story) return null;
   const meta = metaDe(story);
-  const autre = meta.moi == null ? null : meta.participants[1 - meta.moi].prenom;
+  /* Avant « Qui es-tu ? », on ne sait pas qui est l’autre : pas de prénom plutôt qu’un au hasard */
+  const autre = meta.moi == null ? null : personnesDe(meta).autre.prenom;
   if (!quiRempli(meta)) return { autre, destination: "/qui" };
   return { autre, destination: (await finDeLecture(story.id)) ? "/app" : "/lecture" };
 }

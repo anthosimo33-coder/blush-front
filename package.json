@@ -14,6 +14,7 @@
     "postbuild": "node scripts/verifier-fuite.mjs",
     "pretest": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs",
     "test": "vitest run",
+    "test:unit": "node scripts/prompts.mjs && vitest run --project unit",
     "check": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && next typegen && tsc --noEmit && eslint . && node scripts/verifier-typo.mjs && npm run mort && vitest run",
     "mort": "knip --no-progress",
     "todo": "git grep -n -F 'TODO(produit)' -- src scripts tests || true",

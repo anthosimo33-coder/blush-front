@@ -9,6 +9,7 @@ import { play } from "@/lib/sound";
 import { messageErreur } from "@/lib/messages-erreur";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
+import { CODE_MINUTES } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -16,6 +17,7 @@ import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { useJourney } from "@/state/journey";
+import { quiComplet, reponsesQui, vientDeCaptures } from "@/state/parcours";
 import { retenirLecture } from "@/state/lecture";
 
 const LENGTH = 6;
@@ -96,9 +98,10 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
     }
     /*
      * Sans les réponses de « Qui es-tu ? » (le parcours de cet onglet perdu), la lecture viserait la conv déjà suivie,
-     * pas celle qu’on importe. « Qui es-tu ? » les redemande, et lance la lecture de la bonne conv.
+     * pas celle qu’on importe. Sur des captures, sans ton prénom, tu y serais « Moi ». « Qui es-tu ? » les redemande, et
+     * lance la lecture de la bonne conv.
      */
-    if (!(j.me && j.pronom && j.guess && j.goal)) {
+    if (!quiComplet(j, { captures: vientDeCaptures(j) })) {
       router.push("/qui");
       return;
     }
@@ -107,7 +110,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
-      await startAnalysis({ me: j.me, pronom: j.pronom, prenom: j.prenom, guess: j.guess, goal: j.goal });
+      await startAnalysis(reponsesQui(j));
       retenirLecture();
       router.push("/lecture");
     } catch {
@@ -223,7 +226,9 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
 
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Pas de mot de passe{NBSP}: ce code suffit. Il expire au bout de 10 minutes.
+        {/* La fin de la phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
+        Pas de mot de passe{NBSP}
+        {`: ce code suffit. Il expire au bout de ${CODE_MINUTES} minutes.`}
       </p>
       {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
     </Screen>

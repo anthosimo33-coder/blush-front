@@ -8,6 +8,7 @@ import { useReducedMotion } from "@/lib/hooks";
 import { codeDe } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
+import { connexionPuis } from "@/lib/suite";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
@@ -83,7 +84,7 @@ export function LectureScreen({ total }: { total: number }) {
       }
       /* Plus de session (expirée, ou ouverte ailleurs) : on se reconnecte, la lecture reprend ensuite */
       if (lance === "connexion") {
-        router.replace("/connexion?suite=/lecture");
+        router.replace(connexionPuis("/lecture"));
         return;
       }
       /* La conv ouverte n’est pas passée par « Qui es-tu ? » (la page le vérifie déjà avant) : rien à relancer, c’est là qu’on va */
@@ -103,7 +104,7 @@ export function LectureScreen({ total }: { total: number }) {
         } catch (e) {
           if (!alive) return;
           if (codeDe(e) === "connexion") {
-            router.replace("/connexion?suite=/lecture");
+            router.replace(connexionPuis("/lecture"));
             return;
           }
           rates += 1;

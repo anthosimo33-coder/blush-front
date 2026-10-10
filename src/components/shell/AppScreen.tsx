@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { rang } from "@/lib/acces";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
 import type { Plan } from "@/types";
@@ -11,9 +12,7 @@ import { AccountPill, Screen } from "./Screen";
 /* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */
 const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
-const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, blushplus: 2 };
-
-/** Les droits d’accès du compte : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres + une question), BLUSH+ (en plus : accueil, aide, fiche). */
+/** Les droits d’accès du compte (src/lib/acces.ts) : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres + une question), BLUSH+ (en plus : accueil, aide, fiche). */
 export function useAccess() {
   const { data } = useCompte();
   const plan = data?.subscription.plan;
@@ -21,7 +20,7 @@ export function useAccess() {
     initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,
     loaded: !!data,
     plan: plan ?? "gratuit",
-    can: (need: Plan) => (plan ? RANK[plan] >= RANK[need] : false),
+    can: (need: Plan) => !!plan && rang(plan) >= rang(need),
   };
 }
 

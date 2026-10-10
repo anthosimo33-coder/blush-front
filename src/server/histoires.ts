@@ -3,18 +3,18 @@ import { and, desc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
 import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
-import { detecterFormat, erreurImport, lire, participantsDe, principaux, type Devinette, type Format, type Histoire, type Objectif, type Pronom } from "@prompts/lib/conv";
+import { detecterFormat, erreurImport, lire, participantsDe, principaux, type Devinette, type Format, type Histoire, type Message, type Objectif, type Pronom } from "@prompts/lib/conv";
 import { prenomDe } from "@prompts/lib/ajouts";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
+import { CORPS_VERCEL_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
+import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Story } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
 
-/** Le texte d’une conv, même très longue, tient sous cette taille (une fois décompressé). */
-const TAILLE_MAX = 40 * 1024 * 1024;
 /** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
 const FICHIERS_MAX = 200;
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
@@ -65,7 +65,7 @@ export type LigneEcran = Ligne & { aConv: boolean };
 
 /** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */
 export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string }> {
-  if (fichier.size > TAILLE_MAX || fichier.size === 0) throw new ErreurImport("fichier");
+  if (fichier.size > TEXTE_CONV_MAX || fichier.size === 0) throw new ErreurImport("fichier");
   const octets = new Uint8Array(await fichier.arrayBuffer());
   let fichiers = [{ nom: fichier.name, contenu: "" }];
   if (octets[0] === 0x50 && octets[1] === 0x4b) {
@@ -77,7 +77,7 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
         filter: (f) => {
           if (!estFichierUtile(f.name)) return false;
           total += f.originalSize;
-          if (++nombre > FICHIERS_MAX || total > TAILLE_MAX) throw new ErreurImport("fichier");
+          if (++nombre > FICHIERS_MAX || total > TEXTE_CONV_MAX) throw new ErreurImport("fichier");
           return true;
         },
       });
@@ -99,10 +99,10 @@ const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ 
  * `coupe` : la conv était trop longue pour partir en entier, le navigateur n’a gardé que sa partie la plus récente.
  */
 export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string; coupe?: boolean }> {
-  if (paquet.size > 4.5 * 1024 * 1024 || paquet.size === 0) throw new ErreurImport("fichier");
+  if (paquet.size > CORPS_VERCEL_MAX || paquet.size === 0) throw new ErreurImport("fichier");
   try {
-    /* La décompression s’arrête d’elle-même à TAILLE_MAX : un paquet piégé ne remplit pas la mémoire du serveur */
-    const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TAILLE_MAX });
+    /* La décompression s’arrête d’elle-même à TEXTE_CONV_MAX : un paquet piégé ne remplit pas la mémoire du serveur */
+    const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TEXTE_CONV_MAX });
     const p = Paquet.parse(JSON.parse(octets.toString("utf8")));
     const lu = lireExport(p.parties);
     if (!lu) throw new ErreurImport("fichier");
@@ -110,6 +110,26 @@ export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: stri
   } catch {
     throw new ErreurImport("fichier");
   }
+}
+
+/** Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. */
+const resumeDe = (messages: Message[]): Meta["resume"] => ({
+  debut: new Date(messages[0].t).toISOString().slice(0, 10),
+  fin: new Date(messages.at(-1)!.t).toISOString().slice(0, 10),
+  total: messages.length,
+  vocaux: messages.filter((m) => m.media === "vocal").length,
+});
+
+/**
+ * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées. Le
+ * cookie du brouillon la retrouve par l’empreinte de `secret`.
+ */
+async function creerBrouillon(meta: Meta, texte: string, secret: string): Promise<{ id: string; meta: Meta; secret: string }> {
+  const [ligne] = await db()
+    .insert(schema.stories)
+    .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: chiffrer(meta), conv: chiffrerCompresse(texte) })
+    .returning({ id: schema.stories.id });
+  return { id: ligne.id, meta, secret };
 }
 
 /** Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. */
@@ -131,20 +151,10 @@ export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: s
     format,
     fichier: nom.slice(0, 200),
     participants: noms.map((n) => ({ nom: n.nom, prenom: prenomDe(n.nom), messages: n.messages })),
-    resume: {
-      debut: new Date(lu.messages[0].t).toISOString().slice(0, 10),
-      fin: new Date(lu.messages.at(-1)!.t).toISOString().slice(0, 10),
-      total: lu.messages.length,
-      vocaux: lu.messages.filter((m) => m.media === "vocal").length,
-    },
+    resume: resumeDe(lu.messages),
     ...(coupe ? { coupe: true } : {}),
   };
-  const secret = jeton();
-  const [ligne] = await db()
-    .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrerCompresse(texte) })
-    .returning({ id: schema.stories.id });
-  return { id: ligne.id, meta, secret };
+  return creerBrouillon(meta, texte, jeton());
 }
 
 /**
@@ -166,19 +176,10 @@ export async function importerCaptures({ appli, t, secret = jeton() }: { appli: 
       { nom: "Moi", prenom: "Moi", messages: compte("Moi") },
       { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre) },
     ],
-    resume: {
-      debut: new Date(lu.messages[0].t).toISOString().slice(0, 10),
-      fin: new Date(lu.messages.at(-1)!.t).toISOString().slice(0, 10),
-      total: lu.messages.length,
-      vocaux: lu.messages.filter((m) => m.media === "vocal").length,
-    },
+    resume: resumeDe(lu.messages),
     moi: 0,
   };
-  const [ligne] = await db()
-    .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrerCompresse(t.texte) })
-    .returning({ id: schema.stories.id });
-  return { id: ligne.id, meta, secret };
+  return creerBrouillon(meta, t.texte, secret);
 }
 
 /**
@@ -288,13 +289,22 @@ export const convDe = (ligne: LigneComplete) => (ligne.conv ? dechiffrer<string>
 export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> =>
   meta.moi != null && !!meta.pronom && !!meta.devinette && !!meta.objectif;
 
+/**
+ * Toi et l’autre, parmi les participants. La règle des écrans (moiEtAutre, src/lib/participants.ts) : toi connu
+ * (« Qui es-tu ? » rempli), l’autre est l’autre participant ; toi inconnu, l’autre est le second (`participants[1]`).
+ */
+export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Meta["participants"][number]; autre: Meta["participants"][number] } {
+  const k = meta.moi ?? 0;
+  return { moi: meta.participants[k], autre: meta.participants[1 - k] };
+}
+
 /** Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom opposé (BLUSH : un garçon et une fille). */
 export function histoireDe(meta: Meta): Histoire {
   if (!quiRempli(meta)) throw new Error("« Qui es-tu ? » n’est pas rempli");
-  const [moi, autre] = [meta.participants[meta.moi], meta.participants[1 - meta.moi]];
+  const { moi, autre } = personnesDe(meta);
   return {
     utilisateur: { prenom: moi.prenom, pronom: meta.pronom, nomExport: moi.nom },
-    autre: { prenom: autre.prenom, pronom: meta.pronom === "il" ? "elle" : "il", nomExport: autre.nom },
+    autre: { prenom: autre.prenom, pronom: pronomOppose(meta.pronom), nomExport: autre.nom },
     devinette: meta.devinette,
     objectif: meta.objectif,
     appli: meta.appli,
@@ -322,7 +332,7 @@ export function storyAffichee(id: string, meta: Meta): Story {
   const jours = Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / 86400e3));
   const [a, b] = meta.participants;
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
-  const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : meta.pronom === "il" ? ("elle" as const) : ("il" as const) });
+  const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });
   return {
     id,
     participants: [

@@ -10,6 +10,7 @@ import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, typ
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
+import { peut } from "@/lib/acces";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import type { AvanceMoitie, Genre } from "./db/enums";
@@ -443,7 +444,7 @@ const ETAPES: Partial<Record<Genre, (story: LigneComplete, t: Tache) => Promise<
 async function aAcces(story: Ligne): Promise<boolean> {
   if (!story.userId) return false;
   const [u] = await db().select({ plan: schema.users.plan }).from(schema.users).where(eq(schema.users.id, story.userId));
-  return !!u && u.plan !== "gratuit";
+  return !!u && peut(u.plan, "rapport");
 }
 
 /* ———— L’exécution ———— */

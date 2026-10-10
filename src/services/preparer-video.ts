@@ -5,6 +5,8 @@ import "client-only";
  * (deux écrans gardés se recouvrent : aucun message ne tombe entre les deux). La vidéo ne quitte jamais l’appareil :
  * seules ces images partent, réduites comme des captures.
  */
+import { COTE_IMAGE_MAX } from "@/lib/limites";
+import { toileEnJpeg } from "./preparer-captures";
 
 export class VideoIllisible extends Error {
   constructor(readonly code: "video" | "longue") {
@@ -14,7 +16,6 @@ export class VideoIllisible extends Error {
 
 /** Au-delà, l’enregistrement est trop long pour une lecture (et pour son coût). */
 export const IMAGES_MAX = 80;
-const COTE_MAX = 1568;
 /* La mesure du défilement : la zone de la conv (sans la barre du haut ni le champ du bas), en tout petit */
 const MESURE_L = 24;
 const MESURE_H = 240;
@@ -115,14 +116,14 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
       for (let i = 0; i < m.length; i++) m[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
       return m;
     };
-    const echelle = Math.min(1, COTE_MAX / Math.max(L, H));
+    const echelle = Math.min(1, COTE_IMAGE_MAX / Math.max(L, H));
     const toile = document.createElement("canvas");
     toile.width = Math.round(L * echelle);
     toile.height = Math.round(H * echelle);
     const ct = toile.getContext("2d")!;
     const photo = () => {
       ct.drawImage(v, 0, 0, toile.width, toile.height);
-      return new Promise<Blob>((ok, ko) => toile.toBlob((b) => (b ? ok(b) : ko(new VideoIllisible("video"))), "image/jpeg", 0.72));
+      return toileEnJpeg(toile, 0.72, () => new VideoIllisible("video"));
     };
     /* Un pas de 0,2 s (pas plus de 500 instants regardés) ; on saute la première demi-seconde (le Centre de contrôle qui se ferme) */
     const pas = Math.max(0.2, duree / 500);

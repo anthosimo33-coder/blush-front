@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
+import { peut } from "@/lib/acces";
+import { pronomOppose } from "@/lib/pronom";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Echec, Fiche, Plan, Story, VocalRapport } from "@/types";
@@ -20,7 +22,7 @@ import { echecDe } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import type { Genre } from "./db/enums";
-import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
+import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
 import { aRelancer, etatDesTaches, planifier, type Tache } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
@@ -87,7 +89,7 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
   return lignes
     .map((l) => {
       const meta = metaDe(l);
-      const autre = meta.participants[1 - (meta.moi ?? 0)].prenom;
+      const autre = personnesDe(meta).autre.prenom;
       const sortie = sortieDe.get(l.id);
       const verdict = sortie ? verdictAffiche(sortie) : null;
       const parle = parleDe.get(l.id);
@@ -248,6 +250,8 @@ export async function contactDe(storyId: string): Promise<EnTete | null> {
  */
 export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
   const access: Plan = utilisateur?.plan ?? "gratuit";
+  /* Le rapport entier (src/lib/acces.ts) ; sans, le chapitre offert */
+  const aLeRapport = peut(access, "rapport");
   /*
    * Tout est lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès, l’état des tâches (lu une
    * fois pour toutes les étapes ci-dessous) et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
@@ -255,15 +259,15 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
   const [[v], [r], tachesLues, vocalLuAvant] = await Promise.all([
     db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)),
     db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id)),
-    access !== "gratuit" ? etatDesTaches(story.id, TACHES_DU_RAPPORT) : null,
-    access !== "gratuit" ? vocalLu(story.id) : null,
+    aLeRapport ? etatDesTaches(story.id, TACHES_DU_RAPPORT) : null,
+    aLeRapport ? vocalLu(story.id) : null,
   ]);
   if (!v) return null;
   const { sortie, scores } = dechiffrer<DonneesVerdict>(v.data);
   const donnees = r?.data ? dechiffrer<DonneesRapport>(r.data) : null;
   const meta = metaDe(story);
-  const autre = meta.participants[1 - (meta.moi ?? 0)].prenom;
-  const ouvert = access !== "gratuit" || sortie.mode_sobre;
+  const autre = personnesDe(meta).autre.prenom;
+  const ouvert = aLeRapport || sortie.mode_sobre;
   /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
   const [tachesOuvertes, vocalDeLaConv] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, TACHES_DU_RAPPORT), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
   let taches = tachesOuvertes;
@@ -301,7 +305,7 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
   }
   /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant (et
      l’état des tâches est relu, pour montrer l’écriture tout de suite) */
-  if (access !== "gratuit" && (!donnees || donnees.sobre) && (await assurerLaSuite(story, true, taches))) taches = await etatDesTaches(story.id, TACHES_DU_RAPPORT);
+  if (aLeRapport && (!donnees || donnees.sobre) && (await assurerLaSuite(story, true, taches))) taches = await etatDesTaches(story.id, TACHES_DU_RAPPORT);
   const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
   const echec = ouvert && !donnees ? echecDuRapport(taches) : undefined;
   const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titres, autre, new Set(partiels.keys())) : undefined;
@@ -359,8 +363,8 @@ export const memoireDe = cache(async (storyId: string): Promise<DonneesMemoire |
 /** Sa fiche, remplie par la mémoire. Avant la mémoire : vide, avec son prénom. */
 export async function ficheDe(story: Ligne): Promise<Fiche> {
   const meta = metaDe(story);
-  const autre = meta.participants[1 - (meta.moi ?? 0)];
-  const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: meta.pronom === "elle" ? ("il" as const) : ("elle" as const) };
+  const { autre } = personnesDe(meta);
+  const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomOppose(meta.pronom) };
   const m = await memoireDe(story.id);
   const fiche = m?.etat.fiche;
   if (!m || !fiche) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };

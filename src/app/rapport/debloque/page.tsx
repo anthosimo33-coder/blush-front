@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES, PREMIER_PAYANT } from "@/contenu/chapitres";
+import { moiEtAutre } from "@/lib/participants";
 import { suiteSure } from "@/lib/suite";
 import { getReport, getStory } from "@/services/serveur";
 import { UnlockedScreen } from "./UnlockedScreen";
@@ -20,7 +21,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const chapitres = payload?.report.chapters ?? [];
   /* Un rapport écrit peut avoir moins de huit chapitres (une moitié rendue incomplète) : on compte les siens */
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
-  const autre = story ? (story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).pronoun : undefined;
+  const autre = story ? moiEtAutre(story).autre.pronoun : undefined;
   return (
     <>
       <ConvDeLaPage />

@@ -11,6 +11,7 @@ import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import type { Confidence, Message, Story } from "@/types";
+import { moiEtAutre } from "@/lib/participants";
 import { IlOuElle } from "@/lib/pronom";
 import { bloquerDefilement } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
@@ -66,7 +67,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   const card = cards[Math.min(at, last)];
   const { verdict } = payload.report;
   /* L’autre personne : « Il » ou « Elle » dans le duel (d’après son pronom, une fois « Qui es-tu ? » rempli) */
-  const autre = IlOuElle((story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).pronoun);
+  const autre = IlOuElle(moiEtAutre(story).autre.pronoun);
 
   /* Le mode sobre (une alerte de danger) : pas de mise en scène, le rapport tout de suite */
   useEffect(() => {

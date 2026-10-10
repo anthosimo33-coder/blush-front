@@ -6,6 +6,9 @@ import { cn } from "@/lib/cn";
 import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
 import { formatCount, NBSP } from "@/lib/format";
+import { QUESTION_MAX } from "@/lib/limites";
+import { moiEtAutre } from "@/lib/participants";
+import { peut } from "@/lib/acces";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { askQuestion, souciQuestion } from "@/services/api";
@@ -102,7 +105,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         <span className="sr-only">Ta question à BLUSH</span>
         <textarea
           rows={1}
-          maxLength={200}
+          maxLength={QUESTION_MAX}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -139,7 +142,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       </ButtonLink>
       {/* Sans remise en haut : l’accueil s’ouvre sur le dernier échange */}
       <Link href="/app" scroll={false} className="relative inline-flex min-h-11 items-center px-1 text-[15px] font-black text-soft no-underline transition-colors hover:text-ink">
-        {plan === "blushplus" ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
+        {peut(plan, "chat") ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
       </Link>
     </div>
   );
@@ -147,7 +150,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   return (
     <AppScreen
       requires="rapport"
-      autre={(story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).name}
+      autre={moiEtAutre(story).autre.name}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
       className={figtree.variable}

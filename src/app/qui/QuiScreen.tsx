@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
+import { PRENOM_MAX } from "@/lib/limites";
 import { messageErreur } from "@/lib/messages-erreur";
 import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
@@ -15,6 +16,7 @@ import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { GUESS_LABELS } from "@/contenu/parcours";
 import { useJourney } from "@/state/journey";
+import { quiComplet, reponsesQui } from "@/state/parcours";
 import { retenirLecture } from "@/state/lecture";
 import type { Goal, Guess, Person } from "@/types";
 
@@ -52,7 +54,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   /* La lecture n’est pas partie : pourquoi, dit simplement (textes relus le 8 octobre) */
   const [problem, setProblem] = useState<string | null>(null);
   const goals = goalsFor(j.guess);
-  const ready = !!((captures ? j.prenom.trim() : j.me) && j.pronom && j.guess && j.goal);
+  const ready = quiComplet(j, { captures });
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   /* Arrivé sans le parcours de cet onglet (importée dans un autre, puis ouverte par une connexion) : d’après la conv */
@@ -68,7 +70,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
 
   const next = async () => {
     if (!connecte) return router.push("/email");
-    if (busy) return;
+    if (busy || !quiComplet(j, { captures })) return;
     setBusy(true);
     setProblem(null);
     try {
@@ -77,7 +79,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
        * pas de second POST. Le bouton n’est actif qu’avec toutes les réponses (`ready`) : sur des captures, ton prénom
        * donne aussi `me`
        */
-      await startAnalysis({ me: j.me!, pronom: j.pronom, prenom: j.prenom, guess: j.guess!, goal: j.goal! });
+      await startAnalysis(reponsesQui(j));
       retenirLecture();
       router.push("/lecture");
     } catch (e) {
@@ -115,7 +117,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
             value={j.prenom}
             onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}
             autoComplete="given-name"
-            maxLength={40}
+            maxLength={PRENOM_MAX}
             placeholder="Ton prénom"
             className="h-[60px] rounded-field bg-white px-[18px] text-[17px] font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_#121214]"
           />

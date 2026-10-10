@@ -3,12 +3,11 @@ import "client-only";
  * Dans le navigateur, avant l’envoi : chaque capture est réduite (1 568 px au plus sur le grand côté, ce que le modèle
  * lit de toute façon) et compressée en JPEG. L’envoi reste sous la limite de Vercel (4,5 Mo), même avec 20 captures.
  */
+import { COTE_IMAGE_MAX, ENVOI_IMAGES_MAX } from "@/lib/limites";
 
-const COTE_MAX = 1568;
-const ENVOI_MAX = 4 * 1024 * 1024;
 /* Les crans de réduction : le premier pour toutes, les suivants pour les plus lourdes si l’ensemble dépasse la limite */
 const CRANS = [
-  [0.82, COTE_MAX],
+  [0.82, COTE_IMAGE_MAX],
   [0.7, 1400],
   [0.6, 1200],
 ] as const;
@@ -96,6 +95,10 @@ function auWorker(t: Travail): Promise<Blob | null> {
   return suite;
 }
 
+/** Le contenu d’une toile en JPEG (sur le fil principal), ou `erreur()` si le navigateur n’y arrive pas. Les images d’une vidéo aussi (preparer-video.ts). */
+export const toileEnJpeg = (toile: HTMLCanvasElement, qualite: number, erreur: () => Error) =>
+  new Promise<Blob>((ok, ko) => toile.toBlob((b) => (b ? ok(b) : ko(erreur())), "image/jpeg", qualite));
+
 /** Le repli, sur le fil principal (le chemin d’avant) : une pause d’abord, pour que l’écran respire entre deux captures. */
 async function reduireIci(fichier: File, qualite: number, cote: number): Promise<Blob> {
   await new Promise((r) => setTimeout(r, 0));
@@ -106,7 +109,7 @@ async function reduireIci(fichier: File, qualite: number, cote: number): Promise
   toile.height = Math.round(image.height * echelle);
   toile.getContext("2d")!.drawImage(image, 0, 0, toile.width, toile.height);
   image.close();
-  const blob = await new Promise<Blob>((ok, ko) => toile.toBlob((b) => (b ? ok(b) : ko(new Error("capture"))), "image/jpeg", qualite));
+  const blob = await toileEnJpeg(toile, qualite, () => new Error("capture"));
   /* La toile rendue tout de suite : Safari sur iPhone plafonne la mémoire des toiles */
   toile.width = toile.height = 0;
   return blob;
@@ -144,7 +147,7 @@ export async function preparerCaptures(fichiers: File[]): Promise<Blob[]> {
   for (const f of fichiers) blobs.push((await dejaReduites.get(f)) ?? (await reduire(f, 0)));
   const crans = fichiers.map(() => 0);
   const total = () => blobs.reduce((s, b) => s + b.size, 0);
-  while (total() > ENVOI_MAX) {
+  while (total() > ENVOI_IMAGES_MAX) {
     /* Le cran le moins serré d’abord, et la plus lourde à ce cran */
     let k = -1;
     for (let i = 0; i < blobs.length; i++) {

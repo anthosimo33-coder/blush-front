@@ -4,6 +4,7 @@
  * Gmail ignore la police et le mode sombre déclarés : il retombe sur une police système et ses propres couleurs.
  * Textes validés le 8 octobre.
  */
+import { CODE_MINUTES } from "@/lib/limites";
 
 const POLICE = "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const ENCRE = "#121214";
@@ -18,7 +19,7 @@ export type MailCode = { sujet: string; texte: string; html: string };
 export function mailCode(code: string, base: string): MailCode {
   const c = code.replace(/\D/g, "").slice(0, 6);
   const sujet = `${c}\u00a0: ton code BLUSH`;
-  const texte = `Ton code BLUSH\u00a0: ${c}\n\nIl marche 10 minutes. Si tu n’as rien demandé, ignore ce message\u00a0: sans ce code, personne n’entre.`;
+  const texte = `Ton code BLUSH\u00a0: ${c}\n\nIl marche ${CODE_MINUTES} minutes. Si tu n’as rien demandé, ignore ce message\u00a0: sans ce code, personne n’entre.`;
   const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -41,7 +42,7 @@ export function mailCode(code: string, base: string): MailCode {
 </style>
 </head>
 <body class="papier" style="margin:0;padding:0;background:${PAPIER};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Ton code BLUSH&nbsp;: ${c}. Il marche 10 minutes.&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Ton code BLUSH&nbsp;: ${c}. Il marche ${CODE_MINUTES} minutes.&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
 <table role="presentation" class="papier" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPIER};">
   <tr>
     <td align="center" style="padding:40px 16px 48px;">
@@ -67,7 +68,7 @@ export function mailCode(code: string, base: string): MailCode {
                 </td>
               </tr>
             </table>
-            <div class="doux" style="padding-top:18px;font-family:${POLICE};font-size:14px;line-height:20px;font-weight:800;color:${GRIS};">Il marche 10 minutes.</div>
+            <div class="doux" style="padding-top:18px;font-family:${POLICE};font-size:14px;line-height:20px;font-weight:800;color:${GRIS};">Il marche ${CODE_MINUTES} minutes.</div>
           </td>
         </tr>
         <tr>

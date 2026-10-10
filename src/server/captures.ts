@@ -2,6 +2,7 @@ import "server-only";
 import { versTexteCaptures, type TexteCaptures } from "@prompts/lib/captures";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import { Sortie01, type Captures } from "@prompts/lib/schemas";
+import { CAPTURES_MAX } from "@/lib/limites";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { utilisateurDeSession } from "./auth";
 import { empreinte, jeton } from "./chiffrement";
@@ -36,8 +37,7 @@ export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promis
   return ok ? "ok" : "trop";
 }
 
-/** Combien de captures à la fois, et leur taille (déjà réduites par le navigateur). */
-const CAPTURES_MAX = 20;
+/** La taille d’une capture reçue (déjà réduite par le navigateur) ; leur nombre, CAPTURES_MAX. */
 const TAILLE_IMAGE_MAX = 2 * 1024 * 1024;
 
 /** Les captures envoyées (des fichiers image), vérifiées : type, nombre, taille. */

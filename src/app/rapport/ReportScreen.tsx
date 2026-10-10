@@ -8,6 +8,8 @@ import { cn } from "@/lib/cn";
 import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
+import { moiEtAutre, titreDuo } from "@/lib/participants";
+import { peut } from "@/lib/acces";
 import { setQueryData } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import { messageErreur } from "@/lib/messages-erreur";
@@ -121,9 +123,9 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
       <>
         <SoberReport
           data={payload.sober}
-          vocal={payload.vocal ? <VocalDuRapport vocal={payload.vocal} sobre ecrit={!!payload.generating} titre={`${story.participants[0].name} & ${story.participants[1].name}`} fin={{ titre: payload.sober.title, sousTitre: payload.sober.reassurance, action: "Lire la suite" }} /> : undefined}
+          vocal={payload.vocal ? <VocalDuRapport vocal={payload.vocal} sobre ecrit={!!payload.generating} titre={titreDuo(story)} fin={{ titre: payload.sober.title, sousTitre: payload.sober.reassurance, action: "Lire la suite" }} /> : undefined}
         />
-        {payload.access === "blushplus" && !payload.generating && <ChatBubble sobre />}
+        {peut(payload.access, "chat") && !payload.generating && <ChatBubble sobre />}
       </>
     );
   return (
@@ -243,13 +245,12 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const [resume, setResume] = useState<number | null>(null);
 
   const { report, access } = payload;
-  const full = access !== "gratuit";
+  const full = peut(access, "rapport");
   /* Le rapport s’écrit : les chapitres à venir ne mènent pas au paiement, ils montrent où en est l’écriture */
   const ecriture = payload.generating ? payload.ecriture : undefined;
   const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
-  const moi = story.me ?? journeyMe;
-  const [me, other] = moi === story.participants[1].id ? [story.participants[1], story.participants[0]] : story.participants;
+  const { moi: me, autre: other } = moiEtAutre(story, journeyMe);
   const chapters = report.chapters;
   const free = chapters.filter((c) => !c.locked);
   const locked = chapters.filter((c) => c.locked);
@@ -467,7 +468,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         <VocalDuRapport
           vocal={payload.vocal}
           ecrit={!!payload.generating}
-          titre={`${story.participants[0].name} & ${story.participants[1].name}`}
+          titre={titreDuo(story)}
           fin={{ emoji: report.verdict.emoji, titre: report.verdict.title, sousTitre: report.verdict.subtitle, action: "Lire mon rapport" }}
         />
       )}
@@ -481,7 +482,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         <div className="flex items-center gap-2.5">
           <AvatarPair me={me.initial} other={other.initial} />
           <h1 className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">
-            {story.participants[0].name} & {story.participants[1].name}
+            {titreDuo(story)}
           </h1>
         </div>
         <div className="text-[13px] font-bold leading-[1.45] text-grey">
@@ -574,7 +575,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       )}
 
       {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
-      {payload.access === "blushplus" && !payload.generating && !payload.echec && <ChatBubble raised={!!resume} />}
+      {peut(payload.access, "chat") && !payload.generating && !payload.echec && <ChatBubble raised={!!resume} />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (

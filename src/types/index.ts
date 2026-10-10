@@ -20,7 +20,7 @@ export type ExportApp = Extract<AppKind, "whatsapp" | "instagram">;
 type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 type Side = "toi" | "elle" | "pareil";
-/** Ce que le compte a (users.plan) : l’offre achetée en donne un (src/contenu/offres.ts). */
+/** Ce que le compte a (users.plan) : l’offre achetée en donne un (src/contenu/offres.ts). Du moins au plus : src/lib/acces.ts lit cet ordre. */
 export const PLANS = ["gratuit", "rapport", "blushplus"] as const;
 export type Plan = (typeof PLANS)[number];
 /** Les deux voix de l’A/B test (vocals, chat_vocals, vocal_ecoutes) : A (E2, créée pour BLUSH) et B (L2, Harmonie, de la bibliothèque ElevenLabs). */

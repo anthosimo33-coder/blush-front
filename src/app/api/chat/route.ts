@@ -12,6 +12,7 @@ import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
+import { peut } from "@/lib/acces";
 import type { EvenementChat } from "@/types";
 import { codePublic } from "@/types/erreurs-api";
 
@@ -126,7 +127,7 @@ async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion");
-  if (utilisateur.plan !== "blushplus") return erreur("acces");
+  if (!peut(utilisateur.plan, "chat")) return erreur("acces");
   if (!story) return erreur("aucune");
   const envoi = await lireEnvoi(req);
   if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");

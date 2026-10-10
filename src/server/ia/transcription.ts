@@ -1,4 +1,5 @@
 import "server-only";
+import { extensionAudio } from "@/lib/limites";
 import { delaiAppel } from "../echeance";
 import { env } from "../env";
 import { ErreurTache } from "../erreurs";
@@ -17,15 +18,12 @@ const DELAI_TRANSCRIPTION_MS = 60_000;
 /** Un vocal de 2 minutes pèse moins d’un mégaoctet : au-delà, ce n’est pas un vocal du chat. */
 export const TAILLE_VOCAL_MAX = 4 * 1024 * 1024;
 
-/** L’extension du fichier, d’après le type que le navigateur a enregistré (webm sur Chrome, mp4 sur Safari). */
-const extension = (type: string) => (type.includes("webm") ? "webm" : type.includes("ogg") ? "ogg" : type.includes("wav") ? "wav" : type.includes("mpeg") ? "mp3" : "m4a");
-
 /** La transcription du vocal, ou null si les vocaux ne sont pas encore branchés (ni clé Mistral, ni clé ElevenLabs). */
 export async function transcrire(vocal: File): Promise<string | null> {
   const e = env();
   if (e.BLUSH_IA_FACTICE) return "bon elle m’a répondu ok pour samedi, mais elle a mis trois heures, je lui dis quoi";
   if (!e.MISTRAL_API_KEY && !e.ELEVENLABS_API_KEY) return null;
-  const fichier = new File([await vocal.arrayBuffer()], `vocal.${extension(vocal.type)}`, { type: vocal.type || "audio/mp4" });
+  const fichier = new File([await vocal.arrayBuffer()], `vocal.${extensionAudio(vocal.type)}`, { type: vocal.type || "audio/mp4" });
   const fd = new FormData();
   let r: Response | null;
   if (e.MISTRAL_API_KEY) {
