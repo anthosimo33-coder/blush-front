@@ -1,6 +1,6 @@
 # Le back-end de BLUSH
 
-Le back-end vit dans ce projet Next.js. Il s’allume avec `NEXT_PUBLIC_BLUSH_BACKEND=1`. Sans cette variable, l’appli garde ses données de démo : le site de démo, la galerie des écrans et les captures ne changent pas.
+Le back-end vit dans ce projet Next.js : les routes `/api`, Postgres (Drizzle) et le modèle. L’appli tourne toujours avec lui, en local comme en production.
 
 ## Ce qu’il fait
 
@@ -18,7 +18,7 @@ Le back-end vit dans ce projet Next.js. Il s’allume avec `NEXT_PUBLIC_BLUSH_BA
 | Le compte, la pause, les suppressions | `/api/compte`, `/api/histoire` | |
 | La purge de nuit (Vercel Cron) | `GET /api/cron/purge` | `src/server/purge.ts` |
 
-Les pages serveur lisent les données via `src/services/serveur.ts`, et le navigateur passe par `src/services/api.ts`, qui appelle `src/services/reel.ts`.
+Les pages serveur lisent les données via `src/services/serveur.ts`, et le navigateur passe par `src/services/api.ts`, qui appelle les routes `/api`.
 
 ## Les prompts
 
@@ -47,7 +47,6 @@ Les pages serveur lisent les données via `src/services/serveur.ts`, et le navig
 
 | Variable | Rôle |
 |---|---|
-| `NEXT_PUBLIC_BLUSH_BACKEND` | `1` allume le back-end |
 | `DATABASE_URL` | Postgres. En production, l’URL **avec pooler** de Neon |
 | `BLUSH_CLE` | La clé de chiffrement : `openssl rand -base64 32`. **À garder précieusement** : la perdre rend les données illisibles |
 | `ANTHROPIC_API_KEY` | La clé de l’API Claude. `ANTHROPIC_WORKSPACE_ID` si la clé n’a pas de workspace |
@@ -60,12 +59,11 @@ Les pages serveur lisent les données via `src/services/serveur.ts`, et le navig
 ## En local
 
 ```bash
-createdb blush_dev && DATABASE_URL=postgres://localhost:5432/blush_dev npm run db:migrer
+cp .env.example .env.development.local   # une fois : la configuration de dev, fictive
+npm run dev
 ```
 
-```bash
-NEXT_PUBLIC_BLUSH_BACKEND=1 DATABASE_URL=postgres://localhost:5432/blush_dev BLUSH_CLE=$(openssl rand -base64 32) BLUSH_IA_FACTICE=1 BLUSH_ACCES_LIBRE='*' npm run dev
-```
+`npm run dev` (`scripts/developper.mjs`) lit les fichiers `.env` comme `next dev`, crée la base `blush_dev` si elle manque (sans jamais l’effacer), y applique les migrations, puis lance `next dev`. Ce qu’on lui donne dans le shell l’emporte (`DATABASE_URL=postgres://localhost:5432/blush_dev_<nom> npm run dev`). Avec le modèle factice (`BLUSH_IA_FACTICE=1`), il refuse les clés d’API : une vraie clé ferait partir de vrais appels. Seul `next dev` lit `.env.development.local` : ni `npm run build`, ni les tests de bout en bout ne le voient.
 
 En dev, le code de connexion s’affiche dans les logs du serveur.
 
@@ -77,7 +75,7 @@ Les vrais parcours, dans Chromium (ordinateur) et WebKit (iPhone), contre le bac
 
 ```bash
 npx playwright install chromium webkit   # une fois
-npm run e2e:build                        # le build du back-end, après chaque changement de l’appli
+npm run e2e:build                        # le build des tests, après chaque changement de l’appli
 npm run e2e                              # ou : npm run e2e -- --project=webkit-iphone, npm run e2e:ui
 ```
 
@@ -108,7 +106,7 @@ NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_
 Déjà fait (production, sur Vercel) : `BLUSH_CLE` (une copie locale dans `~/.blush/BLUSH_CLE`, à ranger dans un gestionnaire de mots de passe : la perdre rend les données illisibles), `CRON_SECRET`, `BLUSH_EMAIL_FROM` (`BLUSH <bonjour@askblush.com>`). Les variables sont « sensibles » : Vercel ne les rend plus, même à nous.
 
 1. **La base :** créer une base Neon depuis Vercel (projet blush-front, onglet Storage, région Francfort, « Connect »). Vercel ajoute `DATABASE_URL` tout seul. Les tables se créent au build (`scripts/migrer.mjs`, lancé par `prebuild` sur Vercel) : pas besoin de l’URL en local.
-2. **Les variables qui restent :** `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (une clé à part, avec un plafond de dépenses), `BLUSH_ACCES_LIBRE` (les emails des testeurs), puis `NEXT_PUBLIC_BLUSH_BACKEND=1` en dernier : il allume le back-end au build.
+2. **Les variables qui restent :** `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (une clé à part, avec un plafond de dépenses), `BLUSH_ACCES_LIBRE` (les emails des testeurs).
 3. **Le déploiement :** par la CI seulement, et toujours à la main : « Run workflow » sur `main` (onglet Actions de `blush-front`), ou `gh workflow run CI --ref main`. Ce lancement refait les vérifications et les tests de bout en bout sur la tête de `main`, puis `vercel deploy --prod` depuis GitHub (le sous-module `prompts/` compris ; `.vercelignore` garde `prompts/evals` hors de Vercel). Un push sur `main` ne déploie rien. Plus jamais `vercel deploy` depuis un dossier local. Pas d’intégration Git côté Vercel : `vercel.json` coupe ses déploiements automatiques, au cas où le dépôt y serait relié un jour.
 4. **Donner l’accès à un ami pendant la bêta :** ajouter son email à `BLUSH_ACCES_LIBRE`, puis relancer la mise en production (un nouveau « Run workflow » sur `main` : un « Re-run » d’un ancien lancement s’arrête si `main` a avancé depuis), ou, avec l’URL de la base :
    ```bash

@@ -19,12 +19,6 @@ const SECURITE = [
 const SESSION = { type: "cookie" as const, key: "blush-session" };
 
 const nextConfig: NextConfig = {
-  /*
-   * Le mode (back-end ou démo) est figé au build, côté serveur comme dans le navigateur. Absente au build, la variable
-   * restait lue au démarrage par le serveur seul : un build de démo lancé avec elle servait la vraie base à un navigateur
-   * resté en démo.
-   */
-  env: { NEXT_PUBLIC_BLUSH_BACKEND: process.env.NEXT_PUBLIC_BLUSH_BACKEND ?? "" },
   async redirects() {
     return [
       /* L’écran 14 (son message) vit désormais dans le chat de l’accueil ; l’écran 15 (relire ma réponse) a été retiré */

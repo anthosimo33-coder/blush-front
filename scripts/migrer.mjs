@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Au build sur Vercel : met la base à jour (les migrations de drizzle/), avant de construire l’appli.
- * L’URL de la base n’existe que dans Vercel : on n’a jamais besoin de la voir. Sans base (le mode démo), rien à faire.
- * Hors de Vercel, rien non plus : en local, c’est `npm run db:migrer`.
+ * L’URL de la base n’existe que dans Vercel : on n’a jamais besoin de la voir. Sans base, rien à faire.
+ * Hors de Vercel, rien non plus : en local, c’est `npm run dev` qui migre la base (scripts/developper.mjs), ou `npm run db:migrer`.
  */
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";

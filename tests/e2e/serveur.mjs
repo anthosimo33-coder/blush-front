@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Un serveur des tests de bout en bout, lancé par Playwright (webServer de playwright.config.ts) :
- * 1. il vérifie que .next est le build du back-end fait par `npm run e2e:build` ;
+ * 1. il vérifie que .next est le build fait par `npm run e2e:build` ;
  * 2. le premier serveur (E2E_PREPARER=1) recrée la base des tests, y applique les migrations de drizzle/, et vide la
  *    boîte à mails. C’est ici, pas dans un globalSetup : Playwright lance les serveurs avant le globalSetup ;
  * 3. il lance `next start` avec l’environnement des tests seulement : aucune clé d’API du shell ne passe.
@@ -31,7 +31,7 @@ const lire = (chemin) => {
 
 if (!DATABASE_URL || !BLUSH_BOITE_MAILS || !E2E_PORT_SERVEUR) arreter("lance les tests avec `npm run e2e` (ce serveur prend ses réglages dans playwright.config.ts)");
 
-/* 1. Le build : celui du back-end, fait par `npm run e2e:build` (tests/e2e/construire.mjs pose sa marque) */
+/* 1. Le build : celui fait par `npm run e2e:build` (tests/e2e/construire.mjs pose sa marque) */
 const buildId = lire(".next/BUILD_ID")?.trim();
 if (!buildId) arreter("pas de build dans .next : lance d’abord `npm run e2e:build`");
 let marque = null;
@@ -40,8 +40,7 @@ try {
 } catch {
   /* une marque illisible : comme pas de marque */
 }
-if (marque?.buildId !== buildId || marque.backend !== true)
-  arreter("le build de .next n’est pas celui des tests (le back-end, NEXT_PUBLIC_BLUSH_BACKEND=1) : relance `npm run e2e:build`");
+if (marque?.buildId !== buildId) arreter("le build de .next n’est pas celui des tests : relance `npm run e2e:build`");
 
 /*
  * `next start` lit aussi les fichiers .env du projet, sans écraser ce qu’on lui donne : une vraie clé d’API qui y traîne
