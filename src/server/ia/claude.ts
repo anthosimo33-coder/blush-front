@@ -127,7 +127,8 @@ export async function appeler<S extends z.ZodType>(
   if (env().BLUSH_IA_FACTICE) {
     if (signal?.aborted) throw new ErreurTache("annule");
     const brut = factice(req);
-    if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: null };
+    /* REFUS_FACTICE, ou refusFactice(categorie) */
+    if (typeof brut === "string" && brut.startsWith(REFUS_FACTICE)) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: brut.slice(REFUS_FACTICE.length + 1) || null };
     if (surAvance && req.tache === "10-chat") await ecrireFactice(JSON.stringify(brut), surAvance);
     const ok = schema.safeParse(brut);
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };

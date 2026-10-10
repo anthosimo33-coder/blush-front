@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { EVENEMENTS_ECOUTE } from "@/server/db/enums";
 import { contexteRequete } from "@/server/donnees";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { noterEcoute } from "@/server/vocal";
+import { EVENEMENTS_ECOUTE } from "@/types";
 
 const Evenement = z.enum(EVENEMENTS_ECOUTE);
 

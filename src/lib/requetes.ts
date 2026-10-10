@@ -4,7 +4,7 @@
  * Ce que le cache des requêtes (src/lib/query.ts) garde du compte et de la conv ouverte, et ce qui le fait relire : les
  * écrans passent par ici, pour qu’un changement de conv ou un paiement n’oublie aucune donnée.
  */
-import { getAccount, getReport, openConv, type ReportPayload } from "@/services/api";
+import { getAccount, getReport, openConv, type Account, type ReportPayload } from "@/services/api";
 import { invalidate, useQuery, type Cle, type OptionsLecture } from "./query";
 
 /**
@@ -13,8 +13,8 @@ import { invalidate, useQuery, type Cle, type OptionsLecture } from "./query";
  */
 const CLES_DE_LA_CONV = ["report", "account"] as const satisfies readonly Cle[];
 
-/** Le compte (son email, son plan), lu une seule fois pour tous les écrans montés. */
-export const useCompte = () => useQuery("account", getAccount);
+/** Le compte (son email, son plan), lu une seule fois pour tous les écrans montés ; `initial` : celui que la page serveur a rendu. */
+export const useCompte = (initial?: Account, options?: OptionsLecture) => useQuery("account", getAccount, initial, options);
 
 /** Le rapport de la conv ouverte, à partir de celui que la page serveur a rendu (`initial`, voir useQuery). */
 export const useRapport = (initial: ReportPayload, options?: OptionsLecture) => useQuery("report", getReport, initial, options);

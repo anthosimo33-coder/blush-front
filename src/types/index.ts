@@ -23,6 +23,12 @@ type Side = "toi" | "elle" | "pareil";
 /** Ce que le compte a (users.plan) : l’offre achetée en donne un (src/contenu/offres.ts). */
 export const PLANS = ["gratuit", "rapport", "blushplus"] as const;
 export type Plan = (typeof PLANS)[number];
+/** Les deux voix de l’A/B test (vocals, chat_vocals, vocal_ecoutes) : A (E2, créée pour BLUSH) et B (L2, Harmonie, de la bibliothèque ElevenLabs). */
+export const VOIX = ["A", "B"] as const;
+export type Voix = (typeof VOIX)[number];
+/** vocal_ecoutes.evenement : un moment de l’écoute du vocal (le début, la fin, une réécoute, fermé avant la fin). */
+export const EVENEMENTS_ECOUTE = ["debut", "fin", "reecoute", "ferme"] as const;
+export type EvenementEcoute = (typeof EVENEMENTS_ECOUTE)[number];
 /** La devinette de « Qui es-tu ? » : où vous en êtes, d’après toi. */
 export const GUESSES = ["parle", "vus", "flou", "ensemble"] as const;
 export type Guess = (typeof GUESSES)[number];
@@ -165,7 +171,7 @@ export type VocalLigne = {
  */
 export type VocalRapport =
   | { etat: "en_cours" }
-  | { etat: "pret"; audio: string; duree: number; voix: "A" | "B"; sobre: boolean; lignes: VocalLigne[] };
+  | { etat: "pret"; audio: string; duree: number; voix: Voix; sobre: boolean; lignes: VocalLigne[] };
 
 export type Report = {
   storyId: string;

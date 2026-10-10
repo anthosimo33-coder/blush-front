@@ -9,14 +9,50 @@ import { codePublic, ERREURS_API, ErreurApi, type CodeErreur } from "@/types/err
 const api = (code: CodeErreur) => new ErreurApi(code, ERREURS_API[code]);
 
 describe("le serveur", () => {
+  it("chaque code garde le statut que ses routes répondaient (le navigateur en lit certains : un lot de vidéo se rejoue sur un 5xx)", () => {
+    /* Écrit en dur : une faute de frappe dans la liste ne passe pas. pas_pret vaut 409 partout (l’audio du vocal répondait 404) */
+    expect(ERREURS_API).toEqual({
+      origine: 403,
+      connexion: 401,
+      interdit: 401,
+      beta: 403,
+      trop: 429,
+      aucune: 404,
+      introuvable: 404,
+      lien: 404,
+      pas_pret: 409,
+      occupe: 409,
+      sobre: 409,
+      acces: 402,
+      bientot: 402,
+      email: 422,
+      texte: 422,
+      faits: 422,
+      offre: 422,
+      cible: 422,
+      invalide: 422,
+      qui: 422,
+      fichier: 422,
+      groupe: 422,
+      courte: 422,
+      capture: 422,
+      autre_conv: 422,
+      rien_de_neuf: 422,
+      vocal: 422,
+      vocal_vide: 422,
+      vocal_bientot: 503,
+      refus: 502,
+      transcription: 502,
+      panne: 502,
+    });
+  });
+
   it("une erreur répond son code, avec le statut de la liste", async () => {
     for (const [code, status] of Object.entries(ERREURS_API) as [CodeErreur, number][]) {
       const r = erreur(code);
       expect(r.status).toBe(status);
       expect(await r.json()).toEqual({ erreur: code });
     }
-    /* pas_pret : 409 partout, l’audio du vocal compris (il répondait 404) */
-    expect(erreur("pas_pret").status).toBe(409);
   });
 
   it("une erreur d’étape ne dit au navigateur que le refus, le vocal ou la panne", () => {

@@ -2,8 +2,9 @@
  * Les erreurs de l’API, du serveur jusqu’aux écrans : la seule liste de leurs codes, avec leur statut HTTP. Sans
  * server-only : le serveur répond `{ erreur: code }` (src/server/http.ts), le navigateur en fait une ErreurApi, et ses
  * écrans un texte (src/lib/messages-erreur.ts). Un code ne dit jamais rien d’interne.
- * Une seule exception : un mauvais code de connexion (/api/auth/verifier) répond 200 `{ ok: false }`, la même réponse
- * pour tous, invités ou non.
+ * Seule exception d’une route d’action : un mauvais code de connexion (/api/auth/verifier) répond 200 `{ ok: false }`,
+ * la même réponse pour tous, invités ou non. Hors de ce contrat : /api/reveil, un réveil sans code, répond 503
+ * `{ ok: false }` quand la base ne répond pas.
  */
 export const ERREURS_API = {
   /* La requête */
@@ -37,11 +38,17 @@ export const ERREURS_API = {
   bientot: 402,
 
   /* Ce qu’elle envoie */
+  /** Un email qui n’en est pas un (le code de connexion, la liste d’attente). */
   email: 422,
+  /** Un message au chat vide, ou trop long. */
   texte: 422,
+  /** Sa fiche corrigée, mal formée. */
   faits: 422,
+  /** Une offre qui n’existe pas. */
   offre: 422,
+  /** Ce qu’on veut partager en image (une réponse du chat, un chapitre) n’est pas désigné comme il faut. */
   cible: 422,
+  /** Le reste de ce qu’une route attend (le mode vocal du chat, un moment de l’écoute du vocal). */
   invalide: 422,
   /** « Qui es-tu ? » n’est pas rempli : la lecture ne peut pas partir. */
   qui: 422,
@@ -59,13 +66,17 @@ export const ERREURS_API = {
   rien_de_neuf: 422,
   /** Un vocal vide, ou trop long. */
   vocal: 422,
+  /** Un vocal où la transcription n’entend rien. */
   vocal_vide: 422,
   /** La transcription des vocaux n’est pas configurée. */
   vocal_bientot: 503,
 
   /* Le modèle, au chat et à la fiche : seulement codePublic */
+  /** Le modèle refuse de répondre (ses règles, ou les filtres de son prestataire), malgré le repli sur un autre. */
   refus: 502,
+  /** Le vocal n’a pas pu être transcrit. */
   transcription: 502,
+  /** Le reste : une sortie illisible, le temps écoulé, un bug. */
   panne: 502,
 } as const;
 

@@ -3,11 +3,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { messagesAffiches } from "@prompts/lib/front";
 import type { Vocal } from "@prompts/lib/schemas";
 import { minuter, texteDit } from "@/lib/vocal";
-import type { VocalLigne, VocalRapport } from "@/types";
+import type { EvenementEcoute, VocalLigne, VocalRapport, Voix } from "@/types";
 import { chiffrer, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { db, schema } from "./db";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
-import type { EvenementEcoute, Voix } from "./db/enums";
 import { dire, voixPour } from "./ia/voix";
 
 /*

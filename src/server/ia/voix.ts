@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Alignement } from "@/lib/vocal";
 import { db, schema } from "../db";
-import type { Voix } from "../db/enums";
+import type { Voix } from "@/types";
 import { env } from "../env";
 import { delaiAppel, tempsRestant } from "../echeance";
 

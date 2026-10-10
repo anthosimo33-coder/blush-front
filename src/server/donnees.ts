@@ -16,11 +16,12 @@ import { ENTETE_CONV } from "@/services/session";
 import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
-import { estRefus } from "./erreurs";
+import { echecDe } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
+import type { Genre } from "./db/enums";
 import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
-import { aRelancer, etatDesTaches, planifier, type Genre, type Tache } from "./taches";
+import { aRelancer, etatDesTaches, planifier, type Tache } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
 import { jourRelatif } from "./temps";
@@ -140,7 +141,7 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
     stepsDone: fini ? 4 : etape,
     discoveries: decouvertes(story, p),
     done: fini,
-    ...(echec ? { failed: true, failReason: estRefus(verdict?.error) ? ("refus" as const) : ("panne" as const) } : {}),
+    ...(echec ? { failed: true, failReason: echecDe(verdict?.error) } : {}),
   };
 }
 
@@ -220,7 +221,7 @@ const TACHES_DU_RAPPORT: Genre[] = ["verdict", "rapport_plan", "rapport_chapitre
 function echecDuRapport({ rapport_plan, rapport_chapitres }: EtatTaches): Echec | undefined {
   const t = [rapport_plan, rapport_chapitres].find((x) => x?.status === "echec");
   if (!t) return undefined;
-  return estRefus(t.error) ? "refus" : "panne";
+  return echecDe(t.error);
 }
 
 /** Ce que le verdict dit en tête du rapport, et sur l’accueil : son verdict, où vous en êtes, ton prochain pas. */

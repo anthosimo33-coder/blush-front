@@ -6,10 +6,11 @@
  * Le compte doit exister (la personne s’est connectée une fois). Pour la bêta, BLUSH_ACCES_LIBRE fait la même chose à la connexion.
  */
 import postgres from "postgres";
+import { PLANS, type Plan } from "../src/types";
 
 const [email, plan] = process.argv.slice(2);
-if (!email || !["gratuit", "rapport", "blushplus"].includes(plan ?? "")) {
-  console.error("usage : npm run acces -- <email> <gratuit|rapport|blushplus>");
+if (!email || !PLANS.includes(plan as Plan)) {
+  console.error(`usage : npm run acces -- <email> <${PLANS.join("|")}>`);
   process.exit(1);
 }
 const sql = postgres(process.env.DATABASE_URL ?? "postgres://localhost:5432/blush_dev", { max: 1, prepare: false });

@@ -13,7 +13,7 @@ Le navigateur passe par `src/services/api.ts`, qui appelle ces routes ; les page
 - **limite `x`** : `LIMITES.x` (`src/server/limites.ts`), par adresse IP, par compte ou par email, sinon 429 `trop`.
 - **bêta** : en bêta fermée, BLUSH ne lit des captures que pour un compte connecté (`lecturePermise`, `src/server/captures.ts`), sinon 401 `connexion`.
 
-Une erreur répond `{ erreur: <code> }`, avec le statut que lui donne la liste des codes (`ERREURS_API`, `src/types/erreurs-api.ts`) ; les écrans en tirent leur texte (`src/lib/messages-erreur.ts`). D’une étape du modèle, le chat et la fiche ne disent que `refus`, `transcription` ou `panne` (`codePublic`) : son code interne (`refus:cyber`, `sortie_illisible`) reste dans l’alerte. Seule exception : un mauvais code de connexion répond 200 `{ ok: false }`, la même réponse pour tous.
+Une erreur répond `{ erreur: <code> }`, avec le statut que lui donne la liste des codes (`ERREURS_API`, `src/types/erreurs-api.ts`) ; les écrans en tirent leur texte (`src/lib/messages-erreur.ts`). D’une étape du modèle, le chat et la fiche ne disent que `refus`, `transcription` ou `panne` (`codePublic`) : son code interne (`refus:cyber`, `sortie_illisible`) reste dans l’alerte. Seule exception d’une route d’action : un mauvais code de connexion répond 200 `{ ok: false }`, la même réponse pour tous. Hors de ce contrat, `/api/reveil` (un réveil, sans code) répond 503 `{ ok: false }` quand la base ne répond pas.
 
 | Route | Méthodes | Rôle | Garde | Module |
 |---|---|---|---|---|
@@ -142,7 +142,7 @@ npm run dev
 
 En dev, le code de connexion s’affiche dans les logs du serveur.
 
-Les tests tournent sur la base `blush_test`, ou celle de `DATABASE_URL_TEST` : `npm test` la crée si elle manque et la migre (`tests/preparer-la-base.ts`), sans jamais l’effacer. `blush_test` sert à tous les dossiers du projet sur la machine : sans `DATABASE_URL_TEST`, elle n’est migrée que si elle vient d’être créée, et une migration qui lui manque arrête les tests (prendre alors `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom>`). `npm run check` lance tout ce que la CI vérifie avant le build : les types, le lint, la cohérence des migrations (`scripts/verifier-migrations.mjs` : le journal de `drizzle/`, puis `drizzle-kit check`) et les tests.
+Les tests tournent sur la base `blush_test`, ou celle de `DATABASE_URL_TEST` : `npm test` la crée si elle manque et la migre (`tests/preparer-la-base.ts`), sans jamais l’effacer. `blush_test` sert à tous les dossiers du projet sur la machine : sans `DATABASE_URL_TEST`, elle n’est migrée que si elle vient d’être créée, et une migration qui lui manque arrête les tests (prendre alors `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom>`). `npm run check` lance tout ce que la CI vérifie avant le build : les types, le lint, la cohérence des migrations (`scripts/verifier-migrations.mjs` : le journal de `drizzle/`, `drizzle-kit check`, puis `drizzle-kit generate` sur une copie, qui ne doit rien trouver à migrer) et les tests.
 
 ### Les tests de bout en bout
 

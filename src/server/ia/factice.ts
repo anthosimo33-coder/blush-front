@@ -7,6 +7,8 @@ const ids = (req: Requete) => [...new Set(textes(req).join("\n").match(/^m\d{4,}
 
 /** Ce qu’une sortie factice rend pour simuler un refus du modèle (src/server/ia/claude.ts le traite comme un vrai refus). */
 export const REFUS_FACTICE = "@@refus@@";
+/** Un refus avec sa catégorie, comme les filtres du prestataire (« cyber ») : le code d’erreur la porte (« refus:cyber »). */
+export const refusFactice = (categorie: string) => `${REFUS_FACTICE}:${categorie}`;
 
 /*
  * Les déclencheurs, pour les tests de bout en bout (tests/e2e/aide/exports.ts les écrit dans une conv) : des marqueurs

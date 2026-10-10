@@ -6,11 +6,12 @@ import type { Requete } from "@prompts/lib/contextes";
 /*
  * La réponse du chat en flux (POST /api/chat, une ligne JSON par événement) : les bulles une à une pendant que
  * BLUSH écrit, la réponse validée, puis le vocal, fait après elle. La route est appelée comme le ferait le navigateur
- * (cookies simulés, after() gardé pour être lancé à la main), et lue par le vrai lecteur du navigateur (src/services/api.ts).
+ * (cookies simulés, after() gardé pour être lancé à la main, les alertes à l’équipe gardées pour être lues), et lue par
+ * le vrai lecteur du navigateur (src/services/api.ts).
  * Le dépôt est public : un échec n’affiche ni les prompts (le garde-fou lit un faux texte) ni les messages de la conv
  * (on compare leurs longueurs, pas leur texte).
  */
-const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), apres: [] as (() => unknown)[] }));
+const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), apres: [] as (() => unknown)[], alertes: [] as string[][] }));
 const FAUX_PROMPT = vi.hoisted(() => "Tu es un phare. Des marins de toutes les mers t’envoient leur carnet de bord avec la côte qui les attire.");
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -22,6 +23,7 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
+vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]) }));
 vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof import("@/server/ia/claude")>()), textesSysteme: () => [FAUX_PROMPT] }));
 
 import { POST } from "@/app/api/chat/route";
@@ -31,7 +33,7 @@ import { historique } from "@/server/chat";
 import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
 import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { REFUS_FUITE } from "@/server/ia/garde";
 import { planifier } from "@/server/taches";
 import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
@@ -89,6 +91,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   appels = 0;
   chat = null;
+  etat.alertes.length = 0;
   await vocalEnBase(false);
 });
 afterAll(async () => {
@@ -174,13 +177,30 @@ describe("POST /api/chat en flux", () => {
     await lancerApres();
   });
 
-  it("un refus du modèle avant toute bulle : la réponse d’un bloc, avec son statut et son code, comme avant le flux", async () => {
-    chat = () => REFUS_FACTICE;
-    const r = await envoyer("…");
+  it("un refus du modèle avant toute bulle : la réponse d’un bloc, avec son statut et son code public ; sa catégorie reste dans l’alerte", async () => {
+    chat = () => refusFactice("cyber");
+    /* En flux, et d’une page d’avant le flux (sans Accept) */
+    for (const flux of [true, false]) {
+      etat.alertes.length = 0;
+      const r = await envoyer("…", flux);
+      expect(r.status).toBe(502);
+      expect(r.headers.get("content-type")).toContain("application/json");
+      expect(await r.json()).toEqual({ erreur: "refus" });
+      await lancerApres();
+      expect(etat.alertes).toEqual([["chat en échec", `Histoire ${id}`, "Erreur : refus:cyber"]]);
+    }
+  });
+
+  it("une sortie illisible avant toute bulle : la réponse d’un bloc dit une panne, l’alerte dit pourquoi", async () => {
+    chat = () => ({ illisible: true });
+    const r = await envoyer("elle veut quoi ?");
+    /* Rejouée une fois, illisible encore */
+    expect(appels).toBe(2);
     expect(r.status).toBe(502);
     expect(r.headers.get("content-type")).toContain("application/json");
-    expect(await r.json()).toEqual({ erreur: "refus" });
+    expect(await r.json()).toEqual({ erreur: "panne" });
     await lancerApres();
+    expect(etat.alertes).toEqual([["chat en échec", `Histoire ${id}`, "Erreur : sortie_illisible"]]);
   });
 
   it("une erreur après des bulles : elles sont parties, l’erreur arrive en dernier dans le flux, sans son code interne", async () => {
@@ -195,6 +215,7 @@ describe("POST /api/chat en flux", () => {
     expect(evenements.at(-1)).toEqual({ erreur: "panne" });
     expect(appels).toBe(1);
     await lancerApres();
+    expect(etat.alertes).toEqual([["chat en échec", `Histoire ${id}`, "Erreur : sortie_illisible"]]);
   });
 
   it("une page d’avant le flux (sans Accept) : la réponse d’un bloc, vocal compris, comme avant", async () => {

@@ -10,6 +10,7 @@ import type {
   BulleChat,
   Echec,
   EvenementChat,
+  EvenementEcoute,
   Fiche,
   FicheFact,
   FicheUpdate,
@@ -26,7 +27,6 @@ import type {
 } from "@/types";
 import { ErreurApi, type CodeErreur } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
-import type { EvenementEcoute } from "@/server/db/enums";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
 import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";

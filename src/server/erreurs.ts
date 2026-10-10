@@ -1,4 +1,5 @@
 import "server-only";
+import type { Echec } from "@/types";
 import { codePublic } from "@/types/erreurs-api";
 
 /**
@@ -38,3 +39,6 @@ export class ErreurTache extends Error {
  * d’étape, ou le code gardé en base (tasks.error).
  */
 export const estRefus = (e: ErreurTache | string | null | undefined): boolean => !!e && codePublic(typeof e === "string" ? e : e.code) === "refus";
+
+/** Ce que l’écran dit d’une étape en échec, d’après le code gardé en base (tasks.error) : le refus du modèle, ou une panne. */
+export const echecDe = (code: string | null | undefined): Echec => (estRefus(code) ? "refus" : "panne");

@@ -9,7 +9,6 @@ import type { Genre } from "./db/enums";
  * Une tâche « en cours » dont le battement de cœur est périmé a été abandonnée (instance arrêtée) : on la reprend.
  * Leurs genres et leurs états : src/server/db/enums.ts.
  */
-export type { Genre };
 export type Tache = typeof schema.tasks.$inferSelect;
 
 export const ESSAIS_MAX = 3;

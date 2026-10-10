@@ -1,9 +1,8 @@
 import { sql } from "drizzle-orm";
 import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { PLANS } from "../../types";
-import type { AvanceMoitie } from "../analyse";
-import { EVENEMENTS_ECOUTE, GENRES, GENRES_CHAINE, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, VOIX } from "./enums";
+import { EVENEMENTS_ECOUTE, PLANS, VOIX } from "../../types";
+import { GENRES, GENRES_CHAINE, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -121,9 +120,6 @@ export const chatMessages = pgTable(
   },
   (t) => [index("chat_messages_story_idx").on(t.storyId, t.id)],
 );
-
-/** Le détail de l’avancée d’une tâche (tasks.detail) : les deux moitiés du rapport, chapitre par chapitre. */
-export type DetailEcriture = { a: AvanceMoitie; b: AvanceMoitie };
 
 /**
  * Les tâches longues (le verdict, le plan du rapport, ses chapitres, le vocal, la mémoire, une mise à jour de la

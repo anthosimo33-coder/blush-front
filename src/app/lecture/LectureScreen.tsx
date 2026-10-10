@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useReducedMotion } from "@/lib/hooks";
+import { codeDe } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
@@ -16,7 +17,6 @@ import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import { lectureLancee } from "@/state/lecture";
 import type { AnalysisProgress } from "@/types";
-import { ErreurApi } from "@/types/erreurs-api";
 
 const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
 /** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */
@@ -70,8 +70,10 @@ export function LectureScreen({ total }: { total: number }) {
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
       const lance = deja || await resumeAnalysis().then(
         () => true,
-        (e: unknown) =>
-          e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : e instanceof ErreurApi && e.code === "trop" ? ("trop" as const) : null,
+        (e: unknown) => {
+          const code = codeDe(e);
+          return code === "qui" || code === "connexion" || code === "trop" ? code : null;
+        },
       );
       if (!alive) return;
       if (lance === "trop") {
@@ -100,13 +102,13 @@ export function LectureScreen({ total }: { total: number }) {
           next = await getAnalysisProgress();
         } catch (e) {
           if (!alive) return;
-          if (e instanceof ErreurApi && e.status === 401) {
+          if (codeDe(e) === "connexion") {
             router.replace("/connexion?suite=/lecture");
             return;
           }
           rates += 1;
           /* La conv a disparu, ou le serveur ne répond plus depuis un moment : l’écran d’échec, avec « Relancer » */
-          if ((e instanceof ErreurApi && e.status === 404) || rates >= RATES_MAX) {
+          if (codeDe(e) === "aucune" || rates >= RATES_MAX) {
             setFailed(true);
             return;
           }

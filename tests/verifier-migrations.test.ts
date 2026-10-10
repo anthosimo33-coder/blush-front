@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /*
  * scripts/verifier-migrations.mjs, lancé avant chaque build et chaque `npm test` : sur une copie de drizzle/, un journal
- * cassé de chacune des façons qu’il doit voir fait échouer le script (code 1, et il dit pourquoi) ; la copie intacte passe.
+ * cassé de chacune des façons qu’il doit voir, ou un dernier instantané en retard sur schema.ts, fait échouer le script
+ * (code 1, et il dit pourquoi) ; la copie intacte passe.
  */
 const SCRIPT = join(__dirname, "../scripts/verifier-migrations.mjs");
 let dossier: string;
@@ -83,5 +84,18 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
     expect(code).toBe(1);
     expect(sortie).toContain("drizzle-kit check a échoué");
     expect(sortie).toContain("collision");
+  });
+
+  it("refuse un schéma qui a changé sans sa migration (une liste des étapes de la chaîne, et son index unique)", () => {
+    /* Le dernier instantané garde l’index d’avant une étape de plus dans GENRES_CHAINE : schema.ts en demande un autre */
+    const chemin = join(dossier, "meta/0011_snapshot.json");
+    const dernier = JSON.parse(readFileSync(chemin, "utf8")) as { tables: Record<string, { indexes: Record<string, { where: string }> }> };
+    const index = dernier.tables["public.tasks"].indexes.tasks_une_par_etape;
+    index.where = index.where.replace(", 'memoire')", ")");
+    writeFileSync(chemin, JSON.stringify(dernier));
+    const { code, sortie } = verifier();
+    expect(code).toBe(1);
+    expect(sortie).toContain("schema.ts a changé sans sa migration");
+    expect(sortie).toContain('CREATE UNIQUE INDEX "tasks_une_par_etape"');
   });
 });

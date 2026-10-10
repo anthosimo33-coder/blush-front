@@ -12,6 +12,7 @@ import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
+import type { AvanceMoitie, Genre } from "./db/enums";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache, estRefus } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
@@ -21,7 +22,7 @@ import { alerter } from "./alertes";
 import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
-import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, type Genre, type Tache } from "./taches";
+import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
@@ -135,8 +136,7 @@ export function chapitresFinis(ecrit: string): Chapitre[] {
   });
 }
 
-/** Une moitié du rapport (chapitres 1 à 4, ou 5 à 8) : où elle en est (0 à 1), ses chapitres écrits, celui en cours. */
-export type AvanceMoitie = { progres: number; ecrits: number[]; enCours: number | null };
+/** Où en est une moitié du rapport (chapitres 1 à 4, ou 5 à 8), d’après ce que le modèle a déjà écrit. */
 export function avanceMoitie(a: Avance, premier: 1 | 5): AvanceMoitie {
   const nums = chapitresCommences(a.ecrit).filter((n) => n >= premier && n < premier + 4);
   /* Avant le premier chapitre, il réfléchit : on s’approche de 45 % sans l’atteindre */
