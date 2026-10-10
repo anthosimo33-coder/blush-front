@@ -47,7 +47,9 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     ecrire("static/chunks/app/page.js", `const consigne = ${JSON.stringify(phrase)};`);
     const { code, sortie } = verifier();
     expect(code).toBe(1);
-    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
+    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js (phrase n° 1 sur");
+    /* La sortie ne recopie pas la phrase (les logs de la CI sont publics) ; un booléen, pour qu’un échec ne l’affiche pas non plus */
+    expect(sortie.includes(phrase)).toBe(false);
   });
 
   it("échoue aussi quand la phrase est dans une page prérendue", () => {
@@ -57,6 +59,7 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     const { code, sortie } = verifier();
     expect(code).toBe(1);
     expect(sortie).toContain("fuite des prompts : server/app/rapport.rsc");
+    expect(sortie.includes(phrase.slice(0, 40))).toBe(false);
   });
 
   it("échoue sans build : un dossier vide n’a pas de .next/static", () => {

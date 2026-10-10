@@ -49,8 +49,9 @@ export function verifier(dossierNext) {
   const problemes = [];
   for (const f of cibles) {
     const contenu = readFileSync(f, "utf8");
-    const trouvee = phrases.find((ph) => contenu.includes(ph) || contenu.includes(JSON.stringify(ph).slice(1, -1)));
-    if (trouvee) problemes.push(`fuite des prompts : ${f.slice(dossierNext.length + 1)} : « ${trouvee.slice(0, 60)}… »`);
+    const i = phrases.findIndex((ph) => contenu.includes(ph) || contenu.includes(JSON.stringify(ph).slice(1, -1)));
+    /* Le numéro de la phrase, jamais son texte : les logs de la CI sont publics (phrasesDesPrompts()[n - 1] la retrouve en local) */
+    if (i >= 0) problemes.push(`fuite des prompts : ${f.slice(dossierNext.length + 1)} (phrase n° ${i + 1} sur ${phrases.length})`);
   }
   return { problemes, cibles: cibles.length, phrases: phrases.length };
 }
