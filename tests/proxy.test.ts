@@ -1,10 +1,11 @@
+import { existsSync } from "node:fs";
 import { NextRequest, type NextResponse } from "next/server";
 import { getRewrittenUrl, isRewrite, unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { config, proxy } from "@/proxy";
 
 /*
- * Le proxy (src/proxy.ts) : les outils de l’équipe en 404 sur Vercel et ouverts ailleurs, d’après un seul critère
+ * Le proxy (src/proxy.ts) : les outils de l’équipe introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
  * (src/server/drapeaux.ts), et les variantes de la bêta fermée, qui ne changent pas. Sans base ni serveur : la requête
  * est construite ici, les variables posées par cas. (Le guide de Next appelle unstable_doesProxyMatch ce que cette
  * version exporte encore sous le nom unstable_doesMiddlewareMatch.)
@@ -31,17 +32,24 @@ describe("les outils de l’équipe : jamais sur Vercel", () => {
     for (const url of ["/", "/app", "/rapport", "/admin", "/api/auth/code", "/v/abc"]) expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(false);
   });
 
-  it("sur Vercel, en ligne comme en préversion : 404, bêta fermée ou non", () => {
+  it("sur Vercel, en ligne comme en préversion : la page introuvable (404), bêta fermée ou non", () => {
     vi.stubEnv("VERCEL", "1");
+    const cibles = new Set<string | null>();
     for (const [vercel, beta] of [["production", "1"], ["production", "0"], ["preview", "0"]]) {
       vi.stubEnv("VERCEL_ENV", vercel);
       vi.stubEnv("BLUSH_BETA_FERMEE", beta);
       for (const url of OUTILS) {
         const r = proxy(requete(url));
-        expect(r.status, `${url} (${vercel}, bêta ${beta})`).toBe(404);
-        expect(passe(r) || isRewrite(r), url).toBe(false);
+        expect(passe(r), `${url} (${vercel}, bêta ${beta})`).toBe(false);
+        cibles.add(reecriteVers(r));
       }
     }
+    /* Une seule adresse, sans page (Next y sert src/app/not-found.tsx, en 404) et hors du matcher (le proxy n’y repasse pas) */
+    expect(cibles.size).toBe(1);
+    const [cible] = cibles;
+    expect(cible).toMatch(/^\/[a-z-]+$/);
+    expect(existsSync(`src/app${cible}`), cible!).toBe(false);
+    expect(unstable_doesMiddlewareMatch({ config, url: cible! })).toBe(false);
   });
 
   it("hors de Vercel (en local, le serveur des tests) : ils s’ouvrent", () => {

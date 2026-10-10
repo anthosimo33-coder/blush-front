@@ -1,7 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { BlushAnswer, ReportPayload } from "@/services/api";
-import { cheminDesApercus } from "@/server/drapeaux";
 import type { Fiche, Story } from "@/types";
 
 /** Ce que vers-front.mjs écrit pour une conv : le rapport, et (avec la mémoire) sa fiche et l’accueil. */
@@ -19,11 +18,11 @@ export type Apercu = {
 };
 
 /**
- * Hors de Vercel seulement (src/proxy.ts) : BLUSH_APERCU désigne un fichier (une conv) ou un dossier (une conv par
- * fichier, `?cas=01`). Renvoie null sans aperçu.
+ * Hors de Vercel seulement (src/proxy.ts) : `chemin` désigne un fichier (une conv) ou un dossier (une conv par fichier,
+ * `?cas=01`). C’est BLUSH_APERCU, que la page lit (cheminDesApercus) et passe ici : ce fichier ne lit rien du serveur.
+ * Renvoie null sans aperçu.
  */
-export async function lireApercu(cas?: string): Promise<{ data: Apercu; cas: string | null; tous: string[] } | null> {
-  const chemin = cheminDesApercus();
+export async function lireApercu(chemin: string | null, cas?: string): Promise<{ data: Apercu; cas: string | null; tous: string[] } | null> {
   if (!chemin) return null;
   if (!(await stat(chemin)).isDirectory()) return { data: JSON.parse(await readFile(chemin, "utf8")), cas: null, tous: [] };
   const tous = (await readdir(chemin)).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
@@ -33,8 +32,8 @@ export async function lireApercu(cas?: string): Promise<{ data: Apercu; cas: str
 }
 
 /** Tous les aperçus du dossier, pour la liste. */
-export async function lireTous(): Promise<{ cas: string; data: Apercu }[]> {
-  const premier = await lireApercu();
+export async function lireTous(chemin: string | null): Promise<{ cas: string; data: Apercu }[]> {
+  const premier = await lireApercu(chemin);
   if (!premier?.cas) return premier ? [{ cas: "", data: premier.data }] : [];
-  return Promise.all(premier.tous.map(async (cas) => ({ cas, data: (await lireApercu(cas))!.data })));
+  return Promise.all(premier.tous.map(async (cas) => ({ cas, data: (await lireApercu(chemin, cas))!.data })));
 }

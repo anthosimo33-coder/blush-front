@@ -41,7 +41,7 @@ Le navigateur passe par `src/services/api.ts`, qui appelle ces routes ; les page
 | `/api/reveil` | GET | Le réveil : démarre une instance et réveille la base (`select 1`), sans rien lire ni écrire. Le navigateur l’appelle sans attendre (`src/components/shell/Reveil.tsx`) | aucune | la route |
 | `/api/cron/purge` | GET | La purge de nuit (Vercel Cron, `vercel.json`), puis le résumé de la veille à l’équipe | l’en-tête `Authorization: Bearer <CRON_SECRET>`, sinon 401 | `src/server/purge.ts`, `src/server/alertes.ts` |
 
-Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’à l’équipe : jamais sur Vercel, où `src/proxy.ts` répond 404 (comme pour `/styleguide`).
+Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’à l’équipe : jamais sur Vercel, où `src/proxy.ts` sert à leur place la page introuvable, en 404 (comme pour `/styleguide`).
 
 ## Les tâches
 
@@ -127,7 +127,7 @@ En production (`VERCEL_ENV=production`, pas les préversions), `env()` refuse au
 
 `tests/documentation.test.ts` échoue si une variable du schéma manque à ce tableau, ou si ce tableau en cite une qu’il ne connaît pas.
 
-Lues hors du schéma, par `src/server/drapeaux.ts` (sans `server-only` : le proxy et les pages rendues au build le lisent) : `VERCEL` (posée par Vercel : le modèle factice et la boîte à mails y sont ignorés, et les outils de l’équipe, `/apercu` et `/styleguide`, y répondent 404), `VERCEL_ENV` (`production` : les garde-fous ci-dessus), `BLUSH_BETA_FERMEE` pour le proxy, et hors de Vercel seulement `BLUSH_APERCU` et `BLUSH_DEMANDER` (les aperçus de `/apercu`). Ailleurs : `NODE_ENV`, `DATABASE_URL_UNPOOLED` (les migrations du build, `scripts/migrer.mjs`), `DATABASE_URL_TEST` et les `E2E_*` des tests. ESLint refuse `process.env` dans le reste de `src`, sauf pour `NODE_ENV`.
+Lues hors du schéma, par `src/server/drapeaux.ts` (sans `server-only` : le proxy et les pages rendues au build le lisent) : `VERCEL` (posée par Vercel : le modèle factice et la boîte à mails y sont ignorés, et les outils de l’équipe, `/apercu` et `/styleguide`, y répondent 404), `VERCEL_ENV` (`production` : les garde-fous ci-dessus), `BLUSH_BETA_FERMEE` pour le proxy et la page des captures de la bêta fermée, et hors de Vercel seulement `BLUSH_APERCU` et `BLUSH_DEMANDER` (les aperçus de `/apercu`). Ailleurs : `NODE_ENV`, `DATABASE_URL_UNPOOLED` (les migrations du build, `scripts/migrer.mjs`), `DATABASE_URL_TEST` et les `E2E_*` des tests. ESLint refuse `process.env` dans le reste de `src`, sauf pour `NODE_ENV`.
 
 ## En local
 

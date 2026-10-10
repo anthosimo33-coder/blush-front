@@ -2,7 +2,7 @@ import { estOffert } from "@/contenu/chapitres";
 import type { Report, Source, Story } from "@/types";
 
 /*
- * L’histoire d’exemple de l’aperçu de l’écriture (en local seulement) : Hugo et Sophie, données reprises des maquettes.
+ * L’histoire d’exemple de l’aperçu de l’écriture (hors de Vercel seulement) : Hugo et Sophie, données reprises des maquettes.
  * En production, elles viennent de l’analyse réelle.
  */
 

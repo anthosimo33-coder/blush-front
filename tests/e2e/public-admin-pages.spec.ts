@@ -187,7 +187,7 @@ test("une page qui plante : « Ça a coincé de notre côté. », puis « Réess
 });
 
 test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rien de réel sans leurs variables locales", async ({ request }) => {
-  /* Un seul critère, « jamais sur Vercel » : src/proxy.ts y répond 404 (tests/proxy.test.ts). Ce serveur de test n’y est pas */
+  /* Un seul critère, « jamais sur Vercel » : src/proxy.ts y sert la page introuvable (tests/proxy.test.ts). Ce serveur de test n’y est pas */
   const styleguide = await request.get("/styleguide");
   expect(styleguide.status()).toBe(200);
   expect(await styleguide.text()).toContain("Le jeu");
@@ -195,7 +195,13 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   for (const chemin of ["/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/mail"]) {
     expect((await request.get(chemin)).status(), chemin).toBe(200);
   }
-  /* Les rapports écrits par les prompts (BLUSH_APERCU) et le vrai modèle (BLUSH_DEMANDER) : sans leur variable, rien */
+  const carte = await request.get("/apercu/carte?cas=court");
+  expect(carte.status(), "/apercu/carte").toBe(200);
+  expect(carte.headers()["content-type"], "/apercu/carte").toBe("image/png");
+  /*
+   * Les rapports écrits par les prompts (BLUSH_APERCU) et le vrai modèle (BLUSH_DEMANDER) : sans leur variable, rien.
+   * tests/e2e/serveur.mjs refuse de lancer les tests si un fichier .env les définit.
+   */
   for (const chemin of ["/apercu", "/apercu/liste", "/apercu/accueil", "/apercu/fiche"]) {
     expect((await request.get(chemin)).status(), chemin).toBe(404);
   }

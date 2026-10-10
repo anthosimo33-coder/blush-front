@@ -23,13 +23,16 @@ const SESSION = "blush-session";
 
 /**
  * Les outils de l’équipe : les aperçus (/apercu, des données fictives ou des rapports locaux) et le design system. Ils
- * n’existent pas sur Vercel (src/server/drapeaux.ts, outilsDeLEquipe) : ce proxy y répond 404 avant eux, à leur place.
+ * n’existent pas sur Vercel (src/server/drapeaux.ts, outilsDeLEquipe) : ce proxy y sert à leur place une adresse sans
+ * page, donc la page introuvable de BLUSH (src/app/not-found.tsx), en 404.
  */
 const estUnOutil = (chemin: string) => /^\/(apercu|styleguide)(\/|$)/.test(chemin);
+/** Aucune page à cette adresse, hors du matcher (tests/proxy.test.ts le vérifie) : Next y répond par sa page introuvable. */
+const INTROUVABLE = "/introuvable";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (estUnOutil(pathname)) return outilsDeLEquipe() ? NextResponse.next() : new NextResponse(null, { status: 404 });
+  if (estUnOutil(pathname)) return outilsDeLEquipe() ? NextResponse.next() : NextResponse.rewrite(new URL(INTROUVABLE, request.url));
   const variante = VARIANTES[pathname];
   if (!variante || !betaFermee()) return NextResponse.next();
   /* Déjà connecté (une autre conv) : /commencer sans la liste d’attente (next.config.ts sert alors /commencer/connecte) */

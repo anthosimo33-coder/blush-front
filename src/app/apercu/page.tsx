@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { cheminDesApercus } from "@/server/drapeaux";
 import { ReportScreen } from "../rapport/ReportScreen";
 import { ApercuNav } from "./ApercuNav";
 import { lireApercu } from "./lire";
@@ -8,12 +9,12 @@ export const metadata: Metadata = { title: "Aperçu d’un rapport" };
 export const dynamic = "force-dynamic";
 
 /**
- * En local seulement : affiche un vrai rapport produit par les prompts (prompts/evals/vers-front.mjs),
+ * Hors de Vercel seulement (src/proxy.ts) : affiche un vrai rapport produit par les prompts (prompts/evals/vers-front.mjs),
  * lu là où pointe BLUSH_APERCU (un fichier, ou un dossier et `?cas=`). Rien de ce rapport ne vit dans le dépôt.
  */
 export default async function Page({ searchParams }: PageProps<"/apercu">) {
   const { cas } = await searchParams;
-  const a = await lireApercu(typeof cas === "string" ? cas : undefined);
+  const a = await lireApercu(cheminDesApercus(), typeof cas === "string" ? cas : undefined);
   if (!a) notFound();
   return (
     <>

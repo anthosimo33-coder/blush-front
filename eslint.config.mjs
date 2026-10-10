@@ -30,7 +30,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // L’appli tourne toujours sur son back-end : jamais de données factices dans son code (le contenu du produit est dans src/contenu).
-  // Les seules qui restent servent aux aperçus locaux (src/app/apercu, 404 en production) : aucun autre fichier ne les importe.
+  // Les seules qui restent servent aux aperçus (src/app/apercu, jamais sur Vercel : src/proxy.ts) : aucun autre fichier ne les importe.
   // src/mocks n’existe plus : la règle empêche seulement qu’il revienne.
   {
     files: ["src/**"],
@@ -60,9 +60,8 @@ const eslintConfig = defineConfig([
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
-  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, ConvDeLaPage, le proxy et lire.ts, qui lit les aperçus
-  // locaux sur le disque). Ni par l’alias, ni en chemin relatif, ni par un import() dynamique. Seul server-only le disait,
-  // et au build ; schema.ts et les mails ne l’ont pas.
+  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, ConvDeLaPage et le proxy). Ni par l’alias, ni en chemin
+  // relatif, ni par un import() dynamique. Seul server-only le disait, et au build ; schema.ts et les mails ne l’ont pas.
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
@@ -73,7 +72,6 @@ const eslintConfig = defineConfig([
       "src/services/serveur.ts",
       "src/components/shell/ConvDeLaPage.tsx",
       "src/proxy.ts",
-      "src/app/apercu/lire.ts",
     ],
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }] }],

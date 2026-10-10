@@ -1,7 +1,8 @@
 /*
  * Les drapeaux lus sans le schéma d’env.ts, et sans server-only : src/proxy.ts (qui ne tourne pas parmi les composants
  * serveur) et les pages rendues au build, sans les secrets, ne peuvent pas appeler env(). Rien de secret ici : où tourne
- * l’appli, la bêta fermée, et les chemins des aperçus locaux. Avec env.ts, le seul fichier qui lit process.env (ESLint).
+ * l’appli, la bêta fermée, et les chemins des aperçus locaux. Avec env.ts, le seul fichier qui lit process.env, NODE_ENV
+ * mis à part (ESLint).
  */
 
 /** Sur Vercel, en ligne ou en préversion. Jamais en local, ni sur le serveur des tests de bout en bout. */

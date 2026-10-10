@@ -2,14 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { NBSP } from "@/lib/format";
+import { cheminDesApercus } from "@/server/drapeaux";
 import { lireTous } from "../lire";
 
 export const metadata: Metadata = { title: "Aperçu des convs de test" };
 export const dynamic = "force-dynamic";
 
-/** En local seulement : toutes les convs de test de la passe, avec leur verdict, et leurs trois vues. */
+/** Hors de Vercel seulement (src/proxy.ts) : toutes les convs de test de la passe, avec leur verdict, et leurs trois vues. */
 export default async function Page() {
-  const tous = await lireTous();
+  const tous = await lireTous(cheminDesApercus());
   if (!tous.length) notFound();
   return (
     <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col gap-4 px-4 py-10 [background:var(--paper-light)]">
