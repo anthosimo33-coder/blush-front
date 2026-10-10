@@ -22,14 +22,14 @@ npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (
 
 `blush_test` sert à tous les dossiers du projet sur la machine : les tests ne la migrent que s’ils viennent de la créer. Un dossier qui ajoute une migration prend sa propre base : `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom> npm run check`.
 
-La CI (`.github/workflows/ci.yml`), à chaque push et chaque pull request :
+La CI (`.github/workflows/ci.yml`), à chaque pull request et à chaque push sur `main` :
 
 1. **Vérifications et build** : `npm run check` (dont la cohérence des migrations, `scripts/verifier-migrations.mjs`), puis le build du back-end et sa vérification qu’aucun prompt n’arrive au navigateur (`scripts/verifier-fuite.mjs`).
-2. **E2E (chromium)** et **E2E (webkit)** : les tests de bout en bout sur ce build, avec un Postgres neuf. En cas d’échec, le rapport et les traces sont dans les artefacts du run.
+2. **E2E (chromium)** et **E2E (webkit)** : chacun refait le build, puis les tests de bout en bout avec un Postgres neuf. En cas d’échec, le rapport et les traces (données de test inventées, jamais les prompts) sont dans les artefacts du run.
 
 **La mise en production est un geste, jamais l’effet d’un push** : sur `main`, « Run workflow » dans l’onglet Actions (ou `gh workflow run CI --ref main`). Ce lancement refait les vérifications et les tests de bout en bout sur la tête de `main`, puis lance `vercel deploy --prod` : Vercel construit sur ses serveurs avec ses variables, et y migre la base. Relancer un ancien run ne redéploie pas une version passée : seule la tête de `main` part. On ne déploie plus depuis un dossier local.
 
-Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteur obligatoire, et les secrets sont ceux du dépôt. La CI en lit deux, `PROMPTS_TOKEN` (un jeton GitHub qui lit `blush-front` et `blush-prompts`) et `VERCEL_TOKEN`. L’artefact `build-e2e` d’un run (gardé un jour) contient les prompts, côté serveur : donner l’accès à `blush-front`, c’est donner les prompts. Si un collaborateur arrive un jour, chaque job E2E construira avec le sous-module au lieu de recevoir ce build.
+Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteur obligatoire, et les secrets sont ceux du dépôt. La CI en lit deux, `PROMPTS_TOKEN` (un jeton GitHub qui lit `blush-front` et `blush-prompts`) et `VERCEL_TOKEN`. Le build contient les prompts (côté serveur) : il ne sort jamais d’un job, aucun artefact ne le transporte, puisque les artefacts se téléchargent par quiconque lit le dépôt.
 
 ## Où sont les choses
 

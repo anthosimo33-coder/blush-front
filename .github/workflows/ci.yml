@@ -13,9 +13,11 @@
 # Les actions sont épinglées à un commit (leur version en commentaire) : une étiquette déplacée ne change rien ici.
 name: CI
 
+# Sur les pull requests et sur main : une branche poussée sans PR ne lance rien (un push et sa PR ne la lançaient pas
+# deux fois pour le même commit)
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   # La mise en production (job deployer), lancée à la main sur main
   workflow_dispatch:
@@ -69,16 +71,6 @@ jobs:
       - name: Build du back-end (prebuild, next build, puis la vérification des prompts)
         run: npm run e2e:build
 
-      - name: Le build, pour les tests de bout en bout
-        run: tar -cf build-e2e.tar --exclude=.next/cache .next
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: build-e2e
-          path: build-e2e.tar
-          retention-days: 1
-          if-no-files-found: error
-
   e2e:
     name: E2E (${{ matrix.navigateur }})
     needs: verifier
@@ -98,9 +90,12 @@ jobs:
       E2E_POSTGRES: postgres://postgres:postgres@localhost:5432
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      # Pas de sous-module ici : le build reçu contient déjà les prompts, côté serveur
+      # Chaque job construit avec le sous-module : le build contient les prompts (côté serveur), il ne sort jamais du
+      # job (un artefact se télécharge par quiconque lit le dépôt)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          submodules: recursive
+          token: ${{ secrets.PROMPTS_TOKEN }}
           persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -125,12 +120,8 @@ jobs:
         if: steps.navigateurs.outputs.cache-hit == 'true'
         run: npx playwright install-deps ${{ matrix.navigateur }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: build-e2e
-
-      - name: Le build du job « verifier »
-        run: tar -xf build-e2e.tar && rm build-e2e.tar
+      - name: Le build du back-end, pour les tests de bout en bout
+        run: npm run e2e:build
 
       # Le Postgres 16 déjà installé sur l’image ubuntu-24.04 : pas d’image Docker à tirer (Docker Hub limite les
       # téléchargements anonymes depuis les machines de GitHub)
