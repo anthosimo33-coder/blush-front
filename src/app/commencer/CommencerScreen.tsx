@@ -1,6 +1,5 @@
 "use client";
 
-import { BACKEND } from "@/services/mode";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
@@ -16,10 +15,8 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
   /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
   { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
-  /* Avec le back-end, Instagram passe par son export (la lecture des captures arrive ensuite) */
-  BACKEND
-    ? { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" }
-    : { app: "instagram", title: "Instagram", subtitle: "Captures d’écran", href: "/importer/captures?app=instagram" },
+  /* Instagram passe par son export (la lecture des captures arrive ensuite) */
+  { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" },
   { app: "hinge", title: "Hinge", subtitle: "Captures d’écran", href: "/importer/captures?app=hinge" },
   { app: "autre", title: "Autre appli", subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
 ];

@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { BACKEND } from "@/services/mode";
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
-import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { formatCount } from "@/lib/format";
@@ -14,8 +12,7 @@ import { useJourney } from "@/state/journey";
 import type { Source } from "@/types";
 
 /*
- * Écran 04 — Ta conv est ajoutée. Un seul bouton fort (Continuer) ; ajouter le début de l’histoire
- * reste à portée, en ligne discrète. Le « 100 % privé » est dit ici, une seule fois.
+ * Écran 04 — Ta conv est ajoutée. Un seul bouton fort (Continuer). Le « 100 % privé » est dit ici, une seule fois.
  */
 export function ConvOkScreen({ source }: { source: Source }) {
   const [j] = useJourney();
@@ -65,19 +62,6 @@ export function ConvOkScreen({ source }: { source: Source }) {
             Votre conv est très longue{"\u00a0"}: BLUSH lit {source.moisLus > 1 ? `vos ${source.moisLus} derniers mois` : "votre dernier mois"}, ce qui compte le plus pour savoir où vous en êtes.
           </span>
         </p>
-      )}
-
-      {/* Back-end v1 : réunir un export et des captures arrive plus tard */}
-      {!BACKEND && (
-        <InsetGroup title="Vous vous parliez ailleurs avant ?" id="ailleurs">
-          <InsetRow
-            leading={<RowIcon icon="photo" tone="elle" />}
-            title="Ajouter des captures"
-            sub="Du début (Hinge, Insta) : ton rapport sera plus juste."
-            href="/importer/captures?mode=ajout"
-            chevron
-          />
-        </InsetGroup>
       )}
 
       <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">

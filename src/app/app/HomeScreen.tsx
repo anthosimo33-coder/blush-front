@@ -28,8 +28,7 @@ import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
 import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { CoupureChat, getChatHistory, modeVocalChat, sendToBlush, sendVoiceToBlush, type BlushAnswer, type HistoriqueChat, type SuiviChat } from "@/services/api";
-import { BACKEND } from "@/services/mode";
+import { CoupureChat, getChatHistory, modeVocalChat, prechargerExport, sendToBlush, sendVoiceToBlush, type BlushAnswer, type HistoriqueChat, type SuiviChat } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -46,7 +45,6 @@ import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { reveiller } from "@/components/shell/Reveil";
-import { prechargerExport } from "@/services/reel";
 import { useHydrated } from "@/state/journey";
 import type { BulleChat, ConvSummary, Fiche, LevelId, Reply, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
@@ -197,8 +195,8 @@ function echangesEnMsgs(script: EchangeScript[]): Msg[] {
 type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
 
 /**
- * L’intro de BLUSH (ton prochain pas, puis « elle vient de répondre ? »). Back-end : à l’heure où ta lecture s’est
- * finie (`at`), avant tout l’historique. Démo : hier soir, comme dans les maquettes.
+ * L’intro de BLUSH (ton prochain pas, puis « elle vient de répondre ? ») : à l’heure où ta lecture s’est finie (`at`),
+ * avant tout l’historique. Sans cette heure (l’aperçu) : hier soir, comme dans les maquettes.
  */
 const introDe = (at?: number): Msg[] => [
   { id: -2, from: "blush", intro: "next", ...(at ? { at } : { seed: { day: -1, h: 21, m: 40 } }) },
@@ -351,7 +349,7 @@ export function HomeScreen({
   };
   /* 7 · Le point creusé : ta prochaine question porte dessus */
   const [about, setAbout] = useState<string | null>(null);
-  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (le serveur le sait ; en démo, la dernière réponse) */
+  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (le serveur le sait ; sans lui, l’aperçu, d’après la dernière réponse) */
   const [modeVocal, setModeVocal] = useState(() => reprise?.modeVocal ?? modeVocalInitial ?? !!script.at(-1)?.answer.modeVocal);
   /* 11 · Où vous en êtes : un message peut vous faire passer un cap pendant la visite */
   const [level, setLevel] = useState(contact.report.level);
@@ -577,7 +575,6 @@ export function HomeScreen({
    * visite a déjà écrit (ses messages sont les plus récents).
    */
   useEffect(() => {
-    if (!BACKEND) return;
     let fini = false;
     const recharger = () =>
       getChatHistory()
@@ -614,7 +611,7 @@ export function HomeScreen({
   /** Le morceau d’avant le plus ancien affiché, demandé d’avance (une seule fois). */
   const precharger = useCallback(() => {
     const avant = plusAncien.current;
-    if (!BACKEND || !avant || !ilEnReste.current || chargement.current || suivant.current?.avant === avant) return;
+    if (!avant || !ilEnReste.current || chargement.current || suivant.current?.avant === avant) return;
     const reponse = getChatHistory(avant);
     suivant.current = { avant, reponse };
     /* Raté (réseau coupé) : il sera redemandé */
@@ -631,7 +628,7 @@ export function HomeScreen({
    */
   const chargerAnciens = useCallback(async () => {
     const avant = plusAncien.current;
-    if (!BACKEND || !avant || !ilEnReste.current || chargement.current || devant.current) return;
+    if (!avant || !ilEnReste.current || chargement.current || devant.current) return;
     chargement.current = true;
     setAnciens(true);
     let h: HistoriqueChat;
@@ -688,7 +685,7 @@ export function HomeScreen({
   useEffect(() => {
     const el = haut.current;
     const box = thread.current;
-    if (!BACKEND || !plus || !el || !box) return;
+    if (!plus || !el || !box) return;
     const desk = window.matchMedia(DESKTOP).matches;
     const pos = () => (desk ? box.scrollTop : window.scrollY);
     const bas = () => (desk ? box.scrollHeight - box.clientHeight : basDePage());
@@ -1864,7 +1861,7 @@ type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean; autre?:
 /**
  * L’heure d’un message, seulement dans le navigateur (`opened` est vide au rendu serveur) : le serveur est à l’heure
  * UTC, le téléphone à la sienne, et des heures différentes feraient refaire tout l’écran à l’hydratation.
- * L’intro de la démo se cale sur l’ouverture de l’écran.
+ * Sans l’heure du verdict, l’intro se cale sur l’ouverture de l’écran.
  */
 function timeOf(m: Msg, opened: number | null) {
   if (opened === null) return null;

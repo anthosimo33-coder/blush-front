@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { auRepos } from "@/lib/repos";
 import { Icon } from "@/components/ui/icons";
-import type { Verdict } from "@/types";
 
 /*
  * Le bouton « Partager mon verdict » sous l’en-tête du rapport, et la promesse de confidentialité. Leurs feuilles
@@ -43,7 +42,7 @@ const usePartageOuvert = () =>
   );
 
 /** Sous l’en-tête du rapport : partager son verdict, et la promesse de confidentialité (avec le détail à un toucher). */
-export function PartageEtConfidentialite({ verdict }: { verdict: Pick<Verdict, "emoji" | "title"> }) {
+export function PartageEtConfidentialite() {
   const [partage, setPartage] = useState(false);
   const [confidentialite, setConfidentialite] = useState(false);
   /*
@@ -98,7 +97,7 @@ export function PartageEtConfidentialite({ verdict }: { verdict: Pick<Verdict, "
           </button>
         </span>
       </p>
-      {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />}
+      {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} />}
       {confidentialiteVu && <ConfidentialiteSheet open={confidentialite} onClose={() => setConfidentialite(false)} />}
     </div>
   );

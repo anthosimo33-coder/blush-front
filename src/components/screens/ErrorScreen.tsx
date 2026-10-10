@@ -1,15 +1,17 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { BACKEND } from "@/services/mode";
-import type { DemoError } from "@/types";
 import { useSoundOnce } from "@/lib/sound";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
+/** Les erreurs du parcours d’import, posées dans l’adresse (`?erreur=<code>`) : voir ErreurDeParcours. */
+export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"] as const;
+export type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
+
 /* Écrans d’erreur : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
-export const ERROR_COPY: Record<DemoError, { title: string; text: string; action: string; href: string; back: string }> = {
+export const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: string; back: string }> = {
   fichier: {
     title: "On n’arrive pas à lire ce fichier.",
     text: "Exporte à nouveau votre discussion, sans médias, puis choisis le fichier enregistré.",
@@ -35,7 +37,7 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
     title: "L’analyse n’a pas abouti.",
     text: "Rien n’est perdu : ta conv est toujours là. Relance l’analyse.",
     action: "Relancer l’analyse",
-    href: "/lecture?relance=1",
+    href: "/lecture",
     back: "/email",
   },
   capture: {
@@ -61,14 +63,14 @@ export const ERROR_COPY: Record<DemoError, { title: string; text: string; action
   },
 };
 
-type Copie = (typeof ERROR_COPY)[DemoError];
+type Copie = (typeof ERROR_COPY)[ErreurParcours];
 
 /**
  * Le texte et les liens d’une erreur, d’après l’écran où elle arrive : réessayer garde son appli (`?app=`) et son mode.
- * Une conv trop courte : sur des captures, en choisir plus (20 messages suffisent) ; sur un export, avec le back-end,
- * passer aux captures (réunir un export et des captures arrive plus tard, voir ConvOkScreen).
+ * Une conv trop courte : sur des captures, en choisir plus (20 messages suffisent) ; sur un export, passer aux captures
+ * (réunir un export et des captures arrive plus tard).
  */
-function copieDe(kind: DemoError, chemin: string, params: URLSearchParams): Copie {
+function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchParams): Copie {
   const c = ERROR_COPY[kind];
   const reste = new URLSearchParams(params);
   reste.delete("erreur");
@@ -83,7 +85,7 @@ function copieDe(kind: DemoError, chemin: string, params: URLSearchParams): Copi
       href: ici,
       back: ici,
     };
-  if (kind === "courte" && BACKEND)
+  if (kind === "courte")
     return {
       ...c,
       text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
@@ -95,7 +97,7 @@ function copieDe(kind: DemoError, chemin: string, params: URLSearchParams): Copi
   return c;
 }
 
-export function ErrorScreen({ kind }: { kind: DemoError }) {
+export function ErrorScreen({ kind }: { kind: ErreurParcours }) {
   const c = copieDe(kind, usePathname(), useSearchParams());
   /* Une erreur se dit doucement : deux touchers sourds, sans buzzer */
   useSoundOnce("non");

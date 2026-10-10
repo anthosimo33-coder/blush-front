@@ -1,6 +1,5 @@
 import "server-only";
 import { contexteRequete } from "@/server/donnees";
-import { BACKEND } from "@/services/mode";
 import { PoseConv } from "./PoseConv";
 
 /**
@@ -8,7 +7,6 @@ import { PoseConv } from "./PoseConv";
  * qu’un geste vise la conv à l’écran même si un autre onglet en a ouvert une autre. À poser en tête des pages d’une conv.
  */
 export async function ConvDeLaPage() {
-  if (!BACKEND) return null;
   const { story } = await contexteRequete();
   return <PoseConv id={story?.id ?? null} />;
 }

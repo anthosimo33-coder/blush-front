@@ -6,8 +6,7 @@ import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "BLUSH analyse votre histoire" };
 
-export default async function Page({ searchParams }: PageProps<"/lecture">) {
-  const { relance } = await searchParams;
+export default async function Page() {
   const story = await getStory();
   /*
    * Les gardes sont dans layout.tsx (une vraie 307) : celle-ci ne sert qu’au type, et à une navigation qui ne rejoue pas
@@ -17,7 +16,7 @@ export default async function Page({ searchParams }: PageProps<"/lecture">) {
   return (
     <>
       <ConvDeLaPage />
-      <LectureScreen total={story.totalMessages} restart={relance === "1"} />
+      <LectureScreen total={story.totalMessages} />
     </>
   );
 }

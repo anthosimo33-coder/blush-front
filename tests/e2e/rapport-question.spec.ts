@@ -111,7 +111,7 @@ test("compte « rapport » : le rapport complet, une question incluse, mais pas 
 /*
  * Bug : un compte « rapport » voit « Une question incluse avec ton rapport » et « 1 question incluse », mais sa question
  * est refusée : elle passe par le chat, réservé à BLUSH+ (src/app/api/chat/route.ts:50, `utilisateur.plan !== "blushplus"`
- * → 402 « acces »), et l’écran répond « le chat avec moi, c’est dans BLUSH+ » (souciQuestion, src/services/api.ts:359).
+ * → 402 « acces »), et l’écran répond « le chat avec moi, c’est dans BLUSH+ » (souciQuestion, src/services/api.ts:303).
  */
 test.fixme("compte « rapport » : la question incluse avec le rapport reçoit sa réponse", async ({ page }, testInfo) => {
   await compteRapport(page, testInfo);

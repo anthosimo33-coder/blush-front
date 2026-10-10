@@ -114,7 +114,7 @@ test("l’image du lien : un PNG pour l’aperçu et pour la story ; seul le rob
 });
 
 test("un lien inconnu, ou l’ancien lien de démo : « Ce lien ne montre plus rien. », et pas d’image", async ({ page, request }) => {
-  /* « demo » montrait le verdict de démo sans back-end : avec le back-end (la production), ce n’est plus un lien */
+  /* « demo » montrait le verdict de l’ancien mode démo : ce n’est pas un lien (un identifiant de partage a 12 caractères) */
   for (const id of ["demo", "abcdefghijkm", "pas-un-lien"]) {
     await test.step(`/v/${id}`, async () => {
       await mesurerCompteurs(async () => {

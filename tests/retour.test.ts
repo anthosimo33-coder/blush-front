@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 /*
  * Les pages serveur de la navigation (src/services/serveur.ts) : où mène « Retrouver ma conv » selon l’état de la conv
  * (sans les redirections en chaîne /app → /rapport → /lecture → /qui), et le compte lu pour « Mon compte ».
- * Les cookies sont simulés, le back-end allumé.
+ * Les cookies sont simulés.
  */
 const etat = vi.hoisted(() => ({ cookies: new Map<string, string>() }));
 vi.mock("next/headers", () => ({
@@ -17,7 +17,6 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => new Headers(),
 }));
-vi.mock("@/services/mode", () => ({ BACKEND: true }));
 
 import { executerChaine } from "@/server/analyse";
 import { ouvrirSession } from "@/server/auth";
@@ -26,7 +25,7 @@ import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/serve
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier } from "@/server/taches";
-import { getCompte, getQuestion, getRetour } from "@/services/serveur";
+import { getCompte, getRetour } from "@/services/serveur";
 
 const email = `retour-${Date.now()}@blush.test`;
 let histoire = "";
@@ -66,14 +65,10 @@ describe("« Retrouver ma conv » sur la landing", () => {
   });
 });
 
-describe("« Mon compte » et « Ta question », dès le rendu serveur", () => {
+describe("« Mon compte », dès le rendu serveur", () => {
   it("le compte connecté, avec son abonnement", async () => {
     const compte = await getCompte();
     expect(compte?.email).toBe(email);
     expect(compte?.subscription.plan).toBe("gratuit");
-  });
-
-  it("la question du rapport n’est pas lue côté serveur avec le back-end (elle passe par le chat)", async () => {
-    expect(await getQuestion()).toBeNull();
   });
 });

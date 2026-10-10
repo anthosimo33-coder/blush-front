@@ -78,7 +78,7 @@ describe("lire un export zippé dans le navigateur", () => {
     expect(lu.max).toBeLessThan(200_000);
   });
 
-  /* Le chemin que prend vraiment l’import (reel.ts) : analyserExport, puis le paquet envoyé */
+  /* Le chemin que prend vraiment l’import (uploadExport, src/services/api.ts) : analyserExport, puis le paquet envoyé */
   const contenuDe = async (paquet: Blob) => (JSON.parse(gunzipSync(Buffer.from(await paquet.arrayBuffer())).toString("utf8")) as { parties: { nom: string; contenu: string }[] }).parties;
 
   it("à l’import, un export WhatsApp avec médias : seul _chat.txt part, le zip n’est jamais lu en entier", async () => {

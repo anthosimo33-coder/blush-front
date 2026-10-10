@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { sendLoginCode } from "@/services/api";
-import { ErreurApi } from "@/services/reel";
+import { ErreurApi, sendLoginCode } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";

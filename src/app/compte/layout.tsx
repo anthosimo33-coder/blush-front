@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
-import { BACKEND } from "@/services/mode";
 import { estConnecte } from "@/services/serveur";
 
 /*
@@ -12,6 +11,6 @@ import { estConnecte } from "@/services/serveur";
  */
 export default async function Layout({ children }: LayoutProps<"/compte">) {
   /* Sans compte connecté (session expirée, autre appareil) : la connexion d’abord, puis retour ici */
-  if (BACKEND && !(await estConnecte())) redirect(connexionPuis("/compte"));
+  if (!(await estConnecte())) redirect(connexionPuis("/compte"));
   return children;
 }

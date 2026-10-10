@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { BACKEND } from "@/services/mode";
 
 /*
  * Réveiller le serveur avant d’en avoir besoin. Après quelques minutes sans requête, la première paie le démarrage
@@ -17,9 +16,9 @@ const ECART_MS = 60_000;
 
 let dernier = 0;
 
-/** Réveille le serveur, sans attendre. Rien en démo (pas de base), ni deux fois dans la même minute. */
+/** Réveille le serveur, sans attendre. Pas deux fois dans la même minute. */
 export function reveiller(): void {
-  if (!BACKEND || Date.now() - dernier < ECART_MS) return;
+  if (Date.now() - dernier < ECART_MS) return;
   dernier = Date.now();
   void fetch("/api/reveil", { cache: "no-store" }).catch(() => {});
 }

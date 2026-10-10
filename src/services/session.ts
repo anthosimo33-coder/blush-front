@@ -1,7 +1,7 @@
 /**
- * L’histoire ouverte : un cookie, lu par les pages côté serveur (src/services/session.server.ts) et par
- * src/services/api.ts dans le navigateur. Avec le back-end, c’est la conv choisie dans « Tes convs » (le serveur la pose
- * aussi quand une nouvelle conv est lue, et vérifie qu’elle est bien au compte : src/server/histoires.ts).
+ * L’histoire ouverte : un cookie, lu par le serveur seulement (src/server/cookies.ts). C’est la conv choisie dans « Tes
+ * convs » (le serveur la pose aussi quand une nouvelle conv est lue, et vérifie qu’elle est bien au compte :
+ * src/server/histoires.ts).
  */
 export const STORY_COOKIE = "blush-story";
 
@@ -17,17 +17,9 @@ export const poserConvDeLaPage = (id: string | null) => {
 };
 export const lireConvDeLaPage = () => convDeLaPage;
 
-export function readStoryCookie(): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const hit = document.cookie.split("; ").find((c) => c.startsWith(`${STORY_COOKIE}=`));
-  return hit ? decodeURIComponent(hit.slice(STORY_COOKIE.length + 1)) : undefined;
-}
-
-export function writeStoryCookie(storyId: string | null) {
+export function writeStoryCookie(storyId: string) {
   if (typeof document === "undefined") return;
-  document.cookie = storyId
-    ? `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; max-age=31536000; samesite=lax`
-    : `${STORY_COOKIE}=; path=/; max-age=0; samesite=lax`;
+  document.cookie = `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; max-age=31536000; samesite=lax`;
 }
 
 /** L’arrivée de l’accueil ne se joue qu’une fois par jour : ce cookie la saute jusqu’à minuit (heure du téléphone). */

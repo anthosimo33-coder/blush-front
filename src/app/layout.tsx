@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { JourneyProvider } from "@/state/journey";
-import { DemoParams } from "@/state/DemoParams";
 import { SoundBoot } from "@/components/shell/SoundBoot";
 import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
+import { ErreurDeParcours } from "@/components/screens/ErreurDeParcours";
 import { classesDesPolices } from "./polices";
 import "./globals.css";
 
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Reveil />
           <SuiviNavigation />
           <Suspense fallback={null}>
-            <DemoParams />
+            <ErreurDeParcours />
           </Suspense>
         </JourneyProvider>
       </body>

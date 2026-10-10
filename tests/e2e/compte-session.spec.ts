@@ -166,7 +166,7 @@ test("après la connexion, « suite » ne mène jamais vers un autre site : seul
 
 /*
  * Bug : aucun écran ne permet de se déconnecter. La route existe (src/app/api/auth/deconnexion/route.ts:9), mais rien ne
- * l’appelle : ni l’appli (src/services/reel.ts, à côté de verifyLoginCode ligne 146), ni Mon compte
+ * l’appelle : ni l’appli (src/services/api.ts, à côté de verifyLoginCode ligne 183), ni Mon compte
  * (src/app/compte/CompteScreen.tsx:189, « Tes données »). Sur un appareil partagé, la personne suivante retrouve la conv.
  * Ce test décrit le bon comportement : un « Se déconnecter » dans Mon compte, qui ferme la session.
  */

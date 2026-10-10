@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getChat, getContact, getConvs, getFiche, getQuickQuestions, getRetour, getStory, sansHistoire } from "@/services/serveur";
-import { currentStoryId } from "@/services/session.server";
+import { convChoisie, getChat, getContact, getConvs, getFiche, getQuickQuestions, getRetour, getStory, sansHistoire } from "@/services/serveur";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
 import { IDEES_MASQUEES } from "./idees";
@@ -17,14 +16,13 @@ export const metadata: Metadata = { title: "Accueil" };
  * ?arrivee=1 la rejoue.
  */
 export default async function Page({ searchParams }: PageProps<"/app">) {
-  const { version, anim, arrivee, depuis, convs } = await searchParams;
+  const { version, anim, arrivee, depuis } = await searchParams;
   const motion = anim !== "avant";
-  const storyId = await currentStoryId();
-  const jar = await cookies();
+  const [storyId, jar] = await Promise.all([convChoisie(), cookies()]);
   /* ?arrivee=1 rejoue l’arrivée sans attendre le lendemain (pour la revoir, ou la montrer) */
   const arrived = arrivee !== "1" && jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
-  const lectures = Promise.all([getQuickQuestions(storyId), getContact(storyId), getFiche(storyId), getStory(storyId), getChat(), getConvs(convs)]);
+  const lectures = Promise.all([getQuickQuestions(), getContact(), getFiche(), getStory(), getChat(), getConvs()]);
   /* Une erreur remonte quand l’accueil les attend (plus bas) ; redirigé avant, on ne les attend pas */
   lectures.catch(() => {});
   /*

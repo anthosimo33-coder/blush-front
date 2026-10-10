@@ -5,10 +5,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
 import { connexionPuis } from "@/lib/suite";
-import { uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
-import { BACKEND } from "@/services/mode";
+import { ErreurApi, prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
-import { ErreurApi, prechargerVideo } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -92,10 +90,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       }),
     );
 
-  /* Back-end : une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=) */
+  /* Une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=, ErreurDeParcours) */
   const echec = (code: string) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
-  const handle = async (picked: File[], video: boolean) => {
+  const handle = (picked: File[], video: boolean) => {
     /* Un enregistrement garde son fichier en aperçu (la balise vidéo le lit) ; une capture attend sa vignette */
     const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: video ? URL.createObjectURL(file) : null }));
     /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
@@ -106,30 +104,19 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     toutes.slice(next.length).forEach((s) => s.url && URL.revokeObjectURL(s.url));
     setTrop(!video && toutes.length > CAPTURES_MAX);
     setSouci(null);
-    /* Back-end : l’enregistrement sert à la première importation (pas encore pour compléter une conv) */
-    if (BACKEND && video && addMode) return echec("capture");
+    /* L’enregistrement sert à la première importation (pas encore pour compléter une conv) */
+    if (video && addMode) return echec("capture");
     setItems(next);
     if (!video) {
       const gardees = added.filter((s) => next.includes(s));
       /* all.current suit items après le rendu : à jour dès maintenant pour les vignettes qui arrivent */
       all.current = next;
       apercus(gardees);
-      /* Back-end : le Worker les réduit déjà pour l’envoi, pendant qu’on règle l’ordre */
-      if (BACKEND) prereduire(gardees.map((s) => s.file));
+      /* Le Worker les réduit déjà pour l’envoi, pendant qu’on règle l’ordre */
+      prereduire(gardees.map((s) => s.file));
     }
-    /* Back-end : la lecture ne part qu’une fois, au clic sur Continuer */
-    if (BACKEND) {
-      setResult({ count: next.length, messages: -1, video });
-      return;
-    }
-    setBusy(true);
-    const r = await uploadScreenshots(
-      next.map((s) => s.file),
-      { app: captureApp, mode: addMode ? "add" : "first" },
-    );
-    setBusy(false);
-    setResult({ count: next.length, messages: r.messagesRead, video });
-    setJourney({ captureNames: next.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }) });
+    /* La lecture ne part qu’une fois, au clic sur Continuer */
+    setResult({ count: next.length, messages: -1, video });
   };
 
   const remove = (id: string) => {
@@ -156,9 +143,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     });
   };
 
-  /* Back-end : BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite */
+  /* BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite */
   const continuer = async () => {
-    if (!BACKEND) return router.push(next);
     setBusy(true);
     setSouci(null);
     setAvance(null);
@@ -216,7 +202,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         items.length ? (
           <>
             <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
-              {busy && BACKEND ? (
+              {busy ? (
                 <span className="flex min-w-0 items-center gap-2.5">
                   <TypingDots color="#FFFFFF" label={enCours} />
                   <span className="text-[16px] leading-[1.2] tabular-nums">{enCours}</span>
@@ -226,7 +212,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
               )}
             </Button>
             {/* Des captures : rien ne dit où en est la lecture, une barre avance d’après sa durée habituelle */}
-            {busy && BACKEND && !result?.video && <BarreLecture captures={items.length} />}
+            {busy && !result?.video && <BarreLecture captures={items.length} />}
           </>
         ) : enregistrement ? (
           <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>

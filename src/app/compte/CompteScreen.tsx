@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { cancelSubscription, deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
-import { BACKEND } from "@/services/mode";
 import { OFFERS } from "@/content/offres";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -29,11 +28,11 @@ export type NomsDuCompte = { me: Person; other: Person; period: string };
 /**
  * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).
  * `compte` : le compte lu par la page serveur à l’heure `rendu` : l’abonnement est là dès l’affichage, rien ne descend
- * ensuite, et il n’est pas relu tout de suite (back-end ; la démo relit son faux serveur, qui dit la même chose).
+ * ensuite, et il n’est pas relu tout de suite.
  */
 export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
   const router = useRouter();
-  const { data: account } = useQuery("account", getAccount, compte ?? undefined, { rendu, frais: BACKEND ? 10_000 : 0 });
+  const { data: account } = useQuery("account", getAccount, compte ?? undefined, { rendu, frais: 10_000 });
   /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
   const [ouverture, demarrer] = useTransition();
   const [ouverte, setOuverte] = useState<string | null>(null);

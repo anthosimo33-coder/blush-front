@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
-import { BACKEND } from "@/services/mode";
 import { estConnecte } from "@/services/serveur";
 import { adresseDesCaptures } from "../adresse";
 import { CapturesScreen } from "../CapturesScreen";
@@ -16,7 +15,7 @@ export const metadata: Metadata = { title: "Choisis tes captures" };
 export default async function Page({ searchParams }: PageProps<"/importer/captures/fermee">) {
   const { app, mode } = await searchParams;
   const { appli, ajout } = adresseDesCaptures(app, mode);
-  if (BACKEND && process.env.BLUSH_BETA_FERMEE === "1" && !(await estConnecte())) {
+  if (process.env.BLUSH_BETA_FERMEE === "1" && !(await estConnecte())) {
     const ici = new URLSearchParams({ ...(appli ? { app: appli } : {}), ...(ajout ? { mode: "ajout" } : {}) }).toString();
     redirect(connexionPuis(`/importer/captures${ici ? `?${ici}` : ""}`));
   }

@@ -1,11 +1,10 @@
 "use client";
 
-import { ErreurApi, prechargerExport } from "@/services/reel";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDevice, useFilePicker } from "@/lib/hooks";
-import { uploadExport } from "@/services/api";
+import { ErreurApi, prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/content/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -65,10 +64,10 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
     let source;
     try {
       /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
-      source = await uploadExport(file, app, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
+      source = await uploadExport(file, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
     } catch (e) {
       if (!monte.current) return;
-      /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (DemoParams, ?erreur=) */
+      /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (ErreurDeParcours, ?erreur=) */
       setBusy(false);
       setAvance(null);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */

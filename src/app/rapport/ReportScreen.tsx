@@ -1,6 +1,5 @@
 "use client";
 
-import { BACKEND } from "@/services/mode";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,8 +9,7 @@ import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
 import { setQueryData, useQuery } from "@/lib/query";
-import { getReport, relancerRapport, type ReportPayload } from "@/services/api";
-import { ErreurApi } from "@/services/reel";
+import { ErreurApi, getReport, relancerRapport, type ReportPayload } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -104,9 +102,9 @@ const brancherBarre = (el: HTMLDivElement | null) => {
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
 export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean; rendu?: number }) {
-  /* `rendu` : l’heure du rendu serveur. Tout juste rendu (back-end), le rapport n’est pas relu au montage (src/lib/query.ts) */
-  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed, rendu, frais: BACKEND ? 10_000 : 0 });
-  /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
+  /* `rendu` : l’heure du rendu serveur. Tout juste rendu, le rapport n’est pas relu au montage (src/lib/query.ts) */
+  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed, rendu, frais: 10_000 });
+  /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
   const payload = fixed ? initial : (data ?? initial);
   /* Le rapport s’écrit encore (back-end), ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
   const attendre = !!payload.generating || payload.vocal?.etat === "en_cours";
@@ -514,7 +512,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       </Card>
 
       {/* Partager son verdict (le verdict seul, le prénom de l’autre masqué), et ce que BLUSH fait de ta conv */}
-      <PartageEtConfidentialite verdict={report.verdict} />
+      <PartageEtConfidentialite />
 
       {free.map((c, i) => (
         <Fragment key={c.number}>
@@ -560,7 +558,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       {full && !payload.generating && !payload.echec && (
         <>
           <ChapterRule />
-          {/* Après la lecture : ta question d’abord (bien visible), puis compléter le début de l’histoire */}
+          {/* Après la lecture : ta question, bien visible */}
           <InsetGroup>
             <InsetRow
               leading={<RowIcon icon="bolt" tone="toi" />}
@@ -569,16 +567,6 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
               href="/rapport/question"
               chevron
             />
-            {/* Back-end v1 : réunir un export et des captures arrive plus tard */}
-            {!BACKEND && (
-              <InsetRow
-                leading={<RowIcon icon="photo" tone="elle" />}
-                title="Ajouter le début"
-                sub="Votre histoire commence avant WhatsApp ? Ajoute des captures (Hinge, Insta) : ton rapport sera encore plus juste."
-                href="/importer/captures?mode=ajout"
-                chevron
-              />
-            )}
           </InsetGroup>
         </>
       )}

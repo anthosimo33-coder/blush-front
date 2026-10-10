@@ -5,9 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { play } from "@/lib/sound";
-import { createAccount, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
-import { BACKEND } from "@/services/mode";
-import { ErreurApi } from "@/services/reel";
+import { ErreurApi, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
@@ -102,10 +100,10 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       return;
     }
     /*
-     * Back-end : sans les réponses de « Qui es-tu ? » (le parcours de cet onglet perdu), la lecture viserait la conv déjà
-     * suivie, pas celle qu’on importe. « Qui es-tu ? » les redemande, et lance la lecture de la bonne conv.
+     * Sans les réponses de « Qui es-tu ? » (le parcours de cet onglet perdu), la lecture viserait la conv déjà suivie,
+     * pas celle qu’on importe. « Qui es-tu ? » les redemande, et lance la lecture de la bonne conv.
      */
-    if (BACKEND && !(j.me && j.pronom && j.guess && j.goal)) {
+    if (!(j.me && j.pronom && j.guess && j.goal)) {
       router.push("/qui");
       return;
     }
@@ -114,7 +112,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
-      const [, lecture] = await Promise.all([createAccount(email), startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" })]);
+      const lecture = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
       retenirLecture(lecture);
       set({ jobId: lecture.jobId });
       router.push("/lecture");

@@ -416,7 +416,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
 
       {/* Les touchers dans la fenêtre de partage n’avancent pas les cartes du verdict */}
       <div className="contents" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-        {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />}
+        {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} />}
       </div>
     </main>
   );

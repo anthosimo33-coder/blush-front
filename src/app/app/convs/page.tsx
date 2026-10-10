@@ -7,12 +7,12 @@ import { ConvsScreen } from "./ConvsScreen";
 export const metadata: Metadata = { title: "Tes convs" };
 
 /*
- * Proposition « plusieurs convs » (démo : ?convs=plusieurs). Une seule conv : pas de liste, on va droit à l’accueil.
+ * Les convs du compte. Une seule conv : pas de liste, on va droit à l’accueil.
  * La liste est au-dessus de l’accueil : il arrive par la droite quand on choisit une conv, et y repart au retour.
  */
-export default async function Page({ searchParams }: PageProps<"/app/convs">) {
-  const convs = await getConvs((await searchParams).convs);
-  /* Back-end : déjà gardé par layout.tsx (une vraie 307, avant le squelette). Démo : la garde, d’après ?convs= */
+export default async function Page() {
+  const convs = await getConvs();
+  /* Déjà gardé par layout.tsx (une vraie 307, avant le squelette) : reste pour le type, et une navigation qui ne rejoue pas le layout */
   if (convs.length < 2) redirect("/app");
   return (
     <ViewTransition enter={{ "nav-back": "pop-in", default: "none" }} exit={{ "nav-forward": "push-out", default: "none" }} default="none">

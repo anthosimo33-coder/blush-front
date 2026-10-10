@@ -9,8 +9,7 @@ import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
-import { addToFiche, getFiche, updateFiche } from "@/services/api";
-import { ErreurApi, prechargerExport } from "@/services/reel";
+import { addToFiche, ErreurApi, getFiche, prechargerExport, updateFiche } from "@/services/api";
 import { FICHE_SECTIONS } from "@/content/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -53,7 +52,7 @@ const SONDAGE_MAX_MS = 5 * 60_000;
  * Rien n’est cherché ailleurs.
  */
 export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initial: Fiche; fixed?: boolean; storyId?: string; rendu?: number }) {
-  /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas la fiche de démo.
+  /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas celle du compte connecté.
      Sinon, une clé par conv : le cache d’une autre conv ne s’affiche jamais à la place de la sienne */
   const key = fixed ? "fiche-apercu" : `fiche:${storyId ?? ""}`;
   /* `rendu` : l’heure du rendu serveur. Préchargée par l’accueil, la page garde la fiche d’alors : modifiée ici depuis,

@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { json } from "@/server/http";
-import { BACKEND } from "@/services/mode";
 
 /*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes
@@ -10,7 +9,6 @@ import { BACKEND } from "@/services/mode";
  * n’est lu ni écrit, et elle ne dit rien d’autre que « ok ».
  */
 export async function GET() {
-  if (!BACKEND) return json({ ok: true });
   try {
     await db().execute(sql`select 1`);
     return json({ ok: true });

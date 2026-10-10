@@ -10,7 +10,6 @@ import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/moti
 import { setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { askQuestion, getQuestion, souciQuestion } from "@/services/api";
-import { BACKEND } from "@/services/mode";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -26,12 +25,12 @@ import type { Story } from "@/types";
  * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
-/**
- * `posee` : la question déjà posée et sa réponse, lues par la page serveur (back-end : jamais, elle passe par le chat).
- * Le champ et les idées sont ainsi là dès le premier affichage, sans attendre une lecture du navigateur.
- */
-export function QuestionChat({ ideas, story, posee = null }: { ideas: string[]; story: Story; posee?: QuestionAnswer | null }) {
-  const { data: answer, loading } = useQuery("question", getQuestion, posee, { fetch: !BACKEND });
+export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
+  /*
+   * La question déjà posée : jamais, elle passe par le chat (son historique est sur l’accueil). Le champ et les idées
+   * sont là dès le premier affichage, sans lecture du navigateur ; la réponse de la visite s’efface au retour sur l’écran.
+   */
+  const { data: answer, loading } = useQuery<QuestionAnswer | null>("question", getQuestion, null, { fetch: false });
   const { plan } = useAccess();
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */

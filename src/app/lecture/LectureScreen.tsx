@@ -1,20 +1,18 @@
 "use client";
 
-import { BACKEND } from "@/services/mode";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
 import { play } from "@/lib/sound";
-import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
-import { ErreurApi } from "@/services/reel";
+import { ErreurApi, getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/content/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
-import { readJourney, setJourney } from "@/state/journey";
+import { setJourney } from "@/state/journey";
 import { lectureLancee } from "@/state/lecture";
 import type { AnalysisProgress } from "@/types";
 
@@ -30,12 +28,11 @@ type Phase = "reading" | "leaving" | "done";
  * le visuel (la bulle dans son anneau, puis la gerbe), le titre et son compteur, les découvertes.
  * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ».
  */
-export function LectureScreen({ total, restart }: { total: number; restart: boolean }) {
+export function LectureScreen({ total }: { total: number }) {
   const router = useRouter();
   const reduced = useReducedMotion();
   const [p, setP] = useState<AnalysisProgress>(START);
   const [phase, setPhase] = useState<Phase>("reading");
-  const restartRef = useRef(restart);
   /* Vrai dès qu’on voit la lecture se faire : une analyse déjà finie à l’arrivée ne rejoue pas ses sons */
   const live = useRef(false);
   const heard = useRef(0);
@@ -66,12 +63,10 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     let first = true;
     let timer: ReturnType<typeof setTimeout>;
     (async () => {
-      /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
-      const cur = readJourney();
       /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) : pas de second POST, on suit tout de suite */
-      const deja = run === 0 && !restartRef.current ? lectureLancee() : null;
+      const deja = run === 0 ? lectureLancee() : null;
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
-      const lance = deja ?? await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
+      const lance = deja ?? await resumeAnalysis().catch(
         (e: unknown) =>
           e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : e instanceof ErreurApi && e.code === "trop" ? ("trop" as const) : null,
       );
@@ -96,13 +91,12 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         return;
       }
       const { jobId } = lance;
-      restartRef.current = false;
       setJourney({ jobId });
       let rates = 0;
       const tick = async () => {
         let next: AnalysisProgress;
         try {
-          next = await getAnalysisProgress(jobId);
+          next = await getAnalysisProgress();
         } catch (e) {
           if (!alive) return;
           if (e instanceof ErreurApi && e.status === 401) {
@@ -129,8 +123,8 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
         }
         if (!next.done) {
           live.current = true;
-          /* La démo s’anime toutes les 150 ms ; le vrai back-end, on le lit chaque seconde */
-          timer = setTimeout(tick, BACKEND ? 1000 : 150);
+          /* L’avancée se relit chaque seconde */
+          timer = setTimeout(tick, 1000);
           return;
         }
         /* Lecture déjà finie à l’arrivée, ou mouvement réduit : la fin s’affiche directement. */

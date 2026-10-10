@@ -4,12 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import { compterImagePartagee, creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
-import { BACKEND } from "@/services/mode";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Sheet } from "@/components/ui/surfaces";
-import type { Verdict } from "@/types";
 
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
@@ -86,7 +84,7 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
  * Le lien est créé à l’ouverture (toujours le même), et se désactive d’un toucher. Jamais avant le geste : c’est un lien
  * public, et un lien désactivé ne doit pas renaître tout seul à la visite suivante du rapport.
  */
-export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClose: () => void; verdict: Pick<Verdict, "emoji" | "title"> }) {
+export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   /* Le lien, et le verdict tel qu’il le montre (le prénom de l’autre masqué, par le serveur) : le texte partagé reprend celui-là */
   const [lien, setLien] = useState<{ url: string; verdict: VerdictMontre | null; story?: string } | null>(null);
   const url = lien?.url ?? null;
@@ -130,8 +128,8 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
     return () => clearTimeout(t);
   }, [copie, fait]);
 
-  /* Le verdict partagé : celui du lien, le prénom de l’autre masqué. La démo n’a pas de vrai lien : son verdict tel quel */
-  const montre = lien?.verdict ?? (BACKEND ? null : verdict);
+  /* Le verdict partagé : celui du lien, le prénom de l’autre masqué */
+  const montre = lien?.verdict ?? null;
   /* Ce qu’on écrit à ses potes avec le lien : comme on le dirait (l’aperçu du lien fait le reste) */
   const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict : ${montre.emoji} « ${montre.title} »` : "j’ai fait lire notre conv à BLUSH 💀";
   const avecLien = url ? `${texte}${"\n"}${url}` : "";

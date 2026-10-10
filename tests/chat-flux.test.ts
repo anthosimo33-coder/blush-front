@@ -6,7 +6,7 @@ import type { Requete } from "@prompts/lib/contextes";
 /*
  * La réponse du chat en flux (POST /api/chat, une ligne JSON par événement) : les bulles une à une pendant que
  * BLUSH écrit, la réponse validée, puis le vocal, fait après elle. La route est appelée comme le ferait le navigateur
- * (cookies simulés, after() gardé pour être lancé à la main), et lue par le vrai lecteur du navigateur (src/services/reel.ts).
+ * (cookies simulés, after() gardé pour être lancé à la main), et lue par le vrai lecteur du navigateur (src/services/api.ts).
  * Le dépôt est public : un échec n’affiche ni les prompts (le garde-fou lit un faux texte) ni les messages de la conv
  * (on compare leurs longueurs, pas leur texte).
  */
@@ -34,7 +34,7 @@ import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { REFUS_FUITE } from "@/server/ia/garde";
 import { planifier } from "@/server/taches";
-import { CoupureChat, ErreurApi, reel } from "@/services/reel";
+import { askQuestion, CoupureChat, sendToBlush, type ErreurApi } from "@/services/api";
 import type { BulleChat, EvenementChat } from "@/types";
 
 const email = `chat-flux-${Date.now()}@blush.test`;
@@ -218,7 +218,7 @@ describe("POST /api/chat en flux", () => {
   });
 });
 
-describe("le lecteur du navigateur (reel.ts)", () => {
+describe("le lecteur du navigateur (api.ts)", () => {
   /* Le navigateur parle à la vraie route */
   beforeAll(() => vi.stubGlobal("fetch", (url: string, init: RequestInit) => POST(new Request(`http://localhost${url}`, { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...Object.fromEntries(new Headers(init.headers)) } }))));
   afterAll(() => vi.unstubAllGlobals());
@@ -226,7 +226,7 @@ describe("le lecteur du navigateur (reel.ts)", () => {
   it("passe les bulles à mesure, se résout avec la réponse, puis donne le vocal", async () => {
     await vocalEnBase(false);
     const vues: string[][] = [];
-    const r = await reel.sendToBlush("on s’est vus hier, c’était trop bien", { bulles: (b) => vues.push(b.map((x) => x.text)) });
+    const r = await sendToBlush({ text: "on s’est vus hier, c’était trop bien" }, { bulles: (b) => vues.push(b.map((x) => x.text)) });
     expect(vues).toEqual([["elle te cherche 👀"], ["elle te cherche 👀", "et toi tu fais le mec occupé"]]);
     expect([r.kind, r.kind === "bubbles" && r.ask]).toEqual(["bubbles", "tu lui as répondu quoi ?"]);
     await lancerApres();
@@ -234,7 +234,7 @@ describe("le lecteur du navigateur (reel.ts)", () => {
     await vocalEnBase(true);
     let vocal: unknown;
     const arrive = new Promise<void>((ok) => {
-      void reel.sendToBlush("et là je lui dis quoi ?", { vocal: (v) => ((vocal = v), ok()) }).then((rv) => expect(rv.vocalEnCours).toBe(true));
+      void sendToBlush({ text: "et là je lui dis quoi ?" }, { vocal: (v) => ((vocal = v), ok()) }).then((rv) => expect(rv.vocalEnCours).toBe(true));
     });
     await arrive;
     expect(vocal).toMatchObject({ audio: expect.stringMatching(/^\/api\/vocal\/chat\/\d+$/) });
@@ -243,7 +243,8 @@ describe("le lecteur du navigateur (reel.ts)", () => {
 
   it("une erreur avant que BLUSH écrive : ErreurApi, avec son code", async () => {
     chat = () => REFUS_FACTICE;
-    await expect(reel.sendToBlush("…")).rejects.toMatchObject({ code: "refus" } satisfies Partial<ErreurApi>);
+    /* La question du rapport : le même lecteur, sans réponse de repli (le chat de l’accueil en fait une bulle) */
+    await expect(askQuestion("…")).rejects.toMatchObject({ code: "refus" } satisfies Partial<ErreurApi>);
     await lancerApres();
   });
 
@@ -252,7 +253,7 @@ describe("le lecteur du navigateur (reel.ts)", () => {
       expect(new Headers(init.headers).get("accept")).toBe("application/x-ndjson");
       return Response.json({ kind: "bubbles", bubbles: [{ text: "d’un bloc" }] });
     });
-    expect(await reel.sendToBlush("allô ?")).toEqual({ kind: "bubbles", bubbles: [{ text: "d’un bloc" }] });
+    expect(await sendToBlush({ text: "allô ?" })).toEqual({ kind: "bubbles", bubbles: [{ text: "d’un bloc" }] });
   });
 
   it("le réseau qui coupe en route : CoupureChat, avec les bulles déjà reçues", async () => {
@@ -267,35 +268,13 @@ describe("le lecteur du navigateur (reel.ts)", () => {
       });
       return new Response(corps, { headers: { "content-type": "application/x-ndjson" } });
     });
-    const e = await reel.sendToBlush("allô ?").catch((x: unknown) => x);
+    const e = await sendToBlush({ text: "allô ?" }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(CoupureChat);
     expect((e as CoupureChat).recues).toEqual([{ text: "elle te cherche" }]);
     /* Rien n’est parti : pas de réponse non plus */
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("Load failed");
     });
-    await expect(reel.sendToBlush("allô ?")).rejects.toBeInstanceOf(CoupureChat);
-  });
-});
-
-describe("la démo garde le même comportement", () => {
-  it("ses bulles arrivent une à une, et un vocal se prépare après la réponse", async () => {
-    const { sendToBlush } = await import("@/services/api");
-    const vues: number[] = [];
-    const ecrit = await sendToBlush({ text: "écris-moi stp" }, { bulles: (b) => vues.push(b.length) });
-    expect(vues).toEqual([1]);
-    expect(ecrit).toMatchObject({ kind: "bubbles", modeVocal: false });
-
-    let vocal: unknown;
-    const arrive = new Promise<void>((ok) => {
-      void sendToBlush({ text: "parle-moi en vocal" }, { vocal: (v) => ((vocal = v), ok()) }).then((r) => {
-        expect(r.vocalEnCours).toBe(true);
-        expect(r.vocal).toBeUndefined();
-      });
-    });
-    await arrive;
-    expect(vocal).toMatchObject({ audio: expect.any(String) });
-    /* Sans suivi (la question du rapport), d’un bloc, comme avant */
-    expect((await sendToBlush({ text: "parle-moi en vocal" })).vocal).toBeDefined();
+    await expect(sendToBlush({ text: "allô ?" })).rejects.toBeInstanceOf(CoupureChat);
   });
 });

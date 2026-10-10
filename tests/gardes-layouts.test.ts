@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
  * Les gardes des pages qui ont un écran de chargement (loading.tsx) sont dans leur layout : une page sous un squelette
  * part en flux, et sa redirection n’est plus une 307. On vérifie que chaque layout redirige là où la page redirigeait,
  * et que les gardes légères (verdictEcrit, nombreDeConvs) disent la même chose que getReport et getConvs.
- * Les cookies sont simulés, le back-end allumé ; redirect lève l’adresse visée.
+ * Les cookies sont simulés ; redirect lève l’adresse visée.
  */
 const etat = vi.hoisted(() => ({ cookies: new Map<string, string>() }));
 vi.mock("next/headers", () => ({
@@ -19,7 +19,6 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => new Headers(),
 }));
-vi.mock("@/services/mode", () => ({ BACKEND: true }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
     throw { redirection: url };

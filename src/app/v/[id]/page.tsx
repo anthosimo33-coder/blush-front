@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
-import { verdictDuLien } from "./verdict";
+import { verdictPartage } from "@/server/partages";
 
 /*
  * Un verdict partagé, tel que le voient les potes, dans l’habit de la landing : BLUSH parle en bulles roses,
@@ -17,7 +17,7 @@ import { verdictDuLien } from "./verdict";
 
 export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const v = await verdictDuLien(id);
+  const v = await verdictPartage(id);
   if (!v) return { title: "Lien désactivé" };
   const titre = `${v.emoji} ${v.title}`;
   return {
@@ -47,9 +47,9 @@ function Bulle({ moi = false, angle, children }: { moi?: boolean; angle: number;
 
 export default async function Page({ params }: PageProps<"/v/[id]">) {
   const { id } = await params;
-  const v = await verdictDuLien(id);
+  const v = await verdictPartage(id);
   /* Une visite, si c’est une personne (les robots d’aperçu de WhatsApp ou iMessage ne comptent pas) */
-  if (v && id !== "demo" && !estUnRobot((await headers()).get("user-agent"))) after(() => compter(CLES.lienVu));
+  if (v && !estUnRobot((await headers()).get("user-agent"))) after(() => compter(CLES.lienVu));
   return (
     <main className="relative isolate flex min-h-dvh flex-col items-center overflow-x-clip bg-paper px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] lg:pt-10">
       <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[900px] -translate-x-1/2 bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]" />

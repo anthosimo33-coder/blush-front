@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { BACKEND } from "@/services/mode";
 
 /*
  * La bêta fermée (BLUSH_BETA_FERMEE) se lit à l’exécution, comme sur le serveur (src/server/env.ts, peutEntrer) : un même
@@ -24,7 +23,7 @@ const SESSION = "blush-session";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const variante = VARIANTES[pathname];
-  if (!variante || !BACKEND || process.env.BLUSH_BETA_FERMEE !== "1") return NextResponse.next();
+  if (!variante || process.env.BLUSH_BETA_FERMEE !== "1") return NextResponse.next();
   /* Déjà connecté (une autre conv) : /commencer sans la liste d’attente (next.config.ts sert alors /commencer/connecte) */
   if (pathname === "/commencer" && request.cookies.has(SESSION)) return NextResponse.next();
   const url = request.nextUrl.clone();
