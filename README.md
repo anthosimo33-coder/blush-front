@@ -3,10 +3,13 @@
 Le SaaS BLUSH : une appli Next.js 16 (App Router), TypeScript et Tailwind v4, avec son back-end (les routes `/api`, Postgres et Drizzle, le modèle). En local, elle tourne sur le Postgres de la machine et le modèle factice, sans aucun appel payé (voir BACKEND.md).
 
 ```bash
+brew services start postgresql@16         # le Postgres de la machine (Homebrew), s’il ne tourne pas déjà
 npm install
 cp .env.example .env.development.local   # une fois : la configuration de dev, fictive
 npm run dev                               # http://localhost:3000 (crée et migre la base blush_dev au besoin)
 ```
+
+Le code de connexion s’affiche dans le terminal (pas de Resend en local). Avec `BLUSH_ACCES_LIBRE=*` (le réglage de `.env.example`), chaque compte a BLUSH+ : pour voir l’appli d’un compte gratuit, enlever la ligne ou la limiter à quelques emails.
 
 ## Développer, vérifier, mettre en ligne
 
@@ -43,7 +46,7 @@ Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteu
 | `src/services/api.ts` | Dans le navigateur, le seul point de contact avec les données : les appels aux routes `/api`. |
 | `src/services/serveur.ts` | Les données des pages serveur, lues en base d’après les cookies de la requête. |
 | `src/server/` | Le back-end : la base, le chiffrement, le modèle, les mails (voir BACKEND.md). |
-| `src/contenu/` | Les textes du produit : offres et prix, étapes de l’export et de la lecture, rubriques de la fiche, landing. |
+| `src/contenu/` | Le contenu du produit : offres et prix, la règle des chapitres offerts (seul le chapitre 1, le verdict) et leurs titres (`chapitres.ts`), étapes de l’export et de la lecture, rubriques de la fiche, landing. Aucun écran n’importe de données factices : ESLint refuse `@/mocks`. |
 | `src/types/` | Types du domaine : `Story`, `Source`, `Report`, `Chapter`, `FicheFact`, `Subscription`… |
 | `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`. |
 
@@ -67,4 +70,4 @@ ONLY=13b,16d npm run galerie           # ces états seulement, les autres captur
 npm run fluidite                       # le banc de fluidité de l’accueil, sur un compte BLUSH+ semé de la même façon
 ```
 
-Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis la démo ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base. Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.
+Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis l’ancienne galerie ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base. Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.

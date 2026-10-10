@@ -34,7 +34,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   if (!report || !fiche) redirect("/rapport");
   /*
    * Vers sa fiche, l’accueil recule à gauche ; au retour, il revient de la gauche (globals.css, « Sophie, en glissé »).
-   * Tes convs : choisi dans la liste, il arrive par la droite ; vers la liste, il repart à droite.
+   * Plusieurs convs : choisi dans la liste, il arrive par la droite ; vers la liste, il repart à droite.
    * Pas de <ViewTransition> autour de l’accueil : il glisse en entier (la racine, une image de l’écran). Nommé, il serait
    * capturé sur toute la hauteur de la conv, et le départ attendrait cette image (HomeScreen, « 10 · »).
    */

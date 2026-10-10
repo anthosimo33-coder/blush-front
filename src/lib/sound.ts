@@ -371,10 +371,8 @@ const SCORES = {
   signature: (at = 0, gap = 0.075): Score => ({ notes: signature(at, gap) }),
   /** Ton message part : un souffle avec ta bulle, un toucher quand elle se pose. Même son pour une pastille. */
   envoi: (): Score => ({ notes: envoi(), haptic: "leger" }),
-  /** La réponse remplace les perles : un pop. Avec ta meilleure réponse, un deuxième, plus doux. */
-  reponse: (meilleure = false): Score => ({
-    notes: [{ k: "pop", t: 0, m: 74, v: 0.85 }, ...(meilleure ? [{ k: "pop", t: 0.12, m: 78, v: 0.55 } as Note] : [])],
-  }),
+  /** La réponse remplace les perles : un pop. */
+  reponse: (): Score => ({ notes: [{ k: "pop", t: 0, m: 74, v: 0.85 }] }),
   copier: (): Score => ({ notes: [{ k: "clic", t: 0, f: 1500, v: 0.6 }, T(0.05, 81, { v: 0.38, d: 0.14 })], haptic: "succes" }),
   vocalDebut: (): Score => ({ notes: [T(0, 74, { v: 0.36, d: 0.09 }), T(0.06, 81, { v: 0.36, d: 0.12 })], haptic: "leger" }),
   vocalEnvoye: (): Score => ({ notes: envoi() }),

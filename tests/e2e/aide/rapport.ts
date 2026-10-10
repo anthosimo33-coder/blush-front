@@ -141,9 +141,9 @@ type BlocEcrit = { kind: string; text?: string; level?: string; messages?: { fro
 /**
  * Les rapports écrits du compte, tels que le vrai modèle les écrit (prompts/05-rapport.md) : le modèle factice n’y met
  * qu’une accroche, un récit et une chute. Au chapitre 2, `essentiel`, `vu` et `action` : la révélation du verdict d’un
- * compte payant montre alors ses cartes « le moment » et « à toi de jouer » (cardsOf, verdict/VerdictReveal.tsx), et le
- * rapport les affiche. `chapitre1` : au chapitre 1 aussi, `sens` et `confiance` (ceux du verdict du modèle factice, comme
- * pour un compte gratuit). Les messages montrés sont ceux de la conv, que le rapport cite déjà.
+ * compte payant montre alors ses cartes « le moment » et « à toi de jouer » (cardsOf, verdict/cartes.ts), et le rapport
+ * les affiche. `chapitre1` : au chapitre 1 aussi, `sens` et `confiance` (ceux du verdict du modèle factice, comme pour
+ * un compte gratuit). Les messages montrés sont ceux de la conv, que le rapport cite déjà.
  */
 export async function rapportCommeLeVraiModele(email: string, { chapitre1 = false }: { chapitre1?: boolean } = {}): Promise<void> {
   let ecrits = 0;

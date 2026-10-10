@@ -1,6 +1,6 @@
 "use client";
 
-import { ConvsDemo } from "./ConvsDemo";
+import { ConvsExemples } from "./ConvsExemples";
 import { Hero } from "./Hero";
 import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReviews, type Retour } from "./parts";
 
@@ -15,7 +15,7 @@ export function Landing({ retour = null }: { retour?: Retour }) {
   return (
     <LandingFrame retour={retour}>
       <Hero>
-        <ConvsDemo />
+        <ConvsExemples />
       </Hero>
       <BlushPlus />
       <Reviews items={reviews} />

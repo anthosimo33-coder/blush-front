@@ -1,4 +1,4 @@
-/* Types du domaine BLUSH — contrat avec le futur back-end. */
+/* Types du domaine BLUSH — contrat avec le back-end. */
 
 export type AppKind = "whatsapp" | "imessage" | "instagram" | "hinge" | "autre";
 export type ImportMode = "export" | "captures";

@@ -295,7 +295,7 @@ export function HomeScreen({
   arrive?: boolean;
   /** Arrivé par la bulle du rapport : sur mobile, le retour au rapport remplace le bouton du compte. */
   fromReport?: boolean;
-  /** Proposition « plusieurs convs » : les autres convs du compte. En haut à gauche, un bouton ramène à leur liste. */
+  /** Plusieurs convs : les autres convs du compte. En haut à gauche, un bouton ramène à leur liste. */
   others?: ConvSummary[];
   /** Back-end : quand la lecture s’est finie (l’heure de l’intro de BLUSH). */
   introAt?: number;
@@ -1737,7 +1737,7 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
 }
 
 /**
- * Tes convs : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
+ * Plusieurs convs : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
  * pour qu’on voie d’un coup d’œil qu’il y a d’autres convs. `flat` : dans la barre de la fenêtre (desktop), sans ombre.
  */
 function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: boolean }) {
@@ -2661,13 +2661,13 @@ function DetailRow({ href, icon, title, sub, divider, prefetch, onNavigate }: { 
 }
 
 /** Les 4 niveaux en version compacte : un fil, des points, les noms dessous. En couple, la température : juste où vous êtes, sans coches. */
-function LevelStepper({ className }: { className?: string }) {
+function LevelStepper() {
   const { report } = useContact();
   const { levels, index: idx, temperature } = scaleOf(report.level);
   const last = levels.length - 1;
   const doneShare = idx > 0 ? ((idx - 1) / idx) * 100 : 0;
   return (
-    <ol className={cn("relative m-0 grid list-none grid-cols-4 p-0", className)}>
+    <ol className="relative m-0 grid list-none grid-cols-4 p-0">
       <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full bg-[#E6E3DC]" />
       {!temperature && idx > 0 && (
         <span

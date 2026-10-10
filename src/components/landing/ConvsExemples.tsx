@@ -22,8 +22,8 @@ const ROWS = [0, 1, 2].map((i) => ({
   offset: [0, 150, 70][i],
 }));
 
-/** Les convs qui défilent : on en choisit une, BLUSH montre son verdict (landings A et C). */
-export function ConvsDemo() {
+/** Les convs qui défilent : on en choisit une, BLUSH montre son verdict. */
+export function ConvsExemples() {
   const [picked, setPicked] = useState<LandingConv | null>(null);
   return (
     <div className="mt-14 lg:mt-20">

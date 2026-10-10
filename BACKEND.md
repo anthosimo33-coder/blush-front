@@ -10,7 +10,7 @@ Le back-end vit dans ce projet Next.js : les routes `/api`, Postgres (Drizzle) e
 | Des captures d’écran, réduites par le navigateur puis lues par le prompt 01, en histoire brouillon | `POST /api/captures` | `src/server/captures.ts`, `prompts/lib/captures.ts` |
 | Code de connexion à 6 chiffres, session en cookie httpOnly | `POST /api/auth/code`, `/api/auth/verifier`, `/api/auth/deconnexion` | `src/server/auth.ts` |
 | La lecture : le verdict, puis (avec l’accès) le plan du rapport, ses deux moitiés et la mémoire | `POST/GET /api/analyse` | `src/server/analyse.ts`, `src/server/taches.ts` |
-| Le rapport (le verdict seul sans accès) | `GET /api/rapport` | `src/server/donnees.ts` |
+| Le rapport : sans accès, seul le chapitre 1 (le verdict) est offert, les autres arrivent fermés et vides (le mode sobre s’ouvre sans paiement) | `GET /api/rapport` | `src/server/donnees.ts`, `src/contenu/chapitres.ts` |
 | Débloquer (v1 sans paiement : les emails de `BLUSH_ACCES_LIBRE`) | `POST /api/debloquer` | |
 | Le chat, d’après la mémoire ; l’historique ; la mise à jour de la mémoire. On y envoie du texte, des captures (leur conv ou son profil), un nouvel export, ou un vocal (transcrit par Mistral) | `POST/GET /api/chat` | `src/server/chat.ts`, `src/server/ajouts.ts`, `src/server/ia/transcription.ts` |
 | Sa fiche, et les corrections de l’utilisateur | `GET/PUT /api/fiche` | |
@@ -90,6 +90,8 @@ npm run e2e                              # ou : npm run e2e -- --project=webkit-
 - Un invité (`nouvelInvite`) repart d’un compte et d’une boîte à mails vides ; un email libre (`emailLibre`) est neuf à chaque test.
 - Dans Chromium, `response.json()` n’aboutit jamais quand la page ne lit pas elle-même le corps de sa requête : vérifier alors `status()`.
 - Après un échec : la trace et la capture dans `test-results/<port>`, le rapport avec `npx playwright show-report`.
+
+La galerie des écrans (`npm run galerie`) et le banc de fluidité de l’accueil (`npm run fluidite`) tournent sur ce même build et ce même serveur, avec leur propre base et des comptes semés par les aides des tests (README, « La galerie »).
 
 Pour mesurer les prompts avec le vrai modèle, il y a aussi `scripts/essai-memoire.mts` (les mises à jour de la mémoire, échange par échange), `scripts/essai-captures.mts` (la lecture des captures, comparée mot pour mot aux captures fabriquées par `prompts/evals/captures/fabriquer.mjs` ; un profil fictif avec `prompts/evals/captures/profil.mjs`) et `scripts/essai-ajouts.mts` (des messages et un profil envoyés après l’import : la réponse du chat, puis la mise à jour de la mémoire).
 

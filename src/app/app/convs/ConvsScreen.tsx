@@ -13,7 +13,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import type { ConvSummary } from "@/types";
 
 /*
- * Proposition « plusieurs convs » : tes convs, comme dans Messages. Une ligne par personne : où vous en êtes (l’anneau
+ * Plusieurs convs : tes convs, comme dans Messages. Une ligne par personne : où vous en êtes (l’anneau
  * du niveau, le verdict en badge), le verdict, la tendance, et quand BLUSH en a parlé pour la dernière fois.
  * Un toucher ouvre son accueil, qui s’ouvrira encore sur elle la fois suivante. En bas, de quoi en analyser une autre.
  * « Mon compte » passe ici : sur l’accueil, sa place sert à revenir à cette liste.
