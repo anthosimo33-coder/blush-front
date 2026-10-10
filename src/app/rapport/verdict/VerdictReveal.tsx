@@ -5,8 +5,8 @@ import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
 import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
-import { useQuery } from "@/lib/query";
-import { getReport, type ReportPayload } from "@/services/api";
+import { useRapport } from "@/lib/requetes";
+import type { ReportPayload } from "@/services/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -50,7 +50,7 @@ const CONFIDENCE: Record<Confidence, string> = { sur: "Sûr", probable: "Probabl
 const toReport = () => window.location.replace("/rapport");
 
 export function VerdictReveal({ initial, story }: { initial: ReportPayload; story: Story }) {
-  const { data } = useQuery("report", getReport, initial);
+  const { data } = useRapport(initial);
   const payload = data ?? initial;
   const cards = cardsOf(payload);
   const last = cards.length - 1;

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
 import { IlOuElle } from "@/lib/pronom";
-import type { LevelId, ScoreRow } from "@/types";
+import type { LevelId, Pronom, ScoreRow } from "@/types";
 import { Icon } from "./icons";
 import { Dot } from "./messages";
 
@@ -10,7 +10,7 @@ const SIDE_COLOR = { toi: "#1A66DB", elle: "#C81D6B", pareil: "#087A56" } as con
 
 /* ———— Barre de score toi / elle ———— */
 /** `autre` : le pronom de l’autre personne (« il » quand une utilisatrice parle d’un garçon) ; « elle » par défaut. */
-function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: "il" | "elle" }) {
+function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: Pronom }) {
   const lui = IlOuElle(autre).toLowerCase();
   return (
     <div className="flex flex-col gap-2 py-2.5 lg:gap-1.5 lg:py-2">
@@ -36,7 +36,7 @@ function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; au
 }
 
 /** Carte de scores avec la légende « ● Toi / Elle ● ». */
-export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; className?: string; autre?: "il" | "elle" }) {
+export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; className?: string; autre?: Pronom }) {
   return (
     <div className={cn("flex flex-col rounded-card bg-white px-4 py-3.5 shadow-card", className)}>
       <div className="flex justify-between text-[12px] font-black">

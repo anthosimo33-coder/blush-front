@@ -1,15 +1,41 @@
 /* Types du domaine BLUSH — contrat avec le back-end. */
+import type { CodeErreur, CodePublic } from "./erreurs-api";
 
-export type AppKind = "whatsapp" | "imessage" | "instagram" | "hinge" | "autre";
+/*
+ * Le vocabulaire du domaine : chaque liste fermée n’est écrite qu’ici, et ses types (et les z.enum des routes) en
+ * dérivent. Le sous-module des prompts a les siens (Devinette, Objectif, Pronom) : tests/vocabulaire.test.ts vérifie
+ * qu’ils restent les mêmes.
+ */
+
+/**
+ * Les applis d’où vient une conv, et leur nom. Des captures d’une autre appli (« autre ») se disent « Captures » une
+ * fois importées ; là où on choisit son appli, « Autre appli » (NOM_AUTRE_APPLI).
+ */
+export const APPLIS = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" } as const;
+export type AppKind = keyof typeof APPLIS;
+/** « autre », là où on choisit son appli (« Vous vous parlez où ? ») : des captures d’une appli qu’on ne nomme pas. */
+export const NOM_AUTRE_APPLI = "Autre appli";
 /** Les applis qui s’exportent (écran 02). iMessage ne s’exporte pas : on filme son écran (/importer/captures). */
 export type ExportApp = Extract<AppKind, "whatsapp" | "instagram">;
 type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 type Side = "toi" | "elle" | "pareil";
-export type Plan = "gratuit" | "rapport" | "blushplus";
-export type Guess = "parle" | "vus" | "flou" | "ensemble";
+/** Ce que le compte a (users.plan) : l’offre achetée en donne un (src/contenu/offres.ts). */
+export const PLANS = ["gratuit", "rapport", "blushplus"] as const;
+export type Plan = (typeof PLANS)[number];
+/** La devinette de « Qui es-tu ? » : où vous en êtes, d’après toi. */
+export const GUESSES = ["parle", "vus", "flou", "ensemble"] as const;
+export type Guess = (typeof GUESSES)[number];
 /** Avant d’être ensemble : ensemble, reciproque, comprendre. En couple : mieux, point, comprendre. */
-export type Goal = "ensemble" | "reciproque" | "comprendre" | "mieux" | "point";
+export const GOALS = ["ensemble", "reciproque", "comprendre", "mieux", "point"] as const;
+export type Goal = (typeof GOALS)[number];
+/** Le pronom d’une personne (BLUSH accompagne un garçon qui parle à une fille, ou l’inverse). */
+export const PRONOMS = ["il", "elle"] as const;
+export type Pronom = (typeof PRONOMS)[number];
+/** Les rubriques de sa fiche, dans l’ordre (leurs titres : src/contenu/fiche.ts). « notes » : ce que tu ajoutes toi-même. */
+export const SECTIONS_FICHE = ["infos", "aime", "gens", "dates", "notes"] as const;
+/** Pourquoi une lecture ou une écriture a échoué pour de bon : le refus du modèle (rien à relancer), ou une panne. */
+export type Echec = "panne" | "refus";
 /** Avant d’être ensemble, les étapes : parle → voit → dit → ensemble. En couple, la température : eloigne → coince → va → soudes. */
 export type LevelId = "parle" | "voit" | "dit" | "ensemble" | "eloigne" | "coince" | "va" | "soudes";
 
@@ -25,8 +51,8 @@ export type Person = {
   id: string;
   name: string;
   initial: string;
-  /** Son pronom (BLUSH accompagne un garçon qui parle à une fille, ou l’inverse). Sans : « elle ». */
-  pronoun?: "il" | "elle";
+  /** Son pronom. Sans : « elle ». */
+  pronoun?: Pronom;
 };
 
 /** Une source importée : un export ou un lot de captures. */
@@ -233,13 +259,13 @@ export type BulleChat = BlushAnswer["bubbles"][number];
  * qu’il écrit ; la réponse validée (elle peut remplacer ces bulles) ; puis, si elle part en vocal, l’audio (null : elle
  * reste écrite). Une erreur en route remplace la suite.
  */
-export type EvenementChat = { bulle: BulleChat } | { reponse: BlushAnswer } | { vocal: NonNullable<BlushAnswer["vocal"]> | null } | { erreur: string };
+export type EvenementChat = { bulle: BulleChat } | { reponse: BlushAnswer } | { vocal: NonNullable<BlushAnswer["vocal"]> | null } | { erreur: CodePublic };
 
 type FicheSource = "conv" | "capture" | "note";
 
 export type FicheFact = {
   id: string;
-  section: "infos" | "aime" | "gens" | "dates" | "notes";
+  section: (typeof SECTIONS_FICHE)[number];
   text: string;
   /** Libellé de provenance (« conv · sa bio Hinge », « ajouté par toi »). */
   sourceLabel: string;
@@ -267,7 +293,7 @@ export type FicheUpdate = {
    */
   pending?: { profile: string[]; messages: number };
   /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, un bug. */
-  problem?: "capture" | "fichier" | "autre_conv" | "trop" | "bug";
+  problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop"> | "bug";
 };
 
 export type Subscription = {
@@ -298,5 +324,5 @@ export type AnalysisProgress = {
   done: boolean;
   failed?: boolean;
   /** Pourquoi : « refus » (le modèle a refusé de lire cette conv, réessayer n’y changerait rien), sinon une panne. */
-  failReason?: "refus" | "panne";
+  failReason?: Echec;
 };

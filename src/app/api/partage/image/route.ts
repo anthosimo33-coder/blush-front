@@ -23,13 +23,13 @@ const Cible = z.discriminatedUnion("type", [
  * et le prénom de l’autre est masqué (le tien reste).
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
-  if (!story) return erreur("aucune", 404);
-  if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop", 429);
+  if (!utilisateur) return erreur("connexion");
+  if (!story) return erreur("aucune");
+  if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop");
   const cible = Cible.safeParse(await req.json().catch(() => null));
-  if (!cible.success) return erreur("cible", 422);
+  if (!cible.success) return erreur("cible");
   const masquer = masqueDe(story);
   const c = cible.data;
 
@@ -46,10 +46,10 @@ export async function POST(req: Request) {
           .orderBy(asc(schema.chatMessages.id))
           .limit(1)
       : [];
-    if (!toi || blush?.role !== "blush") return erreur("introuvable", 404);
+    if (!toi || blush?.role !== "blush") return erreur("introuvable");
     const question = dechiffrer<{ texte: string; affiche?: string }>(toi.data);
     const r = dechiffrer<{ reponse: BlushAnswer }>(blush.data).reponse;
-    if (r.kind !== "bubbles") return erreur("introuvable", 404);
+    if (r.kind !== "bubbles") return erreur("introuvable");
     return carteReponse({
       question: masquer((question.affiche ?? question.texte).replace(/^\(vocal\)\s*/, "")),
       bulles: [...r.bubbles.map((b) => b.text), ...(r.ask ? [r.ask] : [])].map(masquer),
@@ -60,6 +60,6 @@ export async function POST(req: Request) {
   const chapitres: Chapter[] = rapport?.data ? dechiffrer<DonneesRapport>(rapport.data).chapitres : rapport?.partiel ? dechiffrer<Chapter[]>(rapport.partiel) : [];
   const chapitre = chapitres.find((ch) => ch.number === c.chapitre);
   const bloc = chapitre?.blocks[c.bloc];
-  if (!chapitre || bloc?.kind !== "punchline") return erreur("introuvable", 404);
+  if (!chapitre || bloc?.kind !== "punchline") return erreur("introuvable");
   return carteMoment({ surtitre: masquer(`Chapitre ${chapitre.number} · ${chapitre.tocTitle}`), texte: masquer(bloc.text) });
 }

@@ -11,8 +11,8 @@ import { PlayCard } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
 import { Bubble, ConfidenceLine } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import type { LandingConv } from "@/types";
-import { APP_NAME, useCta } from "./parts";
+import { APPLIS, type LandingConv } from "@/types";
+import { useCta } from "./parts";
 
 /* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
 const ROWS = [0, 1, 2].map((i) => ({
@@ -125,7 +125,7 @@ function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => vo
             {conv.name}
           </h2>
           <span className="truncate text-[13px] font-extrabold text-grey">
-            {conv.label} · {APP_NAME[conv.app]}
+            {conv.label} · {APPLIS[conv.app]}
           </span>
         </div>
         <IconButton icon="close" label="Fermer" onClick={onClose} iconSize={18} />

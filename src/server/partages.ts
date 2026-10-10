@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { verdictAffiche } from "@prompts/lib/front";
+import type { CodeErreur } from "@/types/erreurs-api";
 import type { DonneesVerdict } from "./analyse";
 import { chiffrer, dechiffrer, empreinte } from "./chiffrement";
 import { CLES, compter } from "./compteurs";
@@ -17,7 +18,7 @@ import { metaDe, type Ligne } from "./histoires";
 export type VerdictPartage = { emoji: string; title: string; subtitle: string };
 
 export class ErreurPartage extends Error {
-  constructor(readonly code: "pas_pret" | "sobre") {
+  constructor(readonly code: Extract<CodeErreur, "pas_pret" | "sobre">) {
     super(code);
   }
 }

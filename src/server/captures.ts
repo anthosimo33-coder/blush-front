@@ -2,6 +2,7 @@ import "server-only";
 import { versTexteCaptures, type TexteCaptures } from "@prompts/lib/captures";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import { Sortie01, type Captures } from "@prompts/lib/schemas";
+import type { CodeErreur } from "@/types/erreurs-api";
 import { utilisateurDeSession } from "./auth";
 import { empreinte, jeton } from "./chiffrement";
 import { lireSession } from "./cookies";
@@ -26,7 +27,7 @@ const PLAFONDS = {
  * - Bêta ouverte, sans compte : sous un plafond pour tous et par jour, sinon « trop ».
  * Les limites par IP de la route s’appliquent en plus.
  */
-export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promise<"ok" | "connexion" | "trop"> {
+export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promise<"ok" | LectureRefusee["code"]> {
   const utilisateur = await utilisateurDeSession(await lireSession());
   if (!utilisateur && env().BLUSH_BETA_FERMEE) return "connexion";
   if (!quoi) return "ok";
@@ -82,7 +83,7 @@ export class ErreurCaptures extends Error {}
 
 /** La lecture n’est pas permise (voir lecturePermise) : la route le dit au navigateur. */
 export class LectureRefusee extends Error {
-  constructor(readonly code: "connexion" | "trop") {
+  constructor(readonly code: Extract<CodeErreur, "connexion" | "trop">) {
     super(code);
   }
 }

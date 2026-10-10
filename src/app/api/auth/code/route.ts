@@ -8,12 +8,12 @@ import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 
 /** Le code de connexion, envoyé par email. */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const email = Email.safeParse((await corps<{ email: string }>(req)).email);
-  if (!email.success) return erreur("email", 422);
+  if (!email.success) return erreur("email");
   /* Les mêmes limites pour tous : un « trop » ne dit pas si l’email est invité */
   const ok = (await sousLaLimite(`code:ip:${ipDe(req)}`, LIMITES.codeParIp)) && (await sousLaLimite(`code:email:${email.data}`, LIMITES.codeParEmail));
-  if (!ok) return erreur("trop", 429);
+  if (!ok) return erreur("trop");
   /*
    * Bêta fermée : la même réponse pour tous (« regarde tes mails »), pour que personne ne puisse savoir si un email est
    * invité. L’invité reçoit son code. Un email hors de la liste rejoint la liste d’attente, qui lui écrit, et la conv

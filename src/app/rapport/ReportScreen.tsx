@@ -8,8 +8,10 @@ import { cn } from "@/lib/cn";
 import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
-import { setQueryData, useQuery } from "@/lib/query";
-import { ErreurApi, getReport, relancerRapport, type ReportPayload } from "@/services/api";
+import { setQueryData } from "@/lib/query";
+import { useRapport } from "@/lib/requetes";
+import { messageErreur } from "@/lib/messages-erreur";
+import { relancerRapport, type ReportPayload } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -26,7 +28,7 @@ import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import { CLE_REPRISE } from "@/state/cles";
 import { useHydrated, useJourneyMe } from "@/state/journey";
-import type { Chapter, ChapterBlock, Story } from "@/types";
+import type { Chapter, ChapterBlock, Echec, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
@@ -103,7 +105,7 @@ const brancherBarre = (el: HTMLDivElement | null) => {
  */
 export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean; rendu?: number }) {
   /* `rendu` : l’heure du rendu serveur. Tout juste rendu, le rapport n’est pas relu au montage (src/lib/query.ts) */
-  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed, rendu, frais: 10_000 });
+  const { data, refresh } = useRapport(initial, { fetch: !fixed, rendu, frais: 10_000 });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
   const payload = fixed ? initial : (data ?? initial);
   /* Le rapport s’écrit encore, ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
@@ -136,7 +138,7 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
  * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
  * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer.
  */
-function EchecEcriture({ raison }: { raison: "panne" | "refus" }) {
+function EchecEcriture({ raison }: { raison: Echec }) {
   const [busy, setBusy] = useState(false);
   const [souci, setSouci] = useState<string | null>(null);
   const relancer = async () => {
@@ -145,7 +147,7 @@ function EchecEcriture({ raison }: { raison: "panne" | "refus" }) {
     try {
       setQueryData("report", await relancerRapport());
     } catch (e) {
-      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain." : "Ça n’a pas pu repartir. Vérifie ta connexion et réessaie.");
+      setSouci(messageErreur("relance", e));
     }
     setBusy(false);
   };
@@ -725,7 +727,7 @@ const ChapterSection = memo(function ChapterSection({
   children?: ReactNode;
   renderQuestion: Parameters<typeof Blocks>[0]["renderQuestion"];
   onShare?: (chapitre: number, bloc: number) => void;
-  autre?: "il" | "elle";
+  autre?: Pronom;
 }) {
   return (
     <section id={`chapitre-${chapter.number}`} aria-labelledby={`chapitre-${chapter.number}-titre`} className={cn("flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5")}>

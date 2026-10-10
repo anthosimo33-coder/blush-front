@@ -7,7 +7,7 @@ import { NBSP } from "@/lib/format";
 import { useReducedMotion } from "@/lib/hooks";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { ErreurApi, getAnalysisProgress, resumeAnalysis } from "@/services/api";
+import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -16,6 +16,7 @@ import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import { lectureLancee } from "@/state/lecture";
 import type { AnalysisProgress } from "@/types";
+import { ErreurApi } from "@/types/erreurs-api";
 
 const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
 /** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */

@@ -13,6 +13,7 @@ import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
+import { codePublic } from "@/types/erreurs-api";
 
 /*
  * La réponse prend 10 à 20 secondes (une minute avec des captures à lire) : elle part en flux, bulle par bulle, et son
@@ -96,9 +97,9 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
         echec = e;
         return ouvrir(false);
       }
-      emettre({ erreur: e instanceof ErreurTache ? e.message : "erreur" });
+      emettre({ erreur: e instanceof ErreurTache ? codePublic(e.code) : "panne" });
       fermer();
-      if (e instanceof ErreurTache) await alerter(`chat en échec`, [`Histoire ${storyId}`, `Erreur : ${e.message}`]);
+      if (e instanceof ErreurTache) await alerter(`chat en échec`, [`Histoire ${storyId}`, `Erreur : ${e.code}`]);
       else console.error(e);
     },
   );
@@ -122,28 +123,28 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
  * première bulle ; la réponse, elle, part en flux.
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
-  if (utilisateur.plan !== "blushplus") return erreur("acces", 402);
-  if (!story) return erreur("aucune", 404);
+  if (!utilisateur) return erreur("connexion");
+  if (utilisateur.plan !== "blushplus") return erreur("acces");
+  if (!story) return erreur("aucune");
   const envoi = await lireEnvoi(req);
-  if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte", 422);
+  if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");
   const fichiers = envoi.captures.length > 0 || !!envoi.export;
-  if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte", 422);
-  if (!(await sousLaLimite(`chat:${utilisateur.id}`, LIMITES.chatParCompte))) return erreur("trop", 429);
+  if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte");
+  if (!(await sousLaLimite(`chat:${utilisateur.id}`, LIMITES.chatParCompte))) return erreur("trop");
   /* Lire des captures coûte plus qu’un message : une limite à part */
-  if (fichiers && !(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop", 429);
+  if (fichiers && !(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop");
   const memoire = await memoireDe(story.id);
-  if (!memoire) return erreur("pas_pret", 409);
+  if (!memoire) return erreur("pas_pret");
   let dit = envoi.texte;
   let ajout: { ajout: Ajout; affiche: string } | undefined;
   try {
     if (envoi.vocal) {
-      if (!envoi.vocal.size || envoi.vocal.size > TAILLE_VOCAL_MAX) return erreur("vocal", 422);
+      if (!envoi.vocal.size || envoi.vocal.size > TAILLE_VOCAL_MAX) return erreur("vocal");
       const t = await transcrire(envoi.vocal);
-      if (t === null) return erreur("vocal_bientot", 503);
-      if (!t) return erreur("vocal_vide", 422);
+      if (t === null) return erreur("vocal_bientot");
+      if (!t) return erreur("vocal_vide");
       dit = `(vocal) ${t}`.slice(0, LONGUEUR_MAX);
     } else if (envoi.captures.length) {
       const lu = await depuisCaptures(story, memoire, await imagesDe(envoi.captures));
@@ -161,11 +162,12 @@ async function traiter(req: Request) {
     /* Le suivi des coûts attend la fin de la réponse */
     return await enFlux(story.id, (surEvenement) => repondre(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
   } catch (e) {
-    if (e instanceof ErreurAjout) return erreur(e.code, 422);
-    if (e instanceof ErreurImport) return erreur("fichier", 422);
+    if (e instanceof ErreurAjout) return erreur(e.code);
+    if (e instanceof ErreurImport) return erreur("fichier");
+    /* Le code interne (« refus:cyber ») part à l’équipe ; le navigateur n’apprend que le refus, le vocal ou la panne */
     if (e instanceof ErreurTache) {
-      after(() => alerter(`chat en échec`, [`Histoire ${story.id}`, `Erreur : ${e.message}`]));
-      return erreur(e.message, 502);
+      after(() => alerter(`chat en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]));
+      return erreur(codePublic(e.code));
     }
     throw e;
   }
@@ -174,7 +176,7 @@ async function traiter(req: Request) {
 /** L’historique, pour réafficher la conv avec BLUSH : les derniers échanges, ou ceux d’avant `?avant=` (un id d’échange). */
 export async function GET(req: Request) {
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
+  if (!utilisateur) return erreur("connexion");
   const avant = Number(new URL(req.url).searchParams.get("avant"));
   return json(story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
 }

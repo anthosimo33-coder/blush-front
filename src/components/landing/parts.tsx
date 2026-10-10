@@ -13,7 +13,7 @@ import { AppBadge, Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { ConfidenceLine, Tag } from "@/components/ui/messages";
-import type { AppKind, Testimonial } from "@/types";
+import type { Testimonial } from "@/types";
 
 /* Les morceaux de la landing. */
 
@@ -38,7 +38,6 @@ export function useCta() {
   const href = retour.destination ?? "/app";
   return { href, label: "Retrouver ma conv", note: retour.autre ? `Ta conv avec ${retour.autre} t’attend` : "Ta conv t’attend", header: "Ouvrir BLUSH", prefetch: href === "/app" ? true : undefined, scroll: href !== "/app" };
 }
-export const APP_NAME: Record<AppKind, string> = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" };
 
 /** Les blocs apparaissent en douceur au défilement (rien ne bouge si l’appareil demande moins d’animations). */
 export function useReveal(key: number) {

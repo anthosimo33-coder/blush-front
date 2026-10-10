@@ -10,14 +10,15 @@ import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
-import { addToFiche, ErreurApi, getFiche, prechargerExport, updateFiche } from "@/services/api";
+import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
+import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
 import { FICHE_SECTIONS } from "@/contenu/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { AppScreen } from "@/components/shell/AppScreen";
-import type { Fiche, FicheFact, FicheUpdate } from "@/types";
+import type { Fiche, FicheFact, FicheUpdate, Pronom } from "@/types";
 
 /** Largeur de la fiche sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const CARD_W = 600;
@@ -34,7 +35,7 @@ function whatOf(files: File[]) {
 }
 
 /* « Elle aime », ou « Il aime » quand c’est une fille qui utilise BLUSH */
-const sectionTitle = (id: FicheFact["section"], pronoun?: "il" | "elle") => (id === "aime" ? `${IlOuElle(pronoun)} aime` : (FICHE_SECTIONS.find((s) => s.id === id)?.title ?? ""));
+const sectionTitle = (id: FicheFact["section"], pronoun?: Pronom) => (id === "aime" ? `${IlOuElle(pronoun)} aime` : (FICHE_SECTIONS.find((s) => s.id === id)?.title ?? ""));
 
 type Job =
   | { step: "idle" }
@@ -55,7 +56,7 @@ const SONDAGE_MAX_MS = 5 * 60_000;
 export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initial: Fiche; fixed?: boolean; storyId?: string; rendu?: number }) {
   /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas celle du compte connecté.
      Sinon, une clé par conv : le cache d’une autre conv ne s’affiche jamais à la place de la sienne */
-  const key = fixed ? "fiche-apercu" : `fiche:${storyId ?? ""}`;
+  const key = fixed ? ("fiche-apercu" as const) : (`fiche:${storyId ?? ""}` as const);
   /* `rendu` : l’heure du rendu serveur. Préchargée par l’accueil, la page garde la fiche d’alors : modifiée ici depuis,
      on part de la version gardée en cache. La relecture au montage rattrape ce que le chat y a ajouté */
   const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu });
@@ -160,12 +161,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       },
       (e) => {
         if (n !== dernier.current) return;
-        /* La limite du jour (PUT /api/fiche) : réessayer tout de suite n’y changerait rien */
-        setSouci(
-          e instanceof ErreurApi && e.code === "trop"
-            ? "Tu as beaucoup modifié sa fiche aujourd’hui\u00a0: ta dernière modification n’a pas été enregistrée. Réessaie demain."
-            : "Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.",
-        );
+        setSouci(messageErreur("fiche", e));
         invalidate(key);
       },
     );
@@ -458,20 +454,10 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
   );
 }
 
-/* Les erreurs de la fiche (textes relus le 8 octobre) */
-function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string, name: string): { title: string; detail: string } {
-  const one = what === "ta capture";
-  if (problem === "capture") return { title: `BLUSH n’arrive pas à lire ${what}`, detail: one ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner." };
-  if (problem === "fichier") return { title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram." };
-  if (problem === "autre_conv") return { title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${name}.` };
-  if (problem === "trop") return { title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." };
-  return { title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." };
-}
-
 /** Ce que BLUSH a trouvé et où il l’a rangé. « Annuler » retire tout. */
 function Found({ what, update, onUndo, onClose }: { what: string; update: FicheUpdate; onUndo: () => void; onClose: () => void }) {
   const n = update.added.length;
-  const problem = update.problem ? problemText(update.problem, what, update.fiche.person.name) : null;
+  const problem = update.problem ? messageAjoutFiche(update.problem, what, update.fiche.person.name) : null;
   const title = problem?.title ?? (n === 0 ? "Rien de nouveau" : n === 1 ? "1 nouvelle info rangée" : `${n} nouvelles infos rangées`);
   return (
     <section data-rise="" aria-labelledby="trouve-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">

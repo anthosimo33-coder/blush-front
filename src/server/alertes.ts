@@ -1,6 +1,7 @@
 import "server-only";
 import { and, count, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "./db";
+import type { Genre, StatutTache } from "./db/enums";
 import { env } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
@@ -46,7 +47,7 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
   try {
     const depuis = new Date(maintenant.getTime() - 86400e3);
     const nb = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
-    const taches = (genre: string, statut: string) =>
+    const taches = (genre: Genre, statut: StatutTache) =>
       nb(db().select({ n: count() }).from(schema.tasks).where(and(eq(schema.tasks.kind, genre), eq(schema.tasks.status, statut), gte(schema.tasks.updatedAt, depuis))));
     const [histoires, verdicts, rapports, memoires, messages, echecs, attente] = await Promise.all([
       nb(db().select({ n: count() }).from(schema.stories).where(gte(schema.stories.createdAt, depuis))),

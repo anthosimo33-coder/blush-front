@@ -47,7 +47,7 @@ describe("le rapport pendant son écriture", () => {
     expect(lues).not.toHaveBeenCalled();
 
     /* L’accès arrive : le rapport part, et l’état est relu une fois pour montrer l’écriture tout de suite */
-    const plus = { ...u, plan: "blushplus" };
+    const plus = { ...u, plan: "blushplus" as const };
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
     const ligne = (await histoireOuverte(plus, { affichee: imp.id }))!;
     lues.mockClear();

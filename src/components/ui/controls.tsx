@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { AppBadge, type AppKind } from "./Avatar";
+import type { AppKind } from "@/types";
+import { AppBadge } from "./Avatar";
 import { Icon, type IconName } from "./icons";
 
 /* ———— Chip ———— */

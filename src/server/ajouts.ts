@@ -8,6 +8,7 @@ import type { ExportLu } from "@prompts/lib/export";
 import type { Echange } from "@prompts/lib/memoire";
 import { Sortie01 } from "@prompts/lib/schemas";
 import type { FicheUpdate } from "@/types";
+import type { CodeErreur } from "@/types/erreurs-api";
 import { executerChaine, type DonneesMemoire } from "./analyse";
 import { ficheDe } from "./donnees";
 import { planifier } from "./taches";
@@ -24,7 +25,7 @@ import { aujourdhuiParis } from "./temps";
 
 /** Rien d’utilisable : un fichier illisible, une autre conv, des captures sans rien à lire, ou rien de neuf. */
 export class ErreurAjout extends Error {
-  constructor(readonly code: "fichier" | "autre_conv" | "capture" | "rien_de_neuf") {
+  constructor(readonly code: Extract<CodeErreur, "fichier" | "autre_conv" | "capture" | "rien_de_neuf">) {
     super(code);
   }
 }

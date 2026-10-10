@@ -45,13 +45,13 @@ const Envoi = z
  * vus deux fois au bord de deux lots), puis la conv devient une histoire brouillon, comme des captures.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
-  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop", 429);
+  if (!memeOrigine(req)) return erreur("origine");
+  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop");
   /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
   const permis = await lecturePermise(null);
-  if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
+  if (permis !== "ok") return erreur(permis);
   const envoi = Envoi.safeParse(await corps(req));
-  if (!envoi.success) return erreur("fichier", 422);
+  if (!envoi.success) return erreur("fichier");
   const { app, lots, cle } = envoi.data;
   try {
     const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
     const story = storyAffichee(lu.id, lu.meta);
     return json({ source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
-    if (e instanceof ErreurCaptures) return erreur("capture", 422);
-    if (e instanceof ErreurImport) return erreur(e.code, 422);
+    if (e instanceof ErreurCaptures) return erreur("capture");
+    if (e instanceof ErreurImport) return erreur(e.code);
     throw e;
   }
 }

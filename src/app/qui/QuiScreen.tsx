@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
-import { ErreurApi, startAnalysis } from "@/services/api";
+import { messageErreur } from "@/lib/messages-erreur";
+import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -80,8 +81,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       retenirLecture();
       router.push("/lecture");
     } catch (e) {
-      const code = e instanceof ErreurApi ? e.code : "";
-      setProblem(code === "trop" ? "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain." : "La lecture n’a pas pu partir. Réessaie dans un instant.");
+      setProblem(messageErreur("lecture", e));
       setBusy(false);
     }
   };

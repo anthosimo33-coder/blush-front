@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { depart, invalidate, lirePartage, memeValeur, renduFrais, setQueryData } from "@/lib/query";
+import type { Fiche } from "@/types";
 
 /* Le petit cache de lecture du navigateur (src/lib/query.ts) : ce qui se décide hors de React */
 
@@ -18,9 +19,9 @@ describe("lirePartage", () => {
   it("une invalidation pendant la lecture fait repartir la suivante du serveur", async () => {
     let appels = 0;
     const lire = () => new Promise<number>((r) => setTimeout(() => r(++appels), 5));
-    const premiere = lirePartage("compte-b", lire);
-    invalidate("compte-b");
-    const seconde = lirePartage("compte-b", lire);
+    const premiere = lirePartage("fiche:b", lire);
+    invalidate("fiche:b");
+    const seconde = lirePartage("fiche:b", lire);
     expect(await premiere).toBe(1);
     expect(await seconde).toBe(2);
   });
@@ -32,16 +33,19 @@ describe("lirePartage", () => {
 });
 
 describe("depart", () => {
+  /* Une fiche que seul son résumé distingue (une version, puis une autre) */
+  const fiche = (version: number): Fiche => ({ person: { id: "p1", name: "Inès", initial: "I" }, portrait: "", updatedLabel: "", facts: [], summary: `v${version}`, summaryShort: "" });
+
   it("le rendu serveur passe avant le cache, sauf si le cache a été écrit après lui", () => {
-    setQueryData("fiche-a", { faits: 2 });
+    setQueryData("fiche:a", fiche(2));
     /* Une page rendue avant la modification (préchargée) : on part du cache */
-    expect(depart("fiche-a", { faits: 1 }, Date.now() - 60_000)).toEqual({ valeur: { faits: 2 }, duServeur: false });
+    expect(depart("fiche:a", fiche(1), Date.now() - 60_000)).toEqual({ valeur: fiche(2), duServeur: false });
     /* Rendue après : la page */
-    expect(depart("fiche-a", { faits: 3 }, Date.now() + 1000)).toEqual({ valeur: { faits: 3 }, duServeur: true });
+    expect(depart("fiche:a", fiche(3), Date.now() + 1000)).toEqual({ valeur: fiche(3), duServeur: true });
     /* Sans heure de rendu : la page, comme avant */
-    expect(depart("fiche-a", { faits: 1 })).toEqual({ valeur: { faits: 1 }, duServeur: true });
+    expect(depart("fiche:a", fiche(1))).toEqual({ valeur: fiche(1), duServeur: true });
     /* Sans donnée du serveur : le cache */
-    expect(depart("fiche-a", undefined)).toEqual({ valeur: { faits: 2 }, duServeur: false });
+    expect(depart("fiche:a", undefined)).toEqual({ valeur: fiche(2), duServeur: false });
     expect(depart("fiche-inconnue", undefined)).toEqual({ valeur: undefined, duServeur: false });
   });
 });

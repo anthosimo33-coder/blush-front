@@ -2,6 +2,16 @@
 
 /* Petit cache de lecture autour de src/services/api.ts (pas de dépendance externe). */
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Account, ReportPayload } from "@/services/api";
+import type { Fiche } from "@/types";
+
+/**
+ * Ce que le cache garde, clé par clé, et sous quelle forme. La fiche a une clé par conv (`fiche:<id>`) : celle d’une
+ * autre conv ne s’affiche jamais à la place de la sienne. « fiche-apercu » : l’aperçu figé d’une vraie fiche. Ce qui
+ * se relit quand la conv change : src/lib/requetes.ts.
+ */
+export type Requetes = { report: ReportPayload; account: Account; "fiche-apercu": Fiche; [cle: `fiche:${string}`]: Fiche };
+export type Cle = keyof Requetes;
 
 type Listener = (data?: unknown) => void;
 const cache = new Map<string, unknown>();
@@ -27,7 +37,7 @@ function ecrire(key: string, data: unknown) {
  * Relit la donnée depuis la couche de service. Le cache est vidé : un écran qui s’ouvre ensuite (une autre conv, une
  * histoire supprimée) ne montre pas l’ancienne donnée le temps de relire.
  */
-export function invalidate(...keys: string[]) {
+export function invalidate(...keys: Cle[]) {
   keys.forEach((k) => {
     cache.delete(k);
     ecritLe.delete(k);
@@ -37,7 +47,7 @@ export function invalidate(...keys: string[]) {
 }
 
 /** Met à jour la donnée en cache sans la relire (mise à jour optimiste). */
-export function setQueryData<T>(key: string, data: T) {
+export function setQueryData<K extends Cle>(key: K, data: Requetes[K]) {
   ecrire(key, data);
   modifieLe.set(key, Date.now());
   listeners.get(key)?.forEach((l) => l(data));
@@ -101,6 +111,9 @@ export function memeValeur(a: unknown, b: unknown): boolean {
   }
 }
 
+/** Comment useQuery lit sa donnée (voir useQuery). */
+export type OptionsLecture = { fetch?: boolean; rendu?: number; frais?: number };
+
 /**
  * `initial` : la donnée rendue par le serveur pour cette page (voir depart). `fetch: false` : la donnée reste celle
  * donnée au départ (un aperçu figé), sans relire. Une lecture qui échoue garde la donnée qu’on a (`error` le dit).
@@ -110,7 +123,8 @@ export function memeValeur(a: unknown, b: unknown): boolean {
  * Une réponse identique à ce qu’on montre ne re-rend pas l’écran ; deux lectures de la même clé en même temps n’en font
  * qu’une (lirePartage).
  */
-export function useQuery<T>(key: string, fn: () => Promise<T>, initial?: T, { fetch = true, rendu, frais = 0 }: { fetch?: boolean; rendu?: number; frais?: number } = {}) {
+export function useQuery<K extends Cle>(key: K, fn: () => Promise<Requetes[K]>, initial?: Requetes[K], { fetch = true, rendu, frais = 0 }: OptionsLecture = {}) {
+  type T = Requetes[K];
   const [premier] = useState(() => depart(key, initial, rendu));
   const [data, setData] = useState<T | undefined>(premier.valeur);
   const [error, setError] = useState(false);

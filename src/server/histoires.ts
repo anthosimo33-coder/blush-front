@@ -7,7 +7,8 @@ import { detecterFormat, erreurImport, lire, participantsDe, principaux, type De
 import { prenomDe } from "@prompts/lib/ajouts";
 import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
-import type { Story } from "@/types";
+import { APPLIS, type Story } from "@/types";
+import type { CodeErreur } from "@/types/erreurs-api";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
@@ -19,8 +20,9 @@ const FICHIERS_MAX = 200;
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
 const NOM_MAX = 100;
 
+/** Un import refusé : un fichier illisible, une conv de groupe, une conv trop courte (src/types/erreurs-api.ts). */
 export class ErreurImport extends Error {
-  constructor(readonly code: "fichier" | "groupe" | "courte") {
+  constructor(readonly code: Extract<CodeErreur, "fichier" | "groupe" | "courte">) {
     super(code);
   }
 }
@@ -310,7 +312,6 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
   return meta;
 }
 
-const APPLIS: Record<Meta["appli"], string> = { whatsapp: "WhatsApp", instagram: "Instagram", hinge: "Hinge", imessage: "iMessage", autre: "Captures" };
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
 

@@ -12,12 +12,12 @@ export const maxDuration = 60;
  * (« fichier ») est aussi accepté, sous la limite de taille de Vercel.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
-  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop", 429);
+  if (!memeOrigine(req)) return erreur("origine");
+  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop");
   const fd = await req.formData().catch(() => null);
   const paquet = fd?.get("export");
   const fichier = fd?.get("fichier");
-  if (!(paquet instanceof File) && !(fichier instanceof File)) return erreur("fichier", 422);
+  if (!(paquet instanceof File) && !(fichier instanceof File)) return erreur("fichier");
   try {
     const lu = paquet instanceof File ? await depuisPaquet(paquet) : await depuisFichier(fichier as File);
     const { id, meta, secret } = await importer(lu);
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const story = storyAffichee(id, meta);
     return json({ source: story.sources[0], story });
   } catch (e) {
-    if (e instanceof ErreurImport) return erreur(e.code, 422);
+    if (e instanceof ErreurImport) return erreur(e.code);
     throw e;
   }
 }

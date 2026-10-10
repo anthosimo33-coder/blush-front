@@ -6,10 +6,10 @@ import { arreterPartage, ErreurPartage, lienDe, partager, versionImage } from "@
 
 /** Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
 async function histoire(req?: Request) {
-  if (req && !memeOrigine(req)) return { reponse: erreur("origine", 403) };
+  if (req && !memeOrigine(req)) return { reponse: erreur("origine") };
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return { reponse: erreur("connexion", 401) };
-  if (!story) return { reponse: erreur("aucune", 404) };
+  if (!utilisateur) return { reponse: erreur("connexion") };
+  if (!story) return { reponse: erreur("aucune") };
   return { story };
 }
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     /* `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`) */
     return json({ id, verdict, v: versionImage(id, verdict) });
   } catch (e) {
-    if (e instanceof ErreurPartage) return erreur(e.code, 409);
+    if (e instanceof ErreurPartage) return erreur(e.code);
     throw e;
   }
 }

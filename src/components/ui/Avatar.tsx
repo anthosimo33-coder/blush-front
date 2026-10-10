@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import type { AppKind } from "@/types";
 import { Icon } from "./icons";
 
 /* Avatars ronds avec reflet : bleu = toi, rose = elle, vert = la vérité. */
@@ -57,8 +58,6 @@ export function AvatarPair({ me, other, size = 40 }: { me: string; other: string
     </span>
   );
 }
-
-export type AppKind = "whatsapp" | "imessage" | "instagram" | "hinge" | "autre";
 
 const GLOSS = "linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 55%)";
 

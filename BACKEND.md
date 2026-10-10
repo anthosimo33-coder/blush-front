@@ -13,6 +13,8 @@ Le navigateur passe par `src/services/api.ts`, qui appelle ces routes ; les page
 - **limite `x`** : `LIMITES.x` (`src/server/limites.ts`), par adresse IP, par compte ou par email, sinon 429 `trop`.
 - **bêta** : en bêta fermée, BLUSH ne lit des captures que pour un compte connecté (`lecturePermise`, `src/server/captures.ts`), sinon 401 `connexion`.
 
+Une erreur répond `{ erreur: <code> }`, avec le statut que lui donne la liste des codes (`ERREURS_API`, `src/types/erreurs-api.ts`) ; les écrans en tirent leur texte (`src/lib/messages-erreur.ts`). D’une étape du modèle, le chat et la fiche ne disent que `refus`, `transcription` ou `panne` (`codePublic`) : son code interne (`refus:cyber`, `sortie_illisible`) reste dans l’alerte. Seule exception : un mauvais code de connexion répond 200 `{ ok: false }`, la même réponse pour tous.
+
 | Route | Méthodes | Rôle | Garde | Module |
 |---|---|---|---|---|
 | `/api/import` | POST | Un export (WhatsApp .zip ou .txt, Instagram message_1.html ou .json) devient une histoire brouillon, avant l’email. Le navigateur n’envoie que le texte de la conv, compressé (`src/services/preparer-export.ts`) ; un fichier brut passe aussi, sous la limite de taille de Vercel | origine, limite `importParIp` | `src/server/histoires.ts`, `prompts/lib/export.ts`, `prompts/lib/instagram.ts` |

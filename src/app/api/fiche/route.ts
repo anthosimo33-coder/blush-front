@@ -13,7 +13,8 @@ import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
-import type { Fiche } from "@/types";
+import { SECTIONS_FICHE, type Fiche } from "@/types";
+import { codePublic } from "@/types/erreurs-api";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 300;
@@ -32,13 +33,13 @@ async function ficheEtMaj(story: Ligne): Promise<Fiche> {
 
 export async function GET() {
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
-  if (!story) return erreur("aucune", 404);
+  if (!utilisateur) return erreur("connexion");
+  if (!story) return erreur("aucune");
   return json(await ficheEtMaj(story));
 }
 
 const Faits = z
-  .array(z.object({ section: z.enum(["infos", "aime", "gens", "dates", "notes"]), text: z.string().trim().min(1).max(200) }).passthrough())
+  .array(z.object({ section: z.enum(SECTIONS_FICHE), text: z.string().trim().min(1).max(200) }).passthrough())
   .max(60);
 
 /**
@@ -47,17 +48,17 @@ const Faits = z
  * entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à jour a appris n’est effacé).
  */
 export async function PUT(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
-  if (!story) return erreur("aucune", 404);
+  if (!utilisateur) return erreur("connexion");
+  if (!story) return erreur("aucune");
   const faits = Faits.safeParse((await corps<{ facts: unknown }>(req)).facts);
-  if (!faits.success) return erreur("faits", 422);
-  if (!(await sousLaLimite(`fiche:${utilisateur.id}`, LIMITES.ficheParCompte))) return erreur("trop", 429);
+  if (!faits.success) return erreur("faits");
+  if (!(await sousLaLimite(`fiche:${utilisateur.id}`, LIMITES.ficheParCompte))) return erreur("trop");
   for (let essai = 0; essai < 3; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
-    if (!ligne || !m?.etat.fiche) return erreur("pas_pret", 409);
+    if (!ligne || !m?.etat.fiche) return erreur("pas_pret");
     const avant = m.etat.fiche.faits;
     const nouveaux = faits.data.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
     const textesAvant = new Set(avant.map((a) => a.texte));
@@ -75,7 +76,7 @@ export async function PUT(req: Request) {
     /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
     if (ecrite.length) return json(await ficheEtMaj(story));
   }
-  return erreur("occupe", 409);
+  return erreur("occupe");
 }
 
 /**
@@ -83,27 +84,28 @@ export async function PUT(req: Request) {
  * sa mémoire se met à jour après la réponse (ajouterALaFiche), et la fiche se relit jusqu’à ce que ce soit fait.
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
-  if (utilisateur.plan !== "blushplus") return erreur("acces", 402);
-  if (!story) return erreur("aucune", 404);
+  if (!utilisateur) return erreur("connexion");
+  if (utilisateur.plan !== "blushplus") return erreur("acces");
+  if (!story) return erreur("aucune");
   const fd = await req.formData().catch(() => null);
   const captures = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const paquet = fd?.get("export");
-  if (!captures.length && !(paquet instanceof File)) return erreur("fichier", 422);
-  if (!(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop", 429);
+  if (!captures.length && !(paquet instanceof File)) return erreur("fichier");
+  if (!(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop");
   const memoire = await memoireDe(story.id);
-  if (!memoire?.etat.fiche) return erreur("pas_pret", 409);
+  if (!memoire?.etat.fiche) return erreur("pas_pret");
   try {
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
     return json(await ajouterALaFiche(story, ajout));
   } catch (e) {
-    if (e instanceof ErreurAjout) return erreur(e.code, 422);
-    if (e instanceof ErreurImport) return erreur("fichier", 422);
+    if (e instanceof ErreurAjout) return erreur(e.code);
+    if (e instanceof ErreurImport) return erreur("fichier");
+    /* Le code interne part à l’équipe ; le navigateur n’apprend que le refus ou la panne */
     if (e instanceof ErreurTache) {
-      await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.message}`]);
-      return erreur(e.message, 502);
+      await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]);
+      return erreur(codePublic(e.code));
     }
     throw e;
   }

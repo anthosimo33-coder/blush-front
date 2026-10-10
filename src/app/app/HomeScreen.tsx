@@ -46,7 +46,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { reveiller } from "@/components/shell/Reveil";
 import { useHydrated } from "@/state/journey";
-import type { BulleChat, ConvSummary, Fiche, LevelId, Report } from "@/types";
+import type { BulleChat, ConvSummary, Fiche, LevelId, Pronom, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { IDEES_MASQUEES } from "./idees";
 import { fusion, idHistorique, memesMessages, remonter, type Conv } from "./garde";
@@ -1839,7 +1839,7 @@ type Row =
   | { kind: "group"; key: string; from: Msg["from"]; at: number | null; items: Item[]; echange?: number };
 
 /** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot). */
-type BubbleEnv = { nextStep: string; arriving: boolean; autre?: "il" | "elle" };
+type BubbleEnv = { nextStep: string; arriving: boolean; autre?: Pronom };
 
 /**
  * L’heure d’un message, seulement dans le navigateur (`opened` est vide au rendu serveur) : le serveur est à l’heure

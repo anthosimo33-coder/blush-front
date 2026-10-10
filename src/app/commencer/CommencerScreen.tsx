@@ -8,7 +8,7 @@ import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { pagePrecedente } from "@/lib/navigation";
-import type { AppKind } from "@/types";
+import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
 import { NBSP } from "@/lib/format";
 
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
@@ -19,7 +19,7 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide
   /* Instagram passe par son export (la lecture des captures arrive ensuite) */
   { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" },
   { app: "hinge", title: "Hinge", subtitle: "Captures d’écran", href: "/importer/captures?app=hinge" },
-  { app: "autre", title: "Autre appli", subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
+  { app: "autre", title: NOM_AUTRE_APPLI, subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
 ];
 
 export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {

@@ -5,7 +5,7 @@
  * Gardé dans sessionStorage : il survit au rechargement de la page.
  */
 import { useSyncExternalStore } from "react";
-import type { AppKind, ExportApp, Goal, Guess } from "@/types";
+import type { AppKind, ExportApp, Goal, Guess, Pronom } from "@/types";
 import { CLE_PARCOURS } from "./cles";
 
 export type JourneyState = {
@@ -17,7 +17,7 @@ export type JourneyState = {
   capturesAdded: boolean;
   me: string | null;
   /** Tu es un garçon (il) ou une fille (elle) : les prompts en ont besoin ; l’autre est l’opposé. */
-  pronom: "il" | "elle" | null;
+  pronom: Pronom | null;
   /** Des captures : son prénom (il n’y apparaît que comme « Moi »). */
   prenom: string;
   guess: Guess | null;

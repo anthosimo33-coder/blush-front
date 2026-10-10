@@ -18,12 +18,12 @@ const Appli = AppliCaptures;
  * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture).
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
-  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop", 429);
+  if (!memeOrigine(req)) return erreur("origine");
+  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop");
   const fd = await req.formData().catch(() => null);
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = Appli.safeParse(fd?.get("app"));
-  if (fd?.get("mode") === "add") return erreur("capture", 422);
+  if (fd?.get("mode") === "add") return erreur("capture");
   const app = appli.success ? appli.data : "autre";
   try {
     const images = await imagesDe(fichiers);
@@ -41,9 +41,9 @@ async function traiter(req: Request) {
     const story = storyAffichee(lu.id, lu.meta);
     return json({ source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
-    if (e instanceof LectureRefusee) return erreur(e.code, e.code === "connexion" ? 401 : 429);
-    if (e instanceof ErreurCaptures) return erreur("capture", 422);
-    if (e instanceof ErreurImport) return erreur(e.code, 422);
+    if (e instanceof LectureRefusee) return erreur(e.code);
+    if (e instanceof ErreurCaptures) return erreur("capture");
+    if (e instanceof ErreurImport) return erreur(e.code);
     throw e;
   }
 }

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useDevice, useFilePicker } from "@/lib/hooks";
-import { ErreurApi, prechargerExport, uploadExport } from "@/services/api";
+import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
+import { prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/contenu/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -71,13 +72,14 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       setBusy(false);
       setAvance(null);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
-      if (e instanceof ErreurApi && e.code === "annule") return;
+      if (codeDe(e) === "annule") return;
       /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
-      if (e instanceof ErreurApi && ["fichier", "groupe", "courte"].includes(e.code)) {
-        router.replace(`/importer/export?app=${app}&erreur=${e.code}`, { scroll: false });
+      const parcours = erreurDeParcours("export", e);
+      if (parcours) {
+        router.replace(`/importer/export?app=${app}&erreur=${parcours}`, { scroll: false });
         return;
       }
-      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Beaucoup d’imports d’un coup. Réessaie dans une heure." : "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.");
+      setSouci(messageErreur("export", e));
       return;
     }
     if (!monte.current) return;

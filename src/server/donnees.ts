@@ -7,15 +7,16 @@ import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres
 import { SUBSCRIPTIONS } from "@/contenu/offres";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
-import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story, VocalRapport } from "@/types";
+import type { AnalysisProgress, Chapter, ConvSummary, Echec, Fiche, Plan, Story, VocalRapport } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 /*
  * Seulement des types : la chaîne d’analyse (le SDK du modèle, tous les prompts) ne se charge qu’au moment de la
  * lancer (voir chaine()), pas à chaque première page d’une instance.
  */
-import type { AvanceMoitie, DonneesMemoire, DonneesRapport, DonneesVerdict } from "./analyse";
+import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
+import { estRefus } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
@@ -139,7 +140,7 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
     stepsDone: fini ? 4 : etape,
     discoveries: decouvertes(story, p),
     done: fini,
-    ...(echec ? { failed: true, failReason: verdict?.error?.startsWith("refus") ? ("refus" as const) : ("panne" as const) } : {}),
+    ...(echec ? { failed: true, failReason: estRefus(verdict?.error) ? ("refus" as const) : ("panne" as const) } : {}),
   };
 }
 
@@ -162,7 +163,7 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
   const { rapport_plan: tp, rapport_chapitres: tc } = taches;
   if (!tp) return undefined;
   const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
-  const detail = (tc?.detail ?? null) as { a: AvanceMoitie; b: AvanceMoitie } | null;
+  const detail = tc?.detail ?? null;
   const fini = tc?.status === "fini";
   const pChap = fini ? 1 : detail ? (detail.a.progres + detail.b.progres) / 2 : 0;
   const progres = Math.min(0.99, 0.35 * pPlan + 0.65 * pChap);
@@ -216,10 +217,10 @@ type EtatTaches = Partial<Record<Genre, Tache>>;
 const TACHES_DU_RAPPORT: Genre[] = ["verdict", "rapport_plan", "rapport_chapitres", "memoire", "vocal"];
 
 /** L’écriture du rapport a-t-elle échoué pour de bon ? `refus` : le modèle refuse, une relance n’y changerait rien. */
-function echecDuRapport({ rapport_plan, rapport_chapitres }: EtatTaches): "panne" | "refus" | undefined {
+function echecDuRapport({ rapport_plan, rapport_chapitres }: EtatTaches): Echec | undefined {
   const t = [rapport_plan, rapport_chapitres].find((x) => x?.status === "echec");
   if (!t) return undefined;
-  return t.error?.startsWith("refus") ? "refus" : "panne";
+  return estRefus(t.error) ? "refus" : "panne";
 }
 
 /** Ce que le verdict dit en tête du rapport, et sur l’accueil : son verdict, où vous en êtes, ton prochain pas. */
@@ -245,7 +246,7 @@ export async function contactDe(storyId: string): Promise<EnTete | null> {
  * chapitres payants, verrouillés et vides.
  */
 export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
-  const access: Plan = (utilisateur?.plan as Plan) ?? "gratuit";
+  const access: Plan = utilisateur?.plan ?? "gratuit";
   /*
    * Tout est lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès, l’état des tâches (lu une
    * fois pour toutes les étapes ci-dessous) et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
@@ -342,8 +343,7 @@ async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boo
 }
 
 export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account {
-  const plan = utilisateur.plan as Plan;
-  return { email: utilisateur.email, subscription: { ...SUBSCRIPTIONS[plan], paused: utilisateur.paused }, storyDeleted: !story };
+  return { email: utilisateur.email, subscription: { ...SUBSCRIPTIONS[utilisateur.plan], paused: utilisateur.paused }, storyDeleted: !story };
 }
 
 /**

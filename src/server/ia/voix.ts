@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Alignement } from "@/lib/vocal";
 import { db, schema } from "../db";
+import type { Voix } from "../db/enums";
 import { env } from "../env";
 import { delaiAppel, tempsRestant } from "../echeance";
 
@@ -18,9 +19,6 @@ const FORMAT = "mp3_44100_96";
 /* Le plus long qu’on attend la voix pour un vocal, et ce qu’il doit rester avant l’échéance pour la lancer */
 const DELAI_VOIX_MS = 120_000;
 const TEMPS_MIN_VOIX_MS = 15_000;
-
-/** Les deux voix de l’A/B test : A (E2, créée pour BLUSH) et B (L2, Harmonie, de la bibliothèque ElevenLabs). */
-export type Voix = "A" | "B";
 
 /** La voix d’un compte : toujours la même pour un même compte. Sans voix B configurée, tout le monde a la A. */
 export function voixPour(cle: string): Voix {

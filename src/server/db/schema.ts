@@ -1,5 +1,9 @@
 import { sql } from "drizzle-orm";
 import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+/* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
+import { PLANS } from "../../types";
+import type { AvanceMoitie } from "../analyse";
+import { EVENEMENTS_ECOUTE, GENRES, GENRES_CHAINE, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, VOIX } from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -12,8 +16,8 @@ const quand = (nom: string) => timestamp(nom, { withTimezone: true });
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  /** gratuit | rapport | blushplus (en v1, sans paiement : activé à la main ou par BLUSH_ACCES_LIBRE) */
-  plan: text("plan").notNull().default("gratuit"),
+  /** En v1, sans paiement : activé à la main ou par BLUSH_ACCES_LIBRE. */
+  plan: text("plan", { enum: PLANS }).notNull().default("gratuit"),
   paused: boolean("paused").notNull().default(false),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
@@ -111,13 +115,15 @@ export const chatMessages = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    /** toi | blush */
-    role: text("role").notNull(),
+    role: text("role", { enum: ROLES_CHAT }).notNull(),
     data: chiffre("data").notNull(),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
   (t) => [index("chat_messages_story_idx").on(t.storyId, t.id)],
 );
+
+/** Le détail de l’avancée d’une tâche (tasks.detail) : les deux moitiés du rapport, chapitre par chapitre. */
+export type DetailEcriture = { a: AvanceMoitie; b: AvanceMoitie };
 
 /**
  * Les tâches longues (le verdict, le plan du rapport, ses chapitres, le vocal, la mémoire, une mise à jour de la
@@ -131,10 +137,8 @@ export const tasks = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    /** verdict | rapport_plan | rapport_chapitres | vocal | memoire | memoire_maj */
-    kind: text("kind").notNull(),
-    /** attente | en_cours | fini | echec */
-    status: text("status").notNull().default("attente"),
+    kind: text("kind", { enum: GENRES }).notNull(),
+    status: text("status", { enum: STATUTS_TACHE }).notNull().default("attente"),
     attempts: integer("attempts").notNull().default(0),
     /** Ce dont la tâche a besoin (par exemple l’échange à retenir), chiffré. */
     input: chiffre("input"),
@@ -143,7 +147,7 @@ export const tasks = pgTable(
     /** L’avancée de 0 à 100, d’après ce que le modèle a déjà écrit (le verdict, suivi en direct par la lecture). */
     progress: integer("progress").notNull().default(0),
     /** Le détail de l’avancée (les chapitres du rapport : écrits, en cours), des numéros seulement, jamais de contenu. */
-    detail: jsonb("detail"),
+    detail: jsonb("detail").$type<DetailEcriture>(),
     heartbeatAt: quand("heartbeat_at"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
@@ -156,7 +160,7 @@ export const tasks = pgTable(
      */
     uniqueIndex("tasks_une_par_etape")
       .on(t.storyId, t.kind)
-      .where(sql`${t.status} in ('attente', 'en_cours') and ${t.kind} in ('verdict', 'rapport_plan', 'rapport_chapitres', 'vocal', 'memoire')`),
+      .where(sql`${t.status} in ('attente', 'en_cours') and ${t.kind} in (${sql.raw(GENRES_CHAINE.map((g) => `'${g}'`).join(", "))})`),
   ],
 );
 
@@ -197,7 +201,7 @@ export const vocals = pgTable("vocals", {
   storyId: uuid("story_id")
     .primaryKey()
     .references(() => stories.id, { onDelete: "cascade" }),
-  voix: text("voix").notNull(),
+  voix: text("voix", { enum: VOIX }).notNull(),
   data: chiffre("data").notNull(),
   audio: chiffre("audio").notNull(),
   dureeMs: integer("duree_ms").notNull(),
@@ -212,7 +216,7 @@ export const chatVocals = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    voix: text("voix").notNull(),
+    voix: text("voix", { enum: VOIX }).notNull(),
     audio: chiffre("audio").notNull(),
     dureeMs: integer("duree_ms").notNull(),
     createdAt: quand("created_at").notNull().defaultNow(),
@@ -228,9 +232,8 @@ export const vocalEcoutes = pgTable(
     storyId: uuid("story_id")
       .notNull()
       .references(() => stories.id, { onDelete: "cascade" }),
-    voix: text("voix").notNull(),
-    /** debut | fin | reecoute | ferme */
-    evenement: text("evenement").notNull(),
+    voix: text("voix", { enum: VOIX }).notNull(),
+    evenement: text("evenement", { enum: EVENEMENTS_ECOUTE }).notNull(),
     /** Où en était l’écoute, en millisecondes. */
     positionMs: integer("position_ms").notNull().default(0),
     createdAt: quand("created_at").notNull().defaultNow(),
@@ -244,8 +247,7 @@ export const waitlist = pgTable("waitlist", {
   id: uuid("id").primaryKey().defaultRandom(),
   emailHash: text("email_hash").notNull().unique(),
   email: chiffre("email").notNull(),
-  /** D’où vient l’inscription : « accueil » (la page de la liste), « connexion » (refusé à l’écran email). */
-  source: text("source").notNull(),
+  source: text("source", { enum: SOURCES_ATTENTE }).notNull(),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 

@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { chiffrer, empreinte, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
+import type { SourceAttente } from "./db/enums";
 import { envoyerMail } from "./email";
 import { env, peutEntrer } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
@@ -15,7 +16,7 @@ export const lienRetrait = (emailHash: string) => `${env().BLUSH_URL}/attente/re
  * venir de quelqu’un d’autre, le mail donne de quoi se retirer. Un email déjà invité apprend que sa place est prête. Trois
  * mails par jour au plus pour un même email. `convEffacee` : la conv qu’il venait d’importer n’a pas été gardée.
  */
-export async function inscrire(email: string, source: "accueil" | "connexion", { convEffacee = false } = {}): Promise<void> {
+export async function inscrire(email: string, source: SourceAttente, { convEffacee = false } = {}): Promise<void> {
   const propre = email.trim().toLowerCase();
   const emailHash = empreinte(`attente:${propre}`);
   await db()

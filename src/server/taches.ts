@@ -2,12 +2,14 @@ import "server-only";
 import { and, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
+import type { Genre } from "./db/enums";
 
 /*
  * Les tâches longues, rangées en base et exécutées après la réponse HTTP (after()).
  * Une tâche « en cours » dont le battement de cœur est périmé a été abandonnée (instance arrêtée) : on la reprend.
+ * Leurs genres et leurs états : src/server/db/enums.ts.
  */
-export type Genre = "verdict" | "rapport_plan" | "rapport_chapitres" | "vocal" | "memoire" | "memoire_maj";
+export type { Genre };
 export type Tache = typeof schema.tasks.$inferSelect;
 
 export const ESSAIS_MAX = 3;

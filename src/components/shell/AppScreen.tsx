@@ -3,9 +3,8 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { useQuery } from "@/lib/query";
 import { auRepos } from "@/lib/repos";
-import { getAccount } from "@/services/api";
+import { useCompte } from "@/lib/requetes";
 import type { Plan } from "@/types";
 import { AccountPill, Screen } from "./Screen";
 
@@ -16,7 +15,7 @@ const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, blushplus: 2 };
 
 /** Les droits d’accès du compte : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres + une question), BLUSH+ (en plus : accueil, aide, fiche). */
 export function useAccess() {
-  const { data } = useQuery("account", getAccount);
+  const { data } = useCompte();
   const plan = data?.subscription.plan;
   return {
     initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,

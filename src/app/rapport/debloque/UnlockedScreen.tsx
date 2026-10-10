@@ -5,15 +5,16 @@ import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { OFFERS } from "@/contenu/offres";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
-import { invalidate } from "@/lib/query";
+import { apresDeblocage } from "@/lib/requetes";
 import { useSoundOnce } from "@/lib/sound";
 import { CheckBurst } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Screen } from "@/components/shell/Screen";
+import type { Pronom } from "@/types";
 
 /* Ce que l’offre vient d’ouvrir, dit simplement : combien de chapitres restent, d’où la lecture reprend. */
-const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: number, autre?: "il" | "elle") =>
+const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: number, autre?: Pronom) =>
   offre === "rapport"
     ? [
         { title: `Les ${restants} chapitres qui restent`, sub: `Ta lecture reprend au chapitre ${reprise}` },
@@ -41,14 +42,14 @@ export function UnlockedScreen({
   /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
   restants: number;
   reprise: number;
-  autre?: "il" | "elle";
+  autre?: Pronom;
 }) {
   const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
   const plus = offer === "blushplus";
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
   useSoundOnce("debloque");
   /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
-  useEffect(() => invalidate("report", "account"), []);
+  useEffect(() => apresDeblocage(), []);
   const suite = next ?? `/rapport#chapitre-${reprise}`;
   return (
     <Screen

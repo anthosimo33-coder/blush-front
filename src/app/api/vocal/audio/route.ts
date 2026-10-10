@@ -11,10 +11,10 @@ import { audioDuCompte } from "@/server/vocal";
 export async function GET(req: Request) {
   const conv = new URL(req.url).searchParams.get("conv");
   const utilisateur = await utilisateurCourant();
-  if (!utilisateur) return erreur("connexion", 401);
+  if (!utilisateur) return erreur("connexion");
   const storyId = conv ?? (await contexteRequete()).story?.id;
   const vocal = storyId ? await audioDuCompte(utilisateur.id, storyId) : null;
-  if (!vocal) return erreur("aucune", 404);
-  if (!vocal.audio) return erreur("pas_pret", 404);
+  if (!vocal) return erreur("aucune");
+  if (!vocal.audio) return erreur("pas_pret");
   return reponseAudio(req, vocal.audio);
 }

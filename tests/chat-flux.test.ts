@@ -34,7 +34,8 @@ import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { REFUS_FUITE } from "@/server/ia/garde";
 import { planifier } from "@/server/taches";
-import { askQuestion, CoupureChat, sendToBlush, type ErreurApi } from "@/services/api";
+import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
+import type { ErreurApi } from "@/types/erreurs-api";
 import type { BulleChat, EvenementChat } from "@/types";
 
 const email = `chat-flux-${Date.now()}@blush.test`;
@@ -182,7 +183,7 @@ describe("POST /api/chat en flux", () => {
     await lancerApres();
   });
 
-  it("une erreur après des bulles : elles sont parties, l’erreur arrive en dernier dans le flux", async () => {
+  it("une erreur après des bulles : elles sont parties, l’erreur arrive en dernier dans le flux, sans son code interne", async () => {
     /* Une sortie illisible à la fin (un niveau qui n’existe pas), après une lecture déjà montrée : pas de nouvel essai */
     chat = (req) => reponseChat(req, (r) => ({ ...r, niveau_atteint: "inconnu" }));
     const r = await envoyer("elle veut quoi ?");
@@ -190,7 +191,8 @@ describe("POST /api/chat en flux", () => {
     expect(r.headers.get("content-type")).toContain("application/x-ndjson");
     const evenements = (await lectures(r)).flat();
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["bulle", "bulle", "erreur"]);
-    expect(evenements.at(-1)).toEqual({ erreur: "sortie_illisible" });
+    /* « sortie_illisible » reste dans l’alerte à l’équipe : le navigateur n’apprend qu’une panne */
+    expect(evenements.at(-1)).toEqual({ erreur: "panne" });
     expect(appels).toBe(1);
     await lancerApres();
   });

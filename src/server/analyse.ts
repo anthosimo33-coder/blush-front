@@ -13,7 +13,7 @@ import { estOffert } from "@/contenu/chapitres";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type LigneComplete } from "./histoires";
-import { ErreurTache } from "./erreurs";
+import { ErreurTache, estRefus } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
@@ -147,7 +147,7 @@ export function avanceMoitie(a: Avance, premier: 1 | 5): AvanceMoitie {
 }
 
 /** Écrit l’avancée d’une tâche en base (et son détail), au plus une fois par seconde, sans jamais reculer. */
-function ecrireAvance(tacheId: string): (progres: number, detail?: unknown) => void {
+function ecrireAvance(tacheId: string): (progres: number, detail?: Tache["detail"]) => void {
   let derniere = 0;
   let ecrite = -1;
   return (p, detail) => {
@@ -471,24 +471,24 @@ const DUREES_MS: Record<Genre, number> = {
 };
 const MARGE_ETAPE = 1.3;
 /** Le temps qu’il doit rester avant l’échéance pour commencer une étape de ce genre. */
-export const tempsPourCommencer = (kind: string) => MARGE_ETAPE * (DUREES_MS[kind as Genre] ?? 100_000);
+export const tempsPourCommencer = (kind: Genre) => MARGE_ETAPE * DUREES_MS[kind];
 
 /** Exécute une tâche. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
 async function executer(t: Tache): Promise<boolean> {
   const coeur = setInterval(() => void battre(t.id).catch(() => {}), 20_000);
   try {
     const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
-    const etape = ETAPES[t.kind as Genre];
+    const etape = ETAPES[t.kind];
     if (!story || !etape) throw new ErreurTache("tache_inconnue");
     await etape(story, t);
     await finir(t.id);
     return true;
   } catch (e) {
-    const code = e instanceof ErreurTache ? e.message : `erreur:${(e as Error).name}`;
+    const code = e instanceof ErreurTache ? e.code : `erreur:${(e as Error).name}`;
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
     console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
     /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
-    const definitif = code.startsWith("refus");
+    const definitif = estRefus(code);
     await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
     if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);

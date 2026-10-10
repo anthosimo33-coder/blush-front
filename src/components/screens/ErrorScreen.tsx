@@ -1,19 +1,13 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
+import type { ErreurParcours } from "@/lib/messages-erreur";
 import { useSoundOnce } from "@/lib/sound";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
-/**
- * Les erreurs du parcours d’import, posées dans l’adresse (`?erreur=<code>`) : voir ErreurDeParcours. « lecture » n’a
- * plus d’écran qui la pose (l’échec de la lecture se dit sur /lecture) : on n’y arrive qu’en tapant l’adresse.
- */
-export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"] as const;
-type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
-
-/* Écrans d’erreur : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
+/* Écrans d’erreur du parcours d’import (ERREURS_PARCOURS) : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
 const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: string; back: string }> = {
   fichier: {
     title: "On n’arrive pas à lire ce fichier.",

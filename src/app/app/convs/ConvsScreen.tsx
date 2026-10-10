@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import { invalidate } from "@/lib/query";
-import { openConv } from "@/services/api";
+import { changerDeConv } from "@/lib/requetes";
 import { IconButton } from "@/components/ui/Button";
 import { ContactRing } from "@/components/ui/contact";
 import { EnRoute } from "@/components/ui/EnRoute";
@@ -55,10 +54,7 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       prefetch={false}
       scroll={false}
       transitionTypes={["nav-forward"]}
-      onClick={() => {
-        openConv(conv.storyId);
-        invalidate("report", "account", "fiche");
-      }}
+      onClick={() => changerDeConv(conv.storyId)}
       aria-label={`${conv.person.name}\u00a0: ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"
     >

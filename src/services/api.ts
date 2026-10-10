@@ -8,6 +8,7 @@ import type {
   AppKind,
   BlushAnswer,
   BulleChat,
+  Echec,
   EvenementChat,
   Fiche,
   FicheFact,
@@ -15,6 +16,7 @@ import type {
   Goal,
   Guess,
   Plan,
+  Pronom,
   QuestionAnswer,
   Report,
   SoberReport,
@@ -22,6 +24,9 @@ import type {
   Subscription,
   VocalRapport,
 } from "@/types";
+import { ErreurApi, type CodeErreur } from "@/types/erreurs-api";
+import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
+import type { EvenementEcoute } from "@/server/db/enums";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
 import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";
@@ -66,7 +71,7 @@ export type ReportPayload = {
   /** Le vocal de BLUSH, en haut du rapport : prêt, ou en train de s’enregistrer. */
   vocal?: VocalRapport;
   /** L’écriture a échoué pour de bon (la panne : on peut la relancer ; le refus du modèle : rien à relancer). */
-  echec?: "panne" | "refus";
+  echec?: Echec;
 };
 
 /** Un morceau de l’historique du chat (du plus ancien au plus récent), et s’il en reste de plus anciens. */
@@ -77,16 +82,6 @@ export type HistoriqueChat = { echanges: { id: number; mine: string; answer: Blu
  * « reprise » : le réseau a coupé pendant un envoi de captures ou d’enregistrement, il repart (voir avecReprise).
  */
 export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number } | { etape: "reprise" };
-
-/** Une erreur du back-end : son code (« groupe », « courte », « bientot »…), jamais de détail interne. */
-export class ErreurApi extends Error {
-  constructor(
-    readonly code: string,
-    readonly status: number,
-  ) {
-    super(code);
-  }
-}
 
 /** Le chat : la réponse n’est pas arrivée en entier (le réseau a coupé, ou une erreur après des bulles). Les bulles déjà reçues, peut-être aucune. */
 export class CoupureChat extends Error {
@@ -108,7 +103,7 @@ function avecConv(entetes?: HeadersInit): Headers {
 
 async function appel<T>(chemin: string, init: RequestInit = {}): Promise<T> {
   const r = await fetch(chemin, { credentials: "same-origin", cache: "no-store", ...init, headers: avecConv(init.headers) });
-  const corps = (await r.json().catch(() => ({}))) as { erreur?: string };
+  const corps = (await r.json().catch(() => ({}))) as { erreur?: CodeErreur };
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
   return corps as T;
 }
@@ -131,7 +126,7 @@ async function chat(init: RequestInit, suivi: SuiviChat = {}): Promise<BlushAnsw
   }
   /* Une erreur avant que BLUSH écrive, ou un serveur d’avant le flux (pendant une mise en ligne) : la réponse d’un bloc */
   if (!r.ok || !r.body || !r.headers.get("content-type")?.includes("ndjson")) {
-    const corps = (await r.json().catch(() => ({}))) as BlushAnswer & { erreur?: string };
+    const corps = (await r.json().catch(() => ({}))) as BlushAnswer & { erreur?: CodeErreur };
     if (!r.ok || !("kind" in corps)) throw new ErreurApi(corps.erreur ?? "erreur", r.ok ? 500 : r.status);
     return corps;
   }
@@ -348,7 +343,7 @@ export async function verifyLoginCode(email: string, code: string): Promise<{ ok
   return appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code }));
 }
 
-export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null; prenom?: string | null }): Promise<void> {
+export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
   return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", { me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) })));
 }
 
@@ -382,7 +377,7 @@ export function modeVocalChat(actif: boolean): void {
 }
 
 /** Un moment de l’écoute du vocal, pour comparer les deux voix (A/B test). Sans réponse attendue : un échec ne gêne pas l’écoute. */
-export function noterEcouteVocal(evenement: "debut" | "fin" | "reecoute" | "ferme", position: number): void {
+export function noterEcouteVocal(evenement: EvenementEcoute, position: number): void {
   /* keepalive : l’écoute fermée en quittant la page part quand même */
   void appel<{ ok: true }>("/api/vocal/ecoute", { ...envoi("POST", { evenement, position }), keepalive: true }).catch(() => {});
 }
@@ -441,30 +436,10 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, 
 }
 
 /* Une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
-const bulle = (texte: string | string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
+const bulle = (texte: string | readonly string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
 
-/* Les erreurs du chat (captures, export, vocal), dans la voix de BLUSH : une idée par bulle */
-const ERREURS_CHAT: Record<string, string | string[]> = {
-  trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain\u00a0?",
-  pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
-  acces: "le chat avec moi, c’est dans BLUSH+",
-  capture: ["j’arrive pas à lire tes captures", "renvoie-les en entier, sans les rogner"],
-  fichier: ["j’arrive pas à ouvrir ce fichier", "envoie-moi l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram"],
-  autre_conv: "c’est pas votre conv ça 👀 envoie-moi l’export de la vôtre",
-  rien_de_neuf: "ça, je l’ai déjà 😌 rien de nouveau depuis la dernière fois",
-  vocal_bientot: ["les vocaux, ça arrive très vite", "écris-moi en attendant, je te réponds pareil"],
-  vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies\u00a0?",
-  vocal: "ton vocal est trop long, même pour moi 😭 fais-moi la version courte",
-  transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
-};
-
-/** Pourquoi une question n’a pas pu partir, dit par BLUSH, en une phrase (le code d’erreur du serveur). */
-export function souciQuestion(e: unknown): string {
-  const code = e instanceof ErreurApi ? e.code : "";
-  if (code.startsWith("refus")) return "là-dessus je peux pas t’aider, reformule ta question";
-  const m = ERREURS_CHAT[code];
-  return m ? (Array.isArray(m) ? m.join(", ") : m) : "j’ai eu un bug, renvoie-moi ta question";
-}
+/** Pourquoi une question n’a pas pu partir, dit par BLUSH, en une phrase (src/lib/messages-erreur.ts). */
+export const souciQuestion = (e: unknown): string => messageErreur("question", e);
 
 async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<BlushAnswer> {
   try {
@@ -472,10 +447,8 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
   } catch (e) {
     /* Le réseau a coupé en route : l’accueil garde les bulles reçues et propose de réessayer */
     if (e instanceof CoupureChat) throw e;
-    const code = e instanceof ErreurApi ? e.code : "";
-    /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug */
-    if (code.startsWith("refus")) return bulle(["là-dessus je peux pas t’aider", "reformule, ou envoie-moi autre chose"]);
-    return bulle(ERREURS_CHAT[code] ?? "j’ai eu un bug, renvoie-moi ça");
+    /* Une erreur : BLUSH la dit dans sa voix (un refus de l’IA, sans parler de bug) */
+    return bulle(messageErreur("chat", e));
   }
 }
 
@@ -515,8 +488,7 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
     return await appel<FicheUpdate>("/api/fiche", { method: "POST", body: await avecFichiers(new FormData(), files) });
   } catch (e) {
     /* Rien de lisible, ou une erreur : la fiche reste comme avant, et l’écran dit pourquoi (« rien de neuf » n’est pas une erreur) */
-    const code = e instanceof ErreurApi ? e.code : "";
-    const problem = code === "rien_de_neuf" ? undefined : code === "capture" || code === "fichier" || code === "autre_conv" || code === "trop" ? code : "bug";
+    const problem = problemeAjout(e);
     return { fiche: await getFiche(), added: [], ...(problem ? { problem } : {}) };
   }
 }

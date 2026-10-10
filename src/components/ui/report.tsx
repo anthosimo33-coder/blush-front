@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
-import type { ChapterBlock } from "@/types";
+import type { ChapterBlock, Pronom } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "./icons";
 import { PlayCard } from "./cards";
@@ -243,7 +243,7 @@ export function Block({
   block: ChapterBlock;
   renderQuestion?: (b: Extract<ChapterBlock, { kind: "question" }>) => ReactNode;
   onShare?: () => void;
-  autre?: "il" | "elle";
+  autre?: Pronom;
 }) {
   switch (block.kind) {
     case "essential":
@@ -293,7 +293,7 @@ export function Blocks({
   className?: string;
   renderQuestion?: Parameters<typeof Block>[0]["renderQuestion"];
   onShare?: (index: number) => void;
-  autre?: "il" | "elle";
+  autre?: Pronom;
 }) {
   return (
     <div className={cn("contents", className)}>

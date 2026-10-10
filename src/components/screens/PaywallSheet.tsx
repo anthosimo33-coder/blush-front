@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
-import { ErreurApi, unlock } from "@/services/api";
+import { codeDe } from "@/lib/messages-erreur";
+import { unlock } from "@/services/api";
 import { OFFERS, PAYWALL } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -65,7 +66,7 @@ export function PaywallSheet({
     } catch (e) {
       /* Back-end v1, sans paiement : l’accès est réservé à la bêta */
       setBusy(false);
-      if (e instanceof ErreurApi && e.code === "bientot") setLater(true);
+      if (codeDe(e) === "bientot") setLater(true);
       else setSouci(true);
       return;
     }

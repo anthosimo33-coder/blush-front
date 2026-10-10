@@ -6,9 +6,10 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { formatCount } from "@/lib/format";
-import type { Story } from "@/types";
+import { APPLIS, NOM_AUTRE_APPLI, type Story } from "@/types";
 
-const APP_NAME = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Autre appli" } as const;
+/* Ici, des captures d’une autre appli se disent « Autre appli » */
+const APP_NAME = { ...APPLIS, autre: NOM_AUTRE_APPLI };
 
 /*
  * Écran 05 — Votre histoire réunie : le total en grand, puis les applis dans l’ordre, en une seule liste. En sommeil,

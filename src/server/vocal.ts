@@ -7,7 +7,8 @@ import type { VocalLigne, VocalRapport } from "@/types";
 import { chiffrer, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { db, schema } from "./db";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
-import { dire, voixPour, type Voix } from "./ia/voix";
+import type { EvenementEcoute, Voix } from "./db/enums";
+import { dire, voixPour } from "./ia/voix";
 
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
@@ -30,7 +31,7 @@ export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRap
   if (!v) return null;
   const d = dechiffrer<DonneesVocal>(v.data);
   return {
-    pret: { etat: "pret", audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix as Voix, sobre: d.sobre, lignes: d.lignes },
+    pret: { etat: "pret", audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix, sobre: d.sobre, lignes: d.lignes },
     aJour: (d.version ?? 1) >= VERSION_VOCAL,
     fait: v.createdAt,
   };
@@ -121,11 +122,8 @@ export async function audioDuCompte(userId: string, storyId: string): Promise<{ 
   return { audio: dechiffrerOctets(chiffre) };
 }
 
-export const EVENEMENTS = ["debut", "fin", "reecoute", "ferme"] as const;
-export type Evenement = (typeof EVENEMENTS)[number];
-
 /** Note un moment de l’écoute (pour comparer les deux voix). Sans vocal, rien. */
-export async function noterEcoute(storyId: string, evenement: Evenement, positionMs: number): Promise<void> {
+export async function noterEcoute(storyId: string, evenement: EvenementEcoute, positionMs: number): Promise<void> {
   const [v] = await db().select({ voix: schema.vocals.voix }).from(schema.vocals).where(eq(schema.vocals.storyId, storyId));
   if (!v) return;
   await db()

@@ -7,7 +7,7 @@ import { erreur, json, memeOrigine } from "@/server/http";
  * la conv choisie). Sur un appareil partagé, la personne suivante ne retrouve rien.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const secret = await lireSession();
   if (secret) await fermerSession(secret);
   await effacerSession();

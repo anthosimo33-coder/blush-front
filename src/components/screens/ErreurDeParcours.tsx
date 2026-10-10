@@ -2,7 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { ERREURS_PARCOURS, ErrorScreen } from "./ErrorScreen";
+import { ERREURS_PARCOURS } from "@/lib/messages-erreur";
+import { ErrorScreen } from "./ErrorScreen";
 
 /**
  * L’écran d’erreur du parcours d’import : les écrans de l’import posent `?erreur=<code>` dans l’adresse (ExportScreen,

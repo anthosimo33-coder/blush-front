@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { play } from "@/lib/sound";
-import { ErreurApi, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
+import { messageErreur } from "@/lib/messages-erreur";
+import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
@@ -19,14 +20,6 @@ import { retenirLecture } from "@/state/lecture";
 
 const LENGTH = 6;
 const RESEND_AFTER = 30;
-
-/** Ce qui a empêché la vérification, dit simplement (un mauvais code a son propre message). */
-const souciDe = (e: unknown) =>
-  e instanceof ErreurApi && e.code === "trop"
-    ? "Trop d’essais d’un coup. Attends quelques minutes, puis réessaie."
-    : e instanceof ErreurApi && e.code === "beta"
-      ? "Cet email n’est pas encore dans la bêta."
-      : "Ça n’a pas pu partir. Vérifie ta connexion et réessaie.";
 
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
@@ -67,7 +60,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
     } catch (e) {
       play("non");
       setBusy(false);
-      setSouci(souciDe(e));
+      /* Ce qui a empêché la vérification, dit simplement (un mauvais code a son propre message) */
+      setSouci(messageErreur("verification", e));
       return;
     }
     play(ok ? "oui" : "non");
@@ -131,7 +125,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       await sendLoginCode(email);
       setResent(true);
     } catch (e) {
-      setSouci(e instanceof ErreurApi && e.code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
+      setSouci(messageErreur("code", e));
     }
   };
 

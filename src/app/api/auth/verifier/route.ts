@@ -8,17 +8,19 @@ import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 /**
  * Le code reçu par email : bon, il ouvre la session. La conv importée sur ce navigateur rejoint le compte et s’ouvre s’il
  * n’en a encore lu aucune ; sinon elle reste un brouillon, et l’accueil garde la conv qu’on suit (brouillonALaConnexion).
+ * Un mauvais code répond 200 `{ ok: false }`, pas une erreur de la liste (src/types/erreurs-api.ts) : voulu, la même
+ * réponse pour tous.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
-  if (!(await sousLaLimite(`verif:${ipDe(req)}`, LIMITES.verificationParIp))) return erreur("trop", 429);
+  if (!memeOrigine(req)) return erreur("origine");
+  if (!(await sousLaLimite(`verif:${ipDe(req)}`, LIMITES.verificationParIp))) return erreur("trop");
   const b = await corps<{ email: string; code: string }>(req);
   const email = Email.safeParse(b.email);
   if (!email.success || typeof b.code !== "string") return json({ ok: false });
   /* Le code d’abord : sans le bon, la réponse est la même, invité ou pas (un email hors de la bêta n’en reçoit jamais) */
   if (!(await prendreCode(email.data, b.code.trim()))) return json({ ok: false });
   /* Bêta fermée : un email retiré de la liste après l’envoi de son code (seul celui qui a le code l’apprend) */
-  if (!peutEntrer(email.data)) return erreur("beta", 403);
+  if (!peutEntrer(email.data)) return erreur("beta");
   const utilisateur = await compteDe(email.data);
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);

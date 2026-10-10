@@ -13,8 +13,8 @@ export const maxDuration = 180;
  * sa lecture brute. Les images ne sont gardées nulle part. Les lots sont ensuite rassemblés (/api/captures/video).
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
-  if (!(await sousLaLimite(`lot:${ipDe(req)}`, LIMITES.lotParIp))) return erreur("trop", 429);
+  if (!memeOrigine(req)) return erreur("origine");
+  if (!(await sousLaLimite(`lot:${ipDe(req)}`, LIMITES.lotParIp))) return erreur("trop");
   const fd = await req.formData().catch(() => null);
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
@@ -22,10 +22,10 @@ async function traiter(req: Request) {
     const images = await imagesDe(fichiers);
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("lots");
-    if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
+    if (permis !== "ok") return erreur(permis);
     return json({ lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });
   } catch (e) {
-    if (e instanceof ErreurImport) return erreur(e.code, 422);
+    if (e instanceof ErreurImport) return erreur(e.code);
     throw e;
   }
 }

@@ -1,8 +1,10 @@
 import "server-only";
+import { ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 
 /* Les réponses des routes /api : du JSON, et des erreurs qui ne disent jamais rien d’interne. */
 export const json = (corps: unknown, status = 200) => Response.json(corps, { status, headers: { "cache-control": "no-store" } });
-export const erreur = (code: string, status: number) => json({ erreur: code }, status);
+/** Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. */
+export const erreur = (code: CodeErreur) => json({ erreur: code }, ERREURS_API[code]);
 
 /** Une requête qui modifie quelque chose doit venir de l’appli elle-même (contre les requêtes forgées depuis un autre site). */
 export function memeOrigine(req: Request): boolean {

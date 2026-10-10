@@ -14,13 +14,13 @@ export const maxDuration = 300;
  * Le rapport, puis la mémoire, s’écrivent après la réponse.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine", 403);
+  if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion", 401);
+  if (!utilisateur) return erreur("connexion");
   const { offre } = await corps<{ offre: "rapport" | "blushplus" }>(req);
-  if (offre !== "rapport" && offre !== "blushplus") return erreur("offre", 422);
+  if (offre !== "rapport" && offre !== "blushplus") return erreur("offre");
   if (utilisateur.plan === "gratuit") {
-    if (!accesLibre(utilisateur.email)) return erreur("bientot", 402);
+    if (!accesLibre(utilisateur.email)) return erreur("bientot");
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, utilisateur.id));
   }
   /* Le rapport s’il n’a jamais été lancé, ou la mémoire d’un rapport sobre déjà offert : ce qui manque part, une seule fois */

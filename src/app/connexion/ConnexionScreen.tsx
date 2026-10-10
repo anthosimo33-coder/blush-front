@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { suiteSure } from "@/lib/suite";
-import { ErreurApi, sendLoginCode } from "@/services/api";
+import { messageErreur } from "@/lib/messages-erreur";
+import { sendLoginCode } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -46,8 +47,7 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       await sendLoginCode(j.email.trim());
       router.push(versCode);
     } catch (e) {
-      const code = e instanceof ErreurApi ? e.code : "";
-      setProblem(code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
+      setProblem(messageErreur("code", e));
       setBusy(false);
     }
   };

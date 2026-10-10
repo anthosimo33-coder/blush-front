@@ -134,7 +134,7 @@ describe("l’accès donné après le verdict", () => {
     verdict = {};
     const id = await lue("06-elle-hesite.txt");
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
-    const plus = { ...u, plan: "blushplus" };
+    const plus = { ...u, plan: "blushplus" as const };
     const avant = await rapportDe(await ligne(id), plus);
     expect(avant?.generating).toBe(true);
     await lancerApres();

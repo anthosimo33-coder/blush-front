@@ -6,7 +6,8 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { connexionPuis } from "@/lib/suite";
-import { ErreurApi, prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
+import { codeDe, erreurDeParcours, type ErreurParcours } from "@/lib/messages-erreur";
+import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
@@ -16,6 +17,7 @@ import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney, useJourney } from "@/state/journey";
 import type { AppKind } from "@/types";
+import { ErreurApi } from "@/types/erreurs-api";
 
 
 type Shot = { id: string; file: File; url: string | null };
@@ -94,7 +96,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     );
 
   /* Une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=, ErreurDeParcours) */
-  const echec = (code: string) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
+  const echec = (code: ErreurParcours) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
   const handle = (picked: File[], video: boolean) => {
     /* Un enregistrement garde son fichier en aperçu (la balise vidéo le lit) ; une capture attend sa vignette */
@@ -168,10 +170,11 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
-      if (e instanceof ErreurApi && e.code === "trop") return setSouci("trop");
+      if (codeDe(e) === "trop") return setSouci("trop");
       /* Le réseau, encore après la reprise : les captures ne sont pas en cause, elles restent là */
       if (!(e instanceof ErreurApi)) return setSouci("reseau");
-      echec(["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
+      /* La conv elle-même (trop courte, de groupe), ou la vidéo : son écran d’erreur. Toute autre réponse : illisibles */
+      echec(erreurDeParcours("captures", e) ?? "capture");
     }
   };
 
