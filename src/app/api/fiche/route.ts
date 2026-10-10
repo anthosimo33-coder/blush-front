@@ -12,7 +12,7 @@ import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
-import { avecEcheance } from "@/server/echeance";
+import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { Fiche } from "@/types";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
@@ -111,5 +111,5 @@ async function traiter(req: Request) {
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
 export function POST(req: Request) {
-  return avecEcheance(285_000, () => traiter(req));
+  return avecEcheance(echeancePour(maxDuration), () => traiter(req));
 }

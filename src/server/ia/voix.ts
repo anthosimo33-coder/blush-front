@@ -15,6 +15,9 @@ const API = "https://api.elevenlabs.io";
 const PRIX_CARACTERE = 22 / 121_000;
 /* Le MP3 à 96 kb/s : la voix reste nette, et un vocal de 30 s pèse environ 360 Ko */
 const FORMAT = "mp3_44100_96";
+/* Le plus long qu’on attend la voix pour un vocal, et ce qu’il doit rester avant l’échéance pour la lancer */
+const DELAI_VOIX_MS = 120_000;
+const TEMPS_MIN_VOIX_MS = 15_000;
 
 /** Les deux voix de l’A/B test : A (E2, créée pour BLUSH) et B (L2, Harmonie, de la bibliothèque ElevenLabs). */
 export type Voix = "A" | "B";
@@ -45,7 +48,7 @@ export async function dire(texte: string, voix: Voix, { sobre, storyId }: { sobr
   const debut = Date.now();
   for (let essai = 0; ; essai++) {
     /* Plus le temps avant l’échéance de la fonction : la voix ne part pas (le rapport, lui, est gardé ; la réponse du chat reste écrite) */
-    if (tempsRestant() < 15_000) throw new ErreurVoix("voix_delai");
+    if (tempsRestant() < TEMPS_MIN_VOIX_MS) throw new ErreurVoix("voix_delai");
     const r = await fetch(`${API}/v1/text-to-speech/${id}/with-timestamps?output_format=${FORMAT}`, {
       method: "POST",
       headers: { "xi-api-key": e.ELEVENLABS_API_KEY, "content-type": "application/json" },
@@ -54,7 +57,7 @@ export async function dire(texte: string, voix: Voix, { sobre, storyId }: { sobr
         model_id: MODELE_VOIX,
         voice_settings: sobre ? { stability: 0.5, similarity_boost: 0.75, style: 0.2 } : { stability: 0, similarity_boost: 0.75, style: 0.6 },
       }),
-      signal: AbortSignal.timeout(delaiAppel(120_000, 3_000)),
+      signal: AbortSignal.timeout(delaiAppel(DELAI_VOIX_MS, 3_000)),
     }).catch(() => null);
     if (r?.ok) {
       const corps = (await r.json()) as { audio_base64: string; alignment?: Alignement; normalized_alignment?: Alignement };

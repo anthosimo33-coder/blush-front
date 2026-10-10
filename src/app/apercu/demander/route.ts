@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { configDuChatLocal } from "@/server/drapeaux";
 import { memeOrigine } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +11,13 @@ export const dynamic = "force-dynamic";
 type Config = { lanceur: string; cas: string; memoire: string; memoires?: string; cle: string; workspace?: string };
 
 /**
- * En local seulement : pose une question au vrai chat (prompt 10), à partir de la mémoire (prompt 07),
- * via le lanceur des prompts. La config (des chemins, jamais la clé elle-même) est dans le fichier BLUSH_DEMANDER.
+ * Hors de Vercel seulement (src/proxy.ts), et avec BLUSH_DEMANDER : pose une question au vrai chat (prompt 10), à partir
+ * de la mémoire (prompt 07), via le lanceur des prompts. La config (des chemins, jamais la clé elle-même) est dans le
+ * fichier BLUSH_DEMANDER.
  */
 export async function POST(req: Request) {
-  const chemin = process.env.BLUSH_DEMANDER;
-  if (process.env.NODE_ENV === "production" || !chemin) return new Response(null, { status: 404 });
+  const chemin = configDuChatLocal();
+  if (!chemin) return new Response(null, { status: 404 });
   /* Elle appelle le vrai modèle avec ta clé : une page d’un autre site ne doit pas pouvoir la déclencher */
   if (!memeOrigine(req)) return new Response(null, { status: 403 });
   const conf = JSON.parse(await readFile(chemin, "utf8")) as Config;
@@ -26,6 +28,7 @@ export async function POST(req: Request) {
   const quelle = test ? ["--memoire", test, "--aujourdhui", "fin"] : ["--cas-perso", conf.cas, "--memoire", conf.memoire];
   const { text, history = [] } = (await req.json()) as { text: string; history?: { from: "toi" | "blush"; text: string }[] };
   const env = {
+    // eslint-disable-next-line no-restricted-syntax -- le lanceur hérite de l’environnement du serveur local, plus la clé lue dans son fichier
     ...process.env,
     ANTHROPIC_API_KEY: (await readFile(conf.cle, "utf8")).trim(),
     ...(conf.workspace ? { ANTHROPIC_WORKSPACE_ID: (await readFile(conf.workspace, "utf8")).trim() } : {}),

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { configDuChatLocal } from "@/server/drapeaux";
 import { HomeScreen } from "../../app/HomeScreen";
 import { ApercuNav } from "../ApercuNav";
 import { lireApercu } from "../lire";
@@ -18,7 +19,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/accueil"
   const { payload, story, home } = a.data;
   const { verdict, level, trend, nextStep } = payload.report;
   /* Le vrai chat, en direct, sur la mémoire de cette conv (BLUSH_DEMANDER dit où sont les mémoires) */
-  const live = process.env.BLUSH_DEMANDER ? `/apercu/demander${a.cas ? `?cas=${a.cas}` : ""}` : undefined;
+  const live = configDuChatLocal() ? `/apercu/demander${a.cas ? `?cas=${a.cas}` : ""}` : undefined;
   return (
     <div className="[background:var(--paper-light)]">
       <HomeScreen

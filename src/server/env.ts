@@ -1,12 +1,24 @@
 import "server-only";
 import { z } from "zod";
+import { enProduction, surVercel } from "./drapeaux";
 
 /*
- * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build :
- * `next build` n’a pas les secrets). Une variable manquante ou mal formée fait échouer la requête
- * avec un message clair dans les logs, jamais dans la réponse. Chacune a sa ligne dans BACKEND.md
- * (tests/documentation.test.ts y veille).
+ * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build : `next build` n’a pas
+ * les secrets). Une variable manquante ou mal formée fait échouer la requête avec un message clair dans les logs, jamais
+ * dans la réponse. Chacune a sa ligne dans BACKEND.md (tests/documentation.test.ts y veille). Ce que le proxy et les
+ * pages rendues au build lisent sans ce schéma est dans src/server/drapeaux.ts.
  */
+
+/** L’adresse du site en ligne : le défaut de BLUSH_URL. */
+const SITE_EN_LIGNE = "https://www.askblush.com";
+
+/** Une liste d’emails séparés par des virgules : chacun sans ses espaces et en minuscules, sans case vide. */
+const emails = (v: string) =>
+  v
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
 export const Env = z.object({
   /** Postgres : Neon en production, le Postgres local en dev. */
   DATABASE_URL: z.string().url(),
@@ -26,21 +38,25 @@ export const Env = z.object({
   BLUSH_VOIX_B: z.string().min(1).optional(),
   /** Sans clé Resend, le code de connexion s’affiche dans les logs (dev seulement). */
   RESEND_API_KEY: z.string().min(1).optional(),
-  BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@blush.app>"),
+  /** L’expéditeur des mails, sur le domaine vérifié chez Resend. */
+  BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@askblush.com>"),
   /** L’adresse du site : les images des mails viennent de là. */
-  BLUSH_URL: z.string().url().default("https://www.askblush.com"),
-  /** Bêta sans paiement : emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde. */
-  BLUSH_ACCES_LIBRE: z.string().default(""),
-  /** Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). */
+  BLUSH_URL: z.string().url().default(SITE_EN_LIGNE),
+  /** Bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde (refusé en production). */
+  BLUSH_ACCES_LIBRE: z
+    .string()
+    .default("")
+    .transform((v) => (v.trim() === "*" ? ("*" as const) : emails(v))),
+  /** Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). Exigée en production. */
   BLUSH_BETA_FERMEE: z
     .enum(["0", "1"])
     .default("0")
     .transform((v) => v === "1"),
   /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */
-  BLUSH_ALERTES: z.string().optional(),
-  /** Qui peut ouvrir le tableau de bord (/admin) : un ou des emails, séparés par des virgules. Par défaut, ceux de BLUSH_ALERTES. */
-  BLUSH_ADMINS: z.string().optional(),
-  /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). */
+  BLUSH_ALERTES: z.string().default("").transform(emails),
+  /** Qui peut ouvrir le tableau de bord (/admin) : un ou des emails, séparés par des virgules. Sans elle, ceux de BLUSH_ALERTES. */
+  BLUSH_ADMINS: z.string().transform(emails).optional(),
+  /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). Exigé en production. */
   CRON_SECRET: z.string().min(16).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
@@ -53,12 +69,34 @@ export const Env = z.object({
 
 export type Env = z.infer<typeof Env>;
 
+/**
+ * L’adresse du site, sans env() : le layout la lit au build, qui n’a pas les secrets. La même que BLUSH_URL, défaut
+ * compris ; mal formée, c’est env() qui le dira.
+ */
+export const URL_SITE = Env.shape.BLUSH_URL.safeParse(process.env.BLUSH_URL).data ?? SITE_EN_LIGNE;
+
 /*
  * Le modèle factice et la boîte à mails des tests n’existent jamais sur Vercel, même si leurs variables y traînent : la
  * production appelle toujours le vrai modèle, et ses mails partent toujours par Resend. La boîte va avec le modèle
  * factice (jamais allumé en production) : sans lui, elle est ignorée, et Resend reste exigé.
  */
-const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (process.env.VERCEL || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
+const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (surVercel() || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
+
+/*
+ * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou BLUSH+ à tout le
+ * monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Les préversions,
+ * le dev et les tests n’ont pas ces exigences.
+ */
+function refusEnProduction(e: Env): string[] {
+  if (!enProduction()) return [];
+  const refus: string[] = [];
+  /* Son défaut ("0") ouvrirait la bêta : en production, elle s’écrit exprès */
+  if (process.env.BLUSH_BETA_FERMEE === undefined) refus.push("BLUSH_BETA_FERMEE manque (1 : bêta fermée, 0 : ouverte, à écrire exprès)");
+  if (!e.CRON_SECRET) refus.push("CRON_SECRET manque (sans lui, la purge de nuit ne tourne jamais)");
+  /* Un plan donné n’est jamais repris : « * » donnerait BLUSH+ à chaque compte créé, pour toujours */
+  if (e.BLUSH_ACCES_LIBRE === "*") refus.push("BLUSH_ACCES_LIBRE=* est refusée (BLUSH+ d’office pour tout le monde) : seulement la liste des invités");
+  return refus;
+}
 
 let cache: Env | null = null;
 
@@ -69,10 +107,16 @@ export function env(): Env {
     const champs = lu.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ");
     throw new Error(`Variables d’environnement invalides : ${champs}`);
   }
-  if (process.env.VERCEL) lu.data.BLUSH_IA_FACTICE = false;
+  if (surVercel() && lu.data.BLUSH_IA_FACTICE) {
+    /* Ignorée, mais dite : elle n’a rien à faire sur Vercel */
+    console.warn("BLUSH_IA_FACTICE=1 sur Vercel : ignorée (le vrai modèle répond), à retirer des variables du projet");
+    lu.data.BLUSH_IA_FACTICE = false;
+  }
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");
   /* `next start` des tests de bout en bout tourne en production, sans Resend : leurs mails vont dans la boîte */
   if (process.env.NODE_ENV === "production" && !lu.data.RESEND_API_KEY && !boiteDe(lu.data)) throw new Error("RESEND_API_KEY manque en production");
+  const refus = refusEnProduction(lu.data);
+  if (refus.length) throw new Error(`Configuration refusée en production : ${refus.join(" ; ")}`);
   cache = lu.data;
   return cache;
 }
@@ -84,7 +128,7 @@ export const boiteAMails = () => boiteDe(env());
  * Le serveur des tests de bout en bout : `next start` sur http://localhost, avec le modèle factice et la boîte à mails.
  * Jamais sur Vercel. Lu directement dans process.env, sans env() : les cookies le demandent avant toute autre variable.
  */
-export const serveurDeTest = () => !process.env.VERCEL && process.env.BLUSH_IA_FACTICE === "1" && !!process.env.BLUSH_BOITE_MAILS;
+export const serveurDeTest = () => !surVercel() && process.env.BLUSH_IA_FACTICE === "1" && !!process.env.BLUSH_BOITE_MAILS;
 
 /** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
@@ -92,20 +136,11 @@ export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLi
 /** Cet email peut-il ouvrir le tableau de bord ? */
 export function estAdmin(email: string): boolean {
   const { BLUSH_ADMINS, BLUSH_ALERTES } = env();
-  return (BLUSH_ADMINS ?? BLUSH_ALERTES ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email.toLowerCase());
+  return (BLUSH_ADMINS ?? BLUSH_ALERTES).includes(email.toLowerCase());
 }
 
 /** L’email a-t-il BLUSH+ d’office (bêta sans paiement) ? */
 export function accesLibre(email: string): boolean {
-  const liste = env().BLUSH_ACCES_LIBRE.trim();
-  if (liste === "*") return true;
-  return liste
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email.toLowerCase());
+  const liste = env().BLUSH_ACCES_LIBRE;
+  return liste === "*" || liste.includes(email.toLowerCase());
 }

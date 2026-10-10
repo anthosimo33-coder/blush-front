@@ -13,6 +13,18 @@ const PAS_DE_CAST_CSS = [
   { selector: "TSAsExpression > TSTypeReference > TSQualifiedName[right.name='CSSProperties']", message: "Pas de `as CSSProperties` : les variables CSS (--d, --r…) sont permises dans `style` (src/types/css.d.ts)." },
 ];
 const NAVIGATEUR_SANS_SERVEUR = "Le navigateur ne lit pas le serveur : une page serveur passe par src/services/serveur.ts, un écran par les routes /api (src/services/api.ts).";
+/*
+ * La configuration se lit à deux endroits : env() (src/server/env.ts, son schéma) et src/server/drapeaux.ts (le proxy et
+ * les pages rendues au build). Ailleurs dans src, process.env ne sert qu’à NODE_ENV, que Next écrit en dur au build.
+ * scripts/, tests/ et les fichiers de configuration (next.config.ts, playwright.config.ts…) sont hors de src : libres.
+ */
+const LA_CONFIG = "La configuration se lit par env() (src/server/env.ts) ou src/server/drapeaux.ts : ailleurs, process.env ne sert qu’à NODE_ENV.";
+const PAS_DE_PROCESS_ENV = [
+  /* process.env.X ou process.env[x], sauf NODE_ENV */
+  { selector: "MemberExpression[object.object.name='process'][object.property.name='env'][property.name!='NODE_ENV']", message: LA_CONFIG },
+  /* process.env tout entier : passé, copié ou déstructuré */
+  { selector: ":not(MemberExpression) > MemberExpression[object.name='process'][property.name='env']", message: LA_CONFIG },
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -35,16 +47,22 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS). Le bloc du navigateur, plus bas, reprend ces sélecteurs :
-  // un bloc qui redonne no-restricted-syntax remplace toute sa liste.
+  // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), et la configuration lue à ses deux seuls endroits
+  // (PAS_DE_PROCESS_ENV). Les deux blocs suivants reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax
+  // remplace toute sa liste.
   {
     files: ["src/**/*.tsx", "src/**/*.ts"],
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV] },
+  },
+  {
+    files: ["src/server/env.ts", "src/server/drapeaux.ts"],
     rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS] },
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
-  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, ConvDeLaPage et le proxy). Ni par l’alias, ni en chemin
-  // relatif, ni par un import() dynamique. Seul server-only le disait, et au build ; schema.ts et les mails ne l’ont pas.
+  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, ConvDeLaPage, le proxy et lire.ts, qui lit les aperçus
+  // locaux sur le disque). Ni par l’alias, ni en chemin relatif, ni par un import() dynamique. Seul server-only le disait,
+  // et au build ; schema.ts et les mails ne l’ont pas.
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
@@ -55,10 +73,11 @@ const eslintConfig = defineConfig([
       "src/services/serveur.ts",
       "src/components/shell/ConvDeLaPage.tsx",
       "src/proxy.ts",
+      "src/app/apercu/lire.ts",
     ],
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }] }],
-      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
+      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
     },
   },
   // Le serveur ne passe pas par la couche du navigateur. donnees.ts lit encore des types d’api.ts (ils iront dans src/types/api.ts au lot 3).

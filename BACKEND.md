@@ -41,7 +41,7 @@ Le navigateur passe par `src/services/api.ts`, qui appelle ces routes ; les page
 | `/api/reveil` | GET | Le réveil : démarre une instance et réveille la base (`select 1`), sans rien lire ni écrire. Le navigateur l’appelle sans attendre (`src/components/shell/Reveil.tsx`) | aucune | la route |
 | `/api/cron/purge` | GET | La purge de nuit (Vercel Cron, `vercel.json`), puis le résumé de la veille à l’équipe | l’en-tête `Authorization: Bearer <CRON_SECRET>`, sinon 401 | `src/server/purge.ts`, `src/server/alertes.ts` |
 
-Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’en local.
+Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’à l’équipe : jamais sur Vercel, où `src/proxy.ts` répond 404 (comme pour `/styleguide`).
 
 ## Les tâches
 
@@ -59,7 +59,7 @@ Ce qui fait travailler le modèle longtemps (de 20 s à 2 min par étape) passe 
 - **Le battement** : une tâche en cours bat toutes les 20 s (`heartbeat_at`). Sans battement depuis 90 s (`PERIME_S`), elle est abandonnée (l’instance arrêtée, la fonction coupée) : `prendre` la reprend comme une tâche en attente ; coupée à son troisième essai, `clore` la passe en échec (`coupee`).
 - **Une étape à la fois** : `prendre` est atomique, et ne prend rien tant qu’une autre tâche de la même histoire bat encore. Un index unique ne garde qu’une tâche de chaque genre de la chaîne en attente ou en cours par histoire : planifiée deux fois (deux onglets, deux déblocages), c’est la même qui revient.
 - **La chaîne** : `verdict` planifie `rapport_plan`, avec l’accès (un plan autre que `gratuit`) ou en mode sobre (une alerte de danger) ; `rapport_plan` planifie `rapport_chapitres` et, s’il y a une voix (`voixDisponible`), `vocal` ; `rapport_chapitres` planifie `memoire`. Les tâches en attente partent dans l’ordre où elles ont été planifiées (`aRelancer`) : le vocal passe donc entre les chapitres et la mémoire. Il s’enregistre d’habitude pendant les chapitres, et sa tâche ne sert que s’il n’a pas pu s’y faire. En mode sobre, `rapport_plan` écrit tout le rapport doux, offert, en un appel, puis planifie `memoire` si le compte a l’accès ; jamais de vocal sur une alerte. Une fois la mémoire faite, la conv brute est effacée. Ensuite, chaque ajout à la fiche, et chaque échange du chat qui apporte du neuf, planifie un `memoire_maj`.
-- **L’échéance** : une fonction Vercel vit 300 s au plus. `executerChaine` enchaîne les tâches de l’histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant 285 s (sa durée habituelle, plus 30 %) ; sinon elle s’arrête, et la tâche attend en base. Une autre exécution qui tient déjà l’histoire est laissée faire.
+- **L’échéance** : une fonction Vercel vit 300 s au plus. `executerChaine` enchaîne les tâches de l’histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance, 15 s avant la coupure (`echeancePour`, `src/server/echeance.ts` : 285 s), avec sa durée habituelle plus 30 % ; sinon elle s’arrête, et la tâche attend en base. Une autre exécution qui tient déjà l’histoire est laissée faire.
 - **La relance par sondage** : ce qui attend repart quand un écran revient le chercher. `GET /api/analyse` et `GET /api/rapport` relancent les tâches en attente ou abandonnées (`relancer`, `src/server/donnees.ts`), `GET /api/fiche` une mise à jour de la mémoire restée en plan. Ouvrir le rapport planifie aussi ce qui n’a jamais été lancé : le rapport et la mémoire d’un accès donné après coup (`assurerLaSuite`), le vocal d’un rapport écrit avant lui. « Relancer l’écriture » (`POST /api/rapport`) remet en attente, avec trois nouveaux essais, les étapes du rapport en échec (`reprendre`).
 
 ## Les paramètres d’URL
@@ -101,7 +101,9 @@ Ce qui relie les écrans par l’adresse :
 
 ## Variables d’environnement
 
-Le schéma `Env` (`src/server/env.ts`) les vérifie au premier usage, pas au build : une variable manquante ou mal formée fait échouer la requête, avec un message clair dans les logs, jamais dans la réponse.
+Le schéma `Env` (`src/server/env.ts`) les vérifie au premier usage, pas au build : une variable manquante ou mal formée fait échouer la requête, avec un message clair dans les logs, jamais dans la réponse. Les listes d’emails y sont lues une fois (sans espaces, en minuscules).
+
+En production (`VERCEL_ENV=production`, pas les préversions), `env()` refuse aussi de tourner, et dit pourquoi dans les logs, si `BLUSH_BETA_FERMEE` n’est pas écrite, si `CRON_SECRET` manque, ou si `BLUSH_ACCES_LIBRE` vaut `*` : une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou BLUSH+ à tous, ni arrêter la purge sans bruit. À vérifier avant une mise en ligne : `vercel env ls production` montre les noms, sans les valeurs.
 
 | Variable | Rôle | Par défaut | En production |
 |---|---|---|---|
@@ -113,19 +115,19 @@ Le schéma `Env` (`src/server/env.ts`) les vérifie au premier usage, pas au bui
 | `ELEVENLABS_API_KEY` | La voix de BLUSH (le vocal du rapport, les réponses dites en vocal), et la transcription sans clé Mistral | aucune | Sans elle, ou sans `BLUSH_VOIX_A`, pas de vocal |
 | `BLUSH_VOIX_A`, `BLUSH_VOIX_B` | Les identifiants ElevenLabs des deux voix de l’A/B test : chaque compte garde toujours la même | aucune | Sans voix B, tout le monde a la A |
 | `RESEND_API_KEY` | L’envoi des mails (les codes, la liste d’attente, « ton rapport est prêt », les alertes) | aucune : en dev, le code s’affiche dans les logs | Exigée (`NODE_ENV=production`), sauf pour la boîte à mails des tests de bout en bout |
-| `BLUSH_EMAIL_FROM` | L’expéditeur des mails, sur un domaine vérifié chez Resend | `BLUSH <bonjour@blush.app>` | `BLUSH <bonjour@askblush.com>`, écrite dans Vercel |
-| `BLUSH_URL` | L’adresse du site : les images et les liens des mails, et l’adresse de base des pages sur Vercel (`layout.tsx`) | `https://www.askblush.com` | Le défaut |
-| `BLUSH_ACCES_LIBRE` | La bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou `*` pour tout le monde | vide : personne | Les emails des testeurs |
-| `BLUSH_BETA_FERMEE` | `1` : la bêta fermée. Seuls les emails de `BLUSH_ACCES_LIBRE` se connectent (et lancent une lecture) ; les autres rejoignent la liste d’attente. Lue à l’exécution, par `src/proxy.ts` aussi : un même build sert la bêta ouverte ou fermée | `0` : ouverte | Comme en dev : sans elle, la bêta est ouverte |
+| `BLUSH_EMAIL_FROM` | L’expéditeur des mails, sur un domaine vérifié chez Resend | `BLUSH <bonjour@askblush.com>` | Le défaut (aussi écrite dans Vercel) |
+| `BLUSH_URL` | L’adresse du site : les images et les liens des mails, et l’adresse de base des pages sur Vercel (`layout.tsx`, par `URL_SITE`) | `https://www.askblush.com` | Le défaut |
+| `BLUSH_ACCES_LIBRE` | La bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou `*` pour tout le monde (en dev) | vide : personne | Les emails des testeurs. `*` y est refusée : le plan donné n’est jamais repris |
+| `BLUSH_BETA_FERMEE` | `1` : la bêta fermée. Seuls les emails de `BLUSH_ACCES_LIBRE` se connectent (et lancent une lecture) ; les autres rejoignent la liste d’attente. Lue à l’exécution, par `src/proxy.ts` aussi (`src/server/drapeaux.ts`) : un même build sert la bêta ouverte ou fermée | `0` : ouverte | Exigée, écrite exprès (`1` ou `0`) : son défaut ouvrirait la bêta |
 | `BLUSH_ALERTES` | Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules | aucune : pas d’alerte | À écrire, sinon un échec ne prévient personne |
 | `BLUSH_ADMINS` | Qui peut ouvrir le tableau de bord (`/admin`) : un ou des emails, séparés par des virgules | ceux de `BLUSH_ALERTES` | Pour tous les autres, `/admin` n’existe pas (404) |
-| `CRON_SECRET` | Le secret que Vercel Cron envoie à `/api/cron/purge` (16 caractères au moins) | aucun | Sans lui, la purge de nuit répond 401 et ne tourne jamais |
-| `BLUSH_IA_FACTICE` | `1` en dev et en tests : le modèle rejoue des sorties enregistrées, sans aucun coût (`src/server/ia/factice.ts`) | `0` | Ignorée sur Vercel : la production appelle toujours le vrai modèle |
+| `CRON_SECRET` | Le secret que Vercel Cron envoie à `/api/cron/purge` (16 caractères au moins) | aucun | Exigé : sans lui, la purge de nuit répondrait 401 et ne tournerait jamais |
+| `BLUSH_IA_FACTICE` | `1` en dev et en tests : le modèle rejoue des sorties enregistrées, sans aucun coût (`src/server/ia/factice.ts`) | `0` | Ignorée sur Vercel, avec un avertissement dans les logs : la production appelle toujours le vrai modèle |
 | `BLUSH_BOITE_MAILS` | Tests de bout en bout : le dossier où les mails sont écrits au lieu de partir. Avec le modèle factice seulement | aucune | Ignorée sur Vercel : les mails partent toujours par Resend |
 
 `tests/documentation.test.ts` échoue si une variable du schéma manque à ce tableau, ou si ce tableau en cite une qu’il ne connaît pas.
 
-Lues hors du schéma : `VERCEL` (posée par Vercel : le modèle factice et la boîte à mails y sont ignorés, et `/styleguide` y répond 404), `NODE_ENV`, `DATABASE_URL_UNPOOLED` (les migrations du build, `scripts/migrer.mjs`), et en local seulement `BLUSH_APERCU` et `BLUSH_DEMANDER` (les aperçus de `/apercu`), `DATABASE_URL_TEST` et les `E2E_*` des tests.
+Lues hors du schéma, par `src/server/drapeaux.ts` (sans `server-only` : le proxy et les pages rendues au build le lisent) : `VERCEL` (posée par Vercel : le modèle factice et la boîte à mails y sont ignorés, et les outils de l’équipe, `/apercu` et `/styleguide`, y répondent 404), `VERCEL_ENV` (`production` : les garde-fous ci-dessus), `BLUSH_BETA_FERMEE` pour le proxy, et hors de Vercel seulement `BLUSH_APERCU` et `BLUSH_DEMANDER` (les aperçus de `/apercu`). Ailleurs : `NODE_ENV`, `DATABASE_URL_UNPOOLED` (les migrations du build, `scripts/migrer.mjs`), `DATABASE_URL_TEST` et les `E2E_*` des tests. ESLint refuse `process.env` dans le reste de `src`, sauf pour `NODE_ENV`.
 
 ## En local
 
@@ -177,7 +179,7 @@ NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_
 
 ## Mise en ligne
 
-Déjà fait (production, sur Vercel) : `BLUSH_CLE` (une copie locale dans `~/.blush/BLUSH_CLE`, à ranger dans un gestionnaire de mots de passe : la perdre rend les données illisibles), `CRON_SECRET`, `BLUSH_EMAIL_FROM` (`BLUSH <bonjour@askblush.com>`). Les variables sont « sensibles » : Vercel ne les rend plus, même à nous.
+Déjà fait (production, sur Vercel) : `BLUSH_CLE` (une copie locale dans `~/.blush/BLUSH_CLE`, à ranger dans un gestionnaire de mots de passe : la perdre rend les données illisibles), `CRON_SECRET`, `BLUSH_EMAIL_FROM` (`BLUSH <bonjour@askblush.com>`, aussi le défaut). Les variables sont « sensibles » : Vercel ne les rend plus, même à nous.
 
 1. **La base :** créer une base Neon depuis Vercel (projet blush-front, onglet Storage, région Francfort, « Connect »). Vercel ajoute `DATABASE_URL` tout seul. Les tables se créent au build (`scripts/migrer.mjs`, lancé par `prebuild` sur Vercel) : pas besoin de l’URL en local.
 2. **Les variables qui restent :** `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (une clé à part, avec un plafond de dépenses), `BLUSH_ACCES_LIBRE` (les emails des testeurs).

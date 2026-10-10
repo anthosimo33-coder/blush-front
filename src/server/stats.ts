@@ -2,6 +2,7 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
 import { env } from "./env";
+import { PERIME_S } from "./taches";
 
 /*
  * Le tableau de bord (/admin) : que des nombres. Aucune conv, aucun message, aucun email n’en sort.
@@ -91,7 +92,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     lignes<Record<string, string>>(
       sql`select count(*) filter (where status = 'en_cours') as en_cours,
-            count(*) filter (where status = 'en_cours' and heartbeat_at < now() - interval '2 minutes') as bloquees,
+            count(*) filter (where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
             count(*) filter (where status = 'attente') as attente
           from tasks`,
     ),
@@ -106,7 +107,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   const postes = POSTES.map(([nom, f]) => ({ nom, dollars: dollars(coutDe(f)), appels: couts.filter((r) => f(r.task)).reduce((s, r) => s + n(r.appels), 0) }));
   const autres = couts.filter((r) => !POSTES.some(([, f]) => f(r.task)));
   if (autres.length) postes.push({ nom: "Autres", dollars: dollars(autres.reduce((s, r) => s + n(r.micros), 0)), appels: autres.reduce((s, r) => s + n(r.appels), 0) });
-  const liste = env().BLUSH_ACCES_LIBRE.trim();
+  const invites = env().BLUSH_ACCES_LIBRE;
 
   return {
     jours,
@@ -134,7 +135,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     sante: { echecs: echecs.map((r) => ({ code: r.code, n: n(r.n) })), enCours: n(taches[0].en_cours), bloquees: n(taches[0].bloquees), enAttente: n(taches[0].attente) },
     beta: {
       fermee: env().BLUSH_BETA_FERMEE,
-      invites: liste === "*" ? "tous" : liste.split(",").filter((e) => e.trim()).length,
+      invites: invites === "*" ? "tous" : invites.length,
       attente: n(totaux[0].attente),
       attenteNouveaux: attente.valeur,
       comptes: n(totaux[0].comptes),

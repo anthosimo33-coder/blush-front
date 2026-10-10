@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
 /*
  * La bêta fermée (BLUSH_BETA_FERMEE) se lit à l’exécution, comme sur le serveur (src/server/env.ts, peutEntrer) : un même
@@ -20,10 +21,17 @@ const VARIANTES: Record<string, string> = {
 /** Le cookie de session (src/server/cookies.ts) : sa seule présence, sans le vérifier, comme aUneSession. */
 const SESSION = "blush-session";
 
+/**
+ * Les outils de l’équipe : les aperçus (/apercu, des données fictives ou des rapports locaux) et le design system. Ils
+ * n’existent pas sur Vercel (src/server/drapeaux.ts, outilsDeLEquipe) : ce proxy y répond 404 avant eux, à leur place.
+ */
+const estUnOutil = (chemin: string) => /^\/(apercu|styleguide)(\/|$)/.test(chemin);
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (estUnOutil(pathname)) return outilsDeLEquipe() ? NextResponse.next() : new NextResponse(null, { status: 404 });
   const variante = VARIANTES[pathname];
-  if (!variante || process.env.BLUSH_BETA_FERMEE !== "1") return NextResponse.next();
+  if (!variante || !betaFermee()) return NextResponse.next();
   /* Déjà connecté (une autre conv) : /commencer sans la liste d’attente (next.config.ts sert alors /commencer/connecte) */
   if (pathname === "/commencer" && request.cookies.has(SESSION)) return NextResponse.next();
   const url = request.nextUrl.clone();
@@ -31,4 +39,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-export const config = { matcher: ["/commencer", "/email/code", "/connexion/code", "/importer/captures"] };
+export const config = { matcher: ["/commencer", "/email/code", "/connexion/code", "/importer/captures", "/apercu/:path*", "/styleguide"] };

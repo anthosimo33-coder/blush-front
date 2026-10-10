@@ -1,10 +1,8 @@
-import { notFound } from "next/navigation";
 import type { Periode, StatsAdmin } from "@/server/stats";
 import { AdminScreen } from "@/app/admin/AdminScreen";
 
-/** En local seulement : le tableau de bord avec des chiffres d’exemple (`?p=1|7|30`, `&calme=1` : sans échec). */
+/** Hors de Vercel seulement (src/proxy.ts) : le tableau de bord avec des chiffres d’exemple (`?p=1|7|30`, `&calme=1` : sans échec). */
 export default async function Page({ searchParams }: PageProps<"/apercu/admin">) {
-  if (process.env.NODE_ENV === "production") notFound();
   const q = await searchParams;
   const p = Number(q.p);
   const jours: Periode = p === 1 || p === 30 ? p : 7;

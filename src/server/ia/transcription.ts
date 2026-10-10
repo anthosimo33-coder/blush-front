@@ -1,4 +1,5 @@
 import "server-only";
+import { delaiAppel } from "../echeance";
 import { env } from "../env";
 import { ErreurTache } from "../erreurs";
 
@@ -10,6 +11,8 @@ const URL_MISTRAL = "https://api.mistral.ai/v1/audio/transcriptions";
 const MODELE_MISTRAL = "voxtral-mini-latest";
 const URL_ELEVENLABS = "https://api.elevenlabs.io/v1/speech-to-text";
 const MODELE_ELEVENLABS = "scribe_v1";
+/* Le plus long qu’on attend une transcription, si l’échéance de la route le permet (src/server/echeance.ts) */
+const DELAI_TRANSCRIPTION_MS = 60_000;
 
 /** Un vocal de 2 minutes pèse moins d’un mégaoctet : au-delà, ce n’est pas un vocal du chat. */
 export const TAILLE_VOCAL_MAX = 4 * 1024 * 1024;
@@ -29,14 +32,14 @@ export async function transcrire(vocal: File): Promise<string | null> {
     fd.append("model", MODELE_MISTRAL);
     fd.append("language", "fr");
     fd.append("file", fichier);
-    r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(60_000) }).catch(() => null);
+    r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(() => null);
   } else {
     fd.append("model_id", MODELE_ELEVENLABS);
     fd.append("language_code", "fr");
     /* Le texte seul : pas de « (rires) » ni de qui parle, c’est lui qui parle */
     fd.append("tag_audio_events", "false");
     fd.append("file", fichier);
-    r = await fetch(URL_ELEVENLABS, { method: "POST", headers: { "xi-api-key": e.ELEVENLABS_API_KEY! }, body: fd, signal: AbortSignal.timeout(60_000) }).catch(() => null);
+    r = await fetch(URL_ELEVENLABS, { method: "POST", headers: { "xi-api-key": e.ELEVENLABS_API_KEY! }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(() => null);
   }
   /* Jamais de contenu dans les logs : le statut seulement */
   if (!r?.ok) {

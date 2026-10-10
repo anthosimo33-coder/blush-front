@@ -38,6 +38,18 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/server/stats.ts", `import type { ReportPayload } from "@/services/api";\nexport type R = ReportPayload;\n`)).toEqual([]);
   });
 
+  it("process.env seulement dans env.ts et drapeaux.ts, sauf NODE_ENV ; libre hors de src", async () => {
+    for (const chemin of ["src/app/rapport/page.tsx", "src/server/stats.ts", "src/proxy.ts", "src/components/ui/Essai.tsx"]) {
+      expect(await regles(chemin, `export const x = process.env.BLUSH_URL;\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `export const x = { ...process.env };\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `export const x = process.env.NODE_ENV === "production";\n`), chemin).toEqual([]);
+    }
+    expect(await regles("src/server/stats.ts", `export const { VERCEL } = process.env;\n`)).toEqual(["no-restricted-syntax"]);
+    for (const chemin of ["src/server/env.ts", "src/server/drapeaux.ts", "scripts/essai.mjs", "tests/essai.test.ts", "next.config.ts"]) {
+      expect(await regles(chemin, `export const x = process.env.BLUSH_URL;\n`), chemin).toEqual([]);
+    }
+  });
+
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual(["no-restricted-syntax"]);
     expect(await regles("prompts/lib/essai.ts", `import { NBSP } from "@/lib/format";\nexport const x = NBSP;\n`)).toEqual(["no-restricted-imports"]);

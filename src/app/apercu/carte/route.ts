@@ -10,9 +10,8 @@ const EXEMPLES = {
   froid: { emoji: "🧊", title: "Elle a déjà tourné la page.", subtitle: "Ses réponses raccourcissent depuis le 3 mars." },
 } as const;
 
-/** En local seulement : l’image d’un verdict partagé (`?cas=court|moyen|long|froid&format=carte|story`), ou d’un moment (`?type=reponse|moment`). */
+/** Hors de Vercel seulement (src/proxy.ts) : l’image d’un verdict partagé (`?cas=court|moyen|long|froid&format=carte|story`), ou d’un moment (`?type=reponse|moment`). */
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") return new Response(null, { status: 404 });
   const p = new URL(req.url).searchParams;
   /* Des moments fictifs (aucune vraie conv) */
   if (p.get("type") === "reponse")

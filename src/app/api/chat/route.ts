@@ -11,7 +11,7 @@ import { depuisPaquet, ErreurImport } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
 import { LIMITES, sousLaLimite } from "@/server/limites";
-import { avecEcheance } from "@/server/echeance";
+import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
 
 /*
@@ -181,5 +181,5 @@ export async function GET(req: Request) {
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
 export function POST(req: Request) {
-  return avecEcheance(285_000, () => traiter(req));
+  return avecEcheance(echeancePour(maxDuration), () => traiter(req));
 }

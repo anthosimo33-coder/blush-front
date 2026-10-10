@@ -11,7 +11,8 @@ export type Genre = "verdict" | "rapport_plan" | "rapport_chapitres" | "vocal" |
 export type Tache = typeof schema.tasks.$inferSelect;
 
 export const ESSAIS_MAX = 3;
-const PERIME_S = 90;
+/** Sans battement depuis 90 s, une tâche « en cours » est abandonnée : on la reprend (le tableau de bord la compte « bloquée »). */
+export const PERIME_S = 90;
 
 /**
  * Planifie une étape. Celles de la chaîne (verdict, rapport, vocal, mémoire) n’existent qu’une fois en attente ou en

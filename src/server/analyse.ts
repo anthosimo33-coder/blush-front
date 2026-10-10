@@ -16,7 +16,7 @@ import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
-import { avecEcheance, tempsRestant } from "./echeance";
+import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
 import { alerter } from "./alertes";
 import { envoyerMail } from "./email";
 import { env } from "./env";
@@ -448,8 +448,11 @@ async function aAcces(story: Ligne): Promise<boolean> {
 
 /* ———— L’exécution ———— */
 
-/** L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction (300 s). */
-export const ECHEANCE_CHAINE_MS = 285_000;
+/**
+ * L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction. Les
+ * routes qui la lancent vivent DUREE_FONCTION_S (tests/echeance.test.ts).
+ */
+export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);
 
 /*
  * Une fonction Vercel vit 5 minutes au plus (plan gratuit) : on ne commence une étape que s’il reste, avant l’échéance,

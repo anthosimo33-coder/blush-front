@@ -3,7 +3,7 @@ import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
 import { erreur, json, memeOrigine } from "@/server/http";
 import { ErreurImport } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
-import { avecEcheance } from "@/server/echeance";
+import { avecEcheance, echeancePour } from "@/server/echeance";
 
 /* Un lot de six images : une trentaine de secondes de lecture, une minute au pire */
 export const maxDuration = 180;
@@ -32,5 +32,5 @@ async function traiter(req: Request) {
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
 export function POST(req: Request) {
-  return avecEcheance(170_000, () => traiter(req));
+  return avecEcheance(echeancePour(maxDuration), () => traiter(req));
 }

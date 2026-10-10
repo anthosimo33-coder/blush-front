@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { BlushAnswer, ReportPayload } from "@/services/api";
+import { cheminDesApercus } from "@/server/drapeaux";
 import type { Fiche, Story } from "@/types";
 
 /** Ce que vers-front.mjs écrit pour une conv : le rapport, et (avec la mémoire) sa fiche et l’accueil. */
@@ -18,12 +19,12 @@ export type Apercu = {
 };
 
 /**
- * En local seulement : BLUSH_APERCU désigne un fichier (une conv) ou un dossier (une conv par fichier, `?cas=01`).
- * Renvoie null en production ou sans aperçu.
+ * Hors de Vercel seulement (src/proxy.ts) : BLUSH_APERCU désigne un fichier (une conv) ou un dossier (une conv par
+ * fichier, `?cas=01`). Renvoie null sans aperçu.
  */
 export async function lireApercu(cas?: string): Promise<{ data: Apercu; cas: string | null; tous: string[] } | null> {
-  const chemin = process.env.BLUSH_APERCU;
-  if (process.env.NODE_ENV === "production" || !chemin) return null;
+  const chemin = cheminDesApercus();
+  if (!chemin) return null;
   if (!(await stat(chemin)).isDirectory()) return { data: JSON.parse(await readFile(chemin, "utf8")), cas: null, tous: [] };
   const tous = (await readdir(chemin)).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
   const choisi = cas && tous.includes(cas) ? cas : tous[0];

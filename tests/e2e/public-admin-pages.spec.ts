@@ -186,14 +186,18 @@ test("une page qui plante : « Ça a coincé de notre côté. », puis « Réess
   }
 });
 
-test("les pages de l’équipe : /apercu… n’existent pas en production, /styleguide s’ouvre hors de Vercel", async ({ request }) => {
-  /* Les aperçus lisent des rapports locaux (BLUSH_APERCU) ou appellent le vrai modèle : en production, rien */
-  for (const chemin of ["/apercu", "/apercu/liste", "/apercu/accueil", "/apercu/fiche", "/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/carte", "/apercu/mail"]) {
-    expect((await request.get(chemin)).status(), chemin).toBe(404);
-  }
-  expect((await request.post("/apercu/demander", { data: { text: "elle m’a répondu « on verra »" } })).status(), "/apercu/demander").toBe(404);
-  /* Le design system se cache seulement sur Vercel (process.env.VERCEL) : ce serveur de test n’y est pas */
+test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rien de réel sans leurs variables locales", async ({ request }) => {
+  /* Un seul critère, « jamais sur Vercel » : src/proxy.ts y répond 404 (tests/proxy.test.ts). Ce serveur de test n’y est pas */
   const styleguide = await request.get("/styleguide");
   expect(styleguide.status()).toBe(200);
   expect(await styleguide.text()).toContain("Le jeu");
+  /* Des données fictives seulement */
+  for (const chemin of ["/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/mail"]) {
+    expect((await request.get(chemin)).status(), chemin).toBe(200);
+  }
+  /* Les rapports écrits par les prompts (BLUSH_APERCU) et le vrai modèle (BLUSH_DEMANDER) : sans leur variable, rien */
+  for (const chemin of ["/apercu", "/apercu/liste", "/apercu/accueil", "/apercu/fiche"]) {
+    expect((await request.get(chemin)).status(), chemin).toBe(404);
+  }
+  expect((await request.post("/apercu/demander", { data: { text: "elle m’a répondu « on verra »" } })).status(), "/apercu/demander").toBe(404);
 });

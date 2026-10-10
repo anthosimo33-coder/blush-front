@@ -6,11 +6,10 @@ import { AUTRE } from "../ecriture/exemple";
 export const dynamic = "force-dynamic";
 
 /**
- * En local seulement : un mail tel qu’il partira. Le code (par défaut), ou `?type=rapport` (`&sobre=1` : le mode sobre),
- * celui de l’histoire d’exemple (son prénom au chapitre 5 du sommaire).
+ * Hors de Vercel seulement (src/proxy.ts) : un mail tel qu’il partira. Le code (par défaut), ou `?type=rapport`
+ * (`&sobre=1` : le mode sobre), celui de l’histoire d’exemple (son prénom au chapitre 5 du sommaire).
  */
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === "production") return new Response(null, { status: 404 });
   const url = new URL(req.url);
   const html =
     url.searchParams.get("type") === "rapport"

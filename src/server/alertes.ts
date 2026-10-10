@@ -5,6 +5,7 @@ import { env } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
 import { delaiAppel } from "./echeance";
+import { DELAI_MAIL_MS } from "./email";
 
 /*
  * Les alertes de l’équipe, par mail (BLUSH_ALERTES) : un échec définitif, et chaque nuit le résumé de la veille.
@@ -13,7 +14,7 @@ import { delaiAppel } from "./echeance";
 
 async function envoyer(sujet: string, lignes: string[]): Promise<void> {
   const { BLUSH_ALERTES, RESEND_API_KEY, BLUSH_EMAIL_FROM } = env();
-  if (!BLUSH_ALERTES) return;
+  if (!BLUSH_ALERTES.length) return;
   if (!RESEND_API_KEY) {
     console.log(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
@@ -21,8 +22,8 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: BLUSH_ALERTES.split(",").map((e) => e.trim()), subject: sujet, text: lignes.join("\n") }),
-    signal: AbortSignal.timeout(delaiAppel(15_000, 2_000)),
+    body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: BLUSH_ALERTES, subject: sujet, text: lignes.join("\n") }),
+    signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
   if (!r.ok) console.error(`alerte non envoyée : Resend ${r.status}`);
 }
