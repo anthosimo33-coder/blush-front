@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { figtree } from "@/lib/fonts";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
@@ -165,14 +166,14 @@ function Frame({ children }: { children: ReactNode }) {
 const OVERTHINK: { text: string; at: string; r: number; d: string }[] = [
   { text: "on verra", at: "left-[3%] top-[6%]", r: -4, d: "0s" },
   { text: "haha ok", at: "left-[8%] top-[60%]", r: 3, d: "1.2s" },
-  { text: "t’es dispo quand ?", at: "right-[2%] top-[34%]", r: 3, d: "0.6s" },
+  { text: "t’es dispo quand\u00a0?", at: "right-[2%] top-[34%]", r: 3, d: "0.6s" },
   { text: "dsl j’avais pas vu", at: "right-[7%] top-[78%]", r: -3, d: "1.8s" },
 ];
 
 /* Ce qu’on demande à BLUSH, en très grand ; la réponse s’ouvre sous la question */
 const ASKS: { q: string; answer: () => ReactNode }[] = [
   {
-    q: "ça veut dire quoi ?",
+    q: "ça veut dire quoi\u00a0?",
     answer: () => (
       <>
         <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-[15px] font-bold text-white">je suis crevée cette semaine, on verra</span>
@@ -184,14 +185,14 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
     ),
   },
   {
-    q: "je lui réponds quoi ?",
+    q: "je lui réponds quoi\u00a0?",
     answer: () => (
       <FromBlush>
         <span className="flex items-center justify-between gap-2">
           <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
           <Tag tone="recommandee" />
         </span>
-        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold text-white">Courage pour jeudi. Samedi pour fêter ça&nbsp;?</span>
+        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold text-white">Courage pour jeudi. Samedi pour fêter ça{NBSP}?</span>
         <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-full bg-white px-3 text-[12px] font-black shadow-soft">
           <Icon name="copy" size={13} color="#121214" stroke={2.6} />
           Copier
@@ -200,7 +201,7 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
     ),
   },
   {
-    q: "elle voit quelqu’un d’autre ?",
+    q: "elle voit quelqu’un d’autre\u00a0?",
     answer: () => (
       <FromBlush>
         <span className="text-[17px] font-black leading-[1.3]">{REPONSE_EXEMPLE.title}</span>
@@ -212,7 +213,7 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
     ),
   },
   {
-    q: "on en est où ?",
+    q: "on en est où\u00a0?",
     answer: () => (
       <FromBlush>
         <span className="text-[17px] font-black leading-[1.3]">
@@ -300,10 +301,10 @@ export function BlushPlus() {
             <h2 id="quotidien-titre" data-reveal="" className="m-0 mt-4 text-[54px] font-black leading-[0.94] tracking-[-0.05em] sm:text-[76px] lg:text-[100px]">
               un nouveau
               <br />
-              message&nbsp;?
+              message{NBSP}?
             </h2>
             <p data-reveal="" className="m-0 mt-6 max-w-[440px] text-[17px] font-extrabold leading-[1.5] text-white/70 [text-wrap:balance] lg:mt-7 lg:text-[19px]">
-              Colle-le dans BLUSH, envoie une capture ou un nouvel export. Puis demande-lui&nbsp;:
+              Colle-le dans BLUSH, envoie une capture ou un nouvel export. Puis demande-lui{NBSP}:
             </p>
           </div>
 
@@ -527,7 +528,7 @@ export function Reviews({ items }: { items: Testimonial[] }) {
 /* ———— Ce que BLUSH promet, en faits ———— */
 export function Facts() {
   const facts = [
-    { value: "40 s", label: "pour analyser votre conv" },
+    { value: "40\u00a0s", label: "pour analyser votre conv" },
     { value: "8", label: "chapitres dans ton rapport" },
     { value: "0", label: "message gardé après ton rapport" },
   ];
@@ -537,7 +538,7 @@ export function Facts() {
         <SectionHead
           id="faits-titre"
           title="Rapide. Complet. Discret."
-          sub="Et honnête : BLUSH ne garantit rien sur ce que l’autre ressent. Il dit ce que montrent vos messages, et à quel point il en est sûr."
+          sub={"Et honnête\u00a0: BLUSH ne garantit rien sur ce que l’autre ressent. Il dit ce que montrent vos messages, et à quel point il en est sûr."}
         />
         <ul className="m-0 mt-10 grid w-full max-w-[1000px] list-none grid-cols-2 gap-3 p-0 lg:mt-14 lg:grid-cols-4 lg:gap-5">
           {facts.map((f, i) => (

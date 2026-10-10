@@ -13,6 +13,7 @@ import { LevelPath, LockRow, ProgressDots, ScoreCard } from "@/components/ui/pro
 import { ChapterHeader, Essential, Meaning, Seen } from "@/components/ui/report";
 import { Sheet, Toast } from "@/components/ui/surfaces";
 import { figtree } from "@/lib/fonts";
+import { NBSP } from "@/lib/format";
 
 function Section({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   return (
@@ -47,7 +48,7 @@ function Row({ children, gap = 32 }: { children: ReactNode; gap?: number }) {
 const SWATCHES = [
   { hex: "#F4F2ED", name: "Papier", text: "Le fond de tous les écrans, avec une lumière blanche en haut.", dark: false },
   { hex: "#FFFFFF", name: "Blanc", text: "Les cartes, les options, les bulles de saisie.", dark: false },
-  { hex: "#F1EFEA", name: "Plaque", text: "Les zones secondaires : astuces, ajouts.", dark: false },
+  { hex: "#F1EFEA", name: "Plaque", text: "Les zones secondaires\u00a0: astuces, ajouts.", dark: false },
   { hex: "#E6E3DC", name: "Ligne", text: "Les bords et les séparateurs.", dark: false },
   { hex: "#121214", name: "Encre", text: "Le texte et le bouton principal.", dark: true },
   { hex: "#4B4A47", name: "Doux", text: "Le texte secondaire.", dark: true },
@@ -64,7 +65,7 @@ const SENSE = [
 
 const TYPE_SCALE = [
   { name: "Affiche", spec: "56 px · 900", use: "Titres de pages, couverture", sample: "Vous êtes à deux doigts.", size: 56, weight: 900 },
-  { name: "Titre 1", spec: "36 px · 900", use: "Question, verdict", sample: "Qui tient le plus à l’autre ?", size: 36, weight: 900 },
+  { name: "Titre 1", spec: "36 px · 900", use: "Question, verdict", sample: "Qui tient le plus à l’autre\u00a0?", size: 36, weight: 900 },
   { name: "Titre 2", spec: "30 px · 900", use: "Titre d’écran", sample: "Ajoute votre conv, comme tu veux.", size: 30, weight: 900 },
   { name: "Titre 3", spec: "24 px · 900", use: "Chapitres du rapport", sample: "Le moment où tout a basculé", size: 24, weight: 900 },
   { name: "Titre de carte", spec: "18 px · 900", use: "Options, cartes", sample: "Des captures", size: 18, weight: 900 },
@@ -95,9 +96,9 @@ export function Styleguide() {
           </div>
           <h1 className="m-0 mt-3.5 text-[44px] font-black leading-[1.02] tracking-[-0.03em] md:text-[56px]">Le jeu</h1>
           <p className="m-0 mt-2.5 text-[19px] font-bold leading-[1.5] text-soft">
-            L’interface de BLUSH : un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai.
+            L’interface de BLUSH{NBSP}: un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai.
           </p>
-          <p className="m-0 mt-5 text-[21px] font-black">De « on se parle » à « on est ensemble ».</p>
+          <p className="m-0 mt-5 text-[21px] font-black">De «{NBSP}on se parle{NBSP}» à «{NBSP}on est ensemble{NBSP}».</p>
         </div>
         <div data-float="" style={{ ["--r" as string]: "-6deg" }}>
           <BubbleLogo size={200} />
@@ -105,7 +106,7 @@ export function Styleguide() {
       </header>
 
       {/* 01 Couleurs */}
-      <Section title="Couleurs" sub="Le fond reste neutre. La couleur n’est jamais décorative : elle dit qui parle (toi, elle) ou ce qui est vrai.">
+      <Section title="Couleurs" sub={"Le fond reste neutre. La couleur n’est jamais décorative\u00a0: elle dit qui parle (toi, elle) ou ce qui est vrai."}>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
           {SWATCHES.map((s) => (
             <div key={s.hex} className="flex flex-col gap-2.5">
@@ -135,7 +136,7 @@ export function Styleguide() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             { name: "Opale", bg: "linear-gradient(90deg, #8FC8FF 0%, #CFFFF0 25%, #8FC8FF 55%, #E6A8FF 85%, #FFD3A1 100%)", text: "Le troisième point du logo et les billes. Jamais sur du texte." },
-            { name: "Rose BLUSH", bg: "var(--rose-blush)", text: "La couleur du logo : la bulle rose en volume." },
+            { name: "Rose BLUSH", bg: "var(--rose-blush)", text: "La couleur du logo\u00a0: la bulle rose en volume." },
             { name: "Nacre", bg: "linear-gradient(90deg, #FFFFFF 0%, #F3F1F7 45%, #CEC8DB 100%)", text: "Les billes neutres qui accompagnent l’opale." },
           ].map((m) => (
             <div key={m.name} className="flex flex-col gap-2.5">
@@ -177,7 +178,7 @@ export function Styleguide() {
           <Chip>Nunito partout dans l’interface</Chip>
           <Chip>Figtree seulement pour les vrais messages</Chip>
           <Chip>Titres en 900, texte en 800</Chip>
-          <Chip>Espaces insécables avant ? ! : »</Chip>
+          <Chip>Espaces insécables avant{NBSP}?{NBSP}!{NBSP}:{NBSP}»</Chip>
         </Row>
       </Section>
 
@@ -327,7 +328,7 @@ export function Styleguide() {
           <Spec label="LA PREUVE" width={380}>
             <ProofCard conclusion="Vous relancez autant l’un que l’autre.">
               <Bubble from="elle" caption="Elle relance · 4 min après toi">
-                tu fais quoi samedi ?
+                tu fais quoi samedi{NBSP}?
               </Bubble>
               <Bubble from="toi" caption="">
                 je suis libre 🙃
@@ -355,14 +356,14 @@ export function Styleguide() {
       <Section title="Données et progression">
         <Row gap={24}>
           <Spec label="BARRE DE SCORE" width={360}>
-            <ScoreCard rows={[{ label: "Qui propose des plans", winner: "elle", toiPercent: 20, captionLeft: "toi : 1", captionRight: "elle : 4" }]} />
+            <ScoreCard rows={[{ label: "Qui propose des plans", winner: "elle", toiPercent: 20, captionLeft: "toi\u00a0: 1", captionRight: "elle\u00a0: 4" }]} />
           </Spec>
           <Spec label="NIVEAUX" width={380} note="Le niveau en cours pulse doucement.">
             <Card className="px-3 py-[18px]">
               <LevelPath current="dit" />
             </Card>
           </Spec>
-          <Spec label="TEMPÉRATURE (EN COUPLE)" width={380} note="Pas d’étape à franchir : juste où vous êtes, du plus froid au plus chaud.">
+          <Spec label="TEMPÉRATURE (EN COUPLE)" width={380} note={"Pas d’étape à franchir\u00a0: juste où vous êtes, du plus froid au plus chaud."}>
             <Card className="px-3 py-[18px]">
               <LevelPath current="coince" />
             </Card>
@@ -411,10 +412,10 @@ export function Styleguide() {
       </Section>
 
       <Section title="Le rapport">
-        <Spec label="UN CHAPITRE DU RAPPORT" width={420} note="Toujours le même gabarit : l’essentiel, ce qu’on voit, ce que ça veut dire, à toi de jouer.">
+        <Spec label="UN CHAPITRE DU RAPPORT" width={420} note={"Toujours le même gabarit\u00a0: l’essentiel, ce qu’on voit, ce que ça veut dire, à toi de jouer."}>
           <div className="flex flex-col gap-3">
-            <ChapterHeader number={5} kicker="son portrait : la Relanceuse" title="Elle" />
-            <Essential>Elle montre son intérêt en agissant : elle propose, elle relance, elle se livre.</Essential>
+            <ChapterHeader number={5} kicker={"son portrait\u00a0: la Relanceuse"} title="Elle" />
+            <Essential>Elle montre son intérêt en agissant{NBSP}: elle propose, elle relance, elle se livre.</Essential>
             <Seen kind="seen" facts={["Relance après 22 h, 7 fois sur 10."]} messages={[{ from: "elle", text: "dimanche y’a un marché de noël à côté du libanais 👀", caption: "8 févr." }]} />
             <Meaning>Elle t’attend sur les plans précis.</Meaning>
             <PlayCard>Donne une date et une heure.</PlayCard>
@@ -425,7 +426,7 @@ export function Styleguide() {
       <Section title="Saisie et surfaces">
         <Row gap={24}>
           <Spec label="EMAIL" width={360}>
-            <EmailField value={email} onChange={setEmail} onBlur={() => setTouched(true)} invalid={touched && !!email && !EMAIL_RE.test(email)} errorText="Vérifie ton email : il manque quelque chose." />
+            <EmailField value={email} onChange={setEmail} onBlur={() => setTouched(true)} invalid={touched && !!email && !EMAIL_RE.test(email)} errorText={"Vérifie ton email\u00a0: il manque quelque chose."} />
           </Spec>
           <Spec label="PANNEAU" width={320} note="Panneau du bas sur mobile, fenêtre centrée sur desktop.">
             <Button variant="secondary" onClick={() => setSheet(true)}>
@@ -438,7 +439,7 @@ export function Styleguide() {
             </Button>
             {toast && (
               <Toast action="Oui" onAction={() => setToast(false)}>
-                Copié. Je te relance samedi pour savoir ?
+                Copié. Je te relance samedi pour savoir{NBSP}?
               </Toast>
             )}
           </Spec>
@@ -449,7 +450,7 @@ export function Styleguide() {
       </Section>
 
       {/* 05 Logo */}
-      <Section title="Le logo" sub="La bulle rose, avec « blush » en encre sur fond clair, en blanc sur fond encre.">
+      <Section title="Le logo" sub={"La bulle rose, avec «\u00a0blush\u00a0» en encre sur fond clair, en blanc sur fond encre."}>
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="flex h-60 items-center justify-center">
             <Logo size={92} fontSize={64} />
@@ -482,7 +483,7 @@ export function Styleguide() {
             { name: "Les billes", text: "Les trois points du logo, en volume. Nacre et opale.", node: <Marbles /> },
             { name: "Le cadenas", text: "La suite payante du rapport.", node: <div data-float=""><Lock3D size={110} /></div> },
             { name: "La cloche", text: "La relance du samedi.", node: <div data-float=""><Bell3D size={110} /></div> },
-            { name: "La gerbe", text: "Une réussite : partie prête, niveau réussi, message envoyé.", node: <div className="scale-75 md:scale-100"><CheckBurst /></div> },
+            { name: "La gerbe", text: "Une réussite\u00a0: partie prête, niveau réussi, message envoyé.", node: <div className="scale-75 md:scale-100"><CheckBurst /></div> },
           ].map((o) => (
             <div key={o.name} className="flex flex-col items-center gap-3.5 text-center">
               <div className="flex h-[170px] items-center justify-center">{o.node}</div>
@@ -497,7 +498,7 @@ export function Styleguide() {
         </div>
         <div className="flex flex-wrap gap-3">
           {[
-            ["🤏", "Le verdict « à deux doigts »"],
+            ["🤏", "Le verdict «\u00a0à deux doigts\u00a0»"],
             ["🔥", "Elle est partante"],
             ["🤔", "Elle hésite"],
             ["🧊", "Elle s’éloigne"],
@@ -520,9 +521,9 @@ export function Styleguide() {
             ["Pas de couleur de sens", "Ni bleu, ni rose, ni vert. Encre et papier seulement."],
             ["Pas d’objet 3D", "Ni billes, ni emoji, et pas de logo en volume."],
             ["Pas de jeu", "Pas de score, pas de niveau, pas de partage."],
-            ["Une sortie visible", "Le bouton « Quitter vite » reste en haut à droite."],
-            ["Une aide proposée", "« Besoin d’en parler à quelqu’un ? » mène vers des ressources."],
-            ["Des mots doux et vrais", "« Ça ne dit rien de ce que tu vaux. »"],
+            ["Une sortie visible", "Le bouton «\u00a0Quitter vite\u00a0» reste en haut à droite."],
+            ["Une aide proposée", "«\u00a0Besoin d’en parler à quelqu’un\u00a0?\u00a0» mène vers des ressources."],
+            ["Des mots doux et vrais", "«\u00a0Ça ne dit rien de ce que tu vaux.\u00a0»"],
           ].map(([t, d]) => (
             <Card key={t} className="flex flex-col gap-1.5 px-[18px] py-4">
               <CardLabel>{t}</CardLabel>

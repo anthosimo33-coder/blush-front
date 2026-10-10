@@ -24,14 +24,14 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
   const sujet = liste ? "Tu es sur la liste de BLUSH" : "Ta place BLUSH est prête";
   const titre = liste ? "Tu es sur la liste." : "Ta place est prête.";
   const corps = liste
-    ? "BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente : on t’écrit dès que ta place est prête."
-    : "Ton email est déjà invité : entre sur BLUSH avec cet email, et fais-lui lire votre conv.";
+    ? "BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente\u00a0: on t’écrit dès que ta place est prête."
+    : "Ton email est déjà invité\u00a0: entre sur BLUSH avec cet email, et fais-lui lire votre conv.";
   const conv = liste && convEffacee ? "La conv que tu viens d’importer n’a pas été gardée. Tu la renverras ce jour-là." : null;
   const texte = [
     titre,
     corps,
     ...(conv ? [conv] : []),
-    ...(liste ? [`Ce n’est pas toi ? Retire ton email de la liste : ${retrait}`] : [base, "Ce n’est pas toi ? Ignore ce mail."]),
+    ...(liste ? [`Ce n’est pas toi\u00a0? Retire ton email de la liste\u00a0: ${retrait}`] : [base, "Ce n’est pas toi\u00a0? Ignore ce mail."]),
   ].join("\n\n");
   const html = `<!doctype html>
 <html lang="fr">
@@ -92,7 +92,7 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
         </tr>
         <tr>
           <td align="center" class="doux" style="padding:24px 12px 0;font-family:${POLICE};font-size:13px;line-height:19px;font-weight:700;color:${GRIS};">
-            ${liste ? `Ce n’est pas toi ? <a href="${attribut(retrait)}" class="doux" style="color:${GRIS};font-weight:900;">Retire ton email de la liste</a>.` : "Ce n’est pas toi ? Ignore ce mail."}<br>
+            ${liste ? `Ce n’est pas toi&nbsp;? <a href="${attribut(retrait)}" class="doux" style="color:${GRIS};font-weight:900;">Retire ton email de la liste</a>.` : "Ce n’est pas toi&nbsp;? Ignore ce mail."}<br>
             <a href="${attribut(base)}" class="doux" style="color:${GRIS};text-decoration:none;font-weight:900;">askblush.com</a>
           </td>
         </tr>

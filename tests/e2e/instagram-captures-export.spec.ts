@@ -51,8 +51,8 @@ test("Instagram : l’export JSON importé, les prénoms accentués bien relus, 
   });
 
   await test.step("qui es-tu : Noé et Maëlys, avec leurs accents (pas « MaÃ«lys »), Noé d’abord", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
-    const personnes = page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv ?" }).getByRole("radio");
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
+    const personnes = page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" }).getByRole("radio");
     await expect(personnes).toHaveCount(2);
     await expect(personnes.nth(0)).toHaveAccessibleName(/Noé$/);
     await expect(personnes.nth(1)).toHaveAccessibleName(/Maëlys$/);
@@ -65,7 +65,7 @@ test("Instagram : l’export JSON importé, les prénoms accentués bien relus, 
   });
 
   await test.step("l’email, le code, puis la lecture des 64 messages mène au verdict", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     await saisirLeCodeRecu(page, email, await demanderCode(page, email));
     await attendreLecture(page);
     await expect(page.getByRole("heading", { level: 1, name: /BLUSH analyse tes\s*64\s*messages/ })).toBeVisible();
@@ -109,8 +109,8 @@ test("Instagram : l’export HTML (message_1.html) se lit comme le JSON, ses heu
   });
 
   await test.step("qui es-tu : Noé et Maëlys, lus dans le HTML", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
-    const personnes = page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv ?" }).getByRole("radio");
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
+    const personnes = page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" }).getByRole("radio");
     await expect(personnes).toHaveCount(2);
     await expect(personnes.nth(0)).toHaveAccessibleName(/Noé$/);
     await expect(personnes.nth(1)).toHaveAccessibleName(/Maëlys$/);

@@ -280,7 +280,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                       <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
                     </div>
                     <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
-                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, "--d": `${0.45 + i * 0.14}s` }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
+                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, ...delai(0.45 + i * 0.14) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
                     </div>
                     {(r.captionLeft || r.captionRight) && (
                       <div className="mt-1.5 flex justify-between gap-3 text-[12.5px] font-extrabold text-white/60 [@media(max-height:600px)]:hidden">
@@ -466,7 +466,7 @@ function PearlBurst() {
           aria-hidden="true"
           data-burst=""
           className="absolute left-1/2 top-1/2"
-          style={{ "--tx": `${p.tx}px`, "--ty": `${p.ty}px`, "--d": `${0.62 + i * 0.03}s`, width: p.s, height: p.s, margin: `-${p.s / 2}px 0 0 -${p.s / 2}px` }}
+          style={{ "--tx": `${p.tx}px`, "--ty": `${p.ty}px`, ...delai(0.62 + i * 0.03), width: p.s, height: p.s, margin: `-${p.s / 2}px 0 0 -${p.s / 2}px` }}
         >
           <Sphere size={p.s} kind={p.kind} shadow={false} />
         </span>

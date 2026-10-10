@@ -68,7 +68,7 @@ describe("ce que lisent les écrans", () => {
   it("lance le rapport quand l’accès est là, depuis la ligne d’un écran (sans la conv)", async () => {
     const id = await importee("06-elle-hesite.txt");
     await executerChaine(id);
-    expect(await contactDe(id)).toMatchObject({ level: expect.any(String), nextStep: expect.stringMatching(/^Ton prochain pas : /) });
+    expect(await contactDe(id)).toMatchObject({ level: expect.any(String), nextStep: expect.stringMatching(/^Ton prochain pas\u00a0: /) });
     const plus = { ...u, plan: "blushplus" };
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
     const r = await rapportDe((await histoireOuverte(plus, { affichee: id }))!, plus);

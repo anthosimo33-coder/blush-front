@@ -53,12 +53,12 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
   });
 
   await test.step("qui es-tu : une réponse par question, et « Continuer » attend les quatre", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     const continuer = page.getByRole("button", { name: "Continuer" });
     const choix = (nom: string) => page.getByRole("radio", { name: nom });
     await expect(continuer).toBeDisabled();
     /* Les deux personnes de la conv, la plus bavarde d’abord ; un seul « c’est moi » */
-    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv ?" }).getByRole("radio")).toHaveText([/Noé/, /Maëlys/]);
+    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" }).getByRole("radio")).toHaveText([/Noé/, /Maëlys/]);
     await choix("Noé").click();
     await choix("Maëlys").click();
     await expect(choix("Maëlys")).toBeChecked();
@@ -91,7 +91,7 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
   });
 
   await test.step("l’email reçoit un code, le bon code lance la lecture", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     const depuis = await demanderCode(page, email);
     await expect(page.getByText(email)).toBeVisible();
     await saisirLeCodeRecu(page, email, depuis);
@@ -190,7 +190,7 @@ test("export .zip : Noé importe, corrige son email, puis Échap passe le verdic
   });
 
   await test.step("un email incomplet est signalé, et le code ne part pas", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     const champ = page.getByLabel("Ton email");
     const recevoir = page.getByRole("button", { name: "Recevoir mon code" });
     await champ.fill("noe@e2e");
@@ -222,7 +222,7 @@ test("export .zip : Noé importe, corrige son email, puis Échap passe le verdic
 
   await test.step("côté serveur : les réponses de Qui es-tu ? sont gardées avec la conv, un seul mail", async () => {
     expect(await quiEnregistre(email)).toEqual({ moi: "Noé", pronom: "il", devinette: "flou", objectif: "reciproque" });
-    expect(mailsPour(email).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6} : ton code BLUSH$/)]);
+    expect(mailsPour(email).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
   });
 });
 

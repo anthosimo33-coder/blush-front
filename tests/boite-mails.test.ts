@@ -41,7 +41,7 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(envoi).not.toHaveBeenCalled();
     const mails = mailsDeLaBoite();
     expect(mails).toHaveLength(2);
-    expect(mails.find((m) => m.code)).toMatchObject({ pour: "noe@e2e.blush.test", code: "042917", sujet: "042917 : ton code BLUSH" });
+    expect(mails.find((m) => m.code)).toMatchObject({ pour: "noe@e2e.blush.test", code: "042917", sujet: "042917\u00a0: ton code BLUSH" });
     expect(mails.find((m) => !m.code)).toMatchObject({ pour: "noe@e2e.blush.test", sujet: "Un sujet", texte: "Un texte", html: "<p>Un texte</p>" });
   });
 

@@ -131,7 +131,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
   /* Le verdict partagé : celui du lien, le prénom de l’autre masqué */
   const montre = lien?.verdict ?? null;
   /* Ce qu’on écrit à ses potes avec le lien : comme on le dirait (l’aperçu du lien fait le reste) */
-  const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict${NBSP}: ${montre.emoji} «${NBSP}${montre.title}${NBSP}»` : "j’ai fait lire notre conv à BLUSH 💀";
+  const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict\u00a0: ${montre.emoji} «\u00a0${montre.title}\u00a0»` : "j’ai fait lire notre conv à BLUSH 💀";
   const avecLien = url ? `${texte}${"\n"}${url}` : "";
   const pret = !!url;
 
@@ -271,7 +271,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
         <InsetRow
           leading={<RowIcon icon="trash" />}
           title="Effacée dès ton rapport écrit"
-          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24${NBSP}h.`}
+          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24\u00a0h.`}
           className={ligne}
         />
         <InsetRow

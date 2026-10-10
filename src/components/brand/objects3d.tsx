@@ -1,5 +1,6 @@
 /* BLUSH · objets 3D « premium » en SVG — port fidèle de maquettes/objets-3d-source.py */
 import { useId, type CSSProperties } from "react";
+import { delai } from "@/lib/motion";
 
 type Stop = readonly [string, string];
 
@@ -387,7 +388,7 @@ export function CheckBurst({ size = 84, pop = false, className }: { size?: numbe
             {
               "--tx": `${p.tx}px`,
               "--ty": `${p.ty}px`,
-              "--d": `${p.d}s`,
+              ...delai(p.d),
               position: "absolute",
               left: "50%",
               top: "50%",

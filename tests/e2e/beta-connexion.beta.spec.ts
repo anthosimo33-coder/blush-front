@@ -58,7 +58,7 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
     await expect(page).toHaveURL(/\/connexion\/code$/);
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     await expect(page.getByText(`On vient d’écrire à ${email}.`)).toBeVisible();
-    await expect(page.getByText("Pas de code dans le mail ? BLUSH est en bêta privée : ton email est sur la liste d’attente, le mail t’explique tout.")).toBeVisible();
+    await expect(page.getByText("Pas de code dans le mail\u00a0? BLUSH est en bêta privée\u00a0: ton email est sur la liste d’attente, le mail t’explique tout.")).toBeVisible();
     ecrans[email] = await ecranLu(page, email);
     return depuis;
   };
@@ -84,16 +84,16 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
     await champDuCode(page).fill(code);
     /* Pas encore de conv : l’accueil mène au début du parcours */
     await expect(page).toHaveURL(/\/commencer$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où\u00a0?" })).toBeVisible();
   });
 
   await test.step("les mails : le code pour l’invité, « Tu es sur la liste » avec de quoi se retirer pour l’autre", async () => {
-    expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6} : ton code BLUSH$/)]);
+    expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
     const [mail, ...autres] = mailsPour(dehors);
     expect(autres).toEqual([]);
     expect(mail.sujet).toBe("Tu es sur la liste de BLUSH");
     expect(mail.code).toBeUndefined();
-    expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente : on t’écrit dès que ta place est prête.");
+    expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente\u00a0: on t’écrit dès que ta place est prête.");
     /* Rien n’avait été importé sur ce navigateur : rien à dire sur une conv */
     expect(mail.texte).not.toContain("La conv que tu viens d’importer");
     expect(lienDeRetrait(mail)).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+$`));
@@ -188,7 +188,7 @@ test("les limites des codes sont les mêmes pour tous : au sixième code en une 
   });
 
   await test.step("les mails : cinq codes pour l’invité ; trois mails de la liste au plus pour l’autre, pas de rafale chez lui", async () => {
-    expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual(Array(5).fill(expect.stringMatching(/^\d{6} : ton code BLUSH$/)));
+    expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual(Array(5).fill(expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)));
     expect(mailsPour(dehors).map((m) => m.sujet)).toEqual(Array(3).fill("Tu es sur la liste de BLUSH"));
   });
 });
@@ -229,5 +229,5 @@ test.fixme("/email/code en bêta fermée : « On vient d’écrire à », et la 
   await reponseDuCode(page, dehors);
   await expect(page).toHaveURL(/\/email\/code$/);
   await expect(page.getByText(`On vient d’écrire à ${dehors}.`)).toBeVisible();
-  await expect(page.getByText("Pas de code dans le mail ? BLUSH est en bêta privée : ton email est sur la liste d’attente, le mail t’explique tout.")).toBeVisible();
+  await expect(page.getByText("Pas de code dans le mail\u00a0? BLUSH est en bêta privée\u00a0: ton email est sur la liste d’attente, le mail t’explique tout.")).toBeVisible();
 });

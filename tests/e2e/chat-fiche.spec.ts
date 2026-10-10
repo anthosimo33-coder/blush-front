@@ -192,8 +192,8 @@ test("le « + » du chat : le menu, un nouvel export puis des captures, montrés
   await test.step("rechargé, l’historique garde les échanges : les fichiers n’y sont plus, résumés à leur place", async () => {
     await ouvrir(page);
     await expect(reponses).toHaveCount(2);
-    await expect(fil.getByText("(ton export : 20 nouveaux messages)")).toBeVisible();
-    await expect(fil.getByText("(2 captures : 24 nouveaux messages, son profil)")).toBeVisible();
+    await expect(fil.getByText("(ton export\u00a0: 20 nouveaux messages)")).toBeVisible();
+    await expect(fil.getByText("(2 captures\u00a0: 24 nouveaux messages, son profil)")).toBeVisible();
     await expect(fil.getByRole("img", { name: /^Capture/ })).toHaveCount(0);
     await expect(fil.getByText(nouvel.nom)).toHaveCount(0);
     await expect(deja).toHaveCount(0);
@@ -301,7 +301,7 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
     const bulle = fil.getByText("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
     await expect(bulle).toBeVisible();
     /* Avant « ? », une espace insécable : le « ? » ne passe jamais seul à la ligne (getByText ne distingue pas les espaces) */
-    expect(await bulle.textContent()).toBe("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
+    expect(await bulle.textContent()).toBe("tu m’as fait parler toute la journée 😮‍💨 on reprend demain\u00a0?");
   });
 
   await test.step("rien de tout ça ne s’est écrit en base", async () => {

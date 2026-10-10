@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Reac
 import { cn } from "@/lib/cn";
 import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
-import { formatCount } from "@/lib/format";
+import { formatCount, NBSP } from "@/lib/format";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { askQuestion, souciQuestion } from "@/services/api";
@@ -180,7 +180,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           <BlushSays
             bubbles={[
               <span key="a" className="text-[17px] font-black leading-[1.3]">
-                une question sur vous deux&nbsp;? balance
+                une question sur vous deux{NBSP}? balance
               </span>,
               <span key="b" className="text-[14px] font-extrabold leading-[1.45] text-soft">
                 je te réponds avec vos {formatCount(story.totalMessages)} messages, preuves à l’appui

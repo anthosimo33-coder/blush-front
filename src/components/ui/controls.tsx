@@ -153,9 +153,6 @@ export function AppTile({
 /** La teinte d’une tuile de choix : une couleur de globals.css (--toi, --elle, --vrai, --flou, --attente). */
 export type TileTone = "toi" | "elle" | "vrai" | "flou" | "attente";
 
-/* En hex à six chiffres : le fond de la pastille y ajoute son opacité (1F, 12 %) */
-const TILE_TONES: Record<TileTone, string> = { toi: "#3D8BFF", elle: "#FF4F9A", vrai: "#12C08A", flou: "#9B7BFF", attente: "#FFAA2C" };
-
 export function ChoiceTile({
   icon,
   tone,
@@ -171,7 +168,6 @@ export function ChoiceTile({
   onClick: () => void;
   className?: string;
 }) {
-  const color = TILE_TONES[tone];
   return (
     <button
       type="button"
@@ -184,8 +180,9 @@ export function ChoiceTile({
         className,
       )}
     >
-      <span className="lift-badge flex size-9 items-center justify-center rounded-[18px]" style={{ background: `${color}1F` }}>
-        <Icon name={icon} size={20} color={color} />
+      {/* La pastille prend la couleur de globals.css : l’icône en plein, le fond à 31/255 (le 1F d’un hex, 12 %) */}
+      <span className="lift-badge flex size-9 items-center justify-center rounded-[18px]" style={{ color: `var(--${tone})`, background: `color-mix(in srgb, var(--${tone}) calc(100% * 31 / 255), transparent)` }}>
+        <Icon name={icon} size={20} />
       </span>
       <span className="text-[13px] font-black leading-[1.2]">{label}</span>
     </button>

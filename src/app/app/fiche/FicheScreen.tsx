@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, ViewTransition } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
@@ -325,7 +326,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                       ) : (
                         isNew && (
                           <span className="-mr-1 size-[7px] shrink-0 rounded-full bg-elle">
-                            <span className="sr-only">Nouveau&nbsp;:</span>
+                            <span className="sr-only">Nouveau{NBSP}:</span>
                           </span>
                         )
                       )}

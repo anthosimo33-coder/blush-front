@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { ErreurApi, startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -91,7 +92,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       desktopBack={{ target: back }}
       aside={<FlowSteps step={2} />}
       contentGap={12}
-      head={<ScreenTitle size={30}>Qui es-tu dans cette conv ?</ScreenTitle>}
+      head={<ScreenTitle size={30}>Qui es-tu dans cette conv{NBSP}?</ScreenTitle>}
       footer={
         <>
           {problem && (
@@ -120,7 +121,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
           />
         </label>
       ) : (
-      <div role="radiogroup" aria-label="Qui es-tu dans cette conv ?" className="flex gap-3">
+      <div role="radiogroup" aria-label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
         {people.map((p, i) => {
           const me = j.me === p.id;
           /* Bleu = toi, rose = elle : la couleur suit le rôle choisi. */

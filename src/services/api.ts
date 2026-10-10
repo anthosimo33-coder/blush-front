@@ -445,7 +445,7 @@ const bulle = (texte: string | string[]): BlushAnswer => ({ kind: "bubbles", bub
 
 /* Les erreurs du chat (captures, export, vocal), dans la voix de BLUSH : une idée par bulle */
 const ERREURS_CHAT: Record<string, string | string[]> = {
-  trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?",
+  trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain\u00a0?",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
   capture: ["j’arrive pas à lire tes captures", "renvoie-les en entier, sans les rogner"],

@@ -27,7 +27,7 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
   });
 
   await test.step("qui es-tu : Noé, un garçon, on s’est vus, qu’on soit ensemble", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     const continuer = page.getByRole("button", { name: "Continuer" });
     await expect(continuer).toBeDisabled();
     await page.getByRole("radio", { name: "Noé" }).click();
@@ -38,7 +38,7 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
   });
 
   await test.step("l’email reçoit un code, le bon code lance la lecture", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     await page.getByLabel("Ton email").fill(email);
     const depuis = Date.now();
     await page.getByRole("button", { name: "Recevoir mon code" }).click();
@@ -85,6 +85,6 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
   await test.step("côté serveur : un compte gratuit, le verdict seul (rien de payant ne s’écrit), un seul mail", async () => {
     expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
-    expect(mailsPour(email).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6} : ton code BLUSH$/)]);
+    expect(mailsPour(email).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
   });
 });

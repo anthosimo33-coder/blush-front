@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { LANDING_CONVS } from "@/contenu/landing";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
@@ -27,7 +28,7 @@ export function ConvsExemples() {
   const [picked, setPicked] = useState<LandingConv | null>(null);
   return (
     <div className="mt-14 lg:mt-20">
-      <h2 className="sr-only">Des exemples de convs&nbsp;: choisis-en une pour voir le verdict de BLUSH</h2>
+      <h2 className="sr-only">Des exemples de convs{NBSP}: choisis-en une pour voir le verdict de BLUSH</h2>
       <div className="flex flex-col">
         {ROWS.map((r, i) => (
           <ConvRow key={i} {...r} onPick={setPicked} />
@@ -83,7 +84,7 @@ function ConvList({ convs, onPick, copy = false }: { convs: LandingConv[]; onPic
               <span className="truncate text-[16px] font-black leading-tight">{c.name}</span>
               <span className="truncate text-[13px] font-extrabold leading-tight text-grey">{c.label}</span>
             </span>
-            <span className="sr-only">&nbsp;: voir le verdict de BLUSH</span>
+            <span className="sr-only">{NBSP}: voir le verdict de BLUSH</span>
           </button>
         </li>
       ))}

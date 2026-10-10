@@ -18,7 +18,7 @@ describe("le mail du code", () => {
   it("met le code dans le sujet, le texte et le HTML, et l’image vient du site", async () => {
     const { mailCode } = await import("@/server/mail-code");
     const m = mailCode("159714", "https://www.askblush.com");
-    expect(m.sujet).toBe("159714 : ton code BLUSH");
+    expect(m.sujet).toBe("159714\u00a0: ton code BLUSH");
     expect(m.texte).toContain("159714");
     expect(m.html).toContain(">159714</span>");
     expect(m.html).toContain('src="https://www.askblush.com/mail/bulle.png"');
@@ -49,8 +49,8 @@ describe("les trouvailles de la lecture", () => {
     const lu = lire(readFileSync(`prompts/evals/${c03.fichier}`, "utf8"), h03);
     const t = trouvailles(chiffrer(h03, lu.messages), h03, lu.messages);
     expect(t).toHaveLength(3);
-    expect(t[0]).toMatch(/^Tu relances \d+ fois plus qu’elle$/);
-    expect(t.join(" ")).toContain("« patate »");
+    expect(t[0]).toMatch(/^Tu relances \d+\u00a0fois plus qu’elle$/);
+    expect(t.join(" ")).toContain("«\u00a0patate\u00a0»");
     expect(t.every((x) => x.length <= 45)).toBe(true);
   });
 });

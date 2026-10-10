@@ -21,7 +21,7 @@ const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: numbe
       ]
     : [
         { title: "Le rapport complet", sub: `Les ${restants} chapitres qui restent` },
-        { title: "Le chat avec BLUSH", sub: "Envoie sa réponse : BLUSH t’aide à répondre" },
+        { title: "Le chat avec BLUSH", sub: "Envoie sa réponse\u00a0: BLUSH t’aide à répondre" },
         { title: "Sa fiche", sub: `Ce qu’${autre === "il" ? "il" : "elle"} t’a dit, toujours sous la main` },
       ];
 

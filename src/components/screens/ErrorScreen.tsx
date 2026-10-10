@@ -39,7 +39,7 @@ const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: 
   },
   lecture: {
     title: "L’analyse n’a pas abouti.",
-    text: "Rien n’est perdu : ta conv est toujours là. Relance l’analyse.",
+    text: "Rien n’est perdu\u00a0: ta conv est toujours là. Relance l’analyse.",
     action: "Relancer l’analyse",
     href: "/lecture",
     back: "/email",

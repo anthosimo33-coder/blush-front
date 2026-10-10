@@ -68,7 +68,7 @@ export const REPORT: Report = {
   readingTime: { free: "3 min", full: "9 min" },
   level: "dit",
   trend: "↗ ça se réchauffe",
-  nextStep: "Ton prochain pas : lui demander samedi, en face.",
+  nextStep: "Ton prochain pas\u00a0: lui demander samedi, en face.",
   chapters: [
     {
       number: 1,
@@ -81,7 +81,7 @@ export const REPORT: Report = {
           rows: [
             { label: "Qui écrit en premier", winner: "toi", toiPercent: 62, captionLeft: "toi, 6 fois sur 10" },
             { label: "Qui relance après un silence", winner: "elle", toiPercent: 30, captionRight: "elle, 7 fois sur 10" },
-            { label: "Qui propose des plans", winner: "elle", toiPercent: 20, captionLeft: "toi : 1", captionRight: "elle : 4" },
+            { label: "Qui propose des plans", winner: "elle", toiPercent: 20, captionLeft: "toi\u00a0: 1", captionRight: "elle\u00a0: 4" },
             { label: "Qui répond vite", winner: "pareil", toiPercent: 50, captionLeft: "4 min le soir", captionRight: "4 min le soir" },
           ],
         },
@@ -105,7 +105,7 @@ export const REPORT: Report = {
           ],
           factsAfter: ["Ses messages passent ensuite de 31 mots en moyenne à 14."],
         },
-        { kind: "meaning", text: "Son « mdr » était une porte de sortie au cas où. Tu l’as prise. Elle attend que ce soit toi qui reposes la question." },
+        { kind: "meaning", text: "Son «\u00a0mdr\u00a0» était une porte de sortie au cas où. Tu l’as prise. Elle attend que ce soit toi qui reposes la question." },
         { kind: "play", text: "C’est la question que tu vas lui reposer, en face." },
         { kind: "confidence", level: "sur", text: "messages exacts, horodatés" },
       ],
@@ -120,7 +120,7 @@ export const REPORT: Report = {
         {
           kind: "timeline",
           items: [
-            { title: "Hinge · 2 sept.", text: "Elle t’écrit la première, sur ta photo d’escalade.", message: { from: "elle", text: "c’est toi qui grimpes sans corde là ?? 😳" } },
+            { title: "Hinge · 2 sept.", text: "Elle t’écrit la première, sur ta photo d’escalade.", message: { from: "elle", text: "c’est toi qui grimpes sans corde là\u00a0?? 😳" } },
             { title: "Insta · sept. → déc.", text: "Trois mois de memes. C’est elle qui propose de se voir, deux fois." },
             { title: "Le premier date · 14 déc.", text: "Le libanais. Le lendemain, c’est encore elle qui écrit la première." },
           ],
@@ -135,45 +135,45 @@ export const REPORT: Report = {
       tocTitle: "Ce que vous ne dites pas",
       free: estOffert(4),
       blocks: [
-        { kind: "essential", text: "Trois fois, elle a fait un pas vers « nous ». Trois fois, tu as répondu par une blague." },
+        { kind: "essential", text: "Trois fois, elle a fait un pas vers «\u00a0nous\u00a0». Trois fois, tu as répondu par une blague." },
         {
           kind: "seen",
           messages: [
-            { from: "elle", text: "tu fais quoi pour la saint-valentin ? 👀", caption: "13 févr." },
+            { from: "elle", text: "tu fais quoi pour la saint-valentin\u00a0? 👀", caption: "13 févr." },
             { from: "toi", text: "rien de spécial et toi" },
             { from: "elle", text: "ma sœur veut te rencontrer mdr", caption: "6 mars" },
             { from: "toi", text: "haha grave un jour" },
           ],
         },
-        { kind: "play", text: "La prochaine fois qu’elle parle de « vous », réponds au premier degré." },
+        { kind: "play", text: "La prochaine fois qu’elle parle de «\u00a0vous\u00a0», réponds au premier degré." },
       ],
     },
     {
       number: 5,
       title: "Elle",
-      kicker: "son portrait : la Relanceuse",
+      kicker: "son portrait\u00a0: la Relanceuse",
       tocTitle: "Elle",
       free: estOffert(5),
       blocks: [
-        { kind: "essential", text: "Elle montre son intérêt en agissant : elle propose, elle relance, elle se livre." },
+        { kind: "essential", text: "Elle montre son intérêt en agissant\u00a0: elle propose, elle relance, elle se livre." },
         {
           kind: "seen",
           facts: ["Relance après 22 h, 7 fois sur 10 · 4 plans en un mois · 11 vocaux."],
           messages: [{ from: "elle", text: "dimanche y’a un marché de noël à côté du libanais 👀", caption: "8 févr." }],
         },
-        { kind: "play", text: "Quand tu proposes, donne une date et une heure : elle répond alors en moins de 10 minutes." },
+        { kind: "play", text: "Quand tu proposes, donne une date et une heure\u00a0: elle répond alors en moins de 10 minutes." },
       ],
     },
     {
       number: 6,
       title: "Toi",
-      kicker: "ton portrait : le Stratège",
+      kicker: "ton portrait\u00a0: le Stratège",
       tocTitle: "Toi",
       free: estOffert(6),
       blocks: [
         { kind: "essential", text: "Quand ça devient sérieux, tu fais une blague." },
-        { kind: "meaning", text: "C’est une façon de te protéger d’un « non ». Elle, elle y lit de la distance." },
-        { kind: "play", text: "Cette semaine : quand elle propose, tu fixes une date." },
+        { kind: "meaning", text: "C’est une façon de te protéger d’un «\u00a0non\u00a0». Elle, elle y lit de la distance." },
+        { kind: "play", text: "Cette semaine\u00a0: quand elle propose, tu fixes une date." },
       ],
     },
     {
@@ -186,9 +186,9 @@ export const REPORT: Report = {
         {
           kind: "duo",
           title: "Le Stratège & la Relanceuse",
-          text: "Le même rythme, des fous rires tous les jours, et un code à vous : « le libanais ».",
+          text: "Le même rythme, des fous rires tous les jours, et un code à vous\u00a0: «\u00a0le libanais\u00a0».",
           trophies: [
-            { title: "Le mdr stratégique", text: "H. · 3 « mdr » aux 3 pires moments", side: "toi" },
+            { title: "Le mdr stratégique", text: "H. · 3 «\u00a0mdr\u00a0» aux 3 pires moments", side: "toi" },
             { title: "La reine de la relance", text: "S. · 7 relances sur 10", side: "elle" },
           ],
         },
@@ -204,7 +204,7 @@ export const REPORT: Report = {
           kind: "scenarios",
           items: [
             { title: "Si tu ne fais rien", text: "Elle relance encore 2 ou 3 semaines, puis elle s’éloigne.", tag: "probable" },
-            { title: "Si tu lui demandes samedi, en face", text: "Le meilleur scénario : en vrai, c’est elle qui ose le plus.", tag: "meilleur" },
+            { title: "Si tu lui demandes samedi, en face", text: "Le meilleur scénario\u00a0: en vrai, c’est elle qui ose le plus.", tag: "meilleur" },
           ],
         },
         {
@@ -215,7 +215,7 @@ export const REPORT: Report = {
             { when: "Samedi", title: "Pose LA question, en face", text: "Au dessert." },
           ],
         },
-        { kind: "question", label: "LA question", text: "« J’aime bien ce qu’on a. Toi, tu le vois comment ? »" },
+        { kind: "question", label: "LA question", text: "«\u00a0J’aime bien ce qu’on a. Toi, tu le vois comment\u00a0?\u00a0»" },
       ],
     },
   ],

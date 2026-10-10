@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { play } from "@/lib/sound";
 import { ErreurApi, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
@@ -228,9 +229,9 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
 
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Pas de mot de passe : ce code suffit. Il expire au bout de 10 minutes.
+        Pas de mot de passe{NBSP}: ce code suffit. Il expire au bout de 10 minutes.
       </p>
-      {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail ? BLUSH est en bêta privée : ton email est sur la liste d’attente, le mail t’explique tout.</p>}
+      {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
     </Screen>
   );
 }

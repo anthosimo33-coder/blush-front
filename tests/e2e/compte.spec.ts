@@ -165,7 +165,7 @@ test("supprimer l’histoire ouverte : Annuler n’efface rien ; confirmé, l’
   await ouvrir(page, "/compte");
   const main = page.getByRole("main");
   const supprimer = main.getByRole("region", { name: "Tes données" }).getByRole("button", { name: /^Supprimer l’histoire avec Maëlys/ });
-  const confirmation = page.getByRole("dialog", { name: "Supprimer l’histoire avec Maëlys ?" });
+  const confirmation = page.getByRole("dialog", { name: "Supprimer l’histoire avec Maëlys\u00a0?" });
 
   await test.step("Annuler referme la feuille sans rien effacer", async () => {
     await supprimer.click();
@@ -204,7 +204,7 @@ test("Tout effacer : le compte et ses histoires disparaissent, avec leur lien pu
   await attendreTaches(email);
   const lien = await mesurerCompteurs(() => partagerParApi(page, testInfo), { partage_ouvert: 1, lien_cree: 1 });
   await ouvrir(page, "/compte");
-  const confirmation = page.getByRole("dialog", { name: "Tout effacer ?" });
+  const confirmation = page.getByRole("dialog", { name: "Tout effacer\u00a0?" });
 
   await test.step("confirmé : le compte et son histoire sont effacés", async () => {
     await page.getByRole("main").getByRole("region", { name: "Tes données" }).getByRole("button", { name: /^Tout effacer/ }).click();

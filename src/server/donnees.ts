@@ -228,7 +228,7 @@ const enTete = (sortie: Verdict04): EnTete => ({
   verdict: verdictAffiche(sortie),
   level: sortie.niveau ?? "parle",
   trend: sortie.tendance ?? "",
-  nextStep: `Ton prochain pas : ${sortie.prochain_pas ?? ""}`,
+  nextStep: `Ton prochain pas\u00a0: ${sortie.prochain_pas ?? ""}`,
 });
 
 /**

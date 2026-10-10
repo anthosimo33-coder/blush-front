@@ -11,6 +11,7 @@ import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { useJourney } from "@/state/journey";
+import { NBSP } from "@/lib/format";
 
 /*
  * Se connecter : retrouver ses convs sur un autre appareil. L’email du compte, un code (pas de mot de passe),
@@ -60,14 +61,14 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
           <>
             <ScreenTitle>D’abord, ton email.</ScreenTitle>
             <Lead size={15} weight={800}>
-              BLUSH est en bêta privée{" "}: on t’envoie un code, puis tu envoies ta conv.
+              BLUSH est en bêta privée{NBSP}: on t’envoie un code, puis tu envoies ta conv.
             </Lead>
           </>
         ) : (
           <>
             <ScreenTitle>Retrouve tes convs.</ScreenTitle>
             <Lead size={15} weight={800}>
-              Entre l’email de ton compte{" "}: on t’envoie un code, et tout est là, sur cet appareil aussi.
+              Entre l’email de ton compte{NBSP}: on t’envoie un code, et tout est là, sur cet appareil aussi.
             </Lead>
           </>
         )
@@ -98,11 +99,11 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Pas de mot de passe{" "}: un code suffit, sur chaque nouvel appareil. Tes convs restent chiffrées.
+        Pas de mot de passe{NBSP}: un code suffit, sur chaque nouvel appareil. Tes convs restent chiffrées.
       </p>
       {!depuisImport && (
         <p className="m-0 text-[14px] font-extrabold text-grey">
-          Pas encore de compte{" "}?{" "}
+          Pas encore de compte{NBSP}?{" "}
           <Link href="/commencer" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
             Analyser ma conv
           </Link>

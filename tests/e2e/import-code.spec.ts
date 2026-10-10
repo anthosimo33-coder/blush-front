@@ -51,7 +51,7 @@ test("un code expiré est refusé : « Changer d’email » en redemande un, qui
 
   await test.step("« Changer d’email » garde l’email, et un nouveau code part", async () => {
     await page.getByRole("link", { name: "Changer d’email" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     await expect(page.getByLabel("Ton email")).toHaveValue(email);
     const encore = Date.now();
     await page.getByRole("button", { name: "Recevoir mon code" }).click();

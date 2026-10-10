@@ -21,7 +21,7 @@ test("BLUSH+ : ta question, une idée tirée du rapport, puis la réponse de BLU
   await test.step("le rapport mène à « Ta question » : BLUSH accueille, avec le compte de vos messages", async () => {
     await rapport.getByRole("link", { name: "Poser ma question à BLUSH" }).click();
     await expect(page).toHaveURL(/\/rapport\/question$/);
-    await expect(conv.getByText("une question sur vous deux ? balance")).toBeVisible();
+    await expect(conv.getByText("une question sur vous deux\u00a0? balance")).toBeVisible();
     await expect(conv.getByText("je te réponds avec vos 64 messages, preuves à l’appui")).toBeVisible();
     await expect(envoyer).toBeDisabled();
   });

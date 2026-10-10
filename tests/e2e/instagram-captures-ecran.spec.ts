@@ -183,8 +183,8 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
   await test.step("qui es-tu : pas de choix entre deux personnes, mais le prénom (on est à droite des captures, face à Elias)", async () => {
     /* Pas d’écran « C’est bon, on a votre conv. » : les captures mènent droit à « Qui es-tu ? », une fois lues */
     await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
-    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv ?" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" })).toHaveCount(0);
     const prenom = page.getByLabel("Ton prénom (sur tes captures avec Elias, tu es à droite)");
     await expect(prenom).toBeVisible();
     const continuer = page.getByRole("button", { name: "Continuer" });
@@ -201,7 +201,7 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
   });
 
   await test.step("l’email, le code, puis la lecture des 24 messages lus sur les captures", async () => {
-    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
     await saisirLeCodeRecu(page, email, await demanderCode(page, email));
     await attendreLecture(page);
     await expect(page.getByRole("heading", { level: 1, name: /BLUSH analyse tes\s*24\s*messages/ })).toBeVisible();

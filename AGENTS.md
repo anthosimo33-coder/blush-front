@@ -24,7 +24,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Conventions BLUSH
 
 - Tout en français : les noms du code, les commentaires (aussi denses que ceux d’à côté), les messages de commit (avec la ligne `Co-Authored-By` de l’agent) et les textes de l’appli.
-- Les textes affichés : une insécable U+00A0 (`NBSP` de `src/lib/format.ts` dans le JSX, `\u00a0` dans une chaîne) avant ? ! : ; » et après «, des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ». Seul le tableau de bord `/admin`, réservé à l’équipe, peut les nommer.
+- Les textes affichés, dans l’appli comme dans ses mails : une insécable U+00A0 avant ? ! : ; » et après «, écrite `{NBSP}` (`src/lib/format.ts`) entre deux morceaux du JSX et `\u00a0` dans une chaîne ou un gabarit (jamais en clair, ni `&nbsp;`, ni une constante à soi) ; des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ». Seul le tableau de bord `/admin`, réservé à l’équipe, peut les nommer.
 - Le dépôt est public : ni vraie conv, ni vrai prénom, ni texte de prompt. Les exemples sont inventés, et les prompts restent dans le sous-module privé `prompts/`.
 - Une refonte est une proposition : l’ancienne version reste en place (ou à côté, sur une route à part) jusqu’à la décision de l’utilisateur, et la galerie montre les deux.
 - `/apercu` et `/styleguide` sont des outils de l’équipe : jamais en ligne.

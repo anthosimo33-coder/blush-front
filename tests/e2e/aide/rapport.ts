@@ -43,7 +43,7 @@ export async function toucherLaScene(page: Page, cote: "gauche" | "droite"): Pro
 export const CHAPITRES_FERMES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "Maëlys", "Toi", "Votre duo", "Ton prochain pas"];
 
 /** Le titre du paiement, sur le rapport de Noé et Maëlys. */
-export const PAIEMENT = "La suite parle de vous deux : toi et Maëlys.";
+export const PAIEMENT = "La suite parle de vous deux\u00a0: toi et Maëlys.";
 
 /** L’écran est-il un ordinateur ? Le sommaire y est une colonne à gauche (à partir de 1024 px, le point lg de Tailwind). */
 export const surOrdinateur = (page: Page) => (page.viewportSize()?.width ?? 0) >= 1024;

@@ -37,8 +37,8 @@ describe("le minutage", () => {
   it("colle la ponctuation française à son mot, avec une espace insécable", () => {
     const { texte } = texteDit(script);
     const [, b] = minuter(script, regulier(texte));
-    expect(b.mots.map((m) => m.t)).toEqual(["Tu", "réponds", "« mdr » ?!"]);
-    expect(b.texte).toBe("Tu réponds « mdr » ?!");
+    expect(b.mots.map((m) => m.t)).toEqual(["Tu", "réponds", "«\u00a0mdr\u00a0»\u00a0?!"]);
+    expect(b.texte).toBe("Tu réponds «\u00a0mdr\u00a0»\u00a0?!");
   });
   it("tient quand l’alignement n’a pas la même longueur que le texte", () => {
     const { texte } = texteDit(script);

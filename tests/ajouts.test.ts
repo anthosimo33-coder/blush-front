@@ -56,7 +56,7 @@ describe("lib/ajouts", () => {
     expect(a.lignes.map(estLigneProfil)).toEqual([false, false, false, true]);
     expect(blocAjout(a).map((l) => l.slice(0, 8))).toEqual(["  m1074 ", "→ m1075 ", "→ m1076 ", "  m1077 "]);
     expect(blocAjout(a, 2)[0]).toBe("[… 1 messages plus anciens …]");
-    expect(resumeAjout(a, "captures", 2)).toBe("(2 captures : 3 nouveaux messages, son profil)");
+    expect(resumeAjout(a, "captures", 2)).toBe("(2 captures\u00a0: 3 nouveaux messages, son profil)");
 
     /* À l’affichage : son profil n’est pas une bulle, mais il est la source d’une info de sa fiche */
     const lignes = new Map(a.lignes.map((l) => [l.slice(0, 5), l]));
@@ -127,7 +127,7 @@ describe("après l’import : le chat et sa fiche", () => {
     const chat = derniere("10-chat");
     expect(chat).toContain(`→ ${ajout.lignes[2]}`);
     expect(chat).toContain("Hugo (à toi) : ça veut dire quoi ? je lui réponds quoi ?");
-    expect((await historique(id)).echanges.at(-1)?.mine).toBe("(ton export : 3 nouveaux messages)");
+    expect((await historique(id)).echanges.at(-1)?.mine).toBe("(ton export\u00a0: 3 nouveaux messages)");
 
     await executerChaine(id);
     expect(derniere("07-memoire")).toContain(`ajouté à la conv :\n${ajout.lignes.join("\n")}`);

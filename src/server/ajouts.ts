@@ -94,7 +94,7 @@ export async function depuisCaptures(story: Ligne, memoire: DonneesMemoire, imag
 export function resumeAjout(a: Ajout, source: "captures" | "export", n: number): string {
   const quoi = source === "export" ? "ton export" : n > 1 ? `${n} captures` : "ta capture";
   const detail = [a.messages ? `${a.messages} nouveau${a.messages > 1 ? "x" : ""} message${a.messages > 1 ? "s" : ""}` : "", a.profil ? "son profil" : ""].filter(Boolean).join(", ");
-  return `(${quoi}${detail ? ` : ${detail}` : ""})`;
+  return `(${quoi}${detail ? `\u00a0: ${detail}` : ""})`;
 }
 
 /** Ce qu’on a lu sur son profil, tel quel : la fin des lignes « profil de … » de l’ajout. */

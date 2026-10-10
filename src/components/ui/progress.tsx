@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { delai } from "@/lib/motion";
 import { IlOuElle } from "@/lib/pronom";
 import type { LevelId, ScoreRow } from "@/types";
 import { Icon } from "./icons";
@@ -20,9 +21,9 @@ function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; au
       <div
         className="flex h-3.5 overflow-hidden rounded-[7px] bg-[rgba(255,79,154,0.35)]"
         role="img"
-        aria-label={`${row.label} : toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`}
+        aria-label={`${row.label}\u00a0: toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`}
       >
-        <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, "--d": `${delay}s` }} />
+        <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, ...delai(delay) }} />
       </div>
       {(row.captionLeft || row.captionRight) && (
         <div className="flex justify-between text-[12px] font-extrabold text-grey">

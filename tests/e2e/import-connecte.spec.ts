@@ -54,7 +54,7 @@ test("déjà connecté : chaque conv se lit depuis « Qui es-tu ? » (« Lancer 
     await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
     await expect(page.getByText(String(deuxieme.messages), { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Continuer" }).click();
-    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv ?" }).getByRole("radio")).toHaveText([/Timéo/, /Inaya/]);
+    await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" }).getByRole("radio")).toHaveText([/Timéo/, /Inaya/]);
     await repondreQui(page, { moi: "Timéo", tuEs: "Un garçon", ou: "On se parle", veux: "Juste comprendre" });
     await page.getByRole("button", { name: "Lancer la lecture" }).click();
     await attendreLecture(page);

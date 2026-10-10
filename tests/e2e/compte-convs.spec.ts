@@ -127,7 +127,7 @@ test("un geste vise la conv à l’écran, même quand un autre onglet en a ouve
 
     await ongletB.bringToFront();
     await supprimer.click();
-    await ongletB.getByRole("dialog", { name: "Supprimer l’histoire avec Maëlys ?" }).getByRole("button", { name: "Supprimer l’histoire", exact: true }).click();
+    await ongletB.getByRole("dialog", { name: "Supprimer l’histoire avec Maëlys\u00a0?" }).getByRole("button", { name: "Supprimer l’histoire", exact: true }).click();
     /* Une autre conv reste : son accueil s’ouvre */
     await expect(ongletB).toHaveURL(/\/app$/);
     await expect(accueilDe(ongletB, "Romane")).toBeVisible();

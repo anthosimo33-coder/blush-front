@@ -1,8 +1,9 @@
 /*
  * knip : le code mort (fichiers, exports et dépendances sans usage), vérifié par `npm run mort`, que lance `npm run check`.
- * Ses greffons de Next, Vitest, Playwright et drizzle-kit trouvent déjà src/proxy.ts, next.config.ts et les fichiers de
- * configuration ; on y ajoute les entrées qu’ils ne voient pas : les scripts (lancés à la main ou par package.json), la
- * galerie (scripts/galerie, un projet Playwright à part) et les serveurs des tests de bout en bout.
+ * Ses greffons de Next, Vitest, Playwright et drizzle-kit trouvent déjà les pages et les routes de src/app, src/proxy.ts,
+ * next.config.ts, les tests et les fichiers de configuration ; on y ajoute les entrées qu’ils ne voient pas : les scripts
+ * (lancés à la main ou par package.json), la galerie (scripts/galerie, un projet Playwright à part), les serveurs des
+ * tests de bout en bout et le module vide que vitest met à la place de server-only et client-only.
  * Un export qui ne sert qu’aux tests compte comme utilisé : un test le lit. Ce que knip ne voit pas, et qui attend un
  * autre lot :
  * - verifierCode (src/server/auth.ts) ne sert plus qu’aux tests : la PR 2.6 le retire et réécrit ses tests ;
@@ -11,15 +12,7 @@
  */
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/app/**/{page,layout,loading,error,global-error,not-found,route}.{ts,tsx}",
-    "scripts/**/*.{mjs,mts}",
-    "scripts/galerie/*.spec.ts",
-    "tests/**/*.test.ts",
-    "tests/e2e/**/*.spec.ts",
-    "tests/e2e/*.mjs",
-    "tests/vide.ts"
-  ],
+  "entry": ["scripts/**/*.{mjs,mts}", "scripts/galerie/*.spec.ts", "tests/e2e/*.mjs", "tests/vide.ts"],
   "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.{mjs,mts,ts}", "tests/**/*.{ts,mjs}", "*.{ts,mts,mjs}"],
   /* @next/env vient avec next, à sa version : scripts/developper.mjs s’en sert pour lire les .env comme next dev */
   "ignoreDependencies": ["@next/env"],

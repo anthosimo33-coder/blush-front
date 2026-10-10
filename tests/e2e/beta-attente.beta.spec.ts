@@ -45,7 +45,7 @@ test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la l
 
     const mail = await attendreMail(dehors, { depuis });
     expect(mail.sujet).toBe("Tu es sur la liste de BLUSH");
-    expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente : on t’écrit dès que ta place est prête.");
+    expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente\u00a0: on t’écrit dès que ta place est prête.");
     /* Le lien du mail, dans sa version texte comme dans le bouton du HTML : la page de retrait de ce serveur */
     const lien = lienDeRetrait(mail);
     expect(lien).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+$`));
@@ -69,7 +69,7 @@ test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la l
 
     const mail = await attendreMail(invite, { depuis });
     expect(mail.sujet).toBe("Ta place BLUSH est prête");
-    expect(mail.texte).toContain("Ton email est déjà invité : entre sur BLUSH avec cet email, et fais-lui lire votre conv.");
+    expect(mail.texte).toContain("Ton email est déjà invité\u00a0: entre sur BLUSH avec cet email, et fais-lui lire votre conv.");
     expect(mail.texte).toContain(URL_BETA);
     expect(mail.texte).not.toContain("Retire ton email");
     /* Inscrit quand même : la ligne ne dit pas qui est invité */
@@ -86,7 +86,7 @@ test("/attente/retirer : le lien signé du mail pose la question, et seul le bou
 
   await test.step("ouvrir le lien ne retire rien : une question, un bouton", async () => {
     await page.goto(lien);
-    await expect(page.getByRole("heading", { level: 1, name: "Te retirer de la liste ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Te retirer de la liste\u00a0?" })).toBeVisible();
     await expect(page.getByText("Ton email quitte la liste d’attente de BLUSH, et on ne t’écrira plus.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Retirer mon email" })).toBeEnabled();
     expect(await placeSurLaListe(email)).toEqual({ source: "accueil" });

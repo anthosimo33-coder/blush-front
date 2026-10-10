@@ -11,7 +11,10 @@ export type Box = { left: number; top: number; width: number; height: number };
 
 export const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Le délai d’une entrée de globals.css (`data-rise`, `data-popin`…), en secondes : la variable `--d` de son `style`. */
+/**
+ * Le délai d’une entrée de globals.css (`data-rise`, `data-popin`…), en secondes : la variable `--d` de son `style`.
+ * La seule façon de l’écrire, seule (`style={delai(0.2)}`) ou avec d’autres (`{ ...delai(i * 0.05), "--i": i }`).
+ */
 export const delai = (s: number) => ({ "--d": `${s}s` }) satisfies CSSProperties;
 
 /** Un ressort de globals.css : « soft » se pose sans rebond, « pop » dépasse un peu, « bounce » rebondit franchement. */

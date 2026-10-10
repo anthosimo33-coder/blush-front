@@ -35,7 +35,7 @@ test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules
     await page.getByRole("button", { name: "Continuer" }).click();
     /* Regarder la vidéo pas à pas, puis la lecture des écrans par lots : plus long qu’un export */
     await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
-    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     await expect(page.getByLabel("Ton prénom (sur tes captures avec Elias, tu es à droite)")).toBeVisible();
   });
 

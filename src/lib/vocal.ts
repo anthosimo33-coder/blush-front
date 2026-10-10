@@ -46,11 +46,11 @@ export function minuter(lignes: LigneScript[], al: Alignement): Omit<VocalLigne,
     for (const m of propre.matchAll(/\S+/g)) {
       /* La ponctuation seule ne fait pas un mot : « s’attache au mot qui suit, : ; ! ? » au mot d’avant (espace insécable) */
       if (/^[«“]$/.test(m[0])) {
-        ouvrant += `${m[0]} `;
+        ouvrant += `${m[0]}\u00a0`;
         continue;
       }
       if (/^[»”:;!?…][»”:;!?….,]*$/.test(m[0]) && mots.length) {
-        mots[mots.length - 1].t += ` ${m[0]}`;
+        mots[mots.length - 1].t += `\u00a0${m[0]}`;
         continue;
       }
       /* Un mot ne commence jamais avant le précédent : l’alignement peut hésiter sur une ponctuation */

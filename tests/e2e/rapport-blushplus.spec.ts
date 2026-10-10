@@ -78,7 +78,7 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
     /* L’invité repart d’une boîte vide (nouvelInvite) : tous ses mails viennent de ce test */
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === SUJET_PRET });
     expect(mailsPour(email).filter((m) => m.sujet === SUJET_PRET)).toHaveLength(1);
-    expect(mail.texte).toContain("Ton rapport est prêt : 8 chapitres");
+    expect(mail.texte).toContain("Ton rapport est prêt\u00a0: 8 chapitres");
     expect(mail.texte).toContain(lien);
     expect(mail.html).toContain(`href="${lien}"`);
     expect(mail.html).toContain("Lire mon rapport");

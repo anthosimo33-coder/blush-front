@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CommencerScreen } from "../CommencerScreen";
 
-export const metadata: Metadata = { title: "Vous vous parlez où ?" };
+export const metadata: Metadata = { title: "Vous vous parlez où\u00a0?" };
 
 /*
  * /commencer en bêta fermée, sans session (src/proxy.ts sert cette page à la même adresse, la bêta lue à l’exécution) :

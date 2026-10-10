@@ -25,8 +25,8 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
   const sujet = sobre ? "Ton rapport BLUSH est prêt" : "📖 Ton rapport BLUSH est prêt";
   const resume = sobre ? "Prends le temps de le lire au calme." : `${n} chapitres, ${lecture} de lecture. J’ai pas été tendre.`;
   const texte = sobre
-    ? `Ton rapport est prêt.\n\nIl est court, et il t’aide à y voir clair. Prends le temps de le lire au calme :\n${lien}\n\nCe mail ne contient rien de ta conv.`
-    : `Ton rapport est prêt : ${n} chapitres, ${lecture} de lecture.\n\nLe verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain pas :\n${lien}\n\nCe mail ne contient aucun message de ta conv, ni le verdict.`;
+    ? `Ton rapport est prêt.\n\nIl est court, et il t’aide à y voir clair. Prends le temps de le lire au calme\u00a0:\n${lien}\n\nCe mail ne contient rien de ta conv.`
+    : `Ton rapport est prêt\u00a0: ${n} chapitres, ${lecture} de lecture.\n\nLe verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain pas\u00a0:\n${lien}\n\nCe mail ne contient aucun message de ta conv, ni le verdict.`;
 
   const bulle = (t: string) =>
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:linear-gradient(160deg,#FF9BCB,#E8358A);border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;

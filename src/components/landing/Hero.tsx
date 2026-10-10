@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
+import { delai } from "@/lib/motion";
 import { Container, CtaButton, useCta } from "./parts";
 
 /* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
@@ -46,11 +48,11 @@ function Said({ me = false, children }: { me?: boolean; children: string }) {
           ? "rounded-[0.5em_0.5em_0.16em_0.5em] bg-bubble-me text-white shadow-[0_20px_36px_-18px_rgba(26,102,219,0.7)]"
           : "rounded-[0.5em_0.5em_0.5em_0.16em] text-white [background:var(--rose-blush)] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_18px_34px_-18px_rgba(232,53,138,0.75)]",
       )}
-      style={{ transform: `rotate(${r}deg)`, "--r": `${r}deg`, "--d": "0.45s" }}
+      style={{ transform: `rotate(${r}deg)`, "--r": `${r}deg`, ...delai(0.45) }}
     >
-      <span className="sr-only">«&nbsp;</span>
+      <span className="sr-only">«{NBSP}</span>
       {children}
-      <span className="sr-only">&nbsp;»</span>
+      <span className="sr-only">{NBSP}»</span>
     </span>
   );
 }

@@ -14,16 +14,16 @@ import type { Chiffre, Periode, StatsAdmin } from "@/server/stats";
 
 const DEGRADE = "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)";
 const nombre = (v: number) => v.toLocaleString("fr-FR");
-const dollars = (v: number) => `${v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${NBSP}$`;
-const pourcent = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}${NBSP}%` : "–");
+const dollars = (v: number) => `${v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0$`;
+const pourcent = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}\u00a0%` : "–");
 const PERIODES: [Periode, string][] = [
   [1, "24 h"],
   [7, "7 jours"],
   [30, "30 jours"],
 ];
-const nomPeriode = (j: Periode) => (j === 1 ? "la veille" : `les ${j}${NBSP}jours d’avant`);
+const nomPeriode = (j: Periode) => (j === 1 ? "la veille" : `les ${j}\u00a0jours d’avant`);
 /** Sous un chiffre clé : contre quoi se lit la tendance, en court (une ligne sur téléphone). */
-const contre = (j: Periode) => (j === 1 ? "vs la veille" : `vs ${j}${NBSP}j d’avant`);
+const contre = (j: Periode) => (j === 1 ? "vs la veille" : `vs ${j}\u00a0j d’avant`);
 
 function Carte({ titre, sous, droite, children, className }: { titre: string; sous?: ReactNode; droite?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -122,7 +122,7 @@ function Activite({ jours }: { jours: StatsAdmin["activite"] }) {
             {SERIES.map((s, i) => {
               const v = j[s.cle];
               const hauteur = v ? Math.max(3, (v / max) * (h - 8)) : 0;
-              return <rect key={s.cle} x={k * pas + 5 + i * 7} y={h - hauteur} width={6} height={hauteur} rx={3} fill={s.couleur}><title>{`${j.jour} · ${s.nom}${NBSP}: ${v}`}</title></rect>;
+              return <rect key={s.cle} x={k * pas + 5 + i * 7} y={h - hauteur} width={6} height={hauteur} rx={3} fill={s.couleur}><title>{`${j.jour} · ${s.nom}\u00a0: ${v}`}</title></rect>;
             })}
             {(jours.length - 1 - k) % tous === 0 && (
               <text x={k * pas + pas / 2} y={h + 16} textAnchor="middle" fontSize={11} fontWeight={800} fill="#6B6862">
@@ -330,7 +330,7 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: stri
           <Carte titre="Le parcours d’une conv" sous="Les convs importées sur la période, et jusqu’où elles sont allées">
             <Parcours p={s.parcours} />
           </Carte>
-          <Carte titre="Jour par jour" sous={`Les ${s.activite.length}${NBSP}derniers jours, heure de Paris`}>
+          <Carte titre="Jour par jour" sous={`Les ${s.activite.length}\u00a0derniers jours, heure de Paris`}>
             <Activite jours={s.activite} />
           </Carte>
           <Carte titre="Le partage" sous="Du verdict partagé à la conv d’un pote">

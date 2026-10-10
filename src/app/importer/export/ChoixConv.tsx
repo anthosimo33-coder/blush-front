@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow } from "@/components/ui/inset";
 import { Sheet } from "@/components/ui/surfaces";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 
 /*
  * L’export Instagram complet contient toutes les convs : on laisse choisir la bonne, dans le navigateur.
@@ -16,7 +17,7 @@ export type { ConvInstagram } from "@/services/preparer-export";
 import type { ConvInstagram } from "@/services/preparer-export";
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-const quand = (iso: string) => `${+iso.slice(8, 10)}${" "}${MOIS[+iso.slice(5, 7) - 1]}`;
+const quand = (iso: string) => `${+iso.slice(8, 10)}\u00a0${MOIS[+iso.slice(5, 7) - 1]}`;
 const sansAccents = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; convs: ConvInstagram[]; onChoisir: (id: string) => void; onClose: () => void }) {
@@ -27,10 +28,10 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
   return (
     <Sheet open={open} onClose={onClose} labelledBy="choix-conv-titre">
       <h2 id="choix-conv-titre" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] lg:text-[30px]">
-        Quelle conv{" "}?
+        Quelle conv{NBSP}?
       </h2>
       <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">
-        Ton export contient {convs.length}{" "}convs. Choisis celle avec la personne{" "}: seule celle-là part chez BLUSH, les autres ne quittent pas ton appareil.
+        Ton export contient {convs.length}{NBSP}convs. Choisis celle avec la personne{NBSP}: seule celle-là part chez BLUSH, les autres ne quittent pas ton appareil.
       </p>
       <label className="flex h-[52px] items-center gap-3 rounded-field bg-white pl-4 pr-2 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] focus-within:shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]">
         <Icon name="people" size={19} color="#8A8780" stroke={2} />
@@ -61,7 +62,7 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
               </Avatar>
             }
             title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
-            sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}${" "}messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
+            sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}\u00a0messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
             chevron={!c.groupe}
             onClick={c.groupe ? undefined : () => onChoisir(c.id)}
           />

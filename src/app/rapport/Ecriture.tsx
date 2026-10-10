@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/icons";
  */
 
 const DEGRADE = "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)";
-const pct = (p: number) => `${Math.round(Math.min(1, Math.max(0, p)) * 100)}${" "}%`;
+const pct = (p: number) => `${Math.round(Math.min(1, Math.max(0, p)) * 100)}\u00a0%`;
 
 /** Ce qui s’écrit en ce moment, dit simplement : « Il prépare le plan », « Chapitres 3 et 7 en cours ». */
 export function enCours(e: EcritureRapport): string {
@@ -36,7 +36,7 @@ export function BarreEcriture({ ecriture }: { ecriture: EcritureRapport }) {
       </span>
       <span className="text-[12px] font-extrabold text-grey">
         {enCours(ecriture)}
-        {ecriture.restant ? ` · encore ≈${" "}${ecriture.restant}` : ""}
+        {ecriture.restant ? ` · encore ≈\u00a0${ecriture.restant}` : ""}
       </span>
     </div>
   );
@@ -133,7 +133,7 @@ export function PastilleEcriture({ ecriture }: { ecriture: EcritureRapport }) {
           <span className="text-[14px] font-black leading-tight">BLUSH écrit ton rapport</span>
           <span className="truncate text-[12px] font-extrabold leading-tight text-[rgba(255,255,255,0.72)]">
             {enCours(ecriture)}
-            {ecriture.restant ? ` · encore ≈${" "}${ecriture.restant}` : ""}
+            {ecriture.restant ? ` · encore ≈\u00a0${ecriture.restant}` : ""}
           </span>
         </span>
       </span>

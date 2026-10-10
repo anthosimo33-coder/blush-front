@@ -21,7 +21,7 @@ export async function histoire(id: string): Promise<{ aUnCompte: boolean } | nul
 
 /** Le lien « Retire ton email de la liste » d’un mail de la liste d’attente, tel que la version texte du mail le donne. */
 export function lienDeRetrait(mail: { sujet: string; texte: string }): string {
-  const lien = mail.texte.match(/Retire ton email de la liste : (\S+)/)?.[1];
+  const lien = mail.texte.match(/Retire ton email de la liste\u00a0: (\S+)/)?.[1];
   if (!lien) throw new Error(`pas de lien de retrait dans le mail « ${mail.sujet} »`);
   return lien;
 }

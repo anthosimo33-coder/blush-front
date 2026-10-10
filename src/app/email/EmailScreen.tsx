@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { useJourney } from "@/state/journey";
+import { NBSP } from "@/lib/format";
 
 /* Écran 07 — Email seul : on y envoie un code (pas de mot de passe), à saisir sur l’écran suivant. */
 export function EmailScreen() {
@@ -50,7 +51,7 @@ export function EmailScreen() {
       aside={<FlowSteps step={3} />}
       head={
         <>
-          <ScreenTitle>On t’envoie ton rapport où ?</ScreenTitle>
+          <ScreenTitle>On t’envoie ton rapport où{NBSP}?</ScreenTitle>
           <Lead size={15} weight={800}>
             Pour le retrouver quand tu veux, et pour qu’on te relance au bon moment.
           </Lead>
@@ -77,7 +78,7 @@ export function EmailScreen() {
           }}
           onBlur={() => setTouched(true)}
           invalid={!!problem || (touched && j.email.length > 0 && !valid)}
-          errorText={problem ?? "Vérifie ton email : il manque quelque chose."}
+          errorText={problem ?? "Vérifie ton email\u00a0: il manque quelque chose."}
         />
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">

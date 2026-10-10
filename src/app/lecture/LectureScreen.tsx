@@ -217,7 +217,7 @@ export function LectureScreen({ total }: { total: number }) {
                 </span>
                 <span key={step} data-rise="">
                   {READING_STEPS[step]}
-                  <span className="sr-only">{p.done ? " : fait" : " : en cours"}</span>
+                  <span className="sr-only">{p.done ? "\u00a0: fait" : "\u00a0: en cours"}</span>
                 </span>
               </div>
               <p className={cn("m-0 text-[13px] font-extrabold text-grey", p.done && "invisible")}>Ça prend environ 40 secondes</p>
@@ -252,7 +252,7 @@ export function LectureScreen({ total }: { total: number }) {
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-              L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu : tu peux en essayer une autre.
+              L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu{NBSP}: tu peux en essayer une autre.
             </p>
           </div>
         ) : failed ? (
@@ -352,7 +352,7 @@ function Discoveries({ items, className }: { items: string[]; className?: string
             data-popin=""
             /* Une trouvaille longue passe sur deux lignes plutôt que de déborder sur un petit écran */
             className="inline-flex min-h-[34px] max-w-full items-center gap-[7px] rounded-[17px] bg-white px-3 py-[7px] text-left text-[13px] font-black leading-[1.25] shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
-            style={{ "--r": `${d.rotate}deg`, "--d": `${i * 0.08}s`, transform: `rotate(${d.rotate}deg)` }}
+            style={{ "--r": `${d.rotate}deg`, ...delai(i * 0.08), transform: `rotate(${d.rotate}deg)` }}
           >
             <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: d.color }} />
             {text}

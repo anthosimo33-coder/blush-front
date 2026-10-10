@@ -9,6 +9,7 @@ import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Scre
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { pagePrecedente } from "@/lib/navigation";
 import type { AppKind } from "@/types";
+import { NBSP } from "@/lib/format";
 
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
 const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide?: boolean }[] = [
@@ -36,7 +37,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
       aside={<FlowSteps step={1} />}
       head={
         <>
-          <ScreenTitle size={34}>Vous vous parlez où ?</ScreenTitle>
+          <ScreenTitle size={34}>Vous vous parlez où{NBSP}?</ScreenTitle>
           <Lead>On te montre comment récupérer votre conv.</Lead>
         </>
       }
@@ -46,7 +47,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
           <AppTile key={t.app} {...t} onClick={() => nouvelleConv(t.app)} />
         ))}
       </nav>
-      <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis ? Commence par la principale, tu ajouteras le reste juste après.</p>
+      <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale, tu ajouteras le reste juste après.</p>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
         <span>
@@ -64,7 +65,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-[15px] font-black">Bêta privée, sur invitation</span>
-            <span className="text-[13px] font-extrabold text-grey">Pas encore d’invitation ? Rejoins la liste d’attente.</span>
+            <span className="text-[13px] font-extrabold text-grey">Pas encore d’invitation{NBSP}? Rejoins la liste d’attente.</span>
           </span>
           <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
         </Link>

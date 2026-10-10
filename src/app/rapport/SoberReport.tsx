@@ -89,7 +89,7 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               <div className="flex-1 lg:flex-none" />
             </div>
             <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
-              <SoberButton onClick={() => setStep(2)}>Et maintenant ?</SoberButton>
+              <SoberButton onClick={() => setStep(2)}>{"Et maintenant\u00a0?"}</SoberButton>
               <SoberLink onClick={() => setHelp(true)}>{data.helpLabel}</SoberLink>
             </div>
           </>

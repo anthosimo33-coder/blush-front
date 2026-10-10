@@ -52,7 +52,7 @@ test("un invité encore gratuit débloque : « Bienvenue dans BLUSH+. », puis l
     await expect(ecran.getByText("Le rapport complet", { exact: true })).toBeVisible();
     await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
     await expect(ecran.getByText("Le chat avec BLUSH", { exact: true })).toBeVisible();
-    await expect(ecran.getByText("Envoie sa réponse : BLUSH t’aide à répondre")).toBeVisible();
+    await expect(ecran.getByText("Envoie sa réponse\u00a0: BLUSH t’aide à répondre")).toBeVisible();
     await expect(ecran.getByText("Sa fiche", { exact: true })).toBeVisible();
     await expect(ecran.getByText("Ce qu’elle t’a dit, toujours sous la main")).toBeVisible();
     await expect(ecran.getByText("7,99 € / semaine · Sans engagement")).toBeVisible();

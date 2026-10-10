@@ -31,7 +31,7 @@ const texteAvance = (a: AvanceVideo) =>
   a.etape === "reprise"
     ? "La connexion a coupé, je reprends…"
     : a.etape === "video"
-      ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NBSP}%`
+      ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}\u00a0%`
       : a.total > 1
         ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
         : "BLUSH lit ta conv";
@@ -195,8 +195,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
           <ScreenTitle>{enregistrement ? "Filme ta conv." : "Choisis tes captures."}</ScreenTitle>
           <Lead size={14}>
             {enregistrement
-              ? "iMessage ne permet pas d’exporter. Enregistre ton écran en remontant la conv : BLUSH lit tout, message par message."
-              : "Instagram et Hinge ne permettent pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle."}
+              ? "iMessage ne permet pas d’exporter. Enregistre ton écran en remontant la conv\u00a0: BLUSH lit tout, message par message."
+              : "Instagram et Hinge ne permettent pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle."}
           </Lead>
         </>
       }
@@ -238,7 +238,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
           <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video || busy ? undefined : shots.open} fige={busy} />
           {trop && (
             <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
-              {CAPTURES_MAX} captures au plus{"\u00a0"}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
+              {CAPTURES_MAX} captures au plus{NBSP}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
             </p>
           )}
           {items.length > 1 && !result?.video && (
@@ -270,8 +270,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
                 <span className="size-3.5 rounded-[7px] bg-elle" />
               </RowIcon>
             }
-            title="Plus rapide : enregistre ton écran"
-            sub="Remonte la conv doucement en filmant ton écran : BLUSH lit tout."
+            title={"Plus rapide\u00a0: enregistre ton écran"}
+            sub={"Remonte la conv doucement en filmant ton écran\u00a0: BLUSH lit tout."}
             onClick={busy ? undefined : choisirEnregistrement}
             chevron={!busy}
             className={cn(busy && "opacity-50")}
@@ -287,7 +287,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         )}
         {!busy && souci === "trop" && (
           <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">
-            BLUSH a lu beaucoup de captures d’un coup{"\u00a0"}: réessaie un peu plus tard. Tes captures restent là.
+            BLUSH a lu beaucoup de captures d’un coup{NBSP}: réessaie un peu plus tard. Tes captures restent là.
           </p>
         )}
         {!busy && result && !result.video && (
@@ -577,7 +577,7 @@ function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?: () => 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[16px] font-black">Ton enregistrement</span>
         <span className="text-[13px] font-extrabold text-grey">
-          {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}${NBSP}min ` : ""}${Math.round(duree % 60)}${NBSP}s · ` : ""}prêt
+          {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}\u00a0min ` : ""}${Math.round(duree % 60)}\u00a0s · ` : ""}prêt
         </span>
       </span>
       <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink disabled:opacity-50">
@@ -621,7 +621,7 @@ function CommentFilmer({ onPick }: { onPick: () => void }) {
       <p className="m-0 flex items-start gap-2 px-1 text-[12.5px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
         <span>
-          La vidéo reste sur ton téléphone : seuls les écrans de la conv partent, lus une fois puis oubliés. Pas de bouton <BoutonRec /> ? Ajoute-le dans Réglages, Centre de contrôle.
+          La vidéo reste sur ton téléphone{NBSP}: seuls les écrans de la conv partent, lus une fois puis oubliés. Pas de bouton <BoutonRec />{NBSP}? Ajoute-le dans Réglages, Centre de contrôle.
         </span>
       </p>
     </div>

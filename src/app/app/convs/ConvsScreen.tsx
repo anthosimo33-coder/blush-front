@@ -59,7 +59,7 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
         openConv(conv.storyId);
         invalidate("report", "account", "fiche");
       }}
-      aria-label={`${conv.person.name} : ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
+      aria-label={`${conv.person.name}\u00a0: ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"
     >
       <span className="transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">

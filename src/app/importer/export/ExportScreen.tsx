@@ -103,7 +103,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           <Button onClick={choisirFichier} disabled={busy} aria-busy={busy}>
             {busy && avance != null ? (
               <span className="flex min-w-0 items-center gap-2.5">
-                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}${NBSP}%`} />
+                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}\u00a0%`} />
                 <span className="text-[16px] leading-[1.2] tabular-nums">
                   Je lis ton export · {Math.round(avance * 100)}
                   {NBSP}%

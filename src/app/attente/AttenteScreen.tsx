@@ -90,7 +90,7 @@ export function AttenteScreen() {
           }}
           onBlur={() => setTouched(true)}
           invalid={etat === "erreur" || (touched && email.length > 0 && !valid)}
-          errorText={etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : "Vérifie ton email : il manque quelque chose."}
+          errorText={etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : "Vérifie ton email\u00a0: il manque quelque chose."}
         />
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">

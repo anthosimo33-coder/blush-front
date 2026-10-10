@@ -1246,7 +1246,7 @@ function Composer({
               onClick={(e) => onQuick(e.currentTarget.value, e.currentTarget)}
               data-popin={entree ? "" : undefined}
               data-a={arriving ? "chip" : undefined}
-              style={{ "--d": `${i * 0.05}s`, "--i": i }}
+              style={{ ...delai(i * 0.05), "--i": i }}
               className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-toi-ink lg:px-3 shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[box-shadow,background-color,color] duration-200 active:bg-toi-ink active:text-white lg:bg-[#F3F7FF] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_#1A66DB]"
             >
               {q}
@@ -1951,7 +1951,7 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
         r.kind === "day" ? (
           <p key={r.key} data-row={r.key} data-a={arriving && r.key === INTRO_DAY ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
             {r.at === null ? (
-              " "
+              NBSP
             ) : (
               <time dateTime={new Date(r.at).toISOString()}>
                 <span className="font-black">{dayLabel(r.at, now)}</span> {clock(r.at)}
@@ -2043,7 +2043,7 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
             data-rise={unfold === null && it.neuf ? "" : undefined}
             data-a={intro ? "intro" : undefined}
             className="relative flex items-end gap-2"
-            style={{ "--d": `${i * 0.06}s`, "--i": i }}
+            style={{ ...delai(i * 0.06), "--i": i }}
           >
             {i === n - 1 ? (
               /* Juste après « BLUSH écrit », sa petite bulle vole jusqu’ici avec la réponse */
@@ -2080,7 +2080,7 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
         </div>
       ) : (
         <span data-a={intro ? "intro-tm" : undefined} className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}>
-          {row.at === null ? " " : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
+          {row.at === null ? NBSP : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
           {/* La réponse se partage en image (story), le prénom de l’autre masqué */}
           {row.from === "blush" && row.echange && (
             <button

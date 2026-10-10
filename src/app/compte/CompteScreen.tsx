@@ -19,6 +19,7 @@ import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
+import { NBSP } from "@/lib/format";
 
 type Confirm = "keep" | "story" | "all" | null;
 
@@ -216,7 +217,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             <p className="m-0 text-[15px] font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
             <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
               <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-              100 % privé : ta conv est supprimée dès que ton rapport est prêt.
+              100 % privé{NBSP}: ta conv est supprimée dès que ton rapport est prêt.
             </p>
             <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Tes convs ne servent jamais à entraîner une IA. Hébergement en Europe. Tu peux tout effacer à tout moment.</p>
             <Button variant="secondary" onClick={fermer}>
@@ -227,7 +228,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         {(confirm === "story" || confirm === "all") && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              {confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"} ?` : "Tout effacer ?"}
+              {confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"}\u00a0?` : "Tout effacer\u00a0?"}
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
               {confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}

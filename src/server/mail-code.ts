@@ -17,8 +17,8 @@ export type MailCode = { sujet: string; texte: string; html: string };
 /** `base` : l’adresse du site, d’où vient l’image de la bulle (https://www.askblush.com en production). */
 export function mailCode(code: string, base: string): MailCode {
   const c = code.replace(/\D/g, "").slice(0, 6);
-  const sujet = `${c} : ton code BLUSH`;
-  const texte = `Ton code BLUSH : ${c}\n\nIl marche 10 minutes. Si tu n’as rien demandé, ignore ce message : sans ce code, personne n’entre.`;
+  const sujet = `${c}\u00a0: ton code BLUSH`;
+  const texte = `Ton code BLUSH\u00a0: ${c}\n\nIl marche 10 minutes. Si tu n’as rien demandé, ignore ce message\u00a0: sans ce code, personne n’entre.`;
   const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -41,7 +41,7 @@ export function mailCode(code: string, base: string): MailCode {
 </style>
 </head>
 <body class="papier" style="margin:0;padding:0;background:${PAPIER};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Ton code BLUSH : ${c}. Il marche 10 minutes.&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Ton code BLUSH&nbsp;: ${c}. Il marche 10 minutes.&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
 <table role="presentation" class="papier" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPIER};">
   <tr>
     <td align="center" style="padding:40px 16px 48px;">
@@ -72,7 +72,7 @@ export function mailCode(code: string, base: string): MailCode {
         </tr>
         <tr>
           <td align="center" class="doux" style="padding:24px 12px 0;font-family:${POLICE};font-size:13px;line-height:19px;font-weight:700;color:${GRIS};">
-            Ce n’est pas toi ? Ignore ce mail : sans ce code, personne n’entre.<br>
+            Ce n’est pas toi&nbsp;? Ignore ce mail&nbsp;: sans ce code, personne n’entre.<br>
             <a href="${base}" class="doux" style="color:${GRIS};text-decoration:none;font-weight:900;">askblush.com</a>
           </td>
         </tr>

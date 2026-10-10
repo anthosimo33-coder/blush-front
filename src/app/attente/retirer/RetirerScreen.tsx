@@ -5,6 +5,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { NBSP } from "@/lib/format";
 
 /*
  * Se retirer de la liste d’attente, depuis le lien du mail : l’inscription a pu venir de quelqu’un d’autre. Un bouton
@@ -53,7 +54,7 @@ export function RetirerScreen({ id, cle }: { id: string; cle: string }) {
       desktopBack={{ target: "/" }}
       head={
         <>
-          <ScreenTitle>Te retirer de la liste ?</ScreenTitle>
+          <ScreenTitle>Te retirer de la liste{NBSP}?</ScreenTitle>
           <Lead size={15} weight={800}>
             Ton email quitte la liste d’attente de BLUSH, et on ne t’écrira plus.
           </Lead>

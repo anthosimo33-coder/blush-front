@@ -6,7 +6,7 @@ import { desactiverPartage, expect, partageIllisible, test } from "./aide";
  * le comportement d’aujourd’hui (le back-end, la bêta ouverte).
  */
 
-const NB = " ";
+const NB = "\u00a0";
 
 test("la landing : la promesse, les boutons vers le parcours, les faits, sans faux avis", async ({ page }) => {
   await test.step("la promesse, et le bouton principal deux fois (en haut, en bas)", async () => {
