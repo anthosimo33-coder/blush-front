@@ -25,5 +25,14 @@ export function quiComplet(j: JourneyState, { captures }: { captures: boolean })
   return !!j.me && (!captures || !!j.prenom.trim()) && !!j.pronom && !!j.guess && !!j.goal;
 }
 
-/** Les réponses de « Qui es-tu ? » qui lancent la lecture (startAnalysis). Ton prénom, seulement s’il est écrit. */
-export const reponsesQui = (j: QuiRempli) => ({ me: j.me, pronom: j.pronom, guess: j.guess, goal: j.goal, prenom: j.prenom.trim() || null });
+/**
+ * Les réponses de « Qui es-tu ? » qui lancent la lecture (startAnalysis). Ton prénom, seulement sur des captures et
+ * s’il est écrit : celui d’une conv de captures d’avant, resté dans l’onglet, renommerait sinon toi sur un export.
+ */
+export const reponsesQui = (j: QuiRempli, { captures }: { captures: boolean }) => ({
+  me: j.me,
+  pronom: j.pronom,
+  guess: j.guess,
+  goal: j.goal,
+  prenom: (captures && j.prenom.trim()) || null,
+});

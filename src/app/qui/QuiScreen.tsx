@@ -79,7 +79,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
        * pas de second POST. Le bouton n’est actif qu’avec toutes les réponses (`ready`) : sur des captures, ton prénom
        * donne aussi `me`
        */
-      await startAnalysis(reponsesQui(j));
+      await startAnalysis(reponsesQui(j, { captures }));
       retenirLecture();
       router.push("/lecture");
     } catch (e) {

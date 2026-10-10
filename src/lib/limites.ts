@@ -14,9 +14,10 @@ export const CAPTURES_MAX = 20;
 export const COTE_IMAGE_MAX = 1568;
 
 /**
- * Le texte d’une conv (un .txt, ou un fichier de la conv dans un .zip) : au-delà, ce n’est pas une conv. Le navigateur
- * refuse le fichier avant de rien envoyer (src/services/preparer-export.ts), le serveur un fichier reçu tel quel et la
- * décompression d’un paquet (src/server/histoires.ts).
+ * Le texte d’une conv (un .txt, ou un fichier de la conv dans un .zip) : au-delà, ce n’est pas une conv. Le serveur
+ * refuse un fichier reçu tel quel plus gros, et ne décompresse pas un paquet au-delà (src/server/histoires.ts). Le
+ * navigateur mesure les deux avant de rien envoyer (src/services/preparer-export.ts) : il refuse un fichier plus gros,
+ * et coupe un paquet dont le JSON (les fichiers de la conv réunis, leurs échappements) dépasserait.
  */
 export const TEXTE_CONV_MAX = 40 * MO;
 

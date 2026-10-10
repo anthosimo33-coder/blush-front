@@ -4,7 +4,8 @@ import type { Plan } from "@/types";
 
 /*
  * Ce que chaque plan ouvre : le paiement qui s’ouvre à l’écran (AppScreen) et le refus du serveur (402) lisent la même
- * table. Une offre qui change de plan change ici, et les deux suivent.
+ * table (« Ta question » : l’écran seul, pour l’instant, voir src/lib/acces.ts). Une offre qui change de plan change
+ * ici, et les deux suivent.
  */
 const PLANS: Plan[] = ["gratuit", "rapport", "blushplus"];
 const OUVRE: Record<Plan, Record<Besoin, boolean>> = {

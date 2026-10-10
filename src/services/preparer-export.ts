@@ -83,6 +83,8 @@ const ECHANTILLON = 1024 * 1024;
 /**
  * Le paquet compressé. Une conv trop longue pour partir (plus de 15 Mo de texte environ : des années de messages)
  * garde sa partie la plus récente, celle qui tient (`coupe` : l’écran suivant dit combien de mois BLUSH lit).
+ * Le serveur ne décompresse pas plus de TEXTE_CONV_MAX : un paquet qui le dépasserait une fois en JSON (les fichiers
+ * d’une conv réunis, ses échappements), même très compressible, garde aussi sa fin, ici plutôt qu’un refus après l’envoi.
  * Pour une très grosse conv, le taux mesuré sur sa fin (les messages gardés) dit d’avance où couper : on ne la
  * compresse plus en entier jusqu’à six fois. La boucle reste en garde-fou, si l’estimation était trop juste.
  */
@@ -90,6 +92,12 @@ async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
   let garde = parties;
   let coupe = false;
   let brut = await enOctets(nom, garde, false);
+  for (let essai = 0; brut.length > TEXTE_CONV_MAX && essai < 3; essai++) {
+    garde = garderLaFin(garde, (TEXTE_CONV_MAX * 0.9) / brut.length);
+    coupe = true;
+    brut = await enOctets(nom, garde, true);
+  }
+  if (brut.length > TEXTE_CONV_MAX) throw new ExportIllisible("fichier");
   if (brut.length > ESTIMER_AU_DELA) {
     const estime = brut.length * ((await compresser(brut.slice(-ECHANTILLON))).length / ECHANTILLON);
     if (estime > ENVOI_EXPORT_MAX) {

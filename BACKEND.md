@@ -99,7 +99,7 @@ Ce qui relie les écrans par l’adresse :
 - **Les suppressions effacent vraiment tout,** en cascade.
 - **Les logs ne contiennent aucun contenu,** seulement des codes d’erreur et les coûts (`ai_usage`).
 - **Les cookies sont httpOnly,** et toute requête qui modifie quelque chose doit venir de l’appli elle-même (contrôle d’origine).
-- **Des limites anti-abus** (`src/server/limites.ts`) bornent les codes, les imports et le chat.
+- **Des limites anti-abus** (`src/server/limites.ts`) bornent les codes, les imports et le chat. Les tailles et bornes que le navigateur partage avec le serveur (le texte d’une conv, les captures, le corps d’une requête chez Vercel, le prénom…) sont ailleurs, dans un module pur importé des deux côtés : `src/lib/limites.ts`.
 
 ## Variables d’environnement
 

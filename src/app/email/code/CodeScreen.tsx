@@ -101,7 +101,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
      * pas celle qu’on importe. Sur des captures, sans ton prénom, tu y serais « Moi ». « Qui es-tu ? » les redemande, et
      * lance la lecture de la bonne conv.
      */
-    if (!quiComplet(j, { captures: vientDeCaptures(j) })) {
+    const captures = vientDeCaptures(j);
+    if (!quiComplet(j, { captures })) {
       router.push("/qui");
       return;
     }
@@ -110,7 +111,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
-      await startAnalysis(reponsesQui(j));
+      await startAnalysis(reponsesQui(j, { captures }));
       retenirLecture();
       router.push("/lecture");
     } catch {
