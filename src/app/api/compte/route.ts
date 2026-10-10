@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { effacerBrouillon, effacerChoisie, effacerSession } from "@/server/cookies";
+import { oublierCetAppareil } from "@/server/cookies";
 import { db, schema } from "@/server/db";
 import { compteDe, contexteRequete } from "@/server/donnees";
 import { corps, erreur, json, memeOrigine, OUBLIER_LE_NAVIGATEUR } from "@/server/http";
@@ -27,8 +27,6 @@ export async function DELETE(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur } = await contexteRequete();
   if (utilisateur) await db().delete(schema.users).where(eq(schema.users.id, utilisateur.id));
-  await effacerSession();
-  await effacerBrouillon();
-  await effacerChoisie();
+  await oublierCetAppareil();
   return json({ ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
 }

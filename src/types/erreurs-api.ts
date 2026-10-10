@@ -20,7 +20,7 @@ export const ERREURS_API = {
   trop: 429,
   /** Les codes de connexion du jour : trop demandés pour cet email, ou le plafond des mails atteint pour tous. */
   codes: 429,
-  /** Trop d’essais de code ratés aujourd’hui pour cet email (src/server/auth.ts, prendreCode). */
+  /** Trop d’essais de code ratés aujourd’hui pour cet email (src/server/auth.ts, prendreCode) : à la vérification, et à la demande d’un nouveau code. */
   essais: 429,
 
   /* Ce qu’elle désigne */

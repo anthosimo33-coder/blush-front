@@ -187,7 +187,10 @@ async function seDeconnecterDansMonCompte(page: Page, { partout = false } = {}):
 test("Mon compte propose de se déconnecter : la session se ferme, le navigateur oublie ce qu’il gardait, et Mon compte redemande la connexion", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "bouton-deconnexion");
   await connecterParApi(page, testInfo, email);
+  /* Le réveil part à chaque chargement : c’est lui qui fait glisser la session (src/components/shell/Reveil.tsx) */
+  const reveil = page.waitForRequest((r) => new URL(r.url()).pathname === "/api/reveil");
   await ouvrir(page, "/compte");
+  await reveil;
   /* Ce que le navigateur garde de BLUSH (src/state/cles.ts) : où tu t’étais arrêté dans le rapport, le parcours de l’onglet */
   await page.evaluate(([reprise, parcours]) => {
     localStorage.setItem(reprise, "{}");

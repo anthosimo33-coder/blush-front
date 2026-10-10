@@ -410,6 +410,8 @@ export const STATES = [
   },
   { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", compte: "blushplus", ref: "20-mon-compte" },
   { id: "20b", section: "quotidien", title: "Mon compte", state: "Supprimer l’histoire", route: "/compte", compte: "blushplus", steps: click("Supprimer l’histoire avec Maëlys"), sheet: true, note: "Confirmation absente des maquettes." },
+  { id: "20c", section: "quotidien", title: "Mon compte", state: "Se déconnecter", route: "/compte", compte: "blushplus", steps: click("Se déconnecter Sur cet appareil"), sheet: true, note: "Confirmation absente des maquettes. Textes à valider." },
+  { id: "20d", section: "quotidien", title: "Mon compte", state: "Se déconnecter de tous les appareils", route: "/compte", compte: "blushplus", steps: click("Se déconnecter de tous les appareils"), sheet: true, note: "Confirmation absente des maquettes. Textes à valider." },
 
   /* ———— Plusieurs convs ———— */
   {

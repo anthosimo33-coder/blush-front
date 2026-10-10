@@ -77,11 +77,11 @@ export async function lectureFaite(page: Page, testInfo: TestInfo, email: string
 }
 
 /**
- * Se déconnecter par la route de l’appli (POST /api/auth/deconnexion), sans passer par Mon compte : `partout`, de tous les
- * appareils ; `autreSite`, la même requête venue d’un autre site. Renvoie le statut de la réponse.
+ * Se déconnecter par la route de l’appli (POST /api/auth/deconnexion), sans passer par Mon compte : `autreSite`, la même
+ * requête venue d’un autre site. Renvoie le statut de la réponse.
  */
-export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreSite = false, partout = false } = {}): Promise<number> {
-  const r = await page.request.post("/api/auth/deconnexion", { headers: autreSite ? { origin: "https://exemple.test" } : origine(testInfo), data: { partout }, timeout: RESEAU });
+export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreSite = false } = {}): Promise<number> {
+  const r = await page.request.post("/api/auth/deconnexion", { headers: autreSite ? { origin: "https://exemple.test" } : origine(testInfo), timeout: RESEAU });
   return r.status();
 }
 

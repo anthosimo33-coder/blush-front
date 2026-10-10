@@ -7,6 +7,8 @@ import { useEffect } from "react";
  * d’une instance et le réveil de la base (1 à 2 s d’écran figé). On lance donc une requête minuscule (/api/reveil) au
  * chargement, au retour dans l’appli après une longue absence, et quand le champ du chat prend le focus (l’accueil
  * appelle reveiller()) : le temps que le message s’écrive, tout est réveillé. Sa réponse n’est jamais attendue.
+ * Elle prolonge aussi la session (un mois, une fois par jour au plus : prolongerSession, src/app/api/reveil) : sans ce
+ * réveil au chargement, la session ne glisse plus, et chacun est déconnecté un mois après sa connexion.
  */
 
 /** Une absence plus longue : l’instance et la base se sont peut-être endormies. */

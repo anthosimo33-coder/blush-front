@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +11,14 @@ import type { Captures, Memoire } from "@prompts/lib/schemas";
  * règle par test.
  */
 type Attributs = { secure?: boolean; path?: string; domain?: string; httpOnly?: boolean; expires?: Date };
-const etat = vi.hoisted(() => ({ fermee: false, cookies: new Map<string, string>(), attributs: new Map<string, Attributs>(), apres: [] as (() => unknown)[] }));
+const etat = vi.hoisted(() => ({
+  fermee: false,
+  cookies: new Map<string, string>(),
+  attributs: new Map<string, Attributs>(),
+  apres: [] as (() => unknown)[],
+  /* Une panne simulée pendant la demande d’un code : la base (preparerCode), ou Resend qui refuse le mail */
+  panne: null as "base" | "resend" | null,
+}));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (n: string) => (etat.cookies.has(n) ? { name: n, value: etat.cookies.get(n)! } : undefined),
@@ -33,29 +41,43 @@ vi.mock("@/server/env", async (original) => {
 /* after() de Next ne vit que dans une requête : ce qui devait partir après la réponse attend ici, lancé par lancerApres */
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
 /* Les alertes de l’équipe, relevées au lieu de partir */
-const alertes = vi.hoisted(() => [] as string[]);
-vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string) => void alertes.push(sujet) }));
+const alertes = vi.hoisted(() => [] as { sujet: string; lignes: string[] }[]);
+vi.mock("@/server/alertes", async (original) => ({
+  ...(await original<typeof import("@/server/alertes")>()),
+  alerter: async (sujet: string, lignes: string[]) => void alertes.push({ sujet, lignes }),
+}));
+vi.mock("@/server/auth", async (original) => {
+  const m = await original<typeof import("@/server/auth")>();
+  return { ...m, preparerCode: (...a: Parameters<typeof m.preparerCode>) => (etat.panne === "base" ? Promise.reject(new Error("la base ne répond pas")) : m.preparerCode(...a)) };
+});
+vi.mock("@/server/email", async (original) => {
+  const m = await original<typeof import("@/server/email")>();
+  return { ...m, envoyerCodeParEmail: (...a: Parameters<typeof m.envoyerCodeParEmail>) => (etat.panne === "resend" ? Promise.reject(new m.ErreurResend(500)) : m.envoyerCodeParEmail(...a)) };
+});
 
 import { POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postDeconnexion } from "@/app/api/auth/deconnexion/route";
 import { POST as postVerifier } from "@/app/api/auth/verifier/route";
+import { DELETE as deleteCompte } from "@/app/api/compte/route";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
 import { GET as getReveil } from "@/app/api/reveil/route";
 import { editionsBornees, type DonneesMemoire } from "@/server/analyse";
-import { ouvrirSession } from "@/server/auth";
+import { envoyerCode, ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
-import { effacerSession, poserSession } from "@/server/cookies";
+import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
 import { emailCanonique } from "@/server/email-canonique";
-import { NOMS_DE_SESSION } from "@/lib/noms-cookies";
+import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { convDe, depuisFichier, importer, type LigneComplete, type Meta } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { suiteSure } from "@/lib/suite";
 
+/* Le cookie de session des tests, servis en http : sans le préfixe __Host- (src/lib/noms-cookies.ts) */
+const SESSION = nomDuCookie("session", false);
 const n = Date.now();
 const emails = [`securite-${n}@blush.test`];
 let ip = 0;
@@ -165,7 +187,7 @@ describe("S-01 · lire des captures (le modèle payant) avant l’email", () => 
 
   it("bêta fermée, avec un compte invité : permis", async () => {
     etat.fermee = true;
-    etat.cookies.set("blush-session", secretSession);
+    etat.cookies.set(SESSION, secretSession);
     expect(await lecturePermise("captures")).toBe("ok");
   });
 
@@ -178,7 +200,7 @@ describe("S-01 · lire des captures (le modèle payant) avant l’email", () => 
       .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 49, windowStart: new Date() } });
     expect(await lecturePermise("captures")).toBe("ok");
     expect(await lecturePermise("captures")).toBe("trop");
-    etat.cookies.set("blush-session", secretSession);
+    etat.cookies.set(SESSION, secretSession);
     expect(await lecturePermise("captures")).toBe("ok");
   });
 });
@@ -193,7 +215,7 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
 
   it("un nom de l’autre démesuré est refusé ; un vrai enregistrement passe", async () => {
     etat.fermee = false;
-    etat.cookies.set("blush-session", secretSession);
+    etat.cookies.set(SESSION, secretSession);
     const enorme = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot("L".repeat(170_000))] }) }));
     expect(enorme.status).toBe(422);
     const trop = { ...lot("Léa"), profil: Array.from({ length: 51 }, () => "x") };
@@ -240,7 +262,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
 
   it("les infos retirées gardent les 100 plus récentes", async () => {
     etat.fermee = false;
-    etat.cookies.set("blush-session", secretSession);
+    etat.cookies.set(SESSION, secretSession);
     const r = await corriger();
     expect(r.status).toBe(200);
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
@@ -346,7 +368,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     /* A garde le sien, et entre */
     etat.cookies = navigateurA;
     expect(await verifier(e, codeA)).toEqual({ statut: 200, corps: { ok: true, email: e } });
-    expect(etat.cookies.get(NOMS_DE_SESSION[1])).toBeTruthy();
+    expect(etat.cookies.get(SESSION)).toBeTruthy();
   });
 
   it("S-09 · pas plus d’un mail par minute pour un même navigateur, tant que son code marche", async () => {
@@ -358,7 +380,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     expect((await verifier(e, codesEcrits(e)[0])).corps).toMatchObject({ ok: true });
   });
 
-  it("S-07 · vingt essais ratés par jour pour un email, alias compris : un nouveau code n’y change rien, un bon code ne compte pas", async () => {
+  it("S-07 · vingt essais ratés par jour pour un email, alias compris : un nouveau code n’y change rien (il n’est plus envoyé), un bon code ne compte pas", async () => {
     const e = email("essais", "gmail.com");
     const alias = e.replace("essais", "es.sais").replace("@", "+blush@");
     emails.push(alias);
@@ -378,10 +400,13 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     const [code] = codesEcrits(alias);
     expect(await verifier(alias, String((Number(code) + 1) % 1_000_000).padStart(6, "0"))).toEqual({ statut: 200, corps: { ok: false } });
     expect(await verifier(alias, code)).toEqual({ statut: 429, corps: { erreur: "essais" } });
-    /* Un nouveau code, d’un autre navigateur : toujours trop pour aujourd’hui */
+    /* Un nouveau code, d’un autre navigateur : refusé d’emblée, sans mail (il n’y pourrait rien), pour l’alias aussi */
     autreNavigateur();
-    await demander(e);
-    expect(await verifier(e, codesEcrits(e).at(-1)!)).toEqual({ statut: 429, corps: { erreur: "essais" } });
+    const ecrits = codesEcrits(e).length;
+    const refus = await demander(e);
+    expect([refus.status, await refus.json()]).toEqual([429, { erreur: "essais" }]);
+    expect(codesEcrits(e)).toHaveLength(ecrits);
+    expect(await (await demander(alias)).json()).toEqual({ erreur: "essais" });
     await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte(`limite:${echecs}`)));
   });
 
@@ -406,10 +431,44 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     await poserLimite("code:mails", 63);
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
-    expect(alertes).toEqual(["mails de code : 80 % du plafond du jour"]);
+    expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : 80 % du plafond du jour"]);
     await poserLimite("code:mails", 80);
     const r = await demander(email("plafond-apres"));
     expect([r.status, await r.json()]).toEqual([429, { erreur: "codes" }]);
+  });
+
+  it("S-09 · le dernier mail du plafond part, et l’équipe le sait ; passé le plafond entre la question et l’envoi, aucun mail", async () => {
+    const e = email("plafond-atteint");
+    alertes.length = 0;
+    await poserLimite("code:mails", 79);
+    await demander(e);
+    expect(codesEcrits(e)).toHaveLength(1);
+    expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : plafond du jour atteint"]);
+    /* Des demandes en même temps : celle-ci a vu le plafond libre, mais il est atteint quand son mail va partir */
+    await envoyerCode(e, "123456");
+    expect(codesEcrits(e)).toHaveLength(1);
+    expect(alertes).toHaveLength(1);
+  });
+
+  it("S-09 · un code qui ne part pas prévient l’équipe, sans l’email : Resend qui le refuse, ou la base après la réponse", async () => {
+    const e = email("panne");
+    alertes.length = 0;
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      etat.panne = "resend";
+      expect((await demander(e)).status).toBe(200);
+      autreNavigateur();
+      etat.panne = "base";
+      expect((await demander(e)).status).toBe(200);
+    } finally {
+      etat.panne = null;
+      erreurs.mockRestore();
+    }
+    expect(codesEcrits(e)).toHaveLength(0);
+    expect(alertes).toEqual([
+      { sujet: "code de connexion non envoyé", lignes: ["Le mail du code n’est pas parti.", "Erreur : Resend : 500"] },
+      { sujet: "code de connexion non envoyé", lignes: ["Le mail du code n’est pas parti.", "Erreur : la base"] },
+    ]);
   });
 });
 
@@ -425,29 +484,48 @@ describe("S-16 · la session : glissante, et fermée partout d’un geste", () =
 
   it("se déconnecter ferme la session de cet appareil ; « partout », toutes celles du compte. La réponse fait oublier le navigateur", async () => {
     const [a, b, c] = [await ouvrirSession(compte), await ouvrirSession(compte), await ouvrirSession(compte)];
-    etat.cookies = new Map([[NOMS_DE_SESSION[1], a.secret]]);
+    etat.cookies = new Map([[SESSION, a.secret]]);
     const seul = await postDeconnexion(postJson("/api/auth/deconnexion", {}));
     expect(seul.headers.get("clear-site-data")).toBe('"cache", "storage"');
-    expect(etat.cookies.has(NOMS_DE_SESSION[1])).toBe(false);
+    expect(etat.cookies.has(SESSION)).toBe(false);
     expect(await sessions()).toHaveLength(2);
 
-    etat.cookies = new Map([[NOMS_DE_SESSION[1], b.secret]]);
+    etat.cookies = new Map([[SESSION, b.secret]]);
     expect((await postDeconnexion(postJson("/api/auth/deconnexion", { partout: true }))).status).toBe(200);
     expect(await sessions()).toHaveLength(0);
     /* Celle d’un autre appareil aussi */
     expect(await db().select().from(schema.sessions).where(eq(schema.sessions.id, empreinte(c.secret)))).toHaveLength(0);
   });
 
+  it("« Tout effacer » : le compte et ses sessions, les cookies de cet appareil, et la réponse fait oublier le navigateur", async () => {
+    const e = `tout-effacer-${n}@blush.test`;
+    emails.push(e);
+    const [{ id }] = await db().insert(schema.users).values({ email: e }).returning();
+    const { secret } = await ouvrirSession(id);
+    etat.cookies = new Map([
+      [SESSION, secret],
+      [nomDuCookie("brouillon", false), "un-brouillon"],
+      [nomDuCookie("code", false), "un-navigateur"],
+    ]);
+    await poserChoisie(randomUUID());
+    const r = await deleteCompte(requete("/api/compte", { method: "DELETE" }));
+    expect(r.status).toBe(200);
+    expect(r.headers.get("clear-site-data")).toBe('"cache", "storage"');
+    expect(etat.cookies.size).toBe(0);
+    expect(await db().select().from(schema.users).where(eq(schema.users.id, id))).toHaveLength(0);
+    expect(await db().select().from(schema.sessions).where(eq(schema.sessions.id, empreinte(secret)))).toHaveLength(0);
+  });
+
   it("une visite prolonge la session d’un mois, et son cookie avec elle, une fois par jour au plus ; une session expirée ne revient pas", async () => {
     const { secret } = await ouvrirSession(compte);
     const ici = eq(schema.sessions.id, empreinte(secret));
     await db().update(schema.sessions).set({ expiresAt: new Date(Date.now() + 10 * 86400e3) }).where(ici);
-    etat.cookies = new Map([[NOMS_DE_SESSION[1], secret]]);
+    etat.cookies = new Map([[SESSION, secret]]);
     etat.attributs.clear();
     expect((await getReveil()).status).toBe(200);
     const [prolongee] = await db().select().from(schema.sessions).where(ici);
     expect(prolongee.expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 86400e3);
-    expect(etat.attributs.get(NOMS_DE_SESSION[1])?.expires?.getTime()).toBe(prolongee.expiresAt.getTime());
+    expect(etat.attributs.get(SESSION)?.expires?.getTime()).toBe(prolongee.expiresAt.getTime());
     /* Le même jour : rien de plus */
     etat.attributs.clear();
     await getReveil();
@@ -480,5 +558,22 @@ describe("S-32 · en https, les cookies du serveur portent le préfixe __Host-",
     await poserSession("un-secret", new Date(Date.now() + 86400e3));
     expect(etat.cookies.has("blush-session")).toBe(true);
     expect(NOMS_DE_SESSION).toEqual(["__Host-blush-session", "blush-session"]);
+  });
+
+  it("en https, l’ancien cookie de session, sans préfixe, part à la pose comme à l’effacement : le proxy ne le prend plus pour une session", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      etat.cookies = new Map([["blush-session", "un-ancien-secret"]]);
+      etat.attributs.clear();
+      await poserSession("un-secret", new Date(Date.now() + 86400e3));
+      expect([...etat.cookies.keys()]).toEqual(["__Host-blush-session"]);
+      expect(etat.attributs.get("blush-session")).toMatchObject({ secure: true, path: "/" });
+      /* « Tout effacer » ou se déconnecter, l’ancien encore là */
+      etat.cookies.set("blush-session", "un-ancien-secret");
+      await effacerSession();
+      expect(etat.cookies.size).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

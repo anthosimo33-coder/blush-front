@@ -345,18 +345,25 @@ export async function verifyLoginCode(email: string, code: string): Promise<{ ok
 }
 
 /**
- * Se déconnecter de cet appareil, ou de tous (`partout`). Le serveur fait oublier au navigateur ce qu’il garde de BLUSH
- * (Clear-Site-Data) ; on le vide aussi d’ici, pour un navigateur qui ignorerait l’en-tête. À l’écran de repartir ensuite
- * d’un chargement neuf : rien de la session ne reste en mémoire.
+ * Vide ce que le navigateur garde de BLUSH, après une déconnexion ou « Tout effacer ». Le serveur le lui fait déjà
+ * oublier (Clear-Site-Data) : ceci pour un navigateur qui ignorerait l’en-tête.
  */
-export async function seDeconnecter({ partout = false } = {}): Promise<void> {
-  await appel<{ ok: true }>("/api/auth/deconnexion", envoi("POST", { partout }));
+function oublierLeStockage(): void {
   try {
     localStorage.clear();
     sessionStorage.clear();
   } catch {
     /* Un stockage refusé (navigation privée) : rien n’y était gardé */
   }
+}
+
+/**
+ * Se déconnecter de cet appareil, ou de tous (`partout`), et vider ce que le navigateur garde de BLUSH. À l’écran de
+ * repartir ensuite d’un chargement neuf : rien de la session ne reste en mémoire.
+ */
+export async function seDeconnecter({ partout = false } = {}): Promise<void> {
+  await appel<{ ok: true }>("/api/auth/deconnexion", envoi("POST", { partout }));
+  oublierLeStockage();
 }
 
 export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
@@ -562,7 +569,8 @@ export function openConv(storyId: string) {
   writeStoryCookie(storyId);
 }
 
-/** Tout effacer : le compte et toutes les histoires. */
+/** Tout effacer : le compte et toutes les histoires, et ce que le navigateur garde de BLUSH. */
 export async function deleteAccount(): Promise<void> {
-  return void (await appel<{ ok: true }>("/api/compte", envoi("DELETE")));
+  await appel<{ ok: true }>("/api/compte", envoi("DELETE"));
+  oublierLeStockage();
 }

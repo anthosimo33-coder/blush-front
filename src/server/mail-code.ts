@@ -18,6 +18,11 @@ export type MailCode = { sujet: string; texte: string; html: string };
 /** `base` : l’adresse du site, d’où vient l’image de la bulle (https://www.askblush.com en production). */
 export function mailCode(code: string, base: string): MailCode {
   const c = code.replace(/\D/g, "").slice(0, 6);
+  /*
+   * TODO(produit): le code ne vaut que dans le navigateur qui l’a demandé (S-08), et rien ne le dit : tapé sur un autre
+   * appareil, il échoue comme un mauvais code (la réponse reste la même pour tous). Proposé, ici et dans la version texte :
+   * « Tape-le dans BLUSH, sur l’appareil où tu l’as demandé. » (avec l’écran du code ?), à valider avec Mon compte.
+   */
   const sujet = `${c}\u00a0: ton code BLUSH`;
   const texte = `Ton code BLUSH\u00a0: ${c}\n\nIl marche ${CODE_MINUTES} minutes. Si tu n’as rien demandé, ignore ce message\u00a0: sans ce code, personne n’entre.`;
   const html = `<!doctype html>

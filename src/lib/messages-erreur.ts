@@ -16,18 +16,23 @@ const CHAT_ET_QUESTION = {
   acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
 
+/* TODO(produit): texte à valider */
+/** Vingt essais de code ratés aujourd’hui pour cet email : ni un code tapé, ni un nouveau code n’y font plus rien. */
+const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.";
+
 const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
     trop: "Trop de codes demandés. Réessaie dans une heure.",
+    /* TODO(produit): texte à valider */
     codes: "Trop de codes demandés aujourd’hui. Réessaie demain.",
+    essais: ESSAIS_DU_JOUR,
     defaut: "Le code n’est pas parti. Réessaie dans un instant.",
   },
   /* La vérification du code reçu (un mauvais code a son propre message, sur l’écran) */
   verification: {
     trop: "Trop d’essais d’un coup. Attends quelques minutes, puis réessaie.",
-    /* TODO(produit): texte à valider */
-    essais: "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.",
+    essais: ESSAIS_DU_JOUR,
     beta: "Cet email n’est pas encore dans la bêta.",
     defaut: "Ça n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },

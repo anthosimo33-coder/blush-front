@@ -15,9 +15,25 @@ import { STORY_COOKIE } from "@/services/session";
 export const cookieSecurise = () => process.env.NODE_ENV === "production" && !serveurDeTest();
 const nom = (cookie: CookieDuServeur) => nomDuCookie(cookie, cookieSecurise());
 const attributs = () => ({ httpOnly: true, secure: cookieSecurise(), sameSite: "lax" as const, path: "/" });
-const poser = async (cookie: CookieDuServeur, valeur: string, expires: Date) => (await cookies()).set(nom(cookie), valeur, { ...attributs(), expires });
+/*
+ * En https, le cookie sous son ancien nom, sans préfixe, posé avant le préfixe __Host- (la session, pour 90 jours) :
+ * plus lu, mais src/proxy.ts et next.config.ts le prennent encore pour une session. Effacé à la pose comme à
+ * l’effacement du nouveau, s’il est là : une fois suffit, le navigateur ne le renvoie plus.
+ */
+const oublierLAncien = async (cookie: CookieDuServeur) => {
+  const pot = await cookies();
+  const ancien = nomDuCookie(cookie, false);
+  if (cookieSecurise() && pot.has(ancien)) pot.delete({ name: ancien, ...attributs() });
+};
+const poser = async (cookie: CookieDuServeur, valeur: string, expires: Date) => {
+  await oublierLAncien(cookie);
+  (await cookies()).set(nom(cookie), valeur, { ...attributs(), expires });
+};
 /* Avec les attributs de la pose : un navigateur ne prend l’effacement d’un cookie __Host- que Secure, sur path / */
-const effacer = async (cookie: CookieDuServeur) => (await cookies()).delete({ name: nom(cookie), ...attributs() });
+const effacer = async (cookie: CookieDuServeur) => {
+  await oublierLAncien(cookie);
+  (await cookies()).delete({ name: nom(cookie), ...attributs() });
+};
 
 export const lireSession = async () => (await cookies()).get(nom("session"))?.value;
 /** Une session dans la requête, sans la vérifier (ce qui ne fait qu’adapter l’affichage). */
@@ -38,6 +54,10 @@ export async function lireNavigateur(): Promise<string | undefined> {
   const valeur = (await cookies()).get(nom("code"))?.value;
   return valeur && /^[\w-]{43}$/.test(valeur) ? valeur : undefined;
 }
+/*
+ * Deux premières demandes en même temps d’un navigateur sans ce cookie (deux onglets, un double toucher) font deux
+ * jetons, et seul le dernier cookie reste : l’un des deux codes reçus ne marche pas. Rare, et accepté : le suivant marche.
+ */
 /** Le jeton de ce navigateur, repris ou neuf, reposé pour la durée d’un code : à chaque demande, tout le monde reçoit le même cookie. */
 export async function poserNavigateur(): Promise<string> {
   const navigateur = (await lireNavigateur()) ?? jeton();
@@ -54,3 +74,15 @@ export const lireChoisie = async () => (await cookies()).get(STORY_COOKIE)?.valu
 export const poserChoisie = async (id: string) =>
   (await cookies()).set(STORY_COOKIE, id, { httpOnly: false, secure: cookieSecurise(), sameSite: "lax", path: "/", maxAge: 365 * 86400 });
 export const effacerChoisie = async () => (await cookies()).delete(STORY_COOKIE);
+
+/**
+ * Ce que cet appareil oublie quand on s’en va (se déconnecter, « Tout effacer ») : la session, le brouillon d’un import
+ * laissé en plan, la conv choisie et le navigateur d’un code demandé. Ce que le navigateur garde lui-même, la réponse le
+ * lui fait oublier (OUBLIER_LE_NAVIGATEUR, src/server/http.ts).
+ */
+export async function oublierCetAppareil(): Promise<void> {
+  await effacerSession();
+  await effacerBrouillon();
+  await effacerChoisie();
+  await effacerNavigateur();
+}

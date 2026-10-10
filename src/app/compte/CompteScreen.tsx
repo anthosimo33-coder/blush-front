@@ -25,6 +25,9 @@ import { NBSP } from "@/lib/format";
 /* La feuille ouverte : ce que BLUSH garde, une suppression (l’histoire, tout), ou une déconnexion (cet appareil, partout) */
 type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
 
+/** Se déconnecter n’efface rien : dit une fois, sous « Ta connexion » et dans ses deux feuilles. */
+const RIEN_N_EST_EFFACE = "Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver.";
+
 /*
  * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, l’abonnement, l’app, ta connexion (se
  * déconnecter), puis tes données (les gestes qui effacent en rouge).
@@ -204,7 +207,8 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       </InsetGroup>
 
       {/* Se déconnecter : de cet appareil, ou de tous (un appareil perdu, prêté). Rien n’est effacé */}
-      <InsetGroup title="Ta connexion" id="connexion" className="mt-6" footer={"Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver."}>
+      {/* TODO(produit): « Ta connexion », ses lignes et son pied sont absents des maquettes, à valider */}
+      <InsetGroup title="Ta connexion" id="connexion" className="mt-6" footer={RIEN_N_EST_EFFACE}>
         <InsetRow leading={<RowIcon icon="user" />} title="Se déconnecter" sub="Sur cet appareil" onClick={() => setConfirm("sortie")} chevron />
         <InsetRow leading={<RowIcon icon="shield" />} title="Se déconnecter de tous les appareils" sub="Un téléphone perdu, un ordi prêté" onClick={() => setConfirm("partout")} chevron />
       </InsetGroup>
@@ -275,7 +279,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               {confirm === "sortie" ? "Se déconnecter\u00a0?" : "Se déconnecter de tous les appareils\u00a0?"}
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-              {confirm === "sortie" ? "Tes histoires restent gardées. Pour les retrouver, ton email et un code suffisent." : "Celui-ci compris. Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver."}
+              {confirm === "sortie" ? RIEN_N_EST_EFFACE : `Celui-ci compris. ${RIEN_N_EST_EFFACE}`}
             </p>
             {souci && (
               <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">

@@ -22,6 +22,14 @@ async function deposer(boite: string, pour: string, mail: Mail & { code?: string
   await rename(`${nom}.tmp`, `${nom}.json`);
 }
 
+/** Resend a refusé le mail : son statut HTTP, rien d’autre (ni l’adresse, ni le contenu), qu’une alerte peut montrer. */
+export class ErreurResend extends Error {
+  constructor(readonly statut: number) {
+    super(`Resend a répondu ${statut}`);
+    this.name = "ErreurResend";
+  }
+}
+
 /** Envoie un mail (sa version HTML et sa version texte). Sans clé Resend (dev), seul son sujet s’affiche dans les logs. */
 export async function envoyerMail(email: string, { sujet, texte, html }: Mail): Promise<void> {
   const { RESEND_API_KEY, BLUSH_EMAIL_FROM } = env();
@@ -37,7 +45,7 @@ export async function envoyerMail(email: string, { sujet, texte, html }: Mail): 
     body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: [email], subject: sujet, text: texte, html }),
     signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
-  if (!r.ok) throw new Error(`Resend : ${r.status}`);
+  if (!r.ok) throw new ErreurResend(r.status);
 }
 
 /** Envoie le code de connexion. Sans clé Resend (dev), il s’affiche dans les logs du serveur. */

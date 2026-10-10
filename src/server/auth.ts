@@ -5,7 +5,7 @@ import { z } from "zod";
 import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
-import { envoyerCodeParEmail } from "./email";
+import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { accesLibre, boiteAMails, peutEntrer } from "./env";
 import { compter, LIMITES, limiteAtteinte, rendre } from "./limites";
@@ -65,16 +65,17 @@ export async function mailsDeCodeEpuises(): Promise<boolean> {
 }
 
 /**
- * Écrit le code à cet email, compté dans le plafond du jour (mailsCodeParJour) : l’équipe est prévenue à 80 %, puis
- * quand il est atteint (tout le monde voit alors « trop de codes »). Un mail qui ne part pas la prévient aussi, sans
- * l’email : l’écran dit « regarde tes mails ». Ne rejette jamais : elle tourne après la réponse.
+ * Écrit le code à cet email, compté dans le plafond du jour (mailsCodeParJour) : l’équipe est prévenue à 80 % (alerteA),
+ * puis quand il est atteint (tout le monde voit alors « trop de codes »). Un mail qui ne part pas la prévient aussi, sans
+ * l’email : l’écran dit « regarde tes mails ». Elle tourne après la réponse : elle ne rejette que si la base ne répond
+ * pas, et la route prévient alors l’équipe (src/app/api/auth/code).
  */
 export async function envoyerCode(email: string, code: string): Promise<void> {
   const plafond = plafondDesMails();
   if (plafond) {
     const n = await compter("code:mails", plafond);
-    if (n === Math.ceil(plafond.max * 0.8) || n === plafond.max)
-      await alerter(n === plafond.max ? "mails de code : plafond du jour atteint" : "mails de code : 80 % du plafond du jour", [
+    if (n === Math.ceil(plafond.max * plafond.alerteA) || n === plafond.max)
+      await alerter(n === plafond.max ? "mails de code : plafond du jour atteint" : `mails de code : ${Math.round(plafond.alerteA * 100)} % du plafond du jour`, [
         `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (LIMITES.mailsCodeParJour).`,
         "Au plafond, plus personne ne reçoit de code : chacun voit « trop de codes » jusqu’à la fin de la fenêtre.",
       ]);
@@ -84,9 +85,8 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
   try {
     await envoyerCodeParEmail(email, code);
   } catch (e) {
-    /* Une erreur SQL ou réseau peut contenir l’email : seul le statut de Resend passe */
-    const message = e instanceof Error ? e.message : "";
-    await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", `Erreur : ${/^Resend : \d+$/.test(message) ? message : "la base ou le réseau"}`]);
+    /* Une erreur réseau peut contenir l’email : seul le statut de Resend passe */
+    await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", `Erreur : ${e instanceof ErreurResend ? `Resend : ${e.statut}` : "le réseau"}`]);
   }
 }
 

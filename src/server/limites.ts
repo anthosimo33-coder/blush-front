@@ -15,11 +15,11 @@ export const LIMITES = {
   /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. */
   codeParEmail: { max: 10, fenetreS: 86400 },
   /**
-   * Les mails de code, pour tous et par jour : sous le quota de Resend, pour que les codes partent toujours (une alerte à
-   * 80 %). Au plafond, tout le monde voit « trop de codes ». Sans la boîte des tests de bout en bout, dont les mails ne
-   * partent pas.
+   * Les mails de code, pour tous et par jour : sous le quota de Resend, pour que les codes partent toujours. L’équipe est
+   * prévenue à `alerteA` du plafond (80 %), puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans
+   * la boîte des tests de bout en bout, dont les mails ne partent pas.
    */
-  mailsCodeParJour: { max: 80, fenetreS: 86400 },
+  mailsCodeParJour: { max: 80, fenetreS: 86400, alerteA: 0.8 },
   verificationParIp: { max: 30, fenetreS: 3600 },
   /** Les essais de code ratés pour un email (canonique), par jour : un nouveau code ne remet pas ce compte à zéro. */
   echecsCodeParEmail: { max: 20, fenetreS: 86400 },
