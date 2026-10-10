@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { OFFERS } from "@/contenu/offres";
+import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
 import { invalidate } from "@/lib/query";
 import { useSoundOnce } from "@/lib/sound";
@@ -56,7 +57,7 @@ export function UnlockedScreen({
       frameWidth={560}
       desktopTopPad={0}
       footer={
-        <div data-popin="" style={{ "--d": "0.7s" } as CSSProperties}>
+        <div data-popin="" style={delai(0.7)}>
           {/* Vers l’accueil, sans remise en haut : il s’ouvre sur le dernier échange */}
           <ButtonLink href={suite} scroll={cheminDe(suite) !== "/app"} arrow>
             {next ? "Continuer" : "Lire la suite"}
@@ -74,21 +75,21 @@ export function UnlockedScreen({
             <CheckBurst size={96} pop />
           </div>
         </div>
-        <h1 data-rise="" style={{ "--d": "0.2s" } as CSSProperties} className="m-0 mt-5 text-[32px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[40px]">
+        <h1 data-rise="" style={delai(0.2)} className="m-0 mt-5 text-[32px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[40px]">
           {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
         </h1>
-        <p data-rise="" style={{ "--d": "0.3s" } as CSSProperties} className="m-0 mt-3 max-w-[380px] text-[16px] font-extrabold leading-[1.45] text-soft">
+        <p data-rise="" style={delai(0.3)} className="m-0 mt-3 max-w-[380px] text-[16px] font-extrabold leading-[1.45] text-soft">
           {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${NB_CHAPITRES} chapitres sont à toi, pour toujours.`}
         </p>
 
-        <div data-rise="" style={{ "--d": "0.45s" } as CSSProperties} className="mt-8 w-full text-left">
+        <div data-rise="" style={delai(0.45)} className="mt-8 w-full text-left">
           <InsetGroup>
             {ouvert(offer, restants, reprise, autre).map((it) => (
               <InsetRow key={it.title} leading={<RowIcon icon="check" tone="vrai" />} title={it.title} sub={it.sub} />
             ))}
           </InsetGroup>
         </div>
-        <p data-rise="" style={{ "--d": "0.55s" } as CSSProperties} className="m-0 mt-4 text-[13px] font-extrabold text-grey">
+        <p data-rise="" style={delai(0.55)} className="m-0 mt-4 text-[13px] font-extrabold text-grey">
           {o.price} · {o.noteDesktop}
         </p>
       </div>

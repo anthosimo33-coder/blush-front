@@ -3,7 +3,7 @@
 import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, ViewTransition, type CSSProperties } from "react";
+import { useEffect, useRef, useState, ViewTransition } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
@@ -162,7 +162,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
         /* La limite du jour (PUT /api/fiche) : réessayer tout de suite n’y changerait rien */
         setSouci(
           e instanceof ErreurApi && e.code === "trop"
-            ? "Tu as beaucoup modifié sa fiche aujourd’hui : ta dernière modification n’a pas été enregistrée. Réessaie demain."
+            ? "Tu as beaucoup modifié sa fiche aujourd’hui\u00a0: ta dernière modification n’a pas été enregistrée. Réessaie demain."
             : "Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.",
         );
         invalidate(key);
@@ -314,7 +314,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                         <button
                           type="button"
                           onClick={() => save(fiche.facts.filter((x) => x.id !== f.id))}
-                          aria-label={`Retirer « ${f.text} »`}
+                          aria-label={`Retirer «\u00a0${f.text}\u00a0»`}
                           data-popin=""
                           className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center"
                         >
@@ -406,7 +406,7 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
           <span
             key={u}
             className="-ml-3.5 block h-[46px] w-[32px] rounded-[8px] bg-white bg-cover bg-top shadow-[0_0_0_2px_#FFFFFF,0_8px_16px_-8px_rgba(17,17,20,0.45)] first:ml-0"
-            style={{ backgroundImage: `url(${u})`, rotate: `${(i - (thumbs.length - 1) / 2) * 9}deg` } as CSSProperties}
+            style={{ backgroundImage: `url(${u})`, rotate: `${(i - (thumbs.length - 1) / 2) * 9}deg` }}
           />
         ))}
         {file && (
@@ -461,7 +461,7 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
 function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string, name: string): { title: string; detail: string } {
   const one = what === "ta capture";
   if (problem === "capture") return { title: `BLUSH n’arrive pas à lire ${what}`, detail: one ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner." };
-  if (problem === "fichier") return { title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram." };
+  if (problem === "fichier") return { title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram." };
   if (problem === "autre_conv") return { title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${name}.` };
   if (problem === "trop") return { title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." };
   return { title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." };
@@ -524,7 +524,7 @@ function AddRow({ first, label, onAdd }: { first: boolean; label: string; onAdd:
           setValue("");
         }}
       >
-        <button type="submit" aria-label={`Ajouter dans « ${label} »`} className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center">
+        <button type="submit" aria-label={`Ajouter dans «\u00a0${label}\u00a0»`} className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center">
           <span className="flex size-[22px] items-center justify-center rounded-full bg-vrai-ink">
             <Icon name="plus" size={14} color="#FFFFFF" stroke={3} />
           </span>
@@ -532,7 +532,7 @@ function AddRow({ first, label, onAdd }: { first: boolean; label: string; onAdd:
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          aria-label={`Ajouter dans « ${label} »`}
+          aria-label={`Ajouter dans «\u00a0${label}\u00a0»`}
           placeholder="Ajouter"
           className="min-w-0 flex-1 border-none bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-muted focus-visible:outline-none"
         />

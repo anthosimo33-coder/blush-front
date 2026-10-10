@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import type { ChapterBlock } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "./icons";
@@ -21,7 +22,7 @@ export function ChapterHeader({ number, kicker, title, id }: { number: number; k
         {number}
       </span>
       <h2 id={id} className={cn("col-start-2 m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]", kicker && "row-start-2")}>
-        <span className="sr-only">Chapitre {number} : </span>
+        <span className="sr-only">Chapitre {number}{NBSP}: </span>
         {title}
       </h2>
     </div>

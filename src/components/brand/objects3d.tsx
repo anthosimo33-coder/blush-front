@@ -3,7 +3,7 @@ import { useId, type CSSProperties } from "react";
 
 type Stop = readonly [string, string];
 
-export const SPHERE_STOPS = {
+const SPHERE_STOPS = {
   nacre: [["0", "#FFFFFF"], ["0.38", "#F3F1F7"], ["0.78", "#CEC8DB"], ["1", "#A79FBC"]],
   opale: [["0", "#FFFFFF"], ["0.16", "#DDFFF5"], ["0.4", "#A3D3FF"], ["0.64", "#E4B2FF"], ["0.86", "#FFC49B"], ["1", "#E39A86"]],
   rose: [["0", "#FFE3F1"], ["0.3", "#FF94C8"], ["0.7", "#E8358A"], ["1", "#9E0E4E"]],
@@ -87,7 +87,7 @@ export function BubbleLogo({
   const ombre = detail ? { rx: 9, ry: 2.6, fill: "rgba(110,0,50,0.35)", filter: `url(#${u}d)` } : { rx: 11, ry: 4.6, fill: `url(#${u}s)` };
   /* La perle et son ombre bougent séparément : quand la perle monte, son ombre se resserre */
   const dot = (cx: number, kind: "nacre" | "opale", i: number) => (
-    <g key={cx} transform={`translate(${cx - 13} 88)`} style={{ "--i": i } as CSSProperties}>
+    <g key={cx} transform={`translate(${cx - 13} 88)`} style={{ "--i": i }}>
       <ellipse data-shade="" cx="13" cy="27" {...ombre} />
       <g data-pearl="">
         <svg x="0" y="0" width="26" height="26" viewBox="0 0 100 100">
@@ -179,7 +179,7 @@ function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProp
   const oy = (size - 136 * k) / 2;
   const px = (n: number) => `${Math.round(n * 100) / 100}px`;
   const pearl = (cx: number, kind: "nacre" | "opale", i: number) => (
-    <span key={cx} style={{ "--i": i } as CSSProperties}>
+    <span key={cx} style={{ "--i": i }}>
       <span
         data-shade=""
         className="absolute rounded-full"
@@ -316,7 +316,7 @@ export function Bell3D({ size, className, style }: ObjProps) {
   );
 }
 
-export function CheckBadge({ size, className, style }: ObjProps) {
+function CheckBadge({ size, className, style }: ObjProps) {
   const u = useSvgId("ck");
   return (
     <svg aria-hidden="true" width={size} height={size} viewBox="0 0 100 100" className={className} style={{ overflow: "visible", ...style }}>
@@ -394,7 +394,7 @@ export function CheckBurst({ size = 84, pop = false, className }: { size?: numbe
               width: p.s,
               height: p.s,
               margin: `-${Math.floor(p.s / 2)}px 0 0 -${Math.floor(p.s / 2)}px`,
-            } as CSSProperties
+            }
           }
         >
           <Sphere size={p.s} kind={p.kind} shadow={false} />

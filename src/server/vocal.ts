@@ -19,7 +19,7 @@ export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version?: num
  * La version du script (prompt 06). Quand le prompt change, on l’augmente : les vocaux faits avant se refont à leur
  * prochaine ouverture. 2 : des phrases complètes, et chaque message cité annoncé (« elle t’a écrit : … »).
  */
-export const VERSION_VOCAL = 2;
+const VERSION_VOCAL = 2;
 
 /** Le vocal de l’histoire, s’il est fait : ce qu’en voit le front, s’il est à la version du script, et quand il a été fait. */
 export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRapport, { etat: "pret" }>; aJour: boolean; fait: Date } | null> {

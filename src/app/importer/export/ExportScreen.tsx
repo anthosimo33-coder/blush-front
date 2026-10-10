@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { useDevice, useFilePicker } from "@/lib/hooks";
 import { ErreurApi, prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/contenu/parcours";
@@ -15,13 +16,12 @@ import { FlowSteps } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
+import type { ExportApp } from "@/types";
 import { ChoixConv, type ConvInstagram } from "./ChoixConv";
 
-type ExportApp = "whatsapp" | "imessage" | "instagram";
 type Menu = { contact: string; items: readonly string[]; highlight: number };
-const NB = "\u00a0";
 
-/* Écran 02 — Exporter : l’appli, l’écran à reconnaître (téléphone ou Mac), les étapes en frise, puis le fichier. */
+/* Écran 02 — Exporter : l’appli, l’écran du téléphone à reconnaître, les étapes en frise, puis le fichier. */
 export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const router = useRouter();
   const device = useDevice();
@@ -103,10 +103,10 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           <Button onClick={choisirFichier} disabled={busy} aria-busy={busy}>
             {busy && avance != null ? (
               <span className="flex min-w-0 items-center gap-2.5">
-                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}${NB}%`} />
+                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}${NBSP}%`} />
                 <span className="text-[16px] leading-[1.2] tabular-nums">
                   Je lis ton export · {Math.round(avance * 100)}
-                  {NB}%
+                  {NBSP}%
                 </span>
               </span>
             ) : busy ? (
@@ -140,7 +140,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
             aria-hidden="true"
             className="pointer-events-none absolute left-1/2 top-[45%] -z-10 size-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]"
           />
-          {app === "imessage" ? <MacScreen menu={data.menu} /> : <PhoneScreen menu={data.menu} />}
+          <PhoneScreen menu={data.menu} />
           <button
             type="button"
             onClick={() => setVideo(true)}
@@ -162,7 +162,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         </h2>
         {/* TODO(produit): la vidéo de démonstration n’est pas fournie ; l’emplacement est prêt à recevoir le fichier. */}
         <div className="mx-auto flex aspect-[9/16] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-[28px] bg-ink pt-10">
-          {app === "imessage" ? <MacScreen menu={data.menu} /> : <PhoneScreen menu={data.menu} />}
+          <PhoneScreen menu={data.menu} />
         </div>
         <Button variant="secondary" onClick={() => setVideo(false)}>
           Fermer
@@ -199,53 +199,9 @@ function PhoneScreen({ menu }: { menu: Menu }) {
   );
 }
 
-/** iMessage s’exporte depuis le Mac : la fenêtre Messages, votre conv sélectionnée, le menu ouvert. */
-function MacScreen({ menu }: { menu: Menu }) {
+function MenuRow({ children, on, first, className }: { children: ReactNode; on: boolean; first: boolean; className?: string }) {
   return (
-    <div aria-hidden="true" className="relative h-[236px] w-[300px] lg:w-[260px]">
-      <div className="mt-4 overflow-hidden rounded-[14px] bg-white shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_30px_60px_-30px_rgba(17,17,20,0.5)]">
-        <div className="flex h-7 items-center gap-1.5 border-b border-[rgba(17,17,20,0.06)] bg-[#F3F1EE] px-3">
-          {["#FF5F57", "#FEBC2E", "#28C840"].map((c) => (
-            <span key={c} className="size-[9px] rounded-full" style={{ background: c }} />
-          ))}
-        </div>
-        <div className="flex h-[176px]">
-          <div className="flex w-[92px] flex-col gap-1 border-r border-[rgba(17,17,20,0.06)] p-1.5">
-            <div className="flex items-center gap-1.5 rounded-[7px] bg-[rgba(17,17,20,0.06)] px-1.5 py-1.5">
-              <Avatar tone="elle" size={18} fontSize={9}>
-                {menu.contact.charAt(0)}
-              </Avatar>
-              <span className="text-[11px] font-black">{menu.contact}</span>
-            </div>
-            {[54, 40, 48].map((w) => (
-              <div key={w} className="flex items-center gap-1.5 px-1.5 py-1.5">
-                <span className="size-[18px] shrink-0 rounded-full bg-skeleton" />
-                <span className="h-[6px] rounded-full bg-skeleton" style={{ width: `${w}%` }} />
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-1 flex-col justify-end gap-1.5 p-2.5">
-            {[["l", 70], ["r", 52], ["l", 58], ["r", 44]].map(([side, w], i) => (
-              <span key={i} className={cn("h-[14px] rounded-full", side === "l" ? "self-start bg-bubble-her" : "self-end bg-toi")} style={{ width: `${w}%` }} />
-            ))}
-          </div>
-        </div>
-      </div>
-      {/* Le menu contextuel, posé sur la conv */}
-      <div className="absolute left-[54px] top-[86px] w-[204px] whitespace-nowrap rounded-[10px] bg-white p-1 shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_16px_34px_-12px_rgba(17,17,20,0.45)]">
-        {menu.items.map((it, i) => (
-          <MenuRow key={it} on={i === menu.highlight} className={cn("h-8 rounded-[6px] px-2.5 text-[12.5px]", i === menu.items.length - 1 ? "text-[#D93036]" : "text-ink")} tint="rgba(17,17,20,0.06)">
-            {it}
-          </MenuRow>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MenuRow({ children, on, first = true, className, tint = "rgba(18,192,138,0.1)" }: { children: ReactNode; on: boolean; first?: boolean; className?: string; tint?: string }) {
-  return (
-    <div className={cn("flex items-center justify-between font-extrabold", !first && "border-t border-[rgba(17,17,20,0.06)]", className)} style={on ? { background: tint } : undefined}>
+    <div className={cn("flex items-center justify-between font-extrabold", !first && "border-t border-[rgba(17,17,20,0.06)]", className)} style={on ? { background: "rgba(18,192,138,0.1)" } : undefined}>
       {children}
       {/* L’anneau qui bat est un ::after en scale et opacité (data-beat) : une ombre animée repeignait la page à chaque image */}
       {on && <span data-beat="" className="size-3 shrink-0 rounded-full bg-ink shadow-[0_0_0_5px_rgba(17,17,20,0.12)]" />}

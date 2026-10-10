@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { copyText } from "@/lib/hooks";
 import { compterImagePartagee, creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -15,7 +16,6 @@ import { Sheet } from "@/components/ui/surfaces";
  * Les feuilles seulement : le bouton du rapport (PartageVerdict.tsx) les charge à sa première ouverture.
  */
 
-const N = " ";
 /* Le fond de la carte (le papier de la landing), le temps que l’image arrive */
 const PAPIER = "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), #F4F2ED";
 
@@ -131,7 +131,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
   /* Le verdict partagé : celui du lien, le prénom de l’autre masqué */
   const montre = lien?.verdict ?? null;
   /* Ce qu’on écrit à ses potes avec le lien : comme on le dirait (l’aperçu du lien fait le reste) */
-  const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict : ${montre.emoji} « ${montre.title} »` : "j’ai fait lire notre conv à BLUSH 💀";
+  const texte = montre ? `j’ai fait lire notre conv à BLUSH 💀${"\n"}verdict${NBSP}: ${montre.emoji} «${NBSP}${montre.title}${NBSP}»` : "j’ai fait lire notre conv à BLUSH 💀";
   const avecLien = url ? `${texte}${"\n"}${url}` : "";
   const pret = !!url;
 
@@ -237,7 +237,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
         <p className="m-0 flex-1 text-[13px] font-extrabold leading-[1.45] text-soft">
           {fait ?? (
             <>
-              Le lien montre ce verdict, rien d’autre{N}: ni vos messages, ni son prénom.{" "}
+              Le lien montre ce verdict, rien d’autre{NBSP}: ni vos messages, ni son prénom.{" "}
               {url && (
                 <button
                   type="button"
@@ -271,7 +271,7 @@ export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose
         <InsetRow
           leading={<RowIcon icon="trash" />}
           title="Effacée dès ton rapport écrit"
-          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24${N}h.`}
+          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24${NBSP}h.`}
           className={ligne}
         />
         <InsetRow
@@ -316,8 +316,7 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
     return () => {
       fini = true;
     };
-    /* cle résume la cible : on ne redessine que si elle change */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `cle` résume la cible : on ne redessine que si elle change
   }, [cle]);
 
   useEffect(() => {

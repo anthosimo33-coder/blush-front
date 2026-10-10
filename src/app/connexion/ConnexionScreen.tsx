@@ -93,7 +93,7 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
           }}
           onBlur={() => setTouched(true)}
           invalid={!!problem || (touched && j.email.length > 0 && !valid)}
-          errorText={problem ?? "Vérifie ton email : il manque quelque chose."}
+          errorText={problem ?? "Vérifie ton email\u00a0: il manque quelque chose."}
         />
       </form>
       <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">

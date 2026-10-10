@@ -19,7 +19,7 @@ const norm = (t: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, "");
 
 /** Le même message, lu deux fois : même auteur, même média, même texte (ou l’un coupé au bord de l’écran). */
-export function memeMessage(a: Msg, b: Msg): boolean {
+function memeMessage(a: Msg, b: Msg): boolean {
   if (a.de !== b.de || (a.media ?? null) !== (b.media ?? null)) return false;
   const x = norm(a.texte);
   const y = norm(b.texte);

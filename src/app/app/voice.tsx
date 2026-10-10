@@ -31,7 +31,7 @@ type Session = {
   timer: number;
 };
 
-export function formatClock(s: number) {
+function formatClock(s: number) {
   const t = Math.floor(s);
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { figtree } from "@/lib/fonts";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
@@ -16,7 +16,7 @@ import type { AppKind, Testimonial } from "@/types";
 
 /* Les morceaux de la landing. */
 
-export const CTA = "/commencer";
+const CTA = "/commencer";
 
 /**
  * Qui revient : connecté, avec une conv déjà lue (src/app/retour). La landing l’envoie alors vers son accueil plutôt
@@ -90,7 +90,7 @@ export function CtaButton({ className }: { className?: string }) {
   );
 }
 
-export function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string; kicker?: string; title: ReactNode; sub?: ReactNode; align?: "center" | "start" }) {
+function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string; kicker?: string; title: ReactNode; sub?: ReactNode; align?: "center" | "start" }) {
   /* Aligné à gauche = section à deux colonnes : le titre descend d’un cran pour tenir sur deux lignes */
   return (
     <div data-reveal="" className={cn("flex flex-col items-center gap-3 text-center", align === "start" && "lg:items-start lg:text-left")}>
@@ -259,10 +259,10 @@ export function BlushPlus() {
           <BigHand />
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(52%_62%_at_50%_0%,rgba(255,79,154,0.2),rgba(255,79,154,0))]" />
           {/* L’objet 3D : la cloche d’un nouveau message. Et le logo, en bas. */}
-          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -right-5 -top-5 w-[96px] lg:right-6 lg:top-8 lg:w-[132px]" style={{ "--r": "12deg", transform: "rotate(12deg)" } as CSSProperties}>
+          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -right-5 -top-5 w-[96px] lg:right-6 lg:top-8 lg:w-[132px]" style={{ "--r": "12deg", transform: "rotate(12deg)" }}>
             <Bell3D size={132} className="h-auto w-full" />
           </div>
-          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -bottom-8 -left-6 hidden lg:block" style={{ "--r": "-12deg", transform: "rotate(-12deg)", animationDelay: "1.4s" } as CSSProperties}>
+          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -bottom-8 -left-6 hidden lg:block" style={{ "--r": "-12deg", transform: "rotate(-12deg)", animationDelay: "1.4s" }}>
             <BubbleLogo size={150} />
           </div>
 
@@ -277,7 +277,7 @@ export function BlushPlus() {
                   b.r < 0 ? "rounded-bl-[6px]" : "rounded-br-[6px]",
                   b.at,
                 )}
-                style={{ "--r": `${b.r}deg`, transform: `rotate(${b.r}deg)`, animationDelay: b.d } as CSSProperties}
+                style={{ "--r": `${b.r}deg`, transform: `rotate(${b.r}deg)`, animationDelay: b.d }}
               >
                 {b.text}
               </span>
@@ -564,7 +564,7 @@ function FactTile({ index, children }: { index: number; children: ReactNode }) {
   return (
     <li
       data-reveal=""
-      style={{ "--reveal-delay": `${index * 80}ms` } as CSSProperties}
+      style={{ "--reveal-delay": `${index * 80}ms` }}
       className="flex min-h-[156px] flex-col items-center justify-center gap-3 rounded-[28px] bg-white px-4 py-6 text-center shadow-card lg:aspect-square lg:gap-4"
     >
       {children}

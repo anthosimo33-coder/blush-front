@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { useReducedMotion } from "@/lib/hooks";
+import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { ErreurApi, getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/contenu/parcours";
@@ -63,9 +65,10 @@ export function LectureScreen({ total }: { total: number }) {
     let timer: ReturnType<typeof setTimeout>;
     (async () => {
       /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) : pas de second POST, on suit tout de suite */
-      const deja = run === 0 ? lectureLancee() : null;
+      const deja = run === 0 && lectureLancee();
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
-      const lance = deja ?? await resumeAnalysis().catch(
+      const lance = deja || await resumeAnalysis().then(
+        () => true,
         (e: unknown) =>
           e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : e instanceof ErreurApi && e.code === "trop" ? ("trop" as const) : null,
       );
@@ -178,7 +181,7 @@ export function LectureScreen({ total }: { total: number }) {
             </Button>
           ) : done ? (
             /* Le bouton arrive juste après la gerbe (0,15 s) : l’anneau plein a déjà fait attendre */
-            <div data-popin="" className="w-full" style={{ "--d": "0.15s" } as CSSProperties}>
+            <div data-popin="" className="w-full" style={delai(0.15)}>
               {/* D’abord la révélation du verdict, qui mène au rapport. Chargement complet : Safari teinte ses barres pour la scène sombre */}
               <ButtonLink
                 href="/rapport/verdict"
@@ -260,7 +263,7 @@ export function LectureScreen({ total }: { total: number }) {
               <br />
               Ta conv est bien là.
             </h1>
-            {trop && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain : ta conv t’attend.</p>}
+            {trop && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain{NBSP}: ta conv t’attend.</p>}
           </div>
         ) : (
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
@@ -322,7 +325,7 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
           />
         ))}
       </svg>
-      <div data-float="" className="pt-2" style={{ "--r": "-4deg" } as CSSProperties}>
+      <div data-float="" className="pt-2" style={{ "--r": "-4deg" }}>
         <BubbleLogo size={88} animated />
       </div>
     </div>
@@ -349,7 +352,7 @@ function Discoveries({ items, className }: { items: string[]; className?: string
             data-popin=""
             /* Une trouvaille longue passe sur deux lignes plutôt que de déborder sur un petit écran */
             className="inline-flex min-h-[34px] max-w-full items-center gap-[7px] rounded-[17px] bg-white px-3 py-[7px] text-left text-[13px] font-black leading-[1.25] shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
-            style={{ "--r": `${d.rotate}deg`, "--d": `${i * 0.08}s`, transform: `rotate(${d.rotate}deg)` } as CSSProperties}
+            style={{ "--r": `${d.rotate}deg`, "--d": `${i * 0.08}s`, transform: `rotate(${d.rotate}deg)` }}
           >
             <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: d.color }} />
             {text}

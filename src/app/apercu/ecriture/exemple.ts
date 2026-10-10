@@ -64,7 +64,6 @@ export const REPORT: Report = {
     short: "À deux doigts",
     title: "Vous êtes à deux doigts.",
     subtitle: "Et vous faites tous les deux semblant de rien.",
-    difficult: false,
   },
   readingTime: { free: "3 min", full: "9 min" },
   level: "dit",

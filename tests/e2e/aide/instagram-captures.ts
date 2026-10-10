@@ -152,7 +152,7 @@ export function exportInstagramComplet(testInfo: TestInfo): Fichier & { convs: C
 /* ———— Ce qui part du navigateur ———— */
 
 /** Un champ d’un envoi : du texte, ou un fichier (son type, son nom, ses octets en base64). */
-export type Champ = { nom: string; texte?: string; type?: string; fichier?: string; octets?: string };
+type Champ = { nom: string; texte?: string; type?: string; fichier?: string; octets?: string };
 /** Un envoi du navigateur vers /api : son chemin, et son corps (les champs d’un formulaire, ou un texte JSON). */
 export type Envoi = { chemin: string; champs: Champ[]; texte?: string };
 

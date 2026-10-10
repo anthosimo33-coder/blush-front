@@ -19,7 +19,7 @@ const HISTORIQUE = -1_000_000;
 /** L’identifiant d’un message de l’historique : ton message, ou la réponse de BLUSH. */
 export const idHistorique = (echange: number, deBlush: boolean) => HISTORIQUE - 2 * echange - (deBlush ? 1 : 0);
 
-export const estHistorique = (m: { id: number }) => m.id <= HISTORIQUE;
+const estHistorique = (m: { id: number }) => m.id <= HISTORIQUE;
 
 /** L’échange d’un message de l’historique. */
 const echangeDe = (m: { id: number }) => Math.floor((HISTORIQUE - m.id) / 2);

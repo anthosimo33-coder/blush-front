@@ -1,3 +1,4 @@
+import "client-only";
 /*
  * Dans le navigateur, avant l’envoi : chaque capture est réduite (1 568 px au plus sur le grand côté, ce que le modèle
  * lit de toute façon) et compressée en JPEG. L’envoi reste sous la limite de Vercel (4,5 Mo), même avec 20 captures.
@@ -18,6 +19,7 @@ const VIGNETTE = 240;
  * Le travail du Worker : décoder, réduire, encoder en JPEG, hors du fil principal (Safari encode le JPEG d’une toile
  * dans l’appel même : 35 à 65 ms par capture, l’écran accrochait). En texte, chargé depuis un blob : rien à empaqueter,
  * le même code partout. OffscreenCanvas : Safari 16.4 et plus ; ailleurs, ou s’il échoue, le fil principal prend le relais.
+ * typo: du code, pas un texte (scripts/verifier-typo.mjs n’y cherche pas d’insécables).
  */
 const CODE_WORKER = `
 onmessage = async (e) => {

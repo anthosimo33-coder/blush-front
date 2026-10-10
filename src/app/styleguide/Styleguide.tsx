@@ -262,9 +262,9 @@ export function Styleguide() {
           </Spec>
           <Spec label="TUILE DE CHOIX" width={360}>
             <div role="radiogroup" aria-label="Exemple" className="flex gap-2.5">
-              <ChoiceTile icon="imessage" color="#3D8BFF" label="On se parle" selected={tile === "parle"} onClick={() => setTile("parle")} />
-              <ChoiceTile icon="people" color="#12C08A" label="On s’est vus" selected={tile === "vus"} onClick={() => setTile("vus")} />
-              <ChoiceTile icon="cloud" color="#9B7BFF" label="C’est flou" selected={tile === "flou"} onClick={() => setTile("flou")} />
+              <ChoiceTile icon="imessage" tone="toi" label="On se parle" selected={tile === "parle"} onClick={() => setTile("parle")} />
+              <ChoiceTile icon="people" tone="vrai" label="On s’est vus" selected={tile === "vus"} onClick={() => setTile("vus")} />
+              <ChoiceTile icon="cloud" tone="flou" label="C’est flou" selected={tile === "flou"} onClick={() => setTile("flou")} />
             </div>
           </Spec>
         </Row>

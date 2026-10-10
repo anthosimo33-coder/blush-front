@@ -16,10 +16,10 @@ export const URL_APPLI = `http://localhost:${PORT}`;
 export const URL_BETA = `http://localhost:${PORT_BETA}`;
 
 /** La base des tests, recréée à chaque lancement. Son nom commence toujours par blush_e2e : jamais blush_dev, blush_test… */
-export const NOM_BASE = process.env.E2E_DB ?? "blush_e2e";
+const NOM_BASE = process.env.E2E_DB ?? "blush_e2e";
 if (!/^blush_e2e[a-z0-9_]*$/.test(NOM_BASE)) throw new Error(`E2E_DB doit commencer par blush_e2e (minuscules, chiffres, _) : « ${NOM_BASE} » refusé`);
 /** Le serveur Postgres, sans la base (en local, celui de Homebrew ; en CI, celui du service). */
-export const POSTGRES = (process.env.E2E_POSTGRES ?? "postgres://localhost:5432").replace(/\/$/, "");
+const POSTGRES = (process.env.E2E_POSTGRES ?? "postgres://localhost:5432").replace(/\/$/, "");
 export const DATABASE_URL = `${POSTGRES}/${NOM_BASE}`;
 
 /** La boîte à mails du serveur (BLUSH_BOITE_MAILS) : un fichier JSON par mail, vidée à chaque lancement. */
@@ -33,7 +33,7 @@ export const DOMAINE = "e2e.blush.test";
 /** L’équipe : reçoit les alertes (BLUSH_ALERTES) et ouvre /admin (BLUSH_ADMINS). */
 export const ADMIN = `admin@${DOMAINE}`;
 /** Les workers en parallèle au plus (playwright test --workers) : chacun a ses invités. */
-export const WORKERS_MAX = 16;
+const WORKERS_MAX = 16;
 /**
  * Les invités (BLUSH_ACCES_LIBRE) : BLUSH+ d’office, et les seuls à entrer sur le serveur en bêta fermée. Deux par worker
  * (invite-<worker>-<0|1>@e2e.blush.test), effacés au début de chaque test qui les prend (aide/emails.ts) : jamais deux

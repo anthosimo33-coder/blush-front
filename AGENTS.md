@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Ne jamais lancer `vercel deploy` (ni `vercel --prod`) depuis un dossier local. GitHub est la seule source : on pousse une branche, la CI (`.github/workflows/ci.yml`) la vérifie.
 - Un push sur `main` ne déploie rien. La mise en production se lance à la main, avec l’accord de l’utilisateur : « Run workflow » sur `main`, ou `gh workflow run CI --ref main`. La CI refait alors toutes les vérifications sur la tête de `main`, puis déploie.
-- Avant de pousser : `npm run check` (types, lint, migrations, tests), puis `npm run e2e:build && npm run e2e` si l’appli a changé.
+- Avant de pousser : `npm run check` (types, lint, migrations, typographie, code mort, tests), puis `npm run e2e:build && npm run e2e` si l’appli a changé.
 
 # En local : le vrai back-end, le modèle factice
 
@@ -24,7 +24,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Conventions BLUSH
 
 - Tout en français : les noms du code, les commentaires (aussi denses que ceux d’à côté), les messages de commit (avec la ligne `Co-Authored-By` de l’agent) et les textes de l’appli.
-- Les textes affichés : une insécable U+00A0 (`\u00a0` dans une chaîne) avant ? ! : ; » et après «, des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ». Seul le tableau de bord `/admin`, réservé à l’équipe, peut les nommer.
+- Les textes affichés : une insécable U+00A0 (`NBSP` de `src/lib/format.ts` dans le JSX, `\u00a0` dans une chaîne) avant ? ! : ; » et après «, des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ». Seul le tableau de bord `/admin`, réservé à l’équipe, peut les nommer.
 - Le dépôt est public : ni vraie conv, ni vrai prénom, ni texte de prompt. Les exemples sont inventés, et les prompts restent dans le sous-module privé `prompts/`.
 - Une refonte est une proposition : l’ancienne version reste en place (ou à côté, sur une route à part) jusqu’à la décision de l’utilisateur, et la galerie montre les deux.
 - `/apercu` et `/styleguide` sont des outils de l’équipe : jamais en ligne.
@@ -32,7 +32,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Un `/** */` documente la déclaration collée sous lui, et elle seule : c’est lui que montre le survol de l’éditeur. Un en-tête de fichier ou une remarque s’écrit en `/* */`.
 - Une décision produit en attente s’écrit `TODO(produit): …` dans le code ; `npm run todo` les liste.
 - Une route `/api` ou une variable d’environnement arrive avec sa ligne dans BACKEND.md : `tests/documentation.test.ts` échoue sinon.
-- Avant de rendre la main : `npm run check`.
+- Avant de rendre la main : `npm run check`. Il lance aussi les insécables et les caractères invisibles (`scripts/verifier-typo.mjs`), et le code mort (`npm run mort`, knip, `knip.jsonc`).
 
 ## Le glossaire du code
 

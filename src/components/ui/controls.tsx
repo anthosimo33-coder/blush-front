@@ -150,21 +150,28 @@ export function AppTile({
 }
 
 /* ———— Tuile de choix (écran 06) ———— */
+/** La teinte d’une tuile de choix : une couleur de globals.css (--toi, --elle, --vrai, --flou, --attente). */
+export type TileTone = "toi" | "elle" | "vrai" | "flou" | "attente";
+
+/* En hex à six chiffres : le fond de la pastille y ajoute son opacité (1F, 12 %) */
+const TILE_TONES: Record<TileTone, string> = { toi: "#3D8BFF", elle: "#FF4F9A", vrai: "#12C08A", flou: "#9B7BFF", attente: "#FFAA2C" };
+
 export function ChoiceTile({
   icon,
-  color,
+  tone,
   label,
   selected,
   onClick,
   className,
 }: {
   icon: IconName;
-  color: string;
+  tone: TileTone;
   label: string;
   selected: boolean;
   onClick: () => void;
   className?: string;
 }) {
+  const color = TILE_TONES[tone];
   return (
     <button
       type="button"

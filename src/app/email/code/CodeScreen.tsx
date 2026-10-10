@@ -112,7 +112,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
-      retenirLecture(await startAnalysis({ me: j.me, pronom: j.pronom, prenom: j.prenom, guess: j.guess, goal: j.goal }));
+      await startAnalysis({ me: j.me, pronom: j.pronom, prenom: j.prenom, guess: j.guess, goal: j.goal });
+      retenirLecture();
       router.push("/lecture");
     } catch {
       /* Le code est bon (déjà utilisé), la session ouverte : « Qui es-tu ? » relance la lecture d’ici, et dit pourquoi elle bloque */

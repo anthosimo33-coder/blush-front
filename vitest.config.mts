@@ -6,8 +6,9 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@prompts": fileURLToPath(new URL("./prompts", import.meta.url)),
-      /* server-only refuse d’être importé hors des composants serveur : dans les tests, c’est un module vide */
+      /* server-only refuse d’être importé hors des composants serveur, client-only dans un composant serveur : dans les tests, ce sont des modules vides */
       "server-only": fileURLToPath(new URL("./tests/vide.ts", import.meta.url)),
+      "client-only": fileURLToPath(new URL("./tests/vide.ts", import.meta.url)),
     },
   },
   test: {

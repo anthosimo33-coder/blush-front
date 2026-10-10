@@ -5,13 +5,13 @@
  * Gardé dans sessionStorage : il survit au rechargement de la page.
  */
 import { useSyncExternalStore } from "react";
-import type { AppKind, Goal, Guess } from "@/types";
+import type { AppKind, ExportApp, Goal, Guess } from "@/types";
 import { CLE_PARCOURS } from "./cles";
 
 export type JourneyState = {
   /** Appli choisie à l’écran 01 */
   app: AppKind | null;
-  exportApp: "whatsapp" | "imessage" | "instagram";
+  exportApp: ExportApp;
   exportFileName: string | null;
   /** Des captures ont été ajoutées après l’export : l’histoire est réunie (écran 05). */
   capturesAdded: boolean;
@@ -25,7 +25,7 @@ export type JourneyState = {
   email: string;
 };
 
-export const JOURNEY_DEFAULTS: JourneyState = {
+const JOURNEY_DEFAULTS: JourneyState = {
   app: null,
   exportApp: "whatsapp",
   exportFileName: null,

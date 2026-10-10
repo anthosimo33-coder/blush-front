@@ -21,7 +21,7 @@ GitHub (`blush-front`) est la seule source : on travaille sur une branche, on po
 nvm use                                 # Node 24, celui de Vercel (.nvmrc)
 git submodule update --init             # les prompts (dépôt privé blush-prompts)
 npm ci
-npm run check                           # types, lint, migrations, tests (Postgres local : blush_test, créée au besoin)
+npm run check                           # types, lint, migrations, typographie, code mort (knip), tests (Postgres local : blush_test, créée au besoin)
 npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (voir BACKEND.md)
 npm run todo                            # les décisions produit en attente (les TODO(produit) du code), sans rien faire échouer
 ```
@@ -55,7 +55,7 @@ Le dépôt `blush-front` est public : tout ce qu’on y commite (le code, les te
 | `drizzle/` | Les migrations SQL de la base et leur journal (`meta/`). Le schéma est `src/server/db/schema.ts` ; `npm run db:generer` écrit la migration qui va avec. `npm run dev`, les tests et le build sur Vercel les appliquent d’eux-mêmes. |
 | `tests/` | Les tests vitest (`npm test`, dans `npm run check`), sur la base de test, dont `documentation.test.ts` : chaque route `/api` et chaque variable d’environnement a sa ligne dans BACKEND.md. |
 | `tests/e2e/` | Les tests de bout en bout (Playwright, Chromium et WebKit) et leurs aides (`tests/e2e/aide`) : voir BACKEND.md, « Les tests de bout en bout ». |
-| `scripts/` | Les commandes du dépôt : `npm run dev` (`developper.mjs`), la copie des prompts côté serveur (`prompts.mjs`), les vérifications du build (`verifier-*.mjs`), les migrations du build sur Vercel (`migrer.mjs`), l’accès donné à un compte sans paiement (`npm run acces`, `acces.mts`), la galerie (`galerie/`), le banc de fluidité de l’accueil (`fluidite/`), les essais avec le vrai modèle (`essai-*.mts`), et la CLI Vercel de la mise en production, aux versions figées (`deployer/`). |
+| `scripts/` | Les commandes du dépôt : `npm run dev` (`developper.mjs`), la copie des prompts côté serveur (`prompts.mjs`), les vérifications (`verifier-*.mjs` : les migrations et la typographie dans `npm run check`, la fuite des prompts après le build), les migrations du build sur Vercel (`migrer.mjs`), l’accès donné à un compte sans paiement (`npm run acces`, `acces.mts`), la galerie (`galerie/`), le banc de fluidité de l’accueil (`fluidite/`), les essais avec le vrai modèle (`essai-*.mts`), et la CLI Vercel de la mise en production, aux versions figées (`deployer/`). |
 
 Le back-end en détail (les routes et leurs gardes, la file des tâches, les variables d’environnement, les paramètres d’URL qui relient les écrans) : BACKEND.md.
 

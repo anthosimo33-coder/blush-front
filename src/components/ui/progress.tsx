@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { IlOuElle } from "@/lib/pronom";
 import type { LevelId, ScoreRow } from "@/types";
@@ -10,7 +9,7 @@ const SIDE_COLOR = { toi: "#1A66DB", elle: "#C81D6B", pareil: "#087A56" } as con
 
 /* ———— Barre de score toi / elle ———— */
 /** `autre` : le pronom de l’autre personne (« il » quand une utilisatrice parle d’un garçon) ; « elle » par défaut. */
-export function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: "il" | "elle" }) {
+function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: "il" | "elle" }) {
   const lui = IlOuElle(autre).toLowerCase();
   return (
     <div className="flex flex-col gap-2 py-2.5 lg:gap-1.5 lg:py-2">
@@ -23,7 +22,7 @@ export function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: num
         role="img"
         aria-label={`${row.label} : toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`}
       >
-        <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, "--d": `${delay}s` } as CSSProperties} />
+        <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, "--d": `${delay}s` }} />
       </div>
       {(row.captionLeft || row.captionRight) && (
         <div className="flex justify-between text-[12px] font-extrabold text-grey">
@@ -60,7 +59,7 @@ export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; classN
 type Level = { id: LevelId; label: string };
 
 /** Avant d’être ensemble : des étapes, qu’on franchit l’une après l’autre. */
-export const LEVELS: Level[] = [
+const LEVELS: Level[] = [
   { id: "parle", label: "On se parle" },
   { id: "voit", label: "On se voit" },
   { id: "dit", label: "On se le dit" },
@@ -68,7 +67,7 @@ export const LEVELS: Level[] = [
 ];
 
 /** En couple : une température, du plus froid au plus chaud. On y est quelque part, sans étape à franchir. */
-export const TEMPERATURE: Level[] = [
+const TEMPERATURE: Level[] = [
   { id: "eloigne", label: "On s’éloigne" },
   { id: "coince", label: "Ça coince" },
   { id: "va", label: "Ça va" },
@@ -118,7 +117,7 @@ export function LevelPath({ current, className }: { current: LevelId; className?
               </span>
               <span className={cn("text-[13px] font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
                 {l.label}
-                <span className="sr-only">{now ? (temperature ? " : vous en êtes là" : " : niveau en cours") : done ? " : réussi" : temperature ? "" : " : à venir"}</span>
+                <span className="sr-only">{now ? (temperature ? "\u00a0: vous en êtes là" : "\u00a0: niveau en cours") : done ? "\u00a0: réussi" : temperature ? "" : "\u00a0: à venir"}</span>
               </span>
             </li>
           );

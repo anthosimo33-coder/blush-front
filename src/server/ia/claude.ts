@@ -15,7 +15,7 @@ import { TEXTES } from "./textes.generated";
  * Le seul endroit qui parle au modèle. Les prompts (TEXTES) ne sortent pas d’ici : on renvoie la sortie
  * structurée, vérifiée par son schéma, jamais le texte envoyé.
  */
-export const MODELE = "claude-opus-5-5";
+const MODELE = "claude-opus-5-5";
 /* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
 const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
 
@@ -27,7 +27,7 @@ export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; 
 type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
 
 /** Moins de temps que ça avant l’échéance (src/server/echeance.ts) : l’appel ne part pas, il serait coupé avant de répondre. */
-export const TEMPS_MIN_APPEL = 20_000;
+const TEMPS_MIN_APPEL = 20_000;
 
 /** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
 export { REFUS_FACTICE };

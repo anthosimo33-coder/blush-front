@@ -69,7 +69,7 @@ export async function fermerLaFeuille(page: Page): Promise<void> {
  * Le sommaire, ouvert : sur ordinateur, la colonne de gauche (toujours là) ; sur téléphone, la feuille qu’ouvre le
  * bouton en haut à droite.
  */
-export async function ouvrirLeSommaire(page: Page): Promise<Locator> {
+async function ouvrirLeSommaire(page: Page): Promise<Locator> {
   if (surOrdinateur(page)) return page.getByRole("navigation", { name: "Sommaire" });
   await page.getByRole("button", { name: "Sommaire du rapport" }).click();
   const feuille = page.getByRole("dialog", { name: "Sommaire" });
@@ -116,7 +116,7 @@ export const DEFILEMENT_DOUX = 1_000;
  * Attend que le rapport dise ce chapitre « en cours » : sur ordinateur, le sommaire le surligne (aria-current) ; sur
  * téléphone, la barre du haut l’affiche (« 3/8 · Ch. 3 »).
  */
-export async function attendreChapitreEnCours(page: Page, numero: number, titre: string): Promise<void> {
+async function attendreChapitreEnCours(page: Page, numero: number, titre: string): Promise<void> {
   if (surOrdinateur(page))
     await expect(page.getByRole("navigation", { name: "Sommaire" }).getByRole("link", { name: titre, exact: true })).toHaveAttribute("aria-current", "location");
   else await expect(page.getByRole("banner").getByRole("button", { name: new RegExp(`${numero}/\\d+ · ${echapper(titre)}$`) })).toBeVisible();

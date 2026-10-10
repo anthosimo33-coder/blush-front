@@ -4,11 +4,15 @@
  * Tout passe par Web Animations et n’anime que transform et opacity : le compositeur les joue seul,
  * fluides même quand le téléphone est occupé (rendu de la réponse, chargement). « Réduire les animations » coupe tout.
  */
+import type { CSSProperties } from "react";
 
 export type Spring = { easing: string; duration: number };
 export type Box = { left: number; top: number; width: number; height: number };
 
 export const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Le délai d’une entrée de globals.css (`data-rise`, `data-popin`…), en secondes : la variable `--d` de son `style`. */
+export const delai = (s: number) => ({ "--d": `${s}s` }) satisfies CSSProperties;
 
 /** Un ressort de globals.css : « soft » se pose sans rebond, « pop » dépasse un peu, « bounce » rebondit franchement. */
 export function spring(name: "soft" | "pop" | "bounce"): Spring {

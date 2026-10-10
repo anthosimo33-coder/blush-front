@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cheminDe, pagePrecedente } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/brand/Logo";
@@ -81,7 +81,7 @@ export function DesktopHeader({ right, className }: { right?: ReactNode; classNa
 }
 
 /** Lien « Retour » au-dessus du titre (desktop). */
-export function DesktopBack({ target, label = "Retour", trailing }: { target: BackTarget; label?: string; trailing?: string }) {
+function DesktopBack({ target, label = "Retour", trailing }: { target: BackTarget; label?: string; trailing?: string }) {
   const retour = useRetour(typeof target === "string" ? target : "");
   const content = (
     <>
@@ -207,7 +207,7 @@ export function Screen({
   return (
     <div
       className={cn("mx-auto flex min-h-dvh w-full flex-col md:max-w-[560px] lg:max-w-none", className)}
-      style={{ "--main-w": `${mainWidth}px`, "--aside-w": `${asideWidth}px`, "--cols-gap": `${columnsGap}px`, "--gap": `${contentGap}px`, "--footer-w": `${footerWidth}px`, "--top-pad": `${desktopTopPad}px`, "--frame-w": `${frameW}px`, "--aside-mt": `${asideMt}px`, "--gap-m": `${mobileGap ?? contentGap}px` } as CSSProperties}
+      style={{ "--main-w": `${mainWidth}px`, "--aside-w": `${asideWidth}px`, "--cols-gap": `${columnsGap}px`, "--gap": `${contentGap}px`, "--footer-w": `${footerWidth}px`, "--top-pad": `${desktopTopPad}px`, "--frame-w": `${frameW}px`, "--aside-mt": `${asideMt}px`, "--gap-m": `${mobileGap ?? contentGap}px` }}
     >
       {mobileTop}
       <DesktopHeader right={desktopHeaderRight} />
@@ -273,7 +273,7 @@ export function ScreenTitle({ children, size = 32, desktopSize, className, id }:
     <h1
       id={id}
       className={cn("m-0 mt-1.5 text-[length:var(--h1)] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[length:var(--h1-lg)]", className)}
-      style={{ "--h1": `${size}px`, "--h1-lg": `${desktopSize ?? size}px` } as CSSProperties}
+      style={{ "--h1": `${size}px`, "--h1-lg": `${desktopSize ?? size}px` }}
     >
       {children}
     </h1>

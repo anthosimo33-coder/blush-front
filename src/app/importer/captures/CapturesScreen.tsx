@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { connexionPuis } from "@/lib/suite";
 import { ErreurApi, prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
@@ -18,7 +19,6 @@ import type { AppKind } from "@/types";
 
 
 type Shot = { id: string; file: File; url: string | null };
-const NB = "\u00a0";
 
 /* Au plus 20 captures dans un envoi (le serveur n’en lit pas plus : src/server/captures.ts) */
 const CAPTURES_MAX = 20;
@@ -31,7 +31,7 @@ const texteAvance = (a: AvanceVideo) =>
   a.etape === "reprise"
     ? "La connexion a coupé, je reprends…"
     : a.etape === "video"
-      ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NB}%`
+      ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NBSP}%`
       : a.total > 1
         ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
         : "BLUSH lit ta conv";
@@ -432,7 +432,7 @@ function ReorderGrid({
     }
   };
 
-  const onKey = (e: React.KeyboardEvent, id: string, i: number) => {
+  const onKey = (e: KeyboardEvent, id: string, i: number) => {
     if (fige) return;
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[e.key];
     if (step) {
@@ -517,7 +517,7 @@ function ReorderGrid({
   );
 }
 
-function Thumb({ children, selected, number, dark, image, video }: { children?: React.ReactNode; selected?: boolean; number?: number; dark?: boolean; image?: string | null; video?: boolean }) {
+function Thumb({ children, selected, number, image, video }: { children?: ReactNode; selected?: boolean; number?: number; image?: string | null; video?: boolean }) {
   /* Un enregistrement : sa première image (l’ancre #t pour que Safari en affiche une), et le signe lecture */
   if (video && image)
     return (
@@ -533,11 +533,10 @@ function Thumb({ children, selected, number, dark, image, video }: { children?: 
   return (
     <div
       className={cn(
-        "relative flex h-[108px] flex-col justify-end gap-[5px] overflow-hidden rounded-2xl px-2 pb-2 pt-[18px]",
-        dark ? "bg-[#111114]" : "bg-white",
+        "relative flex h-[108px] flex-col justify-end gap-[5px] overflow-hidden rounded-2xl bg-white px-2 pb-2 pt-[18px]",
         selected ? "shadow-selected" : "shadow-thin",
       )}
-      style={image ? ({ backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center top" } as CSSProperties) : undefined}
+      style={image ? { backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center top" } : undefined}
     >
       {number !== undefined && (
         <span className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-xl bg-ink text-[12px] font-black text-white">{number}</span>
@@ -547,8 +546,8 @@ function Thumb({ children, selected, number, dark, image, video }: { children?: 
   );
 }
 
-function Bar({ side, width, dark }: { side: "l" | "r"; width: number; dark?: boolean }) {
-  return <span className={cn("h-[11px] rounded-md", side === "l" ? "self-start" : "self-end", side === "r" ? "bg-toi" : dark ? "bg-[#2A2A30]" : "bg-skeleton")} style={{ width: `${width}%` }} />;
+function Bar({ side, width }: { side: "l" | "r"; width: number }) {
+  return <span className={cn("h-[11px] rounded-md", side === "l" ? "self-start" : "self-end", side === "r" ? "bg-toi" : "bg-skeleton")} style={{ width: `${width}%` }} />;
 }
 
 /** Le bouton d’enregistrement de l’écran du Centre de contrôle : un rond blanc cerclé, un point rouge. */
@@ -578,7 +577,7 @@ function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?: () => 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[16px] font-black">Ton enregistrement</span>
         <span className="text-[13px] font-extrabold text-grey">
-          {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}${NB}min ` : ""}${Math.round(duree % 60)}${NB}s · ` : ""}prêt
+          {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}${NBSP}min ` : ""}${Math.round(duree % 60)}${NBSP}s · ` : ""}prêt
         </span>
       </span>
       <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink disabled:opacity-50">
@@ -674,7 +673,7 @@ function ScreensArt() {
         <span
           key={i}
           className="absolute left-1/2 top-0 -ml-[29px] flex h-[100px] w-[58px] flex-col gap-1 rounded-[12px] bg-white p-1.5 shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_10px_22px_-10px_rgba(17,17,20,0.35)] transition-transform duration-500 ease-out [transform:translate(var(--x),var(--y))_rotate(var(--r))] group-hover:[transform:translate(calc(var(--x)*1.25),calc(var(--y)-2px))_rotate(calc(var(--r)*1.4))]"
-          style={{ "--x": `${s.x}px`, "--y": `${s.y}px`, "--r": `${s.r}deg` } as CSSProperties}
+          style={{ "--x": `${s.x}px`, "--y": `${s.y}px`, "--r": `${s.r}deg` }}
         >
           <span className="mx-auto mb-1 h-[3px] w-4 rounded-full bg-skeleton" />
           {s.rows.map(([side, w], k) => (

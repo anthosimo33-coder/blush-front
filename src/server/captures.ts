@@ -36,7 +36,7 @@ export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promis
 }
 
 /** Combien de captures à la fois, et leur taille (déjà réduites par le navigateur). */
-export const CAPTURES_MAX = 20;
+const CAPTURES_MAX = 20;
 const TAILLE_IMAGE_MAX = 2 * 1024 * 1024;
 
 /** Les captures envoyées (des fichiers image), vérifiées : type, nombre, taille. */

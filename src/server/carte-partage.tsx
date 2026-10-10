@@ -1,5 +1,6 @@
 import "server-only";
 import { ImageResponse } from "next/og";
+import type { ReactNode } from "react";
 import { Bulle, DOUX, ENCRE, PAPIER, ressources } from "./carte-verdict";
 
 /*
@@ -9,12 +10,12 @@ import { Bulle, DOUX, ENCRE, PAPIER, ressources } from "./carte-verdict";
  * Le prénom de l’autre est masqué avant d’arriver ici (le tien reste). Textes relus le 8 octobre (voix de BLUSH).
  */
 
-export const TAILLE_STORY = { width: 1080, height: 1920 } as const;
+const TAILLE_STORY = { width: 1080, height: 1920 } as const;
 
 /** Un texte trop long, coupé proprement (au mot), pour tenir dans la story. */
 const couper = (t: string, max: number) => (t.length <= max ? t : `${t.slice(0, max).replace(/\s+\S*$/, "")}…`);
 
-async function story(contenu: React.ReactNode): Promise<ImageResponse> {
+async function story(contenu: ReactNode): Promise<ImageResponse> {
   const [noir, extra, png] = await ressources;
   const bulle = `data:image/png;base64,${png.toString("base64")}`;
   return new ImageResponse(
@@ -29,7 +30,7 @@ async function story(contenu: React.ReactNode): Promise<ImageResponse> {
         {contenu}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
           <Bulle moi taille={42} angle={1.5}>
-            et la mienne, elle dit quoi ?
+            {"et la mienne, elle dit quoi\u00a0?"}
           </Bulle>
           <span style={{ fontSize: 32, fontWeight: 800, color: "#6B6862" }}>Ta conv en dit plus que tu crois.</span>
         </div>
@@ -105,7 +106,7 @@ export async function carteMoment({ surtitre, texte }: { surtitre: string; texte
         extrait de mon rapport 👀
       </Bulle>
       <span style={{ fontSize: t.length > 140 ? 64 : t.length > 80 ? 76 : 92, fontWeight: 900, lineHeight: 1.12, letterSpacing: "-0.03em", color: ENCRE, maxWidth: 920, textWrap: "balance" }}>
-        « {t} »
+        {`«\u00a0${t}\u00a0»`}
       </span>
       <span style={{ fontSize: 38, fontWeight: 800, color: DOUX }}>{surtitre}</span>
     </div>,

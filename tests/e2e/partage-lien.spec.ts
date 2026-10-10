@@ -68,7 +68,7 @@ test("la page publique, sans compte : le verdict seul, le prénom de l’autre e
     const meta = (nom: string) => pote.locator(`meta[property="${nom}"], meta[name="${nom}"]`);
     await expect(meta("og:title")).toHaveAttribute("content", `🤏 ${titreMasque}`);
     await expect(meta("og:description")).toHaveAttribute("content", sousTitreMasque);
-    await expect(meta("description")).toHaveAttribute("content", "BLUSH a lu toute leur conv. Et la tienne, elle dit quoi ?");
+    await expect(meta("description")).toHaveAttribute("content", "BLUSH a lu toute leur conv. Et la tienne, elle dit quoi\u00a0?");
     await expect(meta("og:image")).toHaveAttribute("content", `${testInfo.project.use.baseURL}/v/${id}/image`);
     await expect(meta("twitter:card")).toHaveAttribute("content", "summary_large_image");
   });
@@ -191,21 +191,19 @@ test.fixme("voir la page ne compte pas d’essai : seul « Analyser ma conv » t
 });
 
 /*
- * Bug : les espaces avant « : » et « ? » de la page publique et de la feuille de partage sont des espaces ordinaires,
- * pas insécables comme ailleurs dans l’appli ({" "} avec U+00A0) : sur un écran étroit, « ? » ou « : » peut partir seul
- * à la ligne. src/app/v/[id]/page.tsx:63, 75 et 97 ({" "} contient une espace ordinaire) ; src/app/rapport/Partage.tsx:18
- * (const N = " " : une espace ordinaire, utilisée ligne 240 et dans « 24 h » de la feuille « En savoir plus »).
+ * Les espaces avant « : » et « ? » de la page publique et des feuilles du partage sont insécables (NBSP, src/lib/format.ts) :
+ * sur un écran étroit, « ? » ou « : » ne part pas seul à la ligne. Le code, lui, est vérifié par scripts/verifier-typo.mjs.
  */
-test.fixme("les espaces avant « : » et « ? » sont insécables, sur la page publique et dans les feuilles", async ({ page }, testInfo) => {
+test("les espaces avant « : » et « ? » sont insécables, sur la page publique et dans les feuilles", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "insecable");
   const id = await partagerUnVerdict(page, testInfo, email);
   const texte = (motif: RegExp) => page.getByText(motif).first().textContent();
-  expect(await texte(/rien d’autre/)).toContain("rien d’autre : ni vos messages");
+  expect(await texte(/rien d’autre/)).toContain("rien d’autre\u00a0: ni vos messages");
   await page.getByRole("dialog", { name: "Partager ton verdict" }).getByRole("button", { name: "Fermer" }).click();
   await page.getByRole("main").getByRole("button", { name: "En savoir plus" }).click();
-  expect(await texte(/au bout de 24/)).toContain("au bout de 24 h");
+  expect(await texte(/au bout de 24/)).toContain("au bout de 24\u00a0h");
   await page.goto(`/v/${id}`);
-  expect(await texte(/^verdict/)).toBe("verdict :");
-  expect(await texte(/elle dit quoi/)).toBe("et la mienne, elle dit quoi ?");
-  expect(await texte(/Leur conv reste privée/)).toContain("privée : seul");
+  expect(await texte(/^verdict/)).toBe("verdict\u00a0:");
+  expect(await texte(/elle dit quoi/)).toBe("et la mienne, elle dit quoi\u00a0?");
+  expect(await texte(/Leur conv reste privée/)).toContain("privée\u00a0: seul");
 });

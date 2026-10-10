@@ -44,7 +44,7 @@ describe("lire un export WhatsApp", () => {
 
   it("reconnaît les médias d’un export « avec médias » (iOS et Android, français et anglais)", () => {
     const medias = [
-      "‎<attached: 00000012-AUDIO-2026-09-12-10-45-53.opus>",
+      "\u200e<attached: 00000012-AUDIO-2026-09-12-10-45-53.opus>",
       "<attached: 00000013-PHOTO-2026-09-12-10-46-01.jpg>",
       "<pièce jointe : 00000014-VIDEO-2026-09-12-10-47-00.mp4>",
       "<attached: 00000015-STICKER-2026-09-12-10-48-00.webp>",

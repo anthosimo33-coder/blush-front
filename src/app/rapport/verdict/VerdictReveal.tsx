@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
+import { delai } from "@/lib/motion";
 import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useQuery } from "@/lib/query";
@@ -41,8 +42,6 @@ const GLOWS: Record<Card["id"], [number, number, number]> = {
 };
 
 const CONFIDENCE: Record<Confidence, string> = { sur: "Sûr", probable: "Probable", verifier: "À vérifier" };
-
-const delay = (s: number) => ({ "--d": `${s}s` }) as CSSProperties;
 
 /*
  * On entre et on sort de la scène par un chargement complet : Safari reteinte alors ses barres (sombres ici, claires au rapport).
@@ -169,7 +168,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
 
   if (payload.sober) return <div className="fixed inset-0 bg-paper" />;
 
-  const step = <span className="sr-only">{`Étape ${at + 1} sur ${cards.length} : `}</span>;
+  const step = <span className="sr-only">{`Étape ${at + 1} sur ${cards.length}\u00a0: `}</span>;
   const glow = GLOWS[card.id];
 
   return (
@@ -232,7 +231,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
           {card.id === "chiffres" && <Numbers story={story} heading={heading} step={step} />}
           {card.id === "verdict" && (
             <div className="flex flex-col items-center text-center">
-              <p data-rise="" style={delay(0.05)} className="m-0 text-[15px] font-black text-elle">
+              <p data-rise="" style={delai(0.05)} className="m-0 text-[15px] font-black text-elle">
                 Le verdict
               </p>
               <div className="relative mt-4 flex size-[150px] items-center justify-center lg:size-[190px] [@media(max-height:600px)]:size-[110px]">
@@ -246,11 +245,11 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 {step}
                 <Words text={verdict.title} from={0.85} />
               </h2>
-              <p data-rise="" style={delay(1.45)} className="m-0 mt-3 max-w-[340px] text-[19px] font-extrabold leading-[1.35] text-white/75 lg:text-[21px]">
+              <p data-rise="" style={delai(1.45)} className="m-0 mt-3 max-w-[340px] text-[19px] font-extrabold leading-[1.35] text-white/75 lg:text-[21px]">
                 {verdict.subtitle}
               </p>
               {card.confidence && (
-                <p data-rise="" style={delay(1.75)} className="m-0 mt-6 flex items-center gap-2 text-[14px] font-extrabold text-white/70 [@media(max-height:600px)]:mt-4">
+                <p data-rise="" style={delai(1.75)} className="m-0 mt-6 flex items-center gap-2 text-[14px] font-extrabold text-white/70 [@media(max-height:600px)]:mt-4">
                   <span className="rounded-full bg-vrai px-2.5 py-1 text-[12px] font-black leading-none text-ink">{CONFIDENCE[card.confidence.level]}</span>
                   {card.confidence.text}
                 </p>
@@ -263,7 +262,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 {step}
                 Entre vous deux
               </h2>
-              <div data-rise="" style={delay(0.1)} className="mt-4 flex justify-between text-[13px] font-black">
+              <div data-rise="" style={delai(0.1)} className="mt-4 flex justify-between text-[13px] font-black">
                 <span className="flex items-center gap-1.5 text-toi">
                   <span className="size-2 rounded-full bg-toi" />
                   Toi
@@ -275,13 +274,13 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
               </div>
               <ul className="m-0 mt-3 flex list-none flex-col gap-4 p-0 [@media(max-height:600px)]:gap-2.5">
                 {card.rows.map((r, i) => (
-                  <li key={r.label} data-rise="" style={delay(0.25 + i * 0.14)}>
+                  <li key={r.label} data-rise="" style={delai(0.25 + i * 0.14)}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-[16px] font-black leading-tight">{r.label}</span>
                       <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
                     </div>
                     <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
-                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, "--d": `${0.45 + i * 0.14}s` } as CSSProperties} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
+                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, "--d": `${0.45 + i * 0.14}s` }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
                     </div>
                     {(r.captionLeft || r.captionRight) && (
                       <div className="mt-1.5 flex justify-between gap-3 text-[12.5px] font-extrabold text-white/60 [@media(max-height:600px)]:hidden">
@@ -293,7 +292,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 ))}
               </ul>
               {card.meaning && (
-                <p data-rise="" style={delay(0.95)} className="m-0 mt-7 text-[24px] font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
+                <p data-rise="" style={delai(0.95)} className="m-0 mt-7 text-[24px] font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
                   {card.meaning}
                 </p>
               )}
@@ -306,7 +305,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                   {card.kicker}
                 </p>
               )}
-              <h2 ref={heading} tabIndex={-1} data-rise="" style={delay(0.05)} className="m-0 mt-1.5 text-[32px] font-black leading-[1.05] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[40px] [@media(max-height:600px)]:text-[26px]">
+              <h2 ref={heading} tabIndex={-1} data-rise="" style={delai(0.05)} className="m-0 mt-1.5 text-[32px] font-black leading-[1.05] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[40px] [@media(max-height:600px)]:text-[26px]">
                 {step}
                 {card.title}
               </h2>
@@ -317,12 +316,12 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 ))}
               </div>
               {card.essential && (
-                <p data-rise="" style={delay(0.55 + card.messages.length * 1.05 + 0.15)} className="m-0 mt-6 text-[22px] font-black leading-[1.25] tracking-[-0.01em] [text-wrap:balance] lg:text-[26px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[19px]">
+                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.15)} className="m-0 mt-6 text-[22px] font-black leading-[1.25] tracking-[-0.01em] [text-wrap:balance] lg:text-[26px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[19px]">
                   {card.essential}
                 </p>
               )}
               {card.fact && (
-                <p data-rise="" style={delay(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-[14px] font-extrabold leading-[1.4] text-white/70">
+                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-[14px] font-extrabold leading-[1.4] text-white/70">
                   <span aria-hidden="true" className="mt-[5px] size-2 shrink-0 rounded-full bg-vrai" />
                   {card.fact}
                 </p>
@@ -335,11 +334,11 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 <Icon name="bolt" size={16} color="#3D8BFF" stroke={2.4} />À toi de jouer
               </p>
               {card.quote && (
-                <span data-rise="" style={delay(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-[16px] font-bold leading-[1.3] text-white/85">
+                <span data-rise="" style={delai(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-[16px] font-bold leading-[1.3] text-white/85">
                   {card.quote}
                 </span>
               )}
-              <h2 ref={heading} tabIndex={-1} data-rise="" style={delay(0.35)} className="m-0 mt-5 text-[34px] font-black leading-[1.08] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[44px] [@media(max-height:600px)]:text-[28px]">
+              <h2 ref={heading} tabIndex={-1} data-rise="" style={delai(0.35)} className="m-0 mt-5 text-[34px] font-black leading-[1.08] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[44px] [@media(max-height:600px)]:text-[28px]">
                 {step}
                 {card.text ?? "Ton rapport est prêt."}
               </h2>
@@ -368,7 +367,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
             </button>
           </div>
         ) : (
-          <div data-rise="" style={delay(0.7)} className="flex flex-col gap-1.5">
+          <div data-rise="" style={delai(0.7)} className="flex flex-col gap-1.5">
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
                 <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
@@ -416,13 +415,13 @@ function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HT
         <span aria-hidden="true" className="block text-[clamp(64px,24vw,124px)] font-black leading-[0.95] tracking-[-0.045em] tabular-nums">
           {formatCount(shown)}
         </span>
-        <span aria-hidden="true" data-rise="" style={delay(0.2)} className="mt-3 block text-[22px] font-black leading-[1.2] lg:text-[26px]">
+        <span aria-hidden="true" data-rise="" style={delai(0.2)} className="mt-3 block text-[22px] font-black leading-[1.2] lg:text-[26px]">
           messages, du premier au dernier.
         </span>
       </h2>
       <ul className="m-0 mt-7 flex list-none flex-wrap justify-center gap-2 p-0">
         {facts.map((f, i) => (
-          <li key={f} data-rise="" style={delay(1.35 + i * 0.12)} className="rounded-full bg-white/10 px-3.5 py-2 text-[14px] font-black">
+          <li key={f} data-rise="" style={delai(1.35 + i * 0.12)} className="rounded-full bg-white/10 px-3.5 py-2 text-[14px] font-black">
             {f}
           </li>
         ))}
@@ -438,7 +437,7 @@ function Words({ text, from }: { text: string; from: number }) {
       {text.split(" ").map((w, i) => (
         <Fragment key={i}>
           {i > 0 && " "}
-          <span data-word="" className="inline-block" style={delay(from + i * 0.08)}>
+          <span data-word="" className="inline-block" style={delai(from + i * 0.08)}>
             {w}
           </span>
         </Fragment>
@@ -467,7 +466,7 @@ function PearlBurst() {
           aria-hidden="true"
           data-burst=""
           className="absolute left-1/2 top-1/2"
-          style={{ "--tx": `${p.tx}px`, "--ty": `${p.ty}px`, "--d": `${0.62 + i * 0.03}s`, width: p.s, height: p.s, margin: `-${p.s / 2}px 0 0 -${p.s / 2}px` } as CSSProperties}
+          style={{ "--tx": `${p.tx}px`, "--ty": `${p.ty}px`, "--d": `${0.62 + i * 0.03}s`, width: p.s, height: p.s, margin: `-${p.s / 2}px 0 0 -${p.s / 2}px` }}
         >
           <Sphere size={p.s} kind={p.kind} shadow={false} />
         </span>
@@ -481,7 +480,7 @@ function Replay({ message, at }: { message: Message; at: number }) {
   const elle = message.from === "elle";
   return (
     <div className={cn("relative flex flex-col", elle ? "items-start" : "items-end")}>
-      <span aria-hidden="true" data-once="" style={delay(at)} className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}>
+      <span aria-hidden="true" data-once="" style={delai(at)} className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}>
         <span data-dots="" className="flex items-center gap-1">
           {[0, 1, 2].map((d) => (
             <span key={d} className={cn("size-[7px] rounded-full", elle ? "bg-[#8A8780]" : "bg-white")} />
@@ -490,7 +489,7 @@ function Replay({ message, at }: { message: Message; at: number }) {
       </span>
       <span
         data-msg=""
-        style={delay(at + 0.7)}
+        style={delai(at + 0.7)}
         className={cn(
           "max-w-[84%] rounded-[22px] px-4 py-2.5 font-message text-[17px] font-bold leading-[1.3]",
           elle ? "origin-bottom-left rounded-bl-[6px] bg-white text-ink" : "origin-bottom-right rounded-br-[6px] bg-toi-ink text-white",
@@ -499,7 +498,7 @@ function Replay({ message, at }: { message: Message; at: number }) {
         {message.text}
       </span>
       {message.caption && (
-        <span data-rise="" style={delay(at + 0.85)} className="mt-1 px-1 text-[12px] font-extrabold text-white/60">
+        <span data-rise="" style={delai(at + 0.85)} className="mt-1 px-1 text-[12px] font-extrabold text-white/60">
           {message.caption}
         </span>
       )}

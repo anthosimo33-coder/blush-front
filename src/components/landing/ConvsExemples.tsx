@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
 import { LANDING_CONVS } from "@/contenu/landing";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -58,7 +58,7 @@ function ConvRow({ convs, reverse, seconds, offset, onPick }: (typeof ROWS)[numb
       ref={ref}
       className="marquee mx-auto w-full max-w-[1280px] overflow-x-auto py-1.5 [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)] [scrollbar-width:none] motion-safe:overflow-hidden [&::-webkit-scrollbar]:hidden"
     >
-      <div data-marquee="" data-reverse={reverse ? "" : undefined} className="flex w-max" style={{ "--marquee-s": `${seconds}s` } as CSSProperties}>
+      <div data-marquee="" data-reverse={reverse ? "" : undefined} className="flex w-max" style={{ "--marquee-s": `${seconds}s` }}>
         <ConvList convs={convs} onPick={onPick} />
         <ConvList convs={convs} onPick={onPick} copy />
       </div>

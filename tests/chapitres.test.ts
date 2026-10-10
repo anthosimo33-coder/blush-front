@@ -88,7 +88,7 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
   const payload = (chapters: Chapter[], access: ReportPayload["access"]): ReportPayload => ({
     report: {
       storyId: "s",
-      verdict: { emoji: "🤏", short: "À deux doigts", title: "Vous êtes à deux doigts.", subtitle: "", difficult: false },
+      verdict: { emoji: "🤏", short: "À deux doigts", title: "Vous êtes à deux doigts.", subtitle: "" },
       chapters,
       readingTime: { free: "1 min", full: "9 min" },
       level: "parle",

@@ -25,7 +25,7 @@ export class ErreurPartage extends Error {
 const ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /** 12 caractères sans ambiguïté (ni l, 1, O, 0) : impossible à deviner, facile à recopier. */
 const nouvelId = () => [...randomBytes(12)].map((o) => ALPHABET[o % ALPHABET.length]).join("");
-export const ID_PARTAGE = /^[a-zA-Z0-9]{12}$/;
+const ID_PARTAGE = /^[a-zA-Z0-9]{12}$/;
 
 const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

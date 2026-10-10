@@ -61,8 +61,8 @@ export async function reecrireVerdict(email: string, { titre, sousTitre }: { tit
 /* ———— Les compteurs du tableau de bord ———— */
 
 /** Les compteurs du partage (src/server/compteurs.ts, CLES). */
-export const COMPTEURS_PARTAGE = ["partage_ouvert", "lien_cree", "lien_apercu", "lien_vu", "lien_essai", "import_partage", "image_partagee"] as const;
-export type CompteurPartage = (typeof COMPTEURS_PARTAGE)[number];
+const COMPTEURS_PARTAGE = ["partage_ouvert", "lien_cree", "lien_apercu", "lien_vu", "lien_essai", "import_partage", "image_partagee"] as const;
+type CompteurPartage = (typeof COMPTEURS_PARTAGE)[number];
 type Compteurs = Record<CompteurPartage, number>;
 
 /** Les compteurs du partage, depuis le jour `depuisLe` (heure de Paris) : un geste à cheval sur minuit compte encore. */

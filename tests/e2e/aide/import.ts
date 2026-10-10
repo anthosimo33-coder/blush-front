@@ -26,7 +26,7 @@ export function exportGroupeWhatsApp(testInfo: TestInfo): string {
   let k = 0;
   const texte = texteWhatsApp(NOE_ET_MAELYS, 64)
     .split("\n")
-    .map((ligne, i) => (i > 0 && /^‎?\[[^\]]+\] (Noé|Maëlys): /.test(ligne) && ++k % 3 === 0 ? ligne.replace(/\] (Noé|Maëlys): /, "] Inès: ") : ligne))
+    .map((ligne, i) => (i > 0 && /^\u200e?\[[^\]]+\] (Noé|Maëlys): /.test(ligne) && ++k % 3 === 0 ? ligne.replace(/\] (Noé|Maëlys): /, "] Inès: ") : ligne))
     .join("\n");
   return ecrire(testInfo.outputPath("exports", "groupe", "_chat.txt"), texte);
 }

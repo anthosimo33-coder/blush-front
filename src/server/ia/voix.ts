@@ -9,7 +9,7 @@ import { delaiAppel, tempsRestant } from "../echeance";
  * La voix de BLUSH (ElevenLabs) : le seul endroit qui lui parle. Elle reçoit le script du vocal (des prénoms et des
  * morceaux de leur conv : on n’envoie rien d’autre), et rend l’audio avec le temps de chaque caractère.
  */
-export const MODELE_VOIX = "eleven_v4";
+const MODELE_VOIX = "eleven_v4";
 const API = "https://api.elevenlabs.io";
 /* Le prix d’un caractère au tarif de l’abonnement Creator (22 $ pour 121 000 caractères), pour le suivi des coûts */
 const PRIX_CARACTERE = 22 / 121_000;

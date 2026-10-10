@@ -17,10 +17,10 @@ export async function GET(req: Request) {
   /* Des moments fictifs (aucune vraie conv) */
   if (p.get("type") === "reponse")
     return carteReponse({
-      question: "elle m’a répondu « haha peut-être » à mon resto, je fais quoi ?",
-      bulles: ["« peut-être » avec un haha, c’est pas un non frérot", "elle te teste : elle veut voir si tu insistes ou si tu proposes mieux", "tu relances pas, tu proposes un vrai plan : jeudi 20h, le japonais dont elle t’a parlé"],
+      question: "elle m’a répondu «\u00a0haha peut-être\u00a0» à mon resto, je fais quoi\u00a0?",
+      bulles: ["«\u00a0peut-être\u00a0» avec un haha, c’est pas un non frérot", "elle te teste\u00a0: elle veut voir si tu insistes ou si tu proposes mieux", "tu relances pas, tu proposes un vrai plan\u00a0: jeudi 20h, le japonais dont elle t’a parlé"],
     });
-  if (p.get("type") === "moment") return carteMoment({ surtitre: "Chapitre 4 · Ce qui coince", texte: "Vous jouez à celui qui écrira le moins vite. Spoiler : vous perdez tous les deux." });
+  if (p.get("type") === "moment") return carteMoment({ surtitre: "Chapitre 4 · Ce qui coince", texte: "Vous jouez à celui qui écrira le moins vite. Spoiler\u00a0: vous perdez tous les deux." });
   const v = EXEMPLES[(p.get("cas") ?? "court") as keyof typeof EXEMPLES] ?? EXEMPLES.court;
   return carteVerdict(v, p.get("format") === "story" ? "story" : "carte");
 }

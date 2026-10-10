@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
@@ -153,7 +153,7 @@ function EchecEcriture({ raison }: { raison: "panne" | "refus" }) {
     <Card className="flex flex-col gap-2 p-[18px]">
       <div role="alert" className="text-[17px] font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
       <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-        {raison === "refus" ? "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste." : "BLUSH a buté en l’écrivant. Ta conv est toujours là : relance, et tout repart de zéro."}
+        {raison === "refus" ? "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste." : "BLUSH a buté en l’écrivant. Ta conv est toujours là\u00a0: relance, et tout repart de zéro."}
       </p>
       {souci && <p className="m-0 text-[14px] font-extrabold leading-[1.4] text-ink">{souci}</p>}
       {raison === "panne" && (
@@ -665,7 +665,7 @@ function ReadingBar({ className }: { className?: string }) {
     <div ref={brancherBarre} role="progressbar" aria-label="Progression de la lecture" aria-valuemin={0} aria-valuemax={100} className={cn("overflow-hidden", className)}>
       <div
         className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]"
-        style={{ background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" } as CSSProperties}
+        style={{ background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" }}
       />
     </div>
   );
@@ -722,7 +722,7 @@ const ChapterSection = memo(function ChapterSection({
   autre,
 }: {
   chapter: Chapter;
-  children?: React.ReactNode;
+  children?: ReactNode;
   renderQuestion: Parameters<typeof Blocks>[0]["renderQuestion"];
   onShare?: (chapitre: number, bloc: number) => void;
   autre?: "il" | "elle";

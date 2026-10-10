@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
-import { formatCount } from "@/lib/format";
+import { formatCount, NBSP } from "@/lib/format";
 import { useSoundOnce } from "@/lib/sound";
 import { useJourney } from "@/state/journey";
 import type { Source } from "@/types";
@@ -36,7 +36,7 @@ export function ConvOkScreen({ source }: { source: Source }) {
       {/* La conv reçue : le fichier, puis ce qu’il contient, en grand */}
       <div className="flex flex-col rounded-[24px] bg-white shadow-card">
         <div className="flex items-center gap-3 px-5 pb-4 pt-5">
-          <AppBadge app={j.exportApp ?? source.app} size={46} />
+          <AppBadge app={j.exportApp} size={46} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-[16px] font-black">{fileName}</span>
             <span className="text-[13px] font-extrabold text-grey">{source.period}</span>
@@ -66,7 +66,7 @@ export function ConvOkScreen({ source }: { source: Source }) {
 
       <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
         <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        100 % privé : ta conv est supprimée dès que ton rapport est prêt. <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">Comment ça marche</Link>
+        100 % privé{NBSP}: ta conv est supprimée dès que ton rapport est prêt. <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">Comment ça marche</Link>
       </p>
     </Screen>
   );

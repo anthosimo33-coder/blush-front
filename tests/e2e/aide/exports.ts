@@ -93,7 +93,7 @@ const enteteIos = (t: number) => {
   return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}]`;
 };
 /* Les médias d’un export iOS sans médias : la marque de sens d’écriture (U+200E), puis le libellé */
-const MEDIA_IOS = { photo: "‎image omitted", vocal: "‎audio omitted" } as const;
+const MEDIA_IOS = { photo: "\u200eimage omitted", vocal: "\u200eaudio omitted" } as const;
 
 /**
  * Le _chat.txt d’un export WhatsApp iPhone : la ligne système du chiffrement d’abord (ce n’est pas un message), puis les
@@ -101,8 +101,8 @@ const MEDIA_IOS = { photo: "‎image omitted", vocal: "‎audio omitted" } as co
  */
 export function texteWhatsApp(personnes: Personnes = NOE_ET_MAELYS, n = 64, ajout?: Ajout): string {
   const ms = messages(n, ajout);
-  const systeme = `${enteteIos(ms[0].t - 90e3)} ${personnes.autre}: ‎Les messages et les appels sont chiffrés de bout en bout.`;
-  return [systeme, ...ms.map((m) => `${m.media ? "‎" : ""}${enteteIos(m.t)} ${personnes[m.de]}: ${m.media ? MEDIA_IOS[m.media] : m.texte}`)].join("\n");
+  const systeme = `${enteteIos(ms[0].t - 90e3)} ${personnes.autre}: \u200eLes messages et les appels sont chiffrés de bout en bout.`;
+  return [systeme, ...ms.map((m) => `${m.media ? "\u200e" : ""}${enteteIos(m.t)} ${personnes[m.de]}: ${m.media ? MEDIA_IOS[m.media] : m.texte}`)].join("\n");
 }
 
 /** L’en-tête d’un message d’un Android en français : « 04/09/2026 19:02 - » (sans les secondes). */
@@ -115,7 +115,7 @@ const enteteAndroid = (t: number) => {
  * Le _chat.txt d’un export WhatsApp Android en français, sans médias : la ligne du chiffrement d’abord (sans auteur),
  * puis les messages ; une photo ou un vocal y devient « <Médias omis> ».
  */
-export function texteWhatsAppAndroid(personnes: Personnes = NOE_ET_MAELYS, n = 64): string {
+function texteWhatsAppAndroid(personnes: Personnes = NOE_ET_MAELYS, n = 64): string {
   const ms = messages(n);
   const systeme = `${enteteAndroid(ms[0].t - 90e3)} Les messages et les appels sont chiffrés de bout en bout. Personne en dehors de cette discussion ne peut les lire ni les écouter.`;
   return [systeme, ...ms.map((m) => `${enteteAndroid(m.t)} ${personnes[m.de]}: ${m.media ? "<Médias omis>" : m.texte}`)].join("\n");

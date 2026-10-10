@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
 import { verdictPartage } from "@/server/partages";
 
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promis
   const titre = `${v.emoji} ${v.title}`;
   return {
     title: { absolute: titre },
-    description: "BLUSH a lu toute leur conv. Et la tienne, elle dit quoi ?",
+    description: "BLUSH a lu toute leur conv. Et la tienne, elle dit quoi\u00a0?",
     openGraph: { title: titre, description: v.subtitle || "BLUSH a lu toute leur conv.", siteName: "BLUSH", type: "website", images: [{ url: `/v/${id}/image`, width: 1200, height: 630, alt: titre }] },
     twitter: { card: "summary_large_image", title: titre, images: [`/v/${id}/image`] },
   };
@@ -60,7 +61,7 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
             <section aria-labelledby="verdict-titre" className="flex flex-col items-start">
               <div className="flex flex-col items-start gap-2">
                 <Bulle angle={-1.5}>j’ai lu toute leur conv 👀</Bulle>
-                <Bulle angle={1.2}>verdict{" "}:</Bulle>
+                <Bulle angle={1.2}>verdict{NBSP}:</Bulle>
               </div>
               <span className="mt-7 text-[76px] leading-none lg:text-[88px]" aria-hidden="true">
                 {v.emoji}
@@ -72,7 +73,7 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
             </section>
             <div className="mt-9 flex justify-end">
               <Bulle moi angle={1.5}>
-                et la mienne, elle dit quoi{" "}?
+                et la mienne, elle dit quoi{NBSP}?
               </Bulle>
             </div>
           </>
@@ -94,7 +95,7 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
         {v && (
           <p className="m-0 mt-4 flex items-start justify-center gap-1.5 px-1 text-center text-[12.5px] font-extrabold leading-[1.45] text-grey">
             <Icon name="shield" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-            Leur conv reste privée{" "}: seul le verdict est partagé, sans le prénom de l’autre.
+            Leur conv reste privée{NBSP}: seul le verdict est partagé, sans le prénom de l’autre.
           </p>
         )}
       </div>

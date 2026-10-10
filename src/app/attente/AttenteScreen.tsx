@@ -7,6 +7,7 @@ import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { NBSP } from "@/lib/format";
 
 /*
  * La bêta fermée : BLUSH est sur invitation. On laisse son email : un mail le confirme (l’inscription a pu venir de
@@ -64,7 +65,7 @@ export function AttenteScreen() {
         <>
           <ScreenTitle>BLUSH est en bêta privée.</ScreenTitle>
           <Lead size={15} weight={800}>
-            Pour l’instant, BLUSH lit les convs de quelques testeurs, sur invitation. Laisse ton email : on te prévient dès qu’une place se libère.
+            Pour l’instant, BLUSH lit les convs de quelques testeurs, sur invitation. Laisse ton email{NBSP}: on te prévient dès qu’une place se libère.
           </Lead>
         </>
       }

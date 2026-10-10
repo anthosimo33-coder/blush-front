@@ -1,4 +1,4 @@
-import type { Guess } from "@/types";
+import type { ExportApp, Guess } from "@/types";
 
 /* Les textes du parcours : « Qui es-tu ? », les étapes de l’export, celles de la lecture. */
 
@@ -16,7 +16,7 @@ export const READING_STEPS = [
   "Ton verdict",
 ];
 
-/** Étapes d’export par appli. La version iPhone/Android est choisie selon l’appareil. */
+/** Étapes d’export par appli (iMessage ne s’exporte pas : on filme son écran). La version iPhone/Android est choisie selon l’appareil. */
 export const EXPORT_STEPS = {
   whatsapp: {
     menu: { contact: "Sophie", items: ["Ajouter aux favoris", "Exporter la discussion", "Effacer la discussion"], highlight: 1 },
@@ -29,15 +29,6 @@ export const EXPORT_STEPS = {
       ],
       ios: ["Ouvre votre conv", "Touche son nom en haut", "Exporter la discussion, sans médias", "Enregistre dans Fichiers"],
       android: ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"],
-    },
-  },
-  /* Plus proposé : Messages sur Mac n’a pas de commande « Exporter la conversation ». iMessage passe par l’enregistrement d’écran (/importer/captures?app=imessage). */
-  imessage: {
-    menu: { contact: "Sophie", items: ["Afficher le contact", "Exporter la conversation", "Supprimer la conversation"], highlight: 1 },
-    steps: {
-      all: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
-      ios: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
-      android: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
     },
   },
   /* Textes Instagram relus le 8 octobre (le délai : Instagram prépare le fichier puis prévient par email). */
@@ -64,4 +55,4 @@ export const EXPORT_STEPS = {
       ],
     },
   },
-} as const;
+} as const satisfies Record<ExportApp, unknown>;

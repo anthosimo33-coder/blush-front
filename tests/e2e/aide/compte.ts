@@ -51,6 +51,7 @@ export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { person
     timeout: RESEAU,
   });
   expect(envoi.status(), `l’export de la conv avec ${personnes.autre} est importé`).toBe(200);
+  const { story } = (await envoi.json()) as { story: { id: string } };
   /* Le premier de l’export (p0) est celui qui importe : il écrit le plus (aide/exports.ts) */
   const lecture = await page.request.post("/api/analyse", {
     headers: origine(testInfo),
@@ -58,7 +59,7 @@ export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { person
     timeout: RESEAU,
   });
   expect(lecture.status(), `la lecture de la conv avec ${personnes.autre} part`).toBe(200);
-  return ((await lecture.json()) as { jobId: string }).jobId;
+  return story.id;
 }
 
 /**

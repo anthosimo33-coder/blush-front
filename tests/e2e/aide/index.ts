@@ -13,7 +13,7 @@ import { nouvelAppareil, suivreLeNavigateur } from "./page";
  * L’adresse IP d’un test, une par test (et par nouvel essai) : 10.x.y.z. Les limites anti-abus comptent par IP (les
  * imports, les codes : src/server/limites.ts), et tous les navigateurs des tests viennent de la même machine.
  */
-export function ipDuTest(testInfo: TestInfo): string {
+function ipDuTest(testInfo: TestInfo): string {
   const [a, b, c] = createHash("sha256").update(`${testInfo.testId}:${testInfo.repeatEachIndex}:${testInfo.retry}`).digest();
   return `10.${a}.${b}.${c}`;
 }

@@ -187,8 +187,9 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
   try {
     if (images.length) (await preparerCaptures(images)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
     else fd.append("export", await px!.preparerExport(files[0]), "export.json.gz");
-  } catch (e) {
-    throw new ErreurApi(images.length ? "capture" : px && e instanceof px.ExportIllisible && e.code !== "plusieurs" ? e.code : "fichier", 422);
+  } catch {
+    /* Un export illisible, ou de plusieurs convs (le chat et la fiche n’en font pas choisir une) : « fichier » */
+    throw new ErreurApi(images.length ? "capture" : "fichier", 422);
   }
   return fd;
 }
@@ -347,8 +348,8 @@ export async function verifyLoginCode(email: string, code: string): Promise<{ ok
   return appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code }));
 }
 
-export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null; prenom?: string | null }): Promise<{ jobId: string }> {
-  return appel<{ jobId: string }>("/api/analyse", envoi("POST", { me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) }));
+export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: "il" | "elle" | null; prenom?: string | null }): Promise<void> {
+  return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", { me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) })));
 }
 
 /**
@@ -356,8 +357,8 @@ export async function startAnalysis(input: { me: string; guess: Guess; goal: Goa
  * navigateur ne part pas : « Qui es-tu ? » est en base (sinon, erreur « qui »), et des réponses d’une autre fois ne
  * lancent pas une autre conv.
  */
-export async function resumeAnalysis(): Promise<{ jobId: string }> {
-  return appel<{ jobId: string }>("/api/analyse", envoi("POST", {}));
+export async function resumeAnalysis(): Promise<void> {
+  return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", {})));
 }
 
 export async function getAnalysisProgress(): Promise<AnalysisProgress> {
@@ -426,7 +427,7 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
   }
   const texte = input.text?.trim();
   if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
-  return envoyerAuChat(() => chat(envoi("POST", { texte: input.about ? `(à propos de « ${input.about} ») ${texte}` : texte }), suivi));
+  return envoyerAuChat(() => chat(envoi("POST", { texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte }), suivi));
 }
 
 /** Un vocal pour BLUSH : transcrit côté serveur, puis lu par BLUSH comme un message. */
@@ -448,11 +449,11 @@ const ERREURS_CHAT: Record<string, string | string[]> = {
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
   capture: ["j’arrive pas à lire tes captures", "renvoie-les en entier, sans les rogner"],
-  fichier: ["j’arrive pas à ouvrir ce fichier", "envoie-moi l’export de votre conv : le .zip WhatsApp, ou le message_1.html d’Instagram"],
+  fichier: ["j’arrive pas à ouvrir ce fichier", "envoie-moi l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram"],
   autre_conv: "c’est pas votre conv ça 👀 envoie-moi l’export de la vôtre",
   rien_de_neuf: "ça, je l’ai déjà 😌 rien de nouveau depuis la dernière fois",
   vocal_bientot: ["les vocaux, ça arrive très vite", "écris-moi en attendant, je te réponds pareil"],
-  vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies ?",
+  vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies\u00a0?",
   vocal: "ton vocal est trop long, même pour moi 😭 fais-moi la version courte",
   transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
 };

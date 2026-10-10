@@ -14,9 +14,9 @@ export const REFUS_FACTICE = "@@refus@@";
  * sur Vercel (src/server/env.ts) : la production ne les lit jamais.
  */
 /** Dans la conv : le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts). */
-export const ALERTE_FACTICE = "#factice-alerte";
+const ALERTE_FACTICE = "#factice-alerte";
 /** Dans la conv : le modèle refuse de la lire (le verdict). Dans un message au chat : il refuse d’y répondre. */
-export const REFUS_DANS_LE_TEXTE = "#factice-refus";
+const REFUS_DANS_LE_TEXTE = "#factice-refus";
 
 const chapitre = (numero: number, p: string[]) => ({
   numero,

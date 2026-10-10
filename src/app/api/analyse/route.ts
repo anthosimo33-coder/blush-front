@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     await planifier(story.id, "verdict");
   }
   after(() => executerChaine(story.id));
-  return json({ jobId: story.id });
+  return json({ ok: true });
 }
 
 /** La progression de la lecture. Relance au passage une tâche abandonnée. */

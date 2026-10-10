@@ -17,16 +17,16 @@ import {
   useSyncExternalStore,
   ViewTransition,
   type ChangeEvent,
-  type CSSProperties,
   type FormEvent,
   type ReactNode,
   type RefObject,
 } from "react";
 import { cn } from "@/lib/cn";
+import { NBSP } from "@/lib/format";
 import { copyText, useFilePicker } from "@/lib/hooks";
 import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
-import { bumpPearl, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
+import { bumpPearl, delai, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { CoupureChat, getChatHistory, modeVocalChat, prechargerExport, sendToBlush, sendVoiceToBlush, type BlushAnswer, type HistoriqueChat, type SuiviChat } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
@@ -1246,7 +1246,7 @@ function Composer({
               onClick={(e) => onQuick(e.currentTarget.value, e.currentTarget)}
               data-popin={entree ? "" : undefined}
               data-a={arriving ? "chip" : undefined}
-              style={{ "--d": `${i * 0.05}s`, "--i": i } as CSSProperties}
+              style={{ "--d": `${i * 0.05}s`, "--i": i }}
               className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-toi-ink lg:px-3 shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[box-shadow,background-color,color] duration-200 active:bg-toi-ink active:text-white lg:bg-[#F3F7FF] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_#1A66DB]"
             >
               {q}
@@ -1710,7 +1710,7 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
         />
       )}
       <span data-c="logo" className="relative block">
-        <span data-float="" className="block" style={{ "--r": "-3deg" } as CSSProperties}>
+        <span data-float="" className="block" style={{ "--r": "-3deg" }}>
           <span data-a="logo" data-blush-logo="" className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] group-hover:scale-105 group-active:scale-95">
             <BubbleLogo size={big ? 88 : 64} animated={busy} layered />
           </span>
@@ -2043,7 +2043,7 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
             data-rise={unfold === null && it.neuf ? "" : undefined}
             data-a={intro ? "intro" : undefined}
             className="relative flex items-end gap-2"
-            style={{ "--d": `${i * 0.06}s`, "--i": i } as CSSProperties}
+            style={{ "--d": `${i * 0.06}s`, "--i": i }}
           >
             {i === n - 1 ? (
               /* Juste après « BLUSH écrit », sa petite bulle vole jusqu’ici avec la réponse */
@@ -2126,7 +2126,7 @@ function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "
       data-bubble={id}
       data-quote={quote}
       data-unfold={unfold !== null ? "" : undefined}
-      style={unfold !== null ? ({ "--d": `${unfold}s` } as CSSProperties) : undefined}
+      style={unfold !== null ? delai(unfold) : undefined}
       className={cn(
         "relative z-[1] flex max-w-[318px] flex-col rounded-[20px] text-left",
         corners,
@@ -2147,7 +2147,7 @@ function Words({ text }: { text: string }) {
   return text.split(" ").map((w, i) => (
     <span key={i}>
       {i > 0 && " "}
-      <span data-a="w" style={{ "--i": i } as CSSProperties}>
+      <span data-a="w" style={{ "--i": i }}>
         {w}
       </span>
     </span>
@@ -2224,8 +2224,8 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
           {
             body: (
               <span className="flex flex-col gap-1">
-                <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre ?</span>
-                <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse : capture, export ou texte. BLUSH reconnaît tout seul.</span>
+                <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
+                <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
               </span>
             ),
           },
@@ -2695,7 +2695,7 @@ function LevelStepper() {
             </span>
             <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
               {l.label}
-              <span className="sr-only">{now ? (temperature ? " : vous en êtes là" : " : niveau en cours") : done ? " : réussi" : temperature ? "" : " : à venir"}</span>
+              <span className="sr-only">{now ? (temperature ? "\u00a0: vous en êtes là" : "\u00a0: niveau en cours") : done ? "\u00a0: réussi" : temperature ? "" : "\u00a0: à venir"}</span>
             </span>
           </li>
         );

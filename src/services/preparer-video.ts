@@ -1,3 +1,4 @@
+import "client-only";
 /*
  * Un enregistrement d’écran devient des images de la conv, dans le navigateur : on regarde la vidéo pas à pas, on
  * mesure de combien la conv a défilé, et on garde un écran dès qu’elle a défilé d’un peu plus d’un demi-écran

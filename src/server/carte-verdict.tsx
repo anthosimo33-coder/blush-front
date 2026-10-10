@@ -12,7 +12,7 @@ import type { VerdictPartage } from "./partages";
  * Rien d’autre que le verdict : ni prénom, ni message. Textes relus le 8 octobre (voix de BLUSH).
  */
 
-export const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 1080, height: 1920 } } as const;
+const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 1080, height: 1920 } } as const;
 export type Format = keyof typeof TAILLES;
 
 /* Des chemins écrits en entier : le build n’embarque que ces trois fichiers dans la fonction (pas tout le projet) */
@@ -78,7 +78,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
               j’ai lu toute leur conv 👀
             </Bulle>
             <Bulle taille={46} angle={1}>
-              verdict :
+              {"verdict\u00a0:"}
             </Bulle>
           </div>
           <span style={{ fontSize: 220, lineHeight: 1, marginTop: 70 }}>{v.emoji}</span>
@@ -87,7 +87,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
           <Bulle moi taille={46} angle={1.5}>
-            et la mienne, elle dit quoi ?
+            {"et la mienne, elle dit quoi\u00a0?"}
           </Bulle>
           <span style={{ fontSize: 34, fontWeight: 800, color: "#6B6862" }}>Ta conv en dit plus que tu crois.</span>
         </div>
@@ -102,7 +102,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
                 j’ai lu toute leur conv 👀
               </Bulle>
               <Bulle taille={27} angle={1.2}>
-                verdict :
+                {"verdict\u00a0:"}
               </Bulle>
             </div>
             <span style={{ fontSize: taille(v.title, 66), fontWeight: 900, lineHeight: 1.04, letterSpacing: "-0.035em", color: ENCRE, marginTop: 24, textWrap: "balance" }}>{v.title}</span>
@@ -112,7 +112,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <Bulle moi taille={27} angle={1.5}>
-            et la mienne, elle dit quoi ?
+            {"et la mienne, elle dit quoi\u00a0?"}
           </Bulle>
         </div>
       </div>

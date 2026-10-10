@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { useEnVue } from "@/lib/hooks";
 import type { EcritureRapport, EtatChapitre } from "@/services/api";
@@ -74,7 +73,7 @@ export function LigneEcriture({ number, title, etat, last = false }: { number: n
                 <span
                   data-ecrit={etat === "en_cours" ? "" : undefined}
                   className="absolute inset-0 rounded"
-                  style={{ background: etat === "ecrit" ? "rgba(18,192,138,0.35)" : DEGRADE, "--k": `${k * 0.6}s` } as CSSProperties}
+                  style={{ background: etat === "ecrit" ? "rgba(18,192,138,0.35)" : DEGRADE, "--k": `${k * 0.6}s` }}
                 />
               )}
             </span>

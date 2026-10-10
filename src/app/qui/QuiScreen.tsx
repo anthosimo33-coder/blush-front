@@ -7,7 +7,7 @@ import { ErreurApi, startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
-import { ChoiceTile, SelectedCheck } from "@/components/ui/controls";
+import { ChoiceTile, SelectedCheck, type TileTone } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
@@ -16,25 +16,25 @@ import { useJourney } from "@/state/journey";
 import { retenirLecture } from "@/state/lecture";
 import type { Goal, Guess, Person } from "@/types";
 
-const GUESSES: { id: Guess; icon: IconName; color: string }[] = [
-  { id: "parle", icon: "imessage", color: "#3D8BFF" },
-  { id: "vus", icon: "people", color: "#12C08A" },
-  { id: "flou", icon: "cloud", color: "#9B7BFF" },
-  { id: "ensemble", icon: "heart", color: "#FF4F9A" },
+const GUESSES: { id: Guess; icon: IconName; tone: TileTone }[] = [
+  { id: "parle", icon: "imessage", tone: "toi" },
+  { id: "vus", icon: "people", tone: "vrai" },
+  { id: "flou", icon: "cloud", tone: "flou" },
+  { id: "ensemble", icon: "heart", tone: "elle" },
 ];
 
-type GoalTile = { id: Goal; label: string; icon: IconName; color: string };
+type GoalTile = { id: Goal; label: string; icon: IconName; tone: TileTone };
 
 /* Ce que tu veux : avant d’être ensemble, ou en couple. Objectifs en couple absents des maquettes, relus le 8 octobre. */
 const GOALS: GoalTile[] = [
-  { id: "ensemble", label: "Qu’on soit ensemble", icon: "heart", color: "#FF4F9A" },
-  { id: "reciproque", label: "Savoir si c’est réciproque", icon: "swap", color: "#3D8BFF" },
-  { id: "comprendre", label: "Juste comprendre", icon: "eye", color: "#FFAA2C" },
+  { id: "ensemble", label: "Qu’on soit ensemble", icon: "heart", tone: "elle" },
+  { id: "reciproque", label: "Savoir si c’est réciproque", icon: "swap", tone: "toi" },
+  { id: "comprendre", label: "Juste comprendre", icon: "eye", tone: "attente" },
 ];
 const COUPLE_GOALS: GoalTile[] = [
-  { id: "mieux", label: "Que ça aille mieux", icon: "bolt", color: "#FF4F9A" },
-  { id: "point", label: "Savoir où on en est", icon: "swap", color: "#3D8BFF" },
-  { id: "comprendre", label: "Juste comprendre", icon: "eye", color: "#FFAA2C" },
+  { id: "mieux", label: "Que ça aille mieux", icon: "bolt", tone: "elle" },
+  { id: "point", label: "Savoir où on en est", icon: "swap", tone: "toi" },
+  { id: "comprendre", label: "Juste comprendre", icon: "eye", tone: "attente" },
 ];
 const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS : GOALS);
 
@@ -75,7 +75,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
        * pas de second POST. Le bouton n’est actif qu’avec toutes les réponses (`ready`) : sur des captures, ton prénom
        * donne aussi `me`
        */
-      retenirLecture(await startAnalysis({ me: j.me!, pronom: j.pronom, prenom: j.prenom, guess: j.guess!, goal: j.goal! }));
+      await startAnalysis({ me: j.me!, pronom: j.pronom, prenom: j.prenom, guess: j.guess!, goal: j.goal! });
+      retenirLecture();
       router.push("/lecture");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
@@ -158,8 +159,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
         Tu es
       </div>
       <div role="radiogroup" aria-labelledby="pronom-label" className="flex gap-2.5">
-        <ChoiceTile icon="user" color="#3D8BFF" label="Un garçon" selected={j.pronom === "il"} onClick={() => set({ pronom: "il" })} />
-        <ChoiceTile icon="user" color="#FF4F9A" label="Une fille" selected={j.pronom === "elle"} onClick={() => set({ pronom: "elle" })} />
+        <ChoiceTile icon="user" tone="toi" label="Un garçon" selected={j.pronom === "il"} onClick={() => set({ pronom: "il" })} />
+        <ChoiceTile icon="user" tone="elle" label="Une fille" selected={j.pronom === "elle"} onClick={() => set({ pronom: "elle" })} />
       </div>
 
       <div id="guess-label" className="text-[13px] font-black text-grey">
@@ -167,7 +168,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       </div>
       <div role="radiogroup" aria-labelledby="guess-label" className="flex gap-2.5">
         {GUESSES.map((g) => (
-          <ChoiceTile key={g.id} icon={g.icon} color={g.color} label={GUESS_LABELS[g.id].tile} selected={j.guess === g.id} onClick={() => pickGuess(g.id)} />
+          <ChoiceTile key={g.id} icon={g.icon} tone={g.tone} label={GUESS_LABELS[g.id].tile} selected={j.guess === g.id} onClick={() => pickGuess(g.id)} />
         ))}
       </div>
 
@@ -176,7 +177,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       </div>
       <div role="radiogroup" aria-labelledby="goal-label" className="flex gap-2.5">
         {goals.map((g) => (
-          <ChoiceTile key={g.id} icon={g.icon} color={g.color} label={g.label} selected={j.goal === g.id} onClick={() => set({ goal: g.id })} />
+          <ChoiceTile key={g.id} icon={g.icon} tone={g.tone} label={g.label} selected={j.goal === g.id} onClick={() => set({ goal: g.id })} />
         ))}
       </div>
     </Screen>

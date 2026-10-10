@@ -11,7 +11,7 @@ const EMOJI = "🤏";
 const TITRE = "Vous êtes à deux doigts.";
 const VERDICT = `${EMOJI} ${TITRE}`;
 /* Le texte qui part avec le lien, dans WhatsApp ou Messages (src/app/rapport/Partage.tsx) */
-const texteAvecLien = (url: string) => `j’ai fait lire notre conv à BLUSH 💀\nverdict : ${EMOJI} « ${TITRE} »\n${url}`;
+const texteAvecLien = (url: string) => `j’ai fait lire notre conv à BLUSH 💀\nverdict\u00a0: ${EMOJI} «\u00a0${TITRE}\u00a0»\n${url}`;
 const texteDe = (href: string | null) => new URL(href!).searchParams.get("text");
 
 test("depuis le rapport : l’aperçu du lien, copier, WhatsApp, Messages ; le même lien à chaque ouverture", async ({ page }, testInfo) => {

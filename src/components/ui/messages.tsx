@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { delai } from "@/lib/motion";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import type { Confidence } from "@/types";
 
@@ -58,37 +59,23 @@ export function BlushTyping({ label, leaving = false, vocal = false }: { label: 
 }
 
 /* ———— Étiquettes de confiance et de statut ———— */
-const TAG_COLOR: Record<string, string> = {
-  /* Teintes foncées : le texte blanc des étiquettes reste lisible (au moins 5:1) */
-  sur: "#087A56",
-  probable: "#A85800",
-  verifier: "#6D4BD8",
-  risque: "#C81D6B",
-  meilleur: "#087A56",
-  conseille: "#087A56",
-  recommandee: "#087A56",
-  partager: "#1A66DB",
-  verite: "#087A56",
-  apercu: "#1A66DB",
-  actif: "#087A56",
-  ink: "#121214",
-};
+/* Teintes foncées : le texte blanc des étiquettes reste lisible (au moins 5:1). Sans libellé, l’étiquette dit ses enfants. */
+const TAGS = {
+  sur: { color: "#087A56", label: "Sûr" },
+  probable: { color: "#A85800", label: "Probable" },
+  verifier: { color: "#6D4BD8", label: "À vérifier" },
+  risque: { color: "#C81D6B", label: "Risqué" },
+  meilleur: { color: "#087A56", label: "Le meilleur" },
+  conseille: { color: "#087A56", label: "Conseillé" },
+  recommandee: { color: "#087A56", label: "Recommandée" },
+  partager: { color: "#1A66DB", label: "à partager" },
+  verite: { color: "#087A56", label: "✓ la vérité" },
+  apercu: { color: "#1A66DB", label: "Aperçu gratuit" },
+  actif: { color: "#087A56", label: "actif" },
+  ink: { color: "#121214" },
+} as const satisfies Record<string, { color: string; label?: string }>;
 
-const TAG_LABEL: Record<string, string> = {
-  sur: "Sûr",
-  probable: "Probable",
-  verifier: "À vérifier",
-  risque: "Risqué",
-  meilleur: "Le meilleur",
-  conseille: "Conseillé",
-  recommandee: "Recommandée",
-  partager: "à partager",
-  verite: "✓ la vérité",
-  apercu: "Aperçu gratuit",
-  actif: "actif",
-};
-
-export type TagTone = keyof typeof TAG_COLOR;
+export type TagTone = keyof typeof TAGS;
 
 export function Tag({
   tone,
@@ -96,11 +83,12 @@ export function Tag({
   size = "sm",
   className,
 }: {
-  tone: TagTone | Confidence;
+  tone: TagTone;
   children?: ReactNode;
   size?: "sm" | "md";
   className?: string;
 }) {
+  const { color, label }: { color: string; label?: string } = TAGS[tone];
   return (
     <span
       className={cn(
@@ -109,11 +97,11 @@ export function Tag({
         className,
       )}
       style={{
-        background: tone === "ink" ? "#121214" : `var(--gloss), ${TAG_COLOR[tone]}`,
+        background: tone === "ink" ? color : `var(--gloss), ${color}`,
         boxShadow: tone === "ink" ? undefined : "inset 0 -1px 0 rgba(0,0,0,0.1)",
       }}
     >
-      {children ?? TAG_LABEL[tone]}
+      {children ?? label}
     </span>
   );
 }
@@ -150,7 +138,7 @@ export function ProofCard({
   className?: string;
 }) {
   return (
-    <div data-rise="" className={cn("flex flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card", className)} style={{ "--d": "0.15s" } as CSSProperties}>
+    <div data-rise="" className={cn("flex flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card", className)} style={delai(0.15)}>
       <span className="text-[13px] font-black text-grey">{title}</span>
       {children}
       {conclusion && <span className="text-[15px] font-extrabold leading-[1.4]">{conclusion}</span>}

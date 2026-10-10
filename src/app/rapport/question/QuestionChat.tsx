@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
 import { formatCount } from "@/lib/format";
-import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
+import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { askQuestion, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
@@ -162,7 +162,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     >
       {/* BLUSH en grand ; sa bulle s’anime quand il écrit */}
       <div className="flex flex-col items-center pt-1 text-center">
-        <span data-float="" className="block" style={{ "--r": "-3deg" } as CSSProperties}>
+        <span data-float="" className="block" style={{ "--r": "-3deg" }}>
           <span className="block drop-shadow-[0_14px_16px_rgba(232,53,138,0.24)]">
             <BubbleLogo size={72} animated={asking !== null} />
           </span>
@@ -233,7 +233,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
                   aria-pressed={on}
                   onClick={() => setDraft(on ? "" : q)}
                   data-rise=""
-                  style={{ "--d": `${0.2 + i * 0.07}s` } as CSSProperties}
+                  style={delai(0.2 + i * 0.07)}
                   className={cn(
                     "max-w-[88%] rounded-[20px] rounded-br-[6px] px-4 py-2.5 text-left text-[15px] font-extrabold leading-[1.35] transition-[background-color,color,box-shadow] duration-200",
                     on
@@ -258,7 +258,7 @@ function BlushSays({ bubbles }: { bubbles: ReactNode[] }) {
   return (
     <div className="flex flex-col gap-[3px]">
       {bubbles.map((b, i) => (
-        <div key={i} data-rise="" className="flex items-end gap-2" style={{ "--d": `${i * 0.08}s` } as CSSProperties}>
+        <div key={i} data-rise="" className="flex items-end gap-2" style={delai(i * 0.08)}>
           {i === n - 1 ? <BubbleLogo size={34} className="-mb-0.5 shrink-0" /> : <span aria-hidden="true" className="w-[34px] shrink-0" />}
           <div
             className={cn(

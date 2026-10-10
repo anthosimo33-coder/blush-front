@@ -33,7 +33,7 @@ const ECHANGES_DANS_LE_FIL = 6;
 const LIGNES_DANS_LE_FIL = 15;
 
 /** L’historique du chat (ce que l’accueil réaffiche) vit à part, sans le modèle : src/server/historique.ts. */
-export { historique, type EchangeAffiche } from "./historique";
+export { historique } from "./historique";
 
 async function fil(storyId: string): Promise<Fil> {
   const lignes = (await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, storyId)).orderBy(desc(schema.chatMessages.id)).limit(ECHANGES_DANS_LE_FIL * 2)).reverse();

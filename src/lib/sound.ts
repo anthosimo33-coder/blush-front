@@ -20,7 +20,7 @@ const KEY = "blush.sons.v1";
 const listeners = new Set<() => void>();
 let memo: boolean | null = null;
 
-export function soundsEnabled() {
+function soundsEnabled() {
   try {
     return localStorage.getItem(KEY) !== "0";
   } catch {

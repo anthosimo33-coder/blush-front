@@ -13,7 +13,7 @@ import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
 
 /** Le texte d’une conv, même très longue, tient sous cette taille (une fois décompressé). */
-export const TAILLE_MAX = 40 * 1024 * 1024;
+const TAILLE_MAX = 40 * 1024 * 1024;
 /** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
 const FICHIERS_MAX = 200;
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
@@ -60,8 +60,6 @@ export type LigneComplete = typeof schema.stories.$inferSelect;
 export type Ligne = Omit<LigneComplete, "conv">;
 /** Ce que lisent les écrans et les routes : la ligne sans la conv, et si elle est encore en base (`aConv`). */
 export type LigneEcran = Ligne & { aConv: boolean };
-
-export { prenomDe };
 
 /** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */
 export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string }> {

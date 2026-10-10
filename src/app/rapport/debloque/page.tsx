@@ -7,7 +7,7 @@ import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
 
-export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function Page({ searchParams }: PageProps<"/rapport/debloque">) {
   const sp = await searchParams;
   const offer = sp.offre === "rapport" ? "rapport" : "blushplus";
   /* Où reprendre après : seulement une adresse interne */

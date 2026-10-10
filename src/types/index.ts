@@ -1,9 +1,11 @@
 /* Types du domaine BLUSH — contrat avec le back-end. */
 
 export type AppKind = "whatsapp" | "imessage" | "instagram" | "hinge" | "autre";
-export type ImportMode = "export" | "captures";
+/** Les applis qui s’exportent (écran 02). iMessage ne s’exporte pas : on filme son écran (/importer/captures). */
+export type ExportApp = Extract<AppKind, "whatsapp" | "instagram">;
+type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
-export type Side = "toi" | "elle" | "pareil";
+type Side = "toi" | "elle" | "pareil";
 export type Plan = "gratuit" | "rapport" | "blushplus";
 export type Guess = "parle" | "vus" | "flou" | "ensemble";
 /** Avant d’être ensemble : ensemble, reciproque, comprendre. En couple : mieux, point, comprendre. */
@@ -117,8 +119,7 @@ export type Verdict = {
   short: string;
   title: string;
   subtitle: string;
-  /** Vrai sur une alerte de danger (`mode_sobre`, prompts/lib/front.ts) ; plus lu par le front, qui regarde `ReportPayload.sober` (src/services/api.ts). */
-  difficult: boolean;
+  /* Le serveur envoie aussi `difficult` (prompts/lib/front.ts), que le front ne lit pas : une alerte de danger se voit à `ReportPayload.sober` (src/services/api.ts) */
 };
 
 /** Une ligne du vocal de BLUSH : ce qu’elle dit, quand (en secondes), mot par mot, et le message de leur conv qu’elle cite. */

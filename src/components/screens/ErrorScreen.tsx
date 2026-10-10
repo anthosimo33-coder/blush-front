@@ -32,7 +32,7 @@ const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: 
   /* Sur un export ; sur des captures, copieDe la change */
   courte: {
     title: "Votre conv est encore trop courte.",
-    text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
+    text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent\u00a0: envoie celles de votre conv, ou reviens dans quelques jours.",
     action: "Envoyer des captures",
     href: "/importer/captures",
     back: "/importer/export",
@@ -53,14 +53,14 @@ const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: 
   },
   video: {
     title: "Je n’arrive pas à lire cette vidéo.",
-    text: "Choisis l’enregistrement tel quel, depuis ton iPhone : sans le recadrer ni le monter.",
+    text: "Choisis l’enregistrement tel quel, depuis ton iPhone\u00a0: sans le recadrer ni le monter.",
     action: "Choisir une autre vidéo",
     href: "/importer/captures",
     back: "/importer/captures",
   },
   longue: {
     title: "Ton enregistrement est trop long.",
-    text: "Refais-le plus court : remonte un peu plus vite, ou arrête-toi là où votre histoire commence vraiment.",
+    text: "Refais-le plus court\u00a0: remonte un peu plus vite, ou arrête-toi là où votre histoire commence vraiment.",
     action: "Refaire un enregistrement",
     href: "/importer/captures",
     back: "/importer/captures",

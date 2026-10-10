@@ -33,7 +33,7 @@ const suivies = new WeakSet<Page>();
  * la main une fois la page hydratée. goto et reload n’attendent plus l’événement load (les images, les polices) mais le
  * document lu, puis l’hydratation : c’est elle qui compte pour un geste. Appliqué à toutes les pages des tests (aide/index.ts).
  */
-export function suivreLesChargements(page: Page): void {
+function suivreLesChargements(page: Page): void {
   if (suivies.has(page)) return;
   suivies.add(page);
   const goto = page.goto.bind(page);
