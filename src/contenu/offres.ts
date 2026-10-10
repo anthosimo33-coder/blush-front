@@ -33,5 +33,5 @@ export const PAYWALL = {
 export const SUBSCRIPTIONS: Record<Subscription["plan"], Subscription> = {
   blushplus: { plan: "blushplus", priceLabel: "7,99 € / semaine", renewLabel: "Renouvelé lundi · sans engagement", stopLabel: "En un geste, effectif lundi", active: true, paused: false },
   rapport: { plan: "rapport", priceLabel: "8,99 €", renewLabel: "Payé une fois · à toi pour toujours", stopLabel: "", active: true, paused: false },
-  gratuit: { plan: "gratuit", priceLabel: "Aperçu gratuit", renewLabel: "Chapitres 1 et 2", stopLabel: "", active: false, paused: false },
+  gratuit: { plan: "gratuit", priceLabel: "Aperçu gratuit", renewLabel: "Chapitre 1", stopLabel: "", active: false, paused: false },
 };

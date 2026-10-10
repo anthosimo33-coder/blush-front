@@ -9,12 +9,13 @@ import { getReport, type ReportPayload } from "@/services/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
-import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
+import type { Confidence, Message, Story } from "@/types";
 import { IlOuElle } from "@/lib/pronom";
 import { bloquerDefilement } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
 import dynamic from "next/dynamic";
+import { cardsOf, type Card } from "./cartes";
 
 const INK = "#121214";
 
@@ -24,34 +25,11 @@ const PartageSheet = dynamic(() => import("../Partage").then((m) => m.PartageShe
 /*
  * La révélation du verdict : juste après l’analyse, une scène sombre et une carte à la fois, comme des stories.
  * Les chiffres, le verdict, qui fait quoi, le moment où tout a basculé, puis « à toi de jouer » et le rapport.
- * Tout vient des chapitres offerts (1 et 2) : rien de payant n’est montré avant le paiement.
+ * Les cartes viennent du rapport (cartes.ts) : sans accès, du seul chapitre offert, le verdict ; rien de payant n’est
+ * montré avant le paiement.
  * Un toucher à droite (ou →) avance, à gauche (ou ←) recule ; « Passer » mène droit au rapport.
  * Proposition absente des maquettes, textes relus le 8 octobre.
  */
-
-type Card =
-  | { id: "chiffres" }
-  | { id: "verdict"; confidence?: { level: Confidence; text: string } }
-  | { id: "duel"; rows: ScoreRow[]; meaning?: string }
-  | { id: "moment"; kicker?: string; title: string; essential?: string; messages: Message[]; fact?: string }
-  | { id: "jouer"; text?: string; quote?: string };
-
-function blockOf<K extends ChapterBlock["kind"]>(c: Chapter | undefined, kind: K) {
-  return c?.blocks.find((b): b is Extract<ChapterBlock, { kind: K }> => b.kind === kind);
-}
-
-/** Les cartes, tirées des chapitres 1 et 2 ; une carte sans contenu est simplement sautée. */
-function cardsOf({ report }: ReportPayload): Card[] {
-  const [c1, c2] = [1, 2].map((n) => report.chapters.find((c) => c.number === n && !c.locked));
-  const scores = blockOf(c1, "scores");
-  const seen = blockOf(c2, "seen");
-  const cards: Card[] = [{ id: "chiffres" }, { id: "verdict", confidence: blockOf(c1, "confidence") }];
-  if (scores) cards.push({ id: "duel", rows: scores.rows, meaning: blockOf(c1, "meaning")?.text });
-  if (c2 && seen?.messages?.length)
-    cards.push({ id: "moment", kicker: c2.kicker, title: c2.title, essential: blockOf(c2, "essential")?.text, messages: seen.messages, fact: seen.factsAfter?.[0] });
-  cards.push({ id: "jouer", text: blockOf(c2, "play")?.text, quote: seen?.messages?.find((m) => m.from === "elle")?.text });
-  return cards;
-}
 
 /* Le fond respire avec chaque carte : trois lueurs (rose au centre, bleu en bas à gauche, rose en haut à droite) */
 const GLOWS: Record<Card["id"], [number, number, number]> = {

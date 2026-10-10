@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type CSSProperties } from "react";
+import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { OFFERS } from "@/contenu/offres";
 import { cheminDe } from "@/lib/navigation";
 import { invalidate } from "@/lib/query";
@@ -30,15 +31,15 @@ const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: numbe
 export function UnlockedScreen({
   offer,
   next,
-  restants = 6,
-  reprise = 3,
+  restants,
+  reprise,
   autre,
 }: {
   offer: "blushplus" | "rapport";
   next: string | null;
   /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
-  restants?: number;
-  reprise?: number;
+  restants: number;
+  reprise: number;
   autre?: "il" | "elle";
 }) {
   const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
@@ -77,7 +78,7 @@ export function UnlockedScreen({
           {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
         </h1>
         <p data-rise="" style={{ "--d": "0.3s" } as CSSProperties} className="m-0 mt-3 max-w-[380px] text-[16px] font-extrabold leading-[1.45] text-soft">
-          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : "Les 8 chapitres sont à toi, pour toujours."}
+          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${NB_CHAPITRES} chapitres sont à toi, pour toujours.`}
         </p>
 
         <div data-rise="" style={{ "--d": "0.45s" } as CSSProperties} className="mt-8 w-full text-left">

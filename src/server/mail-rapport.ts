@@ -1,3 +1,5 @@
+import { NB_CHAPITRES, titreDuMail } from "@/contenu/chapitres";
+
 /*
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
  * parle en bulles roses, comme sur la landing. Rien de la conv : ni prénom, ni verdict, ni message (le mail
@@ -25,10 +27,10 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
   const bulle = (t: string) =>
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:linear-gradient(160deg,#FF9BCB,#E8358A);border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
 
-  const titres = ["Le verdict", "La bascule", "Votre histoire", "Ce qui coince", autre === "elle" ? "Elle" : "Lui", "Toi", "Votre duo", "Ton prochain pas"];
-  const chapitre = (k: number) =>
-    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${k + 1}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${titres[k]}</td></tr></table></td>`;
-  const sommaire = [0, 2, 4, 6].map((k) => `<tr>${chapitre(k)}${chapitre(k + 1)}</tr>`).join("");
+  const chapitre = (numero: number) =>
+    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${titreDuMail(numero, autre)}</td></tr></table></td>`;
+  /* Le sommaire : tous les chapitres, deux par ligne */
+  const sommaire = Array.from({ length: Math.ceil(NB_CHAPITRES / 2) }, (_, k) => `<tr>${chapitre(2 * k + 1)}${chapitre(2 * k + 2)}</tr>`).join("");
 
   const corps = sobre
     ? `${bulle("j’ai fini de lire.")}

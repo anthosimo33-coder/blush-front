@@ -14,7 +14,7 @@ const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").t
 
 const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, blushplus: 2 };
 
-/** Droits d’accès simulés : gratuit (ch. 1-2), rapport (ch. 1-8 + une question), BLUSH+ (en plus : accueil, aide, fiche). */
+/** Les droits d’accès du compte : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres + une question), BLUSH+ (en plus : accueil, aide, fiche). */
 export function useAccess() {
   const { data } = useQuery("account", getAccount);
   const plan = data?.subscription.plan;

@@ -35,7 +35,10 @@ export async function toucherLaScene(page: Page, cote: "gauche" | "droite"): Pro
 
 /* ———— Le rapport (/rapport) ———— */
 
-/** Les sept chapitres fermés d’un rapport gratuit, dans l’ordre (src/server/donnees.ts, ROLES) : le 5 porte le prénom de l’autre. */
+/**
+ * Les sept chapitres fermés d’un rapport gratuit, dans l’ordre : leurs titres d’attente (src/contenu/chapitres.ts,
+ * titreDAttente), le 5 porte le prénom de l’autre. Recopiés ici : les tests ne lisent pas la source qu’ils vérifient.
+ */
 export const CHAPITRES_FERMES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "Maëlys", "Toi", "Votre duo", "Ton prochain pas"];
 
 /** Le titre du paiement, sur le rapport de Noé et Maëlys. */

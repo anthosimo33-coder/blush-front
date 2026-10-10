@@ -1,3 +1,4 @@
+import { estOffert } from "@/contenu/chapitres";
 import type { Report, Source, Story } from "@/types";
 
 /*
@@ -9,6 +10,9 @@ const PEOPLE = {
   hugo: { id: "hugo", name: "Hugo", initial: "H" },
   sophie: { id: "sophie", name: "Sophie", initial: "S" },
 } as const;
+
+/** L’autre personne (Hugo est celui qui lit) : son prénom est le titre d’attente du chapitre 5, comme sur le serveur. */
+export const AUTRE = PEOPLE.sophie.name;
 
 const SOURCE_WHATSAPP: Source = {
   id: "src-whatsapp",
@@ -71,7 +75,7 @@ export const REPORT: Report = {
       number: 1,
       title: "Le verdict",
       tocTitle: "Le verdict",
-      free: true,
+      free: estOffert(1),
       blocks: [
         {
           kind: "scores",
@@ -91,7 +95,7 @@ export const REPORT: Report = {
       title: "Le moment où tout a basculé",
       kicker: "2 mars, 23 h 41",
       tocTitle: "Le moment où tout a basculé",
-      free: true,
+      free: estOffert(2),
       blocks: [
         { kind: "essential", text: "La seule fois où l’un de vous a posé la question, c’était elle." },
         {
@@ -112,7 +116,7 @@ export const REPORT: Report = {
       title: "Votre histoire",
       kicker: "6 mois, 3 applis",
       tocTitle: "Votre histoire",
-      free: false,
+      free: estOffert(3),
       blocks: [
         {
           kind: "timeline",
@@ -130,7 +134,7 @@ export const REPORT: Report = {
       title: "Ce que vous ne dites pas",
       kicker: "les 3 esquives",
       tocTitle: "Ce que vous ne dites pas",
-      free: false,
+      free: estOffert(4),
       blocks: [
         { kind: "essential", text: "Trois fois, elle a fait un pas vers « nous ». Trois fois, tu as répondu par une blague." },
         {
@@ -150,7 +154,7 @@ export const REPORT: Report = {
       title: "Elle",
       kicker: "son portrait : la Relanceuse",
       tocTitle: "Elle",
-      free: false,
+      free: estOffert(5),
       blocks: [
         { kind: "essential", text: "Elle montre son intérêt en agissant : elle propose, elle relance, elle se livre." },
         {
@@ -166,7 +170,7 @@ export const REPORT: Report = {
       title: "Toi",
       kicker: "ton portrait : le Stratège",
       tocTitle: "Toi",
-      free: false,
+      free: estOffert(6),
       blocks: [
         { kind: "essential", text: "Quand ça devient sérieux, tu fais une blague." },
         { kind: "meaning", text: "C’est une façon de te protéger d’un « non ». Elle, elle y lit de la distance." },
@@ -178,7 +182,7 @@ export const REPORT: Report = {
       title: "Votre duo",
       kicker: "à partager, prénoms masqués",
       tocTitle: "Votre duo",
-      free: false,
+      free: estOffert(7),
       blocks: [
         {
           kind: "duo",
@@ -195,7 +199,7 @@ export const REPORT: Report = {
       number: 8,
       title: "Ton prochain pas",
       tocTitle: "Ton prochain pas",
-      free: false,
+      free: estOffert(8),
       blocks: [
         {
           kind: "scenarios",

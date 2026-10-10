@@ -3,6 +3,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { cache } from "react";
+import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
@@ -147,8 +148,6 @@ function decouvertes(story: Ligne, p: number): string[] {
   return (contexteDe(story)?.trouvailles ?? []).slice(0, Math.min(3, Math.floor(p * 5)));
 }
 
-const ROLES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "", "Toi", "Votre duo", "Ton prochain pas"];
-
 const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\u00a0s` : `${Math.max(1, Math.round(s / 60))}\u00a0min`);
 
 /**
@@ -184,7 +183,7 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
     etape: tp.status === "fini" ? "chapitres" : "plan",
     progres,
     restant: duree(restant),
-    chapitres: [2, 3, 4, 5, 6, 7, 8].map((n) => ({ number: n, title: titres.get(n) ?? (ROLES[n - 2] || autre), etat: etat(n) })),
+    chapitres: CHAPITRES_PAYANTS.map((n) => ({ number: n, title: titres.get(n) ?? titreDAttente(n, autre), etat: etat(n) })),
   };
 }
 
@@ -241,7 +240,10 @@ export async function contactDe(storyId: string): Promise<EnTete | null> {
   return v ? enTete(dechiffrer<DonneesVerdict>(v.data).sortie) : null;
 }
 
-/** Le rapport tel que l’affiche le front. Sans accès : le verdict et les chapitres verrouillés. */
+/**
+ * Le rapport tel que l’affiche le front. Sans accès : le chapitre offert (le verdict, src/contenu/chapitres.ts) et les
+ * chapitres payants, verrouillés et vides.
+ */
 export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
   const access: Plan = (utilisateur?.plan as Plan) ?? "gratuit";
   /*
@@ -266,9 +268,9 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
 
   const verdictLibre: Chapter = {
     number: 1,
-    title: "Le verdict",
-    tocTitle: "Le verdict",
-    free: true,
+    title: titreDAttente(1, autre),
+    tocTitle: titreDAttente(1, autre),
+    free: estOffert(1),
     /* Le sous-titre est déjà sous le titre du verdict (en-tête du chapitre) : pas une seconde fois ici */
     blocks: [
       { kind: "scores", rows: scores },
@@ -279,9 +281,9 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
   /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
   const plan = ouvert && !donnees && r?.plan ? dechiffrer<Plan05>(r.plan) : null;
   const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
-  const verrouilles: Chapter[] = ROLES.map((titre, k) => {
-    const t = titres.get(k + 2) ?? (titre || autre);
-    return { number: k + 2, title: t, tocTitle: t, free: false, locked: true, blocks: [] };
+  const verrouilles: Chapter[] = CHAPITRES_PAYANTS.map((n) => {
+    const t = titres.get(n) ?? titreDAttente(n, autre);
+    return { number: n, title: t, tocTitle: t, free: estOffert(n), locked: true, blocks: [] };
   });
   /*
    * Pendant l’écriture, les chapitres déjà finis se lisent tout de suite, dans l’ordre : un chapitre prêt en avance
