@@ -1,4 +1,4 @@
-import type { LandingConv, Testimonial } from "@/types";
+import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
  * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
@@ -242,3 +242,19 @@ export const TESTIMONIAL_SLOTS: Testimonial[] = Array.from({ length: 3 }, () => 
   label: "Sa situation",
   text: "Ici, un vrai avis, publié avec l’accord de la personne. Deux ou trois phrases sur ce que BLUSH lui a appris.",
 }));
+
+/** Dans le bloc BLUSH+, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
+export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confidence" | "limits"> = {
+  title: "Rien ne l’indique dans votre conv.",
+  evidence: "Elle te parle tous les soirs entre 22 h et 1 h, 6 jours sur 7. Ses week-ends, elle te les raconte.",
+  confidence: "probable",
+  limits: "BLUSH ne voit que vos messages.",
+};
+
+/** Dans le bloc BLUSH+, la réponse de BLUSH à « on en est où ? » : le verdict, la tendance, le prochain pas. */
+export const VERDICT_EXEMPLE = {
+  emoji: "🤏",
+  short: "À deux doigts",
+  trend: "↗ ça se réchauffe",
+  nextStep: "Ton prochain pas : lui demander samedi, en face.",
+};

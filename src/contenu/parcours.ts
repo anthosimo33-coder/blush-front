@@ -1,9 +1,6 @@
 import type { Guess } from "@/types";
 
-/*
- * Les textes du parcours (Qui es-tu, la lecture, l’export) : de vrais textes du produit, hors des mocks. Un écran qui
- * les montre ne charge pas l’histoire de démo avec.
- */
+/* Les textes du parcours : « Qui es-tu ? », les étapes de l’export, celles de la lecture. */
 
 export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
   parle: { tile: "On se parle", quote: "« on se parle »" },

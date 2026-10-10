@@ -5,8 +5,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { cn } from "@/lib/cn";
 import { figtree } from "@/lib/fonts";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
-import { TESTIMONIAL_SLOTS, TESTIMONIALS } from "@/mocks/landing";
-import { QUESTION_ANSWER, REPORT } from "@/mocks/report";
+import { REPONSE_EXEMPLE, TESTIMONIAL_SLOTS, TESTIMONIALS, VERDICT_EXEMPLE } from "@/contenu/landing";
 import { Logo } from "@/components/brand/Logo";
 import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
@@ -215,10 +214,10 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
     q: "elle voit quelqu’un d’autre ?",
     answer: () => (
       <FromBlush>
-        <span className="text-[17px] font-black leading-[1.3]">{QUESTION_ANSWER.title}</span>
-        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{QUESTION_ANSWER.evidence}</span>
-        <ConfidenceLine level={QUESTION_ANSWER.confidence} className="mt-1">
-          {QUESTION_ANSWER.limits}
+        <span className="text-[17px] font-black leading-[1.3]">{REPONSE_EXEMPLE.title}</span>
+        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{REPONSE_EXEMPLE.evidence}</span>
+        <ConfidenceLine level={REPONSE_EXEMPLE.confidence} className="mt-1">
+          {REPONSE_EXEMPLE.limits}
         </ConfidenceLine>
       </FromBlush>
     ),
@@ -228,9 +227,9 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
     answer: () => (
       <FromBlush>
         <span className="text-[17px] font-black leading-[1.3]">
-          {REPORT.verdict.emoji} {REPORT.verdict.short} · <span className="text-vrai-ink">{REPORT.trend}</span>
+          {VERDICT_EXEMPLE.emoji} {VERDICT_EXEMPLE.short} · <span className="text-vrai-ink">{VERDICT_EXEMPLE.trend}</span>
         </span>
-        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{REPORT.nextStep}</span>
+        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{VERDICT_EXEMPLE.nextStep}</span>
       </FromBlush>
     ),
   },

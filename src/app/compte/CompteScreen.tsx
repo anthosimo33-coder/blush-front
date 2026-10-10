@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { cancelSubscription, deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
-import { OFFERS } from "@/content/offres";
+import { OFFERS } from "@/contenu/offres";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";

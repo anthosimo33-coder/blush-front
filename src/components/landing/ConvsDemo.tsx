@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
-import { LANDING_CONVS } from "@/mocks/landing";
+import { LANDING_CONVS } from "@/contenu/landing";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
 import { ButtonLink, IconButton } from "@/components/ui/Button";

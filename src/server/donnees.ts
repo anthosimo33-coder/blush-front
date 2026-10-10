@@ -3,7 +3,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { cache } from "react";
-import { SUBSCRIPTIONS } from "@/content/offres";
+import { SUBSCRIPTIONS } from "@/contenu/offres";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story, VocalRapport } from "@/types";

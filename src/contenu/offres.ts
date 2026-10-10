@@ -1,9 +1,6 @@
 import type { Offer, Subscription } from "@/types";
 
-/*
- * Les offres et le paiement : de vrais textes du produit (prix, mentions), lus par les écrans et par le serveur.
- * Hors des mocks : un écran qui les montre ne charge pas les données de démo avec.
- */
+/* Les offres, le paywall et les abonnements : les prix et les libellés que montrent l’appli et le serveur (Mon compte, /api/debloquer). */
 
 export const OFFERS: Offer[] = [
   {

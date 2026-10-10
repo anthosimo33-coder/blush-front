@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { useReducedMotion } from "@/lib/hooks";
 import { play } from "@/lib/sound";
 import { ErreurApi, getAnalysisProgress, resumeAnalysis } from "@/services/api";
-import { READING_STEPS } from "@/content/parcours";
+import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";

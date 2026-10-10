@@ -11,7 +11,7 @@ import { ChoiceTile, SelectedCheck } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
-import { GUESS_LABELS } from "@/content/parcours";
+import { GUESS_LABELS } from "@/contenu/parcours";
 import { useJourney } from "@/state/journey";
 import { retenirLecture } from "@/state/lecture";
 import type { Goal, Guess, Person } from "@/types";

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDevice, useFilePicker } from "@/lib/hooks";
 import { ErreurApi, prechargerExport, uploadExport } from "@/services/api";
-import { EXPORT_STEPS } from "@/content/parcours";
+import { EXPORT_STEPS } from "@/contenu/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/controls";

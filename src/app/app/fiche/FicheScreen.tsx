@@ -10,7 +10,7 @@ import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { addToFiche, ErreurApi, getFiche, prechargerExport, updateFiche } from "@/services/api";
-import { FICHE_SECTIONS } from "@/content/fiche";
+import { FICHE_SECTIONS } from "@/contenu/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { FileInput } from "@/components/ui/FileInput";

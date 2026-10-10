@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { demoStory } from "@/mocks/stories";
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import { ReportScreen } from "../../rapport/ReportScreen";
+import { REPORT as report, STORY as story } from "./exemple";
 
 export const metadata: Metadata = { title: "Aperçu de l’écriture du rapport" };
 export const dynamic = "force-dynamic";
@@ -14,7 +14,6 @@ const ROLES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce 
 export default async function Page({ searchParams }: PageProps<"/apercu/ecriture">) {
   if (process.env.NODE_ENV === "production") notFound();
   const { etat = "chapitres" } = await searchParams;
-  const { story, report } = demoStory(undefined);
   const suite = report.chapters.slice(1);
   const etats: Record<string, { etape: EcritureRapport["etape"]; progres: number; restant: string | null; e: EtatChapitre[] }> = {
     plan: { etape: "plan", progres: 0.14, restant: "2 min", e: ["attente", "attente", "attente", "attente", "attente", "attente", "attente"] },

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { ErreurApi, unlock } from "@/services/api";
-import { OFFERS, PAYWALL } from "@/content/offres";
+import { OFFERS, PAYWALL } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Tag } from "@/components/ui/messages";

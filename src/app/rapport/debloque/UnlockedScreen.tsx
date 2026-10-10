@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type CSSProperties } from "react";
-import { OFFERS } from "@/content/offres";
+import { OFFERS } from "@/contenu/offres";
 import { cheminDe } from "@/lib/navigation";
 import { invalidate } from "@/lib/query";
 import { useSoundOnce } from "@/lib/sound";

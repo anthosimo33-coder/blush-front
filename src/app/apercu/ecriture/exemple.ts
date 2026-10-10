@@ -1,4 +1,57 @@
-import type { QuestionAnswer, Report, SoberReport } from "@/types";
+import type { Report, Source, Story } from "@/types";
+
+/*
+ * L’histoire d’exemple de l’aperçu de l’écriture (en local seulement) : Hugo et Sophie, données reprises des maquettes.
+ * En production, elles viennent de l’analyse réelle.
+ */
+
+const PEOPLE = {
+  hugo: { id: "hugo", name: "Hugo", initial: "H" },
+  sophie: { id: "sophie", name: "Sophie", initial: "S" },
+} as const;
+
+const SOURCE_WHATSAPP: Source = {
+  id: "src-whatsapp",
+  app: "whatsapp",
+  mode: "export",
+  fileName: "Discussion avec Sophie.zip",
+  label: "Depuis votre premier date",
+  period: "14 déc. → 12 mars",
+  messageCount: 1074,
+  voiceCount: 11,
+};
+
+const SOURCE_HINGE: Source = {
+  id: "src-hinge",
+  app: "hinge",
+  mode: "captures",
+  screenshotCount: 2,
+  label: "Le match",
+  period: "2 sept.",
+  messageCount: 12,
+};
+
+const SOURCE_INSTAGRAM: Source = {
+  id: "src-instagram",
+  app: "instagram",
+  mode: "captures",
+  screenshotCount: 4,
+  label: "Les premiers DM",
+  period: "sept. → déc.",
+  messageCount: 116,
+};
+
+export const STORY: Story = {
+  id: "story-hugo-sophie",
+  participants: [PEOPLE.hugo, PEOPLE.sophie],
+  /* Remises dans l’ordre : Hinge, puis Insta, puis WhatsApp */
+  sources: [SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP],
+  totalMessages: 1202,
+  voiceCount: 11,
+  period: "14 déc. → 12 mars",
+  durationLabel: "6 mois",
+  updatedLabel: "mis à jour le 12 mars",
+};
 
 export const REPORT: Report = {
   storyId: "story-hugo-sophie",
@@ -164,61 +217,3 @@ export const REPORT: Report = {
     },
   ],
 };
-
-/** Mode sobre : quand elle ne ressent pas la même chose (écrans 18 et 19). */
-export const SOBER_REPORT: SoberReport = {
-  intro: "Je vais être honnête avec toi.",
-  title: "Elle ne ressent pas la même chose.",
-  facts: "Elle répond, mais elle ne relance plus depuis 3 semaines. Ses messages font 4 mots en moyenne, contre 31 en janvier.",
-  reassurance: "Ça ne dit rien de ce que tu vaux. Ça dit juste où elle en est.",
-  steps: [
-    "Arrête de relancer. Laisse-lui la porte ouverte, sans la tenir.",
-    "Si tu as besoin d’une réponse claire, pose la question une fois. Puis laisse-la répondre.",
-    "Prends deux semaines pour toi. Si quelque chose change, on regardera ensemble.",
-  ],
-  draftLabel: "Si tu veux lui écrire",
-  draft: "J’ai l’impression qu’on n’est pas sur la même longueur d’onde. Je te laisse respirer.",
-  helpLabel: "Besoin d’en parler à quelqu’un ?",
-};
-
-export const QUESTION_ANSWER: QuestionAnswer = {
-  question: "Est-ce qu’elle voit quelqu’un d’autre ?",
-  title: "Rien ne l’indique dans votre conv.",
-  evidenceLabel: "Ce qui va dans ce sens",
-  evidence: "Elle te parle tous les soirs entre 22 h et 1 h, 6 jours sur 7. Ses week-ends, elle te les raconte.",
-  confidence: "probable",
-  limits: "BLUSH ne voit que vos messages.",
-};
-
-/**
- * Des questions toutes prêtes, tirées du rapport, avec la réponse de BLUSH (simulation : en vrai, le back-end répond).
- * Chaque réponse reprend des faits du rapport. ⚠ Absent des maquettes : textes à valider.
- */
-export const QUESTION_IDEAS: QuestionAnswer[] = [
-  QUESTION_ANSWER,
-  {
-    question: "Que voulait dire son « on est quoi » du 2 mars ?",
-    title: "Elle te demandait où vous en étiez, en gardant une porte de sortie.",
-    evidenceLabel: "Ce qu’on voit",
-    message: { from: "elle", text: "au fait on est quoi toi et moi mdr", caption: "Sophie · 2 mars, 23:41" },
-    evidence: "Son « mdr » permettait d’en rire si tu ne suivais pas. Après ton « mdr », ses messages passent de 31 mots en moyenne à 14.",
-    confidence: "sur",
-    limits: "messages exacts, horodatés",
-  },
-  {
-    question: "Pourquoi elle relance toujours après 22 h ?",
-    title: "C’est son moment pour toi, une fois sa journée finie.",
-    evidenceLabel: "Ce qu’on voit",
-    evidence: "Après 22 h, c’est elle qui relance, 7 fois sur 10. Et le soir, elle te répond en 4 min.",
-    confidence: "probable",
-    limits: "BLUSH ne voit que vos messages.",
-  },
-  {
-    question: "Comment lui proposer samedi sans la brusquer ?",
-    title: "Avec un jour et une heure, simplement.",
-    evidenceLabel: "Ce qu’on voit",
-    evidence: "4 plans sur 5 viennent d’elle. Quand tu proposes une date et une heure, elle répond en moins de 10 minutes.",
-    confidence: "probable",
-    limits: "BLUSH ne voit que vos messages.",
-  },
-];
