@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
 import postgres from "postgres";
+import { emailCanonique } from "../../../src/server/email-canonique";
 import { CLE, DATABASE_URL } from "../reglages";
 import { oublierMails } from "./boite";
 import { RESEAU } from "./page";
@@ -134,15 +135,24 @@ export async function remplirLaLimite(email: string, cle: (id: string) => string
   await sql()`insert into rate_limits (key, window_start, count) values (${k}, now(), ${max}) on conflict (key) do update set window_start = now(), count = ${max}`;
 }
 
-/** Remet à zéro le compteur des codes de connexion de cet email (5 par heure : src/server/limites.ts), sans toucher au compte. */
+/*
+ * Les compteurs des codes de connexion d’un email (src/server/limites.ts) : ses codes du jour et ses essais ratés, rangés
+ * par email canonique. Ceux d’un email et d’une adresse IP n’y sont pas : chaque test a son adresse (aide/index.ts).
+ */
+function limitesDesCodes(email: string): [string, string] {
+  const canonique = emailCanonique(email);
+  return [empreinte(`limite:code:email:${canonique}`), empreinte(`limite:code:echecs:${canonique}`)];
+}
+
+/** Remet à zéro les compteurs des codes de connexion de cet email (dix codes et vingt essais ratés par jour), sans toucher au compte. */
 export async function oublierLimiteDesCodes(email: string): Promise<void> {
-  await sql()`delete from rate_limits where key = ${empreinte(`limite:code:email:${email.toLowerCase()}`)}`;
+  await sql()`delete from rate_limits where key in ${sql()(limitesDesCodes(email))}`;
 }
 
 /**
- * Efface toute trace d’un email : son compte (et en cascade ses histoires, sessions, tâches…), son code de connexion, sa
- * place sur la liste d’attente, ses compteurs des limites anti-abus (les codes par email, les mails de la liste), et ses
- * mails dans la boîte des tests. Pour repartir de zéro avec un email réutilisé d’un test à l’autre (les invités :
+ * Efface toute trace d’un email : son compte (et en cascade ses histoires, sessions, tâches…), ses codes de connexion, sa
+ * place sur la liste d’attente, ses compteurs des limites anti-abus (les codes et les essais par email, les mails de la
+ * liste), et ses mails dans la boîte des tests. Pour repartir de zéro avec un email réutilisé d’un test à l’autre (les invités :
  * aide/emails.ts) : tout ce que le test lira ensuite vient de lui.
  */
 export async function oublierEmail(email: string): Promise<void> {
@@ -152,7 +162,7 @@ export async function oublierEmail(email: string): Promise<void> {
     await tx`delete from users where email = ${e}`;
     await tx`delete from login_codes where email = ${e}`;
     await tx`delete from waitlist where email_hash = ${attente}`;
-    await tx`delete from rate_limits where key in ${tx([empreinte(`limite:code:email:${e}`), empreinte(`limite:attente:mail:${attente}`)])}`;
+    await tx`delete from rate_limits where key in ${tx([...limitesDesCodes(e), empreinte(`limite:attente:mail:${attente}`)])}`;
   });
   oublierMails(e);
 }

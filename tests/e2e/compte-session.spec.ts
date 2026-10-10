@@ -1,13 +1,17 @@
+import type { Page } from "@playwright/test";
+import { CLE_PARCOURS, CLE_REPRISE } from "../../src/state/cles";
 import {
   attendreTaches,
   compteDe,
   connecterParApi,
   deconnecterParApi,
   demanderCode,
+  dernierCode,
   emailLibre,
   expect,
   lireUneConvParApi,
   nouvelInvite,
+  origine,
   ouvrir,
   saisirLeCodeRecu,
   sessionsDe,
@@ -17,8 +21,9 @@ import {
 
 /*
  * La session : les pages d’un compte sans session renvoient à la connexion, qui ramène ensuite à la page demandée ; la
- * landing reconnaît qui revient ; se déconnecter ferme la session. Les comptes sont préparés par les routes /api
- * (aide/compte.ts), la connexion qu’on vérifie se fait à l’écran.
+ * landing reconnaît qui revient ; se déconnecter (de cet appareil, ou de tous) ferme la session ; le code ne vaut que
+ * dans le navigateur qui l’a demandé. Les comptes sont préparés par les routes /api (aide/compte.ts), la connexion et la
+ * déconnexion qu’on vérifie se font à l’écran.
  */
 
 /* Chaque page, et la page où la connexion ramène ensuite (encodée dans ?suite=) */
@@ -79,11 +84,13 @@ test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrou
   await lireUneConvParApi(page, testInfo);
   await attendreTaches(email);
 
-  await test.step("avec sa conv : « Ouvrir BLUSH », « Retrouver ma conv », Maëlys qui attend, et Mon compte en bas", async () => {
+  await test.step("avec sa conv : « Ouvrir BLUSH », « Retrouver ma conv », sa conv qui attend sans le prénom de l’autre, et Mon compte en bas", async () => {
     await page.goto("/");
     await expect(entete.getByRole("link", { name: "Ouvrir BLUSH" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Retrouver ma conv" }).first()).toBeVisible();
-    await expect(page.getByText("Ta conv avec Maëlys t’attend").first()).toBeVisible();
+    /* Qui tient l’appareil lit la landing sans rien toucher : elle ne dit pas avec qui */
+    await expect(page.getByText("Ta conv t’attend").first()).toBeVisible();
+    await expect(page.getByText(/Ta conv avec/)).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Pied de page" }).getByRole("link", { name: "Mon compte" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Se connecter" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Commencer" })).toHaveCount(0);
@@ -164,19 +171,65 @@ test("après la connexion, « suite » ne mène jamais vers un autre site : seul
   });
 });
 
-/*
- * Bug : aucun écran ne permet de se déconnecter. La route existe (src/app/api/auth/deconnexion/route.ts:9), mais rien ne
- * l’appelle : ni l’appli (src/services/api.ts, à côté de verifyLoginCode ligne 346), ni Mon compte
- * (src/app/compte/CompteScreen.tsx:202, « Tes données »). Sur un appareil partagé, la personne suivante retrouve la conv.
- * Ce test décrit le bon comportement : un « Se déconnecter » dans Mon compte, qui ferme la session.
- */
-test.fixme("Mon compte propose de se déconnecter : la session se ferme, et Mon compte redemande ensuite la connexion", async ({ page }, testInfo) => {
+/** Dans Mon compte : une ligne de « Ta connexion », puis le bouton de sa feuille. */
+async function seDeconnecterDansMonCompte(page: Page, { partout = false } = {}): Promise<void> {
+  await ouvrir(page, "/compte");
+  const [ligne, titre, bouton] = partout
+    ? [/^Se déconnecter de tous les appareils/, "Se déconnecter de tous les appareils\u00a0?", "Se déconnecter de partout"]
+    : [/^Se déconnecter Sur cet appareil/, "Se déconnecter\u00a0?", "Se déconnecter"];
+  await page.getByRole("main").getByRole("button", { name: ligne }).click();
+  await page.getByRole("dialog", { name: titre }).getByRole("button", { name: bouton, exact: true }).click();
+  /* Un chargement neuf de la landing, celle de tous */
+  await expect(page).toHaveURL(`${URL_APPLI}/`);
+  await expect(page.getByRole("banner").getByRole("link", { name: "Se connecter" })).toBeVisible();
+}
+
+test("Mon compte propose de se déconnecter : la session se ferme, le navigateur oublie ce qu’il gardait, et Mon compte redemande la connexion", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "bouton-deconnexion");
   await connecterParApi(page, testInfo, email);
   await ouvrir(page, "/compte");
-  await page.getByRole("main").getByRole("button", { name: /^Se déconnecter/ }).click();
-  await expect(page).not.toHaveURL(/\/compte$/);
+  /* Ce que le navigateur garde de BLUSH (src/state/cles.ts) : où tu t’étais arrêté dans le rapport, le parcours de l’onglet */
+  await page.evaluate(([reprise, parcours]) => {
+    localStorage.setItem(reprise, "{}");
+    sessionStorage.setItem(parcours, "{}");
+  }, [CLE_REPRISE, CLE_PARCOURS]);
+
+  await seDeconnecterDansMonCompte(page);
   await expect.poll(() => sessionsDe(email)).toBe(0);
+  expect(await page.evaluate(([reprise, parcours]) => [localStorage.getItem(reprise), sessionStorage.getItem(parcours)], [CLE_REPRISE, CLE_PARCOURS])).toEqual([null, null]);
   await page.goto("/compte");
   await expect(page).toHaveURL(urlDeConnexion("/compte"));
+});
+
+test("« Se déconnecter de tous les appareils » ferme aussi la session de l’autre appareil", async ({ page, autreAppareil }, testInfo) => {
+  const email = emailLibre(testInfo, "partout");
+  await connecterParApi(page, testInfo, email);
+  const ordi = await autreAppareil();
+  await connecterParApi(ordi, testInfo, email);
+  expect(await sessionsDe(email)).toBe(2);
+
+  await seDeconnecterDansMonCompte(page, { partout: true });
+  await expect.poll(() => sessionsDe(email)).toBe(0);
+  await ordi.goto("/compte");
+  await expect(ordi).toHaveURL(urlDeConnexion("/compte"));
+});
+
+test("le code ne vaut que dans le navigateur qui l’a demandé : tapé sur un autre appareil, il ne marche pas ; là où il a été demandé, si", async ({ page, autreAppareil }, testInfo) => {
+  const email = emailLibre(testInfo, "navigateur");
+  await page.goto("/connexion");
+  const depuis = await demanderCode(page, email);
+  const code = await dernierCode(email, { depuis });
+
+  await test.step("sur un autre appareil, le même email et le même code : refusé, et rien ne s’ouvre", async () => {
+    const telephone = await autreAppareil();
+    const essai = await telephone.request.post("/api/auth/verifier", { headers: origine(testInfo), data: { email, code } });
+    expect(await essai.json()).toEqual({ ok: false });
+    expect(await compteDe(email)).toBeNull();
+  });
+
+  await test.step("dans le navigateur qui l’a demandé : il ouvre la session", async () => {
+    await saisirLeCodeRecu(page, email, depuis);
+    await expect(page).toHaveURL(/\/commencer$/);
+    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+  });
 });

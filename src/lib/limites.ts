@@ -35,6 +35,11 @@ export const QUESTION_MAX = 200;
 
 /** Combien de minutes un code de connexion marche : en base (src/server/auth.ts), sur l’écran du code et dans son mail. */
 export const CODE_MINUTES = 10;
+/**
+ * Une minute au moins entre deux mails de code pour un même email dans un même navigateur : le serveur n’en écrit pas
+ * d’autre tant que le dernier, encore bon, a moins d’une minute (src/server/auth.ts), et « Renvoyer le code » attend autant.
+ */
+export const CODE_RENVOI_S = 60;
 
 /** L’extension d’un vocal, d’après le type que le navigateur a enregistré (webm sur Chrome, mp4 sur Safari, d’où « m4a » par défaut). */
 export const extensionAudio = (type: string) => (type.includes("webm") ? "webm" : type.includes("ogg") ? "ogg" : type.includes("wav") ? "wav" : type.includes("mpeg") ? "mp3" : "m4a");

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
 /*
@@ -18,8 +19,11 @@ const VARIANTES: Record<string, string> = {
   "/importer/captures": "/importer/captures/fermee",
 };
 
-/** Le cookie de session (src/server/cookies.ts) : sa seule présence, sans le vérifier, comme aUneSession. */
-const SESSION = "blush-session";
+/**
+ * Le cookie de session (src/server/cookies.ts) : sa seule présence, sans le vérifier, comme aUneSession. Sous l’un ou
+ * l’autre de ses noms (__Host- en https : src/lib/noms-cookies.ts).
+ */
+const connecte = (request: NextRequest) => NOMS_DE_SESSION.some((nom) => request.cookies.has(nom));
 
 /**
  * Les outils de l’équipe : les aperçus (/apercu, des données fictives ou des rapports locaux) et le design system. Ils
@@ -36,7 +40,7 @@ export function proxy(request: NextRequest) {
   const variante = VARIANTES[pathname];
   if (!variante || !betaFermee()) return NextResponse.next();
   /* Déjà connecté (une autre conv) : /commencer sans la liste d’attente (next.config.ts sert alors /commencer/connecte) */
-  if (pathname === "/commencer" && request.cookies.has(SESSION)) return NextResponse.next();
+  if (pathname === "/commencer" && connecte(request)) return NextResponse.next();
   const url = request.nextUrl.clone();
   url.pathname = variante;
   return NextResponse.rewrite(url);

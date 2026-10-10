@@ -79,8 +79,11 @@ describe("la bêta fermée : ses variantes, inchangées", () => {
     for (const vercel of ["1", undefined]) {
       vi.stubEnv("VERCEL", vercel);
       for (const [url, variante] of Object.entries(VARIANTES)) expect(reecriteVers(proxy(requete(url))), url).toBe(variante);
-      expect(passe(proxy(requete("/commencer", { "blush-session": "une-session" })))).toBe(true);
-      expect(reecriteVers(proxy(requete("/email/code", { "blush-session": "une-session" })))).toBe("/email/code/fermee");
+      /* La session sous ses deux noms : __Host- en https, sans préfixe en http (src/lib/noms-cookies.ts) */
+      for (const session of ["__Host-blush-session", "blush-session"]) {
+        expect(passe(proxy(requete("/commencer", { [session]: "une-session" }))), session).toBe(true);
+        expect(reecriteVers(proxy(requete("/email/code", { [session]: "une-session" }))), session).toBe("/email/code/fermee");
+      }
     }
   });
 });

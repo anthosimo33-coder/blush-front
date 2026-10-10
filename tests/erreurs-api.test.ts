@@ -17,6 +17,8 @@ describe("le serveur", () => {
       interdit: 401,
       beta: 403,
       trop: 429,
+      codes: 429,
+      essais: 429,
       aucune: 404,
       introuvable: 404,
       lien: 404,
@@ -73,6 +75,8 @@ describe("le serveur", () => {
 describe("les écrans", () => {
   it("chaque action dit le texte de son code, sinon son texte par défaut (le réseau, un bug)", () => {
     expect(messageErreur("code", api("trop"))).toBe("Trop de codes demandés. Réessaie dans une heure.");
+    expect(messageErreur("code", api("codes"))).toBe("Trop de codes demandés aujourd’hui. Réessaie demain.");
+    expect(messageErreur("verification", api("essais"))).toBe("Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.");
     expect(messageErreur("code", new TypeError("Failed to fetch"))).toBe("Le code n’est pas parti. Réessaie dans un instant.");
     expect(messageErreur("verification", api("beta"))).toBe("Cet email n’est pas encore dans la bêta.");
     expect(messageErreur("relance", api("pas_pret"))).toBe("Ça n’a pas pu repartir. Vérifie ta connexion et réessaie.");

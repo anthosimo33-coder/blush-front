@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { NOMS_DE_SESSION } from "./src/lib/noms-cookies";
 
 /* Les en-têtes de sécurité, sur toutes les pages et toutes les routes /api */
 const SECURITE = [
@@ -15,8 +16,12 @@ const SECURITE = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
 ];
 
-/* Le cookie de session (src/server/cookies.ts) : sa seule présence choisit la variante d’une page, sans le vérifier */
-const SESSION = { type: "cookie" as const, key: "blush-session" };
+/*
+ * Le cookie de session (src/server/cookies.ts) : sa seule présence choisit la variante d’une page, sans le vérifier. Il a
+ * deux noms (__Host- en https : src/lib/noms-cookies.ts) ; `has` ne sait pas dire « l’un ou l’autre », d’où une règle
+ * par nom.
+ */
+const avecSession = (source: string, destination: string) => NOMS_DE_SESSION.map((key) => ({ source, has: [{ type: "cookie" as const, key }], destination }));
 
 const nextConfig: NextConfig = {
   async redirects() {
@@ -39,9 +44,9 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        { source: "/", has: [SESSION], destination: "/retour" },
-        { source: "/commencer", has: [SESSION], destination: "/commencer/connecte" },
-        { source: "/connexion", has: [SESSION], destination: "/connexion/connecte" },
+        ...avecSession("/", "/retour"),
+        ...avecSession("/commencer", "/commencer/connecte"),
+        ...avecSession("/connexion", "/connexion/connecte"),
       ],
       afterFiles: [],
       fallback: [],

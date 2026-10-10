@@ -21,10 +21,10 @@ const CTA = "/commencer";
 
 /**
  * Qui revient : connecté, avec une conv déjà lue (src/app/retour). La landing l’envoie alors vers son accueil plutôt
- * que vers le parcours. `autre` : le prénom de l’autre, une fois « Qui es-tu ? » rempli. `destination` : la page où sa
- * conv en est (« Qui es-tu ? », la lecture, ou l’accueil), sans passer par les redirections de l’accueil.
+ * que vers le parcours, sans dire avec qui (qui tient l’appareil le lirait sans rien toucher). `destination` : la page où
+ * sa conv en est (« Qui es-tu ? », la lecture, ou l’accueil), sans passer par les redirections de l’accueil.
  */
-export type Retour = { autre: string | null; destination?: string } | null;
+export type Retour = { destination?: string } | null;
 const RetourContext = createContext<Retour>(null);
 
 /**
@@ -36,7 +36,7 @@ export function useCta() {
   const retour = useContext(RetourContext);
   if (!retour) return { href: CTA, label: "Analyser ma conv", note: "Aperçu gratuit · Sans mot de passe", header: "Commencer", prefetch: undefined, scroll: true };
   const href = retour.destination ?? "/app";
-  return { href, label: "Retrouver ma conv", note: retour.autre ? `Ta conv avec ${retour.autre} t’attend` : "Ta conv t’attend", header: "Ouvrir BLUSH", prefetch: href === "/app" ? true : undefined, scroll: href !== "/app" };
+  return { href, label: "Retrouver ma conv", note: "Ta conv t’attend", header: "Ouvrir BLUSH", prefetch: href === "/app" ? true : undefined, scroll: href !== "/app" };
 }
 
 /** Les blocs apparaissent en douceur au défilement (rien ne bouge si l’appareil demande moins d’animations). */

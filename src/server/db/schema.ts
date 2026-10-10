@@ -35,14 +35,22 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
-/** Un code de connexion par email à la fois : son empreinte, sa date limite, les essais. */
-export const loginCodes = pgTable("login_codes", {
-  email: text("email").primaryKey(),
-  codeHash: text("code_hash").notNull(),
-  expiresAt: quand("expires_at").notNull(),
-  attempts: integer("attempts").notNull().default(0),
-  createdAt: quand("created_at").notNull().defaultNow(),
-});
+/**
+ * Un code de connexion par email et par navigateur : son empreinte, sa date limite, les essais. Le code ne vaut que dans
+ * le navigateur qui l’a demandé : `navigateur` est l’empreinte du jeton de son cookie (src/server/auth.ts).
+ */
+export const loginCodes = pgTable(
+  "login_codes",
+  {
+    email: text("email").notNull(),
+    navigateur: text("navigateur").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: quand("expires_at").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: quand("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.email, t.navigateur] })],
+);
 
 /**
  * Une histoire : une conv importée. D’abord un brouillon anonyme (avant l’email), puis rattachée à un compte.

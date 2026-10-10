@@ -58,7 +58,8 @@ test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la l
     expect(await rejoindreLaListe(page, dehors)).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Tu es sur la liste." })).toBeVisible();
     expect(await placeSurLaListe(dehors)).toEqual({ source: "accueil" });
-    expect(mailsPour(dehors).map((m) => m.sujet)).toEqual(["Tu es sur la liste de BLUSH", "Tu es sur la liste de BLUSH"]);
+    /* Le mail part juste après la réponse (src/app/api/attente/route.ts) */
+    await expect.poll(() => mailsPour(dehors).map((m) => m.sujet)).toEqual(["Tu es sur la liste de BLUSH", "Tu es sur la liste de BLUSH"]);
   });
 
   await test.step("un invité : exactement la même confirmation, mais son mail lui dit que sa place est prête", async () => {

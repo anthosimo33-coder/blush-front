@@ -344,6 +344,21 @@ export async function verifyLoginCode(email: string, code: string): Promise<{ ok
   return appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code }));
 }
 
+/**
+ * Se déconnecter de cet appareil, ou de tous (`partout`). Le serveur fait oublier au navigateur ce qu’il garde de BLUSH
+ * (Clear-Site-Data) ; on le vide aussi d’ici, pour un navigateur qui ignorerait l’en-tête. À l’écran de repartir ensuite
+ * d’un chargement neuf : rien de la session ne reste en mémoire.
+ */
+export async function seDeconnecter({ partout = false } = {}): Promise<void> {
+  await appel<{ ok: true }>("/api/auth/deconnexion", envoi("POST", { partout }));
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {
+    /* Un stockage refusé (navigation privée) : rien n’y était gardé */
+  }
+}
+
 export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
   return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", { me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) })));
 }

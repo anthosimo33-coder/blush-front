@@ -12,9 +12,9 @@ import { seConnecter } from "./parcours";
 
 /**
  * Se connecter avec l’email de l’équipe (ADMIN, dans BLUSH_ADMINS), par l’interface. Il n’y en a qu’un pour tous les
- * workers, et un seul code par email à la fois (le second efface le premier) : deux connexions en même temps se
- * gêneraient. Un verrou Postgres les fait passer l’une après l’autre ; et son compteur de codes (5 par heure) repart
- * de zéro, pour --repeat-each.
+ * workers : deux connexions en même temps liraient l’une le code de l’autre dans la boîte à mails (le dernier arrivé),
+ * qui ne vaut que dans le navigateur qui l’a demandé. Un verrou Postgres les fait passer l’une après l’autre ; et ses
+ * compteurs de codes (dix par jour) repartent de zéro, pour --repeat-each.
  */
 export async function seConnecterAdmin(page: Page, { timeout = RESEAU }: { timeout?: number } = {}): Promise<void> {
   const verrou = await sql().reserve();

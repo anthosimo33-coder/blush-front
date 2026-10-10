@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { invalidate, setQueryData, useQuery } from "@/lib/query";
+import { invalidate, setQueryData } from "@/lib/query";
+import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
-import { deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
+import { deleteAccount, deleteStory, seDeconnecter, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/contenu/offres";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -21,9 +22,13 @@ import type { ConvSummary, Person } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
 import { NBSP } from "@/lib/format";
 
-type Confirm = "keep" | "story" | "all" | null;
+/* La feuille ouverte : ce que BLUSH garde, une suppression (l’histoire, tout), ou une déconnexion (cet appareil, partout) */
+type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
 
-/* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
+/*
+ * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, l’abonnement, l’app, ta connexion (se
+ * déconnecter), puis tes données (les gestes qui effacent en rouge).
+ */
 export type NomsDuCompte = { me: Person; other: Person; period: string };
 
 /**
@@ -33,7 +38,7 @@ export type NomsDuCompte = { me: Person; other: Person; period: string };
  */
 export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
   const router = useRouter();
-  const { data: account } = useQuery("account", getAccount, compte ?? undefined, { rendu, frais: 10_000 });
+  const { data: account } = useCompte(compte ?? undefined, { rendu, frais: 10_000 });
   /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
   const [ouverture, demarrer] = useTransition();
   const [ouverte, setOuverte] = useState<string | null>(null);
@@ -108,8 +113,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               sub={c.current ? "Ouverte sur l’accueil" : c.lastLabel}
               onClick={() => {
                 if (ouverture) return;
-                openConv(c.storyId);
-                invalidate("report", "account");
+                changerDeConv(c.storyId);
                 setOuverte(c.storyId);
                 versAccueil();
               }}
@@ -157,7 +161,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         {plus && sub && (
           <InsetRow
             title="Mettre en pause"
-            sub={souciPause ? "Pas enregistré : vérifie ta connexion et réessaie." : "Ton histoire reste gardée, rien n’est facturé"}
+            sub={souciPause ? "Pas enregistré\u00a0: vérifie ta connexion et réessaie." : "Ton histoire reste gardée, rien n’est facturé"}
             trailing={
               <Switch
                 checked={sub.paused}
@@ -199,6 +203,12 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         />
       </InsetGroup>
 
+      {/* Se déconnecter : de cet appareil, ou de tous (un appareil perdu, prêté). Rien n’est effacé */}
+      <InsetGroup title="Ta connexion" id="connexion" className="mt-6" footer={"Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver."}>
+        <InsetRow leading={<RowIcon icon="user" />} title="Se déconnecter" sub="Sur cet appareil" onClick={() => setConfirm("sortie")} chevron />
+        <InsetRow leading={<RowIcon icon="shield" />} title="Se déconnecter de tous les appareils" sub="Un téléphone perdu, un ordi prêté" onClick={() => setConfirm("partout")} chevron />
+      </InsetGroup>
+
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
       <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne servent jamais à entraîner une IA, et tout ce qui en vient est chiffré.">
         <InsetRow leading={<RowIcon icon="eye" tone="vrai" />} title="Ta conv, en sécurité" sub="Ce qui part, qui la lit, combien de temps" href="/confidentialite" chevron />
@@ -207,7 +217,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
 
-      {/* ⚠ Panneaux de confirmation absents des maquettes : textes repris des libellés de l’écran */}
+      {/* TODO(produit): panneaux de confirmation absents des maquettes, textes repris des libellés de l’écran (ceux de la déconnexion compris), à valider */}
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">
         {confirm === "keep" && (
           <>
@@ -253,6 +263,38 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               }
             >
               {confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
+            </Button>
+            <Button variant="link" onClick={fermer}>
+              Annuler
+            </Button>
+          </>
+        )}
+        {(confirm === "sortie" || confirm === "partout") && (
+          <>
+            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+              {confirm === "sortie" ? "Se déconnecter\u00a0?" : "Se déconnecter de tous les appareils\u00a0?"}
+            </h2>
+            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+              {confirm === "sortie" ? "Tes histoires restent gardées. Pour les retrouver, ton email et un code suffisent." : "Celui-ci compris. Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver."}
+            </p>
+            {souci && (
+              <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
+                {souci}
+              </p>
+            )}
+            <Button
+              aria-busy={busy}
+              onClick={() =>
+                busy
+                  ? undefined
+                  : run(
+                      () => seDeconnecter({ partout: confirm === "partout" }),
+                      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un chargement neuf, rien du compte ne reste en mémoire (le cache des requêtes, le parcours)
+                      () => window.location.assign("/"),
+                    )
+              }
+            >
+              {confirm === "sortie" ? "Se déconnecter" : "Se déconnecter de partout"}
             </Button>
             <Button variant="link" onClick={fermer}>
               Annuler

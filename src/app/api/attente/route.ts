@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { Email } from "@/server/auth";
 import { inscrire } from "@/server/attente";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
@@ -9,6 +10,7 @@ export async function POST(req: Request) {
   const email = Email.safeParse((await corps<{ email: string }>(req)).email);
   if (!email.success) return erreur("email");
   if (!(await sousLaLimite(`attente:${ipDe(req)}`, LIMITES.attenteParIp))) return erreur("trop");
-  await inscrire(email.data, "accueil");
+  /* Après la réponse : un mail qui ne part pas ne change pas ce qu’elle dit, ni son temps */
+  after(() => inscrire(email.data, "accueil").catch((e: Error) => console.error("liste d’attente : l’inscription ou son mail n’est pas passé", e.name)));
   return json({ ok: true });
 }

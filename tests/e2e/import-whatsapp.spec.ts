@@ -201,7 +201,7 @@ test("export .zip : Noé importe, corrige son email, puis Échap passe le verdic
     await expect(champ).toHaveAttribute("aria-invalid", "true");
   });
 
-  await test.step("l’email corrigé reçoit le code ; « Renvoyer le code » attend 30 secondes", async () => {
+  await test.step("l’email corrigé reçoit le code ; « Renvoyer le code » attend une minute", async () => {
     const depuis = await demanderCode(page, email);
     await expect(page.getByRole("button", { name: /^Renvoyer le code \(\d+ s\)$/ })).toBeDisabled();
     await saisirLeCodeRecu(page, email, depuis);

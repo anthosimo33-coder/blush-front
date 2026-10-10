@@ -6,7 +6,6 @@
  * tests de bout en bout et le module vide que vitest met à la place de server-only et client-only.
  * Un export qui ne sert qu’aux tests compte comme utilisé : un test le lit. Ce que knip ne voit pas, et qui attend un
  * autre lot :
- * - verifierCode (src/server/auth.ts) ne sert plus qu’aux tests : la PR 2.6 le retire et réécrit ses tests ;
  * - la colonne stories.status n’est jamais lue : sa migration est au lot 3 ;
  * - l’étiquette "01" de src/server/stats.ts : à retirer après un `select distinct task from ai_usage` en production.
  */

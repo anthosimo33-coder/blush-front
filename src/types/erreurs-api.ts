@@ -18,6 +18,10 @@ export const ERREURS_API = {
   beta: 403,
   /** Une limite atteinte (src/server/limites.ts). */
   trop: 429,
+  /** Les codes de connexion du jour : trop demandés pour cet email, ou le plafond des mails atteint pour tous. */
+  codes: 429,
+  /** Trop d’essais de code ratés aujourd’hui pour cet email (src/server/auth.ts, prendreCode). */
+  essais: 429,
 
   /* Ce qu’elle désigne */
   /** Pas de conv ouverte (ou plus). */

@@ -220,7 +220,7 @@ test("les pages publiques, sans compte", async ({ page }) => {
 });
 
 test("le parcours d’un nouveau venu : une conv refusée, l’import, qui es-tu, l’email, le code", async ({ page }, testInfo) => {
-  /* Le bouton « Renvoyer le code » attend 30 secondes */
+  /* Le bouton « Renvoyer le code » attend une minute (CODE_RENVOI_S) */
   test.slow();
   const email = await emailFixe("parcours");
 
@@ -252,7 +252,7 @@ test("le parcours d’un nouveau venu : une conv refusée, l’import, qui es-tu
 
   await test.step("le code, une fois « Renvoyer le code » libre (son compte à rebours avance chaque seconde)", async () => {
     await demanderCode(page, email);
-    await expect(page.getByRole("button", { name: "Renvoyer le code" })).toBeEnabled({ timeout: 40_000 });
+    await expect(page.getByRole("button", { name: "Renvoyer le code" })).toBeEnabled({ timeout: 70_000 });
     await capturer(page, "email-code");
   });
 });

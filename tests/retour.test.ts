@@ -13,7 +13,7 @@ vi.mock("next/headers", () => ({
     get: (n: string) => (etat.cookies.has(n) ? { name: n, value: etat.cookies.get(n)! } : undefined),
     has: (n: string) => etat.cookies.has(n),
     set: (n: string, v: string) => etat.cookies.set(n, v),
-    delete: (n: string) => etat.cookies.delete(n),
+    delete: (n: string | { name: string }) => etat.cookies.delete(typeof n === "string" ? n : n.name),
   }),
   headers: async () => new Headers(),
 }));

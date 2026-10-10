@@ -19,7 +19,9 @@ export const lireConvDeLaPage = () => convDeLaPage;
 
 export function writeStoryCookie(storyId: string) {
   if (typeof document === "undefined") return;
-  document.cookie = `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; max-age=31536000; samesite=lax`;
+  /* Secure en https, comme le serveur la pose (src/server/cookies.ts) : jamais envoyée en clair */
+  const secure = location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `${STORY_COOKIE}=${encodeURIComponent(storyId)}; path=/; max-age=31536000; samesite=lax${secure}`;
 }
 
 /** L’arrivée de l’accueil ne se joue qu’une fois par jour : ce cookie la saute jusqu’à minuit (heure du téléphone). */

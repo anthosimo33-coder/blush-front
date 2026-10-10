@@ -15,8 +15,9 @@ import { RESEAU } from "./page";
 export const origine = (testInfo: TestInfo) => ({ origin: String(testInfo.project.use.baseURL) });
 
 /**
- * Se connecter sans passer par l’écran : le code demandé, lu dans la boîte à mails, puis vérifié. Le compte naît au
- * premier bon code (gratuit, ou BLUSH+ pour un invité). La page garde ensuite la session.
+ * Se connecter sans passer par l’écran : le code demandé, lu dans la boîte à mails, puis vérifié, dans le même navigateur
+ * (le code ne vaut que là où il a été demandé). Le compte naît au premier bon code (gratuit, ou BLUSH+ pour un invité). La
+ * page garde ensuite la session.
  */
 export async function connecterParApi(page: Page, testInfo: TestInfo, email: string): Promise<void> {
   const depuis = Date.now();
@@ -76,11 +77,11 @@ export async function lectureFaite(page: Page, testInfo: TestInfo, email: string
 }
 
 /**
- * Se déconnecter par la route de l’appli (POST /api/auth/deconnexion) : aucun écran ne l’appelle encore (le test.fixme de
- * compte-session.spec.ts). `autreSite` : la même requête, venue d’un autre site. Renvoie le statut de la réponse.
+ * Se déconnecter par la route de l’appli (POST /api/auth/deconnexion), sans passer par Mon compte : `partout`, de tous les
+ * appareils ; `autreSite`, la même requête venue d’un autre site. Renvoie le statut de la réponse.
  */
-export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreSite = false } = {}): Promise<number> {
-  const r = await page.request.post("/api/auth/deconnexion", { headers: autreSite ? { origin: "https://exemple.test" } : origine(testInfo), timeout: RESEAU });
+export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreSite = false, partout = false } = {}): Promise<number> {
+  const r = await page.request.post("/api/auth/deconnexion", { headers: autreSite ? { origin: "https://exemple.test" } : origine(testInfo), data: { partout }, timeout: RESEAU });
   return r.status();
 }
 

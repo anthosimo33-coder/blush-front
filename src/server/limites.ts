@@ -1,13 +1,28 @@
 import "server-only";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { empreinte } from "./chiffrement";
 import { db, schema } from "./db";
 
 /** Les limites anti-abus : combien de fois, sur quelle fenêtre. */
 export const LIMITES = {
-  codeParEmail: { max: 5, fenetreS: 3600 },
+  /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
   codeParIp: { max: 20, fenetreS: 3600 },
+  /**
+   * Les codes demandés pour un email (canonique : src/server/email-canonique.ts) depuis une même adresse IP, par jour. En
+   * dessous du plafond de l’email : quelqu’un qui en demande pour l’email d’un autre, d’une seule adresse, lui en laisse.
+   */
+  codeParEmailEtIp: { max: 7, fenetreS: 86400 },
+  /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. */
+  codeParEmail: { max: 10, fenetreS: 86400 },
+  /**
+   * Les mails de code, pour tous et par jour : sous le quota de Resend, pour que les codes partent toujours (une alerte à
+   * 80 %). Au plafond, tout le monde voit « trop de codes ». Sans la boîte des tests de bout en bout, dont les mails ne
+   * partent pas.
+   */
+  mailsCodeParJour: { max: 80, fenetreS: 86400 },
   verificationParIp: { max: 30, fenetreS: 3600 },
+  /** Les essais de code ratés pour un email (canonique), par jour : un nouveau code ne remet pas ce compte à zéro. */
+  echecsCodeParEmail: { max: 20, fenetreS: 86400 },
   importParIp: { max: 20, fenetreS: 3600 },
   chatParCompte: { max: 150, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
@@ -22,6 +37,8 @@ export const LIMITES = {
   attenteParIp: { max: 10, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
+  /** Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent pas épuiser le quota des codes. */
+  mailsAttenteParJour: { max: 50, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
@@ -45,24 +62,46 @@ export const LIMITES = {
   ficheParCompte: { max: 60, fenetreS: 86400 },
 } as const;
 
-/**
- * Compte un passage pour `cle` et dit s’il reste sous la limite. Une seule requête, atomique :
- * la fenêtre repart à zéro quand elle a expiré.
- */
-export async function sousLaLimite(cle: string, { max, fenetreS }: { max: number; fenetreS: number }): Promise<boolean> {
+type Limite = { max: number; fenetreS: number };
+/* L’empreinte de la clé : une adresse IP ou un email n’est jamais gardé en clair */
+const cleDe = (cle: string) => empreinte(`limite:${cle}`);
+/* La fenêtre de cette limite a expiré : le compte repart de zéro */
+const expiree = (fenetreS: number) => sql`${schema.rateLimits.windowStart} < now() - make_interval(secs => ${fenetreS})`;
+
+/** Compte un passage pour `cle`, et renvoie le compte de la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré. */
+export async function compter(cle: string, { fenetreS }: Limite): Promise<number> {
   const [ligne] = await db()
     .insert(schema.rateLimits)
-    /* L’empreinte de la clé : une adresse IP ou un email n’est jamais gardé en clair */
-    .values({ key: empreinte(`limite:${cle}`), windowStart: new Date(), count: 1 })
+    .values({ key: cleDe(cle), windowStart: new Date(), count: 1 })
     .onConflictDoUpdate({
       target: schema.rateLimits.key,
       set: {
-        count: sql`case when ${schema.rateLimits.windowStart} < now() - make_interval(secs => ${fenetreS}) then 1 else ${schema.rateLimits.count} + 1 end`,
-        windowStart: sql`case when ${schema.rateLimits.windowStart} < now() - make_interval(secs => ${fenetreS}) then now() else ${schema.rateLimits.windowStart} end`,
+        count: sql`case when ${expiree(fenetreS)} then 1 else ${schema.rateLimits.count} + 1 end`,
+        windowStart: sql`case when ${expiree(fenetreS)} then now() else ${schema.rateLimits.windowStart} end`,
       },
     })
     .returning({ count: schema.rateLimits.count });
-  return ligne.count <= max;
+  return ligne.count;
+}
+
+/** Compte un passage pour `cle` et dit s’il reste sous la limite. */
+export const sousLaLimite = async (cle: string, limite: Limite): Promise<boolean> => (await compter(cle, limite)) <= limite.max;
+
+/** La limite est-elle déjà atteinte pour `cle` ? Sans compter de passage. */
+export async function limiteAtteinte(cle: string, { max, fenetreS }: Limite): Promise<boolean> {
+  const [ligne] = await db()
+    .select({ atteinte: sql<boolean>`not (${expiree(fenetreS)}) and ${schema.rateLimits.count} >= ${max}` })
+    .from(schema.rateLimits)
+    .where(eq(schema.rateLimits.key, cleDe(cle)));
+  return ligne?.atteinte ?? false;
+}
+
+/** Rend un passage compté pour `cle` (ce qui l’a compté n’a finalement pas compté : un bon code, par exemple). */
+export async function rendre(cle: string): Promise<void> {
+  await db()
+    .update(schema.rateLimits)
+    .set({ count: sql`greatest(${schema.rateLimits.count} - 1, 0)` })
+    .where(eq(schema.rateLimits.key, cleDe(cle)));
 }
 
 /** L’adresse IP de la requête (derrière le proxy de Vercel). */

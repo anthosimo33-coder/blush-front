@@ -49,8 +49,8 @@ export function oublierMails(email: string): void {
 
 /**
  * Le dernier mail reçu par cet email depuis `depuis` (un Date.now() pris juste avant le geste qui l’envoie) et qui passe
- * `filtre`. Le serveur l’écrit avant de répondre, mais la page peut avoir avancé avant qu’on lise : on relit la boîte
- * jusqu’à le trouver.
+ * `filtre`. Le serveur l’écrit avant ou juste après sa réponse (les codes et la liste d’attente : after()) : on relit
+ * la boîte jusqu’à le trouver.
  */
 export async function attendreMail(
   email: string,

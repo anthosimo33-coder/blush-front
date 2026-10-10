@@ -1,14 +1,18 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
 import { envoyerCodeParEmail } from "./email";
-import { accesLibre, peutEntrer } from "./env";
-import { CODE_MINUTES } from "@/lib/limites";
+import { emailCanonique } from "./email-canonique";
+import { accesLibre, boiteAMails, peutEntrer } from "./env";
+import { compter, LIMITES, limiteAtteinte, rendre } from "./limites";
+import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
-const SESSION_JOURS = 90;
+/** Une session dure un mois, et chaque visite la prolonge d’autant (prolongerSession) : un mois sans visite la ferme. */
+const SESSION_JOURS = 30;
 const CODE_ESSAIS = 5;
 
 export const Email = z
@@ -20,41 +24,106 @@ export const Email = z
 
 export type Utilisateur = typeof schema.users.$inferSelect;
 
-/** Envoie un code à 6 chiffres. On n’en garde que l’empreinte, liée à l’email. */
-export async function envoyerCode(email: string): Promise<void> {
+/* La ligne d’un navigateur : l’empreinte du jeton de son cookie (src/server/cookies.ts, lireNavigateur) */
+const empreinteNavigateur = (navigateur: string) => empreinte(`code:${navigateur}`);
+
+/**
+ * Prépare un nouveau code pour cet email, valable seulement dans le navigateur dont `navigateur` est le jeton, et le
+ * renvoie : il reste à l’écrire (envoyerCode). On n’en garde que l’empreinte, liée à l’email. null : le code de ce
+ * navigateur, encore bon, a moins d’une minute (CODE_RENVOI_S) ; il marche, pas de nouveau mail. Les demandes d’un autre
+ * navigateur ont leur propre ligne : elles ne remplacent jamais ce code.
+ * `envoye` faux (bêta fermée, un email hors de la liste) : la ligne existe aussi, mais aucun code ne la prend. Les essais
+ * y comptent donc comme chez un invité (prendreCode) : rien ne dit qui l’est.
+ * Un nouveau code repart de cinq essais : son navigateur est le seul à pouvoir les jouer, et celui qui veut deviner
+ * prendrait de toute façon un autre navigateur. La vraie borne est celle des essais ratés de la journée pour l’email
+ * (echecsCodeParEmail), qu’aucun code ne remet à zéro.
+ */
+export async function preparerCode(email: string, navigateur: string, { envoye }: { envoye: boolean }): Promise<string | null> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const ligne = { codeHash: empreinte(`${email}:${code}`), expiresAt: new Date(Date.now() + CODE_MINUTES * 60e3), attempts: 0, createdAt: new Date() };
-  await db()
-    .insert(schema.loginCodes)
-    .values({ email, ...ligne })
-    .onConflictDoUpdate({ target: schema.loginCodes.email, set: ligne });
-  await envoyerCodeParEmail(email, code);
+  const c = schema.loginCodes;
+  const ligne = { codeHash: empreinte(envoye ? `${email}:${code}` : jeton()), expiresAt: new Date(Date.now() + CODE_MINUTES * 60e3), attempts: 0, createdAt: new Date() };
+  const [prise] = await db()
+    .insert(c)
+    .values({ email, navigateur: empreinteNavigateur(navigateur), ...ligne })
+    .onConflictDoUpdate({
+      target: [c.email, c.navigateur],
+      set: ligne,
+      /* Remplacé seulement s’il ne sert plus (expiré, ou ses essais épuisés), ou s’il a plus d’une minute */
+      setWhere: or(lt(c.createdAt, new Date(Date.now() - CODE_RENVOI_S * 1e3)), lt(c.expiresAt, new Date()), sql`${c.attempts} >= ${CODE_ESSAIS}`),
+    })
+    .returning({ email: c.email });
+  return prise ? code : null;
 }
 
-/** Prend le code : bon, il est consommé (il ne sert qu’une fois). Faux sinon : mauvais, expiré, ou trop d’essais. */
-export async function prendreCode(email: string, code: string): Promise<boolean> {
+/* Le plafond des mails de code ne compte que ceux qui partent : pas ceux de la boîte des tests de bout en bout */
+const plafondDesMails = () => (boiteAMails() ? null : LIMITES.mailsCodeParJour);
+
+/** Les mails de code du jour ont-ils atteint leur plafond ? Rien n’est compté : la même question pour tous, invités ou non. */
+export async function mailsDeCodeEpuises(): Promise<boolean> {
+  const plafond = plafondDesMails();
+  return !!plafond && (await limiteAtteinte("code:mails", plafond));
+}
+
+/**
+ * Écrit le code à cet email, compté dans le plafond du jour (mailsCodeParJour) : l’équipe est prévenue à 80 %, puis
+ * quand il est atteint (tout le monde voit alors « trop de codes »). Un mail qui ne part pas la prévient aussi, sans
+ * l’email : l’écran dit « regarde tes mails ». Ne rejette jamais : elle tourne après la réponse.
+ */
+export async function envoyerCode(email: string, code: string): Promise<void> {
+  const plafond = plafondDesMails();
+  if (plafond) {
+    const n = await compter("code:mails", plafond);
+    if (n === Math.ceil(plafond.max * 0.8) || n === plafond.max)
+      await alerter(n === plafond.max ? "mails de code : plafond du jour atteint" : "mails de code : 80 % du plafond du jour", [
+        `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (LIMITES.mailsCodeParJour).`,
+        "Au plafond, plus personne ne reçoit de code : chacun voit « trop de codes » jusqu’à la fin de la fenêtre.",
+      ]);
+    /* Passé le plafond entre la question et l’envoi (des demandes en même temps) : pas de mail */
+    if (n > plafond.max) return;
+  }
+  try {
+    await envoyerCodeParEmail(email, code);
+  } catch (e) {
+    /* Une erreur SQL ou réseau peut contenir l’email : seul le statut de Resend passe */
+    const message = e instanceof Error ? e.message : "";
+    await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", `Erreur : ${/^Resend : \d+$/.test(message) ? message : "la base ou le réseau"}`]);
+  }
+}
+
+/**
+ * Ce que vaut un code tapé : bon (et consommé : il ne sert qu’une fois) ; faux (mauvais, expiré, ses essais épuisés, ou
+ * demandé dans un autre navigateur) ; ou « essais », trop d’essais ratés aujourd’hui pour cet email.
+ */
+export type Essai = "bon" | "faux" | "essais";
+
+/** Prend le code tapé dans le navigateur dont `navigateur` est le jeton (sans lui, aucun code ne vaut rien). */
+export async function prendreCode(email: string, code: string, navigateur: string | undefined): Promise<Essai> {
+  /* Sans le cookie du navigateur qui l’a demandé : rien à deviner, donc rien à compter */
+  if (!navigateur) return "faux";
+  const c = schema.loginCodes;
+  const ici = and(eq(c.email, email), eq(c.navigateur, empreinteNavigateur(navigateur)));
   /*
    * L’essai est compté avant de comparer, en une seule requête : des essais envoyés en même temps ne passent pas tous
    * sous la limite (lire puis écrire laissait chacun voir le même compte).
    */
   const [ligne] = await db()
-    .update(schema.loginCodes)
-    .set({ attempts: sql`${schema.loginCodes.attempts} + 1` })
-    .where(and(eq(schema.loginCodes.email, email), lt(schema.loginCodes.attempts, CODE_ESSAIS), gt(schema.loginCodes.expiresAt, new Date())))
-    .returning({ codeHash: schema.loginCodes.codeHash });
-  if (!ligne) return false;
-  if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return false;
+    .update(c)
+    .set({ attempts: sql`${c.attempts} + 1` })
+    .where(and(ici, lt(c.attempts, CODE_ESSAIS), gt(c.expiresAt, new Date())))
+    .returning({ codeHash: c.codeHash });
+  if (!ligne) return "faux";
+  /* Les essais de la journée pour l’email canonique, comptés aussi avant de comparer : un bon code rend le sien */
+  const echecs = `code:echecs:${emailCanonique(email)}`;
+  if ((await compter(echecs, LIMITES.echecsCodeParEmail)) > LIMITES.echecsCodeParEmail.max) return "essais";
+  if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return "faux";
   /* Le code ne sert qu’une fois : deux bons essais en même temps, un seul ouvre la session */
   const [pris] = await db()
-    .delete(schema.loginCodes)
-    .where(and(eq(schema.loginCodes.email, email), eq(schema.loginCodes.codeHash, ligne.codeHash)))
-    .returning({ email: schema.loginCodes.email });
-  return !!pris;
-}
-
-/** Vérifie le code. Bon : crée le compte s’il n’existe pas et le renvoie. */
-export async function verifierCode(email: string, code: string): Promise<Utilisateur | null> {
-  return (await prendreCode(email, code)) ? compteDe(email) : null;
+    .delete(c)
+    .where(and(ici, eq(c.codeHash, ligne.codeHash)))
+    .returning({ email: c.email });
+  if (!pris) return "faux";
+  await rendre(echecs);
+  return "bon";
 }
 
 /** Le compte de cet email, créé s’il n’existe pas. */
@@ -84,8 +153,24 @@ export async function ouvrirSession(userId: string): Promise<{ secret: string; e
 }
 
 /**
+ * Prolonge la session d’un mois à partir de maintenant : chaque visite (src/app/api/reveil) la garde ouverte. Au plus une
+ * fois par jour. Renvoie sa nouvelle fin, que le cookie reprend, ou null : pas de session valide, ou déjà prolongée
+ * aujourd’hui.
+ */
+export async function prolongerSession(secret: string): Promise<Date | null> {
+  const fin = new Date(Date.now() + SESSION_JOURS * 86400e3);
+  const s = schema.sessions;
+  const [prolongee] = await db()
+    .update(s)
+    .set({ expiresAt: fin })
+    .where(and(eq(s.id, empreinte(secret)), gt(s.expiresAt, new Date()), lt(s.expiresAt, new Date(fin.getTime() - 86400e3))))
+    .returning({ id: s.id });
+  return prolongee ? fin : null;
+}
+
+/**
  * Le compte d’une session, ou null. Bêta fermée : un email retiré de la liste n’entre plus, même avec une session
- * ouverte avant (elle dure 90 jours). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
+ * ouverte avant (elle dure tant qu’il revient). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
  */
 export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   if (!secret) return null;
@@ -97,6 +182,19 @@ export async function utilisateurDeSession(secret: string | undefined): Promise<
   return ligne && peutEntrer(ligne.user.email) ? ligne.user : null;
 }
 
-export async function fermerSession(secret: string): Promise<void> {
-  await db().delete(schema.sessions).where(eq(schema.sessions.id, empreinte(secret)));
+/**
+ * Ferme la session ; `partout` : toutes celles de son compte (se déconnecter de tous les appareils), si elle est encore
+ * valide. Les autres appareils redemandent un code à leur prochaine requête.
+ */
+export async function fermerSession(secret: string, { partout = false } = {}): Promise<void> {
+  const s = schema.sessions;
+  if (!partout) {
+    await db().delete(s).where(eq(s.id, empreinte(secret)));
+    return;
+  }
+  const duCompte = db()
+    .select({ userId: s.userId })
+    .from(s)
+    .where(and(eq(s.id, empreinte(secret)), gt(s.expiresAt, new Date())));
+  await db().delete(s).where(inArray(s.userId, duCompte));
 }

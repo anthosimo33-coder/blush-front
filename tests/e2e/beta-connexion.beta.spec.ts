@@ -35,18 +35,23 @@ import {
 
 /**
  * Demande un code depuis l’écran de l’email, et rend la réponse de /api/auth/code : son statut, son corps, et le cookie
- * qu’elle pose (aucun : la conv effacée d’un email hors de la liste garde son cookie, l’effacer changerait la réponse).
+ * qu’elle pose, sans sa valeur ni sa date. Le même pour tous : le jeton du navigateur, auquel le code est lié (la conv
+ * effacée d’un email hors de la liste garde son cookie, l’effacer changerait la réponse).
  */
 async function reponseDuCode(page: Page, email: string): Promise<{ statut: number; corps: unknown; cookie: string | null }> {
   const { reponse } = await envoyerEmail(page, email);
-  return { statut: reponse.status(), corps: await reponse.json(), cookie: await reponse.headerValue("set-cookie") };
+  const cookie = await reponse.headerValue("set-cookie");
+  return { statut: reponse.status(), corps: await reponse.json(), cookie: cookie && cookie.replace(/=[^;]*/, "=…").replace(/expires=[^;]*/i, "Expires=…") };
 }
+/** Le cookie que pose une demande de code acceptée, sous la forme que rend reponseDuCode : celui du navigateur, httpOnly. */
+const COOKIE_DU_CODE = expect.stringMatching(/^blush-code=…; .*HttpOnly/i);
 
 test("/connexion : le même écran et le même statut pour un invité et pour un email hors de la liste ; l’invité reçoit son code et entre, l’autre reçoit le mail de la liste d’attente", async ({ page }, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const debut = Date.now();
   const dehors = emailLibre(testInfo, "dehors");
   const ecrans: Record<string, string> = {};
+  const cookies: (string | null)[] = [];
 
   /* Comme sur un autre appareil : /connexion, l’email, puis l’écran du code */
   const jusquAuCodeDeConnexion = async (email: string) => {
@@ -54,7 +59,8 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
     await expect(page.getByRole("heading", { level: 1, name: "Retrouve tes convs." })).toBeVisible();
     const depuis = Date.now();
     const reponse = await reponseDuCode(page, email);
-    expect(reponse).toEqual({ statut: 200, corps: { email }, cookie: null });
+    expect(reponse).toEqual({ statut: 200, corps: { email }, cookie: COOKIE_DU_CODE });
+    cookies.push(reponse.cookie);
     await expect(page).toHaveURL(/\/connexion\/code$/);
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     await expect(page.getByText(`On vient d’écrire à ${email}.`)).toBeVisible();
@@ -75,6 +81,7 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
   await test.step("un invité : exactement le même écran, et son code arrive", async () => {
     const depuis = await jusquAuCodeDeConnexion(invite);
     expect(ecrans[invite]).toBe(ecrans[dehors]);
+    expect(cookies[1]).toBe(cookies[0]);
     code = await dernierCode(invite, { depuis });
   });
 
@@ -119,14 +126,14 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
     const brouillon = await jusquALEmail(page, convDehors);
     expect(await histoire(brouillon)).toEqual({ aUnCompte: false });
     const depuis = Date.now();
-    expect(await reponseDuCode(page, dehors)).toEqual({ statut: 200, corps: { email: dehors }, cookie: null });
+    expect(await reponseDuCode(page, dehors)).toEqual({ statut: 200, corps: { email: dehors }, cookie: COOKIE_DU_CODE });
     await expect(page).toHaveURL(/\/email\/code$/);
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     await expect(page.getByText(dehors)).toBeVisible();
     ecranDehors = await ecranLu(page, dehors);
 
-    /* La conv n’est pas gardée : effacée avant même la réponse, et le mail le dit */
-    expect(await histoire(brouillon)).toBeNull();
+    /* La conv n’est pas gardée : effacée juste après la réponse (pour qu’elle ne dise rien, ni par son temps), et le mail le dit */
+    await expect.poll(() => histoire(brouillon)).toBeNull();
     const mail = await attendreMail(dehors, { depuis });
     expect(mail.sujet).toBe("Tu es sur la liste de BLUSH");
     expect(mail.texte).toContain("La conv que tu viens d’importer n’a pas été gardée. Tu la renverras ce jour-là.");
@@ -138,7 +145,7 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
   await test.step("l’invité : le même écran, et sa conv est gardée en attendant son code", async () => {
     const brouillon = await jusquALEmail(page, convInvite, { ...REPONSES_NOE, moi: "Sacha" });
     const depuis = Date.now();
-    expect(await reponseDuCode(page, invite)).toEqual({ statut: 200, corps: { email: invite }, cookie: null });
+    expect(await reponseDuCode(page, invite)).toEqual({ statut: 200, corps: { email: invite }, cookie: COOKIE_DU_CODE });
     await expect(page).toHaveURL(/\/email\/code$/);
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     expect(await ecranLu(page, invite)).toBe(ecranDehors);
@@ -162,34 +169,34 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
   });
 });
 
-test("les limites des codes sont les mêmes pour tous : au sixième code en une heure, « Trop de codes demandés », invité ou pas", async ({ page, request }, testInfo) => {
+test("les limites des codes sont les mêmes pour tous : sept codes par jour pour un email depuis une même adresse, puis « Trop de codes demandés aujourd’hui », invité ou pas", async ({ page, request }, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const debut = Date.now();
   const dehors = emailLibre(testInfo, "dehors");
 
-  await test.step("cinq codes demandés coup sur coup passent, pour l’un comme pour l’autre", async () => {
+  await test.step("sept codes demandés coup sur coup passent, pour l’un comme pour l’autre", async () => {
     for (const email of [dehors, invite])
-      for (let k = 0; k < 5; k++) {
+      for (let k = 0; k < 7; k++) {
         const r = await request.post("/api/auth/code", { headers: { origin: URL_BETA }, data: { email } });
         expect(r.status()).toBe(200);
       }
   });
 
   const ecrans: string[] = [];
-  await test.step("le sixième : le même refus à l’écran, et la même réponse, invité ou pas", async () => {
+  await test.step("le huitième : le même refus à l’écran, et la même réponse, invité ou pas", async () => {
     for (const email of [dehors, invite]) {
       await page.goto("/connexion");
-      expect(await reponseDuCode(page, email)).toEqual({ statut: 429, corps: { erreur: "trop" }, cookie: null });
-      await expect(page.getByRole("main").getByRole("alert")).toHaveText("Trop de codes demandés. Réessaie dans une heure.");
+      expect(await reponseDuCode(page, email)).toEqual({ statut: 429, corps: { erreur: "codes" }, cookie: null });
+      await expect(page.getByRole("main").getByRole("alert")).toHaveText("Trop de codes demandés aujourd’hui. Réessaie demain.");
       await expect(page).toHaveURL(/\/connexion$/);
       ecrans.push(await ecranLu(page, email));
     }
     expect(ecrans[1]).toBe(ecrans[0]);
   });
 
-  await test.step("les mails : cinq codes pour l’invité ; trois mails de la liste au plus pour l’autre, pas de rafale chez lui", async () => {
-    expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual(Array(5).fill(expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)));
-    expect(mailsPour(dehors).map((m) => m.sujet)).toEqual(Array(3).fill("Tu es sur la liste de BLUSH"));
+  await test.step("les mails : un seul pour chacun, son navigateur ayant redemandé dans la minute (le code pour l’invité, la liste pour l’autre)", async () => {
+    await expect.poll(() => mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
+    await expect.poll(() => mailsPour(dehors).map((m) => m.sujet)).toEqual(["Tu es sur la liste de BLUSH"]);
   });
 });
 
@@ -199,7 +206,7 @@ test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en
   await test.step("un compte gratuit se connecte sur le serveur ouvert", async () => {
     await page.goto(`${URL_APPLI}/connexion`);
     const depuis = Date.now();
-    expect(await reponseDuCode(page, email)).toEqual({ statut: 200, corps: { email }, cookie: null });
+    expect(await reponseDuCode(page, email)).toEqual({ statut: 200, corps: { email }, cookie: COOKIE_DU_CODE });
     await saisirLeCodeRecu(page, email, depuis);
     await expect(page).toHaveURL(`${URL_APPLI}/commencer`);
     expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });

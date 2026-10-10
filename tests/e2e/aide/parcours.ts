@@ -76,7 +76,7 @@ export async function envoyerEmail(page: Page, email: string): Promise<{ reponse
  */
 export async function demanderCode(page: Page, email: string): Promise<number> {
   const { depuis } = await envoyerEmail(page, email);
-  /* Le mail est écrit avant la réponse du serveur : une fois l’écran du code là, il est dans la boîte */
+  /* Le mail part juste après la réponse du serveur (after()) : dernierCode relit la boîte jusqu’à le trouver */
   await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
   return depuis;
 }

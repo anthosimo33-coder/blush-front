@@ -20,11 +20,14 @@ const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
     trop: "Trop de codes demandés. Réessaie dans une heure.",
+    codes: "Trop de codes demandés aujourd’hui. Réessaie demain.",
     defaut: "Le code n’est pas parti. Réessaie dans un instant.",
   },
   /* La vérification du code reçu (un mauvais code a son propre message, sur l’écran) */
   verification: {
     trop: "Trop d’essais d’un coup. Attends quelques minutes, puis réessaie.",
+    /* TODO(produit): texte à valider */
+    essais: "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.",
     beta: "Cet email n’est pas encore dans la bêta.",
     defaut: "Ça n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },

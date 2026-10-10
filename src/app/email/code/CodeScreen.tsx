@@ -9,7 +9,7 @@ import { play } from "@/lib/sound";
 import { messageErreur } from "@/lib/messages-erreur";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
-import { CODE_MINUTES } from "@/lib/limites";
+import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
@@ -21,7 +21,6 @@ import { quiComplet, reponsesQui, vientDeCaptures } from "@/state/parcours";
 import { retenirLecture } from "@/state/lecture";
 
 const LENGTH = 6;
-const RESEND_AFTER = 30;
 
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
@@ -36,7 +35,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
-  const [wait, setWait] = useState(RESEND_AFTER);
+  const [wait, setWait] = useState(CODE_RENVOI_S);
   const [resent, setResent] = useState(false);
   /* Autre chose qu’un mauvais code : trop d’essais, pas de réseau */
   const [souci, setSouci] = useState<string | null>(null);
@@ -45,7 +44,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   /* Revenir changer d’email garde la page où l’on allait */
   const retour = !connexion ? "/email" : suite === "/app" ? "/connexion" : connexionPuis(suite);
 
-  /* Le bouton « Renvoyer le code » se libère au bout de 30 secondes */
+  /* Le bouton « Renvoyer le code » se libère au bout d’une minute : avant, le serveur n’en écrirait pas d’autre */
   useEffect(() => {
     if (wait <= 0) return;
     const t = setTimeout(() => setWait((w) => w - 1), 1000);
@@ -121,7 +120,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   };
 
   const resend = async () => {
-    setWait(RESEND_AFTER);
+    setWait(CODE_RENVOI_S);
     setWrong(false);
     setSouci(null);
     setResent(false);

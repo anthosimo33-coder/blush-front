@@ -85,6 +85,13 @@
       "when": 1791545101269,
       "tag": "0011_index_par_histoire",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791668688625,
+      "tag": "0012_code_par_navigateur",
+      "breakpoints": true
     }
   ]
 }

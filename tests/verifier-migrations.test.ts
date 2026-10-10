@@ -88,7 +88,7 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
 
   it("refuse un schéma qui a changé sans sa migration (une liste des étapes de la chaîne, et son index unique)", () => {
     /* Le dernier instantané garde l’index d’avant une étape de plus dans GENRES_CHAINE : schema.ts en demande un autre */
-    const chemin = join(dossier, "meta/0011_snapshot.json");
+    const chemin = join(dossier, `meta/${journal().entries.at(-1)!.tag.slice(0, 4)}_snapshot.json`);
     const dernier = JSON.parse(readFileSync(chemin, "utf8")) as { tables: Record<string, { indexes: Record<string, { where: string }> }> };
     const index = dernier.tables["public.tasks"].indexes.tasks_une_par_etape;
     index.where = index.where.replace(", 'memoire')", ")");

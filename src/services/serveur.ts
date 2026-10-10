@@ -4,7 +4,7 @@ import type { Account, HistoriqueChat, ReportPayload } from "./api";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, contexteRequete, convsDe, ficheDe, finDeLecture, questionsDe, rapportDe, storyCourante, utilisateurCourant } from "@/server/donnees";
-import { histoiresDuCompte, metaDe, personnesDe, quiRempli, storyAffichee } from "@/server/histoires";
+import { histoiresDuCompte, metaDe, quiRempli, storyAffichee } from "@/server/histoires";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
 
@@ -104,18 +104,16 @@ export async function getNomsDuCompte(): Promise<{ me: Story["participants"][num
 }
 
 /**
- * Sur la landing, qui revient : connecté, avec une histoire (null sinon), le prénom de l’autre, et où mène « Retrouver ma
- * conv » : « Qui es-tu ? » s’il n’est pas rempli, la lecture tant qu’elle n’est pas finie, sinon son accueil. Sans les
- * redirections en chaîne (/app → /rapport → /lecture → /qui), un aller-retour et un rendu serveur par saut.
+ * Sur la landing, qui revient : connecté, avec une histoire (null sinon), et où mène « Retrouver ma conv » : « Qui es-tu ? »
+ * s’il n’est pas rempli, la lecture tant qu’elle n’est pas finie, sinon son accueil. Sans les redirections en chaîne
+ * (/app → /rapport → /lecture → /qui), un aller-retour et un rendu serveur par saut. Jamais le prénom de l’autre : la
+ * landing s’ouvre à qui tient l’appareil, sans rien toucher.
  */
-export async function getRetour(): Promise<{ autre: string | null; destination: string } | null> {
+export async function getRetour(): Promise<{ destination: string } | null> {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur || !story) return null;
-  const meta = metaDe(story);
-  /* Avant « Qui es-tu ? », on ne sait pas qui est l’autre : pas de prénom plutôt qu’un au hasard */
-  const autre = meta.moi == null ? null : personnesDe(meta).autre.prenom;
-  if (!quiRempli(meta)) return { autre, destination: "/qui" };
-  return { autre, destination: (await finDeLecture(story.id)) ? "/app" : "/lecture" };
+  if (!quiRempli(metaDe(story))) return { destination: "/qui" };
+  return { destination: (await finDeLecture(story.id)) ? "/app" : "/lecture" };
 }
 
 /** Le compte, pour « Mon compte » : son email et son abonnement, dès le rendu serveur. null : pas connecté. */

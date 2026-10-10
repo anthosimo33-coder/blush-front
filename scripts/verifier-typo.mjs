@@ -25,8 +25,6 @@ const RACINE = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXTENSIONS = /\.(ts|tsx|mts|mjs)$/;
 /* Généré depuis les prompts (scripts/prompts.mjs) : pas un texte de l’appli */
 const GENERES = new Set(["src/server/ia/textes.generated.ts"]);
-/* Les fichiers dispensés des insécables jusqu’à la PR qui les réécrit */
-const EXCEPTIONS = new Map([["src/app/compte/CompteScreen.tsx", "réécrit par la PR 2.6 (se déconnecter), qui lève l’exception"]]);
 /*
  * Les fichiers du serveur dont les textes ne s’affichent ni dans l’appli ni dans un mail : le rapport de la veille à
  * l’équipe (alertes.ts), ce que lit et écrit le modèle (ia/, modèle factice compris ; chat.ts et analyse.ts, qui lui
@@ -41,7 +39,7 @@ const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts
  * du serveur qui n’écrivent qu’à l’équipe, aux logs ou au modèle (HORS_DES_TEXTES).
  */
 export function regleDesInsecables(f) {
-  return f.startsWith("src/") && !EXCEPTIONS.has(f) && !HORS_DES_TEXTES.test(f);
+  return f.startsWith("src/") && !HORS_DES_TEXTES.test(f);
 }
 
 const NBSP = " ";

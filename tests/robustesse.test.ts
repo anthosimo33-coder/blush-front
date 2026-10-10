@@ -10,8 +10,8 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import { executerChaine, type DonneesVerdict } from "@/server/analyse";
-import { verifierCode, type Utilisateur } from "@/server/auth";
-import { dechiffrer, empreinte } from "@/server/chiffrement";
+import { compteDe, preparerCode, prendreCode, type Utilisateur } from "@/server/auth";
+import { dechiffrer, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { rapportDe } from "@/server/donnees";
 import { definirQui, depuisFichier, depuisPaquet, ErreurImport, importer, rattacherBrouillon, type LigneComplete } from "@/server/histoires";
@@ -57,24 +57,26 @@ async function lue(f: string): Promise<string> {
 
 describe("le code de connexion", () => {
   const email = emails[1];
-  const poserCode = (code: string) =>
-    db()
-      .insert(schema.loginCodes)
-      .values({ email, codeHash: empreinte(`${email}:${code}`), expiresAt: new Date(Date.now() + 600e3), attempts: 0, createdAt: new Date() })
-      .onConflictDoUpdate({ target: schema.loginCodes.email, set: { codeHash: empreinte(`${email}:${code}`), attempts: 0, expiresAt: new Date(Date.now() + 600e3) } });
+  /* Un code neuf, dans un navigateur à lui (le jeton de son cookie) */
+  const nouveauCode = async () => {
+    const navigateur = jeton();
+    return { navigateur, code: (await preparerCode(email, navigateur, { envoye: true }))! };
+  };
+  /* Le code tapé : bon, le compte s’ouvre (comme /api/auth/verifier) */
+  const entrer = async (navigateur: string, code: string) => ((await prendreCode(email, code, navigateur)) === "bon" ? compteDe(email) : null);
 
   it("ne laisse pas passer plus de 5 essais, même envoyés en même temps", async () => {
-    await poserCode("123456");
-    await Promise.all(Array.from({ length: 20 }, (_, k) => verifierCode(email, String(200000 + k))));
+    const { navigateur, code } = await nouveauCode();
+    await Promise.all(Array.from({ length: 20 }, (_, k) => entrer(navigateur, String(200000 + k))));
     const [c] = await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email));
     expect(c.attempts).toBe(5);
     /* Le bon code ne marche plus : les essais sont épuisés */
-    expect(await verifierCode(email, "123456")).toBeNull();
+    expect(await entrer(navigateur, code)).toBeNull();
   });
 
   it("ne sert qu’une fois : deux bons essais en même temps, une seule session", async () => {
-    await poserCode("654321");
-    const r = await Promise.all([verifierCode(email, "654321"), verifierCode(email, "654321")]);
+    const { navigateur, code } = await nouveauCode();
+    const r = await Promise.all([entrer(navigateur, code), entrer(navigateur, code)]);
     expect(r.filter(Boolean)).toHaveLength(1);
   });
 });

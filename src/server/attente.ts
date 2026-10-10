@@ -14,7 +14,8 @@ export const lienRetrait = (emailHash: string) => `${env().BLUSH_URL}/attente/re
 /**
  * Inscrit un email sur la liste d’attente de la bêta (une seule fois, même s’il revient), et le lui écrit : l’inscription a pu
  * venir de quelqu’un d’autre, le mail donne de quoi se retirer. Un email déjà invité apprend que sa place est prête. Trois
- * mails par jour au plus pour un même email. `convEffacee` : la conv qu’il venait d’importer n’a pas été gardée.
+ * mails par jour au plus pour un même email, cinquante pour tous. `convEffacee` : la conv qu’il venait d’importer n’a pas
+ * été gardée.
  */
 export async function inscrire(email: string, source: SourceAttente, { convEffacee = false } = {}): Promise<void> {
   const propre = email.trim().toLowerCase();
@@ -23,7 +24,9 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
     .insert(schema.waitlist)
     .values({ emailHash, email: chiffrer(propre), source })
     .onConflictDoNothing({ target: schema.waitlist.emailHash });
+  /* Pas de rafale chez une même personne, et un plafond pour tous (le quota de Resend sert d’abord aux codes) : au-delà, on inscrit sans écrire */
   if (!(await sousLaLimite(`attente:mail:${emailHash}`, LIMITES.mailAttenteParEmail))) return;
+  if (!(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
   await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }));
 }
 

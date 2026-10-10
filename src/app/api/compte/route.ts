@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { effacerBrouillon, effacerSession } from "@/server/cookies";
+import { effacerBrouillon, effacerChoisie, effacerSession } from "@/server/cookies";
 import { db, schema } from "@/server/db";
 import { compteDe, contexteRequete } from "@/server/donnees";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { corps, erreur, json, memeOrigine, OUBLIER_LE_NAVIGATEUR } from "@/server/http";
 
 export async function GET() {
   const { utilisateur, story } = await contexteRequete();
@@ -19,12 +19,16 @@ export async function POST(req: Request) {
   return json({ ok: true });
 }
 
-/** « Supprimer mon compte » : le compte, ses sessions et ses histoires, en cascade. */
+/**
+ * « Tout effacer » : le compte, ses sessions (sur tous ses appareils) et ses histoires, en cascade. Ce navigateur oublie
+ * aussi ce qu’il gardait de BLUSH, comme à la déconnexion.
+ */
 export async function DELETE(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
   const { utilisateur } = await contexteRequete();
   if (utilisateur) await db().delete(schema.users).where(eq(schema.users.id, utilisateur.id));
   await effacerSession();
   await effacerBrouillon();
-  return json({ ok: true });
+  await effacerChoisie();
+  return json({ ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
 }
