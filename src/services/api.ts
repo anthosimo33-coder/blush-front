@@ -400,11 +400,6 @@ export async function askQuestion(question: string): Promise<QuestionAnswer> {
   return enQuestion(question, await chat(envoi("POST", { texte: question })));
 }
 
-/** La question déjà posée : jamais, ici. Elle passe par le chat, et son historique est sur l’accueil. */
-export async function getQuestion(): Promise<QuestionAnswer | null> {
-  return null;
-}
-
 /* ———— Au quotidien ———— */
 
 export type { BlushAnswer };
@@ -485,7 +480,7 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
 
 /** La question du rapport, posée au chat : sa première bulle devient le titre, les autres la preuve. */
 function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
-  const bulles = r.kind === "bubbles" ? r.bubbles : [];
+  const bulles = r.bubbles;
   const message = bulles.flatMap((b) => b.messages ?? [])[0];
   return {
     question,
@@ -494,7 +489,7 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
     evidence: bulles.slice(1).map((b) => b.text).join(" · "),
     ...(message ? { message } : {}),
     confidence: "probable",
-    limits: r.kind === "bubbles" && r.ask ? r.ask : "",
+    limits: r.ask ?? "",
   };
 }
 
@@ -521,7 +516,7 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
     /* Rien de lisible, ou une erreur : la fiche reste comme avant, et l’écran dit pourquoi (« rien de neuf » n’est pas une erreur) */
     const code = e instanceof ErreurApi ? e.code : "";
     const problem = code === "rien_de_neuf" ? undefined : code === "capture" || code === "fichier" || code === "autre_conv" || code === "trop" ? code : "bug";
-    return { fiche: await getFiche(), added: [], confirmed: [], ...(problem ? { problem } : {}) };
+    return { fiche: await getFiche(), added: [], ...(problem ? { problem } : {}) };
   }
 }
 

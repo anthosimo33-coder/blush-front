@@ -7,9 +7,8 @@ import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
 import { formatCount } from "@/lib/format";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
-import { setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
-import { askQuestion, getQuestion, souciQuestion } from "@/services/api";
+import { askQuestion, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -20,17 +19,17 @@ import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
 
 /*
- * Écran 12 — Ta question, en conversation avec BLUSH (proposition ; l’écran actuel reste sur ?version=actuelle).
+ * Écran 12 — Ta question, en conversation avec BLUSH.
  * BLUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
  * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
 export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
   /*
-   * La question déjà posée : jamais, elle passe par le chat (son historique est sur l’accueil). Le champ et les idées
-   * sont là dès le premier affichage, sans lecture du navigateur ; la réponse de la visite s’efface au retour sur l’écran.
+   * La réponse de la visite. Pas de question déjà posée à relire : elle passe par le chat (son historique est sur
+   * l’accueil). Le champ et les idées sont là dès le premier affichage ; au retour sur l’écran, la question est à poser.
    */
-  const { data: answer, loading } = useQuery<QuestionAnswer | null>("question", getQuestion, null, { fetch: false });
+  const [answer, setAnswer] = useState<QuestionAnswer | null>(null);
   const { plan } = useAccess();
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
@@ -42,7 +41,6 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const avant = useRef<Map<string, number> | null>(null);
   const question = answer?.question ?? asking?.question ?? null;
   const typed = draft.trim().length > 0;
-  const ready = !loading;
 
   /* Chaque nouveau message fait descendre la conv (pas à l’arrivée sur l’écran) */
   useEffect(() => {
@@ -88,7 +86,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       await new Promise((r) => setTimeout(r, 190));
     }
     if (conv.current) avant.current = snapshotTops([conv.current], () => "conv");
-    setQueryData("question", a);
+    setAnswer(a);
     setAsking(null);
     play("reponse");
   };
@@ -160,7 +158,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       contentGap={16}
       mobileTop={<MobileTopBar back="/rapport" title="Ta question" />}
       desktopBack={{ target: "/rapport", trailing: "Ta question" }}
-      footer={!ready ? undefined : answer ? after : asking ? null : composer}
+      footer={answer ? after : asking ? null : composer}
     >
       {/* BLUSH en grand ; sa bulle s’anime quand il écrit */}
       <div className="flex flex-col items-center pt-1 text-center">
@@ -221,7 +219,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         </div>
 
         {/* Des idées tirées du rapport, comme des réponses toutes prêtes : un toucher la met dans le champ */}
-        {ready && !question && (
+        {!question && (
           <div role="group" aria-labelledby="idees" className="flex flex-col items-end gap-2">
             <p id="idees" className="m-0 mb-0.5 text-[12.5px] font-black text-grey">
               Des idées, tirées de ton rapport

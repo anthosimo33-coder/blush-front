@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { cn } from "@/lib/cn";
 import { figtree } from "@/lib/fonts";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
-import { REPONSE_EXEMPLE, TESTIMONIAL_SLOTS, TESTIMONIALS, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { REPONSE_EXEMPLE, TESTIMONIALS, VERDICT_EXEMPLE } from "@/contenu/landing";
 import { Logo } from "@/components/brand/Logo";
 import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
@@ -67,15 +67,9 @@ export function useReveal(key: number) {
   }, [key]);
 }
 
-/** Les avis à montrer : les vrais, sinon (galerie, /?apercu=avis) des emplacements, sinon rien. */
+/** Les avis à montrer : les vrais seulement (aucun : pas de section). */
 export function useReviews() {
-  const [slots, setSlots] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l’adresse
-    if (new URLSearchParams(window.location.search).get("apercu") === "avis") setSlots(true);
-  }, []);
-  const items = TESTIMONIALS.length > 0 ? TESTIMONIALS : slots ? TESTIMONIAL_SLOTS : [];
-  return { items, slots: TESTIMONIALS.length === 0 };
+  return TESTIMONIALS;
 }
 
 /* ———— Habillage ———— */
@@ -493,7 +487,7 @@ function FromBlush({ children }: { children: ReactNode }) {
 }
 
 /* ———— Les avis (seulement s’il y en a de vrais) ———— */
-export function Reviews({ items, slots }: { items: Testimonial[]; slots: boolean }) {
+export function Reviews({ items }: { items: Testimonial[] }) {
   const track = useRef<HTMLUListElement>(null);
   const move = (dir: 1 | -1) => {
     const el = track.current;
@@ -515,20 +509,15 @@ export function Reviews({ items, slots }: { items: Testimonial[]; slots: boolean
         {items.map((t, i) => (
           <li key={i} className="flex w-[84vw] max-w-[420px] shrink-0 snap-center flex-col gap-5 rounded-[28px] bg-white p-6 shadow-card lg:p-8">
             <div className="flex items-center gap-3.5">
-              {slots ? (
-                <span aria-hidden="true" className="size-14 shrink-0 rounded-full bg-skeleton" />
-              ) : (
-                <Avatar tone="elle" size={56}>
-                  {t.name.charAt(0)}
-                </Avatar>
-              )}
+              <Avatar tone="elle" size={56}>
+                {t.name.charAt(0)}
+              </Avatar>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[18px] font-black">{t.name}</span>
                 <span className="text-[14px] font-extrabold text-grey">{t.label}</span>
               </div>
-              {slots && <span className="shrink-0 rounded-full bg-plaque px-2.5 py-1 text-[12px] font-black text-soft">Emplacement</span>}
             </div>
-            <p className={cn("m-0 text-[17px] font-extrabold leading-[1.6]", slots ? "text-grey" : "text-ink")}>{t.text}</p>
+            <p className="m-0 text-[17px] font-extrabold leading-[1.6] text-ink">{t.text}</p>
           </li>
         ))}
       </ul>

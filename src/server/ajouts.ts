@@ -105,10 +105,14 @@ const profilLu = (a: Ajout) => a.lignes.filter(estLigneProfil).map((l) => l.repl
  * mémoire se met à jour après la réponse (20 à 60 s ; attendre la gardait jusqu’à 2 min devant le chargement). La
  * fiche dit qu’une mise à jour tourne (`updating`) : l’écran la relit jusqu’à ce qu’elle ait fini (GET /api/fiche).
  */
-export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<FicheUpdate> {
+export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<FicheUpdate & { confirmed: [] }> {
   const echange: Echange = { date: aujourdhuiParis().iso, lignes: ajout.lignes, dit: "(il ajoute ça à sa fiche)" };
   const [, fiche] = await Promise.all([planifier(story.id, "memoire_maj", echange), ficheDe(story)]);
   after(() => executerChaine(story.id));
+  /*
+   * `confirmed` (toujours vide, le front ne le lit plus) reste dans la réponse le temps d’une mise en production : un
+   * onglet ouvert avant elle garde l’ancien code, qui le lit sans vérifier (sa fiche planterait). À retirer au lot suivant.
+   */
   return { fiche: { ...fiche, updating: true }, added: [], confirmed: [], pending: { profile: profilLu(ajout), messages: ajout.messages } };
 }
 

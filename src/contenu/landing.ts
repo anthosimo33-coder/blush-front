@@ -236,13 +236,6 @@ export const LANDING_CONVS: LandingConv[] = [
  */
 export const TESTIMONIALS: Testimonial[] = [];
 
-/** Emplacements montrés dans la galerie (/?apercu=avis) pour voir la mise en page, jamais en production. */
-export const TESTIMONIAL_SLOTS: Testimonial[] = Array.from({ length: 3 }, () => ({
-  name: "Prénom",
-  label: "Sa situation",
-  text: "Ici, un vrai avis, publié avec l’accord de la personne. Deux ou trois phrases sur ce que BLUSH lui a appris.",
-}));
-
 /** Dans le bloc BLUSH+, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
 export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confidence" | "limits"> = {
   title: "Rien ne l’indique dans votre conv.",

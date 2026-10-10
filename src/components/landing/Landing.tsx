@@ -11,14 +11,14 @@ import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReview
  */
 export function Landing({ retour = null }: { retour?: Retour }) {
   const reviews = useReviews();
-  useReveal(reviews.items.length);
+  useReveal(reviews.length);
   return (
     <LandingFrame retour={retour}>
       <Hero>
         <ConvsDemo />
       </Hero>
       <BlushPlus />
-      <Reviews {...reviews} />
+      <Reviews items={reviews} />
       <Facts />
       <FinalCta />
     </LandingFrame>

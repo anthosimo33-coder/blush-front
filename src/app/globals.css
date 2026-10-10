@@ -191,11 +191,9 @@
 @keyframes typingIn { 0% { transform: scale(0.25); opacity: 0; } 55% { transform: scale(1.08); opacity: 1; } 78% { transform: scale(0.97); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes typingOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.35); opacity: 0; } }
 @keyframes typingBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
-@keyframes logoLand { 0% { transform: scale(0.55); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 [data-typing] { transform-origin: 9% 89%; animation: typingIn 0.6s cubic-bezier(0.2, 0.8, 0.25, 1) 0.2s both; }
 [data-typing="out"] { animation: typingOut 0.19s cubic-bezier(0.3, 0, 0.8, 0.15) both; }
 [data-typing] > * { transform-origin: 9% 89%; animation: typingBreathe 2.4s ease-in-out 0.8s infinite; }
-[data-land] { transform-origin: 9% 89%; animation: logoLand 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: var(--d, 0s); }
 
 /* ———— Sa fiche : BLUSH analyse ce que tu ajoutes, puis ce qui arrive s’éclaire en rose ———— */
 /* Rien que transform et opacity : le compositeur les joue seul, même pendant que les fichiers se préparent (animer top ou
@@ -488,7 +486,7 @@ html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) 
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-new] { animation: none !important; }
   [data-scan-bar] { animation: none !important; visibility: hidden; }
   [data-beat="doux"]::after { animation: none !important; opacity: 0; }
 }

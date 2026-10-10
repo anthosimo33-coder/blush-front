@@ -131,7 +131,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     setFresh((ids) => [...ids, ...added.map((f) => f.id)]);
     if (!s.ajout) return;
     /* Cinq minutes sans nouvelles, rien d’arrivé : l’écran dit que ça n’a pas marché */
-    const update: FicheUpdate = { fiche, added, confirmed: [], ...(fiche.updating && !added.length ? { problem: "bug" as const } : {}) };
+    const update: FicheUpdate = { fiche, added, ...(fiche.updating && !added.length ? { problem: "bug" as const } : {}) };
     setJob((j) => (j.step === "adding" ? { step: "done", what: j.what, update, before: j.before } : j));
     /* Un toucher par info rangée, chacun un cran plus haut */
     play("ficheRangee", added.length);
@@ -180,7 +180,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     setEditing(false);
     setJob({ step: "reading", what, thumbs, file: files.some((f) => !isImage(f)) });
     /* Sans réseau, même la fiche ne se relit pas : on garde celle qu’on a, et l’écran dit que ça n’a pas marché */
-    const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], confirmed: [], problem: "bug" }));
+    const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], problem: "bug" }));
     setQueryData(key, update.fiche);
     if (update.pending) {
       /*
@@ -457,7 +457,6 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
   );
 }
 
-/** Ce que BLUSH a trouvé et où il l’a rangé. Ce qu’il savait déjà est dit, pas doublé. « Annuler » retire tout. */
 /* Les erreurs de la fiche (textes relus le 8 octobre) */
 function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string, name: string): { title: string; detail: string } {
   const one = what === "ta capture";
@@ -468,11 +467,11 @@ function problemText(problem: NonNullable<FicheUpdate["problem"]>, what: string,
   return { title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." };
 }
 
+/** Ce que BLUSH a trouvé et où il l’a rangé. « Annuler » retire tout. */
 function Found({ what, update, onUndo, onClose }: { what: string; update: FicheUpdate; onUndo: () => void; onClose: () => void }) {
   const n = update.added.length;
   const problem = update.problem ? problemText(update.problem, what, update.fiche.person.name) : null;
   const title = problem?.title ?? (n === 0 ? "Rien de nouveau" : n === 1 ? "1 nouvelle info rangée" : `${n} nouvelles infos rangées`);
-  const rows = [...update.added.map((f) => ({ f, isNew: true })), ...update.confirmed.map((f) => ({ f, isNew: false }))];
   return (
     <section data-rise="" aria-labelledby="trouve-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">
       <div className="flex items-start gap-3 px-4 pb-3 pt-3.5">
@@ -489,17 +488,13 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
           <Icon name="close" size={16} color="#8A8780" stroke={2.6} />
         </button>
       </div>
-      {rows.length > 0 && (
+      {n > 0 && (
         <ul className="m-0 list-none border-t border-[rgba(17,17,20,0.06)] p-0 py-1">
-          {rows.map(({ f, isNew }) => (
+          {update.added.map((f) => (
             <li key={f.id} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
-              <span aria-hidden="true" className={cn("size-[7px] shrink-0 rounded-full", isNew ? "bg-elle" : "bg-[#D9D6CF]")} />
-              <span className={cn("min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35]", !isNew && "text-soft")}>{f.text}</span>
-              {isNew ? (
-                <span className="shrink-0 rounded-full bg-[#F4F2ED] px-2.5 py-1 text-[12px] font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
-              ) : (
-                <span className="shrink-0 text-[12.5px] font-extrabold text-grey">déjà dans sa fiche</span>
-              )}
+              <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-elle" />
+              <span className="min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35]">{f.text}</span>
+              <span className="shrink-0 rounded-full bg-[#F4F2ED] px-2.5 py-1 text-[12px] font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
             </li>
           ))}
         </ul>

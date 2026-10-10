@@ -200,19 +200,18 @@ export type QuestionAnswer = {
 };
 
 /**
- * La réponse de BLUSH dans le chat : l’analyse d’un message (ce qu’il veut dire et ta meilleure réponse),
- * la meilleure réponse seule, une réponse à une question, ou où vous en êtes (avec les niveaux).
- * `quoted` : BLUSH montre d’abord le message qu’il a lu.
+ * La réponse de BLUSH dans le chat, en bulles, comme un pote qui écrit : chaque bulle suivie des messages qu’elle cite,
+ * puis, s’il y a lieu, les messages à envoyer, une question (quand la suite dépend de lui) ou un geste (liker son message).
+ * `incoming` : les messages qu’il a reçus, montrés d’abord.
  */
-export type BlushAnswer = (
-  | { kind: "analysis"; reply: Reply; quoted?: boolean }
-  | { kind: "best"; reply: Reply }
-  | { kind: "answer"; answer: QuestionAnswer }
-  | { kind: "level"; answer: QuestionAnswer }
-  /* La réponse en bulles, comme un pote qui écrit : chaque bulle suivie des messages qu’elle cite, puis, s’il y a lieu,
-     les messages à envoyer, une question (quand la suite dépend de lui) ou un geste (liker son message). */
-  | { kind: "bubbles"; incoming?: Message[]; bubbles: { text: string; messages?: Message[] }[]; send?: string[]; why?: string; ask?: string; react?: string }
-) & {
+export type BlushAnswer = {
+  kind: "bubbles";
+  incoming?: Message[];
+  bubbles: { text: string; messages?: Message[] }[];
+  send?: string[];
+  why?: string;
+  ask?: string;
+  react?: string;
   /** Le nouveau niveau (ou la nouvelle température) que ce message vous fait atteindre. Une fois par niveau. */
   levelUp?: LevelId;
   /** La réponse dite en vocal : l’audio, sa durée (en secondes) et son onde. Ses bulles ne s’affichent pas. */
@@ -226,7 +225,7 @@ export type BlushAnswer = (
 };
 
 /** Une bulle de BLUSH dans le chat, et les messages qu’elle cite. */
-export type BulleChat = Extract<BlushAnswer, { kind: "bubbles" }>["bubbles"][number];
+export type BulleChat = BlushAnswer["bubbles"][number];
 
 /**
  * Back-end : la réponse du chat en flux (POST /api/chat, une ligne JSON par événement). Ses bulles une à une, pendant
@@ -234,16 +233,6 @@ export type BulleChat = Extract<BlushAnswer, { kind: "bubbles" }>["bubbles"][num
  * reste écrite). Une erreur en route remplace la suite.
  */
 export type EvenementChat = { bulle: BulleChat } | { reponse: BlushAnswer } | { vocal: NonNullable<BlushAnswer["vocal"]> | null } | { erreur: string };
-
-export type Reply = {
-  messageId: string;
-  incoming: Message;
-  sourceLabel: string;
-  meaningTitle: string;
-  meaningProof: string;
-  best: string;
-  why: string;
-};
 
 export type FicheSource = "conv" | "capture" | "note";
 
@@ -271,8 +260,6 @@ export type Fiche = {
 export type FicheUpdate = {
   fiche: Fiche;
   added: FicheFact[];
-  /** Ce qu’il savait déjà : l’info reste une seule fois, sa nouvelle source s’ajoute. */
-  confirmed: FicheFact[];
   /**
    * Lu, pas encore rangé (back-end) : ce qu’on lit sur son profil, et le nombre de nouveaux messages. La mémoire se met
    * à jour après la réponse ; `added` arrive quand la fiche ne dit plus `updating`.

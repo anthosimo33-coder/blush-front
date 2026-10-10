@@ -57,7 +57,7 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       transitionTypes={["nav-forward"]}
       onClick={() => {
         openConv(conv.storyId);
-        invalidate("report", "account", "fiche", "question");
+        invalidate("report", "account", "fiche");
       }}
       aria-label={`${conv.person.name} : ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"

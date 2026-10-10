@@ -38,7 +38,7 @@ import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { marquerChatOuvert } from "../rapport/ChatBubble";
 import dynamic from "next/dynamic";
-import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, Tag } from "@/components/ui/messages";
+import { Bubble as MessageBubble, BlushTyping, Tag } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
@@ -46,7 +46,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { reveiller } from "@/components/shell/Reveil";
 import { useHydrated } from "@/state/journey";
-import type { BulleChat, ConvSummary, Fiche, LevelId, Reply, Report } from "@/types";
+import type { BulleChat, ConvSummary, Fiche, LevelId, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { IDEES_MASQUEES } from "./idees";
 import { fusion, idHistorique, memesMessages, remonter, type Conv } from "./garde";
@@ -121,14 +121,13 @@ function useContact() {
 }
 
 /**
- * L’accueil en mouvement (proposition ; ?anim=avant montre l’accueil d’avant).
- * `on` : les animations et les gestes. `arriving` : l’arrivée du jour se joue. Pas `desktop`, inconnu au rendu serveur :
- * connu juste après l’hydratation, il referait toute la conv.
+ * L’accueil en mouvement. `arriving` : l’arrivée du jour se joue. Pas `desktop`, inconnu au rendu serveur : connu juste
+ * après l’hydratation, il referait toute la conv.
  * « Réduire les animations » coupe tout ce qui bouge : globals.css pour le CSS, prefersReducedMotion() pour le reste.
  */
-type HomeMotion = { on: boolean; arriving: boolean };
+type HomeMotion = { arriving: boolean };
 
-const MotionContext = createContext<HomeMotion>({ on: false, arriving: false });
+const MotionContext = createContext<HomeMotion>({ arriving: false });
 
 const useHomeMotion = () => use(MotionContext);
 
@@ -162,8 +161,8 @@ type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answer
  */
 type Msg = (
   | { id: number; from: "blush"; intro: "next" | "hint" }
-  | { id: number; from: "blush"; reading: string; leaving?: boolean; vocal?: boolean; recues?: BulleChat[]; coupee?: boolean }
-  | { id: number; from: "blush"; result: BlushAnswer; fromCapture?: boolean }
+  | { id: number; from: "blush"; reading: string; vocal?: boolean; recues?: BulleChat[]; coupee?: boolean }
+  | { id: number; from: "blush"; result: BlushAnswer }
   | { id: number; from: "toi"; text: string; about?: string }
   | { id: number; from: "toi"; images: string[] }
   | { id: number; from: "toi"; file: { name: string; size: number } }
@@ -262,7 +261,7 @@ function useOpenedAt() {
  * dans les détails du contact (comme la fiche d’un contact dans Messages).
  * Mobile : plein écran. Desktop : une fenêtre de conv.
  *
- * En mouvement (sauf ?anim=avant), onze idées : 1 l’arrivée du jour, 2 BLUSH t’écoute, 3 la question qui s’envole,
+ * En mouvement, onze idées : 1 l’arrivée du jour, 2 BLUSH t’écoute, 3 la question qui s’envole,
  * 4 l’envoi façon Messages, 5 les perles deviennent la réponse, 6 glisse pour l’heure, 7 glisse pour creuser,
  * 8 l’en-tête qui se replie, 9 la bulle s’ouvre, 10 Sophie en glissé (page.tsx et la fiche), 11 le niveau qui monte.
  */
@@ -274,7 +273,6 @@ export function HomeScreen({
   plusAnciens = false,
   modeVocalInitial,
   contact,
-  motion = true,
   arrive = false,
   fromReport = false,
   others = [],
@@ -294,7 +292,6 @@ export function HomeScreen({
   /** Back-end : le mode vocal du chat, tel qu’il est en base (« Repasser à l’écrit » compris). */
   modeVocalInitial?: boolean;
   contact: HomeContact;
-  motion?: boolean;
   arrive?: boolean;
   /** Arrivé par la bulle du rapport : sur mobile, le retour au rapport remplace le bouton du compte. */
   fromReport?: boolean;
@@ -376,7 +373,7 @@ export function HomeScreen({
   const opened = useOpenedAt();
   const desktop = useDesktop();
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
-  const moving = useMemo(() => ({ on: motion, arriving }), [motion, arriving]);
+  const moving = useMemo(() => ({ arriving }), [arriving]);
 
   /* Le chat est ouvert : la bulle du rapport arrête de s’agiter */
   useEffect(() => marquerChatOuvert(), []);
@@ -388,8 +385,8 @@ export function HomeScreen({
    * défaut, sans effet hors d’un glissé). Il reste posé : à l’aller, l’accueil est déjà parti quand React regarde.
    */
   useLayoutEffect(() => {
-    if (motion) document.documentElement.style.viewTransitionName = "root";
-  }, [motion]);
+    document.documentElement.style.viewTransitionName = "root";
+  }, []);
 
   useEffect(() => {
     if (!arriving) return;
@@ -513,14 +510,11 @@ export function HomeScreen({
     const f = flight.current;
     before.current = null;
     flight.current = null;
-    if (!motion || reduced) {
-      toBottom(reduced ? "auto" : "smooth");
-      return;
-    }
     toBottom("auto");
+    if (reduced) return;
     if (f) launch(box, f);
     if (tops) flipFrom(tops, dernieresLignes(box), (el) => el.dataset.row, spring("soft"));
-  }, [msgs, motion]);
+  }, [msgs]);
 
   /*
    * La barre de saisie change de hauteur sans nouveau message (« Tu creuses », le vocal, les questions masquées) :
@@ -719,19 +713,19 @@ export function HomeScreen({
     };
   }, [plus, chargerAnciens, precharger]);
 
-  useHeaderCollapse(head, motion);
+  useHeaderCollapse(head);
   useEnteteAuClavier(head, composer);
 
   /* 11 · La fête quand un niveau tombe : l’anneau se remplit (CSS), Sophie rebondit, des éclats partent */
   useEffect(() => {
-    if (cheer && motion && !prefersReducedMotion()) celebrate();
-  }, [cheer, motion]);
+    if (cheer && !prefersReducedMotion()) celebrate();
+  }, [cheer]);
 
   const id = () => prochainId++;
 
   /** Toute modification de la conv passe par ici : on note d’abord où sont ses lignes, pour les faire glisser ensuite. */
   const update = (fn: (m: Msg[]) => Msg[]) => {
-    if (motion && !before.current && thread.current) before.current = snapshotTops(dernieresLignes(thread.current), (el) => el.dataset.row);
+    if (!before.current && thread.current) before.current = snapshotTops(dernieresLignes(thread.current), (el) => el.dataset.row);
     setMsgs(fn);
   };
 
@@ -779,21 +773,15 @@ export function HomeScreen({
       if (at) return false;
       at = Date.now();
       if (!prefersReducedMotion()) {
-        if (motion) {
-          /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
-          const typing = thread.current?.querySelector(`[data-reading="${readingId}-ecrit"] svg`);
-          if (typing) flight.current = { kind: "logo", bubble: `${readingId}-0`, from: typing.getBoundingClientRect() };
-        } else {
-          /* « BLUSH écrit » se replie d’abord vers sa pointe, puis la réponse monte à sa place */
-          update((m) => m.map((x) => (x.id === readingId ? { ...x, leaving: true } : x)));
-          await new Promise((r) => setTimeout(r, 190));
-        }
+        /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
+        const typing = thread.current?.querySelector(`[data-reading="${readingId}-ecrit"] svg`);
+        if (typing) flight.current = { kind: "logo", bubble: `${readingId}-0`, from: typing.getBoundingClientRect() };
       }
       return true;
     };
-    /* Un pop quand la réponse remplace les perles, deux avec ta meilleure réponse. Rien si tu écris déjà la suite */
-    const pop = (meilleure: boolean) => {
-      if (!input.current?.value) play("reponse", meilleure);
+    /* Un pop quand la réponse remplace les perles. Rien si tu écris déjà la suite */
+    const pop = () => {
+      if (!input.current?.value) play("reponse");
     };
     /* Des bulles arrivées pendant qu’il écrit : elles se posent, BLUSH écrit encore (rien d’animé à part dans une bulle : elle se déplie entière) */
     const poser = (recues: BulleChat[], coupee = false) => async () => {
@@ -804,7 +792,7 @@ export function HomeScreen({
       if (coupee) vagues = [...vagues, poses];
       const v = vagues;
       update((m) => m.map((x) => (x.id === readingId ? { id: readingId, from: "blush", reading: label, vocal, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v } : x)));
-      if (premiere && recues.length) pop(false);
+      if (premiere && recues.length) pop();
     };
     const suivi: SuiviChat = {
       bulles: (recues) => void (file = file.then(poser(recues))),
@@ -832,7 +820,7 @@ export function HomeScreen({
     posee = true;
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
     update((m) => m.map((x) => (x.id === readingId ? ({ ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } as Msg) : x)));
-    if (premiere) pop("result" in next && (next.result.kind === "analysis" || next.result.kind === "best"));
+    if (premiere) pop();
     if ("result" in next && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
     const up = "result" in next ? next.result.levelUp : undefined;
     if (up) window.setTimeout(() => levelUp(up), 700);
@@ -847,7 +835,7 @@ export function HomeScreen({
     void exchange(null, r.label, r.answer, r.vocal, reponse);
   };
 
-  const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }, fromCapture = false) => {
+  const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }) => {
     play("envoi");
     return exchange(mine, modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse", async (suivi) => {
       const ready = payload.text ? answers[payload.text] : undefined;
@@ -856,7 +844,7 @@ export function HomeScreen({
         : liveUrl && payload.text && !payload.files
           ? await askLive(liveUrl, payload.text, historyOf(msgs))
           : await sendToBlush(payload, suivi);
-      return { from: "blush", result, fromCapture };
+      return { from: "blush", result };
     }, modeVocal);
   };
 
@@ -864,7 +852,7 @@ export function HomeScreen({
   const sendQuick = (q: string, chip?: HTMLElement) => {
     setAsked((a) => [...a, q]);
     const mine = id();
-    if (motion && chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: `${mine}-0`, text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
+    if (chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: `${mine}-0`, text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
     ask({ id: mine, from: "toi", text: q }, { text: q });
   };
 
@@ -873,7 +861,7 @@ export function HomeScreen({
     const mine = id();
     const field = input.current;
     /* 4 · L’envoi façon Messages : ton texte quitte le champ et devient une bulle bleue */
-    if (motion && field && !about && !prefersReducedMotion()) {
+    if (field && !about && !prefersReducedMotion()) {
       const r = field.getBoundingClientRect();
       const w = textWidth(t, field);
       if (w <= r.width) flight.current = { kind: "text", bubble: `${mine}-0`, text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
@@ -886,7 +874,7 @@ export function HomeScreen({
   const sendImages = (files: File[]) => {
     const list = files.map((f) => URL.createObjectURL(f));
     urls.current.push(...list);
-    ask({ id: id(), from: "toi", images: list }, { files }, true);
+    ask({ id: id(), from: "toi", images: list }, { files });
   };
 
   const sendExport = ([file]: File[]) => ask({ id: id(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
@@ -930,7 +918,7 @@ export function HomeScreen({
     setAbout(quote);
     input.current?.focus({ preventScroll: true });
   };
-  useThreadGestures(thread, motion, dig);
+  useThreadGestures(thread, dig);
 
   return (
     <ContactContext value={live}>
@@ -947,7 +935,7 @@ export function HomeScreen({
           mobileTop={
             /* En haut : BLUSH en grand au centre (sa bulle flotte et s’anime quand il répond), Sophie à droite comme un contact.
                Le fond s’efface vers le bas : les messages passent dessous en douceur. 8 · Quand tu remontes dans l’historique, tout se range dans une barre fine. */
-            <header ref={head} className={cn("pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden", motion && "home-head")}>
+            <header ref={head} className={cn("pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden", "home-head")}>
               <span aria-hidden="true" data-c="bg" className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]" />
               <div className="relative grid grid-cols-[1fr_auto_1fr] items-start px-4 pb-5 pt-[max(6px,env(safe-area-inset-top))]">
                 <div data-c="acc" className="pointer-events-auto mt-3 flex">
@@ -1005,7 +993,7 @@ export function HomeScreen({
               aria-live="polite"
               className={cn(
                 "flex flex-1 flex-col px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6",
-                motion && "overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden",
+                "overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden",
               )}
             >
               {/* L’historique plus ancien : il arrive en remontant, ou d’un toucher */}
@@ -1108,7 +1096,7 @@ function Composer({
   /** Ce qui vit dans la barre sans en faire partie (la feuille « Partager en image »). */
   children?: ReactNode;
 }) {
-  const { on: motion, arriving } = useHomeMotion();
+  const { arriving } = useHomeMotion();
   const shots = useFilePicker();
   const exp = useFilePicker();
   const [text, setText] = useState("");
@@ -1139,7 +1127,7 @@ function Composer({
 
   /* 2 · BLUSH t’écoute : chaque lettre fait sauter une perle, et la bulle se penche vers toi */
   const bump = (soft: boolean) => {
-    if (!motion || busy || prefersReducedMotion()) return;
+    if (busy || prefersReducedMotion()) return;
     const logo = visible<HTMLElement>("[data-blush-logo]");
     if (!logo) return;
     bumpPearl(logo, listen.current.k++ % 3, soft);
@@ -1155,7 +1143,7 @@ function Composer({
   /* … et en vocal, les perles suivent ta voix. Le logo et ses perles sont cherchés une fois, au début du vocal */
   const ecoute = useRef<ReturnType<typeof pearlsOf> | null>(null);
   useEffect(() => {
-    if (!motion || !recording || prefersReducedMotion()) return;
+    if (!recording || prefersReducedMotion()) return;
     const logo = visible<HTMLElement>("[data-blush-logo]");
     if (!logo) return;
     ecoute.current = pearlsOf(logo);
@@ -1164,7 +1152,7 @@ function Composer({
     return () => {
       ecoute.current = null;
     };
-  }, [recording, motion]);
+  }, [recording]);
   useEffect(() => {
     const e = ecoute.current;
     if (!e) return;
@@ -1496,10 +1484,10 @@ function celebrate() {
 }
 
 /** 8 · L’en-tête se replie quand tu remontes dans l’historique (--c : 0 en bas de la conv, 1 replié). Mobile seulement. */
-function useHeaderCollapse(ref: RefObject<HTMLElement | null>, enabled: boolean) {
+function useHeaderCollapse(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current;
-    if (!el || !enabled || prefersReducedMotion()) return;
+    if (!el || prefersReducedMotion()) return;
     let raf = 0;
     const measure = () => {
       raf = 0;
@@ -1520,7 +1508,7 @@ function useHeaderCollapse(ref: RefObject<HTMLElement | null>, enabled: boolean)
       cancelAnimationFrame(raf);
       el.style.removeProperty("--c");
     };
-  }, [ref, enabled]);
+  }, [ref]);
 }
 
 /**
@@ -1600,14 +1588,14 @@ const rubber = (d: number, max: number) => (d <= max ? d : max + (d - max) * 0.2
  * 7 · Glisse une réponse de BLUSH vers la droite : passé le cran, elle se cale au-dessus du champ.
  * Au doigt seulement : à la souris, on garde la sélection du texte. Un geste vertical reste un défilement normal.
  */
-function useThreadGestures(ref: RefObject<HTMLElement | null>, enabled: boolean, onDig: (quote: string) => void) {
+function useThreadGestures(ref: RefObject<HTMLElement | null>, onDig: (quote: string) => void) {
   const dig = useRef(onDig);
   useEffect(() => {
     dig.current = onDig;
   });
   useEffect(() => {
     const root = ref.current;
-    if (!root || !enabled) return;
+    if (!root) return;
     const ARMED = 56;
     type Drag = { id: number; x: number; y: number; mode: "?" | "time" | "dig" | "off"; el?: HTMLElement; icon?: HTMLElement | null; v: number; armed: boolean };
     let g: Drag | null = null;
@@ -1705,7 +1693,7 @@ function useThreadGestures(ref: RefObject<HTMLElement | null>, enabled: boolean,
       root.removeEventListener("pointercancel", cancel);
       root.removeEventListener("click", click, true);
     };
-  }, [ref, enabled]);
+  }, [ref]);
 }
 
 /* ———— En-tête : BLUSH en grand, comme le personnage de la conv (sa bulle, son nom en pastille) ———— */
@@ -1749,11 +1737,10 @@ function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: ()
 }
 
 /**
- * Proposition « plusieurs convs » : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
+ * Tes convs : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
  * pour qu’on voie d’un coup d’œil qu’il y a d’autres convs. `flat` : dans la barre de la fenêtre (desktop), sans ombre.
  */
 function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: boolean }) {
-  const { on } = useHomeMotion();
   const shown = others.slice(0, 2);
   const more = others.length - shown.length;
   return (
@@ -1761,7 +1748,7 @@ function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: b
       href="/app/convs"
       /* Préchargée en entier (son rendu ne lit que tes convs) : le glissé emporte la vraie liste, pas son écran d’attente */
       prefetch
-      transitionTypes={on ? ["nav-back", "accueil-vers-convs"] : undefined}
+      transitionTypes={["nav-back", "accueil-vers-convs"]}
       aria-label={`Tes convs (${others.map((o) => o.person.name).join(", ")})`}
       className={cn(
         "back-nudge pointer-events-auto flex h-10 items-center gap-1 rounded-full pl-2 pr-1.5 no-underline",
@@ -1789,7 +1776,6 @@ function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: b
  */
 function SophieButton({ shared = false }: { shared?: boolean }) {
   const { report, fiche, ficheHref = "/app/fiche" } = useContact();
-  const { on } = useHomeMotion();
   const { levels, index: idx, temperature } = scaleOf(report.level);
   const share = (idx + 1) / levels.length;
   const ring = 2 * Math.PI * 21;
@@ -1804,8 +1790,8 @@ function SophieButton({ shared = false }: { shared?: boolean }) {
   return (
     <Link
       href={ficheHref}
-      prefetch={on ? true : undefined}
-      transitionTypes={on ? ["nav-forward", "accueil-vers-fiche"] : undefined}
+      prefetch
+      transitionTypes={["nav-forward", "accueil-vers-fiche"]}
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
       className="group pointer-events-auto flex flex-col items-center gap-1 text-ink no-underline"
     >
@@ -1816,7 +1802,7 @@ function SophieButton({ shared = false }: { shared?: boolean }) {
           <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />
           <circle data-a="ring" data-ring-fill="" cx="24" cy="24" r="21" fill="none" stroke="#12C08A" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${ring * share} ${ring}`} />
         </svg>
-        {shared && on ? (
+        {shared ? (
           <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
             {avatar}
           </ViewTransition>
@@ -1853,10 +1839,10 @@ type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean; 
 type Row =
   | { kind: "day"; key: string; at: number | null }
   | { kind: "event"; key: string; level: LevelId; neuf: boolean }
-  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; landed: boolean; items: Item[]; echange?: number };
+  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; items: Item[]; echange?: number };
 
-/** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot), le mouvement. */
-type BubbleEnv = { nextStep: string; arriving: boolean; motion: boolean; autre?: "il" | "elle" };
+/** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot). */
+type BubbleEnv = { nextStep: string; arriving: boolean; autre?: "il" | "elle" };
 
 /**
  * L’heure d’un message, seulement dans le navigateur (`opened` est vide au rendu serveur) : le serveur est à l’heure
@@ -1881,7 +1867,7 @@ function timeOf(m: Msg, opened: number | null) {
 const bullesGardees = new WeakMap<Msg, { cle: string; nodes: BubbleNode[] }>();
 
 function bullesDe(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv) {
-  const cle = `${env.nextStep}|${env.motion}|${env.autre ?? ""}|${"intro" in m && env.arriving}`;
+  const cle = `${env.nextStep}|${env.autre ?? ""}|${"intro" in m && env.arriving}`;
   const gardees = bullesGardees.get(m);
   if (gardees?.cle === cle) return gardees.nodes;
   const nodes = bubblesOf(m, env);
@@ -1916,14 +1902,13 @@ function rowsOf(msgs: Msg[], opened: number | null, env: BubbleEnv, depuis: numb
       neuf,
     }));
     /* La réponse de BLUSH garde son échange : de quoi la partager en image */
-    const echange = "result" in m && m.result.kind === "bubbles" ? m.result.echange : undefined;
+    const echange = "result" in m ? m.result.echange : undefined;
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
       last.items.push(...items);
       last.at = at;
-      last.landed = !!m.answered && neuf;
       if (echange) last.echange = echange;
-    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, landed: !!m.answered && neuf, items, echange });
+    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, items, echange });
   }
   return rows;
 }
@@ -1958,8 +1943,8 @@ function dayLabel(at: number, now: number) {
  */
 const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; opened: number | null; depuis: number }) {
   const { report, fiche } = useContact();
-  const { on, arriving } = useHomeMotion();
-  const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, motion: on, autre: fiche.person.pronoun }, depuis);
+  const { arriving } = useHomeMotion();
+  const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, autre: fiche.person.pronoun }, depuis);
   /* « Aujourd’hui » se compte depuis le message le plus récent (une conv ouverte avant minuit reste juste) */
   const now = Math.max(opened ?? 0, ...rows.map((r) => (r.kind === "event" ? 0 : (r.at ?? 0))));
   return (
@@ -1979,7 +1964,7 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
         ) : r.kind === "event" ? (
           <LevelEvent key={r.key} row={r.key} level={r.level} neuf={r.neuf} />
         ) : (
-          <Group key={r.key} row={r} on={on} intro={arriving && r.key === INTRO_GROUP} />
+          <Group key={r.key} row={r} intro={arriving && r.key === INTRO_GROUP} />
         ),
       )}
       <LogoDuFilDefini />
@@ -2030,14 +2015,14 @@ function LogoDuFilDefini() {
 /** « Partager en image » une réponse de BLUSH (son échange). */
 const PartagerContext = createContext<(echange: number) => void>(() => {});
 
-type GroupProps = { row: Extract<Row, { kind: "group" }>; on: boolean; intro: boolean };
+type GroupProps = { row: Extract<Row, { kind: "group" }>; intro: boolean };
 
 /**
  * Les bulles d’un même expéditeur : l’avatar de BLUSH sous la dernière, l’heure dessous (ou « BLUSH écrit » à la place).
- * `intro` : 1 · l’arrivée, BLUSH écrit un instant, puis l’intro se pose. Le mouvement arrive en props, pas par le
- * contexte : la fin de l’arrivée ne refait que le groupe de l’intro.
+ * `intro` : 1 · l’arrivée, BLUSH écrit un instant, puis l’intro se pose. L’arrivée arrive en props, pas par le contexte :
+ * sa fin ne refait que le groupe de l’intro.
  */
-const Group = memo(function Group({ row, on, intro }: GroupProps) {
+const Group = memo(function Group({ row, intro }: GroupProps) {
   const partager = use(PartagerContext);
   const typing = row.items.find((it) => it.node.tone === "typing");
   const bubbles = row.items.filter((it) => it !== typing);
@@ -2047,10 +2032,10 @@ const Group = memo(function Group({ row, on, intro }: GroupProps) {
       {bubbles.map((it, i) => {
         const pos: Pos = n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle";
         /* 5 · Une réponse qui vient d’arriver se déplie depuis l’avatar (son délai reste le même quand la suite arrive : rien ne rejoue) */
-        const unfold = on && it.fresh ? it.d : null;
+        const unfold = it.fresh ? it.d : null;
         /* 6 · L’heure de chaque bulle attend hors champ, à droite */
         const time =
-          on && it.at !== null ? (
+          it.at !== null ? (
             <span aria-hidden="true" className="swipe-time">
               {clock(it.at)}
             </span>
@@ -2064,25 +2049,25 @@ const Group = memo(function Group({ row, on, intro }: GroupProps) {
             style={{ "--d": `${i * 0.06}s`, "--i": i } as CSSProperties}
           >
             {i === n - 1 ? (
-              /* Juste après « BLUSH écrit », sa petite bulle arrive d’un bond avec la réponse (en mouvement : elle y vole) */
-              <span data-avatar="" data-land={row.landed && !on ? "" : undefined} data-a={intro ? "intro-av" : undefined} className="-mb-0.5 block shrink-0">
+              /* Juste après « BLUSH écrit », sa petite bulle vole jusqu’ici avec la réponse */
+              <span data-avatar="" data-a={intro ? "intro-av" : undefined} className="-mb-0.5 block shrink-0">
                 <LogoDuFil />
               </span>
             ) : (
               <span aria-hidden="true" className="w-[34px] shrink-0" />
             )}
             {/* 7 · La flèche pour creuser, cachée derrière la bulle */}
-            {on && it.node.quote && (
+            {it.node.quote && (
               <span aria-hidden="true" data-dig-icon="">
                 <Icon name="reply" size={16} color="currentColor" stroke={2.6} />
               </span>
             )}
-            <BubbleShape side="blush" pos={pos} node={it.node} id={it.key} unfold={unfold} on={on} />
+            <BubbleShape side="blush" pos={pos} node={it.node} id={it.key} unfold={unfold} />
             {time}
           </div>
         ) : (
           <div key={it.key} data-rise={it.neuf ? "" : undefined} className="relative flex justify-end">
-            <BubbleShape side="toi" pos={pos} node={it.node} id={it.key} on={on} />
+            <BubbleShape side="toi" pos={pos} node={it.node} id={it.key} />
             {time}
           </div>
         );
@@ -2118,11 +2103,11 @@ const Group = memo(function Group({ row, on, intro }: GroupProps) {
 
 /** Le même groupe : tout ce que Group lit (les bulles comparées une à une, leur contenu par identité). */
 function groupesEgaux(a: GroupProps, b: GroupProps) {
-  if (a.on !== b.on || a.intro !== b.intro) return false;
+  if (a.intro !== b.intro) return false;
   const x = a.row;
   const y = b.row;
   if (x === y) return true;
-  if (x.key !== y.key || x.at !== y.at || x.landed !== y.landed || x.echange !== y.echange || x.from !== y.from || x.items.length !== y.items.length) return false;
+  if (x.key !== y.key || x.at !== y.at || x.echange !== y.echange || x.from !== y.from || x.items.length !== y.items.length) return false;
   return x.items.every((it, i) => {
     const o = y.items[i];
     return it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf;
@@ -2132,9 +2117,9 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
 /** Une bulle : sa forme vient de sa place dans le groupe, son style de son contenu. `quote` : 7 · ce qu’on creuse en la glissant. */
 type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare" | "typing"; className?: string; quote?: string };
 
-function BubbleShape({ side, pos, node, id, unfold = null, on }: { side: "blush" | "toi"; pos: Pos; node: BubbleNode; id: string; unfold?: number | null; on: boolean }) {
+function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "toi"; pos: Pos; node: BubbleNode; id: string; unfold?: number | null }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
-  const quote = on && side === "blush" ? node.quote : undefined;
+  const quote = side === "blush" ? node.quote : undefined;
   const corners =
     side === "blush"
       ? { single: "", first: "rounded-bl-[6px]", middle: "rounded-l-[6px]", last: "rounded-tl-[6px]" }[pos]
@@ -2158,10 +2143,6 @@ function BubbleShape({ side, pos, node, id, unfold = null, on }: { side: "blush"
       {node.body}
     </div>
   );
-}
-
-function VerdictEmoji() {
-  return useContact().report.verdict.emoji;
 }
 
 /** 1 · Ton prochain pas, mot par mot pendant l’arrivée (les espaces insécables gardent « pas : » ensemble). */
@@ -2255,7 +2236,7 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
   if ("reading" in m) {
     /* Ses bulles déjà arrivées pendant qu’il écrit, et « Réessayer » si le réseau a coupé avant la fin */
     if (m.recues?.length || m.coupee) return [...(m.recues ?? []).flatMap(bulleEcrite), ...(m.coupee ? [{ body: <Coupure reponse={m.id} /> }] : [])];
-    return [{ tone: "typing", body: <BlushTyping label={m.reading} leaving={m.leaving} vocal={m.vocal} /> }];
+    return [{ tone: "typing", body: <BlushTyping label={m.reading} vocal={m.vocal} /> }];
   }
   if ("notice" in m) return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
   if ("voice" in m) return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
@@ -2309,22 +2290,12 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
     ];
   const r = m.result;
   /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
-  const shine = env.motion && !!m.answered;
-  /* Le message qu’il a lu (une capture, ou son dernier message pour « ça veut dire quoi ? ») */
-  const incoming = (reply: Reply): BubbleNode => ({
-    className: "pb-2.5 pt-3",
-    quote: reply.incoming.text,
-    body: (
-      <MessageBubble from="elle" caption={reply.incoming.caption}>
-        {reply.incoming.text}
-      </MessageBubble>
-    ),
-  });
+  const shine = !!m.answered;
   /*
    * Une réponse dite en vocal : la bulle vocale à la place des bulles écrites ; les messages qu’elle cite et la réponse à
    * envoyer restent. Le vocal se fait encore : sa bulle attend, la réponse est déjà là
    */
-  if (r.kind === "bubbles" && (r.vocal || r.vocalEnCours))
+  if (r.vocal || r.vocalEnCours)
     return [
       ...(r.incoming ?? []).map(
         (msg): BubbleNode => ({
@@ -2344,83 +2315,23 @@ function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNo
       ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
     ];
   /* La réponse en bulles : chaque bulle, puis les messages qu’elle cite, comme dans un vrai fil */
-  if (r.kind === "bubbles")
-    return [
-      /* Le message qu’il a reçu, montré d’abord */
-      ...(r.incoming ?? []).map(
-        (msg): BubbleNode => ({
-          className: "pb-2.5 pt-3",
-          quote: msg.text,
-          body: (
-            <MessageBubble from={msg.from} caption={msg.caption}>
-              {msg.text}
-            </MessageBubble>
-          ),
-        }),
-      ),
-      ...r.bubbles.flatMap(bulleEcrite),
-      ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
-      ...(r.ask ? [{ quote: r.ask, body: <span className="text-[16px] font-bold leading-[1.4]">{r.ask}</span> }] : []),
-      ...(r.react ? [{ quote: r.react, body: <span className="text-[16px] font-bold leading-[1.4]">{r.react}</span> }] : []),
-    ];
-  if (r.kind === "best") return [incoming(r.reply), { quote: r.reply.best, body: <BestReply reply={r.reply} shine={shine} /> }];
-  if (r.kind === "level")
-    return [
-      {
-        quote: r.answer.title,
-        body: (
-          <span className="flex items-start gap-2.5">
-            <span aria-hidden="true" className="text-[30px] leading-none">
-              <VerdictEmoji />
-            </span>
-            <span className="text-[17px] font-black leading-[1.3]">{r.answer.title}</span>
-          </span>
-        ),
-      },
-      {
-        quote: r.answer.evidence,
-        body: (
-          <span className="flex flex-col gap-3">
-            <LevelStepper className="pt-1" />
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[12px] font-black text-grey">{r.answer.evidenceLabel}</span>
-              <span className="text-[14px] font-extrabold leading-[1.45]">{r.answer.evidence}</span>
-            </span>
-            <ConfidenceLine level={r.answer.confidence}>{r.answer.limits}</ConfidenceLine>
-          </span>
-        ),
-      },
-    ];
-  if (r.kind === "answer")
-    return [
-      {
-        quote: r.answer.title,
-        body: (
-          <span className="flex flex-col gap-2">
-            <span className="text-[17px] font-black leading-[1.3]">{r.answer.title}</span>
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[12px] font-black text-grey">{r.answer.evidenceLabel}</span>
-              <span className="text-[14px] font-extrabold leading-[1.45]">{r.answer.evidence}</span>
-            </span>
-            <ConfidenceLine level={r.answer.confidence}>{r.answer.limits}</ConfidenceLine>
-          </span>
-        ),
-      },
-    ];
   return [
-    /* Sur une capture (ou une question sur son dernier message), BLUSH montre d’abord le message qu’il a lu */
-    ...(m.fromCapture || r.quoted ? [incoming(r.reply)] : []),
-    {
-      quote: r.reply.meaningTitle,
-      body: (
-        <span className="flex flex-col gap-1">
-          <span className="text-[12px] font-black text-grey">Ce que ça veut dire</span>
-          <span className="text-[17px] font-black leading-[1.3]">{r.reply.meaningTitle}</span>
-          <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{r.reply.meaningProof}</span>
-        </span>
-      ),
-    },
-    { quote: r.reply.best, body: <BestReply reply={r.reply} shine={shine} /> },
+    /* Le message qu’il a reçu, montré d’abord */
+    ...(r.incoming ?? []).map(
+      (msg): BubbleNode => ({
+        className: "pb-2.5 pt-3",
+        quote: msg.text,
+        body: (
+          <MessageBubble from={msg.from} caption={msg.caption}>
+            {msg.text}
+          </MessageBubble>
+        ),
+      }),
+    ),
+    ...r.bubbles.flatMap(bulleEcrite),
+    ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
+    ...(r.ask ? [{ quote: r.ask, body: <span className="text-[16px] font-bold leading-[1.4]">{r.ask}</span> }] : []),
+    ...(r.react ? [{ quote: r.react, body: <span className="text-[16px] font-bold leading-[1.4]">{r.react}</span> }] : []),
   ];
 }
 
@@ -2443,25 +2354,6 @@ function CopyPill({ text, label }: { text: string; label: string }) {
   );
 }
 
-/** La meilleure réponse à lui envoyer : une vraie bulle, à copier en un geste. La coche « Copié » confirme. `shine` : elle brille une fois en arrivant. */
-function BestReply({ reply, shine = false }: { reply: Reply; shine?: boolean }) {
-  return (
-    <span className="flex flex-col gap-2">
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
-        <Tag tone="recommandee" />
-      </span>
-      <span data-shine={shine ? "" : undefined} className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold leading-[1.35] text-white">
-        {reply.best}
-      </span>
-      <span className="text-[13px] font-extrabold leading-[1.45] text-grey">{reply.why}</span>
-      <span className="mt-1 flex">
-        <CopyPill text={reply.best} label="Copier" />
-      </span>
-    </span>
-  );
-}
-
 /** L’aperçu en local : ta question part au vrai chat, avec le fil déjà échangé (tes messages, et ce que BLUSH a répondu). */
 async function askLive(url: string, text: string, history: { from: "toi" | "blush"; text: string }[]): Promise<BlushAnswer> {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, history }) });
@@ -2472,7 +2364,7 @@ function historyOf(msgs: Msg[]): { from: "toi" | "blush"; text: string }[] {
   return msgs
     .flatMap((m): { from: "toi" | "blush"; text: string }[] => {
       if (m.from === "toi" && "text" in m) return [{ from: "toi", text: m.text }];
-      if (m.from === "blush" && "result" in m && m.result.kind === "bubbles") return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
+      if (m.from === "blush" && "result" in m) return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
       return [];
     })
     .slice(-6);
@@ -2608,7 +2500,6 @@ function departs(): Departs {
 /* ———— Les détails du contact : où vous en êtes, le rapport, sa fiche ———— */
 function ContactSheet({ open, onClose, departRef }: { open: boolean; onClose: () => void; departRef: RefObject<Departs | null> }) {
   const { report, fiche, period, ficheHref = "/app/fiche" } = useContact();
-  const { on } = useHomeMotion();
   const router = useRouter();
   const logoRef = useRef<HTMLSpanElement>(null);
   const avRef = useRef<HTMLSpanElement>(null);
@@ -2617,7 +2508,7 @@ function ContactSheet({ open, onClose, departRef }: { open: boolean; onClose: ()
   const closing = useRef(false);
 
   useEffect(() => {
-    if (!open || !on || prefersReducedMotion()) return;
+    if (!open || prefersReducedMotion()) return;
     /* Le départ a été relevé au toucher ; l’arrivée l’est à l’image suivante, la feuille posée : rien n’oblige le clic à remettre la page en page */
     const de = departRef.current ?? departs();
     departRef.current = null;
@@ -2661,14 +2552,14 @@ function ContactSheet({ open, onClose, departRef }: { open: boolean; onClose: ()
       closing.current = false;
       recede("reset");
     };
-  }, [open, on, departRef]);
+  }, [open, departRef]);
 
   /* La fermeture : la feuille redescend, la bulle et l’avatar regagnent l’en-tête, l’écran revient */
   const close = () => {
     if (closing.current) return;
     const panel = logoRef.current?.closest<HTMLElement>("[tabindex='-1']");
     const dialog = logoRef.current?.closest("dialog");
-    if (!on || prefersReducedMotion() || !moved.current.length || !panel || !dialog) {
+    if (prefersReducedMotion() || !moved.current.length || !panel || !dialog) {
       onClose();
       return;
     }

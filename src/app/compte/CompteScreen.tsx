@@ -108,7 +108,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               onClick={() => {
                 if (ouverture) return;
                 openConv(c.storyId);
-                invalidate("report", "account", "fiche", "question");
+                invalidate("report", "account", "fiche");
                 setOuverte(c.storyId);
                 versAccueil();
               }}
@@ -246,7 +246,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
                     ? run(cancelSubscription, () => invalidate("account"))
                     : run(confirm === "story" ? deleteStory : deleteAccount, () => {
                         resetJourney();
-                        invalidate("account", "report", "fiche", "question");
+                        invalidate("account", "report", "fiche");
                         /* Une autre conv reste : elle s’ouvre à la place */
                         if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
                         else router.push("/commencer");
