@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { JourneyProvider } from "@/state/journey";
 import { DemoParams } from "@/state/DemoParams";
 import { SoundBoot } from "@/components/shell/SoundBoot";
+import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
 import { classesDesPolices } from "./polices";
 import "./globals.css";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <JourneyProvider>
           <div id="app-root">{children}</div>
           <SoundBoot />
+          <Reveil />
           <SuiviNavigation />
           <Suspense fallback={null}>
             <DemoParams />

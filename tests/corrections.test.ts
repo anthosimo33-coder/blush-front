@@ -6,13 +6,13 @@ import { executerChaine } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
-import { definirQui, depuisFichier, histoireOuverte, importer, rattacherBrouillon, type Ligne } from "@/server/histoires";
+import { definirQui, depuisFichier, histoireOuverte, importer, rattacherBrouillon, type LigneComplete } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { ESSAIS_MAX, planifier, reprendre } from "@/server/taches";
 
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
-const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as Ligne;
+const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as LigneComplete;
 const emails = [`corrections-${Date.now()}@blush.test`, `corrections-autre-${Date.now()}@blush.test`];
 
 /* Les requêtes envoyées au modèle (factice), pour lire ce qu’il reçoit */

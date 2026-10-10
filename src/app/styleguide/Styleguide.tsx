@@ -12,6 +12,7 @@ import { Bubble, PariTag, ProofCard, Tag } from "@/components/ui/messages";
 import { LevelPath, LockRow, ProgressDots, ScoreCard } from "@/components/ui/progress";
 import { ChapterHeader, Essential, Meaning, Seen } from "@/components/ui/report";
 import { Sheet, Toast } from "@/components/ui/surfaces";
+import { figtree } from "@/lib/fonts";
 
 function Section({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   return (
@@ -84,7 +85,7 @@ export function Styleguide() {
   const [toast, setToast] = useState(false);
 
   return (
-    <main className="mx-auto flex max-w-[1280px] flex-col gap-14 px-4 py-10 md:px-[72px] md:py-16">
+    <main className={`mx-auto flex max-w-[1280px] flex-col gap-14 px-4 py-10 md:px-[72px] md:py-16 ${figtree.variable}`}>
       {/* En-tête */}
       <header className="flex flex-wrap items-start justify-between gap-8">
         <div className="max-w-[760px]">

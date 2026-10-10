@@ -49,7 +49,11 @@ export function Bulle({ moi = false, taille, angle, children }: { moi?: boolean;
 /** Le titre rapetisse quand il est long, pour tenir sans être coupé. */
 const taille = (titre: string, grand: number) => Math.round(titre.length > 64 ? grand * 0.7 : titre.length > 40 ? grand * 0.84 : grand);
 
-export async function carteVerdict(v: VerdictPartage, format: Format): Promise<ImageResponse> {
+/**
+ * `cache` : l’en-tête de cache de l’image. Par défaut une minute dans le navigateur, rien sur le CDN (l’aperçu d’un
+ * lien doit repasser par le serveur, qui le compte).
+ */
+export async function carteVerdict(v: VerdictPartage, format: Format, cache = "public, max-age=60"): Promise<ImageResponse> {
   const [noir, extra, png] = await ressources;
   const bulle = `data:image/png;base64,${png.toString("base64")}`;
   const story = format === "story";
@@ -121,7 +125,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format): Promise<I
       ],
       /* Les emojis en volume (Fluent), plus proches de ceux de l’iPhone que les emojis plats */
       emoji: "fluent",
-      headers: { "cache-control": "public, max-age=60" },
+      headers: { "cache-control": cache },
     },
   );
 }

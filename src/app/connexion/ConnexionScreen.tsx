@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { suiteSure } from "@/lib/suite";
 import { sendLoginCode } from "@/services/api";
 import { ErreurApi } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,11 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const valid = EMAIL_RE.test(j.email.trim());
+  const versCode = suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code";
+  /* L’écran du code est statique : préchargé pendant qu’on tape son email, il s’ouvre tout de suite après l’envoi */
+  useEffect(() => {
+    router.prefetch(versCode);
+  }, [router, versCode]);
 
   const submit = async () => {
     if (!valid || busy) {
@@ -38,7 +44,7 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
     setProblem(null);
     try {
       await sendLoginCode(j.email.trim());
-      router.push(suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code");
+      router.push(versCode);
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
       setProblem(code === "trop" ? "Trop de codes demandés. Réessaie dans une heure." : "Le code n’est pas parti. Réessaie dans un instant.");
@@ -105,4 +111,9 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       )}
     </Screen>
   );
+}
+
+/** /connexion statique : `?suite=` se lit dans le navigateur, avec la même garde que côté serveur (suiteSure). */
+export function ConnexionDepuisLadresse() {
+  return <ConnexionScreen suite={suiteSure(useSearchParams().get("suite"))} />;
 }

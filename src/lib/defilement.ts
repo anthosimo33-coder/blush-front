@@ -19,3 +19,11 @@ export function bloquerDefilement(): () => void {
     if (--ouverts === 0) html.style.overflow = avant;
   };
 }
+
+/**
+ * Le bas de la page : le défilement maximal. Viser plus loin (scrollHeight) ne change rien sans clavier ; clavier ouvert,
+ * Safari reporte le surplus sur la vue visible : le champ sort un instant de l’écran, puis reste décollé du clavier.
+ */
+export function basDePage() {
+  return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+}

@@ -1,5 +1,5 @@
 import { AppliCaptures } from "@/server/appli-captures";
-import { ErreurCaptures, imagesDe, lecturePermise, lireCaptures } from "@/server/captures";
+import { cleEnvoi, ErreurCaptures, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, json, memeOrigine } from "@/server/http";
@@ -14,7 +14,8 @@ const Appli = AppliCaptures;
 
 /**
  * Des captures d’écran de la conv (réduites par le navigateur) : BLUSH les lit (prompt 01) et en fait une histoire
- * brouillon, avant l’email, comme un export.
+ * brouillon, avant l’email, comme un export. Un nouvel essai du même envoi (`cle`, après une coupure du réseau) rend
+ * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture).
  */
 async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
@@ -23,18 +24,24 @@ async function traiter(req: Request) {
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = Appli.safeParse(fd?.get("app"));
   if (fd?.get("mode") === "add") return erreur("capture", 422);
+  const app = appli.success ? appli.data : "autre";
   try {
     const images = await imagesDe(fichiers);
-    /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
-    const permis = await lecturePermise("captures");
-    if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
-    const t = await lireCaptures(images, appli.success ? appli.data : "autre");
-    const { id, meta, secret } = await importerCaptures({ appli: appli.success ? appli.data : "autre", t });
-    await poserBrouillon(secret);
-    await compterImportVenuDuPartage();
-    const story = storyAffichee(id, meta);
-    return json({ source: story.sources[0], messagesRead: t.messages, story });
+    const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {
+      /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
+      const permis = await lecturePermise("captures");
+      if (permis !== "ok") throw new LectureRefusee(permis);
+      const t = await lireCaptures(images, app);
+      const { id, meta } = await importerCaptures({ appli: app, t, secret });
+      /* Ici, une fois par lecture : un nouvel essai qui la reprend ne compte pas l’import deux fois */
+      await compterImportVenuDuPartage();
+      return { id, meta, secret, messages: t.messages };
+    });
+    await poserBrouillon(lu.secret);
+    const story = storyAffichee(lu.id, lu.meta);
+    return json({ source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
+    if (e instanceof LectureRefusee) return erreur(e.code, e.code === "connexion" ? 401 : 429);
     if (e instanceof ErreurCaptures) return erreur("capture", 422);
     if (e instanceof ErreurImport) return erreur(e.code, 422);
     throw e;

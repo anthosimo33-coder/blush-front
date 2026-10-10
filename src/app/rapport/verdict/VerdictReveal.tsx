@@ -1,19 +1,25 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useQuery } from "@/lib/query";
 import { getReport, type ReportPayload } from "@/services/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
+import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
-import { PartageSheet } from "../Partage";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow, Story } from "@/types";
 import { IlOuElle } from "@/lib/pronom";
 import { bloquerDefilement } from "@/lib/defilement";
+import { figtree } from "@/lib/fonts";
+import { auRepos } from "@/lib/repos";
+import dynamic from "next/dynamic";
 
 const INK = "#121214";
+
+/* La feuille du partage (src/app/rapport/Partage.tsx) ne s’ouvre qu’au toucher : elle arrive à part, sans alourdir la scène */
+const PartageSheet = dynamic(() => import("../Partage").then((m) => m.PartageSheet), { ssr: false });
 
 /*
  * La révélation du verdict : juste après l’analyse, une scène sombre et une carte à la fois, comme des stories.
@@ -65,10 +71,6 @@ const delay = (s: number) => ({ "--d": `${s}s` }) as CSSProperties;
  * En navigation interne, la barre du bas garderait la couleur de la page d’avant. `replace` : « Retour » depuis le rapport ne revient pas ici.
  */
 const toReport = () => window.location.replace("/rapport");
-const leave = (e: MouseEvent<HTMLAnchorElement>) => {
-  e.preventDefault();
-  toReport();
-};
 
 export function VerdictReveal({ initial, story }: { initial: ReportPayload; story: Story }) {
   const { data } = useQuery("report", getReport, initial);
@@ -77,6 +79,9 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   const last = cards.length - 1;
   const [at, setAt] = useState(0);
   const [partage, setPartage] = useState(false);
+  /* Montée fermée une fois la scène posée (ou à sa première ouverture), puis gardée (sa sortie, le lien et l’image déjà prêts) */
+  const [partageVu, setPartageVu] = useState(false);
+  if (partage && !partageVu) setPartageVu(true);
   const heading = useRef<HTMLHeadingElement>(null);
   const press = useRef<{ x: number; y: number } | null>(null);
   /* Un glissé vient d’avancer : le « clic » qui le suit ne compte pas */
@@ -93,6 +98,40 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
 
   /* Rien ne défile derrière la scène (même quand la feuille de partage s’ouvre puis se ferme par-dessus) */
   useEffect(() => bloquerDefilement(), []);
+
+  /* La feuille du partage, chargée une fois la scène posée et montée fermée : au premier toucher, elle n’a plus qu’à
+     s’ouvrir (montée au toucher, React gardait 0,3 s son écran d’attente avant de la montrer) */
+  useEffect(() => auRepos(() => void import("../Partage").then(() => setPartageVu(true))), []);
+
+  /*
+   * « Passer » ou « Voir mon rapport » : trois points à la place, peints avant le chargement complet (deux images plus
+   * tard), puis le rapport. Un retour arrière qui ressort la page du cache du navigateur rend les liens touchables.
+   */
+  const [enRoute, setEnRoute] = useState(false);
+  const parti = useRef(false);
+  const partir = useCallback((e?: MouseEvent<HTMLAnchorElement>) => {
+    e?.preventDefault();
+    if (parti.current) return;
+    parti.current = true;
+    setEnRoute(true);
+    requestAnimationFrame(() => requestAnimationFrame(toReport));
+  }, []);
+  useEffect(() => {
+    const remettre = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      parti.current = false;
+      setEnRoute(false);
+    };
+    window.addEventListener("pageshow", remettre);
+    return () => window.removeEventListener("pageshow", remettre);
+  }, []);
+  /* La dernière carte : le serveur prépare déjà le rapport (une instance réveillée, la base aussi) pendant qu’on la lit */
+  const chauffe = useRef(false);
+  useEffect(() => {
+    if (at !== last || chauffe.current) return;
+    chauffe.current = true;
+    fetch("/rapport", { credentials: "same-origin", priority: "low" }).catch(() => {});
+  }, [at, last]);
 
   /* Chaque nouvelle carte est annoncée : le focus va sur son titre */
   useEffect(() => {
@@ -121,11 +160,11 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
       if (document.querySelector("dialog[open]")) return;
       if (e.key === "ArrowRight") setAt((i) => Math.min(last, i + 1));
       else if (e.key === "ArrowLeft") setAt((i) => Math.max(0, i - 1));
-      else if (e.key === "Escape") toReport();
+      else if (e.key === "Escape") partir();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [last]);
+  }, [last, partir]);
 
   const go = (to: number) => setAt(Math.max(0, Math.min(last, to)));
 
@@ -162,7 +201,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
       }}
       onPointerUp={onPointerUp}
       onClick={onTap}
-      className="fixed inset-0 z-[60] flex cursor-pointer touch-manipulation select-none flex-col overflow-hidden bg-ink text-white"
+      className={cn("fixed inset-0 z-[60] flex cursor-pointer touch-manipulation select-none flex-col overflow-hidden bg-ink text-white", figtree.variable)}
     >
       {/* Sombre jusque sous les barres du navigateur, dès le premier affichage (Safari les teinte d’après la page) */}
       <style>{`html,body{background:${INK}!important}`}</style>
@@ -204,8 +243,8 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
                 <Icon name="sound" size={18} stroke={2.4} />
               </button>
             )}
-            <a href="/rapport" onClick={leave} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
-              Passer
+            <a href="/rapport" onClick={partir} aria-busy={enRoute} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+              {enRoute ? <TypingDots size={5} color="#FFFFFF" label="Ton rapport arrive" /> : "Passer"}
             </a>
           </span>
         </div>
@@ -356,9 +395,15 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
               <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
                 <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
               </button>
-              <a href="/rapport" onClick={leave} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-[18px] font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
-                Voir mon rapport
-                <Icon name="arrow" size={20} color={INK} stroke={2.8} />
+              <a href="/rapport" onClick={partir} aria-busy={enRoute} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-[18px] font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
+                {enRoute ? (
+                  <TypingDots color={INK} label="Ton rapport arrive" />
+                ) : (
+                  <>
+                    Voir mon rapport
+                    <Icon name="arrow" size={20} color={INK} stroke={2.8} />
+                  </>
+                )}
               </a>
             </div>
             <button type="button" onClick={() => setPartage(true)} aria-haspopup="dialog" className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-[15px] font-black text-white/80 transition-colors hover:text-white">
@@ -371,7 +416,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
 
       {/* Les touchers dans la fenêtre de partage n’avancent pas les cartes du verdict */}
       <div className="contents" onClick={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-        <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />
+        {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />}
       </div>
     </main>
   );

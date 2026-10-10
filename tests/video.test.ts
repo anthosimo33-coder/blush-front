@@ -69,6 +69,19 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
     expect(lotsDe(Array.from({ length: 12 }, (_, k) => k))).toHaveLength(1);
   });
 
+  it("des lots de six (ce que l’import envoie, lus cinq à la fois) : l’ordre et le recouvrement tiennent, et l’enregistrement le plus long reste sous la borne du serveur", () => {
+    const lots = lotsDe(Array.from({ length: 26 }, (_, k) => k), 6);
+    expect(lots.map((l) => [l[0], l.at(-1)])).toEqual([
+      [0, 5],
+      [5, 10],
+      [10, 15],
+      [15, 20],
+      [20, 25],
+    ]);
+    /* IMAGES_MAX (80) : seize lots, sous les 40 que /api/captures/video accepte */
+    expect(lotsDe(Array.from({ length: 80 }, (_, k) => k), 6)).toHaveLength(16);
+  });
+
   it("mesure de combien la conv a défilé, et voit quand elle a sauté", () => {
     const L = 24;
     const H = 240;

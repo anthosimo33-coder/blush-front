@@ -12,7 +12,8 @@ import {
   COUPLE_VOICE_ANSWER,
 } from "./couple";
 import { AUTRES_CONVS, type AutreConv } from "./convs";
-import { FICHE, QUICK_QUESTIONS, REPLY, VOICE_ANSWER } from "./daily";
+import { FICHE } from "./daily";
+import { QUICK_QUESTIONS, REPLY, VOICE_ANSWER } from "./quotidien";
 import { QUESTION_ANSWER, QUESTION_IDEAS, REPORT, SOBER_REPORT } from "./report";
 import { READING_DISCOVERIES, STORY } from "./story";
 

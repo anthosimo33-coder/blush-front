@@ -1,12 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import type { ComponentProps, ReactNode } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { useQuery } from "@/lib/query";
+import { auRepos } from "@/lib/repos";
 import { getAccount } from "@/services/api";
-import { PaywallSheet } from "@/components/screens/PaywallSheet";
 import type { Plan } from "@/types";
 import { AccountPill, Screen } from "./Screen";
+
+/* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */
+const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
 const RANK: Record<Plan, number> = { gratuit: 0, rapport: 1, blushplus: 2 };
 
@@ -43,12 +47,29 @@ export function AppScreen({
   const pathname = usePathname();
   const access = useAccess();
   const blocked = !!requires && access.loaded && !access.can(requires);
+  /*
+   * Monté au premier blocage, puis gardé (pour sa sortie). Tant que les droits peuvent manquer (pas encore lus, ou
+   * insuffisants), il est aussi monté fermé une fois la page posée : monté au moment de s’ouvrir, React gardait 0,3 s
+   * son écran d’attente avant de le montrer. Qui a les droits ne le charge pas (sauf s’ils tardent à arriver).
+   */
+  const [bloqueVu, setBloqueVu] = useState(false);
+  if (blocked && !bloqueVu) setBloqueVu(true);
+  const peutManquer = !!requires && (!access.loaded || blocked);
+  useEffect(() => {
+    if (!peutManquer || bloqueVu) return;
+    let fini = false;
+    const annuler = auRepos(() => void import("@/components/screens/PaywallSheet").then(() => !fini && setBloqueVu(true)));
+    return () => {
+      fini = true;
+      annuler();
+    };
+  }, [peutManquer, bloqueVu]);
   return (
     <>
       <Screen desktopHeaderRight={<AccountPill initial={access.initiale} />} mainWidth={600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
         {children}
       </Screen>
-      {requires && (
+      {requires && bloqueVu && (
         <PaywallSheet
           open={blocked}
           only={requires === "blushplus" && access.plan === "rapport" ? "blushplus" : undefined}

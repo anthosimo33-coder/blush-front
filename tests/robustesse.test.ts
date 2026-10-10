@@ -14,13 +14,13 @@ import { verifierCode, type Utilisateur } from "@/server/auth";
 import { dechiffrer, empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { rapportDe } from "@/server/donnees";
-import { definirQui, depuisFichier, depuisPaquet, ErreurImport, importer, rattacherBrouillon, type Ligne } from "@/server/histoires";
+import { definirQui, depuisFichier, depuisPaquet, ErreurImport, importer, rattacherBrouillon, type LigneComplete } from "@/server/histoires";
 import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier, prendre } from "@/server/taches";
 
 const emails = [`robuste-${Date.now()}@blush.test`, `robuste-code-${Date.now()}@blush.test`];
-const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as Ligne;
+const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as LigneComplete;
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
 const lancerApres = async () => {
   while (apres.length) await apres.shift()!();

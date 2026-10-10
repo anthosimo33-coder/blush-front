@@ -1,20 +1,24 @@
 import "server-only";
-import { eq, inArray, max, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { cache } from "react";
-import { SUBSCRIPTIONS } from "@/mocks/daily";
+import { SUBSCRIPTIONS } from "@/content/offres";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
 import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Fiche, Plan, Story, VocalRapport } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
-import { cloreLesAbandons, executerChaine, type AvanceMoitie, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./analyse";
+/*
+ * Seulement des types : la chaîne d’analyse (le SDK du modèle, tous les prompts) ne se charge qu’au moment de la
+ * lancer (voir chaine()), pas à chaque première page d’une instance.
+ */
+import type { AvanceMoitie, DonneesMemoire, DonneesRapport, DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { dechiffrer } from "./chiffrement";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
-import { contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne } from "./histoires";
-import { aRelancer, etatDesTaches, planifier } from "./taches";
+import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
+import { aRelancer, etatDesTaches, planifier, type Genre, type Tache } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
 import { jourRelatif } from "./temps";
@@ -24,18 +28,30 @@ import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
  * Les données des écrans, dans les types du front. Utilisées par les pages serveur et par les routes /api.
  */
 
-/**
- * Qui fait la requête, et son histoire ouverte (voir histoireOuverte). `parcours` : les écrans et routes de l’import,
- * qui suivent d’abord la conv en train d’être importée. Mémorisé le temps d’un rendu : une page qui lit plusieurs
- * données (l’accueil en lit six) ne refait pas ces requêtes à chaque fois.
+/** Le compte de la requête (sa session), ou null. Mémorisé le temps d’un rendu, comme contexteRequete. */
+export const utilisateurCourant = cache(async (): Promise<Utilisateur | null> => utilisateurDeSession(await lireSession()));
+
+/*
+ * `cache` de React se repère aux arguments : contexteRequete(), contexteRequete(false) et contexteRequete(true)
+ * seraient trois entrées. On passe toujours un booléen explicite, et le compte est lu une fois pour toutes.
  */
-export const contexteRequete = cache(async (parcours = false): Promise<{ utilisateur: Utilisateur | null; story: Ligne | null }> => {
-  const utilisateur = await utilisateurDeSession(await lireSession());
+const contexteMemo = cache(async (parcours: boolean): Promise<{ utilisateur: Utilisateur | null; story: LigneEcran | null }> => {
+  const utilisateur = await utilisateurCourant();
   /* Un appel du navigateur désigne la conv de sa page (src/services/session.ts) ; une page qui se rend n’a pas cet en-tête */
   const affichee = (await headers()).get(ENTETE_CONV);
   const story = await histoireOuverte(utilisateur, { brouillon: await lireBrouillon(), choisie: await lireChoisie(), affichee }, { parcours });
   return { utilisateur, story };
 });
+
+/**
+ * Qui fait la requête, et son histoire ouverte (voir histoireOuverte), sans la conv brute. `parcours` : les écrans et
+ * routes de l’import, qui suivent d’abord la conv en train d’être importée. Mémorisé le temps d’un rendu : une page
+ * qui lit plusieurs données (l’accueil en lit six) ne refait pas ces requêtes à chaque fois.
+ */
+export const contexteRequete = (parcours = false) => contexteMemo(!!parcours);
+
+/** La chaîne d’analyse, chargée à la demande (le SDK du modèle et les prompts ne servent qu’à elle). */
+const chaine = () => import("./analyse");
 
 export async function storyCourante(parcours = false): Promise<Story | null> {
   const { story } = await contexteRequete(parcours);
@@ -50,13 +66,17 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
   const lignes = await histoiresDuCompte(utilisateur.id);
   if (!lignes.length) return [];
   const ids = lignes.map((l) => l.id);
+  /*
+   * Le dernier message de chaque conv : le plus grand id, trouvé dans l’index (story_id, id) sans lire les autres.
+   * Un max(created_at) lisait tous les messages de chaque conv.
+   */
+  const dernier = sql<Date | null>`(select "m"."created_at" from ${schema.chatMessages} as "m" where "m"."story_id" = "stories"."id" order by "m"."id" desc limit 1)`;
   const [verdicts, derniers] = await Promise.all([
     db().select().from(schema.verdicts).where(inArray(schema.verdicts.storyId, ids)),
     db()
-      .select({ storyId: schema.chatMessages.storyId, at: max(schema.chatMessages.createdAt) })
-      .from(schema.chatMessages)
-      .where(inArray(schema.chatMessages.storyId, ids))
-      .groupBy(schema.chatMessages.storyId),
+      .select({ storyId: schema.stories.id, at: dernier.mapWith(schema.chatMessages.createdAt) })
+      .from(schema.stories)
+      .where(inArray(schema.stories.id, ids)),
   ]);
   const sortieDe = new Map(verdicts.map((v) => [v.storyId, dechiffrer<DonneesVerdict>(v.data).sortie]));
   const parleDe = new Map(derniers.map((d) => [d.storyId, d.at]));
@@ -84,14 +104,15 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
     .map((x) => x.conv);
 }
 
-/** Quand la lecture s’est finie (l’heure du verdict), en millisecondes : l’heure de l’intro de BLUSH sur l’accueil. */
-export async function finDeLecture(storyId: string): Promise<number | null> {
+/** Quand la lecture s’est finie (l’heure du verdict), en millisecondes : l’heure de l’intro de BLUSH sur l’accueil. Mémorisé le temps d’un rendu. */
+export const finDeLecture = cache(async (storyId: string): Promise<number | null> => {
   const [v] = await db().select({ at: schema.verdicts.createdAt }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
   return v?.at.getTime() ?? null;
-}
+});
 
 /** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. Celles coupées à leur dernier essai passent en échec. */
 export async function relancer(storyId: string): Promise<void> {
+  const { cloreLesAbandons, executerChaine } = await chaine();
   await cloreLesAbandons(storyId);
   if ((await aRelancer(storyId)).length) after(() => executerChaine(storyId));
 }
@@ -138,8 +159,8 @@ const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\
 const PLAN_S = 55;
 const CHAPITRES_S = 100;
 
-async function ecritureDe(storyId: string, titres: Map<number, string>, autre: string, prets: Set<number>): Promise<EcritureRapport | undefined> {
-  const { rapport_plan: tp, rapport_chapitres: tc } = await etatDesTaches(storyId, ["rapport_plan", "rapport_chapitres"]);
+function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: string, prets: Set<number>): EcritureRapport | undefined {
+  const { rapport_plan: tp, rapport_chapitres: tc } = taches;
   if (!tp) return undefined;
   const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
   const detail = (tc?.detail ?? null) as { a: AvanceMoitie; b: AvanceMoitie } | null;
@@ -170,43 +191,78 @@ async function ecritureDe(storyId: string, titres: Map<number, string>, autre: s
 /**
  * Avec l’accès, ce qui doit s’écrire et n’a jamais été lancé : le rapport (l’accès donné à la main, ou débloqué depuis
  * une autre conv), la mémoire (après un rapport sobre offert, puis l’accès). Rien sans la conv brute (effacée au bout
- * de 30 jours). La chaîne repart après la réponse.
+ * de 30 jours). La chaîne repart après la réponse. `taches` : l’état déjà lu (le rapport le lit une fois pour tout).
+ * Vrai si une tâche vient d’être lancée.
  */
-export async function assurerLaSuite(story: Ligne, acces: boolean): Promise<void> {
-  if (!acces || !story.conv) return;
-  const { verdict, rapport_plan, memoire } = await etatDesTaches(story.id, ["verdict", "rapport_plan", "memoire"]);
-  if (verdict?.status !== "fini") return;
+export async function assurerLaSuite(story: LigneEcran | LigneComplete, acces: boolean, taches?: EtatTaches): Promise<boolean> {
+  if (!acces || !aSaConv(story)) return false;
+  const { verdict, rapport_plan, memoire } = taches ?? (await etatDesTaches(story.id, ["verdict", "rapport_plan", "memoire"]));
+  if (verdict?.status !== "fini") return false;
   if (!rapport_plan) await planifier(story.id, "rapport_plan");
   else if (!memoire) {
     const [r] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
-    if (!r?.pret) return;
+    if (!r?.pret) return false;
     await planifier(story.id, "memoire");
-  } else return;
-  after(() => executerChaine(story.id));
+  } else return false;
+  after(async () => (await chaine()).executerChaine(story.id));
+  return true;
 }
 
 /** Les étapes du rapport (et la mémoire qui le suit) : celles qu’une relance peut reprendre. */
 export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"] as const;
 
+/** L’état des tâches d’une histoire (la dernière de chaque genre). */
+type EtatTaches = Partial<Record<Genre, Tache>>;
+/* Tout ce que le rapport regarde, lu en une requête : la suite à lancer, l’écriture, son échec, le vocal */
+const TACHES_DU_RAPPORT: Genre[] = ["verdict", "rapport_plan", "rapport_chapitres", "memoire", "vocal"];
+
 /** L’écriture du rapport a-t-elle échoué pour de bon ? `refus` : le modèle refuse, une relance n’y changerait rien. */
-async function echecDuRapport(storyId: string): Promise<"panne" | "refus" | undefined> {
-  const { rapport_plan, rapport_chapitres } = await etatDesTaches(storyId, ["rapport_plan", "rapport_chapitres"]);
+function echecDuRapport({ rapport_plan, rapport_chapitres }: EtatTaches): "panne" | "refus" | undefined {
   const t = [rapport_plan, rapport_chapitres].find((x) => x?.status === "echec");
   if (!t) return undefined;
   return t.error?.startsWith("refus") ? "refus" : "panne";
 }
 
+/** Ce que le verdict dit en tête du rapport, et sur l’accueil : son verdict, où vous en êtes, ton prochain pas. */
+type EnTete = Pick<ReportPayload["report"], "verdict" | "level" | "trend" | "nextStep">;
+const enTete = (sortie: Verdict04): EnTete => ({
+  verdict: verdictAffiche(sortie),
+  level: sortie.niveau ?? "parle",
+  trend: sortie.tendance ?? "",
+  nextStep: `Ton prochain pas : ${sortie.prochain_pas ?? ""}`,
+});
+
+/**
+ * Ce que l’accueil montre du rapport (la fiche de contact) : le verdict seul, sans lire ni déchiffrer le rapport, ni
+ * lancer sa suite (le rapport s’en charge à son ouverture). null tant que la lecture n’est pas finie.
+ */
+export async function contactDe(storyId: string): Promise<EnTete | null> {
+  const [v] = await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
+  return v ? enTete(dechiffrer<DonneesVerdict>(v.data).sortie) : null;
+}
+
 /** Le rapport tel que l’affiche le front. Sans accès : le verdict et les chapitres verrouillés. */
-export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
-  const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
+export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
+  const access: Plan = (utilisateur?.plan as Plan) ?? "gratuit";
+  /*
+   * Tout est lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès, l’état des tâches (lu une
+   * fois pour toutes les étapes ci-dessous) et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
+   */
+  const [[v], [r], tachesLues, vocalLuAvant] = await Promise.all([
+    db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)),
+    db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id)),
+    access !== "gratuit" ? etatDesTaches(story.id, TACHES_DU_RAPPORT) : null,
+    access !== "gratuit" ? vocalLu(story.id) : null,
+  ]);
   if (!v) return null;
   const { sortie, scores } = dechiffrer<DonneesVerdict>(v.data);
-  const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id));
   const donnees = r?.data ? dechiffrer<DonneesRapport>(r.data) : null;
-  const access: Plan = (utilisateur?.plan as Plan) ?? "gratuit";
   const meta = metaDe(story);
   const autre = meta.participants[1 - (meta.moi ?? 0)].prenom;
   const ouvert = access !== "gratuit" || sortie.mode_sobre;
+  /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
+  const [tachesOuvertes, vocalDeLaConv] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, TACHES_DU_RAPPORT), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
+  let taches = tachesOuvertes;
 
   const verdictLibre: Chapter = {
     number: 1,
@@ -239,22 +295,20 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
     suite = suite && !!pret;
     enEcriture.push(pret && suite ? { ...pret, free: true, locked: false } : c);
   }
-  /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant */
-  if (access !== "gratuit" && (!donnees || donnees.sobre)) await assurerLaSuite(story, true);
+  /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant (et
+     l’état des tâches est relu, pour montrer l’écriture tout de suite) */
+  if (access !== "gratuit" && (!donnees || donnees.sobre) && (await assurerLaSuite(story, true, taches))) taches = await etatDesTaches(story.id, TACHES_DU_RAPPORT);
   const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
-  const echec = ouvert && !donnees ? await echecDuRapport(story.id) : undefined;
-  const ecriture = ouvert && !donnees && !echec ? await ecritureDe(story.id, titres, autre, new Set(partiels.keys())) : undefined;
-  const vocal = ouvert ? await vocalDuRapport(story, sortie, !!donnees) : undefined;
+  const echec = ouvert && !donnees ? echecDuRapport(taches) : undefined;
+  const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titres, autre, new Set(partiels.keys())) : undefined;
+  const vocal = ouvert ? await vocalDuRapport(story, sortie, !!donnees, taches, vocalDeLaConv) : undefined;
 
   return {
     report: {
       storyId: story.id,
-      verdict: verdictAffiche(sortie),
+      ...enTete(sortie),
       chapters,
       readingTime: donnees?.lecture ?? { free: "1 min", full: "9 min" },
-      level: sortie.niveau ?? "parle",
-      trend: sortie.tendance ?? "",
-      nextStep: `Ton prochain pas : ${sortie.prochain_pas ?? ""}`,
     },
     sober: ouvert ? (donnees?.sobre ?? null) : null,
     access,
@@ -271,18 +325,17 @@ export async function rapportDe(story: Ligne, utilisateur: Utilisateur | null): 
  * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
  * et un vocal d’une ancienne version du script se refait (une fois : si ça échoue, l’ancien reste).
  */
-async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boolean): Promise<VocalRapport | undefined> {
-  const v = await vocalLu(story.id);
+async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boolean, taches: EtatTaches, v: Awaited<ReturnType<typeof vocalLu>>): Promise<VocalRapport | undefined> {
   if (v?.aJour) return v.pret;
   if (!voixDisponible() || verdict.alerte) return v?.pret;
   /* La dernière tâche « vocal » : celle qui tourne, ou la dernière tentative */
-  const { vocal: t } = await etatDesTaches(story.id, ["vocal"]);
+  const { vocal: t } = taches;
   if (t?.status === "attente" || t?.status === "en_cours") return { etat: "en_cours" };
   const tenteDepuis = !!t && (!v || t.createdAt > v.fait);
   if (tenteDepuis) return v?.pret;
   if (!rapportFini) return { etat: "en_cours" };
   await planifier(story.id, "vocal");
-  after(() => executerChaine(story.id));
+  after(async () => (await chaine()).executerChaine(story.id));
   return { etat: "en_cours" };
 }
 
@@ -291,11 +344,14 @@ export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account
   return { email: utilisateur.email, subscription: { ...SUBSCRIPTIONS[plan], paused: utilisateur.paused }, storyDeleted: !story };
 }
 
-/** La mémoire de l’histoire (après le rapport), ou null. */
-export async function memoireDe(storyId: string): Promise<DonneesMemoire | null> {
+/**
+ * La mémoire de l’histoire (après le rapport), ou null. Mémorisée le temps d’un rendu : l’accueil la lit pour la fiche
+ * et pour les questions. (Une route /api la relit à chaque appel : `cache` n’y garde rien.)
+ */
+export const memoireDe = cache(async (storyId: string): Promise<DonneesMemoire | null> => {
   const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
   return m ? dechiffrer<DonneesMemoire>(m.data) : null;
-}
+});
 
 /** Sa fiche, remplie par la mémoire. Avant la mémoire : vide, avec son prénom. */
 export async function ficheDe(story: Ligne): Promise<Fiche> {

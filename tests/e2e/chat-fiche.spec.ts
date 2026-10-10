@@ -348,6 +348,8 @@ test("« Glisse pour creuser », au doigt : la réponse glissée devient le poin
   await lectureBlushPlus(page, testInfo);
   await ouvrir(page, "/app");
   expect(await ecrireABlush(page, "elle répond vite mais court")).toBe(200);
+  /* La réponse arrive en flux : le glissé attend qu’elle soit là en entier (sa question de la fin) */
+  await expect(fil.getByText(QUESTION_DE_BLUSH)).toBeVisible();
   const bulle = fil.getByText("et toi tu fais le mec occupé");
 
   await test.step("une bulle de BLUSH glissée vers la droite : le point se cale au-dessus du champ ; « Ne plus creuser ce point » l’enlève", async () => {

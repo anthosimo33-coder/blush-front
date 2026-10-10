@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "./icons";
 import { bloquerDefilement } from "@/lib/defilement";
@@ -8,6 +8,7 @@ import { bloquerDefilement } from "@/lib/defilement";
 /**
  * Sheet : panneau du bas sur mobile, fenêtre centrée sur desktop.
  * <dialog> natif : focus piégé, Échap pour fermer, fond inerte.
+ * Elle monte en douceur et redescend de même : son contenu reste là le temps de la sortie, puis le dialogue se ferme.
  */
 export function Sheet({
   open,
@@ -27,23 +28,57 @@ export function Sheet({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const voile = useRef<HTMLDivElement>(null);
   /* Le défilement bloqué par cette feuille (src/lib/defilement.ts) : libéré à sa fermeture, quelle qu’elle soit */
   const liberer = useRef<(() => void) | null>(null);
+  /* Le contenu reste monté pendant la sortie : `montee` ne repasse à faux qu’une fois la feuille redescendue */
+  const [montee, setMontee] = useState(open);
+  if (open && !montee) setMontee(true);
+  /* Pendant la sortie, elle garde ce qu’elle montrait : l’écran a souvent déjà effacé sa sélection (la conv, l’image choisie) */
+  const [montre, setMontre] = useState(children);
+  if (open && montre !== children) setMontre(children);
 
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) {
-      d.showModal();
-      /* Le focus va sur le panneau (annoncé par son titre), pas sur la première option.
-         preventScroll : sinon Safari (iPhone) fait défiler la feuille pendant qu’elle monte, et elle reste coincée en haut */
-      requestAnimationFrame(() => panel.current?.focus({ preventScroll: true }));
+    if (open) {
+      if (!d.open) {
+        d.showModal();
+        /* Le focus va sur le panneau (annoncé par son titre), pas sur la première option.
+           preventScroll : sinon Safari (iPhone) fait défiler la feuille pendant qu’elle monte, et elle reste coincée en haut */
+        requestAnimationFrame(() => panel.current?.focus({ preventScroll: true }));
+      }
       liberer.current = bloquerDefilement();
+      return () => {
+        liberer.current?.();
+        liberer.current = null;
+      };
     }
-    if (!open && d.open) d.close();
+    if (!d.open) return;
+    /* La sortie : la page défile de nouveau tout de suite (le défilement a été libéré), la feuille redescend, puis se ferme.
+       Sans animation si l’appareil en demande moins, ou si l’écran anime déjà la sienne (la feuille du contact) */
+    const p = panel.current;
+    const fermer = () => {
+      d.close();
+      setMontee(false);
+    };
+    const geree = p?.getAnimations().some((a) => !(a instanceof CSSAnimation));
+    if (!p || geree || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      fermer();
+      return;
+    }
+    const desk = window.matchMedia("(min-width: 1024px)").matches;
+    const sortie = { duration: desk ? 200 : 280, easing: "cubic-bezier(0.3, 0, 0.2, 1)", fill: "forwards" as const };
+    p.style.pointerEvents = "none";
+    const anims = [
+      p.animate(desk ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(16px) scale(0.98)" }] : [{ transform: "none" }, { transform: "translateY(100%)" }], sortie),
+      ...(voile.current ? [voile.current.animate([{ opacity: 1 }, { opacity: 0 }], sortie)] : []),
+    ];
+    anims[0].finished.then(fermer, () => {});
+    /* Rouverte pendant sa sortie : elle reprend sa place */
     return () => {
-      liberer.current?.();
-      liberer.current = null;
+      anims.forEach((a) => a.cancel());
+      p.style.pointerEvents = "";
     };
   }, [open]);
 
@@ -61,12 +96,14 @@ export function Sheet({
       }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-clip bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
-      {open && (
+      {(open || montee) && (
         <>
+          {/* Le voile : pas de flou sur téléphone (presque invisible sous le noir, mais recalculé sur tout l’écran à chaque image) */}
           <div
+            ref={voile}
             aria-hidden="true"
             onClick={onClose}
-            className={cn("absolute inset-0 bg-[rgba(17,17,20,0.4)] backdrop-blur-[1px] lg:bg-[rgba(17,17,20,0.35)] lg:backdrop-blur-[1.5px]", belowHeader && "lg:top-[84px]")}
+            className={cn("absolute inset-0 bg-[rgba(17,17,20,0.4)] lg:bg-[rgba(17,17,20,0.35)] lg:backdrop-blur-[1.5px]", belowHeader && "lg:top-[84px]")}
             style={{ animation: "fadeIn 0.25s ease-out both" }}
           />
           <div className={cn("pointer-events-none absolute inset-0 flex items-end justify-center lg:items-start", belowHeader ? "lg:pt-[134px]" : "lg:pt-[120px]")}>
@@ -82,7 +119,7 @@ export function Sheet({
               )}
             >
               <span aria-hidden="true" className="h-[5px] w-11 shrink-0 self-center rounded-[3px] bg-track lg:hidden" />
-              {children}
+              {open ? children : montre}
             </div>
           </div>
         </>

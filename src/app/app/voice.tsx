@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { auRepos } from "@/lib/repos";
 import { setForceSound, setRecording } from "@/lib/sound";
 import { Icon } from "@/components/ui/icons";
 
@@ -137,9 +138,11 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
         /* Pas de niveaux : l’onde reste calme, l’enregistrement continue */
       }
     }
+    /* Le temps affiché ne change qu’une fois par seconde : entre deux, rien à refaire */
+    let affichee = 0;
     s.timer = window.setInterval(() => {
       const secs = (performance.now() - s.started) / 1000;
-      setSeconds(secs);
+      if (Math.floor(secs) !== affichee) setSeconds((affichee = Math.floor(secs)));
       if (secs >= MAX_SECONDS) handlers.current.onLimit();
     }, 200);
     /* Par tranches de 250 ms : Safari livre le son au fil de l’eau (à l’arrêt seul, il peut ne rien rendre) */
@@ -281,6 +284,9 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
 /* Un seul vocal à la fois (de BLUSH ou le tien) : en lancer un arrête celui qui jouait */
 let enCours: HTMLAudioElement | null = null;
 
+/* Les vocaux de BLUSH à l’écran : chacun se demande, quand un autre arrive, s’il est encore le dernier de la conv */
+const vocauxDuChat = new Set<() => void>();
+
 /**
  * La réponse de BLUSH dite en vocal, dans sa bulle blanche : le bouton rose, l’onde (la partie écoutée en rose) et la
  * durée. Comme une story, elle s’entend même quand le téléphone est en silencieux.
@@ -289,6 +295,63 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
   const audio = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(0);
+
+  /*
+   * La dernière réponse vocale de la conv (la plus bas), préparée en mémoire avant le toucher dès qu’elle est à l’écran,
+   * comme le vocal du rapport (jamais sur le disque : l’audio reste « no-store »). Au toucher, l’élément audio part d’elle,
+   * sans attendre le réseau. Une réponse vocale plus récente la libère (sauf si elle a déjà servi) ; les plus anciennes
+   * se lisent sur le réseau.
+   */
+  const bulle = useRef<HTMLSpanElement>(null);
+  const enMemoire = useRef<string | null>(null);
+  useEffect(() => {
+    let arret: AbortController | null = null;
+    let annuler = () => {};
+    let vue = false;
+    const liberer = () => {
+      annuler();
+      annuler = () => {};
+      arret?.abort();
+      arret = null;
+      if (enMemoire.current) URL.revokeObjectURL(enMemoire.current);
+      enMemoire.current = null;
+    };
+    const revoir = () => {
+      /* Déjà lu : l’élément audio garde ce qu’il a */
+      if (audio.current) return;
+      const tous = document.querySelectorAll("[data-vocal-blush]");
+      const dernier = !!bulle.current && tous[tous.length - 1] === bulle.current;
+      if (!dernier) return liberer();
+      if (arret || !vue) return;
+      const a = (arret = new AbortController());
+      annuler = auRepos(() => {
+        fetch(vocal.audio, { credentials: "same-origin", signal: a.signal })
+          .then((r) => (r.ok ? r.blob() : null))
+          .then((b) => {
+            if (b && !a.signal.aborted && !audio.current) enMemoire.current = URL.createObjectURL(b);
+          })
+          .catch(() => {
+            /* Rien en mémoire : le toucher lira le son sur le réseau, comme avant */
+          });
+      }, 300);
+    };
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        vue = true;
+        revoir();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    if (bulle.current) obs.observe(bulle.current);
+    vocauxDuChat.add(revoir);
+    vocauxDuChat.forEach((f) => f());
+    return () => {
+      obs.disconnect();
+      vocauxDuChat.delete(revoir);
+      liberer();
+    };
+  }, [vocal.audio]);
 
   useEffect(
     () => () => {
@@ -303,7 +366,8 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
   const toggle = () => {
     let a = audio.current;
     if (!a) {
-      const el = new Audio(vocal.audio);
+      /* Né dans le toucher (sinon Safari refuse de jouer), depuis la mémoire si le son y est déjà */
+      const el = new Audio(enMemoire.current ?? vocal.audio);
       el.preload = "auto";
       el.ontimeupdate = () => setT(el.currentTime);
       el.onplay = () => setPlaying(true);
@@ -337,7 +401,7 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
 
   const duree = vocal.duree || 1;
   return (
-    <span className="flex min-w-[220px] items-center gap-2.5">
+    <span ref={bulle} data-vocal-blush="" className="flex min-w-[220px] items-center gap-2.5">
       <button
         type="button"
         onClick={toggle}

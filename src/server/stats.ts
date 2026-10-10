@@ -27,7 +27,7 @@ export type StatsAdmin = {
   beta: { fermee: boolean; invites: number | "tous"; attente: number; attenteNouveaux: number; comptes: number };
 };
 
-const lignes = async <T,>(q: SQL) => (await db().execute(q)) as unknown as T[];
+const lignes = async <T,>(q: SQL) => (await db().execute(q)).rows as T[];
 const n = (v: unknown) => Number(v ?? 0);
 
 /** Les postes de coût, d’après l’étiquette de chaque appel au modèle. */

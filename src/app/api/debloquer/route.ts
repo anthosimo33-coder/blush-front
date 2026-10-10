@@ -5,7 +5,7 @@ import { db, schema } from "@/server/db";
 import { assurerLaSuite, contexteRequete } from "@/server/donnees";
 import { accesLibre } from "@/server/env";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
-import { SUBSCRIPTIONS } from "@/mocks/daily";
+import { SUBSCRIPTIONS } from "@/content/offres";
 
 export const maxDuration = 300;
 

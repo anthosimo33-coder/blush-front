@@ -1,7 +1,8 @@
+import { after } from "next/server";
 import { CLES, compter } from "@/server/compteurs";
 import { contexteRequete } from "@/server/donnees";
 import { erreur, json, memeOrigine } from "@/server/http";
-import { arreterPartage, ErreurPartage, lienDe, partagerVerdict, verdictPartage } from "@/server/partages";
+import { arreterPartage, ErreurPartage, lienDe, partager, versionImage } from "@/server/partages";
 
 /** Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
 async function histoire(req?: Request) {
@@ -22,10 +23,12 @@ export async function POST(req: Request) {
   const { story, reponse } = await histoire(req);
   if (!story) return reponse;
   try {
-    const id = await partagerVerdict(story);
-    await compter(CLES.partageOuvert);
     /* Le verdict tel que le montre le lien (le prénom de l’autre masqué) : c’est lui que le texte partagé reprend */
-    return json({ id, verdict: await verdictPartage(id) });
+    const { id, verdict } = await partager(story);
+    /* Compté après la réponse : la feuille attend ce lien pour demander l’image story */
+    after(() => compter(CLES.partageOuvert));
+    /* `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`) */
+    return json({ id, verdict, v: versionImage(id, verdict) });
   } catch (e) {
     if (e instanceof ErreurPartage) return erreur(e.code, 409);
     throw e;

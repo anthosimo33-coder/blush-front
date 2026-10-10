@@ -1,19 +1,20 @@
-import { contexteRequete } from "@/server/donnees";
-import { histoireOuverte } from "@/server/histoires";
+import { contexteRequete, utilisateurCourant } from "@/server/donnees";
 import { erreur, reponseAudio } from "@/server/http";
-import { audioDe } from "@/server/vocal";
+import { audioDuCompte } from "@/server/vocal";
 
 /**
  * L’audio du vocal du rapport (MP3), déchiffré à la volée. L’adresse désigne sa conv (`conv`) : un lecteur audio
- * n’envoie pas d’en-tête, et l’audio reste en cache sous son adresse. Une ancienne adresse, sans `conv` : la conv ouverte.
+ * n’envoie pas d’en-tête. Une ancienne adresse, sans `conv` : la conv ouverte. Safari le demande en deux fois (deux
+ * octets, puis le reste) : chaque requête lit le compte, puis sa conv et son vocal en une seule requête, sans relire
+ * l’histoire ni sa conv brute.
  */
 export async function GET(req: Request) {
   const conv = new URL(req.url).searchParams.get("conv");
-  const { utilisateur, story: ouverte } = await contexteRequete();
+  const utilisateur = await utilisateurCourant();
   if (!utilisateur) return erreur("connexion", 401);
-  const story = conv ? await histoireOuverte(utilisateur, { affichee: conv }) : ouverte;
-  if (!story) return erreur("aucune", 404);
-  const audio = await audioDe(story.id);
-  if (!audio) return erreur("pas_pret", 404);
-  return reponseAudio(req, audio);
+  const storyId = conv ?? (await contexteRequete()).story?.id;
+  const vocal = storyId ? await audioDuCompte(utilisateur.id, storyId) : null;
+  if (!vocal) return erreur("aucune", 404);
+  if (!vocal.audio) return erreur("pas_pret", 404);
+  return reponseAudio(req, vocal.audio);
 }

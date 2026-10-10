@@ -42,9 +42,15 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
           className="h-full min-w-0 flex-1 border-none bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-grey"
         />
       </label>
+      {/*
+       * Plus de quatre convs : une hauteur fixe. Sur mobile, la feuille est posée en bas et suit son contenu : une liste qui
+       * rétrécit à chaque lettre faisait descendre le champ de recherche, jusque sous le clavier (et Safari refaisait défiler).
+       * La liste garde sa hauteur dans la zone qui défile (shrink-0) : sinon elle se tassait à la hauteur de la zone, et ses
+       * dernières convs étaient coupées au lieu de défiler.
+       */}
       <InsetGroup
         footer={!cherche.trim() && convs.length > visibles.length ? `Les ${visibles.length} plus longues. Cherche un prénom pour voir les autres.` : undefined}
-        className="max-h-[52dvh] overflow-y-auto lg:max-h-[420px]"
+        className={cn(convs.length > 4 ? "h-[min(52dvh,440px)]" : "max-h-[52dvh]", "overflow-y-auto lg:max-h-[420px] [&>*]:shrink-0")}
       >
         {visibles.map((c) => (
           <InsetRow

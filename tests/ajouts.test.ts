@@ -1,12 +1,17 @@
 import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { blocAjout, estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import type { Requete } from "@prompts/lib/contextes";
 import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
 import type { Captures, Memoire } from "@prompts/lib/schemas";
-import { ajouterALaFiche, depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
+
+/* after() de Next ne vit que dans une requête : ici, on garde ce qui devait partir après la réponse, pour le lancer soi-même */
+const apres = vi.hoisted(() => [] as (() => unknown)[]);
+vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
+
+import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours, resumeAjout } from "@/server/ajouts";
 import { executerChaine } from "@/server/analyse";
 import { historique, repondre } from "@/server/chat";
 import { db, schema } from "@/server/db";
@@ -145,12 +150,20 @@ describe("après l’import : le chat et sa fiche", () => {
     expect(derniere("01-captures")).toContain("autre personne : Sophie");
   });
 
-  it("pour sa fiche : son profil devient une info, avec sa source", async () => {
+  it("pour sa fiche : la réponse part avec ce qui a été lu, puis son profil devient une info, avec sa source", async () => {
     const avant = new Set((await ficheDe(await story())).facts.map((f) => f.text));
     const ajout = await depuisCaptures(await story(), (await memoireDe(id))!, [image]);
-    const r = await ajouterALaFiche(await story(), avant, ajout);
-    expect(r.added.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
-    expect(r.fiche.facts.length).toBeGreaterThan(avant.size);
+    const r = await ajouterALaFiche(await story(), ajout);
+    /* La réponse n’attend pas la mémoire : son profil est « en cours d’ajout », la fiche dit qu’elle se met à jour */
+    expect(r).toMatchObject({ added: [], pending: { profile: ["Étudiante en droit à Lyon"], messages: ajout.messages }, fiche: { updating: true } });
+    expect(r.fiche.facts.length).toBe(avant.size);
+    expect(await majEnCours(id)).toBe(true);
+    /* Après la réponse, la mise à jour tourne : la fiche relue a l’info, avec sa source */
+    while (apres.length) await apres.shift()!();
+    expect(await majEnCours(id)).toBe(false);
+    const fiche = await ficheDe(await story());
+    expect(fiche.facts.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
+    expect(fiche.facts.length).toBeGreaterThan(avant.size);
   });
 
   it("un vocal est transcrit (ici, le modèle factice), puis lu comme un message", async () => {

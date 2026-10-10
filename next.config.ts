@@ -15,20 +15,43 @@ const SECURITE = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
 ];
 
+/* Le cookie de session (src/server/cookies.ts) : sa seule présence choisit la variante d’une page, sans le vérifier */
+const SESSION = { type: "cookie" as const, key: "blush-session" };
+
 const nextConfig: NextConfig = {
-  /* L’écran 14 (son message) vit désormais dans le chat de l’accueil ; l’écran 15 (relire ma réponse) a été retiré */
+  /*
+   * Le mode (back-end ou démo) est figé au build, côté serveur comme dans le navigateur. Absente au build, la variable
+   * restait lue au démarrage par le serveur seul : un build de démo lancé avec elle servait la vraie base à un navigateur
+   * resté en démo.
+   */
+  env: { NEXT_PUBLIC_BLUSH_BACKEND: process.env.NEXT_PUBLIC_BLUSH_BACKEND ?? "" },
   async redirects() {
     return [
+      /* L’écran 14 (son message) vit désormais dans le chat de l’accueil ; l’écran 15 (relire ma réponse) a été retiré */
       { source: "/app/message/:id", destination: "/app", permanent: false },
       { source: "/app/brouillon", destination: "/app", permanent: false },
+      /* iMessage ne s’exporte pas (Messages sur Mac n’a pas de commande pour ça) : on filme son écran. ?app=imessage suit */
+      { source: "/importer/export", has: [{ type: "query", key: "app", value: "imessage" }], destination: "/importer/captures", permanent: false },
     ];
   },
   /*
-   * Qui revient connecté (cookie de session, src/server/cookies.ts) voit la landing de src/app/retour, à la même
-   * adresse : ses boutons mènent à son accueil. Sans le cookie, / reste la page statique.
+   * Qui revient connecté (cookie de session) voit la landing de src/app/retour, à la même adresse : ses boutons mènent à
+   * son accueil. Sans le cookie, / reste la page statique.
+   * Les pages du parcours d’arrivée sont statiques aussi (servies et préchargées tout de suite) ; ce qui y dépend de la
+   * session est une variante servie à la même adresse : /commencer sans la liste d’attente, /connexion qui renvoie qui est
+   * connecté vers son accueil. Ce qui dépend de la bêta fermée, lue à l’exécution et non au build, est servi par
+   * src/proxy.ts, avant ces réécritures.
    */
   async rewrites() {
-    return { beforeFiles: [{ source: "/", has: [{ type: "cookie", key: "blush-session" }], destination: "/retour" }], afterFiles: [], fallback: [] };
+    return {
+      beforeFiles: [
+        { source: "/", has: [SESSION], destination: "/retour" },
+        { source: "/commencer", has: [SESSION], destination: "/commencer/connecte" },
+        { source: "/connexion", has: [SESSION], destination: "/connexion/connecte" },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
   async headers() {
     return [{ source: "/(.*)", headers: SECURITE }];

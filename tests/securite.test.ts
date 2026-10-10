@@ -30,7 +30,7 @@ import { ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { convDe, depuisFichier, importer, type Ligne, type Meta } from "@/server/histoires";
+import { convDe, depuisFichier, importer, type LigneComplete, type Meta } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { suiteSure } from "@/lib/suite";
@@ -98,7 +98,7 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
     const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
     expect(ligne.conv![0]).toBe(2);
     expect(ligne.conv!.length).toBeLessThan(Buffer.byteLength(lu.texte) / 2);
-    expect(convDe(ligne as Ligne)).toBe(lu.texte);
+    expect(convDe(ligne as LigneComplete)).toBe(lu.texte);
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });
 });

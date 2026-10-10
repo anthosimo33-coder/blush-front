@@ -1,7 +1,9 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { OFFERS } from "@/mocks/daily";
+import { useEffect, type CSSProperties } from "react";
+import { OFFERS } from "@/content/offres";
+import { cheminDe } from "@/lib/navigation";
+import { invalidate } from "@/lib/query";
 import { useSoundOnce } from "@/lib/sound";
 import { CheckBurst } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -43,6 +45,9 @@ export function UnlockedScreen({
   const plus = offer === "blushplus";
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
   useSoundOnce("debloque");
+  /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
+  useEffect(() => invalidate("report", "account"), []);
+  const suite = next ?? `/rapport#chapitre-${reprise}`;
   return (
     <Screen
       centered
@@ -51,7 +56,8 @@ export function UnlockedScreen({
       desktopTopPad={0}
       footer={
         <div data-popin="" style={{ "--d": "0.7s" } as CSSProperties}>
-          <ButtonLink href={next ?? `/rapport#chapitre-${reprise}`} arrow>
+          {/* Vers l’accueil, sans remise en haut : il s’ouvre sur le dernier échange */}
+          <ButtonLink href={suite} scroll={cheminDe(suite) !== "/app"} arrow>
             {next ? "Continuer" : "Lire la suite"}
           </ButtonLink>
         </div>

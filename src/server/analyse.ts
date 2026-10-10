@@ -11,7 +11,7 @@ import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
-import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne } from "./histoires";
+import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
@@ -20,7 +20,7 @@ import { alerter } from "./alertes";
 import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
-import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, statutDe, type Genre, type Tache } from "./taches";
+import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, type Genre, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
@@ -47,7 +47,7 @@ export const editionsBornees = (e?: EditionsFiche): EditionsFiche | undefined =>
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
-function relire(story: Ligne) {
+function relire(story: LigneComplete) {
   const conv = convDe(story);
   if (!conv) throw new ErreurTache("conv_effacee");
   const meta = metaDe(story);
@@ -165,7 +165,7 @@ const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
   return (a: Avance) => ecrire(calcul(a));
 };
 
-async function verdict(story: Ligne, t: Tache) {
+async function verdict(story: LigneComplete, t: Tache) {
   const { h, lu, rendu } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
@@ -185,7 +185,7 @@ async function verdict(story: Ligne, t: Tache) {
 }
 
 /** Le rapport, étape 1 : le plan. En mode sobre, le rapport entier en un appel. */
-async function rapportPlan(story: Ligne, t: Tache) {
+async function rapportPlan(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
   const v = await lireVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
@@ -221,7 +221,7 @@ async function rapportPlan(story: Ligne, t: Tache) {
 }
 
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
-async function rapportChapitres(story: Ligne, t: Tache) {
+async function rapportChapitres(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
@@ -350,7 +350,7 @@ async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | {
  * La tâche « vocal » : quand il n’a pas pu se faire pendant l’écriture, en mode sobre, ou pour un rapport écrit avant
  * le vocal. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon de la mémoire.
  */
-async function vocalTache(story: Ligne) {
+async function vocalTache(story: LigneComplete) {
   if (!voixDisponible() || (await vocalAJour(story.id))) return;
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
@@ -368,7 +368,7 @@ async function vocalTache(story: Ligne) {
 }
 
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
-async function memoire(story: Ligne) {
+async function memoire(story: LigneComplete) {
   const { rendu, lu } = relire(story);
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
@@ -419,7 +419,8 @@ async function memoireMaj(story: Ligne, t: Tache) {
   throw new ErreurTache("memoire_changee");
 }
 
-const ETAPES: Partial<Record<Genre, (story: Ligne, t: Tache) => Promise<void>>> = {
+/* Les étapes reçoivent la ligne complète (executer la relit avec la conv brute) : celles qui lisent la conv en ont besoin */
+const ETAPES: Partial<Record<Genre, (story: LigneComplete, t: Tache) => Promise<void>>> = {
   verdict,
   rapport_plan: rapportPlan,
   rapport_chapitres: rapportChapitres,
@@ -437,13 +438,27 @@ async function aAcces(story: Ligne): Promise<boolean> {
 
 /* ———— L’exécution ———— */
 
-/**
- * Une fonction Vercel vit 5 minutes au plus (plan gratuit) et une étape tient sous 3 minutes : on ne commence pas
- * d’étape après 100 secondes, pour qu’elle finisse avant d’être coupée.
- */
-export const BUDGET_CHAINE_MS = 100_000;
 /** L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction (300 s). */
 export const ECHEANCE_CHAINE_MS = 285_000;
+
+/*
+ * Une fonction Vercel vit 5 minutes au plus (plan gratuit) : on ne commence une étape que s’il reste, avant l’échéance,
+ * sa durée habituelle et 30 % de marge. Un budget fixe (rien après 100 s) arrêtait la chaîne après le verdict et le
+ * plan : les chapitres attendaient qu’un sondage la relance, ce que ne font ni la révélation, ni une appli fermée (et
+ * le mail « ton rapport est prêt » avec eux). Durées mesurées sur les rapports de test ; ai_usage.ms donne celles de la production.
+ */
+const DUREES_MS: Record<Genre, number> = {
+  verdict: 60_000,
+  rapport_plan: 55_000,
+  /* Les deux moitiés en même temps, et le vocal pendant ce temps */
+  rapport_chapitres: 100_000,
+  vocal: 45_000,
+  memoire: 90_000,
+  memoire_maj: 60_000,
+};
+const MARGE_ETAPE = 1.3;
+/** Le temps qu’il doit rester avant l’échéance pour commencer une étape de ce genre. */
+export const tempsPourCommencer = (kind: string) => MARGE_ETAPE * (DUREES_MS[kind as Genre] ?? 100_000);
 
 /** Exécute une tâche. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
 async function executer(t: Tache): Promise<boolean> {
@@ -471,18 +486,17 @@ async function executer(t: Tache): Promise<boolean> {
 }
 
 /**
- * Enchaîne les tâches d’une histoire tant qu’il en reste, dans le temps imparti (le reste repart au prochain passage :
- * le suivi de la lecture et du rapport relance la chaîne). Deux appels en même temps ne font jamais deux fois la même
- * tâche : `prendre` est atomique.
+ * Enchaîne les tâches d’une histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance
+ * (sinon elle repart au prochain passage : le suivi de la lecture et du rapport relance la chaîne). Deux appels en même
+ * temps ne font jamais deux fois la même tâche : `prendre` est atomique.
  */
-export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_MS): Promise<void> {
+export async function executerChaine(storyId: string): Promise<void> {
   await cloreLesAbandons(storyId);
   if (await occupee(storyId)) return;
-  const debut = Date.now();
   await avecEcheance(ECHEANCE_CHAINE_MS, async () => {
-    while (Date.now() - debut < budgetMs) {
+    for (;;) {
       const [t] = await aRelancer(storyId);
-      if (!t) return;
+      if (!t || tempsRestant() < tempsPourCommencer(t.kind)) return;
       const pris = await prendre(t.id);
       if (!pris) return;
       /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
@@ -494,19 +508,4 @@ export async function executerChaine(storyId: string, budgetMs = BUDGET_CHAINE_M
 /** Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre échec. */
 export async function cloreLesAbandons(storyId: string): Promise<void> {
   for (const t of await clore(storyId)) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, "Erreur : coupée à chaque essai (délai dépassé)", `Essais : ${t.attempts}`]);
-}
-
-/**
- * Attend qu’une tâche soit finie, en faisant tourner la chaîne (ou en laissant finir celle qui tourne déjà).
- * Renvoie son statut, ou null si le délai est passé (elle finira au prochain passage).
- */
-export async function attendreTache(storyId: string, tacheId: string, delaiMs = 200_000): Promise<string | null> {
-  const fin = Date.now() + delaiMs;
-  while (Date.now() < fin) {
-    await executerChaine(storyId, Math.min(BUDGET_CHAINE_MS, fin - Date.now()));
-    const statut = await statutDe(tacheId);
-    if (statut !== "attente" && statut !== "en_cours") return statut;
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  return null;
 }

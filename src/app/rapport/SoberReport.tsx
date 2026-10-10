@@ -55,7 +55,7 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
   }, [step]);
 
   /* Ouvert directement (le lien du mail) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
-  const back = () => (step === 2 ? setStep(1) : pagePrecedente() ? router.back() : router.push("/app"));
+  const back = () => (step === 2 ? setStep(1) : pagePrecedente() ? router.back() : router.push("/app", { scroll: false }));
 
   return (
     <div className="flex min-h-dvh justify-center bg-paper">

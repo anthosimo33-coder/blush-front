@@ -23,7 +23,8 @@ export function Logo({
       className={cn("inline-flex items-center gap-2 font-black", onInk ? "text-white" : "text-ink", className)}
       style={{ fontSize, letterSpacing: "-0.03em" }}
     >
-      <BubbleLogo size={size} animated={animated} />
+      {/* animated seulement quand il s’anime : un logo fixe reste un simple SVG (un logo animable passe en calques) */}
+      <BubbleLogo size={size} animated={animated || undefined} />
       blush
     </span>
   );

@@ -14,7 +14,7 @@ const COMPRESSE = 2;
 /* Ce qu’une donnée compressée peut redevenir au plus : bien au-delà de la plus longue conv acceptée (histoires.ts, TAILLE_MAX) */
 const DECOMPRESSE_MAX = 256 * 1024 * 1024;
 
-function cles() {
+function deriver() {
   const maitre = Buffer.from(env().BLUSH_CLE, "base64");
   /* Deux clés dérivées : une pour chiffrer, une pour hacher (jetons de session, codes, brouillons) */
   return {
@@ -22,6 +22,10 @@ function cles() {
     hachage: Buffer.from(hkdfSync("sha256", maitre, Buffer.alloc(0), "blush:hachage:v1", 32)),
   };
 }
+
+/* Dérivées une fois par instance (la clé maîtresse ne change pas, env() est lu une fois) : l’accueil déchiffre une centaine de fois par rendu */
+let derivees: ReturnType<typeof deriver> | null = null;
+const cles = () => (derivees ??= deriver());
 
 export function chiffrer(valeur: unknown): Buffer {
   const iv = randomBytes(12);

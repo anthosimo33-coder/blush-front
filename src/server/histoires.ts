@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
 import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
@@ -51,7 +51,15 @@ export type Meta = {
  */
 export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number; trouvailles?: string[] };
 
-export type Ligne = typeof schema.stories.$inferSelect;
+/** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (analyse.ts, executer). */
+export type LigneComplete = typeof schema.stories.$inferSelect;
+/**
+ * Une histoire, sans sa conv brute : ce dont ont besoin le chat, le partage, la fiche, le vocal… Une ligne complète
+ * comme une ligne d’écran s’y passe.
+ */
+export type Ligne = Omit<LigneComplete, "conv">;
+/** Ce que lisent les écrans et les routes : la ligne sans la conv, et si elle est encore en base (`aConv`). */
+export type LigneEcran = Ligne & { aConv: boolean };
 
 export { prenomDe };
 
@@ -139,8 +147,11 @@ export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: s
   return { id: ligne.id, meta, secret };
 }
 
-/** Des captures, lues par le prompt 01 (src/server/captures.ts) : une histoire brouillon, comme un export. */
-export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: TexteCaptures }): Promise<{ id: string; meta: Meta; secret: string }> {
+/**
+ * Des captures, lues par le prompt 01 (src/server/captures.ts) : une histoire brouillon, comme un export. `secret` :
+ * celui du cookie du brouillon, quand il est tiré de la clé de l’envoi (src/server/captures.ts, reprise).
+ */
+export async function importerCaptures({ appli, t, secret = jeton() }: { appli: Meta["appli"]; t: TexteCaptures; secret?: string }): Promise<{ id: string; meta: Meta; secret: string }> {
   const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
   const lu = lire(t.texte, { utilisateur: personne("Moi"), autre: personne(t.autre), format: "captures" });
   const err = erreurImport(lu, "captures");
@@ -163,7 +174,6 @@ export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: 
     },
     moi: 0,
   };
-  const secret = jeton();
   const [ligne] = await db()
     .insert(schema.stories)
     .values({ draftToken: empreinte(secret), messageCount: lu.messages.length, meta: chiffrer(meta), conv: chiffrerCompresse(t.texte) })
@@ -177,7 +187,18 @@ export async function importerCaptures({ appli, t }: { appli: Meta["appli"]; t: 
  */
 export type Designation = { brouillon?: string; choisie?: string; affichee?: string | null };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/*
+ * Les colonnes d’une ligne d’écran : tout sauf la conv brute, que le pilote recevrait en hexadécimal (deux fois sa
+ * taille) à chaque page, appel et sondage. Aucun écran ne la lit : la chaîne d’analyse relit sa ligne elle-même.
+ */
+const { conv, ...sansConv } = getTableColumns(schema.stories);
+const ECRAN = { ...sansConv, aConv: sql<boolean>`${conv} is not null` };
+
+/** La conv brute est-elle encore en base ? (Une ligne d’écran le dit, une ligne complète l’a.) */
+export const aSaConv = (ligne: LigneEcran | LigneComplete) => ("aConv" in ligne ? ligne.aConv : !!ligne.conv);
+
+/** L’identifiant d’une histoire (un uuid) : ce qui n’en a pas la forme ne va pas jusqu’à la base. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Une histoire du compte a-t-elle été lue (sa lecture lancée) ? Les tâches restent après coup : leur présence suffit. */
 const lue = sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.tasks.storyId} = ${schema.stories.id})`;
@@ -190,7 +211,7 @@ const lue = sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.ta
  * - Sinon, la conv du compte choisie dans « Tes convs » (si elle est bien à lui), ou la plus récente déjà lue.
  * Sans compte : le brouillon seul.
  */
-export async function histoireOuverte(utilisateur: Utilisateur | null, { brouillon, choisie, affichee }: Designation, { parcours = false } = {}): Promise<Ligne | null> {
+export async function histoireOuverte(utilisateur: Utilisateur | null, { brouillon, choisie, affichee }: Designation, { parcours = false } = {}): Promise<LigneEcran | null> {
   if (brouillon && (parcours || !utilisateur)) {
     const ligne = await brouillonDe(brouillon);
     if (ligne || !utilisateur) return ligne;
@@ -200,34 +221,34 @@ export async function histoireOuverte(utilisateur: Utilisateur | null, { brouill
   if (affichee && !parcours) {
     if (!UUID.test(affichee)) return null;
     const [ligne] = await db()
-      .select()
+      .select(ECRAN)
       .from(schema.stories)
       .where(and(eq(schema.stories.id, affichee), eq(schema.stories.userId, utilisateur.id)));
     return ligne ?? null;
   }
   if (choisie && UUID.test(choisie)) {
     const [ligne] = await db()
-      .select()
+      .select(ECRAN)
       .from(schema.stories)
       .where(and(eq(schema.stories.id, choisie), eq(schema.stories.userId, utilisateur.id)));
     if (ligne) return ligne;
   }
-  const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.userId, utilisateur.id)).orderBy(desc(lue), desc(schema.stories.createdAt)).limit(1);
+  const [ligne] = await db().select(ECRAN).from(schema.stories).where(eq(schema.stories.userId, utilisateur.id)).orderBy(desc(lue), desc(schema.stories.createdAt)).limit(1);
   return ligne ?? null;
 }
 
 /** Le brouillon d’un cookie, tant qu’il n’a pas de compte. */
-export async function brouillonDe(secret: string): Promise<Ligne | null> {
+export async function brouillonDe(secret: string): Promise<LigneEcran | null> {
   const [ligne] = await db()
-    .select()
+    .select(ECRAN)
     .from(schema.stories)
     .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)));
   return ligne ?? null;
 }
 
 /** Les histoires du compte déjà lues, la plus récente d’abord (celles laissées avant la lecture n’y sont pas). */
-export async function histoiresDuCompte(userId: string): Promise<Ligne[]> {
-  return db().select().from(schema.stories).where(and(eq(schema.stories.userId, userId), lue)).orderBy(desc(schema.stories.createdAt));
+export async function histoiresDuCompte(userId: string): Promise<LigneEcran[]> {
+  return db().select(ECRAN).from(schema.stories).where(and(eq(schema.stories.userId, userId), lue)).orderBy(desc(schema.stories.createdAt));
 }
 
 /**
@@ -259,9 +280,9 @@ export async function rattacherBrouillon(utilisateur: Utilisateur, secret: strin
   return ligne?.id ?? null;
 }
 
-export const metaDe = (ligne: Ligne) => dechiffrer<Meta>(ligne.meta);
-export const contexteDe = (ligne: Ligne) => (ligne.context ? dechiffrer<Contexte>(ligne.context) : null);
-export const convDe = (ligne: Ligne) => (ligne.conv ? dechiffrer<string>(ligne.conv) : null);
+export const metaDe = (ligne: Pick<Ligne, "meta">) => dechiffrer<Meta>(ligne.meta);
+export const contexteDe = (ligne: Pick<Ligne, "context">) => (ligne.context ? dechiffrer<Contexte>(ligne.context) : null);
+export const convDe = (ligne: LigneComplete) => (ligne.conv ? dechiffrer<string>(ligne.conv) : null);
 
 /** « Qui es-tu ? » est rempli (en base) : la lecture peut partir sans le parcours du navigateur. */
 export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> =>
@@ -282,7 +303,7 @@ export function histoireDe(meta: Meta): Histoire {
 }
 
 export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
-  const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+  const [ligne] = await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id));
   const avant = metaDe(ligne);
   /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
   const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;

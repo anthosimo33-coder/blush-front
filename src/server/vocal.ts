@@ -6,7 +6,7 @@ import { minuter, texteDit } from "@/lib/vocal";
 import type { VocalLigne, VocalRapport } from "@/types";
 import { chiffrer, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { db, schema } from "./db";
-import { histoireDe, metaDe, type Ligne } from "./histoires";
+import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
 import { dire, voixPour, type Voix } from "./ia/voix";
 
 /*
@@ -66,15 +66,59 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
     .onConflictDoUpdate({ target: schema.vocals.storyId, set: valeurs });
 }
 
-/** Le vocal tel que l’affiche le front, s’il est fait. L’adresse de l’audio change avec lui (le navigateur le garde en cache). */
+/**
+ * Le vocal tel que l’affiche le front, s’il est fait. L’adresse de l’audio change avec lui : un vocal refait n’est
+ * jamais confondu avec l’ancien. (Le navigateur ne garde pas l’audio : voir reponseAudio, src/server/http.ts.)
+ */
 export async function vocalPret(storyId: string): Promise<Extract<VocalRapport, { etat: "pret" }> | null> {
   return (await vocalLu(storyId))?.pret ?? null;
 }
 
-/** L’audio du vocal (MP3), déchiffré. */
-export async function audioDe(storyId: string): Promise<Buffer | null> {
-  const [v] = await db().select({ audio: schema.vocals.audio }).from(schema.vocals).where(eq(schema.vocals.storyId, storyId));
-  return v ? dechiffrerOctets(v.audio) : null;
+/*
+ * Safari lit un audio en deux requêtes coup sur coup (deux octets, puis le reste). L’instance garde donc un moment
+ * l’audio des derniers vocaux lus, CHIFFRÉ comme en base (jamais en clair hors de la requête) : la seconde requête ne
+ * relit pas ses 500 Ko. Quelques vocaux, une minute : la place de quelques Mo.
+ */
+const GARDE_MS = 60_000;
+const GARDES_MAX = 8;
+const gardes = new Map<string, { fait: number; chiffre: Buffer; jusqua: number }>();
+
+function garder(storyId: string, fait: number, chiffre: Buffer) {
+  gardes.delete(storyId);
+  gardes.set(storyId, { fait, chiffre, jusqua: Date.now() + GARDE_MS });
+  /* Le plus ancien gardé part d’abord (une Map garde l’ordre d’insertion) */
+  for (const cle of gardes.keys()) {
+    if (gardes.size <= GARDES_MAX) break;
+    gardes.delete(cle);
+  }
+}
+
+/**
+ * L’audio du vocal d’une conv de ce compte (MP3), déchiffré, en une seule requête qui vérifie aussi que la conv est à
+ * lui. null : pas de conv à ce compte ; `audio` null : son vocal n’est pas prêt.
+ */
+export async function audioDuCompte(userId: string, storyId: string): Promise<{ audio: Buffer | null } | null> {
+  if (!UUID.test(storyId)) return null;
+  let garde = gardes.get(storyId);
+  if (garde && garde.jusqua < Date.now()) {
+    gardes.delete(storyId);
+    garde = undefined;
+  }
+  const [l] = await db()
+    .select({
+      fait: schema.vocals.createdAt,
+      /* L’audio ne voyage que s’il n’est pas déjà gardé, à la même version (la même date) */
+      chiffre: sql<Buffer | null>`case when date_trunc('milliseconds', ${schema.vocals.createdAt}) = ${garde ? new Date(garde.fait).toISOString() : null} then null else ${schema.vocals.audio} end`,
+    })
+    .from(schema.stories)
+    .leftJoin(schema.vocals, eq(schema.vocals.storyId, schema.stories.id))
+    .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, userId)));
+  if (!l) return null;
+  if (!l.fait) return { audio: null };
+  const chiffre = l.chiffre ?? garde?.chiffre;
+  if (!chiffre) return { audio: null };
+  garder(storyId, l.fait.getTime(), chiffre);
+  return { audio: dechiffrerOctets(chiffre) };
 }
 
 export const EVENEMENTS = ["debut", "fin", "reecoute", "ferme"] as const;

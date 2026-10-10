@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { setForceSound } from "@/lib/sound";
@@ -10,6 +10,8 @@ import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import type { VocalRapport } from "@/types";
 import { bloquerDefilement } from "@/lib/defilement";
+import { figtree } from "@/lib/fonts";
+import { auRepos } from "@/lib/repos";
 
 /*
  * Le vocal de BLUSH, en haut du rapport : une tuile, puis une story plein écran. Elle parle, les perles du logo
@@ -39,6 +41,25 @@ function marquerEcoute(audio: string) {
     /* stockage indisponible : la tuile bougera encore la prochaine fois */
   }
 }
+
+/**
+ * Ce que la story montre à l’instant `t` : la ligne en cours, celle d’avant, le message cité (et sa ligne), et le nombre
+ * de mots allumés. Le temps avance à chaque image, mais l’écran ne change que quand l’un d’eux change (voir `repere`).
+ */
+function aLInstant(vocal: Pret, t: number) {
+  const k = ligneA(vocal.lignes, t);
+  const ligne = vocal.lignes[k];
+  const avant = k > 0 ? vocal.lignes[k - 1] : null;
+  /* Le message cité reste à l’écran pendant sa ligne et un peu après */
+  const recu = ligne?.recu && t >= ligne.debut + 0.3 ? ligne.recu : avant?.recu && t < avant.fin + 1.2 ? avant.recu : null;
+  const cleRecu = recu === ligne?.recu ? k : k - 1;
+  const allumes = ligne ? ligne.mots.filter((m) => t >= m.debut).length : 0;
+  return { k, ligne, avant, recu, cleRecu, allumes };
+}
+const repere = (vocal: Pret, t: number) => {
+  const { k, recu, cleRecu, allumes } = aLInstant(vocal, t);
+  return `${k}:${allumes}:${recu ? cleRecu : -1}`;
+};
 
 export function VocalDuRapport({ vocal, titre, fin, ecrit, sobre = false }: { vocal: VocalRapport; titre: string; fin: FinVocal; ecrit: boolean; sobre?: boolean }) {
   if (vocal.etat === "en_cours") return <TuileEnregistre ecrit={ecrit} sobre={sobre} />;
@@ -101,17 +122,72 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     setNouveau(!dejaEcoute(vocal.audio));
   }, [vocal.audio]);
 
-  /* Pendant la lecture, le temps suit l’audio à chaque image : les mots s’allument au bon moment */
+  /*
+   * Pendant la lecture, l’audio est suivi à chaque image : la barre avance par son style (hors de React), et la story
+   * ne se re-rend que quand un mot s’allume, qu’une ligne change ou qu’un message cité arrive (quelques fois par seconde).
+   */
+  const barre = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!joue) return;
     let raf = 0;
+    let vu = "";
     const suivre = () => {
-      if (audio.current) setT(audio.current.currentTime);
+      const a = audio.current;
+      if (a) {
+        if (barre.current) barre.current.style.transform = `scaleX(${Math.min(1, a.currentTime / vocal.duree)})`;
+        const r = repere(vocal, a.currentTime);
+        if (r !== vu) {
+          vu = r;
+          setT(a.currentTime);
+        }
+      }
       raf = requestAnimationFrame(suivre);
     };
     raf = requestAnimationFrame(suivre);
     return () => cancelAnimationFrame(raf);
-  }, [joue]);
+  }, [joue, vocal]);
+  /* La barre suit aussi les sauts (retour de 5 s, réécoute, fin) et l’ouverture de la story : posée avant l’image */
+  useLayoutEffect(() => {
+    if (barre.current) barre.current.style.transform = `scaleX(${Math.min(1, t / vocal.duree)})`;
+  }, [t, vocal.duree, ouvert]);
+
+  /*
+   * Le son, préparé en mémoire avant le toucher (jamais sur le disque : l’audio reste « no-store ») : dès que la tuile est
+   * à l’écran, ou tout de suite pour un vocal jamais écouté. Au toucher, l’élément audio part de lui, sans attendre le réseau.
+   */
+  const tuile = useRef<HTMLButtonElement>(null);
+  const enMemoire = useRef<string | null>(null);
+  useEffect(() => {
+    const el = tuile.current;
+    if (!el) return;
+    const arret = new AbortController();
+    let annuler = () => {};
+    let lance = false;
+    const precharger = () => {
+      if (lance) return;
+      lance = true;
+      annuler = auRepos(() => {
+        fetch(vocal.audio, { credentials: "same-origin", signal: arret.signal })
+          .then((r) => (r.ok ? r.blob() : null))
+          .then((b) => {
+            if (b && !arret.signal.aborted) enMemoire.current = URL.createObjectURL(b);
+          })
+          .catch(() => {
+            /* Rien en mémoire : le toucher lira le son sur le réseau, comme avant */
+          });
+      }, 300);
+    };
+    const obs = new IntersectionObserver(([e]) => e.isIntersecting && precharger());
+    if (!dejaEcoute(vocal.audio)) precharger();
+    else obs.observe(el);
+    return () => {
+      obs.disconnect();
+      annuler();
+      arret.abort();
+      if (enMemoire.current) URL.revokeObjectURL(enMemoire.current);
+      enMemoire.current = null;
+    };
+  }, [vocal.audio]);
 
   /* On quitte le rapport (ou la page) : l’écoute en cours est notée fermée, le son s’arrête, les sons de BLUSH retrouvent le mode silencieux */
   useEffect(() => {
@@ -130,12 +206,16 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
 
   /* L’élément audio naît dans le toucher (sinon Safari refuse de jouer) et lit le fichier au fil de l’eau */
   const lecteur = () => {
-    /* Un élément en erreur ne repart pas : on en refait un (le réseau est peut-être revenu) */
+    /* Un élément en erreur ne repart pas : on en refait un, sur le réseau (le réseau est peut-être revenu) */
     if (audio.current && !audio.current.error) return audio.current;
-    const a = new Audio(vocal.audio);
+    const a = new Audio((!audio.current && enMemoire.current) || vocal.audio);
     a.preload = "auto";
     a.onplay = () => setJoue(true);
-    a.onpause = () => setJoue(false);
+    /* En pause, l’écran se recale sur le temps exact (la boucle ne le suit plus) */
+    a.onpause = () => {
+      setJoue(false);
+      setT(a.currentTime);
+    };
     a.onwaiting = a.onstalled = () => setAttente(true);
     a.onplaying = () => setAttente(false);
     a.onerror = () => {
@@ -207,11 +287,17 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
   };
 
   const duree = Math.max(1, Math.round(vocal.duree));
-  return (
-    <>
+  /* La tuile ne dépend pas du temps : pendant l’écoute, la story se re-rend sans elle */
+  const ouvrirIci = useRef(ouvrir);
+  useLayoutEffect(() => {
+    ouvrirIci.current = ouvrir;
+  });
+  const laTuile = useMemo(
+    () => (
       <button
+        ref={tuile}
         type="button"
-        onClick={ouvrir}
+        onClick={() => ouvrirIci.current()}
         data-vocal-nouveau={nouveau ? "" : undefined}
         aria-label={`Écouter le vocal de BLUSH, ${duree} secondes`}
         className="lift relative flex w-full items-center gap-3.5 overflow-hidden rounded-card p-4 pl-3.5 text-left text-white"
@@ -229,6 +315,12 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
           <Icon name="play" size={17} color="#121214" fill="#121214" stroke={0} className="translate-x-px" />
         </span>
       </button>
+    ),
+    [nouveau, sobre, duree],
+  );
+  return (
+    <>
+      {laTuile}
       {ouvert &&
         createPortal(
           <Story
@@ -237,6 +329,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
             fin={fin}
             sobre={sobre}
             t={t}
+            barre={barre}
             joue={joue && !attente}
             termine={termine}
             coupe={coupe}
@@ -259,6 +352,7 @@ function Story({
   fin,
   sobre,
   t,
+  barre,
   joue,
   termine,
   coupe,
@@ -272,6 +366,8 @@ function Story({
   fin: FinVocal;
   sobre: boolean;
   t: number;
+  /** La barre de progression : la boucle de lecture la fait avancer elle-même, à chaque image. */
+  barre: RefObject<HTMLDivElement | null>;
   joue: boolean;
   termine: boolean;
   /** Le son ne vient pas (réseau coupé) : on le dit, lecture le relance. */
@@ -287,12 +383,7 @@ function Story({
   useEffect(() => {
     fermer.current = onFermer;
   }, [onFermer]);
-  const k = ligneA(vocal.lignes, t);
-  const ligne = vocal.lignes[k];
-  const avant = k > 0 ? vocal.lignes[k - 1] : null;
-  /* Le message cité reste à l’écran pendant sa ligne et un peu après */
-  const recu = ligne?.recu && t >= ligne.debut + 0.3 ? ligne.recu : avant?.recu && t < avant.fin + 1.2 ? avant.recu : null;
-  const cleRecu = recu === ligne?.recu ? k : k - 1;
+  const { k, ligne, avant, recu, cleRecu } = aLInstant(vocal, t);
 
   /* La page derrière ne défile plus ; Échap ferme ; la barre de Safari prend la couleur de la story */
   useEffect(() => {
@@ -318,7 +409,8 @@ function Story({
       aria-modal="true"
       aria-label="Le vocal de BLUSH"
       data-vocal-story=""
-      className="fixed inset-0 z-[80] flex flex-col text-white"
+      /* La story vit hors du rapport (portail) : elle pose elle-même Figtree, pour les messages cités */
+      className={cn("fixed inset-0 z-[80] flex flex-col text-white", figtree.variable)}
       style={{
         background: sobre ? "#17171A" : "radial-gradient(90% 45% at 50% 105%, rgba(232,53,138,0.42) 0%, rgba(232,53,138,0) 70%), #0E0E10",
         paddingTop: "env(safe-area-inset-top, 0px)",
@@ -329,7 +421,7 @@ function Story({
         <div className="flex flex-col gap-1.5 px-4 pt-3">
           <div className="h-[3px] overflow-hidden rounded-full bg-white/20">
             {/* Une échelle plutôt qu’une largeur : la barre avance sans recalculer la page à chaque image */}
-            <div className="h-full w-full origin-left rounded-full bg-white" style={{ transform: `scaleX(${Math.min(1, t / vocal.duree)})` }} />
+            <div ref={barre} className="h-full w-full origin-left rounded-full bg-white" />
           </div>
           <div className="flex h-11 items-center gap-2">
             {!sobre && <BubbleLogo size={24} />}

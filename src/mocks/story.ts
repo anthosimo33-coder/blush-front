@@ -1,11 +1,8 @@
 import type { Message, Source, Story } from "@/types";
 
 /* Données factices reprises des maquettes. En production, elles viennent de l’analyse réelle. */
-
-export const PEOPLE = {
-  hugo: { id: "hugo", name: "Hugo", initial: "H" },
-  sophie: { id: "sophie", name: "Sophie", initial: "S" },
-} as const;
+import { PEOPLE } from "./people";
+export { PEOPLE };
 
 export const SOURCE_WHATSAPP: Source = {
   id: "src-whatsapp",
@@ -72,59 +69,3 @@ export const READING_FEED: Message[] = [
 /** Ce que BLUSH remarque pendant la lecture (écran 08) : elle, un mot à vous, le moment. */
 export const READING_DISCOVERIES = ["Elle relance après 22 h", "« le libanais » × 9", "2 mars, 23 h 41"];
 
-export const READING_STEPS = [
-  "Votre histoire, du premier au dernier message",
-  "Qui relance, qui propose, qui s’ouvre",
-  "Le moment où tout a basculé",
-  "Ton verdict",
-];
-
-/** Étapes d’export par appli. La version iPhone/Android est choisie selon l’appareil. */
-export const EXPORT_STEPS = {
-  whatsapp: {
-    menu: { contact: "Sophie", items: ["Ajouter aux favoris", "Exporter la discussion", "Effacer la discussion"], highlight: 1 },
-    steps: {
-      all: [
-        "Ouvre votre conv",
-        "Touche son nom en haut (iPhone) ou ⋮ puis Plus (Android)",
-        "Exporter la discussion, sans médias",
-        "Enregistre dans Fichiers (iPhone) ou Drive (Android)",
-      ],
-      ios: ["Ouvre votre conv", "Touche son nom en haut", "Exporter la discussion, sans médias", "Enregistre dans Fichiers"],
-      android: ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"],
-    },
-  },
-  /* Plus proposé : Messages sur Mac n’a pas de commande « Exporter la conversation ». iMessage passe par l’enregistrement d’écran (/importer/captures?app=imessage). */
-  imessage: {
-    menu: { contact: "Sophie", items: ["Afficher le contact", "Exporter la conversation", "Supprimer la conversation"], highlight: 1 },
-    steps: {
-      all: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
-      ios: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
-      android: ["Ouvre Messages sur ton Mac", "Ouvre votre conv", "Exporter la conversation", "Enregistre le fichier"],
-    },
-  },
-  /* Textes Instagram relus le 8 octobre (le délai : Instagram prépare le fichier puis prévient par email). */
-  instagram: {
-    menu: { contact: "Espace Comptes", items: ["Mot de passe et sécurité", "Télécharger vos informations", "Préférences publicitaires"], highlight: 1 },
-    steps: {
-      all: [
-        "Ton profil, puis ☰ et Espace Comptes",
-        "Vos informations et autorisations, puis Télécharger vos informations",
-        "Choisis seulement Messages, au format JSON",
-        "Quand Instagram te prévient, choisis le fichier reçu",
-      ],
-      ios: [
-        "Ton profil, puis ☰ et Espace Comptes",
-        "Vos informations et autorisations, puis Télécharger vos informations",
-        "Choisis seulement Messages, au format JSON",
-        "Quand Instagram te prévient, choisis le fichier reçu",
-      ],
-      android: [
-        "Ton profil, puis ☰ et Espace Comptes",
-        "Vos informations et autorisations, puis Télécharger vos informations",
-        "Choisis seulement Messages, au format JSON",
-        "Quand Instagram te prévient, choisis le fichier reçu",
-      ],
-    },
-  },
-} as const;

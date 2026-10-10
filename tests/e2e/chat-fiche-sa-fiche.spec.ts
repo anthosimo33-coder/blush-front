@@ -209,7 +209,7 @@ test.fixme("après un retrait, les infos arrivées gardent leur point « Nouveau
 
 /*
  * Quand une fille utilise BLUSH, la rubrique s’appelle « Il aime », mais sa ligne d’ajout dit « Ajouter dans « Elle
- * aime » » : src/app/app/fiche/FicheScreen.tsx:252 passe sec.title (src/mocks/daily.ts:105) au lieu de sectionTitle().
+ * aime » » : src/app/app/fiche/FicheScreen.tsx passe sec.title (src/content/fiche.ts) au lieu de sectionTitle().
  */
 test.fixme("quand elle parle de lui, la ligne d’ajout de « Il aime » porte ce nom", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo, { personnes: { toi: "Inès", autre: "Malo" }, jeSuis: "Une fille" });

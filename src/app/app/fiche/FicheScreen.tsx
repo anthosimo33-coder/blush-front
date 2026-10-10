@@ -10,8 +10,8 @@ import { pagePrecedente } from "@/lib/navigation";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { addToFiche, getFiche, updateFiche } from "@/services/api";
-import { ErreurApi } from "@/services/reel";
-import { FICHE_SECTIONS } from "@/mocks/daily";
+import { ErreurApi, prechargerExport } from "@/services/reel";
+import { FICHE_SECTIONS } from "@/content/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { FileInput } from "@/components/ui/FileInput";
@@ -39,7 +39,12 @@ const sectionTitle = (id: FicheFact["section"], pronoun?: "il" | "elle") => (id 
 type Job =
   | { step: "idle" }
   | { step: "reading"; what: string; thumbs: string[]; file: boolean }
+  /* Lu, pas encore rangé (back-end) : la mémoire se met à jour après la réponse, la fiche se relit jusqu’à ce qu’elle ait fini */
+  | { step: "adding"; what: string; pending: NonNullable<FicheUpdate["pending"]>; before: FicheFact[] }
   | { step: "done"; what: string; update: FicheUpdate; before: FicheFact[] };
+
+/* Au-delà, on cesse de relire la fiche : la mise à jour prend 20 à 60 s, trois essais au plus */
+const SONDAGE_MAX_MS = 5 * 60_000;
 
 /*
  * Écran 16 — Sa fiche, à la manière d’une fiche Contacts. Un seul geste pour la remplir : ajouter des captures
@@ -47,10 +52,13 @@ type Job =
  * ce qui vient d’arriver est marqué d’un point rose. « Modifier » pour retirer une info ou ajouter la tienne.
  * Rien n’est cherché ailleurs.
  */
-export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?: boolean }) {
-  /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas la fiche de démo */
-  const key = fixed ? "fiche-apercu" : "fiche";
-  const { data } = useQuery(key, getFiche, initial, { fetch: !fixed });
+export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initial: Fiche; fixed?: boolean; storyId?: string; rendu?: number }) {
+  /* `fixed` : un aperçu figé (une vraie fiche produite par les prompts), qui ne relit pas la fiche de démo.
+     Sinon, une clé par conv : le cache d’une autre conv ne s’affiche jamais à la place de la sienne */
+  const key = fixed ? "fiche-apercu" : `fiche:${storyId ?? ""}`;
+  /* `rendu` : l’heure du rendu serveur. Préchargée par l’accueil, la page garde la fiche d’alors : modifiée ici depuis,
+     on part de la version gardée en cache. La relecture au montage rattrape ce que le chat y a ajouté */
+  const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu });
   const fiche = data ?? initial;
   const [editing, setEditing] = useState(false);
   const [job, setJob] = useState<Job>({ step: "idle" });
@@ -70,6 +78,15 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     e.preventDefault();
     router.back();
   };
+  /*
+   * Venu de l’accueil, « Retour » passe par l’historique : précharger l’accueil (tout son rendu serveur) ne servirait à
+   * rien. Lu après le montage, une fois la page d’avant notée (SuiviNavigation) ; le premier rendu reste celui du serveur.
+   */
+  const [prechargerAccueil, setPrechargerAccueil] = useState<true | undefined>(undefined);
+  useEffect(() => {
+    const t = setTimeout(() => setPrechargerAccueil(pagePrecedente() !== "/app" ? true : undefined));
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -83,6 +100,45 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
   }, []);
 
   /*
+   * Une mise à jour de la mémoire tourne (un ajout d’ici, ou un échange du chat ; back-end) : la fiche se relit toutes
+   * les 3 s jusqu’à ce qu’elle ait fini, puis ce qui est arrivé prend son point rose. Pas pendant un enregistrement : la
+   * relecture remettrait un instant la fiche d’avant la modification.
+   */
+  const [sondageArrete, setSondageArrete] = useState(false);
+  const majEnCours = !fixed && !!fiche.updating && !sondageArrete;
+  /* Les textes de la fiche avant la mise à jour, et si elle vient d’un ajout d’ici (qui dit alors ce qu’il a rangé) */
+  const suivi = useRef<{ avant: Set<string>; ajout: boolean } | null>(null);
+  const enVol = useRef(0);
+  /* Depuis quand on attend : un ajout repart de zéro, même si la fiche se relisait déjà (une mise à jour du chat) */
+  const debutSondage = useRef(0);
+  useEffect(() => {
+    if (!majEnCours) return;
+    debutSondage.current = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - debutSondage.current > SONDAGE_MAX_MS) setSondageArrete(true);
+      else if (!enVol.current) refresh();
+    }, 3000);
+    return () => clearInterval(t);
+  }, [majEnCours, refresh]);
+  useEffect(() => {
+    if (majEnCours) {
+      suivi.current ??= { avant: new Set(fiche.facts.map((f) => f.text)), ajout: false };
+      return;
+    }
+    const s = suivi.current;
+    if (!s) return;
+    suivi.current = null;
+    const added = fiche.facts.filter((f) => !s.avant.has(f.text));
+    setFresh((ids) => [...ids, ...added.map((f) => f.id)]);
+    if (!s.ajout) return;
+    /* Cinq minutes sans nouvelles, rien d’arrivé : l’écran dit que ça n’a pas marché */
+    const update: FicheUpdate = { fiche, added, confirmed: [], ...(fiche.updating && !added.length ? { problem: "bug" as const } : {}) };
+    setJob((j) => (j.step === "adding" ? { step: "done", what: j.what, update, before: j.before } : j));
+    /* Un toucher par info rangée, chacun un cran plus haut */
+    play("ficheRangee", added.length);
+  }, [majEnCours, fiche]);
+
+  /*
    * La fiche change tout de suite à l’écran, puis part au serveur. Les enregistrements partent l’un après l’autre (deux
    * retraits rapides arrivent dans l’ordre) ; un enregistrement raté le dit, et la fiche revient à ce que le serveur garde.
    */
@@ -92,8 +148,11 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
   const save = (facts: FicheFact[]) => {
     setQueryData(key, { ...fiche, facts });
     setSouci(null);
+    /* Ce que tu écris toi-même pendant une mise à jour n’est pas « arrivé » : pas de point rose */
+    facts.forEach((f) => suivi.current?.avant.add(f.text));
     const n = ++dernier.current;
-    const envoi = file.current.then(() => updateFiche(facts));
+    enVol.current += 1;
+    const envoi = file.current.then(() => updateFiche(facts)).finally(() => (enVol.current -= 1));
     file.current = envoi.catch(() => {});
     return envoi.then(
       (f) => {
@@ -114,7 +173,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
 
   const add = async (picked: File[]) => {
     const files = picked.filter(accepted);
-    if (!files.length || job.step === "reading") return;
+    if (!files.length || job.step === "reading" || job.step === "adding") return;
     const before = fiche.facts;
     const thumbs = files.filter(isImage).slice(0, 3).map((f) => URL.createObjectURL(f));
     urls.current.push(...thumbs);
@@ -124,6 +183,18 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     /* Sans réseau, même la fiche ne se relit pas : on garde celle qu’on a, et l’écran dit que ça n’a pas marché */
     const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], confirmed: [], problem: "bug" }));
     setQueryData(key, update.fiche);
+    if (update.pending) {
+      /*
+       * Lu, pas encore rangé : les infos arrivent avec la mise à jour de la mémoire (la fiche se relit, voir plus haut).
+       * Le point de départ est la fiche de la réponse : ce que le chat y a rangé pendant la lecture n’est pas compté
+       */
+      const avant = update.fiche.facts;
+      suivi.current = { avant: new Set(avant.map((f) => f.text)), ajout: true };
+      debutSondage.current = Date.now();
+      setSondageArrete(false);
+      setJob({ step: "adding", what, pending: update.pending, before: avant });
+      return;
+    }
     setFresh((ids) => [...ids, ...update.added.map((f) => f.id)]);
     setJob({ step: "done", what, update, before });
     /* Un toucher par info rangée, chacun un cran plus haut */
@@ -151,7 +222,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
       type="button"
       onClick={toggleEditing}
       aria-pressed={editing}
-      disabled={job.step === "reading"}
+      disabled={job.step === "reading" || job.step === "adding"}
       className={cn("relative h-10 rounded-full px-3 text-[15px] text-toi-ink transition-[color,opacity] after:absolute after:-inset-1 after:content-[''] disabled:opacity-40", editing ? "font-black" : "font-extrabold")}
     >
       {editing ? "OK" : "Modifier"}
@@ -169,7 +240,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
       contentGap={0}
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
-          <Link href="/app" prefetch transitionTypes={["nav-back"]} onNavigate={retour} aria-label="Retour" className="flex size-11 items-center justify-center">
+          <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} aria-label="Retour" className="flex size-11 items-center justify-center">
             <Icon name="back" size={24} color="#121214" stroke={2.6} />
           </Link>
           <span className="text-[14px] font-black text-grey">Sa fiche</span>
@@ -179,7 +250,7 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" prefetch transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+        <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
           <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
           Retour
         </Link>
@@ -204,8 +275,17 @@ export function FicheScreen({ initial, fixed = false }: { initial: Fiche; fixed?
       <div aria-live="polite" className="mt-6 flex flex-col gap-3">
         {job.step === "reading" ? (
           <Reading what={job.what} thumbs={job.thumbs} file={job.file} />
+        ) : job.step === "adding" ? (
+          <Adding what={job.what} pending={job.pending} />
         ) : (
-          <AddButton onClick={picker.open} dimmed={editing} />
+          /* Un export se prépare dans un module à part (src/services/preparer-export.ts) : il se charge pendant qu’on choisit */
+          <AddButton
+            onClick={() => {
+              prechargerExport();
+              picker.open();
+            }}
+            dimmed={editing}
+          />
         )}
         {job.step === "done" && <Found what={job.what} update={job.update} onUndo={undo} onClose={() => setJob({ step: "idle" })} />}
         {souci && (
@@ -335,9 +415,46 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
             <Icon name="file" size={18} color="#4B4A47" stroke={2.2} />
           </span>
         )}
-        <span data-scan-bar="" className="absolute -inset-x-1 top-0 h-[2px] rounded-full bg-elle shadow-[0_0_10px_2px_rgba(255,79,154,0.55)]" />
+        {/* Le trait est le haut d’un calque qui glisse (transform) : il balaie même quand la préparation des fichiers occupe le téléphone */}
+        <span
+          data-scan-bar=""
+          className="pointer-events-none absolute -inset-x-1 inset-y-0 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:rounded-full before:bg-elle before:shadow-[0_0_10px_2px_rgba(255,79,154,0.55)] before:content-['']"
+        />
       </span>
     </div>
+  );
+}
+
+/**
+ * Lu, pas encore rangé : à la place de la lecture, ce que BLUSH a lu, « en cours d’ajout » le temps que sa mémoire se
+ * mette à jour (20 à 60 s). Les infos rangées arrivent ensuite, avec leur point rose (Found).
+ */
+function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpdate["pending"]> }) {
+  const n = pending.messages;
+  const rows = [...pending.profile, ...(n > 0 ? [`${n} nouveau${n > 1 ? "x" : ""} message${n > 1 ? "s" : ""}`] : [])];
+  return (
+    <section role="status" aria-labelledby="ajout-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">
+      <div className="flex items-center gap-3.5 py-3.5 pl-3 pr-4">
+        <BubbleLogo size={50} animated />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h2 id="ajout-titre" className="m-0 text-[16px] font-black leading-[1.25]">
+            BLUSH a lu {what}
+          </h2>
+          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">Il range tout ça dans sa fiche, même si tu pars.</span>
+        </span>
+      </div>
+      {rows.length > 0 && (
+        <ul className="m-0 list-none border-t border-[rgba(17,17,20,0.06)] p-0 py-1">
+          {rows.map((t, i) => (
+            <li key={`${i}-${t}`} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
+              <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-[#D9D6CF] motion-safe:animate-pulse" />
+              <span className="min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35] text-soft">{t}</span>
+              <span className="shrink-0 text-[12.5px] font-extrabold text-grey">en cours d’ajout</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

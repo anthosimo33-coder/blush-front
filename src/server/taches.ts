@@ -141,11 +141,6 @@ export async function occupee(storyId: string): Promise<boolean> {
   return !!t;
 }
 
-export async function statutDe(id: string): Promise<string | null> {
-  const [t] = await db().select({ status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.id, id));
-  return t?.status ?? null;
-}
-
 /** Les tâches d’une histoire, par genre (la plus récente de chaque). */
 export async function etatDesTaches(storyId: string, genres: Genre[]): Promise<Partial<Record<Genre, Tache>>> {
   const lignes = await db()

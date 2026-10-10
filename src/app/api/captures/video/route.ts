@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sortie01 } from "@prompts/lib/schemas";
 import { AppliCaptures } from "@/server/appli-captures";
-import { enTexte, ErreurCaptures, lecturePermise } from "@/server/captures";
+import { cleEnvoi, enTexte, ErreurCaptures, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
@@ -12,7 +12,7 @@ import { fusionnerLots } from "@/server/video";
 /*
  * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
  * contenir, pour qu’un envoi forgé ne coûte pas des secondes de calcul ni des Mo en base. Un enregistrement réel en
- * est loin (une dizaine de lots d’une douzaine d’écrans, un peu plus quand des écrans lourds les font couper).
+ * est loin (seize lots de six écrans au plus, un peu plus quand des écrans lourds les font couper).
  */
 const MESSAGES_MAX = 3000;
 const TEXTE_MAX = 4000;
@@ -30,7 +30,8 @@ const Lot = Sortie01.extend({
   doutes: z.array(z.string().max(1000)).max(50),
 });
 const Envoi = z
-  .object({ app: AppliCaptures, lots: z.array(Lot).min(1).max(20) })
+  /* `cle` : celle de l’envoi, pour qu’un nouvel essai après une coupure retrouve l’histoire déjà créée */
+  .object({ app: AppliCaptures, lots: z.array(Lot).min(1).max(40), cle: z.string().max(64).optional() })
   .refine(({ lots }) => {
     const blocs = lots.flatMap((l) => l.blocs);
     const messages = blocs.flatMap((b) => b.messages);
@@ -51,14 +52,18 @@ export async function POST(req: Request) {
   if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
   const envoi = Envoi.safeParse(await corps(req));
   if (!envoi.success) return erreur("fichier", 422);
-  const { app, lots } = envoi.data;
+  const { app, lots, cle } = envoi.data;
   try {
-    const t = enTexte(fusionnerLots(lots, app));
-    const { id, meta, secret } = await importerCaptures({ appli: app, t });
-    await poserBrouillon(secret);
-    await compterImportVenuDuPartage();
-    const story = storyAffichee(id, meta);
-    return json({ source: story.sources[0], messagesRead: t.messages, story });
+    const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
+      const t = enTexte(fusionnerLots(lots, app));
+      const { id, meta } = await importerCaptures({ appli: app, t, secret });
+      /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
+      await compterImportVenuDuPartage();
+      return { id, meta, secret, messages: t.messages };
+    });
+    await poserBrouillon(lu.secret);
+    const story = storyAffichee(lu.id, lu.meta);
+    return json({ source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
     if (e instanceof ErreurCaptures) return erreur("capture", 422);
     if (e instanceof ErreurImport) return erreur(e.code, 422);

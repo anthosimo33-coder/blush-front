@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { suiteSure } from "@/lib/suite";
-import { estConnecte } from "@/services/serveur";
-import { ConnexionScreen } from "./ConnexionScreen";
+import { Suspense } from "react";
+import { ConnexionDepuisLadresse, ConnexionScreen } from "./ConnexionScreen";
 
 export const metadata: Metadata = { title: "Se connecter" };
 
 /**
- * Retrouver ses convs sur un autre appareil : l’email du compte, puis un code. Déjà connecté : son accueil.
- * `?suite=` : la page où l’on allait (le lien du mail, une page de l’appli sans session), rouverte après le code.
+ * Retrouver ses convs sur un autre appareil : l’email du compte, puis un code.
+ * `?suite=` : la page où l’on allait (le lien du mail, une page de l’appli sans session), rouverte après le code. Lue dans
+ * le navigateur : la page reste statique (servie et préchargée tout de suite). Avec un cookie de session, next.config.ts
+ * sert à la place /connexion/connecte, qui envoie qui est vraiment connecté vers son accueil.
  */
-export default async function Page({ searchParams }: PageProps<"/connexion">) {
-  const suite = suiteSure((await searchParams).suite);
-  /* Une session valide, pas seulement son cookie : un cookie périmé (compte supprimé ailleurs, bêta retirée) ferait boucler /app et /connexion */
-  if (await estConnecte()) redirect(suite ?? "/app");
-  return <ConnexionScreen suite={suite} />;
+export default function Page() {
+  return (
+    <Suspense fallback={<ConnexionScreen />}>
+      <ConnexionDepuisLadresse />
+    </Suspense>
+  );
 }

@@ -12,6 +12,7 @@ export const metadata: Metadata = { title: "Tes convs" };
  */
 export default async function Page({ searchParams }: PageProps<"/app/convs">) {
   const convs = await getConvs((await searchParams).convs);
+  /* Back-end : déjà gardé par layout.tsx (une vraie 307, avant le squelette). Démo : la garde, d’après ?convs= */
   if (convs.length < 2) redirect("/app");
   return (
     <ViewTransition enter={{ "nav-back": "pop-in", default: "none" }} exit={{ "nav-forward": "push-out", default: "none" }} default="none">

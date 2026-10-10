@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { auRepos } from "./repos";
 
 /*
  * Le son de BLUSH (v2, « sobre ») : des touchers courts et ronds, tirés des trois perles du logo, en Ré pentatonique.
@@ -85,24 +86,36 @@ export function setRecording(on: boolean) {
 
 /* ———— Le moteur ———— */
 
-type Chain = { ac: AudioContext; dry: GainNode; send: GainNode; noise: AudioBuffer };
+type Chain = { ac: AudioContext; dry: GainNode; send: GainNode; noise: AudioBuffer; room: ConvolverNode };
 let chain: Chain | null = null;
 
-function impulse(ac: BaseAudioContext, sec: number) {
-  const sr = ac.sampleRate;
+/*
+ * Les échantillons de la pièce (1,1 s de réverbération en stéréo) et du bruit : une centaine de milliers de calculs.
+ * Faits au repos après le chargement, pas dans le premier toucher (qui passe avant les gestionnaires de la page).
+ * Pour 48 kHz, la fréquence de l’iPhone ; refaits hors du geste si la sortie en a une autre.
+ */
+type Echantillons = { sr: number; piece: [Float32Array, Float32Array]; bruit: Float32Array };
+let prets: Echantillons | null = null;
+
+function piece(sr: number, sec: number) {
   const len = Math.floor(sr * sec);
   const pre = Math.floor(sr * 0.012);
-  const b = ac.createBuffer(2, len, sr);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = b.getChannelData(ch);
-    let y = 0;
-    for (let i = pre; i < len; i++) {
-      y += 0.4 * ((Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.4) - y);
-      d[i] = y;
-    }
+  const d = new Float32Array(len);
+  let y = 0;
+  for (let i = pre; i < len; i++) {
+    y += 0.4 * ((Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.4) - y);
+    d[i] = y;
   }
-  return b;
+  return d;
 }
+
+function bruit(sr: number) {
+  const d = new Float32Array(sr);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return d;
+}
+
+const echantillons = (sr: number): Echantillons => (prets?.sr === sr ? prets : (prets = { sr, piece: [piece(sr, 1.1), piece(sr, 1.1)], bruit: bruit(sr) }));
 
 /** La sortie : une petite pièce (les sons restent près de toi), un filtre doux, un compresseur qui retient les accords. */
 function build(ac: AudioContext): Chain {
@@ -120,16 +133,26 @@ function build(ac: AudioContext): Chain {
   lp.connect(comp).connect(out).connect(ac.destination);
   const dry = ac.createGain();
   dry.connect(lp);
+  /* La pièce reçoit sa réverbération juste après le geste (remplirLaPiece) : le tout premier son peut partir sec */
   const room = ac.createConvolver();
-  room.buffer = impulse(ac, 1.1);
   const wet = ac.createGain();
   wet.gain.value = 0.7;
   const send = ac.createGain();
   send.connect(room).connect(wet).connect(lp);
+  /* Le bruit sert dès le premier son (souffle, grain) : recopié tout de suite, s’il est prêt (sinon un calcul bref) */
   const noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
-  const nd = noise.getChannelData(0);
-  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  return { ac, dry, send, noise };
+  noise.getChannelData(0).set(prets?.sr === ac.sampleRate ? prets.bruit : bruit(ac.sampleRate));
+  return { ac, dry, send, noise, room };
+}
+
+/* Hors du geste : la réverbération (sa préparation par le navigateur est synchrone, quelques ms) */
+function remplirLaPiece(c: Chain) {
+  if (c.room.buffer) return;
+  const { sr, piece: [g, d] } = echantillons(c.ac.sampleRate);
+  const b = c.ac.createBuffer(2, g.length, sr);
+  b.getChannelData(0).set(g);
+  b.getChannelData(1).set(d);
+  c.room.buffer = b;
 }
 
 /** Réveille le son pendant un geste : Safari garde une page muette tant qu’on ne l’a pas touchée. */
@@ -145,12 +168,13 @@ function wake() {
     } catch {
       return;
     }
-    chain = build(ac);
+    const c = (chain = build(ac));
     /* iPhone : un son vide joué dans le geste ouvre la sortie */
     const s = ac.createBufferSource();
     s.buffer = ac.createBuffer(1, 1, 22050);
     s.connect(ac.destination);
     s.start(0);
+    auRepos(() => remplirLaPiece(c), 100);
   }
   if (chain.ac.state !== "running") chain.ac.resume().catch(() => {});
 }
@@ -161,6 +185,10 @@ export function bootSound() {
   if (booted || typeof window === "undefined") return;
   booted = true;
   for (const type of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(type, wake, { capture: true, passive: true });
+  /* Les échantillons se calculent pendant que la page est au repos, avant le premier toucher */
+  auRepos(() => {
+    if (enabled()) echantillons(48000);
+  });
 }
 
 /* ———— Les instruments ———— */

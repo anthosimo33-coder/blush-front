@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { play } from "@/lib/sound";
 import { createAccount, sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { BACKEND } from "@/services/mode";
 import { ErreurApi } from "@/services/reel";
-import { connexionPuis } from "@/lib/suite";
+import { cheminDe } from "@/lib/navigation";
+import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { useJourney } from "@/state/journey";
+import { retenirLecture } from "@/state/lecture";
 
 const LENGTH = 6;
 const RESEND_AFTER = 30;
@@ -77,10 +79,26 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       input.current?.focus();
       return;
     }
+    /* La page où l’on allait. Le lien du mail (/ouvrir/…) est une route, pas une page : un vrai chargement, qui repart de zéro */
+    if (connexion && suite.startsWith("/ouvrir/")) {
+      /*
+       * Surtout pas de router.refresh() avant : le chargement couperait sa requête, et Next, la croyant perdue, rechargerait
+       * la page du code par-dessus (WebKit), sans jamais ouvrir le lien
+       */
+      window.location.assign(suite);
+      return;
+    }
+    /*
+     * Connecté : ce que le routeur garde des pages déjà vues ou préchargées (5 minutes) date d’avant la connexion. Or /,
+     * /commencer et /connexion changent selon le cookie, à la même adresse : sans ça, un retour sur /commencer remontrerait
+     * la version sans compte. On l’oublie. /lecture n’est pas préchargée : ses gardes (layout.tsx) lisent la conv que
+     * le lancement rattache au compte, avec « Qui es-tu ? » ; préchargée avant, elle garderait une redirection périmée
+     * (vers la connexion ou /qui) que router.push suivrait
+     */
+    router.refresh();
     if (connexion) {
-      /* La page où l’on allait. Le lien du mail (/ouvrir/…) est une route, pas une page : un vrai chargement */
-      if (suite.startsWith("/ouvrir/")) window.location.assign(suite);
-      else router.push(suite);
+      /* L’accueil se pose lui-même sur le dernier échange : Next ne doit pas le remettre en haut */
+      router.push(suite, { scroll: cheminDe(suite) !== "/app" });
       return;
     }
     /*
@@ -92,9 +110,13 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       return;
     }
     try {
-      await createAccount(email);
-      const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
-      set({ jobId });
+      /*
+       * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
+       * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
+       */
+      const [, lecture] = await Promise.all([createAccount(email), startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" })]);
+      retenirLecture(lecture);
+      set({ jobId: lecture.jobId });
       router.push("/lecture");
     } catch {
       /* Le code est bon (déjà utilisé), la session ouverte : « Qui es-tu ? » relance la lecture d’ici, et dit pourquoi elle bloque */
@@ -214,4 +236,9 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail ? BLUSH est en bêta privée : ton email est sur la liste d’attente, le mail t’explique tout.</p>}
     </Screen>
   );
+}
+
+/** /connexion/code statique : `?suite=` se lit dans le navigateur, avec la même garde que côté serveur (suiteSure). */
+export function CodeDepuisLadresse({ fermee = false }: { fermee?: boolean }) {
+  return <CodeScreen connexion suite={suiteSure(useSearchParams().get("suite")) ?? undefined} fermee={fermee} />;
 }

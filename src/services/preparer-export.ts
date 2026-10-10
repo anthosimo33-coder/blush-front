@@ -3,7 +3,7 @@
  * (le .txt WhatsApp, ou les message_N d’Instagram), et on le compresse. Les photos et vocaux ne partent jamais,
  * et l’envoi reste petit (Vercel refuse plus de 4,5 Mo).
  */
-import { gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
+import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
 
@@ -22,21 +22,94 @@ export type ConvInstagram = { id: string; nom: string; messages: number; dernier
 /** Ce que Vercel accepte au plus dans un envoi (4,5 Mo), moins une marge pour le formulaire. */
 const ENVOI_MAX = 4.2 * 1024 * 1024;
 
-const compresser = (nom: string, parties: Partie[], coupe: boolean) => gzipSync(strToU8(JSON.stringify({ nom, parties, ...(coupe ? { coupe: true } : {}) })));
+/* Un morceau de texte mis en JSON et encodé d’un coup : environ 3 ms sur un Mac, avant de rendre la main */
+const MORCEAU = 1 << 20;
+
+/**
+ * Le paquet en octets : le JSON de { nom, parties, coupe? }, écrit et encodé morceau par morceau, en rendant la main
+ * entre deux (15 Mo de texte d’un coup bloquaient l’écran, et doublaient la mémoire le temps d’une grande chaîne).
+ * Un émoji coupé entre deux morceaux s’écrit en deux échappements (\ud83d\ude0a), que JSON.parse recolle.
+ */
+async function enOctets(nom: string, parties: Partie[], coupe: boolean): Promise<Uint8Array> {
+  const morceaux: Uint8Array[] = [];
+  const ecrire = (json: string) => morceaux.push(strToU8(json));
+  ecrire(`{"nom":${JSON.stringify(nom)},"parties":[`);
+  for (const [k, p] of parties.entries()) {
+    ecrire(`${k ? "," : ""}{"nom":${JSON.stringify(p.nom)},"contenu":"`);
+    for (let i = 0; i < p.contenu.length; i += MORCEAU) {
+      ecrire(JSON.stringify(p.contenu.slice(i, i + MORCEAU)).slice(1, -1));
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    ecrire('"}');
+  }
+  ecrire(`]${coupe ? ',"coupe":true' : ""}}`);
+  const octets = new Uint8Array(morceaux.reduce((n, m) => n + m.length, 0));
+  let ou = 0;
+  for (const m of morceaux) {
+    octets.set(m, ou);
+    ou += m.length;
+  }
+  return octets;
+}
+
+/**
+ * Compressé hors du fil principal : fflate le fait dans un Worker (un gzip synchrone de 15 Mo de texte gelait l’écran
+ * près d’une seconde dans Safari). Pas de CompressionStream : dans Safari, il bloque quand même le fil principal.
+ * Un Worker qui échoue ou ne répond pas (navigateur qui le refuse) : on compresse ici, comme avant.
+ */
+function compresser(octets: Uint8Array): Promise<Uint8Array> {
+  return new Promise((ok) => {
+    let fini = false;
+    let arreter = () => {};
+    const finir = (gz?: Uint8Array | null) => {
+      if (fini) return;
+      fini = true;
+      clearTimeout(garde);
+      ok(gz ?? gzipSync(octets));
+    };
+    const garde = setTimeout(() => {
+      arreter();
+      finir();
+    }, 30_000);
+    try {
+      /* Sans `consume` : le Worker reçoit une copie, et le repli a encore les octets */
+      arreter = gzip(octets, (err, gz) => finir(err ? null : gz));
+    } catch {
+      finir();
+    }
+  });
+}
+
+/* Au-delà de cette taille, la conv ne tiendra sans doute pas : son taux de compression est d’abord mesuré sur sa fin */
+const ESTIMER_AU_DELA = ENVOI_MAX * 3;
+const ECHANTILLON = 1024 * 1024;
 
 /**
  * Le paquet compressé. Une conv trop longue pour partir (plus de 15 Mo de texte environ : des années de messages)
  * garde sa partie la plus récente, celle qui tient (`coupe` : l’écran suivant dit combien de mois BLUSH lit).
+ * Pour une très grosse conv, le taux mesuré sur sa fin (les messages gardés) dit d’avance où couper : on ne la
+ * compresse plus en entier jusqu’à six fois. La boucle reste en garde-fou, si l’estimation était trop juste.
  */
-function paquet(nom: string, parties: Partie[]): Blob {
-  let gz = compresser(nom, parties, false);
+async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
   let garde = parties;
+  let coupe = false;
+  let brut = await enOctets(nom, garde, false);
+  if (brut.length > ESTIMER_AU_DELA) {
+    const estime = brut.length * ((await compresser(brut.slice(-ECHANTILLON))).length / ECHANTILLON);
+    if (estime > ENVOI_MAX) {
+      garde = garderLaFin(garde, (ENVOI_MAX * 0.9) / estime);
+      coupe = true;
+      brut = await enOctets(nom, garde, true);
+    }
+  }
+  let gz = await compresser(brut);
   for (let essai = 0; gz.length > ENVOI_MAX && essai < 6; essai++) {
     garde = garderLaFin(garde, (ENVOI_MAX * 0.92) / gz.length);
-    gz = compresser(nom, garde, true);
+    coupe = true;
+    gz = await compresser(await enOctets(nom, garde, coupe));
   }
   if (gz.length > ENVOI_MAX) throw new ExportIllisible("fichier");
-  return new Blob([gz], { type: "application/gzip" });
+  return new Blob([gz as BlobPart], { type: "application/gzip" });
 }
 
 /**
@@ -79,13 +152,46 @@ function couperInstagram(p: Partie, part: number): Partie {
  * et de quoi faire le paquet de celle qu’on choisit. Les autres convs ne quittent jamais le navigateur.
  * Un export complet compte des dizaines de convs : on les lit une à une (le temps d’en faire le résumé), sans les
  * garder toutes en mémoire, et la conv choisie est relue dans le zip au moment de partir (Safari sur iPhone
- * recharge la page quand la mémoire déborde).
+ * recharge la page quand la mémoire déborde). `onAvance` (de 0 à 1) : où en est ce tour des convs, à afficher.
  */
-export async function analyserExport(fichier: File): Promise<{ type: "un"; paquet: Blob } | { type: "plusieurs"; convs: ConvInstagram[]; paquetDe: (id: string) => Promise<Blob> }> {
+export async function analyserExport(
+  fichier: File,
+  onAvance?: (part: number) => void,
+): Promise<{ type: "un"; paquet: Blob } | { type: "plusieurs"; convs: ConvInstagram[]; paquetDe: (id: string) => Promise<Blob> }> {
+  const { choix, noms, contenus } = await ouvrir(fichier);
+  if (choix !== "plusieurs") return { type: "un", paquet: await paquet(fichier.name, await contenus(choix)) };
+  const convs = convsInstagram(noms);
+  const resumes: ConvInstagram[] = [];
+  onAvance?.(0);
+  for (const [k, c] of convs.entries()) {
+    const r = resumeConvInstagram(await contenus(c.parties));
+    if (r && r.messages > 0) resumes.push({ id: String(k), ...r });
+    onAvance?.((k + 1) / convs.length);
+  }
+  if (!resumes.length) throw new ExportIllisible("fichier");
+  return { type: "plusieurs", convs: resumes, paquetDe: async (id) => paquet(fichier.name, await contenus(convs[+id].parties)) };
+}
+
+/** Le fichier choisi devient un petit paquet compressé : { parties: [{ nom, contenu }] } en gzip. */
+export async function preparerExport(fichier: File): Promise<Blob> {
+  const { choix, contenus } = await ouvrir(fichier);
+  /*
+   * Un export Instagram complet (le chat et la fiche ne font pas choisir la conv) : refusé d’après les noms de ses
+   * fichiers, sans décompresser ses convs (des secondes, et assez de mémoire pour que Safari recharge la page).
+   */
+  if (choix === "plusieurs") throw new ExportIllisible("plusieurs");
+  return paquet(fichier.name, await contenus(choix));
+}
+
+/**
+ * Ce qu’est l’export, sans lire ses convs : la conv retenue (ou « plusieurs », un export Instagram complet), les
+ * fichiers utiles du zip (leurs noms, et le texte des .txt), et de quoi lire les fichiers d’une conv au moment voulu.
+ */
+async function ouvrir(fichier: File): Promise<{ choix: Partie[] | "plusieurs"; noms: Partie[]; contenus: (parties: Partie[]) => Promise<Partie[]> }> {
   if (!(await estUnZip(fichier))) {
     const parties = choisirParties(await lireFichiers(fichier));
     if (!parties || parties === "plusieurs") throw new ExportIllisible("fichier");
-    return { type: "un", paquet: paquet(fichier.name, parties) };
+    return { choix: parties, noms: parties, contenus: async (p) => p };
   }
   const entrees = await entreesZip(fichier).catch(() => {
     throw new ExportIllisible("fichier");
@@ -100,22 +206,7 @@ export async function analyserExport(fichier: File): Promise<{ type: "un"; paque
   const choix = choisirParties(noms);
   if (!choix) throw new ExportIllisible("fichier");
   const contenus = (parties: Partie[]) => (parties.some((p) => /\.txt$/i.test(p.nom)) ? Promise.resolve(parties) : lire(parties.map((p) => p.nom)));
-  if (choix !== "plusieurs") return { type: "un", paquet: paquet(fichier.name, await contenus(choix)) };
-  const convs = convsInstagram(noms);
-  const resumes: ConvInstagram[] = [];
-  for (const [k, c] of convs.entries()) {
-    const r = resumeConvInstagram(await contenus(c.parties));
-    if (r && r.messages > 0) resumes.push({ id: String(k), ...r });
-  }
-  if (!resumes.length) throw new ExportIllisible("fichier");
-  return { type: "plusieurs", convs: resumes, paquetDe: async (id) => paquet(fichier.name, await contenus(convs[+id].parties)) };
-}
-
-/** Le fichier choisi devient un petit paquet compressé : { parties: [{ nom, contenu }] } en gzip. */
-export async function preparerExport(fichier: File): Promise<Blob> {
-  const parties = choisirParties(await lireFichiers(fichier));
-  if (parties === "plusieurs" || !parties) throw new ExportIllisible(parties === "plusieurs" ? "plusieurs" : "fichier");
-  return paquet(fichier.name, parties);
+  return { choix, noms, contenus };
 }
 
 const estUnZip = async (fichier: Blob) => {
@@ -204,11 +295,21 @@ async function entreesZip(fichier: Blob): Promise<EntreeZip[]> {
   return entrees;
 }
 
-/** Le texte d’un fichier du zip, lu à sa place dans le fichier. */
+/**
+ * Le texte d’un fichier du zip, lu à sa place dans le fichier. Décompressé par le navigateur quand il sait le faire
+ * (DecompressionStream, Safari 16.4 et plus : hors du fil principal, 16 ms au lieu de 210 pour 15 Mo), sinon par fflate.
+ */
 async function lireEntree(fichier: Blob, e: EntreeZip): Promise<string> {
   const tete = new DataView((await octets(fichier, e.local, e.local + 30)).buffer);
   if (tete.getUint32(0, true) !== 0x04034b50) throw new Error("entrée introuvable");
   const de = e.local + 30 + tete.getUint16(26, true) + tete.getUint16(28, true);
+  if (e.methode !== 0 && typeof DecompressionStream !== "undefined") {
+    try {
+      return await new Response(fichier.slice(de, de + e.compresse).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+    } catch {
+      /* « deflate-raw » inconnu de ce navigateur (ou des octets abîmés, que fflate refusera aussi) : le chemin d’avant */
+    }
+  }
   const brut = await octets(fichier, de, de + e.compresse);
   return strFromU8(e.methode === 0 ? brut : inflateSync(brut));
 }

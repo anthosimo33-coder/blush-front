@@ -9,7 +9,7 @@ import { definirQui, depuisFichier, ErreurImport, importer as importerLu, metaDe
 import { definirFactice } from "@/server/ia/claude";
 import { planifier } from "@/server/taches";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { audioDe, noterEcoute, statsVocal, vocalAJour, vocalPret, type DonneesVocal } from "@/server/vocal";
+import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalPret, type DonneesVocal } from "@/server/vocal";
 
 const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
 const importer = async (f: File) => importerLu(await depuisFichier(f));
@@ -69,7 +69,7 @@ describe("de l’import à la mémoire", () => {
     expect(vocal?.lignes.some((l) => l.punch)).toBe(true);
     expect(vocal?.lignes.some((l) => l.recu?.caption)).toBe(true);
     expect(vocal?.lignes.every((l, k, ls) => l.debut <= l.fin && (k === 0 || ls[k - 1].debut <= l.debut))).toBe(true);
-    const audio = await audioDe(id);
+    const audio = (await audioDuCompte(u.id, id))?.audio;
     expect(audio?.subarray(0, 2).toString("hex")).toBe("fffb");
     const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, id));
     expect(brut.data.toString("utf8")).not.toContain("Lis la suite");

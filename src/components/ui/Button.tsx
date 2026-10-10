@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { EnRoute } from "./EnRoute";
 import { Icon, type IconName } from "./icons";
 
 type Variant = "primary" | "secondary" | "link";
@@ -26,13 +27,15 @@ type CommonProps = {
   children: ReactNode;
 };
 
-function Content({ arrow, icon, variant, children }: Pick<CommonProps, "arrow" | "icon" | "variant" | "children">) {
+/** `lien` : dans un lien, la flèche (ou l’icône) laisse place aux trois points tant que la page n’arrive pas. */
+function Content({ arrow, icon, variant, children, lien = false }: Pick<CommonProps, "arrow" | "icon" | "variant" | "children"> & { lien?: boolean }) {
   const color = variant === "primary" ? "#FFFFFF" : "currentColor";
+  const enRoute = (glyph: ReactNode) => (lien ? <EnRoute color={variant === "primary" ? "#FFFFFF" : undefined}>{glyph}</EnRoute> : glyph);
   return (
     <>
-      {icon && <Icon name={icon} size={18} color={color} stroke={2.4} />}
+      {icon && enRoute(<Icon name={icon} size={18} color={color} stroke={2.4} />)}
       {children}
-      {arrow && <Icon name="arrow" size={18} color={color} stroke={1.9} />}
+      {arrow && enRoute(<Icon name="arrow" size={18} color={color} stroke={1.9} />)}
     </>
   );
 }
@@ -72,7 +75,7 @@ export function ButtonLink({
       className={cn(base, variants[variant], className)}
       {...rest}
     >
-      <Content arrow={arrow} icon={icon} variant={variant}>
+      <Content arrow={arrow} icon={icon} variant={variant} lien>
         {children}
       </Content>
     </Link>
@@ -106,7 +109,7 @@ export function IconButton({
   if (href)
     return (
       <Link href={href} aria-label={label} className={cls}>
-        {glyph}
+        <EnRoute>{glyph}</EnRoute>
       </Link>
     );
   return (

@@ -8,13 +8,14 @@ import { useReducedMotion } from "@/lib/hooks";
 import { play } from "@/lib/sound";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { ErreurApi } from "@/services/reel";
-import { READING_STEPS } from "@/mocks/story";
+import { READING_STEPS } from "@/content/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import { readJourney, setJourney } from "@/state/journey";
+import { lectureLancee } from "@/state/lecture";
 import type { AnalysisProgress } from "@/types";
 
 const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
@@ -34,7 +35,6 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
   const reduced = useReducedMotion();
   const [p, setP] = useState<AnalysisProgress>(START);
   const [phase, setPhase] = useState<Phase>("reading");
-  const count = useCountUp(p.messagesRead, reduced);
   const restartRef = useRef(restart);
   /* Vrai dès qu’on voit la lecture se faire : une analyse déjà finie à l’arrivée ne rejoue pas ses sons */
   const live = useRef(false);
@@ -44,6 +44,16 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
   /* Trop de relances aujourd’hui (chaque lecture coûte) : on le dit, plutôt qu’un bouton qui ne fait rien */
   const [trop, setTrop] = useState(false);
   const [run, setRun] = useState(0);
+  /* « Voir mon rapport » touché : le bouton le montre jusqu’au chargement du verdict (un vrai chargement, voulu) */
+  const [enRoute, setEnRoute] = useState(false);
+  useEffect(() => {
+    /* Un retour arrière ressort la page du cache du navigateur : le bouton redevient touchable */
+    const remettre = (e: PageTransitionEvent) => {
+      if (e.persisted) setEnRoute(false);
+    };
+    window.addEventListener("pageshow", remettre);
+    return () => window.removeEventListener("pageshow", remettre);
+  }, []);
   const retry = () => {
     setFailed(false);
     setTrop(false);
@@ -58,8 +68,10 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
     (async () => {
       /* Le parcours lu maintenant : au premier rendu (hydratation), l’état du navigateur n’est pas encore là */
       const cur = readJourney();
+      /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) : pas de second POST, on suit tout de suite */
+      const deja = run === 0 && !restartRef.current ? lectureLancee() : null;
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
-      const lance = await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
+      const lance = deja ?? await resumeAnalysis({ me: cur.me ?? "hugo", pronom: cur.pronom, prenom: cur.prenom, guess: cur.guess ?? "flou", goal: cur.goal ?? "ensemble" }, { restart: restartRef.current }).catch(
         (e: unknown) =>
           e instanceof ErreurApi && e.code === "qui" ? ("qui" as const) : e instanceof ErreurApi && e.status === 401 ? ("connexion" as const) : e instanceof ErreurApi && e.code === "trop" ? ("trop" as const) : null,
       );
@@ -174,18 +186,27 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
               Relancer la lecture
             </Button>
           ) : done ? (
-            <div data-popin="" className="w-full" style={{ "--d": "0.5s" } as CSSProperties}>
+            /* Le bouton arrive juste après la gerbe (0,15 s) : l’anneau plein a déjà fait attendre */
+            <div data-popin="" className="w-full" style={{ "--d": "0.15s" } as CSSProperties}>
               {/* D’abord la révélation du verdict, qui mène au rapport. Chargement complet : Safari teinte ses barres pour la scène sombre */}
               <ButtonLink
                 href="/rapport/verdict"
-                arrow
+                arrow={!enRoute}
+                aria-busy={enRoute}
                 onClick={(e) => {
                   e.preventDefault();
-                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un vrai chargement pour que Safari reteinte ses barres
-                  window.location.assign("/rapport/verdict");
+                  if (enRoute) return;
+                  setEnRoute(true);
+                  /* Deux images plus tard : les trois points sont peints avant que le navigateur ne parte */
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() => {
+                      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un vrai chargement pour que Safari reteinte ses barres
+                      window.location.assign("/rapport/verdict");
+                    }),
+                  );
                 }}
               >
-                Voir mon rapport
+                {enRoute ? <TypingDots color="#FFFFFF" label="Ton verdict arrive" /> : "Voir mon rapport"}
               </ButtonLink>
             </div>
           ) : (
@@ -254,7 +275,7 @@ export function LectureScreen({ total, restart }: { total: number; restart: bool
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
             {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
             BLUSH analyse tes
-            <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : count}</span> messages,
+            <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : <Compteur cible={p.messagesRead} reduced={reduced} />}</span> messages,
             <br />
             du premier au dernier.
           </h1>
@@ -327,7 +348,8 @@ const STICKERS = [
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
 function Discoveries({ items, className }: { items: string[]; className?: string }) {
   return (
-    <ul className={cn("m-0 flex min-h-[34px] list-none flex-wrap justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">
+    /* La place de deux lignes, réservée d’avance : le bloc centré ne remonte pas quand les découvertes passent à la ligne */
+    <ul className={cn("m-0 flex min-h-[78px] list-none flex-wrap content-start justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">
       {items.map((text, i) => {
         const d = STICKERS[i % STICKERS.length];
         return (
@@ -345,6 +367,11 @@ function Discoveries({ items, className }: { items: string[]; className?: string
       })}
     </ul>
   );
+}
+
+/** Le compteur, à part : sa montée, image par image, ne re-rend que lui, pas tout l’écran. */
+function Compteur({ cible, reduced }: { cible: number; reduced: boolean }) {
+  return useCountUp(cible, reduced);
 }
 
 /** Le compteur monte en douceur vers la valeur reçue. */

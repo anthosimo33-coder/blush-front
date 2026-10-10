@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { figtree } from "@/lib/fonts";
+import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { TESTIMONIAL_SLOTS, TESTIMONIALS } from "@/mocks/landing";
 import { QUESTION_ANSWER, REPORT } from "@/mocks/report";
 import { Logo } from "@/components/brand/Logo";
@@ -19,17 +21,22 @@ export const CTA = "/commencer";
 
 /**
  * Qui revient : connecté, avec une conv déjà lue (src/app/retour). La landing l’envoie alors vers son accueil plutôt
- * que vers le parcours. `autre` : le prénom de l’autre, une fois « Qui es-tu ? » rempli.
+ * que vers le parcours. `autre` : le prénom de l’autre, une fois « Qui es-tu ? » rempli. `destination` : la page où sa
+ * conv en est (« Qui es-tu ? », la lecture, ou l’accueil), sans passer par les redirections de l’accueil.
  */
-export type Retour = { autre: string | null } | null;
+export type Retour = { autre: string | null; destination?: string } | null;
 const RetourContext = createContext<Retour>(null);
 
-/** Le bouton principal de la landing, et la ligne dessous : analyser sa conv, ou la retrouver. */
+/**
+ * Le bouton principal de la landing, et la ligne dessous : analyser sa conv, ou la retrouver.
+ * Vers l’accueil : préchargé en entier (il n’a pas d’écran de chargement, qui casserait le glissé vers sa fiche), et
+ * sans remise en haut de page, qui défaisait l’arrivée sur le dernier échange (`scroll`).
+ */
 export function useCta() {
   const retour = useContext(RetourContext);
-  return retour
-    ? { href: "/app", label: "Retrouver ma conv", note: retour.autre ? `Ta conv avec ${retour.autre} t’attend` : "Ta conv t’attend", header: "Ouvrir BLUSH" }
-    : { href: CTA, label: "Analyser ma conv", note: "Aperçu gratuit · Sans mot de passe", header: "Commencer" };
+  if (!retour) return { href: CTA, label: "Analyser ma conv", note: "Aperçu gratuit · Sans mot de passe", header: "Commencer", prefetch: undefined, scroll: true };
+  const href = retour.destination ?? "/app";
+  return { href, label: "Retrouver ma conv", note: retour.autre ? `Ta conv avec ${retour.autre} t’attend` : "Ta conv t’attend", header: "Ouvrir BLUSH", prefetch: href === "/app" ? true : undefined, scroll: href !== "/app" };
 }
 export const APP_NAME: Record<AppKind, string> = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" };
 
@@ -82,6 +89,8 @@ export function CtaButton({ className }: { className?: string }) {
   return (
     <Link
       href={cta.href}
+      prefetch={cta.prefetch}
+      scroll={cta.scroll}
       className={cn(
         "arrow-nudge lift lift-ink lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-[18px] font-black text-white no-underline shadow-ink [background:var(--btn-ink-bg)]",
         className,
@@ -119,7 +128,7 @@ function Frame({ children }: { children: ReactNode }) {
   const cta = useCta();
   const retour = useContext(RetourContext);
   return (
-    <div className="min-h-dvh overflow-x-clip">
+    <div className={cn("min-h-dvh overflow-x-clip", figtree.variable)}>
       <header className="sticky top-0 z-40 border-b border-[rgba(17,17,20,0.05)] bg-[rgba(244,242,237,0.82)] backdrop-blur-xl">
         <Container className="flex h-16 items-center justify-between">
           <Logo size={30} fontSize={22} href="/" />
@@ -131,7 +140,7 @@ function Frame({ children }: { children: ReactNode }) {
               </Link>
             )}
             {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
-            <Link href={cta.href} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
+            <Link href={cta.href} prefetch={cta.prefetch} scroll={cta.scroll} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
               {cta.header}
               <Icon name="arrow" size={15} color="#121214" stroke={2.6} className="arrow" />
             </Link>
@@ -146,7 +155,7 @@ function Frame({ children }: { children: ReactNode }) {
             <span className="text-[13px] font-extrabold text-grey">© 2026</span>
           </div>
           <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-extrabold">
-            <Link href={cta.href} className="text-soft no-underline hover:text-ink">
+            <Link href={cta.href} scroll={cta.scroll} className="text-soft no-underline hover:text-ink">
               {cta.label}
             </Link>
             <Link href={retour ? "/compte" : "/connexion"} className="text-soft no-underline hover:text-ink">
@@ -231,6 +240,30 @@ const ASKS: { q: string; answer: () => ReactNode }[] = [
 export function BlushPlus() {
   const [open, setOpen] = useState(0);
   const [touched, setTouched] = useState(false);
+  /*
+   * Une autre question s’ouvre d’un coup (animer la hauteur refaisait la mise en page de toute la suite à chaque image) :
+   * les questions glissent de leur ancienne place à la nouvelle (FLIP, en transform), puis la réponse apparaît.
+   * La liste garde la place de la plus longue réponse : le bloc noir ne change pas de hauteur, rien ne saute dessous.
+   */
+  const liste = useRef<HTMLUListElement>(null);
+  const avant = useRef<Map<string, number> | null>(null);
+  const [reserve, setReserve] = useState<number>();
+  const questions = () => liste.current?.querySelectorAll<HTMLElement>("[data-demande]") ?? [];
+  const cle = (el: HTMLElement) => el.id;
+  useLayoutEffect(() => {
+    const b = avant.current;
+    avant.current = null;
+    if (b && !prefersReducedMotion()) flipFrom(b, questions(), cle, spring("soft"));
+  }, [open]);
+  useEffect(() => {
+    const ul = liste.current;
+    if (!ul) return;
+    const somme = (sel: string, f: (h: number[]) => number) => f([...ul.querySelectorAll<HTMLElement>(sel)].map((el) => el.offsetHeight));
+    /* Les questions, plus la plus longue réponse (fermée, son contenu garde sa hauteur sous le masque) */
+    const ro = new ResizeObserver(() => setReserve(somme("[data-demande]", (h) => h.reduce((a, b) => a + b, 0)) + somme("[data-reponse]", (h) => Math.max(0, ...h))));
+    ul.querySelectorAll("[data-demande], [data-reponse]").forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, []);
   return (
     <section aria-labelledby="quotidien-titre" className="py-10 lg:py-16">
       <Container>
@@ -286,7 +319,7 @@ export function BlushPlus() {
             </p>
           </div>
 
-          <ul data-reveal="" className="m-0 mt-8 flex list-none flex-col p-0 lg:mt-12">
+          <ul ref={liste} data-reveal="" className="m-0 mt-8 flex list-none flex-col p-0 lg:mt-12" style={reserve ? { minHeight: reserve } : undefined}>
             {ASKS.map((a, i) => {
               const on = i === open;
               return (
@@ -302,9 +335,11 @@ export function BlushPlus() {
                   <button
                     type="button"
                     id={`demande-${i}-q`}
+                    data-demande=""
                     aria-expanded={on}
                     aria-controls={`demande-${i}`}
                     onClick={() => {
+                      if (i !== open) avant.current = snapshotTops(questions(), cle);
                       setOpen(i);
                       setTouched(true);
                     }}
@@ -315,15 +350,10 @@ export function BlushPlus() {
                   >
                     {a.q}
                   </button>
-                  {/* La réponse s’ouvre en glissant (hauteur 0 → auto) ; fermée, elle sort du clavier et des lecteurs d’écran */}
-                  <div
-                    id={`demande-${i}`}
-                    role="region"
-                    aria-labelledby={`demande-${i}-q`}
-                    className={cn("grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
-                  >
+                  {/* La réponse s’ouvre d’un coup et apparaît en fondu, une fois les questions presque posées ; fermée, elle sort du clavier et des lecteurs d’écran */}
+                  <div id={`demande-${i}`} role="region" aria-labelledby={`demande-${i}-q`} className={cn("grid", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                     <div inert={!on || undefined} className="min-h-0 overflow-hidden">
-                      <div className={cn("mx-auto max-w-[500px] pb-7 pt-3 transition-opacity duration-500", on ? "opacity-100" : "opacity-0")}>
+                      <div data-reponse="" className={cn("mx-auto max-w-[500px] pb-7 pt-3 transition-[opacity,transform] duration-300 ease-out", on ? "translate-y-0 opacity-100 delay-150" : "-translate-y-2 opacity-0")}>
                         <div className="flex flex-col gap-2 rounded-[26px] bg-white p-3.5 text-left text-ink shadow-[0_30px_70px_-30px_rgba(0,0,0,0.8)] lg:p-4">{a.answer()}</div>
                       </div>
                     </div>

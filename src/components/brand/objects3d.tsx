@@ -64,23 +64,31 @@ const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 
 /**
  * Le logo officiel : la bulle rose en volume, deux points nacre et un point opale.
  * `animated` : BLUSH écrit. Les perles s’allument l’une après l’autre, comme les trois points de Messages (globals.css).
+ * Un logo qui peut s’animer (prop `animated` passée, même à false) est en calques par défaut : animées dans le SVG,
+ * les perles repeindraient tout le logo à chaque image ; et basculer du SVG aux calques au premier mot le remonterait.
  */
 export function BubbleLogo({
   size,
   dots = true,
-  animated = false,
-  layered = false,
+  animated,
+  layered,
   glow = true,
   className,
   style,
 }: ObjProps & { dots?: boolean; animated?: boolean; layered?: boolean; glow?: boolean }) {
   const u = useSvgId("bp");
   const detail = size >= 44;
-  if (layered && dots) return <LayeredBubbleLogo size={size} animated={animated} detail={detail} className={className} style={style} />;
+  if ((layered ?? animated !== undefined) && dots)
+    return <LayeredBubbleLogo size={size} animated={!!animated} detail={detail} className={className} style={style} />;
+  /*
+   * L’ombre d’une perle. En petit (l’avatar du fil, sous chaque réponse), son flou est un dégradé radial : un
+   * feGaussianBlur par perle se recalculait à chaque peinture de chaque avatar, pour un flou de moins d’un pixel.
+   */
+  const ombre = detail ? { rx: 9, ry: 2.6, fill: "rgba(110,0,50,0.35)", filter: `url(#${u}d)` } : { rx: 11, ry: 4.6, fill: `url(#${u}s)` };
   /* La perle et son ombre bougent séparément : quand la perle monte, son ombre se resserre */
   const dot = (cx: number, kind: "nacre" | "opale", i: number) => (
     <g key={cx} transform={`translate(${cx - 13} 88)`} style={{ "--i": i } as CSSProperties}>
-      <ellipse data-shade="" cx="13" cy="27" rx="9" ry="2.6" fill="rgba(110,0,50,0.35)" filter={`url(#${u}d)`} />
+      <ellipse data-shade="" cx="13" cy="27" {...ombre} />
       <g data-pearl="">
         <svg x="0" y="0" width="26" height="26" viewBox="0 0 100 100">
           <defs>
@@ -119,12 +127,26 @@ export function BubbleLogo({
           <stop offset="0.45" stopColor="#7A0035" stopOpacity="0" />
           <stop offset="1" stopColor="#7A0035" stopOpacity="0.32" />
         </linearGradient>
-        <filter id={`${u}c`} x="-50%" y="-300%" width="200%" height="700%">
-          <feGaussianBlur stdDeviation="5" />
-        </filter>
-        <filter id={`${u}d`} x="-50%" y="-300%" width="200%" height="700%">
-          <feGaussianBlur stdDeviation="1.4" />
-        </filter>
+        {/* Les flous ne servent qu’en grand (le halo, le reflet du bas, les ombres des perles) */}
+        {detail && glow && (
+          <filter id={`${u}c`} x="-50%" y="-300%" width="200%" height="700%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
+        )}
+        {detail && (
+          <filter id={`${u}d`} x="-50%" y="-300%" width="200%" height="700%">
+            <feGaussianBlur stdDeviation="1.4" />
+          </filter>
+        )}
+        {/* En petit, l’ombre floue des perles : le même rose, qui s’efface vers le bord (le profil d’un flou de 1,4) */}
+        {!detail && dots && (
+          <radialGradient id={`${u}s`}>
+            <stop offset="0" stopColor="#6E0032" stopOpacity="0.33" />
+            <stop offset="0.4" stopColor="#6E0032" stopOpacity="0.27" />
+            <stop offset="0.7" stopColor="#6E0032" stopOpacity="0.14" />
+            <stop offset="1" stopColor="#6E0032" stopOpacity="0" />
+          </radialGradient>
+        )}
       </defs>
       {detail && glow && <ellipse data-glow="" cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
       <path d={BUBBLE_BODY} fill={`url(#${u}b)`} />
@@ -148,6 +170,7 @@ export function BubbleLogo({
  * Le même logo, perles, ombres et halo en calques HTML posés au même endroit.
  * Une animation dans un SVG repeint tout le logo à chaque image sur le fil principal (et saccade quand le téléphone est occupé) ;
  * en calques, la vague de « BLUSH écrit », les sauts quand tu tapes et le halo se jouent sur le compositeur.
+ * Un bloc de la taille du logo, comme le SVG (un bloc lui aussi, par la base de Tailwind) : rien ne bouge autour.
  */
 function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProps & { animated: boolean; detail: boolean }) {
   const u = useSvgId("bl");
