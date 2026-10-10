@@ -6,7 +6,7 @@
 prompts/evals
 prompts/voix
 prompts/README.md
-# Les résultats des tests de bout en bout (traces, captures, boîte à mails des tests), et leur build empaqueté par la CI
+# Les résultats des tests de bout en bout (traces, captures, boîte à mails des tests)
 test-results
 playwright-report*
 blob-report
