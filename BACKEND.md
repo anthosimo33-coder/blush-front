@@ -90,6 +90,7 @@ npm run e2e                              # ou : npm run e2e -- --project=webkit-
 - Un invité (`nouvelInvite`) repart d’un compte et d’une boîte à mails vides ; un email libre (`emailLibre`) est neuf à chaque test.
 - Dans Chromium, `response.json()` n’aboutit jamais quand la page ne lit pas elle-même le corps de sa requête : vérifier alors `status()`.
 - Après un échec : la trace et la capture dans `test-results/<port>`, le rapport avec `npx playwright show-report`.
+- La référence visuelle des écrans de la production (`tests/e2e/visuel.spec.ts`, voir son en-tête) : `E2E_VISUEL_DIR=<dossier hors du dépôt> npm run e2e:visuel -- --update-snapshots` pose les captures avant un changement, puis `E2E_VISUEL_DIR=<le même dossier> npm run e2e:visuel` compare après, au pixel près (même machine). Ni `npm run e2e` ni la CI ne la lancent.
 
 La galerie des écrans (`npm run galerie`) et le banc de fluidité de l’accueil (`npm run fluidite`) tournent sur ce même build et ce même serveur, avec leur propre base et des comptes semés par les aides des tests (README, « La galerie »).
 

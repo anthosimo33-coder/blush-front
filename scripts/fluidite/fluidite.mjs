@@ -7,9 +7,11 @@
  *   - « fil » : les images du fil principal (requestAnimationFrame) et ses longues tâches (LoAF).
  * Une animation saine ne touche que transform et opacity : le compositeur la joue même quand le fil principal est occupé.
  * Chrome reste un substitut de l’iPhone : un écart se confirme sur Safari (WebKit) ou sur un vrai téléphone.
- * L’accueil d’un compte BLUSH+ dont la conv est lue : SESSION, la valeur de son cookie blush-session.
+ * L’accueil d’un compte BLUSH+ semé dont la conv est lue, sur le serveur des tests : SESSION, la valeur de son cookie
+ * blush-session. Le banc écrit au chat de ce compte (pastille, envoi, niveau) : il ne mesure qu’un serveur local (BASE
+ * sur localhost), jamais la production, et SESSION n’est jamais le cookie d’un compte réel (c’est un jeton de connexion).
  *   npm run fluidite                                  (le serveur des tests et un compte BLUSH+ semé : scripts/galerie/fluidite.spec.ts)
- *   BASE=https://blush-front.vercel.app SESSION=… NORAF=1 RUNS=3 node scripts/fluidite/fluidite.mjs
+ *   NORAF=1 RUNS=3 npm run fluidite                   (sans la boucle requestAnimationFrame du fil, trois passages)
  *   ONLY=pastille,feuille DEBUG=1 npm run fluidite    (le détail des longues images et de leurs scripts)
  * L’ancien compteur (PipelineReporter de Chrome) ne s’affiche plus que sous DEBUG : il marque « perdue » toute image
  * dont le seul changement est en bas de l’écran (la bulle du rapport, par exemple), même quand viz l’a bien dessinée.
@@ -28,6 +30,8 @@ const RUNS = Number(process.env.RUNS ?? 2);
 const ONLY = process.env.ONLY?.split(",");
 const SESSION = process.env.SESSION;
 if (!SESSION) throw new Error("SESSION manque : la valeur du cookie blush-session d’un compte BLUSH+ (ou npm run fluidite, qui en sème un)");
+/* Un serveur local seulement : le banc écrit au chat du compte, et son cookie ne doit jamais être celui d’un compte réel */
+if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(BASE)) throw new Error(`BASE refusée : « ${BASE} » (le banc ne mesure qu’un serveur local, jamais la production)`);
 
 function chromePath() {
   const cache = path.join(os.homedir(), "Library/Caches/ms-playwright");
@@ -210,11 +214,19 @@ const SCENARIOS = {
   },
   async niveau(page) {
     const input = page.locator("input[enterkeyhint]");
-    await input.fill("elle veut qu'on soit ensemble");
-    return measure(page, "11 · niveau qui monte", async () => {
+    /* « on est ensemble » : le déclencheur du modèle factice (src/server/ia/factice.ts), un niveau de franchi */
+    await input.fill("elle m'a dit on est ensemble");
+    const nouveau = page.getByText(/^Nouve(au niveau|lle température) · /);
+    const avant = await nouveau.count();
+    const r = await measure(page, "11 · niveau qui monte", async () => {
       await input.press("Enter");
       await sleep(4300);
     });
+    /* Sans le nouveau niveau dans la conv, la mesure n’est qu’un envoi : le scénario échoue */
+    await nouveau.nth(avant).waitFor({ timeout: 5000 }).catch(() => {
+      throw new Error("le niveau n’est pas monté (ni anneau ni célébration) : la mesure n’est qu’un envoi");
+    });
+    return r;
   },
   async fiche(page) {
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -263,6 +275,8 @@ const by = new Map();
 for (const r of rows) {
   if (r.error) {
     console.log("ERREUR", r.label, r.error);
+    /* Un scénario raté fait échouer le banc (et npm run fluidite) */
+    process.exitCode = 1;
     continue;
   }
   const a = by.get(r.label) ?? [];

@@ -13,8 +13,6 @@ export type JourneyState = {
   app: AppKind | null;
   exportApp: "whatsapp" | "imessage" | "instagram";
   exportFileName: string | null;
-  captureNames: string[];
-  captureApp: AppKind | null;
   /** Des captures ont été ajoutées après l’export : l’histoire est réunie (écran 05). */
   capturesAdded: boolean;
   me: string | null;
@@ -31,8 +29,6 @@ export const JOURNEY_DEFAULTS: JourneyState = {
   app: null,
   exportApp: "whatsapp",
   exportFileName: null,
-  captureNames: [],
-  captureApp: null,
   capturesAdded: false,
   me: null,
   pronom: null,

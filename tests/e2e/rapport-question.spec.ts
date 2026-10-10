@@ -3,7 +3,7 @@ import { attendreTaches, definirPlan, emailLibre, expect, lectureBlushPlus, lect
 
 /*
  * « Ta question » (/rapport/question), depuis le rapport complet : BLUSH accueille, propose des idées tirées du rapport
- * (les questions de la mémoire), puis répond en bulles. Avec le back-end, la question passe par le chat : le modèle
+ * (les questions de la mémoire), puis répond en bulles. La question passe par le chat : le modèle
  * factice répond « elle te cherche 👀 », « et toi tu fais le mec occupé », puis demande « tu lui as répondu quoi ? ».
  */
 

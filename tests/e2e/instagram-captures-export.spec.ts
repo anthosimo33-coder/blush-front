@@ -21,9 +21,9 @@ import {
 } from "./aide";
 
 /*
- * L’export Instagram, avec le back-end : la tuile Instagram mène à l’export (pas aux captures). Le fichier se lit dans le
- * navigateur : un message_1.json, un message_1.html, ou l’export complet du compte, où « Quelle conv ? » fait choisir la
- * bonne. Seule celle-là part chez BLUSH. Les convs sont inventées (aide/exports.ts, aide/instagram-captures.ts).
+ * L’export Instagram : la tuile Instagram mène à l’export (pas aux captures). Le fichier se lit dans le navigateur : un
+ * message_1.json, un message_1.html, ou l’export complet du compte, où « Quelle conv ? » fait choisir la bonne. Seule
+ * celle-là part chez BLUSH. Les convs sont inventées (aide/exports.ts, aide/instagram-captures.ts).
  */
 
 test("Instagram : l’export JSON importé, les prénoms accentués bien relus, puis la lecture jusqu’au verdict", async ({ page }, testInfo) => {
@@ -204,10 +204,10 @@ test("Instagram : une conv trop courte choisie dans l’export complet, l’écr
 });
 
 /*
- * Un bug de texte : avec le back-end, Instagram s’importe par son export (la tuile, l’écran d’erreur « trop courte »
- * qui envoie vers les captures en disant « Un export doit avoir au moins 50 messages »). Puis l’écran des captures
- * affirme « Instagram et Hinge ne permettent pas d’exporter », juste après un export Instagram.
- * src/app/importer/captures/CapturesScreen.tsx:200 (le texte d’avant le back-end, quand Instagram passait par les captures).
+ * Un bug de texte : Instagram s’importe par son export (la tuile, l’écran d’erreur « trop courte » qui envoie vers les
+ * captures en disant « Un export doit avoir au moins 50 messages »). Puis l’écran des captures affirme « Instagram et
+ * Hinge ne permettent pas d’exporter », juste après un export Instagram.
+ * src/app/importer/captures/CapturesScreen.tsx:199 (le texte d’avant le back-end, quand Instagram passait par les captures).
  */
 test.fixme("Instagram : l’écran des captures ne dit pas qu’Instagram ne s’exporte pas", async ({ page }) => {
   await page.goto("/importer/captures?app=instagram");

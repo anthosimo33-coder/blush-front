@@ -1,14 +1,15 @@
-# La CI de BLUSH. Chaque push (toutes les branches) et chaque pull request passent les vérifications (types, lint,
-# tests, migrations, build du back-end et sa vérification des prompts), puis les tests de bout en bout dans Chromium et
+# La CI de BLUSH. Chaque pull request et chaque push sur main passent les vérifications (types, lint, tests,
+# migrations, build du back-end et sa vérification des prompts), puis les tests de bout en bout dans Chromium et
 # WebKit. On ne déploie plus depuis un dossier local.
 #
 # La mise en production est un geste, jamais l’effet d’un push : « Run workflow » sur main (onglet Actions), ou
 # `gh workflow run CI --ref main`. Ce lancement refait toutes les vérifications sur la tête de main, puis déploie. Le
-# dépôt est privé, sur GitHub Free : ni règle de branche, ni relecteur obligatoire, ni secret d’environnement ; c’est
-# ce lancement à la main qui tient lieu d’accord.
+# dépôt est public : tout ce qui y est commité se lit par n’importe qui, seuls les prompts restent privés (le
+# sous-module blush-prompts). Ni règle de branche, ni relecteur obligatoire, ni secret d’environnement : c’est ce
+# lancement à la main qui tient lieu d’accord.
 #
 # Ce qu’elle attend du dépôt (README.md, « La CI ») :
-#   - le secret PROMPTS_TOKEN : un jeton GitHub (fine-grained) qui lit blush-front et blush-prompts (le sous-module) ;
+#   - le secret PROMPTS_TOKEN : un jeton GitHub (fine-grained) qui lit blush-front et blush-prompts (le sous-module privé) ;
 #   - le secret VERCEL_TOKEN : un jeton Vercel qui déploie le projet blush-front.
 # Les actions sont épinglées à un commit (leur version en commentaire) : une étiquette déplacée ne change rien ici.
 name: CI
@@ -151,7 +152,7 @@ jobs:
     needs: [verifier, e2e]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Pas d’environnement GitHub : un dépôt privé sur GitHub Free n’en a pas. Vercel garde l’historique des mises en production
+    # Pas d’environnement GitHub : Vercel garde l’historique des mises en production
     # Une mise en production à la fois, dans l’ordre des lancements
     concurrency:
       group: production

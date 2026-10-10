@@ -1,10 +1,10 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
 
 /*
- * Les tests de bout en bout (tests/e2e) : les vrais parcours, dans un vrai navigateur, contre le back-end (le mode de la
- * production), avec le modèle factice, une base Postgres recréée à chaque lancement et la boîte à mails des tests.
+ * Les tests de bout en bout (tests/e2e) : les vrais parcours, dans un vrai navigateur, contre le back-end, avec le
+ * modèle factice, une base Postgres recréée à chaque lancement et la boîte à mails des tests.
  *   npm run e2e:build   le build du back-end, une fois puis après chaque changement de l’appli
  *   npm run e2e         E2E_PORT (3400) et E2E_DB (blush_e2e) pour lancer plusieurs suites en même temps
  *   npm run e2e:visuel  les captures de référence des écrans (tests/e2e/visuel.spec.ts), avec E2E_VISUEL_DIR
@@ -66,6 +66,12 @@ const BETA = /\.beta\.spec\.ts$/;
  * une à une (un seul worker) : le tableau de bord compte tout ce que la base contient.
  */
 const VISUEL = process.env.E2E_VISUEL_DIR ? resolve(process.env.E2E_VISUEL_DIR) : null;
+/* Jamais dans le dépôt (public) : un dossier sous sa racine est refusé, même ignoré par git */
+const dansLeDepot = (dossier: string) => {
+  const r = relative(RACINE, dossier);
+  return r === "" || !(r === ".." || r.startsWith(`..${sep}`) || isAbsolute(r));
+};
+if (VISUEL && dansLeDepot(VISUEL)) throw new Error(`E2E_VISUEL_DIR doit être hors du dépôt : « ${VISUEL} » refusé (un dossier sous ${RACINE})`);
 const CAPTURES = /[\\/]visuel\.spec\.ts$/;
 
 /*

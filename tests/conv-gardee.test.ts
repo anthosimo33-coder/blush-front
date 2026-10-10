@@ -88,7 +88,7 @@ describe("fusion", () => {
     expect(memesMessages(r.msgs, s.msgs)).toBe(true);
   });
 
-  it("sans historique (démo) : la conv gardée revient telle quelle", () => {
+  it("sans historique (l’aperçu local, ou aucun échange encore) : la conv gardée revient telle quelle", () => {
     const s = conv([...intro, { id: 1, from: "toi", text: "q" }, { id: 2, from: "blush", text: "r" }]);
     const r = fusion(s, conv([...intro]));
     expect(memesMessages(r.msgs, s.msgs)).toBe(true);

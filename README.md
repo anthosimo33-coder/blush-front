@@ -15,7 +15,7 @@ Le code de connexion s’affiche dans le terminal (pas de Resend en local). Avec
 
 ## Développer, vérifier, mettre en ligne
 
-GitHub (`blush-front`) est la seule source : on travaille sur une branche, on pousse, et la CI vérifie chaque push.
+GitHub (`blush-front`) est la seule source : on travaille sur une branche, on pousse, et la CI vérifie chaque pull request, et chaque push sur `main`.
 
 ```bash
 nvm use                                 # Node 24, celui de Vercel (.nvmrc)
@@ -34,7 +34,7 @@ La CI (`.github/workflows/ci.yml`), à chaque pull request et à chaque push sur
 
 **La mise en production est un geste, jamais l’effet d’un push** : sur `main`, « Run workflow » dans l’onglet Actions (ou `gh workflow run CI --ref main`). Ce lancement refait les vérifications et les tests de bout en bout sur la tête de `main`, puis lance `vercel deploy --prod` : Vercel construit sur ses serveurs avec ses variables, et y migre la base. Relancer un ancien run ne redéploie pas une version passée : seule la tête de `main` part. On ne déploie plus depuis un dossier local.
 
-Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteur obligatoire, et les secrets sont ceux du dépôt. La CI en lit deux, `PROMPTS_TOKEN` (un jeton GitHub qui lit `blush-front` et `blush-prompts`) et `VERCEL_TOKEN`. Le build contient les prompts (côté serveur) : il ne sort jamais d’un job, aucun artefact ne le transporte, puisque les artefacts se téléchargent par quiconque lit le dépôt.
+Le dépôt `blush-front` est public : tout ce qu’on y commite (le code, les tests, l’historique) se lit par n’importe qui, donc rien de sensible n’y entre (ni vraie conv, ni texte des prompts). Seuls les prompts restent privés, dans le sous-module `blush-prompts`, un dépôt à part. Pas de règle de branche ni de relecteur obligatoire, et les secrets sont ceux du dépôt. La CI en lit deux, `PROMPTS_TOKEN` (un jeton GitHub qui lit `blush-front` et le sous-module privé `blush-prompts`) et `VERCEL_TOKEN`. Le build contient les prompts (côté serveur) : il ne sort jamais d’un job, aucun artefact ne le transporte, puisque les artefacts se téléchargent par quiconque lit le dépôt.
 
 ## Où sont les choses
 
@@ -50,7 +50,7 @@ Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteu
 | `src/server/` | Le back-end : la base, le chiffrement, le modèle, les mails (voir BACKEND.md). |
 | `src/contenu/` | Le contenu du produit : offres et prix, la règle des chapitres offerts (seul le chapitre 1, le verdict) et leurs titres (`chapitres.ts`), étapes de l’export et de la lecture, rubriques de la fiche, landing. Les seules données fictives de l’appli servent aux aperçus locaux (`src/app/apercu`, 404 en production) : ESLint refuse qu’un autre fichier les importe (et `@/mocks`, pour qu’il ne revienne pas). |
 | `src/types/` | Types du domaine : `Story`, `Source`, `Report`, `Chapter`, `FicheFact`, `Subscription`… |
-| `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`, et les clés de ce que l’appli garde dans le navigateur (`cles.ts`, que lisent aussi les aides des tests). |
+| `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`, et les clés du navigateur que lisent aussi les aides des tests et la galerie (`cles.ts`). |
 
 ## Mise en page
 
@@ -72,4 +72,4 @@ ONLY=13b,16d npm run galerie           # ces états seulement, les autres captur
 npm run fluidite                       # le banc de fluidité de l’accueil, sur un compte BLUSH+ semé de la même façon
 ```
 
-Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis l’ancienne galerie ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base. Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.
+Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis l’ancienne galerie ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base : la galerie et le banc de fluidité n’acceptent qu’une base dont le nom commence par `blush_e2e_galerie` (celle qu’ils effacent à la fin), une par dossier de travail (`E2E_PORT=3700 E2E_DB=blush_e2e_galerie_<nom> npm run galerie`). Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.

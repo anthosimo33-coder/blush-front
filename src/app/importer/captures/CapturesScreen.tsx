@@ -133,7 +133,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     else setResult((r) => (r ? { ...r, count: next.length } : r));
   };
 
-  /** Déplace une capture à une autre place ; l’ordre est gardé pour la suite du parcours. */
+  /** Déplace une capture à une autre place : BLUSH les lit dans cet ordre. */
   const move = (id: string, to: number) => {
     setItems((list) => {
       const from = list.findIndex((s) => s.id === id);
@@ -141,7 +141,6 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       const next = [...list];
       const [it] = next.splice(from, 1);
       next.splice(to, 0, it);
-      setJourney({ captureNames: next.map((s) => s.file.name) });
       return next;
     });
   };
@@ -160,7 +159,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             { app: captureApp, mode: addMode ? "add" : "first", onAvance: setAvance },
           );
       if (!monte.current) return;
-      setJourney({ captureNames: items.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
+      setJourney({ ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
       setResult({ count: items.length, messages: r.messagesRead, video });
       router.push(next);
     } catch (e) {

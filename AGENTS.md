@@ -17,6 +17,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # En local : le vrai back-end, le modèle factice
 
 - L’appli a toujours son back-end : en local, le Postgres de la machine et le modèle factice (`BLUSH_IA_FACTICE=1`), jamais une vraie clé d’API ni la base de la production. `cp .env.example .env.development.local` une fois, puis `npm run dev` (README, BACKEND.md).
-- Une base à soi par dossier de travail : `DATABASE_URL=postgres://localhost:5432/blush_dev_<nom> npm run dev`, `DATABASE_URL_TEST=…/blush_test_<nom> npm run check`, `E2E_PORT=<port> E2E_DB=blush_e2e_<nom> npm run e2e`. On efface ses bases à la fin.
+- Une base à soi par dossier de travail : `DATABASE_URL=postgres://localhost:5432/blush_dev_<nom> npm run dev`, `DATABASE_URL_TEST=…/blush_test_<nom> npm run check`, `E2E_PORT=<port> E2E_DB=blush_e2e_<nom> npm run e2e` (la galerie et le banc de fluidité : `E2E_DB=blush_e2e_galerie_<nom>`). On efface ses bases à la fin.
 - Un état à montrer (un compte gratuit, BLUSH+, le mode sobre, plusieurs convs) se prépare comme dans les tests de bout en bout, par les routes `/api` et `tests/e2e/aide` : la galerie des écrans le fait pour chaque état (`npm run e2e:build && npm run galerie`, README « La galerie »).
 - Le contenu du produit vit dans `src/contenu` (dont la règle des chapitres offerts, `chapitres.ts`). Les données fictives ne servent qu’aux tests, à la galerie et aux aperçus locaux (`/apercu`, 404 en production).

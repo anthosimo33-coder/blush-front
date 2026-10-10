@@ -6,10 +6,8 @@
  * chapitres fermés et l’écriture (src/server/donnees.ts), la révélation du verdict (src/app/rapport/verdict/cartes.ts),
  * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
  * lisent ici.
- * Une exception reste, hors de ce dépôt : les chapitres écrits par le modèle prennent leur `free` de prompts/lib/front.ts
- * (`chapitresAffiches`, encore les chapitres 1 et 2). Aucun écran ne lit ce `free` ; il ne compte que dans le temps
- * de lecture « offert » d’un rapport déjà écrit (readingTime.free, src/server/analyse.ts), que voit un compte repassé
- * en gratuit.
+ * Le `free` des chapitres écrits par le modèle vient du sous-module des prompts, pas d’ici. Aucun écran ne le lit : seul
+ * le temps de lecture « offert » d’un rapport déjà écrit en est tiré (readingTime.free, src/server/analyse.ts).
  */
 
 export const NB_CHAPITRES = 8;
