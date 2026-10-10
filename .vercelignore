@@ -10,6 +10,5 @@ prompts/README.md
 test-results
 playwright-report*
 blob-report
-build-e2e.tar
 # La CLI Vercel de la mise en production : elle déploie, elle ne fait pas partie du site
 scripts/deployer
