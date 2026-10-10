@@ -18,7 +18,7 @@ export default async function Page() {
         {tous.map(({ cas, data }) => {
           const v = data.payload.report.verdict;
           const [toi, autre] = data.story.participants;
-          const q = `?cas=${cas}&plan=blushplus`;
+          const q = `?cas=${cas}`;
           return (
             <li key={cas} className="flex flex-col gap-2 rounded-[20px] bg-white p-4 shadow-card">
               <div className="flex items-start gap-3">

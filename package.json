@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "galerie": "node scripts/galerie/capture.mjs",
-    "fluidite": "node scripts/fluidite/fluidite.mjs",
+    "fluidite": "node scripts/galerie/capture.mjs --fluidite",
     "predev": "node scripts/prompts.mjs",
     "prebuild": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && node scripts/migrer.mjs",
     "postbuild": "node scripts/verifier-fuite.mjs",

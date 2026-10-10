@@ -8,6 +8,7 @@ import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT
  *   npm run e2e:build   le build du back-end, une fois puis après chaque changement de l’appli
  *   npm run e2e         E2E_PORT (3400) et E2E_DB (blush_e2e) pour lancer plusieurs suites en même temps
  *   npm run e2e:visuel  les captures de référence des écrans (tests/e2e/visuel.spec.ts), avec E2E_VISUEL_DIR
+ *   npm run galerie     la galerie des écrans (scripts/galerie), avec BLUSH_GALERIE=1 (posé par la commande)
  * Chromium sur ordinateur, et WebKit en iPhone (le moteur de Safari, là où BLUSH se teste à la main).
  */
 const CI = !!process.env.CI;
@@ -67,6 +68,19 @@ const BETA = /\.beta\.spec\.ts$/;
 const VISUEL = process.env.E2E_VISUEL_DIR ? resolve(process.env.E2E_VISUEL_DIR) : null;
 const CAPTURES = /[\\/]visuel\.spec\.ts$/;
 
+/*
+ * La galerie des écrans (scripts/galerie/galerie.spec.ts, `npm run galerie`) : chaque état, atteint par le vrai back-end,
+ * capturé en mobile et en ordinateur dans Chromium (avec le micro factice des vocaux). Seulement avec BLUSH_GALERIE=1 :
+ * sans lui, ni ce fichier ni ses projets (`npm run e2e` et la CI ne les voient pas). `metadata.ecran` : la clé des
+ * captures (m ou d), celle de la page de la galerie. Avec, aussi le banc de fluidité de l’accueil sur un compte BLUSH+
+ * semé (scripts/galerie/fluidite.spec.ts, `npm run fluidite`).
+ */
+const GALERIE = process.env.BLUSH_GALERIE === "1";
+const ecransDeLaGalerie = [
+  { name: "galerie-mobile", metadata: { ecran: "m" }, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 },
+  { name: "galerie-ordinateur", metadata: { ecran: "d" }, viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1.5 },
+];
+
 /* Un dossier de résultats et un rapport par port : deux suites en même temps ne s’effacent pas */
 const rapport = PORT === 3400 ? "playwright-report" : `playwright-report-${PORT}`;
 
@@ -100,6 +114,18 @@ export default defineConfig({
     ...navigateurs.map((n) => ({ name: `${n.name}-beta`, testMatch: BETA, use: { ...n.use, baseURL: URL_BETA } })),
     /* Une capture par écran et par navigateur : <E2E_VISUEL_DIR>/visuel-chromium/accueil.png… */
     ...(VISUEL ? navigateurs.map((n) => ({ name: n.visuel, testMatch: CAPTURES, snapshotPathTemplate: `${VISUEL}/{projectName}/{arg}{ext}`, use: { ...n.use, baseURL: URL_APPLI } })) : []),
+    ...(GALERIE
+      ? ecransDeLaGalerie.map(({ name, metadata, viewport, deviceScaleFactor }) => ({
+          name,
+          metadata,
+          testDir: "scripts/galerie",
+          testMatch: /[\\/]galerie\.spec\.ts$/,
+          /* Chaque état a son propre compte : les états du fichier se capturent en parallèle */
+          fullyParallel: true,
+          use: { ...navigateurs[0].use, viewport, deviceScaleFactor, baseURL: URL_APPLI },
+        }))
+      : []),
+    ...(GALERIE ? [{ name: "galerie-fluidite", testDir: "scripts/galerie", testMatch: /[\\/]fluidite\.spec\.ts$/, use: { ...navigateurs[0].use, baseURL: URL_APPLI } }] : []),
   ],
   webServer: [serveur(PORT, false), serveur(PORT_BETA, true)],
 });

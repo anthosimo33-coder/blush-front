@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /** En local : passer d’une vue à l’autre de la même conv (rapport, accueil, fiche), ou revenir à la liste. */
 export function ApercuNav({ cas, ici }: { cas: string | null; ici: "rapport" | "accueil" | "fiche" }) {
-  const q = cas ? `?cas=${cas}&plan=blushplus` : "?plan=blushplus";
+  const q = cas ? `?cas=${cas}` : "";
   const liens = [
     { id: "rapport", label: "Rapport", href: `/apercu${q}` },
     { id: "accueil", label: "Accueil", href: `/apercu/accueil${q}` },

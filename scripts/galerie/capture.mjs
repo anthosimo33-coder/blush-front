@@ -1,172 +1,120 @@
 /*
- * Galerie des écrans BLUSH — capture tous les états puis génère la page.
+ * Galerie des écrans BLUSH — capture tous les états sur le vrai back-end, puis génère la page.
  *
- *   npm run galerie                         (serveur déjà lancé sur http://localhost:3100)
- *   BASE=http://localhost:3300 npm run galerie
+ *   npm run e2e:build && npm run galerie     aucun serveur à lancer : Playwright lance celui des tests (tests/e2e/serveur.mjs)
+ *   ONLY=13b,16d npm run galerie             ces états seulement (les autres captures restent)
+ *   npm run galerie -- --page                la page seulement, avec les captures déjà faites
+ *   E2E_PORT=3700 E2E_DB=blush_e2e_galerie_b npm run galerie   un autre port (et le suivant) ou une autre base
+ *   MAQUETTES=<dossier>                      les maquettes de référence (par défaut ../maquettes/png, facultatives)
+ *   npm run fluidite                         le banc de fluidité de l’accueil (scripts/fluidite) sur un compte BLUSH+ semé,
+ *                                            sur la même infrastructure (scripts/galerie/fluidite.spec.ts) ; ni page ni captures
  *
- * Sortie : .galerie/ (galerie.html, img/, ref/, files.json) — à publier en artefact.
+ * Les captures : scripts/galerie/galerie.spec.ts, dans les projets galerie-* de playwright.config.ts (BLUSH_GALERIE=1),
+ * sur une base neuve (blush_e2e_galerie, effacée à la fin), avec le modèle factice et sans aucune clé d’API.
+ * Sortie : .galerie/ (galerie.html, img/, ref/, etats/, files.json, publish.json) — à publier en artefact.
  */
-import { chromium } from "playwright-core";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { PLANCHES, SECTIONS, STATES } from "./screens.mjs";
+import postgres from "postgres";
+import { PLANCHES, RETIRES, SECTIONS, STATES } from "./screens.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const OUT = path.join(ROOT, ".galerie");
-const MAQ = path.resolve(ROOT, "../maquettes/png");
-const BASE = process.env.BASE ?? "http://localhost:3100";
-const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
-/* Noms horodatés : un nouveau fichier à chaque capture, jamais d’image périmée en cache */
-const STAMP = Date.now().toString(36);
-const VP = {
-  m: { width: 390, height: 844, dsf: 2 },
-  d: { width: 1280, height: 900, dsf: 1.5 },
-};
+const MAQ = path.resolve(ROOT, process.env.MAQUETTES ?? "../maquettes/png");
+const ONLY = process.env.ONLY ? process.env.ONLY.split(",").map((s) => s.trim()).filter(Boolean) : null;
+const PAGE_SEULEMENT = process.argv.includes("--page");
+const FLUIDITE = process.argv.includes("--fluidite");
+/* Le serveur des tests, à part : un port (et le suivant, pour la bêta fermée) et une base à la galerie (ou au banc) */
+const PORT = process.env.E2E_PORT ?? (FLUIDITE ? "3490" : "3480");
+const BASE = process.env.E2E_DB ?? (FLUIDITE ? "blush_e2e_galerie_fluidite" : "blush_e2e_galerie");
+const POSTGRES = (process.env.E2E_POSTGRES ?? "postgres://localhost:5432").replace(/\/$/, "");
 
-function chromePath() {
-  const cache = path.join(os.homedir(), "Library/Caches/ms-playwright");
-  const builds = fs.existsSync(cache) ? fs.readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse() : [];
-  for (const b of builds) {
-    for (const p of [
-      "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-      "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-      "chrome-linux/chrome",
-    ]) {
-      const full = path.join(cache, b, p);
-      if (fs.existsSync(full)) return full;
-    }
+/** Lance les captures (galerie.spec.ts), ou le banc de fluidité (fluidite.spec.ts), dans Playwright. Renvoie son code de sortie. */
+function capturer() {
+  /* La base est recréée par le serveur des tests : jamais une autre que celle de la galerie */
+  if (!/^blush_e2e_galerie[a-z0-9_]*$/.test(BASE)) {
+    console.error(`✗ base refusée : « ${BASE} » (le nom doit commencer par blush_e2e_galerie)`);
+    process.exit(1);
   }
-  const sys = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  if (fs.existsSync(sys)) return sys;
-  throw new Error("Chromium introuvable (cache Playwright ou Google Chrome).");
+  /* Le banc lit ONLY lui-même (ses scénarios) */
+  if (FLUIDITE) return lancer(["test", "--project=galerie-fluidite"]);
+  if (!ONLY) for (const dossier of ["img", "etats"]) fs.rmSync(path.join(OUT, dossier), { recursive: true, force: true });
+  const args = ["test", "--project=galerie-mobile", "--project=galerie-ordinateur"];
+  /* Les titres des tests commencent par l’identifiant de l’état : « 13b · Accueil · … » */
+  if (ONLY) args.push("--grep", `(^|\\s)(${ONLY.map((id) => id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}) · `);
+  return lancer(args);
 }
 
-function jpegFromPng(src, dest) {
-  execFileSync("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "85", src, "--out", dest], { stdio: "ignore" });
-  const out = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", dest]).toString();
-  const w = +out.match(/pixelWidth: (\d+)/)[1];
-  const h = +out.match(/pixelHeight: (\d+)/)[1];
-  return { w, h };
-}
-
-async function shoot(browser, st, key) {
-  const vp = VP[key];
-  /* `touch` : le mobile est capturé comme un vrai écran tactile (pas de survol, pointeur grossier) */
-  const touch = !!st.touch && key === "m";
-  const ctx = await browser.newContext({
-    viewport: { width: vp.width, height: vp.height },
-    deviceScaleFactor: vp.dsf,
-    reducedMotion: st.motion ? "no-preference" : "reduce",
-    locale: "fr-FR",
-    hasTouch: touch,
-    isMobile: touch,
+/** Playwright, avec les projets de la galerie (BLUSH_GALERIE=1), sur le port et la base de la galerie. */
+function lancer(args) {
+  const r = spawnSync(path.join(ROOT, "node_modules/.bin/playwright"), args, {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: { ...process.env, BLUSH_GALERIE: "1", E2E_PORT: PORT, E2E_DB: BASE },
   });
-  await ctx.grantPermissions(["clipboard-read", "clipboard-write", "microphone"], { origin: BASE });
-  /* `story` : l’histoire ouverte (cookie de session), lue par les pages côté serveur dès le premier rendu */
-  if (st.story) await ctx.addCookies([{ name: "blush-story", value: st.story, url: BASE }]);
-  /* L’arrivée de l’accueil (une fois par jour) est déjà jouée : la capture montre l’écran posé */
-  await ctx.addCookies([{ name: "blush-arrivee", value: "1", url: BASE }]);
-  await ctx.addInitScript(
-    ({ journey, server }) => {
-      try {
-        if (journey) sessionStorage.setItem("blush.journey.v1", JSON.stringify(journey));
-        const s = { ...server };
-        if (s.analysisStartedAgo) {
-          s.analysisStartedAt = Date.now() - s.analysisStartedAgo;
-          delete s.analysisStartedAgo;
-        }
-        if (Object.keys(s).length) sessionStorage.setItem("blush.mock-server.v1", JSON.stringify(s));
-      } catch {
-        /* rien */
-      }
-    },
-    { journey: st.journey ?? null, server: st.server ?? {} },
-  );
-  const page = await ctx.newPage();
+  return r.status ?? 1;
+}
+
+/** Efface la base de la galerie : elle ne sert plus une fois les captures faites. */
+async function oublierLaBase() {
+  const admin = postgres(`${POSTGRES}/postgres`, { max: 1, onnotice: () => {} });
   try {
-    await page.goto(BASE + st.route, { waitUntil: "networkidle" });
-    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-    await page.waitForTimeout(st.wait ?? 600);
-    if (st.steps) await st.steps(page, key);
-    if (st.hover) {
-      const target = typeof st.hover === "string" ? page.locator(st.hover).first() : page.getByRole(st.hover.role, { name: st.hover.name }).first();
-      await target.hover();
-      await page.waitForTimeout(700);
-    }
-    /* États animés : les entrées (rebond, montée) sont figées à leur état final, la progression continue */
-    if (st.motion) await page.addStyleTag({ content: "[data-popin],[data-rise],[data-pop]{animation:none!important}" });
-    const full = !st.sheet;
-    const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, window.innerHeight)) : vp.height;
-    const rel = `img/${key}-${st.id}-${STAMP}.jpg`;
-    /* Au-delà de ~16 000 px, le navigateur recolle mal l’image : on capture alors en pixels CSS */
-    await page.screenshot({ path: path.join(OUT, rel), type: "jpeg", quality: 85, fullPage: full, scale: h * vp.dsf > 15000 ? "css" : "device" });
-    return { src: rel, w: vp.width, h };
+    await admin.unsafe(`drop database if exists "${BASE}" with (force)`);
+  } catch (e) {
+    console.error(`la base ${BASE} n’a pas pu être effacée : ${e.message}`);
   } finally {
-    await ctx.close();
+    await admin.end();
   }
 }
 
-async function main() {
-  if (!ONLY) fs.rmSync(path.join(OUT, "img"), { recursive: true, force: true });
-  fs.mkdirSync(path.join(OUT, "img"), { recursive: true });
+/** Une maquette PNG en JPEG (sips, sur macOS) ; null si ce n’est pas possible ici. */
+function jpegFromPng(src, dest) {
+  try {
+    execFileSync("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "85", src, "--out", dest], { stdio: "ignore" });
+    const out = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", dest]).toString();
+    return { w: +out.match(/pixelWidth: (\d+)/)[1], h: +out.match(/pixelHeight: (\d+)/)[1] };
+  } catch {
+    return null;
+  }
+}
+
+/** Assemble la page de la galerie avec les captures de .galerie/etats, les maquettes (s’il y en a) et le gabarit. */
+function assembler() {
   fs.mkdirSync(path.join(OUT, "ref"), { recursive: true });
 
-  /* Micro factice (un bip) : les états « vocal » s’enregistrent sans vrai micro ni question d’autorisation */
-  const browser = await chromium.launch({ executablePath: chromePath(), args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
-  const jobs = [];
-  for (const st of STATES) {
-    if (ONLY && !ONLY.includes(st.id)) continue;
-    for (const key of st.only ? [st.only] : ["m", "d"]) jobs.push({ st, key });
-  }
+  /* Les captures faites : une fiche par état et par écran (galerie.spec.ts) */
   const shots = {};
-  const queue = [...jobs];
-  let done = 0;
-  await Promise.all(
-    Array.from({ length: 4 }, async () => {
-      while (queue.length) {
-        const { st, key } = queue.shift();
-        try {
-          (shots[st.id] ??= {})[key] = await shoot(browser, st, key);
-        } catch (e) {
-          console.error(`✗ ${st.id} ${key}: ${e.message.split("\n")[0]}`);
-        }
-        done++;
-        process.stdout.write(`\r${done}/${jobs.length} captures`);
-      }
-    }),
-  );
-  await browser.close();
-  process.stdout.write("\n");
+  const dossier = path.join(OUT, "etats");
+  for (const f of fs.existsSync(dossier) ? fs.readdirSync(dossier) : []) {
+    const m = f.match(/^(.+)-([md])\.json$/);
+    if (!m) continue;
+    const shot = JSON.parse(fs.readFileSync(path.join(dossier, f), "utf8"));
+    if (fs.existsSync(path.join(OUT, shot.src))) (shots[m[1]] ??= {})[m[2]] = shot;
+  }
 
-  /* Maquettes de référence */
+  /* Maquettes de référence : facultatives (hors du dépôt) */
+  const maquettes = fs.existsSync(MAQ);
+  if (!maquettes) console.log(`maquettes absentes (${MAQ}) : la galerie sans elles`);
   const refs = {};
   for (const st of STATES) {
-    if (!st.ref) continue;
+    if (!st.ref || !maquettes) continue;
     refs[st.id] = {};
     for (const [key, dir] of [["m", "mobile"], ["d", "desktop"]]) {
       const src = path.join(MAQ, dir, `${st.ref}.png`);
       if (!fs.existsSync(src)) continue;
       const rel = `ref/${key}-${st.ref}.jpg`;
-      refs[st.id][key] = { src: rel, ...jpegFromPng(src, path.join(OUT, rel)) };
+      const taille = jpegFromPng(src, path.join(OUT, rel));
+      if (taille) refs[st.id][key] = { src: rel, ...taille };
     }
   }
   const TITLES = ["Couverture", "Couleurs", "Typographie", "Boutons et contrôles", "Composants", "Logo", "Logo en mouvement", "Objets 3D", "Mode sobre", "Règles"];
-  const planches = PLANCHES.map((name, i) => {
+  const planches = PLANCHES.flatMap((name, i) => {
+    const src = path.join(MAQ, "design-system", `${name}.png`);
     const rel = `ref/ds-${name}.jpg`;
-    return { name, title: TITLES[i], src: rel, ...jpegFromPng(path.join(MAQ, "design-system", `${name}.png`), path.join(OUT, rel)) };
+    const taille = fs.existsSync(src) ? jpegFromPng(src, path.join(OUT, rel)) : null;
+    return taille ? [{ name, title: TITLES[i], src: rel, ...taille }] : [];
   });
-
-  /* Avec ONLY, on garde les captures déjà faites pour les autres états */
-  let prev = {};
-  try {
-    const old = fs.readFileSync(path.join(OUT, "galerie.html"), "utf8").match(/const DATA = (\{.*?\});\n/s);
-    if (old) for (const s of JSON.parse(old[1]).states) prev[s.id] = s.shots;
-  } catch {
-    prev = {};
-  }
-  const previous = (id) => (ONLY ? prev[id] ?? {} : {});
 
   const now = new Date();
   const fmt = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).formatToParts(now);
@@ -175,14 +123,19 @@ async function main() {
     generatedAt: now.toISOString(),
     generatedLabel: `${part("day")} ${part("month")} à ${part("hour")} h ${part("minute")}`,
     sections: SECTIONS,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- on retire du manifeste ce qui ne sert qu’à la capture
-    states: STATES.map(({ steps, journey, server, hover, motion, wait, touch, story, ...s }) => ({ ...s, shots: shots[s.id] ?? previous(s.id), ref: refs[s.id] ?? null })),
+    retires: RETIRES,
+    /* Ce que la page affiche, sans ce qui ne sert qu’à la capture (le compte, les gestes…) */
+    states: STATES.map(({ id, section, title, state, route, note, changement, full, only }) => ({ id, section, title, state, route, note, changement, full, only, shots: shots[id] ?? {}, ref: refs[id] ?? null })),
     planches,
   };
 
   const tpl = fs.readFileSync(path.join(import.meta.dirname, "template.html"), "utf8");
   const html = tpl.replace("__MANIFEST__", JSON.stringify(manifest).replace(/</g, "\\u003c"));
   fs.writeFileSync(path.join(OUT, "galerie.html"), html);
+
+  /* Les captures manquantes : un état raté (son test a échoué) ou pas encore capturé */
+  const manquantes = manifest.states.flatMap((s) => (s.only ? [s.only] : ["m", "d"]).filter((k) => !s.shots[k]).map((k) => `${s.id} ${k}`));
+  if (manquantes.length) console.log(`✗ ${manquantes.length} capture(s) manquante(s) : ${manquantes.join(", ")}`);
 
   /* Fichiers référencés par la page, et ce qu’il faut retirer de la version publiée précédente */
   const files = [
@@ -203,6 +156,16 @@ async function main() {
   console.log(`${Object.values(map).filter(Boolean).length} fichiers à envoyer, ${remove.length} à retirer (publish.json)`);
   const size = uniq.reduce((s, f) => s + fs.statSync(path.join(OUT, f)).size, 0);
   console.log(`${uniq.length} fichiers, ${(size / 1e6).toFixed(1)} Mo → .galerie/galerie.html`);
+}
+
+async function main() {
+  let code = 0;
+  if (!PAGE_SEULEMENT) {
+    code = capturer();
+    await oublierLaBase();
+  }
+  if (!FLUIDITE) assembler();
+  process.exit(code);
 }
 
 main().catch((e) => {

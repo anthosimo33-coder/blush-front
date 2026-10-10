@@ -7,8 +7,9 @@
  *   - « fil » : les images du fil principal (requestAnimationFrame) et ses longues tâches (LoAF).
  * Une animation saine ne touche que transform et opacity : le compositeur la joue même quand le fil principal est occupé.
  * Chrome reste un substitut de l’iPhone : un écart se confirme sur Safari (WebKit) ou sur un vrai téléphone.
- *   npm run fluidite                                  (serveur de production lancé sur http://localhost:3300)
- *   BASE=https://blush-front.vercel.app NORAF=1 RUNS=3 npm run fluidite
+ * L’accueil d’un compte BLUSH+ dont la conv est lue : SESSION, la valeur de son cookie blush-session.
+ *   npm run fluidite                                  (le serveur des tests et un compte BLUSH+ semé : scripts/galerie/fluidite.spec.ts)
+ *   BASE=https://blush-front.vercel.app SESSION=… NORAF=1 RUNS=3 node scripts/fluidite/fluidite.mjs
  *   ONLY=pastille,feuille DEBUG=1 npm run fluidite    (le détail des longues images et de leurs scripts)
  * L’ancien compteur (PipelineReporter de Chrome) ne s’affiche plus que sous DEBUG : il marque « perdue » toute image
  * dont le seul changement est en bas de l’écran (la bulle du rapport, par exemple), même quand viz l’a bien dessinée.
@@ -25,6 +26,8 @@ const BASE = process.env.BASE ?? "http://localhost:3300";
 const CPU = Number(process.env.CPU ?? 4);
 const RUNS = Number(process.env.RUNS ?? 2);
 const ONLY = process.env.ONLY?.split(",");
+const SESSION = process.env.SESSION;
+if (!SESSION) throw new Error("SESSION manque : la valeur du cookie blush-session d’un compte BLUSH+ (ou npm run fluidite, qui en sème un)");
 
 function chromePath() {
   const cache = path.join(os.homedir(), "Library/Caches/ms-playwright");
@@ -155,7 +158,7 @@ async function measure(page, label, run) {
 
 const SCENARIOS = {
   async arrivee(page) {
-    await page.goto(`${BASE}/app?plan=blushplus&arrivee=1&v=${Date.now()}`, { waitUntil: "commit" });
+    await page.goto(`${BASE}/app?v=${Date.now()}`, { waitUntil: "commit" });
     await page.waitForFunction(() => !!window.__f);
     return measure(page, "1 · arrivée", () => sleep(4200));
   },
@@ -231,6 +234,8 @@ const browser = await chromium.launch({ executablePath: chromePath(), args: ["--
 const rows = [];
 for (let run = 0; run < RUNS; run++) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-FR" });
+  /* Un contexte neuf à chaque passage : l’arrivée de l’accueil se joue */
+  await ctx.addCookies([{ name: "blush-session", value: SESSION, url: BASE }]);
   await ctx.addInitScript(INIT, !!process.env.NORAF);
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
@@ -240,7 +245,7 @@ for (let run = 0; run < RUNS; run++) {
     if (ONLY && !ONLY.includes(name)) continue;
     /* Lancé seul, un scénario ouvre d’abord l’accueil (l’arrivée s’en charge sinon) */
     if (name !== "arrivee" && !page.url().includes("/app")) {
-      await page.goto(`${BASE}/app?plan=blushplus`);
+      await page.goto(`${BASE}/app`);
       await sleep(1500);
     }
     try {

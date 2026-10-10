@@ -56,3 +56,15 @@ Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteu
 
 - `?erreur=fichier|groupe|courte|lecture|capture|video|longue` : l'écran d'erreur du parcours d'import, par-dessus n'importe quelle route (`src/components/screens/ErreurDeParcours.tsx`). Les écrans de l'import le posent eux-mêmes.
 - `/rapport?paiement=1` : ouvre directement le panneau de paiement (écran 10).
+
+## La galerie
+
+La galerie des écrans (`scripts/galerie`) montre chaque état de chaque écran, en mobile et en ordinateur, pour les relire d’un coup (et les commenter, une fois publiée en artefact). Elle tourne sur le vrai back-end, comme les tests de bout en bout : leur build, leur serveur, une base neuve (`blush_e2e_galerie`, effacée à la fin), le modèle factice et aucune clé d’API. Chaque état prépare son propre compte par les routes `/api` et les aides des tests : une conv importée sans compte, un compte gratuit, le plan « rapport », BLUSH+, le mode sobre (une alerte dans la conv), trois convs.
+
+```bash
+npm run e2e:build && npm run galerie   # .galerie/galerie.html, les captures dans .galerie/img
+ONLY=13b,16d npm run galerie           # ces états seulement, les autres captures restent
+npm run fluidite                       # le banc de fluidité de l’accueil, sur un compte BLUSH+ semé de la même façon
+```
+
+Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis la démo ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base. Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.

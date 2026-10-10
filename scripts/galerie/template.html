@@ -94,6 +94,7 @@
   .seg button[aria-checked="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--shadow); }
   .toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; font-size: 14px; min-height: 40px; cursor: pointer; }
   .toggle input { width: 18px; height: 18px; accent-color: var(--ink); }
+  .toggle[hidden] { display: none; }
   .jump { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
   .jump a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 34px; border-radius: 999px; background: var(--sheet); box-shadow: var(--shadow); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 900; }
   .jump a span { color: var(--grey); font-variant-numeric: tabular-nums; }
@@ -135,6 +136,7 @@
   .lbl .k { color: var(--rose); }
   .note { margin: 0; display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13px; font-weight: 800; }
   .note b { font-weight: 900; }
+  .note.change { background: color-mix(in srgb, var(--toi) 10%, var(--sheet)); color: var(--toi); }
   .card-f { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
   .act { border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 13px; font-weight: 900; background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
   .act.primary { background: var(--ink); color: var(--paper); box-shadow: none; }
@@ -144,6 +146,13 @@
   body:not([data-cmp="1"]) .is-ref { display: none; }
   .missing { display: grid; place-items: center; aspect-ratio: 390 / 844; border-radius: 12px; border: 1px dashed var(--line); color: var(--grey); font-size: 12px; font-weight: 800; padding: 8px; text-align: center; }
   .shot.d .missing { aspect-ratio: 1280 / 900; }
+
+  /* États retirés */
+  .retires { margin-top: 28px; padding: 14px 16px; border-radius: 18px; background: var(--sheet); box-shadow: var(--shadow); }
+  .retires summary { font-weight: 900; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+  .retires ul { margin: 8px 0 0; padding-left: 18px; color: var(--soft); font-size: 14px; }
+  .retires li { margin-top: 4px; }
+  .retires li b { color: var(--ink); }
 
   /* Planches */
   .planches { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); margin-top: 18px; }
@@ -195,7 +204,7 @@
       <h1>Les écrans</h1>
       <p class="meta"><span id="count"></span> · version du <span id="date"></span></p>
     </div>
-    <p class="help">Clique sur un écran pour l’agrandir. « Commenter » épingle ta remarque sur l’écran ; tu peux aussi me citer son numéro dans la conversation.</p>
+    <p class="help">Chaque écran est celui de l’appli, sur son vrai back-end (des convs fictives, un modèle factice). Clique sur un écran pour l’agrandir. « Commenter » épingle ta remarque sur l’écran ; tu peux aussi me citer son numéro dans la conversation.</p>
   </header>
 
   <nav class="bar" aria-label="Affichage">
@@ -303,6 +312,7 @@
       el("header", { class: "card-h" }, el("span", { class: "num", text: numOf(s) }), el("div", { class: "t" }, el("h3", { text: s.title }), el("p", {}, s.state ? el("span", { text: s.state }) : null, el("code", { text: s.route })))),
       el("div", { class: "shots" }, s.only !== "d" ? shotBlock(s, "m") : null, s.only !== "m" ? shotBlock(s, "d") : null),
       s.note ? el("p", { class: "note" }, el("b", { text: "À valider" }), el("span", { text: s.note })) : null,
+      s.changement ? el("p", { class: "note change" }, el("b", { text: "Changé" }), el("span", { text: s.changement })) : null,
       el(
         "footer",
         { class: "card-f" },
@@ -314,6 +324,16 @@
   }
 
   const main = document.getElementById("sections");
+  /* Les états qui ne sont plus dans la galerie, et pourquoi */
+  if (DATA.retires && DATA.retires.length)
+    main.append(
+      el(
+        "details",
+        { class: "retires" },
+        el("summary", { text: `Retirés de la galerie (${DATA.retires.length})` }),
+        el("ul", {}, DATA.retires.map((r) => el("li", {}, el("b", { text: r.ids }), `\u00a0: ${r.why}`))),
+      ),
+    );
   const jump = document.getElementById("jump");
   for (const sec of DATA.sections) {
     const list = states.filter((s) => s.section === sec.id);
@@ -462,7 +482,10 @@
 
   /* ———— Démarrage ———— */
   setMode(store.get("mode", matchMedia("(max-width: 640px)").matches ? "m" : "both"));
-  setCmp(store.get("cmp", "0") === "1");
+  /* Sans maquettes (hors du dépôt), rien à mettre à côté */
+  const maquettes = DATA.planches.length > 0 || states.some((s) => s.ref && (s.ref.m || s.ref.d));
+  document.querySelector('label[for="cmp"]').hidden = !maquettes;
+  setCmp(maquettes && store.get("cmp", "0") === "1");
   const h = location.hash.slice(1);
   if (h) {
     const target = document.getElementById(h);
