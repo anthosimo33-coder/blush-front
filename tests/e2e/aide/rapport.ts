@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { sql } from "./base";
+import { chiffrer, dechiffrer, histoiresDe, sql } from "./base";
 import { pagePrete } from "./page";
 
 /*
@@ -131,6 +131,47 @@ export async function allerAuChapitre(page: Page, numero: number, titre: string)
   /* Le défilement est doux : on attend qu’il soit arrivé, pas seulement que le chapitre entre à l’écran */
   await attendreEnHaut(page, page.getByRole("main").getByRole("heading", { level: 2, name: new RegExp(`^Chapitre ${numero} : `) }));
   await attendreChapitreEnCours(page, numero, titre);
+}
+
+type BlocEcrit = { kind: string; text?: string; level?: string; messages?: { from: "toi" | "elle"; text: string }[]; factsAfter?: string[] };
+
+/**
+ * Les rapports écrits du compte, tels que le vrai modèle les écrit (prompts/05-rapport.md) : le modèle factice n’y met
+ * qu’une accroche, un récit et une chute. Au chapitre 2, `essentiel`, `vu` et `action` : la révélation du verdict d’un
+ * compte payant montre alors ses cartes « le moment » et « à toi de jouer » (cardsOf, verdict/VerdictReveal.tsx), et le
+ * rapport les affiche. `chapitre1` : au chapitre 1 aussi, `sens` et `confiance` (ceux du verdict du modèle factice, comme
+ * pour un compte gratuit). Les messages montrés sont ceux de la conv, que le rapport cite déjà.
+ */
+export async function rapportCommeLeVraiModele(email: string, { chapitre1 = false }: { chapitre1?: boolean } = {}): Promise<void> {
+  let ecrits = 0;
+  for (const { id } of await histoiresDe(email)) {
+    const [r] = await sql()<{ data: Uint8Array | null }[]>`select data from reports where story_id = ${id}`;
+    if (!r?.data) continue;
+    const rapport = dechiffrer<{ chapitres: { number: number; blocks: BlocEcrit[] }[] }>(r.data);
+    const cites = rapport.chapitres.flatMap((c) => c.blocks.flatMap((b) => b.messages ?? []));
+    const [elle, toi] = [cites.find((m) => m.from === "elle"), cites.find((m) => m.from === "toi")];
+    const [verdict, bascule] = [1, 2].map((n) => rapport.chapitres.find((c) => c.number === n));
+    if (!verdict || !bascule || !elle || !toi) throw new Error("le rapport écrit n’a plus ses chapitres 1 et 2, ou ne cite plus la conv");
+    if (chapitre1)
+      verdict.blocks = [
+        ...verdict.blocks.slice(0, -1),
+        { kind: "meaning", text: "C’est flou parce que t’as esquivé." },
+        { kind: "confidence", level: "probable", text: "7 preuves dans votre conv" },
+        ...verdict.blocks.slice(-1),
+      ];
+    const [accroche, ...suite] = bascule.blocks;
+    bascule.blocks = [
+      accroche,
+      { kind: "essential", text: "Elle t’a tendu la perche, et t’as parlé du métro." },
+      { kind: "seen", messages: [elle, toi], factsAfter: ["Trois minutes plus tard, t’as changé de sujet."] },
+      ...suite.slice(0, -1),
+      { kind: "play", text: "Samedi au marché, c’est toi qui proposes le prochain verre." },
+      ...suite.slice(-1),
+    ];
+    await sql()`update reports set data = ${chiffrer(rapport)} where story_id = ${id}`;
+    ecrits++;
+  }
+  if (!ecrits) throw new Error(`aucun rapport écrit pour ${email}`);
 }
 
 /**

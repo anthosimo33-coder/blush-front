@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
 
@@ -6,6 +7,7 @@ import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT
  * production), avec le modèle factice, une base Postgres recréée à chaque lancement et la boîte à mails des tests.
  *   npm run e2e:build   le build du back-end, une fois puis après chaque changement de l’appli
  *   npm run e2e         E2E_PORT (3400) et E2E_DB (blush_e2e) pour lancer plusieurs suites en même temps
+ *   npm run e2e:visuel  les captures de référence des écrans (tests/e2e/visuel.spec.ts), avec E2E_VISUEL_DIR
  * Chromium sur ordinateur, et WebKit en iPhone (le moteur de Safari, là où BLUSH se teste à la main).
  */
 const CI = !!process.env.CI;
@@ -48,12 +50,22 @@ const navigateurs = [
    */
   {
     name: "chromium",
+    visuel: "visuel-chromium",
     use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] } },
   },
-  { name: "webkit-iphone", use: { ...devices["iPhone 15"] } },
+  { name: "webkit-iphone", visuel: "visuel-webkit", use: { ...devices["iPhone 15"] } },
 ];
 /* Les fichiers *.beta.spec.ts tournent sur le serveur en bêta fermée, les autres sur le serveur ouvert */
 const BETA = /\.beta\.spec\.ts$/;
+
+/*
+ * Les captures de référence des écrans (tests/e2e/visuel.spec.ts) : seulement avec E2E_VISUEL_DIR, le dossier où elles
+ * s’écrivent (--update-snapshots) puis se comparent, hors du dépôt (elles dépendent des polices et des navigateurs de la
+ * machine). Sans lui, ni ce fichier ni ses projets : `npm run e2e` et la CI ne les voient pas. Les captures se prennent
+ * une à une (un seul worker) : le tableau de bord compte tout ce que la base contient.
+ */
+const VISUEL = process.env.E2E_VISUEL_DIR ? resolve(process.env.E2E_VISUEL_DIR) : null;
+const CAPTURES = /[\\/]visuel\.spec\.ts$/;
 
 /* Un dossier de résultats et un rapport par port : deux suites en même temps ne s’effacent pas */
 const rapport = PORT === 3400 ? "playwright-report" : `playwright-report-${PORT}`;
@@ -69,7 +81,7 @@ export default defineConfig({
   expect: { timeout: 30_000 },
   /* Les tests d’un fichier à la suite, les fichiers en parallèle : chaque test a ses emails, son IP (aide/index.ts) */
   fullyParallel: false,
-  workers: Number(process.env.E2E_WORKERS) || (CI ? 2 : 3),
+  workers: VISUEL ? 1 : Number(process.env.E2E_WORKERS) || (CI ? 2 : 3),
   /* Aucun nouvel essai, en CI non plus : un test qui ne passe qu’une fois sur deux est un test à corriger */
   retries: 0,
   forbidOnly: CI,
@@ -84,8 +96,10 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   projects: [
-    ...navigateurs.map((n) => ({ name: n.name, testIgnore: BETA, use: { ...n.use, baseURL: URL_APPLI } })),
+    ...navigateurs.map((n) => ({ name: n.name, testIgnore: [BETA, CAPTURES], use: { ...n.use, baseURL: URL_APPLI } })),
     ...navigateurs.map((n) => ({ name: `${n.name}-beta`, testMatch: BETA, use: { ...n.use, baseURL: URL_BETA } })),
+    /* Une capture par écran et par navigateur : <E2E_VISUEL_DIR>/visuel-chromium/accueil.png… */
+    ...(VISUEL ? navigateurs.map((n) => ({ name: n.visuel, testMatch: CAPTURES, snapshotPathTemplate: `${VISUEL}/{projectName}/{arg}{ext}`, use: { ...n.use, baseURL: URL_APPLI } })) : []),
   ],
   webServer: [serveur(PORT, false), serveur(PORT_BETA, true)],
 });

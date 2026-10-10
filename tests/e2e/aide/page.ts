@@ -117,6 +117,39 @@ export async function ouvrir(page: Page, adresse?: string): Promise<void> {
 }
 
 /**
+ * Attend que la page soit au repos depuis `repos` ms : plus aucune animation finie en cours (celles qui tournent sans
+ * fin ne comptent pas : une capture les arrête), plus aucune bulle en vol (un double posé par-dessus le chat, retiré par
+ * un minuteur une fois la vraie bulle arrivée), et plus aucun changement du document. Une animation finie déclenche
+ * souvent la suite (une classe, un attribut, une autre animation) : capturée trop tôt, la page n’est pas tout à fait la
+ * même d’un lancement à l’autre. Au bout de `max` ms, une erreur ; avec `echouer: false`, false (la page bouge encore).
+ * Pour les captures : la référence visuelle (visuel.spec.ts).
+ */
+export async function pageAuRepos(page: Page, { repos = 600, max = 15_000, echouer = true }: { repos?: number; max?: number; echouer?: boolean } = {}): Promise<boolean> {
+  const pose = await page.evaluate(
+    ({ repos, max }) =>
+      new Promise<boolean>((fini) => {
+        let dernier = performance.now();
+        const debut = dernier;
+        const changements = new MutationObserver(() => (dernier = performance.now()));
+        changements.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+        const verifier = () => {
+          const anime = !!document.querySelector(".flight") || document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity);
+          if (anime) dernier = performance.now();
+          const auRepos = performance.now() - dernier >= repos;
+          if (auRepos || performance.now() - debut > max) {
+            changements.disconnect();
+            fini(auRepos);
+          } else setTimeout(verifier, 50);
+        };
+        verifier();
+      }),
+    { repos, max },
+  );
+  if (!pose && echouer) throw new Error(`la page bouge encore après ${max / 1000} secondes`);
+  return pose;
+}
+
+/**
  * Choisit des fichiers par un bouton de l’écran (par défaut « Choisir le fichier enregistré »), dans le sélecteur du
  * système. L’attente du sélecteur et le toucher partent ensemble : l’une ne reste jamais sans l’autre.
  */

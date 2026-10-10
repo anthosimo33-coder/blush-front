@@ -66,6 +66,10 @@ export async function histoiresDe(email: string): Promise<Histoire[]> {
     where u.email = ${email.toLowerCase()} order by s.created_at`;
 }
 
+/** La dernière histoire du compte, à glisser dans une requête : sql()`… where story_id = ${derniereHistoire(email)}`. */
+export const derniereHistoire = (email: string) =>
+  sql()`(select s.id from stories s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()} order by s.created_at desc limit 1)`;
+
 /** L’histoire est-elle encore en base (sous ce compte, un autre, ou en brouillon) ? */
 export async function histoireExiste(id: string): Promise<boolean> {
   const [ligne] = await sql()`select 1 from stories where id = ${id}`;

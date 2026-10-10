@@ -18,6 +18,7 @@
     "e2e:build": "node tests/e2e/construire.mjs",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
+    "e2e:visuel": ": \"${E2E_VISUEL_DIR:?le dossier des captures de référence, hors du dépôt (voir tests/e2e/visuel.spec.ts)}\" && playwright test --project=visuel-chromium --project=visuel-webkit",
     "db:generer": "drizzle-kit generate",
     "db:migrer": "drizzle-kit migrate",
     "acces": "tsx scripts/acces.mts"
