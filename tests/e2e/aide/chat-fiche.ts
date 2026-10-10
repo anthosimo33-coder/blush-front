@@ -17,10 +17,19 @@ export const filDuChat = (page: Page) => page.getByRole("log", { name: "Ta conv 
  */
 export const champDuChat = (page: Page) => page.getByRole("textbox", { name: /^Écris à BLUSH, ou colle sa réponse/ });
 
-/** Écrit à BLUSH depuis le champ du chat, et attend sa réponse (POST /api/chat). Renvoie son statut. */
+/**
+ * Écrit à BLUSH depuis le champ du chat, et attend sa réponse (POST /api/chat) en entier. Renvoie son statut. La réponse
+ * part en flux (ses bulles, la réponse enregistrée, puis son vocal) : le statut arrive avant elle, et le vocal n’est
+ * enregistré qu’à la fin du flux.
+ */
 export async function ecrireABlush(page: Page, texte: string): Promise<number> {
   await champDuChat(page).fill(texte);
   const reponse = await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Envoyer" }).click());
+  /*
+   * La fin du flux : body() attend que la requête se termine, même quand Chromium la marque « interrompue » une fois tout
+   * lu (finished() ne rendrait alors jamais la main). Son contenu ne sert pas ici.
+   */
+  await reponse.body().catch(() => undefined);
   return reponse.status();
 }
 
@@ -83,9 +92,30 @@ export async function enregistrerLaFiche(page: Page, geste: () => Promise<unknow
 /**
  * Un glissé au doigt sur `cible`, de `dx` pixels vers la droite (négatif : vers la gauche), en quelques pas : les gestes
  * de la conv ne répondent qu’au toucher, pas à la souris. Joué par le protocole de Chromium (Input.dispatchTouchEvent) :
- * Chromium seulement.
+ * Chromium seulement. Le doigt se pose une fois la cible immobile (la même place trois images de suite) : une réponse
+ * de BLUSH arrive en flux, puis la conv glisse en place, et la bulle bougerait sous le doigt.
  */
 export async function glisserAuDoigt(page: Page, cible: Locator, dx: number): Promise<void> {
+  const immobile = await cible.evaluate(
+    (el, delai) =>
+      new Promise<boolean>((ok) => {
+        const fin = performance.now() + delai;
+        let avant = "";
+        let pareilles = 0;
+        const relever = () => {
+          const r = el.getBoundingClientRect();
+          const ici = `${r.x} ${r.y} ${r.width} ${r.height}`;
+          pareilles = ici === avant ? pareilles + 1 : 0;
+          avant = ici;
+          if (pareilles >= 2) ok(true);
+          else if (performance.now() > fin) ok(false);
+          else requestAnimationFrame(relever);
+        };
+        requestAnimationFrame(relever);
+      }),
+    RESEAU,
+  );
+  if (!immobile) throw new Error("la cible du glissé bouge encore");
   const b = await cible.boundingBox();
   if (!b) throw new Error("la cible du glissé n’est pas à l’écran");
   const cdp = await page.context().newCDPSession(page);

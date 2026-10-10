@@ -1,7 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { deflateSync, strToU8, zipSync } from "fflate";
-import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
+import { analyserExport, ExportIllisible, lireFichiers, preparerExport } from "@/services/preparer-export";
 
 const chat = "[12/09/2026 18:58:00] Léa: t’es dispo jeudi ?\n[12/09/2026 19:00:00] Malik: à demain alors 😊\n".repeat(2000);
 const fichier = (octets: Uint8Array, nom: string) => new File([octets as BlobPart], nom);
@@ -100,12 +101,52 @@ describe("lire un export zippé dans le navigateur", () => {
       { nom: "your_instagram_activity/messages/inbox/ines_2/message_1.json", donnees: conv("Inès", 12) },
       { nom: "your_instagram_activity/messages/inbox/ines_2/photos/1.jpg", virtuel: 300_000_000 },
     ]);
-    const pret = await analyserExport(zip);
+    const avance: number[] = [];
+    const pret = await analyserExport(zip, (p) => avance.push(p));
     if (pret.type !== "plusieurs") throw new Error("plusieurs convs attendues");
+    /* L’avancée du tour des convs, affichée par l’écran d’import : de 0 à 1, conv par conv */
+    expect(avance).toEqual([0, 0.5, 1]);
     const ines = pret.convs.find((c) => c.messages === 12)!;
     const parties = await contenuDe(await pret.paquetDe(ines.id));
     expect(parties.map((p) => p.nom)).toEqual(["your_instagram_activity/messages/inbox/ines_2/message_1.json"]);
     expect(lu.max).toBeLessThan(200_000);
+  });
+
+  it("dans le chat ou la fiche, un export Instagram complet est refusé d’après les noms, sans décompresser ses convs", async () => {
+    const { fichier: zip, lu } = zipVirtuel([
+      { nom: "your_instagram_activity/messages/inbox/lea_1/message_1.json", virtuel: 3_000_000 },
+      { nom: "your_instagram_activity/messages/inbox/ines_2/message_1.json", virtuel: 3_000_000 },
+    ]);
+    const refus = preparerExport(zip);
+    await expect(refus).rejects.toBeInstanceOf(ExportIllisible);
+    await expect(refus).rejects.toThrow("plusieurs");
+    expect(lu.max).toBeLessThan(200_000);
+  });
+
+  it("une conv bien trop longue (16 Mo) : coupée d’après un échantillon de sa fin, elle garde ses derniers messages et tient dans un envoi", async () => {
+    /* Du hasard : il se compresse mal, la conv ne peut pas partir en entier */
+    const texte = Array.from({ length: 170_000 }, (_, k) => `[12/09/2026 18:58:00] ${k % 2 ? "Léa" : "Tom"}: ${randomBytes(48).toString("base64")}`).join("\n");
+    expect(texte.length).toBeGreaterThan(15_000_000);
+    const pret = await analyserExport(fichier(strToU8(texte), "WhatsApp Chat - Léa.txt"));
+    if (pret.type !== "un") throw new Error("une conv attendue");
+    expect(pret.paquet.size).toBeLessThanOrEqual(4.2 * 1024 * 1024);
+    const p = JSON.parse(gunzipSync(Buffer.from(await pret.paquet.arrayBuffer())).toString("utf8")) as { coupe?: boolean; parties: { contenu: string }[] };
+    expect(p.coupe).toBe(true);
+    const garde = p.parties[0].contenu;
+    expect(texte.endsWith(garde)).toBe(true);
+    expect(garde).toMatch(/^\[12\/09\/2026 /);
+    /* L’estimation ne coupe pas beaucoup trop : la plus grande part de ce qui tient est gardée */
+    expect(pret.paquet.size).toBeGreaterThan(3 * 1024 * 1024);
+  });
+
+  it("le paquet, écrit par morceaux : un émoji coupé entre deux morceaux revient entier", async () => {
+    /* « ah » : les émojis commencent à un indice impair, la limite d’un morceau (2^20) tombe au milieu de l’un d’eux */
+    const texte = `[12/09/2026 18:58:00] Léa: ah${"😊".repeat(700_000)}\n[12/09/2026 19:00:00] Tom: « ok » \"\\ \u2028 fin`;
+    const pret = await analyserExport(fichier(strToU8(texte), "WhatsApp Chat - Léa.txt"));
+    if (pret.type !== "un") throw new Error("une conv attendue");
+    expect(texte.charCodeAt(2 ** 20 - 1)).toBeGreaterThanOrEqual(0xd800);
+    expect(texte.charCodeAt(2 ** 20 - 1)).toBeLessThanOrEqual(0xdbff);
+    expect(await contenuDe(pret.paquet)).toEqual([{ nom: "WhatsApp Chat - Léa.txt", contenu: texte }]);
   });
 
   it("un zip ordinaire (fflate) : les .txt et les message_N d’Instagram, dans leurs dossiers", async () => {

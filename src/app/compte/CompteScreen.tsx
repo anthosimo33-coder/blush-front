@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { cancelSubscription, deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
-import { OFFERS } from "@/mocks/daily";
+import { BACKEND } from "@/services/mode";
+import { OFFERS } from "@/content/offres";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { TypingDots } from "@/components/ui/FileInput";
 import { Switch } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
@@ -24,10 +26,18 @@ type Confirm = "stop" | "keep" | "story" | "all" | null;
 /* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
 export type NomsDuCompte = { me: Person; other: Person; period: string };
 
-/** `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`). */
-export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; convs?: ConvSummary[] }) {
+/**
+ * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).
+ * `compte` : le compte lu par la page serveur à l’heure `rendu` : l’abonnement est là dès l’affichage, rien ne descend
+ * ensuite, et il n’est pas relu tout de suite (back-end ; la démo relit son faux serveur, qui dit la même chose).
+ */
+export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
   const router = useRouter();
-  const { data: account } = useQuery("account", getAccount);
+  const { data: account } = useQuery("account", getAccount, compte ?? undefined, { rendu, frais: BACKEND ? 10_000 : 0 });
+  /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
+  const [ouverture, demarrer] = useTransition();
+  const [ouverte, setOuverte] = useState<string | null>(null);
+  const versAccueil = () => demarrer(() => router.push("/app", { scroll: false }));
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   const sub = account?.subscription;
@@ -35,7 +45,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
   const sons = useSoundsEnabled();
 
   /* Ouvert directement (un lien, un nouvel onglet) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
-  const retour = () => (pagePrecedente() ? router.back() : router.push("/app"));
+  const retour = () => (pagePrecedente() ? router.back() : versAccueil());
   const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
   /* Un geste qui n’a pas abouti (réseau, serveur) : on le dit dans la feuille, et le bouton se libère pour réessayer */
@@ -97,11 +107,14 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
               title={`${c.person.name} et toi`}
               sub={c.current ? "Ouverte sur l’accueil" : c.lastLabel}
               onClick={() => {
+                if (ouverture) return;
                 openConv(c.storyId);
                 invalidate("report", "account", "fiche", "question");
-                router.push("/app");
+                setOuverte(c.storyId);
+                versAccueil();
               }}
-              chevron
+              trailing={ouverture && ouverte === c.storyId ? <TypingDots size={5} label="Ouverture de la conv" /> : undefined}
+              chevron={!(ouverture && ouverte === c.storyId)}
             />
           ))}
         {convs.length <= 1 && !account?.storyDeleted && noms && (
@@ -114,6 +127,7 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
             title={`${noms.other.name} et toi`}
             sub={noms.period}
             href="/app"
+            scroll={false}
             chevron
           />
         )}
@@ -235,7 +249,8 @@ export function CompteScreen({ noms, convs = [] }: { noms: NomsDuCompte | null; 
                         resetJourney();
                         invalidate("account", "report", "fiche", "question");
                         /* Une autre conv reste : elle s’ouvre à la place */
-                        router.push(confirm === "story" && convs.length > 1 ? "/app" : "/commencer");
+                        if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
+                        else router.push("/commencer");
                       })
               }
             >

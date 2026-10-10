@@ -53,6 +53,7 @@ export function InsetRow({
   trailing,
   chevron,
   href,
+  scroll,
   onClick,
   danger,
   className,
@@ -63,6 +64,8 @@ export function InsetRow({
   trailing?: ReactNode;
   chevron?: boolean;
   href?: string;
+  /** false : le lien ne remet pas la page en haut (vers l’accueil, qui s’ouvre sur le dernier échange). */
+  scroll?: boolean;
   onClick?: () => void;
   danger?: boolean;
   className?: string;
@@ -81,7 +84,7 @@ export function InsetRow({
   const cls = cn("flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline", className);
   if (href)
     return (
-      <Link href={href} className={cn("row-hover", cls)}>
+      <Link href={href} scroll={scroll} className={cn("row-hover", cls)}>
         {body}
       </Link>
     );

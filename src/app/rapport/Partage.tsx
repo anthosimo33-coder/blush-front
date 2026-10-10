@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import { compterImagePartagee, creerLienPartage, desactiverLienPartage, imagePartage, type CibleImage, type VerdictMontre } from "@/services/api";
@@ -14,82 +14,12 @@ import type { Verdict } from "@/types";
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
  * le prénom de l’autre masqué (le tien reste) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
+ * Les feuilles seulement : le bouton du rapport (PartageVerdict.tsx) les charge à sa première ouverture.
  */
 
 const N = " ";
 /* Le fond de la carte (le papier de la landing), le temps que l’image arrive */
 const PAPIER = "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), #F4F2ED";
-
-/* « Partager mon verdict » sonne (dring dring) tant qu’on ne l’a jamais ouvert, sur ce navigateur */
-const CLE_OUVERT = "blush.partage.ouvert.v1";
-const abonnes = new Set<() => void>();
-const dejaOuvert = () => {
-  try {
-    return localStorage.getItem(CLE_OUVERT) === "1";
-  } catch {
-    return true;
-  }
-};
-function marquerPartageOuvert() {
-  try {
-    localStorage.setItem(CLE_OUVERT, "1");
-  } catch {
-    /* Stockage refusé (navigation privée) : le bouton sonnera encore, sans gravité */
-  }
-  abonnes.forEach((f) => f());
-}
-const usePartageOuvert = () =>
-  useSyncExternalStore(
-    (f) => {
-      abonnes.add(f);
-      return () => abonnes.delete(f);
-    },
-    dejaOuvert,
-    /* Côté serveur : calme, le bouton ne sonne qu’une fois le navigateur lu */
-    () => true,
-  );
-
-/** Sous l’en-tête du rapport : partager son verdict, et la promesse de confidentialité (avec le détail à un toucher). */
-export function PartageEtConfidentialite({ verdict }: { verdict: Pick<Verdict, "emoji" | "title"> }) {
-  const [partage, setPartage] = useState(false);
-  const [confidentialite, setConfidentialite] = useState(false);
-  const sonne = !usePartageOuvert();
-  return (
-    <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        onClick={() => {
-          setPartage(true);
-          marquerPartageOuvert();
-        }}
-        aria-haspopup="dialog"
-        data-dring={sonne ? "" : undefined}
-        className="lift lift-sm inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[26px] bg-white px-5 text-[16px] font-black text-ink shadow-soft"
-      >
-        <span data-dring-icone={sonne ? "" : undefined} className="flex">
-          <Icon name="share" size={17} color="#121214" stroke={2.4} />
-        </span>
-        Partager mon verdict
-      </button>
-      <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="shield" size={16} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-        <span>
-          Ta conv reste privée, et c’est toi qui décides.{" "}
-          <button
-            type="button"
-            onClick={() => setConfidentialite(true)}
-            aria-haspopup="dialog"
-            className="relative font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2 after:absolute after:-inset-2 after:content-['']"
-          >
-            En savoir plus
-          </button>
-        </span>
-      </p>
-      <PartageSheet open={partage} onClose={() => setPartage(false)} verdict={verdict} />
-      <ConfidentialiteSheet open={confidentialite} onClose={() => setConfidentialite(false)} />
-    </div>
-  );
-}
 
 function EnTete({ id, titre, onClose }: { id: string; titre: string; onClose: () => void }) {
   return (
@@ -153,11 +83,12 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
 
 /**
  * Partager son verdict : l’aperçu tel qu’il s’affichera dans WhatsApp ou iMessage, puis où l’envoyer.
- * Le lien est créé à l’ouverture (toujours le même), et se désactive d’un toucher.
+ * Le lien est créé à l’ouverture (toujours le même), et se désactive d’un toucher. Jamais avant le geste : c’est un lien
+ * public, et un lien désactivé ne doit pas renaître tout seul à la visite suivante du rapport.
  */
 export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClose: () => void; verdict: Pick<Verdict, "emoji" | "title"> }) {
   /* Le lien, et le verdict tel qu’il le montre (le prénom de l’autre masqué, par le serveur) : le texte partagé reprend celui-là */
-  const [lien, setLien] = useState<{ url: string; verdict: VerdictMontre | null } | null>(null);
+  const [lien, setLien] = useState<{ url: string; verdict: VerdictMontre | null; story?: string } | null>(null);
   const url = lien?.url ?? null;
   const [probleme, setProbleme] = useState(false);
   const [image, setImage] = useState(false);
@@ -180,17 +111,18 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
   }, [open, url, essai]);
 
   /* L’image story est prête avant le toucher : sur iPhone, le partage doit partir tout de suite après le geste */
+  const adresseStory = lien?.story ?? (url ? `${url}/image?format=story` : null);
   useEffect(() => {
-    if (!open || !url || story) return;
+    if (!open || !adresseStory || story) return;
     let fini = false;
-    fetch(`${url}/image?format=story`)
+    fetch(adresseStory)
       .then((r) => (r.ok ? r.blob() : Promise.reject()))
       .then((b) => !fini && setStory(new File([b], "verdict-blush.png", { type: "image/png" })))
       .catch(() => !fini && setStoryRatee(true));
     return () => {
       fini = true;
     };
-  }, [open, url, story]);
+  }, [open, adresseStory, story]);
 
   useEffect(() => {
     if (!copie && !fait) return;
@@ -252,9 +184,21 @@ export function PartageSheet({ open, onClose, verdict }: { open: boolean; onClos
               className={cn("absolute inset-0 size-full object-cover transition-opacity duration-300", image ? "opacity-100" : "opacity-0")}
             />
           )}
+          {/* Le temps que la carte soit dessinée : son verdict tel que le lien le montre, plutôt que trois points */}
           {!image && !probleme && (
-            <span className="absolute inset-0 flex items-center justify-center">
-              <TypingDots label="Préparation de la carte" />
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center">
+              {montre ? (
+                <>
+                  <span aria-hidden="true" className="text-[52px] leading-none">
+                    {montre.emoji}
+                  </span>
+                  <span aria-hidden="true" className="line-clamp-2 text-[20px] font-black leading-[1.15] tracking-[-0.01em] text-ink [text-wrap:balance]">
+                    {montre.title}
+                  </span>
+                </>
+              ) : (
+                <TypingDots label="Préparation de la carte" />
+              )}
             </span>
           )}
         </div>
@@ -359,7 +303,8 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
   const pret = !!image && image.cle === cle;
 
   useEffect(() => {
-    if (!cible || !cle) return;
+    /* Rouverte sur la même cible : l’image déjà dessinée sert telle quelle, sans redemander un rendu au serveur */
+    if (!cible || !cle || image?.cle === cle) return;
     let fini = false;
     imagePartage(cible)
       .then((b) => {

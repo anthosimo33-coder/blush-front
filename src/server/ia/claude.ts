@@ -89,23 +89,54 @@ const BETA_REPLI = "server-side-fallback-2026-07-01";
 let repliDisponible = true;
 
 /**
+ * En mode factice, le chat suivi passe par le même chemin qu’en vrai : son texte arrive par morceaux, à chaque fois en
+ * entier depuis le début, à un rythme qu’on voit (ses bulles arrivent une à une en dev). Les autres tâches suivies (la
+ * jauge de la lecture) restent d’un bloc, comme avant.
+ */
+async function ecrireFactice(texte: string, surAvance: (a: Avance) => void) {
+  for (let n = 16; ; n += 16) {
+    await new Promise((ok) => setTimeout(ok, 8));
+    const ecrit = texte.slice(0, n);
+    try {
+      surAvance({ reflexion: 0, texte: ecrit.length, ecrit });
+    } catch {
+      /* comme en vrai : le suivi ne fait jamais échouer la réponse */
+    }
+    if (n >= texte.length) return;
+  }
+}
+
+/**
  * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts.
- * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment).
+ * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment, les bulles du chat).
  * `signal` : l’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué).
+ * `differer` : le suivi des coûts et l’alerte d’un repli passent après la réponse (le chat en flux), au lieu de la retarder.
  * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps.
  */
 export async function appeler<S extends z.ZodType>(
   req: Requete,
   schema: S,
-  { storyId, etiquette, surAvance, signal }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void; signal?: AbortSignal } = {},
+  {
+    storyId,
+    etiquette,
+    surAvance,
+    signal,
+    differer,
+  }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void; signal?: AbortSignal; differer?: (tache: () => Promise<unknown>) => void } = {},
 ): Promise<Appel<z.infer<S>>> {
   if (env().BLUSH_IA_FACTICE) {
     if (signal?.aborted) throw new ErreurTache("annule");
     const brut = factice(req);
     if (brut === REFUS_FACTICE) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: null };
+    if (surAvance && req.tache === "10-chat") await ecrireFactice(JSON.stringify(brut), surAvance);
     const ok = schema.safeParse(brut);
     return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
   }
+  /* Tout de suite, ou après la réponse */
+  const ensuite = async (tache: () => Promise<unknown>) => {
+    if (differer) differer(tache);
+    else await tache();
+  };
   if (tempsRestant() < TEMPS_MIN_APPEL) throw new ErreurTache("delai");
   const reglage = REGLAGES[req.tache];
   const base = {
@@ -171,13 +202,15 @@ export async function appeler<S extends z.ZodType>(
     repliDisponible = false;
     message = await envoyer(false);
   }
-  await noterUsage(message.usage, { storyId, tache: etiquette ?? req.tache, ms: Date.now() - debut, modele: message.model });
+  const { usage, model } = message;
+  const ms = Date.now() - debut;
+  await ensuite(() => noterUsage(usage, { storyId, tache: etiquette ?? req.tache, ms, modele: model }));
   /* Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le contenu) */
   const repli = message.content.find((b) => b.type === "fallback");
   if (repli?.type === "fallback") {
     const lignes = [`Tâche ${req.tache}`, `Catégorie du refus : ${repli.trigger.category ?? "aucune (refus sans catégorie)"}`, `De ${repli.from.model} vers ${repli.to.model}`, ...(storyId ? [`Histoire ${storyId}`] : [])];
     console.warn(`repli : ${lignes.join(" · ")}`);
-    await alerter("repli sur un autre modèle", lignes);
+    await ensuite(() => alerter("repli sur un autre modèle", lignes));
   }
   if (message.stop_reason === "refusal") {
     /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête : jamais de contenu */

@@ -108,7 +108,8 @@ export function LevelPath({ current, className }: { current: LevelId; className?
               aria-current={now ? "step" : undefined}
             >
               <span
-                data-pulse={now ? "" : undefined}
+                /* L’étape en cours bat par un anneau sur le compositeur (une ombre animée repeindrait la page à chaque image) */
+                data-beat={now ? "doux" : undefined}
                 className={cn("flex size-[50px] items-center justify-center rounded-[25px]", done && "bg-vrai-ink", now && "bg-toi-ink", !done && !now && "bg-white shadow-thin")}
               >
                 {done && <Icon name="check" size={20} color="#FFFFFF" stroke={3.2} />}

@@ -1,9 +1,10 @@
 "use client";
 
 import { BACKEND } from "@/services/mode";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
@@ -25,14 +26,22 @@ import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
 import { Sheet, Toast } from "@/components/ui/surfaces";
 import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
-import { useJourney } from "@/state/journey";
+import { useHydrated, useJourneyMe } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
+import { figtree } from "@/lib/fonts";
+import { auRepos } from "@/lib/repos";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
-import { BarreEcriture, LigneEcriture, MarqueChapitre, PastilleEcriture } from "./Ecriture";
-import { PartageEtConfidentialite, PartageImageSheet } from "./Partage";
+import { PartageEtConfidentialite } from "./PartageVerdict";
 import type { CibleImage } from "@/services/api";
-import { SoberReport } from "./SoberReport";
 import { VocalDuRapport } from "./Vocal";
+
+/* Ce qui ne sert pas à chaque lecture (le mode sobre, l’écriture en cours, « Partager en image ») est chargé à part, quand il sert */
+const SoberReport = dynamic(() => import("./SoberReport").then((m) => m.SoberReport));
+const BarreEcriture = dynamic(() => import("./Ecriture").then((m) => m.BarreEcriture));
+const LigneEcriture = dynamic(() => import("./Ecriture").then((m) => m.LigneEcriture));
+const MarqueChapitre = dynamic(() => import("./Ecriture").then((m) => m.MarqueChapitre));
+const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
+const PartageImageSheet = dynamic(() => import("./Partage").then((m) => m.PartageImageSheet), { ssr: false });
 
 /** Où tu t’étais arrêté, conv par conv (ce navigateur seulement). */
 const RESUME_KEY = "blush.rapport.reprise.v2";
@@ -43,10 +52,60 @@ const lireReprises = (): Reprises => {
 };
 
 /*
+ * Un retour par l’historique (bouton, geste) : Next rend la position de défilement quelques images après l’affichage.
+ * Retenu ici pour ne pas lire le haut de la page entre-temps (l’en-tête « Ton rapport complet », la reprise qui clignote).
+ * React rend ce retour tout de suite, dans l’écouteur popstate de Next : seul l’événement navigate (API Navigation)
+ * l’annonce avant. Sans elle (ancien Safari), popstate arrive après le premier rendu : la reprise, décidée un instant
+ * plus tard, ne clignote plus, mais l’en-tête part encore du haut.
+ */
+type Navigation = EventTarget & { addEventListener(type: "navigate", f: (e: Event & { navigationType: string; destination: { url: string } }) => void): void };
+let traversee: { adresse: string; t: number } | null = null;
+const noterTraversee = (adresse: string) => (traversee = { adresse, t: Date.now() });
+if (typeof window !== "undefined") {
+  (window as unknown as { navigation?: Navigation }).navigation?.addEventListener("navigate", (e) => e.navigationType === "traverse" && noterTraversee(e.destination.url));
+  window.addEventListener("popstate", () => noterTraversee(window.location.href));
+}
+const parTraversee = () => !!traversee && traversee.adresse === window.location.href && Date.now() - traversee.t < 3000;
+
+/* Le chapitre où l’on était (gardé à chaque chapitre lu), pour l’en-tête d’un retour par l’historique */
+const chapitreGarde = (storyId: string, openKey: string): number | null => {
+  try {
+    const n = Number(lireReprises()[storyId]);
+    return openKey.split(",").map(Number).includes(n) ? n : null;
+  } catch {
+    return null;
+  }
+};
+
+/*
+ * La progression de lecture ne passe pas par React : à chaque image de défilement, seules les barres (en-tête, sommaire,
+ * feuille) changent d’échelle, sans re-rendre tout le rapport. Le pourcentage annoncé ne change que quand l’entier change.
+ */
+const barres = new Set<HTMLElement>();
+let lu = 0;
+const poserLu = (barre: HTMLElement) => {
+  (barre.firstElementChild as HTMLElement | null)?.style.setProperty("transform", `scaleX(${lu})`);
+  const pct = String(Math.round(lu * 100));
+  if (barre.getAttribute("aria-valuenow") !== pct) barre.setAttribute("aria-valuenow", pct);
+};
+const suivreLu = (p: number) => {
+  lu = p;
+  barres.forEach(poserLu);
+};
+/* Une barre qui apparaît (la feuille du sommaire) prend tout de suite la valeur du moment */
+const brancherBarre = (el: HTMLDivElement | null) => {
+  if (!el) return;
+  barres.add(el);
+  poserLu(el);
+  return () => void barres.delete(el);
+};
+
+/*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
-export function ReportScreen({ initial, story, openPaywall, fixed = false }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean }) {
-  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed });
+export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean; rendu?: number }) {
+  /* `rendu` : l’heure du rendu serveur. Tout juste rendu (back-end), le rapport n’est pas relu au montage (src/lib/query.ts) */
+  const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed, rendu, frais: BACKEND ? 10_000 : 0 });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par les données de démo */
   const payload = fixed ? initial : (data ?? initial);
   /* Le rapport s’écrit encore (back-end), ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
@@ -122,11 +181,12 @@ function Writing() {
 
 /**
  * Suit la lecture : le chapitre à l’écran (celui dont le haut a passé le tiers de l’écran)
- * et la progression, du début du chapitre 1 à la fin du dernier chapitre ouvert.
+ * et la progression, du début du chapitre 1 à la fin du dernier chapitre ouvert (posée sur les barres, hors de React).
+ * `retour` : arrivé par l’historique, on part du chapitre gardé et on attend que la position soit rendue pour mesurer.
  */
-function useReading(openKey: string) {
-  const [current, setCurrent] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
+function useReading(openKey: string, depart: number | null, retour: boolean) {
+  const [current, setCurrent] = useState<number | null>(depart);
+  const attendre = useRef(retour);
   useEffect(() => {
     const numbers = openKey.split(",").map(Number);
     let raf = 0;
@@ -138,38 +198,48 @@ function useReading(openKey: string) {
         const el = document.getElementById(`chapitre-${n}`);
         if (el && el.getBoundingClientRect().top <= line) now = n;
       }
+      /* Une valeur identique ne re-rend pas : le rapport ne se re-rend qu’au changement de chapitre */
       setCurrent(now);
       const first = document.getElementById(`chapitre-${numbers[0]}`);
       const last = document.getElementById(`chapitre-${numbers[numbers.length - 1]}`);
       if (first && last) {
         const start = first.getBoundingClientRect().top + window.scrollY - line;
         const end = last.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
-        setProgress(Math.min(1, Math.max(0, (window.scrollY - start) / Math.max(1, end - start))));
+        suivreLu(Math.min(1, Math.max(0, (window.scrollY - start) / Math.max(1, end - start))));
       }
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(measure);
     };
-    measure();
+    /* Un retour par l’historique : le défilement qui rend la position déclenche la mesure ; au plus tard dans un instant */
+    let plusTard = 0;
+    if (attendre.current) {
+      attendre.current = false;
+      plusTard = window.setTimeout(measure, 700);
+    } else measure();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(plusTard);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
   }, [openKey]);
-  return { current, progress };
+  return current;
 }
 
 function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; story: Story; openPaywall: boolean }) {
   const router = useRouter();
-  const [j] = useJourney();
+  /* Du parcours, seul « qui est toi » sert ici : le reste ne re-rend pas tout le rapport */
+  const journeyMe = useJourneyMe();
   const [paywall, setPaywall] = useState(openPaywall);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /* « Partager en image » : la chute d’un chapitre en story */
   const [image, setImage] = useState<CibleImage | null>(null);
+  const [imageVue, setImageVue] = useState(false);
+  if (image && !imageVue) setImageVue(true);
   const [resume, setResume] = useState<number | null>(null);
 
   const { report, access } = payload;
@@ -178,14 +248,17 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const ecriture = payload.generating ? payload.ecriture : undefined;
   const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
-  const moi = story.me ?? j.me;
+  const moi = story.me ?? journeyMe;
   const [me, other] = moi === story.participants[1].id ? [story.participants[1], story.participants[0]] : story.participants;
   const chapters = report.chapters;
   const free = chapters.filter((c) => !c.locked);
   const locked = chapters.filter((c) => c.locked);
   /* Les chapitres ouverts, en clé stable : la mesure de lecture ne se relance que s’ils changent */
   const openKey = free.map((c) => c.number).join(",");
-  const { current, progress } = useReading(openKey);
+  /* Arrivé par l’historique (retour de « Ta question ») : la position revient seule, sans proposer de reprise */
+  const [retour] = useState(() => typeof window !== "undefined" && parTraversee());
+  const [depart] = useState(() => (retour ? chapitreGarde(report.storyId, openKey) : null));
+  const current = useReading(openKey, depart, retour);
   const label = full ? "Ton rapport complet" : "Ton rapport";
   const currentChapter = chapters.find((c) => c.number === current);
 
@@ -195,17 +268,27 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* À l’arrivée : si tu t’étais arrêté plus loin, on propose d’y reprendre (sans sauter tout seul) */
+  /* À l’arrivée : si tu t’étais arrêté plus loin, on propose d’y reprendre (sans sauter tout seul). Décidé un instant
+     plus tard : un retour par l’historique (popstate, sans API Navigation) se sait alors, et ne propose rien */
   useEffect(() => {
-    if (window.location.hash || window.scrollY > 200) return;
-    try {
-      const saved = Number(lireReprises()[report.storyId]);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du stockage local à l’arrivée
-      if (saved >= 2 && openKey.split(",").map(Number).includes(saved)) setResume(saved);
-    } catch {
-      /* stockage indisponible : pas de reprise */
-    }
-  }, [openKey, report.storyId]);
+    if (retour) return;
+    const t = setTimeout(() => {
+      if (parTraversee() || window.location.hash || window.scrollY > 200) return;
+      try {
+        const saved = Number(lireReprises()[report.storyId]);
+        if (saved >= 2 && openKey.split(",").map(Number).includes(saved)) setResume(saved);
+      } catch {
+        /* stockage indisponible : pas de reprise */
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [openKey, report.storyId, retour]);
+
+  /*
+   * « Partager en image » : chargée une fois la page posée, et montée fermée. Au premier toucher, elle n’a plus qu’à
+   * s’ouvrir (montée au toucher, React gardait 0,3 s son écran d’attente avant de la montrer)
+   */
+  useEffect(() => auRepos(() => void import("./Partage").then(() => setImageVue(true))), []);
 
   /* On garde le chapitre en cours ; la proposition de reprise s’efface dès qu’on lit plus loin */
   useEffect(() => {
@@ -228,7 +311,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
     });
   }, []);
 
-  const renderQuestion = (b: Extract<ChapterBlock, { kind: "question" }>) => (
+  /* Les mêmes à chaque rendu (comme le partage d’un moment) : un chapitre qui n’a pas changé ne se refait pas */
+  const renderQuestion = useCallback((b: Extract<ChapterBlock, { kind: "question" }>) => (
     <Card className="flex flex-col gap-2 p-3.5">
       <div className="text-[13px] font-black text-grey">{b.label}</div>
       <div className="text-[17px] font-black leading-[1.35]">{b.text}</div>
@@ -243,13 +327,29 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         Copier
       </button>
     </Card>
+  ), []);
+  const partagerMoment = useCallback((chapitre: number, bloc: number) => setImage({ type: "moment", chapitre, bloc }), []);
+  /* L’en-tête du verdict, en tête du chapitre 1 : refait seulement si le verdict change */
+  const enTeteVerdict = useMemo(
+    () => (
+      <>
+        <div className="flex items-start gap-2.5">
+          <span className="text-[44px] leading-none" aria-hidden="true">
+            {report.verdict.emoji}
+          </span>
+          <span className="text-[32px] font-black leading-[1.05] tracking-[-0.02em]">{report.verdict.title}</span>
+        </div>
+        <p className="m-0 text-[17px] font-extrabold leading-[1.45] text-soft">{report.verdict.subtitle}</p>
+      </>
+    ),
+    [report.verdict],
   );
 
   /* Desktop : le sommaire suit la lecture (chapitre en cours surligné, progression sous le titre) */
   const toc = (
     <nav aria-label="Sommaire" className="flex flex-col gap-0.5 rounded-card bg-white p-[18px] shadow-card">
       <div className="text-[13px] font-black text-grey">Sommaire</div>
-      {ecriture ? <BarreEcriture ecriture={ecriture} /> : <ReadingBar progress={progress} className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />}
+      {ecriture ? <BarreEcriture ecriture={ecriture} /> : <ReadingBar className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />}
       <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
         {chapters.map((c) => (
           <li key={c.number}>
@@ -305,11 +405,13 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
 
   return (
     <Screen
+      /* Figtree pour les bulles citées des chapitres (src/lib/fonts.ts) */
+      className={figtree.variable}
       mobileTop={
         /* Mobile : la barre reste en haut — le chapitre en cours, la progression, et le sommaire à un toucher */
         <header className="sticky top-0 z-30 shrink-0 bg-[rgba(244,242,237,0.88)] backdrop-blur-xl lg:hidden">
           <div className="grid h-[58px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 px-2">
-            <button type="button" aria-label="Retour" onClick={() => (pagePrecedente() ? router.back() : router.push("/app"))} className="flex size-11 items-center justify-center">
+            <button type="button" aria-label="Retour" onClick={() => (pagePrecedente() ? router.back() : router.push("/app", { scroll: false }))} className="flex size-11 items-center justify-center">
               <Icon name="back" size={24} color="#121214" stroke={2.6} />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">
@@ -333,7 +435,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
               <Icon name="list" size={22} color="#121214" stroke={2.4} />
             </button>
           </div>
-          <ReadingBar progress={progress} className="h-[3px] bg-[rgba(17,17,20,0.06)]" />
+          <ReadingBar className="h-[3px] bg-[rgba(17,17,20,0.06)]" />
         </header>
       }
       desktopLabel={label}
@@ -348,7 +450,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         /* Le rapport écrit : on continue avec BLUSH, dans le chat. Pendant l’écriture, le chat n’est pas encore prêt */
         full ? (
           payload.generating || payload.echec ? undefined : (
-            <ButtonLink id="cta-chat" href="/app?depuis=rapport" onClick={marquerChatOuvert} arrow>
+            /* scroll={false} : l’accueil se pose lui-même en bas de la conv, Next ne doit pas le remettre en haut. Préchargé en entier (voir ChatBubble) */
+            <ButtonLink id="cta-chat" href="/app?depuis=rapport" scroll={false} prefetch onClick={marquerChatOuvert} arrow>
               Parler à BLUSH
             </ButtonLink>
           )
@@ -416,18 +519,8 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       {free.map((c, i) => (
         <Fragment key={c.number}>
           {i > 0 && <ChapterRule />}
-          <ChapterSection chapter={c} renderQuestion={renderQuestion} onShare={(bloc) => setImage({ type: "moment", chapitre: c.number, bloc })} autre={other.pronoun}>
-            {c.number === 1 && (
-              <>
-                <div className="flex items-start gap-2.5">
-                  <span className="text-[44px] leading-none" aria-hidden="true">
-                    {report.verdict.emoji}
-                  </span>
-                  <span className="text-[32px] font-black leading-[1.05] tracking-[-0.02em]">{report.verdict.title}</span>
-                </div>
-                <p className="m-0 text-[17px] font-extrabold leading-[1.45] text-soft">{report.verdict.subtitle}</p>
-              </>
-            )}
+          <ChapterSection chapter={c} renderQuestion={renderQuestion} onShare={partagerMoment} autre={other.pronoun}>
+            {c.number === 1 && enTeteVerdict}
           </ChapterSection>
         </Fragment>
       ))}
@@ -528,7 +621,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
             <Icon name="close" size={16} color="#121214" stroke={2.8} />
           </button>
         </div>
-        <ReadingBar progress={progress} className="h-1 rounded-full bg-[#E6E3DC]" />
+        <ReadingBar className="h-1 rounded-full bg-[#E6E3DC]" />
         <InsetGroup>
           {chapters.map((c) =>
             c.locked ? (
@@ -562,7 +655,10 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
 
       {toast && <Toast className="fixed inset-x-4 top-3 lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{toast}</Toast>}
 
-      <PartageImageSheet cible={image} onClose={() => setImage(null)} />
+      {/* Montée fermée une fois la page posée, ou au premier « Partager en image » (puis gardée, pour sa sortie et l’image déjà prête) */}
+      {imageVue && <PartageImageSheet cible={image} onClose={() => setImage(null)} />}
+
+      <SuivreAncre retour={retour} />
 
       <PaywallSheet
         open={paywall}
@@ -575,20 +671,13 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   );
 }
 
-/** La barre de progression de lecture : bleu toi → rose elle → vert vérité. */
-function ReadingBar({ progress, className }: { progress: number; className?: string }) {
+/** La barre de progression de lecture : bleu toi → rose elle → vert vérité. Sa valeur est posée par suivreLu, hors de React. */
+function ReadingBar({ className }: { className?: string }) {
   return (
-    <div
-      role="progressbar"
-      aria-label="Progression de la lecture"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(progress * 100)}
-      className={cn("overflow-hidden", className)}
-    >
+    <div ref={brancherBarre} role="progressbar" aria-label="Progression de la lecture" aria-valuemin={0} aria-valuemax={100} className={cn("overflow-hidden", className)}>
       <div
-        className="h-full origin-left rounded-full transition-transform duration-150 ease-out"
-        style={{ transform: `scaleX(${progress})`, background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" } as CSSProperties}
+        className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]"
+        style={{ background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" } as CSSProperties}
       />
     </div>
   );
@@ -613,7 +702,31 @@ function ChapterBadge({ number, state, large }: { number: number; state: "read" 
   );
 }
 
-function ChapterSection({
+/**
+ * Arrivé sur un chapitre (/rapport#chapitre-N, « Lire la suite » de « C’est débloqué ») par une navigation dans l’appli :
+ * l’écran d’attente du rapport passe avant lui, et Next, qui n’y trouve pas encore le chapitre, oublie l’ancre. On y va
+ * une fois le rapport posé. Pas au premier chargement (le navigateur a suivi l’ancre lui-même, et on a pu lire plus loin
+ * depuis), ni après un retour par l’historique (la position revient seule). À part : le rapport ne se re-rend pas pour ça.
+ */
+function SuivreAncre({ retour }: { retour: boolean }) {
+  /* Vrai seulement à l’hydratation de la page du serveur ; gardé tel quel ensuite */
+  const pageDuServeur = !useHydrated();
+  const [premierChargement] = useState(pageDuServeur);
+  useEffect(() => {
+    if (premierChargement || retour) return;
+    const ancre = /^#(chapitre-\d+)$/.exec(window.location.hash)?.[1];
+    if (!ancre) return;
+    const raf = requestAnimationFrame(() => document.getElementById(ancre)?.scrollIntoView({ block: "start" }));
+    return () => cancelAnimationFrame(raf);
+  }, [premierChargement, retour]);
+  return null;
+}
+
+/*
+ * Mémorisé : le rapport se re-rend à chaque chapitre atteint pendant la lecture, et toutes les 2 s pendant l’écriture ;
+ * un chapitre déjà écrit, lui, ne change pas (ses props restent les mêmes : voir partagerMoment, enTeteVerdict).
+ */
+const ChapterSection = memo(function ChapterSection({
   chapter,
   children,
   renderQuestion,
@@ -623,14 +736,14 @@ function ChapterSection({
   chapter: Chapter;
   children?: React.ReactNode;
   renderQuestion: Parameters<typeof Blocks>[0]["renderQuestion"];
-  onShare?: (bloc: number) => void;
+  onShare?: (chapitre: number, bloc: number) => void;
   autre?: "il" | "elle";
 }) {
   return (
     <section id={`chapitre-${chapter.number}`} aria-labelledby={`chapitre-${chapter.number}-titre`} className={cn("flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5")}>
       <ChapterHeader number={chapter.number} kicker={chapter.kicker} title={chapter.title} id={`chapitre-${chapter.number}-titre`} />
       {children}
-      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare} autre={autre} />
+      <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare && ((bloc) => onShare(chapter.number, bloc))} autre={autre} />
     </section>
   );
-}
+});

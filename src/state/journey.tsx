@@ -4,7 +4,7 @@
  * État du parcours côté interface (choix, fichiers, devinette…).
  * Gardé dans sessionStorage : il survit au rechargement de la page.
  */
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import type { AppKind, Goal, Guess } from "@/types";
 
 export type JourneyState = {
@@ -95,23 +95,30 @@ export function resetJourney() {
   setJourney(JOURNEY_DEFAULTS);
 }
 
-const HydratedContext = createContext(false);
+/* Rien à écouter : « hydraté » ne change qu’une fois, au passage du rendu serveur au navigateur */
+const sansAbonnement = () => () => {};
 
+/*
+ * Le parcours vit hors de React (sessionStorage, useJourney) : ce fournisseur ne transmet rien. Il ne doit surtout pas
+ * changer de valeur à l’hydratation : un contexte qui change à la racine fait rendre de zéro, côté navigateur, toute
+ * frontière Suspense pas encore hydratée (l’écran de chargement d’une page, dont le contenu attend encore d’être
+ * dévoilé), au lieu de l’hydrater. Le contenu envoyé par le serveur reste alors un moment en double, caché.
+ */
 export function JourneyProvider({ children }: { children: ReactNode }) {
-  const hydrated = useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
-  return <HydratedContext.Provider value={hydrated}>{children}</HydratedContext.Provider>;
+  return children;
 }
 
-/** Vrai une fois l’état du navigateur lu (après hydratation). */
+/** Vrai une fois l’état du navigateur lu (après hydratation) : seul le composant qui le demande se re-rend. */
 export function useHydrated() {
-  return useContext(HydratedContext);
+  return useSyncExternalStore(sansAbonnement, () => true, () => false);
 }
 
 export function useJourney(): [JourneyState, typeof setJourney] {
   const s = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return [s, setJourney];
+}
+
+/** Seulement « qui est toi » : l’écran qui ne lit que lui ne se re-rend pas après l’hydratation, ni quand le reste du parcours change. */
+export function useJourneyMe(): string | null {
+  return useSyncExternalStore(subscribe, () => getSnapshot().me, () => JOURNEY_DEFAULTS.me);
 }

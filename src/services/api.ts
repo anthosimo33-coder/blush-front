@@ -2,6 +2,8 @@
  * Couche de service BLUSH — le seul point de contact avec les données.
  * Avec NEXT_PUBLIC_BLUSH_BACKEND=1, chaque fonction branchée appelle le vrai back-end (reel.ts) ;
  * sinon, elle renvoie les mocks (le site de démo, la galerie). Les pages serveur passent par serveur.ts.
+ * Les branches démo vivent dans ./demo, chargé à la demande : avec le back-end, ni les données de démo ni son faux
+ * back-end (mockServer) ne sont jamais chargés. Côté serveur, serveur.ts appelle ./demo directement (voir avecEtat).
  */
 import type {
   AnalysisProgress,
@@ -12,7 +14,6 @@ import type {
   FicheUpdate,
   Goal,
   Guess,
-  LevelId,
   Plan,
   QuestionAnswer,
   Reply,
@@ -23,15 +24,12 @@ import type {
   Subscription,
   VocalRapport,
 } from "@/types";
-import { FICHE, FICHE_FINDINGS, SUBSCRIPTIONS } from "@/mocks/daily";
-import { SCREENSHOTS_RESULT, SOURCE_HINGE, SOURCE_INSTAGRAM, SOURCE_WHATSAPP } from "@/mocks/story";
-import { DEMO_STORY_IDS, demoStory, storyIdFor } from "@/mocks/stories";
-import { chatVocalDemo, vocalDemo } from "@/mocks/vocal";
-import { delay, mockServer } from "@/mocks/server";
 import { BACKEND } from "./mode";
 import type { ConvInstagram } from "./preparer-export";
-import { avecConv, ErreurApi, reel, type AvanceVideo, type HistoriqueChat } from "./reel";
-import { readStoryCookie, writeStoryCookie } from "./session";
+import { avecConv, CoupureChat, ErreurApi, reel, type AvanceVideo, type HistoriqueChat, type SuiviChat } from "./reel";
+import { writeStoryCookie } from "./session";
+
+const demo = () => import("./demo");
 
 export type Account = {
   email: string | null;
@@ -66,15 +64,6 @@ export type ReportPayload = {
   echec?: "panne" | "refus";
 };
 
-/* Durée simulée de la lecture (environ 6 s). */
-const ANALYSIS_MS = 6000;
-
-/**
- * L’histoire ouverte. Dans le navigateur, elle vient du cookie de session ;
- * côté serveur, la page la lit (currentStoryId) et la passe en `storyId`.
- */
-const opened = (storyId?: string) => demoStory(storyId ?? readStoryCookie());
-
 /* ———— Import ———— */
 
 export async function uploadExport(
@@ -82,37 +71,30 @@ export async function uploadExport(
   app: Extract<AppKind, "whatsapp" | "imessage" | "instagram">,
   /** Un export Instagram complet : de quoi faire choisir la conv (voir src/services/reel.ts). */
   choisir?: (convs: ConvInstagram[]) => Promise<string | null>,
+  /** Un export Instagram complet : où en est le tour de ses convs (de 0 à 1). */
+  onAvance?: (part: number) => void,
 ): Promise<Source> {
-  if (BACKEND) return reel.uploadExport(file, choisir);
-  await delay(500);
-  mockServer.set({ analysisStartedAt: null });
-  return { ...SOURCE_WHATSAPP, app, fileName: file.name };
+  if (BACKEND) return reel.uploadExport(file, choisir, onAvance);
+  return (await demo()).uploadExport(file, app);
 }
 
 export async function uploadScreenshots(
   files: File[],
-  opts: { app: AppKind; mode: "first" | "add" },
+  opts: { app: AppKind; mode: "first" | "add"; onAvance?: (a: AvanceVideo) => void },
 ): Promise<{ source: Source; messagesRead: number }> {
   if (BACKEND) return reel.uploadScreenshots(files, opts);
-  await delay(500);
-  const base = opts.app === "hinge" ? SOURCE_HINGE : SOURCE_INSTAGRAM;
-  return {
-    source: { ...base, app: opts.app, screenshotCount: files.length },
-    messagesRead: opts.mode === "first" ? SCREENSHOTS_RESULT.messagesRead : base.messageCount,
-  };
+  return (await demo()).uploadScreenshots(files, opts);
 }
 
 /** Un enregistrement d’écran de la conv (sa première importation) : ses écrans sont tirés dans le navigateur, puis lus. */
 export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
   if (BACKEND) return reel.uploadRecording(file, app, onAvance);
-  onAvance?.({ etape: "lecture", faits: 0, total: 1 });
-  await delay(800);
-  return { source: { ...SOURCE_INSTAGRAM, app, screenshotCount: 1 }, messagesRead: SCREENSHOTS_RESULT.messagesRead };
+  return (await demo()).uploadRecording(app, onAvance);
 }
 
 export async function getStory(storyId?: string): Promise<Story> {
   if (BACKEND) return reel.getStory();
-  return opened(storyId).story;
+  return (await demo()).getStory(storyId);
 }
 
 /* ———— Compte et analyse ———— */
@@ -120,25 +102,20 @@ export async function getStory(storyId?: string): Promise<Story> {
 /** Envoie le code à 6 chiffres par email (simulation : rien ne part). */
 export async function sendLoginCode(email: string): Promise<{ email: string }> {
   if (BACKEND) return reel.sendLoginCode(email);
-  await delay(500);
-  return { email };
+  return (await demo()).sendLoginCode(email);
 }
 
 /** Vérifie le code reçu. Simulation : tout code à 6 chiffres passe, sauf 000000 (pour montrer l’erreur). */
 export async function verifyLoginCode(email: string, code: string): Promise<{ ok: boolean }> {
   if (BACKEND) return reel.verifyLoginCode(email, code);
-  void email;
-  await delay(600);
-  return { ok: /^\d{6}$/.test(code) && code !== "000000" };
+  return (await demo()).verifyLoginCode(code);
 }
 
 /** Crée le compte sans mot de passe. */
 export async function createAccount(email: string): Promise<{ email: string }> {
   /* Back-end : le compte est créé par la vérification du code */
   if (BACKEND) return { email };
-  await delay(400);
-  mockServer.set({ email });
-  return { email };
+  return (await demo()).createAccount(email);
 }
 
 export async function startAnalysis(
@@ -146,13 +123,7 @@ export async function startAnalysis(
   opts: { restart?: boolean } = {},
 ): Promise<{ jobId: string }> {
   if (BACKEND) return reel.startAnalysis({ me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) });
-  const s = mockServer.get();
-  if (!s.analysisStartedAt || opts.restart) {
-    mockServer.set({ analysisStartedAt: Date.now() });
-    /* Simulation : la nouvelle analyse ouvre l’histoire qui correspond à ce que tu as dit (en couple, ou pas encore) */
-    writeStoryCookie(storyIdFor(input.guess));
-  }
-  return { jobId: "job-001" };
+  return (await demo()).startAnalysis(input.guess, opts);
 }
 
 /**
@@ -167,37 +138,13 @@ export async function resumeAnalysis(input: Parameters<typeof startAnalysis>[0],
 export async function getAnalysisProgress(jobId: string): Promise<AnalysisProgress> {
   if (BACKEND) return reel.getAnalysisProgress();
   void jobId;
-  const started = mockServer.get().analysisStartedAt ?? Date.now();
-  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  const total = reduced ? 600 : ANALYSIS_MS;
-  const t = Math.min(1, (Date.now() - started) / total);
-  const ease = (x: number) => 1 - Math.pow(1 - x, 3);
-  const { story, discoveries } = opened();
-  return {
-    progress: Math.min(1, t / 0.93),
-    messagesRead: Math.round(story.totalMessages * ease(Math.min(1, t / 0.7))),
-    stepsDone: [0.13, 0.33, 0.53, 0.77].filter((s) => t >= s).length,
-    discoveries: discoveries.slice(0, [0.17, 0.33, 0.5].filter((s) => t >= s).length),
-    done: t >= 1,
-  };
+  return (await demo()).getAnalysisProgress();
 }
 
 /** Le rapport, avec les droits d’accès. Les chapitres non payés arrivent verrouillés, sans contenu. */
 export async function getReport(storyId?: string): Promise<ReportPayload> {
   if (BACKEND) return reel.getReport();
-  const s = mockServer.get();
-  const { report, sober, story } = opened(storyId);
-  const full = s.plan !== "gratuit";
-  const chapters = report.chapters.map((c) => (c.free || full ? c : { ...c, locked: true, blocks: [] }));
-  const difficult = s.verdict === "difficile";
-  /* Le vocal : avec le rapport (ou sa version sobre, offerte), sur l’histoire des maquettes seulement */
-  const vocal = (full || difficult) && story.id === DEMO_STORY_IDS.rencontre ? vocalDemo(difficult) : undefined;
-  return {
-    report: { ...report, chapters, verdict: { ...report.verdict, difficult } },
-    sober: difficult ? sober : null,
-    access: s.plan,
-    ...(vocal ? { vocal } : {}),
-  };
+  return (await demo()).getReport(storyId);
 }
 
 /** Le chat de nouveau à l’écrit (« Repasser à l’écrit »). En démo, rien à garder. */
@@ -219,26 +166,14 @@ export function noterEcouteVocal(evenement: "debut" | "fin" | "reecoute" | "ferm
 /** Simule le paiement. */
 export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscription> {
   if (BACKEND) return reel.unlock(offer);
-  await delay(900);
-  mockServer.set({ plan: offer, paused: false, cancelled: false });
-  return SUBSCRIPTIONS[offer];
+  return (await demo()).unlock(offer);
 }
 
 /* ———— Question incluse ———— */
 
-/* Simulation : une question toute prête reçoit sa réponse ; une question libre, la réponse type */
-const sameQuestion = (a: string, b: string) => {
-  const norm = (q: string) => q.toLowerCase().replace(/[’']/g, "'").replace(/[\s\u00a0\u202f]+/g, " ").trim();
-  return norm(a) === norm(b);
-};
-const answerTo = (question: string): QuestionAnswer => {
-  const { questionIdeas, questionAnswer } = opened();
-  return { ...(questionIdeas.find((a) => sameQuestion(a.question, question)) ?? questionAnswer), question };
-};
-
 /** Des idées de questions, tirées du rapport. */
 export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
-  return opened(storyId).questionIdeas.map((a) => a.question);
+  return (await demo()).getQuestionIdeas(storyId);
 }
 
 /**
@@ -247,24 +182,20 @@ export async function getQuestionIdeas(storyId?: string): Promise<string[]> {
  */
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
   if (BACKEND) return enQuestion(question, await reel.sendToBlush(question));
-  await delay(2000);
-  mockServer.set({ questionAsked: question });
-  return answerTo(question);
+  return (await demo()).askQuestion(question);
 }
 
 export async function getQuestion(): Promise<QuestionAnswer | null> {
   /* Back-end : la question passe par le chat, son historique est sur l’accueil */
   if (BACKEND) return null;
-  const q = mockServer.get().questionAsked;
-  return q ? answerTo(q) : null;
+  return (await demo()).getQuestion();
 }
 
 /* ———— Au quotidien ———— */
 
 export async function analyzeMessage(file: File | null): Promise<Reply> {
   void file;
-  await delay(900);
-  return opened().reply;
+  return (await demo()).analyzeMessage();
 }
 
 /**
@@ -272,7 +203,8 @@ export async function analyzeMessage(file: File | null): Promise<Reply> {
  * tout le reste (texte collé, captures, export) est lu comme sa réponse à elle.
  */
 export type { BlushAnswer };
-export type { AvanceVideo, HistoriqueChat };
+export type { AvanceVideo, HistoriqueChat, SuiviChat };
+export { CoupureChat };
 
 /** L’historique du chat (back-end) : les derniers échanges, ou ceux d’avant `avant`. En démo, il n’y en a pas. */
 export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
@@ -282,71 +214,27 @@ export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
 
 /** Les questions toutes prêtes du chat (celles que promet la landing). */
 export async function getQuickQuestions(storyId?: string): Promise<string[]> {
-  return opened(storyId).quickQuestions.map((q) => q.question);
+  return (await demo()).getQuickQuestions(storyId);
 }
-
-/** Le cran suivant de chaque échelle (les étapes, ou la température en couple). */
-const NEXT_LEVEL: Partial<Record<LevelId, LevelId>> = { parle: "voit", voit: "dit", dit: "ensemble", eloigne: "coince", coince: "va", va: "soudes" };
 
 /**
  * `about` : le point d’une réponse de BLUSH que tu creuses (tu l’as glissée vers la droite) ; ta question porte dessus.
- * Simulation : un message qui annonce un cap (« on est ensemble », « en couple », « je t’aime »…) vous fait passer au niveau suivant.
- * ⚠ Textes du passage de niveau absents des maquettes : à valider.
+ * Démo : la réponse arrive comme du back-end (voir ./demo).
  */
-export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }): Promise<BlushAnswer> {
+export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }, suivi?: SuiviChat): Promise<BlushAnswer> {
   if (BACKEND) {
-    if (input.files?.length) return envoyerAuChat(() => reel.sendFilesToBlush(input.files!, input.text?.trim()));
+    if (input.files?.length) return envoyerAuChat(() => reel.sendFilesToBlush(input.files!, input.text?.trim(), suivi));
     const texte = input.text?.trim();
     if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
-    return envoyerAuChat(() => reel.sendToBlush(input.about ? `(à propos de « ${input.about} ») ${texte}` : texte));
+    return envoyerAuChat(() => reel.sendToBlush(input.about ? `(à propos de « ${input.about} ») ${texte}` : texte, suivi));
   }
-  void input.files;
-  void input.about;
-  await delay(2000);
-  const text = input.text?.trim();
-  const { quickQuestions, reply, report } = opened();
-  const quick = text ? quickQuestions.find((q) => sameQuestion(q.question, text)) : undefined;
-  if (quick) return quick.answer;
-  /* Le chat en vocal : « parle-moi en vocal » le lance, « écris-moi » le coupe */
-  if (text && /vocal/i.test(text) && /parle|envoie|réponds|reponds/i.test(text))
-    return { kind: "bubbles", bubbles: [{ text: "ok chef, je passe en vocal" }, { text: "mais tu m’écoutes jusqu’au bout hein" }], vocal: chatVocalDemo("mode"), modeVocal: true };
-  if (text && /[ée]cris[- ]moi|à l[’']écrit|a l[’']ecrit/i.test(text)) return { kind: "bubbles", bubbles: [{ text: "ok, je repasse à l’écrit" }], modeVocal: false };
-  const levelUp = NEXT_LEVEL[report.level];
-  if (text && levelUp && /ensemble|en couple|officiel|je t[’']aime|soud[ée]s/i.test(text))
-    return {
-      kind: "answer",
-      levelUp,
-      answer: {
-        question: text,
-        title: "Vous passez un cap.",
-        evidenceLabel: "Ce qui change",
-        evidence: "Ce qu’elle vient de te dire, elle ne l’avait jamais dit. Vous changez de niveau.",
-        confidence: "probable",
-        limits: "Je me fie à ce que tu me racontes : envoie-moi la capture pour que j’en sois sûr.",
-      },
-    };
-  if (text && text.endsWith("?")) return { kind: "answer", answer: answerTo(text) };
-  return { kind: "analysis", reply };
+  return (await demo()).sendToBlush(input.text?.trim(), suivi);
 }
 
 /** Un vocal pour BLUSH. Simulation : en vrai, le back-end le transcrit, puis BLUSH répond à ce qui est dit. */
-export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }): Promise<BlushAnswer> {
-  if (BACKEND) return envoyerAuChat(() => reel.sendVoiceToBlush(input.audio));
-  void input.audio;
-  await delay(2600);
-  /* Tu lui parles en vocal, elle te répond en vocal (sur l’histoire des maquettes ; les autres gardent leur réponse écrite) */
-  const { story, voiceAnswer } = opened();
-  if (story.id !== DEMO_STORY_IDS.rencontre) return { kind: "answer", answer: voiceAnswer };
-  return {
-    kind: "bubbles",
-    bubbles: [
-      { text: "attends, elle t’a écrit ça", messages: [{ from: "elle", text: "je suis crevée cette semaine, on verra", caption: "Sophie · son dernier message" }] },
-      { text: "et toi t’as cru que c’était mort, avoue" },
-      { text: "en vrai elle est partante, juste fatiguée" },
-    ],
-    send: ["courage pour jeudi. samedi pour fêter ça ?"],
-    vocal: chatVocalDemo("chat"),
-  };
+export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, suivi?: SuiviChat): Promise<BlushAnswer> {
+  if (BACKEND) return envoyerAuChat(() => reel.sendVoiceToBlush(input.audio, suivi));
+  return (await demo()).sendVoiceToBlush(suivi);
 }
 
 /* Back-end : une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
@@ -379,6 +267,8 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
   try {
     return await envoyer();
   } catch (e) {
+    /* Le réseau a coupé en route : l’accueil garde les bulles reçues et propose de réessayer */
+    if (e instanceof CoupureChat) throw e;
     const code = e instanceof ErreurApi ? e.code : "";
     /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug */
     if (code.startsWith("refus")) return bulle(["là-dessus je peux pas t’aider", "reformule, ou envoie-moi autre chose"]);
@@ -405,15 +295,12 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
 
 export async function getFiche(storyId?: string): Promise<Fiche> {
   if (BACKEND) return reel.getFiche();
-  const s = mockServer.get();
-  return { ...FICHE, ...opened(storyId).fiche, facts: s.ficheFacts, updatedLabel: s.ficheUpdated ? "mise à jour aujourd’hui" : FICHE.updatedLabel };
+  return (await demo()).getFiche(storyId);
 }
 
 export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
   if (BACKEND) return reel.updateFiche(facts);
-  mockServer.set({ ficheFacts: facts });
-  await delay(250);
-  return getFiche();
+  return (await demo()).updateFiche(facts);
 }
 
 /**
@@ -429,65 +316,38 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
       const problem = code === "rien_de_neuf" ? undefined : code === "capture" || code === "fichier" || code === "autre_conv" || code === "trop" ? code : "bug";
       return { fiche: await reel.getFiche(), added: [], confirmed: [], ...(problem ? { problem } : {}) };
     });
-  await delay(2200);
-  const images = files.filter((f) => f.type.startsWith("image/")).length;
-  const kinds = [...(images > 0 ? (["captures"] as const) : []), ...(images < files.length ? (["export"] as const) : [])];
-  const facts = [...mockServer.get().ficheFacts];
-  const added: FicheFact[] = [];
-  const confirmed: FicheFact[] = [];
-  for (const kind of kinds) {
-    const found = FICHE_FINDINGS[kind];
-    for (const f of found.facts) {
-      const i = facts.findIndex((x) => x.section === f.section && x.text === f.text);
-      if (i >= 0) {
-        const same = facts[i];
-        if (!same.sourceLabel.split(" · ").includes(found.sourceLabel))
-          facts[i] = { ...same, sourceLabel: `${same.sourceLabel} · ${found.sourceLabel}`, sources: [...new Set([...same.sources, found.source])] };
-        confirmed.push(facts[i]);
-      } else {
-        const fact: FicheFact = { id: `t${Date.now()}-${added.length}`, section: f.section, text: f.text, sourceLabel: found.sourceLabel, sources: [found.source] };
-        facts.push(fact);
-        added.push(fact);
-      }
-    }
-  }
-  mockServer.set({ ficheFacts: facts, ficheUpdated: true });
-  return { fiche: await getFiche(), added, confirmed };
+  return (await demo()).addToFiche(files);
 }
 
 /* ———— Compte ———— */
 
 export async function getAccount(): Promise<Account> {
   if (BACKEND) return reel.getAccount();
-  const s = mockServer.get();
-  const sub = SUBSCRIPTIONS[s.plan];
-  return {
-    email: s.email,
-    subscription: { ...sub, paused: s.paused, active: sub.active && !s.cancelled },
-    storyDeleted: s.storyDeleted,
-  };
+  return (await demo()).getAccount();
 }
 
 export async function setPaused(paused: boolean): Promise<void> {
   if (BACKEND) return void (await reel.setPaused(paused));
-  await delay(200);
-  mockServer.set({ paused });
+  return (await demo()).setPaused(paused);
 }
 
 export async function cancelSubscription(): Promise<void> {
   /* Back-end v1 : pas de paiement, donc rien à résilier */
   if (BACKEND) return;
-  await delay(500);
-  mockServer.set({ cancelled: true });
+  return (await demo()).cancelSubscription();
 }
 
 /**
  * Le lien public du verdict (/v/<id>) : le verdict seul, le prénom de l’autre masqué, jamais la conv. Toujours le même lien
  * tant qu’on ne le désactive pas. En démo : le lien « demo ».
  */
-export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre | null }> {
-  const { id, verdict } = BACKEND ? await reel.creerLienPartage() : (await delay(300), { id: "demo", verdict: null });
-  return { url: `${window.location.origin}/v/${id}`, verdict };
+export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre | null; story?: string }> {
+  const { id, verdict, v } = BACKEND
+    ? ((await reel.creerLienPartage()) as { id: string; verdict: VerdictMontre | null; v?: string })
+    : await (await demo()).creerLienPartage();
+  const url = `${window.location.origin}/v/${id}`;
+  /* `story` : l’image story à sa version (`v`, donnée par le serveur), que le CDN garde : la feuille l’a tout de suite */
+  return { url, verdict, story: `${url}/image?format=story${v ? `&v=${encodeURIComponent(v)}` : ""}` };
 }
 
 /** Le verdict tel que le montre un lien partagé : le prénom de l’autre en initiale, le tien en clair (« C. t’attend, Hugo »). */
@@ -512,14 +372,13 @@ export function compterImagePartagee(): void {
 
 export async function desactiverLienPartage(): Promise<void> {
   if (BACKEND) return reel.desactiverLienPartage();
-  await delay(300);
+  return (await demo()).desactiverLienPartage();
 }
 
 /** Supprime l’histoire : le rapport, la fiche et les captures. */
 export async function deleteStory(): Promise<void> {
   if (BACKEND) return void (await reel.deleteStory());
-  await delay(500);
-  mockServer.set({ storyDeleted: true, ficheFacts: FICHE.facts, ficheUpdated: false, questionAsked: null, analysisStartedAt: null });
+  return (await demo()).deleteStory();
 }
 
 /** Ouvre une autre conv du compte : l’accueil s’ouvre sur elle, maintenant et les fois suivantes (sur cet appareil). */
@@ -530,7 +389,5 @@ export function openConv(storyId: string) {
 /** Tout effacer : le compte et toutes les histoires. */
 export async function deleteAccount(): Promise<void> {
   if (BACKEND) return void (await reel.deleteAccount());
-  await delay(500);
-  mockServer.reset();
-  writeStoryCookie(null);
+  return (await demo()).deleteAccount();
 }

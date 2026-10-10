@@ -1,10 +1,10 @@
-import { expect, type Page, type Response, type TestInfo } from "@playwright/test";
+import { expect, type Page, type Request, type Response, type TestInfo } from "@playwright/test";
 import { attendreTaches } from "./base";
 import { dernierCode } from "./boite";
 import { lectureFaite, type Lecture } from "./compte";
 import { nouvelInvite } from "./emails";
 import type { Fichier } from "./exports";
-import { choisirFichier, reponseAuGeste } from "./page";
+import { choisirFichier, pagePrete, RESEAU, reponseAuGeste } from "./page";
 
 /*
  * Les gestes du parcours, par l’interface, comme quelqu’un qui découvre BLUSH : importer sa conv, répondre à « Qui
@@ -85,12 +85,46 @@ export async function saisirLeCodeRecu(page: Page, email: string, depuis: number
 /**
  * Se connecter par l’interface, comme quelqu’un qui revient sur un autre appareil : /connexion, l’email, puis le code lu
  * dans la boîte à mails. Le compte naît au premier bon code. `suite` : la page où aller ensuite (par défaut, l’accueil).
- * Pour une page sans session (déjà connecté, /connexion renvoie tout de suite à l’accueil). Attend d’avoir quitté la connexion.
+ * Pour une page sans session (déjà connecté, /connexion renvoie tout de suite à l’accueil). Attend d’être arrivé :
+ * la connexion quittée, puis plus aucune navigation en route.
  */
 export async function seConnecter(page: Page, email: string, { suite }: { suite?: string } = {}): Promise<void> {
   await page.goto(suite ? `/connexion?suite=${encodeURIComponent(suite)}` : "/connexion");
-  await saisirLeCodeRecu(page, email, await demanderCode(page, email));
-  await expect(page).not.toHaveURL(/\/connexion(\/|\?|$)/);
+  /*
+   * L’adresse quitte /connexion dès la première page (l’accueil, /app), que le serveur peut encore renvoyer ailleurs
+   * (sans conv : /commencer). Depuis que le bon code oublie les pages préchargées avant la connexion (CodeScreen,
+   * router.refresh), ce renvoi se demande au serveur : une navigation de plus, après l’adresse changée. Un page.goto
+   * lancé pendant la couperait, et Next la referait en rechargeant toute la page, par-dessus le goto. On suit donc les
+   * navigations de Next (ses requêtes RSC, hors préchargements) jusqu’à la dernière.
+   */
+  const enRoute = new Set<Request>();
+  const partie = (r: Request) => void (r.headers()["rsc"] === "1" && !r.headers()["next-router-prefetch"] && enRoute.add(r));
+  const finie = (r: Request) => void enRoute.delete(r);
+  page.on("request", partie);
+  page.on("requestfinished", finie);
+  page.on("requestfailed", finie);
+  try {
+    await saisirLeCodeRecu(page, email, await demanderCode(page, email));
+    await expect(page).not.toHaveURL(/\/connexion(\/|\?|$)/);
+    /* Arrivé : la même adresse deux relevés de suite, sans navigation en route (le renvoi part juste après une page posée) */
+    let avant = "";
+    await expect
+      .poll(
+        () => {
+          const ici = `${page.url()} ${enRoute.size}`;
+          const pose = ici === avant && enRoute.size === 0;
+          avant = ici;
+          return pose;
+        },
+        { message: "la page d’arrivée après la connexion", intervals: [300], timeout: RESEAU },
+      )
+      .toBe(true);
+  } finally {
+    page.off("request", partie);
+    page.off("requestfinished", finie);
+    page.off("requestfailed", finie);
+  }
+  await pagePrete(page);
 }
 
 /**

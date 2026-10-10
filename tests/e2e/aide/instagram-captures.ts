@@ -248,24 +248,31 @@ export function captureIllisible(testInfo: TestInfo): string {
 /**
  * Les captures dans l’ordre où la grille les montre : le numéro du fichier (capture-N.png, aide/exports.ts) que chaque
  * vignette affiche. Chaque capture a sa couleur : on lit celle de l’image affichée dans la vignette, comme on la voit
- * (de capture-1.png à capture-20.png, la limite du serveur).
+ * (de capture-1.png à capture-20.png, la limite du serveur). L’image d’une capture qu’on vient de choisir arrive un peu
+ * après sa vignette (une image réduite, tirée du fichier hors du fil principal ; le cadre gris en attendant) : on
+ * l’attend, comme on l’attendrait à l’écran.
  */
 export async function ordreAffiche(page: Page): Promise<number[]> {
   const vignettes = grilleDesCaptures(page).getByRole("button", { name: /^Capture \d+ sur \d+$/ });
   return Promise.all((await vignettes.all()).map(numeroDeLImage));
 }
 
+/* L’image d’une vignette, attendue 10 s au plus : au-delà, elle ne viendra pas (-1) */
+const IMAGE_DE_LA_VIGNETTE = 10_000;
+
 /* capturesPng peint capture-N.png en rouge 240 − 10 × (N − 1) : la couleur dit quel fichier la vignette montre (de 1 à 20) */
 async function numeroDeLImage(vignette: Locator): Promise<number> {
-  const rouge = await vignette.evaluate(async (bouton) => {
-    const fond = [...bouton.querySelectorAll<HTMLElement>("*")].map((e) => getComputedStyle(e).backgroundImage).find((f) => f.startsWith("url("));
+  const rouge = await vignette.evaluate(async (bouton, attente) => {
+    const fondAffiche = () => [...bouton.querySelectorAll<HTMLElement>("*")].map((e) => getComputedStyle(e).backgroundImage).find((f) => f.startsWith("url("));
+    let fond = fondAffiche();
+    for (const fin = performance.now() + attente; !fond && performance.now() < fin; fond = fondAffiche()) await new Promise((r) => setTimeout(r, 50));
     if (!fond) return -1;
     const image = await createImageBitmap(await (await fetch(fond.slice(5, -2))).blob());
     const toile = Object.assign(document.createElement("canvas"), { width: 1, height: 1 });
     const ctx = toile.getContext("2d")!;
     ctx.drawImage(image, 20, 60, 1, 1, 0, 0, 1, 1);
     return ctx.getImageData(0, 0, 1, 1).data[0];
-  });
+  }, IMAGE_DE_LA_VIGNETTE);
   return rouge < 0 ? -1 : Math.round((240 - rouge) / 10) + 1;
 }
 

@@ -12,8 +12,8 @@ export async function GET() {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
   if (!story) return erreur("aucune", 404);
-  await relancer(story.id);
-  const rapport = await rapportDe(story, utilisateur);
+  /* Les tâches coupées repartent pendant que le rapport se lit (pas avant) : relu toutes les 2 s pendant l’écriture */
+  const [, rapport] = await Promise.all([relancer(story.id), rapportDe(story, utilisateur)]);
   return rapport ? json(rapport) : erreur("pas_pret", 409);
 }
 

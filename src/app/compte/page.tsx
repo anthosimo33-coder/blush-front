@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { connexionPuis } from "@/lib/suite";
-import { BACKEND } from "@/services/mode";
-import { estConnecte, getConvs, getNomsDuCompte } from "@/services/serveur";
+import { heureDuRendu } from "@/lib/rendu";
+import { getCompte, getConvs, getNomsDuCompte } from "@/services/serveur";
 import { CompteScreen } from "./CompteScreen";
 import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "Mon compte" };
 
+/* Sans compte connecté, la connexion : la garde est dans layout.tsx, pour une vraie 307 avant le squelette */
 export default async function Page() {
-  /* Sans compte connecté (session expirée, autre appareil) : la connexion d’abord, puis retour ici */
-  if (BACKEND && !(await estConnecte())) redirect(connexionPuis("/compte"));
-  const [noms, convs] = await Promise.all([getNomsDuCompte(), getConvs()]);
+  /* Le compte aussi (l’abonnement) : l’écran ne descend plus quand il arrive */
+  const rendu = heureDuRendu();
+  const [noms, convs, compte] = await Promise.all([getNomsDuCompte(), getConvs(), getCompte()]);
   return (
     <>
       <ConvDeLaPage />
-      <CompteScreen noms={noms} convs={convs} />
+      <CompteScreen noms={noms} convs={convs} compte={compte} rendu={rendu} />
     </>
   );
 }

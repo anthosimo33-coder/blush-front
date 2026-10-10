@@ -8,7 +8,7 @@ import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, importer, rattacherBrouillon, type Ligne } from "@/server/histoires";
 import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { arreterPartage, ErreurPartage, lienDe, masqueDe, masquerPrenoms, partagerVerdict, verdictPartage } from "@/server/partages";
+import { arreterPartage, ErreurPartage, lienDe, masqueDe, masquerPrenoms, partager, verdictPartage } from "@/server/partages";
 import { planifier } from "@/server/taches";
 
 describe("les prénoms dans ce qui se partage", () => {
@@ -69,39 +69,41 @@ describe("le lien de partage du verdict", () => {
   });
 
   it("montre le verdict seul, le prénom de l’autre masqué (le tien en clair), et reste le même lien", async () => {
-    const id = await partagerVerdict(story);
+    const id = (await partager(story)).id;
     expect(id).toMatch(/^[a-zA-Z0-9]{12}$/);
-    expect(await partagerVerdict(story)).toBe(id);
+    expect((await partager(story)).id).toBe(id);
     expect(await lienDe(story.id)).toBe(id);
     const v = await verdictPartage(id);
     expect(Object.keys(v!).sort()).toEqual(["emoji", "subtitle", "title"]);
     expect(v!.subtitle).toBe("S. attend que tu parles, Hugo.");
+    /* La feuille de partage reçoit ce que montre le lien, sans le relire */
+    expect(await partager(story)).toEqual({ id, verdict: v });
     /* Rien en clair dans la base */
     const [ligne] = await db().select().from(schema.shares).where(eq(schema.shares.id, id));
     expect(ligne.data.toString("utf8")).not.toContain("attend");
   });
 
   it("repartagé, le même lien montre le verdict tel qu’on le masque aujourd’hui", async () => {
-    const id = await partagerVerdict(story);
+    const id = (await partager(story)).id;
     /* Un lien d’avant : ton prénom y était masqué aussi */
     await db().update(schema.shares).set({ data: chiffrer({ emoji: "🤔", title: "x", subtitle: "S. attend que tu parles, H." }) }).where(eq(schema.shares.id, id));
-    expect(await partagerVerdict(story)).toBe(id);
+    expect((await partager(story)).id).toBe(id);
     expect((await verdictPartage(id))!.subtitle).toBe("S. attend que tu parles, Hugo.");
   });
 
   it("se désactive : le lien ne montre plus rien, et le suivant est un autre lien", async () => {
-    const avant = await partagerVerdict(story);
+    const avant = (await partager(story)).id;
     await arreterPartage(story.id);
     expect(await verdictPartage(avant)).toBeNull();
     expect(await lienDe(story.id)).toBeNull();
-    const apres = await partagerVerdict(story);
+    const apres = (await partager(story)).id;
     expect(apres).not.toBe(avant);
     await arreterPartage(story.id);
   });
 
   it("refuse une situation difficile (mode sobre), et un identifiant mal formé", async () => {
     await changerVerdict((v) => (v.sortie.mode_sobre = true));
-    await expect(partagerVerdict(story)).rejects.toEqual(new ErreurPartage("sobre"));
+    await expect(partager(story)).rejects.toEqual(new ErreurPartage("sobre"));
     expect(await verdictPartage("../../etc")).toBeNull();
   });
 });

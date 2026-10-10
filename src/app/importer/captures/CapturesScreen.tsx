@@ -7,7 +7,8 @@ import { useFilePicker } from "@/lib/hooks";
 import { connexionPuis } from "@/lib/suite";
 import { uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { BACKEND } from "@/services/mode";
-import { ErreurApi } from "@/services/reel";
+import { prereduire, vignette } from "@/services/preparer-captures";
+import { ErreurApi, prechargerVideo } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -29,7 +30,16 @@ const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
 
 /** Où en est un enregistrement, dit simplement : la vidéo regardée dans le téléphone, puis lue par BLUSH. */
 const texteAvance = (a: AvanceVideo) =>
-  a.etape === "video" ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NB}%` : a.total > 1 ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}` : "BLUSH lit ta conv";
+  a.etape === "reprise"
+    ? "La connexion a coupé, je reprends…"
+    : a.etape === "video"
+      ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}${NB}%`
+      : a.total > 1
+        ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
+        : "BLUSH lit ta conv";
+
+/** Pendant la lecture des captures (sans avancée à dire) : ce que BLUSH fait, en clair dans le bouton. */
+const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : "BLUSH lit ta capture…");
 
 /*
  * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement
@@ -48,8 +58,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [announce, setAnnounce] = useState("");
   /* Plus de 20 captures choisies : on garde les 20 premières, et on le dit */
   const [trop, setTrop] = useState(false);
-  /* Une limite atteinte (« trop ») : les captures restent là, le message dit d’attendre */
-  const [attente, setAttente] = useState(false);
+  /* Une limite atteinte (« trop »), ou le réseau qui a lâché deux fois : les captures restent là, le message le dit */
+  const [souci, setSouci] = useState<"trop" | "reseau" | null>(null);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useRef(true);
   useEffect(() => {
@@ -68,11 +78,26 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   /* Les aperçus sont créés une fois par fichier (déplacer une capture ne les recharge pas) */
   useEffect(() => () => all.current.forEach((s) => s.url && URL.revokeObjectURL(s.url)), []);
 
+  /*
+   * L’aperçu d’une capture : une vignette (le Worker la tire du fichier), pas l’originale, qui pèse une douzaine de Mo
+   * une fois décodée (vingt captures font grimper la mémoire jusqu’au rechargement de Safari). Sans Worker, l’originale.
+   */
+  const apercus = (shots: Shot[]) =>
+    shots.forEach((s) =>
+      void vignette(s.file).then((b) => {
+        /* Retirée entre-temps, ou l’écran est parti : l’aperçu ne sert plus */
+        if (!monte.current || !all.current.some((x) => x.id === s.id)) return;
+        const url = URL.createObjectURL(b ?? s.file);
+        setItems((list) => list.map((x) => (x.id === s.id ? { ...x, url } : x)));
+      }),
+    );
+
   /* Back-end : une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=) */
   const echec = (code: string) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
   const handle = async (picked: File[], video: boolean) => {
-    const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: URL.createObjectURL(file) }));
+    /* Un enregistrement garde son fichier en aperçu (la balise vidéo le lit) ; une capture attend sa vignette */
+    const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: video ? URL.createObjectURL(file) : null }));
     /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
     const replace = video || !!result?.video;
     if (replace) items.forEach((s) => s.url && URL.revokeObjectURL(s.url));
@@ -80,10 +105,18 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     const next = video ? toutes : toutes.slice(0, CAPTURES_MAX);
     toutes.slice(next.length).forEach((s) => s.url && URL.revokeObjectURL(s.url));
     setTrop(!video && toutes.length > CAPTURES_MAX);
-    setAttente(false);
+    setSouci(null);
     /* Back-end : l’enregistrement sert à la première importation (pas encore pour compléter une conv) */
     if (BACKEND && video && addMode) return echec("capture");
     setItems(next);
+    if (!video) {
+      const gardees = added.filter((s) => next.includes(s));
+      /* all.current suit items après le rendu : à jour dès maintenant pour les vignettes qui arrivent */
+      all.current = next;
+      apercus(gardees);
+      /* Back-end : le Worker les réduit déjà pour l’envoi, pendant qu’on règle l’ordre */
+      if (BACKEND) prereduire(gardees.map((s) => s.file));
+    }
     /* Back-end : la lecture ne part qu’une fois, au clic sur Continuer */
     if (BACKEND) {
       setResult({ count: next.length, messages: -1, video });
@@ -127,14 +160,15 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const continuer = async () => {
     if (!BACKEND) return router.push(next);
     setBusy(true);
-    setAttente(false);
+    setSouci(null);
+    setAvance(null);
     const video = !!result?.video;
     try {
       const r = video
         ? await uploadRecording(items[0].file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", setAvance)
         : await uploadScreenshots(
             items.map((s) => s.file),
-            { app: captureApp, mode: addMode ? "add" : "first" },
+            { app: captureApp, mode: addMode ? "add" : "first", onAvance: setAvance },
           );
       if (!monte.current) return;
       setJourney({ captureNames: items.map((s) => s.file.name), captureApp, ...(addMode ? { capturesAdded: true } : { app: captureApp }), me: "p0" });
@@ -146,13 +180,22 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
-      if (e instanceof ErreurApi && e.code === "trop") return setAttente(true);
-      echec(e instanceof ErreurApi && ["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
+      if (e instanceof ErreurApi && e.code === "trop") return setSouci("trop");
+      /* Le réseau, encore après la reprise : les captures ne sont pas en cause, elles restent là */
+      if (!(e instanceof ErreurApi)) return setSouci("reseau");
+      echec(["courte", "groupe", "video", "longue"].includes(e.code) ? e.code : "capture");
     }
   };
 
   const back = addMode ? "/importer/ok" : "/commencer";
   const next = addMode ? "/importer/histoire" : "/qui";
+  /* L’extraction d’un enregistrement est chargée à la demande : on la charge dès qu’on ouvre le choix de la vidéo */
+  const choisirEnregistrement = () => {
+    prechargerVideo();
+    rec.open();
+  };
+  /* Pendant la lecture, ce qui se dit dans le bouton (et aux lecteurs d’écran) */
+  const enCours = avance ? texteAvance(avance) : texteLecture(items.length);
 
   return (
     <Screen
@@ -171,18 +214,22 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       }
       footer={
         items.length ? (
-          <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
-            {busy && BACKEND ? (
-              <span className="flex items-center gap-2.5">
-                <TypingDots color="#FFFFFF" label={avance ? texteAvance(avance) : "BLUSH lit tes captures"} />
-                {avance && <span className="text-[16px] tabular-nums">{texteAvance(avance)}</span>}
-              </span>
-            ) : (
-              "Continuer"
-            )}
-          </Button>
+          <>
+            <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
+              {busy && BACKEND ? (
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <TypingDots color="#FFFFFF" label={enCours} />
+                  <span className="text-[16px] leading-[1.2] tabular-nums">{enCours}</span>
+                </span>
+              ) : (
+                "Continuer"
+              )}
+            </Button>
+            {/* Des captures : rien ne dit où en est la lecture, une barre avance d’après sa durée habituelle */}
+            {busy && BACKEND && !result?.video && <BarreLecture captures={items.length} />}
+          </>
         ) : enregistrement ? (
-          <Button onClick={rec.open}>Choisir mon enregistrement</Button>
+          <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>
         ) : (
           /* ⚠ Libellé avant sélection absent des maquettes */
           <Button onClick={shots.open}>Choisir mes captures</Button>
@@ -196,10 +243,11 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
           <Dropzone onPick={shots.open} onFiles={(f) => handle(f, false)} />
         )
       ) : result?.video ? (
-        <CarteEnregistrement shot={items[0]} onChange={rec.open} />
+        <CarteEnregistrement shot={items[0]} onChange={busy ? undefined : choisirEnregistrement} />
       ) : (
         <div className="flex flex-col gap-2.5">
-          <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video ? undefined : shots.open} />
+          {/* Pendant la lecture, l’ordre et la sélection sont figés : ce qui part est déjà parti */}
+          <ReorderGrid items={items} onMove={move} onRemove={remove} onAnnounce={setAnnounce} onAdd={result?.video || busy ? undefined : shots.open} fige={busy} />
           {trop && (
             <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
               {CAPTURES_MAX} captures au plus{"\u00a0"}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
@@ -219,7 +267,14 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       {/* L’autre façon d’ajouter la conv, en ligne discrète comme sur l’écran suivant */}
       <InsetGroup>
         {enregistrement ? (
-          <InsetRow leading={<RowIcon icon="photo" tone="toi" />} title="Ou choisis des captures d’écran" sub="Pour une conv courte, quelques captures suffisent." onClick={shots.open} chevron />
+          <InsetRow
+            leading={<RowIcon icon="photo" tone="toi" />}
+            title="Ou choisis des captures d’écran"
+            sub="Pour une conv courte, quelques captures suffisent."
+            onClick={busy ? undefined : shots.open}
+            chevron={!busy}
+            className={cn(busy && "opacity-50")}
+          />
         ) : (
           <InsetRow
             leading={
@@ -229,16 +284,20 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             }
             title="Plus rapide : enregistre ton écran"
             sub="Remonte la conv doucement en filmant ton écran : BLUSH lit tout."
-            onClick={rec.open}
-            chevron
+            onClick={busy ? undefined : choisirEnregistrement}
+            chevron={!busy}
+            className={cn(busy && "opacity-50")}
           />
         )}
       </InsetGroup>
 
       <div aria-live="polite" className="min-h-6">
-        {/* L’avancée d’un enregistrement s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
-        {busy && (avance ? <span className="sr-only">{texteAvance(avance)}</span> : <TypingDots label="Analyse des captures" />)}
-        {!busy && attente && (
+        {/* L’avancée s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
+        {busy && <span className="sr-only">{enCours}</span>}
+        {!busy && souci === "reseau" && (
+          <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.</p>
+        )}
+        {!busy && souci === "trop" && (
           <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">
             BLUSH a lu beaucoup de captures d’un coup{"\u00a0"}: réessaie un peu plus tard. Tes captures restent là.
           </p>
@@ -260,6 +319,28 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   );
 }
 
+/**
+ * Pendant la lecture des captures : une barre qui avance d’après une durée prudente (13 s, plus 3 s par capture),
+ * ralentit vers 90 % et n’arrive au bout qu’avec la réponse (l’écran suivant). En transform : le compositeur la fait
+ * avancer, sans rien recalculer ni repeindre.
+ */
+function BarreLecture({ captures }: { captures: number }) {
+  const barre = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const a = barre.current?.animate([{ transform: "scaleX(0.04)" }, { transform: "scaleX(0.9)" }], {
+      duration: (13 + 3 * captures) * 1000,
+      easing: "cubic-bezier(0.3, 0.55, 0.45, 1)",
+      fill: "forwards",
+    });
+    return () => a?.cancel();
+  }, [captures]);
+  return (
+    <span aria-hidden="true" className="mx-auto mt-3 block h-1 w-[calc(100%_-_48px)] overflow-hidden rounded-full bg-[rgba(17,17,20,0.08)]">
+      <span ref={barre} className="block h-full origin-left bg-ink" style={{ transform: "scaleX(0.04)" }} />
+    </span>
+  );
+}
+
 /* Pendant un glisser au doigt, la page ne doit pas défiler */
 function blockScroll(e: TouchEvent) {
   e.preventDefault();
@@ -275,12 +356,15 @@ function ReorderGrid({
   onRemove,
   onAnnounce,
   onAdd,
+  fige,
 }: {
   items: Shot[];
   onMove: (id: string, to: number) => void;
   onRemove: (id: string) => void;
   onAnnounce: (t: string) => void;
   onAdd?: () => void;
+  /** Pendant la lecture : ni glisser, ni déplacer, ni retirer */
+  fige?: boolean;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const drag = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean; timer: number; el: HTMLElement } | null>(null);
@@ -333,7 +417,7 @@ function ReorderGrid({
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>, id: string) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (fige || (e.pointerType === "mouse" && e.button !== 0)) return;
     drag.current = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, active: false, timer: 0, el: e.currentTarget };
     /* Au doigt, un appui maintenu lance le glisser (un simple balayage fait défiler la page) */
     if (e.pointerType !== "mouse") drag.current.timer = window.setTimeout(start, 230);
@@ -361,6 +445,7 @@ function ReorderGrid({
   };
 
   const onKey = (e: React.KeyboardEvent, id: string, i: number) => {
+    if (fige) return;
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[e.key];
     if (step) {
       e.preventDefault();
@@ -418,6 +503,7 @@ function ReorderGrid({
             {/* Retirer : une petite croix, comme sur les photos d’un message */}
             <button
               type="button"
+              hidden={fige}
               aria-label={`Retirer la capture ${i + 1}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onRemove(s.id)}
@@ -486,8 +572,8 @@ function BoutonRec() {
   );
 }
 
-/** L’enregistrement choisi : son aperçu, sa durée, et de quoi en changer. */
-function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange: () => void }) {
+/** L’enregistrement choisi : son aperçu, sa durée, et de quoi en changer (pas pendant sa lecture : `onChange` absent). */
+function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?: () => void }) {
   const [duree, setDuree] = useState<number | null>(null);
   return (
     <div className="flex items-center gap-4 rounded-card bg-white p-3.5 shadow-soft">
@@ -507,7 +593,7 @@ function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange: () => v
           {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}${NB}min ` : ""}${Math.round(duree % 60)}${NB}s · ` : ""}prêt
         </span>
       </span>
-      <button type="button" onClick={onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink">
+      <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink disabled:opacity-50">
         Changer
       </button>
     </div>

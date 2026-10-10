@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { ViewTransition } from "react";
 import { redirect } from "next/navigation";
-import { getChat, getConvs, getFiche, getQuickQuestions, getReport, getStory, sansHistoire } from "@/services/serveur";
+import { getChat, getContact, getConvs, getFiche, getQuickQuestions, getRetour, getStory, sansHistoire } from "@/services/serveur";
 import { currentStoryId } from "@/services/session.server";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
+import { IDEES_MASQUEES } from "./idees";
 import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
 export const metadata: Metadata = { title: "Accueil" };
@@ -20,12 +20,23 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   const { version, anim, arrivee, depuis, convs } = await searchParams;
   const motion = anim !== "avant";
   const storyId = await currentStoryId();
+  const jar = await cookies();
   /* ?arrivee=1 rejoue l’arrivée sans attendre le lendemain (pour la revoir, ou la montrer) */
-  const arrived = arrivee !== "1" && (await cookies()).has(ARRIVAL_COOKIE);
-  const [quick, payload, fiche, story, chat, all] = await Promise.all([getQuickQuestions(storyId), getReport(storyId), getFiche(storyId), getStory(storyId), getChat(), getConvs(convs)]);
+  const arrived = arrivee !== "1" && jar.has(ARRIVAL_COOKIE);
+  /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
+  const lectures = Promise.all([getQuickQuestions(storyId), getContact(storyId), getFiche(storyId), getStory(storyId), getChat(), getConvs(convs)]);
+  /* Une erreur remonte quand l’accueil les attend (plus bas) ; redirigé avant, on ne les attend pas */
+  lectures.catch(() => {});
+  /*
+   * Pas encore d’accueil (« Qui es-tu ? » à remplir, la lecture pas finie) : droit à la bonne page, dès que la conv et son
+   * verdict sont lus (lus pour l’accueil de toute façon, une fois par rendu), sans attendre le reste ni repasser par le
+   * rapport et la lecture, un aller-retour chacun. Le reste est lu en même temps : l’accueil ne l’attend pas plus.
+   */
+  const retour = await getRetour();
+  if (retour && retour.destination !== "/app") redirect(retour.destination);
+  const [quick, report, fiche, story, chat, all] = await lectures;
   if (!story) redirect(await sansHistoire("/app"));
-  if (!payload || !fiche) redirect("/rapport");
-  const { report } = payload;
+  if (!report || !fiche) redirect("/rapport");
   const screen = (
     <HomeScreen
       quick={version === "actuelle" ? [] : quick}
@@ -38,6 +49,8 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
       fromReport={depuis === "rapport"}
       others={all.filter((c) => !c.current)}
       introAt={chat.introAt}
+      ideesMasquees={jar.get(IDEES_MASQUEES)?.value === "1"}
+      storyId={storyId ?? ""}
     />
   );
   if (!motion)
@@ -50,14 +63,13 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   /*
    * Vers sa fiche, l’accueil recule à gauche ; au retour, il revient de la gauche (globals.css, « Sophie, en glissé »).
    * Proposition « plusieurs convs » : choisi dans la liste, il arrive par la droite ; vers la liste, il repart à droite.
+   * Pas de <ViewTransition> autour de l’accueil : il glisse en entier (la racine, une image de l’écran). Nommé, il serait
+   * capturé sur toute la hauteur de la conv, et le départ attendrait cette image (HomeScreen, « 10 · »).
    */
   return (
     <>
       <ConvDeLaPage />
-      <ViewTransition enter={{ "nav-back": "pop-in", "nav-forward": "push-in", default: "none" }} exit={{ "nav-forward": "push-out", "nav-back": "pop-out", default: "none" }} default="none">
-        {/* Un fond à elle : pendant le glissé, chaque page est une image qui doit être opaque */}
-        <div className="[background:var(--paper-light)]">{screen}</div>
-      </ViewTransition>
+      <div className="[background:var(--paper-light)]">{screen}</div>
     </>
   );
 }

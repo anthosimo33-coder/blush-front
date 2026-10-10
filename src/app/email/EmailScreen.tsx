@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { sendLoginCode } from "@/services/api";
 import { ErreurApi } from "@/services/reel";
 import { Button } from "@/components/ui/Button";
@@ -22,6 +22,10 @@ export function EmailScreen() {
   /* Le code n’est pas parti : pourquoi, dit simplement (textes relus le 8 octobre) */
   const [problem, setProblem] = useState<string | null>(null);
   const valid = EMAIL_RE.test(j.email.trim());
+  /* L’écran du code est statique : préchargé pendant qu’on tape son email, il s’ouvre tout de suite après l’envoi */
+  useEffect(() => {
+    router.prefetch("/email/code");
+  }, [router]);
 
   const submit = async () => {
     if (!valid || busy) {

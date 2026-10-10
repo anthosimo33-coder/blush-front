@@ -6,6 +6,7 @@ import { invalidate } from "@/lib/query";
 import { openConv } from "@/services/api";
 import { IconButton } from "@/components/ui/Button";
 import { ContactRing } from "@/components/ui/contact";
+import { EnRoute } from "@/components/ui/EnRoute";
 import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -50,8 +51,9 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
   return (
     <Link
       href="/app"
-      /* Pas de préchargement : l’accueil dépend de la conv choisie au toucher */
+      /* Pas de préchargement : l’accueil dépend de la conv choisie au toucher. Sans remise en haut : il s’ouvre sur le dernier échange */
       prefetch={false}
+      scroll={false}
       transitionTypes={["nav-forward"]}
       onClick={() => {
         openConv(conv.storyId);
@@ -71,7 +73,10 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
         <span className="mt-0.5 truncate text-[14px] font-extrabold leading-[1.35] text-soft">{where}</span>
         {conv.trend && <span className={cn("mt-1 text-[12.5px] font-black leading-none", up ? "text-vrai-ink" : "text-grey")}>{conv.trend}</span>}
       </span>
-      <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />
+      {/* Sans préchargement, l’accueil se rend au toucher : le chevron laisse place aux trois points pendant ce temps */}
+      <EnRoute>
+        <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />
+      </EnRoute>
     </Link>
   );
 }

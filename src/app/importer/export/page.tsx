@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { ExportScreen } from "./ExportScreen";
+import { Suspense } from "react";
+import { Squelette } from "@/components/shell/Squelette";
+import { ExportDepuisLadresse } from "./ExportDepuisLadresse";
 
 export const metadata: Metadata = { title: "Exporte votre conv" };
 
-export default async function Page({ searchParams }: PageProps<"/importer/export">) {
-  const { app } = await searchParams;
-  /* iMessage ne s’exporte pas (Messages sur Mac n’a pas de commande pour ça) : on filme son écran */
-  if (app === "imessage") redirect("/importer/captures?app=imessage");
-  return <ExportScreen initialApp={app === "instagram" ? app : "whatsapp"} />;
+/*
+ * Statique : servie et préchargée tout de suite depuis « Vous vous parlez où ? ». L’appli (?app=) se lit dans le
+ * navigateur ; ouverte directement (un rechargement), la page attend son JS sur un écran sobre plutôt que de montrer
+ * les étapes d’une autre appli. iMessage ne s’exporte pas : next.config.ts l’envoie filmer son écran.
+ */
+export default function Page() {
+  return (
+    <Suspense fallback={<Squelette />}>
+      <ExportDepuisLadresse />
+    </Suspense>
+  );
 }

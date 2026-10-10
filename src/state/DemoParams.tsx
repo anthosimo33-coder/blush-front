@@ -10,9 +10,6 @@
  */
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
-import { mockServer } from "@/mocks/server";
-import { CONVS_COOKIE } from "@/mocks/convs";
-import { DEMO_STORY_IDS } from "@/mocks/stories";
 import { readStoryCookie, writeStoryCookie } from "@/services/session";
 import { readJourney, setJourney } from "@/state/journey";
 import { invalidate } from "@/lib/query";
@@ -37,31 +34,41 @@ export function DemoParams() {
   useIsoLayoutEffect(() => {
     /* Avec le vrai back-end, ces paramètres de démo ne touchent à rien (un lien ?histoire=couple changeait la conv ouverte). `?erreur=` reste : le vrai parcours s’en sert */
     if (BACKEND) return;
-    let changed = false;
-    if (plan && PLANS.includes(plan as Plan)) {
-      mockServer.set({ plan: plan as Plan });
-      changed = true;
-    }
-    if (verdict) {
-      mockServer.set({ verdict: verdict === "difficile" ? "difficile" : "normal" });
-      changed = true;
-    }
-    /* Une autre histoire : les pages serveur la relisent (cookie), les données en cache aussi */
-    const storyId = histoire === "couple" || histoire === "rencontre" ? DEMO_STORY_IDS[histoire] : null;
-    if (storyId) {
-      /* Le parcours suit : « En couple » choisi pour l’histoire en couple, décoché sinon */
-      const couple = histoire === "couple";
-      if (couple !== (readJourney().guess === "ensemble")) setJourney(couple ? { guess: "ensemble", goal: "mieux" } : { guess: null, goal: null });
-      if (readStoryCookie() !== storyId) {
-        writeStoryCookie(storyId);
-        invalidate("report", "account", "fiche", "question");
-        router.refresh();
+    const couple = histoire === "couple" || histoire === "rencontre";
+    if (!plan && !verdict && !couple && !convs) return;
+    /* Les mocks n’arrivent qu’ici, à la demande : ils ne pèsent sur aucune page du vrai site (ni de la démo sans paramètre) */
+    let fini = false;
+    void Promise.all([import("@/mocks/server"), convs ? import("@/mocks/convs") : null, couple ? import("@/mocks/stories") : null]).then(([{ mockServer }, mConvs, mStories]) => {
+      if (fini) return;
+      let changed = false;
+      if (plan && PLANS.includes(plan as Plan)) {
+        mockServer.set({ plan: plan as Plan });
+        changed = true;
       }
-    }
-    /* Les pages serveur lisent déjà le paramètre ; le cookie le garde pour les pages suivantes */
-    if (convs === "plusieurs") document.cookie = `${CONVS_COOKIE}=plusieurs; path=/; samesite=lax`;
-    if (convs === "une") document.cookie = `${CONVS_COOKIE}=; path=/; max-age=0; samesite=lax`;
-    if (changed) invalidate("report", "account");
+      if (verdict) {
+        mockServer.set({ verdict: verdict === "difficile" ? "difficile" : "normal" });
+        changed = true;
+      }
+      /* Une autre histoire : les pages serveur la relisent (cookie), les données en cache aussi */
+      const storyId = mStories && (histoire === "couple" || histoire === "rencontre") ? mStories.DEMO_STORY_IDS[histoire] : null;
+      if (storyId) {
+        /* Le parcours suit : « En couple » choisi pour l’histoire en couple, décoché sinon */
+        const enCouple = histoire === "couple";
+        if (enCouple !== (readJourney().guess === "ensemble")) setJourney(enCouple ? { guess: "ensemble", goal: "mieux" } : { guess: null, goal: null });
+        if (readStoryCookie() !== storyId) {
+          writeStoryCookie(storyId);
+          invalidate("report", "account", "fiche", "question");
+          router.refresh();
+        }
+      }
+      /* Les pages serveur lisent déjà le paramètre ; le cookie le garde pour les pages suivantes */
+      if (mConvs && convs === "plusieurs") document.cookie = `${mConvs.CONVS_COOKIE}=plusieurs; path=/; samesite=lax`;
+      if (mConvs && convs === "une") document.cookie = `${mConvs.CONVS_COOKIE}=; path=/; max-age=0; samesite=lax`;
+      if (changed) invalidate("report", "account");
+    });
+    return () => {
+      fini = true;
+    };
   }, [plan, verdict, histoire, convs, router]);
 
   const error = erreur && ERRORS.includes(erreur as DemoError) ? (erreur as DemoError) : null;

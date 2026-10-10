@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { basDePage } from "@/lib/defilement";
+import { figtree } from "@/lib/fonts";
 import { formatCount } from "@/lib/format";
+import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { askQuestion, getQuestion, souciQuestion } from "@/services/api";
+import { BACKEND } from "@/services/mode";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -22,8 +26,12 @@ import type { Story } from "@/types";
  * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
-export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
-  const { data: answer, loading } = useQuery("question", getQuestion);
+/**
+ * `posee` : la question déjà posée et sa réponse, lues par la page serveur (back-end : jamais, elle passe par le chat).
+ * Le champ et les idées sont ainsi là dès le premier affichage, sans attendre une lecture du navigateur.
+ */
+export function QuestionChat({ ideas, story, posee = null }: { ideas: string[]; story: Story; posee?: QuestionAnswer | null }) {
+  const { data: answer, loading } = useQuery("question", getQuestion, posee, { fetch: !BACKEND });
   const { plan } = useAccess();
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
@@ -31,6 +39,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
   const [souci, setSouci] = useState<string | null>(null);
   const first = useRef(true);
+  const conv = useRef<HTMLDivElement>(null);
+  const avant = useRef<Map<string, number> | null>(null);
   const question = answer?.question ?? asking?.question ?? null;
   const typed = draft.trim().length > 0;
   const ready = !loading;
@@ -42,8 +52,19 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       return;
     }
     const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    /* Jamais plus bas que le bas de la page : clavier ouvert, Safari décollerait le champ du clavier */
+    window.scrollTo({ top: basDePage(), behavior: smooth ? "smooth" : "auto" });
   }, [question, asking?.leaving, answer]);
+
+  /*
+   * La réponse arrive : la conv, posée en bas, remonte d’un coup de toute sa hauteur (et le pied change). Elle glisse
+   * plutôt de son ancienne place à la nouvelle (FLIP, en transform), la réponse montant avec elle depuis le bas.
+   */
+  useLayoutEffect(() => {
+    const b = avant.current;
+    avant.current = null;
+    if (b && conv.current && !prefersReducedMotion()) flipFrom(b, [conv.current], () => "conv", spring("soft"));
+  }, [answer]);
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -67,6 +88,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       setAsking({ question: q, leaving: true });
       await new Promise((r) => setTimeout(r, 190));
     }
+    if (conv.current) avant.current = snapshotTops([conv.current], () => "conv");
     setQueryData("question", a);
     setAsking(null);
     play("reponse");
@@ -118,7 +140,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       <ButtonLink href="/rapport" arrow>
         Retour au rapport
       </ButtonLink>
-      <Link href="/app" className="relative inline-flex min-h-11 items-center px-1 text-[15px] font-black text-soft no-underline transition-colors hover:text-ink">
+      {/* Sans remise en haut : l’accueil s’ouvre sur le dernier échange */}
+      <Link href="/app" scroll={false} className="relative inline-flex min-h-11 items-center px-1 text-[15px] font-black text-soft no-underline transition-colors hover:text-ink">
         {plan === "blushplus" ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
       </Link>
     </div>
@@ -129,6 +152,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       requires="rapport"
       autre={(story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).name}
       srTitle="Ta question"
+      /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
+      className={figtree.variable}
       aside={null}
       mainWidth={600}
       frameWidth={600}
@@ -154,7 +179,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
       {/* La conv, posée en bas, près du champ */}
       <div className="flex flex-1 flex-col justify-end gap-5 pb-2 pt-4 lg:pt-6">
-        <div role="log" aria-label="Ta conversation avec BLUSH" aria-live="polite" className="flex flex-col gap-4">
+        <div ref={conv} role="log" aria-label="Ta conversation avec BLUSH" aria-live="polite" className="flex flex-col gap-4">
           <BlushSays
             bubbles={[
               <span key="a" className="text-[17px] font-black leading-[1.3]">

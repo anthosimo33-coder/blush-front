@@ -2,11 +2,10 @@
 
 import { ErreurApi } from "@/services/reel";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
-import { invalidate } from "@/lib/query";
 import { unlock } from "@/services/api";
-import { OFFERS, PAYWALL } from "@/mocks/daily";
+import { OFFERS, PAYWALL } from "@/content/offres";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Tag } from "@/components/ui/messages";
@@ -40,6 +39,20 @@ export function PaywallSheet({
   const offers = only ? OFFERS.filter((o) => o.id === only) : OFFERS;
   const [selected, setSelected] = useState<Offer["id"]>(only ?? "blushplus");
   const [busy, setBusy] = useState(false);
+  /*
+   * Payé : le bouton reste occupé jusqu’à l’arrivée de « C’est débloqué », la feuille reste ouverte (elle part avec la
+   * page). Fermer la feuille et relire le rapport avant faisait redessiner et sauter le rapport dessous.
+   */
+  const [navigue, demarrer] = useTransition();
+  const paye = useRef<Exclude<Plan, "gratuit"> | null>(null);
+  const occupe = busy || navigue;
+  /* La navigation finie sans quitter la page : le parent ferme le panneau (fermer n’est pas annuler) */
+  useEffect(() => {
+    if (navigue || !paye.current) return;
+    const plan = paye.current;
+    paye.current = null;
+    onUnlocked?.(plan);
+  }, [navigue, onUnlocked]);
 
   const [later, setLater] = useState(false);
   /* Autre chose que « bientôt » (le réseau, le serveur) : on le dit, le bouton se libère */
@@ -57,11 +70,10 @@ export function PaywallSheet({
       else setSouci(true);
       return;
     }
-    invalidate("report", "account");
+    /* Le moment « C’est débloqué », qui relit le rapport et le compte en arrivant. Le bouton passe d’occupé (busy) à en route (navigue) sans se libérer */
     setBusy(false);
-    /* Le parent ferme le panneau : fermer n’est pas annuler. Puis le moment « C’est débloqué ». */
-    onUnlocked?.(selected);
-    router.push(`/rapport/debloque?offre=${selected}${next ? `&suite=${encodeURIComponent(next)}` : ""}`);
+    paye.current = selected;
+    demarrer(() => router.push(`/rapport/debloque?offre=${selected}${next ? `&suite=${encodeURIComponent(next)}` : ""}`));
   };
 
   return (
@@ -119,8 +131,8 @@ export function PaywallSheet({
             Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.
           </p>
         )}
-        <Button arrow={!busy} onClick={busy ? undefined : pay} aria-busy={busy}>
-          {busy ? <TypingDots color="#FFFFFF" label="Paiement en cours" /> : "Débloquer"}
+        <Button arrow={!occupe} onClick={occupe ? undefined : pay} aria-busy={occupe}>
+          {occupe ? <TypingDots color="#FFFFFF" label="Paiement en cours" /> : "Débloquer"}
         </Button>
         <span className="text-center text-[12px] font-extrabold text-grey">{PAYWALL.payments}</span>
       </div>

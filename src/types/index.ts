@@ -217,11 +217,23 @@ export type BlushAnswer = (
   levelUp?: LevelId;
   /** La réponse dite en vocal : l’audio, sa durée (en secondes) et son onde. Ses bulles ne s’affichent pas. */
   vocal?: { audio: string; duree: number; peaks: number[] };
+  /** Back-end : le vocal se prépare encore (il arrive juste après la réponse, voir EvenementChat) ; sa bulle attend. Jamais en base. */
+  vocalEnCours?: boolean;
   /** Le chat est en vocal après cette réponse (il a demandé à BLUSH de lui parler en vocal). */
   modeVocal?: boolean;
   /** Back-end : l’échange (l’id de ton message) auquel cette réponse appartient, pour la partager en image. */
   echange?: number;
 };
+
+/** Une bulle de BLUSH dans le chat, et les messages qu’elle cite. */
+export type BulleChat = Extract<BlushAnswer, { kind: "bubbles" }>["bubbles"][number];
+
+/**
+ * Back-end : la réponse du chat en flux (POST /api/chat, une ligne JSON par événement). Ses bulles une à une, pendant
+ * qu’il écrit ; la réponse validée (elle peut remplacer ces bulles) ; puis, si elle part en vocal, l’audio (null : elle
+ * reste écrite). Une erreur en route remplace la suite.
+ */
+export type EvenementChat = { bulle: BulleChat } | { reponse: BlushAnswer } | { vocal: NonNullable<BlushAnswer["vocal"]> | null } | { erreur: string };
 
 export type Reply = {
   messageId: string;
@@ -251,6 +263,8 @@ export type Fiche = {
   facts: FicheFact[];
   summary: string;
   summaryShort: string;
+  /** Une mise à jour de la mémoire est en attente ou en cours (back-end) : ce qui arrive n’est pas encore dans la fiche, l’écran la relit. */
+  updating?: boolean;
 };
 
 /** Ce que BLUSH a trouvé dans des captures ou un export, déjà rangé dans sa fiche. */
@@ -259,6 +273,11 @@ export type FicheUpdate = {
   added: FicheFact[];
   /** Ce qu’il savait déjà : l’info reste une seule fois, sa nouvelle source s’ajoute. */
   confirmed: FicheFact[];
+  /**
+   * Lu, pas encore rangé (back-end) : ce qu’on lit sur son profil, et le nombre de nouveaux messages. La mémoire se met
+   * à jour après la réponse ; `added` arrive quand la fiche ne dit plus `updating`.
+   */
+  pending?: { profile: string[]; messages: number };
   /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, un bug. */
   problem?: "capture" | "fichier" | "autre_conv" | "trop" | "bug";
 };

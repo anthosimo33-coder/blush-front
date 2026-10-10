@@ -158,7 +158,7 @@ function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => vo
       <PlayCard title="Ton prochain pas" className="[@media(max-height:600px)]:py-2.5">
         {conv.next}
       </PlayCard>
-      <ButtonLink href={cta.href} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
+      <ButtonLink href={cta.href} scroll={cta.scroll} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
         {cta.label}
       </ButtonLink>
       <p className="m-0 hidden text-center text-[13px] font-extrabold text-grey lg:block">Exemple fictif. Ton rapport, lui, part de vos vrais messages.</p>

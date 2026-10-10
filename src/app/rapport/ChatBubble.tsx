@@ -55,6 +55,10 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
   return (
     <Link
       href="/app?depuis=rapport"
+      /* L’accueil se pose lui-même en bas de la conv : Next ne doit pas le remettre en haut */
+      scroll={false}
+      /* Préchargé en entier : l’accueil n’a pas d’écran de chargement (il casserait le glissé vers la fiche). Gardé 5 min, il relit son historique en s’ouvrant */
+      prefetch
       onClick={marquerChatOuvert}
       aria-label="Parler à BLUSH"
       aria-hidden={cachee || undefined}
@@ -81,7 +85,8 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
           sobre ? "bg-ink shadow-[0_14px_30px_-14px_rgba(17,17,20,0.6)]" : "bg-white shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_16px_34px_-14px_rgba(17,17,20,0.45)]",
         )}
       >
-        {sobre ? <Icon name="imessage" size={26} color="#FFFFFF" stroke={2.2} /> : <BubbleLogo size={40} animated />}
+        {/* Une fois le chat ouvert, la bulle se calme : ses perles ne tournent plus en fond pendant toute la lecture */}
+        {sobre ? <Icon name="imessage" size={26} color="#FFFFFF" stroke={2.2} /> : <BubbleLogo size={40} animated={!ouvert} />}
         {!ouvert && <span aria-hidden="true" className="absolute right-1 top-1 size-3.5 rounded-full border-[2.5px] border-white bg-elle" />}
       </span>
     </Link>

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { verdictAffiche } from "@prompts/lib/front";
 import type { DonneesVerdict } from "./analyse";
-import { chiffrer, dechiffrer } from "./chiffrement";
+import { chiffrer, dechiffrer, empreinte } from "./chiffrement";
 import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { metaDe, type Ligne } from "./histoires";
@@ -57,19 +57,23 @@ export function masqueDe(story: Ligne): (texte: string) => string {
   return (texte) => masquerPrenoms(texte, autres, toi);
 }
 
-/** Le lien de partage de l’histoire, créé s’il n’existe pas encore. Ce qu’il montre est refait à chaque partage. */
-export async function partagerVerdict(story: Ligne): Promise<string> {
+/**
+ * Le lien de partage de l’histoire, créé s’il n’existe pas encore, et ce qu’il montre (refait à chaque partage) : la
+ * feuille de partage a les deux sans relire le lien qu’on vient d’écrire.
+ */
+export async function partager(story: Ligne): Promise<{ id: string; verdict: VerdictPartage }> {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
   if (!v) throw new ErreurPartage("pas_pret");
   const { sortie } = dechiffrer<DonneesVerdict>(v.data);
   /* Une situation difficile ne se partage pas */
   if (sortie.mode_sobre) throw new ErreurPartage("sobre");
-  const verdict = verdictAffiche(sortie);
+  const affiche = verdictAffiche(sortie);
   const masquer = masqueDe(story);
-  const data = chiffrer({ emoji: verdict.emoji, title: masquer(verdict.title), subtitle: masquer(verdict.subtitle) } satisfies VerdictPartage);
+  const verdict: VerdictPartage = { emoji: affiche.emoji, title: masquer(affiche.title), subtitle: masquer(affiche.subtitle) };
+  const data = chiffrer(verdict);
   /* Déjà partagé : le même lien, masqué comme aujourd’hui (un lien créé avant le 9 octobre masquait aussi ton prénom) */
   const [deja] = await db().update(schema.shares).set({ data }).where(eq(schema.shares.storyId, story.id)).returning({ id: schema.shares.id });
-  if (deja) return deja.id;
+  if (deja) return { id: deja.id, verdict };
   const [cree] = await db()
     .insert(schema.shares)
     .values({ id: nouvelId(), storyId: story.id, data })
@@ -77,7 +81,7 @@ export async function partagerVerdict(story: Ligne): Promise<string> {
     .onConflictDoUpdate({ target: schema.shares.storyId, set: { data } })
     .returning({ id: schema.shares.id });
   await compter(CLES.lienCree);
-  return cree.id;
+  return { id: cree.id, verdict };
 }
 
 /** Le lien de l’histoire, s’il existe. */
@@ -90,6 +94,13 @@ export async function lienDe(storyId: string): Promise<string | null> {
 export async function arreterPartage(storyId: string): Promise<void> {
   await db().delete(schema.shares).where(eq(schema.shares.storyId, storyId));
 }
+
+/**
+ * La version de l’image story d’un lien, pour son adresse (`/v/<id>/image?format=story&v=<version>`) : une empreinte
+ * (avec la clé du serveur) du lien et de ce qu’il montre. Elle change quand le verdict montré change ; un lien
+ * désactivé puis repartagé a un autre identifiant. Impossible à deviner : seule la feuille de partage la connaît.
+ */
+export const versionImage = (id: string, v: VerdictPartage) => empreinte(`partage:${id}:${v.emoji}:${v.title}:${v.subtitle}`).slice(0, 16);
 
 /** Ce que montre un lien public, ou null (lien inconnu ou désactivé). */
 export async function verdictPartage(id: string): Promise<VerdictPartage | null> {

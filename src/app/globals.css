@@ -2,11 +2,15 @@
 /* Les prompts (sous-module) ne contiennent aucune classe : Tailwind ne les lit pas */
 @source not "../../prompts";
 
+/* Figtree, posée seulement sur les écrans à bulles (src/lib/fonts.ts) : la pile est assemblée là où ses alphabets sont définis */
+.police-figtree {
+  --font-figtree: var(--font-figtree-latin-ext), var(--font-figtree-latin);
+}
+
 /* BLUSH · Design system « Le jeu » — tokens repris de maquettes/design-tokens.css */
 :root {
   /* Les polices (src/app/polices.ts) : les alphabets rares d’abord, le latin et sa police de repli en dernier */
   --font-nunito: var(--font-nunito-cyrillique-ext), var(--font-nunito-cyrillique), var(--font-nunito-vietnamien), var(--font-nunito-latin-ext), var(--font-nunito-latin);
-  --font-figtree: var(--font-figtree-latin-ext), var(--font-figtree-latin);
 
   --paper: #f4f2ed;
   --paper-light: radial-gradient(120% 55% at 50% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 62%), #f4f2ed;
@@ -113,7 +117,12 @@
     color: var(--ink);
     font-family: var(--font-nunito), system-ui, sans-serif;
     font-weight: 700;
-    overflow-x: hidden;
+    /* clip et non hidden : quand une feuille bloque le défilement (overflow: hidden sur html), un body en
+       hidden deviendrait un conteneur de défilement, et les en-têtes collants s’y recolleraient tout en haut */
+    overflow-x: clip;
+  }
+  @supports not (overflow: clip) {
+    body { overflow-x: hidden; }
   }
 
   button {
@@ -189,10 +198,17 @@
 [data-land] { transform-origin: 9% 89%; animation: logoLand 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: var(--d, 0s); }
 
 /* ———— Sa fiche : BLUSH analyse ce que tu ajoutes, puis ce qui arrive s’éclaire en rose ———— */
-@keyframes ficheScan { 0% { top: 0; opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
-@keyframes factNew { 0%, 30% { background-color: rgba(255, 79, 154, 0.13); } 100% { background-color: rgba(255, 79, 154, 0); } }
+/* Rien que transform et opacity : le compositeur les joue seul, même pendant que les fichiers se préparent (animer top ou
+   un fond repeindrait chaque image sur le fil principal, qui est alors occupé) */
+@keyframes ficheScan { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(100%); opacity: 0; } }
+@keyframes factNew { 0%, 30% { opacity: 1; } 100% { opacity: 0; } }
 [data-scan-bar] { animation: ficheScan 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
-[data-new] { animation: factNew 2.8s ease-out both; }
+/* Le rose est un calque sous le texte de la ligne, qui s’efface */
+[data-new] { position: relative; isolation: isolate; }
+[data-new]::before { content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(255, 79, 154, 0.13); pointer-events: none; animation: factNew 2.8s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  [data-new]::before { display: none; }
+}
 
 /* ———— La révélation du verdict : une scène sombre, une carte à la fois ———— */
 @keyframes vStage { from { opacity: 0; } to { opacity: 1; } }
@@ -201,7 +217,8 @@
 @keyframes vDrop { 0% { opacity: 0; transform: translateY(-70px) scale(0.4) rotate(-20deg); } 55% { opacity: 1; transform: translateY(0) scale(1.14) rotate(5deg); } 75% { transform: scale(0.95) rotate(-2deg); } 100% { opacity: 1; transform: none; } }
 @keyframes vGlow { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.08); opacity: 1; } }
 @keyframes vWord { from { opacity: 0; transform: translateY(0.45em); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
-@keyframes vBar { from { width: 50%; } }
+/* La barre du duel glisse (transform) au lieu de s’élargir : aucune mise en page pendant le moment « waouh » */
+@keyframes vBar { from { transform: translateX(-50%); } }
 @keyframes vOnce { 0% { opacity: 0; transform: scale(0.85); } 18%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(0.95); } }
 @keyframes vMsg { from { opacity: 0; transform: translateY(10px) scale(0.92); } to { opacity: 1; transform: none; } }
 [data-stage] { animation: vStage 0.7s ease-out both; }
@@ -210,7 +227,7 @@
 [data-drop] { animation: vDrop 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) 0.25s both; }
 [data-vglow] { animation: vGlow 3.2s ease-in-out infinite; }
 [data-word] { animation: vWord 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
-[data-bar] { width: var(--w); animation: vBar 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+[data-bar] { width: 100%; transform: translateX(calc(var(--w) - 100%)); animation: vBar 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
 /* les trois points ne font que passer : cachés au repos */
 [data-once] { opacity: 0; animation: vOnce 0.75s ease-out both; animation-delay: var(--d, 0s); }
 [data-msg] { animation: vMsg 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) both; animation-delay: var(--d, 0s); }
@@ -223,9 +240,6 @@
 
 @keyframes dRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 [data-rise] { animation: dRise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: var(--d, 0s); }
-
-@keyframes jPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(61, 151, 255, 0.45); } 50% { box-shadow: 0 0 0 10px rgba(61, 151, 255, 0); } }
-[data-pulse] { animation: jPulse 1.8s ease-in-out infinite; }
 
 @keyframes jGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 [data-grow] { transform-origin: left center; animation: jGrow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
@@ -242,6 +256,9 @@
 @keyframes sheetIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+/* Une feuille ouverte : les boucles de la page derrière (défilé, logos qui flottent ou écrivent, bulle qui s’agite) se figent ;
+   rien ne bouge plus sous le voile, le téléphone n’a que la feuille à dessiner. Le contenu de la feuille, lui, continue */
+html:has(dialog[open]) :is([data-marquee], [data-float], [data-nudge], [data-dring], [data-dring-icone], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow]):not(dialog *) { animation-play-state: paused; }
 /* Code faux : les cases tremblent une fois */
 @keyframes codeShake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
@@ -265,7 +282,7 @@
 }
 
 /* 1 · L’arrivée (une fois par jour) : BLUSH se pose d’un bond et fait coucou, l’anneau de Sophie se dessine,
-   puis il écrit son conseil mot par mot. Rien n’attend : on peut écrire pendant. */
+   puis il écrit son conseil mot par mot. Rien n’attend : on peut écrire pendant, et le premier geste pose tout d’un coup (HomeScreen). */
 @keyframes arDrop { from { opacity: 0; transform: translateY(-54px) scale(0.3) rotate(-18deg); } to { opacity: 1; transform: none; } }
 @keyframes arPop { from { opacity: 0; transform: translateY(-20px) scale(0.6); } to { opacity: 1; transform: none; } }
 @keyframes arGrow { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
@@ -289,7 +306,8 @@
 .home-arrive [data-a="ring"] { animation: arRing 1.1s cubic-bezier(0.25, 0.8, 0.25, 1) 0.9s both; }
 .home-arrive [data-a="nm"] { animation: arFade 0.42s ease-out 0.7s both; }
 .home-arrive [data-a="badge"] { animation: arBadge var(--spring-bounce-d) var(--spring-bounce) 1.45s both; }
-.home-arrive [data-a="composer"] { animation: arUp var(--spring-soft-d) var(--spring-soft) 0.67s both; }
+/* Ce qui sert à agir arrive tôt (la barre de saisie, puis les pastilles) : la suite de la scène ne fait pas attendre */
+.home-arrive [data-a="composer"] { animation: arUp var(--spring-soft-d) var(--spring-soft) 0.4s both; }
 .home-arrive [data-a="day"] { animation: arFade 0.5s ease-out 1s both; }
 .home-arrive [data-a="ghost"] { transform-origin: 9% 89%; animation: arGhost 1.05s linear 1.05s both; }
 /* Les bulles de l’intro et les pastilles gardent le nom de leur animation habituelle (dRise, crPopIn) : à la fin de l’arrivée, elle ne rejoue pas */
@@ -297,7 +315,7 @@
 .home-arrive [data-a="intro-av"] { transform-origin: 9% 89%; animation: arGrow var(--spring-bounce-d) var(--spring-bounce) 2.25s both; }
 .home-arrive [data-a="w"] { display: inline-block; animation: arWord 0.48s cubic-bezier(0.2, 0.8, 0.2, 1) calc(2.24s + var(--i, 0) * 0.06s) both; }
 .home-arrive [data-a="intro-tm"] { animation: arFade 0.4s ease-out 2.7s both; }
-.home-arrive [data-a="chip"] { animation: crPopIn var(--spring-pop-d) var(--spring-pop) calc(2.9s + var(--i, 0) * 0.06s) both; }
+.home-arrive [data-a="chip"] { animation: crPopIn var(--spring-pop-d) var(--spring-pop) calc(0.75s + var(--i, 0) * 0.05s) both; }
 
 /* 2 · BLUSH t’écoute : la bulle se penche vers toi pendant que tu écris ; en vocal, les perles suivent ta voix */
 [data-blush-logo] { transition: transform var(--spring-pop-d) var(--spring-pop), scale 0.3s var(--ease-pop); }
@@ -339,6 +357,10 @@
 @keyframes beat { 0% { transform: scale(1); opacity: 0.9; } 70%, 100% { transform: scale(2.25); opacity: 0; } }
 [data-beat] { position: relative; isolation: isolate; }
 [data-beat]::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 50%; background: rgba(61, 151, 255, 0.45); pointer-events: none; animation: beat 1.8s ease-out infinite; }
+/* Sur une grande pastille (l’étape en cours de l’échelle des niveaux) : un anneau autour, jamais dessus (la pastille garde sa
+   couleur), qui s’écarte d’une dizaine de pixels et s’efface comme l’ancienne ombre animée ; son ombre fixe ne se repeint pas */
+@keyframes beatDoux { 0% { transform: scale(1); opacity: 0; } 15% { opacity: 1; } 60%, 100% { transform: scale(1.3); opacity: 0; } }
+[data-beat="doux"]::after { background: none; box-shadow: 0 0 0 5px rgba(61, 151, 255, 0.45); animation: beatDoux 1.8s ease-out infinite; }
 
 /* 11 · Le niveau qui monte : l’anneau se remplit, des éclats partent de Sophie */
 [data-ring-fill] { transition: stroke-dasharray 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -357,6 +379,21 @@
 ::view-transition-old(.pop-out) { animation: vtToRight var(--spring-soft-d) var(--spring-soft) both; box-shadow: -14px 0 34px -14px rgba(17, 17, 20, 0.3); }
 ::view-transition-group(.push-in), ::view-transition-group(.pop-out) { z-index: 2; }
 ::view-transition-group(.avatar-morph) { z-index: 3; animation-duration: var(--spring-soft-d); animation-timing-function: var(--spring-soft); }
+/* L’accueil, lui, glisse en entier (la racine : une image de l’écran, pas de toute la conv). Le sens vient des types du lien.
+   Il arrive (de la liste, nav-forward : par la droite, au-dessus ; de sa fiche, nav-back : par la gauche, dessous), ou il
+   part (accueil-vers-fiche : à gauche, sous la fiche ; accueil-vers-convs : à droite, au-dessus). L’autre image de la
+   racine n’est que le fond de l’autre page, qui glisse dans son propre calque : elle reste cachée */
+html:active-view-transition-type(nav-forward)::view-transition-group(root) { z-index: 2; }
+html:active-view-transition-type(nav-forward)::view-transition-old(root) { animation: none; opacity: 0; }
+html:active-view-transition-type(nav-forward)::view-transition-new(root) { animation: vtFromRight var(--spring-soft-d) var(--spring-soft) both; box-shadow: -14px 0 34px -14px rgba(17, 17, 20, 0.3); }
+html:active-view-transition-type(nav-back)::view-transition-old(root) { animation: none; opacity: 0; }
+html:active-view-transition-type(nav-back)::view-transition-new(root) { animation: vtFromLeft var(--spring-soft-d) var(--spring-soft) both; }
+html:active-view-transition-type(accueil-vers-fiche)::view-transition-group(root) { z-index: auto; }
+html:active-view-transition-type(accueil-vers-fiche)::view-transition-old(root) { animation: vtToLeft var(--spring-soft-d) var(--spring-soft) both; opacity: 1; }
+html:active-view-transition-type(accueil-vers-fiche)::view-transition-new(root) { animation: none; opacity: 0; }
+html:active-view-transition-type(accueil-vers-convs)::view-transition-group(root) { z-index: 2; }
+html:active-view-transition-type(accueil-vers-convs)::view-transition-old(root) { animation: vtToRight var(--spring-soft-d) var(--spring-soft) both; box-shadow: -14px 0 34px -14px rgba(17, 17, 20, 0.3); opacity: 1; }
+html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) { animation: none; opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(*), ::view-transition-new(*), ::view-transition-group(*) { animation-duration: 0s !important; animation-delay: 0s !important; }
 }
@@ -451,6 +488,7 @@
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
-  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-pulse], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
+  [data-vocal-parle] [data-pearl], [data-vocal-parle] [data-shade], [data-vocal-halo], [data-vocal-pop], [data-vocal-story], [data-vocal-nouveau], [data-vocal-eq], [data-vocal-rec], [data-vocal-respire] > *, [data-dots] > *, [data-nudge], [data-dring], [data-dring-icone], [data-ecrit], [data-float], [data-marquee], [data-tap], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-typing], [data-typing] > *, [data-land], [data-new] { animation: none !important; }
   [data-scan-bar] { animation: none !important; visibility: hidden; }
+  [data-beat="doux"]::after { animation: none !important; opacity: 0; }
 }

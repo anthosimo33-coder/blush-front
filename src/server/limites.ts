@@ -24,8 +24,12 @@ export const LIMITES = {
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
-  /** Les lots d’images d’un enregistrement d’écran (une dizaine par enregistrement), chacun lu par le modèle. */
-  lotParIp: { max: 60, fenetreS: 3600 },
+  /**
+   * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six écrans (douze avant),
+   * jusqu’à seize pour un long enregistrement. Les plafonds des lots ont doublé avec eux : autant d’enregistrements
+   * qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer plusieurs), pour à peu près autant d’images lues.
+   */
+  lotParIp: { max: 120, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**
@@ -33,10 +37,10 @@ export const LIMITES = {
    * travailler le modèle payant avant l’email : changer d’adresse IP ne doit pas faire grimper la facture sans fin.
    */
   capturesAnonymesParJour: { max: 50, fenetreS: 86400 },
-  lotsAnonymesParJour: { max: 200, fenetreS: 86400 },
+  lotsAnonymesParJour: { max: 400, fenetreS: 86400 },
   /** Les mêmes lectures pour un compte connecté, par jour (un compte gratuit suffirait sinon à passer outre le plafond). */
   capturesParCompte: { max: 30, fenetreS: 86400 },
-  lotsParCompte: { max: 150, fenetreS: 86400 },
+  lotsParCompte: { max: 300, fenetreS: 86400 },
   /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
   ficheParCompte: { max: 60, fenetreS: 86400 },
 } as const;

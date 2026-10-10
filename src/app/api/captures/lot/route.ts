@@ -5,7 +5,7 @@ import { ErreurImport } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance } from "@/server/echeance";
 
-/* Un lot d’une douzaine d’images : jusqu’à une minute de lecture */
+/* Un lot de six images : une trentaine de secondes de lecture, une minute au pire */
 export const maxDuration = 180;
 
 /**
@@ -23,7 +23,7 @@ async function traiter(req: Request) {
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("lots");
     if (permis !== "ok") return erreur(permis, permis === "connexion" ? 401 : 429);
-    return json({ lot: await lireLot(images, appli.success ? appli.data : "autre") });
+    return json({ lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });
   } catch (e) {
     if (e instanceof ErreurImport) return erreur(e.code, 422);
     throw e;

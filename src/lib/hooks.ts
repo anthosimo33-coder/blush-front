@@ -20,16 +20,23 @@ export function useReducedMotion() {
 
 export type Device = "ios" | "android" | "other";
 
-/** iPhone, Android ou autre (pour adapter les étapes d’export). */
+const appareil = (): Device => {
+  const ua = navigator.userAgent;
+  const iPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  return /Android/i.test(ua) ? "android" : /iPhone|iPad|iPod/.test(ua) || iPadOS ? "ios" : "other";
+};
+
+/**
+ * iPhone, Android ou autre (pour adapter les étapes d’export). Le serveur ne le sait pas (« autre ») : seule une page
+ * chargée en entier corrige après l’hydratation. Ouvert depuis une autre page, l’écran le sait dès son premier rendu, sans
+ * texte qui change sous les yeux.
+ */
 export function useDevice(): Device {
-  const [d, setD] = useState<Device>("other");
-  useEffect(() => {
-    const ua = navigator.userAgent;
-    const iPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture du navigateur après hydratation
-    setD(/Android/i.test(ua) ? "android" : /iPhone|iPad|iPod/.test(ua) || iPadOS ? "ios" : "other");
-  }, []);
-  return d;
+  return useSyncExternalStore(
+    () => () => {},
+    appareil,
+    () => "other",
+  );
 }
 
 /** Ouvre le sélecteur de fichiers natif depuis n’importe quel bouton. */

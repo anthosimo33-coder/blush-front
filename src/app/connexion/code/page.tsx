@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
-import { CodeScreen } from "@/app/email/code/CodeScreen";
-import { suiteSure } from "@/lib/suite";
+import { Suspense } from "react";
+import { CodeDepuisLadresse, CodeScreen } from "@/app/email/code/CodeScreen";
 
 export const metadata: Metadata = { title: "Ton code" };
 
-export default async function Page({ searchParams }: PageProps<"/connexion/code">) {
-  const suite = suiteSure((await searchParams).suite);
-  return <CodeScreen connexion suite={suite ?? undefined} fermee={process.env.NEXT_PUBLIC_BLUSH_BACKEND === "1" && process.env.BLUSH_BETA_FERMEE === "1"} />;
+/*
+ * Statique, comme /connexion : `?suite=` se lit dans le navigateur (avec la même garde, suiteSure). Bêta fermée :
+ * src/proxy.ts sert à la même adresse /connexion/code/fermee (la bêta lue à l’exécution).
+ */
+export default function Page() {
+  return (
+    <Suspense fallback={<CodeScreen connexion />}>
+      <CodeDepuisLadresse />
+    </Suspense>
+  );
 }

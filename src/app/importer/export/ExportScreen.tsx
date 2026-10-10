@@ -1,12 +1,12 @@
 "use client";
 
-import { ErreurApi } from "@/services/reel";
+import { ErreurApi, prechargerExport } from "@/services/reel";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDevice, useFilePicker } from "@/lib/hooks";
 import { uploadExport } from "@/services/api";
-import { EXPORT_STEPS } from "@/mocks/story";
+import { EXPORT_STEPS } from "@/content/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/controls";
@@ -20,6 +20,7 @@ import { ChoixConv, type ConvInstagram } from "./ChoixConv";
 
 type ExportApp = "whatsapp" | "imessage" | "instagram";
 type Menu = { contact: string; items: readonly string[]; highlight: number };
+const NB = "\u00a0";
 
 /* Écran 02 — Exporter : l’appli, l’écran à reconnaître (téléphone ou Mac), les étapes en frise, puis le fichier. */
 export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
@@ -29,6 +30,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [app, setApp] = useState<ExportApp>(initialApp);
   const [video, setVideo] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* Un export Instagram complet : où en est le tour de ses convs (de 0 à 1), dit dans le bouton */
+  const [avance, setAvance] = useState<number | null>(null);
   /* L’envoi n’a pas pu se faire (le réseau, trop d’imports d’un coup) : on le dit ici, la conv n’est pas en cause */
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
@@ -49,16 +52,25 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const data = EXPORT_STEPS[app];
   const steps = device === "ios" ? data.steps.ios : device === "android" ? data.steps.android : data.steps.all;
 
+  /* La lecture de l’export est chargée à la demande : on la charge dès qu’on ouvre le choix du fichier */
+  const choisirFichier = () => {
+    prechargerExport();
+    picker.open();
+  };
+
   const onFiles = async ([file]: File[]) => {
     setBusy(true);
     setSouci(null);
+    setAvance(null);
     let source;
     try {
-      source = await uploadExport(file, app, choisir);
+      /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
+      source = await uploadExport(file, app, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
     } catch (e) {
       if (!monte.current) return;
       /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (DemoParams, ?erreur=) */
       setBusy(false);
+      setAvance(null);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
       if (e instanceof ErreurApi && e.code === "annule") return;
       /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
@@ -89,8 +101,20 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </p>
           )}
-          <Button onClick={picker.open} disabled={busy} aria-busy={busy}>
-            {busy ? <TypingDots color="#FFFFFF" label="Analyse du fichier" /> : "Choisir le fichier enregistré"}
+          <Button onClick={choisirFichier} disabled={busy} aria-busy={busy}>
+            {busy && avance != null ? (
+              <span className="flex min-w-0 items-center gap-2.5">
+                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}${NB}%`} />
+                <span className="text-[16px] leading-[1.2] tabular-nums">
+                  Je lis ton export · {Math.round(avance * 100)}
+                  {NB}%
+                </span>
+              </span>
+            ) : busy ? (
+              <TypingDots color="#FFFFFF" label="Analyse du fichier" />
+            ) : (
+              "Choisir le fichier enregistré"
+            )}
           </Button>
           <FileInput inputRef={picker.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={onFiles} label="Fichier de la conversation exportée" />
         </>
@@ -224,7 +248,8 @@ function MenuRow({ children, on, first = true, className, tint = "rgba(18,192,13
   return (
     <div className={cn("flex items-center justify-between font-extrabold", !first && "border-t border-[rgba(17,17,20,0.06)]", className)} style={on ? { background: tint } : undefined}>
       {children}
-      {on && <span data-pulse="" className="size-3 shrink-0 rounded-full bg-ink shadow-[0_0_0_5px_rgba(17,17,20,0.12)]" />}
+      {/* L’anneau qui bat est un ::after en scale et opacité (data-beat) : une ombre animée repeignait la page à chaque image */}
+      {on && <span data-beat="" className="size-3 shrink-0 rounded-full bg-ink shadow-[0_0_0_5px_rgba(17,17,20,0.12)]" />}
     </div>
   );
 }

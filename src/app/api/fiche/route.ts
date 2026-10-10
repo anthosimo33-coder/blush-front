@@ -1,26 +1,40 @@
 import { and, eq } from "drizzle-orm";
+import { after } from "next/server";
 import { z } from "zod";
-import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout } from "@/server/ajouts";
-import { SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
+import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout, majEnCours } from "@/server/ajouts";
+import { executerChaine, SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { contexteRequete, ficheDe, memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
-import { depuisPaquet, ErreurImport } from "@/server/histoires";
+import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
 import { corps, erreur, json, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance } from "@/server/echeance";
+import type { Fiche } from "@/types";
 
-/* Lire les captures, puis mettre la mémoire à jour : jusqu’à deux minutes */
+/* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 300;
+
+/**
+ * Sa fiche, et si une mise à jour de la mémoire est en attente ou en cours (`updating`) : l’écran la relit toutes les
+ * 3 s jusqu’à ce qu’elle ait fini. Une mise à jour restée en plan (l’instance arrêtée, ou plus le temps de la commencer
+ * après la lecture des captures) repart après la réponse ; si une autre la tient, executerChaine la laisse faire.
+ */
+async function ficheEtMaj(story: Ligne): Promise<Fiche> {
+  const [fiche, enCours] = await Promise.all([ficheDe(story), majEnCours(story.id)]);
+  if (!enCours) return fiche;
+  after(() => executerChaine(story.id));
+  return { ...fiche, updating: true };
+}
 
 export async function GET() {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion", 401);
   if (!story) return erreur("aucune", 404);
-  return json(await ficheDe(story));
+  return json(await ficheEtMaj(story));
 }
 
 const Faits = z
@@ -58,14 +72,15 @@ export async function PUT(req: Request) {
       .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
       .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
       .returning({ version: schema.memories.version });
-    if (ecrite.length) return json(await ficheDe(story));
+    /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
+    if (ecrite.length) return json(await ficheEtMaj(story));
   }
   return erreur("occupe", 409);
 }
 
 /**
- * Des captures (son profil, leur conv) ou un nouvel export, pour sa fiche : BLUSH les lit, met sa mémoire à jour
- * tout de suite, et renvoie la fiche avec les infos qui viennent d’arriver.
+ * Des captures (son profil, leur conv) ou un nouvel export, pour sa fiche : BLUSH les lit et répond avec ce qu’il a lu ;
+ * sa mémoire se met à jour après la réponse (ajouterALaFiche), et la fiche se relit jusqu’à ce que ce soit fait.
  */
 async function traiter(req: Request) {
   if (!memeOrigine(req)) return erreur("origine", 403);
@@ -81,9 +96,8 @@ async function traiter(req: Request) {
   const memoire = await memoireDe(story.id);
   if (!memoire?.etat.fiche) return erreur("pas_pret", 409);
   try {
-    const avant = new Set((await ficheDe(story)).facts.map((f) => f.text));
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
-    return json(await ajouterALaFiche(story, avant, ajout));
+    return json(await ajouterALaFiche(story, ajout));
   } catch (e) {
     if (e instanceof ErreurAjout) return erreur(e.code, 422);
     if (e instanceof ErreurImport) return erreur("fichier", 422);

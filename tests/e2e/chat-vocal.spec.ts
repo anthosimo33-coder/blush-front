@@ -1,4 +1,4 @@
-import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureBlushPlus, litLeMp3, ouvrir, reponseAuGeste, tesMessagesAuChat, test } from "./aide";
+import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureBlushPlus, litLeMp3, ouvrir, RESEAU, reponseAuGeste, tesMessagesAuChat, test } from "./aide";
 
 /*
  * Le chat en vocal (/app) : BLUSH répond en vocal quand on le lui demande (« parle-moi en vocal », que le modèle factice
@@ -16,6 +16,13 @@ test("« parle-moi en vocal » : BLUSH répond en vocal ; « Repasser à l’éc
   const fil = filDuChat(page);
   const bandeau = page.getByRole("status").filter({ hasText: "BLUSH te répond en vocal" });
   const vocal = fil.getByRole("button", { name: VOCAL_DE_BLUSH });
+  /*
+   * Le vocal de la dernière réponse se prépare en mémoire dès qu’il est à l’écran (src/app/app/voice.tsx, VocalBlush) :
+   * il est demandé au serveur avant le toucher, ou au toucher s’il n’en a pas eu le temps. On l’attend donc dès l’envoi,
+   * et l’attente ne reste pas sans personne pour l’écouter si le test échoue avant
+   */
+  const demandeDuVocal = page.waitForResponse((r) => /^\/api\/vocal\/chat\/\d+$/.test(new URL(r.url()).pathname) && r.request().method() === "GET", { timeout: 2 * RESEAU });
+  demandeDuVocal.catch(() => {});
 
   await test.step("demandé par écrit : BLUSH répond par un vocal, et le chat passe en vocal", async () => {
     expect(await ecrireABlush(page, "parle-moi en vocal stp")).toBe(200);
@@ -27,11 +34,13 @@ test("« parle-moi en vocal » : BLUSH répond en vocal ; « Repasser à l’éc
   });
 
   await test.step("le vocal vient du serveur, en MP3 ; là où le navigateur le lit, il se met en pause d’un toucher", async () => {
-    const audio = await reponseAuGeste(page, { chemin: /^\/api\/vocal\/chat\/\d+$/, methode: "GET" }, () => vocal.click());
+    await vocal.click();
+    const audio = await demandeDuVocal;
     const chemin = new URL(audio.url()).pathname;
     /*
-     * Le toucher a demandé le vocal ; ce que le serveur sert se vérifie par une requête de la même session : le WebKit de
-     * Linux (la CI) charge les médias hors de son réseau habituel, et Playwright y lit un statut 0
+     * Le vocal a été demandé (avant le toucher, ou par lui) ; ce que le serveur sert se vérifie par une requête de la
+     * même session : le WebKit de Linux (la CI) charge les médias hors de son réseau habituel, et Playwright y lit un
+     * statut 0
      */
     const fichier = await page.request.get(chemin);
     expect(fichier.status()).toBe(200);
@@ -50,6 +59,8 @@ test("« parle-moi en vocal » : BLUSH répond en vocal ; « Repasser à l’éc
     await expect.poll(() => chatEnVocal(email)).toBe(false);
     expect(await ecrireABlush(page, "et là, elle pense quoi ?")).toBe(200);
     await expect(fil.getByText("elle te cherche 👀")).toBeVisible();
+    /* Ses bulles arrivent en flux, avant que l’échange soit gardé : sa question de la fin dit la réponse entière, enregistrée */
+    await expect(fil.getByText("tu lui as répondu quoi ?")).toBeVisible();
     await expect(vocal).toHaveCount(1);
   });
 

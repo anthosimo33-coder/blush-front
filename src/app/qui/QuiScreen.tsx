@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { startAnalysis } from "@/services/api";
 import { ErreurApi } from "@/services/reel";
@@ -12,8 +12,9 @@ import { ChoiceTile, SelectedCheck } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
 import { FlowSteps } from "@/components/ui/progress";
 import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
-import { GUESS_LABELS } from "@/mocks/report";
+import { GUESS_LABELS } from "@/content/parcours";
 import { useJourney } from "@/state/journey";
+import { retenirLecture } from "@/state/lecture";
 import type { Goal, Guess, Person } from "@/types";
 
 const GUESSES: { id: Guess; icon: IconName; color: string }[] = [
@@ -55,6 +56,14 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   /* Arrivé sans le parcours de cet onglet (importée dans un autre, puis ouverte par une connexion) : d’après la conv */
   const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : captures ? "/importer/captures" : "/importer/ok";
+  /*
+   * L’écran suivant, préparé pendant qu’on répond : l’email (statique, en entier). Pas /lecture (déjà connecté) : ses
+   * gardes (layout.tsx) renvoient ici tant que la lecture n’est pas lancée, et le préchargement garderait ce renvoi, que
+   * router.push suivrait après « Lancer la lecture »
+   */
+  useEffect(() => {
+    if (!connecte) router.prefetch("/email");
+  }, [router, connecte]);
 
   const next = async () => {
     if (!connecte) return router.push("/email");
@@ -62,8 +71,10 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
     setBusy(true);
     setProblem(null);
     try {
-      const { jobId } = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
-      set({ jobId });
+      /* Attendu avant d’ouvrir /lecture (sa page serveur lit « Qui es-tu ? »), puis repris tel quel par l’écran de lecture : pas de second POST */
+      const lecture = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
+      retenirLecture(lecture);
+      set({ jobId: lecture.jobId });
       router.push("/lecture");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";
