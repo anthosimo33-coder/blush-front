@@ -34,14 +34,16 @@ export type Lecture = {
   jeSuis?: "Un garçon" | "Une fille";
   /** Un dernier message en plus dans la conv (un déclencheur du modèle factice, aide/exports.ts). */
   ajout?: Ajout;
+  /** « En couple » à « Qui es-tu ? » (et « Que ça aille mieux ») : le verdict passe à la température. */
+  enCouple?: boolean;
 };
 
 /**
  * Une conv WhatsApp fictive importée puis lue pour le compte connecté (comme « Qui es-tu ? » rempli : toi, on s’est vus,
- * qu’on soit ensemble ; puis « Lancer la lecture ») : elle devient la conv ouverte. Renvoie son identifiant. La lecture
+ * qu’on soit ensemble, ou en couple avec `enCouple` ; puis « Lancer la lecture ») : elle devient la conv ouverte. Renvoie son identifiant. La lecture
  * tourne ensuite sur le serveur : attendreTaches (aide/base.ts) attend sa fin.
  */
-export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout }: Lecture = {}): Promise<string> {
+export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false }: Lecture = {}): Promise<string> {
   const conv = exportWhatsApp(testInfo, { personnes, ajout });
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
@@ -52,7 +54,7 @@ export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { person
   /* Le premier de l’export (p0) est celui qui importe : il écrit le plus (aide/exports.ts) */
   const lecture = await page.request.post("/api/analyse", {
     headers: origine(testInfo),
-    data: { me: "p0", pronom: jeSuis === "Une fille" ? "elle" : "il", guess: "vus", goal: "ensemble" },
+    data: { me: "p0", pronom: jeSuis === "Une fille" ? "elle" : "il", guess: enCouple ? "ensemble" : "vus", goal: enCouple ? "mieux" : "ensemble" },
     timeout: RESEAU,
   });
   expect(lecture.status(), `la lecture de la conv avec ${personnes.autre} part`).toBe(200);

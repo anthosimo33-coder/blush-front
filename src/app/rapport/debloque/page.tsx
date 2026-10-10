@@ -18,13 +18,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
    */
   const [payload, story] = await Promise.all([getReport(), getStory()]);
   const chapitres = payload?.report.chapters ?? [];
-  const reprise = PREMIER_PAYANT;
+  /* Un rapport écrit peut avoir moins de huit chapitres (une moitié rendue incomplète) : on compte les siens */
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
   const autre = story ? (story.participants.find((p) => story.me && p.id !== story.me) ?? story.participants[1]).pronoun : undefined;
   return (
     <>
       <ConvDeLaPage />
-      <UnlockedScreen offer={offer} next={next} restants={restants} reprise={reprise} autre={autre} />
+      <UnlockedScreen offer={offer} next={next} restants={restants} reprise={PREMIER_PAYANT} autre={autre} />
     </>
   );
 }

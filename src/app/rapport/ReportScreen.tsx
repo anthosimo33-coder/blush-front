@@ -24,6 +24,7 @@ import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
 import { Sheet, Toast } from "@/components/ui/surfaces";
 import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
+import { CLE_REPRISE } from "@/state/cles";
 import { useHydrated, useJourneyMe } from "@/state/journey";
 import type { Chapter, ChapterBlock, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
@@ -41,11 +42,10 @@ const MarqueChapitre = dynamic(() => import("./Ecriture").then((m) => m.MarqueCh
 const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
 const PartageImageSheet = dynamic(() => import("./Partage").then((m) => m.PartageImageSheet), { ssr: false });
 
-/** Où tu t’étais arrêté, conv par conv (ce navigateur seulement). */
-const RESUME_KEY = "blush.rapport.reprise.v2";
+/** Où tu t’étais arrêté, conv par conv (ce navigateur seulement, sous CLE_REPRISE). */
 type Reprises = Record<string, number>;
 const lireReprises = (): Reprises => {
-  const brut = JSON.parse(localStorage.getItem(RESUME_KEY) ?? "{}") as unknown;
+  const brut = JSON.parse(localStorage.getItem(CLE_REPRISE) ?? "{}") as unknown;
   return brut && typeof brut === "object" ? (brut as Reprises) : {};
 };
 
@@ -106,7 +106,7 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
   const { data, refresh } = useQuery("report", getReport, initial, { fetch: !fixed, rendu, frais: 10_000 });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
   const payload = fixed ? initial : (data ?? initial);
-  /* Le rapport s’écrit encore (back-end), ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
+  /* Le rapport s’écrit encore, ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
   const attendre = !!payload.generating || payload.vocal?.etat === "en_cours";
   useEffect(() => {
     if (!attendre || fixed) return;
@@ -292,7 +292,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   useEffect(() => {
     if (!current) return;
     try {
-      localStorage.setItem(RESUME_KEY, JSON.stringify({ ...lireReprises(), [report.storyId]: current }));
+      localStorage.setItem(CLE_REPRISE, JSON.stringify({ ...lireReprises(), [report.storyId]: current }));
     } catch {
       /* rien */
     }

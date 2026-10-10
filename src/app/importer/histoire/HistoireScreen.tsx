@@ -10,7 +10,10 @@ import type { Story } from "@/types";
 
 const APP_NAME = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Autre appli" } as const;
 
-/* Écran 05 — Votre histoire réunie : le total en grand, puis les applis dans l’ordre, en une seule liste. */
+/*
+ * Écran 05 — Votre histoire réunie : le total en grand, puis les applis dans l’ordre, en une seule liste. En sommeil,
+ * comme l’ajout de captures à un export qui y mène (CapturesScreen, `addMode`) : rien n’y conduit en production.
+ */
 export function HistoireScreen({ story }: { story: Story }) {
   return (
     <Screen

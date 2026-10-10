@@ -1,3 +1,4 @@
+import { CHAPITRE_DE_LA_BASCULE, CHAPITRE_DU_VERDICT } from "@/contenu/chapitres";
 import type { ReportPayload } from "@/services/api";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow } from "@/types";
 
@@ -24,7 +25,7 @@ function blockOf<K extends ChapterBlock["kind"]>(c: Chapter | undefined, kind: K
  * en plus « le moment », et « à toi de jouer » prend son texte. Une carte sans contenu est simplement sautée.
  */
 export function cardsOf({ report }: ReportPayload): Card[] {
-  const [c1, c2] = [1, 2].map((n) => report.chapters.find((c) => c.number === n && !c.locked));
+  const [c1, c2] = [CHAPITRE_DU_VERDICT, CHAPITRE_DE_LA_BASCULE].map((n) => report.chapters.find((c) => c.number === n && !c.locked));
   const scores = blockOf(c1, "scores");
   const seen = blockOf(c2, "seen");
   const cards: Card[] = [{ id: "chiffres" }, { id: "verdict", confidence: blockOf(c1, "confidence") }];

@@ -70,10 +70,12 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
     setBusy(true);
     setProblem(null);
     try {
-      /* Attendu avant d’ouvrir /lecture (sa page serveur lit « Qui es-tu ? »), puis repris tel quel par l’écran de lecture : pas de second POST */
-      const lecture = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
-      retenirLecture(lecture);
-      set({ jobId: lecture.jobId });
+      /*
+       * Attendu avant d’ouvrir /lecture (sa page serveur lit « Qui es-tu ? »), puis repris tel quel par l’écran de lecture :
+       * pas de second POST. Le bouton n’est actif qu’avec toutes les réponses (`ready`) : sur des captures, ton prénom
+       * donne aussi `me`
+       */
+      retenirLecture(await startAnalysis({ me: j.me!, pronom: j.pronom, prenom: j.prenom, guess: j.guess!, goal: j.goal! }));
       router.push("/lecture");
     } catch (e) {
       const code = e instanceof ErreurApi ? e.code : "";

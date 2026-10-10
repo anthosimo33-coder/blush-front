@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { cn } from "@/lib/cn";
 import { figtree } from "@/lib/fonts";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
-import { REPONSE_EXEMPLE, TESTIMONIALS, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
 import { Logo } from "@/components/brand/Logo";
 import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
@@ -65,11 +65,6 @@ export function useReveal(key: number) {
       document.documentElement.classList.remove("reveal-ready");
     };
   }, [key]);
-}
-
-/** Les avis à montrer : les vrais seulement (aucun : pas de section). */
-export function useReviews() {
-  return TESTIMONIALS;
 }
 
 /* ———— Habillage ———— */

@@ -38,7 +38,7 @@ const sectionTitle = (id: FicheFact["section"], pronoun?: "il" | "elle") => (id 
 type Job =
   | { step: "idle" }
   | { step: "reading"; what: string; thumbs: string[]; file: boolean }
-  /* Lu, pas encore rangé (back-end) : la mémoire se met à jour après la réponse, la fiche se relit jusqu’à ce qu’elle ait fini */
+  /* Lu, pas encore rangé : la mémoire se met à jour après la réponse, la fiche se relit jusqu’à ce qu’elle ait fini */
   | { step: "adding"; what: string; pending: NonNullable<FicheUpdate["pending"]>; before: FicheFact[] }
   | { step: "done"; what: string; update: FicheUpdate; before: FicheFact[] };
 

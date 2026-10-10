@@ -6,12 +6,15 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 
-/** Les erreurs du parcours d’import, posées dans l’adresse (`?erreur=<code>`) : voir ErreurDeParcours. */
+/**
+ * Les erreurs du parcours d’import, posées dans l’adresse (`?erreur=<code>`) : voir ErreurDeParcours. « lecture » n’a
+ * plus d’écran qui la pose (l’échec de la lecture se dit sur /lecture) : on n’y arrive qu’en tapant l’adresse.
+ */
 export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"] as const;
-export type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
+type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
 
 /* Écrans d’erreur : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
-export const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: string; back: string }> = {
+const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: string; back: string }> = {
   fichier: {
     title: "On n’arrive pas à lire ce fichier.",
     text: "Exporte à nouveau votre discussion, sans médias, puis choisis le fichier enregistré.",
@@ -26,12 +29,13 @@ export const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; a
     href: "/commencer",
     back: "/commencer",
   },
+  /* Sur un export ; sur des captures, copieDe la change */
   courte: {
     title: "Votre conv est encore trop courte.",
-    text: "Il faut au moins 50 messages pour un verdict juste. Ajoute des captures du début, ou reviens dans quelques jours.",
-    action: "Ajouter des captures",
-    href: "/importer/captures?mode=ajout",
-    back: "/importer/ok",
+    text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
+    action: "Envoyer des captures",
+    href: "/importer/captures",
+    back: "/importer/export",
   },
   lecture: {
     title: "L’analyse n’a pas abouti.",
@@ -85,14 +89,7 @@ function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchParams):
       href: ici,
       back: ici,
     };
-  if (kind === "courte")
-    return {
-      ...c,
-      text: "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
-      action: "Envoyer des captures",
-      href: app ? `/importer/captures?app=${encodeURIComponent(app)}` : "/importer/captures",
-      back: ici,
-    };
+  if (kind === "courte") return { ...c, href: app ? `/importer/captures?app=${encodeURIComponent(app)}` : c.href, back: ici };
   if (kind === "fichier" || kind === "capture" || kind === "video" || kind === "longue") return { ...c, href: ici, back: ici };
   return c;
 }

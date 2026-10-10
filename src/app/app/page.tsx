@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { convChoisie, getChat, getContact, getConvs, getFiche, getQuickQuestions, getRetour, getStory, sansHistoire } from "@/services/serveur";
+import { convChoisie, getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, sansHistoire } from "@/services/serveur";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
 import { IDEES_MASQUEES } from "./idees";
@@ -19,7 +19,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   const [storyId, jar] = await Promise.all([convChoisie(), cookies()]);
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
-  const lectures = Promise.all([getQuickQuestions(), getContact(), getFiche(), getStory(), getChat(), getConvs()]);
+  const lectures = Promise.all([questionsDeLaConv(), getContact(), getFiche(), getStory(), getChat(), getConvs()]);
   /* Une erreur remonte quand l’accueil les attend (plus bas) ; redirigé avant, on ne les attend pas */
   lectures.catch(() => {});
   /*

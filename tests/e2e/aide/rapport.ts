@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { CLE_REPRISE } from "../../../src/state/cles";
 import { chiffrer, dechiffrer, histoiresDe, sql } from "./base";
 import { pagePrete } from "./page";
 
@@ -134,6 +135,14 @@ export async function allerAuChapitre(page: Page, numero: number, titre: string)
   /* Le défilement est doux : on attend qu’il soit arrivé, pas seulement que le chapitre entre à l’écran */
   await attendreEnHaut(page, page.getByRole("main").getByRole("heading", { level: 2, name: new RegExp(`^Chapitre ${numero} : `) }));
   await attendreChapitreEnCours(page, numero, titre);
+}
+
+/**
+ * Pose où la lecture du rapport de cette histoire s’était arrêtée (son chapitre), dans le navigateur, avant que le rapport
+ * ne le lise : il propose alors d’y reprendre (src/app/rapport/ReportScreen.tsx).
+ */
+export async function poserLaReprise(page: Page, histoire: string, chapitre: number): Promise<void> {
+  await page.addInitScript(({ cle, histoire, chapitre }) => localStorage.setItem(cle, JSON.stringify({ [histoire]: chapitre })), { cle: CLE_REPRISE, histoire, chapitre });
 }
 
 type BlocEcrit = { kind: string; text?: string; level?: string; messages?: { from: "toi" | "elle"; text: string }[]; factsAfter?: string[] };

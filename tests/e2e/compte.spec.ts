@@ -122,8 +122,8 @@ test("BLUSH+ : actif à 7,99 € la semaine, et la pause qui tient après un rec
 
 /*
  * Bug : « Arrêter BLUSH+ » ne fait rien. La feuille annonce « En un geste, effectif lundi. », mais
- * cancelSubscription rentre sans appeler le serveur (src/services/api.ts:372) et la ligne reste proposée
- * (src/app/compte/CompteScreen.tsx:166) : confirmé, l’abonnement reste « actif », « Renouvelé lundi ». Ce test décrit ce
+ * cancelSubscription rentre sans appeler le serveur (src/services/api.ts:533) et la ligne reste proposée
+ * (src/app/compte/CompteScreen.tsx:179) : confirmé, l’abonnement reste « actif », « Renouvelé lundi ». Ce test décrit ce
  * que l’écran promet : l’abonnement passe à « arrêté ».
  */
 test.fixme("BLUSH+ : « Arrêter BLUSH+ » confirmé, l’abonnement s’affiche arrêté", async ({ page }, testInfo) => {

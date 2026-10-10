@@ -4,6 +4,8 @@ Le SaaS BLUSH : une appli Next.js 16 (App Router), TypeScript et Tailwind v4, av
 
 ```bash
 brew services start postgresql@16         # le Postgres de la machine (Homebrew), s’il ne tourne pas déjà
+nvm use                                   # Node 24, celui de Vercel (.nvmrc)
+git submodule update --init               # les prompts (dépôt privé blush-prompts) : sans eux, npm run dev s’arrête
 npm install
 cp .env.example .env.development.local   # une fois : la configuration de dev, fictive
 npm run dev                               # http://localhost:3000 (crée et migre la base blush_dev au besoin)
@@ -46,9 +48,9 @@ Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteu
 | `src/services/api.ts` | Dans le navigateur, le seul point de contact avec les données : les appels aux routes `/api`. |
 | `src/services/serveur.ts` | Les données des pages serveur, lues en base d’après les cookies de la requête. |
 | `src/server/` | Le back-end : la base, le chiffrement, le modèle, les mails (voir BACKEND.md). |
-| `src/contenu/` | Le contenu du produit : offres et prix, la règle des chapitres offerts (seul le chapitre 1, le verdict) et leurs titres (`chapitres.ts`), étapes de l’export et de la lecture, rubriques de la fiche, landing. Aucun écran n’importe de données factices : ESLint refuse `@/mocks`. |
+| `src/contenu/` | Le contenu du produit : offres et prix, la règle des chapitres offerts (seul le chapitre 1, le verdict) et leurs titres (`chapitres.ts`), étapes de l’export et de la lecture, rubriques de la fiche, landing. Les seules données fictives de l’appli servent aux aperçus locaux (`src/app/apercu`, 404 en production) : ESLint refuse qu’un autre fichier les importe (et `@/mocks`, pour qu’il ne revienne pas). |
 | `src/types/` | Types du domaine : `Story`, `Source`, `Report`, `Chapter`, `FicheFact`, `Subscription`… |
-| `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`. |
+| `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`, et les clés de ce que l’appli garde dans le navigateur (`cles.ts`, que lisent aussi les aides des tests). |
 
 ## Mise en page
 
@@ -57,12 +59,12 @@ Le dépôt est privé, sur GitHub Free : pas de règle de branche ni de relecteu
 
 ## Paramètres d'URL
 
-- `?erreur=fichier|groupe|courte|lecture|capture|video|longue` : l'écran d'erreur du parcours d'import, par-dessus n'importe quelle route (`src/components/screens/ErreurDeParcours.tsx`). Les écrans de l'import le posent eux-mêmes.
+- `?erreur=fichier|groupe|courte|lecture|capture|video|longue` : l'écran d'erreur du parcours d'import, par-dessus n'importe quelle route (`src/components/screens/ErreurDeParcours.tsx`). L'écran de l'export et celui des captures le posent eux-mêmes (`fichier`, `groupe`, `courte`, `capture`, `video`, `longue`) ; aucun écran ne pose plus `lecture` : on n'y arrive qu'en tapant l'adresse.
 - `/rapport?paiement=1` : ouvre directement le panneau de paiement (écran 10).
 
 ## La galerie
 
-La galerie des écrans (`scripts/galerie`) montre chaque état de chaque écran, en mobile et en ordinateur, pour les relire d’un coup (et les commenter, une fois publiée en artefact). Elle tourne sur le vrai back-end, comme les tests de bout en bout : leur build, leur serveur, une base neuve (`blush_e2e_galerie`, effacée à la fin), le modèle factice et aucune clé d’API. Chaque état prépare son propre compte par les routes `/api` et les aides des tests : une conv importée sans compte, un compte gratuit, le plan « rapport », BLUSH+, le mode sobre (une alerte dans la conv), trois convs.
+La galerie des écrans (`scripts/galerie`) montre chaque état de chaque écran, en mobile et en ordinateur, pour les relire d’un coup (et les commenter, une fois publiée en artefact). Elle tourne sur le vrai back-end, comme les tests de bout en bout : leur build, leur serveur, une base neuve (`blush_e2e_galerie`, effacée à la fin), le modèle factice et aucune clé d’API. Chaque état prépare son propre compte par les routes `/api` et les aides des tests : une conv importée sans compte, un compte gratuit, le plan « rapport », BLUSH+, le mode sobre (une alerte dans la conv), trois convs, une conv lue « En couple ».
 
 ```bash
 npm run e2e:build && npm run galerie   # .galerie/galerie.html, les captures dans .galerie/img

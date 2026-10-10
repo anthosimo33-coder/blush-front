@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { JourneyProvider } from "@/state/journey";
 import { SoundBoot } from "@/components/shell/SoundBoot";
 import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
@@ -27,15 +26,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fr" className={`${classesDesPolices} antialiased`}>
       <body>
-        <JourneyProvider>
-          <div id="app-root">{children}</div>
-          <SoundBoot />
-          <Reveil />
-          <SuiviNavigation />
-          <Suspense fallback={null}>
-            <ErreurDeParcours />
-          </Suspense>
-        </JourneyProvider>
+        <div id="app-root">{children}</div>
+        <SoundBoot />
+        <Reveil />
+        <SuiviNavigation />
+        <Suspense fallback={null}>
+          <ErreurDeParcours />
+        </Suspense>
       </body>
     </html>
   );

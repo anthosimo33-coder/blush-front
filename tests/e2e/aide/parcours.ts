@@ -1,4 +1,5 @@
 import { expect, type Page, type Request, type Response, type TestInfo } from "@playwright/test";
+import { CLE_PARCOURS } from "../../../src/state/cles";
 import { attendreTaches } from "./base";
 import { dernierCode } from "./boite";
 import { lectureFaite, type Lecture } from "./compte";
@@ -29,6 +30,21 @@ export async function importerWhatsApp(page: Page, fichier: Fichier): Promise<st
   expect(reponse.status(), `l’import de ${fichier.nom}`).toBe(200);
   await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
   return ((await reponse.json()) as { story: { id: string } }).story.id;
+}
+
+/**
+ * Pose l’état du parcours de l’onglet (sessionStorage, src/state/journey.tsx) avant que l’écran ne le lise : à chaque
+ * chargement de la page, `parcours` complète ce qui y est déjà. Pour ouvrir un écran du parcours en son milieu, avec ce
+ * que les écrans d’avant y auraient mis (la galerie).
+ */
+export async function poserLeParcours(page: Page, parcours: Record<string, unknown>): Promise<void> {
+  await page.addInitScript(
+    ({ cle, parcours }) => {
+      const avant = JSON.parse(sessionStorage.getItem(cle) ?? "{}");
+      sessionStorage.setItem(cle, JSON.stringify({ ...avant, ...parcours }));
+    },
+    { cle: CLE_PARCOURS, parcours },
+  );
 }
 
 /** Les réponses de « Qui es-tu ? », par le texte de leurs tuiles (`moi` : le prénom tel qu’il s’affiche). */

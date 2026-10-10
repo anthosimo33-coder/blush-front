@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * `npm run dev` : l’appli en local, avec son back-end, sur une base Postgres de ce poste et le modèle factice.
- * 1. les fichiers .env du projet, comme `next dev` (.env.development.local, .env.local, .env.development, .env) ; sans
- *    eux, la base blush_dev de ce poste et le modèle factice (BLUSH_IA_FACTICE=1). Ce qu’on donne dans le shell l’emporte
- *    toujours ;
- * 2. BLUSH_CLE est exigée (cp .env.example .env.development.local), et le modèle factice refuse les vraies clés d’API ;
+ * 1. les fichiers .env du projet, comme `next dev` (.env.development.local, .env.local, .env.development, .env) ; ce
+ *    qu’ils ne donnent pas : la base blush_dev de ce poste et le modèle factice (BLUSH_IA_FACTICE=1). Ce qu’on donne dans
+ *    le shell l’emporte toujours ;
+ * 2. BLUSH_CLE est exigée : sans fichier .env (cp .env.example .env.development.local) ni BLUSH_CLE dans le shell, rien
+ *    ne démarre. Et le modèle factice refuse les vraies clés d’API ;
  * 3. une base locale est créée si elle manque (jamais effacée), puis les migrations de drizzle/ y sont appliquées ;
  * 4. puis `next dev`, avec les arguments donnés (npm run dev -- -p 3001).
  */

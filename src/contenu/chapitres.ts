@@ -2,9 +2,14 @@
  * Les chapitres du rapport, et ce qui en est offert. Le rapport a huit chapitres, toujours dans le même ordre. En
  * production, seul le chapitre 1, « Le verdict », est offert : il s’écrit avec le verdict, pour tout le monde. Les sept
  * autres se débloquent (BLUSH+ ou le rapport seul) ; avant, ils restent fermés et vides, et rien de leur contenu n’est
- * montré (seule exception : le mode sobre, qui s’ouvre sans paiement, voir rapportDe). La règle s’écrit ici une seule
- * fois : les chapitres fermés et l’écriture (src/server/donnees.ts), la reprise après le paiement (/rapport/debloque),
- * le mail « ton rapport est prêt » la lisent ici.
+ * montré (seule exception : le mode sobre, qui s’ouvre sans paiement, voir rapportDe). La règle s’écrit ici : les
+ * chapitres fermés et l’écriture (src/server/donnees.ts), la révélation du verdict (src/app/rapport/verdict/cartes.ts),
+ * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
+ * lisent ici.
+ * Une exception reste, hors de ce dépôt : les chapitres écrits par le modèle prennent leur `free` de prompts/lib/front.ts
+ * (`chapitresAffiches`, encore les chapitres 1 et 2). Aucun écran ne lit ce `free` ; il ne compte que dans le temps
+ * de lecture « offert » d’un rapport déjà écrit (readingTime.free, src/server/analyse.ts), que voit un compte repassé
+ * en gratuit.
  */
 
 export const NB_CHAPITRES = 8;
@@ -20,6 +25,12 @@ export const PREMIER_PAYANT = CHAPITRES_OFFERTS + 1;
 
 /** Les chapitres payants, dans l’ordre (2 à 8) : fermés sans accès, écrits par le rapport une fois débloqué. */
 export const CHAPITRES_PAYANTS = Array.from({ length: NB_CHAPITRES - CHAPITRES_OFFERTS }, (_, k) => PREMIER_PAYANT + k);
+
+/** Le chapitre du verdict, offert : la révélation du verdict y prend la confiance et le duel. */
+export const CHAPITRE_DU_VERDICT = 1;
+
+/** « Le moment où tout a basculé », payant : la révélation du verdict y prend « le moment » et « à toi de jouer », une fois débloqué. */
+export const CHAPITRE_DE_LA_BASCULE = 2;
 
 /** Le chapitre de l’autre personne : son prénom en attente, « Elle » ou « Lui » dans le mail (qui ne dit aucun prénom). */
 const DE_L_AUTRE = 5;

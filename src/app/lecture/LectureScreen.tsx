@@ -12,7 +12,6 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
-import { setJourney } from "@/state/journey";
 import { lectureLancee } from "@/state/lecture";
 import type { AnalysisProgress } from "@/types";
 
@@ -90,8 +89,6 @@ export function LectureScreen({ total }: { total: number }) {
         setFailed(true);
         return;
       }
-      const { jobId } = lance;
-      setJourney({ jobId });
       let rates = 0;
       const tick = async () => {
         let next: AnalysisProgress;

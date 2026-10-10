@@ -122,7 +122,7 @@ export async function ouvrir(page: Page, adresse?: string): Promise<void> {
  * un minuteur une fois la vraie bulle arrivée), et plus aucun changement du document. Une animation finie déclenche
  * souvent la suite (une classe, un attribut, une autre animation) : capturée trop tôt, la page n’est pas tout à fait la
  * même d’un lancement à l’autre. Au bout de `max` ms, une erreur ; avec `echouer: false`, false (la page bouge encore).
- * Pour les captures : la référence visuelle (visuel.spec.ts).
+ * Pour les captures : la référence visuelle (visuel.spec.ts), la galerie (scripts/galerie).
  */
 export async function pageAuRepos(page: Page, { repos = 600, max = 15_000, echouer = true }: { repos?: number; max?: number; echouer?: boolean } = {}): Promise<boolean> {
   const pose = await page.evaluate(

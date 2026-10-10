@@ -43,6 +43,9 @@ const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : 
  * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement
  * d’écran : le téléphone en tire les écrans de la conv (la vidéo ne part pas), puis BLUSH les lit. Pour iMessage (pas
  * d’export possible), l’enregistrement est le chemin principal.
+ * `addMode` (?mode=ajout, des captures ajoutées à un export, puis /importer/histoire) est en sommeil : aucun écran n’y
+ * mène plus, sauf /importer/histoire, qu’on n’atteint que par lui, et le serveur refuse ces captures (api/captures).
+ * Il reste pour la fusion d’un export et de captures, décidée pour plus tard.
  */
 export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode: boolean }) {
   const router = useRouter();

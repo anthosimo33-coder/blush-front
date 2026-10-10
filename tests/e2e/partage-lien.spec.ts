@@ -193,8 +193,8 @@ test.fixme("voir la page ne compte pas d’essai : seul « Analyser ma conv » t
 /*
  * Bug : les espaces avant « : » et « ? » de la page publique et de la feuille de partage sont des espaces ordinaires,
  * pas insécables comme ailleurs dans l’appli ({" "} avec U+00A0) : sur un écran étroit, « ? » ou « : » peut partir seul
- * à la ligne. src/app/v/[id]/page.tsx:63, 75 et 97 ({" "} contient une espace ordinaire) ; src/app/rapport/Partage.tsx:19
- * (const N = " " : une espace ordinaire, utilisée ligne 298 et dans « 24 h » de la feuille « En savoir plus »).
+ * à la ligne. src/app/v/[id]/page.tsx:63, 75 et 97 ({" "} contient une espace ordinaire) ; src/app/rapport/Partage.tsx:18
+ * (const N = " " : une espace ordinaire, utilisée ligne 240 et dans « 24 h » de la feuille « En savoir plus »).
  */
 test.fixme("les espaces avant « : » et « ? » sont insécables, sur la page publique et dans les feuilles", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "insecable");

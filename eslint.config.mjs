@@ -6,10 +6,21 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // L’appli tourne toujours sur son back-end : jamais de données factices dans son code (le contenu du produit est dans src/contenu).
+  // Les seules qui restent servent aux aperçus locaux (src/app/apercu, 404 en production) : aucun autre fichier ne les importe.
+  // src/mocks n’existe plus : la règle empêche seulement qu’il revienne.
   {
     files: ["src/**"],
+    ignores: ["src/app/apercu/**"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ group: ["@/mocks", "@/mocks/*"], message: "Pas de données factices dans l’appli : le contenu du produit vit dans src/contenu." }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["@/mocks", "@/mocks/*"], message: "Pas de données factices dans l’appli : le contenu du produit vit dans src/contenu." },
+            { group: ["@/app/apercu", "@/app/apercu/*", "**/apercu/*"], message: "Les aperçus (/apercu) gardent des données fictives : aucun écran de l’appli ne les importe." },
+          ],
+        },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

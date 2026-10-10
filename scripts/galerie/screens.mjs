@@ -14,8 +14,9 @@
  * - rapport : le rapport complet acheté une fois (le plan « rapport »), tout écrit ;
  * - blushplus : un compte BLUSH+, toute la suite écrite (le rapport, le vocal, la mémoire) ;
  * - sobre : un compte gratuit dont la conv lève une alerte (le mode sobre) ;
- * - plusieurs : un compte BLUSH+ avec trois convs lues.
- * @typedef {"brouillon" | "code" | "gratuit" | "lecture-en-cours" | "rapport" | "blushplus" | "sobre" | "plusieurs"} Compte
+ * - plusieurs : un compte BLUSH+ avec trois convs lues ;
+ * - couple : un compte BLUSH+ dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
+ * @typedef {"brouillon" | "code" | "gratuit" | "lecture-en-cours" | "rapport" | "blushplus" | "sobre" | "plusieurs" | "couple"} Compte
  */
 
 /**
@@ -41,6 +42,7 @@
  * @property {"m" | "d"} [only]                 un seul écran
  * @property {Compte} [compte]
  * @property {Record<string, unknown>} [journey] l’état du parcours de l’onglet (sessionStorage), là où l’écran le lit
+ * @property {number} [reprise]                 le chapitre où la lecture du rapport s’était arrêtée (dans le navigateur)
  * @property {string | { role: string, name: string | RegExp }} [hover]
  * @property {{ chemin: string, methode?: string }} [retenir] une requête retenue, jamais servie : l’écran reste « en train d’écrire »
  * @property {(page: import("@playwright/test").Page, ctx: Contexte) => Promise<void>} [steps]
@@ -52,6 +54,7 @@ export const SECTIONS = [
   { id: "rapport", title: "Rapport", sub: "La révélation du verdict, l’aperçu gratuit, le paiement, le rapport complet, ta question, le mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Avec BLUSH+\u00a0: l’accueil, l’aide à chaque message, sa fiche, le compte (13, 16 et 20)" },
   { id: "convs", title: "Plusieurs convs", sub: "Un compte BLUSH+ avec trois convs\u00a0: la liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre" },
+  { id: "couple", title: "En couple", sub: "Un compte BLUSH+ lu «\u00a0En couple\u00a0» (écran 06)\u00a0: la température à la place des étapes" },
   { id: "etats", title: "États", sub: "Accès BLUSH+, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
@@ -61,7 +64,11 @@ export const RETIRES = [
   { ids: "LD", why: "Les emplacements d’avis, une variante de la landing\u00a0: la production n’affiche la section qu’avec de vrais avis." },
   { ids: "12, 12b", why: "L’ancien écran de «\u00a0Ta question\u00a0», gardé pour comparer\u00a0: la production montre la question en conversation (12p à 12s)." },
   { ids: "13z", why: "L’accueil sans les questions toutes prêtes, gardé pour comparer\u00a0: la production les montre." },
-  { ids: "C08 à C16", why: "L’histoire en couple venait de la démo (une autre conv)\u00a0: le choix «\u00a0En couple\u00a0» reste, en C06." },
+  {
+    ids: "C08, C09, C11, C12, C13i, C13k, C16, CV2, CV3, CV4, CV5",
+    why: "Les mêmes écrans que sans couple (08b, 09, 11, 12p, 13i, 16, V2 à V5 et VP2 à VP5)\u00a0: «\u00a0En couple\u00a0» ne change à l’écran que le niveau, la température (en C13 et C13d)\u00a0; le reste, ce sont les textes du vrai modèle, que le modèle factice n’écrit pas. Les questions toutes prêtes de C13i et C13k venaient de la démo\u00a0: elles viennent maintenant de sa mémoire, comme en 13i.",
+  },
+  { ids: "C18", why: "Le mode sobre en couple venait d’un verdict difficile\u00a0: il ne vient plus que d’une alerte (danger), sans niveau, et s’affiche comme en 18." },
   { ids: "V4 (gratuit)", why: "Un compte gratuit voit 4 cartes\u00a0: «\u00a0le moment\u00a0» vient du chapitre 2, payant. Il est dans la série BLUSH+ (VP4)." },
 ];
 
@@ -79,11 +86,27 @@ const click = (name, opts = {}) => async (page) => {
 const suivant = (n) => async (page) => {
   for (let i = 0; i < n; i++) await click("Suivant", { wait: i === n - 1 ? 500 : 400 })(page);
 };
-/** Écrit à BLUSH depuis le champ du chat, puis attend sa réponse (`wait`). */
-const ecrire = (texte, wait = 2600) => async (page) => {
-  await page.getByRole("textbox", { name: /^Écris à BLUSH/ }).fill(texte);
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(wait);
+/** La réponse du serveur à un envoi (POST) sur `chemin`, à attendre : à prendre avant le geste qui l’envoie. */
+const reponseA = (page, chemin) => page.waitForResponse((r) => new URL(r.url()).pathname === chemin && r.request().method() === "POST");
+/** Fait `geste`, qui écrit à BLUSH (POST /api/chat), puis attend sa réponse à l’écran : la requête servie, puis ses trois points remplacés. */
+const reponseDeBlush = async (page, geste) => {
+  const reponse = reponseA(page, "/api/chat");
+  await geste();
+  await reponse;
+  await page.waitForFunction(() => !document.querySelector("[data-reading]"));
+};
+/**
+ * Écrit à BLUSH depuis le champ du chat, puis attend sa réponse. `retenue` : la requête est retenue (`retenir`), jamais
+ * servie : on attend alors ce temps-là, en ms, BLUSH en train d’écrire.
+ */
+const ecrire = (texte, retenue) => async (page) => {
+  const envoyer = async () => {
+    await page.getByRole("textbox", { name: /^Écris à BLUSH/ }).fill(texte);
+    await page.keyboard.press("Enter");
+  };
+  if (!retenue) return reponseDeBlush(page, envoyer);
+  await envoyer();
+  await page.waitForTimeout(retenue);
 };
 /** La première idée de « Ta question » (une question de la mémoire), mise dans le champ. */
 const premiereIdee = async (page) => {
@@ -157,9 +180,16 @@ async function sampleBio(context) {
   return buf;
 }
 
-async function addBio(page, wait) {
-  await page.locator("input[type=file]").setInputFiles({ name: "bio-hinge.png", mimeType: "image/png", buffer: await sampleBio(page.context()) });
-  await page.waitForTimeout(wait);
+/**
+ * Ajoute la capture de sa bio à sa fiche, puis attend que BLUSH l’ait lue et rangée (POST /api/fiche servie). `retenue` :
+ * la requête est retenue (`retenir`), jamais servie : on attend alors ce temps-là, en ms, BLUSH en train d’analyser.
+ */
+async function addBio(page, retenue) {
+  const bio = { name: "bio-hinge.png", mimeType: "image/png", buffer: await sampleBio(page.context()) };
+  const reponse = retenue ? null : reponseA(page, "/api/fiche");
+  await page.locator("input[type=file]").setInputFiles(bio);
+  if (reponse) await reponse;
+  else await page.waitForTimeout(retenue);
 }
 
 /** @type {Etat[]} */
@@ -280,15 +310,9 @@ export const STATES = [
     },
   },
   {
-    id: "11d", section: "rapport", title: "Rapport complet", state: "Reprendre", route: "/rapport", compte: "rapport", sheet: true,
-    steps: async (page, { histoire }) => {
-      /* Le chapitre où la lecture s’est arrêtée, par histoire (src/app/rapport/ReportScreen.tsx, RESUME_KEY) */
-      await page.evaluate((id) => localStorage.setItem("blush.rapport.reprise.v2", JSON.stringify({ [id]: 5 })), histoire);
-      await page.reload();
-      await page.waitForTimeout(900);
-    },
+    id: "11d", section: "rapport", title: "Rapport complet", state: "Reprendre", route: "/rapport", compte: "rapport", sheet: true, reprise: 5, wait: 900,
     note: "Au retour, on propose de reprendre là où tu t’étais arrêté (sans sauter tout seul).",
-    changement: "La reprise est écrite sous la clé que lit le rapport (blush.rapport.reprise.v2)\u00a0: la proposition s’affiche de nouveau.",
+    changement: "La reprise est posée sous la clé que lit le rapport (src/state/cles.ts)\u00a0: la proposition s’affiche de nouveau.",
   },
   {
     id: "12p", section: "rapport", title: "Ta question", state: "Les idées", route: "/rapport/question", compte: "rapport",
@@ -308,7 +332,7 @@ export const STATES = [
     id: "12s", section: "rapport", title: "Ta question", state: "La réponse", route: "/rapport/question", compte: "rapport", full: true,
     steps: async (page) => {
       await premiereIdee(page);
-      await click("Poser ma question", { wait: 2500 })(page);
+      await reponseDeBlush(page, () => page.getByRole("button", { name: "Poser ma question" }).first().click());
     },
     note: "Bug de la production (le test.fixme de tests/e2e/rapport-question.spec.ts)\u00a0: avec le plan rapport, la question incluse passe par le chat, réservé à BLUSH+, et BLUSH répond «\u00a0le chat avec moi, c’est dans BLUSH+\u00a0». Avec BLUSH+, la réponse arrive en bulles, preuve et confiance comprises.",
     changement: "La question est vraiment posée au serveur (la démo inventait une réponse).",
@@ -344,8 +368,7 @@ export const STATES = [
     steps: async (page) => {
       await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
       await page.waitForTimeout(2200);
-      await page.getByRole("button", { name: "Envoyer le vocal" }).click();
-      await page.waitForTimeout(2600);
+      await reponseDeBlush(page, () => page.getByRole("button", { name: "Envoyer le vocal" }).click());
     },
     note: "Le vocal se réécoute dans ta bulle\u00a0; BLUSH le transcrit, puis répond à ce qui est dit. Sans clé de transcription (MISTRAL_API_KEY), BLUSH répond que les vocaux arrivent bientôt. Textes à valider.",
     changement: "Le modèle factice «\u00a0entend\u00a0» toujours la même phrase, et y répond.",
@@ -358,8 +381,7 @@ export const STATES = [
   {
     id: "13i", section: "quotidien", title: "Accueil", state: "Une question toute prête", route: "/app", compte: "blushplus", sheet: true,
     steps: async (page) => {
-      await page.getByRole("group", { name: "Questions toutes prêtes" }).getByRole("button").first().click();
-      await page.waitForTimeout(2600);
+      await reponseDeBlush(page, () => page.getByRole("group", { name: "Questions toutes prêtes" }).getByRole("button").first().click());
     },
     note: "Une question toute prête (tirée de sa mémoire) part en un toucher, comme si tu l’avais écrite, puis sort de la rangée. Textes à valider.",
     changement: "Les questions sont celles de la mémoire écrite par le modèle factice («\u00a0pourquoi elle vanne\u00a0?\u00a0», «\u00a0je relance trop\u00a0?\u00a0»…)\u00a0; «\u00a0On en est où\u00a0?\u00a0» venait de la démo.",
@@ -382,7 +404,7 @@ export const STATES = [
   },
   {
     id: "16d", section: "quotidien", title: "Sa fiche", state: "Infos rangées", route: "/app/fiche", compte: "blushplus", full: true,
-    steps: (page) => addBio(page, 2500),
+    steps: (page) => addBio(page),
     note: "Ce que BLUSH a trouvé et où il l’a rangé\u00a0; ce qu’il savait déjà n’est pas doublé. Les nouvelles infos portent un point rose (et s’éclairent en rose à leur arrivée). «\u00a0Annuler\u00a0» retire tout.",
     changement: "Ce que le modèle factice lit dans toute capture\u00a0: «\u00a0Étudiante en droit à Lyon\u00a0» (son profil), puis «\u00a0Adore les soirées improvisées\u00a0».",
   },
@@ -409,13 +431,35 @@ export const STATES = [
     note: "Inès choisie dans la liste\u00a0: son accueil arrive par la droite, avec son verdict et son prochain pas\u00a0; le retour en haut à gauche montre les deux autres.",
   },
 
+  /* ———— En couple ———— */
+  {
+    id: "C13", section: "couple", title: "Accueil", state: "Le chat", route: "/app", compte: "couple",
+    note: "En couple, l’anneau de Maëlys suit la température (On s’éloigne, Ça coince, Ça va, On est soudés) au lieu des étapes\u00a0: ici, «\u00a0Ça coince\u00a0».",
+    changement: "Le vrai back-end, et le niveau du verdict posé à «\u00a0Ça coince\u00a0» dans la base\u00a0: le modèle factice n’écrit jamais de température.",
+  },
+  {
+    id: "C13d", section: "couple", title: "Accueil", state: "Ce que BLUSH voit", route: "/app", compte: "couple", sheet: true,
+    steps: async (page) => {
+      await page.locator("button[aria-haspopup=dialog]:visible").first().click();
+      await page.waitForTimeout(800);
+    },
+    note: "La température remplace les étapes\u00a0: pas de coche ni de cadenas, juste où vous êtes.",
+  },
+
   /* ———— États ———— */
   { id: "E1", section: "etats", title: "Accès BLUSH+", state: "Plan « rapport » sur l’accueil", route: "/app", compte: "rapport", sheet: true, wait: 1000, note: "Panneau absent des maquettes." },
-  { id: "E2", section: "etats", title: "Erreur", state: "Fichier illisible", route: "/importer/ok?erreur=fichier", compte: "brouillon" },
-  { id: "E3", section: "etats", title: "Erreur", state: "Conversation de groupe", route: "/importer/ok?erreur=groupe", compte: "brouillon" },
-  { id: "E4", section: "etats", title: "Erreur", state: "Conv trop courte", route: "/importer/ok?erreur=courte", compte: "brouillon" },
-  { id: "E5", section: "etats", title: "Erreur", state: "Échec de la lecture", route: "/importer/ok?erreur=lecture", compte: "brouillon" },
-  { id: "E6", section: "etats", title: "Erreur", state: "Capture illisible", route: "/importer/ok?erreur=capture", compte: "brouillon" },
+  /* Les erreurs de l’import, sur l’écran qui les pose (l’export ou les captures) : leurs textes et leurs liens en dépendent */
+  { id: "E2", section: "etats", title: "Erreur", state: "Fichier illisible", route: "/importer/export?app=whatsapp&erreur=fichier", changement: "Sur l’écran de l’export, qui pose cette erreur (avant\u00a0: sur /importer/ok)." },
+  { id: "E3", section: "etats", title: "Erreur", state: "Conversation de groupe", route: "/importer/export?app=whatsapp&erreur=groupe", changement: "Sur l’écran de l’export, qui pose cette erreur (avant\u00a0: sur /importer/ok)." },
+  { id: "E4", section: "etats", title: "Erreur", state: "Export trop court", route: "/importer/export?app=whatsapp&erreur=courte", changement: "Sur l’écran de l’export, qui pose cette erreur (avant\u00a0: sur /importer/ok, avec un texte qui ne s’affiche jamais)." },
+  { id: "E4b", section: "etats", title: "Erreur", state: "Captures trop courtes", route: "/importer/captures?app=instagram&erreur=courte", changement: "Nouveau\u00a0: sur des captures, la conv trop courte a son propre texte (20 messages suffisent)." },
+  {
+    id: "E5", section: "etats", title: "Erreur", state: "Échec de la lecture", route: "/importer/ok?erreur=lecture", compte: "brouillon",
+    note: "Aucun écran ne pose plus cette erreur (l’échec de la lecture se dit sur /lecture)\u00a0: on n’y arrive qu’en tapant l’adresse. À garder ou à retirer.",
+  },
+  { id: "E6", section: "etats", title: "Erreur", state: "Capture illisible", route: "/importer/captures?app=instagram&erreur=capture", changement: "Sur l’écran des captures, qui pose cette erreur (avant\u00a0: sur /importer/ok)." },
+  { id: "E7", section: "etats", title: "Erreur", state: "Vidéo illisible", route: "/importer/captures?app=imessage&erreur=video", changement: "Nouveau\u00a0: l’erreur d’un enregistrement d’écran illisible." },
+  { id: "E8", section: "etats", title: "Erreur", state: "Enregistrement trop long", route: "/importer/captures?app=imessage&erreur=longue", changement: "Nouveau\u00a0: l’erreur d’un enregistrement d’écran trop long." },
   { id: "H1", section: "etats", title: "Survol", state: "Tuile d’appli (iMessage)", route: "/commencer", hover: 'a[href="/importer/captures?app=imessage"]', only: "d", changement: "La tuile iMessage mène à l’enregistrement de l’écran (le survol visait l’ancienne adresse, celle de l’export)." },
   { id: "H2", section: "etats", title: "Survol", state: "Tuile de choix", route: "/qui", compte: "brouillon", journey: J, hover: { role: "radio", name: "On s’est vus" }, only: "d" },
   { id: "H3", section: "etats", title: "Survol", state: "Offre du paiement", route: "/rapport?paiement=1", compte: "gratuit", hover: { role: "radio", name: /Le rapport complet/ }, sheet: true, wait: 900, only: "d" },

@@ -75,12 +75,8 @@ export async function getFiche(): Promise<Fiche | null> {
   return utilisateur && story ? ficheDe(story) : null;
 }
 
-export async function getQuickQuestions(): Promise<string[]> {
-  const { story } = await contexteRequete();
-  return story ? questionsDe(story.id) : [];
-}
-
-export async function getQuestionIdeas(): Promise<string[]> {
+/** Les questions tirées de la mémoire de la conv : les questions toutes prêtes de l’accueil, les idées de « Ta question ». */
+export async function questionsDeLaConv(): Promise<string[]> {
   const { story } = await contexteRequete();
   return story ? questionsDe(story.id) : [];
 }

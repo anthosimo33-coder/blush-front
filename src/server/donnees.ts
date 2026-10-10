@@ -291,11 +291,11 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
    */
   const partiels = new Map((ouvert && !donnees && r?.partiel ? dechiffrer<Chapter[]>(r.partiel) : []).map((c) => [c.number, c]));
   let suite = true;
-  const enEcriture: Chapter[] = [partiels.get(1) ? { ...partiels.get(1)!, free: true, locked: false } : verdictLibre];
+  const enEcriture: Chapter[] = [partiels.get(1) ? { ...partiels.get(1)!, free: estOffert(1), locked: false } : verdictLibre];
   for (const c of verrouilles) {
     const pret = partiels.get(c.number);
     suite = suite && !!pret;
-    enEcriture.push(pret && suite ? { ...pret, free: true, locked: false } : c);
+    enEcriture.push(pret && suite ? { ...pret, free: estOffert(c.number), locked: false } : c);
   }
   /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant (et
      l’état des tâches est relu, pour montrer l’écriture tout de suite) */

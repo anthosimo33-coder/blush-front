@@ -935,7 +935,7 @@ export function HomeScreen({
           mobileTop={
             /* En haut : BLUSH en grand au centre (sa bulle flotte et s’anime quand il répond), Sophie à droite comme un contact.
                Le fond s’efface vers le bas : les messages passent dessous en douceur. 8 · Quand tu remontes dans l’historique, tout se range dans une barre fine. */
-            <header ref={head} className={cn("pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden", "home-head")}>
+            <header ref={head} className="pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden home-head">
               <span aria-hidden="true" data-c="bg" className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]" />
               <div className="relative grid grid-cols-[1fr_auto_1fr] items-start px-4 pb-5 pt-[max(6px,env(safe-area-inset-top))]">
                 <div data-c="acc" className="pointer-events-auto mt-3 flex">
@@ -991,10 +991,7 @@ export function HomeScreen({
               role="log"
               aria-label="Ta conv avec BLUSH"
               aria-live="polite"
-              className={cn(
-                "flex flex-1 flex-col px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6",
-                "overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden",
-              )}
+              className="flex flex-1 flex-col px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6 overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden"
             >
               {/* L’historique plus ancien : il arrive en remontant, ou d’un toucher */}
               {plus && (

@@ -28,7 +28,7 @@ const PartageSheet = dynamic(() => import("../Partage").then((m) => m.PartageShe
  * Les cartes viennent du rapport (cartes.ts) : sans accès, du seul chapitre offert, le verdict ; rien de payant n’est
  * montré avant le paiement.
  * Un toucher à droite (ou →) avance, à gauche (ou ←) recule ; « Passer » mène droit au rapport.
- * Proposition absente des maquettes, textes relus le 8 octobre.
+ * Absent des maquettes, textes relus le 8 octobre.
  */
 
 /* Le fond respire avec chaque carte : trois lueurs (rose au centre, bleu en bas à gauche, rose en haut à droite) */
@@ -117,7 +117,7 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   }, [at]);
 
   /* Le verdict : un souffle grave, puis l’accord de ce verdict quand l’emoji se pose (le mode sobre n’a pas de scène, donc pas de son).
-     Le bouton son, comme une story : touché, la scène joue même en mode silencieux. Proposition, textes relus le 8 octobre */
+     Le bouton son, comme une story : touché, la scène joue même en mode silencieux. Absent des maquettes, textes relus le 8 octobre */
   const sons = useSoundsEnabled();
   const [loud, setLoud] = useState(false);
   const onVerdict = card.id === "verdict";

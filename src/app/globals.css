@@ -253,7 +253,6 @@
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes sheetIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
 /* Une feuille ouverte : les boucles de la page derrière (défilé, logos qui flottent ou écrivent, bulle qui s’agite) se figent ;
    rien ne bouge plus sous le voile, le téléphone n’a que la feuille à dessiner. Le contenu de la feuille, lui, continue */
 html:has(dialog[open]) :is([data-marquee], [data-float], [data-nudge], [data-dring], [data-dring-icone], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow]):not(dialog *) { animation-play-state: paused; }

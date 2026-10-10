@@ -36,7 +36,7 @@ const souciDe = (e: unknown) =>
  */
 export function CodeScreen({ connexion = false, suite = "/app", fermee = false }: { connexion?: boolean; suite?: string; fermee?: boolean }) {
   const router = useRouter();
-  const [j, set] = useJourney();
+  const [j] = useJourney();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
@@ -112,9 +112,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * Le lancement est attendu avant d’ouvrir /lecture (la page serveur lit la conv que ce POST rattache au compte), mais
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
-      const lecture = await startAnalysis({ me: j.me ?? "hugo", pronom: j.pronom, prenom: j.prenom, guess: j.guess ?? "flou", goal: j.goal ?? "ensemble" });
-      retenirLecture(lecture);
-      set({ jobId: lecture.jobId });
+      retenirLecture(await startAnalysis({ me: j.me, pronom: j.pronom, prenom: j.prenom, guess: j.guess, goal: j.goal }));
       router.push("/lecture");
     } catch {
       /* Le code est bon (déjà utilisé), la session ouverte : « Qui es-tu ? » relance la lecture d’ici, et dit pourquoi elle bloque */

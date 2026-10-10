@@ -10,6 +10,7 @@ import {
   dechiffrer,
   definirPlan,
   dernierCode,
+  derniereHistoire,
   DOMAINE,
   emailLibre,
   expect,
@@ -21,6 +22,10 @@ import {
   nouvelInvite,
   oublierEmail,
   origine,
+  pageAuRepos,
+  poserLaReprise,
+  poserLeParcours,
+  rapportCommeLeVraiModele,
   RESEAU,
   sql,
   suivreLeNavigateur,
@@ -48,9 +53,6 @@ type Prepare = { histoire: string | null; codeFaux: string | null };
 /** L’email du parcours (07c, 07d) : un par état et par écran, et le code demandé pour lui. */
 const emailDuParcours = (id: string, ecran: "m" | "d") => `noe-${id.toLowerCase()}-${ecran}@${DOMAINE}`;
 
-/** La dernière histoire du compte. */
-const derniereHistoire = (email: string) => sql()`(select s.id from stories s join users u on u.id = s.user_id where u.email = ${email} order by s.created_at desc limit 1)`;
-
 /** Une conv importée sans compte (POST /api/import), comme à l’écran de l’export : le brouillon tient par son cookie. */
 async function importerUnBrouillon(page: Page, testInfo: TestInfo): Promise<string> {
   const conv = exportWhatsApp(testInfo);
@@ -63,42 +65,22 @@ async function importerUnBrouillon(page: Page, testInfo: TestInfo): Promise<stri
   return ((await envoi.json()) as { story: { id: string } }).story.id;
 }
 
-type BlocEcrit = { kind: string; text?: string; level?: string; messages?: { from: "toi" | "elle"; text: string }[]; factsAfter?: string[] };
+/**
+ * Les rapports écrits du compte, aux chapitres 1 et 2 tels que les écrit le vrai modèle (rapportCommeLeVraiModele) : la
+ * révélation du verdict d’un compte payant montre alors la confiance, ce que veulent dire les chiffres, et ses cartes
+ * « le moment » et « à toi de jouer », comme en production.
+ */
+const commeLeVraiModele = (email: string) => rapportCommeLeVraiModele(email, { chapitre1: true });
 
 /**
- * Les chapitres 1 et 2 des rapports écrits du compte, tels que le vrai modèle les écrit (prompts/05-rapport.md) : le
- * modèle factice n’y met qu’une accroche, un récit et une chute. Au chapitre 1, le vrai modèle ajoute `sens` et
- * `confiance` (ici, ceux du verdict du modèle factice, comme pour un compte gratuit) ; au chapitre 2, `essentiel`, `vu`
- * et `action`. Avec ces blocs, la révélation du verdict d’un compte payant montre la confiance, ce que veulent dire les
- * chiffres, et ses cartes « le moment » et « à toi de jouer », comme en production (tests/e2e/visuel.spec.ts fait de
- * même pour le chapitre 2). Les messages montrés sont ceux de la conv, que le rapport cite déjà.
+ * Le niveau du verdict de la dernière histoire du compte, réécrit dans la base : le modèle factice écrit toujours une
+ * étape (« On se le dit »), jamais la température que le vrai modèle donne à une conv « En couple ».
  */
-async function rapportCommeLeVraiModele(email: string): Promise<void> {
-  for (const { id } of await histoiresDe(email)) {
-    const [r] = await sql()<{ data: Uint8Array | null }[]>`select data from reports where story_id = ${id}`;
-    if (!r?.data) continue;
-    const rapport = dechiffrer<{ chapitres: { number: number; blocks: BlocEcrit[] }[] }>(r.data);
-    const cites = rapport.chapitres.flatMap((c) => c.blocks.flatMap((b) => b.messages ?? []));
-    const [elle, toi] = [cites.find((m) => m.from === "elle"), cites.find((m) => m.from === "toi")];
-    const [chapitre1, chapitre2] = [1, 2].map((n) => rapport.chapitres.find((c) => c.number === n));
-    if (!chapitre1 || !chapitre2 || !elle || !toi) throw new Error("le rapport écrit n’a plus ses chapitres 1 et 2, ou ne cite plus la conv");
-    chapitre1.blocks = [
-      ...chapitre1.blocks.slice(0, -1),
-      { kind: "meaning", text: "C’est flou parce que t’as esquivé." },
-      { kind: "confidence", level: "probable", text: "7 preuves dans votre conv" },
-      ...chapitre1.blocks.slice(-1),
-    ];
-    const [accroche, ...suite] = chapitre2.blocks;
-    chapitre2.blocks = [
-      accroche,
-      { kind: "essential", text: "Elle t’a tendu la perche, et t’as parlé du métro." },
-      { kind: "seen", messages: [elle, toi], factsAfter: ["Trois minutes plus tard, t’as changé de sujet."] },
-      ...suite.slice(0, -1),
-      { kind: "play", text: "Samedi au marché, c’est toi qui proposes le prochain verre." },
-      ...suite.slice(-1),
-    ];
-    await sql()`update reports set data = ${chiffrer(rapport)} where story_id = ${id}`;
-  }
+async function temperatureDuVerdict(email: string, niveau: "eloigne" | "coince" | "va" | "soudes"): Promise<void> {
+  const [v] = await sql()<{ data: Uint8Array }[]>`select data from verdicts where story_id = ${derniereHistoire(email)}`;
+  if (!v) throw new Error(`aucun verdict pour ${email}`);
+  const donnees = dechiffrer<{ sortie: Record<string, unknown> }>(v.data);
+  await sql()`update verdicts set data = ${chiffrer({ ...donnees, sortie: { ...donnees.sortie, niveau } })} where story_id = ${derniereHistoire(email)}`;
 }
 
 /** Un compte payant (`plan`), connecté dans ce navigateur, dont une conv est lue et toute la suite écrite. */
@@ -111,7 +93,7 @@ async function comptePayant(page: Page, testInfo: TestInfo, plan: "rapport" | "b
     await lireUneConvParApi(page, testInfo);
     await attendreTaches(email);
   }
-  await rapportCommeLeVraiModele(email);
+  await commeLeVraiModele(email);
   return email;
 }
 
@@ -131,10 +113,7 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       const depuis = Date.now();
       const envoi = await page.request.post("/api/auth/code", { headers: origine(testInfo), data: { email }, timeout: RESEAU });
       expect(envoi.status(), "le code de connexion est demandé").toBe(200);
-      await page.addInitScript((e) => {
-        const j = JSON.parse(sessionStorage.getItem("blush.journey.v1") ?? "{}");
-        sessionStorage.setItem("blush.journey.v1", JSON.stringify({ ...j, email: e }));
-      }, email);
+      await poserLeParcours(page, { email });
       return { histoire, codeFaux: autreCode(await dernierCode(email, { depuis })) };
     }
     case "gratuit":
@@ -166,8 +145,15 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       await lireUneConvParApi(page, testInfo, { personnes: { toi: "Noé", autre: "Inès" } });
       const histoire = await lireUneConvParApi(page, testInfo);
       await attendreTaches(email);
-      await rapportCommeLeVraiModele(email);
+      await commeLeVraiModele(email);
       return { ...sans, histoire };
+    }
+    case "couple": {
+      /* « En couple » à « Qui es-tu ? », BLUSH+, puis le verdict à « Ça coince », comme le vrai modèle l’écrirait */
+      const email = await lectureBlushPlus(page, testInfo, { enCouple: true });
+      await commeLeVraiModele(email);
+      await temperatureDuVerdict(email, "coince");
+      return { ...sans, histoire: (await histoiresDe(email)).at(-1)?.id ?? null };
     }
   }
 }
@@ -180,32 +166,6 @@ async function pagePosee(page: Page): Promise<void> {
     await document.fonts.ready;
     await Promise.all(Array.from(document.images, (image) => image.decode().catch(() => {})));
   });
-}
-
-/**
- * Attend que la page ne bouge plus depuis 600 ms : plus aucune animation finie en cours (celles qui tournent sans fin ne
- * comptent pas), plus aucune bulle en vol, plus aucun changement du document (tests/e2e/visuel.spec.ts, pageAuRepos).
- * Au bout de 10 secondes, on capture quand même (un compte à rebours, une lecture qui interroge le serveur).
- */
-async function auRepos(page: Page): Promise<void> {
-  await page.evaluate(
-    () =>
-      new Promise<void>((fini) => {
-        let dernier = performance.now();
-        const debut = dernier;
-        const changements = new MutationObserver(() => (dernier = performance.now()));
-        changements.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
-        const verifier = () => {
-          const anime = !!document.querySelector(".flight") || document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity);
-          if (anime) dernier = performance.now();
-          if (performance.now() - dernier >= 600 || performance.now() - debut > 10_000) {
-            changements.disconnect();
-            fini();
-          } else setTimeout(verifier, 50);
-        };
-        verifier();
-      }),
-  );
 }
 
 /** Écrit la capture et sa fiche (.galerie/etats/<id>-<écran>.json) ; l’image d’une capture précédente du même état est retirée. */
@@ -225,7 +185,7 @@ for (const etat of STATES) {
     const ecran = testInfo.project.metadata.ecran as "m" | "d";
     test.skip(!!etat.only && etat.only !== ecran, `seulement en ${etat.only === "m" ? "mobile" : "ordinateur"}`);
     /* Un compte BLUSH+ et trois convs lues : de la marge sur une machine chargée */
-    if (etat.compte === "plusieurs" || etat.compte === "blushplus" || etat.compte === "rapport") test.slow();
+    if (etat.compte === "plusieurs" || etat.compte === "blushplus" || etat.compte === "rapport" || etat.compte === "couple") test.slow();
     const { viewport, deviceScaleFactor = 1 } = testInfo.project.use;
     if (!viewport) throw new Error(`le projet ${testInfo.project.name} n’a pas d’écran (playwright.config.ts)`);
     /* `touch` : le mobile est capturé comme un vrai écran tactile (pas de survol, pointeur grossier) */
@@ -249,11 +209,12 @@ for (const etat of STATES) {
       const page = await contexte.newPage();
       const { histoire, codeFaux } = await preparer(etat, page, testInfo, ecran);
       /* `journey` : l’état du parcours de l’onglet, que l’écran lit (src/state/journey.tsx) */
-      if (etat.journey)
-        await page.addInitScript((j) => {
-          const avant = JSON.parse(sessionStorage.getItem("blush.journey.v1") ?? "{}");
-          sessionStorage.setItem("blush.journey.v1", JSON.stringify({ ...avant, ...j }));
-        }, etat.journey);
+      if (etat.journey) await poserLeParcours(page, etat.journey);
+      /* `reprise` : où la lecture du rapport s’était arrêtée, pour l’histoire préparée */
+      if (etat.reprise) {
+        if (!histoire) throw new Error(`${etat.id} : une reprise sans histoire`);
+        await poserLaReprise(page, histoire, etat.reprise);
+      }
       /* `retenir` : la requête part, mais le serveur ne la reçoit jamais : l’écran reste « en train d’écrire » */
       const retenir = etat.retenir;
       if (retenir)
@@ -274,8 +235,11 @@ for (const etat of STATES) {
       }
       /* États animés : les entrées (rebond, montée) sont figées à leur état final, la progression continue */
       if (etat.motion) await page.addStyleTag({ content: "[data-popin],[data-rise],[data-pop]{animation:none!important}" });
-      /* Les autres sont capturés posés : la scène finie, le texte arrivé (le survol, lui, reste) */
-      else await auRepos(page);
+      /*
+       * Les autres sont capturés posés : la scène finie, le texte arrivé (le survol, lui, reste). Au bout de 10 secondes,
+       * on capture quand même (un compte à rebours, une lecture qui interroge le serveur), et on le dit.
+       */
+      else if (!(await pageAuRepos(page, { max: 10_000, echouer: false }))) console.warn(`${etat.id} (${ecran}) : la page bouge encore après 10 secondes, capturée quand même`);
 
       const entiere = !etat.sheet;
       const hauteur = entiere ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, window.innerHeight)) : viewport.height;

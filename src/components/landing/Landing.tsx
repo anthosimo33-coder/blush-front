@@ -1,8 +1,9 @@
 "use client";
 
+import { TESTIMONIALS } from "@/contenu/landing";
 import { ConvsExemples } from "./ConvsExemples";
 import { Hero } from "./Hero";
-import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReviews, type Retour } from "./parts";
+import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, type Retour } from "./parts";
 
 /*
  * La landing (/) : la promesse en bulles, les convs qui défilent (on en touche une, BLUSH montre son verdict),
@@ -10,7 +11,8 @@ import { BlushPlus, Facts, FinalCta, LandingFrame, Reviews, useReveal, useReview
  * `retour` : qui revient, connecté (src/app/retour) ; ses boutons mènent alors à son accueil.
  */
 export function Landing({ retour = null }: { retour?: Retour }) {
-  const reviews = useReviews();
+  /* Les avis à montrer : les vrais seulement (aucun : pas de section) */
+  const reviews = TESTIMONIALS;
   useReveal(reviews.length);
   return (
     <LandingFrame retour={retour}>

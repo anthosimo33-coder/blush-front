@@ -298,7 +298,10 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
   await test.step("150 messages dans la journée : « on reprend demain ? »", async () => {
     await remplirLaLimite(email, (id) => `chat:${id}`, 150);
     expect(await ecrireABlush(page, "dernière question promis")).toBe(429);
-    await expect(fil.getByText("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?")).toBeVisible();
+    const bulle = fil.getByText("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
+    await expect(bulle).toBeVisible();
+    /* Avant « ? », une espace insécable : le « ? » ne passe jamais seul à la ligne (getByText ne distingue pas les espaces) */
+    expect(await bulle.textContent()).toBe("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
   });
 
   await test.step("rien de tout ça ne s’est écrit en base", async () => {
@@ -423,7 +426,7 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
 
 /*
  * Le champ du chat est dans un <label> qui contient aussi ses boutons (le vocal, ou la flèche) : son nom accessible les
- * lit avec lui (« Écris à BLUSH, ou colle sa réponse Enregistrer un vocal »). src/app/app/HomeScreen.tsx:846
+ * lit avec lui (« Écris à BLUSH, ou colle sa réponse Enregistrer un vocal »). src/app/app/HomeScreen.tsx:1310
  */
 test.fixme("le champ du chat porte son seul nom, sans celui du bouton à côté", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo);
