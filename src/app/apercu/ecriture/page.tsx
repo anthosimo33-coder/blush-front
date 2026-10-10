@@ -34,7 +34,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
       ...report,
       chapters: [
         ...report.chapters.filter((c) => estOffert(c.number)).map((c) => ({ ...c, locked: false })),
-        ...suite.map((c, k) => (lisibles.includes(c.number) ? { ...c, free: true, locked: false } : { ...c, tocTitle: ecriture.chapitres[k].title, locked: true, blocks: [] })),
+        ...suite.map((c, k) => (lisibles.includes(c.number) ? { ...c, locked: false } : { ...c, tocTitle: ecriture.chapitres[k].title, locked: true, blocks: [] })),
       ],
     },
     sober: null,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cardsOf } from "@/app/rapport/verdict/cartes";
-import { tempsDeLecture } from "@prompts/lib/front";
+import { chapitresAffiches, tempsDeLecture } from "@prompts/lib/front";
+import type { Rapport } from "@prompts/lib/schemas";
 import { CHAPITRES_OFFERTS, CHAPITRES_PAYANTS, estOffert, NB_CHAPITRES, PREMIER_PAYANT, titreDAttente } from "@/contenu/chapitres";
 import { lectureDe } from "@/server/analyse";
 import { mailRapport } from "@/server/mail-rapport";
@@ -45,9 +46,14 @@ describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
     expect(html).not.toContain("<b>Léa");
   });
 
-  it("le temps de lecture offert ne compte que le chapitre 1, même quand le modèle marque aussi le 2 « free »", () => {
+  it("le sous-module des prompts ne marque « free » que les chapitres offerts", () => {
+    const rapport = { chapitres: Array.from({ length: NB_CHAPITRES }, (_, k) => ({ numero: k + 1, titre: "t", titre_court: "t", surtitre: null, blocs: [] })) } as unknown as Rapport;
+    expect(chapitresAffiches(rapport, new Map(), []).map((c) => c.free)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map(estOffert));
+  });
+
+  it("le temps de lecture offert ne compte que le chapitre 1, même quand un chapitre 2 est marqué « free »", () => {
     const court: Chapter = { number: 1, title: "Le verdict", tocTitle: "Le verdict", free: true, blocks: [{ kind: "meaning", text: "L’envie est là des deux côtés." }] };
-    /* Le `free` du sous-module des prompts (prompts/lib/front.ts) : vrai pour les chapitres 1 et 2 */
+    /* Un `free` vrai au chapitre 2, comme le marquait le sous-module des prompts avant de n’offrir que le chapitre 1 : il n’est pas lu */
     const long: Chapter = { number: 2, title: "Le moment où tout a basculé", tocTitle: "La bascule", free: true, blocks: [{ kind: "story", text: "mot ".repeat(2_300) }] };
     expect(lectureDe([court, long])).toEqual({ free: tempsDeLecture([court]), full: tempsDeLecture([court, long]) });
     expect(lectureDe([court, long])).toEqual({ free: "1 min", full: "10 min" });
