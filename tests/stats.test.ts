@@ -22,13 +22,16 @@ describe("les robots d’aperçu ne sont pas des visites", () => {
 });
 
 describe("le mail « ton rapport est prêt »", () => {
-  it("ne contient rien de la conv, et reste sobre en mode sobre", () => {
-    const m = mailRapport({ base: "https://www.askblush.com", lien: "https://www.askblush.com/ouvrir/abc", chapitres: 8, lecture: "9 min", autre: "elle", sobre: false });
+  it("son prénom au sommaire seulement (ni le sujet, ni l’aperçu, ni le texte brut), et sobre en mode sobre", () => {
+    const m = mailRapport({ base: "https://www.askblush.com", lien: "https://www.askblush.com/ouvrir/abc", chapitres: 8, lecture: "9 min", autre: "Maëlys", sobre: false });
     expect(m.html).toContain("https://www.askblush.com/ouvrir/abc");
-    expect(m.html).toContain(">Elle<");
+    expect(m.html.match(/Maëlys/g)).toEqual(["Maëlys"]);
+    expect(m.html).toContain(">Maëlys</td>");
+    expect(`${m.sujet}\n${m.texte}`).not.toContain("Maëlys");
     expect(m.texte).toContain("8 chapitres, 9 min de lecture");
-    const s = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 0, lecture: "2 min", autre: "il", sobre: true });
+    const s = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 0, lecture: "2 min", autre: "Maëlys", sobre: true });
     expect(s.html).not.toContain("tendre");
+    expect(s.html).not.toContain("Maëlys");
     expect(s.sujet).not.toContain("📖");
   });
 

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
-import { cancelSubscription, deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
+import { deleteAccount, deleteStory, getAccount, openConv, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/contenu/offres";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +20,7 @@ import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
 
-type Confirm = "stop" | "keep" | "story" | "all" | null;
+type Confirm = "keep" | "story" | "all" | null;
 
 /* Écran 20 — Mon compte, à la manière des Réglages : toi en haut, l’abonnement, puis tes données (les gestes qui effacent en rouge). */
 export type NomsDuCompte = { me: Person; other: Person; period: string };
@@ -176,7 +176,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             }
           />
         )}
-        {plus && sub?.active && <InsetRow title="Arrêter BLUSH+" sub="En un geste, effectif lundi" onClick={() => setConfirm("stop")} chevron />}
+        {/* « Arrêter BLUSH+ » revient avec le paiement (Stripe) : sans lui, il n’y a rien à résilier côté serveur */}
         {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
       </InsetGroup>
 
@@ -224,13 +224,13 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             </Button>
           </>
         )}
-        {(confirm === "stop" || confirm === "story" || confirm === "all") && (
+        {(confirm === "story" || confirm === "all") && (
           <>
             <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              {confirm === "stop" ? "Arrêter BLUSH+ ?" : confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"} ?` : "Tout effacer ?"}
+              {confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"} ?` : "Tout effacer ?"}
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-              {confirm === "stop" ? "En un geste, effectif lundi." : confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
+              {confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
             </p>
             {souci && (
               <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
@@ -242,18 +242,16 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               onClick={() =>
                 busy
                   ? undefined
-                  : confirm === "stop"
-                    ? run(cancelSubscription, () => invalidate("account"))
-                    : run(confirm === "story" ? deleteStory : deleteAccount, () => {
-                        resetJourney();
-                        invalidate("account", "report", "fiche");
-                        /* Une autre conv reste : elle s’ouvre à la place */
-                        if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
-                        else router.push("/commencer");
-                      })
+                  : run(confirm === "story" ? deleteStory : deleteAccount, () => {
+                      resetJourney();
+                      invalidate("account", "report", "fiche");
+                      /* Une autre conv reste : elle s’ouvre à la place */
+                      if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
+                      else router.push("/commencer");
+                    })
               }
             >
-              {confirm === "stop" ? "Arrêter BLUSH+" : confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
+              {confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
             </Button>
             <Button variant="link" onClick={fermer}>
               Annuler

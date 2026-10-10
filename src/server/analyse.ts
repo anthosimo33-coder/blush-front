@@ -9,6 +9,7 @@ import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan
 import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
+import { estOffert } from "@/contenu/chapitres";
 import { chiffrer, dechiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type LigneComplete } from "./histoires";
@@ -299,6 +300,12 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   }
 }
 
+/** Le temps de lecture d’un rapport écrit : en entier, et ses chapitres offerts (estOffert, pas le `free` du modèle). */
+export const lectureDe = (chapitres: ChapitreAffiche[]): DonneesRapport["lecture"] => ({
+  free: tempsDeLecture(chapitres.filter((c) => estOffert(c.number))),
+  full: tempsDeLecture(chapitres),
+});
+
 async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: LigneScore[]) {
   const h = histoireDe(metaDe(story));
   const chapitres = chapitresAffiches(r, messagesAffiches(lignes, h.utilisateur.prenom), lignesScores);
@@ -306,7 +313,7 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     sortie: r,
     chapitres,
     sobre: sobreAffiche(r),
-    lecture: { free: tempsDeLecture(chapitres.filter((c) => c.free)), full: tempsDeLecture(chapitres) },
+    lecture: lectureDe(chapitres),
   };
   const [avant] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
   /* Le rapport assemblé : les chapitres gardés au fil de l’écriture ne servent plus */
@@ -315,11 +322,14 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     .values({ storyId: story.id, data: chiffrer(donnees) })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { data: chiffrer(donnees), partiel: null, updatedAt: new Date() } });
   /* La première fois seulement (pas à une relance) : le mail « ton rapport est prêt » */
-  if (!avant?.pret) await prevenirRapportPret(story, donnees, h.autre.pronom);
+  if (!avant?.pret) await prevenirRapportPret(story, donnees, h.autre.prenom);
 }
 
-/** Le mail « ton rapport est prêt », avec le lien qui ouvre cette conv-là. Un mail raté ne fait pas échouer le rapport. */
-async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre: "il" | "elle") {
+/**
+ * Le mail « ton rapport est prêt », avec le lien qui ouvre cette conv-là. Un mail raté ne fait pas échouer le rapport.
+ * `autre` : le prénom de l’autre, le titre de son chapitre dans le sommaire, comme dans le rapport.
+ */
+async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre: string) {
   if (!story.userId) return;
   try {
     const [u] = await db().select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, story.userId));

@@ -74,7 +74,7 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
     expect(histoire.convGardee).toBe(false);
   });
 
-  await test.step("le mail « ton rapport est prêt » est arrivé une fois, avec le lien de ce rapport, sans rien de la conv", async () => {
+  await test.step("le mail « ton rapport est prêt » est arrivé une fois, avec le lien de ce rapport, et de la conv seulement son prénom", async () => {
     /* L’invité repart d’une boîte vide (nouvelInvite) : tous ses mails viennent de ce test */
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === SUJET_PRET });
     expect(mailsPour(email).filter((m) => m.sujet === SUJET_PRET)).toHaveLength(1);
@@ -82,8 +82,11 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
     expect(mail.texte).toContain(lien);
     expect(mail.html).toContain(`href="${lien}"`);
     expect(mail.html).toContain("Lire mon rapport");
-    /* Le mail peut s’afficher sur l’écran verrouillé : ni prénom, ni verdict, ni message */
-    for (const prive of ["Noé", "Maëlys", "Vous êtes à deux doigts", "esquivé", "marché aux puces"]) expect(`${mail.sujet}\n${mail.texte}\n${mail.html}`).not.toContain(prive);
+    /* Ni verdict, ni message, ni ton prénom ; le sien une fois, au sommaire (le titre de son chapitre, comme dans le rapport) */
+    for (const prive of ["Noé", "Vous êtes à deux doigts", "esquivé", "marché aux puces"]) expect(`${mail.sujet}\n${mail.texte}\n${mail.html}`).not.toContain(prive);
+    expect(mail.html.match(/Maëlys/g)).toHaveLength(1);
+    /* Ce que montre l’écran verrouillé (le sujet, le texte brut) ne dit aucun prénom */
+    expect(`${mail.sujet}\n${mail.texte}`).not.toContain("Maëlys");
   });
 
   await test.step("le lien du mail ouvre le rapport", async () => {

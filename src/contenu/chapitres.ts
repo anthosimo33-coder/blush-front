@@ -6,8 +6,8 @@
  * chapitres fermés et l’écriture (src/server/donnees.ts), la révélation du verdict (src/app/rapport/verdict/cartes.ts),
  * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
  * lisent ici.
- * Le `free` des chapitres écrits par le modèle vient du sous-module des prompts, pas d’ici. Aucun écran ne le lit : seul
- * le temps de lecture « offert » d’un rapport déjà écrit en est tiré (readingTime.free, src/server/analyse.ts).
+ * Le `free` des chapitres écrits par le modèle (le sous-module des prompts) n’est pas lu : même le temps de lecture
+ * « offert » d’un rapport écrit (readingTime.free, src/server/analyse.ts) suit estOffert.
  */
 
 export const NB_CHAPITRES = 8;
@@ -30,25 +30,22 @@ export const CHAPITRE_DU_VERDICT = 1;
 /** « Le moment où tout a basculé », payant : la révélation du verdict y prend « le moment » et « à toi de jouer », une fois débloqué. */
 export const CHAPITRE_DE_LA_BASCULE = 2;
 
-/** Le chapitre de l’autre personne : son prénom en attente, « Elle » ou « Lui » dans le mail (qui ne dit aucun prénom). */
+/** Le chapitre de l’autre personne : son titre est son prénom. */
 const DE_L_AUTRE = 5;
 
 /*
- * Les titres de chaque chapitre, sauf celui de l’autre. `attente` : dans le rapport, tant que le plan n’a pas donné
- * les vrais (les chapitres fermés, la liste de l’écriture). `mail` : le sommaire du mail « ton rapport est prêt ».
+ * Les titres de chaque chapitre, sauf celui de l’autre. Le rapport les montre tant que le plan n’a pas donné les vrais
+ * (les chapitres fermés, la liste de l’écriture) ; le sommaire du mail « ton rapport est prêt » les reprend tels quels.
  */
-const TITRES: Record<number, { attente: string; mail: string }> = {
-  1: { attente: "Le verdict", mail: "Le verdict" },
-  2: { attente: "Le moment où tout a basculé", mail: "La bascule" },
-  3: { attente: "Votre histoire, en actes", mail: "Votre histoire" },
-  4: { attente: "Ce qui coince", mail: "Ce qui coince" },
-  6: { attente: "Toi", mail: "Toi" },
-  7: { attente: "Votre duo", mail: "Votre duo" },
-  8: { attente: "Ton prochain pas", mail: "Ton prochain pas" },
+const TITRES: Record<number, string> = {
+  1: "Le verdict",
+  2: "Le moment où tout a basculé",
+  3: "Votre histoire, en actes",
+  4: "Ce qui coince",
+  6: "Toi",
+  7: "Votre duo",
+  8: "Ton prochain pas",
 };
 
-/** Le titre d’un chapitre avant que le plan donne le sien. `autre` : le prénom de l’autre personne. */
-export const titreDAttente = (numero: number, autre: string) => (numero === DE_L_AUTRE ? autre : TITRES[numero].attente);
-
-/** Le titre d’un chapitre dans le sommaire du mail. `autre` : le pronom de l’autre personne. */
-export const titreDuMail = (numero: number, autre: "il" | "elle") => (numero === DE_L_AUTRE ? (autre === "elle" ? "Elle" : "Lui") : TITRES[numero].mail);
+/** Le titre d’un chapitre avant que le plan donne le sien (et dans le mail). `autre` : le prénom de l’autre personne. */
+export const titreDAttente = (numero: number, autre: string) => (numero === DE_L_AUTRE ? autre : TITRES[numero]);

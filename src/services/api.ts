@@ -530,10 +530,6 @@ export async function setPaused(paused: boolean): Promise<void> {
   return void (await appel<{ ok: true }>("/api/compte", envoi("POST", { paused })));
 }
 
-export async function cancelSubscription(): Promise<void> {
-  /* v1 : pas de paiement, donc rien à résilier */
-}
-
 /**
  * Le lien public du verdict (/v/<id>) : le verdict seul, le prénom de l’autre masqué, jamais la conv. Toujours le même
  * lien tant qu’on ne le désactive pas.

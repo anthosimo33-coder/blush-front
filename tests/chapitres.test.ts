@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cardsOf } from "@/app/rapport/verdict/cartes";
-import { CHAPITRES_OFFERTS, CHAPITRES_PAYANTS, estOffert, NB_CHAPITRES, PREMIER_PAYANT, titreDAttente, titreDuMail } from "@/contenu/chapitres";
+import { tempsDeLecture } from "@prompts/lib/front";
+import { CHAPITRES_OFFERTS, CHAPITRES_PAYANTS, estOffert, NB_CHAPITRES, PREMIER_PAYANT, titreDAttente } from "@/contenu/chapitres";
+import { lectureDe } from "@/server/analyse";
 import { mailRapport } from "@/server/mail-rapport";
 import type { ReportPayload } from "@/services/api";
 import type { Chapter } from "@/types";
@@ -27,13 +29,28 @@ describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
     ]);
   });
 
-  it("le sommaire du mail : « Elle » ou « Lui », jamais un prénom, et dans l’ordre", () => {
-    const titres = ["Le verdict", "La bascule", "Votre histoire", "Ce qui coince", "Elle", "Toi", "Votre duo", "Ton prochain pas"];
-    expect([1, 2, 3, 4, 5, 6, 7, 8].map((n) => titreDuMail(n, "elle"))).toEqual(titres);
-    expect(titreDuMail(5, "il")).toBe("Lui");
-    const { html } = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 8, lecture: "9 min", autre: "il", sobre: false });
-    const lus = [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => [Number(m[1]), m[2]]);
-    expect(lus).toEqual(titres.map((t, k) => [k + 1, t === "Elle" ? "Lui" : t]));
+  /* Le sommaire du mail, lu dans son HTML : la pastille du numéro, puis le titre */
+  const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => [Number(m[1]), m[2]]);
+
+  it("le sommaire du mail : les titres du rapport, dans l’ordre, le 5 au prénom de l’autre", () => {
+    const { html } = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 8, lecture: "9 min", autre: "Maëlys", sobre: false });
+    expect(sommaireDuMail(html)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => [n, titreDAttente(n, "Maëlys")]));
+    /* Le mode sobre n’a pas de sommaire : aucun prénom */
+    expect(sommaireDuMail(mailRapport({ base: "x", lien: "x", chapitres: 1, lecture: "2 min", autre: "Maëlys", sobre: true }).html)).toEqual([]);
+  });
+
+  it("le prénom de l’autre reste du texte dans le HTML du mail", () => {
+    const { html } = mailRapport({ base: "x", lien: "x", chapitres: 8, lecture: "9 min", autre: "<b>Léa & Zoé</b>", sobre: false });
+    expect(sommaireDuMail(html)[4]).toEqual([5, "&lt;b&gt;Léa &amp; Zoé&lt;/b&gt;"]);
+    expect(html).not.toContain("<b>Léa");
+  });
+
+  it("le temps de lecture offert ne compte que le chapitre 1, même quand le modèle marque aussi le 2 « free »", () => {
+    const court: Chapter = { number: 1, title: "Le verdict", tocTitle: "Le verdict", free: true, blocks: [{ kind: "meaning", text: "L’envie est là des deux côtés." }] };
+    /* Le `free` du sous-module des prompts (prompts/lib/front.ts) : vrai pour les chapitres 1 et 2 */
+    const long: Chapter = { number: 2, title: "Le moment où tout a basculé", tocTitle: "La bascule", free: true, blocks: [{ kind: "story", text: "mot ".repeat(2_300) }] };
+    expect(lectureDe([court, long])).toEqual({ free: tempsDeLecture([court]), full: tempsDeLecture([court, long]) });
+    expect(lectureDe([court, long])).toEqual({ free: "1 min", full: "10 min" });
   });
 });
 

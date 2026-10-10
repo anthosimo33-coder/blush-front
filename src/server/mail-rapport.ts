@@ -1,10 +1,11 @@
-import { NB_CHAPITRES, titreDuMail } from "@/contenu/chapitres";
+import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
 
 /*
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
- * parle en bulles roses, comme sur la landing. Rien de la conv : ni prénom, ni verdict, ni message (le mail
- * peut s’afficher sur l’écran verrouillé). En mode sobre, pas de vanne. En tableaux et en styles en ligne.
- * Textes relus le 8 octobre (voix de BLUSH).
+ * parle en bulles roses, comme sur la landing. Son sommaire reprend les titres du rapport (src/contenu/chapitres.ts),
+ * dont le prénom de l’autre (son chapitre). Rien d’autre de la conv : ni verdict, ni message. Le sujet, l’aperçu et le
+ * texte brut (ce que montre l’écran verrouillé) ne disent aucun prénom. En mode sobre, ni sommaire ni vanne. En
+ * tableaux et en styles en ligne. Textes relus le 8 octobre (voix de BLUSH).
  */
 
 const POLICE = "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -15,21 +16,24 @@ const PAPIER = "#F4F2ED";
 
 export type MailRapport = { sujet: string; texte: string; html: string };
 
-/** `lien` : l’adresse qui ouvre ce rapport ; `autre` : le pronom de l’autre (le chapitre 5 s’appelle « Elle » ou « Lui »). */
-export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { base: string; lien: string; chapitres: number; lecture: string; autre: "il" | "elle"; sobre: boolean }): MailRapport {
+/** Un texte de la conv (un prénom) dans le HTML du mail. */
+const enHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** `lien` : l’adresse qui ouvre ce rapport ; `autre` : le prénom de l’autre (le titre de son chapitre, comme dans le rapport). */
+export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { base: string; lien: string; chapitres: number; lecture: string; autre: string; sobre: boolean }): MailRapport {
   const n = String(chapitres);
   const sujet = sobre ? "Ton rapport BLUSH est prêt" : "📖 Ton rapport BLUSH est prêt";
   const resume = sobre ? "Prends le temps de le lire au calme." : `${n} chapitres, ${lecture} de lecture. J’ai pas été tendre.`;
   const texte = sobre
     ? `Ton rapport est prêt.\n\nIl est court, et il t’aide à y voir clair. Prends le temps de le lire au calme :\n${lien}\n\nCe mail ne contient rien de ta conv.`
-    : `Ton rapport est prêt : ${n} chapitres, ${lecture} de lecture.\n\nLe verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain pas :\n${lien}\n\nCe mail ne contient rien de ta conv : ni prénom, ni message.`;
+    : `Ton rapport est prêt : ${n} chapitres, ${lecture} de lecture.\n\nLe verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain pas :\n${lien}\n\nCe mail ne contient aucun message de ta conv, ni le verdict.`;
 
   const bulle = (t: string) =>
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:linear-gradient(160deg,#FF9BCB,#E8358A);border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
 
   const chapitre = (numero: number) =>
-    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${titreDuMail(numero, autre)}</td></tr></table></td>`;
-  /* Le sommaire : tous les chapitres, deux par ligne */
+    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreDAttente(numero, autre))}</td></tr></table></td>`;
+  /* Le sommaire : tous les chapitres, deux par ligne, sous les titres du rapport */
   const sommaire = Array.from({ length: Math.ceil(NB_CHAPITRES / 2) }, (_, k) => `<tr>${chapitre(2 * k + 1)}${chapitre(2 * k + 2)}</tr>`).join("");
 
   const corps = sobre
@@ -97,7 +101,7 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
         </tr>
         <tr>
           <td align="center" class="gris" style="padding:24px 12px 0;font-family:${POLICE};font-size:13px;line-height:19px;font-weight:700;color:${GRIS};">
-            Ce mail ne contient rien de ta conv&nbsp;: ni prénom, ni&nbsp;message.<br>
+            ${sobre ? "Ce mail ne contient rien de ta conv&nbsp;: ni prénom, ni&nbsp;message." : "Ce mail ne contient aucun message de ta conv, ni&nbsp;le&nbsp;verdict."}<br>
             <a href="${base}" class="gris" style="color:${GRIS};text-decoration:none;font-weight:900;">askblush.com</a>
           </td>
         </tr>

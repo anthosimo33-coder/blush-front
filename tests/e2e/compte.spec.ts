@@ -98,7 +98,6 @@ test("BLUSH+ : actif à 7,99 € la semaine, et la pause qui tient après un rec
     await expect(abonnement.getByText("Renouvelé lundi · sans engagement")).toBeVisible();
     await expect(abonnement.getByText("7,99 €", { exact: true })).toBeVisible();
     await expect(abonnement.getByText("/ semaine", { exact: true })).toBeVisible();
-    await expect(abonnement.getByRole("button", { name: /^Arrêter BLUSH\+/ })).toBeVisible();
     await expect(pause).not.toBeChecked();
   });
 
@@ -121,25 +120,21 @@ test("BLUSH+ : actif à 7,99 € la semaine, et la pause qui tient après un rec
 });
 
 /*
- * Bug : « Arrêter BLUSH+ » ne fait rien. La feuille annonce « En un geste, effectif lundi. », mais
- * cancelSubscription rentre sans appeler le serveur (src/services/api.ts:533) et la ligne reste proposée
- * (src/app/compte/CompteScreen.tsx:179) : confirmé, l’abonnement reste « actif », « Renouvelé lundi ». Ce test décrit ce
- * que l’écran promet : l’abonnement passe à « arrêté ».
+ * « Arrêter BLUSH+ » revient avec le paiement (Stripe) : sans lui, il n’y a rien à résilier côté serveur. D’ici là, ni
+ * la ligne ni sa feuille : l’abonnement ne propose que la pause.
  */
-test.fixme("BLUSH+ : « Arrêter BLUSH+ » confirmé, l’abonnement s’affiche arrêté", async ({ page }, testInfo) => {
+test("BLUSH+ : la pause seulement, sans « Arrêter BLUSH+ » tant que le paiement n’existe pas", async ({ page }, testInfo) => {
   const email = await nouvelInvite(testInfo);
   await connecterParApi(page, testInfo, email);
   await ouvrir(page, "/compte");
   const abonnement = page.getByRole("main").getByRole("region", { name: "Ton abonnement" });
-  await abonnement.getByRole("button", { name: /^Arrêter BLUSH\+/ }).click();
-  const confirmation = page.getByRole("dialog", { name: "Arrêter BLUSH+ ?" });
-  await expect(confirmation.getByText("En un geste, effectif lundi.")).toBeVisible();
-  await confirmation.getByRole("button", { name: "Arrêter BLUSH+" }).click();
-  await expect(confirmation).toBeHidden();
-  await expect(abonnement).toContainText(/BLUSH\+\s*arrêté/);
-  await ouvrir(page);
-  await expect(abonnement).toContainText(/BLUSH\+\s*arrêté/);
-  await expect(abonnement.getByText("Renouvelé lundi · sans engagement")).toHaveCount(0);
+
+  await expect(abonnement).toContainText(/BLUSH\+\s*actif/);
+  await expect(abonnement.getByRole("switch", { name: "Mettre en pause" })).toBeVisible();
+  /* Ni bouton ni lien dans l’abonnement, et rien de l’arrêt nulle part sur la page */
+  await expect(abonnement.getByRole("button")).toHaveCount(0);
+  await expect(abonnement.getByRole("link")).toHaveCount(0);
+  await expect(page.getByText(/Arrêter BLUSH\+|effectif lundi/)).toHaveCount(0);
 });
 
 test("Sons et vibrations : coupés d’un toucher, et toujours coupés au retour sur la page", async ({ page }, testInfo) => {

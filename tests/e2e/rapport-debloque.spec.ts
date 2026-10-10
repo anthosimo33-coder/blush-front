@@ -1,10 +1,24 @@
-import { attendreTaches, compteDe, connecterParApi, definirPlan, expect, lireUneConvParApi, nouvelInvite, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
+import type { Locator } from "@playwright/test";
+import { attendreMail, attendreTaches, CHAPITRES_FERMES, compteDe, connecterParApi, definirPlan, expect, lireUneConvParApi, nouvelInvite, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
 
 /*
  * Débloquer, en bêta (sans paiement) : seuls les emails de BLUSH_ACCES_LIBRE le peuvent. Un invité dont le compte est
  * encore gratuit (ajouté à la liste après coup, sa session déjà ouverte : src/server/auth.ts) débloque depuis son rapport,
- * passe par « Bienvenue dans BLUSH+. », puis retrouve la suite qui s’écrit.
+ * passe par « Bienvenue dans BLUSH+. », puis retrouve la suite qui s’écrit, et le mail « ton rapport est prêt ».
  */
+
+/**
+ * Les titres des chapitres tels que le rapport gratuit les montre, dans l’ordre : le chapitre 1 (sans « Chapitre 1 : »,
+ * dit aux lecteurs d’écran seulement), puis les sept fermés (sans leur numéro ni « (verrouillé) »).
+ */
+async function titresDuRapport(rapport: Locator): Promise<string[]> {
+  const verdict = await rapport.getByRole("heading", { level: 2, name: /^Chapitre 1 : / }).textContent();
+  const fermes = await rapport.getByRole("button", { name: /\(verrouillé\)$/ }).allTextContents();
+  return [verdict!.replace(/^Chapitre 1\s*:\s*/, ""), ...fermes.map((t) => t.replace(/^\d+/, "").replace(/\(verrouillé\)$/, ""))];
+}
+
+/** Le sommaire du mail « ton rapport est prêt », lu dans son HTML : la pastille du numéro, puis le titre. */
+const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`);
 
 test("un invité encore gratuit débloque : « Bienvenue dans BLUSH+. », puis la suite de son rapport", async ({ page }, testInfo) => {
   const email = await nouvelInvite(testInfo);
@@ -14,9 +28,13 @@ test("un invité encore gratuit débloque : « Bienvenue dans BLUSH+. », puis l
   await attendreTaches(email);
   const rapport = await ouvrirLeRapport(page);
 
-  await test.step("le rapport est celui d’un compte gratuit : le verdict seul", async () => {
+  let titres: string[] = [];
+  await test.step("le rapport est celui d’un compte gratuit : le verdict seul, les sept autres fermés sous leur titre", async () => {
     await expect(rapport.getByText("Aperçu gratuit", { exact: true })).toBeVisible();
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
+    await expect(rapport.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveCount(7);
+    titres = await titresDuRapport(rapport);
+    expect(titres).toEqual(["Le verdict", ...CHAPITRES_FERMES]);
   });
 
   await test.step("« Lire la suite », BLUSH+ (choisi d’office), « Débloquer » : le moment « C’est débloqué »", async () => {
@@ -49,5 +67,10 @@ test("un invité encore gratuit débloque : « Bienvenue dans BLUSH+. », puis l
     await expect(rapport.getByRole("region", { name: "Chapitre 2 : Chapitre 2" })).toBeVisible();
     await expect(rapport.getByRole("region", { name: /^Chapitre \d : / })).toHaveCount(8);
     expect((await tachesDe(email)).every((t) => t.statut === "fini")).toBe(true);
+  });
+
+  await test.step("le mail « ton rapport est prêt » : son sommaire reprend les titres du rapport, le prénom de Maëlys compris", async () => {
+    const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });
+    expect(sommaireDuMail(mail.html)).toEqual(titres.map((titre, k) => `${k + 1} ${titre}`));
   });
 });
