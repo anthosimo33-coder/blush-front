@@ -31,7 +31,7 @@ test("la page publique, sans compte : le verdict seul, le prénom de l’autre e
     await expect(feuille.getByRole("figure")).toContainText(`🤏 ${titreMasque}`);
     await expect(feuille.getByRole("img", { name: `🤏 ${titreMasque}` })).toBeVisible();
     const whatsapp = await feuille.getByRole("link", { name: "WhatsApp" }).getAttribute("href");
-    expect(new URL(whatsapp!).searchParams.get("text")).toContain(`« ${titreMasque} »`);
+    expect(new URL(whatsapp!).searchParams.get("text")).toContain(`«\u00a0${titreMasque}\u00a0»`);
     /* Le rapport, lui, garde les deux prénoms */
     await feuille.getByRole("button", { name: "Fermer" }).click();
     await expect(page.getByRole("main").getByText(titre).first()).toBeVisible();
@@ -202,7 +202,11 @@ test("les espaces avant « : » et « ? » sont insécables, sur la page publiqu
   await page.getByRole("dialog", { name: "Partager ton verdict" }).getByRole("button", { name: "Fermer" }).click();
   await page.getByRole("main").getByRole("button", { name: "En savoir plus" }).click();
   expect(await texte(/au bout de 24/)).toContain("au bout de 24\u00a0h");
-  await page.goto(`/v/${id}`);
+  /* Une visite compte (lien_vu) : mesurée comme les autres gestes du partage, pour ne pas fausser les compteurs d’un autre test */
+  await mesurerCompteurs(async () => {
+    await page.goto(`/v/${id}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  }, { lien_vu: 1 });
   expect(await texte(/^verdict/)).toBe("verdict\u00a0:");
   expect(await texte(/elle dit quoi/)).toBe("et la mienne, elle dit quoi\u00a0?");
   expect(await texte(/Leur conv reste privée/)).toContain("privée\u00a0: seul");
