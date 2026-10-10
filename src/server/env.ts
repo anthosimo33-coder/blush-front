@@ -4,9 +4,10 @@ import { z } from "zod";
 /*
  * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build :
  * `next build` n’a pas les secrets). Une variable manquante ou mal formée fait échouer la requête
- * avec un message clair dans les logs, jamais dans la réponse.
+ * avec un message clair dans les logs, jamais dans la réponse. Chacune a sa ligne dans BACKEND.md
+ * (tests/documentation.test.ts y veille).
  */
-const Env = z.object({
+export const Env = z.object({
   /** Postgres : Neon en production, le Postgres local en dev. */
   DATABASE_URL: z.string().url(),
   /** Clé de chiffrement du contenu (32 octets en base64). Jamais dans la base. */

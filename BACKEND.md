@@ -2,23 +2,79 @@
 
 Le back-end vit dans ce projet Next.js : les routes `/api`, Postgres (Drizzle) et le modèle. L’appli tourne toujours avec lui, en local comme en production.
 
-## Ce qu’il fait
+## Les routes /api
 
-| Étape | Route | Où |
-|---|---|---|
-| Import d’un export (WhatsApp .zip ou .txt, Instagram message_1.html ou .json) en histoire brouillon, avant l’email. Le navigateur n’envoie que le texte de la conv, compressé (`src/services/preparer-export.ts`) | `POST /api/import` | `src/server/histoires.ts`, `prompts/lib/export.ts`, `prompts/lib/instagram.ts` |
-| Des captures d’écran, réduites par le navigateur puis lues par le prompt 01, en histoire brouillon | `POST /api/captures` | `src/server/captures.ts`, `prompts/lib/captures.ts` |
-| Code de connexion à 6 chiffres, session en cookie httpOnly | `POST /api/auth/code`, `/api/auth/verifier`, `/api/auth/deconnexion` | `src/server/auth.ts` |
-| La lecture : le verdict, puis (avec l’accès) le plan du rapport, ses deux moitiés et la mémoire | `POST/GET /api/analyse` | `src/server/analyse.ts`, `src/server/taches.ts` |
-| Le rapport : sans accès, seul le chapitre 1 (le verdict) est offert, les autres arrivent fermés et vides (le mode sobre s’ouvre sans paiement) | `GET /api/rapport` | `src/server/donnees.ts`, `src/contenu/chapitres.ts` |
-| Débloquer (v1 sans paiement : les emails de `BLUSH_ACCES_LIBRE`) | `POST /api/debloquer` | |
-| Le chat, d’après la mémoire ; l’historique ; la mise à jour de la mémoire. On y envoie du texte, des captures (leur conv ou son profil), un nouvel export, ou un vocal (transcrit par Mistral) | `POST/GET /api/chat` | `src/server/chat.ts`, `src/server/ajouts.ts`, `src/server/ia/transcription.ts` |
-| Sa fiche, et les corrections de l’utilisateur | `GET/PUT /api/fiche` | |
-| Des captures ou un export ajoutés à sa fiche : lus, puis la mémoire mise à jour tout de suite | `POST /api/fiche` | `src/server/ajouts.ts` |
-| Le compte, la pause, les suppressions | `/api/compte`, `/api/histoire` | |
-| La purge de nuit (Vercel Cron) | `GET /api/cron/purge` | `src/server/purge.ts` |
+Le navigateur passe par `src/services/api.ts`, qui appelle ces routes ; les pages serveur lisent les mêmes données par `src/services/serveur.ts`. Les gardes, dans l’ordre où une route les vérifie :
 
-Les pages serveur lisent les données via `src/services/serveur.ts`, et le navigateur passe par `src/services/api.ts`, qui appelle les routes `/api`.
+- **origine** : une requête qui modifie quelque chose vient de l’appli elle-même (`memeOrigine`, `src/server/http.ts`), sinon 403 `origine`.
+- **session** : un compte connecté (le cookie de session, httpOnly), sinon 401 `connexion`.
+- **conv** : la conv ouverte, sinon 404 `aucune`. Un appel du navigateur désigne la conv de sa page (l’en-tête `x-blush-conv`, `src/services/session.ts`) ; sans lui, le brouillon du parcours d’import, la conv choisie dans « Tes convs » ou la dernière lue (`histoireOuverte`, `src/server/histoires.ts`).
+- **plan** : ce que le compte a débloqué (`gratuit`, `rapport`, `blushplus`), sinon 402.
+- **limite `x`** : `LIMITES.x` (`src/server/limites.ts`), par adresse IP, par compte ou par email, sinon 429 `trop`.
+- **bêta** : en bêta fermée, BLUSH ne lit des captures que pour un compte connecté (`lecturePermise`, `src/server/captures.ts`), sinon 401 `connexion`.
+
+| Route | Méthodes | Rôle | Garde | Module |
+|---|---|---|---|---|
+| `/api/import` | POST | Un export (WhatsApp .zip ou .txt, Instagram message_1.html ou .json) devient une histoire brouillon, avant l’email. Le navigateur n’envoie que le texte de la conv, compressé (`src/services/preparer-export.ts`) ; un fichier brut passe aussi, sous la limite de taille de Vercel | origine, limite `importParIp` | `src/server/histoires.ts`, `prompts/lib/export.ts`, `prompts/lib/instagram.ts` |
+| `/api/captures` | POST | Des captures d’écran (20 au plus, réduites par le navigateur), lues par le prompt 01, deviennent une histoire brouillon. Un nouvel essai du même envoi (`cle`, après une coupure du réseau) rend la lecture déjà faite | origine, limite `importParIp`, bêta, limite `capturesAnonymesParJour` (sans compte) ou `capturesParCompte` | `src/server/captures.ts`, `src/server/histoires.ts`, `prompts/lib/captures.ts` |
+| `/api/captures/lot` | POST | Un lot de six images tirées d’un enregistrement d’écran (dans le navigateur), lu par le prompt 01 : la route rend la lecture brute, et ne garde rien | origine, limite `lotParIp`, bêta, limite `lotsAnonymesParJour` (sans compte) ou `lotsParCompte` | `src/server/captures.ts` |
+| `/api/captures/video` | POST | Les lots lus, rassemblés en une seule lecture (sans les messages vus deux fois au bord de deux lots), deviennent une histoire brouillon | origine, limite `importParIp`, bêta | `src/server/video.ts`, `src/server/captures.ts`, `src/server/histoires.ts` |
+| `/api/histoire` | GET, DELETE | GET : l’histoire du parcours (la conv qu’on importe, sinon celle qui est ouverte). DELETE : « Supprimer l’histoire » ouverte, et tout ce qui en vient, en cascade | origine (DELETE), conv | `src/server/histoires.ts`, `src/server/donnees.ts` |
+| `/api/auth/code` | POST | Le code de connexion à 6 chiffres, par email. En bêta fermée, la même réponse pour tous : un email hors de la liste reçoit le mail de la liste d’attente, et la conv importée sur ce navigateur est effacée | origine, limites `codeParIp` et `codeParEmail` | `src/server/auth.ts`, `src/server/attente.ts` |
+| `/api/auth/verifier` | POST | Le code reçu : bon, il ouvre la session et rattache au compte la conv importée sur ce navigateur ; mauvais, la réponse est `{ ok: false }` (200), la même pour tous | origine, limite `verificationParIp` | `src/server/auth.ts`, `src/server/histoires.ts` |
+| `/api/auth/deconnexion` | POST | Ferme la session, et oublie ce qui désigne une conv sur cet appareil (le brouillon, la conv choisie) | origine | `src/server/auth.ts`, `src/server/cookies.ts` |
+| `/api/attente` | POST | S’inscrire sur la liste d’attente de la bêta fermée (l’email chiffré, et son empreinte) | origine, limite `attenteParIp` | `src/server/attente.ts` |
+| `/api/attente/retrait` | POST | Se retirer de la liste, depuis le lien signé de son mail | origine, le lien (`id` et `cle`) | `src/server/attente.ts` |
+| `/api/analyse` | POST, GET | POST : lance la lecture (« Qui es-tu ? » rempli) ; le verdict part après la réponse, et relancer ne refait rien de ce qui est fait. GET : la progression de la lecture, relue chaque seconde par l’écran de lecture ; relance au passage une tâche abandonnée | origine (POST), session, conv, limite `analyseParCompte` (une nouvelle conv) ou `relanceParCompte` (après un échec) | `src/server/analyse.ts`, `src/server/taches.ts`, `src/server/donnees.ts` |
+| `/api/rapport` | GET, POST | GET : le rapport ; sans accès, seul le chapitre 1 (le verdict) est offert, les autres arrivent fermés et vides (le mode sobre s’ouvre sans paiement). Relu toutes les 2 s pendant l’écriture, il relance les tâches coupées. POST : « Relancer l’écriture » après une panne | origine (POST), session, conv, limite `relanceParCompte` (POST) | `src/server/donnees.ts`, `src/contenu/chapitres.ts`, `src/server/taches.ts` |
+| `/api/debloquer` | POST | Débloquer le rapport. v1 sans paiement : un compte gratuit passe à BLUSH+ s’il est dans `BLUSH_ACCES_LIBRE` (sinon 402 `bientot`), puis ce qui manque (le rapport, la mémoire) s’écrit après la réponse | origine, session | `src/server/donnees.ts`, `src/server/env.ts` |
+| `/api/partage` | GET, POST, DELETE | Le lien public du verdict (`/v/<id>`, le prénom de l’autre masqué) : le lire, le créer (toujours le même), le désactiver | origine (POST, DELETE), session, conv | `src/server/partages.ts`, `src/server/compteurs.ts` |
+| `/api/partage/image` | POST | « Partager en image » : une réponse du chat ou la chute d’un chapitre, dessinée en story d’après le compte (jamais d’après la requête), le prénom de l’autre masqué | origine, session, conv, limite `imageParCompte` | `src/server/carte-partage.tsx`, `src/server/partages.ts` |
+| `/api/partage/compte` | POST | Compte une image vraiment partagée ou enregistrée, pas seulement préparée | origine, session, limite `imageParCompte` (au-delà, rien n’est compté) | `src/server/compteurs.ts` |
+| `/api/chat` | POST, GET | POST : un message à BLUSH (du texte, des captures de leur conv ou de son profil, un nouvel export, ou un vocal transcrit) ; la réponse part en flux, une ligne JSON par événement, puis la mémoire se met à jour. GET : l’historique (`?avant=<id>` : les échanges d’avant) | origine (POST), session, plan `blushplus` (POST), conv, la mémoire faite (POST, sinon 409 `pas_pret`), limites `chatParCompte` et `ajoutParCompte` (avec des fichiers) | `src/server/chat.ts`, `src/server/ajouts.ts`, `src/server/historique.ts`, `src/server/ia/transcription.ts` |
+| `/api/chat/vocal` | POST | Le chat en vocal, ou de nouveau à l’écrit (« Repasser à l’écrit ») | origine, session, conv | la route (`stories.chat_vocal`) |
+| `/api/vocal/audio` | GET | L’audio du vocal du rapport (MP3), déchiffré à la volée. `?conv=<id>` désigne sa conv : un lecteur audio n’envoie pas d’en-tête | session, une conv du compte | `src/server/vocal.ts`, `src/server/http.ts` |
+| `/api/vocal/chat/[id]` | GET | L’audio d’une réponse du chat dite en vocal | session, une conv du compte | la route, `src/server/chiffrement.ts` |
+| `/api/vocal/ecoute` | POST | Un moment de l’écoute du vocal (début, fin, réécoute, fermé avant la fin), pour comparer les deux voix | origine, session, conv, limite `ecouteParCompte` (au-delà, ignoré) | `src/server/vocal.ts` |
+| `/api/fiche` | GET, PUT, POST | GET : sa fiche, et si la mémoire se met à jour (l’écran la relit alors toutes les 3 s). PUT : la fiche corrigée par l’utilisateur (la liste entière). POST : des captures ou un export pour sa fiche, lus tout de suite ; la mémoire se met à jour après la réponse | origine (PUT, POST), session, plan `blushplus` (POST), conv, limites `ficheParCompte` (PUT) et `ajoutParCompte` (POST) | `src/server/ajouts.ts`, `src/server/donnees.ts` |
+| `/api/compte` | GET, POST, DELETE | GET : le compte (son email, son abonnement). POST : mettre BLUSH en pause, ou le reprendre. DELETE : « Tout effacer », le compte, ses sessions et ses histoires, en cascade | origine (POST, DELETE), session (GET, POST) | `src/server/donnees.ts` |
+| `/api/reveil` | GET | Le réveil : démarre une instance et réveille la base (`select 1`), sans rien lire ni écrire. Le navigateur l’appelle sans attendre (`src/components/shell/Reveil.tsx`) | aucune | la route |
+| `/api/cron/purge` | GET | La purge de nuit (Vercel Cron, `vercel.json`), puis le résumé de la veille à l’équipe | l’en-tête `Authorization: Bearer <CRON_SECRET>`, sinon 401 | `src/server/purge.ts`, `src/server/alertes.ts` |
+
+Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’en local.
+
+## Les tâches
+
+Ce qui fait travailler le modèle longtemps (de 20 s à 2 min par étape) passe par une file en base, la table `tasks` (`src/server/taches.ts`). La route répond tout de suite, puis `after()` (`next/server`) garde la fonction en vie le temps d’enchaîner les tâches (`executerChaine`, `src/server/analyse.ts`).
+
+- **Les genres** : `verdict` (prompt 04), `rapport_plan` et `rapport_chapitres` (prompt 05), `vocal` (prompt 06, puis la voix), `memoire` et `memoire_maj` (prompt 07). L’entrée d’une tâche (l’échange, pour `memoire_maj`) est chiffrée ; `progress` et `detail` donnent son avancée aux écrans.
+- **Les états** :
+  ```
+  attente ──prendre──▶ en_cours ──finir──▶ fini
+     ▲                    │
+     └────── echouer ─────┤  (il reste des essais)
+                          └── echouer ──▶ echec  (le 3e essai, ou un refus du modèle)
+  ```
+  Un refus du modèle reviendrait à chaque essai : il passe tout de suite en échec. Chaque échec définitif prévient l’équipe (`BLUSH_ALERTES`), avec le code et la tâche, jamais de contenu.
+- **Le battement** : une tâche en cours bat toutes les 20 s (`heartbeat_at`). Sans battement depuis 90 s (`PERIME_S`), elle est abandonnée (l’instance arrêtée, la fonction coupée) : `prendre` la reprend comme une tâche en attente ; coupée à son troisième essai, `clore` la passe en échec (`coupee`).
+- **Une étape à la fois** : `prendre` est atomique, et ne prend rien tant qu’une autre tâche de la même histoire bat encore. Un index unique ne garde qu’une tâche de chaque genre de la chaîne en attente ou en cours par histoire : planifiée deux fois (deux onglets, deux déblocages), c’est la même qui revient.
+- **La chaîne** : `verdict` → `rapport_plan` → `rapport_chapitres` → `vocal` → `memoire`, chaque étape planifiant la suivante. Le rapport ne part qu’avec l’accès (un plan autre que `gratuit`), sauf en mode sobre (une alerte de danger) : son rapport court et doux, offert, s’écrit d’un appel à l’étape `rapport_plan`. Le vocal s’enregistre d’habitude pendant les chapitres, et sa tâche ne sert que s’il n’a pas pu s’y faire ; jamais sur une alerte. Une fois la mémoire faite, la conv brute est effacée. Ensuite, chaque ajout à la fiche, et chaque échange du chat qui apporte du neuf, planifie un `memoire_maj`.
+- **L’échéance** : une fonction Vercel vit 300 s au plus. `executerChaine` enchaîne les tâches de l’histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant 285 s (sa durée habituelle, plus 30 %) ; sinon elle s’arrête, et la tâche attend en base. Une autre exécution qui tient déjà l’histoire est laissée faire.
+- **La relance par sondage** : ce qui attend repart quand un écran revient le chercher. `GET /api/analyse` et `GET /api/rapport` relancent les tâches en attente ou abandonnées (`relancer`, `src/server/donnees.ts`), `GET /api/fiche` une mise à jour de la mémoire restée en plan. Ouvrir le rapport planifie aussi ce qui n’a jamais été lancé : le rapport et la mémoire d’un accès donné après coup (`assurerLaSuite`), le vocal d’un rapport écrit avant lui. « Relancer l’écriture » (`POST /api/rapport`) remet en attente, avec trois nouveaux essais, les étapes du rapport en échec (`reprendre`).
+
+## Les paramètres d’URL
+
+Ce qui relie les écrans par l’adresse :
+
+- `?suite=<chemin>` sur `/connexion`, `/connexion/code` et `/rapport/debloque` : la page où reprendre ensuite. Seulement une adresse de l’appli (`suiteSure`, `src/lib/suite.ts`). Les pages qui demandent une session le posent, en général par `connexionPuis(chemin)` : le lien d’un mail ouvert ailleurs (`/ouvrir/<id>`), Mon compte, l’écran de lecture, les captures en bêta fermée.
+- `?erreur=<code>` : l’écran d’erreur du parcours d’import, par-dessus n’importe quelle route (`src/components/screens/ErreurDeParcours.tsx`, les codes dans `ERREURS_PARCOURS`). L’écran de l’export et celui des captures le posent eux-mêmes (`fichier`, `groupe`, `courte`, `capture`, `video`, `longue`) ; aucun écran ne pose plus `lecture` : on n’y arrive qu’en tapant l’adresse.
+- `?app=` : l’appli de la conv, sur `/importer/export` (`whatsapp` ou `instagram`) et `/importer/captures` (`instagram`, `hinge`, `imessage` ou `autre`). `/importer/export?app=imessage` mène aux captures (`next.config.ts`) : iMessage ne s’exporte pas, on filme son écran.
+- `?mode=ajout` sur `/importer/captures` : des captures ajoutées à un export, puis `/importer/histoire`. En sommeil : seul `/importer/histoire` y mène, et `/api/captures` refuse ces captures, en attendant la fusion d’un export et de captures.
+- `/rapport?paiement=1` : ouvre directement le panneau de paiement (écran 10), comme « Lire la suite » dans Mon compte.
+- `/rapport/debloque?offre=rapport` ou `?offre=blushplus` : « C’est débloqué », après le panneau de paiement (avec `&suite=` quand il s’est ouvert sur un autre écran que le rapport : on y revient ensuite).
+- `/app?depuis=rapport` : l’accueil ouvert depuis le rapport (sa bulle de chat, ou le bouton du chat).
+- `/attente/retirer?id=…&cle=…` : le lien signé du mail de la liste d’attente.
+- `/admin?p=1`, `?p=7` (par défaut) ou `?p=30` : la période du tableau de bord.
 
 ## Les prompts
 
@@ -45,16 +101,31 @@ Les pages serveur lisent les données via `src/services/serveur.ts`, et le navig
 
 ## Variables d’environnement
 
-| Variable | Rôle |
-|---|---|
-| `DATABASE_URL` | Postgres. En production, l’URL **avec pooler** de Neon |
-| `BLUSH_CLE` | La clé de chiffrement : `openssl rand -base64 32`. **À garder précieusement** : la perdre rend les données illisibles |
-| `ANTHROPIC_API_KEY` | La clé de l’API Claude. `ANTHROPIC_WORKSPACE_ID` si la clé n’a pas de workspace |
-| `RESEND_API_KEY`, `BLUSH_EMAIL_FROM` | L’envoi des codes. Il faut un domaine vérifié chez Resend |
-| `MISTRAL_API_KEY` | La transcription des vocaux (Mistral, Voxtral). Sans elle, le chat répond que les vocaux arrivent bientôt |
-| `BLUSH_ACCES_LIBRE` | La bêta sans paiement : des emails séparés par des virgules, ou `*` |
-| `CRON_SECRET` | Le secret de la purge de nuit (16 caractères au moins) |
-| `BLUSH_IA_FACTICE` | `1` en dev et en tests : un modèle factice, sans aucun coût |
+Le schéma `Env` (`src/server/env.ts`) les vérifie au premier usage, pas au build : une variable manquante ou mal formée fait échouer la requête, avec un message clair dans les logs, jamais dans la réponse.
+
+| Variable | Rôle | Par défaut | En production |
+|---|---|---|---|
+| `DATABASE_URL` | Postgres : celui de la machine en dev, Neon en production | aucun, exigée | L’URL **avec pooler** de Neon, ajoutée par Vercel. Les migrations du build prennent `DATABASE_URL_UNPOOLED` quand elle est là |
+| `BLUSH_CLE` | La clé de chiffrement du contenu, 32 octets en base64 (`openssl rand -base64 32`), jamais dans la base. **À garder précieusement** : la perdre rend les données illisibles | aucun, exigée | Sa propre clé, dont une copie reste hors de Vercel (voir « Mise en ligne ») |
+| `ANTHROPIC_API_KEY` | La clé de l’API du modèle | aucun | Exigée : sans elle (et sans le modèle factice, toujours éteint sur Vercel), `env()` échoue, et toute route avec. Une clé à part, avec un plafond de dépenses |
+| `ANTHROPIC_WORKSPACE_ID` | Le workspace, quand la clé n’est rattachée à aucun | aucun | Seulement si la clé le demande |
+| `MISTRAL_API_KEY` | La transcription des vocaux du chat (Voxtral, serveurs en Europe), prioritaire quand elle est là | aucune | Sans elle, ElevenLabs transcrit ; sans aucune des deux clés, le chat répond que les vocaux arrivent bientôt |
+| `ELEVENLABS_API_KEY` | La voix de BLUSH (le vocal du rapport, les réponses dites en vocal), et la transcription sans clé Mistral | aucune | Sans elle, ou sans `BLUSH_VOIX_A`, pas de vocal |
+| `BLUSH_VOIX_A`, `BLUSH_VOIX_B` | Les identifiants ElevenLabs des deux voix de l’A/B test : chaque compte garde toujours la même | aucune | Sans voix B, tout le monde a la A |
+| `RESEND_API_KEY` | L’envoi des mails (les codes, la liste d’attente, « ton rapport est prêt », les alertes) | aucune : en dev, le code s’affiche dans les logs | Exigée (`NODE_ENV=production`), sauf pour la boîte à mails des tests de bout en bout |
+| `BLUSH_EMAIL_FROM` | L’expéditeur des mails, sur un domaine vérifié chez Resend | `BLUSH <bonjour@blush.app>` | `BLUSH <bonjour@askblush.com>`, écrite dans Vercel |
+| `BLUSH_URL` | L’adresse du site : les images et les liens des mails, et l’adresse de base des pages sur Vercel (`layout.tsx`) | `https://www.askblush.com` | Le défaut |
+| `BLUSH_ACCES_LIBRE` | La bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou `*` pour tout le monde | vide : personne | Les emails des testeurs |
+| `BLUSH_BETA_FERMEE` | `1` : la bêta fermée. Seuls les emails de `BLUSH_ACCES_LIBRE` se connectent (et lancent une lecture) ; les autres rejoignent la liste d’attente. Lue à l’exécution, par `src/proxy.ts` aussi : un même build sert la bêta ouverte ou fermée | `0` : ouverte | Comme en dev : sans elle, la bêta est ouverte |
+| `BLUSH_ALERTES` | Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules | aucune : pas d’alerte | À écrire, sinon un échec ne prévient personne |
+| `BLUSH_ADMINS` | Qui peut ouvrir le tableau de bord (`/admin`) : un ou des emails, séparés par des virgules | ceux de `BLUSH_ALERTES` | Pour tous les autres, `/admin` n’existe pas (404) |
+| `CRON_SECRET` | Le secret que Vercel Cron envoie à `/api/cron/purge` (16 caractères au moins) | aucun | Sans lui, la purge de nuit répond 401 et ne tourne jamais |
+| `BLUSH_IA_FACTICE` | `1` en dev et en tests : le modèle rejoue des sorties enregistrées, sans aucun coût (`src/server/ia/factice.ts`) | `0` | Ignorée sur Vercel : la production appelle toujours le vrai modèle |
+| `BLUSH_BOITE_MAILS` | Tests de bout en bout : le dossier où les mails sont écrits au lieu de partir. Avec le modèle factice seulement | aucune | Ignorée sur Vercel : les mails partent toujours par Resend |
+
+`tests/documentation.test.ts` échoue si une variable du schéma manque à ce tableau, ou si ce tableau en cite une qu’il ne connaît pas.
+
+Lues hors du schéma : `VERCEL` (posée par Vercel : le modèle factice et la boîte à mails y sont ignorés, et `/styleguide` y répond 404), `NODE_ENV`, `DATABASE_URL_UNPOOLED` (les migrations du build, `scripts/migrer.mjs`), et en local seulement `BLUSH_APERCU` et `BLUSH_DEMANDER` (les aperçus de `/apercu`), `DATABASE_URL_TEST` et les `E2E_*` des tests.
 
 ## En local
 

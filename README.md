@@ -23,6 +23,7 @@ git submodule update --init             # les prompts (dépôt privé blush-prom
 npm ci
 npm run check                           # types, lint, migrations, tests (Postgres local : blush_test, créée au besoin)
 npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (voir BACKEND.md)
+npm run todo                            # les décisions produit en attente (les TODO(produit) du code), sans rien faire échouer
 ```
 
 `blush_test` sert à tous les dossiers du projet sur la machine : les tests ne la migrent que s’ils viennent de la créer. Un dossier qui ajoute une migration prend sa propre base : `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom> npm run check`.
@@ -40,27 +41,28 @@ Le dépôt `blush-front` est public : tout ce qu’on y commite (le code, les te
 
 | Dossier | Rôle |
 |---|---|
-| `src/app/` | La landing (`/`), une route par écran (01 à 20), plus `/styleguide`. L'écran 14 (son message) vit désormais dans le chat de l'accueil (`/app`) ; l'écran 15 (relire ma réponse) a été retiré ; l'écran 17 (ajouter à sa fiche) se fait dans la fiche elle-même (`/app/fiche`), où BLUSH range tout seul ce qu'il trouve. Après l'analyse, `/rapport/verdict` révèle le verdict en cartes (comme des stories) avant le rapport. « Ta question » (`/rapport/question`) se pose en conversation avec BLUSH, avec des idées tirées du rapport. Au-dessus du champ du chat (`/app`), les questions toutes prêtes que promet la landing. Chaque `page.tsx` charge ses données côté serveur (`src/services/serveur.ts`), puis affiche l'écran client (`*Screen.tsx`). Les routes `/api` sont le back-end (voir BACKEND.md). |
-| `src/components/ui/` | Composants du design system : Button, Chip, Segmented, Switch, tuiles, cartes, Bubble, ProofCard, Tag, ScoreBar, LevelPath, ProgressDots, LockRow, blocs du rapport, Sheet, Toast, EmailField. |
-| `src/components/brand/` | Logo et objets 3D en SVG, portés depuis `maquettes/objets-3d-source.py` : bulle, sphères nacre et opale, cadenas, cloche, coche. |
-| `src/components/landing/` | La landing : le titre en bulles, les convs qui défilent (on en touche une, son verdict s’ouvre), BLUSH+ en bloc noir (avec la grosse main en guise de curseur), les avis, les faits. Ses textes et ses convs d’exemple sont dans `src/contenu/landing.ts`. |
-| `src/components/shell/` | Coque commune : barre du haut mobile, en-tête desktop, colonne d'appoint, zone du bouton principal. |
-| `src/services/api.ts` | Dans le navigateur, le seul point de contact avec les données : les appels aux routes `/api`. |
-| `src/services/serveur.ts` | Les données des pages serveur, lues en base d’après les cookies de la requête. |
-| `src/server/` | Le back-end : la base, le chiffrement, le modèle, les mails (voir BACKEND.md). |
+| `src/app/` | Une route par écran : la landing (`/`), le parcours d’import (`/commencer`, `/importer`, `/qui`, `/email`), la lecture (`/lecture`), le verdict et le rapport (`/rapport`), l’accueil et son chat (`/app`), la fiche (`/app/fiche`), Mon compte (`/compte`), la page publique d’un verdict partagé (`/v/[id]`). Chaque `page.tsx` lit ses données côté serveur (`src/services/serveur.ts`), puis affiche l’écran client (`*Screen.tsx`). Les outils de l’équipe, `/styleguide` et `/apercu`, ne sont jamais en ligne. |
+| `src/app/api/` | Le back-end : les routes `/api`, décrites une à une dans BACKEND.md (méthode, rôle, garde, module). |
+| `src/proxy.ts` | Le proxy de Next (l’ancien middleware) : en bêta fermée, il sert à leur adresse les variantes « fermee » des pages du parcours d’arrivée. Les autres variantes (connecté ou non) sont des réécritures de `next.config.ts`. |
+| `src/server/` | Le métier du back-end : la base (`db/`), le chiffrement, la file des tâches (`taches.ts`, `analyse.ts`), le modèle et la voix (`ia/`), les mails, les limites (voir BACKEND.md). |
+| `src/services/` | `api.ts`, le seul point de contact du navigateur avec les données (les appels aux routes `/api`) ; `serveur.ts`, les données des pages serveur, lues en base d’après les cookies de la requête ; `preparer-*.ts`, ce que le navigateur prépare avant un envoi (l’export réduit à sa conv, les captures réduites, les images d’un enregistrement d’écran). |
+| `src/components/` | Le design system (`ui/`, montré sur `/styleguide`), le logo et les objets 3D en SVG (`brand/`), la coque des écrans (`shell/` : barre du haut mobile, en-tête desktop, colonne d’appoint, zone du bouton principal), la landing (`landing/`, ses textes dans `src/contenu/landing.ts`) et les écrans partagés (`screens/` : le paiement, les erreurs). |
 | `src/contenu/` | Le contenu du produit : offres et prix, la règle des chapitres offerts (seul le chapitre 1, le verdict) et leurs titres (`chapitres.ts`), étapes de l’export et de la lecture, rubriques de la fiche, landing. Les seules données fictives de l’appli servent aux aperçus locaux (`src/app/apercu`, 404 en production) : ESLint refuse qu’un autre fichier les importe (et `@/mocks`, pour qu’il ne revienne pas). |
-| `src/types/` | Types du domaine : `Story`, `Source`, `Report`, `Chapter`, `FicheFact`, `Subscription`… |
+| `src/types/` | Les types du front : `Story`, `Source`, `Report`, `Chapter`, `FicheFact`, `Subscription`… |
 | `src/state/` | État du parcours (choix, fichiers, devinette) gardé dans `sessionStorage`, et les clés du navigateur que lisent aussi les aides des tests et la galerie (`cles.ts`). |
+| `src/lib/` | Les petits outils des écrans : les sons, les mouvements, le cache des requêtes (`query.ts`), la garde de `?suite=` (`suite.ts`), l’écriture des nombres (`format.ts`)… |
+| `prompts/` | Le sous-module privé `blush-prompts` : les textes des prompts, leur logique partagée (`prompts/lib`, importée en `@prompts/…`) et leur banc d’essai (`prompts/evals`). Voir BACKEND.md, « Les prompts ». |
+| `drizzle/` | Les migrations SQL de la base et leur journal (`meta/`). Le schéma est `src/server/db/schema.ts` ; `npm run db:generer` écrit la migration qui va avec. `npm run dev`, les tests et le build sur Vercel les appliquent d’eux-mêmes. |
+| `tests/` | Les tests vitest (`npm test`, dans `npm run check`), sur la base de test, dont `documentation.test.ts` : chaque route `/api` et chaque variable d’environnement a sa ligne dans BACKEND.md. |
+| `tests/e2e/` | Les tests de bout en bout (Playwright, Chromium et WebKit) et leurs aides (`tests/e2e/aide`) : voir BACKEND.md, « Les tests de bout en bout ». |
+| `scripts/` | Les commandes du dépôt : `npm run dev` (`developper.mjs`), la copie des prompts côté serveur (`prompts.mjs`), les vérifications du build (`verifier-*.mjs`), la galerie (`galerie/`), les essais avec le vrai modèle (`essai-*.mts`). |
+
+Le back-end en détail (les routes et leurs gardes, la file des tâches, les variables d’environnement, les paramètres d’URL qui relient les écrans) : BACKEND.md.
 
 ## Mise en page
 
 - **Moins de 1024 px :** mise en page mobile. Elle est fluide sous 768 px, puis centrée sur 560 px de large au maximum.
 - **À partir de 1024 px :** mise en page desktop, avec la colonne d'appoint (étapes, état de la relation ou sommaire du rapport).
-
-## Paramètres d'URL
-
-- `?erreur=fichier|groupe|courte|lecture|capture|video|longue` : l'écran d'erreur du parcours d'import, par-dessus n'importe quelle route (`src/components/screens/ErreurDeParcours.tsx`). L'écran de l'export et celui des captures le posent eux-mêmes (`fichier`, `groupe`, `courte`, `capture`, `video`, `longue`) ; aucun écran ne pose plus `lecture` : on n'y arrive qu'en tapant l'adresse.
-- `/rapport?paiement=1` : ouvre directement le panneau de paiement (écran 10).
 
 ## La galerie
 
