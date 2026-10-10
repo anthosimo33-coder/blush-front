@@ -1,11 +1,14 @@
-/**
- * Le défilement de la page, bloqué tant qu’un panneau est ouvert (une feuille, la story du vocal, la révélation du
- * verdict). Un compteur : deux panneaux l’un sur l’autre (la feuille de partage sur la révélation) ne se débloquent
- * pas l’un l’autre, et la valeur d’avant revient quand le dernier se ferme. Rend la fonction qui libère (une seule fois).
+/*
+ * Un compteur de panneaux ouverts : deux panneaux l’un sur l’autre (la feuille de partage sur la révélation) ne se
+ * débloquent pas l’un l’autre, et la valeur d’avant revient quand le dernier se ferme.
  */
 let ouverts = 0;
 let avant = "";
 
+/**
+ * Bloque le défilement de la page tant qu’un panneau est ouvert (une feuille, la story du vocal, la révélation du
+ * verdict). Rend la fonction qui le libère, à appeler une fois : les appels suivants ne font rien.
+ */
 export function bloquerDefilement(): () => void {
   const html = document.documentElement;
   if (ouverts++ === 0) {

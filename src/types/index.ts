@@ -117,7 +117,7 @@ export type Verdict = {
   short: string;
   title: string;
   subtitle: string;
-  /** Plus lu : le mode sobre ne vient que d’une alerte de danger (ReportPayload.sober, src/services/api.ts). */
+  /** Vrai sur une alerte de danger (`mode_sobre`, prompts/lib/front.ts) ; plus lu par le front, qui regarde `ReportPayload.sober` (src/services/api.ts). */
   difficult: boolean;
 };
 

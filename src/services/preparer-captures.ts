@@ -1,7 +1,8 @@
-/**
+/*
  * Dans le navigateur, avant l’envoi : chaque capture est réduite (1 568 px au plus sur le grand côté, ce que le modèle
  * lit de toute façon) et compressée en JPEG. L’envoi reste sous la limite de Vercel (4,5 Mo), même avec 20 captures.
  */
+
 const COTE_MAX = 1568;
 const ENVOI_MAX = 4 * 1024 * 1024;
 /* Les crans de réduction : le premier pour toutes, les suivants pour les plus lourdes si l’ensemble dépasse la limite */

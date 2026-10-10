@@ -24,7 +24,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Conventions BLUSH
 
 - Tout en français : les noms du code, les commentaires (aussi denses que ceux d’à côté), les messages de commit (avec la ligne `Co-Authored-By` de l’agent) et les textes de l’appli.
-- Les textes affichés : une insécable U+00A0 (`\u00a0` dans une chaîne) avant ? ! : ; » et après «, des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ».
+- Les textes affichés : une insécable U+00A0 (`\u00a0` dans une chaîne) avant ? ! : ; » et après «, des apostrophes courbes (’), et aucun nom d’IA ni de prestataire (Claude, Anthropic, ElevenLabs, Mistral…), page de confidentialité comprise : « une IA », « notre prestataire de voix ». Seul le tableau de bord `/admin`, réservé à l’équipe, peut les nommer.
 - Le dépôt est public : ni vraie conv, ni vrai prénom, ni texte de prompt. Les exemples sont inventés, et les prompts restent dans le sous-module privé `prompts/`.
 - Une refonte est une proposition : l’ancienne version reste en place (ou à côté, sur une route à part) jusqu’à la décision de l’utilisateur, et la galerie montre les deux.
 - `/apercu` et `/styleguide` sont des outils de l’équipe : jamais en ligne.
@@ -37,7 +37,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Le glossaire du code
 
 - **conv** dans le code, « histoire » seulement dans les textes affichés ; la table reste `stories`. Le code dit encore `story`, `histoire` ou `conv` pour la même chose : les renommages se feront d’un bloc, pas au passage.
-- Les types du front sont en anglais (`Story`, `Report`, `Chapter`, dans `src/types`), le domaine du serveur en français (`histoire`, `tache`, `memoire`, dans `src/server`).
+- Les types du front sont en anglais (`Story`, `Report`, `Chapter`, dans `src/types`), le domaine du serveur en français (`conv`, `tache`, `memoire`, `verdict`, dans `src/server`). Les `histoire` du serveur (`histoires.ts`, `histoireOuverte`) font partie des renommages à venir.
 - Le suffixe d’un schéma de sortie est le numéro de son prompt : `Sortie04` (le verdict), `Etape05` et `Sortie05` (le rapport), `Sortie07` et `Maj07` (la mémoire).
 - « elle » désigne l’autre personne, quel que soit son pronom (à l’écran, « il » ou « elle » d’après `pronom`).
 - **moi** / **autre** : celui qui importe sa conv, et la personne dont il parle.
