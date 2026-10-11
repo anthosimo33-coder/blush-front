@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useReducedMotion } from "@/lib/hooks";
-import { codeDe } from "@/lib/messages-erreur";
+import { codeDe, messageErreur } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { connexionPuis } from "@/lib/suite";
@@ -17,7 +17,7 @@ import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import { lectureLancee } from "@/state/lecture";
-import type { AnalysisProgress } from "@/types";
+import type { AnalysisProgress, Echec } from "@/types";
 
 const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
 /** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */
@@ -41,8 +41,12 @@ export function LectureScreen({ total }: { total: number }) {
   const heard = useRef(0);
   /* La lecture a échoué (le serveur a tout essayé) : on le dit, et on propose de relancer. `run` relance l’effet */
   const [failed, setFailed] = useState(false);
-  /* Trop de relances aujourd’hui (chaque lecture coûte) : on le dit, plutôt qu’un bouton qui ne fait rien */
-  const [trop, setTrop] = useState(false);
+  /*
+   * Trop de relances aujourd’hui (chaque lecture coûte), ou trop de lectures depuis ce réseau : on le dit, plutôt qu’un
+   * bouton qui ne fait rien. Le budget de l’IA du jour atteint dès la relance (« souffle ») : l’échec le dit, comme
+   * quand il arrête la lecture en route (p.failReason)
+   */
+  const [refus, setRefus] = useState<{ code: "trop" | "reseau" | "souffle"; e: unknown } | null>(null);
   const [run, setRun] = useState(0);
   /* « Voir mon rapport » touché : le bouton le montre jusqu’au chargement du verdict (un vrai chargement, voulu) */
   const [enRoute, setEnRoute] = useState(false);
@@ -56,7 +60,7 @@ export function LectureScreen({ total }: { total: number }) {
   }, []);
   const retry = () => {
     setFailed(false);
-    setTrop(false);
+    setRefus(null);
     setP(START);
     setRun((r) => r + 1);
   };
@@ -73,12 +77,13 @@ export function LectureScreen({ total }: { total: number }) {
         () => true,
         (e: unknown) => {
           const code = codeDe(e);
-          return code === "qui" || code === "connexion" || code === "trop" ? code : null;
+          if (code === "trop" || code === "reseau" || code === "souffle") return { code, e };
+          return code === "qui" || code === "connexion" ? code : null;
         },
       );
       if (!alive) return;
-      if (lance === "trop") {
-        setTrop(true);
+      if (typeof lance === "object" && lance) {
+        setRefus(lance);
         setFailed(true);
         return;
       }
@@ -162,6 +167,8 @@ export function LectureScreen({ total }: { total: number }) {
   }, [phase]);
 
   const done = phase === "done";
+  /* Pourquoi la lecture a échoué : le budget du jour dès la relance, sinon ce que dit le suivi */
+  const raison: Echec | undefined = refus?.code === "souffle" ? "souffle" : p.failReason;
   const step = p.done ? READING_STEPS.length - 1 : Math.min(p.stepsDone, READING_STEPS.length - 1);
   const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
 
@@ -174,12 +181,12 @@ export function LectureScreen({ total }: { total: number }) {
       footer={
         /* Même hauteur que le bouton : rien ne bouge quand il remplace l’étape en cours */
         <div className="flex h-[60px] flex-col items-center justify-center">
-          {failed && p.failReason === "refus" ? (
+          {failed && raison === "refus" ? (
             /* Un refus revient à chaque essai : on propose une autre conv, pas de relancer */
             <ButtonLink href="/commencer" arrow>
               Essayer une autre conv
             </ButtonLink>
-          ) : failed ? (
+          ) : failed && raison === "souffle" ? null : failed ? (
             <Button arrow onClick={retry}>
               Relancer la lecture
             </Button>
@@ -251,13 +258,20 @@ export function LectureScreen({ total }: { total: number }) {
           )}
         </div>
 
-        {failed && p.failReason === "refus" ? (
+        {failed && raison === "refus" ? (
           /* Texte relu le 8 octobre */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
               L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu{NBSP}: tu peux en essayer une autre.
             </p>
+          </div>
+        ) : failed && raison === "souffle" ? (
+          /* Le budget de l’IA du jour : rien à relancer, la lecture repart quand on revient après minuit */
+          <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
+            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH souffle un peu, réessaie demain.</h1>
+            {/* TODO(produit): phrase à valider */}
+            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Ta conv est bien là{NBSP}: la lecture reprendra quand tu reviendras.</p>
           </div>
         ) : failed ? (
           /* Texte relu le 8 octobre */
@@ -267,7 +281,8 @@ export function LectureScreen({ total }: { total: number }) {
               <br />
               Ta conv est bien là.
             </h1>
-            {trop && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain{NBSP}: ta conv t’attend.</p>}
+            {refus?.code === "trop" && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain{NBSP}: ta conv t’attend.</p>}
+            {refus?.code === "reseau" && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">{messageErreur("lecture", refus.e)}</p>}
           </div>
         ) : (
           <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">

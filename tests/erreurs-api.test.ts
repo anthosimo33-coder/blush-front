@@ -19,6 +19,7 @@ describe("le serveur", () => {
       trop: 429,
       codes: 429,
       essais: 429,
+      reseau: 429,
       aucune: 404,
       introuvable: 404,
       lien: 404,
@@ -46,6 +47,7 @@ describe("le serveur", () => {
       refus: 502,
       transcription: 502,
       panne: 502,
+      souffle: 503,
     });
   });
 
@@ -57,10 +59,11 @@ describe("le serveur", () => {
     }
   });
 
-  it("une erreur d’étape ne dit au navigateur que le refus, le vocal ou la panne", () => {
+  it("une erreur d’étape ne dit au navigateur que le refus, le vocal, le budget du jour ou la panne", () => {
     expect(codePublic("refus")).toBe("refus");
     expect(codePublic("refus:cyber")).toBe("refus");
     expect(codePublic("transcription")).toBe("transcription");
+    expect(codePublic("budget")).toBe("souffle");
     for (const interne of ["sortie_illisible", "contexte_absent", "delai", "annule"]) expect(codePublic(interne)).toBe("panne");
   });
 
@@ -91,6 +94,19 @@ describe("les écrans", () => {
     expect(messageErreur("question", api("refus"))).toBe("là-dessus je peux pas t’aider, reformule ta question");
     expect(messageErreur("question", api("acces"))).toBe("le chat avec moi, c’est dans BLUSH+");
     expect(messageErreur("question", api("panne"))).toBe("j’ai eu un bug, renvoie-moi ta question");
+  });
+
+  it("le budget de l’IA du jour atteint : « BLUSH souffle un peu, réessaie demain », dit par BLUSH au chat", () => {
+    for (const action of ["lecture", "relance", "fiche"] as const) expect(messageErreur(action, api("souffle"))).toBe("BLUSH souffle un peu, réessaie demain.");
+    expect(messageErreur("chat", api("souffle"))).toBe("je souffle un peu, réessaie demain");
+    expect(messageErreur("question", api("souffle"))).toBe("je souffle un peu, réessaie demain");
+    expect(problemeAjout(api("souffle"))).toBe("souffle");
+    expect(messageAjoutFiche("souffle", "ta capture", "Inès")).toEqual({ title: "BLUSH souffle un peu", detail: "Réessaie demain." });
+  });
+
+  it("une lecture refusée par la limite de son réseau ne se dit pas comme celle du compte", () => {
+    expect(messageErreur("lecture", api("reseau"))).toBe("Beaucoup de lectures sont parties de ce réseau aujourd’hui. Réessaie demain.");
+    expect(messageErreur("lecture", api("reseau"))).not.toBe(messageErreur("lecture", api("trop")));
   });
 
   it("le fichier ou la conv elle-même ouvrent l’écran d’erreur de l’import ; le reste se dit sur l’écran", () => {

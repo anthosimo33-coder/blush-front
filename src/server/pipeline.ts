@@ -1,16 +1,18 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { peut } from "@/lib/acces";
 import { alerter } from "./alertes";
+import { DEBUT_DU_JOUR } from "./budget";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
-import { ErreurTache, estRefus } from "./erreurs";
+import { ErreurTache, estBudget, estRefus } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
+import { auMieux, journal, journalErreur } from "./journal";
 import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, planifier, prendre, type Tache } from "./taches";
 import type { DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
@@ -95,6 +97,15 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  * `etat` : celui déjà lu par l’appelant (le rapport le lit une fois pour tout). Vrai si une tâche vient d’être lancée.
  */
 export async function reparerLaChaine(story: Pick<Ligne, "id">, acces: boolean, etat?: EtatChaine): Promise<boolean> {
+  /*
+   * Ce que le budget de l’IA a arrêté avant minuit repart d’abord : la chaîne le reprend, comme une étape planifiée. Lu
+   * seulement s’il y a une étape en échec (l’état déjà lu le dit) : l’ouverture du rapport ne paie pas une requête de plus
+   */
+  const enEchec = !etat || Object.values(etat.taches).some((t) => t?.status === "echec");
+  if (enEchec && (await reprendreApresMinuit(story.id))) {
+    after(() => executerChaine(story.id));
+    return true;
+  }
   const genres = suite(etat ?? (await lireEtat(story.id)), acces);
   if (!genres.length) return false;
   for (const g of genres) await planifier(story.id, g);
@@ -131,9 +142,51 @@ const BATTEMENT_MS = 20_000;
 /** Les étapes qui effacent ce qu’elles lisent : rejouées, elles ne trouveraient plus leur entrée. */
 const DETRUIT_SON_ENTREE: ReadonlySet<Genre> = new Set(["memoire"]);
 
-/** Exécute une tâche, puis planifie la suite. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
-async function executer(t: Tache): Promise<boolean> {
-  const coeur = setInterval(() => void battre(t.id).catch(() => {}), BATTEMENT_MS);
+/* ———— Le budget de l’IA ———— */
+
+/**
+ * Le budget de l’IA du jour a arrêté l’étape avant l’appel (src/server/budget.ts) : elle passe en échec sur « budget »
+ * (l’écran dit « BLUSH souffle un peu, réessaie demain »), sans user l’essai que `prendre` venait de compter. Pas
+ * d’alerte : l’équipe est prévenue du budget lui-même. Elle repart après minuit (reprendreApresMinuit).
+ */
+async function suspendre(t: Tache): Promise<void> {
+  await db()
+    .update(schema.tasks)
+    .set({ status: "echec", error: "budget", attempts: sql`greatest(${schema.tasks.attempts} - 1, 0)`, updatedAt: new Date() })
+    .where(eq(schema.tasks.id, t.id));
+}
+
+/*
+ * Seule la dernière tâche de son genre repart, et seulement si aucune autre du même genre n’attend ou ne tourne : une
+ * lecture relancée le jour même (POST /api/analyse) a pu laisser deux verdicts arrêtés par le budget, et l’index unique
+ * des tâches en cours refuserait d’en remettre deux en attente.
+ */
+const derniereDeSonGenre = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."kind" = ${schema.tasks.kind} and "autre"."id" <> ${schema.tasks.id} and ("autre"."status" in ('attente', 'en_cours') or "autre"."created_at" > ${schema.tasks.createdAt}))`;
+
+/**
+ * Les étapes de l’histoire arrêtées par le budget d’un jour passé (avant minuit, heure de Paris) repartent en attente,
+ * avec les essais qu’elles avaient. Renvoie leur nombre. Au suivi de la lecture et du rapport (cloreLesAbandons), et à
+ * l’ouverture du rapport (reparerLaChaine) : une lecture arrêtée hier reprend quand on revient.
+ */
+async function reprendreApresMinuit(storyId: string): Promise<number> {
+  const reprises = await db()
+    .update(schema.tasks)
+    .set({ status: "attente", error: null, updatedAt: new Date() })
+    .where(
+      and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "echec"), eq(schema.tasks.error, "budget"), lt(schema.tasks.updatedAt, DEBUT_DU_JOUR), derniereDeSonGenre),
+    )
+    .returning({ id: schema.tasks.id });
+  return reprises.length;
+}
+
+/* ———— Une tâche ———— */
+
+/** Ce que devient une tâche exécutée : finie, en échec (elle repartira, sauf au dernier essai), ou arrêtée par le budget du jour. */
+type Issue = "finie" | "echec" | "budget";
+
+/** Exécute une tâche, puis planifie la suite. */
+async function executer(t: Tache): Promise<Issue> {
+  const coeur = setInterval(() => void auMieux(battre(t.id), "battement de cœur perdu", { tache: t.id }), BATTEMENT_MS);
   try {
     const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
     /* tasks.kind est un text que la base ne contrôle pas (src/server/db/enums.ts) : un genre sans étape est une tâche inconnue */
@@ -146,23 +199,29 @@ async function executer(t: Tache): Promise<boolean> {
        * suite qui n’a pas pu être planifiée (seul un vocal peut venir après elle) le sera par la réparation, à l’ouverture.
        */
       await finir(t.id);
-      await enchainer(story, t).catch((e: unknown) => console.error(`suite de ${t.kind} ${t.id} non planifiée : ${(e as Error).name}`));
-      return true;
+      await auMieux(enchainer(story, t), "suite non planifiée", { genre: t.kind, tache: t.id });
+      return "finie";
     }
     /* La suite est planifiée avant que l’étape soit dite finie : un échec ici fait rejouer l’étape, rien ne se perd */
     await enchainer(story, t);
     await finir(t.id);
-    return true;
+    return "finie";
   } catch (e) {
+    if (e instanceof ErreurTache && estBudget(e)) {
+      journal("tâche arrêtée par le budget de l’IA", { genre: t.kind, tache: t.id }, "alerte");
+      await suspendre(t);
+      return "budget";
+    }
     const code = e instanceof ErreurTache ? e.code : `erreur:${(e as Error).name}`;
-    /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
-    console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
+    /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche (le nom d’une erreur imprévue, jamais son message) */
+    if (e instanceof ErreurTache) journal("tâche en échec", { genre: t.kind, tache: t.id, code }, "erreur");
+    else journalErreur("tâche en échec", e, { genre: t.kind, tache: t.id });
     /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
     const definitif = estRefus(code);
     await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
     if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
-    return false;
+    return "echec";
   } finally {
     clearInterval(coeur);
   }
@@ -171,7 +230,8 @@ async function executer(t: Tache): Promise<boolean> {
 /**
  * Enchaîne les tâches d’une histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance
  * (sinon elle repart au prochain passage : le suivi de la lecture et du rapport relance la chaîne). Deux appels en même
- * temps ne font jamais deux fois la même tâche : `prendre` est atomique.
+ * temps ne font jamais deux fois la même tâche : `prendre` est atomique. Le budget de l’IA atteint arrête la chaîne : les
+ * étapes suivantes l’attendraient aussi.
  */
 export async function executerChaine(storyId: string): Promise<void> {
   await cloreLesAbandons(storyId);
@@ -182,12 +242,18 @@ export async function executerChaine(storyId: string): Promise<void> {
       if (!t || tempsRestant() < tempsPourCommencer(t.kind)) return;
       const pris = await prendre(t.id);
       if (!pris) return;
-      if (!(await executer(pris))) await pause(PAUSE_APRES_ECHEC_MS * pris.attempts);
+      const issue = await executer(pris);
+      if (issue === "budget") return;
+      if (issue === "echec") await pause(PAUSE_APRES_ECHEC_MS * pris.attempts);
     }
   });
 }
 
-/** Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre échec. */
+/**
+ * Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre
+ * échec. Celles que le budget de l’IA a arrêtées avant minuit repartent (reprendreApresMinuit) : la chaîne les relance.
+ */
 export async function cloreLesAbandons(storyId: string): Promise<void> {
+  await reprendreApresMinuit(storyId);
   for (const t of await clore(storyId)) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, "Erreur : coupée à chaque essai (délai dépassé)", `Essais : ${t.attempts}`]);
 }

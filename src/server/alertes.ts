@@ -3,7 +3,8 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "./db";
 import type { Genre, StatutTache } from "./db/enums";
 import { env } from "./env";
-import { LIMITES, sousLaLimite } from "./limites";
+import { journal, journalErreur } from "./journal";
+import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
 import { delaiAppel } from "./echeance";
 import { DELAI_MAIL_MS } from "./email";
@@ -17,6 +18,7 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
   const { BLUSH_ALERTES, RESEND_API_KEY, BLUSH_EMAIL_FROM } = env();
   if (!BLUSH_ALERTES.length) return;
   if (!RESEND_API_KEY) {
+    /* En local : l’alerte s’écrit dans le terminal du serveur de dev, en clair, pour qu’on la lise */
     console.log(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
   }
@@ -26,16 +28,41 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
     body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: BLUSH_ALERTES, subject: sujet, text: lignes.join("\n") }),
     signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
-  if (!r.ok) console.error(`alerte non envoyée : Resend ${r.status}`);
+  if (!r.ok) journal("alerte non envoyée", { statut: r.status }, "erreur");
 }
 
-/** Quelque chose a échoué pour de bon. Une alerte ne fait jamais échouer ce qui l’appelle, et pas plus de 30 par jour. */
-export async function alerter(sujet: string, lignes: string[]): Promise<void> {
+/*
+ * Le budget des alertes (S-19). Une seule clé pour toutes (30 par jour) s’épuisait sur un seul sujet : une rafale de
+ * replis du modèle, et l’échec d’un rapport ou le budget de l’IA atteint ne partaient plus. Chaque sujet a donc sa part
+ * du jour, et les dernières alertes du jour sont gardées pour les importantes.
+ */
+/** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour. TODO(produit): 5, à revoir à l’usage. */
+const ALERTES_PAR_SUJET = { max: 5, fenetreS: 86400 };
+/** Sur les alertes du jour (LIMITES.alertesParJour), celles gardées pour les importantes : une alerte ordinaire s’arrête avant. TODO(produit): 10. */
+const RESERVE_IMPORTANTES = 10;
+
+/** Une alerte de plus pour ce sujet, aujourd’hui, peut-elle partir ? Compte son passage si oui. */
+async function dansLeBudget(sujet: string, importante: boolean): Promise<boolean> {
+  const jour = LIMITES.alertesParJour;
+  /* Une alerte ordinaire ne touche pas à la réserve : elle regarde sans compter, puis compte */
+  if (!importante && (await limiteAtteinte("alertes", { ...jour, max: jour.max - RESERVE_IMPORTANTES }))) return false;
+  if (!(await sousLaLimite(`alertes:sujet:${sujet}`, ALERTES_PAR_SUJET))) return false;
+  return sousLaLimite("alertes", jour);
+}
+
+/**
+ * Quelque chose a échoué pour de bon. Une alerte ne fait jamais échouer ce qui l’appelle. Pas plus de 5 par sujet et 30
+ * en tout par jour, dont les 10 dernières pour les `importante` (le budget de l’IA, ce qui touche tout le monde).
+ */
+export async function alerter(sujet: string, lignes: string[], { importante = false }: { importante?: boolean } = {}): Promise<void> {
   try {
-    if (!(await sousLaLimite("alertes", LIMITES.alertesParJour))) return;
+    if (!(await dansLeBudget(sujet, importante))) {
+      journal("alerte retenue", { sujet }, "alerte");
+      return;
+    }
     await envoyer(`BLUSH · ${sujet}`, [...lignes, "", `${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (heure de Paris)`]);
   } catch (e) {
-    console.error("alerte non envoyée", (e as Error).message);
+    journalErreur("alerte non envoyée", e, { sujet });
   }
 }
 
@@ -87,6 +114,6 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
         : []),
     ]);
   } catch (e) {
-    console.error("résumé non envoyé", (e as Error).message);
+    journalErreur("résumé non envoyé", e);
   }
 }

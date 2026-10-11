@@ -5,7 +5,8 @@ import type { z } from "zod";
 import type { CleJson, ReponseErreur, Routes } from "@/types/api";
 import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 import { alerter } from "./alertes";
-import { ErreurPublique, ErreurTache } from "./erreurs";
+import { ErreurPublique, ErreurTache, estBudget } from "./erreurs";
+import { journal, journalErreur } from "./journal";
 
 /*
  * Les réponses des routes /api : du JSON, celui que dit leur ligne du contrat (src/types/api.ts), et des erreurs qui ne
@@ -43,17 +44,18 @@ export type AlerteDErreur = { sujet: string; lignes: string[] };
 /**
  * Ce que l’équipe apprend d’une erreur levée pendant une route, jamais son message ni ses détails : le message d’une
  * erreur SQL cite ses paramètres (un email), celui d’un JSON illisible un morceau du contenu. Une ErreurPublique est
- * attendue : rien. Une erreur d’étape : son code interne (« refus:cyber », « delai »), aux logs, et à l’équipe avec
- * `alerte`. Le reste : son nom seulement (« DrizzleQueryError »). Le journal des erreurs (lot 3) reprendra ces lignes.
+ * attendue : rien. Une erreur d’étape : son code interne (« refus:cyber », « delai »), au journal, et à l’équipe avec
+ * `alerte` ; sauf le budget de l’IA atteint, dont l’équipe est déjà prévenue (src/server/budget.ts). Le reste : son nom
+ * et son code seulement (« DrizzleQueryError », journalErreur, src/server/journal.ts).
  */
 export async function signalerErreur(e: unknown, alerte?: AlerteDErreur): Promise<void> {
   if (e instanceof ErreurPublique) return;
   if (e instanceof ErreurTache) {
-    console.error(`route /api en échec : ${e.code}`);
-    if (alerte) await alerter(alerte.sujet, [...alerte.lignes, `Erreur : ${e.code}`]);
+    journal("route /api en échec", { code: e.code }, estBudget(e) ? "alerte" : "erreur");
+    if (alerte && !estBudget(e)) await alerter(alerte.sujet, [...alerte.lignes, `Erreur : ${e.code}`]);
     return;
   }
-  console.error("route /api en panne :", e instanceof Error ? e.name : typeof e);
+  journalErreur("route /api en panne", e);
 }
 
 /**

@@ -6,8 +6,10 @@ import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contex
 import { db, schema } from "../db";
 import { env } from "../env";
 import { alerter } from "../alertes";
+import { controlerBudget, noterDepense } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
+import { journal, journalErreur } from "../journal";
 import { fournisseurFactice, REFUS_FACTICE } from "./factice";
 import { TEXTES } from "./textes.generated";
 
@@ -107,7 +109,9 @@ async function ecrireFactice(texte: string, surAvance: (a: Avance) => void) {
 }
 
 /**
- * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert seulement au suivi des coûts.
+ * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert au suivi des coûts et au budget du jour :
+ * au-delà de celui de tous ou de celui du compte de la conv (sans conv, la part sans compte), l’appel ne part pas
+ * (ErreurTache « budget », src/server/budget.ts), en mode factice aussi.
  * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment, les bulles du chat).
  * `signal` : l’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué).
  * `differer` : le suivi des coûts et l’alerte d’un repli passent après la réponse (le chat en flux), au lieu de la retarder.
@@ -124,6 +128,7 @@ export async function appeler<S extends z.ZodType>(
     differer,
   }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void; signal?: AbortSignal; differer?: (tache: () => Promise<unknown>) => void } = {},
 ): Promise<Appel<z.infer<S>>> {
+  const payeur = await controlerBudget(storyId);
   if (env().BLUSH_IA_FACTICE) {
     if (signal?.aborted) throw new ErreurTache("annule");
     const brut = factice(req);
@@ -199,24 +204,32 @@ export async function appeler<S extends z.ZodType>(
     message = await envoyer(repliDisponible);
   } catch (e) {
     if (!(repliDisponible && e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
-    console.error("repli d’Anthropic refusé par l’API : on s’en passe");
+    journal("repli refusé par l’API : on s’en passe", { tache: req.tache }, "alerte");
     repliDisponible = false;
     message = await envoyer(false);
   }
   const { usage, model } = message;
   const ms = Date.now() - debut;
+  noterDepense(payeur, Math.round(cout(usage) * 1e6));
   await ensuite(() => noterUsage(usage, { storyId, tache: etiquette ?? req.tache, ms, modele: model }));
-  /* Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le contenu) */
+  /*
+   * Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le
+   * contenu). L’équipe n’en est prévenue que pour une conv : un repli sans conv (des captures lues avant l’import, que
+   * n’importe qui peut envoyer) ne ferait qu’user le budget des alertes (S-19)
+   */
   const repli = message.content.find((b) => b.type === "fallback");
   if (repli?.type === "fallback") {
-    const lignes = [`Tâche ${req.tache}`, `Catégorie du refus : ${repli.trigger.category ?? "aucune (refus sans catégorie)"}`, `De ${repli.from.model} vers ${repli.to.model}`, ...(storyId ? [`Histoire ${storyId}`] : [])];
-    console.warn(`repli : ${lignes.join(" · ")}`);
-    await ensuite(() => alerter("repli sur un autre modèle", lignes));
+    const categorie = repli.trigger.category ?? null;
+    journal("repli sur un autre modèle", { tache: req.tache, categorie, de: repli.from.model, vers: repli.to.model, histoire: storyId }, "alerte");
+    if (storyId)
+      await ensuite(() =>
+        alerter("repli sur un autre modèle", [`Tâche ${req.tache}`, `Catégorie du refus : ${categorie ?? "aucune (refus sans catégorie)"}`, `De ${repli.from.model} vers ${repli.to.model}`, `Histoire ${storyId}`]),
+      );
   }
   if (message.stop_reason === "refusal") {
     /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête : jamais de contenu */
     const categorie = message.stop_details?.category ?? null;
-    console.warn(`refus du modèle (${req.tache}) : ${categorie ?? "sans catégorie"} · ${(message as { _request_id?: string | null })._request_id ?? ""}`);
+    journal("refus du modèle", { tache: req.tache, categorie, requete: (message as { _request_id?: string | null })._request_id }, "alerte");
     return { sortie: null, refus: true, stop: message.stop_reason, cout: cout(message.usage), categorie };
   }
   return { sortie: lireSortie(message.content as { type: string; text?: string }[], schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
@@ -239,6 +252,6 @@ async function noterUsage(u: Usage, { storyId, tache, ms, modele }: { storyId?: 
       });
   } catch (e) {
     /* Le suivi des coûts ne doit jamais faire échouer une réponse */
-    console.error("usage non noté", (e as Error).message);
+    journalErreur("usage non noté", e, { tache });
   }
 }

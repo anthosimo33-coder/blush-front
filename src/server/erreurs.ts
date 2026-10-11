@@ -33,6 +33,8 @@ export type CodeTache =
   | "transcription"
   | "annule"
   | "delai"
+  /* Le budget de l’IA du jour est atteint (src/server/budget.ts) : l’appel n’est pas parti */
+  | "budget"
   | "contexte_absent"
   | "conv_effacee"
   | "tache_inconnue"
@@ -59,5 +61,11 @@ export class ErreurTache extends Error {
  */
 export const estRefus = (e: ErreurTache | string | null | undefined): boolean => !!e && codePublic(typeof e === "string" ? e : e.code) === "refus";
 
-/** Ce que l’écran dit d’une étape en échec, d’après le code gardé en base (tasks.error) : le refus du modèle, ou une panne. */
-export const echecDe = (code: string | null | undefined): Echec => (estRefus(code) ? "refus" : "panne");
+/** Le budget de l’IA du jour a arrêté cette étape (une erreur, ou le code gardé en base) : elle repart après minuit, sans user ses essais. */
+export const estBudget = (e: ErreurTache | string | null | undefined): boolean => (typeof e === "string" ? e : e?.code) === "budget";
+
+/**
+ * Ce que l’écran dit d’une étape en échec, d’après le code gardé en base (tasks.error) : le refus du modèle, le budget du
+ * jour atteint (« souffle » : ça repart demain), ou une panne.
+ */
+export const echecDe = (code: string | null | undefined): Echec => (estRefus(code) ? "refus" : estBudget(code) ? "souffle" : "panne");

@@ -40,8 +40,11 @@ export const PRONOMS = ["il", "elle"] as const;
 export type Pronom = (typeof PRONOMS)[number];
 /** Les rubriques de sa fiche, dans l’ordre (leurs titres : src/contenu/fiche.ts). « notes » : ce que tu ajoutes toi-même. */
 export const SECTIONS_FICHE = ["infos", "aime", "gens", "dates", "notes"] as const;
-/** Pourquoi une lecture ou une écriture a échoué pour de bon : le refus du modèle (rien à relancer), ou une panne. */
-export type Echec = "panne" | "refus";
+/**
+ * Pourquoi une lecture ou une écriture a échoué : le refus du modèle (rien à relancer), le budget de l’IA du jour atteint
+ * (« souffle » : rien à relancer non plus, elle repart d’elle-même après minuit), ou une panne.
+ */
+export type Echec = "panne" | "refus" | "souffle";
 /** Avant d’être ensemble, les étapes : parle → voit → dit → ensemble. En couple, la température : eloigne → coince → va → soudes. */
 export type LevelId = "parle" | "voit" | "dit" | "ensemble" | "eloigne" | "coince" | "va" | "soudes";
 
@@ -298,8 +301,8 @@ export type FicheUpdate = {
    * la réponse ; `added` arrive quand la fiche ne dit plus `updating`.
    */
   pending?: { profile: string[]; messages: number };
-  /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, un bug. */
-  problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop"> | "bug";
+  /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, le budget de l’IA du jour, un bug. */
+  problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle"> | "bug";
 };
 
 export type Subscription = {
@@ -329,6 +332,6 @@ export type AnalysisProgress = {
   discoveries: string[];
   done: boolean;
   failed?: boolean;
-  /** Pourquoi : « refus » (le modèle a refusé de lire cette conv, réessayer n’y changerait rien), sinon une panne. */
+  /** Pourquoi : « refus » (le modèle a refusé de lire cette conv, réessayer n’y changerait rien), « souffle » (le budget du jour, elle repart demain), sinon une panne. */
   failReason?: Echec;
 };

@@ -136,9 +136,17 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
   );
 }
 
+/** Ce que dit l’écriture en échec, selon pourquoi. TODO(produit): la seconde phrase de « souffle », à valider. */
+const TEXTES_ECHEC: Record<Echec, string> = {
+  refus: "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste.",
+  souffle: "BLUSH souffle un peu, réessaie demain. Ta conv est toujours là\u00a0: l’écriture reprendra quand tu reviendras.",
+  panne: "BLUSH a buté en l’écrivant. Ta conv est toujours là\u00a0: relance, et tout repart de zéro.",
+};
+
 /**
  * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
- * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer.
+ * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer ; le budget de l’IA du jour
+ * atteint (« souffle ») non plus : l’écriture repart d’elle-même après minuit, quand on rouvre le rapport.
  */
 function EchecEcriture({ raison }: { raison: Echec }) {
   const [busy, setBusy] = useState(false);
@@ -156,9 +164,7 @@ function EchecEcriture({ raison }: { raison: Echec }) {
   return (
     <Card className="flex flex-col gap-2 p-[18px]">
       <div role="alert" className="text-[17px] font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
-      <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
-        {raison === "refus" ? "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste." : "BLUSH a buté en l’écrivant. Ta conv est toujours là\u00a0: relance, et tout repart de zéro."}
-      </p>
+      <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
       {souci && <p className="m-0 text-[14px] font-extrabold leading-[1.4] text-ink">{souci}</p>}
       {raison === "panne" && (
         <Button className="mt-1" onClick={relancer} disabled={busy} aria-busy={busy}>

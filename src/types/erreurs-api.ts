@@ -22,6 +22,11 @@ export const ERREURS_API = {
   codes: 429,
   /** Trop d’essais de code ratés aujourd’hui pour cet email (src/server/auth.ts, prendreCode) : à la vérification, et à la demande d’un nouveau code. */
   essais: 429,
+  /**
+   * Les lectures du jour lancées depuis ce réseau (son adresse IP, tous comptes confondus) : à part de « trop », la limite
+   * du compte, pour que l’écran ne dise pas « tu as lancé beaucoup de lectures » à quelqu’un qui n’en a lancé aucune.
+   */
+  reseau: 429,
 
   /* Ce qu’elle désigne */
   /** Pas de conv ouverte (ou plus). */
@@ -75,13 +80,15 @@ export const ERREURS_API = {
   /** La transcription des vocaux n’est pas configurée. */
   vocal_bientot: 503,
 
-  /* Le modèle, au chat et à la fiche : seulement codePublic */
+  /* Le modèle, au chat, à la fiche et aux lectures : seulement codePublic */
   /** Le modèle refuse de répondre (ses règles, ou les filtres de son prestataire), malgré le repli sur un autre. */
   refus: 502,
   /** Le vocal n’a pas pu être transcrit. */
   transcription: 502,
   /** Le reste : une sortie illisible, le temps écoulé, un bug. */
   panne: 502,
+  /** Le budget de l’IA du jour est atteint, pour tous ou pour ce compte (src/server/budget.ts) : ça repart après minuit. */
+  souffle: 503,
 } as const;
 
 export type CodeErreur = keyof typeof ERREURS_API;
@@ -107,14 +114,15 @@ export class ErreurApi extends Error {
 }
 
 /** Ce qu’une étape du modèle peut dire au navigateur (le chat, la fiche). */
-export type CodePublic = Extract<CodeErreur, "refus" | "transcription" | "panne">;
+export type CodePublic = Extract<CodeErreur, "refus" | "transcription" | "souffle" | "panne">;
 
 /**
  * Le code public d’une erreur d’étape (ErreurTache, src/server/erreurs.ts). Son code interne (« refus:cyber »,
  * « sortie_illisible ») reste dans les alertes et les tâches : le navigateur n’apprend que le refus du modèle, un vocal
- * qui ne s’écoute pas, ou une panne.
+ * qui ne s’écoute pas, le budget du jour atteint (« budget » : BLUSH souffle), ou une panne.
  */
 export function codePublic(interne: string): CodePublic {
   if (interne === "refus" || interne.startsWith("refus:")) return "refus";
+  if (interne === "budget") return "souffle";
   return interne === "transcription" ? "transcription" : "panne";
 }

@@ -9,9 +9,14 @@ import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
 /** Une phrase, ou quelques bulles dans le chat (une idée par bulle). */
 type Texte = string | readonly string[];
 
+/** Le budget de l’IA du jour est atteint (« souffle ») : le texte décidé, partout où l’écran parle de BLUSH. */
+const SOUFFLE = "BLUSH souffle un peu, réessaie demain.";
+
 /* Ce que BLUSH répond au chat comme à la question du rapport */
 const CHAT_ET_QUESTION = {
   trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain\u00a0?",
+  /* TODO(produit): « BLUSH souffle un peu, réessaie demain », dit par BLUSH lui-même, à valider */
+  souffle: "je souffle un peu, réessaie demain",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
@@ -44,16 +49,21 @@ const MESSAGES = {
   /* « Lancer la lecture », sur « Qui es-tu ? » */
   lecture: {
     trop: "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain.",
+    /* TODO(produit): texte à valider */
+    reseau: "Beaucoup de lectures sont parties de ce réseau aujourd’hui. Réessaie demain.",
+    souffle: SOUFFLE,
     defaut: "La lecture n’a pas pu partir. Réessaie dans un instant.",
   },
   /* « Relancer l’écriture » du rapport */
   relance: {
     trop: "Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain.",
+    souffle: SOUFFLE,
     defaut: "Ça n’a pas pu repartir. Vérifie ta connexion et réessaie.",
   },
   /* Une modification de sa fiche (PUT /api/fiche) : la limite du jour, réessayer tout de suite n’y changerait rien */
   fiche: {
     trop: "Tu as beaucoup modifié sa fiche aujourd’hui\u00a0: ta dernière modification n’a pas été enregistrée. Réessaie demain.",
+    souffle: SOUFFLE,
     defaut: "Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.",
   },
   /* Le chat (un message, des captures, un export, un vocal), dans la voix de BLUSH : une idée par bulle */
@@ -130,6 +140,7 @@ const AJOUT_FICHE = {
   fichier: () => ({ title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram." }),
   autre_conv: (_, prenom) => ({ title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${prenom}.` }),
   trop: () => ({ title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." }),
+  souffle: () => ({ title: "BLUSH souffle un peu", detail: "Réessaie demain." }),
   bug: () => ({ title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." }),
 } satisfies Record<NonNullable<FicheUpdate["problem"]>, (quoi: string, prenom: string) => { title: string; detail: string }>;
 
@@ -137,7 +148,7 @@ const AJOUT_FICHE = {
 export const messageAjoutFiche = (probleme: NonNullable<FicheUpdate["problem"]>, quoi: string, prenom: string) => AJOUT_FICHE[probleme](quoi, prenom);
 
 /* Les erreurs d’un ajout que l’écran de la fiche sait dire ; les autres sont un bug */
-const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop"] as const satisfies readonly NonNullable<FicheUpdate["problem"]>[];
+const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop", "souffle"] as const satisfies readonly NonNullable<FicheUpdate["problem"]>[];
 
 /** Pourquoi un ajout à sa fiche n’a rien rangé : ce que l’écran sait dire, un bug pour le reste, rien si rien n’était neuf. */
 export function problemeAjout(e: unknown): FicheUpdate["problem"] {
