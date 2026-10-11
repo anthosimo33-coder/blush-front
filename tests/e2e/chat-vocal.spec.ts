@@ -138,12 +138,15 @@ test("au micro : un vocal annulé ne part pas ; un vocal envoyé est écouté pa
  * qui part vraiment au serveur, sur les deux navigateurs, avec le même micro de synthèse : un souffle et un la, plus durs
  * à compresser qu’une voix (le pire cas).
  *   - Chromium : au plus 5 ko par seconde (32 kb/s et l’enveloppe), pour que le débit ne remonte pas en silence.
- *   - Partout : un vocal de la durée que le serveur accepte (environ 130 s, la limite prévue par 4a), à ce débit, tient
+ *   - Partout : un vocal de la durée que le serveur accepte (130 s, mesurées par le serveur), à ce débit, tient
  *     sous la taille maximale du serveur. Si elle baisse, ce test dit si les vocaux de l’iPhone passent encore.
  */
-/** La taille maximale d’un vocal pour le serveur : TAILLE_VOCAL_MAX, src/server/ia/transcription.ts (à suivre s’il change). */
-const TAILLE_VOCAL_MAX_DU_SERVEUR = 4 * 1024 * 1024;
-/** Le plus long vocal que le serveur accepte (le navigateur l’envoie tout seul à 120 s). */
+/**
+ * La taille maximale d’un vocal pour le serveur : TAILLE_VOCAL_MAX, src/server/ia/transcription.ts (à suivre s’il
+ * change), 130 s à 192 kb/s plus 64 Ko d’enveloppe.
+ */
+const TAILLE_VOCAL_MAX_DU_SERVEUR = (130 * 192_000) / 8 + 64 * 1024;
+/** Le plus long vocal que le serveur accepte (le navigateur l’envoie tout seul à 120 s) : DUREE_VOCAL_MAX_S, au même endroit. */
 const DUREE_VOCAL_MAX_DU_SERVEUR = 130;
 
 test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigateur, tient sous sa taille maximale", async ({ page, browserName }, testInfo) => {

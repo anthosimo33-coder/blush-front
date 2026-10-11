@@ -8,7 +8,7 @@ import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { PREDICATS } from "./depot";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
-import { dire, voixPour } from "./ia/voix";
+import { COUPE_VOIX, dire, scriptQuiTient, voixPour } from "./ia/voix";
 
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
@@ -50,12 +50,14 @@ export async function vocalAJour(storyId: string): Promise<boolean> {
 export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<string, string>, sobre: boolean): Promise<void> {
   if (!script.lignes.length || (await vocalAJour(story.id))) return;
   const voix: Voix = voixPour(story.userId ?? story.id);
-  const { texte } = texteDit(script.lignes);
-  const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id });
+  /* Le script tient dans la coupe du vocal du rapport (S-13) : des lignes entières, pour que les sous-titres suivent l’audio */
+  const dites = scriptQuiTient(script.lignes, COUPE_VOIX.rapport);
+  const { texte } = texteDit(dites);
+  const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id, max: COUPE_VOIX.rapport });
   const prenom = histoireDe(metaDe(story)).utilisateur.prenom;
   const messages = messagesAffiches(lignes, prenom);
-  const minutees: VocalLigne[] = minuter(script.lignes, alignement).map((l, k) => {
-    const recu = script.lignes[k].preuve ? messages.get(script.lignes[k].preuve!) : undefined;
+  const minutees: VocalLigne[] = minuter(dites, alignement).map((l, k) => {
+    const recu = dites[k].preuve ? messages.get(dites[k].preuve!) : undefined;
     return recu ? { ...l, recu } : l;
   });
   const fin = Math.max(...alignement.character_end_times_seconds, ...minutees.map((l) => l.fin));

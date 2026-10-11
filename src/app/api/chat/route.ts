@@ -7,7 +7,7 @@ import { historique, repondre as blushRepond } from "@/server/chat";
 import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/histoires";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, signalerErreur } from "@/server/http";
-import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
+import { lireVocal, transcrire } from "@/server/ia/transcription";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
@@ -144,8 +144,11 @@ async function traiter(req: Request) {
   let ajout: { ajout: Ajout; affiche: string } | undefined;
   try {
     if (envoi.vocal) {
-      if (!envoi.vocal.size || envoi.vocal.size > TAILLE_VOCAL_MAX) return erreur("vocal");
-      const t = await transcrire(envoi.vocal);
+      /* Sa durée, mesurée ici (S-15) : un vocal trop long ou illisible ne part pas à la transcription, qui se paie à la durée */
+      const lu = await lireVocal(envoi.vocal);
+      if (typeof lu === "string") return erreur(lu);
+      if (!(await sousLaLimiteDuCompte(utilisateur, "vocal"))) return erreur("trop");
+      const t = await transcrire(envoi.vocal, { storyId: story.id, duree: lu.duree });
       if (t === null) return erreur("vocal_bientot");
       if (!t) return erreur("vocal_vide");
       dit = `(vocal) ${t}`.slice(0, LONGUEUR_MAX);

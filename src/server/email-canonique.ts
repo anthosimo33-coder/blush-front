@@ -43,6 +43,8 @@ export const LIMITES_DU_COMPTE = {
   "relance:verdict": "relanceParCompte",
   relance: "relanceParCompte",
   chat: "chatParCompte",
+  vocal: "vocalParCompte",
+  voix: "voixParCompte",
   ajout: "ajoutParCompte",
   fiche: "ficheParCompte",
   image: "imageParCompte",

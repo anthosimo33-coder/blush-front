@@ -29,6 +29,16 @@ export const LIMITES = {
   echecsCodeParEmail: { max: 20, fenetreS: 86400 },
   importParIp: { max: 20, fenetreS: 3600 },
   chatParCompte: { max: 150, fenetreS: 86400 },
+  /**
+   * Les vocaux envoyés au chat (S-15), par jour : chacun est transcrit, à la durée. Un message du chat les compte aussi
+   * (chatParCompte). TODO(produit): 40 par jour.
+   */
+  vocalParCompte: { max: 40, fenetreS: 86400 },
+  /**
+   * Les caractères que la voix dit pour un compte (S-13), par jour : ses réponses du chat en vocal et le vocal de son
+   * rapport. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts). TODO(produit): 6 000, environ 6 minutes de voix.
+   */
+  voixParCompte: { max: 6000, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
   /**
