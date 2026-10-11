@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEMANDE_PLAN, demandeMoitie, requeteChat, requeteRapport, type Requete } from "@prompts/lib/contextes";
+import { DEMANDE_PLAN, demandeMoitie, requeteChat, requeteMemoireMaj, requeteRapport, type Requete } from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
 import { Plan05, Sortie04 } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -204,6 +204,32 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     expect([...new Set(textes(premier)[0].match(/\bm\d{4,}\b/g))].sort()).toEqual([...lignes.keys()].sort());
     for (const l of lignes.values()) expect(textes(premier)[0]).toContain(l);
     expect(textes(premier)[0]).toContain(rendu.chiffres);
+  });
+
+  /*
+   * Deux lignes que seul le chat reçoit (le niveau du rapport, la fin de la conv importée), à leur place : la dernière de
+   * <histoire> et la première de <memoire>. Leur texte n’est pas recopié ici (le dépôt est public) : on les reconnaît
+   * à la valeur qu’elles portent, et la mise à jour de la mémoire, qui ne les reçoit pas, sert de témoin.
+   */
+  it("le niveau du rapport finit <histoire>, la fin de la conv importée ouvre <memoire> ; la mise à jour de la mémoire n’a ni l’un ni l’autre", () => {
+    /* Les lignes d’un bloc, de sa balise ouvrante à sa balise fermante comprises */
+    const bloc = (t: string, ouvre: string, ferme: string) => {
+      const l = t.split("\n");
+      return l.slice(l.indexOf(ouvre), l.indexOf(ferme) + 1);
+    };
+    const enChat = textes(chat())[0];
+    const maj = textes(requeteMemoireMaj(h, Date.UTC(2026, 9, 1), etat, lignes, "<nouveau>\n</nouveau>"))[0];
+    const histoire = { chat: bloc(enChat, "<histoire>", "</histoire>"), maj: bloc(maj, "<histoire>", "</histoire>") };
+    const memoire = { chat: bloc(enChat, "<memoire>", "</fiche>"), maj: bloc(maj, "<memoire>", "</fiche>") };
+    /* Le chat : une ligne de plus juste avant </histoire>, qui porte le niveau ; le reste est celui de la mise à jour */
+    expect(histoire.chat.at(-2)).toMatch(/ : voit$/);
+    expect(histoire.chat.toSpliced(-2, 1)).toEqual(histoire.maj);
+    /* Et une ligne de plus juste après <memoire>, qui porte la date du dernier message de la conv importée */
+    expect(memoire.chat[1]).toContain(rendu.fin);
+    expect(memoire.chat.toSpliced(1, 1)).toEqual(memoire.maj);
+    expect(memoire.maj.some((l) => l.includes(rendu.fin))).toBe(false);
+    /* Sans niveau (une mémoire du mode sobre), la ligne reste, et le dit */
+    expect(bloc(textes(chat({ etat: { ...etat, niveau: null } }))[0], "<histoire>", "</histoire>").at(-2)).toMatch(/ : mode sobre$/);
   });
 
   it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style et le nouveau (instantané)", () => {

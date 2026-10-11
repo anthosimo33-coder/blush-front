@@ -11,14 +11,13 @@ import { SUPPRIMEES_MAX, type DonneesMemoire } from "./stockage/types";
 export type FaitCorrige = Pick<FicheFact, "section" | "text">;
 
 /**
- * La mémoire avec la fiche corrigée (la liste entière des faits, dans l’ordre de l’écran), ou null : pas encore de fiche.
+ * La mémoire avec la fiche corrigée (la liste entière des faits, dans l’ordre de l’écran).
  * - Un fait déjà là (même texte, même section) garde ses preuves et son statut ; un nouveau est gardé, sans preuve.
  * - Ce qu’il ajoute fait foi pour la mémoire (`parToi`), tant qu’il reste sur la fiche.
  * - Ce qu’il supprime, la mémoire ne le remet pas (`supprimees`, les SUPPRIMEES_MAX derniers), sauf s’il le réécrit.
  */
-export function fusionnerFaits(m: DonneesMemoire, faits: FaitCorrige[]): DonneesMemoire | null {
-  const fiche = m.etat.fiche;
-  if (!fiche) return null;
+export function fusionnerFaits(m: DonneesMemoire, faits: FaitCorrige[]): DonneesMemoire {
+  const { fiche } = m.etat;
   const avant = fiche.faits;
   const nouveaux = faits.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
   const textesAvant = new Set(avant.map((a) => a.texte));

@@ -7,7 +7,7 @@ import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRappo
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { estOffert } from "@/contenu/chapitres";
-import type { Chapter, ScoreRow } from "@/types";
+import type { Chapter, Message, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -142,7 +142,7 @@ const dansLaMoitie = (n: number, premier: Moitie) => n >= premier && n < premier
  * rapport. `surAvance(premier, signal)` : le suivi du flux d’une moitié ; `enregistre()` : la fin des écritures en cours
  * (l’une après l’autre).
  */
-function suiviDesChapitres(story: Ligne, t: Tache, messages: ReturnType<typeof messagesAffiches>, lignesScores: ScoreRow[]) {
+function suiviDesChapitres(story: Ligne, t: Tache, messages: Map<string, Message>, lignesScores: ScoreRow[]) {
   const detail: DetailEcriture = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
   const ecrire = ecrireAvance(t.id);
   const prets = new Map<number, Chapitre>();
@@ -350,8 +350,6 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const ecrite = await modifierMemoire(
     story.id,
     async (avant) => {
-      /* Une mémoire gardée est toujours faite (la création refuse une sortie sans mémoire ni fiche) */
-      if (!estFaite(avant.etat)) throw new ErreurTache("memoire_vide");
       const nouveau = rendreNouveau(ech, h, avant.suivant);
       const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
       const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.texte, editionsBornees(avant.editions));

@@ -65,9 +65,10 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
 
   /* Les délais de réponse médians : un écart net, sinon leur rythme commun (moins prioritaire) */
   const { toi: dt, autre: da } = c.delai;
-  const net = dt != null && da != null && Math.max(dt, da) >= 60e3 && Math.max(dt, da) / Math.max(1, Math.min(dt, da)) >= 1.5;
-  const delai = net ? `${Elle} te répond en ${duree(da!)}, toi en ${duree(dt!)}` : null;
-  const rythme = dt != null && da != null && !net ? `Vous vous répondez en ${duree(Math.max(dt, da))}` : null;
+  const deux = dt != null && da != null ? { dt, da } : null;
+  const net = !!deux && Math.max(deux.dt, deux.da) >= 60e3 && Math.max(deux.dt, deux.da) / Math.max(1, Math.min(deux.dt, deux.da)) >= 1.5;
+  const delai = deux && net ? `${Elle} te répond en ${duree(deux.da)}, toi en ${duree(deux.dt)}` : null;
+  const rythme = deux && !net ? `Vous vous répondez en ${duree(Math.max(deux.dt, deux.da))}` : null;
 
   /* La longueur des messages : nettement plus longs d’un côté */
   const { toi: lt, autre: la } = c.motsMoyens;

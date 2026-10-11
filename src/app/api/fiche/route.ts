@@ -53,7 +53,7 @@ async function traiter(req: Request) {
   if (!captures.length && !(paquet instanceof File)) return erreur("fichier");
   if (!(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
   const memoire = await memoireDe(story.id);
-  if (!memoire?.etat.fiche) return erreur("pas_pret");
+  if (!memoire) return erreur("pas_pret");
   try {
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
     return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));

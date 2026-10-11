@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
-import { estFaite, type Echange } from "@prompts/lib/memoire";
+import type { Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
@@ -131,9 +131,6 @@ export async function repondre(
   const h = histoireDe(meta);
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
-  /* Une mémoire gardée est toujours faite (la création refuse une sortie sans mémoire ni fiche) */
-  const etat = memoire.etat;
-  if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
   const nouvelles = ajout?.ajout.lignes ?? [];
   const lignes = new Map([...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
@@ -144,7 +141,7 @@ export async function repondre(
     aujourdhui: jour.t,
     chiffres: ctx.chiffres,
     fin: ctx.fin,
-    etat,
+    etat: memoire.etat,
     lignes,
     editions: editionsBornees(memoire.editions),
     style: ctx.style,
@@ -178,7 +175,7 @@ export async function repondre(
   /* Le garde-fou : une réponse qui recopie les prompts est remplacée */
   const fuite = recopieLesPrompts(texteDe(sortie), textesSysteme);
   if (fuite) console.warn(`garde-fou : réponse remplacée (histoire ${story.id})`);
-  const avant = etat.niveau?.niveau ?? null;
+  const avant = memoire.etat.niveau?.niveau ?? null;
   /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
   const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;
   if (modeVocal !== story.chatVocal) await db().update(schema.stories).set({ chatVocal: modeVocal }).where(eq(schema.stories.id, story.id));

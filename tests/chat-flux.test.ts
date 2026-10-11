@@ -28,7 +28,8 @@ vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof i
 import { POST } from "@/app/api/chat/route";
 import { ouvrirSession } from "@/server/auth";
 import { cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/server/budget";
-import { empreinte } from "@/server/chiffrement";
+import { chiffrer, empreinte } from "@/server/chiffrement";
+import * as coffre from "@/server/coffre";
 import { aujourdhuiParis } from "@/server/temps";
 import { historique } from "@/server/chat";
 import { db, schema } from "@/server/db";
@@ -235,6 +236,19 @@ describe("POST /api/chat en flux", () => {
     expect(await r.json()).toEqual({ erreur: "panne" });
     await lancerApres();
     expect(etat.alertes).toEqual([["chat en échec", `Histoire ${id}`, "Erreur : sortie_illisible"]]);
+  });
+
+  it("une mémoire gardée sans sa fiche (la création n’en écrit jamais) : refusée à la lecture par le coffre, sans appeler le modèle", async () => {
+    const [ligne] = await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, id));
+    const gardee = coffre.lire("memories.data", ligne.data);
+    await db().update(schema.memories).set({ data: chiffrer({ ...gardee, etat: { ...gardee.etat, fiche: null } }) }).where(eq(schema.memories.storyId, id));
+    try {
+      /* L’erreur nomme la colonne et le champ, jamais leur contenu ; Next (ou l’enveloppe `route`, src/server/http.ts) en fait une panne */
+      await expect(envoyer("elle veut quoi ?")).rejects.toThrow(/^memories\.data : forme inattendue \(etat\)$/);
+      expect(appels).toBe(0);
+    } finally {
+      await db().update(schema.memories).set({ data: ligne.data }).where(eq(schema.memories.storyId, id));
+    }
   });
 
   it("une erreur après des bulles : elles sont parties, l’erreur arrive en dernier dans le flux, sans son code interne", async () => {

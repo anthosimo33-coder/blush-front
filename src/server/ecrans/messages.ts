@@ -5,7 +5,8 @@ import type { Message } from "@/types";
  * Des sorties du modèle aux écrans de l’appli (src/server/ecrans) : le rapport, le verdict, les scores, sa fiche, les
  * bulles du chat, et les trouvailles de la lecture. Ces fonctions rendent les types du front (src/types), et rien
  * d’autre : ni base, ni modèle. Elles vivaient dans le sous-module des prompts (prompts/lib/front.ts), avec leur
- * propre copie des types du front ; le sous-module ne garde que ce que lit et écrit le modèle.
+ * propre copie des types du front ; le sous-module ne garde que ce que lit et écrit le modèle. Le rapport de l’écran
+ * s’assemble ensuite, d’après ce qui est lu en base, dans src/server/presentation (README, « Où sont les choses »).
  *
  * Ici, les preuves : une ligne de la conv (lib/ligne.ts) devient un message daté.
  */

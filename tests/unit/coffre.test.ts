@@ -1,7 +1,8 @@
 import { getTableColumns, getTableName, is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
+import type { MemoireFaite } from "@prompts/lib/memoire";
+import type { Plan, Rapport, Verdict } from "@prompts/lib/schemas";
 import { chiffrer } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import * as schema from "@/server/db/schema";
@@ -45,7 +46,7 @@ const RAPPORT: Rapport = {
   chapitres: [{ numero: 2, titre: "Le premier verre", titre_court: "Le verre", surtitre: null, blocs: [{ type: "essentiel", texte: "Elle propose.", preuves: [], titre: null, niveau: null, items: null }] }],
   sobre: null,
 };
-const MEMOIRE: Memoire = {
+const MEMOIRE: MemoireFaite = {
   alerte: null,
   rien_de_neuf: false,
   memoire: { ou_on_en_est: "Ils se voient jeudi.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [{ date: "2026-03-12", quoi: "le verre" }] },
@@ -147,6 +148,10 @@ describe("le coffre", () => {
     expect(lire).not.toThrow(/Léa/);
     expect(() => coffre.lire("stories.meta", chiffrer({ ...META, participants: [{ prenom: "Léa" }] }))).toThrow("stories.meta : forme inattendue (participants.0.nom)");
     expect(() => coffre.lire("reports.data", chiffrer({ test: true }))).toThrow(/^reports\.data : forme inattendue \(sortie, chapitres, sobre, lecture\)$/);
+    /* Une mémoire gardée est faite : sans sa fiche (ou sans sa mémoire), aucun lecteur ne la reçoit */
+    for (const vide of [{ fiche: null }, { memoire: null }]) {
+      expect(() => coffre.lire("memories.data", chiffrer({ ...EXEMPLES["memories.data"], etat: { ...MEMOIRE, ...vide } }))).toThrow("memories.data : forme inattendue (etat)");
+    }
   });
 
   it("n’accepte à l’écriture que la forme de la colonne : le compilateur le vérifie (tsc, dans npm run check)", () => {

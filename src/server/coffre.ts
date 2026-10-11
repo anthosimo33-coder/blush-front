@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import type { Echange } from "@prompts/lib/memoire";
+import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
 import type { Memoire, Plan, Rapport } from "@prompts/lib/schemas";
 import type { BlushAnswer, Chapter, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
@@ -101,7 +101,11 @@ const ContexteGarde = z
   .transform((c) => ({ ...c, dernier: c.dernier ?? Date.parse(`${c.fin}T23:59:59Z`) }));
 
 const MemoireGardee = z.looseObject({
-  etat: objet<Memoire>(),
+  /*
+   * Faite (sa mémoire et sa fiche) : la création refuse une sortie sans elles (« memoire_vide », analyse.ts). Vérifié
+   * ici, une fois pour tous ses lecteurs (le chat, sa mise à jour, la fiche), qui n’ont plus à le faire
+   */
+  etat: z.custom<MemoireFaite>((v) => typeof v === "object" && v !== null && !Array.isArray(v) && estFaite(v as Memoire)),
   lignes: z.array(z.tuple([z.string(), z.string()])),
   suivant: z.number(),
   /*

@@ -236,8 +236,8 @@ export async function ficheDe(story: Ligne): Promise<Fiche> {
   const { autre } = personnesDe(meta);
   const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomOppose(meta.pronom) };
   const m = await memoireDe(story.id);
-  const fiche = m?.etat.fiche;
-  if (!m || !fiche) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
+  if (!m) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
+  const { fiche } = m.etat;
   const portrait = fiche.portrait.replace(/^\p{Ll}/u, (l) => l.toUpperCase());
   return { person, portrait, updatedLabel: "mise à jour aujourd’hui", facts: faitsAffiches(m.etat, new Map(m.lignes)), summary: fiche.phrase, summaryShort: fiche.phrase_courte };
 }

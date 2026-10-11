@@ -1,5 +1,5 @@
-import type { EditionsFiche } from "@prompts/lib/memoire";
-import type { Memoire, Rapport, Verdict } from "@prompts/lib/schemas";
+import type { EditionsFiche, MemoireFaite } from "@prompts/lib/memoire";
+import type { Rapport, Verdict } from "@prompts/lib/schemas";
 import type { Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 
 /*
@@ -17,9 +17,10 @@ export type DonneesRapport = { sortie: Rapport; chapitres: Chapter[]; sobre: Sob
 
 /**
  * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
- * et ce que l’utilisateur a corrigé lui-même dans sa fiche.
+ * et ce que l’utilisateur a corrigé lui-même dans sa fiche. Une mémoire gardée est faite (sa mémoire et sa fiche) : la
+ * création refuse une sortie sans elles, une mise à jour appliquée en rend une, et le coffre le vérifie à la lecture.
  */
-export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
+export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
 
 /**
  * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans

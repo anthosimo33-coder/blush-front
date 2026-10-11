@@ -6,8 +6,8 @@
  * chapitres fermés et l’écriture (src/server/donnees.ts), la révélation du verdict (src/app/rapport/verdict/cartes.ts),
  * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
  * lisent ici.
- * Le `free` des chapitres écrits par le modèle (le sous-module des prompts) n’est pas lu : même le temps de lecture
- * « offert » d’un rapport écrit (readingTime.free, src/server/analyse.ts) suit estOffert.
+ * Les chapitres écrits par le modèle prennent leur `free` et le titre du verdict ici (src/server/ecrans/rapport.ts), comme
+ * le temps de lecture « offert » d’un rapport écrit (readingTime.free, src/server/analyse.ts).
  */
 
 export const NB_CHAPITRES = 8;
@@ -27,6 +27,9 @@ export const CHAPITRES_PAYANTS = Array.from({ length: NB_CHAPITRES - CHAPITRES_O
 /** Le chapitre du verdict, offert : la révélation du verdict y prend la confiance et le duel. */
 export const CHAPITRE_DU_VERDICT = 1;
 
+/** Son titre : le verdict lui-même est affiché juste au-dessus. */
+export const TITRE_DU_VERDICT = "Le verdict";
+
 /** « Le moment où tout a basculé », payant : la révélation du verdict y prend « le moment » et « à toi de jouer », une fois débloqué. */
 export const CHAPITRE_DE_LA_BASCULE = 2;
 
@@ -38,7 +41,7 @@ const DE_L_AUTRE = 5;
  * (les chapitres fermés, la liste de l’écriture) ; le sommaire du mail « ton rapport est prêt » les reprend tels quels.
  */
 const TITRES: Record<number, string> = {
-  1: "Le verdict",
+  [CHAPITRE_DU_VERDICT]: TITRE_DU_VERDICT,
   2: "Le moment où tout a basculé",
   3: "Votre histoire, en actes",
   4: "Ce qui coince",
