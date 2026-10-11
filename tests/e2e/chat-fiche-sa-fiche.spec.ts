@@ -190,7 +190,7 @@ test("« Complète sa fiche » : une capture, les infos rangées dans leur rubri
 });
 
 /*
- * Les infos de sa fiche ont pour identifiant leur place dans la liste (f0, f1… : prompts/lib/front.ts:172). La fiche
+ * Les infos de sa fiche ont pour identifiant leur place dans la liste (f0, f1… : faitsAffiches, src/server/ecrans/fiche.ts:17). La fiche
  * retient les infos arrivées par ces identifiants (src/app/app/fiche/FicheScreen.tsx:138) : un retrait décale les
  * suivantes, et le point « Nouveau » (src/app/app/fiche/FicheScreen.tsx:313) passe à une autre info, ou disparaît.
  */
