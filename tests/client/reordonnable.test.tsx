@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TEXTES_GRILLE } from "@/app/importer/captures/parts";
 import { ReorderGrid } from "@/components/ui/ReorderGrid";
 
 /*
@@ -8,14 +9,6 @@ import { ReorderGrid } from "@/components/ui/ReorderGrid";
  * souris et l’appui maintenu au doigt déplacent une case, la croix ou Suppr la retirent, et rien ne bouge quand elle
  * est figée (pendant l’envoi). L’écran qui la porte (CapturesScreen) a ses tests de bout en bout (instagram-captures-*).
  */
-
-const TEXTES = {
-  liste: "Tes captures, dans l’ordre",
-  element: (position: number, total: number) => `Capture ${position} sur ${total}`,
-  retirer: (position: number) => `Retirer la capture ${position}`,
-  deplacee: (position: number) => `Capture déplacée en position ${position}.`,
-  ajouter: "Ajouter des captures",
-};
 
 type Case = { id: string };
 
@@ -36,16 +29,16 @@ function Grille({ ids, fige, onAdd }: { ids: string[]; fige?: boolean; onAdd?: (
         onMove={move}
         onRemove={(id) => setItems((list) => list.filter((s) => s.id !== id))}
         onAnnounce={setAnnonce}
-        onAdd={onAdd}
         fige={fige}
         rendu={(s, position) => (
           <span data-testid="case">
             {s.id}:{position}
           </span>
         )}
-        ajout={<span>+</span>}
-        textes={TEXTES}
-        aide="aide"
+        ajout={onAdd && { onAdd, rendu: <span>+</span> }}
+        textes={TEXTES_GRILLE}
+        sous={<p data-testid="sous">sous la grille</p>}
+        aide="Glisse pour changer l’ordre."
       />
       <p data-testid="annonce">{annonce}</p>
     </>
@@ -59,6 +52,7 @@ const annonce = () => screen.getByTestId("annonce").textContent;
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("ReorderGrid", () => {
@@ -66,12 +60,17 @@ describe("ReorderGrid", () => {
     const { unmount } = render(<Grille ids={["a", "b", "c"]} onAdd={() => {}} />);
     expect(screen.getByRole("list", { name: "Tes captures, dans l’ordre" })).toBeTruthy();
     expect(ordre()).toEqual(["a:1", "b:2", "c:3"]);
-    expect(poignee(2, 3).getAttribute("aria-describedby")).toBe("aide");
+    /* L’aide est rendue par la grille, après ce qui se dit sous elle, et chaque case la désigne */
+    const aide = screen.getByText("Glisse pour changer l’ordre.");
+    expect(aide.id).not.toBe("");
+    expect(poignee(2, 3).getAttribute("aria-describedby")).toBe(aide.id);
+    expect(screen.getByTestId("sous").compareDocumentPosition(aide) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: "Ajouter des captures" })).toBeTruthy();
     unmount();
-    /* Une seule case, et sans `onAdd` : ni aide, ni case d’ajout */
+    /* Une seule case, et sans `ajout` : ni aide, ni case d’ajout */
     render(<Grille ids={["a"]} />);
     expect(poignee(1, 1).getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByText("Glisse pour changer l’ordre.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Ajouter des captures" })).toBeNull();
   });
 
@@ -93,6 +92,14 @@ describe("ReorderGrid", () => {
     fireEvent.keyDown(poignee(1, 5), { key: "ArrowUp" });
     expect(ordre()).toEqual(["b:1", "a:2", "c:3", "d:4", "e:5"]);
     expect(annonce()).toBe("Capture déplacée en position 2.");
+    /* Vers le bas depuis l’avant-dernière ligne : bornée à la dernière case (la 4 + 3 n’existe pas), et annoncée */
+    fireEvent.keyDown(poignee(4, 5), { key: "ArrowDown" });
+    expect(ordre()).toEqual(["b:1", "a:2", "c:3", "e:4", "d:5"]);
+    expect(annonce()).toBe("Capture déplacée en position 5.");
+    /* Déjà dernière : rien ne bouge */
+    fireEvent.keyDown(poignee(5, 5), { key: "ArrowRight" });
+    fireEvent.keyDown(poignee(5, 5), { key: "ArrowDown" });
+    expect(ordre()).toEqual(["b:1", "a:2", "c:3", "e:4", "d:5"]);
   });
 
   it("Suppr, Retour arrière ou la croix retirent la case", () => {
@@ -125,7 +132,10 @@ describe("ReorderGrid", () => {
     expect(sous).toHaveBeenCalledWith(200, 10);
     expect(ordre()).toEqual(["b:1", "c:2", "a:3"]);
     expect(annonce()).toBe("");
+    const retire = vi.spyOn(window, "removeEventListener");
     fireEvent.pointerUp(a, { pointerId: 1, pointerType: "mouse" });
+    /* Le défilement de la page, bloqué pendant le glisser, est rendu */
+    expect(retire).toHaveBeenCalledWith("touchmove", expect.any(Function));
     expect(annonce()).toBe("Capture déplacée en position 3.");
     expect(poignee(3, 3).className).toContain("cursor-grab");
     expect(poignee(3, 3).className).not.toContain("cursor-grabbing");
@@ -144,9 +154,15 @@ describe("ReorderGrid", () => {
     fireEvent.pointerDown(a, { pointerId: 3, pointerType: "touch", clientX: 10, clientY: 10 });
     act(() => vi.advanceTimersByTime(229));
     expect(a.className).not.toContain("cursor-grabbing");
+    const pose = vi.spyOn(window, "addEventListener");
     act(() => vi.advanceTimersByTime(1));
     expect(a.className).toContain("cursor-grabbing");
+    /* Pendant le glisser, la page ne défile pas ; une annulation (un appel, une alerte) le rend, avec le même écouteur */
+    const bloque = pose.mock.calls.find(([type]) => type === "touchmove")?.[1];
+    expect(bloque).toBeTypeOf("function");
+    const retire = vi.spyOn(window, "removeEventListener");
     fireEvent.pointerCancel(a, { pointerId: 3, pointerType: "touch" });
+    expect(retire).toHaveBeenCalledWith("touchmove", bloque);
     expect(a.className).not.toContain("cursor-grabbing");
     expect(annonce()).toBe("Capture déplacée en position 1.");
   });

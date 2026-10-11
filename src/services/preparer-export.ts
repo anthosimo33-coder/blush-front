@@ -7,7 +7,7 @@ import "client-only";
 import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, debutDeMessage, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
-import { ENVOI_EXPORT_MAX, PARTIES_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
+import { ENVOI_EXPORT_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
 
 export class ExportIllisible extends Error {
   constructor(readonly code: "fichier" | "plusieurs") {
@@ -21,24 +21,27 @@ export type ConvInstagram = { id: string; nom: string; messages: number; dernier
 /* Un morceau de texte mis en JSON et encodé d’un coup : environ 3 ms sur un Mac, avant de rendre la main */
 const MORCEAU = 1 << 20;
 
+/* Un nom de champ du paquet, écrit tel que le type Paquet le nomme (le serveur relit ce type) : en renommer un ne compile plus ici */
+const champ = (nom: keyof Paquet | keyof Paquet["parties"][number]) => JSON.stringify(nom);
+
 /**
- * Le paquet en octets : le JSON de { nom, parties, coupe? }, écrit et encodé morceau par morceau, en rendant la main
- * entre deux (15 Mo de texte d’un coup bloquaient l’écran, et doublaient la mémoire le temps d’une grande chaîne).
+ * Le paquet en octets : le JSON d’un Paquet, écrit et encodé morceau par morceau, en rendant la main entre deux (15 Mo
+ * de texte d’un coup bloquaient l’écran, et doublaient la mémoire le temps d’une grande chaîne).
  * Un émoji coupé entre deux morceaux s’écrit en deux échappements (\ud83d\ude0a), que JSON.parse recolle.
  */
-async function enOctets(nom: string, parties: Partie[], coupe: boolean): Promise<Uint8Array> {
+async function enOctets({ nom, parties, coupe }: Paquet): Promise<Uint8Array> {
   const morceaux: Uint8Array[] = [];
   const ecrire = (json: string) => morceaux.push(strToU8(json));
-  ecrire(`{"nom":${JSON.stringify(nom)},"parties":[`);
+  ecrire(`{${champ("nom")}:${JSON.stringify(nom)},${champ("parties")}:[`);
   for (const [k, p] of parties.entries()) {
-    ecrire(`${k ? "," : ""}{"nom":${JSON.stringify(p.nom)},"contenu":"`);
+    ecrire(`${k ? "," : ""}{${champ("nom")}:${JSON.stringify(p.nom)},${champ("contenu")}:"`);
     for (let i = 0; i < p.contenu.length; i += MORCEAU) {
       ecrire(JSON.stringify(p.contenu.slice(i, i + MORCEAU)).slice(1, -1));
       await new Promise((r) => setTimeout(r, 0));
     }
     ecrire('"}');
   }
-  ecrire(`]${coupe ? ',"coupe":true' : ""}}`);
+  ecrire(`]${coupe ? `,${champ("coupe")}:true` : ""}}`);
   const octets = new Uint8Array(morceaux.reduce((n, m) => n + m.length, 0));
   let ou = 0;
   for (const m of morceaux) {
@@ -92,12 +95,13 @@ const ECHANTILLON = 1024 * 1024;
  */
 async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
   let coupe = parties.length > PARTIES_MAX;
+  /* TODO(produit): couper plutôt que refuser au-delà de PARTIES_MAX fichiers (avant, le serveur refusait le paquet : « fichier ») */
   let garde = coupe ? parties.slice(0, PARTIES_MAX) : parties;
-  let brut = await enOctets(nom, garde, coupe);
+  let brut = await enOctets({ nom, parties: garde, coupe });
   for (let essai = 0; brut.length > TEXTE_CONV_MAX && essai < 3; essai++) {
     garde = garderLaFin(garde, (TEXTE_CONV_MAX * 0.9) / brut.length);
     coupe = true;
-    brut = await enOctets(nom, garde, true);
+    brut = await enOctets({ nom, parties: garde, coupe: true });
   }
   if (brut.length > TEXTE_CONV_MAX) throw new ExportIllisible("fichier");
   if (brut.length > ESTIMER_AU_DELA) {
@@ -105,14 +109,14 @@ async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
     if (estime > ENVOI_EXPORT_MAX) {
       garde = garderLaFin(garde, (ENVOI_EXPORT_MAX * 0.9) / estime);
       coupe = true;
-      brut = await enOctets(nom, garde, true);
+      brut = await enOctets({ nom, parties: garde, coupe: true });
     }
   }
   let gz = await compresser(brut);
   for (let essai = 0; gz.length > ENVOI_EXPORT_MAX && essai < 6; essai++) {
     garde = garderLaFin(garde, (ENVOI_EXPORT_MAX * 0.92) / gz.length);
     coupe = true;
-    gz = await compresser(await enOctets(nom, garde, coupe));
+    gz = await compresser(await enOctets({ nom, parties: garde, coupe }));
   }
   if (gz.length > ENVOI_EXPORT_MAX) throw new ExportIllisible("fichier");
   return new Blob([gz as BlobPart], { type: "application/gzip" });

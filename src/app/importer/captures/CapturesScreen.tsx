@@ -8,6 +8,7 @@ import { useFilePicker } from "@/lib/hooks";
 import { ACCEPT_IMAGES, CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
+import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
@@ -62,13 +63,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   /* Ce qui a empêché l’envoi et ne vient pas des captures (la limite du jour, le budget de l’IA, le réseau) : dit sous elles, qui restent là */
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
-  const monte = useRef(true);
-  useEffect(() => {
-    monte.current = true;
-    return () => {
-      monte.current = false;
-    };
-  }, []);
+  const monte = useMonte();
   const captureApp = app ?? journey.app ?? "instagram";
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
@@ -241,23 +236,19 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             onMove={move}
             onRemove={remove}
             onAnnounce={setAnnounce}
-            onAdd={result?.video || busy ? undefined : shots.open}
             fige={busy}
             rendu={(s, position) => <VignetteCapture shot={s} position={position} />}
-            ajout={<CaseAjout />}
+            ajout={busy ? undefined : { onAdd: shots.open, rendu: <CaseAjout /> }}
             textes={TEXTES_GRILLE}
-            aide="ordre-aide"
+            sous={
+              trop && (
+                <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
+                  {CAPTURES_MAX} captures au plus{NBSP}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
+                </p>
+              )
+            }
+            aide="Maintiens une capture et glisse-la pour changer l’ordre. BLUSH les remettra aussi dans l’ordre des dates."
           />
-          {trop && (
-            <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
-              {CAPTURES_MAX} captures au plus{NBSP}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
-            </p>
-          )}
-          {items.length > 1 && !result?.video && (
-            <p id="ordre-aide" className="m-0 text-[13px] font-extrabold leading-[1.45] text-grey">
-              Maintiens une capture et glisse-la pour changer l’ordre. BLUSH les remettra aussi dans l’ordre des dates.
-            </p>
-          )}
           <p aria-live="polite" className="sr-only">
             {announce}
           </p>

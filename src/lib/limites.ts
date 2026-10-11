@@ -31,6 +31,13 @@ export const estExport = (f: File) => EXTENSIONS_EXPORT.some((e) => f.name.toLow
  */
 export const PARTIES_MAX = 50;
 
+/**
+ * Le paquet d’un export, tel que le navigateur l’écrit (src/services/preparer-export.ts) et que le serveur le relit
+ * (src/server/import.ts) : le nom du fichier choisi, les fichiers de la conv (au plus PARTIES_MAX), et `coupe` quand
+ * le navigateur n’en a gardé que la partie la plus récente.
+ */
+export type Paquet = { nom: string; parties: { nom: string; contenu: string }[]; coupe?: boolean };
+
 /** Le grand côté d’une image lue par le modèle, en pixels (il ne lit pas plus fin) : captures et images d’une vidéo y sont réduites. */
 export const COTE_IMAGE_MAX = 1568;
 

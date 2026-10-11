@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "./icons";
 
@@ -23,8 +23,8 @@ type TextesGrille = {
   ajouter: string;
 };
 
-/** Ce que le moteur rapporte à l’écran : un déplacement, un retrait, et ce qu’il faut annoncer. */
-type Rappels = { onMove: (id: string, to: number) => void; onRemove: (id: string) => void; onAnnounce: (t: string) => void; fige?: boolean; textes: TextesGrille };
+/** Les réglages du moteur : ce qu’il rapporte à l’écran (un déplacement, un retrait, ce qu’il faut annoncer), s’il est figé, et ce qui se dit des cases. */
+type Reglages = { onMove: (id: string, to: number) => void; onRemove: (id: string) => void; onAnnounce: (t: string) => void; fige?: boolean; textes: TextesGrille };
 
 /* Pendant un glisser au doigt, la page ne doit pas défiler */
 function blockScroll(e: TouchEvent) {
@@ -35,7 +35,7 @@ function blockScroll(e: TouchEvent) {
  * Le moteur du réordonnancement : l’appui maintenu (au doigt) ou le glisser (à la souris), la case visée sous le
  * pointeur, les flèches du clavier, et le glissement des cases qui changent de place. `fige` : rien ne bouge.
  */
-function useReordonnable(ids: string[], { onMove, onRemove, onAnnounce, fige, textes }: Rappels) {
+function useReordonnable(ids: string[], { onMove, onRemove, onAnnounce, fige, textes }: Reglages) {
   const [dragId, setDragId] = useState<string | null>(null);
   const drag = useRef<{ id: string; pointerId: number; x: number; y: number; active: boolean; timer: number; el: HTMLElement } | null>(null);
   const nodes = useRef(new Map<string, HTMLElement>());
@@ -149,74 +149,84 @@ function useReordonnable(ids: string[], { onMove, onRemove, onAnnounce, fige, te
 
 /**
  * La grille à réordonner : chaque case (`rendu`) se glisse ou se déplace au clavier, et se retire d’une petite croix,
- * comme les photos d’un message. `onAdd` : une dernière case, `ajout`, pour en ajouter. `aide` : l’id du texte qui
- * explique le geste, lu avec chaque case dès qu’il y en a deux. `fige` (pendant l’envoi) : ni glisser, ni déplacer, ni retirer.
+ * comme les photos d’un message. `ajout` : une dernière case (son `rendu`) pour en ajouter (`onAdd`). `sous` : ce qui se
+ * dit juste sous la grille. `aide` : le texte qui explique le geste, montré ensuite et lu avec chaque case dès qu’il y
+ * en a deux. `fige` (pendant l’envoi) : ni glisser, ni déplacer, ni retirer.
  */
 export function ReorderGrid<T extends { id: string }>({
   items,
   onMove,
   onRemove,
   onAnnounce,
-  onAdd,
   fige,
   rendu,
   ajout,
   textes,
+  sous,
   aide,
-}: Rappels & {
+}: Reglages & {
   items: T[];
-  onAdd?: () => void;
   rendu: (item: T, position: number) => ReactNode;
-  ajout?: ReactNode;
-  aide?: string;
+  ajout?: { onAdd: () => void; rendu: ReactNode };
+  sous?: ReactNode;
+  aide?: ReactNode;
 }) {
-  const { dragId, caseDe, poignee } = useReordonnable(
-    items.map((s) => s.id),
-    { onMove, onRemove, onAnnounce, fige, textes },
-  );
+  /* Les identifiants ne changent qu’avec les cases : le moteur ne les relit pas à chaque rendu */
+  const ids = useMemo(() => items.map((s) => s.id), [items]);
+  const { dragId, caseDe, poignee } = useReordonnable(ids, { onMove, onRemove, onAnnounce, fige, textes });
+  const aideId = useId();
+  const avecAide = aide != null && items.length > 1;
 
   return (
-    <ol className="relative m-0 grid list-none grid-cols-3 gap-2 p-0" aria-label={textes.liste}>
-      {items.map((s, i) => {
-        const lifted = dragId === s.id;
-        return (
-          <li key={s.id} data-thumb={s.id} ref={caseDe(s.id)} className={cn("relative", lifted && "z-10")}>
-            <button
-              type="button"
-              data-handle=""
-              aria-label={textes.element(i + 1, items.length)}
-              aria-describedby={items.length > 1 ? aide : undefined}
-              {...poignee(s.id, i)}
-              onContextMenu={(e) => e.preventDefault()}
-              className={cn(
-                "block w-full select-none rounded-2xl transition-[transform,box-shadow] duration-200 [-webkit-touch-callout:none]",
-                lifted ? "-rotate-2 scale-[1.06] cursor-grabbing shadow-[0_18px_36px_-12px_rgba(17,17,20,0.45)]" : "cursor-grab",
-              )}
-              style={lifted ? { touchAction: "none" } : undefined}
-            >
-              {rendu(s, i + 1)}
-            </button>
-            {/* Retirer : une petite croix, comme sur les photos d’un message */}
-            <button
-              type="button"
-              hidden={fige}
-              aria-label={textes.retirer(i + 1)}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onRemove(s.id)}
-              className={cn("absolute left-1.5 top-1.5 z-[1] flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.72)] transition-opacity", lifted && "opacity-0")}
-            >
-              <Icon name="close" size={12} color="#FFFFFF" stroke={3} />
+    <>
+      <ol className="relative m-0 grid list-none grid-cols-3 gap-2 p-0" aria-label={textes.liste}>
+        {items.map((s, i) => {
+          const lifted = dragId === s.id;
+          return (
+            <li key={s.id} data-thumb={s.id} ref={caseDe(s.id)} className={cn("relative", lifted && "z-10")}>
+              <button
+                type="button"
+                data-handle=""
+                aria-label={textes.element(i + 1, items.length)}
+                aria-describedby={avecAide ? aideId : undefined}
+                {...poignee(s.id, i)}
+                onContextMenu={(e) => e.preventDefault()}
+                className={cn(
+                  "block w-full select-none rounded-2xl transition-[transform,box-shadow] duration-200 [-webkit-touch-callout:none]",
+                  lifted ? "-rotate-2 scale-[1.06] cursor-grabbing shadow-[0_18px_36px_-12px_rgba(17,17,20,0.45)]" : "cursor-grab",
+                )}
+                style={lifted ? { touchAction: "none" } : undefined}
+              >
+                {rendu(s, i + 1)}
+              </button>
+              {/* Retirer : une petite croix, comme sur les photos d’un message */}
+              <button
+                type="button"
+                hidden={fige}
+                aria-label={textes.retirer(i + 1)}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => onRemove(s.id)}
+                className={cn("absolute left-1.5 top-1.5 z-[1] flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.72)] transition-opacity", lifted && "opacity-0")}
+              >
+                <Icon name="close" size={12} color="#FFFFFF" stroke={3} />
+              </button>
+            </li>
+          );
+        })}
+        {ajout && (
+          <li>
+            <button type="button" onClick={ajout.onAdd} aria-label={textes.ajouter} className="lift block w-full rounded-2xl">
+              {ajout.rendu}
             </button>
           </li>
-        );
-      })}
-      {onAdd && (
-        <li>
-          <button type="button" onClick={onAdd} aria-label={textes.ajouter} className="lift block w-full rounded-2xl">
-            {ajout}
-          </button>
-        </li>
+        )}
+      </ol>
+      {sous}
+      {avecAide && (
+        <p id={aideId} className="m-0 text-[13px] font-extrabold leading-[1.45] text-grey">
+          {aide}
+        </p>
       )}
-    </ol>
+    </>
   );
 }

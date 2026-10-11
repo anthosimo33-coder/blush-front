@@ -3,7 +3,7 @@ import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
 import { choisirParties, debutDeMessage, estFichierUtile, lireExport, type ExportLu } from "@prompts/lib/export";
-import { CORPS_VERCEL_MAX, PARTIES_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
+import { CORPS_VERCEL_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { ErreurPublique } from "./erreurs";
 
@@ -120,7 +120,7 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
   return borner({ ...lu, nom: fichier.name });
 }
 
-const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(PARTIES_MAX), coupe: z.boolean().optional() });
+const SchemaPaquet: z.ZodType<Paquet> = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(PARTIES_MAX), coupe: z.boolean().optional() });
 
 /**
  * Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici.
@@ -131,7 +131,7 @@ export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: stri
   try {
     /* La décompression s’arrête d’elle-même à TEXTE_CONV_MAX, la limite que le navigateur respecte : un paquet piégé ne remplit pas la mémoire du serveur */
     const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TEXTE_CONV_MAX });
-    const p = Paquet.parse(JSON.parse(octets.toString("utf8")));
+    const p = SchemaPaquet.parse(JSON.parse(octets.toString("utf8")));
     const lu = lireExport(p.parties);
     if (!lu) throw new ErreurImport("fichier");
     return borner({ ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}) });

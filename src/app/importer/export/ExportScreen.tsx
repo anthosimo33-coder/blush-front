@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useDevice, useFilePicker } from "@/lib/hooks";
 import { ACCEPT_EXPORT } from "@/lib/limites";
+import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/contenu/parcours";
@@ -36,13 +37,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   /* L’envoi n’a pas pu se faire (le réseau, trop d’imports d’un coup) : on le dit ici, la conv n’est pas en cause */
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
-  const monte = useRef(true);
-  useEffect(() => {
-    monte.current = true;
-    return () => {
-      monte.current = false;
-    };
-  }, []);
+  const monte = useMonte();
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));

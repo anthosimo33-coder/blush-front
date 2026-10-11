@@ -28,7 +28,6 @@ const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps
 const SOURCE = { kind: "captures", app: "imessage" };
 const VIDEO = new File([new Uint8Array(8)], "enregistrement.mp4", { type: "video/mp4" });
 
-
 /**
  * Le serveur simulé : `lot(n, essai)` répond à l’essai n° `essai` (1, 2…) du lot n° `n` (une Response, ou « pend » :
  * pas de réponse avant l’arrêt de l’envoi) ; `video` répond à l’assemblage. Rend la liste des appels, et les signaux.

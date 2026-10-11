@@ -72,8 +72,9 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   const [fresh, setFresh] = useState<string[]>([]);
   const [over, setOver] = useState(false);
   const picker = useFilePicker();
-  /* Les vignettes des captures en cours de lecture, libérées au départ de la fiche */
+  /* Les vignettes des captures en cours de lecture : celles d’une lecture sont libérées à la suivante, toutes au départ de la fiche */
   const apercus = useApercusFichiers();
+  const vignettes = useRef<string[]>([]);
   const router = useRouter();
   /*
    * « Retour » : venu de l’accueil, on y revient par l’historique, comme le geste retour (sinon le retour suivant
@@ -175,7 +176,9 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     const files = picked.filter(accepted);
     if (!files.length || job.step === "reading" || job.step === "adding") return;
     const before = fiche.facts;
+    vignettes.current.forEach(apercus.liberer);
     const thumbs = files.filter(estImage).slice(0, 3).map(apercus.creer);
+    vignettes.current = thumbs;
     const what = whatOf(files);
     setEditing(false);
     setJob({ step: "reading", what, thumbs, file: files.some((f) => !estImage(f)) });
