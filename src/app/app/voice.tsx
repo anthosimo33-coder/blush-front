@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import { auRepos } from "@/lib/repos";
 import { setForceSound, setRecording } from "@/lib/sound";
@@ -16,6 +16,12 @@ export type VoiceError = "denied" | "unsupported";
 
 /** Au-delà, le vocal part tout seul. */
 const MAX_SECONDS = 120;
+/*
+ * Le débit demandé à l’enregistreur : la voix y reste nette, et un vocal de 2 minutes pèse environ 500 ko (au lieu de
+ * 1 à 2 Mo au débit par défaut). Le serveur peut donc borner un vocal plus bas que ses 4 Mo (S-15, côté serveur).
+ * TODO(produit): 32 kb/s, à revoir avec la taille maximale qu’accepte le serveur (1 Mo prévu).
+ */
+const DEBIT_VOCAL = 32_000;
 /** Nombre de barres de l’onde, pendant l’enregistrement et dans la bulle. */
 const LIVE_BARS = 34;
 const NOTE_BARS = 28;
@@ -31,6 +37,48 @@ type Session = {
   timer: number;
 };
 
+/**
+ * Ce que l’enregistrement montre en direct : le temps écoulé (à la seconde) et les derniers niveaux du micro, relevés
+ * environ 14 fois par seconde. Il se lit par abonnement : seuls ceux qui le montrent se refont (la barre
+ * d’enregistrement, RecordingBar) ou le suivent hors de React (les perles du logo, accueil/Composer.tsx), pas l’écran
+ * qui tient l’enregistreur.
+ */
+type Ecoute = { seconds: number; levels: readonly number[] };
+
+/** Le direct d’un enregistrement : la dernière valeur, et l’abonnement à ses changements (useSyncExternalStore). */
+type EcouteEnDirect = { lire: () => Ecoute; abonner: (suivre: () => void) => () => void };
+
+const AU_REPOS: Ecoute = { seconds: 0, levels: [] };
+
+function creerEcoute() {
+  let valeur = AU_REPOS;
+  const abonnes = new Set<() => void>();
+  return {
+    lire: () => valeur,
+    abonner: (suivre: () => void) => {
+      abonnes.add(suivre);
+      return () => void abonnes.delete(suivre);
+    },
+    poser: (v: Ecoute) => {
+      if (v === valeur) return;
+      valeur = v;
+      abonnes.forEach((suivre) => suivre());
+    },
+  };
+}
+
+/**
+ * L’enregistreur au débit de la voix (DEBIT_VOCAL). Un navigateur qui refuse l’option enregistre à son débit par
+ * défaut : le vocal part quand même.
+ */
+function enregistreur(stream: MediaStream) {
+  try {
+    return new MediaRecorder(stream, { audioBitsPerSecond: DEBIT_VOCAL });
+  } catch {
+    return new MediaRecorder(stream);
+  }
+}
+
 function formatClock(s: number) {
   const t = Math.floor(s);
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -42,8 +90,8 @@ function formatClock(s: number) {
  */
 export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError) => void; onLimit: () => void }) {
   const [phase, setPhase] = useState<"idle" | "starting" | "recording">("idle");
-  const [seconds, setSeconds] = useState(0);
-  const [levels, setLevels] = useState<number[]>([]);
+  /* Le temps et les niveaux : hors de l’état de l’écran, qui ne se refait qu’aux changements de phase */
+  const [ecoute] = useState(creerEcoute);
   const session = useRef<Session | null>(null);
   /* L’écran est-il toujours là ? Le micro s’ouvre après un temps : si on a quitté l’écran entre-temps, on le referme */
   const monte = useRef(true);
@@ -99,7 +147,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     }
     let recorder: MediaRecorder;
     try {
-      recorder = new MediaRecorder(stream);
+      recorder = enregistreur(stream);
     } catch {
       stream.getTracks().forEach((t) => t.stop());
       ctx?.close().catch(() => {});
@@ -129,7 +177,8 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
             for (const v of buf) sum += ((v - 128) / 128) ** 2;
             const level = Math.min(1, Math.sqrt(sum / buf.length) * 3.4);
             s.all.push(level);
-            setLevels((l) => [...l.slice(1 - LIVE_BARS), level]);
+            const avant = ecoute.lire();
+            ecoute.poser({ ...avant, levels: [...avant.levels.slice(1 - LIVE_BARS), level] });
           }
           s.raf = requestAnimationFrame(tick);
         };
@@ -142,14 +191,13 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     let affichee = 0;
     s.timer = window.setInterval(() => {
       const secs = (performance.now() - s.started) / 1000;
-      if (Math.floor(secs) !== affichee) setSeconds((affichee = Math.floor(secs)));
+      if (Math.floor(secs) !== affichee) ecoute.poser({ ...ecoute.lire(), seconds: (affichee = Math.floor(secs)) });
       if (secs >= MAX_SECONDS) handlers.current.onLimit();
     }, 200);
     /* Par tranches de 250 ms : Safari livre le son au fil de l’eau (à l’arrêt seul, il peut ne rien rendre) */
     recorder.start(250);
     session.current = s;
-    setLevels([]);
-    setSeconds(0);
+    ecoute.poser(AU_REPOS);
     setPhase("recording");
   };
 
@@ -163,8 +211,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       const done = () => {
         release(s);
         setPhase("idle");
-        setLevels([]);
-        setSeconds(0);
+        ecoute.poser(AU_REPOS);
         const blob = new Blob(s.chunks, { type: s.recorder.mimeType || "audio/mp4" });
         /* Un toucher trop court (moins d’une demi-seconde) ne fait pas de vocal */
         if (!keep || secs < 0.5) return resolve(null);
@@ -181,7 +228,9 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       s.recorder.stop();
     });
 
-  return { phase, seconds, levels, start, stop };
+  /** Le temps et les niveaux en direct, par abonnement (RecordingBar, les perles du logo) : qui les lit ne les écrit pas. */
+  const direct: EcouteEnDirect = ecoute;
+  return { phase, ecoute: direct, start, stop };
 }
 
 function release(s: Session) {
@@ -202,8 +251,12 @@ function resample(levels: number[], n: number) {
   });
 }
 
-/** Pendant l’enregistrement : le point rouge, le temps, l’onde qui bouge, et le bouton pour envoyer. */
-export function RecordingBar({ seconds, levels, onSend }: { seconds: number; levels: number[]; onSend: () => void }) {
+/**
+ * Pendant l’enregistrement : le point rouge, le temps, l’onde qui bouge, et le bouton pour envoyer. Abonnée au direct de
+ * l’enregistreur, elle seule se refait à chaque relevé du micro.
+ */
+export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSend: () => void }) {
+  const { seconds, levels } = useSyncExternalStore(ecoute.abonner, ecoute.lire, ecoute.lire);
   const bars = [...Array.from({ length: Math.max(0, LIVE_BARS - levels.length) }, () => 0), ...levels];
   return (
     <>
