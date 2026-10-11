@@ -6,30 +6,24 @@ import { db, schema } from "@/server/db";
 import { importerCaptures, storyAffichee } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
 import { decalage, lotsDe } from "@/services/preparer-video";
+import { captures, msg } from "./aide/fabriques";
 
-type Msg = Captures["blocs"][number]["messages"][number];
-const m = (de: "moi" | "autre", texte: string, coupe = false): Msg => ({ de, texte, media: null, coupe, reaction: null });
-const lot = (blocs: Captures["blocs"], images: number, autre: string | null = "Inès"): Captures => ({
-  appli: "imessage",
-  autre,
-  captures: Array.from({ length: images }, (_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
-  blocs,
-  profil: [],
-  doutes: [],
-});
+/** Un lot lu d’un enregistrement iMessage : ses blocs, sur `images` captures. */
+const lot = (blocs: Captures["blocs"], images: number, autre: string | null = "Inès"): Captures =>
+  captures({ appli: "imessage", autre, captures: Array.from({ length: images }, (_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })), blocs });
 
 describe("les lots d’un enregistrement, rassemblés", () => {
   it("recolle deux lots sans doublon, et garde le message entier plutôt que le bout coupé", () => {
     const a = lot(
       [
-        { repere: { date: "2026-10-01", heure: "21:00" }, messages: [m("autre", "salut toi"), m("moi", "hey"), m("autre", "tu fais quoi ce soir"), m("moi", "rien de spécial et toi", true)] },
+        { repere: { date: "2026-10-01", heure: "21:00" }, messages: [msg("autre", "salut toi"), msg("moi", "hey"), msg("autre", "tu fais quoi ce soir"), msg("moi", "rien de spécial et toi", { coupe: true })] },
       ],
       12,
     );
     const b = lot(
       [
-        { repere: null, messages: [m("autre", "tu fais quoi ce soir ?"), m("moi", "rien de spécial et toi ? je regarde un film"), m("autre", "viens on sort")] },
-        { repere: { date: "2026-10-02", heure: "10:12" }, messages: [m("moi", "bien dormi ?")] },
+        { repere: null, messages: [msg("autre", "tu fais quoi ce soir ?"), msg("moi", "rien de spécial et toi ? je regarde un film"), msg("autre", "viens on sort")] },
+        { repere: { date: "2026-10-02", heure: "10:12" }, messages: [msg("moi", "bien dormi ?")] },
       ],
       12,
       null,
@@ -51,8 +45,8 @@ describe("les lots d’un enregistrement, rassemblés", () => {
   });
 
   it("met bout à bout deux lots sans message commun, et ne recolle pas sur un seul message court", () => {
-    expect(recouvrement([m("moi", "ok")], [m("moi", "ok"), m("autre", "ça marche")])).toEqual({ garderA: 1, sauterB: 0, long: 0 });
-    const f = fusionnerLots([lot([{ repere: null, messages: [m("moi", "a1"), m("autre", "a2")] }], 3), lot([{ repere: null, messages: [m("moi", "b1")] }], 3)], "autre");
+    expect(recouvrement([msg("moi", "ok")], [msg("moi", "ok"), msg("autre", "ça marche")])).toEqual({ garderA: 1, sauterB: 0, long: 0 });
+    const f = fusionnerLots([lot([{ repere: null, messages: [msg("moi", "a1"), msg("autre", "a2")] }], 3), lot([{ repere: null, messages: [msg("moi", "b1")] }], 3)], "autre");
     expect(f.blocs.flatMap((x) => x.messages.map((y) => y.texte))).toEqual(["a1", "a2", "b1"]);
   });
 });
@@ -105,7 +99,7 @@ describe("une conv iMessage lue sur un enregistrement", () => {
   });
 
   it("devient une histoire brouillon, comme des captures", async () => {
-    const messages = Array.from({ length: 30 }, (_, k) => m(k % 2 ? "moi" : "autre", `message numéro ${k + 1} de la conv`));
+    const messages = Array.from({ length: 30 }, (_, k) => msg(k % 2 ? "moi" : "autre", `message numéro ${k + 1} de la conv`));
     const lots = [lot([{ repere: { date: "2026-10-01", heure: "20:00" }, messages: messages.slice(0, 18) }], 12), lot([{ repere: null, messages: messages.slice(14) }], 6)];
     const t = enTexte(fusionnerLots(lots, "imessage"));
     expect(t.messages).toBe(30);

@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DonneesVerdict } from "@/server/analyse";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import type { Ligne } from "@/server/histoires";
+import type { Ligne, Meta } from "@/server/histoires";
 import { arreterPartage, ErreurPartage, lienDe, masqueDe, masquerPrenoms, partager, verdictPartage } from "@/server/partages";
 import { compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -22,7 +23,12 @@ describe("les prénoms dans ce qui se partage", () => {
   });
 
   it("le masque d’une histoire : l’autre en initiale, ton prénom en clair ; sans « Qui es-tu ? », tout le monde masqué", () => {
-    const histoire = (meta: object) => ({ meta: chiffrer(meta) }) as Ligne;
+    /* Une vraie ligne d’histoire, sans base : un export WhatsApp de 19 messages, sauf ce que `m` change */
+    const histoire = (m: Pick<Meta, "participants"> & Partial<Meta>): Ligne => {
+      const meta: Meta = { appli: "whatsapp", format: "whatsapp-ios", fichier: "conv.txt", resume: { debut: "2026-09-01", fin: "2026-09-30", total: 19, vocaux: 0 }, ...m };
+      const t = new Date();
+      return { id: randomUUID(), userId: null, draftToken: null, status: "prete", messageCount: 19, nextMessage: null, meta: chiffrer(meta), context: null, convPurgedAt: null, chatVocal: false, createdAt: t, updatedAt: t };
+    };
     const deux = [
       { nom: "Hugo Lemaire", prenom: "Hugo", messages: 10 },
       { nom: "Sophie B", prenom: "Sophie", messages: 9 },
@@ -34,7 +40,7 @@ describe("les prénoms dans ce qui se partage", () => {
       { nom: "Moi", prenom: "Karim", messages: 10 },
       { nom: "Inès", prenom: "Inès", messages: 9 },
     ];
-    expect(masqueDe(histoire({ participants: captures, moi: 0 }))("Inès attend Karim, dis-moi.")).toBe("I. attend Karim, dis-moi.");
+    expect(masqueDe(histoire({ appli: "instagram", format: "captures", captures: 2, participants: captures, moi: 0 }))("Inès attend Karim, dis-moi.")).toBe("I. attend Karim, dis-moi.");
   });
 });
 
@@ -88,7 +94,12 @@ describe("le lien de partage du verdict", () => {
 
   it("refuse une situation difficile (mode sobre), et un identifiant mal formé", async () => {
     await changerVerdict((v) => (v.sortie.mode_sobre = true));
-    await expect(partager(story)).rejects.toEqual(new ErreurPartage("sobre"));
+    /* Le verdict redevient partageable même si le test échoue : les autres tests le partagent */
+    try {
+      await expect(partager(story)).rejects.toEqual(new ErreurPartage("sobre"));
+    } finally {
+      await changerVerdict((v) => (v.sortie.mode_sobre = false));
+    }
     expect(await verdictPartage("../../etc")).toBeNull();
   });
 });

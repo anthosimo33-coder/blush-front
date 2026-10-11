@@ -27,7 +27,7 @@ npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (
 npm run todo                            # les décisions produit en attente (les TODO(produit) du code), sans rien faire échouer
 ```
 
-`blush_test` sert à tous les dossiers du projet sur la machine : les tests ne la migrent que s’ils viennent de la créer. Un dossier qui ajoute une migration prend sa propre base : `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom> npm run check`.
+`blush_test` sert à tous les dossiers du projet sur la machine : les tests ne la migrent que s’ils viennent de la créer. Un dossier qui ajoute une migration prend sa propre base : `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom> npm run check`. Une base à soi est migrée et remise à zéro à chaque lancement : ses limites et ses compteurs du jour (`rate_limits`, `counters`). Ses autres tables gardent ce que les tests y laissent : les comptes et les brouillons des fixtures (`tests/aide/fixtures.ts`) sont effacés à la fin de chaque fichier, un test qui écrit autrement efface lui-même ce qu’il crée. Les fichiers de tests avec la base passent un par un (`fileParallelism: false`).
 
 La CI (`.github/workflows/ci.yml`), à chaque pull request et à chaque push sur `main` :
 

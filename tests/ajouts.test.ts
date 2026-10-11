@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { blocAjout, estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter } from "@prompts/lib/ajouts";
+import { blocAjout, estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import type { Requete } from "@prompts/lib/contextes";
 import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
@@ -83,6 +83,10 @@ describe("lib/ajouts", () => {
   });
 });
 
+/*
+ * Chaque test part de sa conv lue : aucun ne dépend de ce qu’un autre a ajouté (un export, des captures, un échange), et
+ * chacun passe seul comme dans n’importe quel ordre. Ceux qui regardent la suite d’un export la font dans leur beforeAll.
+ */
 describe("après l’import : le chat et sa fiche", () => {
   const requetes: Requete[] = [];
   const derniere = (tache: Requete["tache"]) =>
@@ -91,23 +95,23 @@ describe("après l’import : le chat et sa fiche", () => {
       .at(-1)!
       .blocs.flatMap((b) => ("texte" in b ? [b.texte] : []))
       .join("\n");
-  let id = "";
-  const story = () => ligneEnBase(id);
   const image = { media: "image/jpeg" as const, base64: "AAAA" };
+  /** Une conv lue par un compte BLUSH+ neuf (Hugo et Sophie, la conv 01) : son id. */
+  const convLue = async () => (await histoireLue(await compteDeTest("ajouts", "blushplus"), "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
+  /** Le numéro d’une ligne ajoutée (« m1074 … » : 1074). */
+  const numero = (ligne: string) => Number(/^m(\d+) /.exec(ligne)?.[1]);
 
   /* Les requêtes au modèle (factice) pendant les tests, pour lire ce qu’il reçoit */
   facticePourChaqueTest((req) => (requetes.push(req), fournisseurFactice(req)));
-  beforeAll(async () => {
-    id = (await histoireLue(await compteDeTest("ajouts", "blushplus"), "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
-  });
 
   it("un nouvel export dans le chat : ses messages marqués, l’historique résumé, la mémoire qui les relit", async () => {
+    const id = await convLue();
     const memoire = (await memoireDe(id))!;
-    const ajout = await depuisExport(await story(), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
+    const ajout = await depuisExport(await ligneEnBase(id), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
     expect(ajout.messages).toBe(3);
-    expect(ajout.lignes[0].startsWith(`m${String(memoire.suivant).padStart(4, "0")} `)).toBe(true);
+    expect(numero(ajout.lignes[0])).toBe(memoire.suivant);
 
-    const { reponse, majMemoire } = await repondre(await story(), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
+    const { reponse, majMemoire } = await repondre(await ligneEnBase(id), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
     expect(reponse.kind).toBe("bubbles");
     expect(majMemoire).toBe(true);
     const chat = derniere("10-chat");
@@ -119,27 +123,40 @@ describe("après l’import : le chat et sa fiche", () => {
     expect(derniere("07-memoire")).toContain(`ajouté à la conv :\n${ajout.lignes.join("\n")}`);
 
     /* Le même export, renvoyé : le curseur a avancé, rien de neuf */
-    await expect(depuisExport(await story(), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({ code: "rien_de_neuf" });
+    await expect(depuisExport(await ligneEnBase(id), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({ code: "rien_de_neuf" });
   });
 
-  it("le message suivant garde dans le fil les messages qu’il avait envoyés", async () => {
-    await repondre(await story(), (await memoireDe(id))!, "je lui dis oui direct ?");
-    expect(derniere("10-chat")).toMatch(/ {2}m\d{4} 2026-03-14 sam\. 18:40 Sophie : samedi ça te dit toujours \?\nHugo \(à toi\) : ça veut dire quoi \?/);
-  });
+  describe("après un nouvel export, envoyé dans le chat puis relu par la mémoire", () => {
+    let id = "";
+    /** L’export ajouté par le beforeAll : ses lignes, numérotées à la suite de la conv. */
+    let exporte: Ajout;
+    beforeAll(async () => {
+      id = await convLue();
+      const memoire = (await memoireDe(id))!;
+      exporte = await depuisExport(await ligneEnBase(id), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
+      await repondre(await ligneEnBase(id), memoire, "", { ajout: exporte, affiche: resumeAjout(exporte, "export", 1) });
+      await executerChaine(id);
+    });
 
-  it("des captures : leurs messages et son profil, numérotés après l’export", async () => {
-    const memoire = (await memoireDe(id))!;
-    const ajout = await depuisCaptures(await story(), memoire, [image]);
-    expect(ajout.messages).toBe(24);
-    expect(ajout.profil).toBe(1);
-    expect(ajout.lignes[0].startsWith(`m${String(memoire.suivant + 3).padStart(4, "0")} `)).toBe(true);
-    expect(derniere("01-captures")).toContain("autre personne : Sophie");
+    it("le message suivant garde dans le fil les messages qu’il avait envoyés", async () => {
+      await repondre(await ligneEnBase(id), (await memoireDe(id))!, "je lui dis oui direct ?");
+      expect(derniere("10-chat")).toContain(`  ${exporte.lignes.at(-1)}\nHugo (à toi) : ça veut dire quoi ?`);
+    });
+
+    it("des captures : leurs messages et son profil, numérotés à la suite de l’export", async () => {
+      const ajout = await depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
+      expect(ajout.messages).toBe(24);
+      expect(ajout.profil).toBe(1);
+      expect(numero(ajout.lignes[0])).toBe(numero(exporte.lignes.at(-1)!) + 1);
+      expect(derniere("01-captures")).toContain("autre personne : Sophie");
+    });
   });
 
   it("pour sa fiche : la réponse part avec ce qui a été lu, puis son profil devient une info, avec sa source", async () => {
-    const avant = new Set((await ficheDe(await story())).facts.map((f) => f.text));
-    const ajout = await depuisCaptures(await story(), (await memoireDe(id))!, [image]);
-    const r = await ajouterALaFiche(await story(), ajout);
+    const id = await convLue();
+    const avant = new Set((await ficheDe(await ligneEnBase(id))).facts.map((f) => f.text));
+    const ajout = await depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
+    const r = await ajouterALaFiche(await ligneEnBase(id), ajout);
     /* La réponse n’attend pas la mémoire : son profil est « en cours d’ajout », la fiche dit qu’elle se met à jour */
     expect(r).toMatchObject({ added: [], pending: { profile: ["Étudiante en droit à Lyon"], messages: ajout.messages }, fiche: { updating: true } });
     expect(r.fiche.facts.length).toBe(avant.size);
@@ -147,15 +164,16 @@ describe("après l’import : le chat et sa fiche", () => {
     /* Après la réponse, la mise à jour tourne : la fiche relue a l’info, avec sa source */
     while (apres.length) await apres.shift()!();
     expect(await majEnCours(id)).toBe(false);
-    const fiche = await ficheDe(await story());
+    const fiche = await ficheDe(await ligneEnBase(id));
     expect(fiche.facts.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
     expect(fiche.facts.length).toBeGreaterThan(avant.size);
   });
 
   it("un vocal est transcrit (ici, le modèle factice), puis lu comme un message", async () => {
+    const id = await convLue();
     const t = await transcrire(new File([new Uint8Array(16)], "vocal.webm", { type: "audio/webm" }));
     expect(t).toContain("samedi");
-    await repondre(await story(), (await memoireDe(id))!, `(vocal) ${t}`);
+    await repondre(await ligneEnBase(id), (await memoireDe(id))!, `(vocal) ${t}`);
     expect(derniere("10-chat")).toContain(`Hugo (à toi) : (vocal) ${t}`);
   });
 });

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
 
 /*
@@ -85,7 +85,6 @@ beforeEach(async () => {
   etat.alertes.length = 0;
   await vocalEnBase(false);
 });
-afterAll(() => vi.unstubAllGlobals());
 
 describe("POST /api/chat en flux", () => {
   it("les bulles arrivent une à une, avant la réponse validée, qui porte son échange", async () => {
@@ -230,9 +229,12 @@ describe("POST /api/chat en flux", () => {
 });
 
 describe("le lecteur du navigateur (api.ts)", () => {
-  /* Le navigateur parle à la vraie route */
-  beforeAll(() => vi.stubGlobal("fetch", (url: string, init: RequestInit) => POST(new Request(`http://localhost${url}`, { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...Object.fromEntries(new Headers(init.headers)) } }))));
-  afterAll(() => vi.unstubAllGlobals());
+  /*
+   * Le navigateur parle à la vraie route, avant chaque test : ceux qui simulent un autre serveur (d’avant le flux, ou
+   * le réseau qui coupe) remplacent fetch le temps de leur test seulement, dans n’importe quel ordre.
+   */
+  beforeEach(() => vi.stubGlobal("fetch", (url: string, init: RequestInit) => POST(new Request(`http://localhost${url}`, { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...Object.fromEntries(new Headers(init.headers)) } }))));
+  afterEach(() => vi.unstubAllGlobals());
 
   it("passe les bulles à mesure, se résout avec la réponse, puis donne le vocal", async () => {
     await vocalEnBase(false);

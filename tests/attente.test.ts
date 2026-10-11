@@ -1,13 +1,18 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { alerter, resumerLaVeille } from "@/server/alertes";
 import { inscrire } from "@/server/attente";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 
-const email = `pote-${Date.now()}@exemple.fr`;
+const n = Date.now();
+const email = `pote-${n}@exemple.fr`;
+/* L’inscription du résumé de la veille : la sienne, pour qu’il ait toujours de quoi parler, quel que soit l’ordre des tests */
+const emailDeLaVeille = `pote-veille-${n}@exemple.fr`;
 afterAll(async () => {
-  await db().delete(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${email}`)));
+  await db()
+    .delete(schema.waitlist)
+    .where(inArray(schema.waitlist.emailHash, [email, emailDeLaVeille].map((e) => empreinte(`attente:${e}`))));
 });
 
 describe("la liste d’attente", () => {
@@ -29,6 +34,8 @@ describe("les alertes", () => {
     await alerter("verdict en échec", ["Tâche verdict (t1)", "Erreur : refus"]);
     expect(log.mock.calls.flat().join("\n")).toContain("BLUSH · verdict en échec");
     log.mockClear();
+    /* Un résumé sans rien de neuf ne part pas : une inscription du jour lui donne de quoi dire */
+    await inscrire(emailDeLaVeille, "accueil");
     await resumerLaVeille();
     const resume = log.mock.calls.flat().join("\n");
     expect(resume).toContain("Nouveaux sur la liste d’attente : ");

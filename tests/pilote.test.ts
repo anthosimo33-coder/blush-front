@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { count, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { db, schema } from "@/server/db";
@@ -42,7 +43,14 @@ describe("le pilote de la base", () => {
   it("garde le jour en texte, et les requêtes brutes rendent leurs lignes", async () => {
     const jour = (await db().execute(sql`select ${"2026-10-10"}::date as jour, count(*) as n from (values (1), (2)) v(x)`)).rows[0] as { jour: string; n: string };
     expect(jour).toEqual({ jour: "2026-10-10", n: "2" });
-    const [c] = await db().select({ day: schema.counters.day }).from(schema.counters).limit(1);
-    if (c) expect(c.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    /* Un compteur à lui (une clé que rien d’autre n’écrit), relu puis effacé : la colonne `date` revient en texte */
+    const cle = `pilote:${randomUUID()}`;
+    try {
+      await db().insert(schema.counters).values({ day: "2026-10-10", key: cle, count: 1 });
+      const [c] = await db().select({ day: schema.counters.day }).from(schema.counters).where(eq(schema.counters.key, cle));
+      expect(c.day).toBe("2026-10-10");
+    } finally {
+      await db().delete(schema.counters).where(eq(schema.counters.key, cle));
+    }
   });
 });

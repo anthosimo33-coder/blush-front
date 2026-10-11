@@ -35,14 +35,13 @@ describe("le jour de la lecture", () => {
 });
 
 describe("une écriture coupée à chaque essai", () => {
-  let id: string;
-  /** Un compte à lui : son plan change au milieu du describe. */
-  let plus: Utilisateur;
-
-  beforeAll(async () => {
-    /* Le verdict seul (compte gratuit), puis l’accès : le rapport est planifié, et sa première étape coupée trois fois */
-    plus = await compteDeTest("corrections-acces");
-    id = await lue("01-a-deux-doigts.txt", { compte: plus });
+  /**
+   * Une conv lue par un compte à lui (le verdict seul, en gratuit), puis l’accès : le rapport est planifié, et sa
+   * première étape coupée trois fois. Chaque test part de la sienne : le plan du compte et la tâche changent en route.
+   */
+  async function coupee(): Promise<{ id: string; plus: Utilisateur }> {
+    const plus = await compteDeTest("corrections-acces");
+    const id = await lue("01-a-deux-doigts.txt", { compte: plus });
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, plus.id));
     plus.plan = "blushplus";
     const tache = await planifier(id, "rapport_plan");
@@ -50,9 +49,11 @@ describe("une écriture coupée à chaque essai", () => {
       .update(schema.tasks)
       .set({ status: "en_cours", attempts: ESSAIS_MAX, heartbeatAt: sql`now() - interval '10 minutes'` })
       .where(eq(schema.tasks.id, tache));
-  });
+    return { id, plus };
+  }
 
   it("passe en échec, et le rapport le dit au lieu de s’écrire pour toujours", async () => {
+    const { id, plus } = await coupee();
     await relancer(id);
     const [t] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
     expect([t.status, t.error]).toEqual(["echec", "coupee"]);
@@ -62,7 +63,10 @@ describe("une écriture coupée à chaque essai", () => {
     expect(r?.ecriture).toBeUndefined();
   });
 
-  it("se relance de zéro, et le rapport s’écrit", async () => {
+  it("en échec, se relance de zéro, et le rapport s’écrit", async () => {
+    const { id, plus } = await coupee();
+    await relancer(id);
+    expect((await rapportDe(await ligneEnBase(id), plus))?.echec).toBe("panne");
     expect(await reprendre(id, [...ETAPES_DU_RAPPORT])).toBe(1);
     await executerChaine(id);
     const r = await rapportDe(await ligneEnBase(id), plus);

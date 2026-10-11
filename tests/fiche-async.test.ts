@@ -26,11 +26,12 @@ import { GET, POST, PUT } from "@/app/api/fiche/route";
 import { ouvrirSession } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { ErreurTache } from "@/server/erreurs";
+import { contexteDe } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier } from "@/server/taches";
 import type { Fiche, FicheUpdate } from "@/types";
 import { texteDeConv } from "./aide/fichiers";
-import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
+import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 /* Les étapes demandées au modèle (factice) pendant les tests */
 const taches: string[] = [];
@@ -41,6 +42,17 @@ const lire = async () => (await (await GET()).json()) as Fiche;
 const lancerApres = async () => {
   while (etat.apres.length) await etat.apres.shift()!();
 };
+/**
+ * Une ligne d’un export WhatsApp, `minutes` après le dernier message lu de la conv (relu en base : l’import, ou un ajout
+ * d’un autre test) : toujours nouvelle. L’heure d’un export n’a pas de fuseau, elle se garde et se relit en UTC.
+ */
+async function apresLeDernierLu(minutes: number, qui: string, texte: string): Promise<string> {
+  const dernier = contexteDe(await ligneEnBase(id))?.dernier;
+  if (dernier == null) throw new Error("une conv lue garde l’heure de son dernier message");
+  const d = new Date(dernier + minutes * 60e3);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `[${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}] ${qui}: ${texte}`;
+}
 /** Une mise à jour de la mémoire planifiée par le chat (un échange qui apporte du neuf). */
 const majDuChat = () => planifier(id, "memoire_maj", { date: "2026-03-15", dit: "on s’est vus hier, c’était trop bien", reponse: ["Enfin."] });
 
@@ -54,7 +66,7 @@ beforeAll(async () => {
 
 describe("ajouter des captures à sa fiche", () => {
   it("un nouvel export : la réponse part avec le nombre de nouveaux messages, sans profil", async () => {
-    const suite = ["[14/03/2026 10:02:11] Hugo: alors cette semaine ?", "[14/03/2026 18:40:00] Sophie: ça va mieux"].join("\n");
+    const suite = [await apresLeDernierLu(1, "Hugo", "alors cette semaine ?"), await apresLeDernierLu(2, "Sophie", "ça va mieux")].join("\n");
     /* Le paquet que prépare le navigateur (src/services/preparer-export.ts) : du JSON compressé */
     const paquet = gzipSync(JSON.stringify({ nom: "conv.txt", parties: [{ nom: "conv.txt", contenu: `${texteDeConv("01-a-deux-doigts.txt")}\n${suite}` }] }));
     const fd = new FormData();

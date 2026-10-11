@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Memoire } from "@prompts/lib/schemas";
 
 /*
  * Les correctifs de l’audit de sécurité du 9 octobre (S-01, S-02, S-03, S-05, S-06, et pour la connexion S-07, S-08,
@@ -73,7 +72,7 @@ import { db, schema } from "@/server/db";
 import { convDe, depuisFichier, importer, type Meta } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { suiteSure } from "@/lib/suite";
-import { lotVideo } from "./aide/fabriques";
+import { lotVideo, memoire } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
 import { facticePourChaqueTest } from "./aide/fixtures";
 
@@ -209,14 +208,12 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
 });
 
 describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées ne grossit plus sans fin", () => {
-  const memoire: Memoire = {
-    alerte: null,
-    rien_de_neuf: false,
-    memoire: { ou_on_en_est: "Vus deux fois.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [] },
-    fiche: { portrait: "la Taquine", phrase: "p", phrase_courte: "p", faits: [{ section: "infos", texte: "Fait 0", preuves: [], statut: "garde" }] },
+  /* Une mémoire dont la fiche a une info, celle que la correction retire */
+  const etatMemoire = memoire({
+    fiche: { faits: [{ section: "infos", texte: "Fait 0", preuves: [], statut: "garde" }] },
     niveau: { niveau: "voit", tendance: null, pourquoi: "vus", preuves: [] },
     questions: ["a", "b", "c", "d"],
-  };
+  });
   let storyId = "";
 
   beforeAll(async () => {
@@ -234,16 +231,19 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
     };
     const [s] = await db().insert(schema.stories).values({ userId, messageCount: 20, meta: chiffrer(meta) }).returning();
     storyId = s.id;
-    const donnees: DonneesMemoire = { etat: memoire, lignes: [], suivant: 21, editions: { parToi: [], supprimees: Array.from({ length: 150 }, (_, k) => `ancien ${k}`) } };
+    const donnees: DonneesMemoire = { etat: etatMemoire, lignes: [], suivant: 21, editions: { parToi: [], supprimees: Array.from({ length: 150 }, (_, k) => `ancien ${k}`) } };
     await db().insert(schema.memories).values({ storyId, data: chiffrer(donnees) });
   });
 
+  /* Chaque test corrige la fiche depuis le navigateur du compte, bêta ouverte : il ne compte pas sur celui d’un autre */
+  beforeEach(() => {
+    etat.fermee = false;
+    etat.cookies.set(SESSION, secretSession);
+  });
   const corriger = () =>
     putFiche(requete("/api/fiche", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ facts: [{ section: "infos", text: "Fait 1" }] }) }));
 
   it("les infos retirées gardent les 100 plus récentes", async () => {
-    etat.fermee = false;
-    etat.cookies.set(SESSION, secretSession);
     const r = await corriger();
     expect(r.status).toBe(200);
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
@@ -262,13 +262,14 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
   });
 
   it("au-delà de la limite du jour : « trop »", async () => {
-    await db()
-      .insert(schema.rateLimits)
-      .values({ key: empreinte(`limite:fiche:${userId}`), windowStart: new Date(), count: 60 })
-      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 60, windowStart: new Date() } });
-    const r = await corriger();
-    expect(r.status).toBe(429);
-    await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte(`limite:fiche:${userId}`)));
+    const cle = empreinte(`limite:fiche:${userId}`);
+    await db().insert(schema.rateLimits).values({ key: cle, windowStart: new Date(), count: 60 }).onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 60, windowStart: new Date() } });
+    /* Le plafond est retiré même si le test échoue : les autres corrigent la fiche du même compte */
+    try {
+      expect((await corriger()).status).toBe(429);
+    } finally {
+      await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, cle));
+    }
   });
 });
 

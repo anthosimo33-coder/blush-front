@@ -41,9 +41,9 @@ describe("le rapport pendant son écriture", () => {
     u = await compteDeTest("ecriture", "blushplus");
     id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   });
-  /** L’histoire remise au milieu de l’écriture : le plan fait, les deux moitiés en cours, le rapport pas encore écrit. */
+  /** L’histoire remise au milieu de l’écriture : le plan fait, les deux moitiés en cours, ni rapport écrit ni chapitre prêt en avance. */
   async function auMilieuDeLEcriture() {
-    await db().update(schema.reports).set({ data: null }).where(eq(schema.reports.storyId, id));
+    await db().update(schema.reports).set({ data: null, partiel: null }).where(eq(schema.reports.storyId, id));
     await db()
       .update(schema.tasks)
       .set({ status: "en_cours", progress: 60, detail: { a: { progres: 0.7, ecrits: [1, 2], enCours: 3 }, b: { progres: 0.5, ecrits: [5], enCours: 6 } } })

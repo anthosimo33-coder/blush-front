@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
  * Les gardes des pages qui ont un écran de chargement (loading.tsx) sont dans leur layout : une page sous un squelette
@@ -63,10 +63,14 @@ const toutes = async () => ({
   convs: await garde(Convs),
 });
 
-let u: Utilisateur;
-beforeAll(async () => {
-  u = await compteDeTest("gardes");
-});
+/* Chaque test part d’un navigateur sans cookie, et ouvre la session du compte qu’il crée : aucun ne compte sur un autre */
+beforeEach(() => etat.cookies.clear());
+/** Un compte neuf, connecté dans le navigateur du test. */
+async function connecte(): Promise<Utilisateur> {
+  const u = await compteDeTest("gardes");
+  etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
+  return u;
+}
 
 /** Les gardes légères des layouts disent la même chose que les lectures complètes des pages. */
 async function memesReponses() {
@@ -90,8 +94,7 @@ describe("les gardes des pages à squelette, dans leur layout", () => {
   });
 
   it("suit la conv : « Qui es-tu ? » d’abord, puis la lecture, puis le rapport", async () => {
-    etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
-    const histoire = (await convRattachee(u, "01-a-deux-doigts.txt")).id;
+    const histoire = (await convRattachee(await connecte(), "01-a-deux-doigts.txt")).id;
 
     /* Importée, « Qui es-tu ? » pas rempli : pas de lecture sans */
     const avantQui = await toutes();
@@ -113,6 +116,10 @@ describe("les gardes des pages à squelette, dans leur layout", () => {
   });
 
   it("deux convs lues : la liste s’ouvre", async () => {
+    const u = await connecte();
+    await histoireLue(u, "01-a-deux-doigts.txt");
+    expect(await nombreDeConvs()).toBe(1);
+    expect(await garde(Convs)).toBe("/app");
     await histoireLue(u, "02-reciproque.txt");
     expect(await nombreDeConvs()).toBe(2);
     expect(await garde(Convs)).toBeNull();

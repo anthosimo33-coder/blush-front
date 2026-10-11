@@ -1,4 +1,4 @@
-import { Sortie01, Sortie05, Sortie07, type Captures, type Chapitre, type Memoire, type Rapport } from "@prompts/lib/schemas";
+import { Maj07, Sortie01, Sortie05, Sortie07, type Captures, type Chapitre, type Maj, type Memoire, type Rapport } from "@prompts/lib/schemas";
 
 /*
  * Des sorties des prompts fabriquées pour les tests, sans base ni modèle : le test ne donne que ce qu’il regarde, le
@@ -29,6 +29,27 @@ export const memoire = ({
   ...reste
 }: Partial<Omit<Memoire, "memoire" | "fiche">> & { memoire?: Partial<NonNullable<Memoire["memoire"]>>; fiche?: Partial<NonNullable<Memoire["fiche"]>> } = {}): Memoire =>
   Sortie07.parse({ alerte: null, rien_de_neuf: false, niveau: null, questions: null, ...reste, memoire: { ...MEMOIRE, ...m }, fiche: { ...FICHE, ...f } });
+
+/** Une mise à jour de la mémoire (prompt 07, Maj07) : rien ne change, sauf ce que `m` donne. */
+export const maj = (m: Partial<Maj> = {}): Maj =>
+  Maj07.parse({
+    alerte: null,
+    rien_de_neuf: false,
+    ou_on_en_est: null,
+    moments_ajoutes: [],
+    son_mode: null,
+    ton_mode: null,
+    conseils: null,
+    a_venir: null,
+    faits_ajoutes: [],
+    faits_retires: [],
+    portrait: null,
+    phrase: null,
+    phrase_courte: null,
+    niveau: null,
+    questions: null,
+    ...m,
+  });
 
 /** Un chapitre du rapport (prompt 05), sans bloc (sauf ce que `autres` change). */
 export const chapitre = (numero: number, autres: Partial<Chapitre> = {}): Chapitre => ({ numero, titre: `Chapitre ${numero}`, titre_court: `Ch. ${numero}`, surtitre: null, blocs: [], ...autres });

@@ -21,13 +21,16 @@ describe("import", () => {
 
 /*
  * Une conv lue de bout en bout par un compte BLUSH+ (le verdict, le rapport, le vocal, la mémoire), une fois pour tout
- * le describe : chaque test en regarde une étape, et passe seul (it.only) comme à la suite des autres.
+ * le describe : chaque test en regarde une étape, et passe seul (it.only) comme dans n’importe quel ordre. Ce que la
+ * lecture laisse et que les tests changent ensuite (la conv brute, les tâches) est relevé dans le beforeAll.
  */
 describe("de l’import à la mémoire", () => {
   let u: Utilisateur;
   let imp: Importee;
   /** La ligne de l’histoire juste après l’import, conv brute comprise (la lecture l’efface ensuite). */
   let importee: LigneComplete;
+  /** Les tâches de la première lecture, triées par création (sans tri, Postgres les rend dans l’ordre de leur mise à jour) : le chat et le vocal en ajoutent ensuite. */
+  let taches: (typeof schema.tasks.$inferSelect)[];
   const relire = () => ligneEnBase(imp.id);
   const memoire = async () => (await memoireDe(imp.id))!;
 
@@ -36,6 +39,7 @@ describe("de l’import à la mémoire", () => {
     imp = await convImportee("01-a-deux-doigts.txt");
     importee = await ligneEnBase(imp.id);
     await histoireLue(u, imp, { qui: { moi: "Hugo" } });
+    taches = await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, imp.id)).orderBy(schema.tasks.createdAt);
   });
 
   it("l’import : deux participants, plus de 50 messages, et la conv chiffrée en base", () => {
@@ -44,9 +48,7 @@ describe("de l’import à la mémoire", () => {
     expect(importee.conv!.toString("utf8")).not.toContain(imp.meta.participants[0].nom);
   });
 
-  it("enchaîne verdict, plan, chapitres, vocal et mémoire", async () => {
-    /* Triées par création : sans tri, Postgres les rend dans l’ordre où elles ont été mises à jour */
-    const taches = await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, imp.id)).orderBy(schema.tasks.createdAt);
+  it("enchaîne verdict, plan, chapitres, vocal et mémoire", () => {
     expect(taches.map((t) => [t.kind, t.status])).toEqual([
       ["verdict", "fini"],
       ["rapport_plan", "fini"],

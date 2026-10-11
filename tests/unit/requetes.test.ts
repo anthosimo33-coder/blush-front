@@ -1,8 +1,6 @@
-import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { DEMANDE_PLAN, demandeMoitie, requeteChat, requeteRapport, type Requete } from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
-import { citees } from "@prompts/lib/memoire";
 import { Plan05, Sortie04 } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { memoire } from "../aide/fabriques";
@@ -10,9 +8,10 @@ import { memoire } from "../aide/fabriques";
 /*
  * Ce que reçoit le modèle pour le rapport (prompt 05) et le chat (prompt 10), bloc par bloc. Le premier bloc est mis
  * en cache : tant qu’il ne change pas d’un appel à l’autre (le plan puis les deux moitiés, un message du chat puis le
- * suivant), le modèle ne relit pas la conv ni la mémoire. Le dépôt est public : on fige la forme des blocs (leurs
- * balises, les messages qu’ils citent, leur ordre, leur taille) et une empreinte de leur texte, jamais le texte des
- * prompts. La conv et la mémoire sont inventées (Tom et Léa).
+ * suivant), le modèle ne relit pas la conv ni la mémoire. Les instantanés figent la forme des blocs (leurs balises,
+ * le cache, les messages qu’ils citent, leur ordre), jamais leur texte ni sa taille : le dépôt est public, et une
+ * retouche de formulation dans le sous-module privé ne doit pas faire échouer un test du front. Que le préfixe en cache
+ * reste le même d’un appel à l’autre, les tests d’égalité le prouvent. La conv et la mémoire sont inventées (Tom et Léa).
  */
 const pad = (n: number) => String(n).padStart(2, "0");
 const MOTS = ["ciné jeudi ?", "trop bien hier", "tu fais quoi ce soir", "jsp encore", "on se voit samedi", "ok 😊"];
@@ -57,8 +56,7 @@ const plan = Plan05.parse({
   chapitres: [{ numero: 1, titre: "Le verdict", titre_court: "Le verdict", surtitre: null, periode: "septembre", scenes: [{ quand: "le 8", quoi: "le ciné", preuves: ["m0001"] }], epice: "le jeudi" }],
 });
 
-const empreinte = (t: string) => createHash("sha256").update(t).digest("hex").slice(0, 12);
-/** Un bloc tel que le test le fige : ses balises ouvrantes dans l’ordre, les messages qu’il cite, sa taille, son empreinte. Jamais son texte. */
+/** Un bloc tel que le test le fige : ses balises ouvrantes dans l’ordre, s’il est en cache, les messages qu’il cite. Jamais son texte. */
 function structure(req: Requete) {
   return {
     tache: req.tache,
@@ -70,8 +68,6 @@ function structure(req: Requete) {
         cache: !!b.cache,
         balises: [...b.texte.matchAll(/<([a-z_]+)[ >]/g)].map((m) => m[1]),
         messages: ids.length > 4 ? `${ids.length} : ${ids[0]} … ${ids.at(-1)}` : ids.join(", ") || "aucun",
-        lignes: b.texte.split("\n").length,
-        empreinte: empreinte(b.texte),
       };
     }),
   };
@@ -99,6 +95,10 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
     expect(new Set([requetes.plan, requetes.premiere, requetes.seconde].map((r) => textes(r)[1])).size).toBe(3);
     expect(requetes.sobre.blocs).toHaveLength(1);
     for (const r of Object.values(requetes)) for (const t of textes(r)) expect(bienFermees(t)).toBe(true);
+    /* Le bloc en cache porte toute la conv rendue et ses chiffres, tels que lib/conv les rend (comparés à eux-mêmes, pas figés) */
+    const enCache = textes(requetes.plan)[0];
+    for (const l of rendu.lignes.values()) expect(enCache).toContain(l);
+    expect(enCache).toContain(rendu.chiffres);
   });
 
   it("ses blocs : l’histoire, les chiffres, toute la conv, l’aide et le verdict, puis la demande (instantané)", () => {
@@ -115,15 +115,11 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
                 "verdict",
               ],
               "cache": true,
-              "empreinte": "5c11034ef3bf",
-              "lignes": 117,
               "messages": "60 : m0001 … m0060",
             },
             {
               "balises": [],
               "cache": false,
-              "empreinte": "ac79420ceb7d",
-              "lignes": 1,
               "messages": "aucun",
             },
           ],
@@ -140,8 +136,6 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
                 "verdict",
               ],
               "cache": true,
-              "empreinte": "5c11034ef3bf",
-              "lignes": 117,
               "messages": "60 : m0001 … m0060",
             },
             {
@@ -149,8 +143,6 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
                 "plan",
               ],
               "cache": false,
-              "empreinte": "6d4154921813",
-              "lignes": 28,
               "messages": "m0001",
             },
           ],
@@ -167,8 +159,6 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
                 "verdict",
               ],
               "cache": true,
-              "empreinte": "5c11034ef3bf",
-              "lignes": 117,
               "messages": "60 : m0001 … m0060",
             },
           ],
@@ -186,8 +176,8 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     niveau: { niveau: "voit", tendance: null, pourquoi: "Ils se voient le samedi.", preuves: ["m0040"] },
     questions: ["Elle a dit quoi samedi ?", "Tu l’as revue ?", "Elle t’a relancé ?", "Tu veux quoi ?"],
   });
-  /* Les messages que garde la mémoire, une fois la conv effacée */
-  const lignes = new Map([...rendu.lignes].filter(([id]) => citees(etat).includes(id)));
+  /* Les messages que garde la mémoire, une fois la conv effacée : ceux qu’elle cite ci-dessus */
+  const lignes = new Map(["m0001", "m0002", "m0013", "m0040"].map((id) => [id, rendu.lignes.get(id)!]));
   const chat = (autres: Partial<Parameters<typeof requeteChat>[0]> = {}) =>
     requeteChat({ h, aujourdhui: Date.UTC(2026, 9, 1), chiffres: rendu.chiffres, fin: rendu.fin, etat, lignes, style: profil(h, lu.messages).bloc, fil: [], dit: "elle m’a répondu ok", ...autres });
   const suite = chat({
@@ -209,9 +199,11 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
       expect(r.blocs.slice(1).some((b) => "cache" in b && b.cache)).toBe(false);
       for (const t of textes(r)) expect(bienFermees(t)).toBe(true);
     }
-    /* La conv n’y est pas : seulement les messages que la mémoire garde */
+    /* La conv n’y est pas : seulement les messages que la mémoire garde, et les chiffres de la conv */
     expect(textes(premier)[0]).not.toContain("<conversation");
     expect([...new Set(textes(premier)[0].match(/\bm\d{4,}\b/g))].sort()).toEqual([...lignes.keys()].sort());
+    for (const l of lignes.values()) expect(textes(premier)[0]).toContain(l);
+    expect(textes(premier)[0]).toContain(rendu.chiffres);
   });
 
   it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style et le nouveau (instantané)", () => {
@@ -228,8 +220,6 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
                 "aide",
               ],
               "cache": true,
-              "empreinte": "52f69419d56d",
-              "lignes": 56,
               "messages": "m0001, m0002, m0040, m0013",
             },
             {
@@ -238,8 +228,6 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
                 "nouveau",
               ],
               "cache": false,
-              "empreinte": "2f2e90151acd",
-              "lignes": 14,
               "messages": "aucun",
             },
           ],
@@ -256,8 +244,6 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
                 "aide",
               ],
               "cache": true,
-              "empreinte": "52f69419d56d",
-              "lignes": 56,
               "messages": "m0001, m0002, m0040, m0013",
             },
             {
@@ -267,8 +253,6 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
                 "vocal",
               ],
               "cache": false,
-              "empreinte": "bb781869f9ca",
-              "lignes": 19,
               "messages": "m0060, m0061",
             },
           ],

@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import type { Captures } from "@prompts/lib/schemas";
 import { lireCaptures } from "@/server/captures";
 import { db, schema } from "@/server/db";
 import { definirQui, histoireDe, importerCaptures, metaDe, storyAffichee } from "@/server/histoires";
+import { captures, msg } from "./aide/fabriques";
 
 describe("des captures à l’histoire", () => {
   it("transcrit, crée le brouillon, et prend le prénom de l’utilisateur", async () => {
@@ -23,17 +23,14 @@ describe("des captures à l’histoire", () => {
   });
 
   it("sans repère au début, le premier bloc prend le jour du premier repère", () => {
-    const c: Captures = {
+    const c = captures({
       appli: null,
       autre: "Léo: le vrai",
-      captures: [{ numero: 1, place: 1, hors_sujet: false }],
       blocs: [
-        { repere: null, messages: [{ de: "autre", texte: "salut", media: null, coupe: false, reaction: null }] },
-        { repere: { date: "2026-09-08", heure: null }, messages: [{ de: "moi", texte: "", media: "vocal", coupe: false, reaction: null }] },
+        { repere: null, messages: [msg("autre", "salut")] },
+        { repere: { date: "2026-09-08", heure: null }, messages: [msg("moi", "", { media: "vocal" })] },
       ],
-      profil: [],
-      doutes: [],
-    };
+    });
     expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe("# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis");
   });
 });
