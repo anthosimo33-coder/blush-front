@@ -105,7 +105,7 @@ export function AppBadge({ app, size = 46, radius = 13, className }: { app: AppK
           <span data-dots="" className="inline-flex items-center gap-1">
             <span className="inline-block size-1.5 rounded-full bg-grey" />
             <span className="inline-block size-1.5 rounded-full bg-grey" />
-            <span className="inline-block size-1.5 rounded-full" style={{ background: "linear-gradient(120deg, #A8FFE4 0%, #8FC8FF 35%, #E6A8FF 68%, #FFD3A1 100%)" }} />
+            <span className="inline-block size-1.5 rounded-full" style={{ background: "var(--degrade-perle)" }} />
           </span>
         </span>
       );

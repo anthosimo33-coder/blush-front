@@ -1,28 +1,57 @@
+import { etatDuNiveau, scaleOf } from "@/contenu/niveaux";
 import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
 import { IlOuElle } from "@/lib/pronom";
 import type { LevelId, Pronom, ScoreRow } from "@/types";
+import { DoneCheck } from "./feedback";
 import { Icon } from "./icons";
 import { Dot } from "./messages";
+
+/* Les niveaux vivent dans src/contenu/niveaux.ts : la réexportation garde l’accueil tel quel, le temps que 9a le bascule */
+export { scaleOf } from "@/contenu/niveaux";
 
 /* Couleur du nom du gagnant : les teintes foncées, lisibles en petit (au moins 4,5:1) */
 const SIDE_COLOR = { toi: "#1A66DB", elle: "#C81D6B", pareil: "#087A56" } as const;
 
 /* ———— Barre de score toi / elle ———— */
-/** `autre` : le pronom de l’autre personne (« il » quand une utilisatrice parle d’un garçon) ; « elle » par défaut. */
-function ScoreBar({ row, delay = 0, autre }: { row: ScoreRow; delay?: number; autre?: Pronom }) {
+/* La couleur du gagnant sur le fond sombre de la révélation : les teintes vives, lisibles sur le noir */
+const SIDE_CLASS_SOMBRE = { toi: "text-toi", elle: "text-elle", pareil: "text-vrai" } as const;
+
+/**
+ * Une ligne du duel toi / elle : le libellé, qui l’emporte, la barre (dite aux lecteurs d’écran par son role="img"), et
+ * les deux légendes. `autre` : le pronom de l’autre personne (« il » quand une utilisatrice parle d’un garçon) ; « elle »
+ * par défaut. `sombre` : sur le fond noir de la révélation du verdict (le duel), la barre fine qui glisse (data-bar) et
+ * les teintes vives ; ses morceaux se posent dans l’élément de l’écran (un <li>), sans enveloppe à elle.
+ */
+export function ScoreBar({ row, delay = 0, autre, sombre = false }: { row: ScoreRow; delay?: number; autre?: Pronom; sombre?: boolean }) {
   const lui = IlOuElle(autre).toLowerCase();
+  const gagnant = row.winner === "elle" ? lui : row.winner;
+  const dite = `${row.label}\u00a0: toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`;
+  if (sombre)
+    return (
+      <>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[16px] font-black leading-tight">{row.label}</span>
+          <span className={cn("shrink-0 text-[14px] font-black", SIDE_CLASS_SOMBRE[row.winner])}>{gagnant}</span>
+        </div>
+        <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle" role="img" aria-label={dite}>
+          <span data-bar="" style={{ "--w": `${row.toiPercent}%`, ...delai(delay) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
+        </div>
+        {(row.captionLeft || row.captionRight) && (
+          <div className="mt-1.5 flex justify-between gap-3 text-[12.5px] font-extrabold text-white/60 [@media(max-height:600px)]:hidden">
+            <span>{row.captionLeft}</span>
+            <span>{row.captionRight}</span>
+          </div>
+        )}
+      </>
+    );
   return (
     <div className="flex flex-col gap-2 py-2.5 lg:gap-1.5 lg:py-2">
       <div className="flex justify-between gap-3 text-[15px] font-black">
         <span>{row.label}</span>
-        <span style={{ color: SIDE_COLOR[row.winner] }}>{row.winner === "elle" ? lui : row.winner}</span>
+        <span style={{ color: SIDE_COLOR[row.winner] }}>{gagnant}</span>
       </div>
-      <div
-        className="flex h-3.5 overflow-hidden rounded-[7px] bg-[rgba(255,79,154,0.35)]"
-        role="img"
-        aria-label={`${row.label}\u00a0: toi ${row.toiPercent} %, ${lui} ${100 - row.toiPercent} %`}
-      >
+      <div className="flex h-3.5 overflow-hidden rounded-[7px] bg-[rgba(255,79,154,0.35)]" role="img" aria-label={dite}>
         <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, ...delai(delay) }} />
       </div>
       {(row.captionLeft || row.captionRight) && (
@@ -57,33 +86,12 @@ export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; classN
 }
 
 /* ———— Chemin des niveaux ———— */
-type Level = { id: LevelId; label: string };
-
-/** Avant d’être ensemble : des étapes, qu’on franchit l’une après l’autre. */
-const LEVELS: Level[] = [
-  { id: "parle", label: "On se parle" },
-  { id: "voit", label: "On se voit" },
-  { id: "dit", label: "On se le dit" },
-  { id: "ensemble", label: "On est ensemble" },
-];
-
-/** En couple : une température, du plus froid au plus chaud. On y est quelque part, sans étape à franchir. */
-const TEMPERATURE: Level[] = [
-  { id: "eloigne", label: "On s’éloigne" },
-  { id: "coince", label: "Ça coince" },
-  { id: "va", label: "Ça va" },
-  { id: "soudes", label: "On est soudés" },
-];
-
-/** L’échelle d’un niveau : les étapes, ou la température en couple. */
-export function scaleOf(level: LevelId) {
-  const temperature = TEMPERATURE.some((l) => l.id === level);
-  const levels = temperature ? TEMPERATURE : LEVELS;
-  return { levels, index: levels.findIndex((l) => l.id === level), temperature };
-}
-
-/** Les étapes (franchies en vert, la tienne en bleu, les suivantes verrouillées), ou la température (juste où vous êtes). */
-export function LevelPath({ current, className }: { current: LevelId; className?: string }) {
+/**
+ * Les étapes (franchies en vert, la tienne en bleu, les suivantes verrouillées), ou la température (juste où vous êtes).
+ * `variant="compact"` : la version d’une feuille (le contact de l’accueil), un fil et des points, les noms dessous.
+ */
+export function LevelPath({ current, variant = "normal", className }: { current: LevelId; variant?: "normal" | "compact"; className?: string }) {
+  if (variant === "compact") return <LevelPathCompact current={current} className={className} />;
   const { levels, index: idx, temperature } = scaleOf(current);
   const pct = (n: number) => `${Math.round((n / (levels.length - 1)) * 100)}%`;
   return (
@@ -118,13 +126,59 @@ export function LevelPath({ current, className }: { current: LevelId; className?
               </span>
               <span className={cn("text-[13px] font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
                 {l.label}
-                <span className="sr-only">{now ? (temperature ? "\u00a0: vous en êtes là" : "\u00a0: niveau en cours") : done ? "\u00a0: réussi" : temperature ? "" : "\u00a0: à venir"}</span>
+                <span className="sr-only">{etatDuNiveau(i, idx, temperature)}</span>
               </span>
             </li>
           );
         })}
       </ol>
     </div>
+  );
+}
+
+/** Les niveaux en version compacte : un fil, des points, les noms dessous. En couple, la température : juste où vous êtes, sans coches. */
+function LevelPathCompact({ current, className }: { current: LevelId; className?: string }) {
+  const { levels, index: idx, temperature } = scaleOf(current);
+  const last = levels.length - 1;
+  const doneShare = idx > 0 ? ((idx - 1) / idx) * 100 : 0;
+  return (
+    <ol className={cn("relative m-0 grid list-none grid-cols-4 p-0", className)}>
+      <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full bg-[#E6E3DC]" />
+      {!temperature && idx > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute left-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full"
+          style={{
+            width: `${(idx / last) * 75}%`,
+            background: `linear-gradient(90deg, #12C08A 0%, #12C08A ${doneShare}%, #3D8BFF ${doneShare}%, #3D8BFF 100%)`,
+          }}
+        />
+      )}
+      {levels.map((l, i) => {
+        const done = !temperature && i < idx;
+        const now = i === idx;
+        return (
+          <li key={l.id} className="relative flex flex-col items-center gap-1.5 text-center" aria-current={now ? "step" : undefined}>
+            <span
+              data-beat={now ? "" : undefined}
+              className={cn(
+                "flex size-4 items-center justify-center rounded-full",
+                done && "bg-vrai-ink",
+                now && "bg-toi-ink",
+                !done && !now && "bg-white shadow-[inset_0_0_0_1.5px_#D9D6CF]",
+              )}
+            >
+              {done && <Icon name="check" size={9} color="#FFFFFF" stroke={4} />}
+              {now && <span className="size-1.5 rounded-full bg-white" />}
+            </span>
+            <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
+              {l.label}
+              <span className="sr-only">{etatDuNiveau(i, idx, temperature)}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -187,15 +241,11 @@ export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {
           const done = n < step;
           return (
             <li key={s.title} className="flex items-start gap-3 py-2" aria-current={on ? "step" : undefined}>
-              <span
-                className={cn(
-                  "flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-[14px] font-black",
-                  on ? "bg-ink text-white" : done ? "text-white" : "bg-white text-grey shadow-thin",
-                )}
-                style={done ? { background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" } : undefined}
-              >
-                {done ? <Icon name="check" size={16} color="#FFFFFF" stroke={3.4} /> : n}
-              </span>
+              {done ? (
+                <DoneCheck size={30} />
+              ) : (
+                <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-[14px] font-black", on ? "bg-ink text-white" : "bg-white text-grey shadow-thin")}>{n}</span>
+              )}
               <div>
                 <div className={cn("text-[16px] font-black", on || done ? "text-ink" : "text-grey")}>{s.title}</div>
                 <div className="text-[13px] font-extrabold text-grey">{s.sub}</div>

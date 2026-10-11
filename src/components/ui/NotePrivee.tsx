@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { Icon } from "./icons";
+import { NoteIcone } from "./feedback";
 
 /*
  * La note de confidentialité des écrans : une promesse (src/contenu/confidentialite.ts), parfois suivie d’un lien discret
@@ -16,17 +16,12 @@ import { Icon } from "./icons";
  * l’écran qui la pose.
  */
 export function NotePrivee({ children, icone = "lock", petite = false, className }: { children: ReactNode; icone?: "lock" | "shield"; petite?: boolean; className?: string }) {
+  /* Le cadenas des écrans du parcours reste dans le gris doux ; le bouclier et le petit cadenas, dans le gris du texte */
+  const doux = icone === "lock" && !petite;
   return (
-    <p className={cn("m-0 flex items-start gap-2 font-extrabold text-grey", petite ? "text-[12.5px]" : "text-[13px]", className)}>
-      {icone === "shield" ? (
-        <Icon name="shield" size={16} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-      ) : petite ? (
-        <Icon name="lock" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-      ) : (
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-      )}
-      <span>{children}</span>
-    </p>
+    <NoteIcone icone={icone} taille={icone === "lock" && petite ? 15 : 16} couleur={doux ? "#8A8780" : "#6B6862"} className={cn(petite ? "text-[12.5px]" : "text-legende", className)}>
+      {children}
+    </NoteIcone>
   );
 }
 

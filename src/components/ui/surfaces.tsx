@@ -1,34 +1,102 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/cn";
+import { DoneCheck } from "./feedback";
 import { Icon } from "./icons";
 import { bloquerDefilement } from "@/lib/defilement";
+
+/** Donne l’élément à une ref de l’écran, objet ou fonction. */
+function assigner<T>(ref: Ref<T> | undefined, el: T | null) {
+  if (typeof ref === "function") ref(el);
+  else if (ref) ref.current = el;
+}
+
+/** La sortie d’une feuille : sa durée (ms) et sa courbe. */
+export type SortieFeuille = { duration: number; easing: string };
+
+/**
+ * La sortie de la feuille sur cet appareil : le panneau redescend (téléphone, 280 ms) ou s’efface en reculant
+ * (ordinateur, 200 ms), le voile s’éteint au même rythme. `sortie` : une autre durée, une autre courbe. Exportée pour
+ * l’écran qui anime d’autres éléments avec elle (la feuille du contact de l’accueil).
+ */
+export function sortieDeFeuille(desk: boolean, sortie?: SortieFeuille) {
+  const temps = { duration: sortie?.duration ?? (desk ? 200 : 280), easing: sortie?.easing ?? "cubic-bezier(0.3, 0, 0.2, 1)", fill: "forwards" as const };
+  const panneau: Keyframe[] = desk ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(16px) scale(0.98)" }] : [{ transform: "none" }, { transform: "translateY(100%)" }];
+  const voile: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
+  return { temps, panneau, voile };
+}
+
+/**
+ * Le titre d’une feuille : `labelledBy`, l’id d’un titre que l’écran pose dans la feuille ; ou `title`, que la feuille
+ * pose elle-même en tête (TitreFeuille, son id tiré de useId), `titleSize` sa taille, `titleClose` le bouton Fermer à côté.
+ */
+type TitreDeLaFeuille =
+  | { labelledBy: string; title?: undefined; titleSize?: undefined; titleClose?: undefined }
+  | { title: ReactNode; titleSize?: TailleTitreFeuille; titleClose?: boolean; labelledBy?: undefined };
 
 /**
  * Sheet : panneau du bas sur mobile, fenêtre centrée sur desktop.
  * <dialog> natif : focus piégé, Échap pour fermer, fond inerte.
  * Elle monte en douceur et redescend de même : son contenu reste là le temps de la sortie, puis le dialogue se ferme.
+ *
+ * Les refs (`dialogRef`, `panelRef`, `backdropRef`) donnent à l’écran le dialogue, le panneau et le voile, pour animer
+ * avec eux sans les chercher dans le DOM. `sortie` : la durée et la courbe de la sortie animée. `onClosed` : la feuille
+ * est fermée, sa sortie finie, quelle qu’ait été la fermeture (Échap, le voile, l’écran).
  */
 export function Sheet({
   open,
   onClose,
-  labelledBy,
+  onClosed,
   children,
   className,
   belowHeader = true,
+  dialogRef,
+  panelRef,
+  backdropRef,
+  sortie,
+  ...titre
 }: {
   open: boolean;
   onClose: () => void;
-  labelledBy: string;
+  onClosed?: () => void;
   children: ReactNode;
   className?: string;
   /** Desktop : le voile commence sous l’en-tête de 84 px (faux pour les écrans sans en-tête, comme le mode sobre). */
   belowHeader?: boolean;
-}) {
+  dialogRef?: Ref<HTMLDialogElement>;
+  panelRef?: Ref<HTMLDivElement>;
+  backdropRef?: Ref<HTMLDivElement>;
+  sortie?: SortieFeuille;
+} & TitreDeLaFeuille) {
   const ref = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const voile = useRef<HTMLDivElement>(null);
+  /* Chaque élément tenu par la feuille, et par l’écran s’il le demande */
+  const refDialogue = useCallback(
+    (el: HTMLDialogElement | null) => {
+      ref.current = el;
+      assigner(dialogRef, el);
+    },
+    [dialogRef],
+  );
+  const refPanneau = useCallback(
+    (el: HTMLDivElement | null) => {
+      panel.current = el;
+      assigner(panelRef, el);
+    },
+    [panelRef],
+  );
+  const refVoile = useCallback(
+    (el: HTMLDivElement | null) => {
+      voile.current = el;
+      assigner(backdropRef, el);
+    },
+    [backdropRef],
+  );
+  /* Le titre posé par la feuille : un id à elle, unique sur la page */
+  const idTitre = useId();
+  const labelledBy = titre.labelledBy ?? idTitre;
   /* Le défilement bloqué par cette feuille (src/lib/defilement.ts) : libéré à sa fermeture, quelle qu’elle soit */
   const liberer = useRef<(() => void) | null>(null);
   /* Le contenu reste monté pendant la sortie : `montee` ne repasse à faux qu’une fois la feuille redescendue */
@@ -37,6 +105,9 @@ export function Sheet({
   /* Pendant la sortie, elle garde ce qu’elle montrait : l’écran a souvent déjà effacé sa sélection (la conv, l’image choisie) */
   const [montre, setMontre] = useState(children);
   if (open && montre !== children) setMontre(children);
+  /* La sortie demandée par l’écran, en valeurs simples : l’effet ne repart pas à chaque rendu */
+  const dureeSortie = sortie?.duration;
+  const courbeSortie = sortie?.easing;
 
   useEffect(() => {
     const d = ref.current;
@@ -68,23 +139,20 @@ export function Sheet({
       return;
     }
     const desk = window.matchMedia("(min-width: 1024px)").matches;
-    const sortie = { duration: desk ? 200 : 280, easing: "cubic-bezier(0.3, 0, 0.2, 1)", fill: "forwards" as const };
+    const { temps, panneau, voile: eteint } = sortieDeFeuille(desk, dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
     p.style.pointerEvents = "none";
-    const anims = [
-      p.animate(desk ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(16px) scale(0.98)" }] : [{ transform: "none" }, { transform: "translateY(100%)" }], sortie),
-      ...(voile.current ? [voile.current.animate([{ opacity: 1 }, { opacity: 0 }], sortie)] : []),
-    ];
+    const anims = [p.animate(panneau, temps), ...(voile.current ? [voile.current.animate(eteint, temps)] : [])];
     anims[0].finished.then(fermer, () => {});
     /* Rouverte pendant sa sortie : elle reprend sa place */
     return () => {
       anims.forEach((a) => a.cancel());
       p.style.pointerEvents = "";
     };
-  }, [open]);
+  }, [open, dureeSortie, courbeSortie]);
 
   return (
     <dialog
-      ref={ref}
+      ref={refDialogue}
       aria-labelledby={labelledBy}
       onCancel={(e) => {
         e.preventDefault();
@@ -93,6 +161,7 @@ export function Sheet({
       onClose={() => {
         liberer.current?.();
         liberer.current = null;
+        onClosed?.();
       }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-clip bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
@@ -100,7 +169,7 @@ export function Sheet({
         <>
           {/* Le voile : pas de flou sur téléphone (presque invisible sous le noir, mais recalculé sur tout l’écran à chaque image) */}
           <div
-            ref={voile}
+            ref={refVoile}
             aria-hidden="true"
             onClick={onClose}
             className={cn("absolute inset-0 bg-[rgba(17,17,20,0.4)] lg:bg-[rgba(17,17,20,0.35)] lg:backdrop-blur-[1.5px]", belowHeader && "lg:top-[84px]")}
@@ -108,7 +177,7 @@ export function Sheet({
           />
           <div className={cn("pointer-events-none absolute inset-0 flex items-end justify-center lg:items-start", belowHeader ? "lg:pt-[134px]" : "lg:pt-[120px]")}>
             <div
-              ref={panel}
+              ref={refPanneau}
               tabIndex={-1}
               className={cn(
                 /* [&>*]:shrink-0 : quand le contenu dépasse l’écran, le panneau défile ; rien ne s’écrase (bouton aplati, carte rognée) */
@@ -119,12 +188,49 @@ export function Sheet({
               )}
             >
               <span aria-hidden="true" className="h-[5px] w-11 shrink-0 self-center rounded-[3px] bg-track lg:hidden" />
+              {titre.title !== undefined && (
+                <TitreFeuille id={labelledBy} taille={titre.titleSize} fermer={titre.titleClose ? onClose : undefined}>
+                  {titre.title}
+                </TitreFeuille>
+              )}
               {open ? children : montre}
             </div>
           </div>
         </>
       )}
     </dialog>
+  );
+}
+
+/* ———— Le titre d’une feuille ———— */
+/** Les tailles de titre des feuilles, telles qu’elles s’écrivaient : 22 (la vidéo), 24 (la plupart), 26 (le paiement, le choix d’une conv). */
+const TAILLES_TITRE = {
+  22: "text-[22px] leading-[1.1]",
+  24: "text-titre-3 leading-[1.1]",
+  26: "text-[26px] leading-[1.05]",
+} as const;
+
+type TailleTitreFeuille = keyof typeof TAILLES_TITRE;
+
+/**
+ * Le titre d’une feuille, que son dialogue lit (aria-labelledby = `id`). `fermer` : le bouton Fermer à sa droite (le
+ * partage). `className` : ce que l’écran ajoute (la taille sur ordinateur, l’équilibre des lignes), jamais une autre
+ * taille de base.
+ */
+export function TitreFeuille({ id, children, taille = 24, fermer, className }: { id: string; children: ReactNode; taille?: TailleTitreFeuille; fermer?: () => void; className?: string }) {
+  const h2 = (
+    <h2 id={id} className={cn("m-0 font-black tracking-[-0.02em]", TAILLES_TITRE[taille], className)}>
+      {children}
+    </h2>
+  );
+  if (!fermer) return h2;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      {h2}
+      <button type="button" aria-label="Fermer" onClick={fermer} className="lift lift-sm flex size-10 shrink-0 items-center justify-center rounded-full bg-white shadow-soft">
+        <Icon name="close" size={16} color="#121214" stroke={2.8} />
+      </button>
+    </div>
   );
 }
 
@@ -150,12 +256,7 @@ export function Toast({
         className,
       )}
     >
-      <span
-        className="flex size-[26px] shrink-0 items-center justify-center rounded-full"
-        style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}
-      >
-        <Icon name="check" size={14} color="#FFFFFF" stroke={3.4} />
-      </span>
+      <DoneCheck size={26} />
       <span className="flex-1 text-[14px] font-extrabold">{children}</span>
       {action && (
         <button

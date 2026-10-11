@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
 import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
@@ -16,8 +16,9 @@ import { askQuestion, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
-import { Bubble as MessageBubble, ConfidenceLine, BlushTyping } from "@/components/ui/messages";
+import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, GroupeBulles } from "@/components/ui/messages";
 import { AppScreen, useAccess } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
@@ -101,11 +102,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
   const composer = (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      {souci && (
-        <p role="alert" className="m-0 rounded-[16px] bg-white px-4 py-3 text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
-          {souci}
-        </p>
-      )}
+      {souci && <Alert variant="carte">{souci}</Alert>}
       <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214,0_10px_26px_-16px_rgba(17,17,20,0.35)]">
         <span className="sr-only">Ta question à BLUSH</span>
         <textarea
@@ -184,8 +181,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       {/* La conv, posée en bas, près du champ */}
       <div className="flex flex-1 flex-col justify-end gap-5 pb-2 pt-4 lg:pt-6">
         <div ref={conv} role="log" aria-label="Ta conversation avec BLUSH" aria-live="polite" className="flex flex-col gap-4">
-          <BlushSays
-            bubbles={[
+          <GroupeBulles
+            bulles={[
               <span key="a" className="text-[17px] font-black leading-[1.3]">
                 une question sur vous deux{NBSP}? balance
               </span>,
@@ -205,8 +202,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
             </div>
           )}
           {answer && (
-            <BlushSays
-              bubbles={[
+            <GroupeBulles
+              bulles={[
                 <span key="titre" className="text-[19px] font-black leading-[1.25] tracking-[-0.01em]">
                   {answer.title}
                 </span>,
@@ -256,27 +253,5 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         )}
       </div>
     </AppScreen>
-  );
-}
-
-/** Les bulles de BLUSH, groupées comme dans le chat de l’accueil : sa petite bulle à côté de la dernière. */
-function BlushSays({ bubbles }: { bubbles: ReactNode[] }) {
-  const n = bubbles.length;
-  return (
-    <div className="flex flex-col gap-[3px]">
-      {bubbles.map((b, i) => (
-        <div key={i} data-rise="" className="flex items-end gap-2" style={delai(i * 0.08)}>
-          {i === n - 1 ? <BubbleLogo size={34} className="-mb-0.5 shrink-0" /> : <span aria-hidden="true" className="w-[34px] shrink-0" />}
-          <div
-            className={cn(
-              "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]",
-              n > 1 && (i === 0 ? "rounded-bl-[6px]" : i === n - 1 ? "rounded-tl-[6px]" : "rounded-l-[6px]"),
-            )}
-          >
-            {b}
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }

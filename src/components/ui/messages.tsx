@@ -49,12 +49,75 @@ export function BlushTyping({ label, leaving = false, vocal = false }: { label: 
         {/* La réponse part en vocal : « BLUSH enregistre », comme dans une messagerie */}
         {vocal && (
           <span className="mb-2 flex h-10 items-center gap-2 rounded-[20px] bg-white pl-3 pr-3.5 shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]">
-            <span data-vocal-rec="" className="size-[9px] rounded-full bg-[#E5484D]" />
+            <span data-vocal-rec="" className="size-[9px] rounded-full bg-danger-vif" />
             <span className="text-[14px] font-black text-ink">enregistre un vocal…</span>
           </span>
         )}
       </span>
     </span>
+  );
+}
+
+/* ———— Le fil de BLUSH : ses bulles, groupées comme dans une messagerie ———— */
+
+/** La place d’une bulle dans le groupe de son expéditeur : seule, première, au milieu ou dernière. Ses coins en dépendent. */
+export type PlaceBulle = "single" | "first" | "middle" | "last";
+
+/** La place de la bulle `i` dans un groupe de `n` bulles. */
+export const placeDansLeGroupe = (i: number, n: number): PlaceBulle => (n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle");
+
+/* Les coins resserrés du côté de l’expéditeur : les bulles d’un groupe se tiennent (BLUSH à gauche, toi à droite) */
+const COINS = {
+  blush: { single: "", first: "rounded-bl-[6px]", middle: "rounded-l-[6px]", last: "rounded-tl-[6px]" },
+  toi: { single: "", first: "rounded-br-[6px]", middle: "rounded-r-[6px]", last: "rounded-tr-[6px]" },
+} as const;
+
+/** Les coins d’une bulle, d’après son côté et sa place dans le groupe. */
+export const coinsDeBulle = (cote: keyof typeof COINS, place: PlaceBulle) => COINS[cote][place];
+
+/** La bulle blanche de BLUSH : sa forme (318 px au plus), son fond et son filet. */
+const BULLE_DE_BLUSH = "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]";
+
+/**
+ * Une bulle du fil de BLUSH, avant d’être posée : son contenu, son ton (`plain` la bulle blanche, `accent` le pas suivant,
+ * `toi` ton message, `bare` une image), ses classes, et `quote`, le texte qu’on creuse en la glissant.
+ */
+type BulleDeBlush = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string; quote?: string };
+
+/** Un vrai message de votre conv, cité par BLUSH. */
+type MessageCite = { from: "elle" | "toi"; caption?: string; text: string };
+
+/**
+ * Un vrai message cité dans le fil : sa bulle (grise ou bleue, en Figtree) dans la bulle de BLUSH, un peu plus serrée.
+ * `corps` : un autre rendu du même message (la bulle repliée des longs messages, ClampedBubble).
+ */
+export function citation(msg: MessageCite, corps?: ReactNode): BulleDeBlush {
+  return {
+    className: "pb-2.5 pt-3",
+    quote: msg.text,
+    body: corps ?? (
+      <Bubble from={msg.from} caption={msg.caption}>
+        {msg.text}
+      </Bubble>
+    ),
+  };
+}
+
+/**
+ * Les bulles de BLUSH, groupées comme dans le chat de l’accueil : elles montent l’une après l’autre, sa petite bulle
+ * (le logo) à côté de la dernière, les coins resserrés entre elles.
+ */
+export function GroupeBulles({ bulles }: { bulles: ReactNode[] }) {
+  const n = bulles.length;
+  return (
+    <div className="flex flex-col gap-[3px]">
+      {bulles.map((b, i) => (
+        <div key={i} data-rise="" className="flex items-end gap-2" style={delai(i * 0.08)}>
+          {i === n - 1 ? <BubbleLogo size={34} className="-mb-0.5 shrink-0" /> : <span aria-hidden="true" className="w-[34px] shrink-0" />}
+          <div className={cn(BULLE_DE_BLUSH, coinsDeBulle("blush", placeDansLeGroupe(i, n)))}>{b}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -34,13 +34,5 @@ export function FileInput({
   );
 }
 
-/** Trois points animés (« en train d’écrire »). */
-export function TypingDots({ color = "#8A8780", size = 6, label }: { color?: string; size?: number; label?: string }) {
-  return (
-    <span data-dots="" role={label ? "status" : undefined} aria-label={label} aria-hidden={label ? undefined : true} className="inline-flex items-center" style={{ gap: size * 0.66 }}>
-      <span className="inline-block rounded-full" style={{ width: size, height: size, background: color }} />
-      <span className="inline-block rounded-full" style={{ width: size, height: size, background: color }} />
-      <span className="inline-block rounded-full" style={{ width: size, height: size, background: "linear-gradient(120deg, #A8FFE4 0%, #8FC8FF 35%, #E6A8FF 68%, #FFD3A1 100%)" }} />
-    </span>
-  );
-}
+/* TypingDots vit dans feedback.tsx : la réexportation garde ses importeurs tels quels, le temps que 9a les bascule */
+export { TypingDots } from "./feedback";

@@ -42,6 +42,11 @@
 
   --btn-ink-bg: linear-gradient(180deg, #2a2a30, #121214);
 
+  /* Les dégradés écrits en plusieurs endroits : la barre de l’écriture et de la lecture (le rapport, le tableau de bord),
+     la perle des trois points de BLUSH (TypingDots, la pastille de l’avatar) */
+  --degrade-lecture: linear-gradient(90deg, #3d8bff, #ff4f9a 60%, #12c08a);
+  --degrade-perle: linear-gradient(120deg, #a8ffe4 0%, #8fc8ff 35%, #e6a8ff 68%, #ffd3a1 100%);
+
   --t-pop: 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
   --t-rise: 0.45s ease-out;
   --t-fill: 0.7s ease-out;
@@ -81,6 +86,28 @@
   --color-skeleton: #e7e4dd;
   --color-segment: #e9e6df;
   --color-disabled: #d9d6cf;
+  /* L’erreur et la réussite (Q59), aux valeurs d’aujourd’hui : le rouge des soucis (le plus utilisé), le même plus foncé
+     sur un fond rouge pâle, le rouge vif des pastilles et des icônes ; le vert de « c’est fait », celui de la vérité.
+     Les autres rouges écrits en dur rejoignent danger par le codemod des couleurs (8b, 8c). */
+  --color-danger: #d93036;
+  --color-danger-ink: #c2363b;
+  --color-danger-vif: #e5484d;
+  --color-ok: var(--vrai);
+
+  /* L’échelle du texte (les classes text-micro… text-affiche), aux tailles d’aujourd’hui : celles du styleguide (TYPE_SCALE)
+     et les plus écrites en text-[…px]. Une taille seule, sans interligne : la classe se comporte comme text-[13px]. */
+  --text-micro: 12px;
+  --text-legende: 13px;
+  --text-note: 14px;
+  --text-detail: 15px;
+  --text-corps: 16px;
+  --text-accent: 17px;
+  --text-carte: 18px;
+  --text-titre-3: 24px;
+  --text-titre-2: 30px;
+  --text-titre-1: 36px;
+  --text-chiffre: 52px;
+  --text-affiche: 56px;
 
   --font-sans: var(--font-nunito), system-ui, sans-serif;
   --font-message: var(--font-figtree), system-ui, sans-serif;

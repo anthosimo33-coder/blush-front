@@ -1,7 +1,9 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, MouseEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import type { AttributsLibres } from "./attributs";
 import { EnRoute } from "./EnRoute";
+import { TypingDots } from "./feedback";
 import { Icon, type IconName } from "./icons";
 
 type Variant = "primary" | "secondary" | "link";
@@ -11,16 +13,30 @@ const base = "inline-flex select-none items-center justify-center no-underline d
 const variants: Record<Variant, string> = {
   /* Le bouton principal : encre en relief, un seul par écran. Il s’enfonce d’1 px et son ombre se resserre. */
   primary:
-    "lift lift-ink lift-sm h-[60px] w-full gap-2.5 rounded-[30px] px-[22px] text-[18px] font-black text-white [background:var(--btn-ink-bg)] shadow-ink aria-disabled:pointer-events-none aria-disabled:![background:#D9D6CF] aria-disabled:!text-grey aria-disabled:!shadow-none disabled:![background:#D9D6CF] disabled:!text-grey disabled:!shadow-none",
+    "lift lift-ink lift-sm w-full font-black text-white [background:var(--btn-ink-bg)] shadow-ink aria-disabled:pointer-events-none aria-disabled:![background:#D9D6CF] aria-disabled:!text-grey aria-disabled:!shadow-none disabled:![background:#D9D6CF] disabled:!text-grey disabled:!shadow-none",
   /* Secondaire : blanc, bordé, il s’efface devant le principal. */
-  secondary:
-    "lift lift-sm h-[60px] w-full gap-2.5 rounded-[30px] bg-white px-[22px] text-[18px] font-black text-ink shadow-soft",
+  secondary: "lift lift-sm w-full bg-white font-black text-ink shadow-soft",
   /* Lien : texte doux, zone tactile de 44 px. */
   link: "min-h-11 px-1 text-[15px] font-black text-soft transition-colors hover:text-ink",
 };
 
+/**
+ * La taille des boutons pleins (le lien garde la sienne) : `lg`, le grand bouton de bas d’écran (60 px) ; `md`, le bouton
+ * d’une carte ou d’une rangée de deux (52 px, comme ceux du verdict).
+ */
+export type TailleBouton = "lg" | "md";
+
+const tailles: Record<TailleBouton, string> = {
+  lg: "h-[60px] gap-2.5 rounded-[30px] px-[22px] text-[18px]",
+  md: "h-[52px] gap-2 rounded-[26px] px-5 text-[16px]",
+};
+
+/* Les classes d’un bouton : sa variante, et sa taille s’il est plein */
+const classes = (variant: Variant, size: TailleBouton) => cn(base, variants[variant], variant !== "link" && tailles[size]);
+
 type CommonProps = {
   variant?: Variant;
+  size?: TailleBouton;
   arrow?: boolean;
   icon?: IconName;
   className?: string;
@@ -40,18 +56,29 @@ function Content({ arrow, icon, variant, children, lien = false }: Pick<CommonPr
   );
 }
 
+/**
+ * Un bouton. `loading` : l’action est partie ; les trois points de BLUSH prennent la place du texte (dits aux lecteurs
+ * d’écran par `loadingLabel`), la flèche s’efface et un nouveau toucher ne fait rien (même un bouton d’envoi de
+ * formulaire). Le bouton garde son allure : `disabled` en plus le grise, comme avant.
+ */
 export function Button({
   variant = "primary",
+  size = "lg",
   arrow,
   icon,
+  loading = false,
+  loadingLabel,
   className,
   children,
+  onClick,
   ...rest
-}: CommonProps & ComponentPropsWithoutRef<"button">) {
+}: CommonProps & { loading?: boolean; loadingLabel?: string } & ComponentPropsWithoutRef<"button">) {
+  /* En route, le toucher est retenu : ni l’action, ni l’envoi du formulaire */
+  const toucher = loading ? (e: MouseEvent<HTMLButtonElement>) => e.preventDefault() : onClick;
   return (
-    <button type="button" className={cn(base, variants[variant], className)} {...rest}>
-      <Content arrow={arrow && !rest.disabled} icon={icon} variant={variant}>
-        {children}
+    <button type="button" className={cn(classes(variant, size), className)} onClick={toucher} {...rest} aria-busy={loading || rest["aria-busy"]}>
+      <Content arrow={arrow && !rest.disabled && !loading} icon={loading ? undefined : icon} variant={variant}>
+        {loading ? <TypingDots color={variant === "primary" ? "#FFFFFF" : undefined} label={loadingLabel} /> : children}
       </Content>
     </button>
   );
@@ -59,6 +86,7 @@ export function Button({
 
 export function ButtonLink({
   variant = "primary",
+  size = "lg",
   arrow,
   icon,
   className,
@@ -72,7 +100,7 @@ export function ButtonLink({
       href={href}
       aria-disabled={disabled || undefined}
       tabIndex={disabled ? -1 : undefined}
-      className={cn(base, variants[variant], className)}
+      className={cn(classes(variant, size), className)}
       {...rest}
     >
       <Content arrow={arrow} icon={icon} variant={variant} lien>
@@ -82,38 +110,54 @@ export function ButtonLink({
   );
 }
 
-/** Bouton icône 44 × 44 (retour, fermer, compte). */
+/** Le fond d’un bouton icône : une carte blanche en relief, une carte plus douce (bordée, comme Chip), ou rien. */
+export type FondIconButton = "carte" | "doux" | "nu";
+
+const FONDS_ICONE: Record<FondIconButton, string> = {
+  carte: "lift lift-sm lift-card bg-white shadow-card",
+  doux: "lift lift-sm lift-card bg-white shadow-soft",
+  nu: "",
+};
+
+/**
+ * Bouton icône (retour, fermer, compte) : 44 × 44 (`md`), ou 40 × 40 (`sm`, dans un en-tête serré). `variant` : son fond
+ * (`plain`, l’ancien nom de `nu`, reste compris). Un lien avec `href`, un bouton sinon ; `disabled`, les aria-* et les
+ * data-* vont sur l’élément.
+ */
 export function IconButton({
   icon,
   label,
   href,
   onClick,
   plain = false,
+  size = "md",
+  variant = plain ? "nu" : "carte",
   iconSize = 22,
+  disabled,
   className,
+  ...rest
 }: {
   icon: IconName;
   label: string;
   href?: string;
   onClick?: () => void;
   plain?: boolean;
+  size?: "md" | "sm";
+  variant?: FondIconButton;
   iconSize?: number;
+  disabled?: boolean;
   className?: string;
-}) {
-  const cls = cn(
-    "inline-flex size-11 shrink-0 items-center justify-center rounded-full",
-    plain ? "" : "lift lift-sm lift-card bg-white shadow-card",
-    className,
-  );
+} & AttributsLibres) {
+  const cls = cn("inline-flex shrink-0 items-center justify-center rounded-full", size === "sm" ? "size-10" : "size-11", FONDS_ICONE[variant], className);
   const glyph = <Icon name={icon} size={iconSize} color="#121214" stroke={icon === "user" ? 2.2 : 2.6} />;
   if (href)
     return (
-      <Link href={href} aria-label={label} className={cls}>
+      <Link href={href} aria-label={label} aria-disabled={disabled || undefined} tabIndex={disabled ? -1 : undefined} className={cls} {...rest}>
         <EnRoute>{glyph}</EnRoute>
       </Link>
     );
   return (
-    <button type="button" aria-label={label} onClick={onClick} className={cls}>
+    <button type="button" aria-label={label} onClick={onClick} disabled={disabled} className={cls} {...rest}>
       {glyph}
     </button>
   );

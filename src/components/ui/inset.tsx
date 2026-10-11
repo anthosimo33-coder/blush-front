@@ -1,6 +1,8 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import type { AttributsLibres } from "./attributs";
+import { EnRoute } from "./EnRoute";
 import { Icon, type IconName } from "./icons";
 
 /*
@@ -42,9 +44,20 @@ export function RowIcon({ icon, tone = "grey", children }: { icon?: IconName; to
   );
 }
 
+/*
+ * Les deux tailles d’une ligne. `normal` : celle des Réglages (58 px au moins, le titre à 16 px). `compact` : celle des
+ * feuilles (le contact de l’accueil) ; le titre à 15 px, le sous-titre sur une ligne, coupé, et le chevron d’un lien
+ * laisse place aux trois points de BLUSH tant que la page n’arrive pas.
+ */
+const TAILLES_LIGNE = {
+  normal: { ligne: "flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline", titre: "text-[16px] font-black leading-[1.3]", sous: "text-[13px] font-extrabold leading-[1.4] text-grey" },
+  compact: { ligne: "flex items-center gap-3 px-4 py-3.5 text-ink no-underline", titre: "text-[15px] font-black", sous: "truncate text-[13px] font-extrabold text-grey" },
+} as const;
+
 /**
  * Une ligne de liste groupée. Lien, bouton ou simple ligne selon `href` / `onClick`.
- * `danger` : action destructive, en rouge, comme sur iPhone.
+ * `danger` : action destructive, en rouge, comme sur iPhone. `size` : normal, ou compact dans une feuille.
+ * Un lien prend aussi `prefetch` et `onNavigate` (ceux de next/link) ; un bouton, `disabled` ; tous, les aria-* et data-*.
  */
 export function InsetRow({
   leading,
@@ -54,9 +67,14 @@ export function InsetRow({
   chevron,
   href,
   scroll,
+  prefetch,
+  onNavigate,
   onClick,
+  disabled,
   danger,
+  size = "normal",
   className,
+  ...rest
 }: {
   leading?: ReactNode;
   title: ReactNode;
@@ -66,35 +84,48 @@ export function InsetRow({
   href?: string;
   /** false : le lien ne remet pas la page en haut (vers l’accueil, qui s’ouvre sur le dernier échange). */
   scroll?: boolean;
+  prefetch?: ComponentProps<typeof Link>["prefetch"];
+  onNavigate?: ComponentProps<typeof Link>["onNavigate"];
   onClick?: () => void;
+  disabled?: boolean;
   danger?: boolean;
+  size?: keyof typeof TAILLES_LIGNE;
   className?: string;
-}) {
+} & AttributsLibres) {
+  const t = TAILLES_LIGNE[size];
+  const compact = size === "compact";
+  /* EnRoute suit le lien qui l’entoure (useLinkStatus) : seulement dans un lien */
+  const chevronCompact = <Icon name="chevron" size={16} color="#8A8780" stroke={2.6} />;
   const body = (
     <>
       {leading}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={cn("text-[16px] font-black leading-[1.3]", danger ? "text-[#D93036]" : "text-ink")}>{title}</span>
-        {sub && <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{sub}</span>}
+        <span className={cn(t.titre, danger ? "text-danger" : "text-ink")}>{title}</span>
+        {sub && <span className={t.sous}>{sub}</span>}
       </span>
       {trailing}
-      {chevron && <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />}
+      {chevron && !compact && <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />}
+      {chevron && compact && (href ? <EnRoute>{chevronCompact}</EnRoute> : chevronCompact)}
     </>
   );
-  const cls = cn("flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline", className);
+  const cls = cn(t.ligne, className);
   if (href)
     return (
-      <Link href={href} scroll={scroll} className={cn("row-hover", cls)}>
+      <Link href={href} scroll={scroll} prefetch={prefetch} onNavigate={onNavigate} className={cn("row-hover", cls)} {...rest}>
         {body}
       </Link>
     );
   if (onClick)
     return (
-      <button type="button" onClick={onClick} className={cn("row-hover", cls)}>
+      <button type="button" onClick={onClick} disabled={disabled} className={cn("row-hover", cls)} {...rest}>
         {body}
       </button>
     );
-  return <div className={cls}>{body}</div>;
+  return (
+    <div className={cls} {...rest}>
+      {body}
+    </div>
+  );
 }
 
 /** En-tête centré : un visuel, un titre, une phrase. Pour les écrans qui ont un seul sujet. */

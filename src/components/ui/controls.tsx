@@ -1,26 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { copyText } from "@/lib/hooks";
 import type { AppKind } from "@/types";
+import type { AttributsLibres } from "./attributs";
 import { AppBadge } from "./Avatar";
 import { Icon, type IconName } from "./icons";
 
 /* ———— Chip ———— */
+/** Une pastille : un lien avec `href`, un bouton à bascule avec `onClick` (`disabled` possible), une étiquette sinon ; les aria-* et data-* vont sur l’élément. */
 export function Chip({
   children,
   selected = false,
   onClick,
   href,
+  disabled,
   className,
+  ...rest
 }: {
   children: ReactNode;
   selected?: boolean;
   onClick?: () => void;
   href?: string;
+  disabled?: boolean;
   className?: string;
-}) {
+} & AttributsLibres) {
   const cls = cn(
     "inline-flex h-9 items-center whitespace-nowrap rounded-[18px] px-3.5 text-[14px] font-black",
     selected ? "bg-ink text-white shadow-ink" : "bg-white text-ink shadow-soft",
@@ -30,17 +36,48 @@ export function Chip({
   );
   if (href)
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} {...rest}>
         {children}
       </Link>
     );
   if (onClick)
     return (
-      <button type="button" aria-pressed={selected} onClick={onClick} className={cls}>
+      <button type="button" aria-pressed={selected} onClick={onClick} disabled={disabled} className={cls} {...rest}>
         {children}
       </button>
     );
-  return <span className={cls}>{children}</span>;
+  return (
+    <span className={cls} {...rest}>
+      {children}
+    </span>
+  );
+}
+
+/* ———— Copier en un geste ———— */
+/**
+ * La pastille « Copier » : un toucher copie `text` (avec le son de la copie), et elle dit « Copié » deux secondes.
+ * `label` : ce qu’elle dit avant (« Copier », « Copier le message »). Une copie refusée par le navigateur ne change rien.
+ */
+export function CopyPill({ text, label, className }: { text: string; label: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const minuteur = useRef<number | undefined>(undefined);
+  /* Démontée pendant ses deux secondes de « Copié » : le minuteur part avec elle */
+  useEffect(() => () => window.clearTimeout(minuteur.current), []);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        if (!(await copyText(text))) return;
+        setCopied(true);
+        window.clearTimeout(minuteur.current);
+        minuteur.current = window.setTimeout(() => setCopied(false), 2000);
+      }}
+      className={cn("lift lift-sm inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-black text-ink shadow-soft", className)}
+    >
+      <Icon name={copied ? "check" : "copy"} size={14} color="#121214" stroke={2.6} />
+      {copied ? "Copié" : label}
+    </button>
+  );
 }
 
 /* ———— Segmented (deux options) ———— */
