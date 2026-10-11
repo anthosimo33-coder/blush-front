@@ -41,10 +41,10 @@ vi.mock("@/server/env", async (original) => {
 /* after() de Next ne vit que dans une requête : ce qui devait partir après la réponse attend ici, lancé par lancerApres */
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
 /* Les alertes de l’équipe, relevées au lieu de partir */
-const alertes = vi.hoisted(() => [] as { sujet: string; lignes: string[] }[]);
+const alertes = vi.hoisted(() => [] as { sujet: string; lignes: string[]; importante?: true }[]);
 vi.mock("@/server/alertes", async (original) => ({
   ...(await original<typeof import("@/server/alertes")>()),
-  alerter: async (sujet: string, lignes: string[]) => void alertes.push({ sujet, lignes }),
+  alerter: async (sujet: string, lignes: string[], o?: { importante?: boolean }) => void alertes.push({ sujet, lignes, ...(o?.importante && { importante: true as const }) }),
 }));
 vi.mock("@/server/auth", async (original) => {
   const m = await original<typeof import("@/server/auth")>();
@@ -420,6 +420,8 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : 80 % du plafond du jour"]);
+    /* Elle touche tout le monde : elle passe dans la réserve des importantes (S-19) */
+    expect(alertes[0].importante).toBe(true);
     await poserLimite("code:mails", 80);
     const r = await demander(email("plafond-apres"));
     expect([r.status, await r.json()]).toEqual([429, { erreur: "codes" }]);
@@ -432,6 +434,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : plafond du jour atteint"]);
+    expect(alertes[0].importante).toBe(true);
     /* Des demandes en même temps : celle-ci a vu le plafond libre, mais il est atteint quand son mail va partir */
     await envoyerCode(e, "123456");
     expect(codesEcrits(e)).toHaveLength(1);

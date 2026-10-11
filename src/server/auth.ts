@@ -76,10 +76,15 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
   if (plafond) {
     const n = await compter("code:mails", plafond);
     if (n === Math.ceil(plafond.max * plafond.alerteA) || n === plafond.max)
-      await alerter(n === plafond.max ? "mails de code : plafond du jour atteint" : `mails de code : ${Math.round(plafond.alerteA * 100)} % du plafond du jour`, [
-        `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (LIMITES.mailsCodeParJour).`,
-        "Au plafond, plus personne ne reçoit de code : chacun voit « trop de codes » jusqu’à la fin de la fenêtre.",
-      ]);
+      await alerter(
+        n === plafond.max ? "mails de code : plafond du jour atteint" : `mails de code : ${Math.round(plafond.alerteA * 100)} % du plafond du jour`,
+        [
+          `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (LIMITES.mailsCodeParJour).`,
+          "Au plafond, plus personne ne reçoit de code : chacun voit « trop de codes » jusqu’à la fin de la fenêtre.",
+        ],
+        /* Touche tout le monde : passe dans la réserve des alertes importantes (S-19) */
+        { importante: true },
+      );
     /* Passé le plafond entre la question et l’envoi (des demandes en même temps) : pas de mail */
     if (n > plafond.max) return;
   }
