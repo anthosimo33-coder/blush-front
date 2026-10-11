@@ -22,8 +22,7 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
   return (
     <AppScreen
       aside={null}
-      mainWidth={600}
-      frameWidth={600}
+      mise="etroit"
       contentGap={0}
       mobileTop={
         <header className="flex h-[60px] shrink-0 items-center px-4 lg:hidden">

@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/controls";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
-import { FlowSteps } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
-import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
 import type { ExportApp } from "@/types";
 import { ChoixConv, type ConvInstagram } from "./ChoixConv";
@@ -88,10 +88,9 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   };
 
   return (
-    <Screen
-      mobileTop={<MobileTopBar back="/commencer" progress={1} />}
-      desktopBack={{ target: "/commencer" }}
-      aside={<FlowSteps step={1} />}
+    <ParcoursScreen
+      step={1}
+      back="/commencer"
       contentGap={24}
       head={<ScreenTitle>Exporte votre conv.</ScreenTitle>}
       footer={
@@ -172,7 +171,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       </Sheet>
 
       <ChoixConv open={!!choix} convs={choix?.convs ?? []} onChoisir={(id) => fermerChoix(id)} onClose={() => fermerChoix(null)} />
-    </Screen>
+    </ParcoursScreen>
   );
 }
 

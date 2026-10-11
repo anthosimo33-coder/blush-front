@@ -3,8 +3,8 @@
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
-import { FlowSteps } from "@/components/ui/progress";
-import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { ScreenTitle } from "@/components/shell/Screen";
 import { formatCount } from "@/lib/format";
 import { APPLIS, NOM_AUTRE_APPLI, type Story } from "@/types";
 
@@ -17,10 +17,9 @@ const APP_NAME = { ...APPLIS, autre: NOM_AUTRE_APPLI };
  */
 export function HistoireScreen({ story }: { story: Story }) {
   return (
-    <Screen
-      mobileTop={<MobileTopBar back="/importer/ok" progress={1} />}
-      desktopBack={{ target: "/importer/ok" }}
-      aside={<FlowSteps step={1} />}
+    <ParcoursScreen
+      step={1}
+      back="/importer/ok"
       contentGap={22}
       head={
         <>
@@ -67,6 +66,6 @@ export function HistoireScreen({ story }: { story: Story }) {
         ))}
         <InsetRow leading={<RowIcon icon="plus" tone="vrai" />} title={<span className="text-toi-ink">Ajouter d’autres captures</span>} href="/importer/captures?mode=ajout" />
       </InsetGroup>
-    </Screen>
+    </ParcoursScreen>
   );
 }

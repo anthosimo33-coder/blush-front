@@ -164,11 +164,8 @@ describe("le navigateur n’importe du contrat que des types", () => {
 });
 
 describe("le navigateur appelle les routes par le contrat", () => {
-  /*
-   * Les appels qui passent encore à côté, par un fetch direct : la liste d’attente et son retrait (à reprendre dans
-   * src/services/api.ts avec les formulaires email), et le réveil de la base, une balise dont la réponse n’est pas lue
-   */
-  const A_COTE = ["src/app/attente/AttenteScreen.tsx", "src/app/attente/retirer/RetirerScreen.tsx", "src/components/shell/Reveil.tsx"];
+  /* Le seul appel qui passe encore à côté, par un fetch direct : le réveil de la base, une balise dont la réponse n’est pas lue */
+  const A_COTE = ["src/components/shell/Reveil.tsx"];
 
   it("hors du serveur, seule la couche de service (src/services/api.ts) passe une adresse /api/ à fetch", async () => {
     const appelants: string[] = [];

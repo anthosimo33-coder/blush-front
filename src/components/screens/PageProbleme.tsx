@@ -8,7 +8,7 @@ import { Screen } from "@/components/shell/Screen";
  */
 export function PageProbleme({ titre, texte, action }: { titre: string; texte: string; action: ReactNode }) {
   return (
-    <Screen centered mainWidth={520} frameWidth={520} footer={action}>
+    <Screen mise="colonne" footer={action}>
       <div className="flex flex-1 flex-col items-center justify-center pb-10 text-center lg:flex-none lg:pb-0 lg:pt-[max(24px,calc(50dvh_-_330px))]">
         <span aria-hidden="true" className="flex size-[76px] items-center justify-center rounded-full bg-plaque">
           <Icon name="alert" size={34} color="#121214" stroke={2.2} />

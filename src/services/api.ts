@@ -1,9 +1,8 @@
 /*
  * Couche de service BLUSH, dans le navigateur : le point de contact avec les données, par les routes /api du back-end,
  * sous les types de leur contrat (src/types/api.ts). Les cookies de session sont httpOnly : le navigateur les envoie, il
- * ne les lit pas. Les pages serveur passent par serveur.ts. Trois appels passent encore à côté, par un fetch direct :
- * la liste d’attente et son retrait (src/app/attente, à reprendre ici avec ses formulaires email), et le réveil de la
- * base (src/components/shell/Reveil.tsx, une balise dont la réponse n’est pas lue).
+ * ne les lit pas. Les pages serveur passent par serveur.ts. Un seul appel passe encore à côté, par un fetch direct : le
+ * réveil de la base (src/components/shell/Reveil.tsx, une balise dont la réponse n’est pas lue).
  */
 import type { AnalysisProgress, AppKind, BlushAnswer, BulleChat, EvenementChat, EvenementEcoute, Fiche, FicheFact, FicheUpdate, Goal, Guess, Plan, Pronom, QuestionAnswer, Source, Subscription } from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
@@ -558,4 +557,24 @@ export function openConv(storyId: string) {
 export async function deleteAccount(): Promise<void> {
   await appel("DELETE /api/compte");
   oublierLeStockage();
+}
+
+/* ———— Liste d’attente (bêta fermée) ———— */
+
+/** S’inscrire sur la liste d’attente : un mail le confirme. Refusée (réseau, serveur, email) : une erreur. */
+export async function rejoindreAttente(email: string): Promise<void> {
+  await appel("POST /api/attente", { corps: { email } });
+}
+
+/**
+ * Se retirer de la liste d’attente, depuis le lien signé de son mail : `retire`, `lien` (il ne mène à aucune
+ * inscription, ou plus : 404) ou `echec` (le réseau, le serveur : on peut réessayer).
+ */
+export async function retirerDeLaListe(lien: { id: string; cle: string }): Promise<"retire" | "lien" | "echec"> {
+  try {
+    await appel("POST /api/attente/retrait", { corps: lien });
+    return "retire";
+  } catch (e) {
+    return e instanceof ErreurApi && e.status === 404 ? "lien" : "echec";
+  }
 }

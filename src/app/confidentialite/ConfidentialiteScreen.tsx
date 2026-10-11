@@ -9,7 +9,8 @@ import { NBSP } from "@/lib/format";
 
 /*
  * Ce que BLUSH fait de ta conv, en mots simples. Les faits suivent le code (src/server : chiffrement, purge,
- * hébergement à Francfort). Textes relus le 8 octobre.
+ * hébergement à Francfort). Textes relus le 8 octobre. Les promesses courtes des écrans (src/contenu/confidentialite.ts)
+ * la résument : un changement ici se reporte là-bas.
  * TODO(produit): à faire relire par un juriste avant d’ouvrir au public.
  */
 

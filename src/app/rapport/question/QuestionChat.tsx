@@ -160,8 +160,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
       className={figtree.variable}
       aside={null}
-      mainWidth={600}
-      frameWidth={600}
+      mise="etroit"
       footerWidth={600}
       contentGap={16}
       mobileTop={<MobileTopBar back="/rapport" title="Ta question" />}

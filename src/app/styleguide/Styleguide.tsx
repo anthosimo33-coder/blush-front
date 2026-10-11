@@ -7,7 +7,8 @@ import { AppBadge, Avatar, AvatarPair } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Card, CardLabel, PlayCard, StepList } from "@/components/ui/cards";
 import { AppTile, Chip, ChoiceCard, ChoiceTile, Segmented, Switch } from "@/components/ui/controls";
-import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
+import { EmailField } from "@/components/ui/EmailField";
+import { emailValide } from "@/lib/email";
 import { Bubble, PariTag, ProofCard, Tag } from "@/components/ui/messages";
 import { LevelPath, LockRow, ProgressDots, ScoreCard } from "@/components/ui/progress";
 import { ChapterHeader, Essential, Meaning, Seen } from "@/components/ui/report";
@@ -426,7 +427,7 @@ export function Styleguide() {
       <Section title="Saisie et surfaces">
         <Row gap={24}>
           <Spec label="EMAIL" width={360}>
-            <EmailField value={email} onChange={setEmail} onBlur={() => setTouched(true)} invalid={touched && !!email && !EMAIL_RE.test(email)} errorText={"Vérifie ton email\u00a0: il manque quelque chose."} />
+            <EmailField value={email} onChange={setEmail} onBlur={() => setTouched(true)} invalid={touched && !!email && !emailValide(email)} errorText={"Vérifie ton email\u00a0: il manque quelque chose."} />
           </Spec>
           <Spec label="PANNEAU" width={320} note="Panneau du bas sur mobile, fenêtre centrée sur desktop.">
             <Button variant="secondary" onClick={() => setSheet(true)}>

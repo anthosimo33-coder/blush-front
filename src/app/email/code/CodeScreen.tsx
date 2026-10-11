@@ -9,13 +9,14 @@ import { play } from "@/lib/sound";
 import { messageErreur } from "@/lib/messages-erreur";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
-import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
+import { CODE_RENVOI_S } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
-import { FlowSteps } from "@/components/ui/progress";
-import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { NotePrivee } from "@/components/ui/NotePrivee";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { Lead, ScreenTitle } from "@/components/shell/Screen";
+import { NOTE_CODE } from "@/contenu/confidentialite";
 import { useJourney } from "@/state/journey";
 import { quiComplet, reponsesQui, vientDeCaptures } from "@/state/parcours";
 import { retenirLecture } from "@/state/lecture";
@@ -133,10 +134,9 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   };
 
   return (
-    <Screen
-      mobileTop={<MobileTopBar back={retour} progress={connexion ? undefined : 3} />}
-      desktopBack={{ target: retour }}
-      aside={connexion ? undefined : <FlowSteps step={3} />}
+    <ParcoursScreen
+      step={connexion ? undefined : 3}
+      back={retour}
       contentGap={22}
       head={
         <>
@@ -224,14 +224,10 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         </Link>
       </div>
 
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        {/* La fin de la phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
-        Pas de mot de passe{NBSP}
-        {`: ce code suffit. Il expire au bout de ${CODE_MINUTES} minutes.`}
-      </p>
+      {/* La phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
+      <NotePrivee>{NOTE_CODE}</NotePrivee>
       {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
-    </Screen>
+    </ParcoursScreen>
   );
 }
 

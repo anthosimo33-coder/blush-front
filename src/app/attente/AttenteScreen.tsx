@@ -3,11 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
+import { NotePrivee } from "@/components/ui/NotePrivee";
+import { FormulaireEmail } from "@/components/formulaires/FormulaireEmail";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { NOTE_ATTENTE } from "@/contenu/confidentialite";
+import { emailValide } from "@/lib/email";
 import { NBSP } from "@/lib/format";
+import { champInvalide, type SaisieEmail } from "@/lib/useEnvoiCode";
+import { rejoindreAttente } from "@/services/api";
 
 /*
  * La bêta fermée : BLUSH est sur invitation. On laisse son email : un mail le confirme (l’inscription a pu venir de
@@ -19,7 +24,7 @@ export function AttenteScreen() {
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
   const [etat, setEtat] = useState<"saisie" | "envoi" | "fait" | "erreur">("saisie");
-  const valid = EMAIL_RE.test(email.trim());
+  const valid = emailValide(email);
 
   const envoyer = async () => {
     if (!valid || etat === "envoi") {
@@ -27,8 +32,26 @@ export function AttenteScreen() {
       return;
     }
     setEtat("envoi");
-    const r = await fetch("/api/attente", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.trim() }) }).catch(() => null);
-    setEtat(r?.ok ? "fait" : "erreur");
+    try {
+      await rejoindreAttente(email.trim());
+      setEtat("fait");
+    } catch {
+      setEtat("erreur");
+    }
+  };
+  /* Le même champ que le parcours : son erreur de forme, ou l’inscription ratée */
+  const probleme = etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : null;
+  const saisie: SaisieEmail = {
+    email,
+    changer: (v) => {
+      setEmail(v);
+      if (etat === "erreur") setEtat("saisie");
+    },
+    quitter: () => setTouched(true),
+    valide: valid,
+    invalide: champInvalide({ email, valide: valid, probleme, touche: touched }),
+    probleme,
+    envoyer,
   };
 
   if (etat === "fait")
@@ -75,28 +98,8 @@ export function AttenteScreen() {
         </Button>
       }
     >
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          void envoyer();
-        }}
-      >
-        <EmailField
-          value={email}
-          onChange={(v) => {
-            setEmail(v);
-            if (etat === "erreur") setEtat("saisie");
-          }}
-          onBlur={() => setTouched(true)}
-          invalid={etat === "erreur" || (touched && email.length > 0 && !valid)}
-          errorText={etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : "Vérifie ton email\u00a0: il manque quelque chose."}
-        />
-      </form>
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Un mail pour confirmer, puis un autre le jour où ta place est prête. Ton email n’est jamais partagé.
-      </p>
+      <FormulaireEmail envoi={saisie} />
+      <NotePrivee>{NOTE_ATTENTE}</NotePrivee>
     </Screen>
   );
 }

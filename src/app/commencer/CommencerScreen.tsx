@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
-import { FlowSteps } from "@/components/ui/progress";
-import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { Lead, ScreenTitle } from "@/components/shell/Screen";
+import { PROMESSE_CONV } from "@/contenu/confidentialite";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { pagePrecedente } from "@/lib/navigation";
 import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
@@ -31,10 +33,11 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
     setJourney({ app, email });
   };
   return (
-    <Screen
-      /* Retour : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici directement, l’accueil */
-      mobileTop={<MobileTopBar back={() => (pagePrecedente() ? router.back() : router.push("/"))} progress={1} />}
-      aside={<FlowSteps step={1} />}
+    <ParcoursScreen
+      step={1}
+      /* Retour (mobile) : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici directement, l’accueil. Sur ordinateur, le logo y mène */
+      back={() => (pagePrecedente() ? router.back() : router.push("/"))}
+      retourDesktop={false}
       head={
         <>
           <ScreenTitle size={34}>Vous vous parlez où{NBSP}?</ScreenTitle>
@@ -48,15 +51,9 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
         ))}
       </nav>
       <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale, tu ajouteras le reste juste après.</p>
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        <span>
-          Ta conv est chiffrée, lue par une IA, et effacée après ton rapport.{" "}
-          <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
-            Comment ça marche
-          </Link>
-        </span>
-      </p>
+      <NotePrivee className="leading-[1.45]">
+        {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>
+      </NotePrivee>
       {fermee && (
         /* Texte relu le 8 octobre */
         <Link href="/attente" className="row-hover flex items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-ink no-underline shadow-soft">
@@ -70,6 +67,6 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
           <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
         </Link>
       )}
-    </Screen>
+    </ParcoursScreen>
   );
 }

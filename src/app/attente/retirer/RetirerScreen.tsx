@@ -6,6 +6,7 @@ import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { NBSP } from "@/lib/format";
+import { retirerDeLaListe } from "@/services/api";
 
 /*
  * Se retirer de la liste d’attente, depuis le lien du mail : l’inscription a pu venir de quelqu’un d’autre. Un bouton
@@ -16,8 +17,8 @@ export function RetirerScreen({ id, cle }: { id: string; cle: string }) {
 
   const retirer = async () => {
     setEtat("envoi");
-    const r = await fetch("/api/attente/retrait", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, cle }) }).catch(() => null);
-    setEtat(r?.ok ? "fait" : r?.status === 404 ? "lien" : "reseau");
+    const issue = await retirerDeLaListe({ id, cle });
+    setEtat(issue === "retire" ? "fait" : issue === "lien" ? "lien" : "reseau");
   };
 
   if (etat === "fait" || etat === "lien")

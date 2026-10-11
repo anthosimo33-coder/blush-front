@@ -127,31 +127,17 @@ export function AccountPill({ initial }: { initial?: string }) {
   );
 }
 
-/* ———— Écran : une seule structure, deux mises en page ———— */
-export function Screen({
-  mobileTop,
-  desktopHeaderRight,
-  desktopBack,
-  aside,
-  footer,
-  children,
-  mainWidth = 560,
-  asideWidth = 380,
-  columnsGap = 80,
-  contentGap = 14,
-  footerWidth = 400,
-  centered = false,
-  desktopTopPad = 16,
-  asideSide = "right",
-  desktopLabel,
-  stickyFooter = true,
-  srTitle,
-  asideOffset,
-  head,
-  mobileGap,
-  frameWidth,
-  className,
-}: {
+/*
+ * Les mises en page nommées d’un écran, au lieu de largeurs recopiées : `etroit`, une colonne de 600 px sans colonne
+ * d’appoint, le cadre à sa mesure (le compte, les convs, la question) ; `colonne`, 520 px centrés (les pages d’erreur,
+ * le rapport débloqué). Une largeur donnée à côté passe avant ; sans colonne d’appoint, le cadre suit la colonne.
+ */
+const MISES = {
+  etroit: { mainWidth: 600, centered: false },
+  colonne: { mainWidth: 520, centered: true },
+} as const;
+
+export type ScreenProps = {
   /** Barre du haut mobile (MobileTopBar ou en-tête dédié). */
   mobileTop?: ReactNode;
   desktopHeaderRight?: ReactNode;
@@ -161,6 +147,8 @@ export function Screen({
   /** Zone du bouton principal : collée en bas sur mobile, sous le contenu sur desktop. */
   footer?: ReactNode;
   children: ReactNode;
+  /** Une mise en page nommée (MISES) : sa largeur, son centrage, et un cadre à la mesure de la colonne. */
+  mise?: keyof typeof MISES;
   mainWidth?: number;
   asideWidth?: number;
   columnsGap?: number;
@@ -188,9 +176,39 @@ export function Screen({
   /** Largeur du cadre desktop (en-tête et contenu), quand elle doit suivre un contenu plus étroit que 1020 px. */
   frameWidth?: number;
   className?: string;
-}) {
+};
+
+/* ———— Écran : une seule structure, deux mises en page ———— */
+export function Screen({
+  mobileTop,
+  desktopHeaderRight,
+  desktopBack,
+  aside,
+  footer,
+  children,
+  mise,
+  mainWidth: largeur,
+  asideWidth = 380,
+  columnsGap = 80,
+  contentGap = 14,
+  footerWidth = 400,
+  centered: centre,
+  desktopTopPad = 16,
+  asideSide = "right",
+  desktopLabel,
+  stickyFooter = true,
+  srTitle,
+  asideOffset,
+  head,
+  mobileGap,
+  frameWidth,
+  className,
+}: ScreenProps) {
+  const preset = mise ? MISES[mise] : null;
+  const mainWidth = largeur ?? preset?.mainWidth ?? 560;
+  const centered = centre ?? preset?.centered ?? false;
   /* Un seul cadre pour l’en-tête et les colonnes, aussi large que les colonnes de la maquette */
-  const frameW = frameWidth ?? (aside ? mainWidth + columnsGap + asideWidth : Math.max(1020, mainWidth));
+  const frameW = frameWidth ?? (aside ? mainWidth + columnsGap + asideWidth : preset ? mainWidth : Math.max(1020, mainWidth));
   const asideMt = asideOffset ?? (desktopBack || desktopLabel ? 4 : 10);
   const grid = !!head && !!aside;
   const top = (

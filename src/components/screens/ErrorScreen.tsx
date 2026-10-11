@@ -95,7 +95,7 @@ export function ErrorScreen({ kind }: { kind: ErreurParcours }) {
   useSoundOnce("non");
   return (
     <div role="alertdialog" aria-modal="true" aria-labelledby="error-title" aria-describedby="error-text" className="fixed inset-0 z-50 overflow-y-auto [background:var(--paper-light)] bg-paper">
-      <Screen mobileTop={<MobileTopBar back={c.back} />} desktopBack={{ target: c.back }} centered mainWidth={520} frameWidth={520} footer={<ButtonLink href={c.href}>{c.action}</ButtonLink>}>
+      <Screen mobileTop={<MobileTopBar back={c.back} />} desktopBack={{ target: c.back }} mise="colonne" footer={<ButtonLink href={c.href}>{c.action}</ButtonLink>}>
         {/* Centré, calme : une icône, ce qui se passe, ce qu’on fait. Pas d’alarme. */}
         <div className="flex flex-1 flex-col items-center justify-center pb-10 text-center lg:flex-none lg:pb-0 lg:pt-[max(24px,calc(50dvh_-_330px))]">
           <span aria-hidden="true" className="flex size-[76px] items-center justify-center rounded-full bg-plaque">

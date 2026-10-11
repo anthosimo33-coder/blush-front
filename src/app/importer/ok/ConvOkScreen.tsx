@@ -1,18 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
-import { FlowSteps } from "@/components/ui/progress";
-import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { ScreenTitle } from "@/components/shell/Screen";
+import { PROMESSE_CONV } from "@/contenu/confidentialite";
 import { formatCount, NBSP } from "@/lib/format";
 import { useSoundOnce } from "@/lib/sound";
 import { useJourney } from "@/state/journey";
 import type { Source } from "@/types";
 
 /*
- * Écran 04 — Ta conv est ajoutée. Un seul bouton fort (Continuer). Le « 100 % privé » est dit ici, une seule fois.
+ * Écran 04 — Ta conv est ajoutée. Un seul bouton fort (Continuer). La promesse sur la conv (PROMESSE_CONV) est redite ici,
+ * une seule fois, au moment où elle est partie.
  */
 export function ConvOkScreen({ source }: { source: Source }) {
   const [j] = useJourney();
@@ -21,10 +23,9 @@ export function ConvOkScreen({ source }: { source: Source }) {
   const back = `/importer/export?app=${j.exportApp}`;
   const fileName = j.exportFileName ?? source.fileName;
   return (
-    <Screen
-      mobileTop={<MobileTopBar back={back} progress={1} />}
-      desktopBack={{ target: back }}
-      aside={<FlowSteps step={1} />}
+    <ParcoursScreen
+      step={1}
+      back={back}
       contentGap={22}
       head={<ScreenTitle>C’est bon, on a votre conv.</ScreenTitle>}
       footer={
@@ -64,10 +65,9 @@ export function ConvOkScreen({ source }: { source: Source }) {
         </p>
       )}
 
-      <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        100 % privé{NBSP}: ta conv est supprimée dès que ton rapport est prêt. <Link href="/confidentialite" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">Comment ça marche</Link>
-      </p>
-    </Screen>
+      <NotePrivee className="px-1 leading-[1.45]">
+        {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>
+      </NotePrivee>
+    </ParcoursScreen>
   );
 }

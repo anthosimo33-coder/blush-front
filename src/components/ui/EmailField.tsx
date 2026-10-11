@@ -4,8 +4,7 @@ import { useId } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "./icons";
 
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
+/** Le champ « Ton email » : sa forme se vérifie à côté (emailValide, src/lib/email.ts), le champ montre l’erreur qu’on lui passe. */
 export function EmailField({
   value,
   onChange,

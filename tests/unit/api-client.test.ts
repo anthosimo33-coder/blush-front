@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/services/preparer-captures", () => ({ preparerCaptures: async (fichiers: File[]) => fichiers.map((f) => new Blob([f], { type: "image/jpeg" })) }));
 
-import { addToFiche, getAccount, getChatHistory, modeVocalChat, startAnalysis, updateFiche } from "@/services/api";
+import { addToFiche, getAccount, getChatHistory, modeVocalChat, rejoindreAttente, retirerDeLaListe, startAnalysis, updateFiche } from "@/services/api";
 import { ENTETE_CONV, poserConvDeLaPage } from "@/services/session";
 import { ErreurApi } from "@/types/erreurs-api";
 import type { Fiche, FicheFact } from "@/types";
@@ -136,5 +136,30 @@ describe("le chat en vocal (modeVocalChat)", () => {
   ] as const)("%s (vocal voulu : %s) : gardé = %s, sans jamais échouer", async (_, actif, garde, reponse) => {
     repondre = reponse;
     await expect(modeVocalChat(actif)).resolves.toBe(garde);
+  });
+});
+
+describe("la liste d’attente (rejoindreAttente, retirerDeLaListe)", () => {
+  it("s’inscrire : l’email part en JSON par la route du contrat ; un refus est une erreur", async () => {
+    repondre = () => Response.json({ ok: true });
+    await rejoindreAttente("sam@exemple.fr");
+    const [{ url, init }] = envois;
+    expect({ url, method: init.method, corps: JSON.parse(String(init.body)) }).toEqual({ url: "/api/attente", method: "POST", corps: { email: "sam@exemple.fr" } });
+    repondre = () => Response.json({ erreur: "email" }, { status: 422 });
+    await expect(rejoindreAttente("sam")).rejects.toBeInstanceOf(ErreurApi);
+    repondre = () => Promise.reject(new TypeError("Failed to fetch"));
+    await expect(rejoindreAttente("sam@exemple.fr")).rejects.toThrow();
+  });
+
+  it.each([
+    ["retiré", "retire", () => Response.json({ ok: true })],
+    ["un lien qui ne mène plus à rien (404)", "lien", () => Response.json({ erreur: "lien" }, { status: 404 })],
+    ["une erreur du serveur (500)", "echec", () => Response.json({ erreur: "erreur" }, { status: 500 })],
+    ["une requête refusée (403)", "echec", () => Response.json({ erreur: "origine" }, { status: 403 })],
+    ["le réseau qui coupe", "echec", () => Promise.reject(new TypeError("Failed to fetch"))],
+  ] as const)("se retirer, %s : %s, sans jamais échouer", async (_, issue, reponse) => {
+    repondre = reponse;
+    await expect(retirerDeLaListe({ id: "i1", cle: "c1" })).resolves.toBe(issue);
+    expect(envois.map((e) => [e.init.method, e.url, JSON.parse(String(e.init.body))])).toEqual([["POST", "/api/attente/retrait", { id: "i1", cle: "c1" }]]);
   });
 });

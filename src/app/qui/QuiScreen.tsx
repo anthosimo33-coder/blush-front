@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { ChoiceTile, SelectedCheck, type TileTone } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
-import { FlowSteps } from "@/components/ui/progress";
-import { MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { ScreenTitle } from "@/components/shell/Screen";
 import { GUESS_LABELS } from "@/contenu/parcours";
 import { useJourney } from "@/state/journey";
 import { quiComplet, reponsesQui } from "@/state/parcours";
@@ -89,10 +89,9 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   };
 
   return (
-    <Screen
-      mobileTop={<MobileTopBar back={back} progress={2} />}
-      desktopBack={{ target: back }}
-      aside={<FlowSteps step={2} />}
+    <ParcoursScreen
+      step={2}
+      back={back}
       contentGap={12}
       head={<ScreenTitle size={30}>Qui es-tu dans cette conv{NBSP}?</ScreenTitle>}
       footer={
@@ -183,6 +182,6 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
           <ChoiceTile key={g.id} icon={g.icon} tone={g.tone} label={g.label} selected={j.goal === g.id} onClick={() => set({ goal: g.id })} />
         ))}
       </div>
-    </Screen>
+    </ParcoursScreen>
   );
 }

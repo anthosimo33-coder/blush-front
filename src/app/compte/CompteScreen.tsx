@@ -7,12 +7,13 @@ import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { deleteAccount, deleteStory, seDeconnecter, setPaused, type Account } from "@/services/api";
 import { OFFERS } from "@/contenu/offres";
+import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Switch } from "@/components/ui/controls";
-import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
+import { NotePrivee } from "@/components/ui/NotePrivee";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -20,7 +21,6 @@ import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
-import { NBSP } from "@/lib/format";
 
 /* La feuille ouverte : ce que BLUSH garde, une suppression (l’histoire, tout), ou une déconnexion (cet appareil, partout) */
 type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
@@ -82,8 +82,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
     <AppScreen
       srTitle="Mon compte"
       aside={null}
-      mainWidth={600}
-      frameWidth={600}
+      mise="etroit"
       contentGap={0}
       mobileTop={<MobileTopBar back={retour} title="Mon compte" />}
       desktopBack={{ target: retour, trailing: "Mon compte" }}
@@ -214,7 +213,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       </InsetGroup>
 
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
-      <InsetGroup title="Tes données" id="donnees" className="mt-6" footer="Tes convs ne servent jamais à entraîner une IA, et tout ce qui en vient est chiffré.">
+      <InsetGroup title="Tes données" id="donnees" className="mt-6" footer={PROMESSE_DONNEES}>
         <InsetRow leading={<RowIcon icon="eye" tone="vrai" />} title="Ta conv, en sécurité" sub="Ce qui part, qui la lit, combien de temps" href="/confidentialite" chevron />
         <InsetRow leading={<RowIcon icon="lock" />} title="Ce que BLUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title={`Supprimer l’histoire avec ${noms?.other.name ?? "elle"}`} sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
@@ -229,11 +228,9 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               Ce que BLUSH garde
             </h2>
             <p className="m-0 text-[15px] font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
-            <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
-              <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-              100 % privé{NBSP}: ta conv est supprimée dès que ton rapport est prêt.
-            </p>
-            <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Tes convs ne servent jamais à entraîner une IA. Hébergement en Europe. Tu peux tout effacer à tout moment.</p>
+            <NotePrivee>{PROMESSE_CONV}</NotePrivee>
+            {/* « Hébergement en Europe » taisait les États-Unis (l’IA, la voix) : la page Confidentialité le dit, ceci aussi */}
+            <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">{`${PROMESSE_DONNEES} ${PROMESSE_LIEU} ${PROMESSE_EFFACEMENT}`}</p>
             <Button variant="secondary" onClick={fermer}>
               Fermer
             </Button>

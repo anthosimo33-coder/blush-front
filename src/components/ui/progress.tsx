@@ -129,13 +129,17 @@ export function LevelPath({ current, className }: { current: LevelId; className?
 }
 
 /* ———— Points de progression du parcours (haut à droite) ———— */
+/** Les points se voient, l’étape se dit : « Étape n sur 3 » aux lecteurs d’écran (sur ordinateur, FlowSteps la porte). */
 export function ProgressDots({ total = 3, current }: { total?: number; current: number }) {
   return (
-    <div aria-hidden="true" className="flex w-[72px] gap-1">
-      {Array.from({ length: total }, (_, i) => (
-        <span key={i} className={cn("h-1.5 flex-1 rounded-[3px]", i < current ? "bg-ink" : "bg-track")} />
-      ))}
-    </div>
+    <>
+      <div aria-hidden="true" className="flex w-[72px] gap-1">
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={cn("h-1.5 flex-1 rounded-[3px]", i < current ? "bg-ink" : "bg-track")} />
+        ))}
+      </div>
+      <span className="sr-only">{`Étape ${current} sur ${total}`}</span>
+    </>
   );
 }
 

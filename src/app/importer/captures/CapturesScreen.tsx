@@ -14,8 +14,10 @@ import { Button } from "@/components/ui/Button";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
-import { FlowSteps } from "@/components/ui/progress";
-import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
+import { NotePrivee } from "@/components/ui/NotePrivee";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { Lead, ScreenTitle } from "@/components/shell/Screen";
+import { NOTE_ENREGISTREMENT } from "@/contenu/confidentialite";
 import { setJourney, useJourney } from "@/state/journey";
 import type { AppKind } from "@/types";
 import { ErreurApi } from "@/types/erreurs-api";
@@ -188,10 +190,9 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const enCours = avance ? texteAvance(avance) : texteLecture(items.length);
 
   return (
-    <Screen
-      mobileTop={<MobileTopBar back={back} progress={1} />}
-      desktopBack={{ target: back }}
-      aside={<FlowSteps step={1} />}
+    <ParcoursScreen
+      step={1}
+      back={back}
       head={
         <>
           <ScreenTitle>{enregistrement ? "Filme ta conv." : "Choisis tes captures."}</ScreenTitle>
@@ -305,7 +306,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
 
       <FileInput inputRef={shots.ref} accept="image/*" multiple onFiles={(f) => handle(f, false)} label="Captures d’écran de la conversation" />
       <FileInput inputRef={rec.ref} accept="video/*" onFiles={(f) => handle(f, true)} label="Enregistrement d’écran de la conversation" />
-    </Screen>
+    </ParcoursScreen>
   );
 }
 
@@ -620,12 +621,9 @@ function CommentFilmer({ onPick }: { onPick: () => void }) {
           ))}
         </ol>
       </button>
-      <p className="m-0 flex items-start gap-2 px-1 text-[12.5px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="lock" size={15} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-        <span>
-          La vidéo reste sur ton téléphone{NBSP}: seuls les écrans de la conv partent, lus une fois puis oubliés. Pas de bouton <BoutonRec />{NBSP}? Ajoute-le dans Réglages, Centre de contrôle.
-        </span>
-      </p>
+      <NotePrivee petite className="px-1 leading-[1.45]">
+        {NOTE_ENREGISTREMENT} Pas de bouton <BoutonRec />{NBSP}? Ajoute-le dans Réglages, Centre de contrôle.
+      </NotePrivee>
     </div>
   );
 }

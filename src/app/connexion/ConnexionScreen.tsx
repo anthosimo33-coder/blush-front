@@ -1,17 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { suiteSure } from "@/lib/suite";
-import { messageErreur } from "@/lib/messages-erreur";
-import { sendLoginCode } from "@/services/api";
-import { Button } from "@/components/ui/Button";
-import { EmailField, EMAIL_RE } from "@/components/ui/EmailField";
-import { TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
-import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
-import { useJourney } from "@/state/journey";
+import { useEnvoiCode } from "@/lib/useEnvoiCode";
+import { BoutonRecevoirCode, FormulaireEmail } from "@/components/formulaires/FormulaireEmail";
+import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
+import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
+import { Lead, ScreenTitle } from "@/components/shell/Screen";
+import { NOTE_CONNEXION } from "@/contenu/confidentialite";
 import { NBSP } from "@/lib/format";
 
 /*
@@ -22,40 +18,13 @@ import { NBSP } from "@/lib/format";
  * ici) disparaît. Textes à valider.
  */
 export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
-  const router = useRouter();
   const depuisImport = !!suite?.startsWith("/importer/");
   const retour = depuisImport ? "/commencer" : "/";
-  const [j, set] = useJourney();
-  const [touched, setTouched] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const valid = EMAIL_RE.test(j.email.trim());
-  const versCode = suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code";
-  /* L’écran du code est statique : préchargé pendant qu’on tape son email, il s’ouvre tout de suite après l’envoi */
-  useEffect(() => {
-    router.prefetch(versCode);
-  }, [router, versCode]);
-
-  const submit = async () => {
-    if (!valid || busy) {
-      setTouched(true);
-      return;
-    }
-    setBusy(true);
-    setProblem(null);
-    try {
-      await sendLoginCode(j.email.trim());
-      router.push(versCode);
-    } catch (e) {
-      setProblem(messageErreur("code", e));
-      setBusy(false);
-    }
-  };
+  const envoi = useEnvoiCode(suite ? `/connexion/code?suite=${encodeURIComponent(suite)}` : "/connexion/code");
 
   return (
-    <Screen
-      mobileTop={<MobileTopBar back={retour} />}
-      desktopBack={{ target: retour }}
+    <ParcoursScreen
+      back={retour}
       head={
         depuisImport ? (
           <>
@@ -73,43 +42,17 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
           </>
         )
       }
-      footer={
-        <Button arrow={!busy} disabled={!valid || busy} aria-busy={busy} onClick={submit}>
-          {busy ? <TypingDots color="#FFFFFF" label="Envoi du code" /> : "Recevoir mon code"}
-        </Button>
-      }
+      footer={<BoutonRecevoirCode envoi={envoi} />}
     >
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <EmailField
-          value={j.email}
-          onChange={(v) => {
-            set({ email: v });
-            setProblem(null);
-          }}
-          onBlur={() => setTouched(true)}
-          invalid={!!problem || (touched && j.email.length > 0 && !valid)}
-          errorText={problem ?? "Vérifie ton email\u00a0: il manque quelque chose."}
-        />
-      </form>
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        Pas de mot de passe{NBSP}: un code suffit, sur chaque nouvel appareil. Tes convs restent chiffrées.
-      </p>
+      <FormulaireEmail envoi={envoi} />
+      <NotePrivee className="leading-[1.45]">{NOTE_CONNEXION}</NotePrivee>
       {!depuisImport && (
         <p className="m-0 text-[14px] font-extrabold text-grey">
           Pas encore de compte{NBSP}?{" "}
-          <Link href="/commencer" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
-            Analyser ma conv
-          </Link>
+          <LienDiscret href="/commencer">Analyser ma conv</LienDiscret>
         </p>
       )}
-    </Screen>
+    </ParcoursScreen>
   );
 }
 

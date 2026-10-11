@@ -53,9 +53,8 @@ export function UnlockedScreen({
   const suite = next ?? `/rapport#chapitre-${reprise}`;
   return (
     <Screen
-      centered
+      mise="colonne"
       mainWidth={560}
-      frameWidth={560}
       desktopTopPad={0}
       footer={
         <div data-popin="" style={delai(0.7)}>
