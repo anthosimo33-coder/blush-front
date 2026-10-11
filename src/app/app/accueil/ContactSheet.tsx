@@ -35,7 +35,7 @@ function Pastille({ children }: { children: ReactNode }) {
 /**
  * Les détails du contact : le verdict, où vous en êtes, le rapport et sa fiche. `departRef` : d’où l’accueil a vu partir
  * la bulle et l’avatar au toucher (departs), lu une fois à l’ouverture ; sans lui, relevé à ce moment-là dans `entete`
- * (rien ne vole sans l’un ni l’autre). `pageRef` : l’accueil, qui recule derrière la feuille (mobile).
+ * (le registre de l’en-tête de l’accueil). `pageRef` : l’accueil, qui recule derrière la feuille (mobile).
  */
 export function ContactSheet({
   contact,
@@ -49,8 +49,8 @@ export function ContactSheet({
   open: boolean;
   onClose: () => void;
   departRef: RefObject<Departs | null>;
-  entete?: RegistreEntete;
-  pageRef?: RefObject<HTMLElement | null>;
+  entete: RegistreEntete;
+  pageRef: RefObject<HTMLElement | null>;
 }) {
   const { report, fiche, period, ficheHref = "/app/fiche" } = contact;
   const router = useRouter();
@@ -59,6 +59,8 @@ export function ContactSheet({
   /* Le dialogue et le panneau de la feuille, qu’elle nous donne */
   const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  /* L’accueil qui recule derrière la feuille (null : déjà parti) */
+  const page = useCallback(() => pageRef.current, [pageRef]);
   /* 9 · Ce qui a quitté l’en-tête pour la feuille : la bulle et l’avatar de l’autre, et d’où ils venaient (pour y revenir) */
   const moved = useRef<{ src: HTMLElement; from: Box; target: HTMLElement | SVGElement }[]>([]);
   /* La feuille joue sa sortie (close) : tout reprend sa place à sa fin (onClosed) */
@@ -72,8 +74,8 @@ export function ContactSheet({
     }
     moved.current = [];
     closing.current = false;
-    recede(pageRef?.current ?? null, "reset");
-  }, [pageRef]);
+    recede(page(), "reset");
+  }, [page]);
   /* L’accueil quitté pendant la sortie : rien ne reste caché, ni l’écran reculé */
   useEffect(
     () => () => {
@@ -87,7 +89,7 @@ export function ContactSheet({
     /* Rouverte pendant sa sortie : la précédente finit d’abord de tout remettre en place */
     if (closing.current) remettre();
     /* Le départ a été relevé au toucher ; l’arrivée l’est à l’image suivante, la feuille posée : rien n’oblige le clic à remettre la page en page */
-    const de = departRef.current ?? (entete ? departs(entete) : { logo: null, av: null });
+    const de = departRef.current ?? departs(entete);
     departRef.current = null;
     const raf = requestAnimationFrame(() => {
       const logoBox = logoRef.current;
@@ -116,7 +118,7 @@ export function ContactSheet({
         });
         moved.current.push({ src, from, target: p.target });
       }
-      recede(pageRef?.current ?? null, "in", SHEET_IN);
+      recede(page(), "in", SHEET_IN);
     });
     return () => {
       cancelAnimationFrame(raf);
@@ -124,7 +126,7 @@ export function ContactSheet({
          feuille redescend encore : à la fin de sa sortie (onClosed) */
       if (!closing.current) remettre();
     };
-  }, [open, departRef, entete, pageRef, remettre]);
+  }, [open, departRef, entete, page, remettre]);
 
   /*
    * La fermeture : la feuille redescend (sa sortie, à notre rythme : SHEET_OUT), la bulle et l’avatar regagnent
@@ -144,7 +146,7 @@ export function ContactSheet({
       shown(m.target, false);
       void flyBox(clone, from, m.from, { spring: SHEET_OUT, host: dialog, settle: 1 });
     }
-    recede(pageRef?.current ?? null, "out", SHEET_OUT);
+    recede(page(), "out", SHEET_OUT);
     onClose();
   };
 

@@ -44,6 +44,7 @@ function monter(plus: Partial<Props> = {}) {
     onVoice: vi.fn(),
     onMicError: vi.fn(),
     arriving: false,
+    logo: () => null,
     ...plus,
   };
   const rendu = render(<Composer {...props} />);
@@ -97,5 +98,33 @@ describe("la barre de saisie de l’accueil", () => {
     expect(screen.queryByRole("group", { name: "Questions toutes prêtes" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Idées de questions" }));
     expect(screen.getByRole("group", { name: "Questions toutes prêtes" })).toBeTruthy();
+  });
+
+  it("2 · chaque lettre penche le logo que l’accueil donne (celui de son en-tête), et lui seul ; il se redresse après 0,9 s", () => {
+    vi.useFakeTimers();
+    try {
+      /* Un autre logo dans la page, qui porte le même attribut : il n’est pas pris (Q62, rien n’est cherché dans la page) */
+      const [donne, autre] = [0, 1].map(() => {
+        const el = document.body.appendChild(document.createElement("span"));
+        el.setAttribute("data-blush-logo", "");
+        return el;
+      });
+      const { champ } = monter({ logo: () => donne });
+      fireEvent.change(champ, { target: { value: "s" } });
+      expect(donne.hasAttribute("data-lean")).toBe(true);
+      expect(autre.hasAttribute("data-lean")).toBe(false);
+      vi.advanceTimersByTime(900);
+      expect(donne.hasAttribute("data-lean")).toBe(false);
+      donne.remove();
+      autre.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("2 · sans logo à l’écran (l’accueil n’en donne pas), une lettre ne casse rien", () => {
+    const { champ } = monter({ logo: () => null });
+    fireEvent.change(champ, { target: { value: "s" } });
+    expect(champ.value).toBe("s");
   });
 });

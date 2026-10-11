@@ -35,7 +35,7 @@ function dernieresLignes(box: HTMLElement) {
  * Devant (accueil/conv/useChargerAnciens.ts). Jusqu’au rendu qui les pose, Chrome ne garde pas la place de lui-même (l’ancrage du défilement, que Safari
  * n’a pas) : le décalage appliqué ensuite compterait deux fois.
  */
-export function mesurer(box: HTMLElement | null, marque?: number) {
+function mesurerLaConv(box: HTMLElement | null, marque?: number) {
   const desk = !!box && window.matchMedia(DESKTOP).matches;
   defilant(desk ? box : null).style.overflowAnchor = "none";
   return { desk, h: desk && box ? box.scrollHeight : document.documentElement.scrollHeight, marque };
@@ -48,7 +48,7 @@ const defilant = (box: HTMLElement | null) => box ?? document.documentElement;
  * Attend que la conv soit au repos (120 ms sans défilement) avant d’y poser un morceau d’historique : posé pendant
  * l’élan d’un geste, il couperait l’élan sur Safari. Tout près du haut (moins d’un écran), il se pose tout de suite.
  */
-export function auRepos(box: HTMLElement | null) {
+function convAuRepos(box: HTMLElement | null) {
   const desk = !!box && window.matchMedia(DESKTOP).matches;
   const pres = () => (desk && box ? box.scrollTop < box.clientHeight : window.scrollY < window.innerHeight);
   const cible: HTMLElement | Window = desk && box ? box : window;
@@ -134,8 +134,8 @@ export function useDefilement(threadRef: RefObject<HTMLDivElement | null>) {
 
   const ecran: EcranDeLHistorique = {
     devant: devantRef,
-    mesurer: (marque) => mesurer(threadRef.current, marque),
-    auRepos: () => auRepos(threadRef.current),
+    mesurer: (marque) => mesurerLaConv(threadRef.current, marque),
+    auRepos: () => convAuRepos(threadRef.current),
   };
   /* On note d’abord où sont les lignes de la conv, pour les faire glisser ensuite */
   const avantChangement = () => {
@@ -209,7 +209,7 @@ export function useConvSuitLeBas(
     if (reduced) return;
     if (f) launch(box, f);
     if (tops) flipFrom(tops, dernieresLignes(box), (el) => el.dataset.row, spring("soft"));
-    /* À chaque nouvelle conv seulement : les refs ne changent pas */
+    /* À chaque nouveau msgs seulement (chaque message, chaque morceau d’historique) : les refs ne changent pas */
   }, [msgs, threadRef, composerRef, devantRef, beforeRef, flightRef]);
 
   /*
@@ -238,7 +238,7 @@ export function useConvSuitLeBas(
     /* Au montage seulement : les refs ne changent pas */
   }, [composerRef, threadRef]);
 
-  /* Parti avant que des messages attendus soient posés : l’ancrage du défilement revient (voir mesurer) */
+  /* Parti avant que des messages attendus soient posés : l’ancrage du défilement revient (voir mesurerLaConv) */
   useEffect(
     () => () => {
       document.documentElement.style.removeProperty("overflow-anchor");

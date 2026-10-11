@@ -79,7 +79,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  document.querySelectorAll("[data-blush-logo]").forEach((el) => el.remove());
+  logoPose?.remove();
+  logoPose = null;
 });
 
 /* Des images passent, une toutes les 80 ms (l’onde relève le micro toutes les 70 ms au moins), chacune rendue à part */
@@ -93,13 +94,16 @@ function images80(n: number) {
     });
 }
 
-/* Le logo de BLUSH, avec ses trois perles et leurs ombres, à l’écran (visible : il a une boîte) */
+/* Le logo de BLUSH qu’on voit, tel que l’accueil le donne à la barre (pris au registre de son en-tête) */
+let logoPose: HTMLElement | null = null;
+
+/* Le logo de BLUSH, avec ses trois perles et leurs ombres, à l’écran */
 function logo() {
   const el = document.createElement("div");
   el.setAttribute("data-blush-logo", "");
   el.innerHTML = '<span data-pearl=""></span><span data-pearl=""></span><span data-pearl=""></span><span data-shade=""></span><span data-shade=""></span><span data-shade=""></span>';
-  el.getClientRects = () => ({ length: 1 }) as DOMRectList;
   document.body.append(el);
+  logoPose = el;
   return el;
 }
 
@@ -122,6 +126,7 @@ function monter() {
     onVoice: vi.fn(),
     onMicError: vi.fn(),
     arriving: false,
+    logo: () => logoPose,
   };
   render(<Composer {...props} />);
   return props;

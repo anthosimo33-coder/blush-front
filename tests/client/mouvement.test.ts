@@ -4,20 +4,22 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AvecLogoDuFil, BlushTitle, LogoDuFil, SophieButton } from "@/app/app/accueil/Entetes";
 import { ConvEnBas } from "@/app/app/accueil/mouvement/ConvEnBas";
-import { auRepos, mesurer } from "@/app/app/accueil/mouvement/defilement";
-import { useHeaderCollapse } from "@/app/app/accueil/mouvement/entete";
+import { useAnciensEnRemontant, useConvSuitLeBas, useDefilement } from "@/app/app/accueil/mouvement/defilement";
+import { useEnteteAuClavier, useHeaderCollapse } from "@/app/app/accueil/mouvement/entete";
 import { celebrate } from "@/app/app/accueil/mouvement/fete";
 import { useThreadGestures } from "@/app/app/accueil/mouvement/gestes";
 import { recede, shown } from "@/app/app/accueil/mouvement/recul";
 import { creerRegistreEntete, departs, useRegistreEntete } from "@/app/app/accueil/mouvement/registre";
 import { launch } from "@/app/app/accueil/mouvement/vol";
 import { flyBox, flyText } from "@/lib/motion";
+import type { Msg } from "@/app/app/accueil/conv/modele";
 
 /*
  * Le mouvement de l’accueil (src/app/app/accueil/mouvement/) et ses en-têtes (accueil/Entetes.tsx), dans le DOM simulé :
  * le registre de l’en-tête (ce qui part de l’en-tête ou s’y anime, pris là au lieu d’être cherché dans la page), l’écran
- * qui recule par sa ref, la fête d’un niveau, les vols, le repli de l’en-tête, les gestes de la conv, l’attente du
- * repos, l’arrivée du jour et le script qui pose la conv en bas. Le DOM simulé n’a ni mise en page ni animations :
+ * qui recule par sa ref, la fête d’un niveau, les vols, le repli de l’en-tête et l’en-tête au clavier, les gestes de la
+ * conv, son défilement (posée en bas, retour par l’historique, la conv qui suit le bas, les anciens en remontant), l’arrivée
+ * du jour et le script qui pose la conv en bas. Le DOM simulé n’a ni mise en page ni animations :
  * animate() est noté (et rend une animation qu’on finit à la main), ce qu’on voit (getClientRects) et les rectangles
  * sont posés par le test, et les minuteurs (requestAnimationFrame compris) avancent à la main.
  */
@@ -443,22 +445,38 @@ describe("6 · 7 · les gestes de la conv", () => {
 });
 
 describe("le défilement de la conv", () => {
-  it("mesurer : la hauteur d’avant, et l’ancrage du défilement coupé jusqu’au rendu qui pose les messages", () => {
+  /* La page et la fenêtre de la conv ne défilent pas dans le DOM simulé : on note où on les envoie */
+  let vaA: ReturnType<typeof vi.fn>;
+  let decale: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vaA = vi.fn();
+    decale = vi.fn();
+    vi.spyOn(window, "scrollTo").mockImplementation(vaA as never);
+    vi.spyOn(window, "scrollBy").mockImplementation(decale as never);
+  });
+
+  /** Un message de la conv, réduit à ce que le défilement en lit (son identifiant). */
+  const msg = (id: number) => ({ type: "mot", id, from: "blush", notice: "" }) as unknown as Msg;
+  const vide = () => ({ current: null }) as RefObject<HTMLDivElement | null>;
+
+  it("mesurer (par l’écran que l’accueil donne au chargement) : la hauteur d’avant, et l’ancrage du défilement coupé jusqu’au rendu qui pose les messages", () => {
     page({ hauteur: 4200, y: 0, vue: 800 });
-    expect(mesurer(null, 7)).toEqual({ desk: false, h: 4200, marque: 7 });
+    const { result } = renderHook(() => useDefilement(vide()));
+    expect(result.current.ecran.mesurer(7)).toEqual({ desk: false, h: 4200, marque: 7 });
     expect(document.documentElement.style.overflowAnchor).toBe("none");
   });
 
-  it("auRepos : tout près du haut, tout de suite ; sinon 120 ms sans défilement", async () => {
+  it("auRepos (par l’écran) : tout près du haut, tout de suite ; sinon 120 ms sans défilement", async () => {
+    const { result } = renderHook(() => useDefilement(vide()));
     page({ hauteur: 4200, y: 300, vue: 800 });
     let pose = false;
-    void auRepos(null).then(() => (pose = true));
+    void result.current.ecran.auRepos().then(() => (pose = true));
     await act(async () => {});
     expect(pose).toBe(true);
 
     page({ hauteur: 4200, y: 2000, vue: 800 });
     pose = false;
-    void auRepos(null).then(() => (pose = true));
+    void result.current.ecran.auRepos().then(() => (pose = true));
     await act(async () => void vi.advanceTimersByTime(100));
     /* L’élan continue : l’attente repart */
     window.dispatchEvent(new Event("scroll"));
@@ -468,10 +486,255 @@ describe("le défilement de la conv", () => {
     expect(pose).toBe(true);
   });
 
+  it("à l’ouverture, la conv se pose en bas ; revenu par l’historique alors qu’on lisait plus haut, elle revient à cette place", () => {
+    const box = pose(document.createElement("div"));
+    box.innerHTML = `<div data-thread=""></div>`;
+    const threadRef = { current: box } as RefObject<HTMLDivElement | null>;
+    page({ hauteur: 4200, y: 1000, vue: 800 });
+    const premiere = renderHook(() => useDefilement(threadRef));
+    expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 3400 });
+    /* On lisait plus haut (la page ne défile pas ici : elle est restée à 1000) quand l’accueil est parti */
+    premiere.unmount();
+    vaA.mockClear();
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    const retour = renderHook(() => useDefilement(threadRef));
+    expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 1000 });
+    retour.unmount();
+    /* Une ouverture suivante, sans retour par l’historique : en bas */
+    vaA.mockClear();
+    renderHook(() => useDefilement(threadRef));
+    expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 3400 });
+  });
+
+  /** La conv (une réponse de BLUSH et son avatar, la ligne qui glisse) et sa barre de saisie, suivies comme dans l’accueil. */
+  function suivre(premiers: Msg[]) {
+    const box = pose(document.createElement("div"));
+    box.innerHTML = `<div data-row="r1" data-group=""><span data-avatar=""><svg></svg></span><div data-bubble="b1"></div></div>`;
+    const form = pose(document.createElement("form"));
+    const threadRef = { current: box } as RefObject<HTMLDivElement | null>;
+    const composerRef = { current: form } as RefObject<HTMLFormElement | null>;
+    const rendu = renderHook(
+      ({ msgs }) => {
+        const d = useDefilement(threadRef);
+        useConvSuitLeBas(msgs, threadRef, composerRef, d);
+        return d;
+      },
+      { initialProps: { msgs: premiers } },
+    );
+    return { ...rendu, box, form, avatar: box.querySelector<HTMLElement>("[data-avatar]")!, ligne: box.querySelector<HTMLElement>("[data-row]")! };
+  }
+
+  it("des anciens posés devant, mais un autre rendu passe avant le leur : rien ne défile, la hauteur de référence est celle de ce rendu", () => {
+    page({ hauteur: 3000, y: 200, vue: 800 });
+    const debut = [msg(10)];
+    const { result, rerender } = suivre(debut);
+    const pose = vi.fn();
+    result.current.devantRef.current = { desk: false, h: 3000, marque: 3, pose };
+    result.current.beforeRef.current = new Map([["r1", 100]]);
+    result.current.flightRef.current = { kind: "logo", bubble: "b1", from: { left: 0, top: 0, width: 30, height: 30 } };
+    page({ hauteur: 3300, y: 200, vue: 800 });
+    rerender({ msgs: [...debut, msg(11)] });
+    expect(vaA).not.toHaveBeenCalled();
+    expect(decale).not.toHaveBeenCalled();
+    expect(pose).not.toHaveBeenCalled();
+    expect(flyBox).not.toHaveBeenCalled();
+    expect(result.current.devantRef.current?.h).toBe(3300);
+    expect(result.current.beforeRef.current).toBeNull();
+    expect(result.current.flightRef.current).toBeNull();
+  });
+
+  it("le rendu qui pose les anciens : la conv reste là où on la lisait (un décalage), l’ancrage du défilement revient, le chargement est prévenu", () => {
+    page({ hauteur: 3000, y: 200, vue: 800 });
+    const debut = [msg(10)];
+    const { result, rerender } = suivre(debut);
+    const pose = vi.fn();
+    result.current.ecran.mesurer(3);
+    result.current.devantRef.current = { desk: false, h: 3000, marque: 3, pose };
+    page({ hauteur: 3800, y: 200, vue: 800 });
+    rerender({ msgs: [msg(3), ...debut] });
+    expect(decale).toHaveBeenCalledExactlyOnceWith(0, 800);
+    expect(vaA).not.toHaveBeenCalled();
+    expect(document.documentElement.style.overflowAnchor).toBe("");
+    expect(pose).toHaveBeenCalledTimes(1);
+    expect(result.current.devantRef.current).toBeNull();
+  });
+
+  it("un nouveau message : la conv saute en bas, la ligne glisse depuis sa place d’avant, et la bulle en attente vole", () => {
+    page({ hauteur: 3000, y: 2200, vue: 800 });
+    const debut = [msg(10)];
+    const { result, rerender, avatar, ligne } = suivre(debut);
+    vaA.mockClear();
+    ligne.getBoundingClientRect = () => ({ left: 0, top: 300, width: 300, height: 40 }) as DOMRect;
+    result.current.beforeRef.current = new Map([["r1", 340]]);
+    result.current.flightRef.current = { kind: "logo", bubble: "b1", from: { left: 0, top: 0, width: 30, height: 30 } };
+    page({ hauteur: 3100, y: 2200, vue: 800 });
+    rerender({ msgs: [...debut, msg(11)] });
+    expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 2300, behavior: "auto" });
+    expect(avatar.style.visibility).toBe("hidden");
+    expect(flyBox).toHaveBeenCalledTimes(1);
+    expect(animees.find((a) => a.el === ligne)?.images[0]).toEqual({ transform: "translateY(40px)" });
+    expect(result.current.beforeRef.current).toBeNull();
+    expect(result.current.flightRef.current).toBeNull();
+  });
+
+  it("moins d’animations : la conv saute en bas, rien ne vole ni ne glisse", () => {
+    moinsDeMouvement = true;
+    page({ hauteur: 3000, y: 2200, vue: 800 });
+    const debut = [msg(10)];
+    const { result, rerender, avatar } = suivre(debut);
+    vaA.mockClear();
+    result.current.flightRef.current = { kind: "logo", bubble: "b1", from: { left: 0, top: 0, width: 30, height: 30 } };
+    rerender({ msgs: [...debut, msg(11)] });
+    expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 2200, behavior: "auto" });
+    expect(avatar.style.visibility).toBe("");
+    expect(flyBox).not.toHaveBeenCalled();
+  });
+
+  it("la barre de saisie grandit sans nouveau message : collée en bas, la conv y reste ; lue plus haut, elle ne bouge pas", () => {
+    let observe: (() => void) | null = null;
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(f: () => void) {
+          observe = f;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    try {
+      page({ hauteur: 3000, y: 2200, vue: 800 });
+      const { form } = suivre([msg(10)]);
+      vaA.mockClear();
+      let hauteur = 60;
+      Object.defineProperty(form, "offsetHeight", { configurable: true, get: () => hauteur });
+      /* Un premier relevé à 60 (montée à 0 dans le DOM simulé) : la hauteur de référence */
+      act(() => observe!());
+      vaA.mockClear();
+      hauteur = 100;
+      page({ hauteur: 3040, y: 2200, vue: 800 });
+      act(() => observe!());
+      expect(vaA).toHaveBeenCalledExactlyOnceWith({ top: 2240 });
+      vaA.mockClear();
+      hauteur = 140;
+      page({ hauteur: 3080, y: 1000, vue: 800 });
+      act(() => observe!());
+      expect(vaA).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("en remontant, les anciens sont demandés d’avance puis posés quand le haut approche ; un rebond en bas ne compte pas", () => {
+    let voit: ((e: { isIntersecting: boolean }[]) => void) | null = null;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(f: (e: { isIntersecting: boolean }[]) => void) {
+          voit = f;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    try {
+      page({ hauteur: 4200, y: 3400, vue: 800 });
+      const box = pose(document.createElement("div"));
+      const haut = pose(document.createElement("div"));
+      const chargerAnciens = vi.fn(() => Promise.resolve());
+      const precharger = vi.fn();
+      renderHook(() => useAnciensEnRemontant({ plus: true, hautRef: { current: haut }, threadRef: { current: box }, chargerAnciens, precharger }));
+      /* La fin d’un rebond, tout en bas : la position diminue, mais ce n’est pas une remontée */
+      page({ hauteur: 4200, y: 3399, vue: 800 });
+      window.dispatchEvent(new Event("scroll"));
+      expect(precharger).not.toHaveBeenCalled();
+      /* Une vraie remontée : le morceau d’avant est demandé d’avance, rien n’est posé tant que le haut est loin */
+      page({ hauteur: 4200, y: 2000, vue: 800 });
+      window.dispatchEvent(new Event("scroll"));
+      expect(precharger).toHaveBeenCalledTimes(1);
+      expect(chargerAnciens).not.toHaveBeenCalled();
+      /* Le haut approche en remontant : il se pose */
+      act(() => voit!([{ isIntersecting: true }]));
+      expect(chargerAnciens).toHaveBeenCalledTimes(1);
+      /* En redescendant, rien de plus */
+      page({ hauteur: 4200, y: 2100, vue: 800 });
+      window.dispatchEvent(new Event("scroll"));
+      expect(precharger).toHaveBeenCalledTimes(1);
+      expect(chargerAnciens).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("plus rien d’ancien : rien n’écoute la remontée", () => {
+    page({ hauteur: 4200, y: 3400, vue: 800 });
+    const precharger = vi.fn();
+    renderHook(() => useAnciensEnRemontant({ plus: false, hautRef: { current: pose(document.createElement("div")) }, threadRef: { current: pose(document.createElement("div")) }, chargerAnciens: vi.fn(), precharger }));
+    page({ hauteur: 4200, y: 1000, vue: 800 });
+    window.dispatchEvent(new Event("scroll"));
+    expect(precharger).not.toHaveBeenCalled();
+  });
+
   it("le script qui pose la conv en bas : dans la page du serveur seulement", () => {
     expect(renderToString(createElement(ConvEnBas))).toMatch(/^<script>\(function\(\)\{try\{if\(matchMedia\("\(min-width: 1024px\)"\)\.matches\)/);
     const { container } = render(createElement(ConvEnBas));
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("l’en-tête au clavier (Safari décale la vue visible)", () => {
+  const vue = Object.assign(new EventTarget(), { offsetTop: 0 });
+  beforeEach(() => {
+    vue.offsetTop = 0;
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: vue });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: null });
+  });
+
+  function monter() {
+    const tete = pose(document.createElement("header"));
+    const form = pose(document.createElement("form"));
+    const champ = form.appendChild(document.createElement("input"));
+    const rendu = renderHook(() => useEnteteAuClavier({ current: tete }, { current: form }));
+    return { tete, champ, ...rendu };
+  }
+
+  it("le champ pris, l’en-tête suit le haut de la vue ; quitté, il la suit encore au plus 0,6 s, puis reprend sa place", () => {
+    const { tete, champ } = monter();
+    champ.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    expect(tete.style.transform).toBe("");
+    vue.offsetTop = 300;
+    vue.dispatchEvent(new Event("resize"));
+    expect(tete.style.transform).toBe("translateY(300.0px)");
+    champ.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    expect(tete.style.transform).toBe("translateY(300.0px)");
+    vue.offsetTop = 120;
+    vue.dispatchEvent(new Event("scroll"));
+    expect(tete.style.transform).toBe("translateY(120.0px)");
+    act(() => void vi.advanceTimersByTime(600));
+    expect(tete.style.transform).toBe("");
+    /* Plus suivie : la vue qui bouge ne le déplace plus */
+    vue.offsetTop = 200;
+    vue.dispatchEvent(new Event("resize"));
+    expect(tete.style.transform).toBe("");
+  });
+
+  it("le clavier refermé (la vue revenue en haut) avant les 0,6 s : l’en-tête reprend sa place tout de suite ; parti, rien ne reste posé", () => {
+    const { tete, champ, unmount } = monter();
+    champ.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    vue.offsetTop = 300;
+    vue.dispatchEvent(new Event("resize"));
+    champ.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    vue.offsetTop = 0;
+    vue.dispatchEvent(new Event("resize"));
+    expect(tete.style.transform).toBe("");
+    champ.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    vue.offsetTop = 250;
+    vue.dispatchEvent(new Event("resize"));
+    expect(tete.style.transform).toBe("translateY(250.0px)");
+    unmount();
+    expect(tete.style.transform).toBe("");
   });
 });
 
@@ -480,6 +743,7 @@ describe("1 · l’arrivée du jour", () => {
     vi.resetModules();
     const { useArrivee } = await import("@/app/app/accueil/mouvement/arrivee");
     const accueil = pose(document.createElement("div"));
+    accueil.className = "home-arrive";
     accueil.innerHTML = `<span data-a="logo"></span><span data-a="pill"></span><span></span>`;
     const finie = { effect: { getComputedTiming: () => ({ endTime: 900 }) }, finish: vi.fn() };
     const boucle = { effect: { getComputedTiming: () => ({ endTime: Infinity }) }, finish: vi.fn() };
@@ -503,6 +767,20 @@ describe("1 · l’arrivée du jour", () => {
     /* Revenu par l’historique avec le `arrive` d’avant : elle ne se rejoue pas */
     const again = renderHook(() => useArrivee(true, ref));
     expect(again.result.current).toBe(false);
+  });
+
+  it("un geste juste après la fin de l’arrivée (l’accueil n’a plus .home-arrive, ses écouteurs pas encore retirés) ne finit rien", async () => {
+    vi.resetModules();
+    const { useArrivee } = await import("@/app/app/accueil/mouvement/arrivee");
+    const accueil = pose(document.createElement("div"));
+    accueil.innerHTML = `<span data-a="logo"></span>`;
+    const finie = { effect: { getComputedTiming: () => ({ endTime: 900 }) }, finish: vi.fn() };
+    accueil.firstElementChild!.getAnimations = () => [finie] as unknown as Animation[];
+    const { result } = renderHook(() => useArrivee(true, { current: accueil }));
+    expect(result.current).toBe(true);
+    act(() => void window.dispatchEvent(new Event("keydown")));
+    expect(finie.finish).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
   });
 
   it("sans geste, elle finit seule après 3,7 s ; sans `arrive`, rien ne se joue", async () => {

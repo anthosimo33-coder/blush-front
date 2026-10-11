@@ -4,11 +4,13 @@ import { useState } from "react";
 import type { Box } from "@/lib/motion";
 
 /*
- * Le registre de l’en-tête de l’accueil : ce qui en part ou s’y anime, vu d’ailleurs. La bulle de BLUSH (9 · elle vole
- * vers la feuille du contact, 11 · elle saute de joie), l’anneau de l’autre (11 · la fête d’un niveau) et son avatar
- * (9 · il vole vers la feuille). L’en-tête existe deux fois (mobile, et la barre de la fenêtre sur desktop) : chacun
- * s’inscrit à son montage par sa ref, et on prend celui qu’on voit. Avant, ils étaient cherchés dans toute la page par
- * leurs attributs (data-blush-logo, data-sophie, data-sophie-avatar), et tout ce qui les portait ailleurs aurait été pris.
+ * Le registre de l’en-tête de l’accueil : ce qui en part ou s’y anime, vu d’ailleurs. La bulle de BLUSH (2 · ses perles
+ * t’écoutent et elle se penche, dans la barre de saisie ; 9 · elle vole vers la feuille du contact ; 11 · elle saute de
+ * joie), l’anneau de l’autre (11 · la fête d’un niveau) et son avatar (9 · il vole vers la feuille). L’en-tête existe
+ * deux fois (mobile, et la barre de la fenêtre sur desktop) : chacun s’inscrit à son montage par sa ref, et on prend
+ * celui qu’on voit. Avant, ils étaient cherchés dans toute la page par leurs attributs (data-blush-logo, data-sophie,
+ * data-sophie-avatar), et tout ce qui les portait ailleurs aurait été pris. data-blush-logo reste sur la bulle : c’est
+ * son style (globals.css : la bulle qui se penche, l’origine de ses perles) et le repère du banc de fluidité.
  */
 
 type Role = "logo" | "anneau" | "avatar";

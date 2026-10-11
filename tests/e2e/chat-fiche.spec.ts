@@ -344,7 +344,7 @@ test("BLUSH propose la phrase à lui envoyer, à copier d’un geste, et marque 
 });
 
 test("« Glisse pour creuser », au doigt : la réponse glissée devient le point creusé, et ta question part avec", async ({ page, browserName }, testInfo) => {
-  /* Les gestes de la conv ne répondent qu’au doigt (src/app/app/HomeScreen.tsx, useThreadGestures) : rien à la souris ni au clavier */
+  /* Les gestes de la conv ne répondent qu’au doigt (src/app/app/accueil/mouvement/gestes.ts, useThreadGestures) : rien à la souris ni au clavier */
   test.skip(browserName !== "chromium", "un glissé au doigt se joue par le protocole de Chromium");
   const fil = filDuChat(page);
   const creuse = page.getByText("Tu creuses", { exact: true });

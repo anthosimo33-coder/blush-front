@@ -5,7 +5,8 @@
  * morceaux plus anciens, demandés d’avance et posés devant en remontant la conv. Les messages eux-mêmes sont à
  * useConversation (./useConversation.ts), qui appelle ce hook : il ne les change que par les deux actions qu’elle lui
  * donne (fondre l’historique frais, poser des anciens devant). Ce qui touche à l’écran (mesurer la conv, attendre
- * qu’elle soit au repos, la recaler au rendu qui pose les anciens) reste à HomeScreen, par `Devant` et ses fonctions.
+ * qu’elle soit au repos, la recaler au rendu qui pose les anciens) est au défilement de l’accueil
+ * (accueil/mouvement/defilement.ts : useDefilement et son `ecran`, useConvSuitLeBas), par `Devant` et ses fonctions.
  */
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { getChatHistory } from "@/services/api";
@@ -17,7 +18,7 @@ import { echangesEnMsgs, type Msg } from "./modele";
 /**
  * Des messages posés devant (ou fondus dans la conv) : la hauteur d’avant, pour garder la conv là où on la lisait.
  * `marque` : un message du morceau, pour reconnaître le rendu qui le pose ; `pose` : prévient qu’il est posé.
- * HomeScreen le lit au rendu qui suit, recale la conv, puis appelle `pose`.
+ * useConvSuitLeBas (accueil/mouvement/defilement.ts) le lit au rendu qui suit, recale la conv, puis appelle `pose`.
  */
 export type Devant = { desk: boolean; h: number; marque?: number; pose?: () => void };
 

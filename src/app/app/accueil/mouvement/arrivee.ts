@@ -13,8 +13,8 @@ let arriveeJouee = false;
 
 /**
  * 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie, `arrive`), et une seule fois depuis l’ouverture de
- * l’appli : vrai tant qu’elle se joue (globals.css, `.home-arrive`). `page` : l’accueil, dont les entrées (`data-a`) se
- * posent d’un coup au premier geste.
+ * l’appli : vrai tant qu’elle se joue (globals.css, `.home-arrive`). `page` : l’accueil, qui porte `.home-arrive`
+ * pendant l’arrivée, et dont les entrées (`data-a`) se posent d’un coup au premier geste.
  */
 export function useArrivee(arrive: boolean, page: RefObject<HTMLElement | null>) {
   const [arriving, setArriving] = useState(() => arrive && !arriveeJouee);
@@ -31,7 +31,9 @@ export function useArrivee(arrive: boolean, page: RefObject<HTMLElement | null>)
     /* Le premier geste (un toucher, la molette, une touche) coupe l’arrivée : ce qui reste à jouer se pose d’un coup, rien ne fait attendre */
     const couper = () => {
       const restantes = new Set<Animation>();
-      page.current?.querySelectorAll("[data-a]").forEach((el) => el.getAnimations({ subtree: true }).forEach((a) => restantes.add(a)));
+      /* Seulement pendant l’arrivée : entre sa fin (le minuteur) et le retrait de ces écouteurs, un geste ne finit rien d’autre */
+      const accueil = page.current;
+      if (accueil?.classList.contains("home-arrive")) accueil.querySelectorAll("[data-a]").forEach((el) => el.getAnimations({ subtree: true }).forEach((a) => restantes.add(a)));
       restantes.forEach((a) => {
         /* Seulement ce qui a une fin : une boucle (le logo qui flotte) continue */
         const fin = a.effect?.getComputedTiming().endTime;

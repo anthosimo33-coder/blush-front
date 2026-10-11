@@ -64,7 +64,7 @@ type Options = Parameters<typeof useConversation>[0];
 
 /*
  * Le hook, comme HomeScreen le monte : au rendu qui pose des messages attendus (Devant), la conv est recalée, puis le
- * chargement est prévenu (HomeScreen, l’effet de mise en page sur `msgs`).
+ * chargement est prévenu (useConvSuitLeBas dans accueil/mouvement/defilement.ts, l’effet de mise en page sur `msgs`).
  */
 function monter(options: Partial<Options> = {}) {
   const s = options.scene ?? scene();

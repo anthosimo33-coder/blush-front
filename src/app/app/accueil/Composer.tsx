@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { copyText, useFilePicker } from "@/lib/hooks";
-import { bumpPearl, delai, pearlsOf, prefersReducedMotion, visible } from "@/lib/motion";
+import { bumpPearl, delai, pearlsOf, prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { prechargerExport } from "@/services/api";
 import { FileInput } from "@/components/ui/FileInput";
@@ -73,7 +73,7 @@ function useQuickHidden(serveur: boolean) {
  * Elle garde ce qui change à chaque lettre : seule elle se refait, pas tout l’accueil. Pendant un vocal, elle ne se
  * refait qu’à son début et à sa fin : le temps et l’onde (environ 14 relevés par seconde) ne refont que la barre
  * d’enregistrement, et les perles du logo les suivent hors de React. L’accueil reçoit ce qui part : ton texte, une
- * question, des fichiers, ton vocal.
+ * question, des fichiers, ton vocal. Il donne le logo de BLUSH qu’on voit (`logo`, pris au registre de son en-tête).
  */
 export function Composer({
   formRef,
@@ -93,6 +93,7 @@ export function Composer({
   onVoice,
   onMicError,
   arriving,
+  logo,
   children,
 }: {
   formRef: RefObject<HTMLFormElement | null>;
@@ -116,6 +117,8 @@ export function Composer({
   onMicError: (e: VoiceError) => void;
   /** L’arrivée du jour se joue : les questions toutes prêtes y prennent part. */
   arriving: boolean;
+  /** Le logo de BLUSH qu’on voit (mobile ou desktop), ou null : ses perles t’écoutent, sa bulle se penche (accueil/mouvement/registre.ts). */
+  logo: () => HTMLElement | null;
   /** Ce qui vit dans la barre sans en faire partie (la feuille « Partager en image »). */
   children?: ReactNode;
 }) {
@@ -131,7 +134,7 @@ export function Composer({
   const voice = useVoiceRecorder({ onError: onMicError, onLimit: () => void sendVoice() });
   /* La barre d’enregistrement n’apparaît qu’une fois le micro ouvert (pendant la question d’autorisation, rien ne bouge) */
   const recording = voice.phase === "recording";
-  const bump = usePerlesALEcoute({ busy, recording, ecoute: voice.ecoute });
+  const bump = usePerlesALEcoute({ busy, recording, ecoute: voice.ecoute, logo });
   const idees = quick.length > 0 && !busy && !menu && !about && voice.phase === "idle";
 
   const sendText = (e: FormEvent) => {
@@ -334,16 +337,19 @@ export function Composer({
 /**
  * 2 · BLUSH t’écoute : chaque lettre fait sauter une perle du logo, et sa bulle se penche vers toi (`bump`, rendu à
  * l’appel à chaque lettre). En vocal, les perles suivent ta voix : abonnées au direct de l’enregistreur, elles bougent
- * à chaque relevé du micro sans rien refaire de React. Le logo et ses perles sont cherchés une fois, au début du vocal.
+ * à chaque relevé du micro sans rien refaire de React. Le logo et ses perles sont pris une fois, au début du vocal, et
+ * ce logo-là est gardé pour le redresser à la fin. `logo` : celui qu’on voit, que l’accueil donne (data-listen et
+ * data-lean : leur style est dans globals.css, sous [data-blush-logo]).
  */
-function usePerlesALEcoute({ busy, recording, ecoute }: { busy: boolean; recording: boolean; ecoute: EcouteEnDirect }) {
-  const listen = useRef({ k: 0, idle: 0 });
+function usePerlesALEcoute({ busy, recording, ecoute, logo: logoVu }: { busy: boolean; recording: boolean; ecoute: EcouteEnDirect; logo: () => HTMLElement | null }) {
+  const listen = useRef<{ k: number; idle: number; penche: HTMLElement | null }>({ k: 0, idle: 0, penche: null });
 
   useEffect(() => {
     if (!recording || prefersReducedMotion()) return;
-    const logo = visible<HTMLElement>("[data-blush-logo]");
+    const logo = logoVu();
     if (!logo) return;
     const { pearls, shades } = pearlsOf(logo);
+    listen.current.penche = logo;
     logo.setAttribute("data-listen", "");
     logo.setAttribute("data-lean", "");
     const suivre = () => {
@@ -356,23 +362,24 @@ function usePerlesALEcoute({ busy, recording, ecoute }: { busy: boolean; recordi
     };
     suivre();
     return ecoute.abonner(suivre);
-  }, [recording, ecoute]);
+    /* `logoVu` ne change pas (l’accueil le donne une fois) */
+  }, [recording, ecoute, logoVu]);
 
-  /* Le vocal fini (envoyé ou jeté) : le logo se redresse, ses perles reviennent à leur place */
+  /* Le vocal fini (envoyé ou jeté) : le logo qui écoutait se redresse, ses perles reviennent à leur place */
   useEffect(() => {
-    if (recording) return;
-    document.querySelectorAll<HTMLElement>("[data-blush-logo][data-listen]").forEach((logo) => {
-      logo.removeAttribute("data-listen");
-      logo.removeAttribute("data-lean");
-      const { pearls, shades } = pearlsOf(logo);
-      [...pearls, ...shades].forEach((p) => (p.style.transform = ""));
-    });
+    const logo = listen.current.penche;
+    if (recording || !logo) return;
+    listen.current.penche = null;
+    logo.removeAttribute("data-listen");
+    logo.removeAttribute("data-lean");
+    const { pearls, shades } = pearlsOf(logo);
+    [...pearls, ...shades].forEach((p) => (p.style.transform = ""));
   }, [recording]);
 
   /** Une lettre tapée (`soft` : effacée). */
   return (soft: boolean) => {
     if (busy || prefersReducedMotion()) return;
-    const logo = visible<HTMLElement>("[data-blush-logo]");
+    const logo = logoVu();
     if (!logo) return;
     bumpPearl(logo, listen.current.k++ % 3, soft);
     logo.setAttribute("data-lean", "");

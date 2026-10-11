@@ -166,11 +166,6 @@ export function restingBox(el: HTMLElement, still: HTMLElement): Box {
   return { left: r.left + left, top: r.top + top, width: el.offsetWidth, height: el.offsetHeight };
 }
 
-/** Le premier élément visible (le même composant existe en version mobile et desktop, l’une est masquée). */
-export function visible<T extends Element>(selector: string, root: ParentNode = document) {
-  return [...root.querySelectorAll<T>(selector)].find((el) => el.getClientRects().length > 0) ?? null;
-}
-
 /** Les perles du logo et leurs ombres, dans l’ordre (nacre, nacre, opale). */
 export function pearlsOf(logo: Element) {
   return {

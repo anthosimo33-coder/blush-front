@@ -3,7 +3,7 @@
 import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createContext, memo, use, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, memo, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { pagePrecedente } from "@/lib/navigation";
@@ -159,6 +159,8 @@ export function HomeScreen({
   const page = useRef<HTMLDivElement>(null);
   /* Ce qui part de l’en-tête ou s’y anime, vu d’ailleurs (accueil/mouvement/registre.ts) */
   const entete = useRegistreEntete();
+  /* 2 · Le logo de BLUSH qu’on voit, pour la barre de saisie (ses perles t’écoutent) : stable, comme le registre */
+  const logoVu = useCallback(() => entete.visible("logo"), [entete]);
   /* Les questions toutes prêtes font leur entrée au premier affichage de l’accueil, puis à leur retour après une réponse */
   const [entreeIdees, setEntreeIdees] = useState(() => !pastillesPosees);
   /* « Partager en image » : la réponse choisie */
@@ -478,6 +480,7 @@ export function HomeScreen({
               onVoice={sendVoice}
               onMicError={micRefused}
               arriving={arriving}
+              logo={logoVu}
             >
               {/* « Partager en image » : la réponse choisie, en story */}
               <PartageImageSheet cible={image ? { type: "reponse", echange: image } : null} onClose={() => setImage(null)} />

@@ -39,6 +39,7 @@ export function BlushTitle({ busy, onClick, big = false, logoRef }: { busy: bool
       )}
       <span data-c="logo" className="relative block">
         <span data-float="" className="block" style={{ "--r": "-3deg" }}>
+          {/* data-blush-logo : son style (globals.css, la bulle qui se penche et l’origine de ses perles) et le repère du banc de fluidité ; le code le prend par logoRef */}
           <span ref={logoRef} data-a="logo" data-blush-logo="" className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] group-hover:scale-105 group-active:scale-95">
             <BubbleLogo size={big ? 88 : 64} animated={busy} layered />
           </span>
@@ -165,8 +166,9 @@ export function SophieButton({
 /*
  * L’avatar de BLUSH sous chaque réponse : dessiné une fois par conv (ses dégradés, ses flous), puis repris par <use>.
  * Une conv longue portait autant de copies du logo que de réponses, chacune avec ses filtres, dans le HTML comme à la
- * peinture. Le dessin a l’identifiant que lui donne sa conv (useId), transmis à ses copies : deux convs dans la même
- * page (l’aperçu, le guide de style) ne se prennent pas leur dessin.
+ * peinture. Le dessin a l’identifiant que lui donne sa conv (useId), transmis à ses copies, et non un identifiant
+ * global : si deux convs se trouvent un jour dans le même document (une page gardée cachée par Next pendant qu’une
+ * autre s’affiche, par exemple), aucune ne prend le dessin de l’autre.
  */
 const LogoDuFilContext = createContext<string | null>(null);
 
