@@ -3,12 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MIN_PHRASES, phrasesDesPrompts } from "../scripts/verifier-fuite.mjs";
+import { canari, decoder, ENCODAGES, MIN_PHRASES, mots, phrasesDesPrompts, TAILLE } from "../scripts/verifier-fuite.mjs";
 
 /*
  * scripts/verifier-fuite.mjs, lancé après chaque build : sur un faux .next, une phrase d’un prompt glissée dans ce que
- * reçoit le navigateur fait échouer le build (code 1), et une vérification qui ne vérifierait rien aussi (pas de build,
- * aucun fichier). Un build propre passe.
+ * reçoit le navigateur fait échouer le build (code 1), quelle que soit sa forme (mise en forme, échappée, en entités
+ * HTML), et une vérification qui ne vérifierait rien aussi (pas de build, aucun fichier). Un build propre passe, comme
+ * un texte qui partage moins de TAILLE mots d’affilée avec les prompts. Les phrases sont lues dans le sous-module à
+ * chaque lancement : aucune n’est recopiée ici (le dépôt est public).
  */
 const SCRIPT = join(__dirname, "../scripts/verifier-fuite.mjs");
 let racine: string;
@@ -60,6 +62,47 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     expect(code).toBe(1);
     expect(sortie).toContain("fuite des prompts : server/app/rapport.rsc");
     expect(sortie.includes(phrase.slice(0, 40))).toBe(false);
+  });
+
+  it.each(Object.keys(ENCODAGES))("échoue quand la phrase est écrite en %s", (forme) => {
+    const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2)!;
+    ecrire("static/chunks/app/page.js", "export {};");
+    ecrire("server/app/page.html", `<html><body>${ENCODAGES[forme as keyof typeof ENCODAGES](phrase)}</body></html>`);
+    const { code, sortie } = verifier();
+    expect(code).toBe(1);
+    expect(sortie).toContain("fuite des prompts : server/app/page.html");
+    expect(sortie.includes(phrase.slice(0, 40))).toBe(false);
+  });
+
+  it("échoue aussi sur une phrase remise en forme : Markdown au milieu, majuscules, coupée par un retour à la ligne", () => {
+    const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2)!;
+    const m = mots(phrase);
+    const remise = `${m.slice(0, 3).join(" ").toUpperCase()} **${m[3]}** \`${m[4]}\` -\n> ${m.slice(5).join(" | ")}`;
+    ecrire("static/chunks/app/page.js", `const t = ${JSON.stringify(remise)};`);
+    const { code, sortie } = verifier();
+    expect(code).toBe(1);
+    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
+  });
+
+  it(`passe quand un texte ne partage que ${TAILLE - 1} mots d’affilée avec une phrase des prompts`, () => {
+    const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2)!;
+    ecrire("static/chunks/app/page.js", `const t = ${JSON.stringify(mots(phrase).slice(0, TAILLE - 1).join(" "))};`);
+    const { code, sortie } = verifier();
+    expect(sortie).toContain("Aucune phrase des prompts dans 1 fichiers");
+    expect(code).toBe(0);
+  });
+
+  it("le canari : une phrase des prompts écrite sous chaque forme est retrouvée, et une recherche aveugle le dit", () => {
+    const phrases = phrasesDesPrompts();
+    expect(canari(phrases)).toEqual([]);
+    /* Sans index (une recherche qui ne trouverait rien), chaque forme est signalée */
+    expect(canari(phrases, new Map())).toEqual(Object.keys(ENCODAGES));
+  });
+
+  it("décode les échappements du JavaScript et les entités HTML, même deux fois", () => {
+    expect(decoder("l\\u2019autre \\x27a\\x27 \\u{1F600}")).toBe("l’autre 'a' 😀");
+    expect(decoder("&lt;p&gt;l&#x27;autre &amp;amp; &#8217; &rsquo;&quot;")).toBe("<p>l'autre & ’ ’\"");
+    expect(mots("<p>C’est <!-- -->l’<strong>AUTRE</strong>, 'vraiment'</p>")).toEqual(["c'est", "l", "autre", "vraiment"]);
   });
 
   it("échoue sans build : un dossier vide n’a pas de .next/static", () => {
