@@ -4,6 +4,7 @@ import "client-only";
  * lit de toute façon) et compressée en JPEG. L’envoi reste sous la limite de Vercel (4,5 Mo), même avec 20 captures.
  */
 import { COTE_IMAGE_MAX, ENVOI_IMAGES_MAX } from "@/lib/limites";
+import { tracer } from "@/lib/tracer";
 
 /* Les crans de réduction : le premier pour toutes, les suivants pour les plus lourdes si l’ensemble dépasse la limite */
 const CRANS = [
@@ -46,22 +47,26 @@ const attentes = new Map<number, (b: Blob | null) => void>();
 
 function leWorker(): Worker | null {
   if (worker !== undefined) return worker;
+  /* Un navigateur sans Worker ni OffscreenCanvas : tout se fait sur le fil principal, sans rien à signaler */
+  if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined") return (worker = null);
   try {
-    if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined") throw new Error("sans worker");
     const w = new Worker(URL.createObjectURL(new Blob([CODE_WORKER], { type: "text/javascript" })));
     w.onmessage = (e: MessageEvent<{ id: number; blob: Blob | null }>) => {
       attentes.get(e.data.id)?.(e.data.blob);
       attentes.delete(e.data.id);
     };
     /* Un Worker qui ne tourne pas : ce qui attend, et tout ce qui suit, repasse par le fil principal */
-    w.onerror = () => {
+    w.onerror = (e) => {
+      tracer("captures:worker", e.error);
       w.terminate();
       worker = null;
       attentes.forEach((r) => r(null));
       attentes.clear();
     };
     worker = w;
-  } catch {
+  } catch (e) {
+    /* Un Worker refusé (une politique de sécurité) : le fil principal, et une trace */
+    tracer("captures:worker", e);
     worker = null;
   }
   return worker;
@@ -116,7 +121,7 @@ async function reduireIci(fichier: File, qualite: number, cote: number): Promise
 }
 
 async function reduire(fichier: File, cran: number): Promise<Blob> {
-  const [qualite, cote] = CRANS[cran];
+  const [qualite, cote] = CRANS[cran] ?? CRANS[2];
   return (await auWorker({ fichier, qualite, cote })) ?? reduireIci(fichier, qualite, cote);
 }
 
@@ -143,19 +148,19 @@ export function vignette(fichier: File): Promise<Blob | null> {
  * jusqu’à ce que ça tienne (avant, toutes étaient redécodées et réencodées, jusqu’à trois fois).
  */
 export async function preparerCaptures(fichiers: File[]): Promise<Blob[]> {
-  const blobs: Blob[] = [];
-  for (const f of fichiers) blobs.push((await dejaReduites.get(f)) ?? (await reduire(f, 0)));
-  const crans = fichiers.map(() => 0);
-  const total = () => blobs.reduce((s, b) => s + b.size, 0);
+  /* Chaque capture, sa réduction et son cran */
+  const captures: { fichier: File; blob: Blob; cran: number }[] = [];
+  for (const f of fichiers) captures.push({ fichier: f, blob: (await dejaReduites.get(f)) ?? (await reduire(f, 0)), cran: 0 });
+  const total = () => captures.reduce((s, c) => s + c.blob.size, 0);
   while (total() > ENVOI_IMAGES_MAX) {
-    /* Le cran le moins serré d’abord, et la plus lourde à ce cran */
-    let k = -1;
-    for (let i = 0; i < blobs.length; i++) {
-      if (crans[i] >= CRANS.length - 1) continue;
-      if (k < 0 || crans[i] < crans[k] || (crans[i] === crans[k] && blobs[i].size > blobs[k].size)) k = i;
+    /* Le cran le moins serré d’abord, et la plus lourde à ce cran (la première, à poids égal) */
+    let choisie: (typeof captures)[number] | undefined;
+    for (const c of captures) {
+      if (c.cran >= CRANS.length - 1) continue;
+      if (!choisie || c.cran < choisie.cran || (c.cran === choisie.cran && c.blob.size > choisie.blob.size)) choisie = c;
     }
-    if (k < 0) throw new Error("capture");
-    blobs[k] = await reduire(fichiers[k], ++crans[k]);
+    if (!choisie) throw new Error("capture");
+    choisie.blob = await reduire(choisie.fichier, ++choisie.cran);
   }
-  return blobs;
+  return captures.map((c) => c.blob);
 }

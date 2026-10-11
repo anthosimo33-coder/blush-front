@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { appliquerSession, audioContextDisponible, creerAudioContext } from "./audio";
 import { auRepos } from "./repos";
+import { tracer } from "./tracer";
 import { drapeauLocal, useDrapeau } from "./stockage";
 
 /*
@@ -119,7 +120,7 @@ function wake() {
     s.start(0);
     auRepos(() => remplirLaPiece(c), 100);
   }
-  if (chain.ac.state !== "running") chain.ac.resume().catch(() => {});
+  if (chain.ac.state !== "running") chain.ac.resume().catch((e: unknown) => tracer("son:reprise", e));
 }
 
 let booted = false;
@@ -293,7 +294,7 @@ function accord(o: Out, t: number, n: Extract<Note, { k: "accord" }>) {
 
 const T = (t: number, m: number, o: Partial<Extract<Note, { k: "toucher" }>> = {}): Note => ({ k: "toucher", t, m, v: 0.5, d: 0.12, ...o });
 const chord = (t: number, ms: number[], d: number, o: Partial<Extract<Note, { k: "accord" }>> = {}): Note => ({ k: "accord", t, ms, d, v: 0.5, ...o });
-const RISE = [74, 76, 78, 81, 83];
+const RISE = [74, 76, 78, 81, 83] as const;
 
 /** La signature : La, Fa♯, puis Ré en opale, comme les trois perles du logo qui sautent l’une après l’autre. */
 const signature = (t = 0, gap = 0.075, shift = 0): Note[] => [
@@ -338,7 +339,7 @@ const SCORES = {
   /** Une erreur se dit doucement : deux touchers sourds qui redescendent, sans buzzer. */
   non: (): Score => ({ notes: [T(0, 64, { v: 0.38, d: 0.11, br: 0.3 }), T(0.13, 62, { v: 0.34, d: 0.16, br: 0.25 })], haptic: "erreur" }),
   /** L’analyse : chaque découverte, un toucher discret, un cran plus haut que la précédente. */
-  decouverte: (i: number): Score => ({ notes: [T(0, RISE[i % RISE.length], { v: 0.3, d: 0.1 })] }),
+  decouverte: (i: number): Score => ({ notes: [T(0, RISE[i % RISE.length] ?? RISE[0], { v: 0.3, d: 0.1 })] }),
   analyseFinie: (): Score => ({ notes: [chord(0, [62, 66, 69, 74], 1.6, { v: 0.55 }), ...signature(0)], haptic: "succes" }),
   /** Le verdict : un souffle grave, puis un seul accord quand l’emoji se pose. Le son ne ment pas. */
   verdict: (emoji: "🔥" | "🤏" | "🤔" | "🧊"): Score => {
@@ -382,7 +383,7 @@ export function play<K extends SoundName>(name: K, ...args: Parameters<(typeof S
   const inGesture = navigator.userActivation?.isActive ?? false;
   if (c.ac.state !== "running") {
     if (!inGesture) return;
-    c.ac.resume().catch(() => {});
+    c.ac.resume().catch((e: unknown) => tracer("son:reprise", e));
   }
   const o: Out = { ac: c.ac, c, nodes: [] };
   const t0 = c.ac.currentTime + 0.02;

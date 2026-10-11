@@ -3,7 +3,8 @@
  * empreinte (digest), jamais son message. Le message d’une erreur SQL cite ses paramètres (un email), celui d’un JSON
  * illisible un morceau de la conv, celui d’une erreur du navigateur une adresse avec ses paramètres.
  * Dans le navigateur, tracer() écrit seulement dans sa console (décidé) : rien n’est envoyé au serveur. Une route
- * /api/journal bornée serait un ajout à décider. Les `catch {}` des écrans y passeront au lot 8.
+ * /api/journal bornée serait un ajout à décider. Une erreur inattendue qu’on attrape sans la montrer y passe ; un
+ * `catch` qui reste muet est un repli voulu (un stockage refusé, une adresse illisible), dit par son commentaire.
  */
 
 /** Un champ d’une ligne du journal : un nom, un code, un identifiant, un nombre. Jamais un texte venu de l’utilisateur. */

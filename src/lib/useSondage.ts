@@ -30,9 +30,10 @@ export function useSondage(tour: () => SuiteDuSondage | Promise<SuiteDuSondage>,
         suite = undefined;
       }
       if (!vivant || suite === false) return;
-      minuteur = setTimeout(tourner, typeof suite === "number" ? suite : intervalle);
+      minuteur = setTimeout(() => void tourner(), typeof suite === "number" ? suite : intervalle);
     };
-    minuteur = setTimeout(tourner, immediat ? 0 : intervalle);
+    /* tourner ne lève jamais (son try) : rien à attraper derrière le minuteur */
+    minuteur = setTimeout(() => void tourner(), immediat ? 0 : intervalle);
     return () => {
       vivant = false;
       clearTimeout(minuteur);

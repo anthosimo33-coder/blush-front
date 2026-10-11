@@ -10,6 +10,7 @@ import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, Hist
 import { ErreurApi } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
+import { tracer } from "@/lib/tracer";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
 import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";
@@ -21,8 +22,9 @@ import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";
  */
 const pExport = () => import("./preparer-export");
 const pVideo = () => import("./preparer-video");
-export const prechargerExport = () => void pExport().catch(() => {});
-export const prechargerVideo = () => void pVideo().catch(() => {});
+/* Un préchargement raté (le réseau) ne gêne rien : le préparateur se recharge à l’import. Il laisse sa trace (tracer) */
+export const prechargerExport = () => void pExport().catch((e: unknown) => tracer("prechargement:export", e));
+export const prechargerVideo = () => void pVideo().catch((e: unknown) => tracer("prechargement:video", e));
 
 /*
  * Les types du réseau vivent dans src/types/api.ts. Repris ici pour les modules qui les lisent encore à cette adresse
@@ -59,7 +61,10 @@ type ArgumentsDe<K extends CleRoute> = [Routes[K]["corps"]] extends [never] ? [o
  * Un corps JSON part en JSON, un formulaire tel quel (le navigateur pose son content-type, avec sa frontière).
  */
 function requete<K extends CleFixe>(cle: K, options: Options & { corps?: Routes[K]["corps"] } = {}, entetes?: HeadersInit): Promise<Response> {
-  const [method, chemin] = cle.split(" ");
+  /* « POST /api/chat » : la méthode, puis l’adresse */
+  const espace = cle.indexOf(" ");
+  const method = cle.slice(0, espace);
+  const chemin = cle.slice(espace + 1);
   const { corps, recherche, keepalive, signal } = options;
   const h = avecConv(entetes);
   if (corps !== undefined && !(corps instanceof FormData)) h.set("content-type", "application/json");
@@ -121,7 +126,7 @@ async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat =
       } else if ("reponse" in e) {
         reponse = e.reponse;
         resoudre(e.reponse);
-        if (!e.reponse.vocalEnCours || !suivi.vocal) void lecteur.cancel().catch(() => {});
+        if (!e.reponse.vocalEnCours || !suivi.vocal) void lecteur.cancel().catch((err: unknown) => tracer("chat:arret-du-flux", err));
       } else if ("vocal" in e) {
         vocal = true;
         suivi.vocal?.(e.vocal);
@@ -157,9 +162,14 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
   const px = images.length ? null : await pExport();
   try {
     if (images.length) (await preparerCaptures(images)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
-    else fd.append("export", await px!.preparerExport(files[0]), "export.json.gz");
-  } catch {
+    else {
+      const [fichier] = files;
+      if (!fichier) throw new Error("aucun fichier");
+      fd.append("export", await px!.preparerExport(fichier), "export.json.gz");
+    }
+  } catch (e) {
     /* Un export illisible, ou de plusieurs convs (le chat et la fiche n’en font pas choisir une) : « fichier » */
+    tracer(images.length ? "import:captures-illisibles" : "import:export-illisible", e);
     throw new ErreurApi(images.length ? "capture" : "fichier", 422);
   }
   return fd;
@@ -216,7 +226,8 @@ export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]
   let pret: Awaited<ReturnType<typeof analyserExport>>;
   try {
     pret = await analyserExport(file, onAvance);
-  } catch {
+  } catch (e) {
+    tracer("import:export-illisible", e);
     throw new ErreurApi("fichier", 422);
   }
   if (pret.type === "un") fd.append("export", pret.paquet, "export.json.gz");
@@ -236,7 +247,8 @@ export async function uploadScreenshots(files: File[], opts: { app: AppKind; mod
   const fd = new FormData();
   try {
     (await preparerCaptures(files)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
-  } catch {
+  } catch (e) {
+    tracer("import:captures-illisibles", e);
     throw new ErreurApi("capture", 422);
   }
   fd.append("app", opts.app);
@@ -276,7 +288,7 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
   const arret = new AbortController();
   const lireLot = async (k: number) => {
     const fd = new FormData();
-    lots[k].forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
+    (lots[k] ?? []).forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
     fd.append("app", app);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
@@ -395,7 +407,7 @@ export async function modeVocalChat(actif: boolean): Promise<boolean> {
 /** Un moment de l’écoute du vocal, pour comparer les deux voix (A/B test). Sans réponse attendue : un échec ne gêne pas l’écoute. */
 export function noterEcouteVocal(evenement: EvenementEcoute, position: number): void {
   /* keepalive : l’écoute fermée en quittant la page part quand même */
-  void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch(() => {});
+  void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch((e: unknown) => tracer("vocal:ecoute", e));
 }
 
 export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscription> {
@@ -537,7 +549,7 @@ export async function imagePartage(cible: CibleImage): Promise<Blob> {
 
 /** Une image vraiment partagée ou enregistrée (« Partager en image »), pas seulement préparée : comptée côté serveur. */
 export function compterImagePartagee(): void {
-  void appel("POST /api/partage/compte").catch(() => {});
+  void appel("POST /api/partage/compte").catch((e: unknown) => tracer("partage:compte", e));
 }
 
 export async function desactiverLienPartage(): Promise<void> {

@@ -83,7 +83,7 @@ export function useEnVue(repere: Repere): boolean {
   const [vu, setVu] = useState(false);
   useEffect(() => {
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => setVu(e.isIntersecting), { threshold: 0.15 });
+    const obs = new IntersectionObserver(([e]) => e && setVu(e.isIntersecting), { threshold: 0.15 });
     obs.observe(el);
     return () => {
       obs.disconnect();
@@ -104,7 +104,7 @@ export function useHauteur(repere: Repere): number {
     if (!el) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- une mesure du DOM, avant que l’écran se peigne
     setHauteur(el.getBoundingClientRect().height);
-    const obs = new ResizeObserver(([e]) => setHauteur(e.borderBoxSize[0]?.blockSize ?? el.offsetHeight));
+    const obs = new ResizeObserver(([e]) => e && setHauteur(e.borderBoxSize[0]?.blockSize ?? el.offsetHeight));
     obs.observe(el);
     return () => {
       obs.disconnect();

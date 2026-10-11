@@ -36,12 +36,13 @@ export function minuter(lignes: LigneScript[], al: Alignement): Omit<VocalLigne,
   const n = al.characters.length;
   if (!n) return [];
   const ratio = n === texte.length ? 1 : n / Math.max(1, texte.length);
-  const debut = (i: number) => al.character_start_times_seconds[Math.min(n - 1, Math.floor(i * ratio))];
-  const fin = (i: number) => al.character_end_times_seconds[Math.min(n - 1, Math.floor(i * ratio))];
+  /* Un alignement plus court que ses caractères (mal formé) compte 0 s au lieu de NaN */
+  const debut = (i: number) => al.character_start_times_seconds[Math.min(n - 1, Math.floor(i * ratio))] ?? 0;
+  const fin = (i: number) => al.character_end_times_seconds[Math.min(n - 1, Math.floor(i * ratio))] ?? 0;
   let avant = 0;
   return lignes.map((l, k) => {
     const propre = l.texte.replace(/\[[^\]]*\]/g, "").trim();
-    const d = debuts[k];
+    const d = debuts[k] ?? 0;
     const mots: VocalLigne["mots"] = [];
     let ouvrant = "";
     for (const m of propre.matchAll(/\S+/g)) {
@@ -50,8 +51,9 @@ export function minuter(lignes: LigneScript[], al: Alignement): Omit<VocalLigne,
         ouvrant += `${m[0]}\u00a0`;
         continue;
       }
-      if (/^[»”:;!?…][»”:;!?….,]*$/.test(m[0]) && mots.length) {
-        mots[mots.length - 1].t += `\u00a0${m[0]}`;
+      const precedent = mots.at(-1);
+      if (/^[»”:;!?…][»”:;!?….,]*$/.test(m[0]) && precedent) {
+        precedent.t += `\u00a0${m[0]}`;
         continue;
       }
       /* Un mot ne commence jamais avant le précédent : l’alignement peut hésiter sur une ponctuation */
@@ -79,12 +81,12 @@ export function ondeDe(al: Alignement, n = 28): number[] {
   const lettres = Array.from({ length: n }, () => 0);
   al.characters.forEach((c, i) => {
     if (!/\S/.test(c)) return;
-    const k = Math.min(n - 1, Math.floor((al.character_start_times_seconds[i] / fin) * n));
-    compte[k]++;
-    lettres[k] = (lettres[k] * 31 + c.charCodeAt(0)) % 997;
+    const k = Math.min(n - 1, Math.floor(((al.character_start_times_seconds[i] ?? 0) / fin) * n));
+    compte[k] = (compte[k] ?? 0) + 1;
+    lettres[k] = ((lettres[k] ?? 0) * 31 + c.charCodeAt(0)) % 997;
   });
   const max = Math.max(1, ...compte);
-  return compte.map((x, k) => (x ? Math.round((0.3 + 0.35 * (x / max) + 0.35 * (lettres[k] / 997)) * 100) / 100 : 0.15));
+  return compte.map((x, k) => (x ? Math.round((0.3 + 0.35 * (x / max) + 0.35 * ((lettres[k] ?? 0) / 997)) * 100) / 100 : 0.15));
 }
 
 /** La ligne dite à l’instant `t` : la dernière commencée (entre deux lignes, la précédente reste affichée). */

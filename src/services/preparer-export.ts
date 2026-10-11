@@ -8,6 +8,7 @@ import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, debutDeMessage, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
 import { ENVOI_EXPORT_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
+import { tracer } from "@/lib/tracer";
 
 export class ExportIllisible extends Error {
   constructor(readonly code: "fichier" | "plusieurs") {
@@ -72,8 +73,12 @@ function compresser(octets: Uint8Array): Promise<Uint8Array> {
     }, 30_000);
     try {
       /* Sans `consume` : le Worker reçoit une copie, et le repli a encore les octets */
-      arreter = gzip(octets, (err, gz) => finir(err ? null : gz));
-    } catch {
+      arreter = gzip(octets, (err, gz) => {
+        if (err) tracer("export:compression", err);
+        finir(err ? null : gz);
+      });
+    } catch (e) {
+      tracer("export:compression", e);
       finir();
     }
   });
@@ -128,10 +133,11 @@ async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
  * récent, et chaque fichier va du plus récent au plus ancien ; les fichiers les plus anciens partent d’abord.
  */
 export function garderLaFin(parties: Partie[], part: number): Partie[] {
-  if (parties.length === 1 && /\.txt$/i.test(parties[0].nom)) {
-    const c = parties[0].contenu;
+  const [seule] = parties;
+  if (parties.length === 1 && seule && /\.txt$/i.test(seule.nom)) {
+    const c = seule.contenu;
     /* Le premier début de message (une ligne qui commence par une date) après la coupe ; sans, la conv reste entière */
-    return [{ ...parties[0], contenu: c.slice(Math.max(0, debutDeMessage(c, Math.floor(c.length * (1 - part))))) }];
+    return [{ ...seule, contenu: c.slice(Math.max(0, debutDeMessage(c, Math.floor(c.length * (1 - part))))) }];
   }
   let reste = parties.reduce((n, p) => n + p.contenu.length, 0) * part;
   const gardees: Partie[] = [];
@@ -176,7 +182,15 @@ export async function analyserExport(
     onAvance?.((k + 1) / convs.length);
   }
   if (!resumes.length) throw new ExportIllisible("fichier");
-  return { type: "plusieurs", convs: resumes, paquetDe: async (id) => paquet(fichier.name, await contenus(convs[+id].parties)) };
+  return {
+    type: "plusieurs",
+    convs: resumes,
+    paquetDe: async (id) => {
+      const conv = convs[+id];
+      if (!conv) throw new ExportIllisible("fichier");
+      return paquet(fichier.name, await contenus(conv.parties));
+    },
+  };
 }
 
 /** Le fichier choisi devient un petit paquet compressé : { parties: [{ nom, contenu }] } en gzip. */
@@ -200,11 +214,13 @@ async function ouvrir(fichier: File): Promise<{ choix: Partie[] | "plusieurs"; n
     if (!parties || parties === "plusieurs") throw new ExportIllisible("fichier");
     return { choix: parties, noms: parties, contenus: async (p) => p };
   }
-  const entrees = await entreesZip(fichier).catch(() => {
+  const entrees = await entreesZip(fichier).catch((e: unknown) => {
+    tracer("export:zip-illisible", e);
     throw new ExportIllisible("fichier");
   });
   const lire = (noms: string[]) =>
-    Promise.all(noms.map(async (nom) => ({ nom, contenu: await lireEntree(fichier, entrees.find((e) => e.nom === nom)!) }))).catch(() => {
+    Promise.all(noms.map(async (nom) => ({ nom, contenu: await lireEntree(fichier, entrees.find((e) => e.nom === nom)!) }))).catch((e: unknown) => {
+      tracer("export:zip-illisible", e);
       throw new ExportIllisible("fichier");
     });
   /* Les noms suffisent pour savoir ce qu’est l’export ; on ne lit d’avance que les .txt (WhatsApp, petits) */
@@ -223,7 +239,8 @@ const estUnZip = async (fichier: Blob) => {
 
 export async function lireFichiers(fichier: Blob & { name: string }): Promise<Partie[]> {
   if (await estUnZip(fichier)) {
-    return lireZip(fichier).catch(() => {
+    return lireZip(fichier).catch((e: unknown) => {
+      tracer("export:zip-illisible", e);
       throw new ExportIllisible("fichier");
     });
   }

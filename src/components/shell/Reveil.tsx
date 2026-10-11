@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { tracer } from "@/lib/tracer";
 
 /*
  * Réveiller le serveur avant d’en avoir besoin. Après quelques minutes sans requête, la première paie le démarrage
@@ -22,7 +23,8 @@ let dernier = 0;
 export function reveiller(): void {
   if (Date.now() - dernier < ECART_MS) return;
   dernier = Date.now();
-  void fetch("/api/reveil", { cache: "no-store" }).catch(() => {});
+  /* Sans réseau, le réveil attendra le prochain : une trace dans la console (tracer), rien à l’écran */
+  void fetch("/api/reveil", { cache: "no-store" }).catch((e: unknown) => tracer("reveil", e));
 }
 
 /** Le réveil au chargement de l’appli, et au retour au premier plan après plus de 4 minutes. */

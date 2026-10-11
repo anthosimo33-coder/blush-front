@@ -25,7 +25,7 @@ export function useAccess() {
   const { data } = useCompte(page?.compte ?? undefined, { rendu: page?.rendu, frais: FRAIS_DU_RENDU });
   const plan = data?.subscription.plan;
   return {
-    initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,
+    initiale: data?.email ? [...data.email][0]?.toUpperCase() : undefined,
     loaded: !!data,
     plan: plan ?? "gratuit",
     peut: (besoin: Besoin) => !!plan && peut(plan, besoin),

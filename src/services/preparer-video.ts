@@ -36,7 +36,8 @@ function ecart(a: Mesure, b: Mesure, d: number): number {
   for (let y = debut; y < fin; y++) {
     const ia = y * MESURE_L;
     const ib = (y + d) * MESURE_L;
-    for (let x = 0; x < MESURE_L; x++) somme += Math.abs(a[ia + x] - b[ib + x]);
+    /* Les deux indices restent dans les mesures (de 0 à MESURE_L × MESURE_H) */
+    for (let x = 0; x < MESURE_L; x++) somme += Math.abs(a[ia + x]! - b[ib + x]!);
   }
   return somme / ((fin - debut) * MESURE_L);
 }
@@ -113,7 +114,8 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
       cm.drawImage(v, 0, H * HAUT, L, H * (BAS - HAUT), 0, 0, MESURE_L, MESURE_H);
       const px = cm.getImageData(0, 0, MESURE_L, MESURE_H).data;
       const m = new Float32Array(MESURE_L * MESURE_H);
-      for (let i = 0; i < m.length; i++) m[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+      /* px : quatre octets (RVBA) par point de la mesure */
+      for (let i = 0; i < m.length; i++) m[i] = 0.299 * px[i * 4]! + 0.587 * px[i * 4 + 1]! + 0.114 * px[i * 4 + 2]!;
       return m;
     };
     const echelle = Math.min(1, COTE_IMAGE_MAX / Math.max(L, H));
@@ -185,7 +187,8 @@ export function lotsDe<T>(images: T[], taille = 12, poids: (x: T) => number = ()
   while (i < images.length) {
     let j = i;
     let total = 0;
-    while (j < images.length && j - i < taille && (j === i || total + poids(images[j]) <= max)) total += poids(images[j++]);
+    /* j < images.length : l’image existe */
+    while (j < images.length && j - i < taille && (j === i || total + poids(images[j]!) <= max)) total += poids(images[j++]!);
     lots.push(images.slice(i, j));
     if (j >= images.length) break;
     /* Le lot suivant reprend la dernière image de celui-ci (sauf un lot d’une seule image : on avance) */

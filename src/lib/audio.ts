@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { tracer } from "./tracer";
 
 /*
  * L’audio du navigateur, écrit une fois : la session audio de Safari (le mode silencieux, le micro), le contexte Web
@@ -100,7 +101,8 @@ export function creerAudioContext(options?: AudioContextOptions): AudioContext |
   if (!AC) return null;
   try {
     return new AC(options);
-  } catch {
+  } catch (e) {
+    tracer("audio:contexte", e);
     return null;
   }
 }
@@ -127,8 +129,9 @@ export async function chargerEnMemoire(url: string, signal: AbortSignal): Promis
     const r = await fetch(url, { credentials: "same-origin", signal });
     const b = r.ok ? await r.blob() : null;
     return b && !signal.aborted ? URL.createObjectURL(b) : null;
-  } catch {
-    /* Rien en mémoire : le toucher lira le son sur le réseau */
+  } catch (e) {
+    /* Rien en mémoire : le toucher lira le son sur le réseau. Arrêté exprès (signal), rien à signaler */
+    if (!signal.aborted) tracer("audio:chargement", e);
     return null;
   }
 }
