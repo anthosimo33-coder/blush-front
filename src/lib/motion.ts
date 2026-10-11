@@ -11,6 +11,12 @@ export type Box = { left: number; top: number; width: number; height: number };
 
 export const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** L’ordinateur : la même borne que `lg:` (1024 px). Les feuilles s’y ouvrent au centre, l’accueil y a sa fenêtre de conv. */
+export const DESKTOP = "(min-width: 1024px)";
+
+/** Sur ordinateur maintenant (DESKTOP) ? Faux hors du navigateur. */
+export const estDesktop = () => typeof window !== "undefined" && window.matchMedia(DESKTOP).matches;
+
 /**
  * Le délai d’une entrée de globals.css (`data-rise`, `data-popin`…), en secondes : la variable `--d` de son `style`.
  * La seule façon de l’écrire, seule (`style={delai(0.2)}`) ou avec d’autres (`{ ...delai(i * 0.05), "--i": i }`).

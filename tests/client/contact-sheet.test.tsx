@@ -1,22 +1,43 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NextRouter } from "next/router";
-import { RouterContext } from "next/dist/shared/lib/router-context.shared-runtime";
 import { ContactSheet, type Departs } from "@/app/app/accueil/ContactSheet";
 import { sortieDeFeuille } from "@/components/ui/surfaces";
 
 /*
  * Les détails du contact de l’accueil (src/app/app/accueil/ContactSheet.tsx) : ce qu’ils montrent, et leur fermeture
- * animée, qui passe par les refs de la feuille (son panneau, son voile, son dialogue) et non par le DOM autour d’elle.
- * Le DOM simulé n’a ni mise en page ni animations : animate() est noté (comme dans sheet.test.tsx), offsetParent est
- * le parent, et les minuteurs (requestAnimationFrame compris) avancent à la main.
+ * animée : la feuille joue sa propre sortie au rythme qu’on lui donne (sortie), la bulle et l’avatar regagnent l’en-tête
+ * avec elle, et tout reprend sa place à sa fin (onClosed). Le DOM simulé n’a ni mise en page ni animations : animate()
+ * est noté et finit quand le test le dit (comme dans sheet.test.tsx), offsetParent est le parent, et les minuteurs
+ * (requestAnimationFrame compris) avancent à la main.
  */
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }) }));
+/*
+ * next/link, réduit à ce que la feuille en attend : onNavigate reçoit le toucher, et un lien dont la navigation est
+ * empêchée (preventDefault) ne navigue pas. `suivi` note les liens suivis. (Le vrai lien ne navigue que sous le routeur de Next.)
+ */
+const suivi = vi.hoisted(() => ({ liens: [] as string[] }));
+vi.mock("next/link", () => ({
+  useLinkStatus: () => ({ pending: false }),
+  default: ({ href, onNavigate, children, className }: { href: string; onNavigate?: (e: { preventDefault: () => void }) => void; children: ReactNode; className?: string }) => (
+    <a
+      href={href}
+      className={className}
+      onClick={(e: MouseEvent) => {
+        e.preventDefault();
+        let empeche = false;
+        onNavigate?.({ preventDefault: () => void (empeche = true) });
+        if (!empeche) suivi.liens.push(href);
+      }}
+    >
+      {children}
+    </a>
+  ),
+}));
 
-type Animee = { el: Element; images: Keyframe[]; temps: KeyframeAnimationOptions };
+type Animee = { el: Element; images: Keyframe[]; temps: KeyframeAnimationOptions; finir: () => void };
 let animees: Animee[] = [];
 let moinsDeMouvement = false;
 /* Les éléments d’en-tête posés par un test (enTete), retirés après lui */
@@ -28,13 +49,16 @@ beforeEach(() => {
   animees = [];
   moinsDeMouvement = false;
   push.mockReset();
+  suivi.liens = [];
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
   vi.spyOn(window, "matchMedia").mockImplementation(
     (requete: string) => ({ matches: requete.includes("reduced-motion") ? moinsDeMouvement : false, media: requete, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
   );
   Element.prototype.animate = function (this: Element, images: Keyframe[] | PropertyIndexedKeyframes | null, temps?: number | KeyframeAnimationOptions) {
-    animees.push({ el: this, images: images as Keyframe[], temps: temps as KeyframeAnimationOptions });
-    return { finished: new Promise(() => {}), cancel: vi.fn() } as unknown as Animation;
+    let finir!: () => void;
+    const finished = new Promise<void>((ok) => (finir = ok));
+    animees.push({ el: this, images: images as Keyframe[], temps: temps as KeyframeAnimationOptions, finir });
+    return { finished, cancel: vi.fn() } as unknown as Animation;
   };
   Element.prototype.getAnimations = () => [];
   Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get: function (this: HTMLElement) { return this.parentElement; } });
@@ -62,7 +86,29 @@ function enTete(): Departs {
   return { logo: { src: logo, from: { left: 150, top: 10, width: 88, height: 88 } }, av: { src: av, from: { left: 330, top: 20, width: 40, height: 40 } } };
 }
 
+/** L’accueil autour de la feuille : il l’ouvre (« ouvrir ») et la ferme quand elle le demande (onClose). */
+function Accueil({ departRef, onClose }: { departRef: { current: Departs | null }; onClose?: () => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        ouvrir
+      </button>
+      <ContactSheet
+        contact={CONTACT}
+        open={open}
+        onClose={() => {
+          onClose?.();
+          setOpen(false);
+        }}
+        departRef={departRef}
+      />
+    </>
+  );
+}
+
 const feuille = () => screen.getByRole("dialog", { name: "Maëlys et toi" });
+const dialogue = () => document.querySelector("dialog")!;
 const panneau = () => feuille().querySelector<HTMLElement>("[tabindex='-1']")!;
 const voile = () => feuille().querySelector<HTMLElement>("[aria-hidden='true']")!;
 
@@ -97,11 +143,11 @@ describe("ContactSheet : ce qu’il montre", () => {
 });
 
 describe("ContactSheet : l’ouverture et la fermeture animées", () => {
-  it("la bulle et l’avatar quittent l’en-tête ; à la fermeture, le panneau et le voile de la feuille redescendent à son rythme, puis onClose", () => {
+  it("la bulle et l’avatar quittent l’en-tête ; à la fermeture, onClose tout de suite, la feuille redescend à son rythme, et tout reprend sa place à la fin de sa sortie", async () => {
     const onClose = vi.fn();
     const de = enTete();
-    const departRef = { current: de };
-    const { rerender } = render(<ContactSheet contact={CONTACT} open onClose={onClose} departRef={departRef} />);
+    const departRef = { current: de as Departs | null };
+    render(<Accueil departRef={departRef} onClose={onClose} />);
     act(() => void vi.advanceTimersByTime(20));
     /* Le départ est lu une fois, puis oublié ; ce qui vole est caché à sa place de départ */
     expect(departRef.current).toBeNull();
@@ -111,20 +157,54 @@ describe("ContactSheet : l’ouverture et la fermeture animées", () => {
     animees = [];
 
     fireEvent.click(within(feuille()).getByRole("button", { name: "Fermer" }));
+    /* La fermeture est demandée tout de suite : la feuille joue sa propre sortie, au rythme de celle du contact (300 ms) */
+    expect(onClose).toHaveBeenCalledTimes(1);
     const { temps, panneau: descente, voile: extinction } = sortieDeFeuille(false, { duration: 300, easing: "cubic-bezier(0.3, 0, 0.2, 1)" });
     const duPanneau = animees.find((a) => a.el === panneau());
     const duVoile = animees.find((a) => a.el === voile());
-    expect(duPanneau).toEqual({ el: panneau(), images: descente, temps });
-    expect(duVoile).toEqual({ el: voile(), images: extinction, temps });
-    expect(onClose).not.toHaveBeenCalled();
+    expect(duPanneau).toMatchObject({ images: descente, temps });
+    expect(duVoile).toMatchObject({ images: extinction, temps });
+    /* La bulle et l’avatar regagnent l’en-tête au même rythme (leurs doubles volent) ; l’en-tête reste caché pendant la sortie */
+    expect(animees.filter((a) => a.el !== panneau() && a.el !== voile()).every((a) => a.temps.duration === 300)).toBe(true);
+    expect(de.logo!.src.style.visibility).toBe("hidden");
+    expect(dialogue().open).toBe(true);
     /* Un second toucher pendant la sortie ne la relance pas */
     fireEvent.click(within(feuille()).getByRole("button", { name: "Fermer" }));
-    expect(animees.filter((a) => a.el === panneau())).toHaveLength(1);
-    act(() => void vi.advanceTimersByTime(300));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(animees.filter((a) => a.el === panneau())).toHaveLength(1);
 
-    /* Fermée : tout reprend sa place dans l’en-tête */
-    rerender(<ContactSheet contact={CONTACT} open={false} onClose={onClose} departRef={departRef} />);
+    /* La sortie finie, le dialogue se ferme (onClosed) : tout reprend sa place dans l’en-tête */
+    await act(async () => duPanneau!.finir());
+    await act(async () => {});
+    expect(dialogue().open).toBe(false);
+    expect(de.logo!.src.style.visibility).toBe("");
+    expect(de.av!.src.style.visibility).toBe("");
+  });
+
+  it("rouverte pendant sa sortie : la précédente remet tout en place, la bulle et l’avatar repartent vers la feuille", async () => {
+    const de = enTete();
+    const departRef = { current: de as Departs | null };
+    render(<Accueil departRef={departRef} />);
+    act(() => void vi.advanceTimersByTime(20));
+    fireEvent.click(within(feuille()).getByRole("button", { name: "Fermer" }));
+    departRef.current = de;
+    fireEvent.click(screen.getByText("ouvrir"));
+    act(() => void vi.advanceTimersByTime(20));
+    expect(dialogue().open).toBe(true);
+    /* Repartis vers la feuille : cachés à leur place de départ, et la fermeture suivante rejoue la sortie */
+    expect(de.logo!.src.style.visibility).toBe("hidden");
+    animees = [];
+    fireEvent.click(within(feuille()).getByRole("button", { name: "Fermer" }));
+    expect(animees.some((a) => a.el === panneau())).toBe(true);
+  });
+
+  it("l’accueil quitté pendant la sortie : rien ne reste caché dans l’en-tête", () => {
+    const de = enTete();
+    const { unmount } = render(<Accueil departRef={{ current: de }} />);
+    act(() => void vi.advanceTimersByTime(20));
+    fireEvent.click(within(feuille()).getByRole("button", { name: "Fermer" }));
+    expect(de.logo!.src.style.visibility).toBe("hidden");
+    unmount();
     expect(de.logo!.src.style.visibility).toBe("");
     expect(de.av!.src.style.visibility).toBe("");
   });
@@ -141,27 +221,28 @@ describe("ContactSheet : l’ouverture et la fermeture animées", () => {
     expect(animees.some((a) => a.el === panneau())).toBe(false);
   });
 
-  it("vers le rapport : le dialogue se ferme d’un coup, puis on part, une image et 120 ms plus tard", () => {
+  it("vers le rapport : le dialogue se ferme d’un coup, tout reprend sa place, puis on part, une image et 120 ms plus tard", () => {
     const onClose = vi.fn();
-    /*
-     * next/link ne suit un lien (et n’appelle onNavigate) que sous un routeur. Hors du build de Next, `next/link` est
-     * celui des pages : un routeur simulé, qui note (le lien lui-même ne doit pas s’en servir)
-     */
-    const routeur = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(() => Promise.resolve()) } as unknown as NextRouter;
-    render(
-      <RouterContext value={routeur}>
-        <ContactSheet contact={CONTACT} open onClose={onClose} departRef={{ current: enTete() }} />
-      </RouterContext>,
-    );
+    const de = enTete();
+    render(<Accueil departRef={{ current: de }} onClose={onClose} />);
     act(() => void vi.advanceTimersByTime(20));
-    const dialogue = document.querySelector("dialog")!;
+    animees = [];
     fireEvent.click(within(feuille()).getByRole("link", { name: /Le rapport de votre histoire/ }));
-    expect(dialogue.open).toBe(false);
+    expect(dialogue().open).toBe(false);
     expect(onClose).toHaveBeenCalledTimes(1);
+    /* Sans sortie animée : rien ne redescend, et l’en-tête est déjà en place (Safari le capture pour le geste retour) */
+    expect(animees.some((a) => a.el === panneau())).toBe(false);
+    expect(de.logo!.src.style.visibility).toBe("");
     expect(push).not.toHaveBeenCalled();
     act(() => void vi.advanceTimersByTime(20 + 120));
     expect(push).toHaveBeenCalledWith("/rapport");
     /* Le lien lui-même ne navigue pas : c’est le départ différé qui s’en charge */
-    expect(routeur.push).not.toHaveBeenCalled();
+    expect(suivi.liens).toEqual([]);
+  });
+
+  it("vers sa fiche : le lien est suivi (la feuille garde le glissé de l’avatar)", () => {
+    render(<Accueil departRef={{ current: enTete() }} />);
+    fireEvent.click(within(feuille()).getByRole("link", { name: /^Sa fiche/ }));
+    expect(suivi.liens).toEqual(["/app/fiche"]);
   });
 });

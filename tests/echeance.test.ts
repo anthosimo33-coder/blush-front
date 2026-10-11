@@ -57,8 +57,8 @@ describe("l’échéance d’une fonction", () => {
     expect(ailleurs[0].texte).toContain("export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);");
   });
 
-  it("une route qui lance la chaîne des tâches (executerChaine) vit DUREE_FONCTION_S", () => {
-    const routes = sources("src/app").filter((f) => /\bexecuterChaine\(/.test(f.texte));
+  it("une route qui lance la chaîne des tâches (executerChaine, ou ficheEtMaj qui la relance) vit DUREE_FONCTION_S", () => {
+    const routes = sources("src/app").filter((f) => /\b(executerChaine|ficheEtMaj)\(/.test(f.texte));
     expect(routes.length).toBeGreaterThanOrEqual(5);
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);
   });

@@ -21,7 +21,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
-import { delai, flipFrom, flyBox, flyText, prefersReducedMotion, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box } from "@/lib/motion";
+import { delai, DESKTOP, flipFrom, flyBox, flyText, prefersReducedMotion, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { sendToBlush, sendVoiceToBlush } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
@@ -38,7 +38,7 @@ import { scaleOf } from "@/components/ui/progress";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { useHydrated } from "@/state/journey";
-import type { BlushAnswer, BulleChat, ConvSummary, Fiche, LevelId, Pronom, Report } from "@/types";
+import type { BlushAnswer, BulleChat, ConvSummary, LevelId, Pronom } from "@/types";
 import { VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { Composer, formatSize, SendReply } from "./accueil/Composer";
 import {
@@ -60,19 +60,12 @@ import {
 } from "./accueil/conv/modele";
 import { nouvelId, useConversation } from "./accueil/conv/useConversation";
 import { ContactSheet, departs, type Departs } from "./accueil/ContactSheet";
+import type { HomeContact } from "./accueil/contact";
 import type { Devant } from "./accueil/conv/useChargerAnciens";
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/app/rapport/Partage.tsx) arrive à part, après l’affichage */
 const PartageImageSheet = dynamic(() => import("../rapport/Partage").then((m) => m.PartageImageSheet), { ssr: false });
 
-/** Ce que l’accueil montre de votre histoire : elle comme un contact, le verdict, où vous en êtes, ton prochain pas. */
-export type HomeContact = {
-  report: Pick<Report, "verdict" | "level" | "trend" | "nextStep">;
-  fiche: Pick<Fiche, "person" | "summaryShort">;
-  period: string;
-  /** Où mène sa fiche (l’aperçu a la sienne). */
-  ficheHref?: string;
-};
 
 const ContactContext = createContext<HomeContact | null>(null);
 
@@ -93,7 +86,6 @@ const MotionContext = createContext<HomeMotion>({ arriving: false });
 
 const useHomeMotion = () => use(MotionContext);
 
-const DESKTOP = "(min-width: 1024px)";
 
 function useDesktop() {
   return useSyncExternalStore(

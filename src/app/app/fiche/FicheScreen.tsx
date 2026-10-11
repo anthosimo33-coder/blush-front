@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
-import { FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
+import { ecritDepuis, FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
 import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
@@ -59,8 +59,11 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   const key = fixed ? ("fiche-apercu" as const) : (`fiche:${storyId ?? ""}` as const);
   /* `rendu` : l’heure du rendu serveur. Préchargée par l’accueil, la page garde la fiche d’alors : modifiée ici depuis,
      on part de la version gardée en cache. Rendue à l’instant (moins de 10 s, FRAIS_DU_RENDU), elle n’est pas relue au
-     montage (Q63) ; plus ancienne, ou revue par l’historique, la relecture rattrape ce que le chat y a ajouté */
-  const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu, frais: FRAIS_DU_RENDU });
+     montage (Q63) : le rendu dit déjà si une mise à jour de la mémoire tourne (`updating`, getFicheEtMaj), et la fiche se
+     relit alors jusqu’à ce qu’elle ait fini. Plus ancienne, revue par l’historique, ou rendue avant un message du chat
+     (qui a pu lancer une mise à jour depuis, ecritDepuis), elle est relue : la relecture rattrape ce que le chat y a ajouté */
+  const [frais] = useState(() => (rendu !== undefined && ecritDepuis("chat", rendu) ? 0 : FRAIS_DU_RENDU));
+  const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu, frais });
   const fiche = data ?? initial;
   const [editing, setEditing] = useState(false);
   const [job, setJob] = useState<Job>({ step: "idle" });

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ViewTransition } from "react";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
-import { convChoisie, getFiche, sansHistoire } from "@/services/serveur";
+import { convChoisie, getFicheEtMaj, sansHistoire } from "@/services/serveur";
 import { FicheScreen } from "./FicheScreen";
 import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Sa fiche" };
 /* Depuis l’accueil, sa fiche arrive par la droite ; « Retour » la renvoie à droite (globals.css, « Sophie, en glissé ») */
 export default async function Page() {
   const rendu = heureDuRendu();
-  const [storyId, fiche] = await Promise.all([convChoisie(), getFiche()]);
+  const [storyId, fiche] = await Promise.all([convChoisie(), getFicheEtMaj()]);
   if (!fiche) redirect(await sansHistoire("/app/fiche"));
   return (
     <>

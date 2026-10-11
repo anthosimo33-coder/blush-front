@@ -1,6 +1,7 @@
 import "server-only";
 import type { ConvSummary, Fiche, Story } from "@/types";
 import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
+import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
@@ -74,9 +75,20 @@ export async function getContact(): Promise<Pick<ReportPayload["report"], "verdi
   return utilisateur && story ? contactDe(story.id) : null;
 }
 
+/** Sa fiche, telle qu’elle est écrite (ce que l’accueil en montre : son prénom, son résumé). */
 export async function getFiche(): Promise<Fiche | null> {
   const { utilisateur, story } = await contexte();
   return utilisateur && story ? ficheDe(story) : null;
+}
+
+/**
+ * Sa fiche pour sa page, comme GET /api/fiche la donne (ficheEtMaj) : avec `updating` si une mise à jour de la mémoire
+ * tourne (l’écran, qui ne relit pas une fiche rendue à l’instant, la relit alors dès le montage), et une mise à jour
+ * restée en plan relancée après le rendu.
+ */
+export async function getFicheEtMaj(): Promise<Fiche | null> {
+  const { utilisateur, story } = await contexte();
+  return utilisateur && story ? ficheEtMaj(story) : null;
 }
 
 /** Les questions tirées de la mémoire de la conv : les questions toutes prêtes de l’accueil, les idées de « Ta question ». */

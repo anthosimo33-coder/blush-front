@@ -1,42 +1,33 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { flyBox, prefersReducedMotion, restingBox, visible, type Box, type Spring } from "@/lib/motion";
+import { useCallback, useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { estDesktop, flyBox, prefersReducedMotion, restingBox, visible, type Box, type Spring } from "@/lib/motion";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
-import { InsetRow } from "@/components/ui/inset";
+import { InsetGroup, InsetRow } from "@/components/ui/inset";
 import { Tag } from "@/components/ui/messages";
 import { LevelPath } from "@/components/ui/progress";
-import { Sheet, sortieDeFeuille } from "@/components/ui/surfaces";
-import type { HomeContact } from "../HomeScreen";
+import { Sheet } from "@/components/ui/surfaces";
+import type { HomeContact } from "./contact";
 
 /*
  * Les détails du contact (9 · « Ce que BLUSH voit ») : où vous en êtes, le rapport, sa fiche. Un toucher sur BLUSH, en
  * haut de l’accueil, l’ouvre : sa bulle et l’avatar de l’autre volent de l’en-tête vers la feuille, l’écran recule
- * derrière elle, puis tout regagne sa place à la fermeture. La feuille donne son dialogue, son panneau et son voile par
- * des refs (src/components/ui/surfaces.tsx) : rien n’est cherché dans le DOM autour d’elle.
+ * derrière elle, puis tout regagne sa place à la fermeture. La feuille donne son dialogue et son panneau par des refs
+ * (src/components/ui/surfaces.tsx), joue sa sortie au rythme qu’on lui donne et prévient de sa fin (onClosed). Ce qui
+ * vit hors d’elle est encore cherché dans la page : l’écran qui recule (recede) et ce qui s’envole de l’en-tête (departs),
+ * jusqu’à 5c (src/app/app/accueil/mouvement/).
  */
-
-const DESKTOP = "(min-width: 1024px)";
 
 /** La feuille « Ce que BLUSH voit » monte en 0,35 s : le logo et l’avatar y volent au même rythme. */
 const SHEET_IN: Spring = { duration: 380, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
 const SHEET_OUT: Spring = { duration: 300, easing: "cubic-bezier(0.3, 0, 0.2, 1)" };
 
-/** Le filet entre deux lignes de la carte, comme dans une liste groupée (InsetGroup). */
-const FILET = "border-t border-[rgba(17,17,20,0.06)]";
-
-/**
- * Le sous-titre d’une ligne, posé même vide (sa fiche pas encore écrite) : InsetRow saute un sous-titre vide, et le titre
- * descendrait d’une demi-ligne. Dans un fragment, toujours là : la ligne garde sa forme.
- */
-const toujours = (texte: string) => <>{texte}</>;
-
 /** La pastille ronde en tête d’une ligne de la feuille : le verdict, l’avatar de l’autre. */
 function Pastille({ children }: { children: ReactNode }) {
-  return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F4F2ED]">{children}</span>;
+  return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-paper">{children}</span>;
 }
 
 /**
@@ -44,10 +35,11 @@ function Pastille({ children }: { children: ReactNode }) {
  * « reset » remet tout en place sans animation (fermeture, départ vers une autre page).
  */
 function recede(state: "in" | "out" | "reset", timing?: Spring) {
+  /* TODO(5c): l’accueil par une ref (mouvement/), plus par sa classe */
   const page = document.querySelector<HTMLElement>(".home-page");
   /* Le fond noir vit sur <body> : on l’enlève toujours, même quand l’accueil a déjà disparu
      (depuis la feuille, on part vers le rapport ou sa fiche : l’accueil est retiré avant ce nettoyage) */
-  if (state === "reset" || !page || window.matchMedia(DESKTOP).matches) {
+  if (state === "reset" || !page || estDesktop()) {
     document.body.style.removeProperty("background");
     if (!page) return;
     page.getAnimations().forEach((a) => a.cancel());
@@ -88,6 +80,7 @@ export type Departs = { logo: Depart | null; av: Depart | null };
 
 /** 9 · Relève d’où partent la bulle de BLUSH et l’avatar de l’autre (ceux qu’on voit, mobile ou desktop) : au toucher, quand la page est encore à jour. */
 export function departs(): Departs {
+  /* TODO(5c): le registre du logo et de l’avatar de l’en-tête, au lieu de leurs attributs cherchés dans toute la page */
   const de = (selector: string) => {
     const src = visible<HTMLElement>(selector);
     return src ? { src, from: src.getBoundingClientRect() } : null;
@@ -114,16 +107,36 @@ export function ContactSheet({
   const router = useRouter();
   const logoRef = useRef<HTMLSpanElement>(null);
   const avRef = useRef<HTMLSpanElement>(null);
-  /* Le dialogue, le panneau et le voile de la feuille, qu’elle nous donne */
+  /* Le dialogue et le panneau de la feuille, qu’elle nous donne */
   const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const voileRef = useRef<HTMLDivElement>(null);
   /* 9 · Ce qui a quitté l’en-tête pour la feuille : la bulle et l’avatar de l’autre, et d’où ils venaient (pour y revenir) */
   const moved = useRef<{ src: HTMLElement; from: Box; target: HTMLElement | SVGElement }[]>([]);
+  /* La feuille joue sa sortie (close) : tout reprend sa place à sa fin (onClosed) */
   const closing = useRef(false);
+
+  /* Tout reprend sa place : la bulle et l’avatar dans l’en-tête, l’écran derrière la feuille */
+  const remettre = useCallback(() => {
+    for (const m of moved.current) {
+      shown(m.src, true);
+      shown(m.target, true);
+    }
+    moved.current = [];
+    closing.current = false;
+    recede("reset");
+  }, []);
+  /* L’accueil quitté pendant la sortie : rien ne reste caché, ni l’écran reculé */
+  useEffect(
+    () => () => {
+      if (closing.current) remettre();
+    },
+    [remettre],
+  );
 
   useEffect(() => {
     if (!open || prefersReducedMotion()) return;
+    /* Rouverte pendant sa sortie : la précédente finit d’abord de tout remettre en place */
+    if (closing.current) remettre();
     /* Le départ a été relevé au toucher ; l’arrivée l’est à l’image suivante, la feuille posée : rien n’oblige le clic à remettre la page en page */
     const de = departRef.current ?? departs();
     departRef.current = null;
@@ -158,33 +171,24 @@ export function ContactSheet({
     });
     return () => {
       cancelAnimationFrame(raf);
-      /* La feuille est fermée (ou on part vers le rapport, sa fiche) : tout reprend sa place */
-      for (const m of moved.current) {
-        shown(m.src, true);
-        shown(m.target, true);
-      }
-      moved.current = [];
-      closing.current = false;
-      recede("reset");
+      /* Fermée sans sortie (on part vers le rapport) : tout reprend sa place tout de suite. Fermée par close(), la
+         feuille redescend encore : à la fin de sa sortie (onClosed) */
+      if (!closing.current) remettre();
     };
-  }, [open, departRef]);
+  }, [open, departRef, remettre]);
 
   /*
-   * La fermeture : la feuille redescend (la sortie de la Sheet, à notre rythme), la bulle et l’avatar regagnent
-   * l’en-tête, l’écran revient. La Sheet voit l’animation déjà posée sur son panneau et ferme sans rejouer la sienne.
+   * La fermeture : la feuille redescend (sa sortie, à notre rythme : SHEET_OUT), la bulle et l’avatar regagnent
+   * l’en-tête au même rythme, l’écran revient. À la fin de la sortie (onClosed), tout reprend sa place.
    */
   const close = () => {
     if (closing.current) return;
-    const panel = panelRef.current;
     const dialog = dialogRef.current;
-    if (prefersReducedMotion() || !moved.current.length || !panel || !dialog) {
+    if (prefersReducedMotion() || !moved.current.length || !dialog) {
       onClose();
       return;
     }
     closing.current = true;
-    const { temps, panneau, voile } = sortieDeFeuille(window.matchMedia(DESKTOP).matches, SHEET_OUT);
-    panel.animate(panneau, temps);
-    voileRef.current?.animate(voile, temps);
     for (const m of moved.current) {
       const from = m.target.getBoundingClientRect();
       const clone = m.target.cloneNode(true) as HTMLElement | SVGElement;
@@ -192,7 +196,7 @@ export function ContactSheet({
       void flyBox(clone, from, m.from, { spring: SHEET_OUT, host: dialog, settle: 1 });
     }
     recede("out", SHEET_OUT);
-    window.setTimeout(onClose, SHEET_OUT.duration);
+    onClose();
   };
 
   /*
@@ -210,7 +214,7 @@ export function ContactSheet({
   };
 
   return (
-    <Sheet open={open} onClose={close} labelledBy="contact-titre" dialogRef={dialogRef} panelRef={panelRef} backdropRef={voileRef}>
+    <Sheet open={open} onClose={close} onClosed={remettre} sortie={SHEET_OUT} labelledBy="contact-titre" dialogRef={dialogRef} panelRef={panelRef}>
       <div className="relative flex flex-col items-center gap-2 pt-1 text-center">
         <IconButton icon="close" label="Fermer" onClick={close} className="!absolute right-0 top-0" />
         <span className="flex items-center gap-1.5 text-[13px] font-black text-grey">
@@ -237,7 +241,7 @@ export function ContactSheet({
       <div className="rounded-[20px] bg-white px-3 pb-3 pt-4 shadow-card">
         <LevelPath current={report.level} variant="compact" />
       </div>
-      <div className="flex flex-col overflow-hidden rounded-[20px] bg-white shadow-card">
+      <InsetGroup>
         {/* Préchargé en entier : la feuille se ferme avant le départ, le rapport doit suivre sans attendre le serveur */}
         <InsetRow
           variant="compact"
@@ -246,7 +250,7 @@ export function ContactSheet({
           onNavigate={versRapport}
           leading={<Pastille><span className="text-[20px] leading-none">{report.verdict.emoji}</span></Pastille>}
           title="Le rapport de votre histoire"
-          sub={toujours(period)}
+          sub={period}
           chevron
         />
         <InsetRow
@@ -260,11 +264,10 @@ export function ContactSheet({
             </Pastille>
           }
           title="Sa fiche"
-          sub={toujours(fiche.summaryShort)}
+          sub={fiche.summaryShort}
           chevron
-          className={FILET}
         />
-      </div>
+      </InsetGroup>
     </Sheet>
   );
 }

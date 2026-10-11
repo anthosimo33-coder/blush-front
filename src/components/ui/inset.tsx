@@ -78,6 +78,7 @@ export function InsetRow({
 }: {
   leading?: ReactNode;
   title: ReactNode;
+  /** Le sous-titre. En `compact`, une chaîne garde sa ligne même vide (un résumé pas encore écrit) : le titre ne descend pas. */
   sub?: ReactNode;
   trailing?: ReactNode;
   chevron?: boolean;
@@ -96,12 +97,13 @@ export function InsetRow({
   const compact = variant === "compact";
   /* EnRoute suit le lien qui l’entoure (useLinkStatus) : seulement dans un lien */
   const chevronCompact = <Icon name="chevron" size={16} color="#8A8780" stroke={2.6} />;
+  const sous = <span className={t.sous}>{sub}</span>;
   const body = (
     <>
       {leading}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={cn(t.titre, danger ? "text-danger" : "text-ink")}>{title}</span>
-        {sub && <span className={t.sous}>{sub}</span>}
+        {compact && typeof sub === "string" ? sous : sub && sous}
       </span>
       {trailing}
       {chevron && !compact && <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />}

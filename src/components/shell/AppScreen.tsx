@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { peut, type Besoin } from "@/lib/acces";
+import { offreAProposer, peut, type Besoin } from "@/lib/acces";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
 import { AccountPill, Screen } from "./Screen";
@@ -12,8 +12,9 @@ import { AccountPill, Screen } from "./Screen";
 const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
 /**
- * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la règle écrite une fois pour l’écran et le serveur) :
- * gratuit (le chapitre 1, le verdict), rapport (tous les chapitres, « Ta question »), BLUSH+ (en plus : le chat, sa fiche).
+ * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la table que l’écran et le serveur lisent ; « Ta question »
+ * et la lecture de sa fiche ne sont encore refusées qu’ici, voir là-bas) : gratuit (le chapitre 1, le verdict), rapport
+ * (tous les chapitres, « Ta question »), BLUSH+ (en plus : le chat, sa fiche).
  */
 export function useAccess() {
   const { data } = useCompte();
@@ -73,7 +74,7 @@ export function AppScreen({
         <PaywallSheet
           open={blocked}
           /* Ce que le rapport n’ouvre pas (le chat, sa fiche) : qui l’a déjà ne voit que BLUSH+ */
-          only={!peut("rapport", besoin) && access.plan === "rapport" ? "blushplus" : undefined}
+          only={offreAProposer(access.plan, besoin)}
           onClose={() => router.push("/rapport")}
           next={pathname}
           otherName={autre}

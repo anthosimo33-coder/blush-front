@@ -29,6 +29,7 @@ import { ErreurTache } from "@/server/erreurs";
 import { contexteDe } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier } from "@/server/taches";
+import { getFiche, getFicheEtMaj } from "@/services/serveur";
 import type { Fiche, FicheUpdate } from "@/types";
 import { texteDeConv } from "./aide/fichiers";
 import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
@@ -135,6 +136,25 @@ describe("ajouter des captures à sa fiche", () => {
     expect(tache.status).toBe("fini");
     expect((await lire()).updating).toBeUndefined();
     /* Plus rien en attente : la relecture ne relance rien */
+    expect(etat.apres).toHaveLength(0);
+  });
+
+  it("la page de sa fiche, rendue par le serveur, dit aussi qu’une mise à jour tourne, et relance celle restée en plan", async () => {
+    /* L’écran ne relit pas une fiche rendue à l’instant (Q63) : le rendu doit porter `updating`, comme GET /api/fiche */
+    const t = await majDuChat();
+    etat.apres.length = 0;
+    expect((await getFicheEtMaj())?.updating).toBe(true);
+    expect(etat.apres).toHaveLength(1);
+    /* Ce que l’accueil lit de sa fiche (son prénom, son résumé) ne la suit pas : rien de relancé */
+    etat.apres.length = 0;
+    expect((await getFiche())?.updating).toBeUndefined();
+    expect(etat.apres).toHaveLength(0);
+    await db().update(schema.tasks).set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` }).where(eq(schema.tasks.id, t));
+    expect((await getFicheEtMaj())?.updating).toBe(true);
+    await lancerApres();
+    const [tache] = await db().select().from(schema.tasks).where(eq(schema.tasks.id, t));
+    expect(tache.status).toBe("fini");
+    expect((await getFicheEtMaj())?.updating).toBeUndefined();
     expect(etat.apres).toHaveLength(0);
   });
 });

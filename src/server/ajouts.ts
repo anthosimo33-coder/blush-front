@@ -7,7 +7,7 @@ import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import type { ExportLu } from "@prompts/lib/export";
 import type { Echange } from "@prompts/lib/memoire";
 import { Sortie01 } from "@prompts/lib/schemas";
-import type { FicheUpdate } from "@/types";
+import type { Fiche, FicheUpdate } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { executerChaine } from "./analyse";
 import * as coffre from "./coffre";
@@ -123,4 +123,18 @@ export async function majEnCours(storyId: string): Promise<boolean> {
     .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, "memoire_maj"), inArray(schema.tasks.status, ["attente", "en_cours"])))
     .limit(1);
   return !!t;
+}
+
+/**
+ * Sa fiche, et si une mise à jour de la mémoire est en attente ou en cours (`updating`) : l’écran la relit toutes les
+ * 3 s jusqu’à ce qu’elle ait fini. Une mise à jour restée en plan (l’instance arrêtée, ou plus le temps de la commencer
+ * après la lecture des captures) repart après la réponse ; si une autre la tient, executerChaine la laisse faire.
+ * La même pour GET et PUT /api/fiche et pour la page rendue par le serveur (getFiche) : une fiche rendue à l’instant,
+ * que l’écran ne relit pas au montage (Q63), dit déjà qu’une mise à jour tourne.
+ */
+export async function ficheEtMaj(story: Ligne): Promise<Fiche> {
+  const [fiche, enCours] = await Promise.all([ficheDe(story), majEnCours(story.id)]);
+  if (!enCours) return fiche;
+  after(() => executerChaine(story.id));
+  return { ...fiche, updating: true };
 }

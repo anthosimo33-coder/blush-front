@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { DoneCheck } from "./feedback";
 import { Icon } from "./icons";
 import { bloquerDefilement } from "@/lib/defilement";
+import { estDesktop } from "@/lib/motion";
 
 /** Donne l’élément à une ref de l’écran, objet ou fonction. */
 function assigner<T>(ref: Ref<T> | undefined, el: T | null) {
@@ -17,8 +18,8 @@ export type SortieFeuille = { duration: number; easing: string };
 
 /**
  * La sortie de la feuille sur cet appareil : le panneau redescend (téléphone, 280 ms) ou s’efface en reculant
- * (ordinateur, 200 ms), le voile s’éteint au même rythme. `sortie` : une autre durée, une autre courbe. Exportée pour
- * l’écran qui anime d’autres éléments avec elle (la feuille du contact de l’accueil).
+ * (ordinateur, 200 ms), le voile s’éteint au même rythme. `sortie` : une autre durée, une autre courbe (la prop `sortie`
+ * de Sheet : un écran qui anime d’autres éléments avec elle lui donne son rythme, comme la feuille du contact de l’accueil).
  */
 export function sortieDeFeuille(desk: boolean, sortie?: SortieFeuille) {
   const temps = { duration: sortie?.duration ?? (desk ? 200 : 280), easing: sortie?.easing ?? "cubic-bezier(0.3, 0, 0.2, 1)", fill: "forwards" as const };
@@ -134,19 +135,17 @@ export function Sheet({
     }
     if (!d.open) return;
     /* La sortie : la page défile de nouveau tout de suite (le défilement a été libéré), la feuille redescend, puis se ferme.
-       Sans animation si l’appareil en demande moins, ou si l’écran anime déjà la sienne (la feuille du contact) */
+       Sans animation si l’appareil en demande moins */
     const p = panel.current;
     const fermer = () => {
       d.close();
       setMontee(false);
     };
-    const geree = p?.getAnimations().some((a) => !(a instanceof CSSAnimation));
-    if (!p || geree || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!p || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       fermer();
       return;
     }
-    const desk = window.matchMedia("(min-width: 1024px)").matches;
-    const { temps, panneau, voile: eteint } = sortieDeFeuille(desk, dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
+    const { temps, panneau, voile: eteint } = sortieDeFeuille(estDesktop(), dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
     p.style.pointerEvents = "none";
     const anims = [p.animate(panneau, temps), ...(voile.current ? [voile.current.animate(eteint, temps)] : [])];
     anims[0].finished.then(fermer, () => {});

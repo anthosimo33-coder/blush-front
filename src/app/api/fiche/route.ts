@@ -1,32 +1,18 @@
-import { after } from "next/server";
-import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours } from "@/server/ajouts";
+import { ajouterALaFiche, depuisCaptures, depuisExport, ficheEtMaj } from "@/server/ajouts";
 import { imagesDe } from "@/server/captures";
 import { modifierMemoire } from "@/server/depot";
-import { ficheDe, memoireDe } from "@/server/donnees";
+import { memoireDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
-import { depuisPaquet, type Ligne } from "@/server/histoires";
+import { depuisPaquet } from "@/server/histoires";
 import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
-import { executerChaine } from "@/server/pipeline";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
-import type { Fiche } from "@/types";
 import { ROUTES } from "@/types/api";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 300;
 
-/**
- * Sa fiche, et si une mise à jour de la mémoire est en attente ou en cours (`updating`) : l’écran la relit toutes les
- * 3 s jusqu’à ce qu’elle ait fini. Une mise à jour restée en plan (l’instance arrêtée, ou plus le temps de la commencer
- * après la lecture des captures) repart après la réponse ; si une autre la tient, executerChaine la laisse faire.
- */
-async function ficheEtMaj(story: Ligne): Promise<Fiche> {
-  const [fiche, enCours] = await Promise.all([ficheDe(story), majEnCours(story.id)]);
-  if (!enCours) return fiche;
-  after(() => executerChaine(story.id));
-  return { ...fiche, updating: true };
-}
-
+/** Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). */
 export async function GET() {
   const g = await lecture({ session: "requise", histoire: true });
   return g instanceof Response ? g : repondre("GET /api/fiche", await ficheEtMaj(g.story));
