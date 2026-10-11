@@ -265,7 +265,7 @@ export function histoireDe(meta: Meta): Histoire {
 }
 
 export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
-  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories (« Qui es-tu ? »)"));
+  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories (qui est qui)"));
   /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
   const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;
   const meta = { ...avant, ...qui, participants };

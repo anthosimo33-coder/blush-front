@@ -246,11 +246,17 @@ describe("POST /api/chat en flux", () => {
   it("une mémoire gardée sans sa fiche (la création n’en écrit jamais) : refusée à la lecture par le coffre, sans appeler le modèle", async () => {
     const [ligne] = await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, id));
     const gardee = coffre.lire("memories.data", ligne.data);
-    await db().update(schema.memories).set({ data: chiffrer({ ...gardee, etat: { ...gardee.etat, fiche: null } }) }).where(eq(schema.memories.storyId, id));
+    const sansFiche = chiffrer({ ...gardee, etat: { ...gardee.etat, fiche: null } });
+    await db().update(schema.memories).set({ data: sansFiche }).where(eq(schema.memories.storyId, id));
+    const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      /* L’erreur nomme la colonne et le champ, jamais leur contenu ; Next (ou l’enveloppe `route`, src/server/http.ts) en fait une panne */
-      await expect(envoyer("elle veut quoi ?")).rejects.toThrow(/^memories\.data : forme inattendue \(etat\)$/);
+      /* L’erreur du coffre nomme la colonne et le champ, jamais leur contenu */
+      expect(() => coffre.lire("memories.data", sansFiche)).toThrow(/^memories\.data : forme inattendue \(etat\)$/);
+      /* Elle ne remonte pas jusqu’à Next : l’enveloppe `route` (src/server/http.ts) en fait une panne, et le journal n’en garde que le nom */
+      const r = await envoyer("elle veut quoi ?");
+      expect([r.status, await r.json()]).toEqual([502, { erreur: "panne" }]);
       expect(appels).toBe(0);
+      expect(erreur.mock.calls.map((c) => JSON.parse(String(c[0])) as unknown)).toEqual([{ evenement: "route /api en panne", niveau: "erreur", erreur: "Error" }]);
     } finally {
       await db().update(schema.memories).set({ data: ligne.data }).where(eq(schema.memories.storyId, id));
     }
