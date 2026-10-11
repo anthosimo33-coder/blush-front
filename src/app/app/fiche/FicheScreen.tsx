@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { pagePrecedente } from "@/lib/navigation";
-import { invalidate, setQueryData, useQuery } from "@/lib/query";
+import { FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
 import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
@@ -58,8 +58,9 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
      Sinon, une clé par conv : le cache d’une autre conv ne s’affiche jamais à la place de la sienne */
   const key = fixed ? ("fiche-apercu" as const) : (`fiche:${storyId ?? ""}` as const);
   /* `rendu` : l’heure du rendu serveur. Préchargée par l’accueil, la page garde la fiche d’alors : modifiée ici depuis,
-     on part de la version gardée en cache. La relecture au montage rattrape ce que le chat y a ajouté */
-  const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu });
+     on part de la version gardée en cache. Rendue à l’instant (moins de 10 s, FRAIS_DU_RENDU), elle n’est pas relue au
+     montage (Q63) ; plus ancienne, ou revue par l’historique, la relecture rattrape ce que le chat y a ajouté */
+  const { data, refresh } = useQuery(key, getFiche, initial, { fetch: !fixed, rendu, frais: FRAIS_DU_RENDU });
   const fiche = data ?? initial;
   const [editing, setEditing] = useState(false);
   const [job, setJob] = useState<Job>({ step: "idle" });
@@ -227,7 +228,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
 
   return (
     <AppScreen
-      requires="blushplus"
+      besoin="fiche"
       autre={fiche.person.name}
       aside={null}
       mainWidth={CARD_W}

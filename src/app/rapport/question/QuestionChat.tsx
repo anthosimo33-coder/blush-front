@@ -151,7 +151,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
   return (
     <AppScreen
-      requires="rapport"
+      besoin="question"
       autre={moiEtAutre(story).autre.name}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */

@@ -3,16 +3,18 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { rang } from "@/lib/acces";
+import { peut, type Besoin } from "@/lib/acces";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
-import type { Plan } from "@/types";
 import { AccountPill, Screen } from "./Screen";
 
 /* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */
 const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
-/** Les droits d’accès du compte (src/lib/acces.ts) : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres + une question), BLUSH+ (en plus : accueil, aide, fiche). */
+/**
+ * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la règle écrite une fois pour l’écran et le serveur) :
+ * gratuit (le chapitre 1, le verdict), rapport (tous les chapitres, « Ta question »), BLUSH+ (en plus : le chat, sa fiche).
+ */
 export function useAccess() {
   const { data } = useCompte();
   const plan = data?.subscription.plan;
@@ -20,22 +22,22 @@ export function useAccess() {
     initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,
     loaded: !!data,
     plan: plan ?? "gratuit",
-    can: (need: Plan) => !!plan && rang(plan) >= rang(need),
+    peut: (besoin: Besoin) => !!plan && peut(plan, besoin),
   };
 }
 
 /**
  * Coque des écrans après le rapport (desktop : une colonne centrée, « Mon compte » en haut ; une colonne d’appoint seulement si l’écran en passe une).
- * `requires` affiche le paiement par-dessus l’écran si les droits manquent.
+ * `besoin` : ce que l’écran demande (le chat, sa fiche, « Ta question ») ; le paiement s’affiche par-dessus si le plan du compte ne l’ouvre pas.
  */
 export function AppScreen({
-  requires,
+  besoin,
   autre,
   aside = null,
   children,
   ...props
 }: {
-  requires?: Exclude<Plan, "gratuit">;
+  besoin?: Besoin;
   /** Le prénom de l’autre personne, pour le paiement (« toi et Léa »). */
   autre?: string;
   aside?: ReactNode | null;
@@ -44,7 +46,7 @@ export function AppScreen({
   const router = useRouter();
   const pathname = usePathname();
   const access = useAccess();
-  const blocked = !!requires && access.loaded && !access.can(requires);
+  const blocked = !!besoin && access.loaded && !access.peut(besoin);
   /*
    * Monté au premier blocage, puis gardé (pour sa sortie). Tant que les droits peuvent manquer (pas encore lus, ou
    * insuffisants), il est aussi monté fermé une fois la page posée : monté au moment de s’ouvrir, React gardait 0,3 s
@@ -52,7 +54,7 @@ export function AppScreen({
    */
   const [bloqueVu, setBloqueVu] = useState(false);
   if (blocked && !bloqueVu) setBloqueVu(true);
-  const peutManquer = !!requires && (!access.loaded || blocked);
+  const peutManquer = !!besoin && (!access.loaded || blocked);
   useEffect(() => {
     if (!peutManquer || bloqueVu) return;
     let fini = false;
@@ -67,10 +69,11 @@ export function AppScreen({
       <Screen desktopHeaderRight={<AccountPill initial={access.initiale} />} mainWidth={props.mise ? undefined : 600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
         {children}
       </Screen>
-      {requires && bloqueVu && (
+      {besoin && bloqueVu && (
         <PaywallSheet
           open={blocked}
-          only={requires === "blushplus" && access.plan === "rapport" ? "blushplus" : undefined}
+          /* Ce que le rapport n’ouvre pas (le chat, sa fiche) : qui l’a déjà ne voit que BLUSH+ */
+          only={!peut("rapport", besoin) && access.plan === "rapport" ? "blushplus" : undefined}
           onClose={() => router.push("/rapport")}
           next={pathname}
           otherName={autre}

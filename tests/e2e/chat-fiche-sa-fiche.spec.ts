@@ -191,8 +191,8 @@ test("« Complète sa fiche » : une capture, les infos rangées dans leur rubri
 
 /*
  * Les infos de sa fiche ont pour identifiant leur place dans la liste (f0, f1… : prompts/lib/front.ts:172). La fiche
- * retient les infos arrivées par ces identifiants (src/app/app/fiche/FicheScreen.tsx:131) : un retrait décale les
- * suivantes, et le point « Nouveau » (src/app/app/fiche/FicheScreen.tsx:310) passe à une autre info, ou disparaît.
+ * retient les infos arrivées par ces identifiants (src/app/app/fiche/FicheScreen.tsx:134) : un retrait décale les
+ * suivantes, et le point « Nouveau » (src/app/app/fiche/FicheScreen.tsx:308) passe à une autre info, ou disparaît.
  */
 test.fixme("après un retrait, les infos arrivées gardent leur point « Nouveau »", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo);

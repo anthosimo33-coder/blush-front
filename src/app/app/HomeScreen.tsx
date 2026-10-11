@@ -21,22 +21,20 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
-import { delai, flipFrom, flyBox, flyText, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
+import { delai, flipFrom, flyBox, flyText, prefersReducedMotion, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { sendToBlush, sendVoiceToBlush } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
-import { EnRoute } from "@/components/ui/EnRoute";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { marquerChatOuvert } from "../rapport/ChatBubble";
 import dynamic from "next/dynamic";
-import { Bubble as MessageBubble, BlushTyping, Tag } from "@/components/ui/messages";
+import { Bubble as MessageBubble, BlushTyping } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
-import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { useHydrated } from "@/state/journey";
@@ -61,6 +59,7 @@ import {
   type Row,
 } from "./accueil/conv/modele";
 import { nouvelId, useConversation } from "./accueil/conv/useConversation";
+import { ContactSheet, departs, type Departs } from "./accueil/ContactSheet";
 import type { Devant } from "./accueil/conv/useChargerAnciens";
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/app/rapport/Partage.tsx) arrive à part, après l’affichage */
@@ -120,10 +119,6 @@ type Flight = { kind: "text"; bubble: string; text: string; from: Box; start: Bu
 const CHIP_LOOK: BubbleLook = { background: "#FFFFFF", ring: "inset 0 0 0 1.5px rgba(26, 102, 219, 0.28)", radius: 999, color: "#1A66DB", size: 14, weight: 800, pad: 14 };
 const FIELD_LOOK: BubbleLook = { background: "rgba(26, 102, 219, 0)", radius: 20, color: "#121214", size: 16, weight: 800, pad: 16 };
 const BUBBLE_LOOK: BubbleLook = { background: "#1A66DB", radius: 20, color: "#FFFFFF", size: 16, weight: 700, pad: 16 };
-
-/** La feuille « Ce que BLUSH voit » monte en 0,35 s : le logo et l’avatar y volent au même rythme. */
-const SHEET_IN: Spring = { duration: 380, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
-const SHEET_OUT: Spring = { duration: 300, easing: "cubic-bezier(0.3, 0, 0.2, 1)" };
 
 /*
  * L’arrivée du jour s’est jouée depuis l’ouverture de l’appli. Revenu par l’historique (le geste retour, « Retour » sur sa
@@ -635,7 +630,7 @@ export function HomeScreen({
     <ContactContext value={live}>
       <MotionContext value={moving}>
         <AppScreen
-          requires="blushplus"
+          besoin="chat"
           autre={contact.fiche.person.name}
           aside={null}
           mainWidth={WINDOW_W}
@@ -749,7 +744,7 @@ export function HomeScreen({
             <ConvEnBas />
           </div>
 
-          <ContactSheet open={details} onClose={() => setDetails(false)} departRef={departRef} />
+          <ContactSheet contact={live} open={details} onClose={() => setDetails(false)} departRef={departRef} />
         </AppScreen>
       </MotionContext>
     </ContactContext>
@@ -1698,269 +1693,4 @@ function historyOf(msgs: Msg[]): { from: "toi" | "blush"; text: string }[] {
       return [];
     })
     .slice(-6);
-}
-
-/**
- * 9 · L’écran recule derrière la feuille, comme sur iPhone (mobile seulement) : il rétrécit un peu, s’arrondit, et le noir apparaît autour.
- * « reset » remet tout en place sans animation (fermeture, départ vers une autre page).
- */
-function recede(state: "in" | "out" | "reset", timing?: Spring) {
-  const page = document.querySelector<HTMLElement>(".home-page");
-  /* Le fond noir vit sur <body> : on l’enlève toujours, même quand l’accueil a déjà disparu
-     (depuis la feuille, on part vers le rapport ou sa fiche : l’accueil est retiré avant ce nettoyage) */
-  if (state === "reset" || !page || window.matchMedia(DESKTOP).matches) {
-    document.body.style.removeProperty("background");
-    if (!page) return;
-    page.getAnimations().forEach((a) => a.cancel());
-    page.parentElement?.style.removeProperty("background");
-    page.style.removeProperty("background");
-    page.style.removeProperty("background-color");
-    page.style.removeProperty("clip-path");
-    return;
-  }
-  page.getAnimations().forEach((a) => a.cancel());
-  const y = window.scrollY - page.offsetTop;
-  const vh = window.innerHeight;
-  const below = Math.max(0, page.offsetHeight - y - vh);
-  /* Accroché en haut : la carte touche la barre d’état de Safari (qui garde sa couleur), le noir n’apparaît que sur les côtés.
-     La découpe arrondie est posée d’un coup, seule l’échelle s’anime : le compositeur la joue seul, même sur une longue conv */
-  page.style.transformOrigin = `50% ${y}px`;
-  page.style.background = "var(--paper-light)";
-  page.style.backgroundColor = "var(--paper)";
-  page.style.clipPath = `inset(${y}px 0 ${below}px 0 round 24px)`;
-  const rest: Keyframe = { transform: "none" };
-  const back: Keyframe = { transform: "scale(0.94)" };
-  page.animate(state === "in" ? [rest, back] : [back, rest], { duration: timing?.duration ?? 300, easing: timing?.easing, fill: state === "in" ? "forwards" : "none" });
-  /* Le noir autour : sur la page et sur son cadre (qui a son propre fond pour le glissé vers la fiche) */
-  if (state === "in") {
-    document.body.style.background = "#000";
-    page.parentElement?.style.setProperty("background", "#000");
-  }
-}
-
-/** Cache ou remontre un élément sans changer la mise en page (pendant qu’un double vole à sa place). */
-function shown(el: HTMLElement | SVGElement, on: boolean) {
-  el.style.visibility = on ? "" : "hidden";
-}
-
-/** 9 · Ce qui vole de l’en-tête vers la feuille du contact (la bulle de BLUSH, l’avatar de Sophie), et d’où. */
-type Depart = { src: HTMLElement; from: Box };
-type Departs = { logo: Depart | null; av: Depart | null };
-
-function departs(): Departs {
-  const de = (selector: string) => {
-    const src = visible<HTMLElement>(selector);
-    return src ? { src, from: src.getBoundingClientRect() } : null;
-  };
-  return { logo: de("[data-blush-logo]"), av: de("[data-sophie-avatar]") };
-}
-
-/* ———— Les détails du contact : où vous en êtes, le rapport, sa fiche ———— */
-function ContactSheet({ open, onClose, departRef }: { open: boolean; onClose: () => void; departRef: RefObject<Departs | null> }) {
-  const { report, fiche, period, ficheHref = "/app/fiche" } = useContact();
-  const router = useRouter();
-  const logoRef = useRef<HTMLSpanElement>(null);
-  const avRef = useRef<HTMLSpanElement>(null);
-  /* 9 · Ce qui a quitté l’en-tête pour la feuille : la bulle et l’avatar de Sophie, et d’où ils venaient (pour y revenir) */
-  const moved = useRef<{ src: HTMLElement; from: Box; target: HTMLElement | SVGElement }[]>([]);
-  const closing = useRef(false);
-
-  useEffect(() => {
-    if (!open || prefersReducedMotion()) return;
-    /* Le départ a été relevé au toucher ; l’arrivée l’est à l’image suivante, la feuille posée : rien n’oblige le clic à remettre la page en page */
-    const de = departRef.current ?? departs();
-    departRef.current = null;
-    const raf = requestAnimationFrame(() => {
-      const logoBox = logoRef.current;
-      const avBox = avRef.current;
-      const panel = logoBox?.closest<HTMLElement>("[tabindex='-1']");
-      const still = panel?.offsetParent as HTMLElement | null | undefined;
-      const dialog = logoBox?.closest("dialog");
-      const logo = logoBox?.querySelector("svg");
-      const av = avBox?.firstElementChild as HTMLElement | null | undefined;
-      if (!logoBox || !avBox || !panel || !still || !dialog || !logo || !av) return;
-      const pairs = [
-        { de: de.logo, measure: logoBox, target: logo as SVGElement },
-        { de: de.av, measure: avBox, target: av },
-      ];
-      moved.current = [];
-      for (const p of pairs) {
-        if (!p.de) continue;
-        const { src, from } = p.de;
-        const to = restingBox(p.measure, still);
-        const clone = p.target.cloneNode(true) as HTMLElement | SVGElement;
-        shown(src, false);
-        shown(p.target, false);
-        const target = p.target;
-        void flyBox(clone, from, to, { spring: SHEET_IN, host: dialog, settle: 1 }).then(() => {
-          if (!closing.current) shown(target, true);
-        });
-        moved.current.push({ src, from, target: p.target });
-      }
-      recede("in", SHEET_IN);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      /* La feuille est fermée (ou on part vers le rapport, sa fiche) : tout reprend sa place */
-      for (const m of moved.current) {
-        shown(m.src, true);
-        shown(m.target, true);
-      }
-      moved.current = [];
-      closing.current = false;
-      recede("reset");
-    };
-  }, [open, departRef]);
-
-  /* La fermeture : la feuille redescend, la bulle et l’avatar regagnent l’en-tête, l’écran revient */
-  const close = () => {
-    if (closing.current) return;
-    const panel = logoRef.current?.closest<HTMLElement>("[tabindex='-1']");
-    const dialog = logoRef.current?.closest("dialog");
-    if (prefersReducedMotion() || !moved.current.length || !panel || !dialog) {
-      onClose();
-      return;
-    }
-    closing.current = true;
-    const desk = window.matchMedia(DESKTOP).matches;
-    panel.animate(desk ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(16px) scale(0.98)" }] : [{ transform: "none" }, { transform: "translateY(100%)" }], { ...SHEET_OUT, fill: "forwards" });
-    panel.parentElement?.previousElementSibling?.animate([{ opacity: 1 }, { opacity: 0 }], { ...SHEET_OUT, fill: "forwards" });
-    for (const m of moved.current) {
-      const from = m.target.getBoundingClientRect();
-      const clone = m.target.cloneNode(true) as HTMLElement | SVGElement;
-      shown(m.target, false);
-      void flyBox(clone, from, m.from, { spring: SHEET_OUT, host: dialog, settle: 1 });
-    }
-    recede("out", SHEET_OUT);
-    window.setTimeout(onClose, SHEET_OUT.duration);
-  };
-
-  /*
-   * Vers le rapport : la feuille se ferme d’abord, d’un coup, puis on part. Au geste retour, Safari remontre l’accueil
-   * tel qu’on l’a quitté, sans la feuille ni l’écran reculé. Sa fiche, elle, garde le glissé de l’avatar.
-   */
-  const versRapport = (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    /* Le dialogue fermé ici : Sheet saute sa sortie animée (la feuille redescendrait encore au départ, dans la capture de Safari) */
-    logoRef.current?.closest("dialog")?.close();
-    onClose();
-    /* Une image peinte sans la feuille, puis un temps : Safari ne reprend sa capture qu’après (mesuré sur iPhone : partie à
-       +62 ms, elle montrait encore la feuille ; à +140 ms, l’accueil propre) */
-    requestAnimationFrame(() => window.setTimeout(() => router.push("/rapport"), 120));
-  };
-
-  return (
-    <Sheet open={open} onClose={close} labelledBy="contact-titre">
-      <div className="relative flex flex-col items-center gap-2 pt-1 text-center">
-        <IconButton icon="close" label="Fermer" onClick={close} className="!absolute right-0 top-0" />
-        <span className="flex items-center gap-1.5 text-[13px] font-black text-grey">
-          <span ref={logoRef} className="-my-2 block">
-            <BubbleLogo size={36} />
-          </span>
-          Ce que BLUSH voit
-        </span>
-        <span ref={avRef} className="block">
-          <Avatar tone="elle" size={72} fontSize={28}>
-            {fiche.person.initial}
-          </Avatar>
-        </span>
-        <h2 id="contact-titre" className="m-0 text-[22px] font-black tracking-[-0.01em]">
-          {fiche.person.name} et toi
-        </h2>
-        <span className="flex items-center gap-2">
-          <span className="text-[15px] font-black">
-            {report.verdict.emoji} {report.verdict.short}
-          </span>
-          <Tag tone="verite">{report.trend}</Tag>
-        </span>
-      </div>
-      <div className="rounded-[20px] bg-white px-3 pb-3 pt-4 shadow-card">
-        <LevelStepper />
-      </div>
-      <div className="flex flex-col overflow-hidden rounded-[20px] bg-white shadow-card">
-        {/* Préchargé en entier : la feuille se ferme avant le départ, le rapport doit suivre sans attendre le serveur */}
-        <DetailRow
-          href="/rapport"
-          prefetch
-          onNavigate={versRapport}
-          icon={<span className="text-[20px] leading-none">{report.verdict.emoji}</span>}
-          title="Le rapport de votre histoire"
-          sub={period}
-        />
-        <DetailRow
-          href={ficheHref}
-          icon={
-            <Avatar tone="elle" size={36} fontSize={15}>
-              {fiche.person.initial}
-            </Avatar>
-          }
-          title="Sa fiche"
-          sub={fiche.summaryShort}
-          divider
-        />
-      </div>
-    </Sheet>
-  );
-}
-
-function DetailRow({ href, icon, title, sub, divider, prefetch, onNavigate }: { href: string; icon: ReactNode; title: string; sub: string; divider?: boolean; prefetch?: boolean; onNavigate?: (e: { preventDefault: () => void }) => void }) {
-  return (
-    <Link href={href} prefetch={prefetch} onNavigate={onNavigate} className={cn("row-hover flex items-center gap-3 px-4 py-3.5 text-ink no-underline", divider && "border-t border-[rgba(17,17,20,0.06)]")}>
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F4F2ED]">{icon}</span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[15px] font-black">{title}</span>
-        <span className="truncate text-[13px] font-extrabold text-grey">{sub}</span>
-      </span>
-      <EnRoute>
-        <Icon name="chevron" size={16} color="#8A8780" stroke={2.6} />
-      </EnRoute>
-    </Link>
-  );
-}
-
-/** Les 4 niveaux en version compacte : un fil, des points, les noms dessous. En couple, la température : juste où vous êtes, sans coches. */
-function LevelStepper() {
-  const { report } = useContact();
-  const { levels, index: idx, temperature } = scaleOf(report.level);
-  const last = levels.length - 1;
-  const doneShare = idx > 0 ? ((idx - 1) / idx) * 100 : 0;
-  return (
-    <ol className="relative m-0 grid list-none grid-cols-4 p-0">
-      <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full bg-[#E6E3DC]" />
-      {!temperature && idx > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute left-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full"
-          style={{
-            width: `${(idx / last) * 75}%`,
-            background: `linear-gradient(90deg, #12C08A 0%, #12C08A ${doneShare}%, #3D8BFF ${doneShare}%, #3D8BFF 100%)`,
-          }}
-        />
-      )}
-      {levels.map((l, i) => {
-        const done = !temperature && i < idx;
-        const now = i === idx;
-        return (
-          <li key={l.id} className="relative flex flex-col items-center gap-1.5 text-center" aria-current={now ? "step" : undefined}>
-            <span
-              data-beat={now ? "" : undefined}
-              className={cn(
-                "flex size-4 items-center justify-center rounded-full",
-                done && "bg-vrai-ink",
-                now && "bg-toi-ink",
-                !done && !now && "bg-white shadow-[inset_0_0_0_1.5px_#D9D6CF]",
-              )}
-            >
-              {done && <Icon name="check" size={9} color="#FFFFFF" stroke={4} />}
-              {now && <span className="size-1.5 rounded-full bg-white" />}
-            </span>
-            <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
-              {l.label}
-              <span className="sr-only">{now ? (temperature ? "\u00a0: vous en êtes là" : "\u00a0: niveau en cours") : done ? "\u00a0: réussi" : temperature ? "" : "\u00a0: à venir"}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
