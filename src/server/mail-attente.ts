@@ -4,7 +4,7 @@
  * sur la liste, et lui seul le lit. L’inscription a pu venir de quelqu’un d’autre : le mail donne de quoi se retirer. Un
  * email déjà invité (inscrit par la page de la liste) apprend que sa place est prête.
  */
-import { attribut, DOUX, ENCRE, gabaritMail, GRIS, POLICE, type MailDessine } from "./marque";
+import { attribut, BOUTON_SOMBRE, boutonMail, DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, POLICE, type MailDessine } from "./marque";
 
 /**
  * `place` : « liste » (sur la liste d’attente) ou « prete » (déjà invité). `retrait` : le lien pour se retirer de la liste.
@@ -28,7 +28,7 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
     base,
     titre: sujet,
     apercu: liste ? "BLUSH est en bêta privée. On t’écrit dès que ta place est prête." : "Ton email est déjà invité.",
-    sombre: [".doux { color: #B9B6AF !important; }", ".bouton { background: #F4F2ED !important; }", ".bouton a { color: #121214 !important; }"],
+    sombre: [`.doux { color: ${DOUX_SOMBRE} !important; }`, ...BOUTON_SOMBRE],
     carte: {
       style: "padding:40px 28px 36px;text-align:center;",
       contenu: `
@@ -39,13 +39,7 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
               liste
                 ? ""
                 : `
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
-              <tr>
-                <td class="bouton" align="center" style="background:${ENCRE};border-radius:30px;">
-                  <a href="${attribut(base)}" style="display:block;padding:18px 24px;font-family:${POLICE};font-size:17px;line-height:22px;font-weight:900;color:#FFFFFF;text-decoration:none;">Ouvrir BLUSH&nbsp;&nbsp;→</a>
-                </td>
-              </tr>
-            </table>`
+            ${boutonMail({ lien: base, libelle: "Ouvrir BLUSH&nbsp;&nbsp;→", marge: 28 })}`
             }`,
     },
     pied: {

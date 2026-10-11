@@ -1,5 +1,5 @@
 import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
-import { DOUX, ENCRE, gabaritMail, GRIS, POLICE, ROSE_CLAIR, ROSE_FONCE, type MailDessine } from "./marque";
+import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, PAPIER, POLICE, type MailDessine } from "./marque";
 
 /*
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
@@ -22,7 +22,7 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
     : `Ton rapport est prêt\u00a0: ${n} chapitres, ${lecture} de lecture.\n\nLe verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain pas\u00a0:\n${lien}\n\nCe mail ne contient aucun message de ta conv, ni le verdict.`;
 
   const bulle = (t: string) =>
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:linear-gradient(160deg,${ROSE_CLAIR},${ROSE_FONCE});border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:${DEGRADE_ROSE};border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
 
   const chapitre = (numero: number) =>
     `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreDAttente(numero, autre))}</td></tr></table></td>`;
@@ -45,23 +45,16 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
     apercu: resume,
     blancs: 6,
     sombre: [
-      ".doux, .gris { color: #B9B6AF !important; }",
-      ".pastille { background: #F4F2ED !important; color: #121214 !important; }",
+      `.doux, .gris { color: ${DOUX_SOMBRE} !important; }`,
+      `.pastille { background: ${PAPIER} !important; color: ${ENCRE} !important; }`,
       ".sommaire { border-color: #2C2C30 !important; }",
-      ".bouton { background: #F4F2ED !important; }",
-      ".bouton a { color: #121214 !important; }",
+      ...BOUTON_SOMBRE,
     ],
     carte: {
       style: "padding:32px 28px 30px;text-align:left;",
       contenu: `
             ${corps}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
-              <tr>
-                <td class="bouton" align="center" style="background:${ENCRE};border-radius:30px;">
-                  <a href="${lien}" style="display:block;padding:18px 24px;font-family:${POLICE};font-size:17px;line-height:22px;font-weight:900;color:#FFFFFF;text-decoration:none;">Lire mon rapport&nbsp;&nbsp;→</a>
-                </td>
-              </tr>
-            </table>
+            ${boutonMail({ lien, libelle: "Lire mon rapport&nbsp;&nbsp;→", marge: 24 })}
             <div class="gris" style="padding-top:14px;text-align:center;font-family:${POLICE};font-size:13px;line-height:19px;font-weight:800;color:${GRIS};">${sobre ? "BLUSH reste là si tu veux en parler." : "Ensuite, parle à BLUSH&nbsp;: il connaît toute votre&nbsp;histoire."}</div>`,
     },
     pied: { classe: "gris", contenu: sobre ? "Ce mail ne contient rien de ta conv&nbsp;: ni prénom, ni&nbsp;message." : "Ce mail ne contient aucun message de ta conv, ni&nbsp;le&nbsp;verdict." },

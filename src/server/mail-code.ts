@@ -5,7 +5,7 @@
  * Textes validés le 8 octobre.
  */
 import { CODE_MINUTES } from "@/lib/limites";
-import { DOUX, ENCRE, gabaritMail, GRIS, POLICE, ROSE, type MailDessine } from "./marque";
+import { DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, POLICE, ROSE, type MailDessine } from "./marque";
 
 /**
  * `base` : l’adresse du site, d’où vient l’image de la bulle (https://www.askblush.com en production). `minutes` : la
@@ -20,7 +20,7 @@ export function mailCode(code: string, base: string, minutes = CODE_MINUTES): Ma
     base,
     titre: "Ton code BLUSH",
     apercu: `Ton code BLUSH&nbsp;: ${c}. Il marche ${minutes} minutes.`,
-    sombre: [".doux { color: #B9B6AF !important; }", ".code { background: #2B0F1F !important; }"],
+    sombre: [`.doux { color: ${DOUX_SOMBRE} !important; }`, ".code { background: #2B0F1F !important; }"],
     carte: {
       style: "padding:40px 28px 36px;text-align:center;",
       contenu: `

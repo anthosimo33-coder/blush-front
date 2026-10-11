@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { ImageResponse } from "next/og";
-import { BLEU, DOUX, ENCRE, GRIS, PAPIER, ROSE_CLAIR, ROSE_FONCE, SITE_AFFICHE } from "./marque";
+import { BLEU, DEGRADE_ROSE, DOUX, ENCRE, FOND_IMAGE, GRIS, SITE_AFFICHE } from "./marque";
 import type { VerdictPartage } from "./partages";
 
 /*
@@ -31,8 +31,8 @@ const ressources = Promise.all([
 /** La bulle de la marque, en data-URL : une image la dessine où elle veut (à côté d’une réponse du chat, par exemple). */
 export const imageBulle = async () => (await ressources).bulle;
 
-/** Le fond des images : le papier crème, sa lueur blanche en haut, rose et bleue dans les coins du bas. */
-const FOND = `radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), radial-gradient(45% 40% at 100% 100%, rgba(255,79,154,0.16), rgba(255,79,154,0) 70%), radial-gradient(45% 40% at 0% 100%, rgba(61,139,255,0.12), rgba(61,139,255,0) 70%), ${PAPIER}`;
+/** La réponse de celui qui regarde, en bas de chaque image : la phrase de la landing. */
+const ACCROCHE = "et la mienne, elle dit quoi\u00a0?";
 
 /**
  * Dessine une image BLUSH : la taille de son format, Nunito 900 et 800, les emojis en volume (Fluent, plus proches de
@@ -79,12 +79,12 @@ const CADRES = {
 export async function cadreStory(cadre: keyof typeof CADRES, contenu: ReactNode): Promise<ReactElement> {
   const { marges, marque, pied } = CADRES[cadre];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", width: "100%", height: "100%", padding: marges, background: FOND, fontFamily: "Nunito" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", width: "100%", height: "100%", padding: marges, background: FOND_IMAGE, fontFamily: "Nunito" }}>
       <Marque bulle={await imageBulle()} {...marque} />
       {contenu}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: pied.ecart }}>
         <Bulle moi taille={pied.bulle} angle={1.5}>
-          {"et la mienne, elle dit quoi\u00a0?"}
+          {ACCROCHE}
         </Bulle>
         <span style={{ fontSize: pied.police, fontWeight: 800, color: GRIS }}>Ta conv en dit plus que tu crois.</span>
       </div>
@@ -99,7 +99,7 @@ export function Bulle({ moi = false, taille, angle, children }: { moi?: boolean;
     display: "flex",
     padding: `${taille * 0.3}px ${taille * 0.66}px ${taille * 0.36}px`,
     borderRadius: moi ? `${r}px ${r}px ${taille * 0.24}px ${r}px` : `${r}px ${r}px ${r}px ${taille * 0.24}px`,
-    background: moi ? BLEU : `linear-gradient(160deg, ${ROSE_CLAIR}, ${ROSE_FONCE})`,
+    background: moi ? BLEU : DEGRADE_ROSE,
     boxShadow: moi ? "0 18px 32px -16px rgba(26,102,219,0.7)" : "0 18px 32px -16px rgba(232,53,138,0.75)",
     color: "#FFFFFF",
     fontSize: taille,
@@ -143,7 +143,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
   /* La carte de l’aperçu du lien : la marque un peu plus petite qu’à l’échelle de la story (0,92 contre 1,5) */
   const k = 0.92;
   return dessiner(
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: "100%", height: "100%", padding: "46px 60px 44px", background: FOND, fontFamily: "Nunito" }}>
+    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: "100%", height: "100%", padding: "46px 60px 44px", background: FOND_IMAGE, fontFamily: "Nunito" }}>
       <Marque bulle={await imageBulle()} taille={78 * k} police={44 * k} ecart={14 * k} />
       <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
         <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "flex-start" }}>
@@ -162,7 +162,7 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Bulle moi taille={27} angle={1.5}>
-          {"et la mienne, elle dit quoi\u00a0?"}
+          {ACCROCHE}
         </Bulle>
       </div>
     </div>,

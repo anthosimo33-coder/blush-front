@@ -18,11 +18,17 @@ export const GRIS = "#6B6862";
 export const PAPIER = "#F4F2ED";
 /** Le rose de BLUSH (le liseré du code, comme le champ au focus). */
 export const ROSE = "#FF4F9A";
-/** Le dégradé des bulles de BLUSH, du clair au foncé (160°). */
-export const ROSE_CLAIR = "#FF9BCB";
-export const ROSE_FONCE = "#E8358A";
+/* Le dégradé des bulles de BLUSH, du clair au foncé (160°) : DEGRADE_ROSE */
+const ROSE_CLAIR = "#FF9BCB";
+const ROSE_FONCE = "#E8358A";
 /** Le bleu des bulles envoyées (la tienne). */
 export const BLEU = "#1A66DB";
+/** Le dégradé des bulles de BLUSH, tel que les mails et les images l’écrivent. */
+export const DEGRADE_ROSE = `linear-gradient(160deg,${ROSE_CLAIR},${ROSE_FONCE})`;
+/** Le fond des images : le papier crème, sa lueur blanche en haut, rose et bleue dans les coins du bas. */
+export const FOND_IMAGE = `radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), radial-gradient(45% 40% at 100% 100%, rgba(255,79,154,0.16), rgba(255,79,154,0) 70%), radial-gradient(45% 40% at 0% 100%, rgba(61,139,255,0.12), rgba(61,139,255,0) 70%), ${PAPIER}`;
+/** Le texte doux des mails en mode sombre (Apple Mail). */
+export const DOUX_SOMBRE = "#B9B6AF";
 /** L’adresse du site telle qu’on l’écrit (c’est elle qu’on retient). */
 export const SITE_AFFICHE = "askblush.com";
 
@@ -33,6 +39,23 @@ export type MailDessine = Required<Mail>;
 
 /** Une valeur d’attribut HTML (un lien) : ses `&` et ses guillemets échappés. */
 export const attribut = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+
+/** Les règles du mode sombre du bouton noir d’un mail (boutonMail) : il passe au papier, son texte à l’encre. */
+export const BOUTON_SOMBRE = [`.bouton { background: ${PAPIER} !important; }`, `.bouton a { color: ${ENCRE} !important; }`];
+
+/**
+ * Le bouton noir d’un mail, sur toute la largeur de la carte : `lien` (échappé ici), `libelle` (du HTML) et `marge`, sa
+ * marge au-dessus. Ses règles du mode sombre sont BOUTON_SOMBRE.
+ */
+export function boutonMail({ lien, libelle, marge }: { lien: string; libelle: string; marge: number }): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:${marge}px;">
+              <tr>
+                <td class="bouton" align="center" style="background:${ENCRE};border-radius:30px;">
+                  <a href="${attribut(lien)}" style="display:block;padding:18px 24px;font-family:${POLICE};font-size:17px;line-height:22px;font-weight:900;color:#FFFFFF;text-decoration:none;">${libelle}</a>
+                </td>
+              </tr>
+            </table>`;
+}
 
 /* Ce qui suit l’aperçu (le préheader) : des blancs invisibles, pour que le client n’y colle pas le début du mail */
 const BLANCS = "&#8199;&#65279;&#847;";
@@ -77,7 +100,7 @@ export function gabaritMail({
   @media (prefers-color-scheme: dark) {
     body, .papier { background: #0E0E10 !important; }
     .carte { background: #1C1C1F !important; border-color: #2C2C30 !important; }
-    .encre { color: #F4F2ED !important; }
+    .encre { color: ${PAPIER} !important; }
 ${sombre.map((regle) => `    ${regle}\n`).join("")}  }
 </style>
 </head>
