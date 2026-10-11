@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent, ReactNode } from "react";
+import type { MouseEvent, ReactNode, Ref } from "react";
 import { cheminDe, pagePrecedente } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/brand/Logo";
@@ -177,6 +177,8 @@ export type ScreenProps = {
   /** Largeur du cadre desktop (en-tête et contenu), quand elle doit suivre un contenu plus étroit que 1020 px. */
   frameWidth?: number;
   className?: string;
+  /** La racine de l’écran : l’accueil la fait reculer derrière la feuille du contact (src/app/app/accueil/mouvement/recul.ts). */
+  ref?: Ref<HTMLDivElement>;
 };
 
 /* ———— Écran : une seule structure, deux mises en page ———— */
@@ -204,6 +206,7 @@ export function Screen({
   mobileGap,
   frameWidth,
   className,
+  ref,
 }: ScreenProps) {
   const preset = mise ? MISES[mise] : null;
   const mainWidth = largeur ?? preset?.mainWidth ?? 560;
@@ -225,6 +228,7 @@ export function Screen({
   );
   return (
     <div
+      ref={ref}
       className={cn("mx-auto flex min-h-dvh w-full flex-col md:max-w-[560px] lg:max-w-none", className)}
       style={{ "--main-w": `${mainWidth}px`, "--aside-w": `${asideWidth}px`, "--cols-gap": `${columnsGap}px`, "--gap": `${contentGap}px`, "--footer-w": `${footerWidth}px`, "--top-pad": `${desktopTopPad}px`, "--frame-w": `${frameW}px`, "--aside-mt": `${asideMt}px`, "--gap-m": `${mobileGap ?? contentGap}px` }}
     >

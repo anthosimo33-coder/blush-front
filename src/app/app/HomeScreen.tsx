@@ -3,30 +3,14 @@
 import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  createContext,
-  memo,
-  use,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  ViewTransition,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { createContext, memo, use, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
-import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
-import { delai, DESKTOP, flipFrom, flyBox, flyText, prefersReducedMotion, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box } from "@/lib/motion";
+import { delai, DESKTOP, prefersReducedMotion, textWidth } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { sendToBlush, sendVoiceToBlush } from "@/services/api";
-import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
-import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
@@ -37,7 +21,6 @@ import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/components/ui/progress";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
-import { useHydrated } from "@/state/journey";
 import type { BlushAnswer, BulleChat, ConvSummary, LevelId, Pronom } from "@/types";
 import { VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { Composer, formatSize, SendReply } from "./accueil/Composer";
@@ -59,13 +42,21 @@ import {
   type Row,
 } from "./accueil/conv/modele";
 import { nouvelId, useConversation } from "./accueil/conv/useConversation";
-import { ContactSheet, departs, type Departs } from "./accueil/ContactSheet";
+import { ContactSheet } from "./accueil/ContactSheet";
 import type { HomeContact } from "./accueil/contact";
-import type { Devant } from "./accueil/conv/useChargerAnciens";
+import { AvecLogoDuFil, BlushTitle, ConvsButton, LogoDuFil, SophieButton } from "./accueil/Entetes";
+import { useArrivee } from "./accueil/mouvement/arrivee";
+import { MotionContext, useHomeMotion } from "./accueil/mouvement/contexte";
+import { ConvEnBas } from "./accueil/mouvement/ConvEnBas";
+import { useAnciensEnRemontant, useConvSuitLeBas, useDefilement } from "./accueil/mouvement/defilement";
+import { useEnteteAuClavier, useHeaderCollapse } from "./accueil/mouvement/entete";
+import { celebrate } from "./accueil/mouvement/fete";
+import { useThreadGestures } from "./accueil/mouvement/gestes";
+import { departs, useRegistreEntete, type Departs } from "./accueil/mouvement/registre";
+import { CHIP_LOOK, FIELD_LOOK } from "./accueil/mouvement/vol";
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/app/rapport/Partage.tsx) arrive à part, après l’affichage */
 const PartageImageSheet = dynamic(() => import("../rapport/Partage").then((m) => m.PartageImageSheet), { ssr: false });
-
 
 const ContactContext = createContext<HomeContact | null>(null);
 
@@ -74,18 +65,6 @@ function useContact() {
   if (!contact) throw new Error("useContact : hors de HomeScreen");
   return contact;
 }
-
-/**
- * L’accueil en mouvement. `arriving` : l’arrivée du jour se joue. Pas `desktop`, inconnu au rendu serveur : connu juste
- * après l’hydratation, il referait toute la conv.
- * « Réduire les animations » coupe tout ce qui bouge : globals.css pour le CSS, prefersReducedMotion() pour le reste.
- */
-type HomeMotion = { arriving: boolean };
-
-const MotionContext = createContext<HomeMotion>({ arriving: false });
-
-const useHomeMotion = () => use(MotionContext);
-
 
 function useDesktop() {
   return useSyncExternalStore(
@@ -101,32 +80,6 @@ function useDesktop() {
 
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
-
-/*
- * 3 · 4 · Une bulle qui vole jusqu’à sa place : depuis la pastille touchée, ou depuis le champ.
- * 5 · La bulle qui écrit vole jusqu’à l’avatar de la réponse.
- */
-type Flight = { kind: "text"; bubble: string; text: string; from: Box; start: BubbleLook } | { kind: "logo"; bubble: string; from: Box };
-
-const CHIP_LOOK: BubbleLook = { background: "#FFFFFF", ring: "inset 0 0 0 1.5px rgba(26, 102, 219, 0.28)", radius: 999, color: "#1A66DB", size: 14, weight: 800, pad: 14 };
-const FIELD_LOOK: BubbleLook = { background: "rgba(26, 102, 219, 0)", radius: 20, color: "#121214", size: 16, weight: 800, pad: 16 };
-const BUBBLE_LOOK: BubbleLook = { background: "#1A66DB", radius: 20, color: "#FFFFFF", size: 16, weight: 700, pad: 16 };
-
-/*
- * L’arrivée du jour s’est jouée depuis l’ouverture de l’appli. Revenu par l’historique (le geste retour, « Retour » sur sa
- * fiche), l’accueil remonte depuis le cache de Next, avec le `arrive` d’avant le cookie : sans ce drapeau, l’arrivée et
- * sa signature se rejoueraient. Rien au rendu serveur ni à l’hydratation (le module est neuf) : pas d’écart.
- */
-let arriveeJouee = false;
-
-/*
- * Un retour par l’historique (le geste retour, « Retour » sur sa fiche) : l’adresse et le moment du dernier. Et où en
- * était la conv quand on a quitté l’accueil (mobile) ? Tout en bas, elle y revient ; lue plus haut, elle revient à
- * cette place (la conv gardée est la même, voir useConversation).
- */
-let traversee: { href: string; at: number } | null = null;
-let quittee = { enBas: true, y: 0 };
-if (typeof window !== "undefined") window.addEventListener("popstate", () => (traversee = { href: location.href, at: performance.now() }));
 
 /*
  * Les questions toutes prêtes déjà posées pendant la visite, gardées hors de l’accueil avec la conv (celle de la conv
@@ -154,6 +107,8 @@ function useOpenedAt() {
  * En mouvement, onze idées : 1 l’arrivée du jour, 2 BLUSH t’écoute, 3 la question qui s’envole,
  * 4 l’envoi façon Messages, 5 les perles deviennent la réponse, 6 glisse pour l’heure, 7 glisse pour creuser,
  * 8 l’en-tête qui se replie, 9 la bulle s’ouvre, 10 Sophie en glissé (page.tsx et la fiche), 11 le niveau qui monte.
+ * Le mouvement lui-même (vols, fête, recul, défilement, gestes, arrivée) vit dans ./accueil/mouvement, les en-têtes dans
+ * ./accueil/Entetes.tsx.
  */
 export function HomeScreen({
   quick = [],
@@ -199,9 +154,11 @@ export function HomeScreen({
 }) {
   const router = useRouter();
   const cle = storyId;
-  /* Des messages posés devant (ou fondus dans la conv) : voir Devant (accueil/conv/useChargerAnciens.ts) */
-  const devant = useRef<Devant | null>(null);
   const haut = useRef<HTMLDivElement>(null);
+  /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste) */
+  const page = useRef<HTMLDivElement>(null);
+  /* Ce qui part de l’en-tête ou s’y anime, vu d’ailleurs (accueil/mouvement/registre.ts) */
+  const entete = useRegistreEntete();
   /* Les questions toutes prêtes font leur entrée au premier affichage de l’accueil, puis à leur retour après une réponse */
   const [entreeIdees, setEntreeIdees] = useState(() => !pastillesPosees);
   /* « Partager en image » : la réponse choisie */
@@ -210,7 +167,7 @@ export function HomeScreen({
   /* 9 · D’où partent la bulle et l’avatar vers la feuille du contact : relevé au toucher, quand la page est encore à jour */
   const departRef = useRef<Departs | null>(null);
   const ouvrirDetails = () => {
-    departRef.current = departs();
+    departRef.current = departs(entete);
     setDetails(true);
   };
   /* 7 · Le point creusé : ta prochaine question porte dessus */
@@ -219,19 +176,14 @@ export function HomeScreen({
   const [level, setLevel] = useState(contact.report.level);
   const levelNow = useRef(contact.report.level);
   const [cheer, setCheer] = useState(0);
-  /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie), et une seule fois depuis l’ouverture de l’appli */
-  const [arriving, setArriving] = useState(() => arrive && !arriveeJouee);
-  const signed = useRef(false);
   const thread = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const composer = useRef<HTMLFormElement>(null);
-  /* La hauteur de la barre de saisie au dernier relevé (pour savoir de combien elle a changé) */
-  const barre = useRef(0);
   const urls = useRef<string[]>([]);
-  /* Avant chaque changement de la conv : où étaient ses lignes (pour les faire glisser), et la bulle qui doit voler */
-  const before = useRef<Map<string, number> | null>(null);
-  const flight = useRef<Flight | null>(null);
+  /* La conv à l’écran : où elle se pose, ce qu’elle garde entre deux changements (accueil/mouvement/defilement.ts) */
+  const defilement = useDefilement(thread);
+  const { flightRef } = defilement;
   /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
   const [asked, setAsked] = useState<string[]>(() => (cle !== undefined && posees?.cle === cle ? posees.asked : []));
 
@@ -247,20 +199,15 @@ export function HomeScreen({
     modeVocalInitial,
     rendu,
     scene: {
-      devant,
-      mesurer: (marque) => mesurer(thread.current, marque),
-      auRepos: () => auRepos(thread.current),
-      /* On note d’abord où sont les lignes de la conv, pour les faire glisser ensuite */
-      avantChangement: () => {
-        if (!before.current && thread.current) before.current = snapshotTops(dernieresLignes(thread.current), (el) => el.dataset.row);
-      },
+      ...defilement.ecran,
+      avantChangement: defilement.avantChangement,
       /* Les questions toutes prêtes s’effacent le temps de la réponse : à leur retour, elles refont leur entrée */
       echangeCommence: () => setEntreeIdees(true),
       ecritCede: (reponse) => {
         if (prefersReducedMotion()) return;
         /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
         const typing = thread.current?.querySelector(`[data-reading="${cleBulle(reponse, "ecrit")}"] svg`);
-        if (typing) flight.current = { kind: "logo", bubble: cleBulle(reponse, 0), from: typing.getBoundingClientRect() };
+        if (typing) flightRef.current = { kind: "logo", bubble: cleBulle(reponse, 0), from: typing.getBoundingClientRect() };
       },
       /* Un pop quand la réponse remplace les perles. Rien si tu écris déjà la suite */
       reponsePosee: () => {
@@ -270,11 +217,12 @@ export function HomeScreen({
     },
   });
   const { msgs, depuis, plus, anciens, chargerAnciens, precharger, modeVocal } = conv;
-  const shown = useRef(msgs);
   /* BLUSH « écrit » (ses bulles arrivent encore) : sa bulle s’anime en haut de la conv. Une réponse coupée attend « Réessayer » */
   const busy = conv.occupe;
   const opened = useOpenedAt();
   const desktop = useDesktop();
+  /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie), et une seule fois depuis l’ouverture de l’appli */
+  const arriving = useArrivee(arrive, page);
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
   const moving = useMemo(() => ({ arriving }), [arriving]);
 
@@ -291,168 +239,10 @@ export function HomeScreen({
     document.documentElement.style.viewTransitionName = "root";
   }, []);
 
-  useEffect(() => {
-    if (!arriving) return;
-    arriveeJouee = true;
-    markArrivalPlayed();
-    /* La signature tombe avec le « coucou » des perles (0,85 s, une perle toutes les 0,11 s). Ouverte à froid, Safari la garde muette */
-    if (!signed.current) play("signature", 0.85, 0.11);
-    signed.current = true;
-    const t = window.setTimeout(() => setArriving(false), 3700);
-    /* Le premier geste (un toucher, la molette, une touche) coupe l’arrivée : ce qui reste à jouer se pose d’un coup, rien ne fait attendre */
-    const couper = () => {
-      const restantes = new Set<Animation>();
-      document.querySelectorAll(".home-arrive [data-a]").forEach((el) => el.getAnimations({ subtree: true }).forEach((a) => restantes.add(a)));
-      restantes.forEach((a) => {
-        /* Seulement ce qui a une fin : une boucle (le logo qui flotte) continue */
-        const fin = a.effect?.getComputedTiming().endTime;
-        if (typeof fin === "number" && Number.isFinite(fin)) a.finish();
-      });
-      setArriving(false);
-    };
-    const gestes = ["pointerdown", "wheel", "keydown"] as const;
-    gestes.forEach((g) => window.addEventListener(g, couper, { capture: true, passive: true }));
-    return () => {
-      window.clearTimeout(t);
-      gestes.forEach((g) => window.removeEventListener(g, couper, { capture: true }));
-    };
-  }, [arriving]);
-
-  /*
-   * À l’ouverture, la conv se pose en bas, sur le dernier échange, sans animation (la page sur mobile, la fenêtre sur
-   * desktop). Revenu par l’historique alors qu’on lisait plus haut, elle revient à cette place : la conv gardée est la
-   * même qu’au départ, et le navigateur, qui remet la place avant que la page soit là, la tronquerait.
-   * Juste après, la conv s’allonge (les jours et les heures, posés après l’hydratation ; les polices) : tant qu’on n’a
-   * pas bougé, elle reste en bas. Safari, lui, ne garde pas la place tout seul (pas d’ancrage du défilement).
-   */
-  useLayoutEffect(() => {
-    const box = thread.current;
-    const fil = box?.querySelector("[data-thread]");
-    if (!box || !fil) return;
-    const retour = traversee !== null && traversee.href === location.href && performance.now() - traversee.at < 10_000;
-    traversee = null;
-    const desk = window.matchMedia(DESKTOP).matches;
-    if (!desk && retour && !quittee.enBas) {
-      window.scrollTo({ top: Math.min(quittee.y, basDePage()) });
-      return;
-    }
-    const ou = () => (desk ? box.scrollTop : window.scrollY);
-    let pose = 0;
-    const poser = () => {
-      if (desk) box.scrollTop = box.scrollHeight;
-      else window.scrollTo({ top: basDePage() });
-      pose = ou();
-    };
-    poser();
-    const obs = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => Math.abs(ou() - pose) < 2 && poser());
-    obs?.observe(fil);
-    /* Le premier geste (ou 3 s) : la conv est à toi */
-    const lacher = () => {
-      obs?.disconnect();
-      window.clearTimeout(t);
-      gestes.forEach((g) => window.removeEventListener(g, lacher, { capture: true }));
-    };
-    const t = window.setTimeout(lacher, 3000);
-    const gestes = ["pointerdown", "wheel", "keydown"] as const;
-    gestes.forEach((g) => window.addEventListener(g, lacher, { capture: true, passive: true }));
-    return lacher;
-  }, []);
-
-  /* Mobile : où en est la conv, tout en bas ou plus haut ? (relevé jusqu’au départ de l’accueil, pour un retour par l’historique) */
-  useLayoutEffect(() => {
-    const suivre = () => {
-      quittee = { enBas: window.scrollY >= basDePage() - 4, y: window.scrollY };
-    };
-    suivre();
-    window.addEventListener("scroll", suivre, { passive: true });
-    return () => window.removeEventListener("scroll", suivre);
-  }, []);
-
-  /*
-   * Chaque nouveau message fait défiler la conv jusqu’en bas (la page sur mobile, la fenêtre sur desktop).
-   * En mouvement : la conv saute d’un coup en bas, puis chaque ligne repart de là où elle était (FLIP) : le défilement devient un ressort,
-   * et la bulle qui vole part juste avant.
-   */
-  useLayoutEffect(() => {
-    if (shown.current === msgs) return;
-    shown.current = msgs;
-    const box = thread.current;
-    if (!box) return;
-    /* La barre de saisie a pu changer de hauteur avec la conv (les questions qui partent ou reviennent) : ce défilement en tient compte */
-    barre.current = composer.current?.offsetHeight ?? 0;
-    /*
-     * Des messages plus anciens posés devant : on garde la conv là où on la lisait. Un décalage, pas une place : entre
-     * la mesure et ce rendu, l’élan du doigt a continué (Safari n’ancre pas le défilement), il n’est pas annulé
-     */
-    const d = devant.current;
-    if (d) {
-      /*
-       * Le morceau attendu n’est pas encore là : un autre rendu passe avant le sien (une réponse de BLUSH pendant qu’on
-       * remonte la conv). Rien ne défile ni ne glisse, la conv ne saute pas en bas ; la hauteur de référence devient
-       * celle de ce rendu, pour que le décalage, au rendu du morceau, ne compte que lui.
-       */
-      if (d.marque !== undefined && !msgs.some((m) => m.id === d.marque)) {
-        d.h = d.desk ? box.scrollHeight : document.documentElement.scrollHeight;
-        before.current = null;
-        flight.current = null;
-        return;
-      }
-      devant.current = null;
-      const delta = (d.desk ? box.scrollHeight : document.documentElement.scrollHeight) - d.h;
-      if (d.desk) box.scrollTop += delta;
-      else window.scrollBy(0, delta);
-      defilant(d.desk ? box : null).style.removeProperty("overflow-anchor");
-      d.pose?.();
-      return;
-    }
-    const desk = window.matchMedia(DESKTOP).matches;
-    const reduced = prefersReducedMotion();
-    /* Sur mobile, jamais plus bas que le bas de la page : clavier ouvert, Safari décollerait le champ du clavier */
-    const toBottom = (behavior: ScrollBehavior) => (desk ? box.scrollTo({ top: box.scrollHeight, behavior }) : window.scrollTo({ top: basDePage(), behavior }));
-    const tops = before.current;
-    const f = flight.current;
-    before.current = null;
-    flight.current = null;
-    toBottom("auto");
-    if (reduced) return;
-    if (f) launch(box, f);
-    if (tops) flipFrom(tops, dernieresLignes(box), (el) => el.dataset.row, spring("soft"));
-  }, [msgs]);
-
-  /*
-   * La barre de saisie change de hauteur sans nouveau message (« Tu creuses », le vocal, les questions masquées) :
-   * collée en bas avant, la conv y reste, sinon la dernière bulle passerait sous la barre.
-   */
-  useEffect(() => {
-    const form = composer.current;
-    const box = thread.current;
-    if (!form || !box || typeof ResizeObserver === "undefined") return;
-    barre.current = form.offsetHeight;
-    const obs = new ResizeObserver(() => {
-      const h = form.offsetHeight;
-      const delta = h - barre.current;
-      barre.current = h;
-      if (!delta) return;
-      const desk = window.matchMedia(DESKTOP).matches;
-      /* Ce qui manque pour toucher le bas : la barre qui grandit l’a ajouté ; au-delà, on lisait plus haut */
-      const reste = desk ? box.scrollHeight - box.scrollTop - box.clientHeight : document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-      if (reste > Math.max(0, delta) + 2) return;
-      if (desk) box.scrollTop = box.scrollHeight;
-      else window.scrollTo({ top: basDePage() });
-    });
-    obs.observe(form);
-    return () => obs.disconnect();
-  }, []);
+  /* Chaque nouveau message, la barre de saisie qui change de hauteur : la conv suit (accueil/mouvement/defilement.ts) */
+  useConvSuitLeBas(msgs, thread, composer, defilement);
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
-  /* Parti avant que des messages attendus soient posés : l’ancrage du défilement revient (voir mesurer) */
-  useEffect(
-    () => () => {
-      document.documentElement.style.removeProperty("overflow-anchor");
-      thread.current?.style.removeProperty("overflow-anchor");
-    },
-    [],
-  );
 
   /* Les questions posées, gardées avec la conv pour un retour sur l’accueil */
   useEffect(() => {
@@ -464,58 +254,16 @@ export function HomeScreen({
     pastillesPosees = true;
   }, []);
 
-  /*
-   * En remontant la conv, les échanges plus anciens arrivent d’eux-mêmes : à la première remontée, le morceau d’avant
-   * est demandé ; quand le haut approche, il se pose. Seulement en remontant vraiment : le défilement diminue, hors du
-   * bas de la conv. En bas, une position qui diminue est la page qui raccourcit (sur mobile, la conv posée en bas se
-   * recale à l’ouverture) ou la fin d’un rebond : rien ne part à l’ouverture, même quand le haut est déjà à l’écran.
-   * Toute remontée compte, au doigt, à la molette, au clavier, par la barre de défilement ou un lecteur d’écran. Un saut
-   * d’un coup (la touche Début, la barre tirée en haut) arrive avant que l’observateur voie le haut : c’est lui qui pose.
-   */
-  useEffect(() => {
-    const el = haut.current;
-    const box = thread.current;
-    if (!plus || !el || !box) return;
-    const desk = window.matchMedia(DESKTOP).matches;
-    const pos = () => (desk ? box.scrollTop : window.scrollY);
-    const bas = () => (desk ? box.scrollHeight - box.clientHeight : basDePage());
-    let proche = false;
-    /* Le dernier défilement remontait la conv */
-    let monte = false;
-    let avant = pos();
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        proche = e.isIntersecting;
-        if (proche && monte && el.isConnected) void chargerAnciens();
-      },
-      { root: desk ? box : null, rootMargin: "1200px 0px 0px 0px" },
-    );
-    obs.observe(el);
-    const cible: HTMLElement | Window = desk ? box : window;
-    const bouge = () => {
-      /* L’accueil quitté (sa fiche remonte la page en haut) : ce n’est pas une remontée */
-      if (!el.isConnected) return;
-      const y = pos();
-      monte = y < avant && y < bas() - 2;
-      avant = y;
-      if (!monte) return;
-      precharger();
-      if (proche) void chargerAnciens();
-    };
-    cible.addEventListener("scroll", bouge, { passive: true });
-    return () => {
-      obs.disconnect();
-      cible.removeEventListener("scroll", bouge);
-    };
-  }, [plus, chargerAnciens, precharger]);
+  /* En remontant la conv, les échanges plus anciens arrivent d’eux-mêmes (accueil/mouvement/defilement.ts) */
+  useAnciensEnRemontant({ plus, hautRef: haut, threadRef: thread, chargerAnciens, precharger });
 
   useHeaderCollapse(head);
   useEnteteAuClavier(head, composer);
 
   /* 11 · La fête quand un niveau tombe : l’anneau se remplit (CSS), Sophie rebondit, des éclats partent */
   useEffect(() => {
-    if (cheer && !prefersReducedMotion()) celebrate();
-  }, [cheer]);
+    if (cheer && !prefersReducedMotion()) celebrate(entete);
+  }, [cheer, entete]);
 
   /** 11 · Un cran de plus sur votre échelle : une seule fois par niveau. */
   const levelUp = (to: LevelId) => {
@@ -555,7 +303,7 @@ export function HomeScreen({
   const sendQuick = (q: string, chip?: HTMLElement) => {
     setAsked((a) => [...a, q]);
     const mine = nouvelId();
-    if (chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: cleBulle(mine, 0), text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
+    if (chip && !prefersReducedMotion()) flightRef.current = { kind: "text", bubble: cleBulle(mine, 0), text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
     ask({ type: "texte", id: mine, from: "toi", text: q }, { text: q });
   };
 
@@ -567,7 +315,7 @@ export function HomeScreen({
     if (field && !about && !prefersReducedMotion()) {
       const r = field.getBoundingClientRect();
       const w = textWidth(t, field);
-      if (w <= r.width) flight.current = { kind: "text", bubble: cleBulle(mine, 0), text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
+      if (w <= r.width) flightRef.current = { kind: "text", bubble: cleBulle(mine, 0), text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
     }
     const point = about ?? undefined;
     setAbout(null);
@@ -629,7 +377,8 @@ export function HomeScreen({
           frameWidth={WINDOW_W}
           contentGap={0}
           desktopTopPad={0}
-          className={cn("home-page", figtree.variable, arriving && "home-arrive")}
+          ref={page}
+          className={cn(figtree.variable, arriving && "home-arrive")}
           mobileTop={
             /* En haut : BLUSH en grand au centre (sa bulle flotte et s’anime quand il répond), Sophie à droite comme un contact.
                Le fond s’efface vers le bas : les messages passent dessous en douceur. 8 · Quand tu remontes dans l’historique, tout se range dans une barre fine. */
@@ -653,10 +402,10 @@ export function HomeScreen({
                     )}
                   </span>
                 </div>
-                <BlushTitle big busy={busy} onClick={ouvrirDetails} />
+                <BlushTitle big busy={busy} onClick={ouvrirDetails} logoRef={entete.inscrire.logo} />
                 <div className="mt-2 flex justify-end">
                   {/* Rendu serveur compris (desktop encore inconnu) : un iPhone ne remonte pas l’avatar à l’hydratation */}
-                  <SophieButton shared={desktop !== true} />
+                  <SophieButton contact={live} anneauRef={entete.inscrire.anneau} avatarRef={entete.inscrire.avatar} shared={desktop !== true} />
                 </div>
               </div>
             </header>
@@ -677,9 +426,9 @@ export function HomeScreen({
                   </Link>
                 )}
               </span>
-              <BlushTitle busy={busy} onClick={ouvrirDetails} />
+              <BlushTitle busy={busy} onClick={ouvrirDetails} logoRef={entete.inscrire.logo} />
               <div className="flex justify-end">
-                <SophieButton shared={desktop === true} />
+                <SophieButton contact={live} anneauRef={entete.inscrire.anneau} avatarRef={entete.inscrire.avatar} shared={desktop === true} />
               </div>
             </div>
 
@@ -736,483 +485,10 @@ export function HomeScreen({
             <ConvEnBas />
           </div>
 
-          <ContactSheet contact={live} open={details} onClose={() => setDetails(false)} departRef={departRef} />
+          <ContactSheet contact={live} open={details} onClose={() => setDetails(false)} departRef={departRef} entete={entete} pageRef={page} />
         </AppScreen>
       </MotionContext>
     </ContactContext>
-  );
-}
-
-/**
- * Les dernières lignes de la conv : seules elles glissent quand un message arrive (la conv saute en bas d’abord). Sur
- * une longue conv, relever toutes les lignes avant et après chaque message coûterait pour rien.
- */
-function dernieresLignes(box: HTMLElement) {
-  return [...box.querySelectorAll<HTMLElement>("[data-row]")].slice(-40);
-}
-
-/**
- * La hauteur de la conv avant d’y poser des messages (la page sur mobile, la fenêtre sur desktop). `marque` : voir
- * Devant (accueil/conv/useChargerAnciens.ts). Jusqu’au rendu qui les pose, Chrome ne garde pas la place de lui-même (l’ancrage du défilement, que Safari
- * n’a pas) : le décalage appliqué ensuite compterait deux fois.
- */
-function mesurer(box: HTMLElement | null, marque?: number) {
-  const desk = !!box && window.matchMedia(DESKTOP).matches;
-  defilant(desk ? box : null).style.overflowAnchor = "none";
-  return { desk, h: desk && box ? box.scrollHeight : document.documentElement.scrollHeight, marque };
-}
-
-/** Ce qui défile : la fenêtre de la conv sur desktop, la page sur mobile. */
-const defilant = (box: HTMLElement | null) => box ?? document.documentElement;
-
-/*
- * La conv en bas dès la première image, comme l’effet de montage la pose ensuite : la page du serveur est peinte bien
- * avant l’hydratation (plusieurs secondes sur un téléphone lent), et montrait d’abord les plus vieux messages. Lu juste
- * après la barre de saisie, ce script la pose avant même la peinture. Dans la page du serveur seulement : rendu par le
- * navigateur (une navigation dans l’appli), un script ne s’exécute pas, et l’effet de montage fait ce travail.
- */
-const POSER_EN_BAS = `(function(){try{if(matchMedia(${JSON.stringify(DESKTOP)}).matches){var f=document.querySelector("[data-thread]");f=f&&f.parentElement;if(f)f.scrollTop=f.scrollHeight}else{var d=document.documentElement;scrollTo(0,Math.max(0,d.scrollHeight-innerHeight))}}catch(e){}})()`;
-
-function ConvEnBas() {
-  /* Vrai au rendu serveur et à l’hydratation (le script est déjà passé), faux ensuite : le navigateur ne le crée jamais */
-  const pageDuServeur = !useHydrated();
-  return pageDuServeur ? <script dangerouslySetInnerHTML={{ __html: POSER_EN_BAS }} /> : null;
-}
-
-/**
- * Attend que la conv soit au repos (120 ms sans défilement) avant d’y poser un morceau d’historique : posé pendant
- * l’élan d’un geste, il couperait l’élan sur Safari. Tout près du haut (moins d’un écran), il se pose tout de suite.
- */
-function auRepos(box: HTMLElement | null) {
-  const desk = !!box && window.matchMedia(DESKTOP).matches;
-  const pres = () => (desk && box ? box.scrollTop < box.clientHeight : window.scrollY < window.innerHeight);
-  const cible: HTMLElement | Window = desk && box ? box : window;
-  return new Promise<void>((pose) => {
-    if (pres()) return pose();
-    let t = window.setTimeout(poser, 120);
-    function poser() {
-      window.clearTimeout(t);
-      cible.removeEventListener("scroll", bouge);
-      pose();
-    }
-    function bouge() {
-      window.clearTimeout(t);
-      if (pres()) poser();
-      else t = window.setTimeout(poser, 120);
-    }
-    cible.addEventListener("scroll", bouge, { passive: true });
-  });
-}
-
-/** 3 · 4 · 5 · Le vol, juste après le rendu : la vraie bulle (ou l’avatar) reste cachée jusqu’à l’atterrissage. */
-function launch(box: HTMLElement, f: Flight) {
-  const target = box.querySelector<HTMLElement>(`[data-bubble="${f.bubble}"]`);
-  if (!target) return;
-  if (f.kind === "text") {
-    const row = target.parentElement;
-    row?.setAttribute("data-flown", "");
-    const to = target.getBoundingClientRect();
-    /* Sur plusieurs lignes, la bulle monte simplement */
-    if (to.height > 48) {
-      row?.removeAttribute("data-flown");
-      return;
-    }
-    target.style.visibility = "hidden";
-    void flyText(f.text, f.from, to, f.start, BUBBLE_LOOK, { spring: spring("soft") }).then(() => {
-      target.style.visibility = "";
-    });
-    return;
-  }
-  const avatar = target.closest("[data-group]")?.querySelector<HTMLElement>("[data-avatar]");
-  const logo = avatar?.querySelector("svg");
-  if (!avatar || !logo) return;
-  const to = avatar.getBoundingClientRect();
-  avatar.style.visibility = "hidden";
-  const el = logo.cloneNode(true) as SVGSVGElement;
-  void flyBox(el, f.from, to, { spring: spring("pop") }).then(() => {
-    avatar.style.visibility = "";
-  });
-}
-
-/** 11 · Sophie rebondit dans son anneau, son badge se retourne, des éclats partent ; BLUSH saute de joie. */
-const SPARKS = ["#FF7DBA", "#3D8BFF", "#12C08A", "#FFC49B", "#E4B2FF", "#E8358A"];
-
-function celebrate() {
-  const logo = visible<HTMLElement>("[data-blush-logo]");
-  if (logo) {
-    wavePearls(logo);
-    logo.animate([{ translate: "0 0" }, { translate: "0 -9px", offset: 0.35 }, { translate: "0 0" }], { duration: 640, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" });
-  }
-  const sophie = visible<HTMLElement>("[data-sophie]");
-  if (!sophie) return;
-  sophie
-    .querySelector("[data-glow-ring]")
-    ?.animate([{ opacity: 0, transform: "scale(0.9)" }, { opacity: 1, transform: "scale(1.05)", offset: 0.4 }, { opacity: 0, transform: "scale(1.18)" }], { duration: 1300, easing: "ease-out" });
-  sophie.querySelector("[data-sophie-avatar]")?.animate([{ scale: 1 }, { scale: 1.16, offset: 0.35 }, { scale: 1 }], { duration: 620, easing: "cubic-bezier(0.3, 1.4, 0.5, 1)" });
-  sophie
-    .querySelector("[data-badge]")
-    ?.animate([{ transform: "rotateY(0deg) scale(1)" }, { transform: "rotateY(180deg) scale(1.35)", offset: 0.5 }, { transform: "rotateY(360deg) scale(1)" }], { duration: 760, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" });
-  const r = sophie.getBoundingClientRect();
-  const cx = r.left + r.width / 2;
-  const cy = r.top + r.height / 2;
-  for (let i = 0; i < 14; i++) {
-    const p = document.createElement("span");
-    const size = 4 + Math.random() * 5;
-    p.className = "level-spark";
-    Object.assign(p.style, { left: `${cx - size / 2}px`, top: `${cy - size / 2}px`, width: `${size}px`, height: `${size}px`, background: SPARKS[i % SPARKS.length] });
-    document.body.append(p);
-    const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
-    const d = 34 + Math.random() * 34;
-    p.animate(
-      [
-        { transform: "translate(0, 0) scale(0.4)", opacity: 1 },
-        { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px) scale(1)`, opacity: 1, offset: 0.6 },
-        { transform: `translate(${Math.cos(a) * d * 1.15}px, ${Math.sin(a) * d * 1.15 + 8}px) scale(0.6)`, opacity: 0 },
-      ],
-      { duration: 900 + Math.random() * 300, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)", fill: "forwards" },
-    ).onfinish = () => p.remove();
-  }
-}
-
-/** 8 · L’en-tête se replie quand tu remontes dans l’historique (--c : 0 en bas de la conv, 1 replié). Mobile seulement. */
-function useHeaderCollapse(ref: RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || prefersReducedMotion()) return;
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
-      /* Les 60 premiers pixels ne comptent pas : une conv à peine plus haute que l’écran garde son grand en-tête */
-      const d = document.documentElement;
-      const c = Math.max(0, Math.min(1, (d.scrollHeight - window.scrollY - window.innerHeight - 60) / 140));
-      el.style.setProperty("--c", c.toFixed(3));
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(measure);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    measure();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      cancelAnimationFrame(raf);
-      el.style.removeProperty("--c");
-    };
-  }, [ref]);
-}
-
-/**
- * Clavier ouvert, Safari ne réduit pas la page : il décale la vue visible vers le bas pour montrer le champ, et l’en-tête
- * (collé en haut de la page) sortait par le haut pendant toute la frappe. Tant que la barre de saisie a le focus,
- * l’en-tête suit le haut de la vue visible (un décalage posé à l’image suivante), puis reprend sa place quand le
- * clavier se ferme. L’accueil ne passe pas pour autant en défilement interne : les vols, le repli de l’en-tête, le
- * chargement de l’historique et le repli de la barre de Safari suivent tous la page.
- */
-function useEnteteAuClavier(head: RefObject<HTMLElement | null>, form: RefObject<HTMLFormElement | null>) {
-  useEffect(() => {
-    const el = head.current;
-    const barre = form.current;
-    const vue = window.visualViewport;
-    if (!el || !barre || !vue) return;
-    let suivi = false;
-    /* Le champ quitté : le délai au-delà duquel on cesse de suivre la vue, même si elle n’est pas revenue en haut */
-    let fin = 0;
-    /* Posé dans l’événement de la vue même, pas à l’image suivante : à l’ouverture du clavier, l’en-tête ne sort pas une image */
-    const poser = () => {
-      const y = Math.max(0, vue.offsetTop);
-      el.style.transform = y > 0.5 ? `translateY(${y.toFixed(1)}px)` : "";
-      /* Le clavier refermé : la vue est revenue en haut, l’en-tête aussi */
-      if (fin && y <= 0.5) arreter();
-    };
-    const arreter = () => {
-      window.clearTimeout(fin);
-      fin = 0;
-      if (!suivi) return;
-      suivi = false;
-      vue.removeEventListener("resize", poser);
-      vue.removeEventListener("scroll", poser);
-      el.style.transform = "";
-    };
-    const entrer = () => {
-      window.clearTimeout(fin);
-      fin = 0;
-      if (!suivi) {
-        suivi = true;
-        vue.addEventListener("resize", poser);
-        vue.addEventListener("scroll", poser);
-      }
-      poser();
-    };
-    /*
-     * Le champ quitté, le clavier redescend encore un instant, et la vue avec lui : l’en-tête la suit jusqu’en haut (au
-     * plus 0,6 s). Retiré tout de suite, il disparaissait le temps que la vue revienne, puis redescendait avec le clavier.
-     */
-    const sortir = () => {
-      if (!suivi) return;
-      window.clearTimeout(fin);
-      fin = window.setTimeout(arreter, 600);
-      poser();
-    };
-    /* De retour dans Safari (l’écran d’accueil, un autre onglet), le champ encore actif : la vue a changé entre-temps */
-    const revenir = () => {
-      if (suivi && document.visibilityState === "visible") poser();
-    };
-    barre.addEventListener("focusin", entrer);
-    barre.addEventListener("focusout", sortir);
-    document.addEventListener("visibilitychange", revenir);
-    window.addEventListener("pageshow", revenir);
-    return () => {
-      barre.removeEventListener("focusin", entrer);
-      barre.removeEventListener("focusout", sortir);
-      document.removeEventListener("visibilitychange", revenir);
-      window.removeEventListener("pageshow", revenir);
-      arreter();
-    };
-  }, [head, form]);
-}
-
-const rubber = (d: number, max: number) => (d <= max ? d : max + (d - max) * 0.2);
-
-/**
- * 6 · Glisse la conv vers la gauche : l’heure de chaque bulle apparaît, puis tout revient en place (comme dans Messages).
- * 7 · Glisse une réponse de BLUSH vers la droite : passé le cran, elle se cale au-dessus du champ.
- * Au doigt seulement : à la souris, on garde la sélection du texte. Un geste vertical reste un défilement normal.
- */
-function useThreadGestures(ref: RefObject<HTMLElement | null>, onDig: (quote: string) => void) {
-  const dig = useRef(onDig);
-  useEffect(() => {
-    dig.current = onDig;
-  });
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const ARMED = 56;
-    type Drag = { id: number; x: number; y: number; mode: "?" | "time" | "dig" | "off"; el?: HTMLElement; icon?: HTMLElement | null; v: number; armed: boolean };
-    let g: Drag | null = null;
-    let swiped = 0;
-    const settle = (el: HTMLElement, v: number) => {
-      el.style.transform = "";
-      if (v && !prefersReducedMotion()) el.animate([{ transform: `translateX(${v}px)` }, { transform: "translateX(0)" }], spring("pop"));
-    };
-    const down = (e: PointerEvent) => {
-      if (e.pointerType === "mouse" || g) return;
-      g = { id: e.pointerId, x: e.clientX, y: e.clientY, mode: "?", v: 0, armed: false };
-    };
-    const move = (e: PointerEvent) => {
-      if (!g || e.pointerId !== g.id || g.mode === "off") return;
-      const dx = e.clientX - g.x;
-      const dy = e.clientY - g.y;
-      if (g.mode === "?") {
-        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
-          g.mode = "off";
-          return;
-        }
-        if (Math.abs(dx) < 10) return;
-        const bubble = dx > 0 ? (e.target as Element | null)?.closest<HTMLElement>("[data-quote]") : null;
-        if (dx > 0 && !bubble) {
-          g.mode = "off";
-          return;
-        }
-        g.mode = dx < 0 ? "time" : "dig";
-        g.el = (dx < 0 ? root.querySelector<HTMLElement>("[data-thread]") : bubble) ?? undefined;
-        g.icon = bubble?.parentElement?.querySelector<HTMLElement>("[data-dig-icon]");
-        g.x += Math.sign(dx) * 10;
-        try {
-          root.setPointerCapture(e.pointerId);
-        } catch {
-          /* Pas de capture : le geste suit quand même tant que le doigt reste sur la conv */
-        }
-      }
-      const d = e.clientX - g.x;
-      if (!g.el) return;
-      if (g.mode === "time") {
-        g.v = -rubber(Math.max(0, -d), 64);
-        g.el.style.transform = `translateX(${g.v}px)`;
-        return;
-      }
-      g.v = rubber(Math.max(0, d), 76);
-      g.el.style.transform = `translateX(${g.v}px)`;
-      const p = Math.min(1, g.v / ARMED);
-      if (g.icon) {
-        g.icon.style.opacity = String(p);
-        g.icon.style.transform = `translateY(-50%) scale(${0.4 + 0.6 * p})`;
-      }
-      const armed = g.v >= ARMED;
-      if (armed !== g.armed) {
-        g.armed = armed;
-        g.icon?.toggleAttribute("data-armed", armed);
-        if (armed) {
-          g.icon?.animate([{ scale: 1 }, { scale: 1.3 }, { scale: 1 }], { duration: 260 });
-          play("cran");
-        }
-      }
-    };
-    const end = (e: PointerEvent, cancelled: boolean) => {
-      if (!g || e.pointerId !== g.id) return;
-      const done = g;
-      g = null;
-      if (done.mode !== "time" && done.mode !== "dig") return;
-      swiped = performance.now();
-      if (done.el) settle(done.el, done.v);
-      if (done.icon) {
-        done.icon.style.opacity = "";
-        done.icon.style.transform = "";
-        done.icon.removeAttribute("data-armed");
-      }
-      const quote = done.el?.dataset.quote;
-      if (done.mode === "dig" && done.armed && !cancelled && quote) dig.current(quote);
-    };
-    const up = (e: PointerEvent) => end(e, false);
-    const cancel = (e: PointerEvent) => end(e, true);
-    /* Après un glissé, relâcher le doigt ne « clique » pas ce qui est dessous */
-    const click = (e: MouseEvent) => {
-      if (performance.now() - swiped < 400) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    root.addEventListener("pointerdown", down);
-    root.addEventListener("pointermove", move);
-    root.addEventListener("pointerup", up);
-    root.addEventListener("pointercancel", cancel);
-    root.addEventListener("click", click, true);
-    return () => {
-      root.removeEventListener("pointerdown", down);
-      root.removeEventListener("pointermove", move);
-      root.removeEventListener("pointerup", up);
-      root.removeEventListener("pointercancel", cancel);
-      root.removeEventListener("click", click, true);
-    };
-  }, [ref]);
-}
-
-/* ———— En-tête : BLUSH en grand, comme le personnage de la conv (sa bulle, son nom en pastille) ———— */
-function BlushTitle({ busy, onClick, big = false }: { busy: boolean; onClick: () => void; big?: boolean }) {
-  const { arriving } = useHomeMotion();
-  return (
-    <button type="button" onClick={onClick} aria-haspopup="dialog" aria-label="BLUSH, ce qu’il voit de vous deux" className="group pointer-events-auto relative flex flex-col items-center px-1 text-ink">
-      {/* 1 · À l’arrivée, un halo rose s’allume derrière lui puis s’efface */}
-      {arriving && (
-        <span
-          aria-hidden="true"
-          data-a="aura"
-          className={cn(
-            "pointer-events-none absolute left-1/2 size-[260px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,125,186,0.5),rgba(255,125,186,0)_64%)] opacity-0",
-            big ? "top-[44px]" : "top-[32px]",
-          )}
-        />
-      )}
-      <span data-c="logo" className="relative block">
-        <span data-float="" className="block" style={{ "--r": "-3deg" }}>
-          <span data-a="logo" data-blush-logo="" className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] group-hover:scale-105 group-active:scale-95">
-            <BubbleLogo size={big ? 88 : 64} animated={busy} layered />
-          </span>
-        </span>
-      </span>
-      <span data-c="pill" className="relative -mt-1 block">
-        <span
-          data-a="pill"
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full bg-white font-black leading-none tracking-[-0.02em] shadow-[0_0_0_1px_rgba(17,17,20,0.08),0_6px_14px_-6px_rgba(17,17,20,0.3)]",
-            big ? "h-[30px] pl-3.5 pr-2 text-[15px]" : "h-[26px] pl-2.5 pr-1.5 text-[14px]",
-          )}
-        >
-          {/* L’adresse du site : toujours en haut de la conv, elle est sur chaque capture du chat */}
-          askblush.com
-          <Icon name="chevron" size={big ? 13 : 12} color="#8A8780" stroke={3} />
-        </span>
-      </span>
-    </button>
-  );
-}
-
-/**
- * Plusieurs convs : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
- * pour qu’on voie d’un coup d’œil qu’il y a d’autres convs. `flat` : dans la barre de la fenêtre (desktop), sans ombre.
- */
-function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: boolean }) {
-  const shown = others.slice(0, 2);
-  const more = others.length - shown.length;
-  return (
-    <Link
-      href="/app/convs"
-      /* Préchargée en entier (son rendu ne lit que tes convs) : le glissé emporte la vraie liste, pas son écran d’attente */
-      prefetch
-      transitionTypes={["nav-back", "accueil-vers-convs"]}
-      aria-label={`Tes convs (${others.map((o) => o.person.name).join(", ")})`}
-      className={cn(
-        "back-nudge pointer-events-auto flex h-10 items-center gap-1 rounded-full pl-2 pr-1.5 no-underline",
-        flat ? "transition-colors hover:bg-[rgba(17,17,20,0.05)]" : "lift lift-sm lift-card bg-white shadow-soft",
-      )}
-    >
-      <Icon name="back" size={17} color="#121214" stroke={2.6} />
-      <span aria-hidden="true" className="flex">
-        {shown.map((o, i) => (
-          <span key={o.storyId} className={cn("rounded-full shadow-[0_0_0_2px_#FFFFFF]", i > 0 && "-ml-2")}>
-            <Avatar tone="elle" size={26} fontSize={11}>
-              {o.person.initial}
-            </Avatar>
-          </span>
-        ))}
-        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-[#F1EFEA] text-[11px] font-black text-soft shadow-[0_0_0_2px_#FFFFFF]">+{more}</span>}
-      </span>
-    </Link>
-  );
-}
-
-/**
- * Sophie, comme un contact : son avatar dans l’anneau de votre niveau, le verdict en badge, son prénom dessous. Un toucher ouvre sa fiche.
- * `shared` : 10 · c’est cet avatar (celui qu’on voit, mobile ou desktop) qui passe sur la fiche pendant le glissé.
- */
-function SophieButton({ shared = false }: { shared?: boolean }) {
-  const { report, fiche, ficheHref = "/app/fiche" } = useContact();
-  const { levels, index: idx, temperature } = scaleOf(report.level);
-  const share = (idx + 1) / levels.length;
-  const ring = 2 * Math.PI * 21;
-  const where = temperature ? levels[idx].label : `niveau ${idx + 1} sur ${levels.length}`;
-  const avatar = (
-    <span data-sophie-avatar="" data-a="av" className="block rounded-full">
-      <Avatar tone="elle" size={36} fontSize={15}>
-        {fiche.person.initial}
-      </Avatar>
-    </span>
-  );
-  return (
-    <Link
-      href={ficheHref}
-      prefetch
-      transitionTypes={["nav-forward", "accueil-vers-fiche"]}
-      aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
-      className="group pointer-events-auto flex flex-col items-center gap-1 text-ink no-underline"
-    >
-      <span data-sophie="" data-c="so" className="relative flex size-12 items-center justify-center transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">
-        {/* 11 · Le halo vert quand un niveau tombe (un calque à part : il s’anime sur le compositeur) */}
-        <span aria-hidden="true" data-glow-ring="" className="pointer-events-none absolute -inset-1 rounded-full opacity-0 shadow-[0_0_14px_3px_rgba(18,192,138,0.7)]" />
-        <svg aria-hidden="true" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
-          <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />
-          <circle data-a="ring" data-ring-fill="" cx="24" cy="24" r="21" fill="none" stroke="#12C08A" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${ring * share} ${ring}`} />
-        </svg>
-        {shared ? (
-          <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
-            {avatar}
-          </ViewTransition>
-        ) : (
-          avatar
-        )}
-        <span
-          aria-hidden="true"
-          data-badge=""
-          data-a="badge"
-          className="absolute -bottom-1 -right-1.5 flex size-[22px] items-center justify-center rounded-full bg-white text-[12px] leading-none shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_3px_8px_-3px_rgba(17,17,20,0.35)]"
-        >
-          {report.verdict.emoji}
-        </span>
-      </span>
-      <span data-c="nm" data-a="nm" className="text-[12px] font-black leading-none">
-        {fiche.person.name}
-      </span>
-    </Link>
   );
 }
 
@@ -1279,24 +555,26 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
   return (
     /* mt-auto pose les messages en bas sans justify-end, qui rend le haut d’une conv longue inaccessible au défilement */
     <div data-thread="" className="mt-auto flex flex-col gap-4">
-      {rows.map((r) =>
-        r.kind === "day" ? (
-          <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
-            {r.at === null ? (
-              NBSP
-            ) : (
-              <time dateTime={new Date(r.at).toISOString()}>
-                <span className="font-black">{dayLabel(r.at, now)}</span> {clock(r.at)}
-              </time>
-            )}
-          </p>
-        ) : r.kind === "event" ? (
-          <LevelEvent key={r.key} row={r.key} level={r.level} neuf={r.neuf} />
-        ) : (
-          <Group key={r.key} row={groupeAffiche(r, env)} intro={arriving && r.key === CLE_INTRO} />
-        ),
-      )}
-      <LogoDuFilDefini />
+      {/* L’avatar de BLUSH sous chaque réponse, dessiné une fois, en dernier dans la conv (accueil/Entetes.tsx) */}
+      <AvecLogoDuFil>
+        {rows.map((r) =>
+          r.kind === "day" ? (
+            <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
+              {r.at === null ? (
+                NBSP
+              ) : (
+                <time dateTime={new Date(r.at).toISOString()}>
+                  <span className="font-black">{dayLabel(r.at, now)}</span> {clock(r.at)}
+                </time>
+              )}
+            </p>
+          ) : r.kind === "event" ? (
+            <LevelEvent key={r.key} row={r.key} level={r.level} neuf={r.neuf} />
+          ) : (
+            <Group key={r.key} row={groupeAffiche(r, env)} intro={arriving && r.key === CLE_INTRO} />
+          ),
+        )}
+      </AvecLogoDuFil>
     </div>
   );
 });
@@ -1311,33 +589,6 @@ function LevelEvent({ row, level, neuf }: { row: string; level: LevelId; neuf: b
         {temperature ? "Nouvelle température" : "Nouveau niveau"} · <b className="font-black">{levels[index].label}</b>
       </span>
     </p>
-  );
-}
-
-/*
- * L’avatar de BLUSH sous chaque réponse : dessiné une fois (ses dégradés, ses flous), puis repris par <use>. Une conv
- * longue portait autant de copies du logo que de réponses, chacune avec ses filtres, dans le HTML comme à la peinture.
- */
-const LOGO_DU_FIL = "blush-logo-fil";
-
-function LogoDuFil() {
-  return (
-    <svg aria-hidden="true" width={34} height={34} viewBox="0 0 34 34" style={{ overflow: "visible", flexShrink: 0 }}>
-      <use href={`#${LOGO_DU_FIL}`} />
-    </svg>
-  );
-}
-
-/* Le dessin, une fois, en dernier dans la conv (hors du flux : rien ne bouge, et la première ligne reste la première) */
-function LogoDuFilDefini() {
-  return (
-    <svg aria-hidden="true" width={0} height={0} className="pointer-events-none absolute">
-      <defs>
-        <g id={LOGO_DU_FIL}>
-          <BubbleLogo size={34} />
-        </g>
-      </defs>
-    </svg>
   );
 }
 

@@ -1,0 +1,198 @@
+"use client";
+
+/*
+ * Les en-têtes de l’accueil (mobile, et la barre de la fenêtre de conv sur desktop) : BLUSH en grand au centre, l’autre
+ * à droite comme un contact, et à gauche le retour à la liste des convs. Ce qui en part ou s’y anime (la bulle de BLUSH,
+ * l’anneau et l’avatar de l’autre) s’inscrit au registre de l’en-tête (./mouvement/registre.ts) : la feuille du contact
+ * et la fête d’un niveau le prennent là, sans le chercher dans la page. Et l’avatar de BLUSH sous chaque réponse de la
+ * conv (LogoDuFil), dessiné une fois par conv.
+ */
+import Link from "next/link";
+import { createContext, use, useId, ViewTransition, type ReactNode, type Ref } from "react";
+import { cn } from "@/lib/cn";
+import { BubbleLogo } from "@/components/brand/objects3d";
+import { Avatar } from "@/components/ui/Avatar";
+import { Icon } from "@/components/ui/icons";
+import { scaleOf } from "@/components/ui/progress";
+import type { ConvSummary } from "@/types";
+import type { HomeContact } from "./contact";
+import { useHomeMotion } from "./mouvement/contexte";
+
+/*
+ * ———— En-tête : BLUSH en grand, comme le personnage de la conv (sa bulle, son nom en pastille) ————
+ * `logoRef` : sa bulle, au registre de l’en-tête (elle vole vers la feuille du contact, saute de joie à un niveau).
+ */
+export function BlushTitle({ busy, onClick, big = false, logoRef }: { busy: boolean; onClick: () => void; big?: boolean; logoRef?: Ref<HTMLSpanElement> }) {
+  const { arriving } = useHomeMotion();
+  return (
+    <button type="button" onClick={onClick} aria-haspopup="dialog" aria-label="BLUSH, ce qu’il voit de vous deux" className="group pointer-events-auto relative flex flex-col items-center px-1 text-ink">
+      {/* 1 · À l’arrivée, un halo rose s’allume derrière lui puis s’efface */}
+      {arriving && (
+        <span
+          aria-hidden="true"
+          data-a="aura"
+          className={cn(
+            "pointer-events-none absolute left-1/2 size-[260px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,125,186,0.5),rgba(255,125,186,0)_64%)] opacity-0",
+            big ? "top-[44px]" : "top-[32px]",
+          )}
+        />
+      )}
+      <span data-c="logo" className="relative block">
+        <span data-float="" className="block" style={{ "--r": "-3deg" }}>
+          <span ref={logoRef} data-a="logo" data-blush-logo="" className="block drop-shadow-[0_16px_18px_rgba(232,53,138,0.26)] group-hover:scale-105 group-active:scale-95">
+            <BubbleLogo size={big ? 88 : 64} animated={busy} layered />
+          </span>
+        </span>
+      </span>
+      <span data-c="pill" className="relative -mt-1 block">
+        <span
+          data-a="pill"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full bg-white font-black leading-none tracking-[-0.02em] shadow-[0_0_0_1px_rgba(17,17,20,0.08),0_6px_14px_-6px_rgba(17,17,20,0.3)]",
+            big ? "h-[30px] pl-3.5 pr-2 text-[15px]" : "h-[26px] pl-2.5 pr-1.5 text-[14px]",
+          )}
+        >
+          {/* L’adresse du site : toujours en haut de la conv, elle est sur chaque capture du chat */}
+          askblush.com
+          <Icon name="chevron" size={big ? 13 : 12} color="#8A8780" stroke={3} />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Plusieurs convs : le retour à la liste, avec les autres personnes en petit (deux au plus, puis « +n »),
+ * pour qu’on voie d’un coup d’œil qu’il y a d’autres convs. `flat` : dans la barre de la fenêtre (desktop), sans ombre.
+ */
+export function ConvsButton({ others, flat = false }: { others: ConvSummary[]; flat?: boolean }) {
+  const shown = others.slice(0, 2);
+  const more = others.length - shown.length;
+  return (
+    <Link
+      href="/app/convs"
+      /* Préchargée en entier (son rendu ne lit que tes convs) : le glissé emporte la vraie liste, pas son écran d’attente */
+      prefetch
+      transitionTypes={["nav-back", "accueil-vers-convs"]}
+      aria-label={`Tes convs (${others.map((o) => o.person.name).join(", ")})`}
+      className={cn(
+        "back-nudge pointer-events-auto flex h-10 items-center gap-1 rounded-full pl-2 pr-1.5 no-underline",
+        flat ? "transition-colors hover:bg-[rgba(17,17,20,0.05)]" : "lift lift-sm lift-card bg-white shadow-soft",
+      )}
+    >
+      <Icon name="back" size={17} color="#121214" stroke={2.6} />
+      <span aria-hidden="true" className="flex">
+        {shown.map((o, i) => (
+          <span key={o.storyId} className={cn("rounded-full shadow-[0_0_0_2px_#FFFFFF]", i > 0 && "-ml-2")}>
+            <Avatar tone="elle" size={26} fontSize={11}>
+              {o.person.initial}
+            </Avatar>
+          </span>
+        ))}
+        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-[#F1EFEA] text-[11px] font-black text-soft shadow-[0_0_0_2px_#FFFFFF]">+{more}</span>}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * Sophie, comme un contact : son avatar dans l’anneau de votre niveau, le verdict en badge, son prénom dessous. Un toucher ouvre sa fiche.
+ * `contact` : où vous en êtes maintenant (un niveau peut tomber pendant la visite). `anneauRef` et `avatarRef` : au
+ * registre de l’en-tête (11 · la fête d’un niveau, 9 · l’avatar qui vole vers la feuille du contact).
+ * `shared` : 10 · c’est cet avatar (celui qu’on voit, mobile ou desktop) qui passe sur la fiche pendant le glissé.
+ */
+export function SophieButton({
+  contact,
+  anneauRef,
+  avatarRef,
+  shared = false,
+}: {
+  contact: Pick<HomeContact, "report" | "fiche" | "ficheHref">;
+  anneauRef?: Ref<HTMLSpanElement>;
+  avatarRef?: Ref<HTMLSpanElement>;
+  shared?: boolean;
+}) {
+  const { report, fiche, ficheHref = "/app/fiche" } = contact;
+  const { levels, index: idx, temperature } = scaleOf(report.level);
+  const share = (idx + 1) / levels.length;
+  const ring = 2 * Math.PI * 21;
+  const where = temperature ? levels[idx].label : `niveau ${idx + 1} sur ${levels.length}`;
+  const avatar = (
+    <span ref={avatarRef} data-a="av" className="block rounded-full">
+      <Avatar tone="elle" size={36} fontSize={15}>
+        {fiche.person.initial}
+      </Avatar>
+    </span>
+  );
+  return (
+    <Link
+      href={ficheHref}
+      prefetch
+      transitionTypes={["nav-forward", "accueil-vers-fiche"]}
+      aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
+      className="group pointer-events-auto flex flex-col items-center gap-1 text-ink no-underline"
+    >
+      <span ref={anneauRef} data-c="so" className="relative flex size-12 items-center justify-center transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">
+        {/* 11 · Le halo vert quand un niveau tombe (un calque à part : il s’anime sur le compositeur) */}
+        <span aria-hidden="true" data-glow-ring="" className="pointer-events-none absolute -inset-1 rounded-full opacity-0 shadow-[0_0_14px_3px_rgba(18,192,138,0.7)]" />
+        <svg aria-hidden="true" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
+          <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />
+          <circle data-a="ring" data-ring-fill="" cx="24" cy="24" r="21" fill="none" stroke="#12C08A" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${ring * share} ${ring}`} />
+        </svg>
+        {shared ? (
+          <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
+            {avatar}
+          </ViewTransition>
+        ) : (
+          avatar
+        )}
+        <span
+          aria-hidden="true"
+          data-badge=""
+          data-a="badge"
+          className="absolute -bottom-1 -right-1.5 flex size-[22px] items-center justify-center rounded-full bg-white text-[12px] leading-none shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_3px_8px_-3px_rgba(17,17,20,0.35)]"
+        >
+          {report.verdict.emoji}
+        </span>
+      </span>
+      <span data-c="nm" data-a="nm" className="text-[12px] font-black leading-none">
+        {fiche.person.name}
+      </span>
+    </Link>
+  );
+}
+
+/*
+ * L’avatar de BLUSH sous chaque réponse : dessiné une fois par conv (ses dégradés, ses flous), puis repris par <use>.
+ * Une conv longue portait autant de copies du logo que de réponses, chacune avec ses filtres, dans le HTML comme à la
+ * peinture. Le dessin a l’identifiant que lui donne sa conv (useId), transmis à ses copies : deux convs dans la même
+ * page (l’aperçu, le guide de style) ne se prennent pas leur dessin.
+ */
+const LogoDuFilContext = createContext<string | null>(null);
+
+/** Une copie de l’avatar de BLUSH, dans une conv qui a son dessin (AvecLogoDuFil). */
+export function LogoDuFil() {
+  const id = use(LogoDuFilContext);
+  return (
+    <svg aria-hidden="true" width={34} height={34} viewBox="0 0 34 34" style={{ overflow: "visible", flexShrink: 0 }}>
+      {id !== null && <use href={`#${id}`} />}
+    </svg>
+  );
+}
+
+/** Une conv et le dessin de l’avatar de BLUSH, une fois, en dernier (hors du flux : rien ne bouge, et la première ligne reste la première). */
+export function AvecLogoDuFil({ children }: { children: ReactNode }) {
+  const id = useId();
+  return (
+    <LogoDuFilContext value={id}>
+      {children}
+      <svg aria-hidden="true" width={0} height={0} className="pointer-events-none absolute">
+        <defs>
+          <g id={id}>
+            <BubbleLogo size={34} />
+          </g>
+        </defs>
+      </svg>
+    </LogoDuFilContext>
+  );
+}

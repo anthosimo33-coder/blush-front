@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { estDesktop, flyBox, prefersReducedMotion, restingBox, visible, type Box, type Spring } from "@/lib/motion";
+import { flyBox, prefersReducedMotion, restingBox, type Box, type Spring } from "@/lib/motion";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
@@ -11,14 +11,16 @@ import { Tag } from "@/components/ui/messages";
 import { LevelPath } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/surfaces";
 import type { HomeContact } from "./contact";
+import { recede, shown } from "./mouvement/recul";
+import { departs, type Departs, type RegistreEntete } from "./mouvement/registre";
 
 /*
  * Les détails du contact (9 · « Ce que BLUSH voit ») : où vous en êtes, le rapport, sa fiche. Un toucher sur BLUSH, en
  * haut de l’accueil, l’ouvre : sa bulle et l’avatar de l’autre volent de l’en-tête vers la feuille, l’écran recule
  * derrière elle, puis tout regagne sa place à la fermeture. La feuille donne son dialogue et son panneau par des refs
  * (src/components/ui/surfaces.tsx), joue sa sortie au rythme qu’on lui donne et prévient de sa fin (onClosed). Ce qui
- * vit hors d’elle est encore cherché dans la page : l’écran qui recule (recede) et ce qui s’envole de l’en-tête (departs),
- * jusqu’à 5c (src/app/app/accueil/mouvement/).
+ * vit hors d’elle, l’accueil le lui donne : l’écran qui recule (sa ref, pour recede) et ce qui s’envole de l’en-tête (son
+ * registre, pour departs), tous deux dans ./mouvement.
  */
 
 /** La feuille « Ce que BLUSH voit » monte en 0,35 s : le logo et l’avatar y volent au même rythme. */
@@ -31,77 +33,24 @@ function Pastille({ children }: { children: ReactNode }) {
 }
 
 /**
- * 9 · L’écran recule derrière la feuille, comme sur iPhone (mobile seulement) : il rétrécit un peu, s’arrondit, et le noir apparaît autour.
- * « reset » remet tout en place sans animation (fermeture, départ vers une autre page).
- */
-function recede(state: "in" | "out" | "reset", timing?: Spring) {
-  /* TODO(5c): l’accueil par une ref (mouvement/), plus par sa classe */
-  const page = document.querySelector<HTMLElement>(".home-page");
-  /* Le fond noir vit sur <body> : on l’enlève toujours, même quand l’accueil a déjà disparu
-     (depuis la feuille, on part vers le rapport ou sa fiche : l’accueil est retiré avant ce nettoyage) */
-  if (state === "reset" || !page || estDesktop()) {
-    document.body.style.removeProperty("background");
-    if (!page) return;
-    page.getAnimations().forEach((a) => a.cancel());
-    page.parentElement?.style.removeProperty("background");
-    page.style.removeProperty("background");
-    page.style.removeProperty("background-color");
-    page.style.removeProperty("clip-path");
-    return;
-  }
-  page.getAnimations().forEach((a) => a.cancel());
-  const y = window.scrollY - page.offsetTop;
-  const vh = window.innerHeight;
-  const below = Math.max(0, page.offsetHeight - y - vh);
-  /* Accroché en haut : la carte touche la barre d’état de Safari (qui garde sa couleur), le noir n’apparaît que sur les côtés.
-     La découpe arrondie est posée d’un coup, seule l’échelle s’anime : le compositeur la joue seul, même sur une longue conv */
-  page.style.transformOrigin = `50% ${y}px`;
-  page.style.background = "var(--paper-light)";
-  page.style.backgroundColor = "var(--paper)";
-  page.style.clipPath = `inset(${y}px 0 ${below}px 0 round 24px)`;
-  const rest: Keyframe = { transform: "none" };
-  const back: Keyframe = { transform: "scale(0.94)" };
-  page.animate(state === "in" ? [rest, back] : [back, rest], { duration: timing?.duration ?? 300, easing: timing?.easing, fill: state === "in" ? "forwards" : "none" });
-  /* Le noir autour : sur la page et sur son cadre (qui a son propre fond pour le glissé vers la fiche) */
-  if (state === "in") {
-    document.body.style.background = "#000";
-    page.parentElement?.style.setProperty("background", "#000");
-  }
-}
-
-/** Cache ou remontre un élément sans changer la mise en page (pendant qu’un double vole à sa place). */
-function shown(el: HTMLElement | SVGElement, on: boolean) {
-  el.style.visibility = on ? "" : "hidden";
-}
-
-/** 9 · Ce qui vole de l’en-tête vers la feuille du contact (la bulle de BLUSH, l’avatar de l’autre), et d’où. */
-type Depart = { src: HTMLElement; from: Box };
-export type Departs = { logo: Depart | null; av: Depart | null };
-
-/** 9 · Relève d’où partent la bulle de BLUSH et l’avatar de l’autre (ceux qu’on voit, mobile ou desktop) : au toucher, quand la page est encore à jour. */
-export function departs(): Departs {
-  /* TODO(5c): le registre du logo et de l’avatar de l’en-tête, au lieu de leurs attributs cherchés dans toute la page */
-  const de = (selector: string) => {
-    const src = visible<HTMLElement>(selector);
-    return src ? { src, from: src.getBoundingClientRect() } : null;
-  };
-  return { logo: de("[data-blush-logo]"), av: de("[data-sophie-avatar]") };
-}
-
-/**
  * Les détails du contact : le verdict, où vous en êtes, le rapport et sa fiche. `departRef` : d’où l’accueil a vu partir
- * la bulle et l’avatar au toucher (departs), lu une fois à l’ouverture ; sans lui, relevé à ce moment-là.
+ * la bulle et l’avatar au toucher (departs), lu une fois à l’ouverture ; sans lui, relevé à ce moment-là dans `entete`
+ * (rien ne vole sans l’un ni l’autre). `pageRef` : l’accueil, qui recule derrière la feuille (mobile).
  */
 export function ContactSheet({
   contact,
   open,
   onClose,
   departRef,
+  entete,
+  pageRef,
 }: {
   contact: Pick<HomeContact, "report" | "fiche" | "period" | "ficheHref">;
   open: boolean;
   onClose: () => void;
   departRef: RefObject<Departs | null>;
+  entete?: RegistreEntete;
+  pageRef?: RefObject<HTMLElement | null>;
 }) {
   const { report, fiche, period, ficheHref = "/app/fiche" } = contact;
   const router = useRouter();
@@ -123,8 +72,8 @@ export function ContactSheet({
     }
     moved.current = [];
     closing.current = false;
-    recede("reset");
-  }, []);
+    recede(pageRef?.current ?? null, "reset");
+  }, [pageRef]);
   /* L’accueil quitté pendant la sortie : rien ne reste caché, ni l’écran reculé */
   useEffect(
     () => () => {
@@ -138,7 +87,7 @@ export function ContactSheet({
     /* Rouverte pendant sa sortie : la précédente finit d’abord de tout remettre en place */
     if (closing.current) remettre();
     /* Le départ a été relevé au toucher ; l’arrivée l’est à l’image suivante, la feuille posée : rien n’oblige le clic à remettre la page en page */
-    const de = departRef.current ?? departs();
+    const de = departRef.current ?? (entete ? departs(entete) : { logo: null, av: null });
     departRef.current = null;
     const raf = requestAnimationFrame(() => {
       const logoBox = logoRef.current;
@@ -167,7 +116,7 @@ export function ContactSheet({
         });
         moved.current.push({ src, from, target: p.target });
       }
-      recede("in", SHEET_IN);
+      recede(pageRef?.current ?? null, "in", SHEET_IN);
     });
     return () => {
       cancelAnimationFrame(raf);
@@ -175,7 +124,7 @@ export function ContactSheet({
          feuille redescend encore : à la fin de sa sortie (onClosed) */
       if (!closing.current) remettre();
     };
-  }, [open, departRef, remettre]);
+  }, [open, departRef, entete, pageRef, remettre]);
 
   /*
    * La fermeture : la feuille redescend (sa sortie, à notre rythme : SHEET_OUT), la bulle et l’avatar regagnent
@@ -195,7 +144,7 @@ export function ContactSheet({
       shown(m.target, false);
       void flyBox(clone, from, m.from, { spring: SHEET_OUT, host: dialog, settle: 1 });
     }
-    recede("out", SHEET_OUT);
+    recede(pageRef?.current ?? null, "out", SHEET_OUT);
     onClose();
   };
 
