@@ -5,7 +5,6 @@
  * pendant la visite (../../garde.ts) lit les mêmes identifiants. Testé dans tests/unit/accueil-modele.test.ts.
  */
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
-import type { VoiceClip } from "../../voice";
 
 /* ———— Les identifiants ———— */
 
@@ -14,9 +13,9 @@ import type { VoiceClip } from "../../voice";
  * - l’intro de BLUSH : −2 (ton prochain pas) et −1 (« elle vient de répondre ? ») ;
  * - l’aperçu (/apercu, des échanges sans identifiant) : −100 − 2 × le rang de l’échange pour ton message, − 1 pour la réponse ;
  * - l’historique du back-end : −1 000 000 − 2 × l’échange (l’id de ton message en base), − 1 pour la réponse de BLUSH ;
- * - la visite : 1, 2, 3… (HomeScreen), qui continuent d’une visite à l’autre.
- * Un échange de l’historique a toujours les mêmes identifiants : d’un chargement à l’autre, les morceaux plus anciens se
- * posent devant sans doublon, et la conv gardée reconnaît ses messages.
+ * - la visite : 1, 2, 3… (PREMIER_ID_VISITE, puis HomeScreen les compte), qui continuent d’une visite à l’autre.
+ * Rien n’est attribué entre les deux (0, −3 à −99). Un échange de l’historique a toujours les mêmes identifiants : d’un
+ * chargement à l’autre, les morceaux plus anciens se posent devant sans doublon, et la conv gardée reconnaît ses messages.
  */
 const HISTORIQUE = -1_000_000;
 const APERCU = -100;
@@ -27,19 +26,29 @@ type Origine = "intro" | "apercu" | "historique" | "visite";
 /** Les deux messages de l’intro de BLUSH : ton prochain pas, puis « elle vient de répondre ? ». */
 export const ID_INTRO = { next: -2, hint: -1 } as const;
 
+/** Le premier message de la visite (ceux d’après se suivent, d’une visite à l’autre). */
+export const PREMIER_ID_VISITE = 1;
+
 /** L’identifiant d’un message de l’historique : ton message, ou la réponse de BLUSH. */
 export const idHistorique = (echange: number, deBlush: boolean) => HISTORIQUE - 2 * echange - (deBlush ? 1 : 0);
 
 /** L’identifiant d’un message de l’aperçu (le `rang`-ième échange de son script) : ton message, ou la réponse de BLUSH. */
 const idApercu = (rang: number, deBlush: boolean) => APERCU - 2 * rang - (deBlush ? 1 : 0);
 
-/** D’où vient le message `id`. */
-export function origineDe(id: number): Origine {
-  if (id > 0) return "visite";
+/** D’où vient le message `id` (`null` : un identifiant que rien n’attribue). */
+export function origineDe(id: number): Origine | null {
+  if (id >= PREMIER_ID_VISITE) return "visite";
   if (id <= HISTORIQUE) return "historique";
-  if (id >= ID_INTRO.next) return "intro";
-  return "apercu";
+  if (id <= APERCU) return "apercu";
+  if (id === ID_INTRO.next || id === ID_INTRO.hint) return "intro";
+  return null;
 }
+
+/**
+ * Dans la visite, ton message auquel répond « BLUSH écrit » (puis sa réponse, qui garde son identifiant) : celui d’avant,
+ * pris dans le même geste (HomeScreen, exchange). Dans l’historique, l’échange les relie (idHistorique).
+ */
+export const questionDe = (idReponse: number) => idReponse - 1;
 
 /** L’échange d’un message de l’historique (back-end : l’id de ton message). */
 export const echangeDe = (id: number) => Math.floor((HISTORIQUE - id) / 2);
@@ -53,6 +62,12 @@ export const rangDansLEchange = (id: number) => (HISTORIQUE - id) % 2;
  */
 export const cleBulle = (id: number, rang: number | "ecrit") => `${id}-${rang}`;
 
+/**
+ * La clé de la bulle `k` du message `m`, la seule règle : « BLUSH écrit » qui tape encore a la sienne (c’est sa seule
+ * bulle). Un groupe prend celle de sa première bulle (rowsOf), et l’habillage des bulles la même (HomeScreen).
+ */
+export const cleDeBulle = (m: Msg, k: number) => cleBulle(m.id, tapeEncore(m) ? "ecrit" : k);
+
 /** La clé de la date posée avant un message (un nouveau jour). */
 const cleJour = (id: number) => `jour-${id}`;
 
@@ -63,11 +78,17 @@ export const CLE_JOUR_INTRO = cleJour(ID_INTRO.next);
 /* ———— Les messages ———— */
 
 /**
- * `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la
+ * `at` : l’heure du message. `seed` : pour l’intro et l’aperçu, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la
  * réponse qui remplace « BLUSH écrit ». `vagues` : une réponse arrivée au fil de l’eau, où commence chaque arrivée de
  * bulles (chacune se déplie à son tour, ce qui est déjà posé ne bouge plus).
  */
 export type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answered?: boolean; vagues?: number[] };
+
+/**
+ * Ton vocal dans la conv : son adresse (locale, révoquée au départ de l’accueil), sa durée en secondes, ses pics. Le
+ * modèle le décrit lui-même : il ne dépend d’aucun composant (le lecteur, ../../voice.tsx, en lit la même forme).
+ */
+type VocalDuMessage = { url: string; seconds: number; peaks: number[] };
 
 /**
  * Un message de la conv, de son `type` :
@@ -84,7 +105,7 @@ export type Msg = (
   | { type: "texte"; id: number; from: "toi"; text: string; about?: string }
   | { type: "images"; id: number; from: "toi"; images: string[] }
   | { type: "fichier"; id: number; from: "toi"; file: { name: string; size: number } }
-  | { type: "vocal"; id: number; from: "toi"; voice: Pick<VoiceClip, "url" | "seconds" | "peaks"> }
+  | { type: "vocal"; id: number; from: "toi"; voice: VocalDuMessage }
   | { type: "mot"; id: number; from: "blush"; notice: string }
   | { type: "niveau"; id: number; from: "event"; level: LevelId }
 ) &
@@ -96,9 +117,12 @@ export type MsgABulles = Exclude<Msg, { type: "niveau" }>;
 /** Un message sans son identifiant (il est attribué au moment de l’ajouter à la conv). */
 export type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
 
-/** Le `default` d’un `switch` sur le `type` d’un message : un type oublié ne compile pas. */
+/**
+ * Le `default` d’un `switch` sur le `type` d’un message : un type oublié ne compile pas. L’erreur ne dit que le type :
+ * le message porte le texte de la conv, qui ne va jamais dans les journaux.
+ */
 export function typeInconnu(m: never): never {
-  throw new Error(`Message de la conv d’un type inconnu (${JSON.stringify(m)})`);
+  throw new Error(`Message de la conv d’un type inconnu (${String((m as { type?: unknown }).type)})`);
 }
 
 /** « BLUSH écrit » sans bulle arrivée ni coupure : sa bulle qui tape, seule dans son message. */
@@ -165,7 +189,8 @@ export const clock = (at: number) => HEURE.format(at);
 /**
  * « Aujourd’hui », « Hier », le jour de la semaine, puis la date : la date posée au-dessus d’un nouveau jour. La règle
  * de `jourRelatif` (src/server/temps.ts, la liste des convs), mais à l’heure du téléphone, qui est aussi celle des
- * bulles, et en toutes lettres.
+ * bulles, et en toutes lettres : le fuseau et le format diffèrent exprès. Le compte des jours, lui, est à mettre en
+ * commun (src/lib) par la PR qui reprend temps.ts.
  */
 export function dayLabel(at: number, now: number) {
   const days = Math.round((dayStart(now) - dayStart(at)) / 86_400_000);
@@ -214,7 +239,7 @@ export function rowsOf(msgs: readonly Msg[], opened: number | null, depuis: numb
       last.msgs.push(ligne);
       last.at = at;
       if (echange) last.echange = echange;
-    } else rows.push({ kind: "group", key: cleBulle(m.id, tapeEncore(m) ? "ecrit" : 0), from: m.from, at, msgs: [ligne], echange });
+    } else rows.push({ kind: "group", key: cleDeBulle(m, 0), from: m.from, at, msgs: [ligne], echange });
   }
   return rows;
 }

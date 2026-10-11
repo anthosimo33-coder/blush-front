@@ -54,12 +54,14 @@ import {
   CLE_INTRO,
   CLE_JOUR_INTRO,
   cleBulle,
+  cleDeBulle,
   clock,
   dayLabel,
   depli,
   echangesEnMsgs,
   introDe,
   maintenantDe,
+  PREMIER_ID_VISITE,
   rowsOf,
   tapeEncore,
   typeInconnu,
@@ -205,7 +207,7 @@ if (typeof window !== "undefined") window.addEventListener("popstate", () => (tr
  */
 let gardee: (Conv<Msg> & { cle: string; modeVocal: boolean; asked: string[] }) | null = null;
 /* Les identifiants des messages de la visite (1, 2, 3…) : ils continuent d’une visite à l’autre, la conv gardée garde les siens */
-let prochainId = 1;
+let prochainId = PREMIER_ID_VISITE;
 /* Les questions toutes prêtes ont fait leur entrée : revenu sur l’accueil, elles sont déjà là (elles la refont après une réponse) */
 let pastillesPosees = false;
 
@@ -781,7 +783,7 @@ export function HomeScreen({
     const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
     posee = true;
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
-    update((m) => m.map((x) => (x.id === readingId ? ({ ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } as Msg) : x)));
+    update((m) => m.map((x) => (x.id === readingId ? { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } : x)));
     if (premiere) pop();
     if (next.type === "reponse" && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
     const up = next.type === "reponse" ? next.result.levelUp : undefined;
@@ -1791,9 +1793,9 @@ type Pos = "single" | "first" | "middle" | "last";
 /**
  * Une bulle de la conv : `at` son heure (6 · glisse pour l’heure), `fresh` une réponse qui vient d’arriver (5 · elle se
  * déplie, `d` secondes après le début de son arrivée), `neuf` un message de cette visite (il fait son entrée ;
- * l’historique et la conv gardée sont déjà lus).
+ * l’historique et la conv gardée sont déjà lus). `tape` : la bulle de « BLUSH écrit » qui tape encore (tapeEncore).
  */
-type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean; d: number; neuf: boolean };
+type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean; d: number; neuf: boolean; tape: boolean };
 
 /** Un groupe de la conv (accueil/conv/modele.ts, rowsOf), habillé : les bulles de chacun de ses messages. */
 type GroupeAffiche = Omit<Extract<Row, { kind: "group" }>, "msgs"> & { items: Item[] };
@@ -1818,15 +1820,17 @@ function bullesDe(m: MsgABulles, env: BubbleEnv) {
 }
 
 /**
- * Un groupe de la conv, en bulles : celles de chaque message (gardées, voir bullesDe), chacune avec sa clé et son délai.
- * « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent.
+ * Un groupe de la conv, en bulles : celles de chaque message (gardées, voir bullesDe), chacune avec sa clé (cleDeBulle,
+ * la règle de la clé du groupe) et son délai. « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro
+ * et ses bulles montent.
  */
 function groupeAffiche({ msgs, ...groupe }: Extract<Row, { kind: "group" }>, env: BubbleEnv): GroupeAffiche {
   return {
     ...groupe,
     items: msgs.flatMap(({ m, at, neuf, fresh }) => {
       const nodes = bullesDe(m, env);
-      return nodes.map((node, k) => ({ key: cleBulle(m.id, node.tone === "typing" ? "ecrit" : k), node, at, fresh, d: depli(k, nodes.length, m.vagues), neuf }));
+      const tape = tapeEncore(m);
+      return nodes.map((node, k) => ({ key: cleDeBulle(m, k), node, at, fresh, d: depli(k, nodes.length, m.vagues), neuf, tape }));
     }),
   };
 }
@@ -1914,11 +1918,13 @@ type GroupProps = { row: GroupeAffiche; intro: boolean };
 /**
  * Les bulles d’un même expéditeur : l’avatar de BLUSH sous la dernière, l’heure dessous (ou « BLUSH écrit » à la place).
  * `intro` : 1 · l’arrivée, BLUSH écrit un instant, puis l’intro se pose. L’arrivée arrive en props, pas par le contexte :
- * sa fin ne refait que le groupe de l’intro.
+ * sa fin ne refait que le groupe de l’intro. Un groupe sans bulle (une réponse vide) ne montre rien, ni heure ni
+ * « Partager ».
  */
 const Group = memo(function Group({ row, intro }: GroupProps) {
   const partager = use(PartagerContext);
-  const typing = row.items.find((it) => it.node.tone === "typing");
+  if (!row.items.length) return null;
+  const typing = row.items.find((it) => it.tape);
   const bubbles = row.items.filter((it) => it !== typing);
   const n = bubbles.length;
   return (
@@ -2004,12 +2010,12 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
   if (x.key !== y.key || x.at !== y.at || x.echange !== y.echange || x.from !== y.from || x.items.length !== y.items.length) return false;
   return x.items.every((it, i) => {
     const o = y.items[i];
-    return it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf;
+    return it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf && it.tape === o.tape;
   });
 }
 
 /** Une bulle : sa forme vient de sa place dans le groupe, son style de son contenu. `quote` : 7 · ce qu’on creuse en la glissant. */
-type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare" | "typing"; className?: string; quote?: string };
+type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string; quote?: string };
 
 function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "toi"; pos: Pos; node: BubbleNode; id: string; unfold?: number | null }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
@@ -2130,7 +2136,8 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BubbleNode[] {
             },
           ];
     case "ecrit":
-      if (tapeEncore(m)) return [{ tone: "typing", body: <BlushTyping label={m.reading} vocal={m.vocal} /> }];
+      /* Sa bulle qui tape, seule : Group la pose à la place de l’heure (Item.tape) */
+      if (tapeEncore(m)) return [{ body: <BlushTyping label={m.reading} vocal={m.vocal} /> }];
       /* Ses bulles déjà arrivées pendant qu’il écrit, et « Réessayer » si le réseau a coupé avant la fin */
       return [...(m.recues ?? []).flatMap(bulleEcrite), ...(m.coupee ? [{ body: <Coupure reponse={m.id} /> }] : [])];
     case "mot":

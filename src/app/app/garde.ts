@@ -7,9 +7,12 @@
  * Les identifiants (l’historique du back-end, l’intro et l’aperçu, la visite) et ce qu’ils disent d’un message :
  * accueil/conv/modele.ts.
  */
-import { echangeDe as echangeDeLId, idHistorique, origineDe, rangDansLEchange } from "./accueil/conv/modele";
+import { echangeDe, idHistorique, origineDe, questionDe, rangDansLEchange } from "./accueil/conv/modele";
 
-/* Ses tests (tests/conv-gardee.test.ts) écrivent l’historique avec lui */
+/*
+ * Ses tests (tests/conv-gardee.test.ts) écrivent l’historique avec lui. À retirer quand leurs messages porteront leur
+ * `type` et l’importeront du modèle.
+ */
 export { idHistorique };
 
 /** Ce que la garde lit d’un message (le type complet, `Msg`, vit dans accueil/conv/modele.ts). */
@@ -21,10 +24,10 @@ export type Conv<M> = { msgs: M[]; plus: boolean; plusAncien: number | null };
 const estHistorique = (m: { id: number }) => origineDe(m.id) === "historique";
 const deLaVisite = (m: { id: number }) => origineDe(m.id) === "visite";
 /** L’intro et l’aperçu : ils restent ceux de la conv affichée. */
-const fixe = (m: { id: number }) => origineDe(m.id) === "intro" || origineDe(m.id) === "apercu";
-
-/** L’échange d’un message de l’historique. */
-const echangeDe = (m: { id: number }) => echangeDeLId(m.id);
+const fixe = (m: { id: number }) => {
+  const origine = origineDe(m.id);
+  return origine === "intro" || origine === "apercu";
+};
 
 /** L’échange auquel appartient une réponse de BLUSH (back-end : l’id de ton message). */
 const echangeRepondu = (m: object) => ("result" in m ? (m.result as { echange?: number } | undefined)?.echange : undefined);
@@ -36,7 +39,7 @@ const echangeRepondu = (m: object) => ("result" in m ? (m.result as { echange?: 
  * l’identifiant qu’il a dans l’historique, l’historique frais le reconnaît au lieu de le doubler.
  */
 export function remonter<M extends MsgGardable>(conv: Conv<M>): Conv<M> {
-  const enAttente = new Set(conv.msgs.filter((m) => "reading" in m).map((m) => m.id - 1));
+  const enAttente = new Set(conv.msgs.filter((m) => "reading" in m).map((m) => questionDe(m.id)));
   const gardes = conv.msgs.filter((m) => !("reading" in m) && !("images" in m) && !("voice" in m) && !(m.from === "toi" && deLaVisite(m) && enAttente.has(m.id)));
   const parId = new Map(gardes.map((m) => [m.id, m]));
   const renommes = new Map<number, number>();
@@ -44,7 +47,8 @@ export function remonter<M extends MsgGardable>(conv: Conv<M>): Conv<M> {
     const e = deLaVisite(m) ? echangeRepondu(m) : undefined;
     if (e === undefined) continue;
     renommes.set(m.id, idHistorique(e, true));
-    if (parId.get(m.id - 1)?.from === "toi") renommes.set(m.id - 1, idHistorique(e, false));
+    const question = questionDe(m.id);
+    if (parId.get(question)?.from === "toi") renommes.set(question, idHistorique(e, false));
   }
   const msgs = gardes.map((m) => {
     const id = renommes.get(m.id) ?? m.id;
@@ -64,24 +68,24 @@ export function fusion<M extends MsgGardable>(s: Conv<M>, f: Conv<M>): Conv<M> {
   const fixes = s.msgs.filter(fixe);
   const sh = s.msgs.filter(estHistorique);
   const fh = f.msgs.filter(estHistorique);
-  const sMax = Math.max(...sh.map(echangeDe));
-  const fMin = Math.min(...fh.map(echangeDe));
+  const sMax = Math.max(...sh.map((m) => echangeDe(m.id)));
+  const fMin = Math.min(...fh.map((m) => echangeDe(m.id)));
   if (sh.length && fh.length && fMin > sMax) return { msgs: [...fixes, ...fh], plus: f.plus, plusAncien: f.plusAncien };
   /* Chaque message et sa place : son échange, puis ton message, la réponse, et ce qui suit dans la visite */
   const places = new Map<number, { m: M; e: number; rang: number }>();
-  for (const m of fh) places.set(m.id, { m, e: echangeDe(m), rang: rangDansLEchange(m.id) });
+  for (const m of fh) places.set(m.id, { m, e: echangeDe(m.id), rang: rangDansLEchange(m.id) });
   let ancre = -Infinity;
   let suite = 2;
   for (const m of s.msgs) {
     if (estHistorique(m)) {
-      ancre = echangeDe(m);
+      ancre = echangeDe(m.id);
       places.set(m.id, { m, e: ancre, rang: rangDansLEchange(m.id) });
     } else if (deLaVisite(m)) places.set(m.id, { m, e: ancre, rang: suite++ });
   }
   const ranges = [...places.values()].sort((a, b) => a.e - b.e || a.rang - b.rang);
   const plusAncienAffiche = ranges.find((p) => estHistorique(p.m))?.e;
   /* Le plus ancien affiché vient de `s` ou de `f` : c’est lui qui sait s’il en reste d’autres */
-  const depuisS = sh.length > 0 && (!fh.length || Math.min(...sh.map(echangeDe)) <= fMin);
+  const depuisS = sh.length > 0 && (!fh.length || Math.min(...sh.map((m) => echangeDe(m.id))) <= fMin);
   return {
     msgs: [...fixes, ...ranges.map((p) => p.m)],
     plus: depuisS ? s.plus : fh.length ? f.plus : s.plus,

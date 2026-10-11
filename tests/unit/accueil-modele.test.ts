@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BlushAnswer } from "@/types";
-import { idHistorique as idDeLaGarde } from "@/app/app/garde";
 import {
   CLE_INTRO,
   CLE_JOUR_INTRO,
   cleBulle,
+  cleDeBulle,
   clock,
   dayLabel,
   dayStart,
@@ -16,10 +16,13 @@ import {
   introDe,
   maintenantDe,
   origineDe,
+  PREMIER_ID_VISITE,
+  questionDe,
   rangDansLEchange,
   rowsOf,
   tapeEncore,
   timeOf,
+  typeInconnu,
   type Msg,
   type Row,
 } from "@/app/app/accueil/conv/modele";
@@ -44,21 +47,58 @@ describe("les identifiants", () => {
     expect(idHistorique(10, true)).toBe(-1_000_021);
     expect([echangeDe(idHistorique(10, false)), echangeDe(idHistorique(10, true))]).toEqual([10, 10]);
     expect([rangDansLEchange(idHistorique(10, false)), rangDansLEchange(idHistorique(10, true))]).toEqual([0, 1]);
-    /* La conv gardée écrit les mêmes */
-    expect(idDeLaGarde).toBe(idHistorique);
   });
 
   it("chaque message dit d’où il vient : l’intro, l’aperçu, l’historique, la visite", () => {
     expect([ID_INTRO.next, ID_INTRO.hint].map(origineDe)).toEqual(["intro", "intro"]);
-    expect([-100, -101, -2_000].map(origineDe)).toEqual(["apercu", "apercu", "apercu"]);
-    expect([idHistorique(1, false), idHistorique(1, true), idHistorique(987_654, true)].map(origineDe)).toEqual(["historique", "historique", "historique"]);
-    expect([1, 2, 40].map(origineDe)).toEqual(["visite", "visite", "visite"]);
+    expect([-100, -101, -2_000, -999_999].map(origineDe)).toEqual(["apercu", "apercu", "apercu", "apercu"]);
+    expect([-1_000_000, idHistorique(1, false), idHistorique(1, true), idHistorique(987_654, true)].map(origineDe)).toEqual(["historique", "historique", "historique", "historique"]);
+    expect([PREMIER_ID_VISITE, 2, 40].map(origineDe)).toEqual(["visite", "visite", "visite"]);
+  });
+
+  it("entre les origines, rien n’est attribué : ni 0, ni −3 à −99", () => {
+    expect(PREMIER_ID_VISITE).toBe(1);
+    expect([0, -3, -50, -99].map(origineDe)).toEqual([null, null, null, null]);
+  });
+
+  it("dans la visite, ta question précède « BLUSH écrit » (puis sa réponse)", () => {
+    expect(questionDe(PREMIER_ID_VISITE + 1)).toBe(PREMIER_ID_VISITE);
+    expect(questionDe(8)).toBe(7);
   });
 
   it("les clés des bulles et des lignes de l’intro", () => {
     expect([cleBulle(5, 0), cleBulle(5, 3), cleBulle(5, "ecrit")]).toEqual(["5-0", "5-3", "5-ecrit"]);
     const rows = rowsOf(introDe(le(9, 20)), OUVERT, 1);
     expect(rows.map((r) => r.key)).toEqual([CLE_JOUR_INTRO, CLE_INTRO]);
+  });
+
+  it("la clé d’un groupe est celle de sa première bulle, pour chaque type de message", () => {
+    const ecrit = { type: "ecrit", id: 9, from: "blush", reading: "BLUSH analyse sa réponse" } as const;
+    const unDeChaque: Msg[] = [
+      ...introDe(),
+      ecrit,
+      { ...ecrit, recues: [{ text: "attends" }] },
+      { ...ecrit, coupee: true },
+      { type: "reponse", id: 9, from: "blush", result: reponse("ok") },
+      { type: "mot", id: 9, from: "blush", notice: "Je n’ai rien entendu." },
+      { type: "texte", id: 9, from: "toi", text: "et là ?" },
+      { type: "images", id: 9, from: "toi", images: ["blob:1"] },
+      { type: "fichier", id: 9, from: "toi", file: { name: "export.txt", size: 12 } },
+      { type: "vocal", id: 9, from: "toi", voice: { url: "blob:2", seconds: 3, peaks: [1] } },
+    ];
+    for (const m of unDeChaque) {
+      const groupe = rowsOf([m], OUVERT, 1).find((r) => r.kind === "group");
+      expect(groupe?.key).toBe(cleDeBulle(m, 0));
+    }
+    /* « BLUSH écrit » qui tape : sa seule bulle a sa clé à elle ; dès qu’une bulle arrive, les clés reprennent leur rang */
+    expect(cleDeBulle(ecrit, 0)).toBe("9-ecrit");
+    expect([0, 1].map((k) => cleDeBulle({ ...ecrit, recues: [{ text: "a" }, { text: "b" }] }, k))).toEqual(["9-0", "9-1"]);
+  });
+
+  it("un type de message inconnu : l’erreur ne dit que son type, jamais son contenu", () => {
+    const inconnu = { type: "carte", id: 3, from: "toi", text: "ce qu’elle m’a écrit" };
+    /* Tout le message d’erreur : le type, et rien du texte */
+    expect(() => typeInconnu(inconnu as never)).toThrow(/^Message de la conv d’un type inconnu \(carte\)$/);
   });
 });
 
