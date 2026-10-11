@@ -1,5 +1,3 @@
-"use client";
-
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";

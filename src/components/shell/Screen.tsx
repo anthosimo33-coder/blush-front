@@ -1,30 +1,17 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { MouseEvent, ReactNode, Ref } from "react";
-import { cheminDe, pagePrecedente } from "@/lib/navigation";
+import type { ReactNode, Ref } from "react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/icons";
 import { ProgressDots } from "@/components/ui/progress";
+import { BoutonRetour, LienRetourDesktop, type BackTarget } from "./BoutonRetour";
 
-export type BackTarget = string | (() => void);
-
-/**
- * Un « Retour » vers une adresse : si c’est la page d’où l’on vient, on revient en arrière (l’historique reste
- * propre, et le retour suivant mène bien plus loin) ; sinon, le lien l’ouvre.
+/*
+ * La structure des écrans, sans « use client » : rendue sur le serveur pour un écran serveur (la confidentialité),
+ * dans le navigateur pour un écran client. Seuls les « Retour » (BoutonRetour.tsx) y tournent toujours.
  */
-function useRetour(target: string) {
-  const router = useRouter();
-  return (e: MouseEvent) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    if (pagePrecedente() === cheminDe(target)) {
-      e.preventDefault();
-      router.back();
-    }
-  };
-}
+
+export type { BackTarget };
 
 /* ———— Barre du haut mobile : retour · titre · progression ———— */
 export function MobileTopBar({
@@ -42,28 +29,10 @@ export function MobileTopBar({
 }) {
   return (
     <header className={cn("flex h-[60px] shrink-0 items-center gap-2 px-4 lg:hidden", className)}>
-      {back ? <BackButton target={back} /> : <span className="size-11" />}
+      {back ? <BoutonRetour target={back} /> : <span className="size-11" />}
       <span className="flex-1 text-center text-[14px] font-black text-grey">{title}</span>
       <span className="flex w-11 justify-end">{right ?? (progress !== undefined && <ProgressDots current={progress} />)}</span>
     </header>
-  );
-}
-
-function BackButton({ target }: { target: BackTarget }) {
-  const router = useRouter();
-  const retour = useRetour(typeof target === "string" ? target : "");
-  const glyph = <Icon name="back" size={24} color="#121214" stroke={2.6} />;
-  const cls = "flex size-11 items-center justify-center";
-  if (typeof target === "string")
-    return (
-      <Link href={target} onClick={retour} aria-label="Retour" className={cls}>
-        {glyph}
-      </Link>
-    );
-  return (
-    <button type="button" aria-label="Retour" className={cls} onClick={target ?? (() => router.back())}>
-      {glyph}
-    </button>
   );
 }
 
@@ -81,28 +50,11 @@ export function DesktopHeader({ right, className }: { right?: ReactNode; classNa
 }
 
 /** Lien « Retour » au-dessus du titre (desktop). */
-function DesktopBack({ target, label = "Retour", trailing }: { target: BackTarget; label?: string; trailing?: string }) {
-  const retour = useRetour(typeof target === "string" ? target : "");
-  const content = (
-    <>
-      <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
-      {label}
-    </>
-  );
-  /* Zone tactile de 44 px sans changer la mise en page */
-  const cls = "back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
+function DesktopBack({ target, label, trailing }: { target: BackTarget; label?: string; trailing?: string }) {
   return (
     /* Toujours 14 px entre « Retour » et le titre, quel que soit l’espacement du contenu */
     <div className="hidden items-center gap-4 lg:flex" style={{ marginBottom: "calc(14px - var(--gap))" }}>
-      {typeof target === "string" ? (
-        <Link href={target} onClick={retour} className={cls}>
-          {content}
-        </Link>
-      ) : (
-        <button type="button" onClick={target} className={cls}>
-          {content}
-        </button>
-      )}
+      <LienRetourDesktop target={target} label={label} />
       {trailing && <span className="text-[14px] font-black text-grey">{trailing}</span>}
     </div>
   );

@@ -1,6 +1,3 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { HeroHeader, InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Icon } from "@/components/ui/icons";
@@ -18,10 +15,10 @@ function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIc
   return <InsetRow leading={<RowIcon icon={icone} tone={ton} />} title={titre} sub={children} className="items-start [&>span:first-child]:mt-0.5" />;
 }
 
+/** La page, rendue sur le serveur : seul son « Retour » tourne dans le navigateur (la page d’avant, ou la landing). */
 export function ConfidentialiteScreen() {
-  const router = useRouter();
   return (
-    <Screen mobileTop={<MobileTopBar back={() => router.back()} title="Confidentialité" />} desktopBack={{ target: "/" }} mainWidth={640}>
+    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title="Confidentialité" />} desktopBack={{ target: "/" }} mainWidth={640}>
       <HeroHeader
         visual={
           <span className="flex size-16 items-center justify-center rounded-full bg-ink shadow-[0_14px_30px_-14px_rgba(17,17,20,0.6)]">

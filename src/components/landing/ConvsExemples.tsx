@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { LANDING_CONVS } from "@/contenu/landing";
@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/icons";
 import { Bubble, ConfidenceLine } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { APPLIS, type LandingConv } from "@/types";
-import { useCta } from "./parts";
+import { ctaDe, type Retour } from "./cta";
 
 /* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
 const ROWS = [0, 1, 2].map((i) => ({
@@ -23,9 +23,10 @@ const ROWS = [0, 1, 2].map((i) => ({
   offset: [0, 150, 70][i],
 }));
 
-/** Les convs qui défilent : on en choisit une, BLUSH montre son verdict. */
-export function ConvsExemples() {
+/** Les convs qui défilent : on en choisit une, BLUSH montre son verdict. `retour` : qui revient (cta.ts). */
+export function ConvsExemples({ retour }: { retour: Retour }) {
   const [picked, setPicked] = useState<LandingConv | null>(null);
+  const titre = useId();
   return (
     <div className="mt-14 lg:mt-20">
       <h2 className="sr-only">Des exemples de convs{NBSP}: choisis-en une pour voir le verdict de BLUSH</h2>
@@ -41,8 +42,8 @@ export function ConvsExemples() {
           Choisis une conv, je te donne mon verdict.
         </p>
       </div>
-      <Sheet open={picked !== null} onClose={() => setPicked(null)} labelledBy="exemple-nom" belowHeader={false}>
-        {picked && <ExampleReport conv={picked} onClose={() => setPicked(null)} />}
+      <Sheet open={picked !== null} onClose={() => setPicked(null)} labelledBy={titre} belowHeader={false}>
+        {picked && <ExampleReport conv={picked} retour={retour} titreId={titre} onClose={() => setPicked(null)} />}
       </Sheet>
     </div>
   );
@@ -113,15 +114,15 @@ function ConvAvatar({ conv, size }: { conv: LandingConv; size: number }) {
  * Mobile : tout tient dans la feuille, sans défiler (légende d’une ligne, confiance sur la ligne de la preuve).
  * Grand écran : « 1 Le verdict », comme le chapitre 1 du rapport.
  */
-function ExampleReport({ conv, onClose }: { conv: LandingConv; onClose: () => void }) {
-  const cta = useCta();
+function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; retour: Retour; titreId: string; onClose: () => void }) {
+  const cta = ctaDe(retour);
   return (
     /* Écrans très courts (iPhone SE 2016) : espacements, carte et bouton se resserrent encore pour tout faire tenir */
     <div className="flex flex-col gap-2.5 lg:gap-4 [@media(max-height:600px)]:gap-1.5">
       <div className="flex items-center gap-3">
         <ConvAvatar conv={conv} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id="exemple-nom" className="m-0 truncate text-[17px] font-black leading-tight lg:text-[19px]">
+          <h2 id={titreId} className="m-0 truncate text-[17px] font-black leading-tight lg:text-[19px]">
             {conv.name}
           </h2>
           <span className="truncate text-[13px] font-extrabold text-grey">

@@ -120,6 +120,29 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   for (const nom of ["Anthropic", "Claude", "ElevenLabs", "Mistral", "OpenAI"]) expect(texte, nom).not.toContain(nom);
 });
 
+test("la confidentialité : « Retour » ramène d’où l’on vient, et à la landing quand on l’ouvre directement", async ({ page }) => {
+  /* La flèche du mobile ou le lien du desktop : celui que montre l’écran */
+  const retour = page.getByRole("link", { name: "Retour" }).locator("visible=true");
+
+  await test.step("venu de la landing : le retour y revient, en arrière (l’historique ne garde pas la confidentialité devant)", async () => {
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "Pied de page" }).getByRole("link", { name: "Confidentialité" }).click();
+    await expect(page).toHaveURL(/\/confidentialite$/);
+    await retour.click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/confidentialite$/);
+  });
+
+  await test.step("ouverte directement (un lien, un nouvel onglet) : le retour mène à la landing, sans quitter BLUSH", async () => {
+    await page.goto("/confidentialite");
+    await expect(retour).toHaveAttribute("href", "/");
+    await retour.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("main").getByRole("link", { name: "Analyser ma conv" }).first()).toBeVisible();
+  });
+});
+
 test("/commencer : cinq applis, chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
   const reponse = await page.goto("/commencer");
   expect(reponse?.status()).toBe(200);
