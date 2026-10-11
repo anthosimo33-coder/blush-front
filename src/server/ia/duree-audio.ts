@@ -68,6 +68,16 @@ export const dureeAudio = (octets: Uint8Array): number | null => lireAudio(octet
 
 const commencePar = (o: Uint8Array, a: number, signature: number[]) => o.length >= a + signature.length && signature.every((b, i) => o[a + i] === b);
 
+/**
+ * L’octet `i` du fichier, lu comme un DataView le lirait : hors du fichier, une RangeError, que lireAudio rattrape (il
+ * est tronqué ou piégé). Jamais undefined, qu’un calcul changerait en silence en 0 (un masque, un décalage) ou en NaN.
+ */
+function octet(o: Uint8Array, i: number): number {
+  const v = o[i];
+  if (v === undefined) throw new RangeError("lecture hors du fichier");
+  return v;
+}
+
 /* ———— Opus : la durée d’un paquet, lue dans son premier octet (RFC 6716, 3.1) ———— */
 
 /* La durée d’une trame selon la configuration (les 5 bits hauts du premier octet), en millisecondes */
@@ -84,13 +94,14 @@ const TRAME_OPUS_MAX_OCTETS = 1275;
  * peuvent l’être (1 275 octets chacune, et leurs longueurs).
  */
 export function dureeOpus(paquet: Uint8Array): number | null {
-  if (!paquet.length) return null;
-  const toc = paquet[0];
+  const [toc, suivant] = paquet;
+  if (toc === undefined) return null;
   const config = toc >> 3;
-  const trame = config < 12 ? TRAME_SILK[config & 3] : config < 16 ? TRAME_HYBRIDE[config & 1] : TRAME_CELT[config & 3];
+  /* Des index masqués (sur 2 bits, sur 1) : toujours dans leur table */
+  const trame = config < 12 ? TRAME_SILK[config & 3]! : config < 16 ? TRAME_HYBRIDE[config & 1]! : TRAME_CELT[config & 3]!;
   const code = toc & 3;
   /* 0 : une trame ; 1 et 2 : deux ; 3 : leur nombre est dans l’octet suivant */
-  const trames = code === 0 ? 1 : code < 3 ? 2 : paquet.length > 1 ? paquet[1] & 0x3f : 0;
+  const trames = code === 0 ? 1 : code < 3 ? 2 : suivant !== undefined ? suivant & 0x3f : 0;
   const ms = trames * trame;
   if (trames === 0 || ms > PAQUET_OPUS_MAX_MS) return null;
   return paquet.length <= 2 + trames * (TRAME_OPUS_MAX_OCTETS + 2) ? ms : null;
@@ -104,9 +115,9 @@ type Opus = { canaux: number; preskip: number; frequence: number; paquets: Uint8
  * (famille 0, celle des enregistreurs). null sinon.
  */
 function lireOpusHead(p: Uint8Array): Pick<Opus, "canaux" | "preskip" | "frequence"> | null {
-  if (p.length < 19 || !commencePar(p, 0, ENTETE_OPUS) || p[8] === 0 || p[8] > 15) return null;
-  const canaux = p[9];
-  if (canaux < 1 || canaux > 2 || p[18] !== 0) return null;
+  if (p.length < 19 || !commencePar(p, 0, ENTETE_OPUS) || octet(p, 8) === 0 || octet(p, 8) > 15) return null;
+  const canaux = octet(p, 9);
+  if (canaux < 1 || canaux > 2 || octet(p, 18) !== 0) return null;
   const vue = new DataView(p.buffer, p.byteOffset, p.byteLength);
   return { canaux, preskip: vue.getUint16(10, true), frequence: vue.getUint32(12, true) };
 }
@@ -161,8 +172,9 @@ function vint(o: Uint8Array, a: number, garderLeBit: boolean): { valeur: number;
   let valeur = garderLeBit ? premier : premier & (0xff >> longueur);
   let unsLes = (premier & (0xff >> longueur)) === 0xff >> longueur;
   for (let i = 1; i < longueur; i++) {
-    valeur = valeur * 256 + o[a + i];
-    unsLes &&= o[a + i] === 0xff;
+    const b = octet(o, a + i);
+    valeur = valeur * 256 + b;
+    unsLes &&= b === 0xff;
   }
   return { valeur, longueur, inconnue: !garderLeBit && unsLes };
 }
@@ -241,7 +253,7 @@ function lireWebm(o: Uint8Array): Opus | null {
 /** Un entier non signé d’EBML (1 à 8 octets). */
 function entier(o: Uint8Array, debut: number, fin: number): number {
   let v = 0;
-  for (let i = debut; i < fin; i++) v = v * 256 + o[i];
+  for (let i = debut; i < fin; i++) v = v * 256 + octet(o, i);
   return v;
 }
 
@@ -261,7 +273,8 @@ const TABLE_CRC = Uint32Array.from({ length: 256 }, (_, n) => {
 });
 function crcOgg(page: Uint8Array): number {
   let crc = 0;
-  for (let i = 0; i < page.length; i++) crc = ((crc << 8) ^ TABLE_CRC[((crc >>> 24) ^ (i >= 22 && i < 26 ? 0 : page[i])) & 0xff]) >>> 0;
+  /* Un index sur 8 bits : la table en a 256 */
+  for (let i = 0; i < page.length; i++) crc = ((crc << 8) ^ TABLE_CRC[((crc >>> 24) ^ (i >= 22 && i < 26 ? 0 : octet(page, i))) & 0xff]!) >>> 0;
   return crc;
 }
 
@@ -282,30 +295,32 @@ function lireOgg(o: Uint8Array): Opus | null {
   let longueur = 0;
   for (let a = 0; a < o.length; ) {
     if (fini || !commencePar(o, a, OGGS) || a + 27 > o.length || o[a + 4] !== 0) return null;
-    const type = o[a + 5];
+    const type = octet(o, a + 5);
     const s = vue.getUint32(a + 14, true);
     /* Un seul flux, des pages qui se suivent, la première marquée comme telle */
     if ((serie !== null && s !== serie) || vue.getUint32(a + 18, true) !== numero || !!(type & 0x02) !== (numero === 0)) return null;
     serie = s;
     numero++;
-    const segments = o[a + 26];
+    const segments = octet(o, a + 26);
     const table = a + 27;
     let donnees = table + segments;
+    /* La table des segments, coupée par la fin du fichier : illisible */
+    if (donnees > o.length) return null;
     let bout = donnees;
-    for (let i = 0; i < segments; i++) bout += o[table + i];
+    for (let i = 0; i < segments; i++) bout += octet(o, table + i);
     if (bout > o.length || vue.getUint32(a + 22, true) !== crcOgg(o.subarray(a, bout))) return null;
     /* La suite d’un paquet ouvert, et elle seule, porte le drapeau « suite » */
     if (!!(type & 0x01) !== longueur > 0) return null;
     fini = !!(type & 0x04);
     for (let i = 0; i < segments; i++) {
-      const t = o[table + i];
+      const t = octet(o, table + i);
       morceaux.push(o.subarray(donnees, donnees + t));
       longueur += t;
       donnees += t;
       if (longueur > PAQUET_OGG_MAX_OCTETS) return null;
       if (t === 255) continue;
       /* Le paquet est complet : d’abord les deux en-têtes d’Opus, puis le son */
-      const p = morceaux.length === 1 ? morceaux[0] : concatener(morceaux);
+      const p = morceaux.length === 1 ? morceaux[0]! : concatener(morceaux);
       if (paquets === 0) {
         const entete = lireOpusHead(p);
         if (!entete) return null;
@@ -422,7 +437,7 @@ const AOT_AAC = new Set([2, 5, 29]);
 /** Des boîtes plus imbriquées que moov > trak > mdia > minf > stbl (ou moof > traf) : piégé. */
 const PROFONDEUR_MAX = 6;
 
-const type4 = (o: Uint8Array, a: number) => String.fromCharCode(o[a], o[a + 1], o[a + 2], o[a + 3]);
+const type4 = (o: Uint8Array, a: number) => String.fromCharCode(octet(o, a), octet(o, a + 1), octet(o, a + 2), octet(o, a + 3));
 
 function dureeMp4(o: Uint8Array): number | null {
   const vue = new DataView(o.buffer, o.byteOffset, o.byteLength);
@@ -519,7 +534,7 @@ function dureeMp4(o: Uint8Array): number | null {
     }
     if (type === "tfra") {
       /* L’index des fragments : chaque entrée pointe un moof, lu à sa place (rien de caché ailleurs) */
-      const version = o[corps];
+      const version = octet(o, corps);
       const longueurs = vue.getUint32(corps + 8);
       const n = vue.getUint32(corps + 12);
       const entree = (version === 1 ? 16 : 8) + ((longueurs >> 4) & 3) + ((longueurs >> 2) & 3) + (longueurs & 3) + 3;
@@ -572,10 +587,10 @@ function lireEsds(o: Uint8Array, debut: number, fin: number): Asc | null {
   let a = debut;
   const descripteur = (): { tag: number; taille: number } | null => {
     if (a >= fin) return null;
-    const tag = o[a++];
+    const tag = octet(o, a++);
     let taille = 0;
     for (let i = 0; i < 4 && a < fin; i++) {
-      const b = o[a++];
+      const b = octet(o, a++);
       taille = (taille << 7) | (b & 0x7f);
       if (!(b & 0x80)) break;
     }
@@ -584,13 +599,13 @@ function lireEsds(o: Uint8Array, debut: number, fin: number): Asc | null {
   const es = descripteur();
   if (es?.tag !== 3) return null;
   /* L’ES_Descriptor : son identifiant (2), ses drapeaux, puis ce qu’ils annoncent */
-  const drapeaux = o[a + 2];
+  const drapeaux = octet(o, a + 2);
   a += 3;
   if (drapeaux & 0x80) a += 2;
-  if (drapeaux & 0x40) a += 1 + o[a];
+  if (drapeaux & 0x40) a += 1 + octet(o, a);
   if (drapeaux & 0x20) a += 2;
   const dc = descripteur();
-  if (dc?.tag !== 4 || o[a] !== AUDIO_MPEG4) return null;
+  if (dc?.tag !== 4 || octet(o, a) !== AUDIO_MPEG4) return null;
   /* Le DecoderConfigDescriptor : 13 octets avant ses descripteurs */
   a += 13;
   const dsi = descripteur();
@@ -599,7 +614,7 @@ function lireEsds(o: Uint8Array, debut: number, fin: number): Asc | null {
   let bit = a * 8;
   const bits = (n: number) => {
     let v = 0;
-    for (let i = 0; i < n; i++, bit++) v = (v << 1) | ((o[bit >> 3] >> (7 - (bit & 7))) & 1);
+    for (let i = 0; i < n; i++, bit++) v = (v << 1) | ((octet(o, bit >> 3) >> (7 - (bit & 7))) & 1);
     return v;
   };
   let aot = bits(5);

@@ -57,7 +57,8 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
   const prenom = histoireDe(metaDe(story)).utilisateur.prenom;
   const messages = messagesAffiches(lignes, prenom);
   const minutees: VocalLigne[] = minuter(dites, alignement).map((l, k) => {
-    const recu = dites[k].preuve ? messages.get(dites[k].preuve!) : undefined;
+    const preuve = dites[k]?.preuve;
+    const recu = preuve ? messages.get(preuve) : undefined;
     return recu ? { ...l, recu } : l;
   });
   const fin = Math.max(...alignement.character_end_times_seconds, ...minutees.map((l) => l.fin));

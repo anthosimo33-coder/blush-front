@@ -34,7 +34,7 @@ function nomPropre(mot: string, messages: Message[]): boolean {
     if (m.media) continue;
     for (const x of m.texte.normalize("NFC").replace(/'/g, "’").matchAll(re)) {
       total++;
-      if (/^\p{Lu}/u.test(x[2])) majuscule++;
+      if (/^\p{Lu}/u.test(x[2]!)) majuscule++;
     }
   }
   return total > 0 && majuscule / total >= 0.6;

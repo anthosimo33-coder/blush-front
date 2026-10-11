@@ -89,7 +89,7 @@ export function borner<T extends ExportLu & { coupe?: boolean }>(lu: T): T & { c
 export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string; coupe?: boolean }> {
   if (fichier.size > TEXTE_CONV_MAX || fichier.size === 0) throw new ErreurImport("fichier");
   const octets = new Uint8Array(await fichier.arrayBuffer());
-  let fichiers = [{ nom: fichier.name, contenu: "" }];
+  let fichiers: { nom: string; contenu: string }[];
   if (octets[0] === 0x50 && octets[1] === 0x4b) {
     /* Une archive piégée (quelques Mo qui en font des Go) : on compte ce qu’on décompresse, au total, avant de le faire */
     let total = 0;
@@ -107,7 +107,7 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
     } catch {
       throw new ErreurImport("fichier");
     }
-  } else fichiers[0].contenu = strFromU8(octets);
+  } else fichiers = [{ nom: fichier.name, contenu: strFromU8(octets) }];
   let lu: ExportLu | null;
   try {
     const parties = choisirParties(fichiers);

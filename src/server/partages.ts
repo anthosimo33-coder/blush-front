@@ -7,7 +7,8 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
-import { db, schema } from "./db";
+import { lesDeux } from "./conv-affichee";
+import { db, schema, uneLigne } from "./db";
 import { chapitresEcrits, donneesVerdict } from "./depot";
 import { echangeDuChat } from "./historique";
 import { verdictAffiche } from "./ecrans/rapport";
@@ -46,7 +47,7 @@ export function masquerPrenoms(texte: string, masquer: string[], garder: string[
   if (!noms.length) return texte;
   /* En une passe, le plus long d’abord : le nom complet de l’export avant le prénom seul */
   const nom = new RegExp(`(?<![\\p{L}\\p{N}])(${noms.map(echapper).join("|")})(?![\\p{L}\\p{N}])\\.?`, "giu");
-  return texte.replace(nom, (m, n: string) => (masques.has(cle(n)) ? `${[...n][0].toUpperCase()}.` : m));
+  return texte.replace(nom, (m, n: string) => (masques.has(cle(n)) ? `${[...n][0]!.toUpperCase()}.` : m));
 }
 
 /**
@@ -55,7 +56,9 @@ export function masquerPrenoms(texte: string, masquer: string[], garder: string[
  * Le « Moi » des captures est le mot, pas un nom.
  */
 export function masqueDe(story: Ligne): (texte: string) => string {
-  const { participants, moi } = metaDe(story);
+  const meta = metaDe(story);
+  const { moi } = meta;
+  const participants = lesDeux(meta);
   const unNom = (n: string) => n !== "Moi";
   const autres = participants.filter((_, k) => k !== moi).flatMap((p) => [p.prenom, p.nom].filter(unNom));
   const toi = moi == null ? [] : [participants[moi].prenom].filter(unNom);
@@ -81,12 +84,15 @@ export async function partager(story: Ligne): Promise<{ id: string; verdict: Ver
   /* Déjà partagé : le même lien, masqué comme aujourd’hui (un lien créé avant le 9 octobre masquait aussi ton prénom) */
   const [deja] = await db().update(schema.shares).set({ data }).where(eq(schema.shares.storyId, story.id)).returning({ id: schema.shares.id });
   if (deja) return { id: deja.id, verdict };
-  const [cree] = await db()
-    .insert(schema.shares)
-    .values({ id: nouvelId(), storyId: story.id, data })
-    /* Deux ouvertures en même temps : un seul lien */
-    .onConflictDoUpdate({ target: schema.shares.storyId, set: { data } })
-    .returning({ id: schema.shares.id });
+  const cree = uneLigne(
+    await db()
+      .insert(schema.shares)
+      .values({ id: nouvelId(), storyId: story.id, data })
+      /* Deux ouvertures en même temps : un seul lien */
+      .onConflictDoUpdate({ target: schema.shares.storyId, set: { data } })
+      .returning({ id: schema.shares.id }),
+    "shares (lien créé)",
+  );
   await compter(CLES.lienCree);
   return { id: cree.id, verdict };
 }

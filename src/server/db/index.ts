@@ -27,3 +27,15 @@ export function db() {
 }
 
 export { schema };
+
+/**
+ * La ligne qu’une requête rend forcément : celle d’un `insert … returning`, d’un `update … returning` sur une ligne
+ * qu’on vient de lire, d’un agrégat (`count(*)`). Sans elle (une ligne effacée entre deux requêtes, une erreur du code),
+ * l’erreur dit ce qu’on cherchait, ici, plutôt qu’un « cannot read properties of undefined » plus loin. `quoi` ne cite
+ * que la table ou l’étape : jamais une valeur (journalErreur n’écrit de toute façon que le nom de l’erreur).
+ */
+export function uneLigne<T>(lignes: readonly T[], quoi: string): T {
+  const [ligne] = lignes;
+  if (ligne === undefined) throw new Error(`${quoi} : aucune ligne`);
+  return ligne;
+}

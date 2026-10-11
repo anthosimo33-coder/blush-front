@@ -5,7 +5,7 @@ import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/cap
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
-import { storyAffichee } from "@/server/conv-affichee";
+import { convImportee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
@@ -73,8 +73,8 @@ export async function POST(req: Request) {
       return { id, meta, secret, messages: t.messages };
     });
     await poserBrouillon(lu.secret);
-    const story = storyAffichee(lu.id, lu.meta);
-    return repondre("POST /api/captures/video", { source: story.sources[0], messagesRead: lu.messages, story });
+    const { story, source } = convImportee(lu.id, lu.meta);
+    return repondre("POST /api/captures/video", { source, messagesRead: lu.messages, story });
   } catch (e) {
     return reponseErreur(e);
   }

@@ -1,7 +1,7 @@
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, reponseErreur } from "@/server/http";
-import { storyAffichee } from "@/server/conv-affichee";
+import { convImportee } from "@/server/conv-affichee";
 import { importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
 import { LIMITES } from "@/server/limites";
@@ -32,8 +32,8 @@ export async function POST(req: Request) {
     const { id, meta, secret } = await importer(lu);
     await poserBrouillon(secret);
     await compterImportVenuDuPartage();
-    const story = storyAffichee(id, meta);
-    return repondre("POST /api/import", { source: story.sources[0], story });
+    const { story, source } = convImportee(id, meta);
+    return repondre("POST /api/import", { source, story });
   } catch (e) {
     return reponseErreur(e);
   }

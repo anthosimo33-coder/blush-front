@@ -78,7 +78,7 @@ function idDeLaVoix(voix: Voix): string | undefined {
 /** La voix d’un compte : toujours la même pour un même compte. Sans voix B configurée, tout le monde a la A. */
 export function voixPour(cle: string): Voix {
   if (!env().BLUSH_VOIX_B) return "A";
-  return createHash("sha256").update(`blush:voix:${cle}`).digest()[0] % 2 === 0 ? "A" : "B";
+  return createHash("sha256").update(`blush:voix:${cle}`).digest().readUInt8(0) % 2 === 0 ? "A" : "B";
 }
 
 /** Le vocal est-il possible ? Il faut la clé et la voix A ; en mode factice (tests, dev), une voix muette suffit. */
@@ -215,8 +215,8 @@ export function couper(texte: string, max: number): string {
  */
 export function scriptQuiTient<L extends LigneScript>(lignes: L[], max: number): L[] {
   for (let n = lignes.length; n > 0; n--) if (texteDit(lignes.slice(0, n)).texte.length <= max) return lignes.slice(0, n);
-  if (!lignes.length) return [];
   const [premiere] = lignes;
+  if (!premiere) return [];
   const jeu = texteDit([{ ...premiere, texte: "" }]).texte.length;
   return [{ ...premiere, texte: couper(premiere.texte.replace(/\[[^\]]*\]/g, ""), Math.max(1, max - jeu)) }];
 }

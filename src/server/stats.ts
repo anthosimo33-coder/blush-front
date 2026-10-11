@@ -1,6 +1,6 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
-import { db } from "./db";
+import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { PERIME_S } from "./taches";
 
@@ -29,6 +29,8 @@ export type StatsAdmin = {
 };
 
 const lignes = async <T,>(q: SQL) => (await db().execute(q)).rows as T[];
+/** La ligne d’un agrégat (count, sum sans group by) : il en rend toujours une. */
+const ligne = async <T,>(q: SQL) => uneLigne(await lignes<T>(q), "stats");
 const n = (v: unknown) => Number(v ?? 0);
 
 /** Les postes de coût, d’après l’étiquette de chaque appel au modèle. */
@@ -45,7 +47,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   const dans = (col: string, k = 0) =>
     sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
   const chiffre = async (table: string, col: string, ou = "true"): Promise<Chiffre> => {
-    const [r] = await lignes<{ a: string; b: string }>(
+    const r = await ligne<{ a: string; b: string }>(
       sql`select count(*) filter (where ${dans(col)}) as a, count(*) filter (where ${dans(col, 1)}) as b from ${sql.raw(table)} where ${sql.raw(ou)}`,
     );
     return { valeur: n(r.a), avant: n(r.b) };
@@ -58,11 +60,11 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     chiffre("verdicts", "created_at"),
     chiffre("reports", "updated_at", "data is not null"),
     chiffre("chat_messages", "created_at", "role = 'toi'"),
-    lignes<{ a: string; b: string }>(
+    ligne<{ a: string; b: string }>(
       sql`select count(distinct s.user_id) filter (where ${dans("c.created_at")}) as a, count(distinct s.user_id) filter (where ${dans("c.created_at", 1)}) as b
           from chat_messages c join stories s on s.id = c.story_id where c.role = 'toi'`,
-    ).then(([r]) => ({ valeur: n(r.a), avant: n(r.b) })),
-    lignes<Record<string, string>>(
+    ).then((r) => ({ valeur: n(r.a), avant: n(r.b) })),
+    ligne<{ importees: string; compte: string; verdict: string; rapport: string; chat: string }>(
       sql`select count(*) as importees,
             count(*) filter (where s.user_id is not null) as compte,
             count(*) filter (where exists (select 1 from verdicts v where v.story_id = s.id)) as verdict,
@@ -70,7 +72,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
             count(*) filter (where exists (select 1 from chat_messages c where c.story_id = s.id and c.role = 'toi')) as chat
           from stories s where ${dans("s.created_at")}`,
     ),
-    lignes<Record<string, string>>(
+    lignes<{ jour: string; imports: string; verdicts: string; rapports: string }>(
       sql`with j as (
             select generate_series((now() at time zone 'Europe/Paris')::date - ${nbJours - 1}::int, (now() at time zone 'Europe/Paris')::date, interval '1 day')::date as jour)
           select to_char(j.jour, 'YYYY-MM-DD') as jour,
@@ -82,22 +84,22 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     lignes<{ key: string; total: string }>(
       sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
-    lignes<{ n: string }>(sql`select count(*) as n from shares`),
+    ligne<{ n: string }>(sql`select count(*) as n from shares`),
     lignes<{ task: string; appels: string; micros: string }>(
       sql`select task, count(*) as appels, sum(cost_micros) as micros from ai_usage where ${dans("created_at")} group by task`,
     ),
-    lignes<{ micros: string }>(sql`select coalesce(sum(cost_micros), 0) as micros from ai_usage where ${dans("created_at", 1)}`),
+    ligne<{ micros: string }>(sql`select coalesce(sum(cost_micros), 0) as micros from ai_usage where ${dans("created_at", 1)}`),
     lignes<{ code: string; n: string }>(
       sql`select coalesce(error, 'inconnu') as code, count(*) as n from tasks where status = 'echec' and ${dans("updated_at")} group by 1 order by 2 desc limit 8`,
     ),
-    lignes<Record<string, string>>(
+    ligne<{ en_cours: string; bloquees: string; attente: string }>(
       sql`select count(*) filter (where status = 'en_cours') as en_cours,
             count(*) filter (where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
             count(*) filter (where status = 'attente') as attente
           from tasks`,
     ),
     chiffre("waitlist", "created_at"),
-    lignes<Record<string, string>>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users) as comptes`),
+    ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users) as comptes`),
   ]);
 
   const c = new Map(compteurs.map((r) => [r.key, n(r.total)]));
@@ -113,7 +115,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     jours,
     le: new Date().toISOString(),
     cles: { comptes, convs, verdicts, rapports, messages, actifs },
-    parcours: { importees: n(parcours[0].importees), compte: n(parcours[0].compte), verdict: n(parcours[0].verdict), rapport: n(parcours[0].rapport), chat: n(parcours[0].chat) },
+    parcours: { importees: n(parcours.importees), compte: n(parcours.compte), verdict: n(parcours.verdict), rapport: n(parcours.rapport), chat: n(parcours.chat) },
     activite: activite.map((r) => ({ jour: r.jour, imports: n(r.imports), verdicts: n(r.verdicts), rapports: n(r.rapports) })),
     partage: {
       ouvertures: c.get("partage_ouvert") ?? 0,
@@ -122,23 +124,23 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
       visites: c.get("lien_vu") ?? 0,
       essais: c.get("lien_essai") ?? 0,
       imports: c.get("import_partage") ?? 0,
-      actifs: n(liensActifs[0].n),
+      actifs: n(liensActifs.n),
     },
     couts: {
       total: dollars(total),
-      avant: dollars(n(coutsAvant[0].micros)),
+      avant: dollars(n(coutsAvant.micros)),
       /* Un rapport complet : son plan, ses chapitres et la mémoire faite juste après */
       parRapport: rapports.valeur ? dollars(coutDe((t) => t.startsWith("rapport") || t === "memoire")) / rapports.valeur : null,
       parVerdict: verdicts.valeur ? dollars(coutDe((t) => t === "verdict")) / verdicts.valeur : null,
       postes: postes.filter((p) => p.appels > 0).sort((a, b) => b.dollars - a.dollars),
     },
-    sante: { echecs: echecs.map((r) => ({ code: r.code, n: n(r.n) })), enCours: n(taches[0].en_cours), bloquees: n(taches[0].bloquees), enAttente: n(taches[0].attente) },
+    sante: { echecs: echecs.map((r) => ({ code: r.code, n: n(r.n) })), enCours: n(taches.en_cours), bloquees: n(taches.bloquees), enAttente: n(taches.attente) },
     beta: {
       fermee: env().BLUSH_BETA_FERMEE,
       invites: invites === "*" ? "tous" : invites.length,
-      attente: n(totaux[0].attente),
+      attente: n(totaux.attente),
       attenteNouveaux: attente.valeur,
-      comptes: n(totaux[0].comptes),
+      comptes: n(totaux.comptes),
     },
   };
 }

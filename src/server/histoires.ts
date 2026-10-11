@@ -7,9 +7,10 @@ import type { TexteCaptures } from "@prompts/lib/captures";
 import { pronomOppose } from "@/lib/pronom";
 import { empreinte, jeton } from "./chiffrement";
 import * as coffre from "./coffre";
-import { db, schema } from "./db";
+import { db, schema, uneLigne } from "./db";
 import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
+import { lesDeux } from "./conv-affichee";
 import { borner, ErreurImport } from "./import";
 
 /*
@@ -54,22 +55,31 @@ export type Ligne = Omit<LigneComplete, "conv" | "status">;
 export type LigneEcran = Ligne & { aConv: boolean };
 
 /** Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. */
-export const resumeDe = (messages: Message[]): Meta["resume"] => ({
-  debut: new Date(messages[0].t).toISOString().slice(0, 10),
-  fin: new Date(messages.at(-1)!.t).toISOString().slice(0, 10),
-  total: messages.length,
-  vocaux: messages.filter((m) => m.media === "vocal").length,
-});
+export function resumeDe(messages: Message[]): Meta["resume"] {
+  const [premier] = messages;
+  const dernier = messages.at(-1);
+  /* erreurImport refuse une conv sans message avant d’arriver ici */
+  if (!premier || !dernier) throw new Error("une conv lue a au moins un message");
+  return {
+    debut: new Date(premier.t).toISOString().slice(0, 10),
+    fin: new Date(dernier.t).toISOString().slice(0, 10),
+    total: messages.length,
+    vocaux: messages.filter((m) => m.media === "vocal").length,
+  };
+}
 
 /**
  * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées. Le
  * cookie du brouillon la retrouve par l’empreinte de `secret`.
  */
 async function creerBrouillon(meta: Meta, texte: string, secret: string): Promise<{ id: string; meta: Meta; secret: string }> {
-  const [ligne] = await db()
-    .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", texte) })
-    .returning({ id: schema.stories.id });
+  const ligne = uneLigne(
+    await db()
+      .insert(schema.stories)
+      .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", texte) })
+      .returning({ id: schema.stories.id }),
+    "stories (brouillon créé)",
+  );
   return { id: ligne.id, meta, secret };
 }
 
@@ -83,12 +93,13 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
   if (format === "captures" || !format) throw new ErreurImport("fichier");
   /* Un nom qui n’apparaît qu’à peine (un message collé d’un autre) ne fait pas une conv de groupe : ses lignes restent du texte */
   const noms = principaux(participantsDe(texte));
+  const [premier, second] = noms;
   if (noms.length > 2) throw new ErreurImport("groupe");
-  if (noms.length < 2) throw new ErreurImport("courte");
+  if (!premier || !second) throw new ErreurImport("courte");
   /* Un nom de contact est court : un nom démesuré (ou fait de caractères de contrôle) gonflerait ce qu’on garde de la conv */
   if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
-  const personne = (k: number) => ({ prenom: prenomDe(noms[k].nom), pronom: "il" as const, nomExport: noms[k].nom });
-  const lu = lire(texte, { utilisateur: personne(0), autre: personne(1), format }, { autresEnTexte: true });
+  const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
+  const lu = lire(texte, { utilisateur: personne(premier), autre: personne(second), format }, { autresEnTexte: true });
   const err = erreurImport(lu);
   if (err) throw new ErreurImport(err);
   const meta: Meta = {
@@ -235,8 +246,8 @@ export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" 
  * (« Qui es-tu ? » rempli), l’autre est l’autre participant ; toi inconnu, l’autre est le second (`participants[1]`).
  */
 export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Meta["participants"][number]; autre: Meta["participants"][number] } {
-  const k = meta.moi ?? 0;
-  return { moi: meta.participants[k], autre: meta.participants[1 - k] };
+  const [a, b] = lesDeux(meta);
+  return meta.moi === 1 ? { moi: b, autre: a } : { moi: a, autre: b };
 }
 
 /** Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom opposé (BLUSH : un garçon et une fille). */
@@ -254,8 +265,7 @@ export function histoireDe(meta: Meta): Histoire {
 }
 
 export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
-  const [ligne] = await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id));
-  const avant = metaDe(ligne);
+  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories (« Qui es-tu ? »)"));
   /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
   const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;
   const meta = { ...avant, ...qui, participants };

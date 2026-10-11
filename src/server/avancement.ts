@@ -48,7 +48,7 @@ const PLAN_REFLEXION = 50;
 const CHAPITRES_DU_PLAN = 8;
 
 /** Les chapitres déjà commencés dans ce que le modèle a écrit (chaque chapitre de sa réponse commence par son numéro). */
-export const chapitresCommences = (ecrit: string) => [...ecrit.matchAll(/"numero"\s*:\s*(\d+)/g)].map((m) => +m[1]);
+export const chapitresCommences = (ecrit: string) => [...ecrit.matchAll(/"numero"\s*:\s*(\d+)/g)].map((m) => +m[1]!);
 
 /** Le plan du rapport (0 à 100) : sa réflexion jusqu’à 50, puis ses huit chapitres, un par un, jusqu’à 98. */
 export const avancePlan = (a: Avance) =>

@@ -1,11 +1,11 @@
-import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres";
+import { CHAPITRES_PAYANTS, estOffert } from "@/contenu/chapitres";
 import { peut } from "@/lib/acces";
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
 import type { Chapter, Echec, Plan, VocalRapport } from "@/types";
 import type { Plan as PlanDuRapport, Verdict } from "@prompts/lib/schemas";
 import { avanceChapitres, CHAPITRES_PAR_MOITIE, DUREES_MS, ECRITURE_MAX, PART_DU_PLAN, RYTHME_FIABLE } from "../avancement";
 import { echecDe } from "../erreurs";
-import { verdictAffiche } from "../ecrans/rapport";
+import { titreAttendu, verdictAffiche } from "../ecrans/rapport";
 import type { DonneesRapport, DonneesVerdict } from "../stockage/types";
 import { enMarche, vocalTente, type EtatTaches } from "../chaine";
 import type { vocalLu } from "../vocal";
@@ -102,7 +102,7 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
     etape: tp.status === "fini" ? "chapitres" : "plan",
     progres,
     restant: duree(restant),
-    chapitres: CHAPITRES_PAYANTS.map((n) => ({ number: n, title: titres.get(n) ?? titreDAttente(n, autre), etat: etat(n) })),
+    chapitres: CHAPITRES_PAYANTS.map((n) => ({ number: n, title: titres.get(n) ?? titreAttendu(n, autre), etat: etat(n) })),
   };
 }
 
@@ -140,8 +140,8 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
 
   const verdictLibre: Chapter = {
     number: 1,
-    title: titreDAttente(1, autre),
-    tocTitle: titreDAttente(1, autre),
+    title: titreAttendu(1, autre),
+    tocTitle: titreAttendu(1, autre),
     free: estOffert(1),
     /* Le sous-titre est déjà sous le titre du verdict (en-tête du chapitre) : pas une seconde fois ici */
     blocks: [
@@ -153,7 +153,7 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
   /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
   const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
   const verrouilles: Chapter[] = CHAPITRES_PAYANTS.map((n) => {
-    const t = titres.get(n) ?? titreDAttente(n, autre);
+    const t = titres.get(n) ?? titreAttendu(n, autre);
     return { number: n, title: t, tocTitle: t, free: estOffert(n), locked: true, blocks: [] };
   });
   /*

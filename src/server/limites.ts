@@ -1,7 +1,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { empreinte } from "./chiffrement";
-import { db, schema } from "./db";
+import { db, schema, uneLigne } from "./db";
 
 /**
  * Les limites anti-abus : combien de fois, sur quelle fenêtre. Celles « par compte » se rangent sur son email canonique
@@ -173,17 +173,20 @@ const expiree = (fenetreS: number) => sql`${schema.rateLimits.windowStart} < now
  * la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré.
  */
 export async function compter(cle: string, { fenetreS }: Pick<Limite, "fenetreS">, n = 1): Promise<number> {
-  const [ligne] = await db()
-    .insert(schema.rateLimits)
-    .values({ key: cleDe(cle), windowStart: new Date(), count: n })
-    .onConflictDoUpdate({
-      target: schema.rateLimits.key,
-      set: {
-        count: sql`case when ${expiree(fenetreS)} then ${n}::int else ${schema.rateLimits.count} + ${n}::int end`,
-        windowStart: sql`case when ${expiree(fenetreS)} then now() else ${schema.rateLimits.windowStart} end`,
-      },
-    })
-    .returning({ count: schema.rateLimits.count });
+  const ligne = uneLigne(
+    await db()
+      .insert(schema.rateLimits)
+      .values({ key: cleDe(cle), windowStart: new Date(), count: n })
+      .onConflictDoUpdate({
+        target: schema.rateLimits.key,
+        set: {
+          count: sql`case when ${expiree(fenetreS)} then ${n}::int else ${schema.rateLimits.count} + ${n}::int end`,
+          windowStart: sql`case when ${expiree(fenetreS)} then now() else ${schema.rateLimits.windowStart} end`,
+        },
+      })
+      .returning({ count: schema.rateLimits.count }),
+    "rate_limits (passage compté)",
+  );
   return ligne.count;
 }
 
@@ -263,7 +266,7 @@ export function groupeIp(brute: string): string {
     .replace(/%.*$/, "");
   if (!ip.includes(":")) return ip;
   const v4 = ip.match(/^(?:0{0,4}:){0,5}:?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (v4) return v4[1];
+  if (v4) return v4[1]!;
   const [tete, queue, deTrop] = ip.split("::");
   if (deTrop !== undefined) return ip;
   const groupes = (texte: string | undefined) => (texte ? texte.split(":").flatMap((g) => (g.includes(".") ? ["0", "0"] : [g])) : []);

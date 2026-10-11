@@ -1,4 +1,5 @@
-import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
+import { NB_CHAPITRES } from "@/contenu/chapitres";
+import { titreAttendu } from "./ecrans/rapport";
 import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, PAPIER, POLICE, type MailDessine } from "./marque";
 
 /*
@@ -25,7 +26,7 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:${DEGRADE_ROSE};border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
 
   const chapitre = (numero: number) =>
-    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreDAttente(numero, autre))}</td></tr></table></td>`;
+    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreAttendu(numero, autre))}</td></tr></table></td>`;
   /* Le sommaire : tous les chapitres, deux par ligne, sous les titres du rapport */
   const sommaire = Array.from({ length: Math.ceil(NB_CHAPITRES / 2) }, (_, k) => `<tr>${chapitre(2 * k + 1)}${chapitre(2 * k + 2)}</tr>`).join("");
 

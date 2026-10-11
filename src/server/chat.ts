@@ -13,7 +13,7 @@ import { ErreurTache } from "./erreurs";
 import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
-import { db, schema } from "./db";
+import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
 import { appelVerifie } from "./ia/appel-verifie";
@@ -62,10 +62,13 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
     const { texte } = texteDit((r.dit ?? []).map((l) => ({ jeu: l.jeu, texte: l.texte, punch: false, preuve: null })));
     const { audio, alignement } = await dire(texte, voix, { sobre: r.mode === "sobre" || r.mode === "doux", storyId: story.id });
     const duree = Math.max(0.5, ...alignement.character_end_times_seconds);
-    const [v] = await db()
-      .insert(schema.chatVocals)
-      .values({ storyId: story.id, voix, audio: coffre.ecrireAudio(audio), dureeMs: Math.round(duree * 1000) })
-      .returning({ id: schema.chatVocals.id });
+    const v = uneLigne(
+      await db()
+        .insert(schema.chatVocals)
+        .values({ storyId: story.id, voix, audio: coffre.ecrireAudio(audio), dureeMs: Math.round(duree * 1000) })
+        .returning({ id: schema.chatVocals.id }),
+      "chat_vocals (vocal créé)",
+    );
     return { audio: `/api/vocal/chat/${v.id}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
   } catch (e) {
     /* Le code d’une ErreurVoix (« voix_429 »), ou le nom d’une autre erreur : jamais son message */
@@ -99,7 +102,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
     /* Les champs suivent l’ordre du schéma : `a_envoyer` commencé, la lecture est close */
     const finies = "a_envoyer" in p ? lecture.length : lecture.length - 1;
     for (; montrees < finies; montrees++) {
-      const { texte: t, preuves } = lecture[montrees];
+      /* Un élément vide (null) se lit comme un texte absent : la lecture s’arrête là */
+      const { texte: t, preuves } = lecture[montrees] ?? {};
       const ids = Array.isArray(preuves) ? preuves.filter((x): x is string => typeof x === "string") : [];
       if (typeof t !== "string" || !Array.isArray(preuves) || introuvables(ids, lignes).length || recopieLesPrompts(`${texte} ${t}`, textesSysteme)) return void (arret = true);
       texte += ` ${t}`;

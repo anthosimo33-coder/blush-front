@@ -5,7 +5,7 @@ import { z } from "zod";
 import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { passerEnBlushPlus } from "./comptes";
-import { db, schema } from "./db";
+import { db, schema, uneLigne } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { accesLibre, boiteAMails, peutEntrer } from "./env";
@@ -201,10 +201,13 @@ export async function compteDe(email: string): Promise<Utilisateur> {
   const [existant] = await db().select().from(schema.users).where(eq(schema.users.email, email));
   const utilisateur =
     existant ??
-    (await db()
-      .insert(schema.users)
-      .values({ email, plan: accesLibre(email) ? "blushplus" : "gratuit" })
-      .returning())[0];
+    uneLigne(
+      await db()
+        .insert(schema.users)
+        .values({ email, plan: accesLibre(email) ? "blushplus" : "gratuit" })
+        .returning(),
+      "users (compte créé)",
+    );
   /* La bêta sans paiement : un email ajouté à la liste après coup a son accès à la connexion suivante */
   if (existant && existant.plan === "gratuit" && accesLibre(email)) {
     await passerEnBlushPlus(existant.id);

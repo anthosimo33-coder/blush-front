@@ -3,7 +3,7 @@ import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSe
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, reponseErreur } from "@/server/http";
-import { storyAffichee } from "@/server/conv-affichee";
+import { convImportee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
@@ -42,8 +42,8 @@ async function traiter(req: Request) {
       return { id, meta, secret, messages: t.messages };
     });
     await poserBrouillon(lu.secret);
-    const story = storyAffichee(lu.id, lu.meta);
-    return repondre("POST /api/captures", { source: story.sources[0], messagesRead: lu.messages, story });
+    const { story, source } = convImportee(lu.id, lu.meta);
+    return repondre("POST /api/captures", { source, messagesRead: lu.messages, story });
   } catch (e) {
     /* La lecture refusée (LectureRefusee), rien de lisible (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne */
     return reponseErreur(e);

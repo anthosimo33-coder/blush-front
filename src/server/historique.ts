@@ -25,12 +25,14 @@ export async function historique(
   const ou = avant ? and(eq(schema.chatMessages.storyId, storyId), lt(schema.chatMessages.id, avant)) : eq(schema.chatMessages.storyId, storyId);
   const lignes = (await db().select().from(schema.chatMessages).where(ou).orderBy(desc(schema.chatMessages.id)).limit(limite)).reverse();
   const echanges: EchangeAffiche[] = [];
-  for (let i = 0; i < lignes.length - 1; i++) {
-    if (lignes[i].role !== "toi" || lignes[i + 1].role !== "blush") continue;
-    const toi = coffre.lire("chat_messages.data:toi", lignes[i].data);
-    const blush = coffre.lire("chat_messages.data:blush", lignes[i + 1].data);
-    echanges.push({ id: lignes[i].id, mine: toi.affiche ?? toi.texte, answer: blush.reponse, at: lignes[i].createdAt.getTime() });
-  }
+  /* Chaque ligne avec la suivante : un message de toi, puis la réponse de BLUSH */
+  lignes.forEach((ligne, i) => {
+    const suivante = lignes[i + 1];
+    if (ligne.role !== "toi" || suivante?.role !== "blush") return;
+    const toi = coffre.lire("chat_messages.data:toi", ligne.data);
+    const blush = coffre.lire("chat_messages.data:blush", suivante.data);
+    echanges.push({ id: ligne.id, mine: toi.affiche ?? toi.texte, answer: blush.reponse, at: ligne.createdAt.getTime() });
+  });
   /* Le mode vocal, tel qu’il est en base : « Repasser à l’écrit » le coupe sans nouvelle réponse */
   if (modeVocal !== undefined) return { echanges, plus: lignes.length === limite, modeVocal };
   const [s] = await db().select({ chatVocal: schema.stories.chatVocal }).from(schema.stories).where(eq(schema.stories.id, storyId));

@@ -63,7 +63,11 @@ export function recouvrement(a: Msg[], b: Msg[]): { garderA: number; sauterB: nu
     for (let debutB = 0; debutB <= Math.min(BOUTS_COUPES_MAX, b.length - 1); debutB++) {
       for (let n = Math.min(finA, b.length - debutB, RECOUVREMENT_MAX); n > mieux.long; n--) {
         let ok = true;
-        for (let i = 0; i < n && ok; i++) ok = memeMessage(a[finA - n + i], b[debutB + i]);
+        for (let i = 0; i < n && ok; i++) {
+          const x = a[finA - n + i];
+          const y = b[debutB + i];
+          ok = !!x && !!y && memeMessage(x, y);
+        }
         if (ok) {
           mieux = { long: n, garderA: finA, sauterB: debutB + n };
           break;
@@ -72,7 +76,8 @@ export function recouvrement(a: Msg[], b: Msg[]): { garderA: number; sauterB: nu
     }
   }
   /* Un seul message en commun ne prouve rien, sauf s’il est long */
-  if (mieux.long === 1 && cle(b[mieux.sauterB - 1]).length < 25) return { garderA: a.length, sauterB: 0, long: 0 };
+  const seul = mieux.long === 1 ? b[mieux.sauterB - 1] : undefined;
+  if (seul && cle(seul).length < 25) return { garderA: a.length, sauterB: 0, long: 0 };
   return mieux;
 }
 
@@ -100,10 +105,10 @@ export function fusionnerLots(lots: Captures[], appli: string): Captures {
     for (let i = 0; i < long; i++) {
       const a = lignes[garderA - long + i];
       const b = suite[sauterB - long + i];
-      if (a.m.coupe && !b.m.coupe) a.m = b.m;
+      if (a && b && a.m.coupe && !b.m.coupe) a.m = b.m;
     }
     lignes.length = garderA;
-    for (let i = sauterB; i < suite.length; i++) lignes.push(suite[i]);
+    for (const l of suite.slice(sauterB)) lignes.push(l);
   });
 
   /* Les blocs se reforment là où un repère (une date) commence */

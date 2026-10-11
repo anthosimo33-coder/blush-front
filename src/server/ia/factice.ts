@@ -47,14 +47,14 @@ function lu<T>(valeur: T | undefined | null, quoi: string, req: Requete): T {
 /** Les numéros des chapitres d’une moitié du rapport (FACTICE.chapitres, en deux moitiés égales). */
 const moitie = (premiere: boolean) => Array.from({ length: FACTICE.chapitres / 2 }, (_, k) => k + 1 + (premiere ? 0 : FACTICE.chapitres / 2));
 
-const chapitre = (numero: number, p: string[]): Chapitre => ({
+const chapitre = (numero: number, preuve: string): Chapitre => ({
   numero,
   titre: `Chapitre ${numero}`,
   titre_court: FACTICE.titreCourt(numero),
   surtitre: null,
   blocs: [
     { type: "accroche", texte: "Assieds-toi.", preuves: [], titre: null, niveau: null, items: null },
-    { type: "recit", texte: "Le soir où tout a basculé.", preuves: [p[numero % p.length]], titre: null, niveau: null, items: null },
+    { type: "recit", texte: "Le soir où tout a basculé.", preuves: [preuve], titre: null, niveau: null, items: null },
     { type: "chute", texte: "Et voilà.", preuves: [], titre: null, niveau: null, items: null },
   ],
 });
@@ -78,6 +78,8 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
     } satisfies Captures;
   }
   const p = ids(req);
+  /* Le k-ième identifiant de la conv (à partir de 0) : une conv trop courte pour le citer le dit (lu), au lieu d’une preuve vide */
+  const preuve = (k: number) => lu(p[k], `l’identifiant ${k} de la conv`, req);
   const demande = textes(req).at(-1)!;
   const tout = textes(req).join("\n");
   if (req.tache === "04-verdict" && tout.includes(FACTICE.refus)) return REFUS_FACTICE;
@@ -90,7 +92,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       court: null,
       titre: "Ce que tu vis n’est pas normal.",
       sous_titre: "Et ce n’est pas ta faute.",
-      preuves: [p[2]],
+      preuves: [preuve(2)],
       confiance: null,
       confiance_texte: null,
       niveau: null,
@@ -111,7 +113,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         intro: "On va parler doucement.",
         titre: "Ce que tu vis n’est pas normal.",
         faits: "Dans votre conv, il revient sans cesse sur tes sorties.",
-        preuves: [p[3]],
+        preuves: [preuve(3)],
         reassurance: "Tu n’y es pour rien.",
         gestes: ["Parles-en à quelqu’un de confiance.", "Garde une trace de ce qui t’inquiète.", "Appelle une ligne d’écoute si ça pèse trop."],
         brouillon: "J’ai besoin de temps pour moi.",
@@ -125,7 +127,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       court: "À deux doigts",
       titre: "Vous êtes à deux doigts.",
       sous_titre: "Elle a posé la question, t’as esquivé.",
-      preuves: [p[2]],
+      preuves: [preuve(2)],
       confiance: "probable",
       confiance_texte: "7 preuves dans votre conv",
       niveau: "dit",
@@ -140,8 +142,8 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         alerte: null,
         mode_sobre: false,
         these: "Vous jouez à cache-cache.",
-        decouvertes: [1, 2, 3].map((k) => ({ texte: `Découverte ${k}`, preuves: [p[k]] })),
-        chapitres: [...moitie(true), ...moitie(false)].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: FACTICE.titreCourt(n), surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [p[n]] }], epice: "une vanne" })),
+        decouvertes: [1, 2, 3].map((k) => ({ texte: `Découverte ${k}`, preuves: [preuve(k)] })),
+        chapitres: [...moitie(true), ...moitie(false)].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: FACTICE.titreCourt(n), surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [preuve(n)] }], epice: "une vanne" })),
       },
       chapitres: null,
     } satisfies z.infer<typeof Etape05>;
@@ -156,7 +158,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
       ],
     } satisfies Vocal;
-  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, p)) } satisfies z.infer<typeof Etape05>;
+  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(n % p.length))) } satisfies z.infer<typeof Etape05>;
   if (req.tache === "07-memoire" && req.partie === "mise à jour")
     return {
       alerte: null,
@@ -220,14 +222,14 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       rien_de_neuf: false,
       memoire: {
         ou_on_en_est: "Vus quatre fois, le mot n’est pas posé.",
-        moments: [{ quand: "2026-02-01", quoi: "Premier verre.", preuves: [p[1]] }],
-        son_mode: [{ texte: "Vanne après un mot doux.", preuves: [p[2]] }],
-        ton_mode: [{ texte: "Esquive.", preuves: [p[3]] }],
+        moments: [{ quand: "2026-02-01", quoi: "Premier verre.", preuves: [preuve(1)] }],
+        son_mode: [{ texte: "Vanne après un mot doux.", preuves: [preuve(2)] }],
+        ton_mode: [{ texte: "Esquive.", preuves: [preuve(3)] }],
         conseils: [{ quand: "2026-03-01", conseil: "Lui répondre en face.", suite: "en_attente", resultat: null }],
         a_venir: [],
       },
-      fiche: { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [{ section: "aime", texte: "Le libanais", preuves: [p[4]], statut: "nouveau" }] },
-      niveau: { niveau: "dit", tendance: null, pourquoi: "vus quatre fois", preuves: [p[2]] },
+      fiche: { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [{ section: "aime", texte: "Le libanais", preuves: [preuve(4)], statut: "nouveau" }] },
+      niveau: { niveau: "dit", tendance: null, pourquoi: "vus quatre fois", preuves: [preuve(2)] },
       questions: ["pourquoi elle vanne ?", "je relance trop ?", "samedi je fais quoi ?", "qui craque en premier ?"],
     } satisfies Memoire;
   throw new Error(`tâche factice inconnue : ${req.tache}`);

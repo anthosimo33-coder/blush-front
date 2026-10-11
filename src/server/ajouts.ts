@@ -13,7 +13,7 @@ import * as coffre from "./coffre";
 import { ficheDe } from "./donnees";
 import { ErreurPublique } from "./erreurs";
 import { planifier } from "./taches";
-import { db, schema } from "./db";
+import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { relancerApres } from "./pipeline";
 import type { DonneesMemoire } from "./stockage/types";
@@ -41,18 +41,21 @@ const curseurDe = (story: Ligne) => {
 
 /** Réserve `n` numéros d’un coup (deux envois en même temps n’ont jamais le même) : renvoie le premier. */
 async function reserver(storyId: string, n: number, depart: number): Promise<number> {
-  const [r] = await db()
-    .update(schema.stories)
-    .set({ nextMessage: sql`greatest(coalesce(${schema.stories.nextMessage}, 0), ${depart}) + ${n}` })
-    .where(eq(schema.stories.id, storyId))
-    .returning({ suivant: schema.stories.nextMessage });
+  const r = uneLigne(
+    await db()
+      .update(schema.stories)
+      .set({ nextMessage: sql`greatest(coalesce(${schema.stories.nextMessage}, 0), ${depart}) + ${n}` })
+      .where(eq(schema.stories.id, storyId))
+      .returning({ suivant: schema.stories.nextMessage }),
+    "stories (numéros réservés)",
+  );
   return r.suivant! - n;
 }
 
 /** Le curseur avance jusqu’au dernier message lu : le prochain export repart de là. */
 async function avancer(storyId: string, dernier: number | null) {
   if (dernier == null) return;
-  const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, storyId));
+  const story = uneLigne(await db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), "stories (curseur)");
   const c = contexteDe(story);
   if (!c || c.dernier >= dernier) return;
   await db().update(schema.stories).set({ context: coffre.ecrire("stories.context", { ...c, dernier }), updatedAt: new Date() }).where(eq(schema.stories.id, storyId));

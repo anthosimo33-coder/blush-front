@@ -127,11 +127,12 @@ export async function lireCorps<S extends z.ZodType>(req: Request, schema: S): P
  */
 export function reponseAudio(req: Request, audio: Buffer): Response {
   const entetes = { "content-type": "audio/mpeg", "accept-ranges": "bytes", "cache-control": "private, no-store" };
-  const plage = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
-  if (plage && (plage[1] || plage[2])) {
+  /* « bytes=debut-fin », l’un des deux pouvant manquer (« bytes=-500 » : les 500 derniers octets) */
+  const [, de = "", a = ""] = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/) ?? [];
+  if (de || a) {
     const total = audio.length;
-    const debut = plage[1] ? +plage[1] : Math.max(0, total - +plage[2]);
-    const fin = plage[1] && plage[2] ? Math.min(+plage[2], total - 1) : total - 1;
+    const debut = de ? +de : Math.max(0, total - +a);
+    const fin = de && a ? Math.min(+a, total - 1) : total - 1;
     if (debut >= total || debut > fin) return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}` } });
     return new Response(new Uint8Array(audio.subarray(debut, fin + 1)), {
       status: 206,
