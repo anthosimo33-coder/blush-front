@@ -94,7 +94,8 @@ const TRAME_OPUS_MAX_OCTETS = 1275;
  * peuvent l’être (1 275 octets chacune, et leurs longueurs).
  */
 export function dureeOpus(paquet: Uint8Array): number | null {
-  const [toc, suivant] = paquet;
+  const toc = paquet[0];
+  const suivant = paquet[1];
   if (toc === undefined) return null;
   const config = toc >> 3;
   /* Des index masqués (sur 2 bits, sur 1) : toujours dans leur table */
