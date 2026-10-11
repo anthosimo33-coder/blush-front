@@ -228,7 +228,8 @@ test("sans session, ou depuis un autre site, l’API du partage ne crée ni ne d
     const sansSession = await request.post("/api/partage", { headers: origine });
     expect(sansSession.status()).toBe(401);
     expect(await sansSession.json()).toEqual({ erreur: "connexion" });
-    expect((await request.get("/api/partage")).status()).toBe(401);
+    /* Le lien ne se relit pas : la feuille le reçoit en le créant (POST), la route n’a pas de GET */
+    expect((await request.get("/api/partage")).status()).toBe(405);
     expect((await request.delete("/api/partage", { headers: origine })).status()).toBe(401);
     expect((await request.post("/api/partage/image", { headers: origine, data: { type: "reponse", echange: 1 } })).status()).toBe(401);
     expect((await request.post("/api/partage/compte", { headers: origine })).status()).toBe(401);

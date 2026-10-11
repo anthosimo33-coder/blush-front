@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import type { Ajout } from "@prompts/lib/ajouts";
 import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import { imagesDe } from "@/server/captures";
 import { historique, repondre as blushRepond } from "@/server/chat";
 import { memoireDe } from "@/server/donnees";

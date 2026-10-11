@@ -1,7 +1,6 @@
-import { sql } from "drizzle-orm";
 import { prolongerSession } from "@/server/auth";
 import { lireSession, poserSession } from "@/server/cookies";
-import { db } from "@/server/db";
+import { reveillerLaBase } from "@/server/depot";
 import { repondre } from "@/server/http";
 
 /*
@@ -13,7 +12,7 @@ import { repondre } from "@/server/http";
  */
 export async function GET() {
   try {
-    await db().execute(sql`select 1`);
+    await reveillerLaBase();
     const secret = await lireSession();
     const fin = secret ? await prolongerSession(secret) : null;
     if (secret && fin) await poserSession(secret, fin);

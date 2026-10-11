@@ -26,11 +26,11 @@ import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesV
 /* ———— Ce que gardent les colonnes ———— */
 
 /*
- * Les formes que la chaîne et les écrans se passent vivent dans src/server/stockage/types.ts. Deux sont reprises ici
- * pour les modules qui les lisent à cette adresse : DonneesMemoire pour le chat et les ajouts (lot 5b), DonneesVocal
- * pour vocal.ts (lot 3a). Elles partent avec ces importeurs, au plus tard au lot 9a (retrait des ré-exportations).
+ * Les formes que la chaîne et les écrans se passent vivent dans src/server/stockage/types.ts. Une est reprise ici pour
+ * les modules qui la lisent à cette adresse : DonneesMemoire pour le chat et les ajouts (lot 5b). Elle part avec ses
+ * importeurs, au plus tard au lot 9a (retrait des ré-exportations).
  */
-export type { DonneesMemoire, DonneesVocal };
+export type { DonneesMemoire };
 
 /**
  * Ce qu’il a envoyé au chat : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un

@@ -3,8 +3,9 @@ import type { ConvSummary, Fiche, Story } from "@/types";
 import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
-import { compteDe, contactDe, contexteRequete, convsDe, ficheDe, finDeLecture, questionsDe, rapportDe, storyCourante, utilisateurCourant } from "@/server/donnees";
+import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
 import { histoiresDuCompte, metaDe, quiRempli, storyAffichee } from "@/server/histoires";
+import { contexte } from "@/server/requete";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
 
@@ -15,7 +16,8 @@ import { connexionPuis } from "@/lib/suite";
 
 /** `parcours` : les écrans de l’import, qui montrent la conv en train d’être importée (voir histoireOuverte). */
 export async function getStory({ parcours = false } = {}): Promise<Story | null> {
-  return storyCourante(parcours);
+  const { story } = await contexte({ parcours });
+  return story ? storyAffichee(story.id, metaDe(story)) : null;
 }
 
 /**
@@ -31,7 +33,7 @@ export async function convChoisie(): Promise<string | undefined> {
  * exemple). Sa lecture ne peut pas partir sans : l’écran de lecture renvoie à /qui.
  */
 export async function quiAttendu(): Promise<boolean> {
-  const { story } = await contexteRequete();
+  const { story } = await contexte();
   return !!story && !quiRempli(metaDe(story));
 }
 
@@ -40,7 +42,7 @@ export async function quiAttendu(): Promise<boolean> {
  * navigateur, une session expirée), la connexion, qui ramène ensuite à `suite`. Connecté sans conv : commencer.
  */
 export async function sansHistoire(suite: string): Promise<string> {
-  return !(await contexteRequete()).utilisateur ? connexionPuis(suite) : "/commencer";
+  return !(await contexte()).utilisateur ? connexionPuis(suite) : "/commencer";
 }
 
 /** Déjà connecté : une nouvelle conv passe alors de « Qui es-tu ? » à la lecture, sans l’écran email. */
@@ -48,17 +50,18 @@ export async function estConnecte(): Promise<boolean> {
   return !!(await utilisateurCourant());
 }
 
+/** Le rapport de la page : ouvert (ouvrirLeRapport), il lance ce qui devait partir et ne l’a jamais été, comme GET /api/rapport. */
 export async function getReport(): Promise<ReportPayload | null> {
-  const { utilisateur, story } = await contexteRequete();
-  return utilisateur && story ? rapportDe(story, utilisateur) : null;
+  const { utilisateur, story } = await contexte();
+  return utilisateur && story ? ouvrirLeRapport(story, utilisateur) : null;
 }
 
 /**
  * La lecture est finie (le verdict est écrit) : getReport ne sera pas null. La garde de /rapport, dans son layout, qui
- * se rend aussi à chaque préchargement du lien : sans lire le rapport, que getReport déchiffre en lançant sa suite.
+ * se rend aussi à chaque préchargement du lien : sans lire le rapport, que getReport déchiffre en lançant ce qui lui manque.
  */
 export async function verdictEcrit(): Promise<boolean> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   return !!utilisateur && !!story && (await finDeLecture(story.id)) != null;
 }
 
@@ -67,18 +70,18 @@ export async function verdictEcrit(): Promise<boolean> {
  * (getReport le déchiffre, avec le vocal et l’état des tâches). null : pas encore de verdict.
  */
 export async function getContact(): Promise<Pick<ReportPayload["report"], "verdict" | "level" | "trend" | "nextStep"> | null> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   return utilisateur && story ? contactDe(story.id) : null;
 }
 
 export async function getFiche(): Promise<Fiche | null> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   return utilisateur && story ? ficheDe(story) : null;
 }
 
 /** Les questions tirées de la mémoire de la conv : les questions toutes prêtes de l’accueil, les idées de « Ta question ». */
 export async function questionsDeLaConv(): Promise<string[]> {
-  const { story } = await contexteRequete();
+  const { story } = await contexte();
   return story ? questionsDe(story.id) : [];
 }
 
@@ -87,7 +90,7 @@ export async function questionsDeLaConv(): Promise<string[]> {
  * l’heure du verdict).
  */
 export async function getChat(): Promise<HistoriqueChat & { introAt?: number }> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   if (!utilisateur || !story) return { echanges: [], plus: false };
   /* Le mode vocal est déjà dans la ligne de l’histoire : historique() ne le relit pas */
   const [h, introAt] = await Promise.all([historique(story.id, { modeVocal: !!story.chatVocal }), finDeLecture(story.id)]);
@@ -96,7 +99,7 @@ export async function getChat(): Promise<HistoriqueChat & { introAt?: number }> 
 
 /** Toi et elle, pour « Mon compte ». */
 export async function getNomsDuCompte(): Promise<{ me: Story["participants"][number]; other: Story["participants"][number]; period: string } | null> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   if (!utilisateur || !story) return null;
   const affichee = storyAffichee(story.id, metaDe(story));
   const { moi, autre } = moiEtAutre(affichee);
@@ -110,7 +113,7 @@ export async function getNomsDuCompte(): Promise<{ me: Story["participants"][num
  * landing s’ouvre à qui tient l’appareil, sans rien toucher.
  */
 export async function getRetour(): Promise<{ destination: string } | null> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   if (!utilisateur || !story) return null;
   if (!quiRempli(metaDe(story))) return { destination: "/qui" };
   return { destination: (await finDeLecture(story.id)) ? "/app" : "/lecture" };
@@ -118,13 +121,13 @@ export async function getRetour(): Promise<{ destination: string } | null> {
 
 /** Le compte, pour « Mon compte » : son email et son abonnement, dès le rendu serveur. null : pas connecté. */
 export async function getCompte(): Promise<Account | null> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   return utilisateur ? compteDe(utilisateur, story) : null;
 }
 
 /** Les convs du compte, pour la liste « Tes convs ». Une seule : pas de liste, l’accueil reste comme avant. */
 export async function getConvs(): Promise<ConvSummary[]> {
-  const { utilisateur, story } = await contexteRequete();
+  const { utilisateur, story } = await contexte();
   return utilisateur ? convsDe(utilisateur, story) : [];
 }
 
@@ -133,6 +136,6 @@ export async function getConvs(): Promise<ConvSummary[]> {
  * « Tes convs », dans son layout, qui se rend aussi à chaque préchargement du lien.
  */
 export async function nombreDeConvs(): Promise<number> {
-  const { utilisateur } = await contexteRequete();
+  const { utilisateur } = await contexte();
   return utilisateur ? (await histoiresDuCompte(utilisateur.id)).length : 0;
 }

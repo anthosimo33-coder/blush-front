@@ -8,7 +8,7 @@ vi.mock("next/server", async (original) => ({ ...(await original<typeof import("
 import type { Utilisateur } from "@/server/auth";
 import { chiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { contactDe, rapportDe } from "@/server/donnees";
+import { contactDe, ouvrirLeRapport } from "@/server/donnees";
 import { avecEcheance } from "@/server/echeance";
 import { historique } from "@/server/historique";
 import { histoireOuverte, histoiresDuCompte } from "@/server/histoires";
@@ -59,7 +59,7 @@ describe("ce que lisent les écrans", () => {
     expect(await contactDe(id)).toMatchObject({ level: expect.any(String), nextStep: expect.stringMatching(/^Ton prochain pas\u00a0: /) });
     const plus = { ...compte, plan: "blushplus" as const };
     await passerABlushPlus(compte);
-    const r = await rapportDe((await histoireOuverte(plus, { affichee: id }))!, plus);
+    const r = await ouvrirLeRapport((await histoireOuverte(plus, { affichee: id }))!, plus);
     expect(r?.generating).toBe(true);
     /* Le contact de l’accueil est celui de la tête du rapport */
     expect(await contactDe(id)).toEqual({ verdict: r!.report.verdict, level: r!.report.level, trend: r!.report.trend, nextStep: r!.report.nextStep });

@@ -1,8 +1,7 @@
-import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { utilisateurDeSession } from "@/server/auth";
 import { lireSession, poserChoisie } from "@/server/cookies";
-import { db, schema } from "@/server/db";
+import { estConvDuCompte } from "@/server/depot";
 import { UUID } from "@/server/histoires";
 import { connexionPuis } from "@/lib/suite";
 
@@ -15,12 +14,6 @@ export async function GET(req: Request, { params }: RouteContext<"/ouvrir/[id]">
   const { id } = await params;
   const utilisateur = await utilisateurDeSession(await lireSession());
   if (!utilisateur) return NextResponse.redirect(new URL(connexionPuis(`/ouvrir/${encodeURIComponent(id)}`), req.url));
-  if (UUID.test(id)) {
-    const [s] = await db()
-      .select({ id: schema.stories.id })
-      .from(schema.stories)
-      .where(and(eq(schema.stories.id, id), eq(schema.stories.userId, utilisateur.id)));
-    if (s) await poserChoisie(s.id);
-  }
+  if (UUID.test(id) && (await estConvDuCompte(id, utilisateur.id))) await poserChoisie(id);
   return NextResponse.redirect(new URL("/rapport", req.url));
 }

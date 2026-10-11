@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
@@ -14,6 +14,7 @@ import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
+import { donneesMemoire, donneesVerdict as lireVerdict, ligneRapport as lireRapport, modifierMemoire } from "./depot";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
@@ -23,7 +24,7 @@ import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
-import { editionsBornees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
+import { editionsBornees, type Contexte, type DonneesRapport } from "./stockage/types";
 import { entreeDe, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
@@ -92,15 +93,6 @@ async function appelVerifie<S extends z.ZodType>(
 /** Le temps qu’il faut encore pour rejouer un appel dont des preuves sont introuvables. */
 const TEMPS_RELANCE = 90_000;
 
-const lireVerdict = async (storyId: string) => {
-  const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
-  return v ? coffre.lire("verdicts.data", v.data) : null;
-};
-const lireRapport = async (storyId: string) => {
-  const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, storyId));
-  return r ?? null;
-};
-
 /* ———— Les étapes ———— */
 
 /** Écrit l’avancée d’une tâche en base (et son détail), au plus une fois par seconde, sans jamais reculer. */
@@ -139,7 +131,7 @@ async function verdict(story: LigneComplete, t: Tache) {
     .insert(schema.verdicts)
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data, createdAt: new Date() } });
-  await db().update(schema.stories).set({ context, status: "prete", updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
+  await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
 }
 
 /**
@@ -349,10 +341,7 @@ async function vocalTache(story: LigneComplete) {
   const r = coffre.lire("reports.data", ligne.data).sortie;
   let lignes: Map<string, string>;
   if (convDe(story)) lignes = choisir(relire(story).rendu.lignes, [...preuvesRapport(r), ...preuvesVerdict(v.sortie)]);
-  else {
-    const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
-    lignes = new Map(m ? coffre.lire("memories.data", m.data).lignes : []);
-  }
+  else lignes = new Map((await donneesMemoire(story.id))?.lignes ?? []);
   /*
    * Héritage : un rapport sobre n’a de vocal que s’il n’a pas d’alerte, ce qui n’arrive plus depuis le 9 octobre (le
    * mode sobre suit l’alerte, voir verdict). Avant, un rejet passait aussi en mode sobre, sans alerte : ces rapports
@@ -391,28 +380,25 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const ech = entreeDe(t);
   if (!ech) throw new ErreurTache("memoire_absente");
   const h = histoireDe(metaDe(story));
-  for (let essai = 0; essai < 2; essai++) {
-    const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
-    if (!ligne) throw new ErreurTache("memoire_absente");
-    const avant = coffre.lire("memories.data", ligne.data);
-    const lignes = new Map(avant.lignes);
-    const suivant = { n: avant.suivant };
-    const nouveau = rendreNouveau(ech, h, lignes, suivant);
-    const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
-    /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-    const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
-    if (maj.rien_de_neuf) return;
-    const etat = appliquerMaj(avant.etat, maj);
-    const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
-    const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
-    const ecrite = await db()
-      .update(schema.memories)
-      .set({ data: coffre.ecrire("memories.data", donnees), version: ligne.version + 1, updatedAt: new Date() })
-      .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
-      .returning({ version: schema.memories.version });
-    if (ecrite.length) return;
-  }
-  throw new ErreurTache("memoire_changee");
+  /* Deux essais : chacun rappelle le modèle */
+  const ecrite = await modifierMemoire(
+    story.id,
+    async (avant) => {
+      const lignes = new Map(avant.lignes);
+      const suivant = { n: avant.suivant };
+      const nouveau = rendreNouveau(ech, h, lignes, suivant);
+      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
+      /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
+      const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
+      if (maj.rien_de_neuf) return null;
+      const etat = appliquerMaj(avant.etat, maj);
+      const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
+      return { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
+    },
+    { essais: 2 },
+  );
+  if (ecrite === "absente") throw new ErreurTache("memoire_absente");
+  if (ecrite === "occupee") throw new ErreurTache("memoire_changee");
 }
 
 /**

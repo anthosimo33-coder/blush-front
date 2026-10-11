@@ -45,7 +45,7 @@ export function chiffrer(valeur: unknown): Buffer {
 
 export type Plan = "gratuit" | "rapport" | "blushplus";
 export type Tache = { genre: string; statut: "attente" | "en_cours" | "fini" | "echec"; essais: number; erreur: string | null };
-export type Histoire = { id: string; statut: string; messages: number; convGardee: boolean };
+export type Histoire = { id: string; messages: number; convGardee: boolean };
 
 /** Le compte de cet email, ou null : il naît au premier bon code. */
 export async function compteDe(email: string): Promise<{ id: string; plan: Plan } | null> {
@@ -62,7 +62,7 @@ export async function definirPlan(email: string, plan: Plan): Promise<void> {
 /** Les histoires du compte, de la plus ancienne à la plus récente. `convGardee` : la conv brute est encore en base. */
 export async function histoiresDe(email: string): Promise<Histoire[]> {
   return sql()<Histoire[]>`
-    select s.id, s.status as statut, s.message_count as messages, s.conv is not null as "convGardee"
+    select s.id, s.message_count as messages, s.conv is not null as "convGardee"
     from stories s join users u on u.id = s.user_id
     where u.email = ${email.toLowerCase()} order by s.created_at`;
 }

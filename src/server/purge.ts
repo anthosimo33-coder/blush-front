@@ -1,6 +1,7 @@
 import "server-only";
-import { and, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, isNotNull, isNull, lt, not } from "drizzle-orm";
 import { db, schema } from "./db";
+import { PREDICATS } from "./depot";
 
 /*
  * La purge quotidienne (Vercel Cron) : on ne garde rien plus longtemps qu’utile.
@@ -24,7 +25,7 @@ export async function purger(maintenant = new Date()) {
       and(
         isNotNull(schema.stories.userId),
         lt(schema.stories.createdAt, il_y_a(1)),
-        sql`not exists (select 1 from ${schema.tasks} where ${schema.tasks.storyId} = ${schema.stories.id})`,
+        not(PREDICATS.lue),
       ),
     )
     .returning({ id: schema.stories.id });
@@ -33,9 +34,9 @@ export async function purger(maintenant = new Date()) {
     .set({ conv: null, convPurgedAt: maintenant })
     .where(
       and(
-        isNotNull(schema.stories.conv),
+        PREDICATS.convGardee,
         lt(schema.stories.createdAt, il_y_a(30)),
-        sql`exists (select 1 from ${schema.reports} where ${schema.reports.storyId} = ${schema.stories.id} and ${schema.reports.data} is not null)`,
+        PREDICATS.rapportPret,
       ),
     )
     .returning({ id: schema.stories.id });

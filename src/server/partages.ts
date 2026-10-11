@@ -7,6 +7,7 @@ import { empreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
+import { donneesVerdict } from "./depot";
 import { ErreurPublique } from "./erreurs";
 import { metaDe, type Ligne } from "./histoires";
 
@@ -61,9 +62,9 @@ export function masqueDe(story: Ligne): (texte: string) => string {
  * feuille de partage a les deux sans relire le lien qu’on vient d’écrire.
  */
 export async function partager(story: Ligne): Promise<{ id: string; verdict: VerdictPartage }> {
-  const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
+  const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurPartage("pas_pret");
-  const { sortie } = coffre.lire("verdicts.data", v.data);
+  const { sortie } = v;
   /* Une situation difficile ne se partage pas */
   if (sortie.mode_sobre) throw new ErreurPartage("sobre");
   const affiche = verdictAffiche(sortie);
@@ -81,12 +82,6 @@ export async function partager(story: Ligne): Promise<{ id: string; verdict: Ver
     .returning({ id: schema.shares.id });
   await compter(CLES.lienCree);
   return { id: cree.id, verdict };
-}
-
-/** Le lien de l’histoire, s’il existe. */
-export async function lienDe(storyId: string): Promise<string | null> {
-  const [l] = await db().select({ id: schema.shares.id }).from(schema.shares).where(eq(schema.shares.storyId, storyId));
-  return l?.id ?? null;
 }
 
 /** Désactive le lien : il ne montre plus rien. */

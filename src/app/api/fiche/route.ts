@@ -1,13 +1,12 @@
-import { and, eq } from "drizzle-orm";
 import { after } from "next/server";
 import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours } from "@/server/ajouts";
-import { executerChaine, SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
-import { chiffrer, dechiffrer } from "@/server/chiffrement";
-import { db, schema } from "@/server/db";
+import { modifierMemoire } from "@/server/depot";
 import { ficheDe, memoireDe } from "@/server/donnees";
+import { fusionnerFaits } from "@/server/fiche";
 import { depuisPaquet, type Ligne } from "@/server/histoires";
 import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { executerChaine } from "@/server/pipeline";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { Fiche } from "@/types";
@@ -35,8 +34,9 @@ export async function GET() {
 
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
- * ce qu’il supprime, elle ne le remet pas. On n’écrit que sur la mémoire qu’on a lue : si une mise à jour l’a changée
- * entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à jour a appris n’est effacé).
+ * ce qu’il supprime, elle ne le remet pas (fusionnerFaits, src/server/fiche.ts). On n’écrit que sur la mémoire qu’on a
+ * lue : si une mise à jour l’a changée entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à
+ * jour a appris n’est effacé).
  */
 export async function PUT(req: Request) {
   const g = await garde(req, { session: "requise", histoire: true });
@@ -45,28 +45,12 @@ export async function PUT(req: Request) {
   const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);
   if (!corrigee) return erreur("faits");
   if (!(await sousLaLimiteDuCompte(utilisateur, "fiche"))) return erreur("trop");
-  for (let essai = 0; essai < 3; essai++) {
-    const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
-    const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
-    if (!ligne || !m?.etat.fiche) return erreur("pas_pret");
-    const avant = m.etat.fiche.faits;
-    const nouveaux = corrigee.facts.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
-    const textesAvant = new Set(avant.map((a) => a.texte));
-    const textes = new Set(nouveaux.map((n) => n.texte));
-    const editions = {
-      parToi: [...new Set([...(m.editions?.parToi ?? []).filter((t) => textes.has(t)), ...nouveaux.filter((n) => !textesAvant.has(n.texte)).map((n) => n.texte)])],
-      supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)).slice(-SUPPRIMEES_MAX),
-    };
-    const donnees: DonneesMemoire = { ...m, etat: { ...m.etat, fiche: { ...m.etat.fiche, faits: nouveaux } }, editions };
-    const ecrite = await db()
-      .update(schema.memories)
-      .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
-      .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
-      .returning({ version: schema.memories.version });
-    /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
-    if (ecrite.length) return repondre("PUT /api/fiche", await ficheEtMaj(story));
-  }
-  return erreur("occupe");
+  /* Trois essais : une mise à jour de la mémoire qui finit pendant la correction ne la fait pas échouer */
+  const modifiee = await modifierMemoire(story.id, (m) => fusionnerFaits(m, corrigee.facts), { essais: 3 });
+  if (modifiee === "occupee") return erreur("occupe");
+  if (modifiee !== "ecrite") return erreur("pas_pret");
+  /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
+  return repondre("PUT /api/fiche", await ficheEtMaj(story));
 }
 
 /**

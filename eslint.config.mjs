@@ -43,26 +43,39 @@ const CHIFFREMENT = "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$";
 const PAR_LE_COFFRE_MESSAGE = "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio) ; chiffrement.ts ne sert ailleurs qu’à empreinte, memeEmpreinte et jeton.";
 const PAR_LE_COFFRE = { regex: CHIFFREMENT, allowImportNames: ["empreinte", "memeEmpreinte", "jeton"], message: PAR_LE_COFFRE_MESSAGE };
 const CHIFFREMENT_DYNAMIQUE = { selector: `ImportExpression[source.value=/${CHIFFREMENT.replaceAll("/", "\\u002F")}/]`, message: PAR_LE_COFFRE_MESSAGE };
-/* Les dernières à passer par le coffre (lot 3a) : trois routes */
-const PAS_ENCORE_PAR_LE_COFFRE = ["src/app/api/fiche/route.ts", "src/app/api/partage/image/route.ts", "src/app/api/vocal/chat/*/route.ts"];
+/*
+ * La base se lit et s’écrit dans src/server : les routes /api et les pages (tout src/app) passent par le dépôt
+ * (src/server/depot.ts), les comptes (comptes.ts) ou les modules de leur domaine, jamais par la base (src/server/db) ni
+ * par drizzle-orm. Une requête SQL écrite dans une route recopiait les lectures et leurs prédicats.
+ */
+const PAR_LE_DEPOT_MESSAGE = "Une route ou une page ne lit pas la base elle-même : elle passe par src/server (depot.ts, comptes.ts ou le module de son domaine).";
+const PAR_LE_DEPOT = [
+  { regex: `${versSrc("server/db")}(/|$)`, message: PAR_LE_DEPOT_MESSAGE },
+  { regex: "^drizzle-orm(/|$)", message: PAR_LE_DEPOT_MESSAGE },
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Ni données factices, ni aperçus, ni chiffrement hors du coffre (PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE). Les deux
-  // blocs suivants reprennent ces motifs : un bloc qui redonne no-restricted-imports remplace toute sa liste.
+  // Ni données factices, ni aperçus, ni chiffrement hors du coffre (PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE), ni la
+  // base dans src/app (PAR_LE_DEPOT). Les trois blocs suivants reprennent ces motifs : un bloc qui redonne
+  // no-restricted-imports remplace toute sa liste.
   {
     files: ["src/**"],
     rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE] }] },
   },
-  // Les aperçus (src/app/apercu) gardent leurs données fictives, sans chiffrer pour autant.
+  {
+    files: ["src/app/**"],
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE, ...PAR_LE_DEPOT] }] },
+  },
+  // Les aperçus (src/app/apercu) gardent leurs données fictives, sans chiffrer ni lire la base pour autant.
   {
     files: ["src/app/apercu/**"],
-    rules: { "no-restricted-imports": ["error", { patterns: [PAR_LE_COFFRE] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAR_LE_COFFRE, ...PAR_LE_DEPOT] }] },
   },
-  // Le coffre chiffre, comme ce qui n’y passe pas encore (PAS_ENCORE_PAR_LE_COFFRE).
+  // Le coffre chiffre.
   {
-    files: ["src/server/coffre.ts", ...PAS_ENCORE_PAR_LE_COFFRE],
+    files: ["src/server/coffre.ts"],
     rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
   },
   // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), la configuration lue à ses deux seuls endroits

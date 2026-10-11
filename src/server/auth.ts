@@ -4,6 +4,7 @@ import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
+import { passerEnBlushPlus } from "./comptes";
 import { db, schema } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
@@ -137,7 +138,7 @@ export async function compteDe(email: string): Promise<Utilisateur> {
       .returning())[0];
   /* La bêta sans paiement : un email ajouté à la liste après coup a son accès à la connexion suivante */
   if (existant && existant.plan === "gratuit" && accesLibre(email)) {
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, existant.id));
+    await passerEnBlushPlus(existant.id);
     utilisateur.plan = "blushplus";
   }
 

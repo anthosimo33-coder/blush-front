@@ -65,8 +65,6 @@ export const stories = pgTable(
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     /** Empreinte du jeton du cookie de brouillon, tant que l’histoire n’a pas de compte. */
     draftToken: text("draft_token").unique(),
-    /** brouillon | analyse | prete */
-    status: text("status").notNull().default("brouillon"),
     messageCount: integer("message_count").notNull(),
     /** Le prochain numéro libre pour les messages ajoutés après l’import (m1074…), réservé d’un coup, sans doublon. */
     nextMessage: integer("next_message"),

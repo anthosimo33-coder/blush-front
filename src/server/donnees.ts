@@ -7,19 +7,20 @@ import { SUBSCRIPTIONS } from "@/contenu/offres";
 import { peut } from "@/lib/acces";
 import { pronomOppose } from "@/lib/pronom";
 import type { Account, ReportPayload } from "@/types/api";
-import type { AnalysisProgress, ConvSummary, Fiche, Plan, Story } from "@/types";
+import type { AnalysisProgress, ConvSummary, Fiche, Plan } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
+import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { echecDe } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
-import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
+import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
 import { cloreLesAbandons, etatDepuis, executerChaine, reparerLaChaine } from "./pipeline";
+import type { EtatChaine } from "./chaine";
 import { assemblerRapport, enTete, ouvertureDu, type EnTete } from "./presentation/rapport";
-import type { DonneesMemoire } from "./stockage/types";
 import { aRelancer, etatDesTaches } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
@@ -52,11 +53,6 @@ const contexteMemo = cache(async (parcours: boolean): Promise<{ utilisateur: Uti
  * qui lit plusieurs données (l’accueil en lit six) ne refait pas ces requêtes à chaque fois.
  */
 export const contexteRequete = (parcours = false) => contexteMemo(!!parcours);
-
-export async function storyCourante(parcours = false): Promise<Story | null> {
-  const { story } = await contexteRequete(parcours);
-  return story ? storyAffichee(story.id, metaDe(story)) : null;
-}
 
 /**
  * Les convs du compte, pour « Tes convs » : l’autre personne, où vous en êtes (une fois le verdict écrit), et quand
@@ -145,14 +141,6 @@ function decouvertes(story: Ligne, p: number): string[] {
   return (contexteDe(story)?.trouvailles ?? []).slice(0, Math.min(3, Math.floor(p * 5)));
 }
 
-/*
- * Avec l’accès, ce qui doit s’écrire et n’a jamais été lancé (le rapport d’un accès donné après coup, la mémoire d’un
- * rapport sobre offert) : reparerLaChaine (pipeline.ts). Repris ici sous son ancien nom pour POST /api/debloquer, son
- * seul importeur : il part quand la route importe pipeline.ts (lot 3a, qui bascule les imports des routes, ou 5b, qui
- * retire le paramètre `acces`), au plus tard au lot 9a.
- */
-export { reparerLaChaine as assurerLaSuite } from "./pipeline";
-
 /** Les étapes du rapport (et la mémoire qui le suit) : celles qu’une relance peut reprendre. */
 export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"] as const;
 
@@ -161,39 +149,35 @@ export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"
  * lancer sa suite (le rapport s’en charge à son ouverture). null tant que la lecture n’est pas finie.
  */
 export async function contactDe(storyId: string): Promise<EnTete | null> {
-  const [v] = await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
-  return v ? enTete(coffre.lire("verdicts.data", v.data).sortie) : null;
+  const v = await donneesVerdict(storyId);
+  return v ? enTete(v.sortie) : null;
 }
 
+/** Le rapport tel que l’affiche le front, et `generating` : il s’écrit encore. */
+type RapportAffiche = ReportPayload & { generating: boolean };
+
 /**
- * Le rapport tel que l’affiche le front : lu, réparé, puis assemblé (assemblerRapport). Tout est lu d’un coup, pas
- * l’un après l’autre : le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches, lu une fois pour
- * tout, et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
- * La réparation (reparerLaChaine, pipeline.ts) lance ce qui devait partir et n’a jamais été lancé : une lecture qui
- * planifie des tâches payantes, le temps que les routes s’en chargent elles-mêmes (lot 3a).
+ * Le rapport lu, et de quoi lancer ce qui lui manque sans rien relire : l’accès du compte et l’état de sa chaîne
+ * (`chaine`), quand le rapport est ouvert (l’accès, ou le mode sobre). Tout est lu d’un coup, pas l’un après l’autre :
+ * le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches, lu une fois pour tout, et le vocal.
  */
-export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
+async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ rapport: RapportAffiche; chaine: { acces: boolean; etat: EtatChaine } | null } | null> {
   const access: Plan = utilisateur?.plan ?? "gratuit";
   const aLeRapport = peut(access, "rapport");
-  const [[v], [r], tachesLues, vocalLuAvant] = await Promise.all([
-    db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)),
-    db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id)),
+  const [verdict, r, tachesLues, vocalLuAvant] = await Promise.all([
+    donneesVerdict(story.id),
+    ligneRapport(story.id),
     aLeRapport ? etatDesTaches(story.id, [...GENRES_CHAINE]) : null,
     aLeRapport ? vocalLu(story.id) : null,
   ]);
-  if (!v) return null;
-  const verdict = coffre.lire("verdicts.data", v.data);
+  if (!verdict) return null;
   const donnees = r?.data ? coffre.lire("reports.data", r.data) : null;
   const { ouvert } = ouvertureDu(access, verdict.sortie);
   /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
-  const [tachesOuvertes, vocal] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, [...GENRES_CHAINE]), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
-  let taches = tachesOuvertes;
-  /* Ce qui n’a jamais été lancé part maintenant ; l’état des tâches est alors relu, pour montrer l’écriture tout de suite */
-  const etat = etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches });
-  if (ouvert && (await reparerLaChaine(story, aLeRapport, etat))) taches = await etatDesTaches(story.id, [...GENRES_CHAINE]);
+  const [taches, vocal] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, [...GENRES_CHAINE]), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
   /* Le plan et les chapitres finis ne sont lus (et déchiffrés) qu’avec l’accès, pendant l’écriture ; assemblerRapport les ignore sans lui */
   const enEcriture = aLeRapport && !donnees;
-  return assemblerRapport({
+  const rapport = assemblerRapport({
     storyId: story.id,
     autre: personnesDe(metaDe(story)).autre.prenom,
     access,
@@ -206,6 +190,29 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
     voix: voixDisponible(),
     maintenant: Date.now(),
   });
+  return { rapport, chaine: ouvert ? { acces: aLeRapport, etat: etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches }) } : null };
+}
+
+/**
+ * Le rapport tel que l’affiche le front : lu, puis assemblé sans effet (assemblerRapport), ou null tant que la lecture
+ * n’est pas finie. Une lecture seule : elle ne lance rien, même ce qui manque (ouvrirLeRapport le fait). Le rapport se
+ * relit toutes les 2 s pendant son écriture.
+ */
+export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<RapportAffiche | null> {
+  return (await lireLeRapport(story, utilisateur))?.rapport ?? null;
+}
+
+/**
+ * Le rapport qu’on ouvre (GET /api/rapport, les pages du rapport par getReport, src/services/serveur.ts) : lu comme par
+ * rapportDe, après avoir lancé ce qui devait partir et ne l’a jamais été (reparerLaChaine, pipeline.ts : le rapport d’un
+ * accès donné après coup, la mémoire d’un rapport sobre offert, un vocal d’une ancienne version). La seule lecture du
+ * rapport qui planifie des tâches payantes, et elle le dit par son nom. Ce qui part est relu tout de suite, pour montrer
+ * l’écriture.
+ */
+export async function ouvrirLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<RapportAffiche | null> {
+  const lu = await lireLeRapport(story, utilisateur);
+  if (!lu?.chaine || !(await reparerLaChaine(story, lu.chaine.acces, lu.chaine.etat))) return lu?.rapport ?? null;
+  return rapportDe(story, utilisateur);
 }
 
 export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account {
@@ -216,10 +223,7 @@ export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account
  * La mémoire de l’histoire (après le rapport), ou null. Mémorisée le temps d’un rendu : l’accueil la lit pour la fiche
  * et pour les questions. (Une route /api la relit à chaque appel : `cache` n’y garde rien.)
  */
-export const memoireDe = cache(async (storyId: string): Promise<DonneesMemoire | null> => {
-  const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
-  return m ? coffre.lire("memories.data", m.data) : null;
-});
+export const memoireDe = cache(donneesMemoire);
 
 /** Sa fiche, remplie par la mémoire. Avant la mémoire : vide, avec son prénom. */
 export async function ficheDe(story: Ligne): Promise<Fiche> {

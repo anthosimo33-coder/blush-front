@@ -13,7 +13,7 @@ vi.mock("@/server/taches", async (original) => {
 
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
-import { rapportDe } from "@/server/donnees";
+import { ouvrirLeRapport, rapportDe } from "@/server/donnees";
 import { histoireOuverte } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { etatDesTaches } from "@/server/taches";
@@ -39,19 +39,25 @@ describe("le rapport pendant son écriture", () => {
     expect((await rapportDe((await histoireOuverte(u, { affichee: imp.id }))!, u))?.generating).toBe(false);
     expect(lues).not.toHaveBeenCalled();
 
-    /* L’accès arrive : le rapport part, et l’état est relu une fois pour montrer l’écriture tout de suite */
+    /* L’accès arrive. Lu seul (rapportDe), le rapport ne lance rien : une lecture ne planifie pas de tâche payante */
     const plus = { ...u, plan: "blushplus" as const };
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
     const ligne = (await histoireOuverte(plus, { affichee: imp.id }))!;
+    const lances = apres.length;
+    expect(await rapportDe(ligne, plus)).not.toBeNull();
+    expect(await tachesDe(imp.id, "rapport_plan")).toEqual([]);
+    expect(apres).toHaveLength(lances);
+
+    /* Ouvert (ouvrirLeRapport) : le rapport part, et l’état est relu une fois pour montrer l’écriture tout de suite */
     lues.mockClear();
-    const lance = await rapportDe(ligne, plus);
+    const lance = await ouvrirLeRapport(ligne, plus);
     expect(lance?.generating).toBe(true);
     expect(lance?.ecriture?.etape).toBe("plan");
     expect(lues).toHaveBeenCalledTimes(2);
 
     /* Les relectures suivantes : une seule lecture de l’état */
     lues.mockClear();
-    expect((await rapportDe(ligne, plus))?.ecriture?.etape).toBe("plan");
+    expect((await ouvrirLeRapport(ligne, plus))?.ecriture?.etape).toBe("plan");
     expect(lues).toHaveBeenCalledTimes(1);
 
     apres.length = 0;
@@ -99,7 +105,7 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
     /* L’accès arrive : ouvrir le rapport lance la mémoire (la réparation), toujours sans chapitre */
     const plus = { ...u, plan: "blushplus" as const };
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
-    const avecAcces = (await rapportDe((await histoireOuverte(plus, { affichee: imp.id }))!, plus))!;
+    const avecAcces = (await ouvrirLeRapport((await histoireOuverte(plus, { affichee: imp.id }))!, plus))!;
     expect(await tachesDe(imp.id, "memoire")).toEqual([{ status: "attente", error: null }]);
     expect(JSON.stringify(avecAcces)).not.toContain("Caché");
     apres.length = 0;

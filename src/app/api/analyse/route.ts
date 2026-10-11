@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
 import { erreur, lireCorps, repondre } from "@/server/http";

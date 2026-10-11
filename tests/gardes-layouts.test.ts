@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
 import { definirQui } from "@/server/histoires";

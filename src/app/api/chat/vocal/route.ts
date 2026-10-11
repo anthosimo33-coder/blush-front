@@ -1,5 +1,4 @@
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
+import { definirChatVocal } from "@/server/depot";
 import { erreur, lireCorps, repondre } from "@/server/http";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
@@ -10,6 +9,6 @@ export async function POST(req: Request) {
   if (g instanceof Response) return g;
   const mode = await lireCorps(req, ROUTES["POST /api/chat/vocal"].corps);
   if (!mode) return erreur("invalide");
-  await db().update(schema.stories).set({ chatVocal: mode.actif }).where(eq(schema.stories.id, g.story.id));
+  await definirChatVocal(g.story.id, mode.actif);
   return repondre("POST /api/chat/vocal", { modeVocal: mode.actif });
 }

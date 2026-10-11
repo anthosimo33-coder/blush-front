@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { migrationsSautees, sslPour, urlVerifiee } from "../scripts/base.mjs";
 
 /*
  * scripts/verifier-migrations.mjs, lancé avant chaque build et chaque `npm test` : sur une copie de drizzle/, un journal
@@ -97,5 +98,42 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
     expect(code).toBe(1);
     expect(sortie).toContain("schema.ts a changé sans sa migration");
     expect(sortie).toContain('CREATE UNIQUE INDEX "tasks_une_par_etape"');
+  });
+});
+
+/*
+ * Au build de la production, scripts/migrer.mjs refuse une migration que drizzle sauterait, et joint la base distante en
+ * vérifiant son certificat (scripts/base.mjs, sans base ici).
+ */
+describe("la migration de la production", () => {
+  const entree = (when: number, tag: string) => ({ when, tag });
+  const entrees = [entree(100, "0000_a"), entree(200, "0001_b"), entree(300, "0002_c")];
+
+  it("refuse une migration plus ancienne que la dernière appliquée, et jamais appliquée (rebasée derrière une autre)", () => {
+    expect(migrationsSautees(entrees, [100, 300])).toEqual([entree(200, "0001_b")]);
+    expect(migrationsSautees([...entrees, entree(250, "0003_rebasee")], [100, 200, 300])).toEqual([entree(250, "0003_rebasee")]);
+  });
+
+  it("laisse passer une base neuve, une base à jour, et ce qui est plus récent que la base", () => {
+    expect(migrationsSautees(entrees, [])).toEqual([]);
+    expect(migrationsSautees(entrees, [100, 200, 300])).toEqual([]);
+    expect(migrationsSautees(entrees, [100])).toEqual([]);
+  });
+
+  it("le journal du dépôt passe, appliqué dans l’ordre jusqu’à n’importe quelle migration", () => {
+    const { entries } = JSON.parse(readFileSync(join(__dirname, "../drizzle/meta/_journal.json"), "utf8")) as { entries: Entree[] };
+    const quand = entries.map((e) => e.when);
+    for (let n = 0; n <= quand.length; n++) expect(migrationsSautees(entries, quand.slice(0, n))).toEqual([]);
+  });
+
+  it("hors de la machine, vérifie le certificat de la base, quoi que dise l’URL (S-36)", () => {
+    const neon = "postgres://moi:secret@ep-exemple.eu-central-1.aws.neon.tech/neondb?sslmode=require";
+    expect(sslPour(neon)).toBe("verify-full");
+    expect(new URL(urlVerifiee(neon)).searchParams.get("sslmode")).toBe("verify-full");
+    expect(urlVerifiee(neon)).toContain("moi:secret@ep-exemple.eu-central-1.aws.neon.tech/neondb");
+    for (const locale of ["postgres://localhost:5432/blush_dev", "postgres://127.0.0.1/blush_test", "postgres://[::1]:5432/blush", "postgres://base.localhost/blush"]) {
+      expect(sslPour(locale), locale).toBe(false);
+      expect(urlVerifiee(locale), locale).toBe(locale);
+    }
   });
 });

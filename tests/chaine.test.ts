@@ -7,11 +7,14 @@ import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
 import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
 import { executerChaine } from "@/server/pipeline";
-import type { DonneesRapport } from "@/server/stockage/types";
+import type { DonneesRapport, DonneesVocal } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
-import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalPret, type DonneesVocal } from "@/server/vocal";
+import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalLu } from "@/server/vocal";
 import { convDeTest } from "./aide/fichiers";
 import { compteDeTest, convImportee, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
+
+/** Le vocal tel que l’affiche le front, s’il est fait (ce que le rapport en montre, par vocalLu). */
+const vocalPret = async (storyId: string) => (await vocalLu(storyId))?.pret ?? null;
 
 describe("import", () => {
   it("refuse une conv de groupe et une conv trop courte", async () => {

@@ -4,10 +4,10 @@
  * next.config.ts, les tests et les fichiers de configuration ; on y ajoute les entrées qu’ils ne voient pas : les scripts
  * (lancés à la main ou par package.json), la galerie (scripts/galerie, un projet Playwright à part), les serveurs des
  * tests de bout en bout et le module vide que vitest met à la place de server-only et client-only.
- * Un export qui ne sert qu’aux tests compte comme utilisé : un test le lit. Ce que knip ne voit pas, et qui attend un
- * autre lot :
- * - la colonne stories.status n’est jamais lue : sa migration est au lot 3 ;
- * - l’étiquette "01" de src/server/stats.ts : à retirer après un `select distinct task from ai_usage` en production.
+ * Un export qui ne sert qu’aux tests compte comme utilisé : un test le lit. Un tel export ne reste dans src que s’il dit
+ * une règle de l’appli (une fonction pure testée en table) ; une simple lecture pour les tests va dans le test, ou dans
+ * tests/aide. Ce que knip ne voit pas, et qui attend un autre lot : l’étiquette "01" de src/server/stats.ts, à retirer
+ * après un `select distinct task from ai_usage` en production.
  */
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",

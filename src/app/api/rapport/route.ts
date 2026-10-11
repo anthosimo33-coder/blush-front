@@ -1,19 +1,23 @@
 import { after } from "next/server";
-import { executerChaine } from "@/server/analyse";
-import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
+import { executerChaine } from "@/server/pipeline";
+import { ETAPES_DU_RAPPORT, ouvrirLeRapport, rapportDe, relancer } from "@/server/donnees";
 import { erreur, repondre } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { reprendre } from "@/server/taches";
 
 export const maxDuration = 300;
 
-/** Le rapport (ou le verdict seul, sans accès). `generating` : il s’écrit encore ; le front repasse dans quelques secondes. */
+/**
+ * Le rapport (ou le verdict seul, sans accès). `generating` : il s’écrit encore ; le front repasse dans quelques secondes.
+ * Ouvert (ouvrirLeRapport) : ce qui devait partir et ne l’a jamais été part maintenant (reparerLaChaine), comme à
+ * l’ouverture de la page.
+ */
 export async function GET() {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
   /* Les tâches coupées repartent pendant que le rapport se lit (pas avant) : relu toutes les 2 s pendant l’écriture */
-  const [, rapport] = await Promise.all([relancer(story.id), rapportDe(story, utilisateur)]);
+  const [, rapport] = await Promise.all([relancer(story.id), ouvrirLeRapport(story, utilisateur)]);
   return rapport ? repondre("GET /api/rapport", rapport) : erreur("pas_pret");
 }
 

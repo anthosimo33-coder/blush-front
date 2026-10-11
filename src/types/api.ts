@@ -130,7 +130,6 @@ type Reponses = {
   "DELETE /api/histoire": Ok;
   "POST /api/import": ConvImportee;
   /** null : pas de lien (ou plus). */
-  "GET /api/partage": { id: string | null };
   /** `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`). */
   "POST /api/partage": { id: string; verdict: VerdictMontre; v: string };
   "DELETE /api/partage": { id: null };
@@ -194,7 +193,6 @@ export const ROUTES = {
   "GET /api/histoire": {},
   "DELETE /api/histoire": {},
   "POST /api/import": { formulaire: true },
-  "GET /api/partage": {},
   "POST /api/partage": {},
   "DELETE /api/partage": {},
   "POST /api/partage/compte": {},

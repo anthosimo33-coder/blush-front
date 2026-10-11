@@ -1,15 +1,13 @@
 import { after } from "next/server";
 import { CLES, compter } from "@/server/compteurs";
 import { repondre, reponseErreur } from "@/server/http";
-import { arreterPartage, lienDe, partager, versionImage } from "@/server/partages";
-import { garde, lecture } from "@/server/requete";
+import { arreterPartage, partager, versionImage } from "@/server/partages";
+import { garde } from "@/server/requete";
 
-/* Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
-
-export async function GET() {
-  const g = await lecture({ session: "requise", histoire: true });
-  return g instanceof Response ? g : repondre("GET /api/partage", { id: await lienDe(g.story.id) });
-}
+/*
+ * Le lien de partage du verdict : le créer (POST, toujours le même), le désactiver (DELETE). La feuille de partage reçoit
+ * le lien en le créant : rien ne le relit.
+ */
 
 export async function POST(req: Request) {
   const g = await garde(req, { session: "requise", histoire: true });

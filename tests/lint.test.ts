@@ -21,14 +21,14 @@ async function regles(chemin: string, source: string) {
 describe("les règles du lint", { timeout: 60_000 }, () => {
   it("le navigateur ne lit pas le serveur : par l’alias, en chemin relatif ou par import(), d’un écran ou de tout composant", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
-    expect(await regles("src/app/rapport/Essai.tsx", `"use client";\nimport { db } from "../../server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    expect(await regles("src/app/rapport/Essai.tsx", `"use client";\nimport { rapportDe } from "../../server/donnees";\nexport const x = rapportDe;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
     expect(await regles("src/lib/essai.ts", `export const x = () => import("@/server/db");\n`)).toEqual(["no-restricted-syntax"]);
   });
 
   it("un `import type` du serveur, une page, ConvDeLaPage et next/server passent", async () => {
     expect(await regles("src/app/admin/Essai.tsx", `import type { Stats } from "@/server/stats";\nexport type S = Stats;\n`)).toEqual([]);
     expect(await regles("src/components/shell/ConvDeLaPage.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual([]);
-    expect(await regles("src/app/rapport/page.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual([]);
+    expect(await regles("src/app/rapport/page.tsx", `import { rapportDe } from "@/server/donnees";\nexport const x = rapportDe;\n`)).toEqual([]);
     expect(await regles("src/lib/essai.ts", `import { NextResponse } from "next/server";\nexport const x = NextResponse;\n`)).toEqual([]);
   });
 
@@ -68,19 +68,33 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/server/stats.ts", `export const x = () => import("./chiffres");\n`)).toEqual([]);
   });
 
-  it("le coffre chiffre ; les empreintes et les jetons restent libres ; les dernières exceptions gardent les autres règles", async () => {
+  it("le coffre chiffre, et lui seul ; les empreintes et les jetons restent libres", async () => {
     expect(await regles("src/server/coffre.ts", `import { chiffrer, dechiffrer } from "./chiffrement";\nexport const x = [chiffrer, dechiffrer];\n`)).toEqual([]);
     expect(await regles("src/server/stats.ts", `import { empreinte, jeton } from "./chiffrement";\nexport const x = [empreinte, jeton];\n`)).toEqual([]);
     expect(await regles("src/server/auth.ts", `import { empreinte, jeton, memeEmpreinte } from "./chiffrement";\nexport const x = [empreinte, jeton, memeEmpreinte];\n`)).toEqual([]);
-    /* Les trois routes du lot 3a, et elles seules : la liste d’attente et les messages ajoutés passent par le coffre */
-    expect(await regles("src/app/api/fiche/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([]);
-    expect(await regles("src/app/api/partage/image/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([]);
-    expect(await regles("src/app/api/vocal/chat/[id]/route.ts", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual([]);
+    /* Les trois dernières routes qui déchiffraient elles-mêmes passent par le dépôt : plus aucune exception */
+    expect(await regles("src/app/api/fiche/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/api/partage/image/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/api/vocal/chat/[id]/route.ts", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
     for (const chemin of ["src/server/attente.ts", "src/server/ajouts.ts", "src/app/api/vocal/audio/route.ts"]) {
       expect(await regles(chemin, `import { chiffrer } from "./chiffrement";\nexport const x = chiffrer;\n`), chemin).toEqual(["no-restricted-imports"]);
     }
     expect(await regles("src/server/coffre.ts", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/apercu/page.tsx", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual([]);
+  });
+
+  it("ni la base ni drizzle-orm dans src/app : les routes et les pages passent par src/server", async () => {
+    for (const chemin of ["src/app/api/rapport/route.ts", "src/app/ouvrir/[id]/route.ts", "src/app/rapport/page.tsx", "src/app/apercu/page.tsx"]) {
+      expect(await regles(chemin, `import { db } from "@/server/db";\nexport const x = db;\n`), chemin).toEqual(["no-restricted-imports"]);
+      expect(await regles(chemin, `import { eq } from "drizzle-orm";\nexport const x = eq;\n`), chemin).toEqual(["no-restricted-imports"]);
+      expect(await regles(chemin, `import { pgTable } from "drizzle-orm/pg-core";\nexport const x = pgTable;\n`), chemin).toEqual(["no-restricted-imports"]);
+    }
+    expect(await regles("src/app/api/rapport/route.ts", `import { schema } from "../../../server/db";\nexport const x = schema;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/api/rapport/route.ts", `import { users } from "@/server/db/schema";\nexport const x = users;\n`)).toEqual(["no-restricted-imports"]);
+    /* Le serveur, lui, lit la base ; une route garde ses autres modules (le dépôt, les données des écrans) */
+    expect(await regles("src/server/depot.ts", `import { eq } from "drizzle-orm";\nimport { db } from "./db";\nexport const x = [eq, db];\n`)).toEqual([]);
+    expect(await regles("src/app/api/rapport/route.ts", `import { ligneRapport } from "@/server/depot";\nexport const x = ligneRapport;\n`)).toEqual([]);
+    expect(await regles("src/app/api/rapport/route.ts", `import { dbg } from "@/server/dbg";\nexport const x = dbg;\n`)).toEqual([]);
   });
 
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {

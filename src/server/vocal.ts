@@ -6,16 +6,15 @@ import { minuter, texteDit } from "@/lib/vocal";
 import type { EvenementEcoute, VocalLigne, VocalRapport, Voix } from "@/types";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
+import { PREDICATS } from "./depot";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
 import { dire, voixPour } from "./ia/voix";
 
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
- * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres. La forme
- * du script gardé est dans le coffre (src/server/coffre.ts, DonneesVocal) ; les tests la lisent encore ici (à retirer
- * quand ils passeront par le coffre).
+ * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres (vocalLu). La
+ * forme du script gardé est dans src/server/stockage/types.ts (DonneesVocal), et le coffre la range par colonne.
  */
-export type { DonneesVocal } from "./coffre";
 
 /**
  * La version du script (prompt 06). Quand le prompt change, on l’augmente : les vocaux faits avant se refont à leur
@@ -69,14 +68,6 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
     .onConflictDoUpdate({ target: schema.vocals.storyId, set: valeurs });
 }
 
-/**
- * Le vocal tel que l’affiche le front, s’il est fait. L’adresse de l’audio change avec lui : un vocal refait n’est
- * jamais confondu avec l’ancien. (Le navigateur ne garde pas l’audio : voir reponseAudio, src/server/http.ts.)
- */
-export async function vocalPret(storyId: string): Promise<Extract<VocalRapport, { etat: "pret" }> | null> {
-  return (await vocalLu(storyId))?.pret ?? null;
-}
-
 /*
  * Safari lit un audio en deux requêtes coup sur coup (deux octets, puis le reste). L’instance garde donc un moment
  * l’audio des derniers vocaux lus, CHIFFRÉ comme en base (jamais en clair hors de la requête) : la seconde requête ne
@@ -115,7 +106,7 @@ export async function audioDuCompte(userId: string, storyId: string): Promise<{ 
     })
     .from(schema.stories)
     .leftJoin(schema.vocals, eq(schema.vocals.storyId, schema.stories.id))
-    .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, userId)));
+    .where(PREDICATS.convDuCompte(storyId, userId));
   if (!l) return null;
   if (!l.fait) return { audio: null };
   const chiffre = l.chiffre ?? garde?.chiffre;

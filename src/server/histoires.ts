@@ -15,6 +15,7 @@ import { empreinte, jeton } from "./chiffrement";
 import { ErreurPublique } from "./erreurs";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
+import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
 
 /** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
@@ -193,8 +194,8 @@ export const aSaConv = (ligne: LigneEcran | LigneComplete) => ("aConv" in ligne 
 /** L’identifiant d’une histoire (un uuid) : ce qui n’en a pas la forme ne va pas jusqu’à la base. */
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Une histoire du compte a-t-elle été lue (sa lecture lancée) ? Les tâches restent après coup : leur présence suffit. */
-const lue = sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.tasks.storyId} = ${schema.stories.id})`;
+/* Une histoire du compte a-t-elle été lue (sa lecture lancée) ? Les tâches restent après coup : leur présence suffit */
+const { lue, convDuCompte } = PREDICATS;
 
 /**
  * L’histoire ouverte.
@@ -213,17 +214,11 @@ export async function histoireOuverte(utilisateur: Utilisateur | null, { brouill
   /* La conv à l’écran : celle-là, ou rien (supprimée entre-temps, ou pas à ce compte). Jamais une autre à sa place */
   if (affichee && !parcours) {
     if (!UUID.test(affichee)) return null;
-    const [ligne] = await db()
-      .select(ECRAN)
-      .from(schema.stories)
-      .where(and(eq(schema.stories.id, affichee), eq(schema.stories.userId, utilisateur.id)));
+    const [ligne] = await db().select(ECRAN).from(schema.stories).where(convDuCompte(affichee, utilisateur.id));
     return ligne ?? null;
   }
   if (choisie && UUID.test(choisie)) {
-    const [ligne] = await db()
-      .select(ECRAN)
-      .from(schema.stories)
-      .where(and(eq(schema.stories.id, choisie), eq(schema.stories.userId, utilisateur.id)));
+    const [ligne] = await db().select(ECRAN).from(schema.stories).where(convDuCompte(choisie, utilisateur.id));
     if (ligne) return ligne;
   }
   const [ligne] = await db().select(ECRAN).from(schema.stories).where(eq(schema.stories.userId, utilisateur.id)).orderBy(desc(lue), desc(schema.stories.createdAt)).limit(1);

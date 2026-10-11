@@ -16,7 +16,7 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { definirQui } from "@/server/histoires";
 import { planifier } from "@/server/taches";

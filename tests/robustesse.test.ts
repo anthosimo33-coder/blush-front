@@ -12,7 +12,7 @@ import type { DonneesVerdict } from "@/server/analyse";
 import { compteDe, preparerCode, prendreCode, type Utilisateur } from "@/server/auth";
 import { dechiffrer, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { rapportDe } from "@/server/donnees";
+import { ouvrirLeRapport } from "@/server/donnees";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/histoires";
 import { REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
@@ -125,7 +125,7 @@ describe("l’accès donné après le verdict", () => {
     const id = await lue("06-elle-hesite.txt", gratuit);
     await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, gratuit.id));
     const plus = { ...gratuit, plan: "blushplus" as const };
-    const avant = await rapportDe(await ligneEnBase(id), plus);
+    const avant = await ouvrirLeRapport(await ligneEnBase(id), plus);
     expect(avant?.generating).toBe(true);
     await lancerApres();
     const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, id));

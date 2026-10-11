@@ -33,6 +33,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Un `/** */` documente la déclaration collée sous lui, et elle seule : c’est lui que montre le survol de l’éditeur. Un en-tête de fichier ou une remarque s’écrit en `/* */`.
 - Une décision produit en attente s’écrit `TODO(produit): …` dans le code ; `npm run todo` les liste.
 - Une route `/api` ou une variable d’environnement arrive avec sa ligne dans BACKEND.md : `tests/documentation.test.ts` échoue sinon.
+- Une route ou une page ne lit pas la base elle-même : elle passe par `src/server` (le dépôt `depot.ts`, les comptes `comptes.ts`, ou le module de son domaine). ESLint refuse `src/server/db` et `drizzle-orm` dans `src/app`.
+- Une migration s’écrit par `npm run db:generer`, jamais à la main, et se régénère après un rebase (ou une fusion) qui en apporte d’autres : sinon la production la sauterait (BACKEND.md, « Les migrations »).
 - Avant de rendre la main : `npm run check`. Il lance aussi les insécables et les caractères invisibles (`scripts/verifier-typo.mjs`), et le code mort (`npm run mort`, knip, `knip.jsonc`).
 
 ## Le glossaire du code

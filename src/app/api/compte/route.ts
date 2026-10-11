@@ -1,6 +1,5 @@
-import { eq } from "drizzle-orm";
+import { mettreEnPause, supprimerCompte } from "@/server/comptes";
 import { oublierCetAppareil } from "@/server/cookies";
-import { db, schema } from "@/server/db";
 import { compteDe } from "@/server/donnees";
 import { erreur, lireCorps, OUBLIER_LE_NAVIGATEUR, repondre } from "@/server/http";
 import { garde, lecture } from "@/server/requete";
@@ -17,7 +16,7 @@ export async function POST(req: Request) {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const paused = (await lireCorps(req, ROUTES["POST /api/compte"].corps))?.paused === true;
-  await db().update(schema.users).set({ paused }).where(eq(schema.users.id, g.utilisateur.id));
+  await mettreEnPause(g.utilisateur.id, paused);
   return repondre("POST /api/compte", { ok: true });
 }
 
@@ -36,7 +35,7 @@ export async function DELETE(req: Request) {
     await oublierCetAppareil();
     return erreur("connexion", OUBLIER_LE_NAVIGATEUR);
   }
-  await db().delete(schema.users).where(eq(schema.users.id, g.utilisateur.id));
+  await supprimerCompte(g.utilisateur.id);
   await oublierCetAppareil();
   return repondre("DELETE /api/compte", { ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
 }
