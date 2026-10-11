@@ -1,6 +1,6 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
-import { erreur, json, memeOrigine } from "@/server/http";
+import { erreur, memeOrigine, repondre } from "@/server/http";
 import { ErreurImport } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -23,7 +23,7 @@ async function traiter(req: Request) {
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("lots");
     if (permis !== "ok") return erreur(permis);
-    return json({ lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });
+    return repondre("POST /api/captures/lot", { lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });
   } catch (e) {
     if (e instanceof ErreurImport) return erreur(e.code);
     throw e;

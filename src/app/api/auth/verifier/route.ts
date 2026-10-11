@@ -1,9 +1,13 @@
 import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
 import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { brouillonALaConnexion } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { ROUTES } from "@/types/api";
+
+/* Le corps du contrat, l’email vérifié comme à la demande du code */
+const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
 
 /**
  * Le code reçu par email, tapé dans le navigateur qui l’a demandé (son cookie) : bon, il ouvre la session. La conv importée
@@ -15,17 +19,16 @@ import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
   if (!(await sousLaLimite(`verif:${ipDe(req)}`, LIMITES.verificationParIp))) return erreur("trop");
-  const b = await corps<{ email: string; code: string }>(req);
-  const email = Email.safeParse(b.email);
-  if (!email.success || typeof b.code !== "string") return json({ ok: false });
+  const b = await lireCorps(req, Corps);
+  if (!b) return repondre("POST /api/auth/verifier", { ok: false });
   /* Le code d’abord : sans le bon, la réponse est la même, invité ou pas (un email hors de la bêta n’en reçoit jamais) */
-  const essai = await prendreCode(email.data, b.code.trim(), await lireNavigateur());
+  const essai = await prendreCode(b.email, b.code.trim(), await lireNavigateur());
   if (essai === "essais") return erreur("essais");
-  if (essai === "faux") return json({ ok: false });
+  if (essai === "faux") return repondre("POST /api/auth/verifier", { ok: false });
   await effacerNavigateur();
   /* Bêta fermée : un email retiré de la liste après l’envoi de son code (seul celui qui a le code l’apprend) */
-  if (!peutEntrer(email.data)) return erreur("beta");
-  const utilisateur = await compteDe(email.data);
+  if (!peutEntrer(b.email)) return erreur("beta");
+  const utilisateur = await compteDe(b.email);
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);
   const rattachee = await brouillonALaConnexion(utilisateur, await lireBrouillon());
@@ -33,5 +36,5 @@ export async function POST(req: Request) {
     await effacerBrouillon();
     await poserChoisie(rattachee);
   }
-  return json({ ok: true, email: utilisateur.email });
+  return repondre("POST /api/auth/verifier", { ok: true, email: utilisateur.email });
 }

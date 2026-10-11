@@ -6,7 +6,7 @@ import { delai } from "@/lib/motion";
 import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useRapport } from "@/lib/requetes";
-import type { ReportPayload } from "@/services/api";
+import type { ReportPayload } from "@/types/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";

@@ -3,17 +3,18 @@ import type { Ajout } from "@prompts/lib/ajouts";
 import { depuisCaptures, depuisExport, ErreurAjout, resumeAjout } from "@/server/ajouts";
 import { executerChaine } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
-import { historique, repondre } from "@/server/chat";
+import { historique, repondre as blushRepond } from "@/server/chat";
 import { contexteRequete, memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, ErreurImport } from "@/server/histoires";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { peut } from "@/lib/acces";
 import type { EvenementChat } from "@/types";
+import { ROUTES } from "@/types/api";
 import { codePublic } from "@/types/erreurs-api";
 
 /*
@@ -30,8 +31,8 @@ type Envoi = { texte: string; captures: File[]; export: File | null; vocal: File
 /** Ce qu’il envoie : du texte (JSON), ou un formulaire avec des captures, un export ou un vocal. */
 async function lireEnvoi(req: Request): Promise<Envoi | null> {
   if (!req.headers.get("content-type")?.startsWith("multipart/form-data")) {
-    const { texte } = await corps<{ texte: string }>(req);
-    return typeof texte === "string" ? { texte: texte.trim(), captures: [], export: null, vocal: null } : null;
+    const lu = await lireCorps(req, ROUTES["POST /api/chat"].corps);
+    return lu ? { texte: lu.texte.trim(), captures: [], export: null, vocal: null } : null;
   }
   const fd = await req.formData().catch(() => null);
   if (!fd) return null;
@@ -156,12 +157,12 @@ async function traiter(req: Request) {
     }
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
-      const r = await repondre(story, memoire, dit, ajout, { parVocal: !!envoi.vocal });
+      const r = await blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal });
       if (r.majMemoire) after(() => executerChaine(story.id));
-      return json(r.reponse);
+      return repondre("POST /api/chat", r.reponse);
     }
     /* Le suivi des coûts attend la fin de la réponse */
-    return await enFlux(story.id, (surEvenement) => repondre(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
+    return await enFlux(story.id, (surEvenement) => blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
   } catch (e) {
     if (e instanceof ErreurAjout) return erreur(e.code);
     if (e instanceof ErreurImport) return erreur("fichier");
@@ -179,7 +180,7 @@ export async function GET(req: Request) {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion");
   const avant = Number(new URL(req.url).searchParams.get("avant"));
-  return json(story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
+  return repondre("GET /api/chat", story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
 }
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { prolongerSession } from "@/server/auth";
 import { lireSession, poserSession } from "@/server/cookies";
 import { db } from "@/server/db";
-import { json } from "@/server/http";
+import { repondre } from "@/server/http";
 
 /*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes
@@ -17,8 +17,8 @@ export async function GET() {
     const secret = await lireSession();
     const fin = secret ? await prolongerSession(secret) : null;
     if (secret && fin) await poserSession(secret, fin);
-    return json({ ok: true });
+    return repondre("GET /api/reveil", { ok: true });
   } catch {
-    return json({ ok: false }, 503);
+    return repondre("GET /api/reveil", { ok: false }, 503);
   }
 }

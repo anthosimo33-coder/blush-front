@@ -1,6 +1,6 @@
 import "server-only";
 import type { ConvSummary, Fiche, Story } from "@/types";
-import type { Account, HistoriqueChat, ReportPayload } from "./api";
+import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, contexteRequete, convsDe, ficheDe, finDeLecture, questionsDe, rapportDe, storyCourante, utilisateurCourant } from "@/server/donnees";

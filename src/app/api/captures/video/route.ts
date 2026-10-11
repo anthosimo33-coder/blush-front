@@ -4,10 +4,11 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { cleEnvoi, enTexte, ErreurCaptures, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { fusionnerLots } from "@/server/video";
+import { ROUTES } from "@/types/api";
 
 /*
  * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
@@ -29,9 +30,9 @@ const Lot = Sortie01.extend({
   profil: z.array(z.string().max(1000)).max(50),
   doutes: z.array(z.string().max(1000)).max(50),
 });
-const Envoi = z
-  /* `cle` : celle de l’envoi, pour qu’un nouvel essai après une coupure retrouve l’histoire déjà créée */
-  .object({ app: AppliCaptures, lots: z.array(Lot).min(1).max(40), cle: z.string().max(64).optional() })
+/* Le corps du contrat (src/types/api.ts, sa `cle` comprise), resserré : une appli de captures, des lots bornés */
+const Envoi = ROUTES["POST /api/captures/video"].corps
+  .extend({ app: AppliCaptures, lots: z.array(Lot).min(1).max(40) })
   .refine(({ lots }) => {
     const blocs = lots.flatMap((l) => l.blocs);
     const messages = blocs.flatMap((b) => b.messages);
@@ -50,9 +51,9 @@ export async function POST(req: Request) {
   /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
   const permis = await lecturePermise(null);
   if (permis !== "ok") return erreur(permis);
-  const envoi = Envoi.safeParse(await corps(req));
-  if (!envoi.success) return erreur("fichier");
-  const { app, lots, cle } = envoi.data;
+  const envoi = await lireCorps(req, Envoi);
+  if (!envoi) return erreur("fichier");
+  const { app, lots, cle } = envoi;
   try {
     const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
       const t = enTexte(fusionnerLots(lots, app));
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     });
     await poserBrouillon(lu.secret);
     const story = storyAffichee(lu.id, lu.meta);
-    return json({ source: story.sources[0], messagesRead: lu.messages, story });
+    return repondre("POST /api/captures/video", { source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
     if (e instanceof ErreurCaptures) return erreur("capture");
     if (e instanceof ErreurImport) return erreur(e.code);

@@ -2,7 +2,7 @@
 
 /* Petit cache de lecture autour de src/services/api.ts (pas de dépendance externe). */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Account, ReportPayload } from "@/services/api";
+import type { Account, ReportPayload } from "@/types/api";
 import type { Fiche } from "@/types";
 
 /**

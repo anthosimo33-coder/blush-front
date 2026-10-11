@@ -1,21 +1,14 @@
 import { and, asc, eq, gt } from "drizzle-orm";
-import { z } from "zod";
 import type { DonneesRapport } from "@/server/analyse";
 import { carteMoment, carteReponse } from "@/server/carte-partage";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { contexteRequete } from "@/server/donnees";
-import { erreur, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { masqueDe } from "@/server/partages";
 import type { BlushAnswer, Chapter } from "@/types";
-
-const Cible = z.discriminatedUnion("type", [
-  /* Une réponse de BLUSH dans le chat : l’échange (l’id de ton message) */
-  z.object({ type: z.literal("reponse"), echange: z.number().int().positive() }),
-  /* La chute d’un chapitre du rapport : le chapitre, et la place du bloc dedans */
-  z.object({ type: z.literal("moment"), chapitre: z.number().int().min(1).max(20), bloc: z.number().int().min(0).max(80) }),
-]);
+import { ROUTES } from "@/types/api";
 
 /**
  * « Partager en image » : un moment de BLUSH (une réponse du chat, la chute d’un chapitre) dessiné en story.
@@ -28,10 +21,10 @@ export async function POST(req: Request) {
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");
   if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop");
-  const cible = Cible.safeParse(await req.json().catch(() => null));
-  if (!cible.success) return erreur("cible");
+  /* Une réponse du chat (son échange) ou la chute d’un chapitre (sa place) : CibleImage, src/types/api.ts */
+  const c = await lireCorps(req, ROUTES["POST /api/partage/image"].corps);
+  if (!c) return erreur("cible");
   const masquer = masqueDe(story);
-  const c = cible.data;
 
   if (c.type === "reponse") {
     const [toi] = await db()

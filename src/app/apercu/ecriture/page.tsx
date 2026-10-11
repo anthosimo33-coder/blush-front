@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres";
-import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
+import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
 import { ReportScreen } from "../../rapport/ReportScreen";
 import { AUTRE, REPORT as report, STORY as story } from "./exemple";
 

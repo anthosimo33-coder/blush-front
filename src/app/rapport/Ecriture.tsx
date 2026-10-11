@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { useEnVue } from "@/lib/hooks";
-import type { EcritureRapport, EtatChapitre } from "@/services/api";
+import type { EcritureRapport, EtatChapitre } from "@/types/api";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 

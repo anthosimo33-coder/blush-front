@@ -13,7 +13,8 @@ import { peut } from "@/lib/acces";
 import { setQueryData } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import { messageErreur } from "@/lib/messages-erreur";
-import { relancerRapport, type ReportPayload } from "@/services/api";
+import { relancerRapport } from "@/services/api";
+import type { CibleImage, ReportPayload } from "@/types/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -35,7 +36,6 @@ import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { PartageEtConfidentialite } from "./PartageVerdict";
-import type { CibleImage } from "@/services/api";
 import { VocalDuRapport } from "./Vocal";
 
 /* Ce qui ne sert pas à chaque lecture (le mode sobre, l’écriture en cours, « Partager en image ») est chargé à part, quand il sert */

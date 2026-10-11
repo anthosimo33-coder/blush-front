@@ -6,14 +6,19 @@ import { lireBrouillon, poserNavigateur } from "@/server/cookies";
 import { emailCanonique } from "@/server/email-canonique";
 import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { ipDe, LIMITES, limiteAtteinte, sousLaLimite } from "@/server/limites";
+import { ROUTES } from "@/types/api";
+
+/* Le corps du contrat, l’email vérifié (Email : sa forme, en minuscules) */
+const Corps = ROUTES["POST /api/auth/code"].corps.extend({ email: Email });
 
 /** Le code de connexion, envoyé par email. Il ne vaudra que dans ce navigateur (son cookie, posé ici). */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
-  const email = Email.safeParse((await corps<{ email: string }>(req)).email);
-  if (!email.success) return erreur("email");
+  const lu = await lireCorps(req, Corps);
+  if (!lu) return erreur("email");
+  const { email } = lu;
   /*
    * Les mêmes limites pour tous : un « trop » ne dit pas si l’email est invité. Par adresse IP ; puis par email canonique
    * (ses alias comptent avec lui) : ses essais ratés du jour (un code de plus n’y pourrait rien, et ne ferait que
@@ -21,7 +26,7 @@ export async function POST(req: Request) {
    * demande pour l’email d’un autre lui en laisse), puis de partout ; enfin le plafond des mails du jour, pour tous.
    */
   const ip = ipDe(req);
-  const canonique = emailCanonique(email.data);
+  const canonique = emailCanonique(email);
   if (!(await sousLaLimite(`code:ip:${ip}`, LIMITES.codeParIp))) return erreur("trop");
   if (await limiteAtteinte(`code:echecs:${canonique}`, LIMITES.echecsCodeParEmail)) return erreur("essais");
   if (!(await sousLaLimite(`code:email-ip:${canonique}:${ip}`, LIMITES.codeParEmailEtIp))) return erreur("codes");
@@ -29,7 +34,7 @@ export async function POST(req: Request) {
   if (await mailsDeCodeEpuises()) return erreur("codes");
   const navigateur = await poserNavigateur();
   const brouillon = await lireBrouillon();
-  const invite = peutEntrer(email.data);
+  const invite = peutEntrer(email);
   /*
    * Bêta fermée : la même réponse pour tous (« regarde tes mails »), pour que personne ne puisse savoir si un email est
    * invité. Tout ce qui en dépend se fait après la réponse : elle a le même temps, et un mail qui ne part pas ne la change
@@ -39,15 +44,15 @@ export async function POST(req: Request) {
    */
   after(async () => {
     try {
-      const code = await preparerCode(email.data, navigateur, { envoye: invite });
+      const code = await preparerCode(email, navigateur, { envoye: invite });
       if (invite) {
-        if (code) await envoyerCode(email.data, code);
+        if (code) await envoyerCode(email, code);
         return;
       }
       const conv = await histoireOuverte(null, { brouillon });
       if (conv) await supprimerHistoire(conv.id);
       /* Le mail de la liste suit le même rythme qu’un code : pas un par demande */
-      if (code) await inscrire(email.data, "connexion", { convEffacee: !!conv });
+      if (code) await inscrire(email, "connexion", { convEffacee: !!conv });
     } catch (e) {
       /* Le message d’une erreur SQL peut contenir l’email : seul son nom va aux logs, et rien de lui à l’alerte */
       console.error("code de connexion : la demande n’a pas abouti après la réponse", (e as Error).name);
@@ -55,5 +60,5 @@ export async function POST(req: Request) {
       if (invite) await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", "Erreur : la base"]);
     }
   });
-  return json({ email: email.data });
+  return repondre("POST /api/auth/code", { email });
 }

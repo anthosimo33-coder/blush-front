@@ -2,7 +2,7 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { cleEnvoi, ErreurCaptures, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, json, memeOrigine } from "@/server/http";
+import { erreur, memeOrigine, repondre } from "@/server/http";
 import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -39,7 +39,7 @@ async function traiter(req: Request) {
     });
     await poserBrouillon(lu.secret);
     const story = storyAffichee(lu.id, lu.meta);
-    return json({ source: story.sources[0], messagesRead: lu.messages, story });
+    return repondre("POST /api/captures", { source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
     if (e instanceof LectureRefusee) return erreur(e.code);
     if (e instanceof ErreurCaptures) return erreur("capture");

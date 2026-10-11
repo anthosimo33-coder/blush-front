@@ -1,26 +1,15 @@
 import { after } from "next/server";
-import { z } from "zod";
 import { executerChaine } from "@/server/analyse";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { contexteRequete, progression, relancer } from "@/server/donnees";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES, sousLaLimite } from "@/server/limites";
-import { PRENOM_MAX } from "@/lib/limites";
 import { etatDesTaches, planifier } from "@/server/taches";
-import { GOALS, GUESSES, PRONOMS } from "@/types";
+import { Qui } from "@/types/api";
 
 /* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
 export const maxDuration = 300;
-
-const Qui = z.object({
-  me: z.enum(["p0", "p1"]),
-  pronom: z.enum(PRONOMS),
-  guess: z.enum(GUESSES),
-  goal: z.enum(GOALS),
-  /** Des captures : son prénom (il n’y est que « Moi ») */
-  prenom: z.string().trim().min(1).max(PRENOM_MAX).optional(),
-});
 
 /**
  * Lance la lecture : « Qui es-tu ? » est rempli, le verdict part. Relancer ne refait rien de ce qui est fait.
@@ -30,12 +19,13 @@ const Qui = z.object({
  */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
-  const qui = Qui.safeParse(await corps(req));
-  const { utilisateur, story } = await contexteRequete(qui.success);
+  /* « Qui es-tu ? », ou rien : un corps qui ne le suit pas (`{}`, l’écran de lecture) est une relance */
+  const qui = await lireCorps(req, Qui);
+  const { utilisateur, story } = await contexteRequete(!!qui);
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");
   /* Une relance (l’écran de lecture, un autre onglet) : « Qui es-tu ? » est déjà en base. Pas rempli : /qui d’abord */
-  if (!qui.success && !quiRempli(metaDe(story))) return erreur("qui");
+  if (!qui && !quiRempli(metaDe(story))) return erreur("qui");
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
     /* Chaque lecture coûte : un nombre de nouvelles convs par jour et par compte, et quelques relances après un échec */
@@ -46,11 +36,11 @@ export async function POST(req: Request) {
       await effacerBrouillon();
     }
     await poserChoisie(story.id);
-    if (qui.success) await definirQui(story.id, { moi: qui.data.me === "p0" ? 0 : 1, pronom: qui.data.pronom, devinette: qui.data.guess, objectif: qui.data.goal, ...(qui.data.prenom ? { prenom: qui.data.prenom } : {}) });
+    if (qui) await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
     await planifier(story.id, "verdict");
   }
   after(() => executerChaine(story.id));
-  return json({ ok: true });
+  return repondre("POST /api/analyse", { ok: true });
 }
 
 /** La progression de la lecture. Relance au passage une tâche abandonnée. */
@@ -59,5 +49,5 @@ export async function GET() {
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");
   await relancer(story.id);
-  return json(await progression(story));
+  return repondre("GET /api/analyse", await progression(story));
 }

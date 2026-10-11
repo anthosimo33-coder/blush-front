@@ -1,6 +1,6 @@
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, json, memeOrigine } from "@/server/http";
+import { erreur, memeOrigine, repondre } from "@/server/http";
 import { depuisFichier, depuisPaquet, ErreurImport, importer, storyAffichee } from "@/server/histoires";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     await poserBrouillon(secret);
     await compterImportVenuDuPartage();
     const story = storyAffichee(id, meta);
-    return json({ source: story.sources[0], story });
+    return repondre("POST /api/import", { source: story.sources[0], story });
   } catch (e) {
     if (e instanceof ErreurImport) return erreur(e.code);
     throw e;

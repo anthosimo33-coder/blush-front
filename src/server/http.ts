@@ -1,10 +1,23 @@
 import "server-only";
+import type { z } from "zod";
+import type { CleJson, ReponseErreur, Routes } from "@/types/api";
 import { ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 
-/* Les réponses des routes /api : du JSON, et des erreurs qui ne disent jamais rien d’interne. */
-export const json = (corps: unknown, status = 200, entetes: Record<string, string> = {}) => Response.json(corps, { status, headers: { "cache-control": "no-store", ...entetes } });
+/*
+ * Les réponses des routes /api : du JSON, celui que dit leur ligne du contrat (src/types/api.ts), et des erreurs qui ne
+ * disent jamais rien d’interne.
+ */
+const json = (corps: unknown, status: number, entetes: Record<string, string>) => Response.json(corps, { status, headers: { "cache-control": "no-store", ...entetes } });
+
+/**
+ * La réponse d’une route, sous le type de sa ligne du contrat (Routes, src/types/api.ts) : le compilateur vérifie
+ * qu’elle le suit, et le navigateur la lit sous ce même type (appel, src/services/api.ts). La clé nomme la route qui
+ * répond : tests/unit/contrat.test.ts vérifie que c’est bien la sienne.
+ */
+export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse"], status = 200, entetes: Record<string, string> = {}) => json(corps, status, entetes);
+
 /** Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. */
-export const erreur = (code: CodeErreur) => json({ erreur: code }, ERREURS_API[code]);
+export const erreur = (code: CodeErreur) => json({ erreur: code } satisfies ReponseErreur, ERREURS_API[code], {});
 
 /**
  * Fait oublier au navigateur ce qu’il garde de BLUSH : son cache, et son stockage (où tu t’étais arrêté dans le rapport,
@@ -25,13 +38,20 @@ export function memeOrigine(req: Request): boolean {
   }
 }
 
-/** Lit un corps JSON sans faire planter la route. */
-export async function corps<T = Record<string, unknown>>(req: Request): Promise<Partial<T>> {
+/**
+ * Le corps JSON d’une requête, vérifié par un schéma (celui de sa ligne du contrat, src/types/api.ts, que la route peut
+ * resserrer) : null s’il n’est pas du JSON ou ne le suit pas. La route répond alors son propre code (texte, email,
+ * invalide…), ou fait sans (une relance, une déconnexion de cet appareil seulement).
+ */
+export async function lireCorps<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S> | null> {
+  let brut: unknown;
   try {
-    return (await req.json()) as Partial<T>;
+    brut = await req.json();
   } catch {
-    return {};
+    return null;
   }
+  const lu = schema.safeParse(brut);
+  return lu.success ? lu.data : null;
 }
 
 /**

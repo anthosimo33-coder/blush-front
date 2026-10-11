@@ -1,31 +1,12 @@
 /*
  * Couche de service BLUSH, dans le navigateur : le seul point de contact avec les données, par les routes /api du
- * back-end. Les cookies de session sont httpOnly : le navigateur les envoie, il ne les lit pas. Les pages serveur
- * passent par serveur.ts.
+ * back-end, sous les types de leur contrat (src/types/api.ts). Les cookies de session sont httpOnly : le navigateur les
+ * envoie, il ne les lit pas. Les pages serveur passent par serveur.ts.
  */
-import type {
-  AnalysisProgress,
-  AppKind,
-  BlushAnswer,
-  BulleChat,
-  Echec,
-  EvenementChat,
-  EvenementEcoute,
-  Fiche,
-  FicheFact,
-  FicheUpdate,
-  Goal,
-  Guess,
-  Plan,
-  Pronom,
-  QuestionAnswer,
-  Report,
-  SoberReport,
-  Source,
-  Subscription,
-  VocalRapport,
-} from "@/types";
-import { ErreurApi, type CodeErreur } from "@/types/erreurs-api";
+import type { AnalysisProgress, AppKind, BlushAnswer, BulleChat, EvenementChat, EvenementEcoute, Fiche, FicheFact, FicheUpdate, Goal, Guess, Plan, Pronom, QuestionAnswer, Source, Subscription } from "@/types";
+/* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
+import type { Account, AvanceVideo, CibleImage, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
+import { ErreurApi } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
 import { preparerCaptures } from "./preparer-captures";
@@ -42,47 +23,12 @@ const pVideo = () => import("./preparer-video");
 export const prechargerExport = () => void pExport().catch(() => {});
 export const prechargerVideo = () => void pVideo().catch(() => {});
 
-export type Account = {
-  email: string | null;
-  subscription: Subscription;
-  storyDeleted: boolean;
-};
-
-/** Un chapitre pendant l’écriture du rapport : en attente, en train de s’écrire, ou prêt. */
-export type EtatChapitre = "attente" | "en_cours" | "ecrit";
-/** Pendant que le rapport s’écrit : la vraie avancée, lue sur ce que le modèle écrit. */
-export type EcritureRapport = {
-  etape: "plan" | "chapitres";
-  /** De 0 à 1 : le plan jusqu’à 0,3, puis les chapitres. */
-  progres: number;
-  chapitres: { number: number; title: string; etat: EtatChapitre }[];
-  /** Le temps qui reste, estimé (« 1 min »), ou null tant qu’on ne sait pas. */
-  restant: string | null;
-};
-
-export type ReportPayload = {
-  report: Report;
-  /** Le mode sobre : présent quand la conv lève une alerte de danger (détresse, mineur), le rapport court et doux. */
-  sober: SoberReport | null;
-  access: Plan;
-  /** Le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
-  generating?: boolean;
-  /** Pendant l’écriture : où en est BLUSH, chapitre par chapitre. */
-  ecriture?: EcritureRapport;
-  /** Le vocal de BLUSH, en haut du rapport : prêt, ou en train de s’enregistrer. */
-  vocal?: VocalRapport;
-  /** L’écriture a échoué pour de bon (la panne : on peut la relancer ; le refus du modèle : rien à relancer). */
-  echec?: Echec;
-};
-
-/** Un morceau de l’historique du chat (du plus ancien au plus récent), et s’il en reste de plus anciens. */
-export type HistoriqueChat = { echanges: { id: number; mine: string; answer: BlushAnswer; at: number }[]; plus: boolean; modeVocal?: boolean };
-
-/**
- * Où en est la lecture d’un enregistrement d’écran : la vidéo regardée dans le navigateur, puis ses lots lus par BLUSH.
- * « reprise » : le réseau a coupé pendant un envoi de captures ou d’enregistrement, il repart (voir avecReprise).
+/*
+ * Les types du réseau vivent dans src/types/api.ts. Repris ici pour les modules qui les lisent encore à cette adresse
+ * (l’accueil, src/server/donnees.ts, src/lib/requetes.ts, « Mon compte », « Partager », l’import de captures) : ces
+ * reprises partent au lot 9a.
  */
-export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number } | { etape: "reprise" };
+export type { Account, AvanceVideo, CibleImage, EcritureRapport, EtatChapitre, HistoriqueChat, ReportPayload, VerdictMontre } from "@/types/api";
 
 /** Le chat : la réponse n’est pas arrivée en entier (le réseau a coupé, ou une erreur après des bulles). Les bulles déjà reçues, peut-être aucune. */
 export class CoupureChat extends Error {
@@ -102,11 +48,42 @@ function avecConv(entetes?: HeadersInit): Headers {
   return h;
 }
 
-async function appel<T>(chemin: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(chemin, { credentials: "same-origin", cache: "no-store", ...init, headers: avecConv(init.headers) });
-  const corps = (await r.json().catch(() => ({}))) as { erreur?: CodeErreur };
+/** Ce qu’un appel ajoute à sa requête : sa recherche (`?avant=…`), keepalive (elle part même si la page se ferme), un signal pour l’arrêter. */
+type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal };
+
+/** Ce qu’un appel à la route K prend : son corps, quand sa ligne du contrat en reçoit un (un objet JSON, ou un formulaire). */
+type ArgumentsDe<K extends CleRoute> = [Routes[K]["corps"]] extends [never] ? [options?: Options & { corps?: never }] : [options: Options & { corps: Routes[K]["corps"] }];
+
+/** La requête d’une route du contrat : sa clé dit la méthode et l’adresse. Un corps JSON part en JSON, un formulaire tel quel. */
+function requete<K extends CleRoute>(cle: K, options: Options & { corps?: Routes[K]["corps"] } = {}, entetes?: HeadersInit): Promise<Response> {
+  const [method, chemin] = cle.split(" ");
+  const { corps, recherche, keepalive, signal } = options;
+  const h = avecConv(entetes);
+  if (corps !== undefined && !(corps instanceof FormData)) h.set("content-type", "application/json");
+  return fetch(recherche ? `${chemin}?${recherche}` : chemin, {
+    method,
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: h,
+    ...(corps === undefined ? {} : { body: corps instanceof FormData ? corps : JSON.stringify(corps) }),
+    ...(keepalive ? { keepalive } : {}),
+    ...(signal ? { signal } : {}),
+  });
+}
+
+/**
+ * Le corps JSON d’une réponse de la route K : ce que dit sa ligne du contrat, ou `{ erreur }` ; `{}` sans JSON (un
+ * serveur qui tombe, une page d’erreur). Le seul endroit où le navigateur croit le serveur sur parole, sans le revérifier
+ * (zod n’entre pas dans ses pages) : le serveur répond sous le même type (repondre, src/server/http.ts).
+ */
+const corpsDe = <K extends CleRoute>(r: Response): Promise<Routes[K]["reponse"] & Partial<ReponseErreur>> => r.json().catch(() => ({}));
+
+/** Un appel à une route du contrat qui répond du JSON : sa réponse, ou une ErreurApi avec son code. Un audio, une image : requete. */
+async function appel<K extends CleJson>(cle: K, ...[options]: ArgumentsDe<K>): Promise<Routes[K]["reponse"]> {
+  const r = await requete(cle, options);
+  const corps = await corpsDe<K>(r);
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
-  return corps as T;
+  return corps;
 }
 
 /**
@@ -115,21 +92,19 @@ async function appel<T>(chemin: string, init: RequestInit = {}): Promise<T> {
  * par `suivi` (sans `suivi.vocal`, on cesse de lire : le serveur finit seul). Une erreur avant que BLUSH écrive :
  * ErreurApi, comme les autres appels. Le réseau qui coupe, ou une erreur après des bulles : CoupureChat.
  */
-async function chat(init: RequestInit, suivi: SuiviChat = {}): Promise<BlushAnswer> {
+async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat = {}): Promise<BlushAnswer> {
   const recues: BulleChat[] = [];
   let r: Response;
   try {
-    const entetes = avecConv(init.headers);
-    entetes.set("accept", "application/x-ndjson");
-    r = await fetch("/api/chat", { credentials: "same-origin", cache: "no-store", ...init, headers: entetes });
+    r = await requete("POST /api/chat", { corps }, { accept: "application/x-ndjson" });
   } catch {
     throw new CoupureChat(recues);
   }
   /* Une erreur avant que BLUSH écrive, ou un serveur d’avant le flux (pendant une mise en ligne) : la réponse d’un bloc */
   if (!r.ok || !r.body || !r.headers.get("content-type")?.includes("ndjson")) {
-    const corps = (await r.json().catch(() => ({}))) as BlushAnswer & { erreur?: CodeErreur };
-    if (!r.ok || !("kind" in corps)) throw new ErreurApi(corps.erreur ?? "erreur", r.ok ? 500 : r.status);
-    return corps;
+    const reponse = await corpsDe<"POST /api/chat">(r);
+    if (!r.ok || !("kind" in reponse)) throw new ErreurApi(reponse.erreur ?? "erreur", r.ok ? 500 : r.status);
+    return reponse;
   }
   const lecteur = r.body.getReader();
   return new Promise<BlushAnswer>((resoudre, rejeter) => {
@@ -169,11 +144,6 @@ async function chat(init: RequestInit, suivi: SuiviChat = {}): Promise<BlushAnsw
     })();
   });
 }
-
-const envoi = (methode: "POST" | "DELETE", corps?: unknown): RequestInit => ({
-  method: methode,
-  ...(corps === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(corps) }),
-});
 
 /** Des captures (réduites dans le navigateur, sous « captures ») ou un export (compressé, sous « export ») dans le formulaire. */
 async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
@@ -250,7 +220,7 @@ export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]
     if (id == null) throw new ErreurApi("annule", 0);
     fd.append("export", await pret.paquetDe(id), "export.json.gz");
   }
-  return (await appel<{ source: Source }>("/api/import", { method: "POST", body: fd })).source;
+  return (await appel("POST /api/import", { corps: fd })).source;
 }
 
 /**
@@ -268,7 +238,7 @@ export async function uploadScreenshots(files: File[], opts: { app: AppKind; mod
   fd.append("mode", opts.mode);
   fd.append("cle", cleEnvoi());
   return avecReprise(
-    () => appel<{ source: Source; messagesRead: number }>("/api/captures", { method: "POST", body: fd }),
+    () => appel("POST /api/captures", { corps: fd }),
     () => opts.onAvance?.({ etape: "reprise" }),
   );
 }
@@ -303,7 +273,7 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
     const fd = new FormData();
     lots[k].forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
     fd.append("app", app);
-    return (await appel<{ lot: unknown }>("/api/captures/lot", { method: "POST", body: fd, signal: arret.signal })).lot;
+    return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   const lecteur = async () => {
     while (suivant < lots.length && !arret.signal.aborted) {
@@ -325,9 +295,9 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
   };
   await Promise.all(Array.from({ length: Math.min(LECTEURS, lots.length) }, lecteur));
   /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
-  const corps = envoi("POST", { app, lots: lus, cle: cleEnvoi() });
+  const corps = { app, lots: lus, cle: cleEnvoi() };
   return avecReprise(
-    () => appel<{ source: Source; messagesRead: number }>("/api/captures/video", corps),
+    () => appel("POST /api/captures/video", { corps }),
     () => onAvance?.({ etape: "reprise" }),
   );
 }
@@ -336,12 +306,12 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
 
 /** Envoie le code à 6 chiffres par email. */
 export async function sendLoginCode(email: string): Promise<{ email: string }> {
-  return appel<{ email: string }>("/api/auth/code", envoi("POST", { email }));
+  return appel("POST /api/auth/code", { corps: { email } });
 }
 
 /** Vérifie le code reçu : le compte est créé (sans mot de passe) à la première vérification. */
 export async function verifyLoginCode(email: string, code: string): Promise<{ ok: boolean }> {
-  return appel<{ ok: boolean }>("/api/auth/verifier", envoi("POST", { email, code }));
+  return appel("POST /api/auth/verifier", { corps: { email, code } });
 }
 
 /**
@@ -362,12 +332,21 @@ function oublierLeStockage(): void {
  * repartir ensuite d’un chargement neuf : rien de la session ne reste en mémoire.
  */
 export async function seDeconnecter({ partout = false } = {}): Promise<void> {
-  await appel<{ ok: true }>("/api/auth/deconnexion", envoi("POST", { partout }));
+  await appel("POST /api/auth/deconnexion", { corps: { partout } });
   oublierLeStockage();
 }
 
+/** Qui tu es dans la conv : l’`id` d’un de ses deux participants (Story.participants), que la route attend tel quel. */
+const estMoi = (id: string): id is Moi => id === "p0" || id === "p1";
+
+/**
+ * « Qui es-tu ? » rempli : la lecture part. `me` vient du parcours (l’`id` d’un participant, une chaîne) : un autre que
+ * p0 ou p1 ne part pas, et c’est « Qui es-tu ? » à refaire, comme le serveur le dirait (« qui »).
+ */
 export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
-  return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", { me: input.me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) })));
+  const { me } = input;
+  if (!estMoi(me)) throw new ErreurApi("qui", 422);
+  return void (await appel("POST /api/analyse", { corps: { me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) } }));
 }
 
 /**
@@ -376,37 +355,43 @@ export async function startAnalysis(input: { me: string; guess: Guess; goal: Goa
  * lancent pas une autre conv.
  */
 export async function resumeAnalysis(): Promise<void> {
-  return void (await appel<{ ok: true }>("/api/analyse", envoi("POST", {})));
+  return void (await appel("POST /api/analyse", { corps: {} }));
 }
 
 export async function getAnalysisProgress(): Promise<AnalysisProgress> {
-  return appel<AnalysisProgress>("/api/analyse");
+  return appel("GET /api/analyse");
 }
 
 /** Le rapport, avec les droits d’accès. Les chapitres non payés arrivent verrouillés, sans contenu. */
 export async function getReport(): Promise<ReportPayload> {
-  return appel<ReportPayload>("/api/rapport");
+  return appel("GET /api/rapport");
 }
 
 /** « Relancer l’écriture » d’un rapport en échec : le rapport tel qu’il repart. */
 export async function relancerRapport(): Promise<ReportPayload> {
-  return appel<ReportPayload>("/api/rapport", envoi("POST"));
+  return appel("POST /api/rapport");
 }
 
-/** Le chat en vocal, ou de nouveau à l’écrit (« Repasser à l’écrit »). Sans réponse attendue. */
-export function modeVocalChat(actif: boolean): void {
+/**
+ * Le chat en vocal, ou de nouveau à l’écrit (« Repasser à l’écrit »). La promesse dit si le serveur l’a gardé (true) ou
+ * pas (le réseau, une erreur : false), et n’échoue jamais : qui n’a pas besoin de le savoir ne l’attend pas.
+ */
+export async function modeVocalChat(actif: boolean): Promise<boolean> {
   /* keepalive : « Repasser à l’écrit » part même si la page se recharge ou se ferme juste après */
-  void appel<{ modeVocal: boolean }>("/api/chat/vocal", { ...envoi("POST", { actif }), keepalive: true }).catch(() => {});
+  return appel("POST /api/chat/vocal", { corps: { actif }, keepalive: true }).then(
+    (r) => r.modeVocal === actif,
+    () => false,
+  );
 }
 
 /** Un moment de l’écoute du vocal, pour comparer les deux voix (A/B test). Sans réponse attendue : un échec ne gêne pas l’écoute. */
 export function noterEcouteVocal(evenement: EvenementEcoute, position: number): void {
   /* keepalive : l’écoute fermée en quittant la page part quand même */
-  void appel<{ ok: true }>("/api/vocal/ecoute", { ...envoi("POST", { evenement, position }), keepalive: true }).catch(() => {});
+  void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch(() => {});
 }
 
 export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscription> {
-  return appel<Subscription>("/api/debloquer", envoi("POST", { offre: offer }));
+  return appel("POST /api/debloquer", { corps: { offre: offer } });
 }
 
 /* ———— Question incluse ———— */
@@ -416,7 +401,7 @@ export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscript
  * quelle, pour que l’écran garde la question et le dise (voir souciQuestion), au lieu d’en faire une réponse.
  */
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  return enQuestion(question, await chat(envoi("POST", { texte: question })));
+  return enQuestion(question, await chat({ texte: question }));
 }
 
 /* ———— Au quotidien ———— */
@@ -425,7 +410,7 @@ export type { BlushAnswer };
 
 /** L’historique du chat : les derniers échanges, ou ceux d’avant `avant`, un échange déjà affiché. */
 export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
-  return appel<HistoriqueChat>(`/api/chat${avant ? `?avant=${avant}` : ""}`);
+  return appel("GET /api/chat", avant ? { recherche: `avant=${avant}` } : {});
 }
 
 /**
@@ -440,12 +425,12 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
     return envoyerAuChat(async () => {
       const fd = await avecFichiers(new FormData(), files);
       if (mot) fd.append("texte", mot);
-      return chat({ method: "POST", body: fd }, suivi);
+      return chat(fd, suivi);
     });
   }
   const texte = input.text?.trim();
   if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
-  return envoyerAuChat(() => chat(envoi("POST", { texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte }), suivi));
+  return envoyerAuChat(() => chat({ texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte }, suivi));
 }
 
 /** Un vocal pour BLUSH : transcrit côté serveur, puis lu par BLUSH comme un message. */
@@ -454,7 +439,7 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, 
   return envoyerAuChat(() => {
     const fd = new FormData();
     fd.append("vocal", audio, `vocal.${extensionAudio(audio.type)}`);
-    return chat({ method: "POST", body: fd }, suivi);
+    return chat(fd, suivi);
   });
 }
 
@@ -493,11 +478,11 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
 /* ———— Sa fiche ———— */
 
 export async function getFiche(): Promise<Fiche> {
-  return appel<Fiche>("/api/fiche");
+  return appel("GET /api/fiche");
 }
 
 export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
-  return appel<Fiche>("/api/fiche", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ facts }) });
+  return appel("PUT /api/fiche", { corps: { facts } });
 }
 
 /**
@@ -508,7 +493,7 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
  */
 export async function addToFiche(files: File[]): Promise<FicheUpdate> {
   try {
-    return await appel<FicheUpdate>("/api/fiche", { method: "POST", body: await avecFichiers(new FormData(), files) });
+    return await appel("POST /api/fiche", { corps: await avecFichiers(new FormData(), files) });
   } catch (e) {
     /* Rien de lisible, ou une erreur : la fiche reste comme avant, et l’écran dit pourquoi (« rien de neuf » n’est pas une erreur) */
     const problem = problemeAjout(e);
@@ -519,49 +504,43 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
 /* ———— Compte ———— */
 
 export async function getAccount(): Promise<Account> {
-  return appel<Account>("/api/compte");
+  return appel("GET /api/compte");
 }
 
 export async function setPaused(paused: boolean): Promise<void> {
-  return void (await appel<{ ok: true }>("/api/compte", envoi("POST", { paused })));
+  return void (await appel("POST /api/compte", { corps: { paused } }));
 }
 
 /**
  * Le lien public du verdict (/v/<id>) : le verdict seul, le prénom de l’autre masqué, jamais la conv. Toujours le même
  * lien tant qu’on ne le désactive pas.
  */
-export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre | null; story?: string }> {
-  const { id, verdict, v } = await appel<{ id: string; verdict: VerdictMontre | null; v?: string }>("/api/partage", envoi("POST"));
+export async function creerLienPartage(): Promise<{ url: string; verdict: VerdictMontre; story: string }> {
+  const { id, verdict, v } = await appel("POST /api/partage");
   const url = `${window.location.origin}/v/${id}`;
   /* `story` : l’image story à sa version (`v`, donnée par le serveur), que le CDN garde : la feuille l’a tout de suite */
   return { url, verdict, story: `${url}/image?format=story${v ? `&v=${encodeURIComponent(v)}` : ""}` };
 }
 
-/** Le verdict tel que le montre un lien partagé : le prénom de l’autre en initiale, le tien en clair (« C. t’attend, Hugo »). */
-export type VerdictMontre = { emoji: string; title: string };
-
-/** Ce qu’on partage en image : une réponse de BLUSH (son échange), ou la chute d’un chapitre (sa place). */
-export type CibleImage = { type: "reponse"; echange: number } | { type: "moment"; chapitre: number; bloc: number };
-
 /** L’image « Partager en image » (story), dessinée par le serveur d’après le contenu du compte. */
 export async function imagePartage(cible: CibleImage): Promise<Blob> {
-  const r = await fetch("/api/partage/image", { method: "POST", headers: avecConv({ "content-type": "application/json" }), body: JSON.stringify(cible), credentials: "same-origin" });
+  const r = await requete("POST /api/partage/image", { corps: cible });
   if (!r.ok) throw new ErreurApi("image", r.status);
   return r.blob();
 }
 
 /** Une image vraiment partagée ou enregistrée (« Partager en image »), pas seulement préparée : comptée côté serveur. */
 export function compterImagePartagee(): void {
-  void appel<{ ok: true }>("/api/partage/compte", envoi("POST")).catch(() => {});
+  void appel("POST /api/partage/compte").catch(() => {});
 }
 
 export async function desactiverLienPartage(): Promise<void> {
-  await appel("/api/partage", envoi("DELETE"));
+  await appel("DELETE /api/partage");
 }
 
 /** Supprime l’histoire : le rapport, la fiche et les captures. */
 export async function deleteStory(): Promise<void> {
-  return void (await appel<{ ok: true }>("/api/histoire", envoi("DELETE")));
+  return void (await appel("DELETE /api/histoire"));
 }
 
 /** Ouvre une autre conv du compte : l’accueil s’ouvre sur elle, maintenant et les fois suivantes (sur cet appareil). */
@@ -571,6 +550,6 @@ export function openConv(storyId: string) {
 
 /** Tout effacer : le compte et toutes les histoires, et ce que le navigateur garde de BLUSH. */
 export async function deleteAccount(): Promise<void> {
-  await appel<{ ok: true }>("/api/compte", envoi("DELETE"));
+  await appel("DELETE /api/compte");
   oublierLeStockage();
 }

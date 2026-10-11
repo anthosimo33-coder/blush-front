@@ -1,5 +1,5 @@
 import { CHAPITRE_DE_LA_BASCULE, CHAPITRE_DU_VERDICT } from "@/contenu/chapitres";
-import type { ReportPayload } from "@/services/api";
+import type { ReportPayload } from "@/types/api";
 import type { Chapter, ChapterBlock, Confidence, Message, ScoreRow } from "@/types";
 
 /*

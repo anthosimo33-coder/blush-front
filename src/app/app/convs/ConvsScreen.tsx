@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { changerDeConv } from "@/lib/requetes";
+import { sensDeTendance } from "@/lib/tendance";
 import { IconButton } from "@/components/ui/Button";
 import { ContactRing } from "@/components/ui/contact";
 import { EnRoute } from "@/components/ui/EnRoute";
@@ -44,7 +45,7 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
 }
 
 function ConvRow({ conv }: { conv: ConvSummary }) {
-  const up = conv.trend.startsWith("↗");
+  const up = sensDeTendance(conv.trend) === "monte";
   /* Pas encore de verdict : BLUSH lit la conv (texte relu le 8 octobre) */
   const where = conv.verdict?.title ?? "BLUSH lit votre conv…";
   return (

@@ -1,6 +1,7 @@
 import { fermerSession } from "@/server/auth";
 import { lireSession, oublierCetAppareil } from "@/server/cookies";
-import { corps, erreur, json, memeOrigine, OUBLIER_LE_NAVIGATEUR } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, OUBLIER_LE_NAVIGATEUR, repondre } from "@/server/http";
+import { ROUTES } from "@/types/api";
 
 /**
  * Se déconnecter : la session (`partout` : toutes celles du compte, sur tous ses appareils), et les cookies qui désignent
@@ -9,9 +10,10 @@ import { corps, erreur, json, memeOrigine, OUBLIER_LE_NAVIGATEUR } from "@/serve
  */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
-  const { partout } = await corps<{ partout: boolean }>(req);
+  /* Un corps mal formé ne déconnecte que cet appareil */
+  const partout = (await lireCorps(req, ROUTES["POST /api/auth/deconnexion"].corps))?.partout === true;
   const secret = await lireSession();
-  if (secret) await fermerSession(secret, { partout: partout === true });
+  if (secret) await fermerSession(secret, { partout });
   await oublierCetAppareil();
-  return json({ ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
+  return repondre("POST /api/auth/deconnexion", { ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
 }

@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { BlushAnswer, ReportPayload } from "@/services/api";
-import type { Fiche, Story } from "@/types";
+import type { BlushAnswer, Fiche, Story } from "@/types";
+import type { EchangeChat, ReportPayload } from "@/types/api";
 
 /** Ce que vers-front.mjs écrit pour une conv : le rapport, et (avec la mémoire) sa fiche et l’accueil. */
 export type Apercu = {
@@ -12,7 +12,8 @@ export type Apercu = {
   home: {
     quick: string[];
     answers: Record<string, BlushAnswer>;
-    script?: { mine?: string; answer: BlushAnswer; at?: number }[];
+    /* Les échanges à rejouer sur l’accueil : ceux du chat, dont seule la réponse est sûre d’y être */
+    script?: (Pick<EchangeChat, "answer"> & Partial<Omit<EchangeChat, "answer">>)[];
     fiche: Pick<Fiche, "person" | "summaryShort">;
   } | null;
 };

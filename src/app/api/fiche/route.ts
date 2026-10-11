@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 import { after } from "next/server";
-import { z } from "zod";
 import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout, majEnCours } from "@/server/ajouts";
 import { executerChaine, SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
@@ -10,11 +9,12 @@ import { contexteRequete, ficheDe, memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
-import { corps, erreur, json, memeOrigine } from "@/server/http";
+import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { peut } from "@/lib/acces";
-import { SECTIONS_FICHE, type Fiche } from "@/types";
+import type { Fiche } from "@/types";
+import { ROUTES } from "@/types/api";
 import { codePublic } from "@/types/erreurs-api";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
@@ -36,12 +36,8 @@ export async function GET() {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");
-  return json(await ficheEtMaj(story));
+  return repondre("GET /api/fiche", await ficheEtMaj(story));
 }
-
-const Faits = z
-  .array(z.object({ section: z.enum(SECTIONS_FICHE), text: z.string().trim().min(1).max(200) }).passthrough())
-  .max(60);
 
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
@@ -53,15 +49,15 @@ export async function PUT(req: Request) {
   const { utilisateur, story } = await contexteRequete();
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");
-  const faits = Faits.safeParse((await corps<{ facts: unknown }>(req)).facts);
-  if (!faits.success) return erreur("faits");
+  const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);
+  if (!corrigee) return erreur("faits");
   if (!(await sousLaLimite(`fiche:${utilisateur.id}`, LIMITES.ficheParCompte))) return erreur("trop");
   for (let essai = 0; essai < 3; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
     if (!ligne || !m?.etat.fiche) return erreur("pas_pret");
     const avant = m.etat.fiche.faits;
-    const nouveaux = faits.data.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
+    const nouveaux = corrigee.facts.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
     const textesAvant = new Set(avant.map((a) => a.texte));
     const textes = new Set(nouveaux.map((n) => n.texte));
     const editions = {
@@ -75,7 +71,7 @@ export async function PUT(req: Request) {
       .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
       .returning({ version: schema.memories.version });
     /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
-    if (ecrite.length) return json(await ficheEtMaj(story));
+    if (ecrite.length) return repondre("PUT /api/fiche", await ficheEtMaj(story));
   }
   return erreur("occupe");
 }
@@ -99,7 +95,7 @@ async function traiter(req: Request) {
   if (!memoire?.etat.fiche) return erreur("pas_pret");
   try {
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
-    return json(await ajouterALaFiche(story, ajout));
+    return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));
   } catch (e) {
     if (e instanceof ErreurAjout) return erreur(e.code);
     if (e instanceof ErreurImport) return erreur("fichier");
