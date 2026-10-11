@@ -285,7 +285,7 @@ export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSen
         Enregistrement du vocal en cours
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-danger-vif" />
+        <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-danger" />
         <span className="w-[38px] text-detail font-black tabular-nums text-ink">{formatClock(seconds)}</span>
       </span>
       <span aria-hidden="true" data-onde="" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">

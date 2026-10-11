@@ -349,7 +349,7 @@ function VocalEnCours() {
   return (
     <span role="status" className="flex h-[42px] min-w-[220px] items-center gap-2 pl-1.5">
       <span className="sr-only">BLUSH</span>
-      <span data-vocal-rec="" className="size-[9px] rounded-full bg-danger-vif" />
+      <span data-vocal-rec="" className="size-[9px] rounded-full bg-danger" />
       <span className="text-note font-black text-ink">enregistre un vocal…</span>
     </span>
   );

@@ -323,7 +323,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                           data-popin=""
                           className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center"
                         >
-                          <span className="flex size-[22px] items-center justify-center rounded-full bg-danger-vif">
+                          <span className="flex size-[22px] items-center justify-center rounded-full bg-danger">
                             <Icon name="minus" size={14} stroke={3} className="text-white" />
                           </span>
                         </button>
