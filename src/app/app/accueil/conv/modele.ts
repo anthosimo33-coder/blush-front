@@ -46,7 +46,7 @@ export function origineDe(id: number): Origine | null {
 
 /**
  * Dans la visite, ton message auquel répond « BLUSH écrit » (puis sa réponse, qui garde son identifiant) : celui d’avant,
- * pris dans le même geste (HomeScreen, exchange). Dans l’historique, l’échange les relie (idHistorique).
+ * pris dans le même geste (echanger, ./useConversation.ts). Dans l’historique, l’échange les relie (idHistorique).
  */
 export const questionDe = (idReponse: number) => idReponse - 1;
 

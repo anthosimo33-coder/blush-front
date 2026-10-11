@@ -9,7 +9,7 @@
  */
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { getChatHistory } from "@/services/api";
-import { renduFrais } from "@/lib/query";
+import { ecritDepuis, FRAIS_DU_RENDU, renduFrais } from "@/lib/query";
 import type { HistoriqueChat } from "@/types/api";
 import { fusion, memesMessages, type Conv } from "../../garde";
 import { echangesEnMsgs, type Msg } from "./modele";
@@ -32,10 +32,12 @@ export type EcranDeLHistorique = {
 
 /*
  * L’historique rendu par la page il y a moins de 10 s, et monté pour la première fois, dispense de le relire à
- * l’ouverture (Q63) : la même règle que les lectures de useQuery (renduFrais, src/lib/query.ts). Une page revue par
- * l’historique du navigateur repasse le même rendu : elle est relue.
+ * l’ouverture (Q63) : la même règle que les lectures de useQuery (renduFrais et FRAIS_DU_RENDU, src/lib/query.ts). Une
+ * page revue par l’historique du navigateur repasse le même rendu : elle est relue. Comme `depart` pour useQuery, une
+ * écriture du chat faite par ce navigateur depuis le rendu (un message, ici ou par la question du rapport ; le mode
+ * vocal) le rend peut-être dépassé : une page préchargée (gardée 5 min par Next) est alors relue.
  */
-const FRAIS = 10_000;
+const renduAJour = (rendu: number | undefined) => rendu !== undefined && renduFrais("chat", rendu, FRAIS_DU_RENDU) && !ecritDepuis("chat", rendu);
 
 export function useChargerAnciens({
   depart,
@@ -54,7 +56,7 @@ export function useChargerAnciens({
   depuis: number;
   /** La conv affichée, à jour après chaque rendu (pour ce qui arrive après coup). */
   derniers: RefObject<Conv<Msg>>;
-  /** L’heure du rendu serveur de la page (voir FRAIS). Sans elle (l’aperçu), l’historique est toujours relu. */
+  /** L’heure du rendu serveur de la page (voir renduAJour). Sans elle (l’aperçu), l’historique est toujours relu. */
   rendu?: number;
   /** Le mode vocal rendu par la page avec l’historique : il vaut celui qu’une relecture aurait rapporté. */
   modeVocalDuRendu?: boolean;
@@ -62,8 +64,8 @@ export function useChargerAnciens({
   fondre: (msgs: Msg[]) => void;
   /** Des échanges plus anciens, posés devant la conv (après l’intro). */
   poserDevant: (nouveaux: Msg[]) => void;
-  /** Le mode vocal tel qu’il est en base. */
-  suivreModeVocal: (actif: boolean) => void;
+  /** Au départ d’une demande au serveur : de quoi suivre le mode vocal qu’elle rapportera (voir useModeVocal). */
+  suivreModeVocal: () => (actif: boolean) => void;
   ecran: EcranDeLHistorique;
 }) {
   /* L’historique se charge par morceaux : y en a-t-il de plus anciens, et le plus ancien déjà affiché */
@@ -88,16 +90,17 @@ export function useChargerAnciens({
    * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
    * (sans les derniers échanges), et un onglet laissé ouvert peut dater. Il se fond dans la conv affichée (garde.ts) :
    * rien n’est remplacé ni déplacé, ce qui manque se pose à sa place, et la conv garde la sienne. Rien ne bouge si la
-   * visite a déjà écrit (ses messages sont les plus récents). La page qui vient de le rendre n’est pas relue (FRAIS).
+   * visite a déjà écrit (ses messages sont les plus récents). La page qui vient de le rendre n’est pas relue (renduAJour).
    */
   useEffect(() => {
     let fini = false;
-    const recharger = () =>
-      getChatHistory()
+    const recharger = () => {
+      const suivreModeVocal = actions.current.suivreModeVocal();
+      return getChatHistory()
         .then((h) => {
           if (fini) return;
           /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
-          if (h.modeVocal !== undefined) actions.current.suivreModeVocal(h.modeVocal);
+          if (h.modeVocal !== undefined) suivreModeVocal(h.modeVocal);
           const s = derniers.current;
           if (s.msgs.some((m) => m.id >= depuis)) return;
           const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
@@ -113,12 +116,13 @@ export function useChargerAnciens({
           actions.current.fondre(r.msgs);
         })
         .catch(() => {});
+    };
     const premier = montage.current;
     montage.current = false;
     const page = auMontage.current;
-    if (premier && renduFrais("chat", page.rendu, FRAIS)) {
+    if (premier && renduAJour(page.rendu)) {
       /* Ce que la relecture aurait rapporté : la conv de départ a déjà l’historique de la page, reste le mode vocal en base */
-      if (page.modeVocalDuRendu !== undefined) actions.current.suivreModeVocal(page.modeVocalDuRendu);
+      if (page.modeVocalDuRendu !== undefined) actions.current.suivreModeVocal()(page.modeVocalDuRendu);
     } else recharger();
     /* Revenu sur la page par le bouton retour du navigateur (la page gardée en mémoire) */
     const auRetour = (e: PageTransitionEvent) => {

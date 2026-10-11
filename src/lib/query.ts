@@ -91,6 +91,28 @@ export function renduFrais(key: string, rendu: number | undefined, frais: number
   return frais > 0 && age > -2000 && age < frais;
 }
 
+/**
+ * La fraîcheur d’une donnée rendue par le serveur, la même pour toutes les pages qui s’en servent : rendue il y a moins
+ * de 10 s, elle dispense de la relire au montage (voir renduFrais, et `frais` dans useQuery).
+ */
+export const FRAIS_DU_RENDU = 10_000;
+
+/**
+ * Une écriture faite par ce navigateur sur une donnée hors du cache (« chat » : un message, le mode vocal) : une page
+ * préchargée avant elle (Next garde une page préchargée 5 min) ne la connaît pas. Voir ecritDepuis.
+ */
+export function noterEcriture(key: "chat") {
+  ecritLe.set(key, Date.now());
+}
+
+/**
+ * Ce navigateur a-t-il écrit la donnée `key` depuis `rendu` (l’heure du serveur) ? Alors le rendu ne la montre pas
+ * forcément, il faut la relire. Avec la marge de renduFrais (2 s d’horloges décalées) : dans le doute, on relit.
+ */
+export function ecritDepuis(key: "chat", rendu: number): boolean {
+  return (ecritLe.get(key) ?? -Infinity) > rendu - 2000;
+}
+
 /* Chaque donnée n’est mise en texte qu’une fois (le rapport, relu toutes les 2 s pendant son écriture, pèse son poids) */
 const textes = new WeakMap<object, string>();
 const texteDe = (v: unknown) => {

@@ -7,16 +7,7 @@
  * Les identifiants (l’historique du back-end, l’intro et l’aperçu, la visite) et ce qu’ils disent d’un message :
  * accueil/conv/modele.ts.
  */
-import { echangeDe, idHistorique, origineDe, questionDe, rangDansLEchange } from "./accueil/conv/modele";
-
-/*
- * Ses tests (tests/conv-gardee.test.ts) écrivent l’historique avec lui. À retirer quand leurs messages porteront leur
- * `type` et l’importeront du modèle.
- */
-export { idHistorique };
-
-/** Ce que la garde lit d’un message (le type complet, `Msg`, vit dans accueil/conv/modele.ts). */
-export type MsgGardable = { id: number; from: string; answered?: boolean };
+import { echangeDe, idHistorique, origineDe, questionDe, rangDansLEchange, type Msg } from "./accueil/conv/modele";
 
 /** Une conv affichée : ses messages, et l’historique plus ancien à charger (`plusAncien` : l’échange le plus ancien affiché). */
 export type Conv<M> = { msgs: M[]; plus: boolean; plusAncien: number | null };
@@ -30,7 +21,10 @@ const fixe = (m: { id: number }) => {
 };
 
 /** L’échange auquel appartient une réponse de BLUSH (back-end : l’id de ton message). */
-const echangeRepondu = (m: object) => ("result" in m ? (m.result as { echange?: number } | undefined)?.echange : undefined);
+const echangeRepondu = (m: Msg) => (m.type === "reponse" ? m.result.echange : undefined);
+
+/** Ce qui ne remonte pas : « BLUSH écrit » (l’échange revient fini par l’historique), et ce qui montre un fichier local. */
+const neRemontePas = (m: Msg) => m.type === "ecrit" || m.type === "images" || m.type === "vocal";
 
 /**
  * La conv gardée, prête à remonter. Sans « BLUSH écrit » ni ton message qui l’attendait (l’échange, fini depuis, revient
@@ -38,9 +32,9 @@ const echangeRepondu = (m: object) => ("result" in m ? (m.result as { echange?: 
  * rejoue son arrivée (`answered` : les réponses ne se déplient plus). Back-end : un échange de la visite prend
  * l’identifiant qu’il a dans l’historique, l’historique frais le reconnaît au lieu de le doubler.
  */
-export function remonter<M extends MsgGardable>(conv: Conv<M>): Conv<M> {
-  const enAttente = new Set(conv.msgs.filter((m) => "reading" in m).map((m) => questionDe(m.id)));
-  const gardes = conv.msgs.filter((m) => !("reading" in m) && !("images" in m) && !("voice" in m) && !(m.from === "toi" && deLaVisite(m) && enAttente.has(m.id)));
+export function remonter(conv: Conv<Msg>): Conv<Msg> {
+  const enAttente = new Set(conv.msgs.filter((m) => m.type === "ecrit").map((m) => questionDe(m.id)));
+  const gardes = conv.msgs.filter((m) => !neRemontePas(m) && !(m.from === "toi" && deLaVisite(m) && enAttente.has(m.id)));
   const parId = new Map(gardes.map((m) => [m.id, m]));
   const renommes = new Map<number, number>();
   for (const m of gardes) {
@@ -52,7 +46,7 @@ export function remonter<M extends MsgGardable>(conv: Conv<M>): Conv<M> {
   }
   const msgs = gardes.map((m) => {
     const id = renommes.get(m.id) ?? m.id;
-    return id === m.id && !m.answered ? m : ({ ...m, id, answered: false } as M);
+    return id === m.id && !m.answered ? m : { ...m, id, answered: false };
   });
   return { ...conv, msgs };
 }
@@ -64,7 +58,7 @@ export function remonter<M extends MsgGardable>(conv: Conv<M>): Conv<M> {
  * l’échange qui les précédait. L’intro et l’aperçu restent ceux de `s`.
  * Si `f` ne rejoint pas ce qui est affiché (un trou : plus d’un morceau écrit ailleurs entre-temps), on part de `f`.
  */
-export function fusion<M extends MsgGardable>(s: Conv<M>, f: Conv<M>): Conv<M> {
+export function fusion(s: Conv<Msg>, f: Conv<Msg>): Conv<Msg> {
   const fixes = s.msgs.filter(fixe);
   const sh = s.msgs.filter(estHistorique);
   const fh = f.msgs.filter(estHistorique);
@@ -72,7 +66,7 @@ export function fusion<M extends MsgGardable>(s: Conv<M>, f: Conv<M>): Conv<M> {
   const fMin = Math.min(...fh.map((m) => echangeDe(m.id)));
   if (sh.length && fh.length && fMin > sMax) return { msgs: [...fixes, ...fh], plus: f.plus, plusAncien: f.plusAncien };
   /* Chaque message et sa place : son échange, puis ton message, la réponse, et ce qui suit dans la visite */
-  const places = new Map<number, { m: M; e: number; rang: number }>();
+  const places = new Map<number, { m: Msg; e: number; rang: number }>();
   for (const m of fh) places.set(m.id, { m, e: echangeDe(m.id), rang: rangDansLEchange(m.id) });
   let ancre = -Infinity;
   let suite = 2;

@@ -10,6 +10,7 @@ import { QUESTION_MAX } from "@/lib/limites";
 import { moiEtAutre } from "@/lib/participants";
 import { peut } from "@/lib/acces";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
+import { noterEcriture } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { askQuestion, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
@@ -75,6 +76,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     setAsking({ question: q, leaving: false });
     play("envoi");
     let a: QuestionAnswer;
+    /* La question passe par le chat : l’accueil préchargé avant sa fin doit relire son historique (src/lib/query.ts) */
+    noterEcriture("chat");
     try {
       a = await askQuestion(q);
     } catch (e) {
@@ -83,6 +86,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       setSouci(souciQuestion(e));
       play("non");
       return;
+    } finally {
+      noterEcriture("chat");
     }
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setAsking({ question: q, leaving: true });

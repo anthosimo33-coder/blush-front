@@ -602,15 +602,19 @@ export function HomeScreen({
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }) => {
     play("envoi");
-    return conv.envoyer(mine, modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse", async (suivi) => {
-      const ready = payload.text ? answers[payload.text] : undefined;
-      const result = ready
-        ? await new Promise<BlushAnswer>((ok) => setTimeout(() => ok(ready), 1600))
-        : liveUrl && payload.text && !payload.files
-          ? await askLive(liveUrl, payload.text, historyOf(msgs))
-          : await sendToBlush(payload, suivi);
-      return { type: "reponse", from: "blush", result };
-    }, modeVocal);
+    return conv.envoyer(mine, {
+      label: modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse",
+      demande: async (suivi) => {
+        const ready = payload.text ? answers[payload.text] : undefined;
+        const result = ready
+          ? await new Promise<BlushAnswer>((ok) => setTimeout(() => ok(ready), 1600))
+          : liveUrl && payload.text && !payload.files
+            ? await askLive(liveUrl, payload.text, historyOf(msgs))
+            : await sendToBlush(payload, suivi);
+        return { type: "reponse", from: "blush", result };
+      },
+      vocal: modeVocal,
+    });
   };
 
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite. 3 · La pastille elle-même devient ta bulle */
@@ -664,9 +668,11 @@ export function HomeScreen({
     /* Tu lui parles en vocal : elle te répond en vocal */
     void conv.envoyer(
       { type: "vocal", id: nouvelId(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
-      "BLUSH enregistre un vocal",
-      async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
-      true,
+      {
+        label: "BLUSH enregistre un vocal",
+        demande: async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
+        vocal: true,
+      },
     );
   };
 
@@ -1114,7 +1120,7 @@ function dernieresLignes(box: HTMLElement) {
 
 /**
  * La hauteur de la conv avant d’y poser des messages (la page sur mobile, la fenêtre sur desktop). `marque` : voir
- * `devant`. Jusqu’au rendu qui les pose, Chrome ne garde pas la place de lui-même (l’ancrage du défilement, que Safari
+ * Devant (accueil/conv/useChargerAnciens.ts). Jusqu’au rendu qui les pose, Chrome ne garde pas la place de lui-même (l’ancrage du défilement, que Safari
  * n’a pas) : le décalage appliqué ensuite compterait deux fois.
  */
 function mesurer(box: HTMLElement | null, marque?: number) {
@@ -1870,7 +1876,7 @@ function VocalEnCours() {
   );
 }
 
-/** « Réessayer » une réponse coupée par le réseau (voir exchange). */
+/** « Réessayer » une réponse coupée par le réseau (voir echanger, accueil/conv/useConversation.ts). */
 const RelanceContext = createContext<(reponse: number) => void>(() => {});
 
 /**

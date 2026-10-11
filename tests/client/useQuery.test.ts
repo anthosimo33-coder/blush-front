@@ -2,11 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidate, setQueryData, useQuery } from "@/lib/query";
 import type { Account } from "@/types/api";
+import { renduNeuf } from "./temps";
 
 /*
  * useQuery (src/lib/query.ts) monté dans un écran : la donnée rendue par le serveur, relue ou non au montage (`rendu`,
  * `frais`), et ce qu’une relecture change. Les règles hors de React (depart, renduFrais…) : tests/query.test.ts.
- * Le cache du module est partagé par tout le fichier : chaque test part d’un cache vide pour sa clé.
+ * Le cache du module est partagé par tout le fichier : chaque test part d’un cache vide pour sa clé, et chaque rendu a
+ * son heure (renduNeuf : deux rendus de la même milliseconde passeraient pour le même rendu revu).
  */
 
 /* Un compte, que son email distingue d’une version à l’autre */
@@ -21,7 +23,7 @@ beforeEach(() => invalidate("account"));
 describe("useQuery : rendu par le serveur, ou relu", () => {
   it("une donnée que le serveur vient de rendre n’est pas relue au montage ; revue (le même rendu), elle l’est", async () => {
     const lire = vi.fn(async () => compte("relu@blush.test"));
-    const rendu = Date.now();
+    const rendu = renduNeuf();
     const { result } = renderHook(() => useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }));
     expect(result.current.data?.email).toBe("rendu@blush.test");
     expect(result.current.loading).toBe(false);
@@ -36,10 +38,12 @@ describe("useQuery : rendu par le serveur, ou relu", () => {
 
   it("un rendu trop ancien, ou sans fraîcheur demandée, est relu au montage", async () => {
     const lire = vi.fn(async () => compte("frais@blush.test"));
-    const ancien = renderHook(() => useQuery("account", lire, compte("vieux@blush.test"), { rendu: Date.now() - 60_000, frais: 10_000 }));
+    const vieux = renduNeuf(-60_000);
+    const ancien = renderHook(() => useQuery("account", lire, compte("vieux@blush.test"), { rendu: vieux, frais: 10_000 }));
     expect(ancien.result.current.data?.email).toBe("vieux@blush.test");
     await waitFor(() => expect(ancien.result.current.data?.email).toBe("frais@blush.test"));
-    const sansFrais = renderHook(() => useQuery("account", lire, compte("vieux@blush.test"), { rendu: Date.now() }));
+    const neuf = renduNeuf();
+    const sansFrais = renderHook(() => useQuery("account", lire, compte("vieux@blush.test"), { rendu: neuf }));
     await waitFor(() => expect(sansFrais.result.current.data?.email).toBe("frais@blush.test"));
     expect(lire).toHaveBeenCalledTimes(2);
   });

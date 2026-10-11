@@ -57,7 +57,7 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
       href="/app?depuis=rapport"
       /* L’accueil se pose lui-même en bas de la conv : Next ne doit pas le remettre en haut */
       scroll={false}
-      /* Préchargé en entier : l’accueil n’a pas d’écran de chargement (il casserait le glissé vers la fiche). Gardé 5 min, il relit son historique en s’ouvrant */
+      /* Préchargé en entier : l’accueil n’a pas d’écran de chargement (il casserait le glissé vers la fiche). Gardé 5 min, il relit son historique en s’ouvrant, sauf rendu de moins de 10 s sans écriture du chat depuis (accueil/conv/useChargerAnciens.ts) */
       prefetch
       onClick={marquerChatOuvert}
       aria-label="Parler à BLUSH"

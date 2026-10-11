@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { CoupureChat, modeVocalChat, type SuiviChat } from "@/services/api";
+import { noterEcriture } from "@/lib/query";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
 import { fusion, remonter, type Conv } from "../../garde";
 import { echangesEnMsgs, introDe, PREMIER_ID_VISITE, type EchangeScript, type Msg, type NewMsg } from "./modele";
@@ -44,6 +45,12 @@ export type Scene = EcranDeLHistorique & {
 /** Ce que demande un échange : la réponse de BLUSH, avec ses bulles et son vocal à mesure (`suivi`). */
 type Demande = (suivi: SuiviChat) => Promise<NewMsg>;
 
+/**
+ * Un échange : `label`, ce que dit « BLUSH écrit » ; `demande`, la réponse de BLUSH ; `vocal`, BLUSH prépare un vocal
+ * (sa bulle l’attend). C’est aussi ce que « Réessayer » relance.
+ */
+export type Echange = { label: string; demande: Demande; vocal?: boolean };
+
 /** Combien de bulles de la conv font ces bulles de BLUSH (une bulle, et chacun de ses messages à copier : bulleEcrite, HomeScreen). */
 const noeudsDe = (bulles: BulleChat[]) => bulles.reduce((n, b) => n + 1 + (b.messages?.length ?? 0), 0);
 
@@ -54,26 +61,43 @@ const avecVocal = (r: BlushAnswer, vocal: NonNullable<BlushAnswer["vocal"]> | nu
  * Le mode vocal du chat, son seul propriétaire : BLUSH répond en vocal tant qu’on ne repasse pas à l’écrit. Il part de
  * la page (la base, ou la conv gardée), puis suit ce que dit le serveur (l’historique relu, chaque réponse) ; « Repasser
  * à l’écrit » change l’écran tout de suite, attend le serveur, et revient au vocal s’il ne l’a pas gardé.
+ *
+ * L’ordre qui compte est celui des demandes, pas celui des réponses : le serveur rapporte le mode lu au début de la
+ * demande (src/server/chat.ts). Une réponse partie avant le dernier geste ne le défait donc pas ; une réponse partie
+ * après lui, et arrivée avant que le serveur le confirme, l’emporte (c’est elle qui sait). `local` (l’aperçu, sans
+ * conv en base) : « Repasser à l’écrit » ne demande rien au serveur, l’écran reste à l’écrit.
  */
-function useModeVocal(initial: () => boolean) {
+function useModeVocal(initial: () => boolean, local: boolean) {
   const [modeVocal, setModeVocal] = useState(initial);
-  /* Chaque écriture a son numéro : une réponse du serveur arrivée entre-temps l’emporte sur un retour en arrière */
-  const ecritures = useRef(0);
-  /** Ce que dit le serveur (l’historique, une réponse). */
-  const suivre = (actif: boolean) => {
-    ecritures.current++;
-    setModeVocal(actif);
+  /* Les gestes (« Repasser à l’écrit ») et les réponses suivies, comptés : qui est parti avant qui */
+  const gestes = useRef(0);
+  const suivies = useRef(0);
+  /**
+   * Au départ d’une demande au serveur (l’historique, un échange) : de quoi suivre le mode qu’elle rapportera. Un geste
+   * fait entre-temps l’emporte sur elle.
+   */
+  const suivreDepuis = () => {
+    const geste = gestes.current;
+    return (actif: boolean) => {
+      if (gestes.current !== geste) return;
+      suivies.current++;
+      setModeVocal(actif);
+    };
   };
   /** « Repasser à l’écrit » : vrai si le serveur l’a gardé. */
   const repasserAEcrit = async () => {
-    const n = ++ecritures.current;
+    const geste = ++gestes.current;
+    const suivi = suivies.current;
     setModeVocal(false);
+    if (local) return true;
+    noterEcriture("chat");
     const garde = await modeVocalChat(false);
-    /* Refusé (le réseau, une erreur) : le chat est encore en vocal, le bandeau revient */
-    if (!garde && ecritures.current === n) setModeVocal(true);
+    noterEcriture("chat");
+    /* Refusé (le réseau, une erreur) : le chat est encore en vocal, le bandeau revient (sauf si on sait mieux depuis) */
+    if (!garde && gestes.current === geste && suivies.current === suivi) setModeVocal(true);
     return garde;
   };
-  return { modeVocal, suivre, repasserAEcrit };
+  return { modeVocal, suivreDepuis, repasserAEcrit };
 }
 
 /**
@@ -112,7 +136,7 @@ export function useConversation({
   const [depuis] = useState(() => prochainId);
   const derniers = useRef(depart);
   /* Le serveur le sait ; sans lui (l’aperçu), d’après la dernière réponse */
-  const vocal = useModeVocal(() => reprise?.modeVocal ?? modeVocalInitial ?? !!script.at(-1)?.answer.modeVocal);
+  const vocal = useModeVocal(() => reprise?.modeVocal ?? modeVocalInitial ?? !!script.at(-1)?.answer.modeVocal, cle === undefined);
   /* L’écran du dernier rendu : un échange en route s’en sert à chaque arrivée */
   const ecran = useRef(scene);
   useEffect(() => {
@@ -132,7 +156,7 @@ export function useConversation({
         const intro = prev.filter((m) => m.type === "intro");
         return [...intro, ...nouveaux.filter((m) => !deja.has(m.id)), ...prev.filter((m) => m.type !== "intro")];
       }),
-    suivreModeVocal: vocal.suivre,
+    suivreModeVocal: vocal.suivreDepuis,
     ecran: scene,
   });
   const { plus, plusAncien } = historique;
@@ -150,15 +174,17 @@ export function useConversation({
   };
 
   /* « Réessayer » une réponse coupée par le réseau : ce qu’elle demandait, par réponse (voir echanger) */
-  const relances = useRef(new Map<number, { label: string; demande: Demande; vocal: boolean }>());
+  const relances = useRef(new Map<number, Echange>());
 
   /**
-   * Ton message part, BLUSH tape « … », puis sa réponse remplace les trois points. Back-end : elle arrive au fil de
-   * l’eau, ses bulles une à une (chaque arrivée se déplie, ce qui est posé ne bouge plus), puis la réponse validée, qui
-   * les complète (ou les remplace) ; un vocal se prépare encore après elle, sa bulle attend. Le réseau qui coupe : les
-   * bulles reçues restent, avec « Réessayer ». `relance` : la réponse coupée qui repart, à sa place.
+   * Ton message part (`mine`), BLUSH tape « … », puis sa réponse remplace les trois points. Back-end : elle arrive au
+   * fil de l’eau, ses bulles une à une (chaque arrivée se déplie, ce qui est posé ne bouge plus), puis la réponse
+   * validée, qui les complète (ou les remplace) ; un vocal se prépare encore après elle, sa bulle attend. Le réseau qui
+   * coupe : les bulles reçues restent, avec « Réessayer ». `relance` : la réponse coupée qui repart, à sa place (sans
+   * ton message, déjà là).
    */
-  const echanger = async (mine: Msg | null, label: string, demande: Demande, vocalAttendu = false, relance?: number) => {
+  const echanger = async ({ mine, relance, ...echange }: Echange & ({ mine: Msg; relance?: undefined } | { mine?: undefined; relance: number })) => {
+    const { label, demande, vocal: vocalAttendu = false } = echange;
     const readingId = relance ?? nouvelId();
     const sent = Date.now();
     ecran.current.echangeCommence();
@@ -200,7 +226,11 @@ export function useConversation({
         changer((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v) } : x)));
       },
     };
+    /* Le mode vocal que rapportera la réponse : celui du serveur au départ de la demande */
+    const suivreModeVocal = vocal.suivreDepuis();
     let next: NewMsg;
+    /* Le chat change en base : une page préchargée avant ne le montre pas (useChargerAnciens la relira) */
+    noterEcriture("chat");
     try {
       next = await demande(suivi);
     } catch (e) {
@@ -208,9 +238,11 @@ export function useConversation({
       await file;
       finie = true;
       /* Le réseau a coupé : ce qui est arrivé reste, « Réessayer » relance la même demande, à la même place */
-      relances.current.set(readingId, { label, demande, vocal: vocalAttendu });
+      relances.current.set(readingId, echange);
       await poser(e.recues, true)();
       return;
+    } finally {
+      noterEcriture("chat");
     }
     await file;
     finie = true;
@@ -220,7 +252,7 @@ export function useConversation({
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
     changer((m) => m.map((x) => (x.id === readingId ? { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } : x)));
     if (premiere) ecran.current.reponsePosee();
-    if (next.type === "reponse" && next.result.modeVocal !== undefined) vocal.suivre(next.result.modeVocal);
+    if (next.type === "reponse" && next.result.modeVocal !== undefined) suivreModeVocal(next.result.modeVocal);
     const up = next.type === "reponse" ? next.result.levelUp : undefined;
     if (up) window.setTimeout(() => ecran.current.niveau(up), 700);
   };
@@ -236,14 +268,14 @@ export function useConversation({
     anciens: historique.anciens,
     chargerAnciens: historique.chargerAnciens,
     precharger: historique.precharger,
-    /** Ton message `mine` (son identifiant : nouvelId) part ; `label`, ce que dit « BLUSH écrit » ; `vocal`, BLUSH prépare un vocal. */
-    envoyer: (mine: Msg, label: string, demande: Demande, vocalAttendu = false) => echanger(mine, label, demande, vocalAttendu),
+    /** Ton message `mine` (son identifiant : nouvelId) part, avec l’échange qu’il demande (voir Echange). */
+    envoyer: (mine: Msg, echange: Echange) => echanger({ ...echange, mine }),
     /** « Réessayer » : la même demande repart, à la place de la réponse coupée. Faux si rien n’est à relancer. */
     relancer: (reponse: number) => {
       const r = relances.current.get(reponse);
       if (!r) return false;
       relances.current.delete(reponse);
-      void echanger(null, r.label, r.demande, r.vocal, reponse);
+      void echanger({ ...r, relance: reponse });
       return true;
     },
     /** Un mot de BLUSH dans la conv (pas de micro, rien entendu). */

@@ -3,8 +3,9 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 /*
  * Les tests sans base : des règles pures (tests/unit), les lectures de conv de prompts/lib, les scripts de vérification.
- * Ils forment le projet `unit`, lancé seul par `npm run test:unit`, sans Postgres (avec le projet `client`, plus bas). Les autres fichiers de tests/ gardent
- * leur nom : la liste les désigne. Un test qui touche à la base va dans le projet `db`, ailleurs que dans cette liste.
+ * Ils forment le projet `unit`, que `npm run test:unit` lance sans Postgres avec le projet `client` (plus bas). Les
+ * autres fichiers de tests/ gardent leur nom : la liste les désigne. Un test qui touche à la base va dans le projet
+ * `db`, ailleurs que dans cette liste.
  */
 const SANS_BASE = [
   "boite-mails",
@@ -47,7 +48,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    /* Les deux projets ont les mêmes variables : env() les lit toutes, même sans jamais ouvrir la base */
+    /* Les trois projets ont les mêmes variables : env() les lit toutes, même sans jamais ouvrir la base */
     env: {
       DATABASE_URL: process.env.DATABASE_URL_TEST || "postgres://localhost:5432/blush_test",
       BLUSH_CLE: "dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtMzI=",
