@@ -52,7 +52,11 @@ const navigateurs = [
   {
     name: "chromium",
     visuel: "visuel-chromium",
-    use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] } },
+    use: {
+      ...devices["Desktop Chrome"],
+      viewport: { width: 1280, height: 800 },
+      launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+    },
   },
   { name: "webkit-iphone", visuel: "visuel-webkit", use: { ...devices["iPhone 15"] } },
 ];
@@ -119,7 +123,9 @@ export default defineConfig({
     ...navigateurs.map((n) => ({ name: n.name, testIgnore: [BETA, CAPTURES], use: { ...n.use, baseURL: URL_APPLI } })),
     ...navigateurs.map((n) => ({ name: `${n.name}-beta`, testMatch: BETA, use: { ...n.use, baseURL: URL_BETA } })),
     /* Une capture par écran et par navigateur : <E2E_VISUEL_DIR>/visuel-chromium/accueil.png… */
-    ...(VISUEL ? navigateurs.map((n) => ({ name: n.visuel, testMatch: CAPTURES, snapshotPathTemplate: `${VISUEL}/{projectName}/{arg}{ext}`, use: { ...n.use, baseURL: URL_APPLI } })) : []),
+    ...(VISUEL
+      ? navigateurs.map((n) => ({ name: n.visuel, testMatch: CAPTURES, snapshotPathTemplate: `${VISUEL}/{projectName}/{arg}{ext}`, use: { ...n.use, baseURL: URL_APPLI } }))
+      : []),
     ...(GALERIE
       ? ecransDeLaGalerie.map(({ name, metadata, viewport, deviceScaleFactor }) => ({
           name,

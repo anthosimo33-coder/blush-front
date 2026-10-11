@@ -32,7 +32,13 @@ const VIDEO = new File([new Uint8Array(8)], "enregistrement.mp4", { type: "video
  * Le serveur simulé : `lot(n, essai)` répond à l’essai n° `essai` (1, 2…) du lot n° `n` (une Response, ou « pend » :
  * pas de réponse avant l’arrêt de l’envoi) ; `video` répond à l’assemblage. Rend la liste des appels, et les signaux.
  */
-function serveur({ lot, video = () => json({ source: SOURCE, story: { id: "s1" }, messagesRead: 42 }) }: { lot: (n: number, essai: number) => Response | "pend"; video?: () => Response }) {
+function serveur({
+  lot,
+  video = () => json({ source: SOURCE, story: { id: "s1" }, messagesRead: 42 }),
+}: {
+  lot: (n: number, essai: number) => Response | "pend";
+  video?: () => Response;
+}) {
   const appels: string[] = [];
   const corpsVideo: unknown[] = [];
   const essais = new Map<number, number>();

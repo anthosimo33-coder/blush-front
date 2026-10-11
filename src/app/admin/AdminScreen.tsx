@@ -122,7 +122,11 @@ function Activite({ jours }: { jours: StatsAdmin["activite"] }) {
             {SERIES.map((s, i) => {
               const v = j[s.cle];
               const hauteur = v ? Math.max(3, (v / max) * (h - 8)) : 0;
-              return <rect key={s.cle} x={k * pas + 5 + i * 7} y={h - hauteur} width={6} height={hauteur} rx={3} style={{ fill: s.couleur }}><title>{`${j.jour} · ${s.nom}\u00a0: ${v}`}</title></rect>;
+              return (
+                <rect key={s.cle} x={k * pas + 5 + i * 7} y={h - hauteur} width={6} height={hauteur} rx={3} style={{ fill: s.couleur }}>
+                  <title>{`${j.jour} · ${s.nom}\u00a0: ${v}`}</title>
+                </rect>
+              );
             })}
             {(jours.length - 1 - k) % tous === 0 && (
               <text x={k * pas + pas / 2} y={h + 16} textAnchor="middle" fontSize={11} fontWeight={800} className="fill-grey">
@@ -158,7 +162,14 @@ function Partage({ p }: { p: StatsAdmin["partage"] }) {
     <div className="flex flex-col gap-2">
       {etapes.map(([nom, v, aide], k) => (
         <div key={nom} className="flex items-center gap-3 rounded-[18px] bg-[#F8F7F4] px-3.5 py-2.5">
-          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-legende font-black", k === etapes.length - 1 ? "text-white [background:var(--rose-blush)]" : "bg-white text-ink shadow-soft")}>{k + 1}</span>
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full text-legende font-black",
+              k === etapes.length - 1 ? "text-white [background:var(--rose-blush)]" : "bg-white text-ink shadow-soft",
+            )}
+          >
+            {k + 1}
+          </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-note font-black">{nom}</span>
             <span className="truncate text-micro font-extrabold text-grey">{aide}</span>
@@ -198,7 +209,10 @@ function Couts({ c, jours }: { c: StatsAdmin["couts"]; jours: Periode }) {
                 <span className="block h-full rounded-full bg-ink" style={{ width: `${Math.max(2, (p.dollars / max) * 100)}%` }} />
               </span>
               <span className="text-legende font-black tabular-nums">
-                {dollars(p.dollars)} <span className="font-extrabold text-grey">· {nombre(p.appels)} appel{p.appels > 1 ? "s" : ""}</span>
+                {dollars(p.dollars)}{" "}
+                <span className="font-extrabold text-grey">
+                  · {nombre(p.appels)} appel{p.appels > 1 ? "s" : ""}
+                </span>
               </span>
             </li>
           ))}
@@ -300,7 +314,10 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: stri
                 key={j}
                 href={`${base}?p=${j}` as Route}
                 aria-current={j === s.jours ? "page" : undefined}
-                className={cn("flex h-8 items-center rounded-full px-3.5 text-legende font-black no-underline", j === s.jours ? "bg-white text-ink shadow-soft" : "text-soft hover:text-ink")}
+                className={cn(
+                  "flex h-8 items-center rounded-full px-3.5 text-legende font-black no-underline",
+                  j === s.jours ? "bg-white text-ink shadow-soft" : "text-soft hover:text-ink",
+                )}
               >
                 {nom}
               </Link>

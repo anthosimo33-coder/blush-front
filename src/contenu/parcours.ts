@@ -9,12 +9,7 @@ export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
   ensemble: { tile: "En couple", quote: "«\u00a0en couple\u00a0»" },
 };
 
-export const READING_STEPS = [
-  "Votre histoire, du premier au dernier message",
-  "Qui relance, qui propose, qui s’ouvre",
-  "Le moment où tout a basculé",
-  "Ton verdict",
-];
+export const READING_STEPS = ["Votre histoire, du premier au dernier message", "Qui relance, qui propose, qui s’ouvre", "Le moment où tout a basculé", "Ton verdict"];
 
 /** Étapes d’export par appli (iMessage ne s’exporte pas : on filme son écran). La version iPhone/Android est choisie selon l’appareil. */
 export const EXPORT_STEPS = {

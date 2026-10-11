@@ -270,18 +270,18 @@ export const rateLimits = pgTable("rate_limits", {
 export const aiUsage = pgTable(
   "ai_usage",
   {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
-  task: text("task").notNull(),
-  model: text("model").notNull(),
-  inputTokens: integer("input_tokens").notNull().default(0),
-  outputTokens: integer("output_tokens").notNull().default(0),
-  cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
-  cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
-  /** En millionièmes de dollar. */
-  costMicros: integer("cost_micros").notNull().default(0),
-  ms: integer("ms").notNull().default(0),
-  createdAt: quand("created_at").notNull().defaultNow(),
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+    task: text("task").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    /** En millionièmes de dollar. */
+    costMicros: integer("cost_micros").notNull().default(0),
+    ms: integer("ms").notNull().default(0),
+    createdAt: quand("created_at").notNull().defaultNow(),
   },
   /* Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue */
   (t) => [index("ai_usage_story_idx").on(t.storyId)],

@@ -19,7 +19,9 @@ async function rejoindreLaListe(page: Page, email: string): Promise<number> {
   return (await reponseAuGeste(page, { chemin: "/api/attente" }, () => page.getByRole("button", { name: "Rejoindre la liste" }).click())).status();
 }
 
-test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la liste » avec de quoi se retirer, ou « Ta place est prête » à un invité", async ({ page }, testInfo) => {
+test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la liste » avec de quoi se retirer, ou « Ta place est prête » à un invité", async ({
+  page,
+}, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const dehors = emailLibre(testInfo, "attente");
   let ecran = "";
@@ -116,7 +118,10 @@ test("/attente/retirer : un lien incomplet, abîmé ou pris dans le mail d’un 
     expect(await rejoindreLaListe(page, email)).toBe(200);
     liens.push(lienDeRetrait(await attendreMail(email, { depuis })));
   }
-  const [lienAlice, lienBruno] = auMoins(liens.map((l) => new URL(l)), 2);
+  const [lienAlice, lienBruno] = auMoins(
+    liens.map((l) => new URL(l)),
+    2,
+  );
 
   /** Ouvre un lien de retrait et appuie sur le bouton : le serveur le refuse (404), l’écran dit que le lien ne marche pas. */
   const refuse = async (lien: string) => {

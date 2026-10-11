@@ -12,7 +12,12 @@ type Fait = DonneesMemoire["etat"]["fiche"]["faits"][number];
 const fait = (texte: string, autres: Partial<Fait> = {}): Fait => ({ section: "infos", texte, preuves: [], statut: "nouveau", ...autres });
 const corrige = (text: string, section: FaitCorrige["section"] = "infos"): FaitCorrige => ({ section, text });
 /** Une mémoire dont la fiche a ces faits, et ces éditions déjà faites. */
-const avec = (faits: Fait[], editions?: DonneesMemoire["editions"]): DonneesMemoire => ({ etat: memoire({ fiche: { faits } }), lignes: [["m1", "Elle : salut"]], suivant: 12, ...(editions ? { editions } : {}) });
+const avec = (faits: Fait[], editions?: DonneesMemoire["editions"]): DonneesMemoire => ({
+  etat: memoire({ fiche: { faits } }),
+  lignes: [["m1", "Elle : salut"]],
+  suivant: 12,
+  ...(editions ? { editions } : {}),
+});
 const faitsDe = (m: DonneesMemoire) => m.etat.fiche.faits;
 
 describe("la fiche corrigée à la main", () => {
@@ -24,7 +29,11 @@ describe("la fiche corrigée à la main", () => {
     expect(faitsDe(apres)).toEqual([chat, piano]);
     expect(apres.editions).toEqual({ parToi: [], supprimees: [] });
     /* Le reste de la mémoire et de la fiche ne bouge pas */
-    expect({ ...apres, etat: { ...apres.etat, fiche: { ...apres.etat.fiche, faits: [] } }, editions: undefined }).toEqual({ ...avant, etat: { ...avant.etat, fiche: { ...avant.etat.fiche, faits: [] } }, editions: undefined });
+    expect({ ...apres, etat: { ...apres.etat, fiche: { ...apres.etat.fiche, faits: [] } }, editions: undefined }).toEqual({
+      ...avant,
+      etat: { ...avant.etat, fiche: { ...avant.etat.fiche, faits: [] } },
+      editions: undefined,
+    });
   });
 
   it("un fait déplacé dans une autre section, ou réécrit, devient un fait à lui, sans preuve", () => {
@@ -68,7 +77,12 @@ describe("la fiche corrigée à la main", () => {
       attendu: { parToi: ["C"], supprimees: ["X"] },
     },
   ])("$cas", ({ avant, editions, faits, attendu }) => {
-    expect(fusionnerFaits(avec(avant, editions), faits.map((t) => corrige(t))).editions).toEqual(attendu);
+    expect(
+      fusionnerFaits(
+        avec(avant, editions),
+        faits.map((t) => corrige(t)),
+      ).editions,
+    ).toEqual(attendu);
   });
 
   it("ne garde que les SUPPRIMEES_MAX dernières suppressions", () => {

@@ -52,7 +52,10 @@ afterEach(() => {
 });
 
 /** Une demande de la page de l’aperçu, servie sous `hote` (son origine la suit, sauf `origine` donnée). */
-function demande(corps: unknown, { hote = "localhost:3000", origine = `http://${hote}`, entetes = {} }: { hote?: string; origine?: string; entetes?: Record<string, string> } = {}) {
+function demande(
+  corps: unknown,
+  { hote = "localhost:3000", origine = `http://${hote}`, entetes = {} }: { hote?: string; origine?: string; entetes?: Record<string, string> } = {},
+) {
   return new Request(`http://${hote}/apercu/demander`, {
     method: "POST",
     headers: { host: hote, origin: origine, "content-type": "application/json", ...entetes },

@@ -6,10 +6,7 @@ import { choisirFichier, enregistrementEcran, expect, LECTURE_DES_CAPTURES, suiv
  * puis BLUSH les lit par lots. La vidéo ne part jamais : seules ces images partent. La vidéo est filmée par le test (une
  * conv inventée qu’on remonte, aide/instagram-captures.ts) ; le modèle factice lit toujours 24 messages avec Elias.
  */
-test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules des images partent, puis « Qui es-tu ? » demande le prénom", async ({
-  page,
-  browser,
-}, testInfo) => {
+test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules des images partent, puis « Qui es-tu ? » demande le prénom", async ({ page, browser }, testInfo) => {
   const video = await enregistrementEcran(browser, testInfo);
   const envoisVers = await suivreLesEnvois(page);
   /* Et toutes les requêtes du navigateur, vues de Playwright : celles d’un worker, d’un XHR ou de sendBeacon comprises */

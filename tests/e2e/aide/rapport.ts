@@ -218,7 +218,13 @@ export async function litLeMp3(page: Page, adresse: string): Promise<boolean> {
     a.muted = true;
     /* Une lecture qui ne répond pas en quelques secondes ne compte pas comme lue */
     const delai = new Promise<boolean>((r) => setTimeout(() => r(false), 3_000));
-    const lu = await Promise.race([a.play().then(() => true, () => false), delai]);
+    const lu = await Promise.race([
+      a.play().then(
+        () => true,
+        () => false,
+      ),
+      delai,
+    ]);
     a.pause();
     a.removeAttribute("src");
     a.load();

@@ -56,7 +56,13 @@ describe("petits cas de lecture", () => {
 
   it("la mémoire garde ses messages dans l’ordre de la conv, au-delà de 9 999", () => {
     const e = memoire({ memoire: { moments: [{ quand: "a", quoi: "b", preuves: ["m10000", "m9999"] }] } });
-    const rendu = rendreMemoire(e, new Map([["m9999", "m9999 …"], ["m10000", "m10000 …"]]));
+    const rendu = rendreMemoire(
+      e,
+      new Map([
+        ["m9999", "m9999 …"],
+        ["m10000", "m10000 …"],
+      ]),
+    );
     expect(rendu.indexOf("m9999 …")).toBeLessThan(rendu.indexOf("m10000 …"));
   });
 
@@ -80,7 +86,8 @@ describe("l’enregistrement d’écran", () => {
 
 describe("un export Instagram complet", () => {
   it("propose ses convs, puis ne fait partir que celle choisie, relue dans le zip", async () => {
-    const conv = (nom: string, n: number) => JSON.stringify({ messages: Array.from({ length: n }, (_, k) => ({ sender_name: k % 2 ? "Moi" : nom, timestamp_ms: 1_790_000_000_000 - k * 60e3, content: `${nom} ${k}` })) });
+    const conv = (nom: string, n: number) =>
+      JSON.stringify({ messages: Array.from({ length: n }, (_, k) => ({ sender_name: k % 2 ? "Moi" : nom, timestamp_ms: 1_790_000_000_000 - k * 60e3, content: `${nom} ${k}` })) });
     const zip = zipSync({
       "your_instagram_activity/messages/inbox/lea_1/message_1.json": strToU8(conv("Léa", 30)),
       "your_instagram_activity/messages/inbox/ines_2/message_1.json": strToU8(conv("Inès", 12)),

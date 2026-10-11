@@ -16,7 +16,16 @@ const ecran = (source: string) => problemesDe("src/app/Essai.tsx", source);
 
 describe("la vérification de la typographie", () => {
   it("passe sur les fichiers que sa première version a corrigés (le dépôt entier, c’est `npm run check`)", () => {
-    const corriges = ["src/app/v/[id]/page.tsx", "src/app/rapport/Partage.tsx", "src/app/admin/AdminScreen.tsx", "src/app/app/HomeScreen.tsx", "src/app/rapport/Ecriture.tsx", "src/server/donnees.ts", "src/server/ajouts.ts", "src/server/mail-code.ts"];
+    const corriges = [
+      "src/app/v/[id]/page.tsx",
+      "src/app/rapport/Partage.tsx",
+      "src/app/admin/AdminScreen.tsx",
+      "src/app/app/HomeScreen.tsx",
+      "src/app/rapport/Ecriture.tsx",
+      "src/server/donnees.ts",
+      "src/server/ajouts.ts",
+      "src/server/mail-code.ts",
+    ];
     expect(verifier(corriges)).toEqual({ problemes: [], lus: corriges.length });
   });
 
@@ -61,7 +70,9 @@ describe("la vérification de la typographie", () => {
     expect(ecran("await alerter(`chat en échec`, [`Histoire ${id}`, `Erreur : ${e.message}`]);")).toEqual([]);
     /* Le journal du serveur et la trace du navigateur : à l’équipe aussi */
     expect(ecran(`journal("garde-fou : réponse remplacée", { histoire: id }, "alerte");\njournalErreur("code : non envoyé", e);`)).toEqual([]);
-    expect(ecran(`after(() => auMieux(() => inscrire(email), "liste d’attente : non inscrit"));\nenLocal(\`[dev] mail « \${sujet} » pour \${pour}\`);\ntracer("son : non joué", e);`)).toEqual([]);
+    expect(
+      ecran(`after(() => auMieux(() => inscrire(email), "liste d’attente : non inscrit"));\nenLocal(\`[dev] mail « \${sujet} » pour \${pour}\`);\ntracer("son : non joué", e);`),
+    ).toEqual([]);
     /* Le même texte hors de ces appels reste lu */
     expect(ecran(`const t = "liste d’attente : non inscrit";`)).toEqual([expect.stringContaining("espace normale avant « : »")]);
     /* Le travail passé à auMieux (une closure ou une promesse) peut envoyer un mail : il reste lu, seul l’événement est dispensé */

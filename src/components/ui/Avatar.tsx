@@ -69,7 +69,11 @@ export function AppBadge({ app, size = 46, radius = 13, className }: { app: AppK
   switch (app) {
     case "whatsapp":
       return (
-        <span aria-hidden="true" className={cls} style={{ ...box, background: `${GLOSS}, linear-gradient(180deg, #5BE584, #1FBF5B)`, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 14px -6px rgba(31,191,91,0.65)" }}>
+        <span
+          aria-hidden="true"
+          className={cls}
+          style={{ ...box, background: `${GLOSS}, linear-gradient(180deg, #5BE584, #1FBF5B)`, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 14px -6px rgba(31,191,91,0.65)" }}
+        >
           <Icon name="whatsapp" size={glyph} stroke={1.9} className="text-white" />
         </span>
       );
@@ -95,7 +99,11 @@ export function AppBadge({ app, size = 46, radius = 13, className }: { app: AppK
       );
     case "hinge":
       return (
-        <span aria-hidden="true" className={cn(cls, "font-black text-white")} style={{ ...box, background: `${GLOSS}, var(--ink)`, boxShadow: "0 6px 14px -6px rgba(17,17,20,0.55)", fontSize: Math.round(size * 0.43) }}>
+        <span
+          aria-hidden="true"
+          className={cn(cls, "font-black text-white")}
+          style={{ ...box, background: `${GLOSS}, var(--ink)`, boxShadow: "0 6px 14px -6px rgba(17,17,20,0.55)", fontSize: Math.round(size * 0.43) }}
+        >
           H
         </span>
       );

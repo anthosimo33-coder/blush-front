@@ -55,7 +55,9 @@ describe("plusieurs convs par compte", () => {
   it("« Tes convs » : les convs lues, la plus active d’abord, avec leur verdict", async () => {
     expect((await histoiresDuCompte(u.id)).map((l) => l.id)).toEqual([seconde, premiere]);
     /* BLUSH a parlé de la première après l’arrivée de la seconde : elle remonte */
-    await db().insert(schema.chatMessages).values({ storyId: premiere, role: "blush", data: chiffrer({ texte: "…" }) });
+    await db()
+      .insert(schema.chatMessages)
+      .values({ storyId: premiere, role: "blush", data: chiffrer({ texte: "…" }) });
     const convs = await convsDe(u, await ligneEnBase(premiere));
     expect(convs.map((c) => c.storyId)).toEqual([premiere, seconde]);
     expect(convs.map((c) => c.current)).toEqual([true, false]);

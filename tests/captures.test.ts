@@ -16,7 +16,13 @@ import { avecFactice } from "./aide/fixtures";
 
 describe("des captures à l’histoire", () => {
   it("transcrit, crée le brouillon, et prend le prénom de l’utilisateur", async () => {
-    const t = await lireCaptures([{ media: "image/png", base64: "AA==" }, { media: "image/png", base64: "AA==" }], "instagram");
+    const t = await lireCaptures(
+      [
+        { media: "image/png", base64: "AA==" },
+        { media: "image/png", base64: "AA==" },
+      ],
+      "instagram",
+    );
     expect(t.messages).toBe(FACTICE.messagesCaptures);
     /* Le modèle factice date ses messages de l’avant-veille et de la veille */
     expect(t.texte).toMatch(/^# captures · instagram · 2 captures\n== \d{4}-\d{2}-\d{2} 13:12 ==\nElias: message 1/);
@@ -39,7 +45,9 @@ describe("des captures à l’histoire", () => {
         { repere: { date: "2026-09-08", heure: null }, messages: [msg("moi", "", { media: "vocal" })] },
       ],
     });
-    expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe("# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis");
+    expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe(
+      "# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis",
+    );
   });
 });
 
@@ -47,11 +55,26 @@ describe("des captures que le modèle ne lit pas", () => {
   const IMAGES = [{ media: "image/png" as const, base64: "AA==" }];
 
   it("un refus du modèle : « refus » (sa catégorie dans le code interne), jamais pris pour un fichier illisible", async () => {
-    await expect(avecFactice(() => refusFactice("cyber"), () => lireCaptures(IMAGES, "instagram"))).rejects.toMatchObject({ code: "refus:cyber" } satisfies Partial<ErreurTache>);
-    await expect(avecFactice(() => REFUS_FACTICE, () => lireCaptures(IMAGES, "instagram"))).rejects.toBeInstanceOf(ErreurTache);
+    await expect(
+      avecFactice(
+        () => refusFactice("cyber"),
+        () => lireCaptures(IMAGES, "instagram"),
+      ),
+    ).rejects.toMatchObject({ code: "refus:cyber" } satisfies Partial<ErreurTache>);
+    await expect(
+      avecFactice(
+        () => REFUS_FACTICE,
+        () => lireCaptures(IMAGES, "instagram"),
+      ),
+    ).rejects.toBeInstanceOf(ErreurTache);
   });
 
   it("une sortie illisible : « fichier »", async () => {
-    await expect(avecFactice(() => ({ rien: "de lisible" }), () => lireCaptures(IMAGES, "instagram"))).rejects.toMatchObject({ code: "fichier" } satisfies Partial<ErreurImport>);
+    await expect(
+      avecFactice(
+        () => ({ rien: "de lisible" }),
+        () => lireCaptures(IMAGES, "instagram"),
+      ),
+    ).rejects.toMatchObject({ code: "fichier" } satisfies Partial<ErreurImport>);
   });
 });

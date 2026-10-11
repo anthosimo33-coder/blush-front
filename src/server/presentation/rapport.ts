@@ -147,7 +147,9 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
     blocks: [
       { kind: "scores", rows: scores },
       ...(sortie.devinette ? [{ kind: "meaning" as const, text: sortie.devinette }] : []),
-      ...(sortie.confiance ? [{ kind: "confidence" as const, level: sortie.confiance === "a_verifier" ? ("verifier" as const) : sortie.confiance, text: sortie.confiance_texte ?? "" }] : []),
+      ...(sortie.confiance
+        ? [{ kind: "confidence" as const, level: sortie.confiance === "a_verifier" ? ("verifier" as const) : sortie.confiance, text: sortie.confiance_texte ?? "" }]
+        : []),
     ],
   };
   /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */

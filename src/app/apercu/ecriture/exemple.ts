@@ -120,7 +120,11 @@ export const REPORT: Report = {
         {
           kind: "timeline",
           items: [
-            { title: "Hinge · 2 sept.", text: "Elle t’écrit la première, sur ta photo d’escalade.", message: { from: "elle", text: "c’est toi qui grimpes sans corde là\u00a0?? 😳" } },
+            {
+              title: "Hinge · 2 sept.",
+              text: "Elle t’écrit la première, sur ta photo d’escalade.",
+              message: { from: "elle", text: "c’est toi qui grimpes sans corde là\u00a0?? 😳" },
+            },
             { title: "Insta · sept. → déc.", text: "Trois mois de memes. C’est elle qui propose de se voir, deux fois." },
             { title: "Le premier date · 14 déc.", text: "Le libanais. Le lendemain, c’est encore elle qui écrit la première." },
           ],

@@ -34,7 +34,9 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
       contenu: `
             <div class="encre" style="font-family:${POLICE};font-size:30px;line-height:36px;font-weight:900;letter-spacing:-0.02em;color:${ENCRE};">${titre}</div>
             <div class="doux" style="padding-top:10px;font-family:${POLICE};font-size:16px;line-height:23px;font-weight:700;color:${DOUX};">${corps}</div>${
-              conv ? `\n            <div class="doux" style="padding-top:14px;font-family:${POLICE};font-size:14px;line-height:20px;font-weight:800;color:${GRIS};">${conv}</div>` : ""
+              conv
+                ? `\n            <div class="doux" style="padding-top:14px;font-family:${POLICE};font-size:14px;line-height:20px;font-weight:800;color:${GRIS};">${conv}</div>`
+                : ""
             }${
               liste
                 ? ""
@@ -44,7 +46,9 @@ export function mailAttente({ base, place, retrait, convEffacee = false }: { bas
     },
     pied: {
       classe: "doux",
-      contenu: liste ? `Ce n’est pas toi&nbsp;? <a href="${attribut(retrait)}" class="doux" style="color:${GRIS};font-weight:900;">Retire ton email de la liste</a>.` : "Ce n’est pas toi&nbsp;? Ignore ce mail.",
+      contenu: liste
+        ? `Ce n’est pas toi&nbsp;? <a href="${attribut(retrait)}" class="doux" style="color:${GRIS};font-weight:900;">Retire ton email de la liste</a>.`
+        : "Ce n’est pas toi&nbsp;? Ignore ce mail.",
     },
   });
   return { sujet, texte, html };

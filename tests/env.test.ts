@@ -25,7 +25,8 @@ const production = () => {
 };
 
 beforeEach(() => {
-  for (const v of ["VERCEL", "VERCEL_ENV", "BLUSH_URL", "BLUSH_EMAIL_FROM", "BLUSH_ACCES_LIBRE", "BLUSH_ADMINS", "BLUSH_BETA_FERMEE", "CRON_SECRET", "BLUSH_BOITE_MAILS"]) vi.stubEnv(v, undefined);
+  for (const v of ["VERCEL", "VERCEL_ENV", "BLUSH_URL", "BLUSH_EMAIL_FROM", "BLUSH_ACCES_LIBRE", "BLUSH_ADMINS", "BLUSH_BETA_FERMEE", "CRON_SECRET", "BLUSH_BOITE_MAILS"])
+    vi.stubEnv(v, undefined);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

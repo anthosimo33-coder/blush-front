@@ -192,14 +192,19 @@ test("Mon compte propose de se déconnecter : la session se ferme, le navigateur
   await ouvrir(page, "/compte");
   await reveil;
   /* Ce que le navigateur garde de BLUSH (src/state/cles.ts) : où tu t’étais arrêté dans le rapport, le parcours de l’onglet */
-  await page.evaluate(({ reprise, parcours }) => {
-    localStorage.setItem(reprise, "{}");
-    sessionStorage.setItem(parcours, "{}");
-  }, { reprise: CLE_REPRISE, parcours: CLE_PARCOURS });
+  await page.evaluate(
+    ({ reprise, parcours }) => {
+      localStorage.setItem(reprise, "{}");
+      sessionStorage.setItem(parcours, "{}");
+    },
+    { reprise: CLE_REPRISE, parcours: CLE_PARCOURS },
+  );
 
   await seDeconnecterDansMonCompte(page);
   await expect.poll(() => sessionsDe(email)).toBe(0);
-  expect(await page.evaluate(({ reprise, parcours }) => [localStorage.getItem(reprise), sessionStorage.getItem(parcours)], { reprise: CLE_REPRISE, parcours: CLE_PARCOURS })).toEqual([null, null]);
+  expect(
+    await page.evaluate(({ reprise, parcours }) => [localStorage.getItem(reprise), sessionStorage.getItem(parcours)], { reprise: CLE_REPRISE, parcours: CLE_PARCOURS }),
+  ).toEqual([null, null]);
   await page.goto("/compte");
   await expect(page).toHaveURL(urlDeConnexion("/compte"));
 });
@@ -217,7 +222,10 @@ test("« Se déconnecter de tous les appareils » ferme aussi la session de l’
   await expect(ordi).toHaveURL(urlDeConnexion("/compte"));
 });
 
-test("le code ne vaut que dans le navigateur qui l’a demandé : tapé sur un autre appareil, il ne marche pas ; là où il a été demandé, si", async ({ page, autreAppareil }, testInfo) => {
+test("le code ne vaut que dans le navigateur qui l’a demandé : tapé sur un autre appareil, il ne marche pas ; là où il a été demandé, si", async ({
+  page,
+  autreAppareil,
+}, testInfo) => {
   const email = emailLibre(testInfo, "navigateur");
   await page.goto("/connexion");
   const depuis = await demanderCode(page, email);

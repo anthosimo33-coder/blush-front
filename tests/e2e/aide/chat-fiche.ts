@@ -128,4 +128,3 @@ export async function glisserAuDoigt(page: Page, cible: Locator, dx: number): Pr
     await cdp.detach();
   }
 }
-

@@ -27,9 +27,7 @@ export function RetirerScreen({ id, cle }: { id: string; cle: string }) {
         desktopBack={{ target: "/" }}
         head={
           <>
-            {etat === "fait" && (
-              <DoneCheck size={48} glyphe={22} trait={3.2} />
-            )}
+            {etat === "fait" && <DoneCheck size={48} glyphe={22} trait={3.2} />}
             <ScreenTitle>{etat === "fait" ? "C’est fait." : "Ce lien ne marche pas."}</ScreenTitle>
             <Lead size={15} weight={800}>
               {etat === "fait" ? "Ton email n’est plus sur la liste d’attente. On ne t’écrira plus." : "Il est peut-être incomplet. Ouvre-le depuis le mail, tel quel."}
@@ -64,13 +62,7 @@ export function RetirerScreen({ id, cle }: { id: string; cle: string }) {
         </Button>
       }
     >
-      {etat === "reseau" ? (
-        <Alert>
-          Ça n’a pas marché. Vérifie ta connexion et réessaie.
-        </Alert>
-      ) : (
-        <span />
-      )}
+      {etat === "reseau" ? <Alert>Ça n’a pas marché. Vérifie ta connexion et réessaie.</Alert> : <span />}
     </Screen>
   );
 }

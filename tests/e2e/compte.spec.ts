@@ -78,7 +78,10 @@ test("le plan affiché suit le compte : l’aperçu gratuit et sa suite à lire,
   });
 
   await test.step("« Nouvelle histoire » repart du choix de l’appli", async () => {
-    await main.getByRole("region", { name: "Tes histoires" }).getByRole("link", { name: /^Nouvelle histoire/ }).click();
+    await main
+      .getByRole("region", { name: "Tes histoires" })
+      .getByRole("link", { name: /^Nouvelle histoire/ })
+      .click();
     await expect(page).toHaveURL(/\/commencer$/);
     await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
   });
@@ -207,7 +210,11 @@ test("Tout effacer : le compte et ses histoires disparaissent, avec leur lien pu
   const confirmation = page.getByRole("dialog", { name: "Tout effacer\u00a0?" });
 
   await test.step("confirmé : le compte et son histoire sont effacés", async () => {
-    await page.getByRole("main").getByRole("region", { name: "Tes données" }).getByRole("button", { name: /^Tout effacer/ }).click();
+    await page
+      .getByRole("main")
+      .getByRole("region", { name: "Tes données" })
+      .getByRole("button", { name: /^Tout effacer/ })
+      .click();
     await expect(confirmation.getByText("Ton compte et toutes tes histoires.")).toBeVisible();
     await confirmation.getByRole("button", { name: "Tout effacer", exact: true }).click();
     await expect(page).toHaveURL(/\/commencer$/);

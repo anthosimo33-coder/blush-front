@@ -70,7 +70,7 @@ export function borner<T extends ExportLu & { coupe?: boolean }>(lu: T): T & { c
   /* Les lignes trop longues, tronquées : les morceaux gardés, puis le reste, réunis une fois */
   const morceaux: string[] = [];
   let fait = 0;
-  for (let i = 0; i <= garde.length; ) {
+  for (let i = 0; i <= garde.length;) {
     const fin = garde.indexOf("\n", i);
     const j = fin < 0 ? garde.length : fin;
     if (j - i > LIGNE_MAX) {
@@ -120,7 +120,14 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
   return borner({ ...lu, nom: fichier.name });
 }
 
-const SchemaPaquet: z.ZodType<Paquet> = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(PARTIES_MAX), coupe: z.boolean().optional() });
+const SchemaPaquet: z.ZodType<Paquet> = z.object({
+  nom: z.string().max(300),
+  parties: z
+    .array(z.object({ nom: z.string().max(500), contenu: z.string() }))
+    .min(1)
+    .max(PARTIES_MAX),
+  coupe: z.boolean().optional(),
+});
 
 /**
  * Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici.

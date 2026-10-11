@@ -79,7 +79,19 @@ const CADRES = {
 export async function cadreStory(cadre: keyof typeof CADRES, contenu: ReactNode): Promise<ReactElement> {
   const { marges, marque, pied } = CADRES[cadre];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", width: "100%", height: "100%", padding: marges, background: FOND_IMAGE, fontFamily: "Nunito" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        height: "100%",
+        padding: marges,
+        background: FOND_IMAGE,
+        fontFamily: "Nunito",
+      }}
+    >
       <Marque bulle={await imageBulle()} {...marque} />
       {contenu}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: pied.ecart }}>
@@ -133,7 +145,20 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
             </Bulle>
           </div>
           <span style={{ fontSize: 220, lineHeight: 1, marginTop: 70 }}>{v.emoji}</span>
-          <span style={{ fontSize: taille(v.title, 104), fontWeight: 900, lineHeight: 1.04, letterSpacing: "-0.035em", color: ENCRE, maxWidth: 920, marginTop: 44, textWrap: "balance" }}>{v.title}</span>
+          <span
+            style={{
+              fontSize: taille(v.title, 104),
+              fontWeight: 900,
+              lineHeight: 1.04,
+              letterSpacing: "-0.035em",
+              color: ENCRE,
+              maxWidth: 920,
+              marginTop: 44,
+              textWrap: "balance",
+            }}
+          >
+            {v.title}
+          </span>
           {v.subtitle && <span style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.32, color: DOUX, maxWidth: 860, marginTop: 30, textWrap: "balance" }}>{v.subtitle}</span>}
         </div>,
       ),
@@ -143,7 +168,18 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
   /* La carte de l’aperçu du lien : la marque un peu plus petite qu’à l’échelle de la story (0,92 contre 1,5) */
   const k = 0.92;
   return dessiner(
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: "100%", height: "100%", padding: "46px 60px 44px", background: FOND_IMAGE, fontFamily: "Nunito" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width: "100%",
+        height: "100%",
+        padding: "46px 60px 44px",
+        background: FOND_IMAGE,
+        fontFamily: "Nunito",
+      }}
+    >
       <Marque bulle={await imageBulle()} taille={78 * k} police={44 * k} ecart={14 * k} />
       <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
         <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "flex-start" }}>
@@ -155,7 +191,9 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
               {"verdict\u00a0:"}
             </Bulle>
           </div>
-          <span style={{ fontSize: taille(v.title, 66), fontWeight: 900, lineHeight: 1.04, letterSpacing: "-0.035em", color: ENCRE, marginTop: 24, textWrap: "balance" }}>{v.title}</span>
+          <span style={{ fontSize: taille(v.title, 66), fontWeight: 900, lineHeight: 1.04, letterSpacing: "-0.035em", color: ENCRE, marginTop: 24, textWrap: "balance" }}>
+            {v.title}
+          </span>
           {v.subtitle && <span style={{ fontSize: 27, fontWeight: 800, lineHeight: 1.32, color: DOUX, marginTop: 14, textWrap: "balance" }}>{v.subtitle}</span>}
         </div>
         <span style={{ fontSize: 190, lineHeight: 1, display: "flex" }}>{v.emoji}</span>

@@ -20,7 +20,10 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
-vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]) }));
+vi.mock("@/server/alertes", async (original) => ({
+  ...(await original<typeof import("@/server/alertes")>()),
+  alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]),
+}));
 
 import { GET, POST, PUT } from "@/app/api/fiche/route";
 import { ouvrirSession } from "@/server/auth";
@@ -38,7 +41,8 @@ import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnB
 const taches: string[] = [];
 let id = "";
 
-const requete = (init: RequestInit = {}) => new Request("http://localhost/api/fiche", { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...init.headers } });
+const requete = (init: RequestInit = {}) =>
+  new Request("http://localhost/api/fiche", { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...init.headers } });
 const lire = async () => (await (await GET()).json()) as Fiche;
 const lancerApres = async () => {
   while (etat.apres.length) await etat.apres.shift()!();
@@ -127,12 +131,20 @@ describe("ajouter des captures à sa fiche", () => {
 
   it("une mise à jour restée en plan (l’instance arrêtée) repart quand la fiche se relit", async () => {
     const t = await majDuChat();
-    await db().update(schema.tasks).set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` }).where(eq(schema.tasks.id, t));
+    await db()
+      .update(schema.tasks)
+      .set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` })
+      .where(eq(schema.tasks.id, t));
     etat.apres.length = 0;
     expect((await lire()).updating).toBe(true);
     expect(etat.apres).toHaveLength(1);
     await lancerApres();
-    const tache = (await db().select().from(schema.tasks).where(and(eq(schema.tasks.id, t), eq(schema.tasks.storyId, id))))[0]!;
+    const tache = (
+      await db()
+        .select()
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.id, t), eq(schema.tasks.storyId, id)))
+    )[0]!;
     expect(tache.status).toBe("fini");
     expect((await lire()).updating).toBeUndefined();
     /* Plus rien en attente : la relecture ne relance rien */
@@ -149,7 +161,10 @@ describe("ajouter des captures à sa fiche", () => {
     etat.apres.length = 0;
     expect((await getFiche())?.updating).toBeUndefined();
     expect(etat.apres).toHaveLength(0);
-    await db().update(schema.tasks).set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` }).where(eq(schema.tasks.id, t));
+    await db()
+      .update(schema.tasks)
+      .set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` })
+      .where(eq(schema.tasks.id, t));
     expect((await getFicheEtMaj())?.updating).toBe(true);
     await lancerApres();
     const tache = (await db().select().from(schema.tasks).where(eq(schema.tasks.id, t)))[0]!;

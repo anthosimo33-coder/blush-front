@@ -160,7 +160,7 @@ describe("lireAudio : ce qui part à la transcription est ce qui a été compté
 /** Les pages d’un Ogg : leur début et leur fin. */
 function pagesOgg(o: Uint8Array): { debut: number; fin: number }[] {
   const pages = [];
-  for (let a = 0; a < o.length; ) {
+  for (let a = 0; a < o.length;) {
     const n = o[a + 26]!;
     let fin = a + 27 + n;
     for (let i = 0; i < n; i++) fin += o[a + 27 + i]!;
@@ -201,7 +201,13 @@ describe("Ogg piégé (S-15) : illisible", () => {
     const cachees = o.subarray(premiere.debut);
     /* Une page de 255 segments de 255 octets, dont le corps commence par un octet TOC (20 ms) : les vraies pages dedans */
     const corps = concat(Uint8Array.of(0x08), cachees, new Uint8Array(Math.max(0, 255 * 254 + 254 - cachees.length)));
-    const fausse = concat(o.subarray(premiere.debut, premiere.debut + 26), Uint8Array.of(255), new Uint8Array(254).fill(255), Uint8Array.of(254), corps.subarray(0, 255 * 254 + 254));
+    const fausse = concat(
+      o.subarray(premiere.debut, premiere.debut + 26),
+      Uint8Array.of(255),
+      new Uint8Array(254).fill(255),
+      Uint8Array.of(254),
+      corps.subarray(0, 255 * 254 + 254),
+    );
     fausse[5] = 0;
     const piege = concat(o.subarray(tete.debut, tags.fin), fausse);
     expect(dureeAudio(piege)).toBeNull();

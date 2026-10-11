@@ -63,7 +63,9 @@ function midiAParis(): Date {
   const jour = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const midiUtc = Date.parse(`${jour}T12:00:00Z`);
   /* Quand il est midi UTC, il est 13 h ou 14 h à Paris (l’heure d’hiver, l’heure d’été) */
-  const heureParis = Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "numeric", hourCycle: "h23" }).formatToParts(midiUtc).find((p) => p.type === "hour")?.value);
+  const heureParis = Number(
+    new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "numeric", hourCycle: "h23" }).formatToParts(midiUtc).find((p) => p.type === "hour")?.value,
+  );
   return new Date(midiUtc - (heureParis - 12) * 3600e3);
 }
 const MIDI = midiAParis();

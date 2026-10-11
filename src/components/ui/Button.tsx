@@ -106,13 +106,7 @@ export function ButtonLink({
   ...rest
 }: CommonProps & { href: Route; disabled?: boolean } & Omit<ComponentProps<typeof Link>, "href">) {
   return (
-    <Link
-      href={href}
-      aria-disabled={disabled || undefined}
-      tabIndex={disabled ? -1 : undefined}
-      className={cn(classes(variant, size), className)}
-      {...rest}
-    >
+    <Link href={href} aria-disabled={disabled || undefined} tabIndex={disabled ? -1 : undefined} className={cn(classes(variant, size), className)} {...rest}>
       <Content arrow={arrow} icon={icon} variant={variant} lien>
         {children}
       </Content>

@@ -47,7 +47,9 @@ async function reponseDuCode(page: Page, email: string): Promise<{ statut: numbe
 /** Le cookie que pose une demande de code acceptée, sous la forme que rend reponseDuCode : celui du navigateur, httpOnly. */
 const COOKIE_DU_CODE = expect.stringMatching(/^blush-code=…; .*HttpOnly/i);
 
-test("/connexion : le même écran et le même statut pour un invité et pour un email hors de la liste ; l’invité reçoit son code et entre, l’autre reçoit le mail de la liste d’attente", async ({ page }, testInfo) => {
+test("/connexion : le même écran et le même statut pour un invité et pour un email hors de la liste ; l’invité reçoit son code et entre, l’autre reçoit le mail de la liste d’attente", async ({
+  page,
+}, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const debut = Date.now();
   const dehors = emailLibre(testInfo, "dehors");
@@ -115,7 +117,9 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
   });
 });
 
-test("/email : après l’import, le même écran pour tous ; la conv d’un email hors de la liste est effacée tout de suite, celle de l’invité est gardée et lue", async ({ page }, testInfo) => {
+test("/email : après l’import, le même écran pour tous ; la conv d’un email hors de la liste est effacée tout de suite, celle de l’invité est gardée et lue", async ({
+  page,
+}, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const dehors = emailLibre(testInfo, "dehors");
   /* Deux convs inventées : Noé et Maëlys pour l’email hors de la liste, Sacha et Lina pour l’invité */
@@ -170,7 +174,10 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
   });
 });
 
-test("les limites des codes sont les mêmes pour tous : sept codes par jour pour un email, un de réserve depuis une même adresse, puis « Trop de codes demandés aujourd’hui », invité ou pas", async ({ page, request }, testInfo) => {
+test("les limites des codes sont les mêmes pour tous : sept codes par jour pour un email, un de réserve depuis une même adresse, puis « Trop de codes demandés aujourd’hui », invité ou pas", async ({
+  page,
+  request,
+}, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const debut = Date.now();
   const dehors = emailLibre(testInfo, "dehors");

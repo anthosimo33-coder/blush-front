@@ -22,8 +22,24 @@ function chiffresDuRapport(story: Story, report: Report, entier: boolean): Chiff
   const lecture = entier ? report.readingTime.full : report.readingTime.free;
   return [
     { valeur: messages, nom: "messages", pastille: <>{messages} messages</> },
-    { valeur: String(story.sources.length), nom: applis, pastille: <>{story.sources.length} {applis}</> },
-    { valeur: String(story.voiceCount), nom: vocaux, pastille: <>{story.voiceCount} {vocaux}</> },
+    {
+      valeur: String(story.sources.length),
+      nom: applis,
+      pastille: (
+        <>
+          {story.sources.length} {applis}
+        </>
+      ),
+    },
+    {
+      valeur: String(story.voiceCount),
+      nom: vocaux,
+      pastille: (
+        <>
+          {story.voiceCount} {vocaux}
+        </>
+      ),
+    },
     { valeur: lecture, nom: "de lecture", pastille: lecture },
   ];
 }
@@ -38,7 +54,13 @@ export function EnTeteRapport({ story, report, entier, moi, autre }: { story: St
     <Card className="flex flex-col gap-2.5 p-[18px]">
       <div className="flex items-center justify-between">
         <div className="text-legende font-black text-grey">Le rapport de votre histoire</div>
-        {entier ? <Tag tone="ink" size="md">Complet</Tag> : <Tag tone="apercu" size="md" />}
+        {entier ? (
+          <Tag tone="ink" size="md">
+            Complet
+          </Tag>
+        ) : (
+          <Tag tone="apercu" size="md" />
+        )}
       </div>
       <div className="flex items-center gap-2.5">
         <AvatarPair me={moi} other={autre} />

@@ -16,13 +16,19 @@ export function ChapterHeader({ number, kicker, title, id }: { number: number; k
     <div className="mb-1.5 mt-3.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5">
       {kicker && <div className="col-start-2 row-start-1 text-legende font-black text-grey">{kicker}</div>}
       <span
-        className={cn("col-start-1 -my-1.5 flex h-[38px] min-w-[38px] items-center justify-center rounded-[19px] bg-ink px-2.5 text-corps font-black text-white shadow-ink", kicker && "row-start-2")}
+        className={cn(
+          "col-start-1 -my-1.5 flex h-[38px] min-w-[38px] items-center justify-center rounded-[19px] bg-ink px-2.5 text-corps font-black text-white shadow-ink",
+          kicker && "row-start-2",
+        )}
         aria-hidden="true"
       >
         {number}
       </span>
       <h2 id={id} className={cn("col-start-2 m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]", kicker && "row-start-2")}>
-        <span className="sr-only">Chapitre {number}{NBSP}: </span>
+        <span className="sr-only">
+          Chapitre {number}
+          {NBSP}:{" "}
+        </span>
         {title}
       </h2>
     </div>
@@ -43,7 +49,9 @@ function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }: Extrac
   return (
     <div className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
       <div className="text-legende font-black text-grey">{title}</div>
-      {facts?.map((f) => <Fact key={f}>{f}</Fact>)}
+      {facts?.map((f) => (
+        <Fact key={f}>{f}</Fact>
+      ))}
       {messages && messages.length > 0 && (
         <div className="flex flex-col gap-2">
           {messages.map((m, i) => (
@@ -51,7 +59,9 @@ function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }: Extrac
           ))}
         </div>
       )}
-      {factsAfter?.map((f) => <Fact key={f}>{f}</Fact>)}
+      {factsAfter?.map((f) => (
+        <Fact key={f}>{f}</Fact>
+      ))}
     </div>
   );
 }
@@ -146,11 +156,14 @@ function Plan({ items }: Extract<ChapterBlock, { kind: "plan" }>) {
 function Paragraphs({ text, className }: { text: string; className: string }) {
   return (
     <>
-      {text.split(/\n+/).filter(Boolean).map((p, i) => (
-        <p key={i} className={cn("m-0", className)}>
-          {p}
-        </p>
-      ))}
+      {text
+        .split(/\n+/)
+        .filter(Boolean)
+        .map((p, i) => (
+          <p key={i} className={cn("m-0", className)}>
+            {p}
+          </p>
+        ))}
     </>
   );
 }

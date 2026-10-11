@@ -113,7 +113,13 @@ describe("un envoi de captures repris après une coupure", () => {
     const [ligne] = await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, a.story.id));
     expect(ligne).toBeTruthy();
     /* Des lots de six : un long enregistrement en compte plus de vingt, toujours acceptés */
-    const long = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: Array.from({ length: 24 }, (_, k) => lot(k * 100)) }) }));
+    const long = await postVideo(
+      requete("/api/captures/video", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ app: "imessage", lots: Array.from({ length: 24 }, (_, k) => lot(k * 100)) }),
+      }),
+    );
     await lue(long);
   });
 });

@@ -84,11 +84,23 @@ async function verdict(story: LigneComplete, t: Tache) {
   const { h, lu, rendu } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
-  const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t, trouvailles: trouvailles(chiffres, h, lu.messages) };
+  const contexte: Contexte = {
+    chiffres: rendu.chiffres,
+    style: profil(h, lu.messages).bloc,
+    fin: rendu.fin,
+    dernier: lu.messages.at(-1)!.t,
+    trouvailles: trouvailles(chiffres, h, lu.messages),
+  };
   /* Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, { preuves: preuvesVerdict, lignes: rendu.lignes, storyId: story.id, etiquette: "verdict", surAvance: suivreAvance(t.id, avanceVerdict) });
+  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, {
+    preuves: preuvesVerdict,
+    lignes: rendu.lignes,
+    storyId: story.id,
+    etiquette: "verdict",
+    surAvance: suivreAvance(t.id, avanceVerdict),
+  });
   /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
   const sortie = verdictNormalise(brute);
   const data = coffre.ecrire("verdicts.data", { sortie, scores: scores(chiffres) });
@@ -109,7 +121,13 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
   const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (v.sortie.mode_sobre) {
-    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, { preuves: preuvesRapport, lignes: rendu.lignes, storyId: story.id, etiquette: "rapport", complet: (x) => !!x.sobre });
+    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, {
+      preuves: preuvesRapport,
+      lignes: rendu.lignes,
+      storyId: story.id,
+      etiquette: "rapport",
+      complet: (x) => !!x.sobre,
+    });
     /* Le rapport sobre sans sa partie sobre : un écran vide. On le refait plutôt que de le garder */
     if (!r.sobre) throw new ErreurTache("sobre_vide");
     await garderRapport(story, { ...r, chapitres: null }, rendu.lignes, v.scores);
@@ -153,11 +171,19 @@ function suiviDesChapitres(story: Ligne, t: Tache, messages: Map<string, Message
   const prets = new Map<number, Chapitre>();
   let enregistrement = Promise.resolve();
   const garderPrets = () => {
-    const affiches = chapitresAffiches([...prets.values()].sort((x, y) => x.numero - y.numero), messages, lignesScores);
+    const affiches = chapitresAffiches(
+      [...prets.values()].sort((x, y) => x.numero - y.numero),
+      messages,
+      lignesScores,
+    );
     /* Des chapitres qui ne s’écrivent pas n’arrêtent pas le rapport : le journal le dit, et la chaîne ne rejette jamais */
     enregistrement = enregistrement.then(() =>
       auMieux(
-        () => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)),
+        () =>
+          db()
+            .update(schema.reports)
+            .set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() })
+            .where(eq(schema.reports.storyId, story.id)),
         "chapitres prêts non gardés",
         { tache: t.id, histoire: story.id },
       ),
@@ -243,7 +269,10 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     sobre: sobreAffiche(r),
     lecture: lectureDe(chapitres),
   };
-  const [avant] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
+  const [avant] = await db()
+    .select({ pret: sql<boolean>`${schema.reports.data} is not null` })
+    .from(schema.reports)
+    .where(eq(schema.reports.storyId, story.id));
   /* Le rapport assemblé : les chapitres gardés au fil de l’écriture ne servent plus */
   const data = coffre.ecrire("reports.data", donnees);
   await db()
@@ -264,7 +293,10 @@ async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre:
     const [u] = await db().select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, story.userId));
     if (!u) return;
     const base = env().BLUSH_URL;
-    await envoyerMail(u.email, mailRapport({ base, lien: `${base}/ouvrir/${story.id}`, chapitres: donnees.chapitres.length, lecture: donnees.lecture.full, autre, sobre: !!donnees.sobre }));
+    await envoyerMail(
+      u.email,
+      mailRapport({ base, lien: `${base}/ouvrir/${story.id}`, chapitres: donnees.chapitres.length, lecture: donnees.lecture.full, autre, sobre: !!donnees.sobre }),
+    );
   } catch (e) {
     journalErreur("mail du rapport non envoyé", e, { histoire: story.id });
   }
@@ -280,7 +312,10 @@ const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flat
  * s’arrête sur « voix_budget » (elle repart après minuit, src/server/pipeline.ts). Une autre erreur de la voix garde
  * son code (« voix_429 »…).
  */
-async function vocal(story: Ligne, { verdict, rapport, lignes, sobre }: { verdict: Verdict; rapport: { plan: Plan } | { court: string }; lignes: Map<string, string>; sobre: boolean }) {
+async function vocal(
+  story: Ligne,
+  { verdict, rapport, lignes, sobre }: { verdict: Verdict; rapport: { plan: Plan } | { court: string }; lignes: Map<string, string>; sobre: boolean },
+) {
   if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
   if (await voixBloquee(story.id, "rapport")) throw new ErreurTache("voix_budget");
   const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
@@ -360,7 +395,13 @@ async function memoireMaj(story: Ligne, t: Tache) {
       const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
       const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.texte, editionsBornees(avant.editions));
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-      const maj = await appelVerifie(req, Maj07, { preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, storyId: story.id, etiquette: "memoire_maj", partie: "mise à jour" });
+      const maj = await appelVerifie(req, Maj07, {
+        preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)),
+        lignes,
+        storyId: story.id,
+        etiquette: "memoire_maj",
+        partie: "mise à jour",
+      });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
       const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);

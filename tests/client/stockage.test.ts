@@ -77,8 +77,8 @@ describe("lireJson : la valeur, si elle a la forme attendue", () => {
 
   it.each([
     ["absente", null],
-    ["un JSON abîmé", "[\"a\", "],
-    ["d’une autre forme", "{\"a\": 1}"],
+    ["un JSON abîmé", '["a", '],
+    ["d’une autre forme", '{"a": 1}'],
     ["une liste d’autre chose", "[1, 2]"],
     ["null", "null"],
   ])("%s : la valeur par défaut", (_, brut) => {
@@ -88,7 +88,7 @@ describe("lireJson : la valeur, si elle a la forme attendue", () => {
   });
 
   it("stockage refusé : la valeur par défaut", () => {
-    localStorage.setItem("blush.test.liste", "[\"a\"]");
+    localStorage.setItem("blush.test.liste", '["a"]');
     stockageRefuse();
     expect(lireJson("blush.test.liste", estListe, [])).toEqual([]);
   });

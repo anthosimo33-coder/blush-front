@@ -145,7 +145,10 @@ export function erreurDeParcours<D extends keyof typeof PARCOURS>(depuis: D, e: 
  * capture », « tes 3 captures », « votre conv ») ; `prenom` : le sien. « rien_de_neuf » n’est pas une erreur.
  */
 const AJOUT_FICHE = {
-  capture: (quoi) => ({ title: `BLUSH n’arrive pas à lire ${quoi}`, detail: quoi === "ta capture" ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner." }),
+  capture: (quoi) => ({
+    title: `BLUSH n’arrive pas à lire ${quoi}`,
+    detail: quoi === "ta capture" ? "Renvoie-la en entier, sans la rogner." : "Renvoie-les en entier, sans les rogner.",
+  }),
   fichier: () => ({ title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram." }),
   autre_conv: (_, prenom) => ({ title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${prenom}.` }),
   trop: () => ({ title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." }),

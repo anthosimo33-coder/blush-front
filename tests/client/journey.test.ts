@@ -46,7 +46,7 @@ describe("l’état du parcours relu de l’onglet", () => {
   });
 
   it("un JSON abîmé, ou autre chose qu’un objet : le parcours part de zéro", async () => {
-    for (const brut of ["{abîmé", "[1,2]", "null", "\"whatsapp\""]) {
+    for (const brut of ["{abîmé", "[1,2]", "null", '"whatsapp"']) {
       sessionStorage.setItem(CLE_PARCOURS, brut);
       vi.resetModules();
       expect((await parcours()).app).toBeNull();

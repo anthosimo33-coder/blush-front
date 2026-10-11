@@ -107,11 +107,7 @@ export function LevelPath({ current, variant = "normal", className }: { current:
           const now = i === idx;
           const done = !temperature && i < idx;
           return (
-            <li
-              key={l.id}
-              className="relative flex w-[76px] flex-col items-center gap-2 text-center"
-              aria-current={now ? "step" : undefined}
-            >
+            <li key={l.id} className="relative flex w-[76px] flex-col items-center gap-2 text-center" aria-current={now ? "step" : undefined}>
               <span
                 /* L’étape en cours bat par un anneau sur le compositeur (une ombre animée repeindrait la page à chaque image) */
                 data-beat={now ? "doux" : undefined}
@@ -241,7 +237,14 @@ export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {
               {done ? (
                 <DoneCheck size={30} />
               ) : (
-                <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black", on ? "bg-ink text-white" : "bg-white text-grey shadow-thin")}>{n}</span>
+                <span
+                  className={cn(
+                    "flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black",
+                    on ? "bg-ink text-white" : "bg-white text-grey shadow-thin",
+                  )}
+                >
+                  {n}
+                </span>
               )}
               <div>
                 <div className={cn("text-corps font-black", on || done ? "text-ink" : "text-grey")}>{s.title}</div>

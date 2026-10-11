@@ -52,7 +52,8 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
       await effacerBrouillon();
     }
     await poserChoisie(story.id);
-    if (qui) await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
+    if (qui)
+      await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
     await planifier(story.id, "verdict");
   }
   relancerApres(story.id);

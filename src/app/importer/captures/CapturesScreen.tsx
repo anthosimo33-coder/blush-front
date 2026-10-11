@@ -80,13 +80,14 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
    * une fois décodée (vingt captures font grimper la mémoire jusqu’au rechargement de Safari). Sans Worker, l’originale.
    */
   const vignettes = (shots: Shot[]) =>
-    shots.forEach((s) =>
-      void vignette(s.file).then((b) => {
-        /* Retirée entre-temps, ou l’écran est parti : l’aperçu ne sert plus */
-        if (!monte.current || !all.current.some((x) => x.id === s.id)) return;
-        const url = apercus.creer(b ?? s.file);
-        setItems((list) => list.map((x) => (x.id === s.id ? { ...x, url } : x)));
-      }),
+    shots.forEach(
+      (s) =>
+        void vignette(s.file).then((b) => {
+          /* Retirée entre-temps, ou l’écran est parti : l’aperçu ne sert plus */
+          if (!monte.current || !all.current.some((x) => x.id === s.id)) return;
+          const url = apercus.creer(b ?? s.file);
+          setItems((list) => list.map((x) => (x.id === s.id ? { ...x, url } : x)));
+        }),
     );
 
   /* Une erreur de lecture (rien de lisible, conv trop courte) ouvre l’écran d’erreur prévu (?erreur=, ErreurDeParcours) */

@@ -38,7 +38,18 @@ export default async function Page({ searchParams }: PageProps<"/apercu/admin">)
         { nom: "Mémoire", dollars: 1.59, appels: 31 },
       ],
     },
-    sante: q.calme === "1" ? { echecs: [], enCours: 2, bloquees: 0, enAttente: 1 } : { echecs: [{ code: "refus", n: 2 }, { code: "panne", n: 1 }], enCours: 2, bloquees: 1, enAttente: 1 },
+    sante:
+      q.calme === "1"
+        ? { echecs: [], enCours: 2, bloquees: 0, enAttente: 1 }
+        : {
+            echecs: [
+              { code: "refus", n: 2 },
+              { code: "panne", n: 1 },
+            ],
+            enCours: 2,
+            bloquees: 1,
+            enAttente: 1,
+          },
     beta: { fermee: true, invites: 12, attente: 87, attenteNouveaux: 9, comptes: 31 },
   };
   return <AdminScreen s={s} base="/apercu/admin" />;

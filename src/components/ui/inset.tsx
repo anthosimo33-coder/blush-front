@@ -55,8 +55,16 @@ export function RowIcon({ icon, tone = "grey", children }: { icon?: IconName; to
  * laisse place aux trois points de BLUSH tant que la page n’arrive pas.
  */
 const TAILLES_LIGNE = {
-  normal: { ligne: "flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline", titre: "text-corps font-black leading-[1.3]", sous: "text-legende font-extrabold leading-[1.4] text-grey" },
-  compact: { ligne: "flex w-full items-center gap-3 px-4 py-3.5 text-left text-ink no-underline", titre: "text-detail font-black", sous: "truncate text-legende font-extrabold text-grey" },
+  normal: {
+    ligne: "flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline",
+    titre: "text-corps font-black leading-[1.3]",
+    sous: "text-legende font-extrabold leading-[1.4] text-grey",
+  },
+  compact: {
+    ligne: "flex w-full items-center gap-3 px-4 py-3.5 text-left text-ink no-underline",
+    titre: "text-detail font-black",
+    sous: "truncate text-legende font-extrabold text-grey",
+  },
 } as const;
 
 /**
@@ -136,12 +144,29 @@ export function InsetRow({
 }
 
 /** En-tête centré : un visuel, un titre, une phrase. Pour les écrans qui ont un seul sujet. */
-export function HeroHeader({ visual, kicker, title, sub, className, titleId }: { visual?: ReactNode; kicker?: ReactNode; title: ReactNode; sub?: ReactNode; className?: string; titleId?: string }) {
+export function HeroHeader({
+  visual,
+  kicker,
+  title,
+  sub,
+  className,
+  titleId,
+}: {
+  visual?: ReactNode;
+  kicker?: ReactNode;
+  title: ReactNode;
+  sub?: ReactNode;
+  className?: string;
+  titleId?: string;
+}) {
   return (
     <div className={cn("flex flex-col items-center text-center", className)}>
       {visual}
       {kicker && <div className={cn("text-legende font-black", !!visual && "mt-4")}>{kicker}</div>}
-      <h1 id={titleId} className={cn("m-0 text-titre-2 font-black leading-[1.08] tracking-[-0.02em] [text-wrap:balance] lg:text-[34px]", !!visual && !kicker && "mt-4", !!kicker && "mt-1.5")}>
+      <h1
+        id={titleId}
+        className={cn("m-0 text-titre-2 font-black leading-[1.08] tracking-[-0.02em] [text-wrap:balance] lg:text-[34px]", !!visual && !kicker && "mt-4", !!kicker && "mt-1.5")}
+      >
         {title}
       </h1>
       {sub && <p className="m-0 mt-2.5 max-w-[440px] text-detail font-extrabold leading-[1.45] text-soft">{sub}</p>}

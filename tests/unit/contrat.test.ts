@@ -86,7 +86,9 @@ describe("la table des routes", () => {
       /* Les schémas tirés d’une ligne dans le fichier : `const Corps = ROUTES["…"].corps.extend(…)` */
       const etendus = new Map([...r.source.matchAll(/const\s+(\w+)\s*=\s*ROUTES\["([^"]+)"\]\.corps\s*\.extend\(/g)].map(([, nom, cle]) => [nom, cle]));
       /* La ligne de chaque schéma passé à lireCorps ; un schéma d’ailleurs garde son texte, entre parenthèses */
-      const lues = [...r.source.matchAll(/lireCorps\(\s*\w+\s*,\s*([^)]*?)\s*\)/g)].map((m) => m[1]!).map((schema) => /^ROUTES\["([^"]+)"\]\.corps$/.exec(schema)?.[1] ?? etendus.get(schema) ?? `(${schema})`);
+      const lues = [...r.source.matchAll(/lireCorps\(\s*\w+\s*,\s*([^)]*?)\s*\)/g)]
+        .map((m) => m[1]!)
+        .map((schema) => /^ROUTES\["([^"]+)"\]\.corps$/.exec(schema)?.[1] ?? etendus.get(schema) ?? `(${schema})`);
       const attendues = r.methodes.map((m) => `${m} ${r.chemin}`).filter((cle) => (ROUTES[cle as CleRoute] as { corps?: unknown }).corps);
       expect({ fichier: r.fichier, lues: [...new Set(lues)].sort() }).toEqual({ fichier: r.fichier, lues: attendues.sort() });
     }

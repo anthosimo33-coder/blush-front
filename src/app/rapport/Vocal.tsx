@@ -413,7 +413,12 @@ function Story({
                   <PerlesSobres />
                 ) : (
                   <>
-                    <span aria-hidden="true" data-vocal-halo="" className="absolute size-[190px] rounded-full" style={{ background: "radial-gradient(circle, rgba(255,125,186,0.35) 0%, rgba(255,125,186,0) 68%)" }} />
+                    <span
+                      aria-hidden="true"
+                      data-vocal-halo=""
+                      className="absolute size-[190px] rounded-full"
+                      style={{ background: "radial-gradient(circle, rgba(255,125,186,0.35) 0%, rgba(255,125,186,0) 68%)" }}
+                    />
                     <span data-vocal-parle={joue ? "" : undefined} className="relative">
                       <BubbleLogo size={132} layered />
                     </span>
@@ -435,7 +440,13 @@ function Story({
                   </div>
                 )}
               </div>
-              <p role={coupe ? "alert" : undefined} className={cn("m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-corps font-extrabold leading-[1.35] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-note", coupe ? "text-white" : "text-white/45")}>
+              <p
+                role={coupe ? "alert" : undefined}
+                className={cn(
+                  "m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-corps font-extrabold leading-[1.35] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-note",
+                  coupe ? "text-white" : "text-white/45",
+                )}
+              >
                 {coupe ? "Le vocal ne charge pas. Vérifie ta connexion, puis relance-le." : avant?.texte}
               </p>
               {ligne && (
@@ -451,7 +462,11 @@ function Story({
                   </span>
                   <span aria-hidden="true">
                     {ligne.mots.map((m, i) => (
-                      <span key={i} className="transition-colors duration-100" style={{ color: t >= m.debut ? (ligne.punch && !sobre ? "#FF7DBA" : "white") : "rgba(255,255,255,0.26)" }}>
+                      <span
+                        key={i}
+                        className="transition-colors duration-100"
+                        style={{ color: t >= m.debut ? (ligne.punch && !sobre ? "#FF7DBA" : "white") : "rgba(255,255,255,0.26)" }}
+                      >
                         {m.t}{" "}
                       </span>
                     ))}
@@ -471,7 +486,11 @@ function Story({
                 className="flex size-[68px] items-center justify-center rounded-full bg-white [@media(max-height:620px)]:size-[60px]"
                 style={{ boxShadow: sobre ? undefined : "0 12px 30px -10px rgba(255,125,186,0.6)" }}
               >
-                {joue ? <Icon name="pause" size={22} stroke={3.2} className="text-ink" /> : <Icon name="play" size={22} fill="currentColor" stroke={0} className="translate-x-0.5 text-ink" />}
+                {joue ? (
+                  <Icon name="pause" size={22} stroke={3.2} className="text-ink" />
+                ) : (
+                  <Icon name="play" size={22} fill="currentColor" stroke={0} className="translate-x-0.5 text-ink" />
+                )}
               </button>
               <button type="button" onClick={onFermer} aria-label="Passer et lire le rapport" className="flex size-12 items-center justify-center rounded-full bg-white/10">
                 <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">

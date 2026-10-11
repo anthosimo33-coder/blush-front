@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresCommences, chapitresFinis, etapeDeLecture, ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "@/server/avancement";
+import {
+  avanceChapitres,
+  avanceMoitie,
+  avancePlan,
+  avanceVerdict,
+  CHAPITRES_PAR_MOITIE,
+  chapitresCommences,
+  chapitresFinis,
+  etapeDeLecture,
+  ETAPES_DE_LECTURE,
+  VERDICT_REFLEXION,
+} from "@/server/avancement";
 
 /*
  * Les jauges (src/server/avancement.ts) : où en est une étape, lu sur ce que le modèle a déjà écrit. Sans base ni
@@ -21,7 +32,8 @@ describe("l’avancée du rapport, lue sur ce que le modèle écrit", () => {
     expect(avanceMoitie(avance("", 50_000), 5).progres).toBeLessThan(0.45);
     expect(avanceMoitie(avance("", 50_000), 5).enCours).toBeNull();
     /* Un chapitre est fini quand le suivant commence : seul le 1 l’est ici */
-    const ch = (n: number) => `{"numero":${n},"titre":"T${n}","titre_court":"C${n}","surtitre":null,"blocs":[{"type":"chute","texte":"fin ${n}","preuves":[],"titre":null,"niveau":null,"items":null}]}`;
+    const ch = (n: number) =>
+      `{"numero":${n},"titre":"T${n}","titre_court":"C${n}","surtitre":null,"blocs":[{"type":"chute","texte":"fin ${n}","preuves":[],"titre":null,"niveau":null,"items":null}]}`;
     expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)},${ch(2).slice(0, 40)}`).map((c) => c.numero)).toEqual([1]);
     expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)}, ${ch(2)},${ch(3).slice(0, 20)}`).map((c) => c.titre)).toEqual(["T1", "T2"]);
     /* Le plan : sa réflexion jusqu’à 50, puis ses chapitres */

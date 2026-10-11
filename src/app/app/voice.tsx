@@ -291,10 +291,20 @@ export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSen
       <span aria-hidden="true" data-onde="" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">
         {bars.map((l, i) => (
           /* Une échelle plutôt qu’une hauteur : 14 fois par seconde pendant l’enregistrement, sans recalculer la page */
-          <span key={i} className="h-[25px] w-[3px] shrink-0 rounded-full bg-ink transition-transform duration-75" style={{ transform: `scaleY(${(3 + l * 22) / 25})`, opacity: l === 0 ? 0.18 : 0.85 }} />
+          <span
+            key={i}
+            className="h-[25px] w-[3px] shrink-0 rounded-full bg-ink transition-transform duration-75"
+            style={{ transform: `scaleY(${(3 + l * 22) / 25})`, opacity: l === 0 ? 0.18 : 0.85 }}
+          />
         ))}
       </span>
-      <button type="button" onClick={onSend} aria-label="Envoyer le vocal" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">
+      <button
+        type="button"
+        onClick={onSend}
+        aria-label="Envoyer le vocal"
+        data-popin=""
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink"
+      >
         <Icon name="arrow" size={17} stroke={2.8} className="-rotate-90 text-white" />
       </button>
     </>
@@ -315,7 +325,11 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
         aria-label={playing ? "Mettre ton vocal en pause" : `Écouter ton vocal (${formatClock(clip.seconds)})`}
         className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white"
       >
-        {playing ? <Icon name="pause" size={15} stroke={3.2} className="text-toi-ink" /> : <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-toi-ink" />}
+        {playing ? (
+          <Icon name="pause" size={15} stroke={3.2} className="text-toi-ink" />
+        ) : (
+          <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-toi-ink" />
+        )}
       </button>
       <span aria-hidden="true" className="flex h-7 items-center gap-[2px]">
         {clip.peaks.map((p, i) => (
@@ -410,7 +424,11 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
         className="flex size-[42px] shrink-0 items-center justify-center rounded-full shadow-[0_6px_14px_-6px_rgba(200,29,107,0.7)]"
         style={{ background: "linear-gradient(160deg, #FF94C8 0%, #E8358A 60%, var(--color-elle-ink) 100%)" }}
       >
-        {playing ? <Icon name="pause" size={15} stroke={3.2} className="text-white" /> : <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-white" />}
+        {playing ? (
+          <Icon name="pause" size={15} stroke={3.2} className="text-white" />
+        ) : (
+          <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-white" />
+        )}
       </button>
       <span aria-hidden="true" className="flex h-7 flex-1 items-center justify-between gap-[2px]">
         {vocal.peaks.map((p, i) => (

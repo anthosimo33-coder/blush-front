@@ -22,7 +22,11 @@ import { PLANCHES, RETIRES, SECTIONS, STATES } from "./screens.mjs";
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const OUT = path.join(ROOT, ".galerie");
 const MAQ = path.resolve(ROOT, process.env.MAQUETTES ?? "../maquettes/png");
-const ONLY = process.env.ONLY ? process.env.ONLY.split(",").map((s) => s.trim()).filter(Boolean) : null;
+const ONLY = process.env.ONLY
+  ? process.env.ONLY.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : null;
 const PAGE_SEULEMENT = process.argv.includes("--page");
 const FLUIDITE = process.argv.includes("--fluidite");
 /* Le serveur des tests, à part : un port (et le suivant, pour la bêta fermée) et une base à la galerie (ou au banc) */
@@ -100,7 +104,10 @@ function assembler() {
   for (const st of STATES) {
     if (!st.ref || !maquettes) continue;
     refs[st.id] = {};
-    for (const [key, dir] of [["m", "mobile"], ["d", "desktop"]]) {
+    for (const [key, dir] of [
+      ["m", "mobile"],
+      ["d", "desktop"],
+    ]) {
       const src = path.join(MAQ, dir, `${st.ref}.png`);
       if (!fs.existsSync(src)) continue;
       const rel = `ref/${key}-${st.ref}.jpg`;
@@ -125,7 +132,19 @@ function assembler() {
     sections: SECTIONS,
     retires: RETIRES,
     /* Ce que la page affiche, sans ce qui ne sert qu’à la capture (le compte, les gestes…) */
-    states: STATES.map(({ id, section, title, state, route, note, changement, full, only }) => ({ id, section, title, state, route, note, changement, full, only, shots: shots[id] ?? {}, ref: refs[id] ?? null })),
+    states: STATES.map(({ id, section, title, state, route, note, changement, full, only }) => ({
+      id,
+      section,
+      title,
+      state,
+      route,
+      note,
+      changement,
+      full,
+      only,
+      shots: shots[id] ?? {},
+      ref: refs[id] ?? null,
+    })),
     planches,
   };
 
@@ -139,7 +158,10 @@ function assembler() {
 
   /* Fichiers référencés par la page, et ce qu’il faut retirer de la version publiée précédente */
   const files = [
-    ...manifest.states.flatMap((s) => [s.shots.m, s.shots.d, s.ref?.m, s.ref?.d]).filter(Boolean).map((x) => x.src),
+    ...manifest.states
+      .flatMap((s) => [s.shots.m, s.shots.d, s.ref?.m, s.ref?.d])
+      .filter(Boolean)
+      .map((x) => x.src),
     ...manifest.planches.map((p) => p.src),
   ];
   const uniq = [...new Set(files)].sort();

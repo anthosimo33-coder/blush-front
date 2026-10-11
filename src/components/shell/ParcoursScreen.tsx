@@ -17,5 +17,12 @@ export function ParcoursScreen({
   retourDesktop = true,
   ...props
 }: { step?: EtapeParcours; back: BackTarget; retourDesktop?: boolean } & Omit<ScreenProps, "mobileTop" | "desktopBack" | "aside">) {
-  return <Screen mobileTop={<MobileTopBar back={back} progress={step} />} desktopBack={retourDesktop ? { target: back } : undefined} aside={step ? <FlowSteps step={step} /> : undefined} {...props} />;
+  return (
+    <Screen
+      mobileTop={<MobileTopBar back={back} progress={step} />}
+      desktopBack={retourDesktop ? { target: back } : undefined}
+      aside={step ? <FlowSteps step={step} /> : undefined}
+      {...props}
+    />
+  );
 }

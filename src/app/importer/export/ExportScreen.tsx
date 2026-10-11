@@ -189,7 +189,12 @@ function PhoneScreen({ menu }: { menu: Menu }) {
         <span className="mt-2 text-corps font-black">{menu.contact}</span>
         <div className="mt-3.5 w-[calc(100%_-_24px)] overflow-hidden rounded-[14px] bg-white">
           {menu.items.map((it, i) => (
-            <MenuRow key={it} first={i === 0} on={i === menu.highlight} className={cn("h-[42px] px-3.5 text-[13.5px]", i === menu.items.length - 1 ? "text-danger" : "text-[#0F7A3C]")}>
+            <MenuRow
+              key={it}
+              first={i === 0}
+              on={i === menu.highlight}
+              className={cn("h-[42px] px-3.5 text-[13.5px]", i === menu.items.length - 1 ? "text-danger" : "text-[#0F7A3C]")}
+            >
               {it}
             </MenuRow>
           ))}
@@ -201,7 +206,10 @@ function PhoneScreen({ menu }: { menu: Menu }) {
 
 function MenuRow({ children, on, first, className }: { children: ReactNode; on: boolean; first: boolean; className?: string }) {
   return (
-    <div className={cn("flex items-center justify-between font-extrabold", !first && "border-t border-[rgba(17,17,20,0.06)]", className)} style={on ? { background: "rgba(18,192,138,0.1)" } : undefined}>
+    <div
+      className={cn("flex items-center justify-between font-extrabold", !first && "border-t border-[rgba(17,17,20,0.06)]", className)}
+      style={on ? { background: "rgba(18,192,138,0.1)" } : undefined}
+    >
       {children}
       {/* L’anneau qui bat est un ::after en scale et opacité (data-beat) : une ombre animée repeignait la page à chaque image */}
       {on && <span data-beat="" className="size-3 shrink-0 rounded-full bg-ink shadow-[0_0_0_5px_rgba(17,17,20,0.12)]" />}

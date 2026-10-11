@@ -112,10 +112,9 @@ export async function reponseAuGeste(page: Page, { chemin, methode = "POST", fil
 export async function ouvrir(page: Page, adresse?: string): Promise<void> {
   /* Une lecture partie de cette page-ci : pas celle, encore en route, de la page d’avant */
   const depuis = Date.now();
-  const lecture = page.waitForResponse(
-    (r) => new URL(r.url()).pathname === "/api/compte" && r.request().method() === "GET" && r.request().timing().startTime >= depuis,
-    { timeout: 2 * RESEAU },
-  );
+  const lecture = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/compte" && r.request().method() === "GET" && r.request().timing().startTime >= depuis, {
+    timeout: 2 * RESEAU,
+  });
   /* Celle des deux attentes qui ne vient pas (la lecture, sur une page d’une conv) ne reste pas sans personne pour l’écouter */
   lecture.catch(() => {});
   await (adresse ? page.goto(adresse) : page.reload());
@@ -139,7 +138,8 @@ export async function pageAuRepos(page: Page, { repos = 600, max = 15_000, echou
         const changements = new MutationObserver(() => (dernier = performance.now()));
         changements.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
         const verifier = () => {
-          const anime = !!document.querySelector(".flight") || document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity);
+          const anime =
+            !!document.querySelector(".flight") || document.getAnimations().some((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity);
           if (anime) dernier = performance.now();
           const auRepos = performance.now() - dernier >= repos;
           if (auRepos || performance.now() - debut > max) {
@@ -181,4 +181,3 @@ export async function releverLePressePapiers(page: Page): Promise<() => Promise<
   });
   return () => page.evaluate(() => (window as unknown as { __copieDuTest?: string }).__copieDuTest);
 }
-

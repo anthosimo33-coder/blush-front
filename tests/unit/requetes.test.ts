@@ -53,7 +53,17 @@ const plan = Plan05.parse({
   mode_sobre: false,
   these: "Deux timides qui se cherchent.",
   decouvertes: [],
-  chapitres: [{ numero: 1, titre: "Le verdict", titre_court: "Le verdict", surtitre: null, periode: "septembre", scenes: [{ quand: "le 8", quoi: "le ciné", preuves: ["m0001"] }], epice: "le jeudi" }],
+  chapitres: [
+    {
+      numero: 1,
+      titre: "Le verdict",
+      titre_court: "Le verdict",
+      surtitre: null,
+      periode: "septembre",
+      scenes: [{ quand: "le 8", quoi: "le ciné", preuves: ["m0001"] }],
+      epice: "le jeudi",
+    },
+  ],
 });
 
 /** Un bloc tel que le test le fige : ses balises ouvrantes dans l’ordre, s’il est en cache, les messages qu’il cite. Jamais son texte. */
@@ -179,7 +189,18 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
   /* Les messages que garde la mémoire, une fois la conv effacée : ceux qu’elle cite ci-dessus */
   const lignes = new Map(["m0001", "m0002", "m0013", "m0040"].map((id) => [id, rendu.lignes.get(id)!]));
   const chat = (autres: Partial<Parameters<typeof requeteChat>[0]> = {}) =>
-    requeteChat({ h, aujourdhui: Date.UTC(2026, 9, 1), chiffres: rendu.chiffres, fin: rendu.fin, etat, lignes, style: profil(h, lu.messages).bloc, fil: [], dit: "elle m’a répondu ok", ...autres });
+    requeteChat({
+      h,
+      aujourdhui: Date.UTC(2026, 9, 1),
+      chiffres: rendu.chiffres,
+      fin: rendu.fin,
+      etat,
+      lignes,
+      style: profil(h, lu.messages).bloc,
+      fil: [],
+      dit: "elle m’a répondu ok",
+      ...autres,
+    });
   const suite = chat({
     fil: [
       { de: "toi", texte: "je lui dis quoi ?", lignes: [[...rendu.lignes.values()].at(-1)!] },

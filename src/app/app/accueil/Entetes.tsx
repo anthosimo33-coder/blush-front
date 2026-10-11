@@ -26,7 +26,13 @@ import { useHomeMotion } from "./mouvement/contexte";
 export function BlushTitle({ busy, onClick, big = false, logoRef }: { busy: boolean; onClick: () => void; big?: boolean; logoRef?: Ref<HTMLSpanElement> }) {
   const { arriving } = useHomeMotion();
   return (
-    <button type="button" onClick={onClick} aria-haspopup="dialog" aria-label="BLUSH, ce qu’il voit de vous deux" className="group pointer-events-auto relative flex flex-col items-center px-1 text-ink">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      aria-label="BLUSH, ce qu’il voit de vous deux"
+      className="group pointer-events-auto relative flex flex-col items-center px-1 text-ink"
+    >
       {/* 1 · À l’arrivée, un halo rose s’allume derrière lui puis s’efface */}
       {arriving && (
         <span
@@ -91,7 +97,9 @@ export function ConvsButton({ others, flat = false }: { others: ConvSummary[]; f
             </Avatar>
           </span>
         ))}
-        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-plaque text-[11px] font-black text-soft shadow-[0_0_0_2px_white]">+{more}</span>}
+        {more > 0 && (
+          <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-plaque text-[11px] font-black text-soft shadow-[0_0_0_2px_white]">+{more}</span>
+        )}
       </span>
     </Link>
   );

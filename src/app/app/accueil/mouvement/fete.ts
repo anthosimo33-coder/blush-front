@@ -15,13 +15,21 @@ export function celebrate(entete: RegistreEntete) {
   }
   const sophie = entete.visible("anneau");
   if (!sophie) return;
-  sophie
-    .querySelector("[data-glow-ring]")
-    ?.animate([{ opacity: 0, transform: "scale(0.9)" }, { opacity: 1, transform: "scale(1.05)", offset: 0.4 }, { opacity: 0, transform: "scale(1.18)" }], { duration: 1300, easing: "ease-out" });
+  sophie.querySelector("[data-glow-ring]")?.animate(
+    [
+      { opacity: 0, transform: "scale(0.9)" },
+      { opacity: 1, transform: "scale(1.05)", offset: 0.4 },
+      { opacity: 0, transform: "scale(1.18)" },
+    ],
+    { duration: 1300, easing: "ease-out" },
+  );
   entete.visible("avatar")?.animate([{ scale: 1 }, { scale: 1.16, offset: 0.35 }, { scale: 1 }], { duration: 620, easing: "cubic-bezier(0.3, 1.4, 0.5, 1)" });
   sophie
     .querySelector("[data-badge]")
-    ?.animate([{ transform: "rotateY(0deg) scale(1)" }, { transform: "rotateY(180deg) scale(1.35)", offset: 0.5 }, { transform: "rotateY(360deg) scale(1)" }], { duration: 760, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" });
+    ?.animate([{ transform: "rotateY(0deg) scale(1)" }, { transform: "rotateY(180deg) scale(1.35)", offset: 0.5 }, { transform: "rotateY(360deg) scale(1)" }], {
+      duration: 760,
+      easing: "cubic-bezier(0.3, 0.7, 0.4, 1)",
+    });
   const r = sophie.getBoundingClientRect();
   const cx = r.left + r.width / 2;
   const cy = r.top + r.height / 2;

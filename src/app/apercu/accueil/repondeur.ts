@@ -44,7 +44,8 @@ function historyOf(msgs: Msg[]): { from: "toi" | "blush"; text: string }[] {
   return msgs
     .flatMap((m): { from: "toi" | "blush"; text: string }[] => {
       if (m.type === "texte") return [{ from: "toi", text: m.text }];
-      if (m.type === "reponse") return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
+      if (m.type === "reponse")
+        return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
       return [];
     })
     .slice(-FIL_MAX)

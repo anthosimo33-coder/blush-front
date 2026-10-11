@@ -133,7 +133,11 @@ const sansAbonnement = () => () => {};
 
 /** Vrai une fois l’état du navigateur lu (après hydratation) : seul le composant qui le demande se re-rend. */
 export function useHydrated() {
-  return useSyncExternalStore(sansAbonnement, () => true, () => false);
+  return useSyncExternalStore(
+    sansAbonnement,
+    () => true,
+    () => false,
+  );
 }
 
 export function useJourney(): [JourneyState, typeof setJourney] {
@@ -143,5 +147,9 @@ export function useJourney(): [JourneyState, typeof setJourney] {
 
 /** Seulement « qui est toi » : l’écran qui ne lit que lui ne se re-rend pas après l’hydratation, ni quand le reste du parcours change. */
 export function useJourneyMe(): string | null {
-  return useSyncExternalStore(subscribe, () => getSnapshot().me, () => JOURNEY_DEFAULTS.me);
+  return useSyncExternalStore(
+    subscribe,
+    () => getSnapshot().me,
+    () => JOURNEY_DEFAULTS.me,
+  );
 }

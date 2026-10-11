@@ -15,7 +15,11 @@ const CSS = readFileSync(join(RACINE, "src/app/globals.css"), "utf8");
 const fichiersDe = (dossier: string) =>
   readdirSync(join(RACINE, dossier), { recursive: true, encoding: "utf8" })
     .filter((f) => /\.tsx?$/.test(f))
-    .map((f) => relative(RACINE, join(RACINE, dossier, f)).split(sep).join("/"));
+    .map((f) =>
+      relative(RACINE, join(RACINE, dossier, f))
+        .split(sep)
+        .join("/"),
+    );
 const SRC = fichiersDe("src");
 const lire = (f: string) => readFileSync(join(RACINE, f), "utf8");
 
@@ -27,8 +31,33 @@ const COULEURS = new Set([...DECLAREES].filter((v) => v?.startsWith("--color-"))
 const DE_TAILWIND = new Set(["white", "black", "transparent", "current", "inherit"]);
 
 /* Une classe de couleur qui nomme une couleur à nous : un préfixe de couleur, puis l’un de nos noms (et sa suite) */
-const RACINES = ["paper", "plaque", "line", "ink", "soft", "grey", "muted", "pale", "toi", "elle", "vrai", "flou", "attente", "danger", "ok", "disabled", "track", "sep", "skeleton", "segment", "bubble"];
-const CLASSE_DE_COULEUR = new RegExp(`(?<![\\w-])(?:bg|text|border|fill|stroke|ring|outline|decoration|from|to|via|caret|accent|divide)-((?:${RACINES.join("|")})(?:-[a-z]+)*)(?=[\\s"'\`/\\]:)}]|$)`, "g");
+const RACINES = [
+  "paper",
+  "plaque",
+  "line",
+  "ink",
+  "soft",
+  "grey",
+  "muted",
+  "pale",
+  "toi",
+  "elle",
+  "vrai",
+  "flou",
+  "attente",
+  "danger",
+  "ok",
+  "disabled",
+  "track",
+  "sep",
+  "skeleton",
+  "segment",
+  "bubble",
+];
+const CLASSE_DE_COULEUR = new RegExp(
+  `(?<![\\w-])(?:bg|text|border|fill|stroke|ring|outline|decoration|from|to|via|caret|accent|divide)-((?:${RACINES.join("|")})(?:-[a-z]+)*)(?=[\\s"'\`/\\]:)}]|$)`,
+  "g",
+);
 
 describe("les tokens de couleur", () => {
   it("globals.css se lit : les couleurs de sens et le rouge des soucis sont là (le test ne passe pas à vide)", () => {

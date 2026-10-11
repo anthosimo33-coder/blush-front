@@ -97,7 +97,8 @@ export async function attendreTaches(email: string, { timeout = RESEAU, echecPer
     const taches = await tachesDe(email);
     if (taches.length && taches.every((t) => t.statut === "fini" || t.statut === "echec")) {
       const echecs = taches.filter((t) => t.statut === "echec");
-      if (echecs.length && !echecPermis) throw new Error(`la chaîne de ${email} a échoué : ${echecs.map((t) => `${t.genre} (${t.erreur ?? "sans code"}, ${t.essais} essais)`).join(", ")}`);
+      if (echecs.length && !echecPermis)
+        throw new Error(`la chaîne de ${email} a échoué : ${echecs.map((t) => `${t.genre} (${t.erreur ?? "sans code"}, ${t.essais} essais)`).join(", ")}`);
       return taches;
     }
     if (Date.now() > fin) throw new Error(`la chaîne de ${email} tourne encore après ${timeout} ms : ${JSON.stringify(taches)}`);
@@ -114,8 +115,10 @@ export async function etapeEnEchec(email: string, genre: string, erreur: string)
   const [s] = await sql()<{ id: string }[]>`
     select s.id from stories s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()} order by s.created_at desc limit 1`;
   if (!s) throw new Error(`aucune histoire pour ${email}`);
-  const t = (await sql()<{ id: string }[]>`
-    insert into tasks (story_id, kind, status, attempts, error) values (${s.id}, ${genre}, 'echec', 3, ${erreur}) returning id`)[0]!;
+  const t = (
+    await sql()<{ id: string }[]>`
+    insert into tasks (story_id, kind, status, attempts, error) values (${s.id}, ${genre}, 'echec', 3, ${erreur}) returning id`
+  )[0]!;
   return t.id;
 }
 

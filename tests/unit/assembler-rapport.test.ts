@@ -28,7 +28,13 @@ const VERDICT: Verdict = {
 };
 const ALERTE: Verdict = { ...VERDICT, alerte: "danger", mode_sobre: true };
 const SORTIE: Rapport = { alerte: null, mode_sobre: false, decouvertes: [], these: "Elle avance, il recule.", chapitres: [], sobre: null };
-const chapitre = (n: number): Chapter => ({ number: n, title: `Chapitre ${n}`, tocTitle: `Ch. ${n}`, free: n === 1, blocks: [{ kind: "essential", text: `Le contenu du chapitre ${n}.` }] });
+const chapitre = (n: number): Chapter => ({
+  number: n,
+  title: `Chapitre ${n}`,
+  tocTitle: `Ch. ${n}`,
+  free: n === 1,
+  blocks: [{ kind: "essential", text: `Le contenu du chapitre ${n}.` }],
+});
 const SOBRE: SoberReport = {
   intro: "On va parler doucement.",
   title: "Ce que tu vis n’est pas normal.",
@@ -92,7 +98,13 @@ describe("le rapport assemblé", () => {
     const r = assemblerRapport(
       lu({
         access: "blushplus",
-        plan: { alerte: null, mode_sobre: false, these: "", decouvertes: [], chapitres: [{ numero: 2, titre: "Le premier verre", titre_court: "Le verre", surtitre: null, periode: "mars", scenes: [], epice: "doux" }] },
+        plan: {
+          alerte: null,
+          mode_sobre: false,
+          these: "",
+          decouvertes: [],
+          chapitres: [{ numero: 2, titre: "Le premier verre", titre_court: "Le verre", surtitre: null, periode: "mars", scenes: [], epice: "doux" }],
+        },
         taches: { rapport_plan: tache("en_cours", { progress: 40 }) },
       }),
     );
@@ -123,7 +135,13 @@ describe("le mode sobre (S-25)", () => {
   });
 
   it("sans l’accès, pendant l’écriture : ni plan ni chapitre fini, même si la lecture en apportait", () => {
-    const plan = { alerte: null, mode_sobre: false, these: "", decouvertes: [], chapitres: [{ numero: 2, titre: "SECRET", titre_court: "SECRET", surtitre: null, periode: "mars", scenes: [], epice: "doux" }] };
+    const plan = {
+      alerte: null,
+      mode_sobre: false,
+      these: "",
+      decouvertes: [],
+      chapitres: [{ numero: 2, titre: "SECRET", titre_court: "SECRET", surtitre: null, periode: "mars", scenes: [], epice: "doux" }],
+    };
     const r = assemblerRapport(lu({ verdict: { sortie: ALERTE, scores: [] }, plan, partiels: [chapitre(2)], taches: { rapport_plan: tache("en_cours") } }));
     expect(r.generating).toBe(true);
     expect(r.report.chapters.slice(1).every((c) => c.locked && !c.blocks.length)).toBe(true);

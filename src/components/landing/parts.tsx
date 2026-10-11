@@ -45,7 +45,10 @@ function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string;
   return (
     <div data-reveal="" className={cn("flex flex-col items-center gap-3 text-center", align === "start" && "lg:items-start lg:text-left")}>
       {kicker && <span className="text-legende font-black text-grey">{kicker}</span>}
-      <h2 id={id} className={cn("m-0 max-w-[720px] text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]", align === "start" ? "lg:text-[44px]" : "lg:text-chiffre")}>
+      <h2
+        id={id}
+        className={cn("m-0 max-w-[720px] text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]", align === "start" ? "lg:text-[44px]" : "lg:text-chiffre")}
+      >
         {title}
       </h2>
       {sub && <p className="m-0 max-w-[540px] text-accent font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:text-[19px]">{sub}</p>}
@@ -69,7 +72,12 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
               </Link>
             )}
             {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
-            <Link href={cta.href} prefetch={cta.prefetch} scroll={cta.scroll} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-note font-black text-ink no-underline shadow-soft">
+            <Link
+              href={cta.href}
+              prefetch={cta.prefetch}
+              scroll={cta.scroll}
+              className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-note font-black text-ink no-underline shadow-soft"
+            >
               {cta.header}
               <Icon name="arrow" size={15} stroke={2.6} className="arrow text-ink" />
             </Link>
@@ -116,7 +124,9 @@ const DEMANDES: Demande[] = [
     q: "ça veut dire quoi\u00a0?",
     reponse: (
       <>
-        <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-detail font-bold text-white">je suis crevée cette semaine, on verra</span>
+        <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-detail font-bold text-white">
+          je suis crevée cette semaine, on verra
+        </span>
         <FromBlush>
           <span className="text-micro font-black text-grey">Ce que ça veut dire</span>
           <span className="text-accent font-black leading-[1.3]">Elle est partante, mais fatiguée.</span>
@@ -132,7 +142,9 @@ const DEMANDES: Demande[] = [
           <span className="text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
           <Tag tone="recommandee" />
         </span>
-        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold text-white">Courage pour jeudi. Samedi pour fêter ça{NBSP}?</span>
+        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold text-white">
+          Courage pour jeudi. Samedi pour fêter ça{NBSP}?
+        </span>
         <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-full bg-white px-3 text-micro font-black shadow-soft">
           <Icon name="copy" size={13} stroke={2.6} className="text-ink" />
           Copier
@@ -172,12 +184,25 @@ export function BlushPlus() {
       <Container>
         <div className="relative isolate overflow-hidden rounded-[36px] bg-ink px-5 pb-10 pt-14 text-white lg:rounded-[48px] lg:px-12 lg:pb-16 lg:pt-20">
           <BigHand />
-          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(52%_62%_at_50%_0%,rgba(255,79,154,0.2),rgba(255,79,154,0))]" />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(52%_62%_at_50%_0%,rgba(255,79,154,0.2),rgba(255,79,154,0))]"
+          />
           {/* L’objet 3D : la cloche d’un nouveau message. Et le logo, en bas. */}
-          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -right-5 -top-5 w-[96px] lg:right-6 lg:top-8 lg:w-[132px]" style={{ "--r": "12deg", transform: "rotate(12deg)" }}>
+          <div
+            aria-hidden="true"
+            data-float=""
+            className="pointer-events-none absolute -right-5 -top-5 w-[96px] lg:right-6 lg:top-8 lg:w-[132px]"
+            style={{ "--r": "12deg", transform: "rotate(12deg)" }}
+          >
             <Cloche size={132} className="h-auto w-full" />
           </div>
-          <div aria-hidden="true" data-float="" className="pointer-events-none absolute -bottom-8 -left-6 hidden lg:block" style={{ "--r": "-12deg", transform: "rotate(-12deg)", animationDelay: "1.4s" }}>
+          <div
+            aria-hidden="true"
+            data-float=""
+            className="pointer-events-none absolute -bottom-8 -left-6 hidden lg:block"
+            style={{ "--r": "-12deg", transform: "rotate(-12deg)", animationDelay: "1.4s" }}
+          >
             <LogoBulle size={150} />
           </div>
 
@@ -205,7 +230,10 @@ export function BlushPlus() {
               {OVERTHINK.slice(0, 3).map((b) => (
                 <span
                   key={b.text}
-                  className={cn("whitespace-nowrap rounded-[18px] bg-white px-3 py-1.5 font-message text-note font-bold text-ink", b.r < 0 ? "rounded-bl-[5px]" : "rounded-br-[5px]")}
+                  className={cn(
+                    "whitespace-nowrap rounded-[18px] bg-white px-3 py-1.5 font-message text-note font-bold text-ink",
+                    b.r < 0 ? "rounded-bl-[5px]" : "rounded-br-[5px]",
+                  )}
                   style={{ transform: `rotate(${b.r}deg)` }}
                 >
                   {b.text}

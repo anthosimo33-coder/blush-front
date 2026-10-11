@@ -39,7 +39,9 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
   /* Le plafond pour tous ne compte que les mails qui partent : pas ceux de la boîte des tests de bout en bout (comme les codes) */
   if (!boiteAMails() && !(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
   /* Le moins nécessaire des mails : le premier retenu quand le quota du prestataire se remplit (QUOTA_MAILS) */
-  await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }), { sorte: "attente" });
+  await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }), {
+    sorte: "attente",
+  });
 }
 
 /** Retire un email de la liste, depuis le lien de son mail. Faux si le lien n’est pas le bon. */

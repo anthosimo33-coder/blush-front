@@ -111,7 +111,11 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
       ) : (
         <div className="flex gap-2.5">
           {peutPartager && (
-            <button type="button" onClick={() => void partager()} className="lift lift-ink lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] text-corps font-black text-white shadow-ink [background:var(--btn-ink-bg)]">
+            <button
+              type="button"
+              onClick={() => void partager()}
+              className="lift lift-ink lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] text-corps font-black text-white shadow-ink [background:var(--btn-ink-bg)]"
+            >
               <Icon name="share" size={17} stroke={2.4} className="text-white" />
               Partager
             </button>
@@ -120,7 +124,10 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
             type="button"
             onClick={enregistrer}
             disabled={!pret}
-            className={cn("lift lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] bg-white text-corps font-black text-ink shadow-soft disabled:opacity-50", !peutPartager && "lift-ink")}
+            className={cn(
+              "lift lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] bg-white text-corps font-black text-ink shadow-soft disabled:opacity-50",
+              !peutPartager && "lift-ink",
+            )}
           >
             <Icon name="download" size={17} stroke={2.4} className="text-ink" />
             {fait ?? (peutPartager ? "Enregistrer" : "Enregistrer l’image")}

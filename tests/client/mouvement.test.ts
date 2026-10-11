@@ -150,7 +150,12 @@ describe("le registre de l’en-tête", () => {
       fiche: { person: { id: "p1", name: "Maëlys", initial: "M" }, summaryShort: "" },
     };
     const { container, unmount } = render(
-      createElement("div", null, createElement(BlushTitle, { busy: false, onClick: () => {}, logoRef: entete.inscrire.logo }), createElement(SophieButton, { contact, anneauRef: entete.inscrire.anneau, avatarRef: entete.inscrire.avatar })),
+      createElement(
+        "div",
+        null,
+        createElement(BlushTitle, { busy: false, onClick: () => {}, logoRef: entete.inscrire.logo }),
+        createElement(SophieButton, { contact, anneauRef: entete.inscrire.anneau, avatarRef: entete.inscrire.avatar }),
+      ),
     );
     container.querySelectorAll("*").forEach((el) => voir(el, true));
     expect(entete.visible("logo")?.hasAttribute("data-blush-logo")).toBe(true);
@@ -295,7 +300,14 @@ describe("3 · 4 · 5 · les vols jusqu’à la conv", () => {
     launch(box, { kind: "text", bubble: "b1", text: "salut", from: { left: 0, top: 700, width: 80, height: 42 }, start: LOOK });
     expect(bulle.parentElement?.hasAttribute("data-flown")).toBe(true);
     expect(bulle.style.visibility).toBe("hidden");
-    expect(flyText).toHaveBeenCalledWith("salut", { left: 0, top: 700, width: 80, height: 42 }, expect.objectContaining({ top: 500, height: 42 }), LOOK, expect.anything(), expect.anything());
+    expect(flyText).toHaveBeenCalledWith(
+      "salut",
+      { left: 0, top: 700, width: 80, height: 42 },
+      expect.objectContaining({ top: 500, height: 42 }),
+      LOOK,
+      expect.anything(),
+      expect.anything(),
+    );
     await act(async () => {});
     expect(bulle.style.visibility).toBe("");
   });
@@ -360,7 +372,12 @@ describe("6 · 7 · les gestes de la conv", () => {
     const racine = pose(document.createElement("div"));
     racine.innerHTML = `<div data-thread=""><div><span data-dig-icon=""></span><div data-quote="Propose-lui un verre"><b>bulle</b></div></div></div>`;
     racine.setPointerCapture = () => {};
-    return { racine, fil: racine.querySelector<HTMLElement>("[data-thread]")!, bulle: racine.querySelector<HTMLElement>("[data-quote]")!, fleche: racine.querySelector<HTMLElement>("[data-dig-icon]")! };
+    return {
+      racine,
+      fil: racine.querySelector<HTMLElement>("[data-thread]")!,
+      bulle: racine.querySelector<HTMLElement>("[data-quote]")!,
+      fleche: racine.querySelector<HTMLElement>("[data-dig-icon]")!,
+    };
   }
   const doigt = (type: string, x: number, y: number, cible: Element, pointerType = "touch") =>
     cible.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType, clientX: x, clientY: y, bubbles: true }));
@@ -670,7 +687,15 @@ describe("le défilement de la conv", () => {
   it("plus rien d’ancien : rien n’écoute la remontée", () => {
     page({ hauteur: 4200, y: 3400, vue: 800 });
     const precharger = vi.fn();
-    renderHook(() => useAnciensEnRemontant({ plus: false, hautRef: { current: pose(document.createElement("div")) }, threadRef: { current: pose(document.createElement("div")) }, chargerAnciens: vi.fn(), precharger }));
+    renderHook(() =>
+      useAnciensEnRemontant({
+        plus: false,
+        hautRef: { current: pose(document.createElement("div")) },
+        threadRef: { current: pose(document.createElement("div")) },
+        chargerAnciens: vi.fn(),
+        precharger,
+      }),
+    );
     page({ hauteur: 4200, y: 1000, vue: 800 });
     window.dispatchEvent(new Event("scroll"));
     expect(precharger).not.toHaveBeenCalled();

@@ -72,13 +72,23 @@ describe("la bêta fermée, sans dire qui est invité", () => {
       expect(ecritsA(avant)).toBe(1);
       await inscrire(apres, "accueil");
       expect(ecritsA(apres)).toBe(0);
-      expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${apres}`)))).toHaveLength(1);
+      expect(
+        await db()
+          .select()
+          .from(schema.waitlist)
+          .where(eq(schema.waitlist.emailHash, empreinte(`attente:${apres}`))),
+      ).toHaveLength(1);
     } finally {
       log.mockRestore();
       await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, mailsDuJour));
       await db()
         .delete(schema.waitlist)
-        .where(inArray(schema.waitlist.emailHash, [avant, apres].map((e) => empreinte(`attente:${e}`))));
+        .where(
+          inArray(
+            schema.waitlist.emailHash,
+            [avant, apres].map((e) => empreinte(`attente:${e}`)),
+          ),
+        );
     }
   });
 });

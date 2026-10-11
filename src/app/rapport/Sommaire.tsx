@@ -33,10 +33,7 @@ const etatDuBadge = (n: number, current: number | null): EtatDuBadge => (n === c
 export function ReadingBar({ className }: { className?: string }) {
   return (
     <div ref={brancherBarre} role="progressbar" aria-label="Progression de la lecture" aria-valuemin={0} aria-valuemax={100} className={cn("overflow-hidden", className)}>
-      <div
-        className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]"
-        style={{ background: "var(--degrade-lecture)" }}
-      />
+      <div className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]" style={{ background: "var(--degrade-lecture)" }} />
     </div>
   );
 }
@@ -92,7 +89,9 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
             {etatDeLaLigne(c, phase) === "ecriture" ? (
               <div className="flex w-full items-center gap-2.5 py-[7px] text-left">
                 <ChapterBadge number={c.number} state="locked" />
-                <span className={cn("flex-1 text-note font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
+                <span className={cn("flex-1 text-note font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>
+                  {enEcriture(c.number)?.title ?? c.tocTitle}
+                </span>
                 {phase.nom === "ecriture" && <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />}
               </div>
             ) : etatDeLaLigne(c, phase) === "paiement" ? (

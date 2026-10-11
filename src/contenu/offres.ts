@@ -58,12 +58,20 @@ export const OFFERS: Offer[] = [OFFRE_PAR_PLAN.blushplus, OFFRE_PAR_PLAN.rapport
 export const PAYWALL = {
   title: (other?: string) => (other ? `La suite parle de vous deux\u00a0: toi et ${other}.` : "La suite parle de vous deux."),
   /** Le nombre de chapitres qui restent, quand on le sait (le rapport ouvert) ; sinon, la suite, sans compter. */
-  subtitle: (chapitres?: number) => (chapitres ? `${chapitres} chapitres, ton plan et les phrases pour lui parler.` : "La suite de ton rapport, ton plan et les phrases pour lui parler."),
+  subtitle: (chapitres?: number) =>
+    chapitres ? `${chapitres} chapitres, ton plan et les phrases pour lui parler.` : "La suite de ton rapport, ton plan et les phrases pour lui parler.",
   payments: "Apple Pay, Google Pay ou carte · paiement sécurisé",
 };
 
 export const SUBSCRIPTIONS: Record<Subscription["plan"], Subscription> = {
-  blushplus: { plan: "blushplus", priceLabel: libelle("blushplus"), renewLabel: "Renouvelé lundi · sans engagement", stopLabel: "En un geste, effectif lundi", active: true, paused: false },
+  blushplus: {
+    plan: "blushplus",
+    priceLabel: libelle("blushplus"),
+    renewLabel: "Renouvelé lundi · sans engagement",
+    stopLabel: "En un geste, effectif lundi",
+    active: true,
+    paused: false,
+  },
   rapport: { plan: "rapport", priceLabel: libelle("rapport"), renewLabel: "Payé une fois · à toi pour toujours", stopLabel: "", active: true, paused: false },
   gratuit: { plan: "gratuit", priceLabel: libelle("gratuit"), renewLabel: "Chapitre 1", stopLabel: "", active: false, paused: false },
 };

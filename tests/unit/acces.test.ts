@@ -21,8 +21,7 @@ describe("les droits par plan", () => {
 
   it("les plans se suivent : chacun ouvre au moins ce qu’ouvre celui d’avant", () => {
     expect(PLANS.map(rang)).toEqual([0, 1, 2]);
-    for (let k = 1; k < PLANS.length; k++)
-      for (const besoin of Object.keys(OUVRE.gratuit) as Besoin[]) if (peut(PLANS[k - 1]!, besoin)) expect(peut(PLANS[k]!, besoin)).toBe(true);
+    for (let k = 1; k < PLANS.length; k++) for (const besoin of Object.keys(OUVRE.gratuit) as Besoin[]) if (peut(PLANS[k - 1]!, besoin)) expect(peut(PLANS[k]!, besoin)).toBe(true);
   });
 });
 

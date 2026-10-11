@@ -47,7 +47,10 @@ describe("le rapport pendant son écriture", () => {
   it("donne à lire les chapitres finis, dans l’ordre : un chapitre prêt en avance attend ceux d’avant", async () => {
     await auMilieuDeLEcriture();
     const pret = (n: number) => ({ number: n, title: `Prêt ${n}`, tocTitle: `Prêt ${n}`, free: false, blocks: [{ kind: "punchline", text: `fin ${n}` }] });
-    await db().update(schema.reports).set({ partiel: chiffrer([pret(2), pret(3), pret(6)]) }).where(eq(schema.reports.storyId, id));
+    await db()
+      .update(schema.reports)
+      .set({ partiel: chiffrer([pret(2), pret(3), pret(6)]) })
+      .where(eq(schema.reports.storyId, id));
     const r = (await rapportDe(await ligneEnBase(id), u))!;
     expect(r.report.chapters.map((c) => [c.number, !c.locked])).toEqual([
       [1, true],
@@ -70,7 +73,12 @@ describe("un refus du modèle", () => {
     const u = await compteDeTest("refus", "blushplus");
     const refus = (req: Requete) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req));
     const imp = await avecFactice(refus, () => histoireLue(u, "02-reciproque.txt", { qui: { devinette: "parle", objectif: "comprendre" } }));
-    const t = (await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict"))))[0]!;
+    const t = (
+      await db()
+        .select()
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict")))
+    )[0]!;
     expect([t.status, t.attempts, t.error]).toEqual(["echec", 1, "refus"]);
     expect(await progression(await ligneEnBase(imp.id))).toMatchObject({ failed: true, failReason: "refus", done: false });
   });

@@ -46,7 +46,19 @@ describe("les prénoms dans ce qui se partage", () => {
     const histoire = (m: Pick<Meta, "participants"> & Partial<Meta>): Ligne => {
       const meta: Meta = { appli: "whatsapp", format: "whatsapp-ios", fichier: "conv.txt", resume: { debut: "2026-09-01", fin: "2026-09-30", total: 19, vocaux: 0 }, ...m };
       const t = new Date();
-      return { id: randomUUID(), userId: null, draftToken: null, messageCount: 19, nextMessage: null, meta: chiffrer(meta), context: null, convPurgedAt: null, chatVocal: false, createdAt: t, updatedAt: t };
+      return {
+        id: randomUUID(),
+        userId: null,
+        draftToken: null,
+        messageCount: 19,
+        nextMessage: null,
+        meta: chiffrer(meta),
+        context: null,
+        convPurgedAt: null,
+        chatVocal: false,
+        createdAt: t,
+        updatedAt: t,
+      };
     };
     const deux: Meta["participants"] = [
       { nom: "Hugo Lemaire", prenom: "Hugo", messages: 10 },
@@ -59,7 +71,9 @@ describe("les prénoms dans ce qui se partage", () => {
       { nom: "Moi", prenom: "Karim", messages: 10 },
       { nom: "Inès", prenom: "Inès", messages: 9 },
     ];
-    expect(masqueDe(histoire({ appli: "instagram", format: "captures", captures: 2, participants: captures, moi: 0 }))("Inès attend Karim, dis-moi.")).toBe("I. attend Karim, dis-moi.");
+    expect(masqueDe(histoire({ appli: "instagram", format: "captures", captures: 2, participants: captures, moi: 0 }))("Inès attend Karim, dis-moi.")).toBe(
+      "I. attend Karim, dis-moi.",
+    );
   });
 });
 
@@ -68,7 +82,10 @@ async function changerVerdict(storyId: string, f: (v: DonneesVerdict) => void) {
   const { data } = (await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId)))[0]!;
   const v = coffre.lire("verdicts.data", data);
   f(v);
-  await db().update(schema.verdicts).set({ data: coffre.ecrire("verdicts.data", v) }).where(eq(schema.verdicts.storyId, storyId));
+  await db()
+    .update(schema.verdicts)
+    .set({ data: coffre.ecrire("verdicts.data", v) })
+    .where(eq(schema.verdicts.storyId, storyId));
 }
 
 /** Le lien de partage de l’histoire, s’il existe (lu en base : rien d’autre ne le relit, la feuille le reçoit en le créant). */
@@ -104,7 +121,10 @@ describe("le lien de partage du verdict", () => {
   it("repartagé, le même lien montre le verdict tel qu’on le masque aujourd’hui", async () => {
     const id = (await partager(story)).id;
     /* Un lien d’avant : ton prénom y était masqué aussi */
-    await db().update(schema.shares).set({ data: chiffrer({ emoji: "🤔", title: "x", subtitle: "S. attend que tu parles, H." }) }).where(eq(schema.shares.id, id));
+    await db()
+      .update(schema.shares)
+      .set({ data: chiffrer({ emoji: "🤔", title: "x", subtitle: "S. attend que tu parles, H." }) })
+      .where(eq(schema.shares.id, id));
     expect((await partager(story)).id).toBe(id);
     expect((await verdictPartage(id))!.subtitle).toBe("S. attend que tu parles, Hugo.");
   });
@@ -145,7 +165,13 @@ describe("partager un moment en image", () => {
   /** La chute d’un chapitre, déjà écrit (le rapport en cours d’écriture garde ses chapitres finis). */
   const chute = (n: number): Chapter => ({ number: n, title: `Chapitre ${n}`, tocTitle: `Ch. ${n}`, free: n === 1, blocks: [{ kind: "punchline", text: `La chute ${n}.` }] });
   const dessiner = (corps: unknown) =>
-    imageDuPartage(new Request("http://localhost/api/partage/image", { method: "POST", headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "content-type": "application/json" }, body: JSON.stringify(corps) }));
+    imageDuPartage(
+      new Request("http://localhost/api/partage/image", {
+        method: "POST",
+        headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "content-type": "application/json" },
+        body: JSON.stringify(corps),
+      }),
+    );
   const passerAuPlan = (plan: "gratuit" | "blushplus") => db().update(schema.users).set({ plan }).where(eq(schema.users.id, compte.id));
   const sobre = (oui: boolean) => changerVerdict(story.id, (v) => (v.sortie.mode_sobre = oui));
   /** Les images comptées aujourd’hui pour ce compte (le passage compté pour les lire compris). */
@@ -159,10 +185,12 @@ describe("partager un moment en image", () => {
       .insert(schema.reports)
       .values({ storyId: story.id, partiel: chiffrer([chute(1), chute(2)]) })
       .onConflictDoUpdate({ target: schema.reports.storyId, set: { partiel: chiffrer([chute(1), chute(2)]) } });
-    const toi = (await db()
-      .insert(schema.chatMessages)
-      .values({ storyId: story.id, role: "toi", data: coffre.ecrire("chat_messages.data:toi", { texte: "Elle m’attend ?" }) })
-      .returning({ id: schema.chatMessages.id }))[0]!;
+    const toi = (
+      await db()
+        .insert(schema.chatMessages)
+        .values({ storyId: story.id, role: "toi", data: coffre.ecrire("chat_messages.data:toi", { texte: "Elle m’attend ?" }) })
+        .returning({ id: schema.chatMessages.id })
+    )[0]!;
     await db()
       .insert(schema.chatMessages)
       .values({ storyId: story.id, role: "blush", data: coffre.ecrire("chat_messages.data:blush", { reponse: { kind: "bubbles", bubbles: [{ text: "Oui." }] }, resume: "oui" }) });

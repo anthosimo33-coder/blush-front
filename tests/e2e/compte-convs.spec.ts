@@ -82,7 +82,11 @@ test("plusieurs convs : « Tes convs » les liste, un toucher ouvre l’accueil 
   });
 
   await test.step("depuis Mon compte, un toucher sur Romane ouvre son accueil", async () => {
-    await page.getByRole("main").getByRole("region", { name: "Tes histoires" }).getByRole("button", { name: /^Romane et toi/ }).click();
+    await page
+      .getByRole("main")
+      .getByRole("region", { name: "Tes histoires" })
+      .getByRole("button", { name: /^Romane et toi/ })
+      .click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(accueilDe(page, "Romane")).toBeVisible();
     await expect(page.getByRole("link", { name: "Tes convs (Maëlys)" })).toBeVisible();
@@ -118,7 +122,10 @@ test("un geste vise la conv à l’écran, même quand un autre onglet en a ouve
 
   await test.step("supprimer depuis Mon compte, resté sur Maëlys pendant que l’onglet A rouvre Romane : c’est Maëlys qui part", async () => {
     await ouvrir(ongletB, "/compte");
-    const supprimer = ongletB.getByRole("main").getByRole("region", { name: "Tes données" }).getByRole("button", { name: /^Supprimer l’histoire avec Maëlys/ });
+    const supprimer = ongletB
+      .getByRole("main")
+      .getByRole("region", { name: "Tes données" })
+      .getByRole("button", { name: /^Supprimer l’histoire avec Maëlys/ });
     await expect(supprimer).toBeVisible();
     await ouvrir(ongletA, "/app/convs");
     await ongletA.getByRole("link", { name: /^Romane\s: / }).click();

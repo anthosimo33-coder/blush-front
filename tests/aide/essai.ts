@@ -39,9 +39,11 @@ export async function rapportEnBase(storyId: string): Promise<DonneesRapport | n
 
 /** Ce qu’ont coûté les appels au modèle d’une histoire (ai_usage), en dollars, et leur nombre. */
 export async function coutDe(storyId: string): Promise<{ dollars: number; appels: number }> {
-  const c = (await db()
-    .select({ micros: sql<string | null>`sum(${schema.aiUsage.costMicros})`, appels: sql<number>`count(*)::int` })
-    .from(schema.aiUsage)
-    .where(eq(schema.aiUsage.storyId, storyId)))[0]!;
+  const c = (
+    await db()
+      .select({ micros: sql<string | null>`sum(${schema.aiUsage.costMicros})`, appels: sql<number>`count(*)::int` })
+      .from(schema.aiUsage)
+      .where(eq(schema.aiUsage.storyId, storyId))
+  )[0]!;
   return { dollars: Number(c.micros ?? 0) / 1e6, appels: c.appels };
 }

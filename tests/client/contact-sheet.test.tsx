@@ -54,7 +54,13 @@ beforeEach(() => {
   suivi.liens = [];
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
   vi.spyOn(window, "matchMedia").mockImplementation(
-    (requete: string) => ({ matches: requete.includes("reduced-motion") ? moinsDeMouvement : false, media: requete, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    (requete: string) =>
+      ({
+        matches: requete.includes("reduced-motion") ? moinsDeMouvement : false,
+        media: requete,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
   );
   Element.prototype.animate = function (this: Element, images: Keyframe[] | PropertyIndexedKeyframes | null, temps?: number | KeyframeAnimationOptions) {
     let finir!: () => void;
@@ -63,7 +69,12 @@ beforeEach(() => {
     return { finished, cancel: vi.fn() } as unknown as Animation;
   };
   Element.prototype.getAnimations = () => [];
-  Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get: function (this: HTMLElement) { return this.parentElement; } });
+  Object.defineProperty(HTMLElement.prototype, "offsetParent", {
+    configurable: true,
+    get: function (this: HTMLElement) {
+      return this.parentElement;
+    },
+  });
 });
 
 afterEach(() => {
@@ -76,14 +87,22 @@ afterEach(() => {
 });
 
 const CONTACT: ComponentProps<typeof ContactSheet>["contact"] = {
-  report: { verdict: { emoji: "🤏", short: "À deux doigts", title: "Elle hésite encore", subtitle: "Un pas de plus" }, level: "dit", trend: "En hausse", nextStep: "Propose-lui un verre" },
+  report: {
+    verdict: { emoji: "🤏", short: "À deux doigts", title: "Elle hésite encore", subtitle: "Un pas de plus" },
+    level: "dit",
+    trend: "En hausse",
+    nextStep: "Propose-lui un verre",
+  },
   fiche: { person: { id: "p1", name: "Maëlys", initial: "M" }, summaryShort: "Son exam jeudi" },
   period: "4 sept. → 7 sept.",
 };
 
 /** L’en-tête de l’accueil, tel que departs() le relève au toucher : la bulle de BLUSH et l’avatar de l’autre. */
 function enTete(): Departs {
-  const [logo, av] = auMoins([0, 1].map(() => document.body.appendChild(document.createElement("span"))), 2);
+  const [logo, av] = auMoins(
+    [0, 1].map(() => document.body.appendChild(document.createElement("span"))),
+    2,
+  );
   enTetes.push(logo, av);
   return { logo: { src: logo, from: { left: 150, top: 10, width: 88, height: 88 } }, av: { src: av, from: { left: 330, top: 20, width: 40, height: 40 } } };
 }
@@ -139,7 +158,12 @@ describe("ContactSheet : ce qu’il montre", () => {
     expect(f.getByRole("heading", { name: "Maëlys et toi" })).toBeTruthy();
     expect(f.getByText("🤏 À deux doigts")).toBeTruthy();
     expect(f.getByText("En hausse")).toBeTruthy();
-    expect(f.getAllByRole("listitem").map((l) => l.textContent)).toEqual(["On se parle\u00a0: réussi", "On se voit\u00a0: réussi", "On se le dit\u00a0: niveau en cours", "On est ensemble\u00a0: à venir"]);
+    expect(f.getAllByRole("listitem").map((l) => l.textContent)).toEqual([
+      "On se parle\u00a0: réussi",
+      "On se voit\u00a0: réussi",
+      "On se le dit\u00a0: niveau en cours",
+      "On est ensemble\u00a0: à venir",
+    ]);
     const rapport = f.getByRole("link", { name: /Le rapport de votre histoire/ });
     expect(rapport.getAttribute("href")).toBe("/rapport");
     expect(rapport.textContent).toContain("4 sept. → 7 sept.");
@@ -157,7 +181,11 @@ describe("ContactSheet : ce qu’il montre", () => {
 
   it("sa fiche mène où l’accueil le dit (l’aperçu a la sienne)", () => {
     render(<ContactSheet contact={{ ...CONTACT, ficheHref: "/apercu/fiche" }} open onClose={() => {}} departRef={{ current: null }} {...sansAccueil()} />);
-    expect(within(feuille()).getByRole("link", { name: /^Sa fiche/ }).getAttribute("href")).toBe("/apercu/fiche");
+    expect(
+      within(feuille())
+        .getByRole("link", { name: /^Sa fiche/ })
+        .getAttribute("href"),
+    ).toBe("/apercu/fiche");
   });
 });
 
@@ -283,11 +311,14 @@ describe("ContactSheet : l’ouverture et la fermeture animées", () => {
 
   it("9 · sans départ relevé au toucher : la bulle et l’avatar sont pris au registre de l’en-tête à l’ouverture, ceux qu’on voit, et volent", () => {
     const entete = creerRegistreEntete();
-    const [cache, logo, av] = auMoins([0, 1, 2].map(() => {
-      const el = document.body.appendChild(document.createElement("span"));
-      enTetes.push(el);
-      return el;
-    }), 3);
+    const [cache, logo, av] = auMoins(
+      [0, 1, 2].map(() => {
+        const el = document.body.appendChild(document.createElement("span"));
+        enTetes.push(el);
+        return el;
+      }),
+      3,
+    );
     /* L’en-tête existe deux fois : celui qui est masqué (sans rectangles) ne part pas */
     cache.getClientRects = () => [] as unknown as DOMRectList;
     [logo, av].forEach((el) => (el.getClientRects = () => [{}] as unknown as DOMRectList));

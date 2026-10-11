@@ -17,7 +17,10 @@ describe("les lots d’un enregistrement, rassemblés", () => {
   it("recolle deux lots sans doublon, et garde le message entier plutôt que le bout coupé", () => {
     const a = lot(
       [
-        { repere: { date: "2026-10-01", heure: "21:00" }, messages: [msg("autre", "salut toi"), msg("moi", "hey"), msg("autre", "tu fais quoi ce soir"), msg("moi", "rien de spécial et toi", { coupe: true })] },
+        {
+          repere: { date: "2026-10-01", heure: "21:00" },
+          messages: [msg("autre", "salut toi"), msg("moi", "hey"), msg("autre", "tu fais quoi ce soir"), msg("moi", "rien de spécial et toi", { coupe: true })],
+        },
       ],
       12,
     );
@@ -87,7 +90,10 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
   });
 
   it("des lots de six (ce que l’import envoie, lus cinq à la fois) : l’ordre et le recouvrement tiennent, et l’enregistrement le plus long reste sous la borne du serveur", () => {
-    const lots = lotsDe(Array.from({ length: 26 }, (_, k) => k), 6);
+    const lots = lotsDe(
+      Array.from({ length: 26 }, (_, k) => k),
+      6,
+    );
     expect(lots.map((l) => [l[0], l.at(-1)])).toEqual([
       [0, 5],
       [5, 10],
@@ -96,7 +102,12 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
       [20, 25],
     ]);
     /* IMAGES_MAX (80) : seize lots, sous les 40 que /api/captures/video accepte */
-    expect(lotsDe(Array.from({ length: 80 }, (_, k) => k), 6)).toHaveLength(16);
+    expect(
+      lotsDe(
+        Array.from({ length: 80 }, (_, k) => k),
+        6,
+      ),
+    ).toHaveLength(16);
   });
 
   it("mesure de combien la conv a défilé, et voit quand elle a sauté", () => {

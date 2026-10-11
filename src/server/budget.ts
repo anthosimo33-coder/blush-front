@@ -113,7 +113,11 @@ export async function payeurDe(storyId: string | undefined): Promise<Payeur> {
   if (!storyId) return null;
   const connu = PAYEURS.get(storyId);
   if (connu) return connu;
-  const [s] = await db().select({ email: schema.users.email }).from(schema.stories).innerJoin(schema.users, eq(schema.users.id, schema.stories.userId)).where(eq(schema.stories.id, storyId));
+  const [s] = await db()
+    .select({ email: schema.users.email })
+    .from(schema.stories)
+    .innerJoin(schema.users, eq(schema.users.id, schema.stories.userId))
+    .where(eq(schema.stories.id, storyId));
   if (!s) return null;
   if (PAYEURS.size >= GARDES_MAX) PAYEURS.clear();
   const payeur = payeurDuCompte(s);
@@ -141,7 +145,10 @@ const garder = (cle: string, m: number) => LUES.set(cle, { micros: m, jusqua: Da
 async function depenses(payeur: Payeur): Promise<Depenses> {
   const jour = gardeDuJour();
   const cle = cleDeDepense(payeur, jour);
-  const [tous, duPayeur] = await Promise.all([garde(TOUS) ?? lireTous().then((m) => (garder(TOUS, m), m)), garde(cle) ?? compteDe(cle, FENETRE_DEPENSE).then((m) => (garder(cle, m), m))]);
+  const [tous, duPayeur] = await Promise.all([
+    garde(TOUS) ?? lireTous().then((m) => (garder(TOUS, m), m)),
+    garde(cle) ?? compteDe(cle, FENETRE_DEPENSE).then((m) => (garder(cle, m), m)),
+  ]);
   return { jour: tous, payeur: duPayeur };
 }
 
@@ -160,7 +167,9 @@ async function prevenir(seuil: number, jour: number): Promise<void> {
     seuil >= 1 ? "budget de l’IA du jour atteint" : `budget de l’IA : ${Math.round(seuil * 100)} % du jour`,
     [
       `Dépensé aujourd’hui : ${depense}`,
-      seuil >= 1 ? `Les lectures, les rapports et le chat répondent « ${SOUFFLE} » jusqu’à minuit (heure de Paris).` : `Au-delà de ${BUDGET_IA.jour} $, tout s’arrête jusqu’à minuit (heure de Paris).`,
+      seuil >= 1
+        ? `Les lectures, les rapports et le chat répondent « ${SOUFFLE} » jusqu’à minuit (heure de Paris).`
+        : `Au-delà de ${BUDGET_IA.jour} $, tout s’arrête jusqu’à minuit (heure de Paris).`,
       `Chaque compte : ${BUDGET_IA.compte} $ par jour ; sans compte : ${BUDGET_IA.anonyme} $ en tout.`,
     ],
     { importante: true },

@@ -19,7 +19,10 @@ import { noterCout } from "@/server/ia/usage";
  * libellé de la demande. Ce qu’il écrit vient de FACTICE (src/server/ia/factice-valeurs.ts). Les conv sont inventées : douze lignes au format de la conversation.
  */
 
-const LIGNES = Array.from({ length: 12 }, (_, k) => `m${String(k + 1).padStart(4, "0")} 2026-09-0${1 + (k % 9)} mar. 20:${String(10 + k).padStart(2, "0")} ${k % 2 ? "Inès" : "Hugo"} : message ${k + 1}`);
+const LIGNES = Array.from(
+  { length: 12 },
+  (_, k) => `m${String(k + 1).padStart(4, "0")} 2026-09-0${1 + (k % 9)} mar. 20:${String(10 + k).padStart(2, "0")} ${k % 2 ? "Inès" : "Hugo"} : message ${k + 1}`,
+);
 const CONV = LIGNES.join("\n");
 const IDS = new Set(LIGNES.map((l) => l.slice(0, 5)));
 
@@ -28,11 +31,18 @@ const requete = (tache: Requete["tache"], demande = "La demande.", conv = CONV):
 const avec = (req: Requete, partie: Partie): RequeteFactice => ({ ...req, partie });
 
 /** Les identifiants cités, où qu’ils soient dans la sortie : tous existent dans la conv. */
-const cites = (sortie: unknown): string[] => JSON.stringify(sortie).match(/"m\d{4}"/g)?.map((m) => m.slice(1, -1)) ?? [];
+const cites = (sortie: unknown): string[] =>
+  JSON.stringify(sortie)
+    .match(/"m\d{4}"/g)
+    ?.map((m) => m.slice(1, -1)) ?? [];
 
 describe("le modèle factice : des sorties qui passent leur schéma", () => {
   const CAS: [quoi: string, req: RequeteFactice, schema: z.ZodType][] = [
-    ["la lecture de captures", { tache: "01-captures", blocs: [{ texte: "<histoire>\naujourd’hui : mer. 2026-09-09\n</histoire>" }, { image: { media: "image/png", base64: "AA==" } }] }, Sortie01],
+    [
+      "la lecture de captures",
+      { tache: "01-captures", blocs: [{ texte: "<histoire>\naujourd’hui : mer. 2026-09-09\n</histoire>" }, { image: { media: "image/png", base64: "AA==" } }] },
+      Sortie01,
+    ],
     ["le verdict", requete("04-verdict"), Sortie04],
     ["le verdict d’une alerte", requete("04-verdict", "La demande.", `${CONV}\n${FACTICE.alerte}`), Sortie04],
     ["le plan du rapport", avec(requete("05-rapport"), "plan"), Etape05],
@@ -56,7 +66,9 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
     const rapport = requete("05-rapport", "Étape : le plan. Remplis seulement `plan`.");
     /* Le libellé de la demande ne compte plus : seule la partie */
     expect(Etape05.parse(fournisseurFactice(rapport)).plan).toBeNull();
-    expect(Etape05.parse(fournisseurFactice(avec(rapport, "plan"))).plan?.chapitres.map((c) => c.titre_court)).toEqual(Array.from({ length: FACTICE.chapitres }, (_, k) => FACTICE.titreCourt(k + 1)));
+    expect(Etape05.parse(fournisseurFactice(avec(rapport, "plan"))).plan?.chapitres.map((c) => c.titre_court)).toEqual(
+      Array.from({ length: FACTICE.chapitres }, (_, k) => FACTICE.titreCourt(k + 1)),
+    );
     expect(Etape05.parse(fournisseurFactice(avec(rapport, "chapitres 1 à 4"))).chapitres?.map((c) => c.numero)).toEqual([1, 2, 3, 4]);
     expect(Etape05.parse(fournisseurFactice(avec(rapport, "chapitres 5 à 8"))).chapitres?.map((c) => c.numero)).toEqual([5, 6, 7, 8]);
     expect(Etape05.parse(fournisseurFactice(rapport)).chapitres?.map((c) => c.numero)).toEqual([5, 6, 7, 8]);
@@ -66,7 +78,9 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
   });
 
   it("la ligne de profil d’une mise à jour devient une info de sa fiche, avec sa preuve", () => {
-    const maj = Maj07.parse(fournisseurFactice(avec(requete("07-memoire", "m0013 2026-09-10 jeu. --:-- profil de Inès : Étudiante en droit\nMoment : la mise à jour."), "mise à jour")));
+    const maj = Maj07.parse(
+      fournisseurFactice(avec(requete("07-memoire", "m0013 2026-09-10 jeu. --:-- profil de Inès : Étudiante en droit\nMoment : la mise à jour."), "mise à jour")),
+    );
     expect(maj.faits_ajoutes).toContainEqual({ section: "infos", texte: "Étudiante en droit", preuves: ["m0013"] });
   });
 

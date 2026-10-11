@@ -232,7 +232,8 @@ function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { ap
   const c = cout(message.usage);
   const bloc = message.content.find((b): b is Extract<BlocRecu, { type: "fallback" }> => b.type === "fallback");
   const repli = bloc ? { categorie: bloc.trigger.category ?? null, de: bloc.from.model, vers: bloc.to.model } : null;
-  if (message.stop_reason === "refusal") return { appel: { sortie: null, refus: true, stop: message.stop_reason, cout: c, categorie: message.stop_details?.category ?? null }, repli };
+  if (message.stop_reason === "refusal")
+    return { appel: { sortie: null, refus: true, stop: message.stop_reason, cout: c, categorie: message.stop_details?.category ?? null }, repli };
   const depuis = message.content.map((b) => b.type).lastIndexOf("fallback");
   const texte = message.content
     .slice(depuis + 1)
@@ -249,7 +250,10 @@ function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { ap
 }
 
 const cout = (u: Usage) =>
-  ((u.input_tokens ?? 0) * PRIX.entree + (u.output_tokens ?? 0) * PRIX.sortie + (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache + (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
+  ((u.input_tokens ?? 0) * PRIX.entree +
+    (u.output_tokens ?? 0) * PRIX.sortie +
+    (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache +
+    (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
   1e6;
 
 /** Les options d’un appel (appeler). */
@@ -278,7 +282,11 @@ export type OptionsAppel = {
  * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps (en
  * mode factice aussi : il passe par le même chemin, prestataireFactice à la place du SDK).
  */
-export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { storyId, etiquette, partie, surAvance, signal, compte, differer }: OptionsAppel = {}): Promise<Appel<z.infer<S>>> {
+export async function appeler<S extends z.ZodType>(
+  req: Requete,
+  schema: S,
+  { storyId, etiquette, partie, surAvance, signal, compte, differer }: OptionsAppel = {},
+): Promise<Appel<z.infer<S>>> {
   const payeur = await controlerBudget({ storyId, compte });
   const prestataire = iaFactice() ? MODELE_FACTICE : fournisseur;
   /* Tout de suite, ou après la réponse */
@@ -308,7 +316,12 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
     journal("repli sur un autre modèle", { tache: req.tache, categorie: repli.categorie, de: repli.de, vers: repli.vers, histoire: storyId }, "alerte");
     if (storyId)
       await ensuite(() =>
-        alerter("repli sur un autre modèle", [`Tâche ${req.tache}`, `Catégorie du refus : ${repli.categorie ?? "aucune (refus sans catégorie)"}`, `De ${repli.de} vers ${repli.vers}`, `Histoire ${storyId}`]),
+        alerter("repli sur un autre modèle", [
+          `Tâche ${req.tache}`,
+          `Catégorie du refus : ${repli.categorie ?? "aucune (refus sans catégorie)"}`,
+          `De ${repli.de} vers ${repli.vers}`,
+          `Histoire ${storyId}`,
+        ]),
       );
   }
   /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête (de la réponse, pas de lireMessage) : jamais de contenu */

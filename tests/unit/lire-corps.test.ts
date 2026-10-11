@@ -22,7 +22,11 @@ vi.mock("@/server/donnees", async (original) => ({
 vi.mock("@/server/histoires", async (original) => ({ ...(await original<typeof import("@/server/histoires")>()), metaDe: () => ({}), quiRempli: () => false }));
 vi.mock("@/server/limites", async (original) => ({ ...(await original<typeof import("@/server/limites")>()), sousLaLimite: async () => true, limiteAtteinte: async () => false }));
 vi.mock("@/server/captures", async (original) => ({ ...(await original<typeof import("@/server/captures")>()), lecturePermise: async () => "ok" }));
-vi.mock("@/server/cookies", async (original) => ({ ...(await original<typeof import("@/server/cookies")>()), lireSession: async () => "secret", oublierCetAppareil: async () => {} }));
+vi.mock("@/server/cookies", async (original) => ({
+  ...(await original<typeof import("@/server/cookies")>()),
+  lireSession: async () => "secret",
+  oublierCetAppareil: async () => {},
+}));
 vi.mock("@/server/auth", async (original) => ({
   ...(await original<typeof import("@/server/auth")>()),
   fermerSession: async (secret: string, { partout = false } = {}) => void etat.fermees.push({ secret, partout }),

@@ -37,7 +37,12 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
         ))}
       </InsetGroup>
       <InsetGroup className="mt-6 pb-10">
-        <InsetRow leading={<RowIcon icon="plus" tone="vrai" />} title={<span className="text-toi-ink">Analyser une autre conv</span>} sub="Une autre personne, un autre rapport" href="/commencer" />
+        <InsetRow
+          leading={<RowIcon icon="plus" tone="vrai" />}
+          title={<span className="text-toi-ink">Analyser une autre conv</span>}
+          sub="Une autre personne, un autre rapport"
+          href="/commencer"
+        />
       </InsetGroup>
     </AppScreen>
   );

@@ -52,7 +52,12 @@ test("l’accès arrive après le verdict : le rapport s’écrit sous tes yeux,
   await test.step("BLUSH dit ce qu’il écrit, et le temps qu’il reste ; son vocal s’enregistre aussi", async () => {
     /* En bas de l’écran (et sur ordinateur, aussi en haut du sommaire) : le plan d’abord, et le temps qui reste */
     await expect(page.getByText("BLUSH écrit ton rapport", { exact: true }).filter({ visible: true }).first()).toBeVisible();
-    await expect(page.getByText(/^Il prépare le plan · encore ≈\s3\smin$/).filter({ visible: true }).first()).toBeVisible();
+    await expect(
+      page
+        .getByText(/^Il prépare le plan · encore ≈\s3\smin$/)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
     await expect(rapport.getByText("BLUSH enregistre ton vocal")).toBeVisible();
     await expect(rapport.getByText("Prêt avant ton rapport")).toBeVisible();
   });

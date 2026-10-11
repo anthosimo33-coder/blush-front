@@ -79,6 +79,9 @@ describe("les prédicats communs", () => {
   it("lue, conv gardée, rapport prêt : sans paramètre, sur la ligne de la conv", () => {
     expect(enSql(PREDICATS.lue)).toEqual({ sql: `exists (select 1 from "tasks" where "tasks"."story_id" = "stories"."id")`, params: [] });
     expect(enSql(PREDICATS.convGardee)).toEqual({ sql: `"stories"."conv" is not null`, params: [] });
-    expect(enSql(PREDICATS.rapportPret)).toEqual({ sql: `exists (select 1 from "reports" where "reports"."story_id" = "stories"."id" and "reports"."data" is not null)`, params: [] });
+    expect(enSql(PREDICATS.rapportPret)).toEqual({
+      sql: `exists (select 1 from "reports" where "reports"."story_id" = "stories"."id" and "reports"."data" is not null)`,
+      params: [],
+    });
   });
 });

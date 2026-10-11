@@ -87,20 +87,41 @@ const LIGNES: Ligne[] = [
   ],
   [
     "tout est fait",
-    etat({ conv: false, plan: true, rapport: true, vocal: VOCAL_A_JOUR, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "fini", memoire: "fini" }) }),
+    etat({
+      conv: false,
+      plan: true,
+      rapport: true,
+      vocal: VOCAL_A_JOUR,
+      taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "fini", memoire: "fini" }),
+    }),
     true,
     [],
   ],
   /* Le mode sobre */
-  ["une alerte, le rapport doux écrit, sans l’accès : rien (ni mémoire, ni vocal)", etat({ verdict: ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), false, []],
-  ["une alerte, le rapport doux écrit, avec l’accès : la mémoire, sans vocal", etat({ verdict: ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), true, ["memoire"]],
+  [
+    "une alerte, le rapport doux écrit, sans l’accès : rien (ni mémoire, ni vocal)",
+    etat({ verdict: ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }),
+    false,
+    [],
+  ],
+  [
+    "une alerte, le rapport doux écrit, avec l’accès : la mémoire, sans vocal",
+    etat({ verdict: ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }),
+    true,
+    ["memoire"],
+  ],
   [
     "héritage : un rapport sobre sans alerte (d’avant le 9 octobre) a son vocal doux, puis la mémoire avec l’accès",
     etat({ verdict: SOBRE_SANS_ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }),
     true,
     ["vocal", "memoire"],
   ],
-  ["héritage, sans l’accès : son vocal doux seulement", etat({ verdict: SOBRE_SANS_ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), false, ["vocal"]],
+  [
+    "héritage, sans l’accès : son vocal doux seulement",
+    etat({ verdict: SOBRE_SANS_ALERTE, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }),
+    false,
+    ["vocal"],
+  ],
   /* Le vocal */
   [
     "un rapport écrit avant le vocal : le vocal, une fois",
@@ -110,13 +131,25 @@ const LIGNES: Ligne[] = [
   ],
   [
     "un vocal d’une ancienne version du script : il se refait, sur la mémoire",
-    etat({ conv: false, plan: true, rapport: true, vocal: { aJour: false, fait: APRES }, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "fini", memoire: "fini" }) }),
+    etat({
+      conv: false,
+      plan: true,
+      rapport: true,
+      vocal: { aJour: false, fait: APRES },
+      taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "fini", memoire: "fini" }),
+    }),
     true,
     ["vocal"],
   ],
   [
     "une ancienne version, déjà retentée depuis et en échec : l’ancien reste",
-    etat({ conv: false, plan: true, rapport: true, vocal: { aJour: false, fait: T0 }, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: ["echec", APRES], memoire: "fini" }) }),
+    etat({
+      conv: false,
+      plan: true,
+      rapport: true,
+      vocal: { aJour: false, fait: T0 },
+      taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: ["echec", APRES], memoire: "fini" }),
+    }),
     true,
     [],
   ],
@@ -128,16 +161,17 @@ const LIGNES: Ligne[] = [
   ],
   [
     "une ancienne version, sa tâche en attente : elle le fera",
-    etat({ conv: false, plan: true, rapport: true, vocal: { aJour: false, fait: APRES }, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "attente", memoire: "fini" }) }),
+    etat({
+      conv: false,
+      plan: true,
+      rapport: true,
+      vocal: { aJour: false, fait: APRES },
+      taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", vocal: "attente", memoire: "fini" }),
+    }),
     true,
     [],
   ],
-  [
-    "une alerte : jamais de vocal",
-    etat({ verdict: ALERTE, conv: false, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini", memoire: "fini" }) }),
-    true,
-    [],
-  ],
+  ["une alerte : jamais de vocal", etat({ verdict: ALERTE, conv: false, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini", memoire: "fini" }) }), true, []],
   [
     "sans voix : pas de vocal",
     etat({ voix: false, conv: false, plan: true, rapport: true, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "fini", memoire: "fini" }) }),

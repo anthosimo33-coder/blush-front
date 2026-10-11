@@ -97,7 +97,13 @@ describe("lire un export zippé dans le navigateur", () => {
   });
 
   it("à l’import, un export Instagram complet avec médias : les convs proposées, puis celle choisie, sans lire le zip en entier", async () => {
-    const conv = (nom: string, n: number) => strToU8(JSON.stringify({ participants: [{ name: nom }, { name: "Moi" }], messages: Array.from({ length: n }, (_, k) => ({ sender_name: k % 2 ? "Moi" : nom, timestamp_ms: 1_790_000_000_000 - k * 60e3, content: `${nom} ${k}` })) }));
+    const conv = (nom: string, n: number) =>
+      strToU8(
+        JSON.stringify({
+          participants: [{ name: nom }, { name: "Moi" }],
+          messages: Array.from({ length: n }, (_, k) => ({ sender_name: k % 2 ? "Moi" : nom, timestamp_ms: 1_790_000_000_000 - k * 60e3, content: `${nom} ${k}` })),
+        }),
+      );
     const { fichier: zip, lu } = zipVirtuel([
       { nom: "your_instagram_activity/messages/inbox/lea_1/message_1.json", donnees: conv("Léa", 30) },
       { nom: "your_instagram_activity/messages/inbox/lea_1/videos/1.mp4", virtuel: 2_000_000_000 },

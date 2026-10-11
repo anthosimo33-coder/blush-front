@@ -31,7 +31,10 @@ export function BarreEcriture({ ecriture }: { ecriture: EcritureRapport }) {
       </div>
       <span className="h-[5px] overflow-hidden rounded-full bg-[#ECE9E2]">
         {/* Une échelle plutôt qu’une largeur : la barre avance sans recalculer la page */}
-        <span className="block h-full w-full origin-left rounded-full transition-transform duration-[900ms] ease-linear" style={{ transform: `scaleX(${Math.min(1, Math.max(0, ecriture.progres))})`, background: "var(--degrade-lecture)" }} />
+        <span
+          className="block h-full w-full origin-left rounded-full transition-transform duration-[900ms] ease-linear"
+          style={{ transform: `scaleX(${Math.min(1, Math.max(0, ecriture.progres))})`, background: "var(--degrade-lecture)" }}
+        />
       </span>
       <span className="text-micro font-extrabold text-grey">
         {enCours(ecriture)}
@@ -48,8 +51,7 @@ export function BarreEcriture({ ecriture }: { ecriture: EcritureRapport }) {
  */
 export function MarqueChapitre({ etat, decorative = false }: { etat: EtatChapitre; decorative?: boolean }) {
   const nom = (label: string) => (decorative ? { "aria-hidden": true as const } : { role: "img", "aria-label": label });
-  if (etat === "ecrit")
-    return <DoneCheck size={20} ombre={false} label={decorative ? undefined : "prêt"} />;
+  if (etat === "ecrit") return <DoneCheck size={20} ombre={false} label={decorative ? undefined : "prêt"} />;
   if (etat === "en_cours")
     return (
       <span className="flex h-5 shrink-0 items-center" {...nom("en cours d’écriture")}>
@@ -63,7 +65,11 @@ export function MarqueChapitre({ etat, decorative = false }: { etat: EtatChapitr
 export function LigneEcriture({ number, title, etat, last = false }: { number: number; title: string; etat: EtatChapitre; last?: boolean }) {
   return (
     <div className={cn("flex w-full items-center gap-3 py-3", !last && "border-b-2 border-sep")}>
-      <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-[14px] text-micro font-black", etat === "attente" ? "bg-plaque text-grey" : "bg-ink text-white")}>{number}</span>
+      <span
+        className={cn("flex size-7 shrink-0 items-center justify-center rounded-[14px] text-micro font-black", etat === "attente" ? "bg-plaque text-grey" : "bg-ink text-white")}
+      >
+        {number}
+      </span>
       <span className="min-w-0 flex-1 text-left">
         <span className={cn("block text-corps font-black", etat === "attente" && "text-grey")}>{title}</span>
         <span aria-hidden="true" className="mt-1.5 flex flex-col gap-1">
@@ -81,7 +87,9 @@ export function LigneEcriture({ number, title, etat, last = false }: { number: n
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-1.5 text-micro font-black">
-        <span className={cn(etat === "ecrit" ? "text-vrai-ink" : etat === "en_cours" ? "text-ink" : "text-grey")}>{etat === "ecrit" ? "Prêt" : etat === "en_cours" ? "S’écrit" : "En attente"}</span>
+        <span className={cn(etat === "ecrit" ? "text-vrai-ink" : etat === "en_cours" ? "text-ink" : "text-grey")}>
+          {etat === "ecrit" ? "Prêt" : etat === "en_cours" ? "S’écrit" : "En attente"}
+        </span>
         <MarqueChapitre etat={etat} decorative />
       </span>
     </div>

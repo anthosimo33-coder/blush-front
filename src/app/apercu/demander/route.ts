@@ -68,7 +68,9 @@ export async function POST(req: Request) {
   const lu = ligne ? reponseLue(ligne.slice("@@BLUSH@@".length)) : null;
   if (!lu?.sortie) {
     /* Une réponse d’un autre format : un ancien lanceur (lancer.mjs), qui mettait lui-même la réponse en bulles */
-    console.error(ligne && !lu ? `format de lanceur inconnu : le champ « lanceur » de BLUSH_DEMANDER doit pointer vers prompts/evals/lancer.mts (${conf.lanceur})` : sortie.slice(-1500));
+    console.error(
+      ligne && !lu ? `format de lanceur inconnu : le champ « lanceur » de BLUSH_DEMANDER doit pointer vers prompts/evals/lancer.mts (${conf.lanceur})` : sortie.slice(-1500),
+    );
     return Response.json(PAS_DE_REPONSE);
   }
   return Response.json(bullesAffichees(lu.sortie, messagesAffiches(new Map(lu.lignes), lu.prenom)));

@@ -42,7 +42,19 @@ const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImag
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
  */
-export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean; rendu?: number }) {
+export function ReportScreen({
+  initial,
+  story,
+  openPaywall,
+  fixed = false,
+  rendu,
+}: {
+  initial: ReportPayload;
+  story: Story;
+  openPaywall: boolean;
+  fixed?: boolean;
+  rendu?: number;
+}) {
   /* `rendu` : l’heure du rendu serveur. Tout juste rendu, le rapport n’est pas relu au montage (src/lib/query.ts) */
   const { data, refresh } = useRapport(initial, { fetch: !fixed, rendu, frais: FRAIS_DU_RENDU });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
@@ -127,20 +139,23 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
   );
 
   /* Les mêmes à chaque rendu (comme le partage d’un moment) : un chapitre qui n’a pas changé ne se refait pas */
-  const renderQuestion = useCallback((b: Extract<ChapterBlock, { kind: "question" }>) => (
-    <Card className="flex flex-col gap-2 p-3.5">
-      <div className="text-legende font-black text-grey">{b.label}</div>
-      <div className="text-accent font-black leading-[1.35]">{b.text}</div>
-      <button
-        type="button"
-        onClick={() => void copyText(b.text.replace(/^«\s*|\s*»$/g, "")).then((copie) => copie && setToast("Copié."))}
-        className="lift lift-sm lift-ink relative inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
-      >
-        <Icon name="copy" size={14} className="text-white" />
-        Copier
-      </button>
-    </Card>
-  ), []);
+  const renderQuestion = useCallback(
+    (b: Extract<ChapterBlock, { kind: "question" }>) => (
+      <Card className="flex flex-col gap-2 p-3.5">
+        <div className="text-legende font-black text-grey">{b.label}</div>
+        <div className="text-accent font-black leading-[1.35]">{b.text}</div>
+        <button
+          type="button"
+          onClick={() => void copyText(b.text.replace(/^«\s*|\s*»$/g, "")).then((copie) => copie && setToast("Copié."))}
+          className="lift lift-sm lift-ink relative inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
+        >
+          <Icon name="copy" size={14} className="text-white" />
+          Copier
+        </button>
+      </Card>
+    ),
+    [],
+  );
   const partagerMoment = useCallback((chapitre: number, bloc: number) => setImage({ type: "moment", chapitre, bloc }), []);
   /* L’en-tête du verdict, en tête du chapitre 1 : refait seulement si le verdict change */
   const enTeteVerdict = useMemo(
@@ -166,7 +181,12 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         /* Mobile : la barre reste en haut — le chapitre en cours, la progression, et le sommaire à un toucher */
         <header className="sticky top-0 z-30 shrink-0 bg-[rgba(244,242,237,0.88)] backdrop-blur-xl lg:hidden">
           <div className="grid h-[58px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 px-2">
-            <button type="button" aria-label="Retour" onClick={() => (pagePrecedente() ? router.back() : router.push("/app", { scroll: false }))} className="flex size-11 items-center justify-center">
+            <button
+              type="button"
+              aria-label="Retour"
+              onClick={() => (pagePrecedente() ? router.back() : router.push("/app", { scroll: false }))}
+              className="flex size-11 items-center justify-center"
+            >
               <Icon name="back" size={24} stroke={2.6} className="text-ink" />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">
@@ -247,7 +267,11 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-40 flex justify-center px-4 lg:bottom-8">
-          <div ref={PASTILLE_REPRISE} data-popin="" className="pointer-events-auto flex max-w-[420px] items-center gap-1 rounded-full bg-ink py-1.5 pl-1.5 pr-1 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]">
+          <div
+            ref={PASTILLE_REPRISE}
+            data-popin=""
+            className="pointer-events-auto flex max-w-[420px] items-center gap-1 rounded-full bg-ink py-1.5 pl-1.5 pr-1 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]"
+          >
             <button type="button" onClick={() => goTo(resume)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-1 pr-2 text-left">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.14)]">
                 <Icon name="arrow" size={15} stroke={2.6} className="rotate-90 text-white" />
@@ -275,13 +299,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
 
       <SuivreAncre retour={retour} />
 
-      <PaywallSheet
-        open={paywall}
-        onClose={() => setPaywall(false)}
-        otherName={other.name}
-        chapitres={locked.length || undefined}
-        onUnlocked={() => setPaywall(false)}
-      />
+      <PaywallSheet open={paywall} onClose={() => setPaywall(false)} otherName={other.name} chapitres={locked.length || undefined} onUnlocked={() => setPaywall(false)} />
     </Screen>
   );
 }

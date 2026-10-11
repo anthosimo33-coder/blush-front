@@ -112,10 +112,16 @@ describe("l’audio du vocal", () => {
     expect(await audioDuCompte(autre.id, id)).toBeNull();
     expect(await audioDuCompte(plus.id, "../../etc")).toBeNull();
     /* L’audio change en base, à la même version : l’instance sert celui qu’elle garde (chiffré), sans le relire */
-    await db().update(schema.vocals).set({ audio: chiffrerOctets(Buffer.from("autre")) }).where(eq(schema.vocals.storyId, id));
+    await db()
+      .update(schema.vocals)
+      .set({ audio: chiffrerOctets(Buffer.from("autre")) })
+      .where(eq(schema.vocals.storyId, id));
     expect((await audioDuCompte(plus.id, id))?.audio?.equals(premier!.audio!)).toBe(true);
     /* Une nouvelle version (le vocal refait) : le nouvel audio */
-    await db().update(schema.vocals).set({ createdAt: new Date(Date.now() + 1000) }).where(eq(schema.vocals.storyId, id));
+    await db()
+      .update(schema.vocals)
+      .set({ createdAt: new Date(Date.now() + 1000) })
+      .where(eq(schema.vocals.storyId, id));
     expect((await audioDuCompte(plus.id, id))?.audio?.toString()).toBe("autre");
   });
 

@@ -26,7 +26,13 @@ describe("le jour de la lecture", () => {
   it("est celui de l’import, pas le lendemain du dernier message", async () => {
     /* Le dernier message d’Inès date du 2 octobre ; la conv est importée le 6 */
     requetes.length = 0;
-    await lue("04-ghosting.txt", { avant: (id) => db().update(schema.stories).set({ createdAt: new Date("2026-10-06T10:00:00Z") }).where(eq(schema.stories.id, id)) });
+    await lue("04-ghosting.txt", {
+      avant: (id) =>
+        db()
+          .update(schema.stories)
+          .set({ createdAt: new Date("2026-10-06T10:00:00Z") })
+          .where(eq(schema.stories.id, id)),
+    });
     const verdict = requetes.find((r) => r.tache === "04-verdict");
     const texte = verdict!.blocs.map((b) => ("texte" in b ? b.texte : "")).join("\n");
     expect(texte).toContain("aujourd’hui : 2026-10-06");
@@ -55,7 +61,12 @@ describe("une écriture coupée à chaque essai", () => {
   it("passe en échec, et le rapport le dit au lieu de s’écrire pour toujours", async () => {
     const { id, plus } = await coupee();
     await relancer(id);
-    const t = (await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan"))))[0]!;
+    const t = (
+      await db()
+        .select()
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")))
+    )[0]!;
     expect([t.status, t.error]).toEqual(["echec", "coupee"]);
     const r = await rapportDe(await ligneEnBase(id), plus);
     expect(r?.echec).toBe("panne");

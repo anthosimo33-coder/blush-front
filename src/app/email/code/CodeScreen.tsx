@@ -157,14 +157,12 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
           loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
           onClick={() => void verify(code)}
         >
-          {!connexion ? (
-            "Créer mon rapport"
-          ) : suite.startsWith("/importer/") ? (
-            /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv (texte à valider) */
-            "Continuer"
-          ) : (
-            "Retrouver mes convs"
-          )}
+          {!connexion
+            ? "Créer mon rapport"
+            : suite.startsWith("/importer/")
+              ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv (texte à valider) */
+                "Continuer"
+              : "Retrouver mes convs"}
         </Button>
       }
     >
@@ -222,7 +220,12 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-        <button type="button" onClick={() => void resend()} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey">
+        <button
+          type="button"
+          onClick={() => void resend()}
+          disabled={wait > 0}
+          className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey"
+        >
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
         <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
@@ -232,7 +235,11 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
 
       {/* La phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
       <NotePrivee>{NOTE_CODE}</NotePrivee>
-      {fermee && <p className="m-0 -mt-2 pl-6 text-legende font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
+      {fermee && (
+        <p className="m-0 -mt-2 pl-6 text-legende font-extrabold text-grey">
+          Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.
+        </p>
+      )}
     </ParcoursScreen>
   );
 }

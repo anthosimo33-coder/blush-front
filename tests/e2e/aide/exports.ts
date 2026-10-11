@@ -161,7 +161,10 @@ export const commeInstagram = (s: string) => String.fromCharCode(...new TextEnco
  * « a aimé un message » (une ligne système, pas un message). `format: "zip"` : dans son dossier de l’export complet,
  * your_instagram_activity/messages/inbox/<conv>/.
  */
-export function exportInstagram(testInfo: TestInfo, { personnes = NOE_ET_MAELYS, n = 64, format = "json" }: { personnes?: Personnes; n?: number; format?: "json" | "zip" } = {}): Fichier {
+export function exportInstagram(
+  testInfo: TestInfo,
+  { personnes = NOE_ET_MAELYS, n = 64, format = "json" }: { personnes?: Personnes; n?: number; format?: "json" | "zip" } = {},
+): Fichier {
   const ms = messages(n);
   /* Le dossier de la conv dans l’export : son nom sans accent, et un numéro */
   const dossier = `your_instagram_activity/messages/inbox/${personnes.autre.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()}_1234567890`;

@@ -229,7 +229,10 @@ for (const etat of STATES) {
       await page.waitForTimeout(etat.wait ?? 600);
       if (etat.steps) await etat.steps(page, { ecran, histoire, codeFaux });
       if (etat.hover) {
-        const cible = typeof etat.hover === "string" ? page.locator(etat.hover).first() : page.getByRole(etat.hover.role as Parameters<Page["getByRole"]>[0], { name: etat.hover.name }).first();
+        const cible =
+          typeof etat.hover === "string"
+            ? page.locator(etat.hover).first()
+            : page.getByRole(etat.hover.role as Parameters<Page["getByRole"]>[0], { name: etat.hover.name }).first();
         await cible.hover();
         await page.waitForTimeout(700);
       }

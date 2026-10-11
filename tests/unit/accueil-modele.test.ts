@@ -39,7 +39,8 @@ const le = (j: number, h = 12, min = 0) => new Date(2026, 9, j, h, min).getTime(
 const OUVERT = le(11, 9);
 
 /** Les lignes, réduites à ce qui se lit : la date (son heure), le niveau, ou le groupe (son expéditeur et ses messages). */
-const lu = (rows: Row[]) => rows.map((r) => (r.kind === "day" ? `jour ${r.key}` : r.kind === "event" ? `niveau ${r.key}` : `${r.from} ${r.key} [${r.msgs.map((x) => x.m.id).join(", ")}]`));
+const lu = (rows: Row[]) =>
+  rows.map((r) => (r.kind === "day" ? `jour ${r.key}` : r.kind === "event" ? `niveau ${r.key}` : `${r.from} ${r.key} [${r.msgs.map((x) => x.m.id).join(", ")}]`));
 
 describe("les identifiants", () => {
   it("l’historique : ton message, puis la réponse de BLUSH, et leur échange se relit", () => {
@@ -52,7 +53,12 @@ describe("les identifiants", () => {
   it("chaque message dit d’où il vient : l’intro, l’aperçu, l’historique, la visite", () => {
     expect([ID_INTRO.next, ID_INTRO.hint].map(origineDe)).toEqual(["intro", "intro"]);
     expect([-100, -101, -2_000, -999_999].map(origineDe)).toEqual(["apercu", "apercu", "apercu", "apercu"]);
-    expect([-1_000_000, idHistorique(1, false), idHistorique(1, true), idHistorique(987_654, true)].map(origineDe)).toEqual(["historique", "historique", "historique", "historique"]);
+    expect([-1_000_000, idHistorique(1, false), idHistorique(1, true), idHistorique(987_654, true)].map(origineDe)).toEqual([
+      "historique",
+      "historique",
+      "historique",
+      "historique",
+    ]);
     expect([PREMIER_ID_VISITE, 2, 40].map(origineDe)).toEqual(["visite", "visite", "visite"]);
   });
 
@@ -212,10 +218,31 @@ describe("les lignes de la conv (rowsOf)", () => {
 
   it("un groupe : l’heure de son dernier message, l’échange de sa dernière réponse ; la date, l’heure de son premier", () => {
     const rows = rowsOf(conv, OUVERT, 1);
-    expect(rows.map((r) => (r.kind === "event" ? null : r.at))).toEqual([le(9, 20), le(9, 20) + 60_000, le(10, 18), le(10, 18), le(10, 18) + 1000, le(10, 18, 5), le(10, 18, 5) + 1000, le(11, 8, 55), le(11, 8, 55), le(11, 8, 55)]);
+    expect(rows.map((r) => (r.kind === "event" ? null : r.at))).toEqual([
+      le(9, 20),
+      le(9, 20) + 60_000,
+      le(10, 18),
+      le(10, 18),
+      le(10, 18) + 1000,
+      le(10, 18, 5),
+      le(10, 18, 5) + 1000,
+      le(11, 8, 55),
+      le(11, 8, 55),
+      le(11, 8, 55),
+    ]);
     expect(rows.flatMap((r) => (r.kind === "group" ? [r.echange] : []))).toEqual([undefined, undefined, 5, undefined, 6, undefined, undefined]);
     /* Deux réponses à la suite (l’aperçu sans tes messages) et un mot de BLUSH : un seul groupe, l’échange de la dernière réponse */
-    const suite = rowsOf([...echangesEnMsgs([{ id: 7, answer: reponse("a"), at: le(10, 9) }, { id: 8, answer: reponse("b"), at: le(10, 10) }]), { type: "mot", id: 3, from: "blush", notice: "Je n’ai rien entendu.", at: le(10, 11) }], OUVERT, 1);
+    const suite = rowsOf(
+      [
+        ...echangesEnMsgs([
+          { id: 7, answer: reponse("a"), at: le(10, 9) },
+          { id: 8, answer: reponse("b"), at: le(10, 10) },
+        ]),
+        { type: "mot", id: 3, from: "blush", notice: "Je n’ai rien entendu.", at: le(10, 11) },
+      ],
+      OUVERT,
+      1,
+    );
     expect(lu(suite)).toEqual([`jour jour-${idHistorique(7, true)}`, `blush ${idHistorique(7, true)}-0 [${idHistorique(7, true)}, ${idHistorique(8, true)}, 3]`]);
     expect(suite[1]!.kind === "group" && [suite[1]!.at, suite[1]!.echange]).toEqual([le(10, 11), 8]);
   });
@@ -262,7 +289,12 @@ describe("les lignes de la conv (rowsOf)", () => {
 
   it("BLUSH écrit : sa bulle qui tape tant que rien n’est arrivé ; ses bulles reçues, ou la coupure, prennent la clé de la première bulle", () => {
     const ecrit = { type: "ecrit", id: 2, from: "blush", reading: "BLUSH analyse sa réponse" } as const;
-    expect([tapeEncore(ecrit), tapeEncore({ ...ecrit, recues: [] }), tapeEncore({ ...ecrit, recues: [{ text: "attends" }] }), tapeEncore({ ...ecrit, coupee: true })]).toEqual([true, true, false, false]);
+    expect([tapeEncore(ecrit), tapeEncore({ ...ecrit, recues: [] }), tapeEncore({ ...ecrit, recues: [{ text: "attends" }] }), tapeEncore({ ...ecrit, coupee: true })]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
     expect(tapeEncore({ type: "reponse", id: 2, from: "blush", result: reponse("ok") })).toBe(false);
     expect(rowsOf([{ ...ecrit, recues: [{ text: "attends" }], at: le(11, 9) }], OUVERT, 1)[1]!.key).toBe("2-0");
   });

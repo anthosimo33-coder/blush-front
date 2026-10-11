@@ -26,7 +26,9 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/components/ui/Button.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
     /* Même un composant serveur de la coque (PageDeConv) : il passe par src/services/serveur.ts */
     expect(await regles("src/components/shell/PageDeConv.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
-    expect(await regles("src/app/rapport/Partage.tsx", `"use client";\nimport { rapportDe } from "../../server/donnees";\nexport const x = rapportDe;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    expect(await regles("src/app/rapport/Partage.tsx", `"use client";\nimport { rapportDe } from "../../server/donnees";\nexport const x = rapportDe;\n`)).toEqual([
+      "@typescript-eslint/no-restricted-imports",
+    ]);
     expect(await regles("src/lib/format.ts", `export const x = () => import("@/server/db");\n`)).toEqual(["no-restricted-syntax"]);
   });
 
@@ -39,7 +41,9 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
 
   it("le serveur ne passe pas par la couche du navigateur (sauf ses types)", async () => {
     expect(await regles("src/server/stats.ts", `import { getReport } from "@/services/api";\nexport const x = getReport;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
-    expect(await regles("src/server/stats.ts", `import { readJourney } from "../state/journey";\nexport const x = readJourney;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    expect(await regles("src/server/stats.ts", `import { readJourney } from "../state/journey";\nexport const x = readJourney;\n`)).toEqual([
+      "@typescript-eslint/no-restricted-imports",
+    ]);
     expect(await regles("src/server/stats.ts", `import type { SuiviChat } from "@/services/api";\nexport type R = SuiviChat;\n`)).toEqual([]);
   });
 
@@ -60,7 +64,9 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/server/ia/voix.ts", `import { chiffrerOctets } from "../chiffrement";\nexport const x = chiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/api/rapport/route.ts", `import { chiffrer } from "@/server/chiffrement";\nexport const x = chiffrer;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/rapport/(rapport)/page.tsx", `import * as c from "../../server/chiffrement";\nexport const x = c;\n`)).toEqual(["no-restricted-imports"]);
-    expect(await regles("src/app/apercu/page.tsx", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/apercu/page.tsx", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual([
+      "no-restricted-imports",
+    ]);
     /* Ajoutés à chiffrement.ts plus tard : seuls ses empreintes et ses jetons sont permis hors du coffre */
     expect(await regles("src/server/stats.ts", `import { dechiffrerSansForme } from "./chiffrement";\nexport const x = dechiffrerSansForme;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/server/stats.ts", `export { dechiffrer } from "./chiffrement";\n`)).toEqual(["no-restricted-imports"]);
@@ -76,11 +82,17 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
   it("le coffre chiffre, et lui seul ; les empreintes et les jetons restent libres", async () => {
     expect(await regles("src/server/coffre.ts", `import { chiffrer, dechiffrer } from "./chiffrement";\nexport const x = [chiffrer, dechiffrer];\n`)).toEqual([]);
     expect(await regles("src/server/stats.ts", `import { empreinte, jeton } from "./chiffrement";\nexport const x = [empreinte, jeton];\n`)).toEqual([]);
-    expect(await regles("src/server/auth.ts", `import { empreinte, jeton, memeEmpreinte } from "./chiffrement";\nexport const x = [empreinte, jeton, memeEmpreinte];\n`)).toEqual([]);
+    expect(await regles("src/server/auth.ts", `import { empreinte, jeton, memeEmpreinte } from "./chiffrement";\nexport const x = [empreinte, jeton, memeEmpreinte];\n`)).toEqual(
+      [],
+    );
     /* Les trois dernières routes qui déchiffraient elles-mêmes passent par le dépôt : plus aucune exception */
     expect(await regles("src/app/api/fiche/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual(["no-restricted-imports"]);
-    expect(await regles("src/app/api/partage/image/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual(["no-restricted-imports"]);
-    expect(await regles("src/app/api/vocal/chat/[id]/route.ts", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/api/partage/image/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([
+      "no-restricted-imports",
+    ]);
+    expect(await regles("src/app/api/vocal/chat/[id]/route.ts", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual([
+      "no-restricted-imports",
+    ]);
     for (const chemin of ["src/server/attente.ts", "src/server/ajouts.ts", "src/app/api/vocal/audio/route.ts"]) {
       expect(await regles(chemin, `import { chiffrer } from "./chiffrement";\nexport const x = chiffrer;\n`), chemin).toEqual(["no-restricted-imports"]);
     }
@@ -121,7 +133,9 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
       expect(await regles(chemin, `import type { Routes } from "@/types/api";\nexport type R = Routes;\n`), chemin).toEqual([]);
       expect(await regles(chemin, `import { type Routes, type CibleImage } from "@/types/api";\nexport type R = [Routes, CibleImage];\n`), chemin).toEqual([]);
     }
-    expect(await regles("src/app/rapport/Partage.tsx", `import { ROUTES } from "../../types/api";\nexport const x = ROUTES;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    expect(await regles("src/app/rapport/Partage.tsx", `import { ROUTES } from "../../types/api";\nexport const x = ROUTES;\n`)).toEqual([
+      "@typescript-eslint/no-restricted-imports",
+    ]);
     /* Le serveur et les routes lisent ses schémas */
     for (const chemin of ["src/server/stats.ts", "src/app/api/rapport/route.ts"]) {
       expect(await regles(chemin, `import { ROUTES } from "@/types/api";\nexport const x = ROUTES;\n`), chemin).toEqual([]);
@@ -129,7 +143,15 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
   });
 
   it("pas de console dans src : le serveur écrit au journal, le navigateur par tracer ; les aperçus, scripts/ et tests/ restent libres", async () => {
-    for (const chemin of ["src/server/stats.ts", "src/server/ia/voix.ts", "src/app/api/rapport/route.ts", "src/app/rapport/Partage.tsx", "src/components/ui/Button.tsx", "src/lib/format.ts", "src/proxy.ts"]) {
+    for (const chemin of [
+      "src/server/stats.ts",
+      "src/server/ia/voix.ts",
+      "src/app/api/rapport/route.ts",
+      "src/app/rapport/Partage.tsx",
+      "src/components/ui/Button.tsx",
+      "src/lib/format.ts",
+      "src/proxy.ts",
+    ]) {
       expect(await regles(chemin, `export const f = () => console.log("x");\n`), chemin).toEqual(["no-console"]);
       expect(await regles(chemin, `export const f = () => console.error("x");\n`), chemin).toEqual(["no-console"]);
     }
@@ -143,7 +165,9 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     for (const chemin of ["src/server/stats.ts", "src/server/env.ts", "src/app/api/rapport/route.ts", "src/app/rapport/Partage.tsx", "src/components/ui/Button.tsx"]) {
       expect(await regles(chemin, `export const f = (e: unknown) => (e as Error).name;\n`), chemin).toEqual(["no-restricted-syntax"]);
       expect(await regles(chemin, `export const f = (p: Promise<void>) => p.catch((e: Error) => e.name);\n`), chemin).toEqual(["no-restricted-syntax"]);
-      expect(await regles(chemin, `import { nomErreur } from "@/lib/tracer";\nexport const f = (p: Promise<void>) => p.catch((e: unknown) => nomErreur(e));\n`), chemin).toEqual([]);
+      expect(await regles(chemin, `import { nomErreur } from "@/lib/tracer";\nexport const f = (p: Promise<void>) => p.catch((e: unknown) => nomErreur(e));\n`), chemin).toEqual(
+        [],
+      );
     }
     /* Les autres façons de le supposer : une sous-classe, un type de Node, une union, une intersection, `<Error>e`, le rejet de `.then` */
     for (const source of [
@@ -176,23 +200,31 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     }
     expect(await regles("src/server/stats.ts", `import { journal } from "./journal";\nexport const f = () => journal("x");\n`)).toEqual([]);
     /* La liste du serveur reste en place dans email.ts et alertes.ts */
-    expect(await regles("src/server/email.ts", `import { useJourney } from "@/state/journey";\nexport const x = useJourney;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    expect(await regles("src/server/email.ts", `import { useJourney } from "@/state/journey";\nexport const x = useJourney;\n`)).toEqual([
+      "@typescript-eslint/no-restricted-imports",
+    ]);
   });
 
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {
-    expect(await regles("src/components/ui/Button.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual(["no-restricted-syntax"]);
+    expect(await regles("src/components/ui/Button.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual([
+      "no-restricted-syntax",
+    ]);
     expect(await regles("prompts/lib/essai.ts", `import { NBSP } from "@/lib/format";\nexport const x = NBSP;\n`)).toEqual(["no-restricted-imports"]);
   });
 
   it("une promesse n’est jamais oubliée, ni passée là où rien ne l’attend : dans tout src, navigateur compris", async () => {
     for (const chemin of ["src/server/stats.ts", "src/app/api/rapport/route.ts", "src/lib/format.ts", "src/components/ui/Button.tsx", "src/app/rapport/Partage.tsx"]) {
       expect(await regles(chemin, `export function f(p: () => Promise<void>) {\n  p();\n}\n`), chemin).toEqual(["@typescript-eslint/no-floating-promises"]);
-      expect(await regles(chemin, `export const f = (xs: number[], p: (x: number) => Promise<void>) => xs.forEach(p);\n`), chemin).toEqual(["@typescript-eslint/no-misused-promises"]);
+      expect(await regles(chemin, `export const f = (xs: number[], p: (x: number) => Promise<void>) => xs.forEach(p);\n`), chemin).toEqual([
+        "@typescript-eslint/no-misused-promises",
+      ]);
       /* Attendue, ou laissée exprès (`void`) : elle passe */
       expect(await regles(chemin, `export async function f(p: () => Promise<void>) {\n  await p();\n  void p();\n}\n`), chemin).toEqual([]);
     }
     /* Une fonction async sur un attribut d’événement : React n’attend pas sa promesse */
-    expect(await regles("src/app/rapport/Partage.tsx", `export const B = ({ f }: { f: () => Promise<void> }) => <button type="button" onClick={f} />;\n`)).toEqual(["@typescript-eslint/no-misused-promises"]);
+    expect(await regles("src/app/rapport/Partage.tsx", `export const B = ({ f }: { f: () => Promise<void> }) => <button type="button" onClick={f} />;\n`)).toEqual([
+      "@typescript-eslint/no-misused-promises",
+    ]);
   });
 
   it("une couleur qui a son token ne s’écrit pas en hex : classe, valeur arbitraire, gabarit ou texte JSX ; les dessins et marque.ts le peuvent", async () => {

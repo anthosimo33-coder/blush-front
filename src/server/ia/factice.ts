@@ -62,8 +62,20 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       autre: "Elias",
       captures: req.blocs.filter((b) => "image" in b).map((_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
       blocs: [
-        { repere: { date: veille(2), heure: "13:12" }, messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
-        { repere: { date: veille(1), heure: "21:05" }, messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
+        {
+          repere: { date: veille(2), heure: "13:12" },
+          messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })),
+        },
+        {
+          repere: { date: veille(1), heure: "21:05" },
+          messages: Array.from({ length: parSoiree }, (_, k) => ({
+            de: k % 2 ? "autre" : "moi",
+            texte: `suite ${k + 1}`,
+            media: k === 3 ? "photo" : null,
+            coupe: false,
+            reaction: null,
+          })),
+        },
       ],
       profil: [FACTICE.profil],
       doutes: [],
@@ -139,7 +151,15 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         mode_sobre: false,
         these: "Vous jouez à cache-cache.",
         decouvertes: [1, 2, 3].map((k) => ({ texte: `Découverte ${k}`, preuves: [preuve(k)] })),
-        chapitres: [...moitie(true), ...moitie(false)].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: FACTICE.titreCourt(n), surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [preuve(n)] }], epice: "une vanne" })),
+        chapitres: [...moitie(true), ...moitie(false)].map((n) => ({
+          numero: n,
+          titre: `Chapitre ${n}`,
+          titre_court: FACTICE.titreCourt(n),
+          surtitre: null,
+          periode: "hors du fil",
+          scenes: [{ quand: "12/09", quoi: "une scène", preuves: [preuve(n)] }],
+          epice: "une vanne",
+        })),
       },
       chapitres: null,
     } satisfies z.infer<typeof Etape05>;
@@ -154,7 +174,8 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
       ],
     } satisfies Vocal;
-  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(p.length ? n % p.length : 0))) } satisfies z.infer<typeof Etape05>;
+  if (req.tache === "05-rapport")
+    return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(p.length ? n % p.length : 0))) } satisfies z.infer<typeof Etape05>;
   if (req.tache === "07-memoire" && req.partie === "mise à jour")
     return {
       alerte: null,
@@ -182,7 +203,14 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
     } satisfies Maj;
   if (req.tache === "10-chat") {
     /* Le vocal : « parle-moi en vocal » l’active, « écris-moi » l’arrête ; <vocal> dit que la réponse part en vocal */
-    const dernier = lu(demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1), "son message (« (à toi) : »)", req);
+    const dernier = lu(
+      demande
+        .split("\n")
+        .filter((l) => l.includes("(à toi) :"))
+        .at(-1),
+      "son message (« (à toi) : »)",
+      req,
+    );
     if (dernier.includes(FACTICE.refus)) return REFUS_FACTICE;
     const modeVocal = dernier.includes("parle-moi en vocal") ? "activer" : dernier.includes("écris-moi") ? "arreter" : null;
     const enVocal = modeVocal === "activer" || (modeVocal !== "arreter" && demande.includes("<vocal>"));
@@ -224,7 +252,12 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         conseils: [{ quand: "2026-03-01", conseil: "Lui répondre en face.", suite: "en_attente", resultat: null }],
         a_venir: [],
       },
-      fiche: { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [{ section: "aime", texte: "Le libanais", preuves: [preuve(4)], statut: "nouveau" }] },
+      fiche: {
+        portrait: "la Taquine",
+        phrase: "Son exam est jeudi",
+        phrase_courte: "Son exam jeudi",
+        faits: [{ section: "aime", texte: "Le libanais", preuves: [preuve(4)], statut: "nouveau" }],
+      },
       niveau: { niveau: "dit", tendance: null, pourquoi: "vus quatre fois", preuves: [preuve(2)] },
       questions: ["pourquoi elle vanne ?", "je relance trop ?", "samedi je fais quoi ?", "qui craque en premier ?"],
     } satisfies Memoire;

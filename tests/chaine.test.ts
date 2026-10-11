@@ -117,7 +117,10 @@ describe("de l’import à la mémoire", () => {
     const avant = await vocalPret(imp.id);
     const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id)))[0]!;
     const ancien = dechiffrer<DonneesVocal>(brut.data);
-    await db().update(schema.vocals).set({ data: chiffrer({ ...ancien, version: 1 }) }).where(eq(schema.vocals.storyId, imp.id));
+    await db()
+      .update(schema.vocals)
+      .set({ data: chiffrer({ ...ancien, version: 1 }) })
+      .where(eq(schema.vocals.storyId, imp.id));
     expect(await vocalAJour(imp.id)).toBe(false);
     await planifier(imp.id, "vocal");
     await executerChaine(imp.id);
@@ -136,12 +139,14 @@ describe("de l’import à la mémoire", () => {
     /* La réponse porte son échange (pour la partager en image), le même que dans l’historique */
     expect(reponse.echange).toBe(apres.at(-1)!.id);
     await executerChaine(imp.id);
-    const maj = (await db()
-      .select()
-      .from(schema.tasks)
-      .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")))
-      .orderBy(desc(schema.tasks.createdAt))
-      .limit(1))[0]!;
+    const maj = (
+      await db()
+        .select()
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")))
+        .orderBy(desc(schema.tasks.createdAt))
+        .limit(1)
+    )[0]!;
     expect(maj.status).toBe("fini");
   });
 
@@ -188,7 +193,10 @@ describe("purge", () => {
   it("efface les brouillons de plus de 24 h", async () => {
     const { purger } = await import("@/server/purge");
     const { id } = await convImportee("02-reciproque.txt");
-    await db().update(schema.stories).set({ createdAt: new Date(Date.now() - 2 * 86400e3) }).where(eq(schema.stories.id, id));
+    await db()
+      .update(schema.stories)
+      .set({ createdAt: new Date(Date.now() - 2 * 86400e3) })
+      .where(eq(schema.stories.id, id));
     const r = await purger();
     expect(r.brouillons).toBeGreaterThanOrEqual(1);
     expect(await db().select().from(schema.stories).where(eq(schema.stories.id, id))).toHaveLength(0);
@@ -197,7 +205,11 @@ describe("purge", () => {
 
 describe("hors de la chaîne (reparerLaChaine)", () => {
   /** Les plans du rapport planifiés pour cette histoire. */
-  const plans = (id: string) => db().select({ status: schema.tasks.status }).from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
+  const plans = (id: string) =>
+    db()
+      .select({ status: schema.tasks.status })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
 
   it("l’accès est celui du compte de l’histoire, lu en base : sans lui, le rapport ne part pas ; avec, il part", async () => {
     const u = await compteDeTest("reparer");

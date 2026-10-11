@@ -38,16 +38,21 @@ const Lot = Sortie01.extend({
   doutes: z.array(z.string().max(1000)).max(50),
 });
 /* Le corps du contrat (src/types/api.ts, sa `cle` comprise), resserré : une appli de captures, des lots bornés */
-const Envoi = ROUTES["POST /api/captures/video"].corps
-  .extend({ app: AppliCaptures, lots: z.array(Lot).min(1).max(40) })
-  .refine(({ lots }) => {
-    const blocs = lots.flatMap((l) => l.blocs);
-    const messages = blocs.flatMap((b) => b.messages);
-    const total = messages.reduce((n, m) => n + m.texte.length, 0);
-    const reperes = blocs.every((b) => !b.repere || (b.repere.date.length <= 20 && (b.repere.heure?.length ?? 0) <= 20));
-    const parLot = lots.every((l) => l.blocs.reduce((n, b) => n + b.messages.length, 0) <= MESSAGES_PAR_LOT_MAX);
-    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && parLot && total <= TEXTE_TOTAL_MAX && reperes && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
-  });
+const Envoi = ROUTES["POST /api/captures/video"].corps.extend({ app: AppliCaptures, lots: z.array(Lot).min(1).max(40) }).refine(({ lots }) => {
+  const blocs = lots.flatMap((l) => l.blocs);
+  const messages = blocs.flatMap((b) => b.messages);
+  const total = messages.reduce((n, m) => n + m.texte.length, 0);
+  const reperes = blocs.every((b) => !b.repere || (b.repere.date.length <= 20 && (b.repere.heure?.length ?? 0) <= 20));
+  const parLot = lots.every((l) => l.blocs.reduce((n, b) => n + b.messages.length, 0) <= MESSAGES_PAR_LOT_MAX);
+  return (
+    blocs.length <= 600 &&
+    messages.length <= MESSAGES_MAX &&
+    parLot &&
+    total <= TEXTE_TOTAL_MAX &&
+    reperes &&
+    messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50)
+  );
+});
 
 /**
  * Un enregistrement d’écran, lu lot par lot (/api/captures/lot) : les lectures sont rassemblées (sans les messages

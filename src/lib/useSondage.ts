@@ -14,7 +14,10 @@ export type SuiteDuSondage = number | false | void;
  * Démonté, ou `actif` qui repasse à faux : plus aucun tour, même celui qui attendait sa réponse.
  * `tour` peut changer à chaque rendu : c’est toujours le dernier qui sert, sans relancer l’attente.
  */
-export function useSondage(tour: () => SuiteDuSondage | Promise<SuiteDuSondage>, { actif = true, intervalle, immediat = false }: { actif?: boolean; intervalle: number; immediat?: boolean }) {
+export function useSondage(
+  tour: () => SuiteDuSondage | Promise<SuiteDuSondage>,
+  { actif = true, intervalle, immediat = false }: { actif?: boolean; intervalle: number; immediat?: boolean },
+) {
   const faire = useEffectEvent(tour);
   useEffect(() => {
     if (!actif) return;

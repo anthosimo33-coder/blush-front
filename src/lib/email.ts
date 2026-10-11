@@ -30,7 +30,8 @@ export type SaisieEmail = {
 };
 
 /** Le champ en erreur : un envoi raté, ou un email mal formé, une fois le champ quitté et quelque chose d’écrit. */
-export const champInvalide = ({ email, valide, probleme, touche }: { email: string; valide: boolean; probleme: string | null; touche: boolean }) => !!probleme || (touche && email.length > 0 && !valide);
+export const champInvalide = ({ email, valide, probleme, touche }: { email: string; valide: boolean; probleme: string | null; touche: boolean }) =>
+  !!probleme || (touche && email.length > 0 && !valide);
 
 /**
  * La saisie d’un email, commune à l’envoi du code (useEnvoiCode) et à la liste d’attente : l’email vient de l’écran

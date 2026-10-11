@@ -45,11 +45,7 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     return {
-      beforeFiles: [
-        ...avecSession("/", "/retour"),
-        ...avecSession("/commencer", "/commencer/connecte"),
-        ...avecSession("/connexion", "/connexion/connecte"),
-      ],
+      beforeFiles: [...avecSession("/", "/retour"), ...avecSession("/commencer", "/commencer/connecte"), ...avecSession("/connexion", "/connexion/connecte")],
       afterFiles: [],
       fallback: [],
     };

@@ -98,27 +98,29 @@ export function useChargerAnciens({
     let fini = false;
     const recharger = () => {
       const suivreModeVocal = actions.current.suivreModeVocal();
-      return getChatHistory()
-        .then((h) => {
-          if (fini) return;
-          /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
-          if (h.modeVocal !== undefined) suivreModeVocal(h.modeVocal);
-          const s = derniers.current;
-          if (s.msgs.some((m) => m.id >= depuis)) return;
-          const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
-          /* Le même historique que celui affiché : rien ne bouge */
-          if (memesMessages(r.msgs, s.msgs)) return;
-          plusAncien.current = r.plusAncien;
-          ilEnReste.current = r.plus;
-          suivant.current = null;
-          /* Un morceau plus ancien attend d’être posé : sa mesure, prise avant, couvre aussi ce rendu */
-          const { devant, mesurer } = actions.current.ecran;
-          devant.current ??= mesurer();
-          setPlus(r.plus);
-          actions.current.fondre(r.msgs);
-        })
-        /* Pas de réseau : la conv affichée reste telle quelle, le prochain retour sur la page relira */
-        .catch((e) => tracer("conv:historique", e));
+      return (
+        getChatHistory()
+          .then((h) => {
+            if (fini) return;
+            /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
+            if (h.modeVocal !== undefined) suivreModeVocal(h.modeVocal);
+            const s = derniers.current;
+            if (s.msgs.some((m) => m.id >= depuis)) return;
+            const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
+            /* Le même historique que celui affiché : rien ne bouge */
+            if (memesMessages(r.msgs, s.msgs)) return;
+            plusAncien.current = r.plusAncien;
+            ilEnReste.current = r.plus;
+            suivant.current = null;
+            /* Un morceau plus ancien attend d’être posé : sa mesure, prise avant, couvre aussi ce rendu */
+            const { devant, mesurer } = actions.current.ecran;
+            devant.current ??= mesurer();
+            setPlus(r.plus);
+            actions.current.fondre(r.msgs);
+          })
+          /* Pas de réseau : la conv affichée reste telle quelle, le prochain retour sur la page relira */
+          .catch((e) => tracer("conv:historique", e))
+      );
     };
     const premier = montage.current;
     montage.current = false;

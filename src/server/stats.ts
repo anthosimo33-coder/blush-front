@@ -28,9 +28,9 @@ export type StatsAdmin = {
   beta: { fermee: boolean; invites: number | "tous"; attente: number; attenteNouveaux: number; comptes: number };
 };
 
-const lignes = async <T,>(q: SQL) => (await db().execute(q)).rows as T[];
+const lignes = async <T>(q: SQL) => (await db().execute(q)).rows as T[];
 /** La ligne d’un agrégat (count, sum sans group by) : il en rend toujours une. */
-const ligne = async <T,>(q: SQL) => uneLigne(await lignes<T>(q), "stats");
+const ligne = async <T>(q: SQL) => uneLigne(await lignes<T>(q), "stats");
 const n = (v: unknown) => Number(v ?? 0);
 
 /** Les postes de coût, d’après l’étiquette de chaque appel au modèle. */
@@ -44,8 +44,7 @@ const POSTES: [string, (tache: string) => boolean][] = [
 
 export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   /* La période (k = 0) et celle d’avant (k = 1), sur une colonne de date */
-  const dans = (col: string, k = 0) =>
-    sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
+  const dans = (col: string, k = 0) => sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
   const chiffre = async (table: string, col: string, ou = "true"): Promise<Chiffre> => {
     const r = await ligne<{ a: string; b: string }>(
       sql`select count(*) filter (where ${dans(col)}) as a, count(*) filter (where ${dans(col, 1)}) as b from ${sql.raw(table)} where ${sql.raw(ou)}`,
@@ -81,9 +80,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
             (select count(*) from reports r where r.data is not null and (r.updated_at at time zone 'Europe/Paris')::date = j.jour) as rapports
           from j order by j.jour`,
     ),
-    lignes<{ key: string; total: string }>(
-      sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
-    ),
+    lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`),
     ligne<{ n: string }>(sql`select count(*) as n from shares`),
     lignes<{ task: string; appels: string; micros: string }>(
       sql`select task, count(*) as appels, sum(cost_micros) as micros from ai_usage where ${dans("created_at")} group by task`,

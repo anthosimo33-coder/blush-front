@@ -172,6 +172,9 @@ export async function lectureBlushPlus(page: Page, testInfo: TestInfo, lecture: 
   const email = await nouvelInvite(testInfo);
   await lectureFaite(page, testInfo, email, lecture);
   const taches = await attendreTaches(email);
-  expect(taches.map((t) => t.genre), "toute la chaîne de BLUSH+").toEqual(expect.arrayContaining(["verdict", "rapport_plan", "rapport_chapitres", "vocal", "memoire"]));
+  expect(
+    taches.map((t) => t.genre),
+    "toute la chaîne de BLUSH+",
+  ).toEqual(expect.arrayContaining(["verdict", "rapport_plan", "rapport_chapitres", "vocal", "memoire"]));
   return email;
 }

@@ -105,7 +105,8 @@ describe("chaque route de la table", () => {
 });
 
 describe("la garde", () => {
-  const post = (entetes: Record<string, string> = { origin: APPLI, host: "localhost", "x-forwarded-for": "2001:db8:1:2:3:4:5:6" }) => new Request(`${APPLI}/api/x`, { method: "POST", headers: entetes });
+  const post = (entetes: Record<string, string> = { origin: APPLI, host: "localhost", "x-forwarded-for": "2001:db8:1:2:3:4:5:6" }) =>
+    new Request(`${APPLI}/api/x`, { method: "POST", headers: entetes });
   const gratuit: Compte = { id: "c1", email: "Noe.Martin+test@gmail.com", plan: "gratuit" };
 
   it("une lecture (GET) ne regarde pas l’origine ; une mutation, si", async () => {

@@ -76,7 +76,8 @@ const COINS = {
 export const coinsDeBulle = (cote: keyof typeof COINS, place: PlaceBulle) => COINS[cote][place];
 
 /** La bulle blanche de BLUSH : sa forme (318 px au plus), son fond et son filet. Aussi celle du fil de l’accueil (src/app/app/accueil/bulles.tsx). */
-export const BULLE_DE_BLUSH = "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]";
+export const BULLE_DE_BLUSH =
+  "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]";
 
 /**
  * Une bulle du fil de BLUSH, avant d’être posée : son contenu, son ton (`plain` la bulle blanche, `accent` le pas suivant,
@@ -141,17 +142,7 @@ const TAGS = {
 
 export type TagTone = keyof typeof TAGS;
 
-export function Tag({
-  tone,
-  children,
-  size = "sm",
-  className,
-}: {
-  tone: TagTone;
-  children?: ReactNode;
-  size?: "sm" | "md";
-  className?: string;
-}) {
+export function Tag({ tone, children, size = "sm", className }: { tone: TagTone; children?: ReactNode; size?: "sm" | "md"; className?: string }) {
   const { couleur, label }: { couleur: string; label?: string } = TAGS[tone];
   return (
     <span

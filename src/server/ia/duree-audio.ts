@@ -132,7 +132,8 @@ function ajouterPaquet(opus: Opus, paquet: Uint8Array): boolean {
   return true;
 }
 
-const enOgg = (opus: Opus | null): AudioLu | null => (opus && opus.paquets.length ? { secondes: opus.ms / 1000, octets: ecrireOggOpus(opus), type: "audio/ogg", extension: "ogg" } : null);
+const enOgg = (opus: Opus | null): AudioLu | null =>
+  opus && opus.paquets.length ? { secondes: opus.ms / 1000, octets: ecrireOggOpus(opus), type: "audio/ogg", extension: "ogg" } : null;
 
 /* ———— WebM (Matroska, EBML) ———— */
 
@@ -196,7 +197,7 @@ function lireWebm(o: Uint8Array): Opus | null {
   let codec = "";
   let entete: Pick<Opus, "canaux" | "preskip" | "frequence"> | null = null;
   const blocs: { piste: number; paquet: Uint8Array }[] = [];
-  for (let a = 0; ; ) {
+  for (let a = 0; ;) {
     while (parents.length && parents.at(-1)!.fin === a) parents.pop();
     if (a >= o.length) break;
     const id = vint(o, a, true);
@@ -294,7 +295,7 @@ function lireOgg(o: Uint8Array): Opus | null {
   /* Le paquet en cours : il peut courir sur plusieurs pages */
   let morceaux: Uint8Array[] = [];
   let longueur = 0;
-  for (let a = 0; a < o.length; ) {
+  for (let a = 0; a < o.length;) {
     if (fini || !commencePar(o, a, OGGS) || a + 27 > o.length || o[a + 4] !== 0) return null;
     const type = octet(o, a + 5);
     const s = vue.getUint32(a + 14, true);
@@ -453,7 +454,7 @@ function dureeMp4(o: Uint8Array): number | null {
   const pointes: number[] = [];
   const lire = (debut: number, fin: number, profondeur: number): boolean => {
     if (profondeur > PROFONDEUR_MAX) return false;
-    for (let a = debut; a < fin; ) {
+    for (let a = debut; a < fin;) {
       if (a + 8 > fin) return false;
       let taille = vue.getUint32(a);
       const type = type4(o, a + 4);
@@ -511,7 +512,12 @@ function dureeMp4(o: Uint8Array): number | null {
     if (type === "tfhd") {
       /* Après l’identifiant de la piste : l’adresse de base (0x01), la description (0x02), la durée (0x08), puis la taille par défaut (0x10) */
       let a = corps + 8;
-      for (const [bit, octets] of [[0x01, 8], [0x02, 4], [0x08, 4]] as const) if (drapeaux & bit) a += octets;
+      for (const [bit, octets] of [
+        [0x01, 8],
+        [0x02, 4],
+        [0x08, 4],
+      ] as const)
+        if (drapeaux & bit) a += octets;
       parDefautTfhd = drapeaux & 0x10 ? vue.getUint32(a) : null;
       return true;
     }
@@ -569,7 +575,7 @@ function configMp4a(o: Uint8Array, vue: DataView, debut: number, fin: number): A
   /* Une entrée QuickTime de version 1 ou 2 allonge l’entrée (16 ou 36 octets) ; la version 2 écrit sa fréquence ailleurs */
   const annoncee = version === 2 ? 0 : vue.getUint32(debut + 32) >>> 16;
   let asc: Asc | null = null;
-  for (let a = debut + 36 + (version === 1 ? 16 : version === 2 ? 36 : 0); a + 8 <= fin; ) {
+  for (let a = debut + 36 + (version === 1 ? 16 : version === 2 ? 36 : 0); a + 8 <= fin;) {
     const taille = vue.getUint32(a);
     if (taille < 8) break;
     if (type4(o, a + 4) === "esds") asc = lireEsds(o, a + 12, Math.min(fin, a + taille));

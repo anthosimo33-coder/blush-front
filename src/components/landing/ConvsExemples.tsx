@@ -151,7 +151,9 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
         </span>
         <span className="text-[22px] font-black leading-[1.1] tracking-[-0.02em] min-[380px]:text-titre-3 lg:text-[32px] lg:leading-[1.05]">{conv.verdict.title}</span>
       </div>
-      <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-accent lg:leading-[1.45] [@media(max-height:600px)]:text-note [@media(max-height:600px)]:leading-[1.3]">{conv.verdict.subtitle}</p>
+      <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-accent lg:leading-[1.45] [@media(max-height:600px)]:text-note [@media(max-height:600px)]:leading-[1.3]">
+        {conv.verdict.subtitle}
+      </p>
       <div className="flex flex-col gap-2 rounded-card bg-white p-3 shadow-card lg:p-3.5 [@media(max-height:600px)]:p-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-legende font-black text-grey">La preuve</span>

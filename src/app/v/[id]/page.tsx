@@ -30,7 +30,13 @@ export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promis
   return {
     title: { absolute: titre },
     description: "BLUSH a lu toute leur conv. Et la tienne, elle dit quoi\u00a0?",
-    openGraph: { title: titre, description: v.subtitle || "BLUSH a lu toute leur conv.", siteName: "BLUSH", type: "website", images: [{ url: `/v/${id}/image`, width: 1200, height: 630, alt: titre }] },
+    openGraph: {
+      title: titre,
+      description: v.subtitle || "BLUSH a lu toute leur conv.",
+      siteName: "BLUSH",
+      type: "website",
+      images: [{ url: `/v/${id}/image`, width: 1200, height: 630, alt: titre }],
+    },
     twitter: { card: "summary_large_image", title: titre, images: [`/v/${id}/image`] },
   };
 }
@@ -59,7 +65,10 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
   if (v && !estUnRobot((await headers()).get("user-agent"))) after(() => compter(CLES.lienVu));
   return (
     <main className="relative isolate flex min-h-dvh flex-col items-center overflow-x-clip bg-paper px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] lg:pt-10">
-      <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[900px] -translate-x-1/2 bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]" />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[900px] -translate-x-1/2 bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
+      />
       <Logo size={34} fontSize={24} href="/" />
       <div className="mt-10 flex w-full max-w-[520px] flex-col lg:mt-16">
         {v ? (
@@ -93,7 +102,9 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
 
         <section className="mt-6 flex flex-col items-center gap-3 rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-card lg:px-7">
           <h2 className="m-0 text-titre-3 font-black leading-[1.12] tracking-[-0.025em] [text-wrap:balance]">Ta conv en dit plus que tu crois.</h2>
-          <p className="m-0 text-detail font-bold leading-[1.45] text-soft [text-wrap:balance]">Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.</p>
+          <p className="m-0 text-detail font-bold leading-[1.45] text-soft [text-wrap:balance]">
+            Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
+          </p>
           {/* Une route (essayer/route.ts, qui pose le cookie et redirige), pas une page : typedRoutes ne connaît que les pages */}
           <ButtonLink href={`/v/${id}/essayer` as Route} arrow className="mt-1 whitespace-nowrap">
             Analyser ma conv

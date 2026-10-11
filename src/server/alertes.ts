@@ -69,21 +69,37 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
     const depuis = new Date(maintenant.getTime() - 86400e3);
     const nb = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
     const taches = (genre: Genre, statut: StatutTache) =>
-      nb(db().select({ n: count() }).from(schema.tasks).where(and(eq(schema.tasks.kind, genre), eq(schema.tasks.status, statut), gte(schema.tasks.updatedAt, depuis))));
+      nb(
+        db()
+          .select({ n: count() })
+          .from(schema.tasks)
+          .where(and(eq(schema.tasks.kind, genre), eq(schema.tasks.status, statut), gte(schema.tasks.updatedAt, depuis))),
+      );
     /* Une étape arrêtée par le budget de l’IA (tasks.error « budget ») n’a pas échoué pour de bon : elle repart après minuit */
     const echecsDe = (budget: boolean) =>
       nb(
         db()
           .select({ n: count() })
           .from(schema.tasks)
-          .where(and(eq(schema.tasks.status, "echec"), gte(schema.tasks.updatedAt, depuis), budget ? eq(schema.tasks.error, "budget") : sql`${schema.tasks.error} is distinct from 'budget'`)),
+          .where(
+            and(
+              eq(schema.tasks.status, "echec"),
+              gte(schema.tasks.updatedAt, depuis),
+              budget ? eq(schema.tasks.error, "budget") : sql`${schema.tasks.error} is distinct from 'budget'`,
+            ),
+          ),
       );
     const [histoires, verdicts, rapports, memoires, messages, echecs, arretees, attente] = await Promise.all([
       nb(db().select({ n: count() }).from(schema.stories).where(gte(schema.stories.createdAt, depuis))),
       taches("verdict", "fini"),
       taches("rapport_chapitres", "fini"),
       taches("memoire", "fini"),
-      nb(db().select({ n: count() }).from(schema.chatMessages).where(and(eq(schema.chatMessages.role, "toi"), gte(schema.chatMessages.createdAt, depuis)))),
+      nb(
+        db()
+          .select({ n: count() })
+          .from(schema.chatMessages)
+          .where(and(eq(schema.chatMessages.role, "toi"), gte(schema.chatMessages.createdAt, depuis))),
+      ),
       echecsDe(false),
       echecsDe(true),
       nb(db().select({ n: count() }).from(schema.waitlist).where(gte(schema.waitlist.createdAt, depuis))),

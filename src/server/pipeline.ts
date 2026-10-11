@@ -211,7 +211,9 @@ const ALERTE_IMPORTANTE: ReadonlySet<Genre> = new Set(["verdict", "rapport_plan"
 
 /** L’alerte à l’équipe d’une étape en échec pour de bon : son genre, la tâche, le code, jamais de contenu. */
 const alerterEchec = (t: Tache, erreur: string) =>
-  alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${erreur}`, `Essais : ${t.attempts}`], { importante: ALERTE_IMPORTANTE.has(t.kind) });
+  alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${erreur}`, `Essais : ${t.attempts}`], {
+    importante: ALERTE_IMPORTANTE.has(t.kind),
+  });
 
 /** Exécute une tâche, puis planifie la suite. */
 async function executer(t: Tache): Promise<Issue> {

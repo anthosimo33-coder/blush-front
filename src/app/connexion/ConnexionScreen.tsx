@@ -48,8 +48,7 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       <NotePrivee className="leading-[1.45]">{NOTE_CONNEXION}</NotePrivee>
       {!depuisImport && (
         <p className="m-0 text-note font-extrabold text-grey">
-          Pas encore de compte{NBSP}?{" "}
-          <LienDiscret href="/commencer">Analyser ma conv</LienDiscret>
+          Pas encore de compte{NBSP}? <LienDiscret href="/commencer">Analyser ma conv</LienDiscret>
         </p>
       )}
     </ParcoursScreen>

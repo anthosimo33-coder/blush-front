@@ -39,7 +39,18 @@ console.log(`<nouveau> :\n${blocAjout(ajout).join("\n")}\n`);
 
 /* Le chat : sans un mot de lui, la demande par défaut */
 const chat = await appeler(
-  requeteChat({ h, aujourdhui: Date.parse(`${jour}T00:00:00Z`), chiffres: rendu.chiffres, fin: rendu.fin, etat, lignes: avec, style: style(h, lu.messages).bloc, fil: [], dit: "ça veut dire quoi ? je lui réponds quoi ?", ajout: blocAjout(ajout) }),
+  requeteChat({
+    h,
+    aujourdhui: Date.parse(`${jour}T00:00:00Z`),
+    chiffres: rendu.chiffres,
+    fin: rendu.fin,
+    etat,
+    lignes: avec,
+    style: style(h, lu.messages).bloc,
+    fil: [],
+    dit: "ça veut dire quoi ? je lui réponds quoi ?",
+    ajout: blocAjout(ajout),
+  }),
   Sortie10,
   { etiquette: "essai_ajouts" },
 );
@@ -49,10 +60,20 @@ console.log(`chat · ${chat.cout.toFixed(3)} $ · type ${r.type} · coup ${r.cou
 for (const b of r.lecture) console.log(`  « ${b.texte} »${b.preuves.length ? `  [${b.preuves.join(", ")}]` : ""}`);
 if (r.a_envoyer) console.log(`  à envoyer : ${r.a_envoyer.join(" / ")}${r.pourquoi ? `\n  pourquoi : ${r.pourquoi}` : ""}`);
 if (r.question) console.log(`  question : ${r.question}`);
-console.log(`  preuves introuvables : ${introuvables(preuvesChat(r), avec).join(", ") || "aucune"} · preuves parmi les nouveaux : ${preuvesChat(r).filter((id) => ajout.lignes.some((l) => l.startsWith(`${id} `))).join(", ") || "aucune"}`);
+console.log(
+  `  preuves introuvables : ${introuvables(preuvesChat(r), avec).join(", ") || "aucune"} · preuves parmi les nouveaux : ${
+    preuvesChat(r)
+      .filter((id) => ajout.lignes.some((l) => l.startsWith(`${id} `)))
+      .join(", ") || "aucune"
+  }`,
+);
 
 /* La mémoire relit ce qui est arrivé */
-const nouveau = rendreNouveau({ date: jour, lignes: ajout.lignes, dit: "ça veut dire quoi ? je lui réponds quoi ?", reponse: r.lecture.map((b) => b.texte).concat(r.a_envoyer ?? []) }, h, 0);
+const nouveau = rendreNouveau(
+  { date: jour, lignes: ajout.lignes, dit: "ça veut dire quoi ? je lui réponds quoi ?", reponse: r.lecture.map((b) => b.texte).concat(r.a_envoyer ?? []) },
+  h,
+  0,
+);
 const pourMaj = new Map([...lignes, ...nouveau.lignes]);
 const maj = await appeler(requeteMemoireMaj(h, Date.parse(`${jour}T00:00:00Z`), etat, pourMaj, nouveau.texte), Maj07, { etiquette: "essai_ajouts", partie: "mise à jour" });
 const m = maj.sortie;

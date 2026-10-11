@@ -13,7 +13,21 @@ import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gaba
 const enHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** `lien` : l’adresse qui ouvre ce rapport ; `autre` : le prénom de l’autre (le titre de son chapitre, comme dans le rapport). */
-export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { base: string; lien: string; chapitres: number; lecture: string; autre: string; sobre: boolean }): MailDessine {
+export function mailRapport({
+  base,
+  lien,
+  chapitres,
+  lecture,
+  autre,
+  sobre,
+}: {
+  base: string;
+  lien: string;
+  chapitres: number;
+  lecture: string;
+  autre: string;
+  sobre: boolean;
+}): MailDessine {
   const n = String(chapitres);
   const sujet = sobre ? "Ton rapport BLUSH est prêt" : "📖 Ton rapport BLUSH est prêt";
   const resume = sobre ? "Prends le temps de le lire au calme." : `${n} chapitres, ${lecture} de lecture. J’ai pas été tendre.`;
@@ -57,7 +71,10 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
             ${boutonMail({ lien, libelle: "Lire mon rapport&nbsp;&nbsp;→", marge: 24 })}
             <div class="gris" style="padding-top:14px;text-align:center;font-family:${POLICE};font-size:13px;line-height:19px;font-weight:800;color:${GRIS};">${sobre ? "BLUSH reste là si tu veux en parler." : "Ensuite, parle à BLUSH&nbsp;: il connaît toute votre&nbsp;histoire."}</div>`,
     },
-    pied: { classe: "gris", contenu: sobre ? "Ce mail ne contient rien de ta conv&nbsp;: ni prénom, ni&nbsp;message." : "Ce mail ne contient aucun message de ta conv, ni&nbsp;le&nbsp;verdict." },
+    pied: {
+      classe: "gris",
+      contenu: sobre ? "Ce mail ne contient rien de ta conv&nbsp;: ni prénom, ni&nbsp;message." : "Ce mail ne contient aucun message de ta conv, ni&nbsp;le&nbsp;verdict.",
+    },
   });
   return { sujet, texte, html };
 }

@@ -104,7 +104,14 @@ export function useEnvois({
     if (field && !about && !prefersReducedMotion()) {
       const r = field.getBoundingClientRect();
       const w = textWidth(t, field);
-      if (w <= r.width) flightRef.current = { kind: "text", bubble: cleBulle(mine, 0), text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
+      if (w <= r.width)
+        flightRef.current = {
+          kind: "text",
+          bubble: cleBulle(mine, 0),
+          text: t,
+          from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 },
+          start: FIELD_LOOK,
+        };
     }
     const point = about ?? undefined;
     setAbout(null);

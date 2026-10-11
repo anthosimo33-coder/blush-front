@@ -115,7 +115,14 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
 
   it(`passe quand un texte ne partage que ${TAILLE - 1} mots d’affilée avec une phrase des prompts`, () => {
     const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2)!;
-    ecrire("static/chunks/app/page.js", `const t = ${JSON.stringify(mots(phrase).slice(0, TAILLE - 1).join(" "))};`);
+    ecrire(
+      "static/chunks/app/page.js",
+      `const t = ${JSON.stringify(
+        mots(phrase)
+          .slice(0, TAILLE - 1)
+          .join(" "),
+      )};`,
+    );
     const { code, sortie } = verifier();
     expect(sortie).toContain("Aucune phrase des prompts dans 1 fichiers");
     expect(code).toBe(0);

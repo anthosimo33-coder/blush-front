@@ -46,7 +46,18 @@ const INIT = (noraf) => {
   };
   requestAnimationFrame(loop);
   try {
-    new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__loaf.push({ d: e.duration, b: e.blockingDuration, s: e.startTime, render: e.renderStart ? Math.round(e.startTime + e.duration - e.renderStart) : 0, style: e.styleAndLayoutStart ? Math.round(e.startTime + e.duration - e.styleAndLayoutStart) : 0, scripts: (e.scripts || []).map((x) => `${x.invoker}:${Math.round(x.duration)}ms ${x.sourceFunctionName || ""} ${(x.sourceURL || "").split("/").pop()}`) }))).observe({ type: "long-animation-frame", buffered: true });
+    new PerformanceObserver((l) =>
+      l.getEntries().forEach((e) =>
+        window.__loaf.push({
+          d: e.duration,
+          b: e.blockingDuration,
+          s: e.startTime,
+          render: e.renderStart ? Math.round(e.startTime + e.duration - e.renderStart) : 0,
+          style: e.styleAndLayoutStart ? Math.round(e.startTime + e.duration - e.styleAndLayoutStart) : 0,
+          scripts: (e.scripts || []).map((x) => `${x.invoker}:${Math.round(x.duration)}ms ${x.sourceFunctionName || ""} ${(x.sourceURL || "").split("/").pop()}`),
+        }),
+      ),
+    ).observe({ type: "long-animation-frame", buffered: true });
   } catch {}
 };
 
@@ -67,7 +78,10 @@ async function traced(run) {
   const events = [];
   const onData = (d) => events.push(...d.value);
   CDP.on("Tracing.dataCollected", onData);
-  await CDP.send("Tracing.start", { traceConfig: { includedCategories: ["viz", "blink.user_timing", "disabled-by-default-devtools.timeline.frame", "benchmark", "cc"] }, transferMode: "ReportEvents" });
+  await CDP.send("Tracing.start", {
+    traceConfig: { includedCategories: ["viz", "blink.user_timing", "disabled-by-default-devtools.timeline.frame", "benchmark", "cc"] },
+    transferMode: "ReportEvents",
+  });
   await run();
   const done = new Promise((r) => CDP.once("Tracing.tracingComplete", r));
   await CDP.send("Tracing.end");
@@ -100,7 +114,16 @@ async function traced(run) {
     /* Pour DEBUG : où tombe le pire trou dans le geste, et le geste (marque) le plus proche avant lui */
     const debutPire = dans[ecarts.indexOf(pire)] ?? g.debut;
     const marqueAvant = g.marques.filter((t) => t <= debutPire).at(-1) ?? g.debut;
-    return { type: g.type, delai: premiere === undefined ? null : premiere - g.debut, pire, trous: ecarts.filter((x) => x > TROU).length, pireA: debutPire - g.debut, apresMarque: debutPire - marqueAvant, duree: fin - g.debut, marques: g.marques.length };
+    return {
+      type: g.type,
+      delai: premiere === undefined ? null : premiere - g.debut,
+      pire,
+      trous: ecarts.filter((x) => x > TROU).length,
+      pireA: debutPire - g.debut,
+      apresMarque: debutPire - marqueAvant,
+      duree: fin - g.debut,
+      marques: g.marques.length,
+    };
   });
   const states = {};
   for (const e of events) {
@@ -128,10 +151,21 @@ async function measure(page, label, run) {
   if (process.env.DEBUG) {
     let t = 0;
     const big = [];
-    f.forEach((d) => { t += d; if (d > 25) big.push(`${Math.round(t)}:${Math.round(d)}`); });
+    f.forEach((d) => {
+      t += d;
+      if (d > 25) big.push(`${Math.round(t)}:${Math.round(d)}`);
+    });
     console.log(label, "images longues (t:durée)", big.join(" "));
     for (const e of loaf) console.log("   LoAF", Math.round(e.d), "ms, rendu", e.render, "style+layout", e.style, e.scripts.join(" | "));
-    console.log("   gestes", parGeste.map((g) => `${g.type} délai ${g.delai === null ? "?" : Math.round(g.delai)} pire ${Math.round(g.pire)} (à ${Math.round(g.pireA)} ms sur ${Math.round(g.duree)}, ${Math.round(g.apresMarque)} ms après la marque d’avant, ${g.marques} marques) trous ${g.trous}`).join(" | "));
+    console.log(
+      "   gestes",
+      parGeste
+        .map(
+          (g) =>
+            `${g.type} délai ${g.delai === null ? "?" : Math.round(g.delai)} pire ${Math.round(g.pire)} (à ${Math.round(g.pireA)} ms sur ${Math.round(g.duree)}, ${Math.round(g.apresMarque)} ms après la marque d’avant, ${g.marques} marques) trous ${g.trous}`,
+        )
+        .join(" | "),
+    );
     /* L’ancien compteur, pour comparer : à ne pas croire seul (voir l’en-tête) */
     console.log("   PipelineReporter (indicatif, faux « perdues » en bas d’écran)", JSON.stringify(states));
   }
@@ -218,9 +252,12 @@ const SCENARIOS = {
       await sleep(4300);
     });
     /* Sans le nouveau niveau dans la conv, la mesure n’est qu’un envoi : le scénario échoue */
-    await nouveau.nth(avant).waitFor({ timeout: 5000 }).catch(() => {
-      throw new Error("le niveau n’est pas monté (ni anneau ni célébration) : la mesure n’est qu’un envoi");
-    });
+    await nouveau
+      .nth(avant)
+      .waitFor({ timeout: 5000 })
+      .catch(() => {
+        throw new Error("le niveau n’est pas monté (ni anneau ni célébration) : la mesure n’est qu’un envoi");
+      });
     return r;
   },
   async vocal(page) {
@@ -305,7 +342,14 @@ const browser = await chromium.launch({
 });
 const rows = [];
 for (let run = 0; run < RUNS; run++) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-FR", permissions: ["microphone"] });
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+    locale: "fr-FR",
+    permissions: ["microphone"],
+  });
   /* Un contexte neuf à chaque passage : l’arrivée de l’accueil se joue */
   await ctx.addCookies([{ name: "blush-session", value: SESSION, url: BASE }]);
   await ctx.addInitScript(INIT, !!process.env.NORAF);
@@ -351,6 +395,18 @@ for (const [label, a] of by) {
     const v = a.map((r) => r[k]).filter((x) => x !== null && x !== undefined);
     return v.length ? String(Math.round(v.reduce((n, x) => n + x, 0) / v.length)) : "–";
   };
-  console.log(label.padEnd(30), avg("vizParS").padStart(8), avg("gestes").padStart(6), avg("trous").padStart(5), avg("pireTrou").padStart(9), avg("toucherImage").padStart(13), "|", avg("smooth").padStart(4), avg("missed").padStart(6), avg("worst").padStart(8), avg("blocking").padStart(11));
+  console.log(
+    label.padEnd(30),
+    avg("vizParS").padStart(8),
+    avg("gestes").padStart(6),
+    avg("trous").padStart(5),
+    avg("pireTrou").padStart(9),
+    avg("toucherImage").padStart(13),
+    "|",
+    avg("smooth").padStart(4),
+    avg("missed").padStart(6),
+    avg("worst").padStart(8),
+    avg("blocking").padStart(11),
+  );
 }
 if (process.env.OUT) fs.writeFileSync(process.env.OUT, JSON.stringify(rows, null, 2));

@@ -6,7 +6,11 @@ export const dynamic = "force-dynamic";
 const EXEMPLES = {
   court: { emoji: "🤏", title: "Vous êtes à deux doigts.", subtitle: "Elle a posé la question, t’as esquivé." },
   moyen: { emoji: "🔥", title: "Vous êtes un couple, sans le nom.", subtitle: "Elle veut que tu dormes chez elle tous les jours. Il manque juste le mot." },
-  long: { emoji: "🤔", title: "Elle teste si tu restes quand ça devient compliqué, et toi tu fuis dès que ça chauffe.", subtitle: "Trois relances en une semaine, zéro réponse claire. Ça mérite une vraie conversation." },
+  long: {
+    emoji: "🤔",
+    title: "Elle teste si tu restes quand ça devient compliqué, et toi tu fuis dès que ça chauffe.",
+    subtitle: "Trois relances en une semaine, zéro réponse claire. Ça mérite une vraie conversation.",
+  },
   froid: { emoji: "🧊", title: "Elle a déjà tourné la page.", subtitle: "Ses réponses raccourcissent depuis le 3 mars." },
 } as const;
 
@@ -17,9 +21,14 @@ export async function GET(req: Request) {
   if (p.get("type") === "reponse")
     return carteReponse({
       question: "elle m’a répondu «\u00a0haha peut-être\u00a0» à mon resto, je fais quoi\u00a0?",
-      bulles: ["«\u00a0peut-être\u00a0» avec un haha, c’est pas un non frérot", "elle te teste\u00a0: elle veut voir si tu insistes ou si tu proposes mieux", "tu relances pas, tu proposes un vrai plan\u00a0: jeudi 20h, le japonais dont elle t’a parlé"],
+      bulles: [
+        "«\u00a0peut-être\u00a0» avec un haha, c’est pas un non frérot",
+        "elle te teste\u00a0: elle veut voir si tu insistes ou si tu proposes mieux",
+        "tu relances pas, tu proposes un vrai plan\u00a0: jeudi 20h, le japonais dont elle t’a parlé",
+      ],
     });
-  if (p.get("type") === "moment") return carteMoment({ surtitre: "Chapitre 4 · Ce qui coince", texte: "Vous jouez à celui qui écrira le moins vite. Spoiler\u00a0: vous perdez tous les deux." });
+  if (p.get("type") === "moment")
+    return carteMoment({ surtitre: "Chapitre 4 · Ce qui coince", texte: "Vous jouez à celui qui écrira le moins vite. Spoiler\u00a0: vous perdez tous les deux." });
   const v = EXEMPLES[(p.get("cas") ?? "court") as keyof typeof EXEMPLES] ?? EXEMPLES.court;
   return carteVerdict(v, p.get("format") === "story" ? "story" : "carte");
 }

@@ -4,7 +4,24 @@
  * ne les lit pas. Les pages serveur passent par serveur.ts. Un seul appel passe encore à côté, par un fetch direct : le
  * réveil de la base (src/components/shell/Reveil.tsx, une balise dont la réponse n’est pas lue).
  */
-import type { AnalysisProgress, AppKind, BlushAnswer, BulleChat, EvenementChat, EvenementEcoute, Fiche, FicheFact, FicheUpdate, Goal, Guess, Plan, Pronom, QuestionAnswer, Source, Subscription } from "@/types";
+import type {
+  AnalysisProgress,
+  AppKind,
+  BlushAnswer,
+  BulleChat,
+  EvenementChat,
+  EvenementEcoute,
+  Fiche,
+  FicheFact,
+  FicheUpdate,
+  Goal,
+  Guess,
+  Plan,
+  Pronom,
+  QuestionAnswer,
+  Source,
+  Subscription,
+} from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
 import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
@@ -173,7 +190,8 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
 const LECTEURS = 5;
 
 /** La clé d’un envoi : le serveur reconnaît un nouvel essai du même envoi (src/server/captures.ts, reprise). */
-const cleEnvoi = () => (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (o) => o.toString(16).padStart(2, "0")).join(""));
+const cleEnvoi = () =>
+  typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (o) => o.toString(16).padStart(2, "0")).join("");
 
 /**
  * Un long envoi (30 s à 2 min de lecture) que le réseau coupe : Safari passé en arrière-plan, l’écran verrouillé, le
@@ -237,7 +255,10 @@ export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]
  * Les captures, réduites dans le navigateur, puis lues par BLUSH (une seule fois, pour toutes). `onAvance` ne dit
  * que la reprise, si le réseau coupe pendant la lecture.
  */
-export async function uploadScreenshots(files: File[], opts: { app: AppKind; mode: "first" | "add"; onAvance?: (a: AvanceVideo) => void }): Promise<{ source: Source; messagesRead: number }> {
+export async function uploadScreenshots(
+  files: File[],
+  opts: { app: AppKind; mode: "first" | "add"; onAvance?: (a: AvanceVideo) => void },
+): Promise<{ source: Source; messagesRead: number }> {
   const fd = new FormData();
   try {
     (await preparerCaptures(files)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
@@ -360,7 +381,9 @@ const estMoi = (id: string): id is Moi => id === "p0" || id === "p1";
 export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
   const { me } = input;
   if (!estMoi(me)) throw new ErreurApi("qui", 422);
-  return void (await appel("POST /api/analyse", { corps: { me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) } }));
+  return void (await appel("POST /api/analyse", {
+    corps: { me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) },
+  }));
 }
 
 /**
@@ -480,7 +503,10 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
     question,
     title: bulles[0]?.text ?? "",
     evidenceLabel: "Ce que je vois",
-    evidence: bulles.slice(1).map((b) => b.text).join(" · "),
+    evidence: bulles
+      .slice(1)
+      .map((b) => b.text)
+      .join(" · "),
     ...(message ? { message } : {}),
     confidence: "probable",
     limits: r.ask ?? "",

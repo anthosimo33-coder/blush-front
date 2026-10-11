@@ -91,7 +91,11 @@ export async function ecrireSurCeQuiAEteLu<T>(
  * `essais` fois. Deux écrivains : la mise à jour après le chat (src/server/analyse.ts, memoireMaj : elle appelle le
  * modèle, 20 à 60 s) et la fiche corrigée à la main (PUT /api/fiche).
  */
-export function modifierMemoire(storyId: string, modifier: (avant: DonneesMemoire) => DonneesMemoire | null | Promise<DonneesMemoire | null>, { essais }: { essais: number }): Promise<Modification> {
+export function modifierMemoire(
+  storyId: string,
+  modifier: (avant: DonneesMemoire) => DonneesMemoire | null | Promise<DonneesMemoire | null>,
+  { essais }: { essais: number },
+): Promise<Modification> {
   const m = schema.memories;
   return ecrireSurCeQuiAEteLu(
     {

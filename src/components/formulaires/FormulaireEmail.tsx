@@ -21,7 +21,13 @@ export function FormulaireEmail({ envoi }: { envoi: SaisieEmail }) {
         void envoi.envoyer();
       }}
     >
-      <EmailField value={envoi.email} onChange={envoi.changer} onBlur={envoi.quitter} invalid={envoi.invalide} errorText={envoi.probleme ?? "Vérifie ton email\u00a0: il manque quelque chose."} />
+      <EmailField
+        value={envoi.email}
+        onChange={envoi.changer}
+        onBlur={envoi.quitter}
+        invalid={envoi.invalide}
+        errorText={envoi.probleme ?? "Vérifie ton email\u00a0: il manque quelque chose."}
+      />
     </form>
   );
 }

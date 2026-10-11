@@ -115,7 +115,9 @@ describe("les sommaires : une même règle par ligne, d’après la phase", () =
     /* Le DOM simulé n’a ni matchMedia ni animate : la feuille s’ouvre sans animation */
     const { animate } = Element.prototype;
     beforeEach(() => {
-      vi.spyOn(window, "matchMedia").mockImplementation((requete: string) => ({ matches: false, media: requete, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList);
+      vi.spyOn(window, "matchMedia").mockImplementation(
+        (requete: string) => ({ matches: false, media: requete, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+      );
       Element.prototype.animate = () => ({ finished: Promise.resolve(), cancel: () => {} }) as unknown as Animation;
     });
     afterEach(() => {

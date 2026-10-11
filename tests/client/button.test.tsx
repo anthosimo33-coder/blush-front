@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 describe("Button", () => {
-  it("le grand bouton par défaut, le moyen avec size=\"md\" ; le lien garde sa taille", () => {
+  it('le grand bouton par défaut, le moyen avec size="md" ; le lien garde sa taille', () => {
     render(
       <>
         <Button>Grand</Button>
@@ -308,7 +308,12 @@ describe("LevelPath compact et les niveaux", () => {
   it("les étapes : franchies cochées, la tienne en cours, les suivantes à venir, dit aux lecteurs d’écran", () => {
     const { container } = render(<LevelPath current="dit" variant="compact" />);
     const etapes = Array.from(container.querySelectorAll("li"));
-    expect(etapes.map((e) => e.textContent)).toEqual(["On se parle\u00a0: réussi", "On se voit\u00a0: réussi", "On se le dit\u00a0: niveau en cours", "On est ensemble\u00a0: à venir"]);
+    expect(etapes.map((e) => e.textContent)).toEqual([
+      "On se parle\u00a0: réussi",
+      "On se voit\u00a0: réussi",
+      "On se le dit\u00a0: niveau en cours",
+      "On est ensemble\u00a0: à venir",
+    ]);
     expect(etapes.map((e) => e.getAttribute("aria-current"))).toEqual([null, null, "step", null]);
     expect(container.querySelector("[data-beat]")?.getAttribute("data-beat")).toBe("");
     expect(container.querySelectorAll("svg")).toHaveLength(2);
@@ -324,7 +329,12 @@ describe("LevelPath compact et les niveaux", () => {
   it("le chemin normal dit la même chose avec ses grands ronds", () => {
     const { container } = render(<LevelPath current="voit" />);
     expect(container.querySelector("[data-beat]")?.getAttribute("data-beat")).toBe("doux");
-    expect(Array.from(container.querySelectorAll(".sr-only")).map((e) => e.textContent)).toEqual(["\u00a0: réussi", "\u00a0: niveau en cours", "\u00a0: à venir", "\u00a0: à venir"]);
+    expect(Array.from(container.querySelectorAll(".sr-only")).map((e) => e.textContent)).toEqual([
+      "\u00a0: réussi",
+      "\u00a0: niveau en cours",
+      "\u00a0: à venir",
+      "\u00a0: à venir",
+    ]);
   });
 
   it("scaleOf : l’échelle et la place d’un niveau", () => {

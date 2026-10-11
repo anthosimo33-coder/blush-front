@@ -81,7 +81,8 @@ describe("une conv trop longue pour partir", () => {
   });
 
   it("Instagram : les fichiers les plus anciens partent d’abord, puis les plus anciens messages du dernier gardé", () => {
-    const json = (n: number, k0: number) => JSON.stringify({ messages: Array.from({ length: n }, (_, k) => ({ sender_name: "Léa", timestamp_ms: 1_800_000_000_000 - (k0 + k) * 60e3, content: "x".repeat(100) })) });
+    const json = (n: number, k0: number) =>
+      JSON.stringify({ messages: Array.from({ length: n }, (_, k) => ({ sender_name: "Léa", timestamp_ms: 1_800_000_000_000 - (k0 + k) * 60e3, content: "x".repeat(100) })) });
     const parties = [
       { nom: "inbox/lea/message_1.json", contenu: json(100, 0) },
       { nom: "inbox/lea/message_2.json", contenu: json(100, 100) },
@@ -108,7 +109,9 @@ describe("la conv brute d’une histoire sans rapport", () => {
     const u = await compteDeTest("longue");
     const sansRapport = (await histoireLue(u, "02-reciproque.txt")).id;
     const rapportSansMemoire = (await histoireLue(u, "03-elle-s-eloigne.txt")).id;
-    await db().insert(schema.reports).values({ storyId: rapportSansMemoire, data: chiffrer({ test: true }) });
+    await db()
+      .insert(schema.reports)
+      .values({ storyId: rapportSansMemoire, data: chiffrer({ test: true }) });
     const vieux = new Date(Date.now() - 40 * 86400e3);
     await db().update(schema.stories).set({ createdAt: vieux }).where(eq(schema.stories.userId, u.id));
     await purger();

@@ -35,7 +35,8 @@ export function ConfidentialiteScreen() {
           Ton export est ouvert sur ton appareil{NBSP}: seuls les messages partent. Les photos, les vidéos et les vocaux ne quittent jamais ton téléphone.
         </Ligne>
         <Ligne icone="photo" ton="elle" titre="Ou des captures, ou un enregistrement de l’écran">
-          Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
+          Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les
+          écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
         </Ligne>
         <Ligne icone="mail" titre="Ton email">
           Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, pas de pub, jamais partagé.
@@ -48,7 +49,8 @@ export function ConfidentialiteScreen() {
           Elle lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Notre prestataire d’IA ne s’en sert pas pour entraîner ses modèles.
         </Ligne>
         <Ligne icone="sound" ton="elle" titre="La voix de BLUSH">
-          Pour les vocaux de BLUSH (ton rapport, ses réponses dans le chat), notre prestataire de voix reçoit seulement leur texte, jamais ta conv entière. Tes vocaux à toi passent aussi par lui, le temps d’être transcrits{NBSP}: BLUSH ne garde pas le son, seulement le texte, chiffré.
+          Pour les vocaux de BLUSH (ton rapport, ses réponses dans le chat), notre prestataire de voix reçoit seulement leur texte, jamais ta conv entière. Tes vocaux à toi passent
+          aussi par lui, le temps d’être transcrits{NBSP}: BLUSH ne garde pas le son, seulement le texte, chiffré.
         </Ligne>
         <Ligne icone="eye" titre="Personne d’autre">
           Personne chez BLUSH ne lit ta conv. Et la personne avec qui tu parles n’est jamais contactée.
@@ -69,7 +71,8 @@ export function ConfidentialiteScreen() {
 
       <InsetGroup title="Combien de temps" id="duree" className="mt-6">
         <Ligne icone="trash" titre="La conv brute, effacée après ton rapport">
-          Dès que ton rapport et la mémoire de BLUSH sont prêts. Tant que ton rapport n’est pas débloqué, elle reste gardée, chiffrée, pour pouvoir l’écrire{NBSP}: tu la supprimes quand tu veux, dans ton compte. Une conv jamais lue est effacée au bout de 24{NBSP}h.
+          Dès que ton rapport et la mémoire de BLUSH sont prêts. Tant que ton rapport n’est pas débloqué, elle reste gardée, chiffrée, pour pouvoir l’écrire{NBSP}: tu la supprimes
+          quand tu veux, dans ton compte. Une conv jamais lue est effacée au bout de 24{NBSP}h.
         </Ligne>
         <Ligne icone="list" titre="Ce qui reste, tant que tu le gardes">
           Ton rapport, son vocal, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{NBSP}: tout part, vraiment.
@@ -87,7 +90,13 @@ export function ConfidentialiteScreen() {
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, la liste d’attente)" />
-        <InsetRow leading={<RowIcon icon="mail" tone="toi" />} title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>} sub="bonjour@askblush.com" href="mailto:bonjour@askblush.com" chevron />
+        <InsetRow
+          leading={<RowIcon icon="mail" tone="toi" />}
+          title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>}
+          sub="bonjour@askblush.com"
+          href="mailto:bonjour@askblush.com"
+          chevron
+        />
       </InsetGroup>
     </Screen>
   );

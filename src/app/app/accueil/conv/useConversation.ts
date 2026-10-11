@@ -209,16 +209,24 @@ export function useConversation({
       return true;
     };
     /* Des bulles arrivées pendant qu’il écrit : elles se posent, BLUSH écrit encore (rien d’animé à part dans une bulle : elle se déplie entière) */
-    const poser = (recues: BulleChat[], coupee = false) => async () => {
-      if (finie && !coupee) return;
-      const premiere = remplacer();
-      vagues = [...vagues, poses];
-      poses = noeudsDe(recues);
-      if (coupee) vagues = [...vagues, poses];
-      const v = vagues;
-      changer((m) => m.map((x) => (x.id === readingId ? { type: "ecrit", id: readingId, from: "blush", reading: label, vocal: vocalAttendu, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v } : x)));
-      if (premiere && recues.length) ecran.current.reponsePosee();
-    };
+    const poser =
+      (recues: BulleChat[], coupee = false) =>
+      async () => {
+        if (finie && !coupee) return;
+        const premiere = remplacer();
+        vagues = [...vagues, poses];
+        poses = noeudsDe(recues);
+        if (coupee) vagues = [...vagues, poses];
+        const v = vagues;
+        changer((m) =>
+          m.map((x) =>
+            x.id === readingId
+              ? { type: "ecrit", id: readingId, from: "blush", reading: label, vocal: vocalAttendu, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v }
+              : x,
+          ),
+        );
+        if (premiere && recues.length) ecran.current.reponsePosee();
+      };
     const suivi: SuiviChat = {
       bulles: (recues) => void (file = file.then(poser(recues))),
       vocal: (v) => {

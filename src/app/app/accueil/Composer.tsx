@@ -153,7 +153,12 @@ export function Composer({
                 <span className="text-micro font-black text-elle-ink">Tu creuses</span>
                 <span className="truncate text-note font-extrabold">{about}</span>
               </span>
-              <button type="button" aria-label="Ne plus creuser ce point" onClick={onAboutClear} className="flex size-7 shrink-0 items-center justify-center rounded-full bg-plaque">
+              <button
+                type="button"
+                aria-label="Ne plus creuser ce point"
+                onClick={onAboutClear}
+                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-plaque"
+              >
                 <Icon name="close" size={13} stroke={2.8} className="text-grey" />
               </button>
             </div>
@@ -166,11 +171,7 @@ export function Composer({
           <span role="status" className="inline-flex h-[34px] items-center gap-2 rounded-full bg-[#FFE6F2] pl-3 pr-1.5 shadow-[inset_0_0_0_1px_rgba(232,53,138,0.22)]">
             <Icon name="sound" size={16} className="text-elle-ink" />
             <span className="text-legende font-black text-[#A3135A]">BLUSH te répond en vocal</span>
-            <button
-              type="button"
-              onClick={onEcrit}
-              className="h-[26px] rounded-full bg-white px-2.5 text-micro font-black text-ink shadow-[0_1px_2px_rgba(17,17,20,0.1)]"
-            >
+            <button type="button" onClick={onEcrit} className="h-[26px] rounded-full bg-white px-2.5 text-micro font-black text-ink shadow-[0_1px_2px_rgba(17,17,20,0.1)]">
               Repasser à l’écrit
             </button>
           </span>
@@ -253,7 +254,12 @@ export function Composer({
               onClick={() => setMenu((v) => !v)}
               className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-paper lg:shadow-none"
             >
-              <Icon name="plus" size={21} stroke={2.8} className={cn("text-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)]", menu && "rotate-45")} />
+              <Icon
+                name="plus"
+                size={21}
+                stroke={2.8}
+                className={cn("text-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)]", menu && "rotate-45")}
+              />
             </button>
             {menu && (
               <AddMenu

@@ -25,7 +25,11 @@ const HORS_CONV = ["src/app/app/convs/page.tsx"];
 const pagesDe = (dossier: string) =>
   readdirSync(join(RACINE, dossier), { recursive: true, encoding: "utf8" })
     .filter((f) => f.split(sep).at(-1) === "page.tsx")
-    .map((f) => relative(RACINE, join(RACINE, dossier, f)).split(sep).join("/"));
+    .map((f) =>
+      relative(RACINE, join(RACINE, dossier, f))
+        .split(sep)
+        .join("/"),
+    );
 const PAGES = DOSSIERS.flatMap(pagesDe).filter((p) => !HORS_CONV.includes(p));
 
 describe("les pages d’une conv passent par PageDeConv", () => {
@@ -73,7 +77,11 @@ describe("les pages d’une conv passent par PageDeConv", () => {
 
 describe("PageDeConv", () => {
   it("pose la conv de la requête et le compte rendu, l’heure du rendu, puis rend son écran", async () => {
-    const compte: Account = { email: "lea@blush.test", subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false }, storyDeleted: false };
+    const compte: Account = {
+      email: "lea@blush.test",
+      subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false },
+      storyDeleted: false,
+    };
     Object.assign(page, { id: "conv-a", compte });
     /* L’heure du rendu vient de la page (prise avant ses lectures) : PageDeConv la passe telle quelle */
     const rendu = (await PageDeConv({ rendu: 1234, children: "l’écran" })) as ReactElement<{ id: string | null; compte: Account | null; rendu: number; children: string }>;

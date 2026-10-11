@@ -190,7 +190,10 @@ test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigat
     return { octets: vocal.size, type: vocal.type, secondes: son.duration };
   });
   const parSeconde = octets / secondes;
-  testInfo.annotations.push({ type: "débit d’un vocal", description: `${browserName} : ${type}, ${octets} octets pour ${secondes.toFixed(2)} s, ${Math.round((parSeconde * 8) / 1000)} kb/s` });
+  testInfo.annotations.push({
+    type: "débit d’un vocal",
+    description: `${browserName} : ${type}, ${octets} octets pour ${secondes.toFixed(2)} s, ${Math.round((parSeconde * 8) / 1000)} kb/s`,
+  });
 
   expect(secondes).toBeGreaterThanOrEqual(3.5);
   if (browserName === "chromium") expect(parSeconde, "Chromium suit les 32 kb/s demandés").toBeLessThanOrEqual(5_000);

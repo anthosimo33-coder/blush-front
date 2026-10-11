@@ -48,9 +48,7 @@ export function ConvOkScreen({ source }: { source: Source }) {
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 border-t border-[rgba(17,17,20,0.06)] px-5 pb-5 pt-4">
           <span className="text-affiche font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(source.messageCount)}</span>
-          <span className="text-corps font-black text-soft">
-            messages · {source.voiceCount} vocaux
-          </span>
+          <span className="text-corps font-black text-soft">messages · {source.voiceCount} vocaux</span>
         </div>
       </div>
 
@@ -59,7 +57,8 @@ export function ConvOkScreen({ source }: { source: Source }) {
         <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-note font-extrabold leading-[1.45] text-soft">
           <Icon name="clock" size={17} style={{ marginTop: 1 }} className="text-soft" />
           <span>
-            Votre conv est très longue{NBSP}: BLUSH lit {source.moisLus > 1 ? `vos ${source.moisLus} derniers mois` : "votre dernier mois"}, ce qui compte le plus pour savoir où vous en êtes.
+            Votre conv est très longue{NBSP}: BLUSH lit {source.moisLus > 1 ? `vos ${source.moisLus} derniers mois` : "votre dernier mois"}, ce qui compte le plus pour savoir où
+            vous en êtes.
           </span>
         </p>
       )}

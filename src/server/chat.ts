@@ -31,7 +31,14 @@ const ECHANGES_DANS_LE_FIL = 6;
 const LIGNES_DANS_LE_FIL = 15;
 
 async function fil(storyId: string): Promise<Fil> {
-  const lignes = (await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, storyId)).orderBy(desc(schema.chatMessages.id)).limit(ECHANGES_DANS_LE_FIL * 2)).reverse();
+  const lignes = (
+    await db()
+      .select()
+      .from(schema.chatMessages)
+      .where(eq(schema.chatMessages.storyId, storyId))
+      .orderBy(desc(schema.chatMessages.id))
+      .limit(ECHANGES_DANS_LE_FIL * 2)
+  ).reverse();
   return lignes.map((l) => {
     if (l.role !== "toi") return { de: "blush" as const, texte: coffre.lire("chat_messages.data:blush", l.data).resume };
     const toi = coffre.lire("chat_messages.data:toi", l.data);
@@ -124,11 +131,7 @@ export async function repondre(
   memoire: DonneesMemoire,
   ditBrut: string,
   ajout?: { ajout: Ajout; affiche: string },
-  {
-    parVocal = false,
-    surEvenement,
-    differer,
-  }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void } = {},
+  { parVocal = false, surEvenement, differer }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
@@ -199,7 +202,10 @@ export async function repondre(
       {
         storyId: story.id,
         role: "toi",
-        data: coffre.ecrire("chat_messages.data:toi", { texte: dit, ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}) }),
+        data: coffre.ecrire("chat_messages.data:toi", {
+          texte: dit,
+          ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}),
+        }),
       },
       { storyId: story.id, role: "blush", data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde }) },
     ])

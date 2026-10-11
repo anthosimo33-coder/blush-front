@@ -52,7 +52,11 @@ describe("PoseConv", () => {
   });
 
   it("donne à ses écrans le compte rendu et l’heure du rendu, et un montage à elle", () => {
-    const compte: Account = { email: "lea@blush.test", subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false }, storyDeleted: false };
+    const compte: Account = {
+      email: "lea@blush.test",
+      subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false },
+      storyDeleted: false,
+    };
     const { unmount } = render(
       <PoseConv id="conv-b" compte={compte} rendu={1234}>
         <Ecran />

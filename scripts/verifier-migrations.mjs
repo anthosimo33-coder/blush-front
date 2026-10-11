@@ -70,12 +70,18 @@ const manque = (() => {
     cpSync(DOSSIER, join(copie, "drizzle"), { recursive: true });
     const schema = join(RACINE, "src/server/db/schema.ts");
     /* Sans entrée : une question (un renommage ?) échoue au lieu d’attendre une réponse */
-    const gen = spawnSync(process.execPath, [bin, "generate", "--dialect", "postgresql", "--schema", schema, "--out", "drizzle"], { cwd: copie, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 });
+    const gen = spawnSync(process.execPath, [bin, "generate", "--dialect", "postgresql", "--schema", schema, "--out", "drizzle"], {
+      cwd: copie,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+    });
     const sortie = `${gen.stdout ?? ""}${gen.stderr ?? ""}`.trim();
     const nouvelles = readdirSync(join(copie, "drizzle")).filter((f) => f.endsWith(".sql") && !existsSync(join(DOSSIER, f)));
     if (nouvelles.length)
       return `schema.ts a changé sans sa migration : \`npm run db:generer\` l’écrit dans drizzle/. drizzle-kit generate propose :\n${nouvelles.map((f) => readFileSync(join(copie, "drizzle", f), "utf8").trim()).join("\n")}`;
-    if (gen.status !== 0 || !sortie.includes("No schema changes")) return `drizzle-kit generate n’a pas pu comparer schema.ts aux migrations (\`npm run db:generer\` le refait) :\n${sortie || gen.error?.message || "aucune sortie"}`;
+    if (gen.status !== 0 || !sortie.includes("No schema changes"))
+      return `drizzle-kit generate n’a pas pu comparer schema.ts aux migrations (\`npm run db:generer\` le refait) :\n${sortie || gen.error?.message || "aucune sortie"}`;
     return null;
   } finally {
     rmSync(copie, { recursive: true, force: true });

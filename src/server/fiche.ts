@@ -19,12 +19,16 @@ export type FaitCorrige = Pick<FicheFact, "section" | "text">;
 export function fusionnerFaits(m: DonneesMemoire, faits: FaitCorrige[]): DonneesMemoire {
   const { fiche } = m.etat;
   const avant = fiche.faits;
-  const nouveaux = faits.map((f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const });
+  const nouveaux = faits.map(
+    (f) => avant.find((a) => a.texte === f.text && a.section === f.section) ?? { section: f.section, texte: f.text, preuves: [], statut: "garde" as const },
+  );
   const textesAvant = new Set(avant.map((a) => a.texte));
   const textes = new Set(nouveaux.map((n) => n.texte));
   const editions = {
     parToi: [...new Set([...(m.editions?.parToi ?? []).filter((t) => textes.has(t)), ...nouveaux.filter((n) => !textesAvant.has(n.texte)).map((n) => n.texte)])],
-    supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])].filter((t) => !textes.has(t)).slice(-SUPPRIMEES_MAX),
+    supprimees: [...new Set([...(m.editions?.supprimees ?? []), ...avant.filter((a) => !textes.has(a.texte)).map((a) => a.texte)])]
+      .filter((t) => !textes.has(t))
+      .slice(-SUPPRIMEES_MAX),
   };
   return { ...m, etat: { ...m.etat, fiche: { ...fiche, faits: nouveaux } }, editions };
 }

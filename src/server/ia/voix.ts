@@ -229,7 +229,11 @@ export function scriptQuiTient<L extends LigneScript>(lignes: L[], max: number):
  * En mode factice (iaFactice), une voix muette ; sans lui et sans clé, rien ne part (ErreurVoix « voix_absente » :
  * voixDisponible le dit avant).
  */
-export async function dire(texte: string, voix: Voix, { sobre, storyId, pour = "chat" }: { sobre: boolean; storyId?: string; pour?: UsageVoix }): Promise<{ audio: Buffer; alignement: Alignement }> {
+export async function dire(
+  texte: string,
+  voix: Voix,
+  { sobre, storyId, pour = "chat" }: { sobre: boolean; storyId?: string; pour?: UsageVoix },
+): Promise<{ audio: Buffer; alignement: Alignement }> {
   const dit = couper(texte, COUPE_VOIX[pour]);
   if (!dit) throw new ErreurVoix("voix_vide");
   if (!iaFactice() && !env().ELEVENLABS_API_KEY) throw new ErreurVoix("voix_absente");
@@ -272,7 +276,15 @@ async function direChezLePrestataire(
     if (r?.ok) {
       /* Facturé dès la réponse : noté avant de la lire, une réponse illisible coûte aussi */
       facture();
-      await noterCout({ storyId, tache: ETIQUETTE_VOIX, modele: MODELE_VOIX, sortie: texte.length, micros: texte.length * PRIX_CARACTERE * 1e6, ms: Date.now() - debut, payeur: payeur ?? undefined });
+      await noterCout({
+        storyId,
+        tache: ETIQUETTE_VOIX,
+        modele: MODELE_VOIX,
+        sortie: texte.length,
+        micros: texte.length * PRIX_CARACTERE * 1e6,
+        ms: Date.now() - debut,
+        payeur: payeur ?? undefined,
+      });
       /* L’élément d’historique de ce vocal (S-17) : sans lui, rien à effacer, et le journal le dit */
       const element = r.headers.get("history-item-id");
       if (element) effacerChezLePrestataire(`/v1/history/${element}`);
@@ -358,10 +370,7 @@ async function effacer(chemin: string, cle: string): Promise<void> {
 /* ———— La voix muette (mode factice) : un vrai MP3 de silence, à la durée du texte ———— */
 
 /* Une trame MP3 de silence (MPEG-1 couche III, 48 kHz, 32 kb/s, mono) : 24 ms, 96 octets, sans en-tête */
-const TRAME_SILENCE = Buffer.from(
-  "//sUxNoDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
-  "base64",
-);
+const TRAME_SILENCE = Buffer.from("//sUxNoDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV", "base64");
 const CARACTERE_S = 0.055;
 
 function muette(texte: string): { audio: Buffer; alignement: Alignement } {

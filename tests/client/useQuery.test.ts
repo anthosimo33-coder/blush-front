@@ -42,7 +42,10 @@ describe("useQuery : rendu par le serveur, ou relu", () => {
     const rendu = renduNeuf();
     const montage = {};
     const page = ({ children }: { children: ReactNode }) => createElement(MontageDeLaPage, { value: montage }, children);
-    const useDeuxEcrans = () => [useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }), useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 })];
+    const useDeuxEcrans = () => [
+      useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }),
+      useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }),
+    ];
     const { result } = renderHook(useDeuxEcrans, { wrapper: page });
     await act(() => Promise.resolve());
     expect(lire).not.toHaveBeenCalled();

@@ -45,7 +45,8 @@ if (!process.env.BLUSH_CLE) arreter("BLUSH_CLE manque : copie la configuration d
  */
 const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "RESEND_API_KEY_CODES", "MISTRAL_API_KEY", "ELEVENLABS_API_KEY"];
 const trouvees = process.env.BLUSH_IA_FACTICE === "1" ? INTERDITES.filter((cle) => process.env[cle]) : [];
-if (trouvees.length) arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${trouvees.join(", ")} : de vrais appels partiraient. Retire-les, ou lance le vrai modèle avec BLUSH_IA_FACTICE=0`);
+if (trouvees.length)
+  arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${trouvees.join(", ")} : de vrais appels partiraient. Retire-les, ou lance le vrai modèle avec BLUSH_IA_FACTICE=0`);
 
 /* Les outils de l’équipe ne s’ouvrent pas au réseau (voir l’en-tête, 4.) : refusé avant de toucher à la base. L’hôte donné : -H, --hostname ou --hostname= */
 const args = process.argv.slice(2);

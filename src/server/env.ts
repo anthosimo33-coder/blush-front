@@ -24,9 +24,7 @@ export const Env = z.object({
   /** Postgres : Neon en production, le Postgres local en dev. */
   DATABASE_URL: z.string().url(),
   /** Clé de chiffrement du contenu (32 octets en base64). Jamais dans la base. */
-  BLUSH_CLE: z
-    .string()
-    .refine((v) => Buffer.from(v, "base64").length === 32, "BLUSH_CLE doit faire 32 octets en base64 (openssl rand -base64 32)"),
+  BLUSH_CLE: z.string().refine((v) => Buffer.from(v, "base64").length === 32, "BLUSH_CLE doit faire 32 octets en base64 (openssl rand -base64 32)"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Quand la clé n’est rattachée à aucun workspace. */
   ANTHROPIC_WORKSPACE_ID: z.string().min(1).optional(),

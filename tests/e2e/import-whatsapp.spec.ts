@@ -38,7 +38,12 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
     await ouvrirExportWhatsApp(page);
     const etapes = (await page.evaluate(() => /iPhone|iPad|iPod/.test(navigator.userAgent)))
       ? ["Ouvre votre conv", "Touche son nom en haut", "Exporter la discussion, sans médias", "Enregistre dans Fichiers"]
-      : ["Ouvre votre conv", "Touche son nom en haut (iPhone) ou ⋮ puis Plus (Android)", "Exporter la discussion, sans médias", "Enregistre dans Fichiers (iPhone) ou Drive (Android)"];
+      : [
+          "Ouvre votre conv",
+          "Touche son nom en haut (iPhone) ou ⋮ puis Plus (Android)",
+          "Exporter la discussion, sans médias",
+          "Enregistre dans Fichiers (iPhone) ou Drive (Android)",
+        ];
     for (const etape of etapes) await expect(page.getByText(etape, { exact: true })).toBeVisible();
   });
 
@@ -235,7 +240,8 @@ test.describe("sur un téléphone Android", () => {
   test("l’export d’un Android : ses étapes à lui, et son format (« 04/09/2026 19:08 - Maëlys: … ») est lu", async ({ page }, testInfo) => {
     const conv = exportWhatsAppAndroid(testInfo);
     await ouvrirExportWhatsApp(page);
-    for (const etape of ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"]) await expect(page.getByText(etape, { exact: true })).toBeVisible();
+    for (const etape of ["Ouvre votre conv", "Touche ⋮ puis Plus", "Exporter la discussion, sans médias", "Enregistre dans Drive"])
+      await expect(page.getByText(etape, { exact: true })).toBeVisible();
     await expect(page.getByText("Touche son nom en haut", { exact: false })).toHaveCount(0);
     await choisirFichier(page, conv.chemin);
     await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();

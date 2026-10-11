@@ -137,7 +137,12 @@ describe("des exports piégés, lus en temps borné", () => {
 
   it("un message de milliers d’espaces (la marque « modifié », un média en légende)", () => {
     const espaces = " ".repeat(150_000);
-    const texte = [`${entete(0)}Tom: a${espaces}b`, `${entete(1)}Léa: a${espaces}<This message was edited>x`, `${entete(2)}Tom: x${espaces}image omitted${espaces}y`, `${entete(3)}Léa: ok${espaces}<Ce message a été modifié>${espaces}`].join("\n");
+    const texte = [
+      `${entete(0)}Tom: a${espaces}b`,
+      `${entete(1)}Léa: a${espaces}<This message was edited>x`,
+      `${entete(2)}Tom: x${espaces}image omitted${espaces}y`,
+      `${entete(3)}Léa: ok${espaces}<Ce message a été modifié>${espaces}`,
+    ].join("\n");
     const [lu, ms] = chrono(() => lire(texte, h));
     expect(ms).toBeLessThan(VITE_MS);
     expect(lu.messages).toHaveLength(4);
@@ -203,7 +208,12 @@ describe("les captures : le type lu dans les octets (S-39)", () => {
   });
 
   it("autre chose qu’une image, même déclarée image : refusé", async () => {
-    for (const octets of [[0x47, 0x49, 0x46, 0x38], [0x25, 0x50, 0x44, 0x46], [...new TextEncoder().encode("<svg ")], [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]]) {
+    for (const octets of [
+      [0x47, 0x49, 0x46, 0x38],
+      [0x25, 0x50, 0x44, 0x46],
+      [...new TextEncoder().encode("<svg ")],
+      [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45],
+    ]) {
       await expect(imagesDe([image(octets, "image/png")])).rejects.toMatchObject({ code: "fichier" });
     }
     await expect(imagesDe([image(PNG, "text/plain")])).rejects.toBeInstanceOf(ErreurImport);

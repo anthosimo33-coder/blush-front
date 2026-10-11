@@ -18,7 +18,10 @@ export const captures = (c: Partial<Captures> = {}): Captures =>
 
 /** Un lot d’enregistrement d’écran, tel que /api/captures/lot le renvoie : quinze messages alternés, « message k0 » et la suite. */
 export const lotVideo = (autre = "Léa", k0 = 0) =>
-  captures({ autre, blocs: [{ repere: { date: "2026-09-08", heure: "21:40" }, messages: Array.from({ length: 15 }, (_, k) => msg(k % 2 ? "moi" : "autre", `message ${k0 + k}`)) }] });
+  captures({
+    autre,
+    blocs: [{ repere: { date: "2026-09-08", heure: "21:40" }, messages: Array.from({ length: 15 }, (_, k) => msg(k % 2 ? "moi" : "autre", `message ${k0 + k}`)) }],
+  });
 
 const MEMOIRE: NonNullable<Memoire["memoire"]> = { ou_on_en_est: "Vus deux fois.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [] };
 const FICHE: NonNullable<Memoire["fiche"]> = { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [] };
@@ -56,4 +59,11 @@ export const maj = (m: Partial<Maj> = {}): Maj =>
   });
 
 /** Un chapitre du rapport (prompt 05), sans bloc (sauf ce que `autres` change). */
-export const chapitre = (numero: number, autres: Partial<Chapitre> = {}): Chapitre => ({ numero, titre: `Chapitre ${numero}`, titre_court: `Ch. ${numero}`, surtitre: null, blocs: [], ...autres });
+export const chapitre = (numero: number, autres: Partial<Chapitre> = {}): Chapitre => ({
+  numero,
+  titre: `Chapitre ${numero}`,
+  titre_court: `Ch. ${numero}`,
+  surtitre: null,
+  blocs: [],
+  ...autres,
+});

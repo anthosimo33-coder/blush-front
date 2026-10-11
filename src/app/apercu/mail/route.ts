@@ -19,7 +19,12 @@ export async function GET(req: Request) {
     type === "rapport"
       ? mailRapport({ base: url.origin, lien: `${url.origin}/rapport`, chapitres: NB_CHAPITRES, lecture: "9 min", autre: AUTRE, sobre: p.get("sobre") === "1" }).html
       : type === "attente"
-        ? mailAttente({ base: url.origin, place: p.get("place") === "prete" ? "prete" : "liste", retrait: `${url.origin}/attente/retirer?id=exemple&cle=exemple`, convEffacee: p.get("conv") === "1" }).html
+        ? mailAttente({
+            base: url.origin,
+            place: p.get("place") === "prete" ? "prete" : "liste",
+            retrait: `${url.origin}/attente/retirer?id=exemple&cle=exemple`,
+            convEffacee: p.get("conv") === "1",
+          }).html
         : mailCode("159714", url.origin).html;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }

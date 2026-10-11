@@ -11,11 +11,7 @@ import type { EcritureRapport, ReportPayload } from "@/types/api";
  * - `complet` : le rapport écrit, avec son accès ; la suite passe par le chat et « Ta question ».
  */
 export type PhaseDuRapport =
-  | { nom: "lecture" }
-  | { nom: "ecriture"; ecriture?: EcritureRapport }
-  | { nom: "echec"; raison: Exclude<Echec, "souffle"> }
-  | { nom: "souffle" }
-  | { nom: "complet" };
+  { nom: "lecture" } | { nom: "ecriture"; ecriture?: EcritureRapport } | { nom: "echec"; raison: Exclude<Echec, "souffle"> } | { nom: "souffle" } | { nom: "complet" };
 
 /**
  * La phase d’un rapport, d’après ce que répond GET /api/rapport. Le serveur n’envoie jamais `generating` avec `echec`

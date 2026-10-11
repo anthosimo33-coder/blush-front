@@ -28,7 +28,9 @@ import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnB
 const texte01 = texteDeConv("01-a-deux-doigts.txt");
 const h = { utilisateur: { prenom: "Hugo", pronom: "il" as const, nomExport: "Hugo" }, autre: { prenom: "Sophie", pronom: "elle" as const, nomExport: "Sophie" } };
 /* La suite de leur conv, après l’import : un message de lui, puis deux d’elle */
-const suite = ["[14/03/2026 10:02:11] Hugo: alors cette semaine ?", "[14/03/2026 18:40:00] Sophie: ça va mieux", "[14/03/2026 18:40:30] Sophie: samedi ça te dit toujours ?"].join("\n");
+const suite = ["[14/03/2026 10:02:11] Hugo: alors cette semaine ?", "[14/03/2026 18:40:00] Sophie: ça va mieux", "[14/03/2026 18:40:30] Sophie: samedi ça te dit toujours ?"].join(
+  "\n",
+);
 /* Le dernier message de la conv 01 : « je suis crevée cette semaine, on verra » */
 const fin01 = Date.UTC(2026, 2, 12, 22, 51, 36);
 /** Les messages d’un nouvel export, d’après la conv 01 : ceux d’après son dernier message lu. */

@@ -231,7 +231,10 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       onClick={toggleEditing}
       aria-pressed={editing}
       disabled={job.step === "reading" || job.step === "adding"}
-      className={cn("relative h-10 rounded-full px-3 text-detail text-toi-ink transition-[color,opacity] after:absolute after:-inset-1 after:content-[''] disabled:opacity-40", editing ? "font-black" : "font-extrabold")}
+      className={cn(
+        "relative h-10 rounded-full px-3 text-detail text-toi-ink transition-[color,opacity] after:absolute after:-inset-1 after:content-[''] disabled:opacity-40",
+        editing ? "font-black" : "font-extrabold",
+      )}
     >
       {editing ? "OK" : "Modifier"}
     </button>
@@ -248,7 +251,15 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       contentGap={0}
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
-          <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} aria-label="Retour" className="flex size-11 items-center justify-center">
+          <Link
+            href="/app"
+            prefetch={prechargerAccueil}
+            scroll={false}
+            transitionTypes={["nav-back"]}
+            onNavigate={retour}
+            aria-label="Retour"
+            className="flex size-11 items-center justify-center"
+          >
             <Icon name="back" size={24} stroke={2.6} className="text-ink" />
           </Link>
           <span className="text-note font-black text-grey">Sa fiche</span>
@@ -258,7 +269,14 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+        <Link
+          href="/app"
+          prefetch={prechargerAccueil}
+          scroll={false}
+          transitionTypes={["nav-back"]}
+          onNavigate={retour}
+          className="back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']"
+        >
           <Icon name="back" size={18} stroke={2.6} className="text-soft" />
           Retour
         </Link>
@@ -314,7 +332,11 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                 {items.map((f, i) => {
                   const isNew = fresh.includes(f.id);
                   return (
-                    <li key={f.id} data-new={isNew ? "" : undefined} className={cn("flex min-h-[52px] items-center gap-3 px-4 py-2.5", i > 0 && "border-t border-[rgba(17,17,20,0.06)]")}>
+                    <li
+                      key={f.id}
+                      data-new={isNew ? "" : undefined}
+                      className={cn("flex min-h-[52px] items-center gap-3 px-4 py-2.5", i > 0 && "border-t border-[rgba(17,17,20,0.06)]")}
+                    >
                       {editing ? (
                         <button
                           type="button"
@@ -339,7 +361,13 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                     </li>
                   );
                 })}
-                {editing && <AddRow first={items.length === 0} label={sec.title} onAdd={(text) => void save([...fiche.facts, { id: `f${Date.now()}`, section: sec.id, text, sourceLabel: "ajouté par toi", sources: ["note"] }])} />}
+                {editing && (
+                  <AddRow
+                    first={items.length === 0}
+                    label={sec.title}
+                    onAdd={(text) => void save([...fiche.facts, { id: `f${Date.now()}`, section: sec.id, text, sourceLabel: "ajouté par toi", sources: ["note"] }])}
+                  />
+                )}
               </ul>
             </section>
           );
@@ -390,7 +418,10 @@ function AddButton({ onClick, dimmed }: { onClick: () => void; dimmed: boolean }
           Ajoute des captures ou un export, BLUSH range tout.<span className="hidden lg:inline"> Tu peux aussi les glisser ici.</span>
         </span>
       </span>
-      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)] group-hover:rotate-90">
+      <span
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)] group-hover:rotate-90"
+      >
         <Icon name="plus" size={18} stroke={2.8} className="text-white" />
       </span>
     </button>
@@ -477,7 +508,9 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
           <h2 id="trouve-titre" className="m-0 text-corps font-black leading-[1.25]">
             {title}
           </h2>
-          <span className="text-legende font-extrabold leading-[1.35] text-grey">{problem?.detail ?? (n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`)}</span>
+          <span className="text-legende font-extrabold leading-[1.35] text-grey">
+            {problem?.detail ?? (n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`)}
+          </span>
         </span>
         <button type="button" onClick={onClose} aria-label="Fermer le résumé" className="-mr-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full">
           <Icon name="close" size={16} stroke={2.6} className="text-muted" />
@@ -489,7 +522,9 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
             <li key={f.id} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
               <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-elle" />
               <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35]">{f.text}</span>
-              <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-micro font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
+              <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-micro font-black leading-none text-soft">
+                {sectionTitle(f.section, update.fiche.person.pronoun)}
+              </span>
             </li>
           ))}
         </ul>

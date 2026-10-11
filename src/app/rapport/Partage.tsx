@@ -37,13 +37,32 @@ function GlypheWhatsApp() {
 function GlypheMessages() {
   return (
     <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true" className="text-white">
-      <path d="M12 4.5c-4.7 0-8.5 3.1-8.5 7 0 2.2 1.2 4.2 3.2 5.5-.2 1-.8 2-1.7 2.8 1.6 0 3.2-.6 4.3-1.5.9.2 1.8.3 2.7.3 4.7 0 8.5-3.1 8.5-7s-3.8-7.1-8.5-7.1z" fill="currentColor" />
+      <path
+        d="M12 4.5c-4.7 0-8.5 3.1-8.5 7 0 2.2 1.2 4.2 3.2 5.5-.2 1-.8 2-1.7 2.8 1.6 0 3.2-.6 4.3-1.5.9.2 1.8.3 2.7.3 4.7 0 8.5-3.1 8.5-7s-3.8-7.1-8.5-7.1z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
 
 /** Un bouton rond de partage, avec son nom dessous. Un lien quand il ouvre une appli (WhatsApp, Messages). */
-function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: IconName; nom: string; fond: string; href?: string; onClick?: () => void; pret: boolean; children?: ReactNode }) {
+function Action({
+  icone,
+  nom,
+  fond,
+  href,
+  onClick,
+  pret,
+  children,
+}: {
+  icone: IconName;
+  nom: string;
+  fond: string;
+  href?: string;
+  onClick?: () => void;
+  pret: boolean;
+  children?: ReactNode;
+}) {
   const contenu = (
     <>
       <span
@@ -56,7 +75,10 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
     </>
   );
   /* Le survol soulève le rond, pas toute la case (sinon un carré blanc apparaît autour) */
-  const classe = cn("group flex flex-col items-center gap-2 rounded-2xl no-underline outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink", !pret && "pointer-events-none opacity-40");
+  const classe = cn(
+    "group flex flex-col items-center gap-2 rounded-2xl no-underline outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink",
+    !pret && "pointer-events-none opacity-40",
+  );
   return href ? (
     <a href={pret ? href : undefined} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" aria-disabled={!pret} className={classe}>
       {contenu}
@@ -170,7 +192,6 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <Sheet open={open} onClose={onClose} title="Partager ton verdict" titleClose>
-
       {/* L’aperçu du lien, comme dans une conv : la carte, puis le titre et le site */}
       <figure className="m-0 overflow-hidden rounded-[22px] bg-white shadow-card">
         <div className="relative aspect-[1200/630] w-full" style={{ background: PAPIER }}>
@@ -229,7 +250,13 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
           <Action icone="imessage" nom="Messages" fond="var(--gloss), #34C759" pret={pret} href={`sms:?&body=${encodeURIComponent(avecLien)}`}>
             <GlypheMessages />
           </Action>
-          <Action icone="instagram" nom="Story" fond="var(--gloss), linear-gradient(45deg, var(--attente), var(--elle) 55%, var(--flou))" pret={pret && (!!story || storyRatee)} onClick={story ? () => void enStory() : () => setFait("L’image story n’a pas pu se préparer. Réessaie dans un instant.")} />
+          <Action
+            icone="instagram"
+            nom="Story"
+            fond="var(--gloss), linear-gradient(45deg, var(--attente), var(--elle) 55%, var(--flou))"
+            pret={pret && (!!story || storyRatee)}
+            onClick={story ? () => void enStory() : () => setFait("L’image story n’a pas pu se préparer. Réessaie dans un instant.")}
+          />
         </div>
       )}
 
@@ -239,9 +266,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
           {fait ?? (
             <>
               Le lien montre ce verdict, rien d’autre{NBSP}: ni vos messages, ni son prénom.{" "}
-              {url && (
-                <LienDiscret onClick={() => void desactiver()}>Désactiver le lien</LienDiscret>
-              )}
+              {url && <LienDiscret onClick={() => void desactiver()}>Désactiver le lien</LienDiscret>}
             </>
           )}
         </p>

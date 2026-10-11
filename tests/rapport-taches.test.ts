@@ -79,7 +79,15 @@ const sobreAvecChapitres = (req: Requete) => {
     decouvertes: [],
     these: "Ce que tu vis compte.",
     chapitres: [2, 3].map((numero) => ({ numero, titre: `Caché ${numero}`, titre_court: `Caché ${numero}`, surtitre: null, blocs })),
-    sobre: { intro: "On va parler doucement.", titre: "Ce que tu vis n’est pas normal.", faits: "Il revient sur tes sorties.", preuves: [], reassurance: "Tu n’y es pour rien.", gestes: ["Parles-en."], brouillon: null },
+    sobre: {
+      intro: "On va parler doucement.",
+      titre: "Ce que tu vis n’est pas normal.",
+      faits: "Il revient sur tes sorties.",
+      preuves: [],
+      reassurance: "Tu n’y es pour rien.",
+      gestes: ["Parles-en."],
+      brouillon: null,
+    },
   };
 };
 

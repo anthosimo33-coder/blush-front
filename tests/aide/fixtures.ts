@@ -29,10 +29,12 @@ const QUI: Qui = { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" 
 let comptes = 0;
 /** Un compte neuf (gratuit, sauf `plan`), à l’email unique `<prefixe>-…@blush.test`, effacé à la fin du fichier. */
 export async function compteDeTest(prefixe: string, plan: Utilisateur["plan"] = "gratuit"): Promise<Utilisateur> {
-  const u = (await db()
-    .insert(schema.users)
-    .values({ email: `${prefixe}-${Date.now()}-${++comptes}@blush.test`, plan })
-    .returning())[0]!;
+  const u = (
+    await db()
+      .insert(schema.users)
+      .values({ email: `${prefixe}-${Date.now()}-${++comptes}@blush.test`, plan })
+      .returning()
+  )[0]!;
   creees.comptes.push(u.id);
   return u;
 }

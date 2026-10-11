@@ -245,8 +245,8 @@ export function Styleguide() {
           </div>
           <h1 className="m-0 mt-3.5 text-[44px] font-black leading-[1.02] tracking-[-0.03em] md:text-affiche">Les briques de BLUSH</h1>
           <p className="m-0 mt-2.5 text-[19px] font-bold leading-[1.5] text-soft">
-            L’interface de BLUSH{NBSP}: un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai.
-            Tout ce que montre cette planche vient de l’appli{NBSP}: ses tokens et ses composants.
+            L’interface de BLUSH{NBSP}: un papier chaud, une typo ronde, des boutons qu’on a envie d’appuyer, et trois couleurs qui disent qui parle et ce qui est vrai. Tout ce que
+            montre cette planche vient de l’appli{NBSP}: ses tokens et ses composants.
           </p>
         </div>
         <div data-float="" style={{ "--r": "-6deg" }}>
@@ -257,7 +257,9 @@ export function Styleguide() {
       {/* 01 Couleurs */}
       <Section
         title="Couleurs"
-        sub={"Le fond reste neutre. La couleur n’est jamais décorative\u00a0: elle dit qui parle (toi, elle) ou ce qui est vrai. Chaque pastille est peinte par son token, et sa valeur est celle que le navigateur calcule."}
+        sub={
+          "Le fond reste neutre. La couleur n’est jamais décorative\u00a0: elle dit qui parle (toi, elle) ou ce qui est vrai. Chaque pastille est peinte par son token, et sa valeur est celle que le navigateur calcule."
+        }
       >
         <h3 className="m-0 text-carte font-black">Le papier et l’encre</h3>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -293,7 +295,10 @@ export function Styleguide() {
       </Section>
 
       {/* 02 Typographie */}
-      <Section title="Typographie" sub="Nunito partout dans l’interface. Figtree seulement pour les vrais messages. Chaque taille est un token (text-legende, text-corps…), pas un nombre écrit à la main.">
+      <Section
+        title="Typographie"
+        sub="Nunito partout dans l’interface. Figtree seulement pour les vrais messages. Chaque taille est un token (text-legende, text-corps…), pas un nombre écrit à la main."
+      >
         <div className="flex flex-col">
           {ECHELLE.map((t) => (
             <Taille key={t.jeton} {...t} />
@@ -311,7 +316,9 @@ export function Styleguide() {
           <Chip>Nunito partout dans l’interface</Chip>
           <Chip>Figtree seulement pour les vrais messages</Chip>
           <Chip>Titres en 900, texte en 800</Chip>
-          <Chip>Espaces insécables avant{NBSP}?{NBSP}!{NBSP}:{NBSP}»</Chip>
+          <Chip>
+            Espaces insécables avant{NBSP}?{NBSP}!{NBSP}:{NBSP}»
+          </Chip>
         </Row>
       </Section>
 
@@ -443,7 +450,12 @@ export function Styleguide() {
         </Row>
       </Section>
 
-      <Section title="La liste" sub={"Comme les Réglages de l’iPhone\u00a0: un titre discret, une carte blanche, des lignes séparées par un filet. «\u00a0Mon compte\u00a0», le contact de l’accueil, tes convs."}>
+      <Section
+        title="La liste"
+        sub={
+          "Comme les Réglages de l’iPhone\u00a0: un titre discret, une carte blanche, des lignes séparées par un filet. «\u00a0Mon compte\u00a0», le contact de l’accueil, tes convs."
+        }
+      >
         <Row gap={24}>
           <Spec label="LIGNES" width={380} note="Une pastille teintée en tête, un chevron pour un lien, le rouge pour une action qui efface.">
             <InsetGroup title="Ton histoire" footer="Effacer ne se rattrape pas.">
@@ -451,7 +463,13 @@ export function Styleguide() {
               <InsetRow leading={<RowIcon icon="heart" tone="elle" />} title="Sa fiche" sub="Ce que BLUSH sait d’elle" href="#" chevron />
               <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title="BLUSH+" sub="Actif" />
               <InsetRow leading={<RowIcon icon="mail" tone="grey" />} title="Ton email" sub="lea@exemple.fr" />
-              <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Supprimer l’histoire" sub="Le rapport, la fiche et les captures" onClick={() => setSheet(true)} danger />
+              <InsetRow
+                leading={<RowIcon icon="trash" tone="danger" />}
+                title="Supprimer l’histoire"
+                sub="Le rapport, la fiche et les captures"
+                onClick={() => setSheet(true)}
+                danger
+              />
             </InsetGroup>
           </Spec>
           <Spec label="LIGNES COMPACTES" width={380} note={"Dans une feuille\u00a0: le titre à 15 px, le sous-titre sur une ligne."}>
@@ -463,7 +481,10 @@ export function Styleguide() {
         </Row>
       </Section>
 
-      <Section title="La coque" sub={"Ce qui entoure chaque écran\u00a0: la barre du haut sur mobile, le retour et les étapes du parcours sur ordinateur, le contact en tête de l’accueil."}>
+      <Section
+        title="La coque"
+        sub={"Ce qui entoure chaque écran\u00a0: la barre du haut sur mobile, le retour et les étapes du parcours sur ordinateur, le contact en tête de l’accueil."}
+      >
         <Row gap={24}>
           <Spec label="BARRE DU HAUT (MOBILE)" width={380} note="Retour, titre, progression du parcours.">
             <Card className="overflow-hidden">
@@ -549,7 +570,13 @@ export function Styleguide() {
             </div>
           </Spec>
           <Spec label="CE QU’ON VOIT" width={380} note="Les faits, puis les messages qui les prouvent (un bloc du rapport).">
-            <Block block={{ kind: "seen", facts: ["Vous relancez autant l’un que l’autre."], messages: [{ from: "elle", text: "tu fais quoi samedi\u00a0?", caption: "4 min après toi" }] }} />
+            <Block
+              block={{
+                kind: "seen",
+                facts: ["Vous relancez autant l’un que l’autre."],
+                messages: [{ from: "elle", text: "tu fais quoi samedi\u00a0?", caption: "4 min après toi" }],
+              }}
+            />
           </Spec>
         </Row>
       </Section>
@@ -635,11 +662,21 @@ export function Styleguide() {
       </Section>
 
       <Section title="Le rapport">
-        <Spec label="UN CHAPITRE DU RAPPORT" width={420} note={"Toujours le même gabarit\u00a0: l’essentiel, ce qu’on voit, ce que ça veut dire, à toi de jouer. Les blocs sont ceux du rapport (Block)."}>
+        <Spec
+          label="UN CHAPITRE DU RAPPORT"
+          width={420}
+          note={"Toujours le même gabarit\u00a0: l’essentiel, ce qu’on voit, ce que ça veut dire, à toi de jouer. Les blocs sont ceux du rapport (Block)."}
+        >
           <div className="flex flex-col gap-3">
             <ChapterHeader number={5} kicker={"son portrait\u00a0: la Relanceuse"} title="Elle" />
             <Block block={{ kind: "essential", text: "Elle montre son intérêt en agissant\u00a0: elle propose, elle relance, elle se livre." }} />
-            <Block block={{ kind: "seen", facts: ["Relance après 22 h, 7 fois sur 10."], messages: [{ from: "elle", text: "dimanche y’a un marché de noël à côté du libanais 👀", caption: "8 févr." }] }} />
+            <Block
+              block={{
+                kind: "seen",
+                facts: ["Relance après 22 h, 7 fois sur 10."],
+                messages: [{ from: "elle", text: "dimanche y’a un marché de noël à côté du libanais 👀", caption: "8 févr." }],
+              }}
+            />
             <Block block={{ kind: "meaning", text: "Elle t’attend sur les plans précis." }} />
             <Block block={{ kind: "play", text: "Donne une date et une heure." }} />
           </div>
@@ -649,7 +686,13 @@ export function Styleguide() {
       <Section title="Saisie et surfaces">
         <Row gap={24}>
           <Spec label="EMAIL" width={360}>
-            <EmailField value={email} onChange={setEmail} onBlur={() => setTouched(true)} invalid={touched && !!email && !emailValide(email)} errorText={"Vérifie ton email\u00a0: il manque quelque chose."} />
+            <EmailField
+              value={email}
+              onChange={setEmail}
+              onBlur={() => setTouched(true)}
+              invalid={touched && !!email && !emailValide(email)}
+              errorText={"Vérifie ton email\u00a0: il manque quelque chose."}
+            />
           </Spec>
           <Spec label="PANNEAU" width={320} note="Panneau du bas sur mobile, fenêtre centrée sur desktop.">
             <Button variant="secondary" onClick={() => setSheet(true)}>
@@ -747,7 +790,10 @@ export function Styleguide() {
       </Section>
 
       {/* 07 Mode sobre */}
-      <Section title="Mode sobre" sub="Seulement quand il y a une alerte (danger, détresse, mineur). Même structure, mais tout ce qui amuse disparaît. Un «\u00a0non\u00a0», un ghosting, une rupture ne sont pas des alertes\u00a0: ils ont le rapport complet.">
+      <Section
+        title="Mode sobre"
+        sub="Seulement quand il y a une alerte (danger, détresse, mineur). Même structure, mais tout ce qui amuse disparaît. Un «\u00a0non\u00a0», un ghosting, une rupture ne sont pas des alertes\u00a0: ils ont le rapport complet."
+      >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { t: "Pas de couleur de sens", d: "Ni bleu, ni rose, ni vert. Encre et papier seulement." },

@@ -23,7 +23,12 @@ export type SortieFeuille = { duration: number; easing: string };
  */
 export function sortieDeFeuille(desk: boolean, sortie?: SortieFeuille) {
   const temps = { duration: sortie?.duration ?? (desk ? 200 : 280), easing: sortie?.easing ?? "cubic-bezier(0.3, 0, 0.2, 1)", fill: "forwards" as const };
-  const panneau: Keyframe[] = desk ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(16px) scale(0.98)" }] : [{ transform: "none" }, { transform: "translateY(100%)" }];
+  const panneau: Keyframe[] = desk
+    ? [
+        { opacity: 1, transform: "none" },
+        { opacity: 0, transform: "translateY(16px) scale(0.98)" },
+      ]
+    : [{ transform: "none" }, { transform: "translateY(100%)" }];
   const voile: Keyframe[] = [{ opacity: 1 }, { opacity: 0 }];
   return { temps, panneau, voile };
 }
@@ -145,7 +150,11 @@ export function Sheet({
       fermer();
       return;
     }
-    const { temps, panneau, voile: eteint } = sortieDeFeuille(estDesktop(), dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
+    const {
+      temps,
+      panneau,
+      voile: eteint,
+    } = sortieDeFeuille(estDesktop(), dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
     p.style.pointerEvents = "none";
     const sortiePanneau = p.animate(panneau, temps);
     const anims = [sortiePanneau, ...(voile.current ? [voile.current.animate(eteint, temps)] : [])];
@@ -225,7 +234,19 @@ type TailleTitreFeuille = keyof typeof TAILLES_TITRE;
  * partage). `className` : ce que l’écran ajoute (la taille sur ordinateur, l’équilibre des lignes), jamais une autre
  * taille de base.
  */
-export function TitreFeuille({ id, children, taille = 24, fermer, className }: { id: string; children: ReactNode; taille?: TailleTitreFeuille; fermer?: () => void; className?: string }) {
+export function TitreFeuille({
+  id,
+  children,
+  taille = 24,
+  fermer,
+  className,
+}: {
+  id: string;
+  children: ReactNode;
+  taille?: TailleTitreFeuille;
+  fermer?: () => void;
+  className?: string;
+}) {
   const h2 = (
     <h2 id={id} className={cn("m-0 font-black tracking-[-0.02em]", TAILLES_TITRE[taille], className)}>
       {children}
@@ -243,26 +264,13 @@ export function TitreFeuille({ id, children, taille = 24, fermer, className }: {
 }
 
 /** Toast : bandeau encre avec coche verte et une action. */
-export function Toast({
-  children,
-  action,
-  onAction,
-  className,
-}: {
-  children: ReactNode;
-  action?: string;
-  onAction?: () => void;
-  className?: string;
-}) {
+export function Toast({ children, action, onAction, className }: { children: ReactNode; action?: string; onAction?: () => void; className?: string }) {
   return (
     <div
       role="status"
       aria-live="polite"
       data-popin=""
-      className={cn(
-        "z-40 flex items-center gap-2.5 rounded-[20px] bg-ink px-3.5 py-3 text-white shadow-[0_16px_34px_-12px_rgba(17,17,20,0.6)]",
-        className,
-      )}
+      className={cn("z-40 flex items-center gap-2.5 rounded-[20px] bg-ink px-3.5 py-3 text-white shadow-[0_16px_34px_-12px_rgba(17,17,20,0.6)]", className)}
     >
       <DoneCheck size={26} />
       <span className="flex-1 text-note font-extrabold">{children}</span>

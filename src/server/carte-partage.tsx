@@ -32,7 +32,19 @@ export async function carteReponse({ question, bulles }: { question: string | nu
     <div style={{ display: "flex", flexDirection: "column", width: "100%", gap: 34 }}>
       {question && (
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ display: "flex", maxWidth: 760, padding: "22px 32px 26px", borderRadius: "44px 44px 12px 44px", background: BLEU, color: "#FFFFFF", fontSize: 40, fontWeight: 800, lineHeight: 1.3 }}>
+          <div
+            style={{
+              display: "flex",
+              maxWidth: 760,
+              padding: "22px 32px 26px",
+              borderRadius: "44px 44px 12px 44px",
+              background: BLEU,
+              color: "#FFFFFF",
+              fontSize: 40,
+              fontWeight: 800,
+              lineHeight: 1.3,
+            }}
+          >
             {couper(question, 140)}
           </div>
         </div>
@@ -73,7 +85,17 @@ export async function carteMoment({ surtitre, texte }: { surtitre: string; texte
       <Bulle taille={44} angle={-1.5}>
         extrait de mon rapport 👀
       </Bulle>
-      <span style={{ fontSize: t.length > 140 ? 64 : t.length > 80 ? 76 : 92, fontWeight: 900, lineHeight: 1.12, letterSpacing: "-0.03em", color: ENCRE, maxWidth: 920, textWrap: "balance" }}>
+      <span
+        style={{
+          fontSize: t.length > 140 ? 64 : t.length > 80 ? 76 : 92,
+          fontWeight: 900,
+          lineHeight: 1.12,
+          letterSpacing: "-0.03em",
+          color: ENCRE,
+          maxWidth: 920,
+          textWrap: "balance",
+        }}
+      >
         {`«\u00a0${t}\u00a0»`}
       </span>
       <span style={{ fontSize: 38, fontWeight: 800, color: DOUX }}>{surtitre}</span>

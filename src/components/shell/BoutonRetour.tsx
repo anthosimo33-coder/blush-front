@@ -59,7 +59,11 @@ function Retour({ target, className, children, label }: { target: BackTarget; cl
         {children}
       </button>
     );
-  return <LienRetour target={target} className={className} label={label}>{children}</LienRetour>;
+  return (
+    <LienRetour target={target} className={className} label={label}>
+      {children}
+    </LienRetour>
+  );
 }
 
 function LienRetour({ target, className, children, label }: { target: Exclude<BackTarget, () => void>; className: string; children: ReactNode; label?: string }) {
@@ -82,7 +86,8 @@ export function BoutonRetour({ target }: { target: BackTarget }) {
 
 /** Le lien « Retour » au-dessus du titre (desktop), sa zone tactile de 44 px sans changer la mise en page. */
 export function LienRetourDesktop({ target, label = "Retour" }: { target: BackTarget; label?: string }) {
-  const cls = "back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
+  const cls =
+    "back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
   return (
     <Retour target={target} className={cls}>
       <Icon name="back" size={18} stroke={2.6} className="text-soft" />

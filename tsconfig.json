@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -23,26 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@prompts/*": [
-        "./prompts/*"
-      ]
+      "@/*": ["./src/*"],
+      "@prompts/*": ["./prompts/*"]
     },
     "allowJs": true
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-  ],
-  "exclude": [
-    "node_modules",
-    "prompts/evals",
-    "prompts/node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts", "**/*.mts"],
+  "exclude": ["node_modules", "prompts/evals", "prompts/node_modules"]
 }

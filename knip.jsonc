@@ -19,5 +19,5 @@
   /* @next/env vient avec next, à sa version : scripts/developper.mjs s’en sert pour lire les .env comme next dev */
   "ignoreDependencies": ["@next/env"],
   /* sips (macOS) réduit les captures de la galerie (scripts/galerie/capture.mjs) */
-  "ignoreBinaries": ["sips"]
+  "ignoreBinaries": ["sips"],
 }

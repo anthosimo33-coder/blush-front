@@ -122,7 +122,12 @@ describe("le chat en vocal (modeVocalChat)", () => {
     repondre = () => Response.json({ modeVocal: false });
     await modeVocalChat(false);
     const { url, init } = envois[0]!;
-    expect({ url, method: init.method, keepalive: init.keepalive, corps: JSON.parse(String(init.body)) }).toEqual({ url: "/api/chat/vocal", method: "POST", keepalive: true, corps: { actif: false } });
+    expect({ url, method: init.method, keepalive: init.keepalive, corps: JSON.parse(String(init.body)) }).toEqual({
+      url: "/api/chat/vocal",
+      method: "POST",
+      keepalive: true,
+      corps: { actif: false },
+    });
   });
 
   it.each([

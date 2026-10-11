@@ -34,7 +34,14 @@ describe("lirePartage", () => {
 
 describe("depart", () => {
   /* Une fiche que seul son résumé distingue (une version, puis une autre) */
-  const fiche = (version: number): Fiche => ({ person: { id: "p1", name: "Inès", initial: "I" }, portrait: "", updatedLabel: "", facts: [], summary: `v${version}`, summaryShort: "" });
+  const fiche = (version: number): Fiche => ({
+    person: { id: "p1", name: "Inès", initial: "I" },
+    portrait: "",
+    updatedLabel: "",
+    facts: [],
+    summary: `v${version}`,
+    summaryShort: "",
+  });
 
   it("le rendu serveur passe avant le cache, sauf si le cache a été écrit après lui", () => {
     setQueryData("fiche:a", fiche(2));

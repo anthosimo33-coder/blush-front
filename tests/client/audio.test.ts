@@ -295,11 +295,20 @@ describe("creerAudioContext", () => {
 describe("chargerEnMemoire", () => {
   it("le son en mémoire : une adresse locale ; une réponse en erreur ou le réseau coupé : null", async () => {
     const creer = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:son");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["son"]))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Blob(["son"]))),
+    );
     expect(await chargerEnMemoire("/son.mp3", new AbortController().signal)).toBe("blob:son");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
     expect(await chargerEnMemoire("/son.mp3", new AbortController().signal)).toBeNull();
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("réseau coupé"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("réseau coupé"))),
+    );
     expect(await chargerEnMemoire("/son.mp3", new AbortController().signal)).toBeNull();
     expect(creer).toHaveBeenCalledTimes(1);
     creer.mockRestore();

@@ -1,7 +1,20 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { ACCEPT_EXPORT, ACCEPT_IMAGES, CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, estExport, estImage, extensionAudio, PARTIES_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
+import {
+  ACCEPT_EXPORT,
+  ACCEPT_IMAGES,
+  CAPTURES_MAX,
+  CODE_MINUTES,
+  CORPS_VERCEL_MAX,
+  ENVOI_EXPORT_MAX,
+  ENVOI_IMAGES_MAX,
+  estExport,
+  estImage,
+  extensionAudio,
+  PARTIES_MAX,
+  TEXTE_CONV_MAX,
+} from "@/lib/limites";
 import { imagesDe } from "@/server/captures";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { CODE_ESSAIS } from "@/server/auth";
@@ -82,7 +95,8 @@ describe("les fichiers d’une conv dans un paquet : 50 au plus, des deux côté
 
 describe("les captures : 20 au plus", () => {
   /* Des JPEG : leurs premiers octets le disent (le serveur lit le type dans les octets, S-39) */
-  const captures = (n: number) => Array.from({ length: n }, (_, k) => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(12)])], `capture-${k + 1}.jpg`, { type: "image/jpeg" }));
+  const captures = (n: number) =>
+    Array.from({ length: n }, (_, k) => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(12)])], `capture-${k + 1}.jpg`, { type: "image/jpeg" }));
 
   it("le serveur lit les 20 que l’écran garde, pas une de plus", async () => {
     await expect(imagesDe(captures(CAPTURES_MAX))).resolves.toHaveLength(CAPTURES_MAX);
@@ -124,7 +138,8 @@ describe("le reste", () => {
   });
 
   it("S-07, S-08 · les essais ratés et la réserve des codes : ce qui se devine reste borné, et un tiers ne ferme la porte qu’en écrivant de cinq adresses", () => {
-    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail, codeParEmailEtIp, codeReserveParEmail, codeReserveParEmailEtIp, mailsCodeParJour } = LIMITES;
+    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail, codeParEmailEtIp, codeReserveParEmail, codeReserveParEmailEtIp, mailsCodeParJour } =
+      LIMITES;
     expect(echecsCodeParEmailEtIp.reserveNavigateur).toBeLessThan(echecsCodeParNavigateur.max);
     expect(echecsCodeParNavigateur.max).toBeLessThan(echecsCodeParEmailEtIp.max);
     expect(echecsCodeParEmailEtIp.max).toBeLessThan(echecsCodeParEmail.max);
@@ -144,7 +159,13 @@ describe("le reste", () => {
     expect(ACCEPT_EXPORT).toBe(".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html");
     const f = (nom: string, type = "") => new File([], nom, { type });
     expect([f("a.png", "image/png"), f("b.HEIC", "image/heic")].map(estImage)).toEqual([true, true]);
-    expect([f("Conv.ZIP"), f("_chat.txt"), f("message_1.json"), f("message_1.html"), f("sans-extension", "application/zip")].map(estExport)).toEqual([true, true, true, true, true]);
+    expect([f("Conv.ZIP"), f("_chat.txt"), f("message_1.json"), f("message_1.html"), f("sans-extension", "application/zip")].map(estExport)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
     expect([f("photo.jpg", "image/jpeg"), f("video.mp4", "video/mp4"), f("conv.zip.pdf", "application/pdf")].map(estExport)).toEqual([false, false, false]);
     expect(estImage(f("video.mp4", "video/mp4"))).toBe(false);
   });

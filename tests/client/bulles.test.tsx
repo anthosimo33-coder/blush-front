@@ -22,7 +22,12 @@ afterEach(() => {
 });
 
 const CONTACT: HomeContact = {
-  report: { verdict: { emoji: "🤏", short: "À deux doigts", title: "Elle hésite encore", subtitle: "Un pas de plus" }, level: "dit", trend: "En hausse", nextStep: "Propose-lui un verre" },
+  report: {
+    verdict: { emoji: "🤏", short: "À deux doigts", title: "Elle hésite encore", subtitle: "Un pas de plus" },
+    level: "dit",
+    trend: "En hausse",
+    nextStep: "Propose-lui un verre",
+  },
   fiche: { person: { id: "p1", name: "Maëlys", initial: "M", pronoun: "il" }, summaryShort: "Son exam jeudi" },
   period: "4 sept. → 7 sept.",
 };
@@ -77,14 +82,24 @@ describe("les bulles de la conv de l’accueil", () => {
   it("des captures : les quatre premières, et combien d’autres sur la dernière", () => {
     const images = ["a", "b", "c", "d", "e", "f"].map((n) => `blob:${n}`);
     const { fil } = monter([{ type: "images", id: 1, from: "toi", images, at: A }]);
-    expect(within(fil).getAllByRole("img").map((i) => i.getAttribute("alt"))).toEqual(["Capture 1", "Capture 2", "Capture 3", "Capture 4"]);
+    expect(
+      within(fil)
+        .getAllByRole("img")
+        .map((i) => i.getAttribute("alt")),
+    ).toEqual(["Capture 1", "Capture 2", "Capture 3", "Capture 4"]);
     expect(within(fil).getByText("+2")).toBeTruthy();
   });
 
   it("une réponse de BLUSH : ses bulles, la réponse à envoyer qui se copie en un geste, et « Partager » son échange", async () => {
     const { props, fil } = monter([
       { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
-      { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "il attend que tu relances" }], send: ["t’es dispo jeudi ?", "j’ai un plan"], why: "Court et léger.", echange: 1 }, at: A },
+      {
+        type: "reponse",
+        id: 2,
+        from: "blush",
+        result: { kind: "bubbles", bubbles: [{ text: "il attend que tu relances" }], send: ["t’es dispo jeudi ?", "j’ai un plan"], why: "Court et léger.", echange: 1 },
+        at: A,
+      },
     ]);
     expect(within(fil).getByText("il attend que tu relances")).toBeTruthy();
     expect(within(fil).getByText("Ta meilleure réponse")).toBeTruthy();

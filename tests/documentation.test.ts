@@ -23,7 +23,12 @@ function tableau(texte: string): string[][] {
   const lignes = texte.split("\n");
   const debut = lignes.findIndex((l) => l.startsWith("|"));
   const fin = lignes.findIndex((l, i) => i > debut && !l.startsWith("|"));
-  return lignes.slice(debut + 2, fin === -1 ? undefined : fin).map((l) => l.split("|").slice(1, -1).map((c) => c.trim()));
+  return lignes.slice(debut + 2, fin === -1 ? undefined : fin).map((l) =>
+    l
+      .split("|")
+      .slice(1, -1)
+      .map((c) => c.trim()),
+  );
 }
 
 /** Les méthodes HTTP citées dans un texte, dans l’ordre de METHODES. */

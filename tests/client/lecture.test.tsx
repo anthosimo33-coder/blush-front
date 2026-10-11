@@ -16,7 +16,15 @@ vi.mock("@/lib/sound", () => ({ play: vi.fn() }));
 
 const suivi = vi.mocked(getAnalysisProgress);
 const relance = vi.mocked(resumeAnalysis);
-const arretee = (failReason: AnalysisProgress["failReason"]): AnalysisProgress => ({ progress: 0.1, messagesRead: 0, stepsDone: 0, discoveries: [], done: false, failed: true, failReason });
+const arretee = (failReason: AnalysisProgress["failReason"]): AnalysisProgress => ({
+  progress: 0.1,
+  messagesRead: 0,
+  stepsDone: 0,
+  discoveries: [],
+  done: false,
+  failed: true,
+  failReason,
+});
 
 beforeEach(() => {
   suivi.mockReset();

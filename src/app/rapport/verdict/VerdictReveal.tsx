@@ -193,12 +193,27 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
       <h1 className="sr-only">Ton verdict</h1>
 
       {/* Les lueurs du fond */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(60%_45%_at_50%_38%,rgba(255,79,154,0.42),transparent_70%)]" style={{ opacity: glow[0] }} />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_12%_78%,rgba(61,139,255,0.34),transparent_70%)]" style={{ opacity: glow[1] }} />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_88%_20%,rgba(255,79,154,0.3),transparent_70%)]" style={{ opacity: glow[2] }} />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(60%_45%_at_50%_38%,rgba(255,79,154,0.42),transparent_70%)]"
+        style={{ opacity: glow[0] }}
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_12%_78%,rgba(61,139,255,0.34),transparent_70%)]"
+        style={{ opacity: glow[1] }}
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 transition-opacity duration-700 [background:radial-gradient(55%_45%_at_88%_20%,rgba(255,79,154,0.3),transparent_70%)]"
+        style={{ opacity: glow[2] }}
+      />
 
       {/* La scène est noire dès le premier affichage (Safari teinte ses barres d’après lui) ; seul le contenu apparaît en fondu */}
-      <div data-stage="" className="relative mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))] lg:px-6 lg:pb-10 lg:pt-8">
+      <div
+        data-stage=""
+        className="relative mx-auto flex min-h-0 w-full max-w-[560px] flex-1 flex-col px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))] lg:px-6 lg:pb-10 lg:pt-8"
+      >
         {/* Les traits du haut, comme des stories */}
         <div aria-hidden="true" className="flex gap-1.5">
           {cards.map((c, i) => (
@@ -228,7 +243,12 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 <Icon name="sound" size={18} stroke={2.4} />
               </button>
             )}
-            <a href="/rapport" onClick={partir} aria-busy={enRoute} className="relative rounded-full px-1 text-note font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+            <a
+              href="/rapport"
+              onClick={partir}
+              aria-busy={enRoute}
+              className="relative rounded-full px-1 text-note font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']"
+            >
               {/* Les points en blanc plein, plus lisibles que le texte à 70 % sur le fond sombre de la révélation */}
               {enRoute ? <TypingDots size={5} color="white" label="Ton rapport arrive" /> : "Passer"}
             </a>
@@ -244,13 +264,21 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 Le verdict
               </p>
               <div className="relative mt-4 flex size-[150px] items-center justify-center lg:size-[190px] [@media(max-height:600px)]:size-[110px]">
-                <span aria-hidden="true" data-vglow="" className="absolute -inset-14 rounded-full [background:radial-gradient(circle,rgba(255,79,154,0.55),rgba(255,79,154,0)_66%)]" />
+                <span
+                  aria-hidden="true"
+                  data-vglow=""
+                  className="absolute -inset-14 rounded-full [background:radial-gradient(circle,rgba(255,79,154,0.55),rgba(255,79,154,0)_66%)]"
+                />
                 <PearlBurst />
                 <span aria-hidden="true" data-drop="" className="relative text-[110px] leading-none lg:text-[140px] [@media(max-height:600px)]:text-[80px]">
                   {verdict.emoji}
                 </span>
               </div>
-              <h2 ref={heading} tabIndex={-1} className="m-0 mt-4 text-[40px] font-black leading-[1.02] tracking-[-0.03em] outline-none [text-wrap:balance] lg:text-[54px] [@media(max-height:600px)]:text-[32px]">
+              <h2
+                ref={heading}
+                tabIndex={-1}
+                className="m-0 mt-4 text-[40px] font-black leading-[1.02] tracking-[-0.03em] outline-none [text-wrap:balance] lg:text-[54px] [@media(max-height:600px)]:text-[32px]"
+              >
                 {step}
                 <Words text={verdict.title} from={0.85} />
               </h2>
@@ -286,7 +314,9 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                   <li key={r.label} data-rise="" style={delai(0.25 + i * 0.14)}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-corps font-black leading-tight">{r.label}</span>
-                      <span className={cn("shrink-0 text-note font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
+                      <span className={cn("shrink-0 text-note font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>
+                        {r.winner === "elle" ? autre.toLowerCase() : r.winner}
+                      </span>
                     </div>
                     <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
                       <span data-bar="" style={{ "--w": `${r.toiPercent}%`, ...delai(0.45 + i * 0.14) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
@@ -301,7 +331,11 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 ))}
               </ul>
               {card.meaning && (
-                <p data-rise="" style={delai(0.95)} className="m-0 mt-7 text-titre-3 font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
+                <p
+                  data-rise=""
+                  style={delai(0.95)}
+                  className="m-0 mt-7 text-titre-3 font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]"
+                >
                   {card.meaning}
                 </p>
               )}
@@ -314,7 +348,13 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                   {card.kicker}
                 </p>
               )}
-              <h2 ref={heading} tabIndex={-1} data-rise="" style={delai(0.05)} className="m-0 mt-1.5 text-[32px] font-black leading-[1.05] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[40px] [@media(max-height:600px)]:text-[26px]">
+              <h2
+                ref={heading}
+                tabIndex={-1}
+                data-rise=""
+                style={delai(0.05)}
+                className="m-0 mt-1.5 text-[32px] font-black leading-[1.05] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[40px] [@media(max-height:600px)]:text-[26px]"
+              >
                 {step}
                 {card.title}
               </h2>
@@ -325,12 +365,20 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 ))}
               </div>
               {card.essential && (
-                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.15)} className="m-0 mt-6 text-[22px] font-black leading-[1.25] tracking-[-0.01em] [text-wrap:balance] lg:text-[26px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[19px]">
+                <p
+                  data-rise=""
+                  style={delai(0.55 + card.messages.length * 1.05 + 0.15)}
+                  className="m-0 mt-6 text-[22px] font-black leading-[1.25] tracking-[-0.01em] [text-wrap:balance] lg:text-[26px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[19px]"
+                >
                   {card.essential}
                 </p>
               )}
               {card.fact && (
-                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-note font-extrabold leading-[1.4] text-white/70">
+                <p
+                  data-rise=""
+                  style={delai(0.55 + card.messages.length * 1.05 + 0.45)}
+                  className="m-0 mt-3 flex items-start gap-2 text-note font-extrabold leading-[1.4] text-white/70"
+                >
                   <span aria-hidden="true" className="mt-[5px] size-2 shrink-0 rounded-full bg-vrai" />
                   {card.fact}
                 </p>
@@ -343,11 +391,21 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 <Icon name="bolt" size={16} stroke={2.4} className="text-toi" />À toi de jouer
               </p>
               {card.quote && (
-                <span data-rise="" style={delai(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-corps font-bold leading-[1.3] text-white/85">
+                <span
+                  data-rise=""
+                  style={delai(0.15)}
+                  className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-corps font-bold leading-[1.3] text-white/85"
+                >
                   {card.quote}
                 </span>
               )}
-              <h2 ref={heading} tabIndex={-1} data-rise="" style={delai(0.35)} className="m-0 mt-5 text-[34px] font-black leading-[1.08] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[44px] [@media(max-height:600px)]:text-[28px]">
+              <h2
+                ref={heading}
+                tabIndex={-1}
+                data-rise=""
+                style={delai(0.35)}
+                className="m-0 mt-5 text-[34px] font-black leading-[1.08] tracking-[-0.02em] outline-none [text-wrap:balance] lg:text-[44px] [@media(max-height:600px)]:text-[28px]"
+              >
                 {step}
                 {card.text ?? "Ton rapport est prêt."}
               </h2>
@@ -359,7 +417,12 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
         {at < last ? (
           <div className="flex items-center justify-between gap-3">
             {at > 0 ? (
-              <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
+              <button
+                type="button"
+                onClick={() => go(at - 1)}
+                aria-label="Précédent"
+                className="flex size-11 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15"
+              >
                 <Icon name="back" size={20} stroke={2.6} className="text-white" />
               </button>
             ) : (
@@ -371,17 +434,32 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 <span className="hidden lg:inline">Clique pour voir le verdict</span>
               </span>
             )}
-            <button type="button" onClick={() => go(at + 1)} aria-label="Suivant" className="lift lift-sm flex size-14 items-center justify-center rounded-full bg-white shadow-[0_10px_30px_-10px_rgba(255,79,154,0.6)]">
+            <button
+              type="button"
+              onClick={() => go(at + 1)}
+              aria-label="Suivant"
+              className="lift lift-sm flex size-14 items-center justify-center rounded-full bg-white shadow-[0_10px_30px_-10px_rgba(255,79,154,0.6)]"
+            >
               <Icon name="arrow" size={22} stroke={2.8} className="arrow-nudge text-ink" />
             </button>
           </div>
         ) : (
           <div data-rise="" style={delai(0.7)} className="flex flex-col gap-1.5">
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
+              <button
+                type="button"
+                onClick={() => go(at - 1)}
+                aria-label="Précédent"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15"
+              >
                 <Icon name="back" size={20} stroke={2.6} className="text-white" />
               </button>
-              <a href="/rapport" onClick={partir} aria-busy={enRoute} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-carte font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
+              <a
+                href="/rapport"
+                onClick={partir}
+                aria-busy={enRoute}
+                className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-carte font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]"
+              >
                 {enRoute ? (
                   <TypingDots color="currentColor" label="Ton rapport arrive" />
                 ) : (
@@ -392,7 +470,12 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 )}
               </a>
             </div>
-            <button type="button" onClick={() => setPartage(true)} aria-haspopup="dialog" className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-detail font-black text-white/80 transition-colors hover:text-white">
+            <button
+              type="button"
+              onClick={() => setPartage(true)}
+              aria-haspopup="dialog"
+              className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-detail font-black text-white/80 transition-colors hover:text-white"
+            >
               <Icon name="share" size={16} color="currentColor" stroke={2.4} />
               Partager mon verdict
             </button>
@@ -412,7 +495,9 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
 function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HTMLHeadingElement | null>; step: ReactNode }) {
   const shown = useCountUp(story.totalMessages, 1300, 350);
   const apps = story.sources.length;
-  const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(Boolean) as string[];
+  const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(
+    Boolean,
+  ) as string[];
   return (
     <div className="flex flex-col items-center text-center">
       <p data-rise="" className="m-0 text-detail font-black text-white/70">
@@ -489,7 +574,12 @@ function Replay({ message, at }: { message: Message; at: number }) {
   const elle = message.from === "elle";
   return (
     <div className={cn("relative flex flex-col", elle ? "items-start" : "items-end")}>
-      <span aria-hidden="true" data-once="" style={delai(at)} className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}>
+      <span
+        aria-hidden="true"
+        data-once=""
+        style={delai(at)}
+        className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}
+      >
         <span data-dots="" className="flex items-center gap-1">
           {[0, 1, 2].map((d) => (
             <span key={d} className={cn("size-[7px] rounded-full", elle ? "bg-muted" : "bg-white")} />

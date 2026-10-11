@@ -24,7 +24,11 @@ describe("export Instagram", () => {
   it("relit le JSON : accents réparés, messages système retirés, ordre et heure de Paris", () => {
     const r = depuisInstagramJson(json);
     expect(r.participants).toEqual(["Malik", "Léa"]);
-    expect(r.texte.split("\n")).toEqual(["[12/09/2026 20:30:00] Malik: t’es dispo jeudi ?", "[12/09/2026 20:58:00] Léa: audio omitted", "[12/09/2026 21:00:00] Malik: à demain alors 😊"]);
+    expect(r.texte.split("\n")).toEqual([
+      "[12/09/2026 20:30:00] Malik: t’es dispo jeudi ?",
+      "[12/09/2026 20:58:00] Léa: audio omitted",
+      "[12/09/2026 21:00:00] Malik: à demain alors 😊",
+    ]);
   });
 
   it("relit le HTML : heures ramenées à Paris d’après l’en-tête, vocal reconnu, réactions et deux-points retirés", () => {
@@ -40,12 +44,27 @@ describe("export Instagram", () => {
   });
 
   it("choisit les bons fichiers d’un export", () => {
-    expect(choisirParties([{ nom: "a/inbox/x/message_2.json", contenu: "" }, { nom: "a/inbox/x/message_1.json", contenu: "" }])).toEqual([
+    expect(
+      choisirParties([
+        { nom: "a/inbox/x/message_2.json", contenu: "" },
+        { nom: "a/inbox/x/message_1.json", contenu: "" },
+      ]),
+    ).toEqual([
       { nom: "a/inbox/x/message_1.json", contenu: "" },
       { nom: "a/inbox/x/message_2.json", contenu: "" },
     ]);
-    expect(choisirParties([{ nom: "a/inbox/x/message_1.json", contenu: "" }, { nom: "a/inbox/y/message_1.json", contenu: "" }])).toBe("plusieurs");
-    expect(choisirParties([{ nom: "WhatsApp Chat/_chat.txt", contenu: "x" }, { nom: "autre.txt", contenu: "y" }])).toEqual([{ nom: "WhatsApp Chat/_chat.txt", contenu: "x" }]);
+    expect(
+      choisirParties([
+        { nom: "a/inbox/x/message_1.json", contenu: "" },
+        { nom: "a/inbox/y/message_1.json", contenu: "" },
+      ]),
+    ).toBe("plusieurs");
+    expect(
+      choisirParties([
+        { nom: "WhatsApp Chat/_chat.txt", contenu: "x" },
+        { nom: "autre.txt", contenu: "y" },
+      ]),
+    ).toEqual([{ nom: "WhatsApp Chat/_chat.txt", contenu: "x" }]);
     expect(lireExport([{ nom: "message_1.json", contenu: json }])?.appli).toBe("instagram");
   });
 });

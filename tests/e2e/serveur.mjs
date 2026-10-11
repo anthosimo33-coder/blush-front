@@ -86,7 +86,18 @@ if (process.env.E2E_PREPARER === "1") {
 
 /* 3. next start, avec l’environnement des tests et le strict nécessaire du système */
 const SYSTEME = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "LC_ALL", "TERM", "CI"];
-const TESTS = ["DATABASE_URL", "BLUSH_CLE", "BLUSH_IA_FACTICE", "BLUSH_URL", "BLUSH_ACCES_LIBRE", "BLUSH_ALERTES", "BLUSH_ADMINS", "CRON_SECRET", "BLUSH_BETA_FERMEE", "BLUSH_BOITE_MAILS"];
+const TESTS = [
+  "DATABASE_URL",
+  "BLUSH_CLE",
+  "BLUSH_IA_FACTICE",
+  "BLUSH_URL",
+  "BLUSH_ACCES_LIBRE",
+  "BLUSH_ALERTES",
+  "BLUSH_ADMINS",
+  "CRON_SECRET",
+  "BLUSH_BETA_FERMEE",
+  "BLUSH_BOITE_MAILS",
+];
 const envServeur = Object.fromEntries([...SYSTEME, ...TESTS].filter((cle) => process.env[cle] !== undefined).map((cle) => [cle, process.env[cle]]));
 /*
  * Les requêtes des tests (request, page.request) gardent leurs connexions ouvertes d’une requête à l’autre. Node ferme

@@ -111,7 +111,11 @@ function Bar({ side, width }: { side: "l" | "r"; width: number }) {
 /** Le bouton d’enregistrement de l’écran du Centre de contrôle : un rond blanc cerclé, un point rouge. */
 function BoutonRec() {
   return (
-    <span aria-label="le bouton d’enregistrement" role="img" className="mx-0.5 inline-flex size-[1.15em] items-center justify-center rounded-full border-2 border-current align-[-0.2em]">
+    <span
+      aria-label="le bouton d’enregistrement"
+      role="img"
+      className="mx-0.5 inline-flex size-[1.15em] items-center justify-center rounded-full border-2 border-current align-[-0.2em]"
+    >
       <span className="size-[0.5em] rounded-full bg-[#FF3B30]" />
     </span>
   );
@@ -124,7 +128,14 @@ export function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?:
     <div className="flex items-center gap-4 rounded-card bg-white p-3.5 shadow-soft">
       <span className="relative h-[112px] w-[64px] shrink-0 overflow-hidden rounded-[14px] bg-[#111114]">
         {shot.url && (
-          <video src={`${shot.url}#t=0.6`} muted playsInline preload="metadata" onLoadedMetadata={(e) => setDuree(e.currentTarget.duration)} className="absolute inset-0 size-full object-cover object-top" />
+          <video
+            src={`${shot.url}#t=0.6`}
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => setDuree(e.currentTarget.duration)}
+            className="absolute inset-0 size-full object-cover object-top"
+          />
         )}
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.6)]">
@@ -138,7 +149,12 @@ export function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?:
           {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}\u00a0min ` : ""}${Math.round(duree % 60)}\u00a0s · ` : ""}prêt
         </span>
       </span>
-      <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-legende font-black text-ink disabled:opacity-50">
+      <button
+        type="button"
+        onClick={onChange}
+        disabled={!onChange}
+        className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-legende font-black text-ink disabled:opacity-50"
+      >
         Changer
       </button>
     </div>
@@ -177,7 +193,8 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
         </ol>
       </button>
       <NotePrivee petite className="px-1 leading-[1.45]">
-        {NOTE_ENREGISTREMENT} Pas de bouton <BoutonRec />{NBSP}? Ajoute-le dans Réglages, Centre de contrôle.
+        {NOTE_ENREGISTREMENT} Pas de bouton <BoutonRec />
+        {NBSP}? Ajoute-le dans Réglages, Centre de contrôle.
       </NotePrivee>
     </div>
   );
@@ -218,9 +235,40 @@ export function Dropzone({ onPick, onFiles }: { onPick: () => void; onFiles: (fi
 /** Trois écrans de conv en éventail ; ils s’écartent au survol. */
 function ScreensArt() {
   const shots = [
-    { x: -38, y: 10, r: -11, rows: [["l", 64], ["r", 46], ["l", 74], ["r", 38]] },
-    { x: 38, y: 10, r: 11, rows: [["r", 52], ["l", 70], ["r", 40], ["l", 56]] },
-    { x: 0, y: 0, r: 0, rows: [["l", 60], ["r", 48], ["l", 72], ["r", 36], ["l", 50]] },
+    {
+      x: -38,
+      y: 10,
+      r: -11,
+      rows: [
+        ["l", 64],
+        ["r", 46],
+        ["l", 74],
+        ["r", 38],
+      ],
+    },
+    {
+      x: 38,
+      y: 10,
+      r: 11,
+      rows: [
+        ["r", 52],
+        ["l", 70],
+        ["r", 40],
+        ["l", 56],
+      ],
+    },
+    {
+      x: 0,
+      y: 0,
+      r: 0,
+      rows: [
+        ["l", 60],
+        ["r", 48],
+        ["l", 72],
+        ["r", 36],
+        ["l", 50],
+      ],
+    },
   ] as const;
   return (
     <span aria-hidden="true" className="relative block h-[108px] w-[170px]">

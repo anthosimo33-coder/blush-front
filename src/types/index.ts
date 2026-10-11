@@ -172,9 +172,7 @@ export type VocalLigne = {
  * Le vocal du rapport (la story en haut). `en_cours` : BLUSH l’enregistre. `pret` : l’audio et ses sous-titres minutés.
  * `voix` : celle de l’A/B test, A ou B.
  */
-export type VocalRapport =
-  | { etat: "en_cours" }
-  | { etat: "pret"; audio: string; duree: number; voix: Voix; sobre: boolean; lignes: VocalLigne[] };
+export type VocalRapport = { etat: "en_cours" } | { etat: "pret"; audio: string; duree: number; voix: Voix; sobre: boolean; lignes: VocalLigne[] };
 
 export type Report = {
   storyId: string;

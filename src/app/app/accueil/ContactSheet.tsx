@@ -199,7 +199,11 @@ export function ContactSheet({
           href="/rapport"
           prefetch
           onNavigate={versRapport}
-          leading={<Pastille><span className="text-[20px] leading-none">{report.verdict.emoji}</span></Pastille>}
+          leading={
+            <Pastille>
+              <span className="text-[20px] leading-none">{report.verdict.emoji}</span>
+            </Pastille>
+          }
           title="Le rapport de votre histoire"
           sub={period}
           chevron

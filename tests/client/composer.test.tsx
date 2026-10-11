@@ -105,11 +105,14 @@ describe("la barre de saisie de l’accueil", () => {
     vi.useFakeTimers();
     try {
       /* Un autre logo dans la page, qui porte le même attribut : il n’est pas pris (Q62, rien n’est cherché dans la page) */
-      const [donne, autre] = auMoins([0, 1].map(() => {
-        const el = document.body.appendChild(document.createElement("span"));
-        el.setAttribute("data-blush-logo", "");
-        return el;
-      }), 2);
+      const [donne, autre] = auMoins(
+        [0, 1].map(() => {
+          const el = document.body.appendChild(document.createElement("span"));
+          el.setAttribute("data-blush-logo", "");
+          return el;
+        }),
+        2,
+      );
       const { champ } = monter({ logo: () => donne });
       fireEvent.change(champ, { target: { value: "s" } });
       expect(donne.hasAttribute("data-lean")).toBe(true);

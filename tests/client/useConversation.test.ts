@@ -33,7 +33,12 @@ const reponse = (textes: string[], plus: Partial<BlushAnswer> = {}): BlushAnswer
 const enMsg = (r: BlushAnswer): NewMsg => ({ type: "reponse", from: "blush", result: r });
 
 /* Un échange de l’historique du back-end : ton message et la réponse de BLUSH, à l’heure `at` */
-const echange = (id: number): EchangeScript & { id: number; mine: string; at: number } => ({ id, mine: `question n° ${id}`, answer: reponse([`réponse n° ${id}`]), at: 1_700_000_000_000 + id * 60_000 });
+const echange = (id: number): EchangeScript & { id: number; mine: string; at: number } => ({
+  id,
+  mine: `question n° ${id}`,
+  answer: reponse([`réponse n° ${id}`]),
+  at: 1_700_000_000_000 + id * 60_000,
+});
 
 /* Une promesse qu’on tient à la main : la réponse de BLUSH arrive quand le test le décide */
 function retenue<T>() {
@@ -117,7 +122,10 @@ describe("useConversation : un échange", () => {
     const mine = texteDe("elle m’a vu ?");
     let fini!: Promise<void>;
     act(() => {
-      fini = result.current.envoyer(mine, analyse(() => r.promesse));
+      fini = result.current.envoyer(
+        mine,
+        analyse(() => r.promesse),
+      );
     });
     expect(types(result.current.msgs)).toEqual(["intro", "intro", "texte", "ecrit"]);
     expect(result.current.occupe).toBe(true);
@@ -202,14 +210,24 @@ describe("useConversation : un échange", () => {
   it("une erreur qui n’est pas une coupure remonte, sans rien poser", async () => {
     const { result } = monter();
     await act(async () => {
-      await expect(result.current.envoyer(texteDe("allô ?"), analyse(() => Promise.reject(new Error("bug"))))).rejects.toThrow("bug");
+      await expect(
+        result.current.envoyer(
+          texteDe("allô ?"),
+          analyse(() => Promise.reject(new Error("bug"))),
+        ),
+      ).rejects.toThrow("bug");
     });
     expect(result.current.relancer(result.current.msgs.at(-1)!.id)).toBe(false);
   });
 
   it("une réponse qui fait passer un cap prévient l’écran, 0,7 s après elle", async () => {
     const { result, scene: s } = monter();
-    await act(() => result.current.envoyer(texteDe("on en est où ?"), analyse(async () => enMsg(reponse(["vous vous voyez"], { levelUp: "voit" })))));
+    await act(() =>
+      result.current.envoyer(
+        texteDe("on en est où ?"),
+        analyse(async () => enMsg(reponse(["vous vous voyez"], { levelUp: "voit" }))),
+      ),
+    );
     expect(s.niveau).not.toHaveBeenCalled();
     await waitFor(() => expect(s.niveau).toHaveBeenCalledWith("voit"), { timeout: 2000 });
   });
@@ -347,7 +365,12 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     /* La page est préchargée (son rendu), puis tu écris au chat ailleurs (une autre conv montée, ici), puis tu l’ouvres */
     const rendu = renduNeuf();
     const ailleurs = monter();
-    await act(() => ailleurs.result.current.envoyer(texteDe("et maintenant ?"), analyse(async () => enMsg(reponse(["maintenant tu attends"])))));
+    await act(() =>
+      ailleurs.result.current.envoyer(
+        texteDe("et maintenant ?"),
+        analyse(async () => enMsg(reponse(["maintenant tu attends"]))),
+      ),
+    );
     ailleurs.unmount();
     historique.mockClear();
     historique.mockResolvedValue({ echanges: [echange(5), echange(6)], plus: false });
@@ -358,7 +381,12 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
 
   it("une écriture bien avant le rendu (plus de 2 s) ne le rend pas dépassé : il n’est pas relu", async () => {
     const ailleurs = monter();
-    await act(() => ailleurs.result.current.envoyer(texteDe("allô ?"), analyse(async () => enMsg(reponse(["oui"])))));
+    await act(() =>
+      ailleurs.result.current.envoyer(
+        texteDe("allô ?"),
+        analyse(async () => enMsg(reponse(["oui"]))),
+      ),
+    );
     ailleurs.unmount();
     historique.mockClear();
     vi.setSystemTime(Date.now() + 5_000);
@@ -407,7 +435,12 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     const h = retenue<HistoriqueChat>();
     historique.mockReturnValueOnce(h.promesse);
     const { result } = monter({ script: [echange(5)] });
-    await act(() => result.current.envoyer(texteDe("coucou"), analyse(async () => enMsg(reponse(["salut"])))));
+    await act(() =>
+      result.current.envoyer(
+        texteDe("coucou"),
+        analyse(async () => enMsg(reponse(["salut"]))),
+      ),
+    );
     const avant = result.current.msgs;
     await act(async () => {
       h.tenir({ echanges: [echange(5), echange(6)], plus: false });
@@ -486,7 +519,12 @@ describe("useConversation : la conv gardée pendant la visite", () => {
   it("revenu sur l’accueil de la même conv, elle reprend ses messages et son mode vocal ; une autre conv repart de sa page", async () => {
     const premiere = monter({ cle: "conv-a", script: [echange(5)], rendu: renduNeuf() });
     act(() => premiere.result.current.direMot("Je n’ai rien entendu."));
-    await act(() => premiere.result.current.envoyer(texteDe("parle-moi en vocal"), analyse(async () => enMsg(reponse(["ok"], { modeVocal: true })))));
+    await act(() =>
+      premiere.result.current.envoyer(
+        texteDe("parle-moi en vocal"),
+        analyse(async () => enMsg(reponse(["ok"], { modeVocal: true }))),
+      ),
+    );
     premiere.unmount();
 
     const retour = monter({ cle: "conv-a", script: [echange(5)], rendu: renduNeuf(-60_000), modeVocalInitial: undefined });

@@ -101,7 +101,8 @@ let logoPose: HTMLElement | null = null;
 function logo() {
   const el = document.createElement("div");
   el.setAttribute("data-blush-logo", "");
-  el.innerHTML = '<span data-pearl=""></span><span data-pearl=""></span><span data-pearl=""></span><span data-shade=""></span><span data-shade=""></span><span data-shade=""></span>';
+  el.innerHTML =
+    '<span data-pearl=""></span><span data-pearl=""></span><span data-pearl=""></span><span data-shade=""></span><span data-shade=""></span><span data-shade=""></span>';
   document.body.append(el);
   logoPose = el;
   return el;

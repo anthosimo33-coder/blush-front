@@ -51,7 +51,11 @@ export function apercuDe(b: SortiesDuBanc): Apercu {
     access: "blushplus",
   };
   const { messages: tous } = lu;
-  const participant = (p: { nomExport: string; prenom: string }): Participant => ({ nom: p.nomExport, prenom: p.prenom, messages: tous.filter((m) => m.nom === p.nomExport).length });
+  const participant = (p: { nomExport: string; prenom: string }): Participant => ({
+    nom: p.nomExport,
+    prenom: p.prenom,
+    messages: tous.filter((m) => m.nom === p.nomExport).length,
+  });
   const meta: Meta = {
     appli: estAppli(h.appli) ? h.appli : "autre",
     format: h.format,

@@ -9,7 +9,11 @@ const ligne = (k: number, nom: string, texte: string) => {
   return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00] ${nom}: ${texte}`;
 };
 const conv = (n: number, noms = ["Léa", "Tom"]) => Array.from({ length: n }, (_, k) => ligne(k, noms[k % 2]!, `message ${k}`));
-const qui = (moi: string, autre: string) => ({ utilisateur: { prenom: moi, pronom: "il" as const, nomExport: moi }, autre: { prenom: autre, pronom: "elle" as const, nomExport: autre }, format: "whatsapp-ios" as const });
+const qui = (moi: string, autre: string) => ({
+  utilisateur: { prenom: moi, pronom: "il" as const, nomExport: moi },
+  autre: { prenom: autre, pronom: "elle" as const, nomExport: autre },
+  format: "whatsapp-ios" as const,
+});
 
 describe("lire un export WhatsApp", () => {
   it("lit un pseudo qui contient des deux-points (« Léa :) »)", () => {
@@ -79,6 +83,10 @@ describe("lire un export Instagram", () => {
     const bloc = (nom: string, texte: string) =>
       `<div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">${nom}</h2><div class="_3-95 _a6-p"><div><div></div><div>${texte}</div><div></div><div></div></div></div><div class="_3-94 _a6-o">sep 18, 2026 8:30 am</div></div>`;
     const html = `<html><body><header><time datetime="2026-09-20T05:40Z">Le Samedi 19 septembre 2026 à 22:40 (UTC)</time></header><main>${bloc("Tom", "trois")}${bloc("Tom", "deux")}${bloc("Léa", "un")}</main></body></html>`;
-    expect(depuisInstagramHtml(html).texte.split("\n").map((l) => l.split("] ")[1])).toEqual(["Léa: un", "Tom: deux", "Tom: trois"]);
+    expect(
+      depuisInstagramHtml(html)
+        .texte.split("\n")
+        .map((l) => l.split("] ")[1]),
+    ).toEqual(["Léa: un", "Tom: deux", "Tom: trois"]);
   });
 });

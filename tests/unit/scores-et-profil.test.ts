@@ -62,7 +62,16 @@ describe("les scores du chapitre 1", () => {
 
 describe("le profil d’écriture", () => {
   let k = 0;
-  const m = (role: Message["role"], texte: string, media?: Message["media"]): Message => ({ id: `m${++k}`, t: k * 60e3, nom: role === "toi" ? "Tom" : "Léa", role, texte, approx: false, ligne: k, ...(media ? { media } : {}) });
+  const m = (role: Message["role"], texte: string, media?: Message["media"]): Message => ({
+    id: `m${++k}`,
+    t: k * 60e3,
+    nom: role === "toi" ? "Tom" : "Léa",
+    role,
+    texte,
+    approx: false,
+    ligne: k,
+    ...(media ? { media } : {}),
+  });
   const messages = [
     m("toi", "Salut ça va ?"),
     m("toi", "mdr t’es sûre"),

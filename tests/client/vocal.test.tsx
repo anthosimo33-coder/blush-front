@@ -27,7 +27,10 @@ beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("IntersectionObserver", FauxObservateur);
   /* Le préchargement du son, au repos : rien ne part */
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(null, { status: 404 })),
+  );
 });
 afterEach(() => {
   vi.unstubAllGlobals();

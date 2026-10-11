@@ -32,7 +32,12 @@ beforeEach(() => {
 /* Pour chaque plan et chaque besoin : le paiement ouvert, et l’offre seule qu’il propose (« » : toutes) */
 const ATTENDU: Record<Plan, Record<Besoin, { ouvert: boolean; seule: string }>> = {
   gratuit: { rapport: { ouvert: true, seule: "" }, question: { ouvert: true, seule: "" }, chat: { ouvert: true, seule: "" }, fiche: { ouvert: true, seule: "" } },
-  rapport: { rapport: { ouvert: false, seule: "" }, question: { ouvert: false, seule: "" }, chat: { ouvert: true, seule: "blushplus" }, fiche: { ouvert: true, seule: "blushplus" } },
+  rapport: {
+    rapport: { ouvert: false, seule: "" },
+    question: { ouvert: false, seule: "" },
+    chat: { ouvert: true, seule: "blushplus" },
+    fiche: { ouvert: true, seule: "blushplus" },
+  },
   blushplus: { rapport: { ouvert: false, seule: "" }, question: { ouvert: false, seule: "" }, chat: { ouvert: false, seule: "" }, fiche: { ouvert: false, seule: "" } },
 };
 const CAS = (Object.keys(ATTENDU) as Plan[]).flatMap((plan) => (["question", "chat", "fiche"] as const).map((besoin) => [plan, besoin, ATTENDU[plan][besoin]] as const));
@@ -66,7 +71,11 @@ describe("AppScreen : le paiement par besoin", () => {
   });
 
   it("dans la page d’une conv, la coque part du compte qu’elle a rendu, avec l’heure du rendu (frais, il n’est pas relu) ; ailleurs, de rien", () => {
-    const rendu: Account = { email: "rendu@blush.test", subscription: { plan: "blushplus", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false }, storyDeleted: false };
+    const rendu: Account = {
+      email: "rendu@blush.test",
+      subscription: { plan: "blushplus", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false },
+      storyDeleted: false,
+    };
     render(
       <PoseConv id="conv-a" compte={rendu} rendu={1234}>
         <AppScreen>

@@ -33,7 +33,13 @@ const VERDICT: Requete = { tache: "04-verdict", blocs: [{ texte: "la conv" }] };
 const USAGE = { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
 
 /** Une réponse du modèle : ses blocs, et comment il s’est arrêté. */
-const message = (content: MessageRecu["content"], autres: Partial<MessageRecu> = {}): MessageRecu => ({ content, usage: USAGE, model: "modele-de-test", stop_reason: "end_turn", ...autres });
+const message = (content: MessageRecu["content"], autres: Partial<MessageRecu> = {}): MessageRecu => ({
+  content,
+  usage: USAGE,
+  model: "modele-de-test",
+  stop_reason: "end_turn",
+  ...autres,
+});
 const texte = (t: string) => ({ type: "text" as const, text: t });
 const repli = { type: "fallback" as const, from: { model: "premier" }, to: { model: "second" }, trigger: { category: "cyber" } };
 
@@ -54,7 +60,9 @@ describe("appeler : la réponse du modèle", () => {
     faux(rend(message([texte('{"ok":true}')])));
     const a = await appeler(VERDICT, Format, { storyId: "histoire", etiquette: "verdict" });
     expect(a).toEqual({ sortie: { ok: true }, refus: false, stop: "end_turn", cout: 4 });
-    expect(noterCout).toHaveBeenCalledWith(expect.objectContaining({ storyId: "histoire", tache: "verdict", modele: "modele-de-test", entree: 1_000_000, micros: 4_000_000, payeur: "payeur" }));
+    expect(noterCout).toHaveBeenCalledWith(
+      expect.objectContaining({ storyId: "histoire", tache: "verdict", modele: "modele-de-test", entree: 1_000_000, micros: 4_000_000, payeur: "payeur" }),
+    );
   });
 
   it("un texte qui n’est pas la sortie attendue : pas de sortie, pas de refus", async () => {
@@ -135,7 +143,9 @@ describe("appeler : l’envoi", () => {
       { reflexion: 0, texte: 11, ecrit: '{"ok":true}' },
     ]);
     /* Le suivi plante à chaque morceau : une seule ligne au journal, avec la tâche, sans le message */
-    expect(erreur.mock.calls.map((c) => JSON.parse(String(c[0])) as unknown)).toEqual([{ evenement: "suivi de l’avance en erreur", niveau: "erreur", tache: "04-verdict", erreur: "Error" }]);
+    expect(erreur.mock.calls.map((c) => JSON.parse(String(c[0])) as unknown)).toEqual([
+      { evenement: "suivi de l’avance en erreur", niveau: "erreur", tache: "04-verdict", erreur: "Error" },
+    ]);
     erreur.mockRestore();
   });
 
@@ -173,11 +183,21 @@ describe("appeler : l’envoi", () => {
 const PARAMS: Demande["params"] = { model: "claude-opus-5-5", max_tokens: 100, messages: [{ role: "user", content: "la conv" }] };
 const DEMANDE: Demande = { requete: VERDICT, partie: null, params: PARAMS };
 const OPTIONS = { timeout: 5_000, maxRetries: 0 };
-const MESSAGE_SDK = { id: "msg_1", type: "message", role: "assistant", model: "claude-opus-5-5", stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } };
+const MESSAGE_SDK = {
+  id: "msg_1",
+  type: "message",
+  role: "assistant",
+  model: "claude-opus-5-5",
+  stop_reason: "end_turn",
+  stop_sequence: null,
+  usage: { input_tokens: 10, output_tokens: 5 },
+};
 
 /** Une réponse en flux, comme l’API l’écrit : un événement par bloc `event:` / `data:`. */
 const flux = (...evenements: Record<string, unknown>[]) =>
-  new Response(evenements.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join(""), { headers: { "content-type": "text/event-stream", "request-id": "req_flux" } });
+  new Response(evenements.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join(""), {
+    headers: { "content-type": "text/event-stream", "request-id": "req_flux" },
+  });
 const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps), { status, headers: { "content-type": "application/json", "request-id": "req_1" } });
 
 /** Un client du SDK dont `fetch` rend, envoi après envoi, les réponses données ; et ce qu’il a reçu (corps, en-têtes). */

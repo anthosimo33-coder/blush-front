@@ -17,7 +17,11 @@ import type { ConvInstagram } from "@/services/preparer-export";
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const quand = (iso: string) => `${+iso.slice(8, 10)}\u00a0${MOIS[+iso.slice(5, 7) - 1]}`;
-const sansAccents = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const sansAccents = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 
 export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; convs: ConvInstagram[]; onChoisir: (id: string) => void; onClose: () => void }) {
   const [cherche, setCherche] = useState("");
@@ -30,7 +34,8 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
         Quelle conv{NBSP}?
       </h2>
       <p className="m-0 text-note font-bold leading-[1.45] text-soft lg:text-detail">
-        Ton export contient {convs.length}{NBSP}convs. Choisis celle avec la personne{NBSP}: seule celle-là part chez BLUSH, les autres ne quittent pas ton appareil.
+        Ton export contient {convs.length}
+        {NBSP}convs. Choisis celle avec la personne{NBSP}: seule celle-là part chez BLUSH, les autres ne quittent pas ton appareil.
       </p>
       <label className="flex h-[52px] items-center gap-3 rounded-field bg-white pl-4 pr-2 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] focus-within:shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]">
         <Icon name="people" size={19} stroke={2} className="text-muted" />

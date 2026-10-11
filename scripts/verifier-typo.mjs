@@ -111,11 +111,14 @@ const A_L_EQUIPE = new Map([
 function horsDesTextes(n, source) {
   /* `enfant` : le nœud du chemin juste sous `p` (l’argument d’un appel qui contient la chaîne) */
   for (let enfant = n, p = n.parent; p; enfant = p, p = p.parent) {
-    if (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ts.isIdentifier(p.expression.expression) && p.expression.expression.text === "console") return true;
-    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text) && p.arguments.indexOf(enfant) >= A_L_EQUIPE.get(p.expression.text)) return true;
+    if (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ts.isIdentifier(p.expression.expression) && p.expression.expression.text === "console")
+      return true;
+    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text) && p.arguments.indexOf(enfant) >= A_L_EQUIPE.get(p.expression.text))
+      return true;
     if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && /Error$|^Erreur/.test(p.expression.text)) return true;
     /* L’instruction qui contient la chaîne : le commentaire juste au-dessus d’elle peut la dispenser */
-    if (p.parent && (ts.isSourceFile(p.parent) || ts.isBlock(p.parent))) return (ts.getLeadingCommentRanges(source, p.pos) ?? []).some((c) => MARQUE.test(source.slice(c.pos, c.end)));
+    if (p.parent && (ts.isSourceFile(p.parent) || ts.isBlock(p.parent)))
+      return (ts.getLeadingCommentRanges(source, p.pos) ?? []).some((c) => MARQUE.test(source.slice(c.pos, c.end)));
   }
   return false;
 }
@@ -138,8 +141,10 @@ export function problemesDe(chemin, source, { insecables = true } = {}) {
   /** `posDe(i)` : où commence, dans la source, le morceau du texte qui contient son caractère i. */
   const signaler = (texte, n, posDe) => {
     if (horsDesTextes(n, source)) return;
-    for (const m of texte.matchAll(AVANT)) problemes.push(`${chemin}:${ligneDe(posDe(m.index))} · espace normale avant « ${m[0]} » : « ${extrait(texte, m.index)} » (NBSP, src/lib/format.ts)`);
-    for (const m of texte.matchAll(APRES)) problemes.push(`${chemin}:${ligneDe(posDe(m.index))} · espace normale après « « » : « ${extrait(texte, m.index)} » (NBSP, src/lib/format.ts)`);
+    for (const m of texte.matchAll(AVANT))
+      problemes.push(`${chemin}:${ligneDe(posDe(m.index))} · espace normale avant « ${m[0]} » : « ${extrait(texte, m.index)} » (NBSP, src/lib/format.ts)`);
+    for (const m of texte.matchAll(APRES))
+      problemes.push(`${chemin}:${ligneDe(posDe(m.index))} · espace normale après « « » : « ${extrait(texte, m.index)} » (NBSP, src/lib/format.ts)`);
   };
   /* Les enfants d’un élément JSX forment une phrase, ses éléments imbriqués compris : on la recolle, puis on la lit d’un
      bloc. Chaque morceau garde son nœud, pour dire la ligne du signe ; un morceau déjà lu ne se relit pas seul. */
@@ -160,9 +165,12 @@ export function problemesDe(chemin, source, { insecables = true } = {}) {
   const visiter = (n) => {
     /* La forme de l’insécable */
     if (ts.isJsxText(n) && ENTITE_NBSP.test(n.text)) forme(n, "`&nbsp;` dans le JSX : écrire {NBSP} (src/lib/format.ts)");
-    if (ts.isJsxExpression(n) && n.parent && (ts.isJsxElement(n.parent) || ts.isJsxFragment(n.parent)) && chaine(n.expression) === NBSP) forme(n, '`{"\\u00a0"}` dans le JSX : écrire {NBSP} (src/lib/format.ts)');
-    if (ts.isTemplateSpan(n) && ((ts.isIdentifier(n.expression) && n.expression.text === "NBSP") || chaine(n.expression) === NBSP)) forme(n.expression, "l’insécable d’un gabarit s’écrit \\u00a0 dans son texte, ni `${NBSP}` ni `${\"\\u00a0\"}`");
-    if (ts.isVariableDeclaration(n) && /^[  ]$/.test(chaine(n.initializer) ?? "") && chemin !== "src/lib/format.ts") forme(n, "une constante d’espace : importer NBSP de src/lib/format.ts (une copie peut contenir une espace normale)");
+    if (ts.isJsxExpression(n) && n.parent && (ts.isJsxElement(n.parent) || ts.isJsxFragment(n.parent)) && chaine(n.expression) === NBSP)
+      forme(n, '`{"\\u00a0"}` dans le JSX : écrire {NBSP} (src/lib/format.ts)');
+    if (ts.isTemplateSpan(n) && ((ts.isIdentifier(n.expression) && n.expression.text === "NBSP") || chaine(n.expression) === NBSP))
+      forme(n.expression, 'l’insécable d’un gabarit s’écrit \\u00a0 dans son texte, ni `${NBSP}` ni `${"\\u00a0"}`');
+    if (ts.isVariableDeclaration(n) && /^[  ]$/.test(chaine(n.initializer) ?? "") && chemin !== "src/lib/format.ts")
+      forme(n, "une constante d’espace : importer NBSP de src/lib/format.ts (une copie peut contenir une espace normale)");
 
     if ((ts.isJsxElement(n) || ts.isJsxFragment(n)) && !lus.has(n)) {
       const morceaux = morceauxDe(n);

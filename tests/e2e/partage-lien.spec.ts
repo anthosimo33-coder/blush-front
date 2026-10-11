@@ -1,5 +1,19 @@
 import type { Page, TestInfo } from "@playwright/test";
-import { DESSIN, emailLibre, expect, exportWhatsApp, importerWhatsApp, lectureFaite, liensDe, mesurerCompteurs, ouvrirLePartage, reecrireVerdict, ROBOT_WHATSAPP, taillePng, test } from "./aide";
+import {
+  DESSIN,
+  emailLibre,
+  expect,
+  exportWhatsApp,
+  importerWhatsApp,
+  lectureFaite,
+  liensDe,
+  mesurerCompteurs,
+  ouvrirLePartage,
+  reecrireVerdict,
+  ROBOT_WHATSAPP,
+  taillePng,
+  test,
+} from "./aide";
 
 /*
  * Le lien public d’un verdict partagé (/v/<id>), tel que le voient les potes : la page (le verdict seul, le prénom de
@@ -39,10 +53,13 @@ test("la page publique, sans compte : le verdict seul, le prénom de l’autre e
   /* Un pote, sur son téléphone : un autre navigateur, sans compte */
   const pote = await autreAppareil();
   await test.step("la page montre le verdict seul, Maëlys devenue « M. », Noé en clair", async () => {
-    await mesurerCompteurs(async () => {
-      await pote.goto(`/v/${id}`);
-      await expect(pote.getByRole("heading", { level: 1, name: titreMasque })).toBeVisible();
-    }, { lien_vu: 1 });
+    await mesurerCompteurs(
+      async () => {
+        await pote.goto(`/v/${id}`);
+        await expect(pote.getByRole("heading", { level: 1, name: titreMasque })).toBeVisible();
+      },
+      { lien_vu: 1 },
+    );
     const verdict = pote.getByRole("region", { name: titreMasque });
     await expect(verdict.getByText("j’ai lu toute leur conv 👀")).toBeVisible();
     await expect(verdict.getByText("verdict :")).toBeVisible();
@@ -92,17 +109,20 @@ test("l’image du lien : un PNG pour l’aperçu et pour la story ; seul le rob
 
   await test.step("le robot de WhatsApp lit l’aperçu dans la page, et son passage ne compte pas comme une visite", async () => {
     const robot = { "user-agent": ROBOT_WHATSAPP };
-    await mesurerCompteurs(async () => {
-      const pageVue = await request.get(`/v/${id}`, { headers: robot });
-      expect(pageVue.status()).toBe(200);
-      expect(await pageVue.text()).toContain(`<meta property="og:image" content="${testInfo.project.use.baseURL}/v/${id}/image"/>`);
-      /* La story, demandée par un robot : jamais comptée */
-      expect((await request.get(`/v/${id}/image?format=story`, { headers: robot, timeout: DESSIN })).status()).toBe(200);
-      /* L’aperçu dessiné pour le robot : le lien vient d’être collé dans une conv */
-      expect((await request.get(`/v/${id}/image`, { headers: robot, timeout: DESSIN })).status()).toBe(200);
-      /* Une personne qui ouvre la page (après le robot : son compte à lui serait déjà là) */
-      expect((await request.get(`/v/${id}`)).status()).toBe(200);
-    }, { lien_apercu: 1, lien_vu: 1 });
+    await mesurerCompteurs(
+      async () => {
+        const pageVue = await request.get(`/v/${id}`, { headers: robot });
+        expect(pageVue.status()).toBe(200);
+        expect(await pageVue.text()).toContain(`<meta property="og:image" content="${testInfo.project.use.baseURL}/v/${id}/image"/>`);
+        /* La story, demandée par un robot : jamais comptée */
+        expect((await request.get(`/v/${id}/image?format=story`, { headers: robot, timeout: DESSIN })).status()).toBe(200);
+        /* L’aperçu dessiné pour le robot : le lien vient d’être collé dans une conv */
+        expect((await request.get(`/v/${id}/image`, { headers: robot, timeout: DESSIN })).status()).toBe(200);
+        /* Une personne qui ouvre la page (après le robot : son compte à lui serait déjà là) */
+        expect((await request.get(`/v/${id}`)).status()).toBe(200);
+      },
+      { lien_apercu: 1, lien_vu: 1 },
+    );
   });
 
   await test.step("l’image demandée par une personne (la feuille de partage) ne compte pas", async () => {
@@ -138,10 +158,13 @@ test("« Analyser ma conv » mène au début du parcours ; la conv importée ens
 
   const pote = await autreAppareil();
   await test.step("sans compte : la page, puis « Analyser ma conv », puis « Vous vous parlez où ? »", async () => {
-    await mesurerCompteurs(async () => {
-      await pote.goto(`/v/${id}`);
-      await expect(pote.getByRole("heading", { level: 1, name: "Vous êtes à deux doigts." })).toBeVisible();
-    }, { lien_vu: 1 });
+    await mesurerCompteurs(
+      async () => {
+        await pote.goto(`/v/${id}`);
+        await expect(pote.getByRole("heading", { level: 1, name: "Vous êtes à deux doigts." })).toBeVisible();
+      },
+      { lien_vu: 1 },
+    );
     await mesurerCompteurs(async () => {
       await pote.getByRole("link", { name: "Analyser ma conv" }).click();
       await expect(pote).toHaveURL(/\/commencer$/);
@@ -156,10 +179,13 @@ test("« Analyser ma conv » mène au début du parcours ; la conv importée ens
   });
 
   await test.step("connecté, celui qui partage voit la même page, et « Analyser ma conv » mène aussi au début du parcours", async () => {
-    await mesurerCompteurs(async () => {
-      await page.goto(`/v/${id}`);
-      await expect(page.getByRole("heading", { level: 1, name: "Vous êtes à deux doigts." })).toBeVisible();
-    }, { lien_vu: 1 });
+    await mesurerCompteurs(
+      async () => {
+        await page.goto(`/v/${id}`);
+        await expect(page.getByRole("heading", { level: 1, name: "Vous êtes à deux doigts." })).toBeVisible();
+      },
+      { lien_vu: 1 },
+    );
     await page.getByRole("link", { name: "Analyser ma conv" }).click();
     await expect(page).toHaveURL(/\/commencer$/);
     await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
@@ -177,16 +203,24 @@ test.fixme("voir la page ne compte pas d’essai : seul « Analyser ma conv » t
   const email = emailLibre(testInfo, "precharge");
   const id = await partagerUnVerdict(page, testInfo, email);
   const pote = await autreAppareil();
-  await mesurerCompteurs(async () => {
-    await pote.goto(`/v/${id}`);
-    await expect(pote.getByRole("link", { name: "Analyser ma conv" })).toBeVisible();
-    /* Le temps qu’un éventuel préchargement parte et revienne */
-    await pote.waitForLoadState("networkidle");
-  }, { lien_vu: 1 }, { avecEssais: true });
-  await mesurerCompteurs(async () => {
-    await pote.getByRole("link", { name: "Analyser ma conv" }).click();
-    await expect(pote).toHaveURL(/\/commencer$/);
-  }, { lien_essai: 1 }, { avecEssais: true });
+  await mesurerCompteurs(
+    async () => {
+      await pote.goto(`/v/${id}`);
+      await expect(pote.getByRole("link", { name: "Analyser ma conv" })).toBeVisible();
+      /* Le temps qu’un éventuel préchargement parte et revienne */
+      await pote.waitForLoadState("networkidle");
+    },
+    { lien_vu: 1 },
+    { avecEssais: true },
+  );
+  await mesurerCompteurs(
+    async () => {
+      await pote.getByRole("link", { name: "Analyser ma conv" }).click();
+      await expect(pote).toHaveURL(/\/commencer$/);
+    },
+    { lien_essai: 1 },
+    { avecEssais: true },
+  );
 });
 
 /*
@@ -202,10 +236,13 @@ test("les espaces avant « : » et « ? » sont insécables, sur la page publiqu
   await page.getByRole("main").getByRole("button", { name: "En savoir plus" }).click();
   expect(await texte(/au bout de 24/)).toContain("au bout de 24\u00a0h");
   /* Une visite compte (lien_vu) : mesurée comme les autres gestes du partage, pour ne pas fausser les compteurs d’un autre test */
-  await mesurerCompteurs(async () => {
-    await page.goto(`/v/${id}`);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  }, { lien_vu: 1 });
+  await mesurerCompteurs(
+    async () => {
+      await page.goto(`/v/${id}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    },
+    { lien_vu: 1 },
+  );
   expect(await texte(/^verdict/)).toBe("verdict\u00a0:");
   expect(await texte(/elle dit quoi/)).toBe("et la mienne, elle dit quoi\u00a0?");
   expect(await texte(/Leur conv reste privée/)).toContain("privée\u00a0: seul");

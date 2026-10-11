@@ -152,7 +152,12 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             chevron
           />
         )}
-        <InsetRow leading={<RowIcon icon="plus" tone="vrai" />} title={<span className="text-toi-ink">Nouvelle histoire</span>} sub="Une autre conv, un autre rapport" href="/commencer" />
+        <InsetRow
+          leading={<RowIcon icon="plus" tone="vrai" />}
+          title={<span className="text-toi-ink">Nouvelle histoire</span>}
+          sub="Une autre conv, un autre rapport"
+          href="/commencer"
+        />
       </InsetGroup>
 
       {/* L’abonnement */}
@@ -166,7 +171,9 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
                   {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.title : "Ton rapport"}
                   {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
                 </span>
-                <span className="text-legende font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.note : null}</span>
+                <span className="text-legende font-extrabold leading-[1.4] text-grey">
+                  {plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.note : null}
+                </span>
               </span>
               <Prix {...prixDe(sub.plan)} />
             </>
@@ -176,13 +183,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
           <InsetRow
             title="Mettre en pause"
             sub={souciPause ? "Pas enregistré\u00a0: vérifie ta connexion et réessaie." : "Ton histoire reste gardée, rien n’est facturé"}
-            trailing={
-              <Switch
-                checked={sub.paused}
-                label="Mettre en pause"
-                onChange={(v) => void mettreEnPause(v)}
-              />
-            }
+            trailing={<Switch checked={sub.paused} label="Mettre en pause" onChange={(v) => void mettreEnPause(v)} />}
           />
         )}
         {/* « Arrêter BLUSH+ » revient avec le paiement (Stripe) : sans lui, il n’y a rien à résilier côté serveur */}
@@ -211,14 +212,26 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       {/* TODO(produit): « Ta connexion », ses lignes et son pied sont absents des maquettes, à valider */}
       <InsetGroup title="Ta connexion" id="connexion" className="mt-6" footer={RIEN_N_EST_EFFACE}>
         <InsetRow leading={<RowIcon icon="user" />} title="Se déconnecter" sub="Sur cet appareil" onClick={() => setConfirm("sortie")} chevron />
-        <InsetRow leading={<RowIcon icon="shield" />} title="Se déconnecter de tous les appareils" sub="Un téléphone perdu, un ordi prêté" onClick={() => setConfirm("partout")} chevron />
+        <InsetRow
+          leading={<RowIcon icon="shield" />}
+          title="Se déconnecter de tous les appareils"
+          sub="Un téléphone perdu, un ordi prêté"
+          onClick={() => setConfirm("partout")}
+          chevron
+        />
       </InsetGroup>
 
       {/* Tes données : ce qui est gardé, puis les gestes qui effacent (en rouge) */}
       <InsetGroup title="Tes données" id="donnees" className="mt-6" footer={PROMESSE_DONNEES}>
         <InsetRow leading={<RowIcon icon="eye" tone="vrai" />} title="Ta conv, en sécurité" sub="Ce qui part, qui la lit, combien de temps" href="/confidentialite" chevron />
         <InsetRow leading={<RowIcon icon="lock" />} title="Ce que BLUSH garde" sub="Votre histoire analysée, sa fiche, tes notes" onClick={() => setConfirm("keep")} chevron />
-        <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title={`Supprimer l’histoire avec ${noms?.other.name ?? "elle"}`} sub="Le rapport, la fiche et les captures" onClick={() => setConfirm("story")} danger />
+        <InsetRow
+          leading={<RowIcon icon="trash" tone="danger" />}
+          title={`Supprimer l’histoire avec ${noms?.other.name ?? "elle"}`}
+          sub="Le rapport, la fiche et les captures"
+          onClick={() => setConfirm("story")}
+          danger
+        />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
 
@@ -272,9 +285,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             <h2 id="confirm-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
               {confirm === "sortie" ? "Se déconnecter\u00a0?" : "Se déconnecter de tous les appareils\u00a0?"}
             </h2>
-            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">
-              {confirm === "sortie" ? RIEN_N_EST_EFFACE : `Celui-ci compris. ${RIEN_N_EST_EFFACE}`}
-            </p>
+            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{confirm === "sortie" ? RIEN_N_EST_EFFACE : `Celui-ci compris. ${RIEN_N_EST_EFFACE}`}</p>
             {souci && <Alert>{souci}</Alert>}
             <Button
               aria-busy={busy}

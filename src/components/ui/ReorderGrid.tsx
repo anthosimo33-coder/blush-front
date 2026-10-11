@@ -206,7 +206,10 @@ export function ReorderGrid<T extends { id: string }>({
                 aria-label={textes.retirer(i + 1)}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onRemove(s.id)}
-                className={cn("absolute left-1.5 top-1.5 z-[1] flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.72)] transition-opacity", lifted && "opacity-0")}
+                className={cn(
+                  "absolute left-1.5 top-1.5 z-[1] flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.72)] transition-opacity",
+                  lifted && "opacity-0",
+                )}
               >
                 <Icon name="close" size={12} stroke={3} className="text-white" />
               </button>

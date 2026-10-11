@@ -52,8 +52,22 @@ const lignes = (bloc: string) => bloc.split("\n");
 const place = (bloc: string, fin: string) => lignes(bloc).findIndex((l) => l.endsWith(` : ${fin}`));
 
 /* Les mesures de toute la conv, puis celles des trois dernières semaines, chacune à ses nombres */
-const TOUTE_LA_CONV = { total: "Tom 41 · Inès 37", ouvre: "Tom 12 · Inès 9", reprend: "Tom 6 · Inès 2", relance: "Tom 4 · Inès 11", delai: "Tom 5 min · Inès 2,0 h", soir: "Tom 38 % · Inès 61 %" };
-const RECENTES = { total: "Tom 15 · Inès 10", ouvre: "Tom 8 · Inès 1", reprend: "Tom 21 · Inès 22", relance: "Tom 23 · Inès 24", delai: "Tom 17 min · Inès 26 min", mots: "Tom 27 · Inès 28" };
+const TOUTE_LA_CONV = {
+  total: "Tom 41 · Inès 37",
+  ouvre: "Tom 12 · Inès 9",
+  reprend: "Tom 6 · Inès 2",
+  relance: "Tom 4 · Inès 11",
+  delai: "Tom 5 min · Inès 2,0 h",
+  soir: "Tom 38 % · Inès 61 %",
+};
+const RECENTES = {
+  total: "Tom 15 · Inès 10",
+  ouvre: "Tom 8 · Inès 1",
+  reprend: "Tom 21 · Inès 22",
+  relance: "Tom 23 · Inès 24",
+  delai: "Tom 17 min · Inès 26 min",
+  mots: "Tom 27 · Inès 28",
+};
 const MESURES_DE_TEMPS = ["ouvre", "reprend", "relance", "delai", "soir"] as const;
 
 describe("le bloc <chiffres>", () => {

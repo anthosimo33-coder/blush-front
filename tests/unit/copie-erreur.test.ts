@@ -42,7 +42,9 @@ describe("copieDe", () => {
 
   it("une conv trop courte, sur des captures : en choisir plus, ici même, avec le seuil des captures", () => {
     const c = copieDe("courte", "/importer/captures", params("app=hinge&mode=ajout&erreur=courte"));
-    expect(c.text).toBe(`Il faut au moins ${MIN_MESSAGES_CAPTURES} messages pour un verdict juste. Ajoute des captures, depuis le début de votre conv, ou reviens dans quelques jours.`);
+    expect(c.text).toBe(
+      `Il faut au moins ${MIN_MESSAGES_CAPTURES} messages pour un verdict juste. Ajoute des captures, depuis le début de votre conv, ou reviens dans quelques jours.`,
+    );
     expect(c.action).toBe("Choisir plus de captures");
     expect(c.href).toBe("/importer/captures?app=hinge&mode=ajout");
     expect(c.back).toBe(c.href);

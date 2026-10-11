@@ -55,9 +55,7 @@ export default async function preparerLaBase(projet: TestProject): Promise<void>
     /* Une autre suite de tests l’a créée au même instant : elle est là, c’est ce qu’on voulait */
     if (code === "42P04") return preparerLaBase(projet);
     if (code === "ECONNREFUSED" || code === "ENOTFOUND" || code === "CONNECT_TIMEOUT")
-      throw new Error(
-        `Postgres est injoignable sur ${serveur.host} : lance-le (brew services start postgresql@16), ou donne une autre adresse dans DATABASE_URL_TEST`,
-      );
+      throw new Error(`Postgres est injoignable sur ${serveur.host} : lance-le (brew services start postgresql@16), ou donne une autre adresse dans DATABASE_URL_TEST`);
     throw new Error(`la base des tests ${nom} n’a pas pu être préparée sur ${serveur.host} : ${(e as Error).message}`);
   } finally {
     await admin.end();

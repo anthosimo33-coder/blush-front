@@ -1,4 +1,17 @@
-import { attendreLaScene, DESSIN, emailLibre, expect, lectureFaite, liensDe, mesurerCompteurs, noterLaFeuilleDuSysteme, ouvrirLePartage, partageDeFichiers, releverLePressePapiers, test } from "./aide";
+import {
+  attendreLaScene,
+  DESSIN,
+  emailLibre,
+  expect,
+  lectureFaite,
+  liensDe,
+  mesurerCompteurs,
+  noterLaFeuilleDuSysteme,
+  ouvrirLePartage,
+  partageDeFichiers,
+  releverLePressePapiers,
+  test,
+} from "./aide";
 
 /*
  * « Partager mon verdict » : la feuille de partage, depuis le rapport et depuis la révélation du verdict, et « En savoir
@@ -190,7 +203,11 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
     await expect(feuille.getByText("Chiffrée, lue seulement par l’IA")).toBeVisible();
     await expect(feuille.getByText("Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit.")).toBeVisible();
     await expect(feuille.getByText("Effacée après ton rapport")).toBeVisible();
-    await expect(feuille.getByText("La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.")).toBeVisible();
+    await expect(
+      feuille.getByText(
+        "La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.",
+      ),
+    ).toBeVisible();
     await expect(feuille.getByText("Rien ne sort sans toi")).toBeVisible();
     await expect(feuille.getByText("La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom.")).toBeVisible();
     /* Cette feuille ne crée aucun lien */

@@ -58,7 +58,10 @@ async function avancer(storyId: string, dernier: number | null) {
   const story = uneLigne(await db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), "stories:curseur");
   const c = contexteDe(story);
   if (!c || c.dernier >= dernier) return;
-  await db().update(schema.stories).set({ context: coffre.ecrire("stories.context", { ...c, dernier }), updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
+  await db()
+    .update(schema.stories)
+    .set({ context: coffre.ecrire("stories.context", { ...c, dernier }), updatedAt: new Date() })
+    .where(eq(schema.stories.id, storyId));
 }
 
 async function garder(story: Ligne, memoire: DonneesMemoire, messages: Message[], profil: string[]): Promise<Ajout> {
@@ -87,7 +90,10 @@ export async function depuisCaptures(story: Ligne, memoire: DonneesMemoire, imag
   const meta = metaDe(story);
   const h = histoireDe(meta);
   const j = aujourdhuiParis();
-  const a = await appeler(requeteCaptures({ prenom: h.utilisateur.prenom, autre: h.autre.prenom, appli: meta.appli, aujourdhui: j.t, images }), Sortie01, { storyId: story.id, etiquette: "captures" });
+  const a = await appeler(requeteCaptures({ prenom: h.utilisateur.prenom, autre: h.autre.prenom, appli: meta.appli, aujourdhui: j.t, images }), Sortie01, {
+    storyId: story.id,
+    etiquette: "captures",
+  });
   const lues = exigerSortie(a, () => new ErreurAjout("capture"));
   const profil = lues.profil.map((p) => p.trim()).filter(Boolean);
   const lus = lues.blocs.some((b) => b.messages.length);
@@ -99,15 +105,18 @@ export async function depuisCaptures(story: Ligne, memoire: DonneesMemoire, imag
 /** Ce que l’historique du chat affiche à la place des fichiers : « 3 captures », « ton export (12 nouveaux messages) ». */
 export function resumeAjout(a: Ajout, source: "captures" | "export", n: number): string {
   const quoi = source === "export" ? "ton export" : n > 1 ? `${n} captures` : "ta capture";
-  const detail = [a.messages ? `${a.messages} nouveau${a.messages > 1 ? "x" : ""} message${a.messages > 1 ? "s" : ""}` : "", a.profil ? "son profil" : ""].filter(Boolean).join(", ");
+  const detail = [a.messages ? `${a.messages} nouveau${a.messages > 1 ? "x" : ""} message${a.messages > 1 ? "s" : ""}` : "", a.profil ? "son profil" : ""]
+    .filter(Boolean)
+    .join(", ");
   return `(${quoi}${detail ? `\u00a0: ${detail}` : ""})`;
 }
 
 /** Ce qu’on a lu sur son profil, tel quel : la fin des lignes « profil de … » de l’ajout. */
-const profilLu = (a: Ajout) => a.lignes.flatMap((l) => {
-  const lue = lireLigne(l);
-  return lue?.profil ? [lue.texte.replaceAll(" ⏎ ", " ")] : [];
-});
+const profilLu = (a: Ajout) =>
+  a.lignes.flatMap((l) => {
+    const lue = lireLigne(l);
+    return lue?.profil ? [lue.texte.replaceAll(" ⏎ ", " ")] : [];
+  });
 
 /**
  * Pour sa fiche : on répond tout de suite avec ce qui a été lu (son profil, le nombre de nouveaux messages), et la

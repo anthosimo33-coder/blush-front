@@ -97,20 +97,22 @@ const APRES_LA_REPONSE = 750;
 export async function mesurerCompteurs<T>(geste: () => Promise<T>, attendus: Partial<Compteurs>, { avecEssais = false }: { avecEssais?: boolean } = {}): Promise<T> {
   const compares = COMPTEURS_PARTAGE.filter((k) => avecEssais || k !== "lien_essai");
   const voulu = Object.fromEntries(compares.map((k) => [k, attendus[k] ?? 0]));
-  return (await sql().begin(async (tx) => {
-    await tx`select pg_advisory_xact_lock(${VERROU_COMPTEURS})`;
-    const { jour } = (await tx<{ jour: string }[]>`select ((now() at time zone 'Europe/Paris')::date)::text as jour`)[0]!;
-    const avant = await compteursDepuis(tx, jour);
-    const resultat = await geste();
-    const ecart = async () => {
-      const apres = await compteursDepuis(tx, jour);
-      return Object.fromEntries(compares.map((k) => [k, apres[k] - avant[k]]));
-    };
-    await expect.poll(ecart, { message: "les compteurs du partage" }).toEqual(voulu);
-    await new Promise((r) => setTimeout(r, APRES_LA_REPONSE));
-    expect(await ecart(), "les compteurs du partage, y compris ceux faits après la réponse").toEqual(voulu);
-    return [resultat];
-  }))[0] as T;
+  return (
+    await sql().begin(async (tx) => {
+      await tx`select pg_advisory_xact_lock(${VERROU_COMPTEURS})`;
+      const { jour } = (await tx<{ jour: string }[]>`select ((now() at time zone 'Europe/Paris')::date)::text as jour`)[0]!;
+      const avant = await compteursDepuis(tx, jour);
+      const resultat = await geste();
+      const ecart = async () => {
+        const apres = await compteursDepuis(tx, jour);
+        return Object.fromEntries(compares.map((k) => [k, apres[k] - avant[k]]));
+      };
+      await expect.poll(ecart, { message: "les compteurs du partage" }).toEqual(voulu);
+      await new Promise((r) => setTimeout(r, APRES_LA_REPONSE));
+      expect(await ecart(), "les compteurs du partage, y compris ceux faits après la réponse").toEqual(voulu);
+      return [resultat];
+    })
+  )[0] as T;
 }
 
 /* ———— La feuille de partage du système ———— */

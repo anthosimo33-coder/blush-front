@@ -94,14 +94,21 @@ describe("les tâches d’une histoire", () => {
     expect(await prendre(t1)).not.toBeNull();
     expect(await prendre(t2)).toBeNull();
     /* La première abandonnée (battement périmé) : la seconde peut partir */
-    await db().update(schema.tasks).set({ heartbeatAt: sql`now() - interval '10 minutes'` }).where(eq(schema.tasks.id, t1));
+    await db()
+      .update(schema.tasks)
+      .set({ heartbeatAt: sql`now() - interval '10 minutes'` })
+      .where(eq(schema.tasks.id, t1));
     expect(await prendre(t2)).not.toBeNull();
   });
 });
 
 describe("le mode sobre", () => {
   const sortie = async (id: string) => dechiffrer<DonneesVerdict>((await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, id)))[0]!.data).sortie;
-  const plans = async (id: string) => db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
+  const plans = async (id: string) =>
+    db()
+      .select()
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
 
   it("n’existe pas sans alerte, même si le modèle le demande (un rejet : le rapport complet, payant)", async () => {
     const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: true, alerte: null } }), () => lue("04-ghosting.txt"));

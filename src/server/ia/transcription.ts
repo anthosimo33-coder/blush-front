@@ -92,7 +92,12 @@ export async function transcrire(
     fd.append("model", modele);
     fd.append("language", "fr");
     fd.append("file", fichier);
-    r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(enPanne);
+    r = await fetch(URL_MISTRAL, {
+      method: "POST",
+      headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` },
+      body: fd,
+      signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)),
+    }).catch(enPanne);
   } else {
     fd.append("model_id", modele);
     fd.append("language_code", "fr");
@@ -124,7 +129,8 @@ export async function transcrire(
   const dite = prestataire === "mistral" ? corps.usage?.prompt_audio_seconds : corps.words?.at(-1)?.end;
   const facturee = Math.max(duree, typeof dite === "number" && Number.isFinite(dite) ? dite : 0);
   if (facturee > duree * 1.1 + 1) journal("transcription plus longue que le vocal mesuré", { prestataire, mesuree: Math.round(duree), facturee: Math.round(facturee) }, "alerte");
-  if (compte && Math.ceil(facturee) > reservees) await auMieux(compter(cleDesSecondes(compte), LIMITES.secondesVocalParCompte, Math.ceil(facturee) - reservees), "secondes du vocal non comptées");
+  if (compte && Math.ceil(facturee) > reservees)
+    await auMieux(compter(cleDesSecondes(compte), LIMITES.secondesVocalParCompte, Math.ceil(facturee) - reservees), "secondes du vocal non comptées");
   await noterCout({ storyId, tache: "vocal_transcription", modele, entree: facturee, micros: (facturee / 60) * prixMinute * 1e6, ms: Date.now() - debut, payeur });
   return corps.text?.trim() ?? "";
 }

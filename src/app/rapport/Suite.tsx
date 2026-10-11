@@ -50,7 +50,9 @@ function EchecEcriture({ raison }: { raison: Echec }) {
   };
   return (
     <Card className="flex flex-col gap-2 p-[18px]">
-      <div role="alert" className="text-accent font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
+      <div role="alert" className="text-accent font-black leading-[1.3]">
+        La suite de ton rapport n’a pas pu s’écrire.
+      </div>
       <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
       {souci && <p className="m-0 text-note font-extrabold leading-[1.4] text-ink">{souci}</p>}
       {raison === "panne" && (
@@ -89,7 +91,13 @@ export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseD
           <div className="text-legende font-black text-grey">La suite de ton rapport s’écrit · {fermes.length} chapitres</div>
           <div ref={SUITE_ECRITURE} className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
             {fermes.map((c, k) => (
-              <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === fermes.length - 1} />
+              <LigneEcriture
+                key={c.number}
+                number={c.number}
+                title={enEcriture(c.number)?.title ?? c.tocTitle}
+                etat={enEcriture(c.number)?.etat ?? "attente"}
+                last={k === fermes.length - 1}
+              />
             ))}
           </div>
         </>

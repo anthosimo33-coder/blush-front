@@ -60,7 +60,8 @@ export const FEUILLE_CONFIDENTIALITE = {
   chiffree: { titre: "Chiffrée, lue seulement par l’IA", detail: "Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit." },
   effacee: {
     titre: "Effacée après ton rapport",
-    detail: "La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.",
+    detail:
+      "La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.",
   },
   partage: { titre: "Rien ne sort sans toi", detail: "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom." },
 } as const;

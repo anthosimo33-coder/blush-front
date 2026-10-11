@@ -94,7 +94,12 @@ describe("NoteIcone et NotePrivee", () => {
       </>,
     );
     /* Les gris par leurs tokens : muted (#8A8780) pour le cadenas doux, grey (#6B6862) pour les deux autres */
-    const icones = Array.from(container.querySelectorAll("svg")).map((s) => [s.getAttribute("width"), s.getAttribute("stroke"), s.getAttribute("class"), s.getAttribute("stroke-width")]);
+    const icones = Array.from(container.querySelectorAll("svg")).map((s) => [
+      s.getAttribute("width"),
+      s.getAttribute("stroke"),
+      s.getAttribute("class"),
+      s.getAttribute("stroke-width"),
+    ]);
     expect(icones).toEqual([
       ["16", "currentColor", "text-muted", "2.2"],
       ["15", "currentColor", "text-grey", "2.2"],

@@ -90,7 +90,11 @@ function convInventee(titre: string, noms: string[], n: number, dossier: string)
   return {
     participants: noms.map((nom) => ({ name: commeInstagram(nom) })),
     /* Du plus récent au plus ancien, comme Instagram */
-    messages: Array.from({ length: n }, (_, k) => ({ sender_name: commeInstagram(noms[k % noms.length]!), timestamp_ms: fin - k * 7 * 60e3, content: commeInstagram(PHRASES[k % PHRASES.length]!) })),
+    messages: Array.from({ length: n }, (_, k) => ({
+      sender_name: commeInstagram(noms[k % noms.length]!),
+      timestamp_ms: fin - k * 7 * 60e3,
+      content: commeInstagram(PHRASES[k % PHRASES.length]!),
+    })),
     title: commeInstagram(titre),
     thread_path: dossier.slice(dossier.indexOf("inbox/")),
   };
@@ -179,8 +183,7 @@ export async function suivreLesEnvois(page: Page): Promise<(chemin?: string) => 
         const corps = init.body;
         if (corps instanceof FormData) {
           const champs: Champ[] = [];
-          for (const [nom, v] of corps.entries())
-            champs.push(typeof v === "string" ? { nom, texte: v } : { nom, type: v.type, fichier: v.name, octets: await base64(v) });
+          for (const [nom, v] of corps.entries()) champs.push(typeof v === "string" ? { nom, texte: v } : { nom, type: v.type, fichier: v.name, octets: await base64(v) });
           envois.push({ chemin: url.pathname, champs });
         } else envois.push({ chemin: url.pathname, champs: [], texte: typeof corps === "string" ? corps : `[${Object.prototype.toString.call(corps)}]` });
       }

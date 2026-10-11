@@ -44,7 +44,11 @@ export type Lecture = {
  * qu’on soit ensemble, ou en couple avec `enCouple` ; puis « Lancer la lecture ») : elle devient la conv ouverte. Renvoie son identifiant. La lecture
  * tourne ensuite sur le serveur : attendreTaches (aide/base.ts) attend sa fin.
  */
-export async function lireUneConvParApi(page: Page, testInfo: TestInfo, { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false }: Lecture = {}): Promise<string> {
+export async function lireUneConvParApi(
+  page: Page,
+  testInfo: TestInfo,
+  { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false }: Lecture = {},
+): Promise<string> {
   const conv = exportWhatsApp(testInfo, { personnes, ajout });
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
@@ -87,8 +91,10 @@ export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreS
 
 /** Les sessions ouvertes du compte (0 : plus aucune, ou plus de compte). */
 export async function sessionsDe(email: string): Promise<number> {
-  const { n } = (await sql()<{ n: number }[]>`
-    select count(*)::int as n from sessions s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()}`)[0]!;
+  const { n } = (
+    await sql()<{ n: number }[]>`
+    select count(*)::int as n from sessions s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()}`
+  )[0]!;
   return n;
 }
 

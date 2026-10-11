@@ -196,7 +196,9 @@ test("Instagram : une conv trop courte choisie dans l’export complet, l’écr
 
   const erreur = page.getByRole("alertdialog", { name: "Votre conv est encore trop courte." });
   await expect(erreur).toBeVisible();
-  await expect(erreur.getByText("Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.")).toBeVisible();
+  await expect(
+    erreur.getByText("Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours."),
+  ).toBeVisible();
   await expect(page).toHaveURL(/\/importer\/export\?app=instagram&erreur=courte$/);
   await erreur.getByRole("link", { name: "Envoyer des captures" }).click();
   await expect(page).toHaveURL(/\/importer\/captures\?app=instagram$/);

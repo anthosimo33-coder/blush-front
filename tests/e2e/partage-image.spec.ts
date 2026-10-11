@@ -1,4 +1,17 @@
-import { DESSIN, ecrireABlush, expect, filDuChat, lectureBlushPlus, mesurerCompteurs, noterLaFeuilleDuSysteme, ouvrir, ouvrirLeRapport, partageDeFichiers, reponseAuGeste, test } from "./aide";
+import {
+  DESSIN,
+  ecrireABlush,
+  expect,
+  filDuChat,
+  lectureBlushPlus,
+  mesurerCompteurs,
+  noterLaFeuilleDuSysteme,
+  ouvrir,
+  ouvrirLeRapport,
+  partageDeFichiers,
+  reponseAuGeste,
+  test,
+} from "./aide";
 
 /*
  * « Partager en image » une réponse de BLUSH dans le chat (BLUSH+, une fois la mémoire faite), ou la chute d’un chapitre
@@ -47,11 +60,14 @@ test("« Partager en image » une réponse du chat : la story dessinée par le s
 
   await test.step("enregistrée : le fichier blush.png, et l’image comptée", async () => {
     /* « Enregistrer l’image » sur ordinateur ; « Enregistrer », à côté de « Partager », là où le navigateur sait partager un fichier */
-    const telechargement = await mesurerCompteurs(async () => {
-      const [fichier] = await Promise.all([page.waitForEvent("download"), feuille.getByRole("button", { name: /^Enregistrer/ }).click()]);
-      await expect(feuille.getByRole("button", { name: "Image enregistrée." })).toBeVisible();
-      return fichier;
-    }, { image_partagee: 1 });
+    const telechargement = await mesurerCompteurs(
+      async () => {
+        const [fichier] = await Promise.all([page.waitForEvent("download"), feuille.getByRole("button", { name: /^Enregistrer/ }).click()]);
+        await expect(feuille.getByRole("button", { name: "Image enregistrée." })).toBeVisible();
+        return fichier;
+      },
+      { image_partagee: 1 },
+    );
     expect(telechargement.suggestedFilename()).toBe("blush.png");
   });
 
@@ -70,7 +86,9 @@ test("« Partager cette phrase en image » : la chute d’un chapitre du rapport
 
   /* La chute du modèle factice, « Et voilà. » : le troisième bloc du chapitre (l’accroche, le récit, la chute) */
   await expect(chapitre2.getByText("Et voilà.")).toBeVisible();
-  const image = await reponseAuGeste(page, { chemin: "/api/partage/image", timeout: DESSIN }, () => chapitre2.getByRole("button", { name: "Partager cette phrase en image" }).click());
+  const image = await reponseAuGeste(page, { chemin: "/api/partage/image", timeout: DESSIN }, () =>
+    chapitre2.getByRole("button", { name: "Partager cette phrase en image" }).click(),
+  );
   expect(image.status()).toBe(200);
   expect(image.headers()["content-type"]).toBe("image/png");
   /* Le moment désigné par sa place dans le rapport du compte, jamais par son texte */

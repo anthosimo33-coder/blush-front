@@ -10,8 +10,25 @@ import { config, proxy } from "@/proxy";
  * est construite ici, les variables posées par cas. (Le guide de Next appelle unstable_doesProxyMatch ce que cette
  * version exporte encore sous le nom unstable_doesMiddlewareMatch.)
  */
-const OUTILS = ["/apercu", "/apercu/liste", "/apercu/accueil", "/apercu/fiche", "/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/carte", "/apercu/mail", "/apercu/demander", "/styleguide"];
-const VARIANTES = { "/commencer": "/commencer/fermee", "/email/code": "/email/code/fermee", "/connexion/code": "/connexion/code/fermee", "/importer/captures": "/importer/captures/fermee" };
+const OUTILS = [
+  "/apercu",
+  "/apercu/liste",
+  "/apercu/accueil",
+  "/apercu/fiche",
+  "/apercu/admin",
+  "/apercu/ecriture",
+  "/apercu/instagram",
+  "/apercu/carte",
+  "/apercu/mail",
+  "/apercu/demander",
+  "/styleguide",
+];
+const VARIANTES = {
+  "/commencer": "/commencer/fermee",
+  "/email/code": "/email/code/fermee",
+  "/connexion/code": "/connexion/code/fermee",
+  "/importer/captures": "/importer/captures/fermee",
+};
 
 /** Une requête pour `chemin`, qui demande `hote` (son en-tête Host, comme un navigateur), avec ces cookies et ces en-têtes. */
 const requete = (chemin: string, cookies: Record<string, string> = {}, hote = "www.askblush.com", entetes: Record<string, string> = {}) => {
@@ -36,7 +53,11 @@ describe("les outils de l’équipe : jamais sur Vercel", () => {
   it("sur Vercel, en ligne comme en préversion : la page introuvable (404), bêta fermée ou non", () => {
     vi.stubEnv("VERCEL", "1");
     const cibles = new Set<string | null>();
-    for (const [vercel, beta] of [["production", "1"], ["production", "0"], ["preview", "0"]]) {
+    for (const [vercel, beta] of [
+      ["production", "1"],
+      ["production", "0"],
+      ["preview", "0"],
+    ]) {
       vi.stubEnv("VERCEL_ENV", vercel);
       vi.stubEnv("BLUSH_BETA_FERMEE", beta);
       for (const url of OUTILS) {

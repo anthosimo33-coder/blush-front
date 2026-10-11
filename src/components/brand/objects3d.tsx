@@ -5,11 +5,38 @@ import { delai } from "@/lib/motion";
 type Stop = readonly [string, string];
 
 const SPHERE_STOPS = {
-  nacre: [["0", "#FFFFFF"], ["0.38", "#F3F1F7"], ["0.78", "#CEC8DB"], ["1", "#A79FBC"]],
-  opale: [["0", "#FFFFFF"], ["0.16", "#DDFFF5"], ["0.4", "#A3D3FF"], ["0.64", "#E4B2FF"], ["0.86", "#FFC49B"], ["1", "#E39A86"]],
-  rose: [["0", "#FFE3F1"], ["0.3", "#FF94C8"], ["0.7", "#E8358A"], ["1", "#9E0E4E"]],
-  vert: [["0", "#D2FFEC"], ["0.3", "#53E8B4"], ["0.7", "#12C08A"], ["1", "#067554"]],
-  bleu: [["0", "#E2F0FF"], ["0.3", "#7DB9FF"], ["0.7", "#3D8BFF"], ["1", "#1A55C4"]],
+  nacre: [
+    ["0", "#FFFFFF"],
+    ["0.38", "#F3F1F7"],
+    ["0.78", "#CEC8DB"],
+    ["1", "#A79FBC"],
+  ],
+  opale: [
+    ["0", "#FFFFFF"],
+    ["0.16", "#DDFFF5"],
+    ["0.4", "#A3D3FF"],
+    ["0.64", "#E4B2FF"],
+    ["0.86", "#FFC49B"],
+    ["1", "#E39A86"],
+  ],
+  rose: [
+    ["0", "#FFE3F1"],
+    ["0.3", "#FF94C8"],
+    ["0.7", "#E8358A"],
+    ["1", "#9E0E4E"],
+  ],
+  vert: [
+    ["0", "#D2FFEC"],
+    ["0.3", "#53E8B4"],
+    ["0.7", "#12C08A"],
+    ["1", "#067554"],
+  ],
+  bleu: [
+    ["0", "#E2F0FF"],
+    ["0.3", "#7DB9FF"],
+    ["0.7", "#3D8BFF"],
+    ["1", "#1A55C4"],
+  ],
 } satisfies Record<string, readonly Stop[]>;
 
 export type SphereKind = keyof typeof SPHERE_STOPS;
@@ -79,8 +106,7 @@ export function BubbleLogo({
 }: ObjProps & { dots?: boolean; animated?: boolean; layered?: boolean; glow?: boolean }) {
   const u = useSvgId("bp");
   const detail = size >= 44;
-  if ((layered ?? animated !== undefined) && dots)
-    return <LayeredBubbleLogo size={size} animated={!!animated} detail={detail} className={className} style={style} />;
+  if ((layered ?? animated !== undefined) && dots) return <LayeredBubbleLogo size={size} animated={!!animated} detail={detail} className={className} style={style} />;
   /*
    * L’ombre d’une perle. En petit (l’avatar du fil, sous chaque réponse), son flou est un dégradé radial : un
    * feGaussianBlur par perle se recalculait à chaque peinture de chaque avatar, pour un flou de moins d’un pixel.
@@ -152,9 +178,7 @@ export function BubbleLogo({
       {detail && glow && <ellipse data-glow="" cx="102" cy="168" rx="52" ry="6" fill="rgba(190,20,100,0.28)" filter={`url(#${u}c)`} />}
       <path d={BUBBLE_BODY} fill={`url(#${u}b)`} />
       <path d={BUBBLE_BODY} fill={`url(#${u}o)`} />
-      {detail && (
-        <path d="M66 141 Q100 151 140 142" fill="none" stroke="#FFC7E4" strokeWidth="3" strokeLinecap="round" opacity="0.65" filter={`url(#${u}d)`} />
-      )}
+      {detail && <path d="M66 141 Q100 151 140 142" fill="none" stroke="#FFC7E4" strokeWidth="3" strokeLinecap="round" opacity="0.65" filter={`url(#${u}d)`} />}
       <path d="M64 62 H136 A34 34 0 0 1 163 76 C135 69 96 69 58 84 A38 38 0 0 1 64 62 Z" fill={`url(#${u}h)`} opacity="0.75" />
       {detail && (
         <>
@@ -184,7 +208,14 @@ function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProp
       <span
         data-shade=""
         className="absolute rounded-full"
-        style={{ left: px((cx - 30 - 9) * k), top: px((115 - 40 - 2.6) * k + oy), width: px(18 * k), height: px(5.2 * k), background: "rgba(110,0,50,0.35)", filter: `blur(${px(1.4 * k)})` }}
+        style={{
+          left: px((cx - 30 - 9) * k),
+          top: px((115 - 40 - 2.6) * k + oy),
+          width: px(18 * k),
+          height: px(5.2 * k),
+          background: "rgba(110,0,50,0.35)",
+          filter: `blur(${px(1.4 * k)})`,
+        }}
       />
       <span data-pearl="" className="absolute block" style={{ left: px((cx - 13 - 30) * k), top: px((88 - 40) * k + oy), width: px(26 * k), height: px(26 * k) }}>
         <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ display: "block", overflow: "visible" }}>
@@ -210,7 +241,14 @@ function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProp
         <span
           data-glow=""
           className="absolute rounded-full"
-          style={{ left: px((102 - 52 - 30) * k), top: px((168 - 6 - 40) * k + oy), width: px(104 * k), height: px(12 * k), background: "rgba(190,20,100,0.28)", filter: `blur(${px(5 * k)})` }}
+          style={{
+            left: px((102 - 52 - 30) * k),
+            top: px((168 - 6 - 40) * k + oy),
+            width: px(104 * k),
+            height: px(12 * k),
+            background: "rgba(190,20,100,0.28)",
+            filter: `blur(${px(5 * k)})`,
+          }}
         />
       )}
       <BubbleLogo size={size} dots={false} glow={false} style={{ position: "absolute", left: 0, top: 0 }} />
@@ -289,7 +327,17 @@ function CheckBadge({ size, className, style }: ObjProps) {
       <ellipse cx="50" cy="98" rx="32" ry="4.5" fill="rgba(6,110,80,0.3)" filter={`url(#${u}f)`} />
       <circle cx="50" cy="50" r="46" fill={`url(#${u}g)`} />
       <ellipse cx="36" cy="27" rx="18" ry="10" transform="rotate(-30 36 27)" fill={`url(#${u}s)`} />
-      <path d="M30 53 L44 66 L71 37" fill="none" stroke="#065E44" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" transform="translate(0 3)" filter={`url(#${u}t)`} />
+      <path
+        d="M30 53 L44 66 L71 37"
+        fill="none"
+        stroke="#065E44"
+        strokeWidth="12"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.45"
+        transform="translate(0 3)"
+        filter={`url(#${u}t)`}
+      />
       <path d="M30 53 L44 66 L71 37" fill="none" stroke="#FFFFFF" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -314,19 +362,17 @@ export function CheckBurst({ size = 84, pop = false, className }: { size?: numbe
           key={i}
           aria-hidden="true"
           data-burst=""
-          style={
-            {
-              "--tx": `${p.tx}px`,
-              "--ty": `${p.ty}px`,
-              ...delai(p.d),
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              width: p.s,
-              height: p.s,
-              margin: `-${Math.floor(p.s / 2)}px 0 0 -${Math.floor(p.s / 2)}px`,
-            }
-          }
+          style={{
+            "--tx": `${p.tx}px`,
+            "--ty": `${p.ty}px`,
+            ...delai(p.d),
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: p.s,
+            height: p.s,
+            margin: `-${Math.floor(p.s / 2)}px 0 0 -${Math.floor(p.s / 2)}px`,
+          }}
         >
           <Sphere size={p.s} kind={p.kind} shadow={false} />
         </span>

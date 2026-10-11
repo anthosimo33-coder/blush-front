@@ -41,7 +41,12 @@ export function LienDiscret(props: { href: Route; children: ReactNode } | { onCl
       </Link>
     );
   return (
-    <button type="button" onClick={props.onClick} aria-haspopup={props.ouvreFeuille ? "dialog" : undefined} className={cn("relative after:absolute after:-inset-2 after:content-['']", LIEN_DISCRET)}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      aria-haspopup={props.ouvreFeuille ? "dialog" : undefined}
+      className={cn("relative after:absolute after:-inset-2 after:content-['']", LIEN_DISCRET)}
+    >
       {props.children}
     </button>
   );

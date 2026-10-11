@@ -12,7 +12,10 @@ import { Icon, type IconName } from "./icons";
 
 /* ———— Chip ———— */
 /** Ce qui fait une pastille : un lien (`href`), un bouton à bascule (`onClick`, le seul qu’on désactive), ou une étiquette. */
-type FormeChip = { href: Route; onClick?: undefined; disabled?: undefined } | { onClick: () => void; disabled?: boolean; href?: undefined } | { href?: undefined; onClick?: undefined; disabled?: undefined };
+type FormeChip =
+  | { href: Route; onClick?: undefined; disabled?: undefined }
+  | { onClick: () => void; disabled?: boolean; href?: undefined }
+  | { href?: undefined; onClick?: undefined; disabled?: undefined };
 
 /** Une pastille : un lien avec `href`, un bouton à bascule avec `onClick` (`disabled` possible), une étiquette sinon ; les aria-* et data-* vont sur l’élément. */
 export function Chip({
@@ -276,7 +279,10 @@ export function ChoiceTile({
       )}
     >
       {/* La pastille prend la couleur de globals.css : l’icône en plein, le fond à 31/255 (le 1F d’un hex, 12 %) */}
-      <span className="lift-badge flex size-9 items-center justify-center rounded-[18px]" style={{ color: `var(--${tone})`, background: `color-mix(in srgb, var(--${tone}) calc(100% * 31 / 255), transparent)` }}>
+      <span
+        className="lift-badge flex size-9 items-center justify-center rounded-[18px]"
+        style={{ color: `var(--${tone})`, background: `color-mix(in srgb, var(--${tone}) calc(100% * 31 / 255), transparent)` }}
+      >
         <Icon name={icon} size={20} />
       </span>
       <span className="text-legende font-black leading-[1.2]">{label}</span>

@@ -15,7 +15,9 @@ export default async function Page() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-[720px] flex-col gap-4 px-4 py-10 [background:var(--paper-light)]">
       <h1 className="text-[28px] font-black leading-tight">Les convs de test</h1>
-      <p className="text-detail font-bold text-grey">La passe finale des prompts, dans l’appli. Chaque conv{NBSP}: son rapport, l’accueil (les vraies réponses du chat déjà dans la conv) et sa fiche.</p>
+      <p className="text-detail font-bold text-grey">
+        La passe finale des prompts, dans l’appli. Chaque conv{NBSP}: son rapport, l’accueil (les vraies réponses du chat déjà dans la conv) et sa fiche.
+      </p>
       <ul className="flex flex-col gap-2.5">
         {tous.map(({ cas, data }) => {
           const v = data.payload.report.verdict;

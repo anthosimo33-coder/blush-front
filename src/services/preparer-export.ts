@@ -219,7 +219,15 @@ async function ouvrir(fichier: File): Promise<{ choix: Partie[] | "plusieurs"; n
     throw new ExportIllisible("fichier");
   });
   const lire = (noms: string[]) =>
-    Promise.all(noms.map(async (nom) => ({ nom, contenu: await lireEntree(fichier, entrees.find((e) => e.nom === nom)!) }))).catch((e: unknown) => {
+    Promise.all(
+      noms.map(async (nom) => ({
+        nom,
+        contenu: await lireEntree(
+          fichier,
+          entrees.find((e) => e.nom === nom)!,
+        ),
+      })),
+    ).catch((e: unknown) => {
       tracer("export:zip-illisible", e);
       throw new ExportIllisible("fichier");
     });
@@ -329,7 +337,12 @@ async function lireEntree(fichier: Blob, e: EntreeZip): Promise<string> {
   const de = e.local + 30 + tete.getUint16(26, true) + tete.getUint16(28, true);
   if (e.methode !== 0 && typeof DecompressionStream !== "undefined") {
     try {
-      return await new Response(fichier.slice(de, de + e.compresse).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+      return await new Response(
+        fichier
+          .slice(de, de + e.compresse)
+          .stream()
+          .pipeThrough(new DecompressionStream("deflate-raw")),
+      ).text();
     } catch {
       /* « deflate-raw » inconnu de ce navigateur (ou des octets abîmés, que fflate refusera aussi) : le chemin d’avant */
     }

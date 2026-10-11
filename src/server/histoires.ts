@@ -1,6 +1,18 @@
 import "server-only";
 import { and, desc, eq, getTableColumns, isNull } from "drizzle-orm";
-import { detecterFormat, erreurImport, lire, participantsDe, principaux, type Devinette, type Format, type Histoire, type Message, type Objectif, type Pronom } from "@prompts/lib/conv";
+import {
+  detecterFormat,
+  erreurImport,
+  lire,
+  participantsDe,
+  principaux,
+  type Devinette,
+  type Format,
+  type Histoire,
+  type Message,
+  type Objectif,
+  type Pronom,
+} from "@prompts/lib/conv";
 import { prenomDe } from "@prompts/lib/ajouts";
 import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
@@ -122,7 +134,15 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
  * Des captures, lues par le prompt 01 (src/server/captures.ts) : une histoire brouillon, comme un export. `secret` :
  * celui du cookie du brouillon, quand il est tiré de la clé de l’envoi (src/server/captures.ts, reprise).
  */
-export async function importerCaptures({ appli, t, secret = jeton() }: { appli: Meta["appli"]; t: TexteCaptures; secret?: string }): Promise<{ id: string; meta: Meta; secret: string }> {
+export async function importerCaptures({
+  appli,
+  t,
+  secret = jeton(),
+}: {
+  appli: Meta["appli"];
+  t: TexteCaptures;
+  secret?: string;
+}): Promise<{ id: string; meta: Meta; secret: string }> {
   const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
   const lu = lire(t.texte, { utilisateur: personne("Moi"), autre: personne(t.autre), format: "captures" });
   const err = erreurImport(lu, "captures");
@@ -206,7 +226,11 @@ export async function brouillonDe(secret: string): Promise<LigneEcran | null> {
 
 /** Les histoires du compte déjà lues, la plus récente d’abord (celles laissées avant la lecture n’y sont pas). */
 export async function histoiresDuCompte(userId: string): Promise<LigneEcran[]> {
-  return db().select(ECRAN).from(schema.stories).where(and(eq(schema.stories.userId, userId), lue)).orderBy(desc(schema.stories.createdAt));
+  return db()
+    .select(ECRAN)
+    .from(schema.stories)
+    .where(and(eq(schema.stories.userId, userId), lue))
+    .orderBy(desc(schema.stories.createdAt));
 }
 
 /**
@@ -275,7 +299,10 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
   const renomme = (p: Participant, k: 0 | 1): Participant => (prenom && k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p);
   const participants: Meta["participants"] = [renomme(avant.participants[0], 0), renomme(avant.participants[1], 1)];
   const meta = { ...avant, ...qui, participants };
-  await db().update(schema.stories).set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
+  await db()
+    .update(schema.stories)
+    .set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() })
+    .where(eq(schema.stories.id, id));
   return meta;
 }
 

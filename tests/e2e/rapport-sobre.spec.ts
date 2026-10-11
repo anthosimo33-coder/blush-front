@@ -97,4 +97,3 @@ test.fixme("une alerte : pas de scène du verdict, même avant que le rapport do
   await expect(page.getByRole("heading", { name: /^Étape \d sur \d/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Partager/ })).toHaveCount(0);
 });
-

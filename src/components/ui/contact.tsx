@@ -47,7 +47,19 @@ export function ContactRing({
       {children}
       <svg viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
         <circle cx="24" cy="24" r="21" fill="none" className="stroke-line" strokeWidth="3.5" />
-        {level && <circle cx="24" cy="24" r="21" fill="none" className="stroke-vrai" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(ring * (index + 1)) / levels.length} ${ring}`} {...ringProps} />}
+        {level && (
+          <circle
+            cx="24"
+            cy="24"
+            r="21"
+            fill="none"
+            className="stroke-vrai"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={`${(ring * (index + 1)) / levels.length} ${ring}`}
+            {...ringProps}
+          />
+        )}
       </svg>
       {enveloppe(
         <Avatar tone="elle" size={Math.round(size * 0.75)} fontSize={fontSize}>

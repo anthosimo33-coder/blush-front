@@ -49,10 +49,13 @@ function boxTransform(b: Box, base: Box) {
 /** Retire l’élément quand le ressort ne bouge presque plus : la vraie bulle reprend la main. */
 function landed(el: Element, sp: Spring, settle: number) {
   return new Promise<void>((resolve) =>
-    window.setTimeout(() => {
-      el.remove();
-      resolve();
-    }, Math.round(sp.duration * settle)),
+    window.setTimeout(
+      () => {
+        el.remove();
+        resolve();
+      },
+      Math.round(sp.duration * settle),
+    ),
   );
 }
 
@@ -87,7 +90,17 @@ export function flyText(text: string, from: Box, to: Box, a: BubbleLook, b: Bubb
   Object.assign(root.style, { left: "0px", top: "0px", width: "0px", height: "0px" });
   const layer = (look: BubbleLook, on: boolean) => {
     const bg = document.createElement("span");
-    Object.assign(bg.style, { position: "absolute", left: px(to.left), top: px(to.top), width: px(to.width), height: px(to.height), borderRadius: px(look.radius), background: look.background, boxShadow: look.ring ?? "none", transformOrigin: "0 0" });
+    Object.assign(bg.style, {
+      position: "absolute",
+      left: px(to.left),
+      top: px(to.top),
+      width: px(to.width),
+      height: px(to.height),
+      borderRadius: px(look.radius),
+      background: look.background,
+      boxShadow: look.ring ?? "none",
+      transformOrigin: "0 0",
+    });
     root.append(bg);
     bg.animate([{ transform: boxTransform(from, to) }, { transform: "none" }], frame);
     bg.animate([{ opacity: on ? 0 : 1 }, { opacity: on ? 1 : 0 }], fade);
@@ -178,16 +191,37 @@ export function pearlsOf(logo: Element) {
 export function bumpPearl(logo: Element, i: number, soft = false) {
   const { pearls, shades } = pearlsOf(logo);
   const ease = "cubic-bezier(0.3, 0.7, 0.4, 1)";
-  pearls[i]?.animate([{ transform: "none" }, { transform: `translateY(${soft ? -10 : -26}%) scale(${soft ? 1.08 : 1.24})`, offset: 0.35 }, { transform: "none" }], { duration: 360, easing: ease });
-  shades[i]?.animate([{ transform: "none", opacity: 1 }, { transform: "scale(0.6)", opacity: 0.4, offset: 0.35 }, { transform: "none", opacity: 1 }], { duration: 360, easing: ease });
+  pearls[i]?.animate([{ transform: "none" }, { transform: `translateY(${soft ? -10 : -26}%) scale(${soft ? 1.08 : 1.24})`, offset: 0.35 }, { transform: "none" }], {
+    duration: 360,
+    easing: ease,
+  });
+  shades[i]?.animate(
+    [
+      { transform: "none", opacity: 1 },
+      { transform: "scale(0.6)", opacity: 0.4, offset: 0.35 },
+      { transform: "none", opacity: 1 },
+    ],
+    { duration: 360, easing: ease },
+  );
 }
 
 /** Un « coucou » : les trois perles sautent une fois, l’une après l’autre. */
 export function wavePearls(logo: Element) {
   const { pearls, shades } = pearlsOf(logo);
   const ease = "cubic-bezier(0.45, 0, 0.55, 1)";
-  pearls.forEach((p, i) => p.animate([{ transform: "none" }, { transform: "translateY(-24%) scale(1.22)", offset: 0.38 }, { transform: "none" }], { duration: 720, delay: i * 110, easing: ease }));
-  shades.forEach((s, i) => s.animate([{ transform: "none", opacity: 1 }, { transform: "scale(0.55)", opacity: 0.35, offset: 0.38 }, { transform: "none", opacity: 1 }], { duration: 720, delay: i * 110, easing: ease }));
+  pearls.forEach((p, i) =>
+    p.animate([{ transform: "none" }, { transform: "translateY(-24%) scale(1.22)", offset: 0.38 }, { transform: "none" }], { duration: 720, delay: i * 110, easing: ease }),
+  );
+  shades.forEach((s, i) =>
+    s.animate(
+      [
+        { transform: "none", opacity: 1 },
+        { transform: "scale(0.55)", opacity: 0.35, offset: 0.38 },
+        { transform: "none", opacity: 1 },
+      ],
+      { duration: 720, delay: i * 110, easing: ease },
+    ),
+  );
 }
 
 /** La largeur d’un texte dans la police d’un champ. */

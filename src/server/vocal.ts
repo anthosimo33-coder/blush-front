@@ -32,7 +32,14 @@ export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRap
   /* Un vocal d’avant la version 2 n’en a pas : le coffre le relit en version 1 */
   const d = coffre.lire("vocals.data", v.data);
   return {
-    pret: { etat: "pret", audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix, sobre: d.sobre, lignes: d.lignes },
+    pret: {
+      etat: "pret",
+      audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`,
+      duree: v.dureeMs / 1000,
+      voix: v.voix,
+      sobre: d.sobre,
+      lignes: d.lignes,
+    },
     aJour: d.version >= VERSION_VOCAL,
     fait: v.createdAt,
   };
@@ -158,5 +165,12 @@ export async function statsVocal() {
     .leftJoin(schema.vocalEcoutes, and(eq(schema.vocalEcoutes.storyId, schema.vocals.storyId)))
     .groupBy(schema.vocals.voix)
     .orderBy(schema.vocals.voix);
-  return lignes.map((l) => ({ ...l, vocaux: Number(l.vocaux), ecoutes: Number(l.ecoutes), finis: Number(l.finis), reecoutes: Number(l.reecoutes), jusqua: l.jusqua == null ? null : Number(l.jusqua) }));
+  return lignes.map((l) => ({
+    ...l,
+    vocaux: Number(l.vocaux),
+    ecoutes: Number(l.ecoutes),
+    finis: Number(l.finis),
+    reecoutes: Number(l.reecoutes),
+    jusqua: l.jusqua == null ? null : Number(l.jusqua),
+  }));
 }

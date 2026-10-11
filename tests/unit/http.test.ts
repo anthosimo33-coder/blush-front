@@ -126,7 +126,8 @@ describe("reponseErreur", () => {
     expect(await reponse(new ErreurCaptures())).toEqual([422, { erreur: "capture" }]);
     expect(await reponse(new LectureRefusee("connexion"))).toEqual([401, { erreur: "connexion" }]);
     expect(await reponse(new ErreurPartage("sobre"))).toEqual([409, { erreur: "sobre" }]);
-    for (const e of [new ErreurImport("fichier"), new ErreurCaptures(), new LectureRefusee("trop"), new ErreurAjout("autre_conv"), new ErreurPartage("pas_pret")]) expect(e).toBeInstanceOf(ErreurPublique);
+    for (const e of [new ErreurImport("fichier"), new ErreurCaptures(), new LectureRefusee("trop"), new ErreurAjout("autre_conv"), new ErreurPartage("pas_pret")])
+      expect(e).toBeInstanceOf(ErreurPublique);
   });
 
   it("une erreur d’étape ne dit que son code public : le refus, le vocal, ou la panne", async () => {

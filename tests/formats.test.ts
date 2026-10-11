@@ -9,7 +9,15 @@ const PHRASES = ["tu fais quoi ce soir", "trop bien ahah", "on se voit samedi ?"
 const pad = (n: number) => String(n).padStart(2, "0");
 const h12 = (d: Date) => `${d.getUTCHours() % 12 || 12}:${pad(d.getUTCMinutes())}`;
 const ap = (d: Date) => (d.getUTCHours() < 12 ? "AM" : "PM");
-const [j, mo, a, aa, hh, mi, s] = [(d: Date) => d.getUTCDate(), (d: Date) => d.getUTCMonth() + 1, (d: Date) => d.getUTCFullYear(), (d: Date) => String(d.getUTCFullYear()).slice(2), (d: Date) => d.getUTCHours(), (d: Date) => pad(d.getUTCMinutes()), (d: Date) => pad(d.getUTCSeconds())];
+const [j, mo, a, aa, hh, mi, s] = [
+  (d: Date) => d.getUTCDate(),
+  (d: Date) => d.getUTCMonth() + 1,
+  (d: Date) => d.getUTCFullYear(),
+  (d: Date) => String(d.getUTCFullYear()).slice(2),
+  (d: Date) => d.getUTCHours(),
+  (d: Date) => pad(d.getUTCMinutes()),
+  (d: Date) => pad(d.getUTCSeconds()),
+];
 
 /** Les en-têtes WhatsApp selon le téléphone et sa langue (U+202F avant AM/PM, comme les exports récents). */
 const FORMATS: Record<string, (d: Date) => string> = {

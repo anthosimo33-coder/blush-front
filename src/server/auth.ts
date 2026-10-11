@@ -17,12 +17,7 @@ const SESSION_JOURS = 30;
 /** Les essais d’un code : au-delà, il ne vaut plus rien (prendreCode). */
 export const CODE_ESSAIS = 5;
 
-export const Email = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email()
-  .max(254);
+export const Email = z.string().trim().toLowerCase().email().max(254);
 
 export type Utilisateur = typeof schema.users.$inferSelect;
 
@@ -105,9 +100,10 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
  */
 export async function codeAccorde(email: string, ip: string): Promise<boolean> {
   const canonique = emailCanonique(email);
-  if ((await sousLaLimite(`code:email-ip:${canonique}:${ip}`, LIMITES.codeParEmailEtIp)) && (await sousLaLimite(`code:email:${canonique}`, LIMITES.codeParEmail)))
-    return true;
-  return (await sousLaLimite(`code:reserve-ip:${canonique}:${ip}`, LIMITES.codeReserveParEmailEtIp)) && (await sousLaLimite(`code:reserve:${canonique}`, LIMITES.codeReserveParEmail));
+  if ((await sousLaLimite(`code:email-ip:${canonique}:${ip}`, LIMITES.codeParEmailEtIp)) && (await sousLaLimite(`code:email:${canonique}`, LIMITES.codeParEmail))) return true;
+  return (
+    (await sousLaLimite(`code:reserve-ip:${canonique}:${ip}`, LIMITES.codeReserveParEmailEtIp)) && (await sousLaLimite(`code:reserve:${canonique}`, LIMITES.codeReserveParEmail))
+  );
 }
 
 /*
@@ -221,7 +217,9 @@ export async function compteDe(email: string): Promise<Utilisateur> {
 export async function ouvrirSession(userId: string): Promise<{ secret: string; expiresAt: Date }> {
   const secret = jeton();
   const expiresAt = new Date(Date.now() + SESSION_JOURS * 86400e3);
-  await db().insert(schema.sessions).values({ id: empreinte(secret), userId, expiresAt });
+  await db()
+    .insert(schema.sessions)
+    .values({ id: empreinte(secret), userId, expiresAt });
   return { secret, expiresAt };
 }
 
@@ -281,7 +279,9 @@ export async function compteRetireDeLaBeta(secret: string | undefined): Promise<
 export async function fermerSession(secret: string, { partout = false } = {}): Promise<void> {
   const s = schema.sessions;
   if (!partout) {
-    await db().delete(s).where(eq(s.id, empreinte(secret)));
+    await db()
+      .delete(s)
+      .where(eq(s.id, empreinte(secret)));
     return;
   }
   const duCompte = db()

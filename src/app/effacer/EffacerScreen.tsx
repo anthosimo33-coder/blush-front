@@ -87,9 +87,7 @@ export function EffacerScreen({ email }: { email: string }) {
         </>
       }
     >
-      {souci && !confirmer && (
-        <Alert>{souci}</Alert>
-      )}
+      {souci && !confirmer && <Alert>{souci}</Alert>}
       <NoteIcone icone="lock" ton="muted" className="text-legende">
         Une question{NBSP}? Écris-nous à{" "}
         <a href="mailto:bonjour@askblush.com" className="underline">

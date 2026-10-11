@@ -23,28 +23,20 @@ export async function purger(maintenant = new Date()) {
   /* Les tâches restent une fois finies : une histoire sans aucune tâche n’a jamais été lue */
   const jamaisLues = await db()
     .delete(schema.stories)
-    .where(
-      and(
-        isNotNull(schema.stories.userId),
-        lt(schema.stories.createdAt, il_y_a(1)),
-        not(PREDICATS.lue),
-      ),
-    )
+    .where(and(isNotNull(schema.stories.userId), lt(schema.stories.createdAt, il_y_a(1)), not(PREDICATS.lue)))
     .returning({ id: schema.stories.id });
   const convs = await db()
     .update(schema.stories)
     .set({ conv: null, convPurgedAt: maintenant })
-    .where(
-      and(
-        PREDICATS.convGardee,
-        lt(schema.stories.createdAt, il_y_a(30)),
-        PREDICATS.rapportPret,
-      ),
-    )
+    .where(and(PREDICATS.convGardee, lt(schema.stories.createdAt, il_y_a(30)), PREDICATS.rapportPret))
     .returning({ id: schema.stories.id });
   const sessions = await db().delete(schema.sessions).where(lt(schema.sessions.expiresAt, maintenant)).returning({ id: schema.sessions.id });
-  await db().delete(schema.loginCodes).where(lt(schema.loginCodes.expiresAt, il_y_a(1)));
-  await db().delete(schema.rateLimits).where(lt(schema.rateLimits.windowStart, il_y_a(2)));
+  await db()
+    .delete(schema.loginCodes)
+    .where(lt(schema.loginCodes.expiresAt, il_y_a(1)));
+  await db()
+    .delete(schema.rateLimits)
+    .where(lt(schema.rateLimits.windowStart, il_y_a(2)));
   await purgerLaListe(maintenant);
   return { brouillons: brouillons.length + jamaisLues.length, convs: convs.length, sessions: sessions.length };
 }

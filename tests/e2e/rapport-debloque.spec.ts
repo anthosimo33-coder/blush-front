@@ -1,5 +1,19 @@
 import type { Locator } from "@playwright/test";
-import { attendreMail, attendreTaches, CHAPITRES_FERMES, compteDe, connecterParApi, definirPlan, expect, lireUneConvParApi, nouvelInvite, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
+import {
+  attendreMail,
+  attendreTaches,
+  CHAPITRES_FERMES,
+  compteDe,
+  connecterParApi,
+  definirPlan,
+  expect,
+  lireUneConvParApi,
+  nouvelInvite,
+  ouvrirLeRapport,
+  PAIEMENT,
+  tachesDe,
+  test,
+} from "./aide";
 
 /*
  * Débloquer, en bêta (sans paiement) : seuls les emails de BLUSH_ACCES_LIBRE le peuvent. Un invité dont le compte est

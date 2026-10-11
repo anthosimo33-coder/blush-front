@@ -15,7 +15,11 @@ import { captures, memoire, msg } from "../aide/fabriques";
  * tout ce qui écrit ou relit une ligne doit rester identique à l’octet.
  */
 
-const empreinte = (x: unknown) => createHash("sha256").update(typeof x === "string" ? x : JSON.stringify(x)).digest("hex").slice(0, 16);
+const empreinte = (x: unknown) =>
+  createHash("sha256")
+    .update(typeof x === "string" ? x : JSON.stringify(x))
+    .digest("hex")
+    .slice(0, 16);
 
 /* Deux prénoms inventés ; des messages sur plusieurs lignes, des médias, un message géant, un message modifié */
 const debut = Date.UTC(2024, 1, 3, 8, 15, 0);
@@ -61,7 +65,10 @@ describe("les lignes de la conv, à l’octet", () => {
         autre: "Inès",
         blocs: [
           { repere: { date: "2024-02-20", heure: "21:05" }, messages: Array.from({ length: 12 }, (_, k) => msg(k % 2 ? "autre" : "moi", `capture ${k}`)) },
-          { repere: { date: "2024-02-21", heure: null }, messages: Array.from({ length: 12 }, (_, k) => msg(k % 2 ? "moi" : "autre", `suite ${k}`, { media: k === 3 ? "photo" : null })) },
+          {
+            repere: { date: "2024-02-21", heure: null },
+            messages: Array.from({ length: 12 }, (_, k) => msg(k % 2 ? "moi" : "autre", `suite ${k}`, { media: k === 3 ? "photo" : null })),
+          },
         ],
       }),
       { aujourdhui: "2024-02-22" },
@@ -131,7 +138,9 @@ describe("lib/ligne.ts : écrire une ligne, la relire", () => {
   });
 
   it("à l’octet : le jour de la semaine, l’heure, le nom, le texte sur une seule ligne", () => {
-    expect(ligneMessage({ id: "m0412", jour: "2026-03-02", heure: "23:41", nom: "Sophie", texte: "on se voit samedi ?" })).toBe("m0412 2026-03-02 lun. 23:41 Sophie : on se voit samedi ?");
+    expect(ligneMessage({ id: "m0412", jour: "2026-03-02", heure: "23:41", nom: "Sophie", texte: "on se voit samedi ?" })).toBe(
+      "m0412 2026-03-02 lun. 23:41 Sophie : on se voit samedi ?",
+    );
     expect(ligneMessage({ id: "m0413", jour: "2026-03-02", heure: "~23:50", nom: "Hugo", texte: "oui\ncarrément" })).toBe("m0413 2026-03-02 lun. ~23:50 Hugo : oui ⏎ carrément");
     expect(ligneProfil("m1080", "2026-03-15", "Sophie", "24 ans\nétudiante")).toBe("m1080 2026-03-15 dim. --:-- profil de Sophie : 24 ans ⏎ étudiante");
   });
@@ -143,11 +152,21 @@ describe("lib/ligne.ts : écrire une ligne, la relire", () => {
       { id: "m0042", jour: "2025-01-01", heure: "~00:01", nom: "Léa", texte: "" },
     ];
     for (const p of parties) expect(lireLigne(ligneMessage(p))).toEqual({ ...p, profil: false });
-    expect(lireLigne(ligneProfil("m0900", "2026-03-15", "Sophie", "aime le libanais"))).toMatchObject({ id: "m0900", nom: "profil de Sophie", texte: "aime le libanais", profil: true });
+    expect(lireLigne(ligneProfil("m0900", "2026-03-15", "Sophie", "aime le libanais"))).toMatchObject({
+      id: "m0900",
+      nom: "profil de Sophie",
+      texte: "aime le libanais",
+      profil: true,
+    });
   });
 
   it("ce qui n’est pas une ligne de message ne se relit pas", () => {
-    for (const l of ["[… 12 messages ne sont pas montrés ici]", "<conversation>", "m12 2024-01-01 lun. 10:00 Léa : trop court", "m0001 2024-01-01 lun. 10:00 Léa sans deux-points"]) {
+    for (const l of [
+      "[… 12 messages ne sont pas montrés ici]",
+      "<conversation>",
+      "m12 2024-01-01 lun. 10:00 Léa : trop court",
+      "m0001 2024-01-01 lun. 10:00 Léa sans deux-points",
+    ]) {
       expect(lireLigne(l)).toBeNull();
     }
     expect(estLigneMessage("m0001 2024-01-01 lun. 10:00 Léa : ok")).toBe(true);

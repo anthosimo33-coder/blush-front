@@ -159,7 +159,12 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
       <AvecLogoDuFil>
         {rows.map((r) =>
           r.kind === "day" ? (
-            <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-micro font-bold leading-4 text-grey first:-mt-2">
+            <p
+              key={r.key}
+              data-row={r.key}
+              data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined}
+              className="m-0 h-4 text-center text-micro font-bold leading-4 text-grey first:-mt-2"
+            >
               {r.at === null ? (
                 NBSP
               ) : (
@@ -264,7 +269,10 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
           {typing.node.body}
         </div>
       ) : (
-        <span data-a={intro ? "intro-tm" : undefined} className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}>
+        <span
+          data-a={intro ? "intro-tm" : undefined}
+          className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}
+        >
           {row.at === null ? NBSP : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
           {/* La réponse se partage en image (story), le prénom de l’autre masqué */}
           {row.from === "blush" && row.echange && (
@@ -367,7 +375,11 @@ function Coupure({ reponse }: { reponse: number }) {
   return (
     <span className="flex flex-col items-start gap-2.5">
       <span className="text-corps font-bold leading-[1.4]">j’ai eu un bug, renvoie-moi ça</span>
-      <button type="button" onClick={() => relancer(reponse)} className="lift lift-sm inline-flex h-9 items-center rounded-full bg-white px-3.5 text-legende font-black text-ink shadow-soft">
+      <button
+        type="button"
+        onClick={() => relancer(reponse)}
+        className="lift lift-sm inline-flex h-9 items-center rounded-full bg-white px-3.5 text-legende font-black text-ink shadow-soft"
+      >
         Réessayer
       </button>
     </span>
@@ -398,7 +410,9 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
             {
               body: (
                 <span className="flex flex-col gap-1">
-                  <span className="text-corps font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
+                  <span className="text-corps font-black leading-[1.3]">
+                    {IlOuElle(env.autre)} vient de répondre{NBSP}?
+                  </span>
                   <span className="text-note font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
                 </span>
               ),
@@ -419,7 +433,11 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
           body: (
             <span className="flex min-w-0 flex-col">
               {/* 7 · Le point creusé, rappelé au-dessus de ta question */}
-              {m.about && <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-legende font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">{m.about}</span>}
+              {m.about && (
+                <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-legende font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">
+                  {m.about}
+                </span>
+              )}
               <span className="whitespace-pre-wrap text-corps font-bold leading-[1.4]">{m.text}</span>
             </span>
           ),
@@ -434,7 +452,12 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
               {m.images.slice(0, 4).map((u, i) => (
                 <span key={u} className="relative block">
                   {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local d’un fichier choisi */}
-                  <img src={u} alt={`Capture ${i + 1}`} decoding="async" className={cn("block object-cover object-top", m.images.length > 1 ? "h-[150px] w-[112px]" : "h-[230px] w-[172px]")} />
+                  <img
+                    src={u}
+                    alt={`Capture ${i + 1}`}
+                    decoding="async"
+                    className={cn("block object-cover object-top", m.images.length > 1 ? "h-[150px] w-[112px]" : "h-[230px] w-[172px]")}
+                  />
                   {i === 3 && m.images.length > 4 && (
                     <span className="absolute inset-0 flex items-center justify-center bg-[rgba(17,17,20,0.55)] text-[20px] font-black text-white">+{m.images.length - 4}</span>
                   )}
@@ -505,7 +528,11 @@ function SendReply({ lines, why, shine = false }: { lines: string[]; why?: strin
       </span>
       <span className="flex flex-col items-start gap-[3px]">
         {lines.map((l, i) => (
-          <span key={i} data-shine={shine && i === 0 ? "" : undefined} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white">
+          <span
+            key={i}
+            data-shine={shine && i === 0 ? "" : undefined}
+            className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white"
+          >
             {l}
           </span>
         ))}

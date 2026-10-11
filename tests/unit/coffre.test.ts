@@ -36,21 +36,44 @@ const PLAN: Plan = {
   mode_sobre: false,
   these: "Elle avance, il recule.",
   decouvertes: [{ texte: "Elle écrit la première le matin.", preuves: ["m0001"] }],
-  chapitres: [{ numero: 2, titre: "Le premier verre", titre_court: "Le verre", surtitre: null, periode: "mars", scenes: [{ quand: "2 mars", quoi: "le verre", preuves: ["m0002"] }], epice: "doux" }],
+  chapitres: [
+    {
+      numero: 2,
+      titre: "Le premier verre",
+      titre_court: "Le verre",
+      surtitre: null,
+      periode: "mars",
+      scenes: [{ quand: "2 mars", quoi: "le verre", preuves: ["m0002"] }],
+      epice: "doux",
+    },
+  ],
 };
 const RAPPORT: Rapport = {
   alerte: null,
   mode_sobre: false,
   decouvertes: [],
   these: "Elle avance, il recule.",
-  chapitres: [{ numero: 2, titre: "Le premier verre", titre_court: "Le verre", surtitre: null, blocs: [{ type: "essentiel", texte: "Elle propose.", preuves: [], titre: null, niveau: null, items: null }] }],
+  chapitres: [
+    {
+      numero: 2,
+      titre: "Le premier verre",
+      titre_court: "Le verre",
+      surtitre: null,
+      blocs: [{ type: "essentiel", texte: "Elle propose.", preuves: [], titre: null, niveau: null, items: null }],
+    },
+  ],
   sobre: null,
 };
 const MEMOIRE: MemoireFaite = {
   alerte: null,
   rien_de_neuf: false,
   memoire: { ou_on_en_est: "Ils se voient jeudi.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [{ date: "2026-03-12", quoi: "le verre" }] },
-  fiche: { portrait: "drôle et directe", phrase: "Elle aime les plans simples.", phrase_courte: "Directe.", faits: [{ section: "aime", texte: "le café", preuves: ["m0002"], statut: "nouveau" }] },
+  fiche: {
+    portrait: "drôle et directe",
+    phrase: "Elle aime les plans simples.",
+    phrase_courte: "Directe.",
+    faits: [{ section: "aime", texte: "le café", preuves: ["m0002"], statut: "nouveau" }],
+  },
   niveau: null,
   questions: ["Tu lui proposes quoi ?"],
 };
@@ -79,7 +102,12 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
   "reports.plan": PLAN,
   "reports.data": { sortie: RAPPORT, chapitres: [CHAPITRE], sobre: null, lecture: { free: "1 min", full: "9 min" } },
   "reports.partiel": [CHAPITRE],
-  "memories.data": { etat: MEMOIRE, lignes: [["m0002", "m0002 2026-03-02 lun. 21:04 Léa : on se voit jeudi ?"]], suivant: 221, editions: { parToi: ["aime le café"], supprimees: [] } },
+  "memories.data": {
+    etat: MEMOIRE,
+    lignes: [["m0002", "m0002 2026-03-02 lun. 21:04 Léa : on se voit jeudi ?"]],
+    suivant: 221,
+    editions: { parToi: ["aime le café"], supprimees: [] },
+  },
   "chat_messages.data:toi": { texte: "elle m’a répondu ok", lignes: ["m0221 2026-03-11 mar. 09:12 Léa : ok"], affiche: "(1 capture) elle m’a répondu ok" },
   "chat_messages.data:blush": { reponse: { kind: "bubbles", bubbles: [{ text: "Un « ok » le matin, c’est bon signe." }] }, resume: "Un « ok » le matin, c’est bon signe." },
   "tasks.input": { date: "2026-03-11", dit: "elle m’a répondu ok", reponse: ["Un « ok » le matin, c’est bon signe."] },

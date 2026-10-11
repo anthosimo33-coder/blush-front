@@ -125,7 +125,12 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
     expect(fiche).toMatchObject({ person: { name: "Léa", initial: "L", pronoun: "elle" }, portrait: "La Taquine" });
     expect(fiche?.facts).toEqual([{ id: "f0", section: "aime", text: "Les crêpes", sourceLabel: "votre conv · 1 mars", sources: ["conv"] }]);
     expect(home?.quick).toEqual(["elle m’aime ?"]);
-    expect(home?.answers["elle m’aime ?"]).toEqual({ kind: "bubbles", bubbles: [{ text: "elle propose", messages: [SAMEDI] }], send: ["samedi 18h ça marche"], why: "tu dis oui, avec une heure" });
+    expect(home?.answers["elle m’aime ?"]).toEqual({
+      kind: "bubbles",
+      bubbles: [{ text: "elle propose", messages: [SAMEDI] }],
+      send: ["samedi 18h ça marche"],
+      why: "tu dis oui, avec une heure",
+    });
     const [quotidien, ouverture] = home?.script ?? [];
     expect(quotidien).toMatchObject({ mine: "je lui réponds quoi ?", answer: { incoming: [SAMEDI], bubbles: [{ text: "elle te tend la perche", messages: [] }] } });
     expect(ouverture).not.toHaveProperty("mine");
@@ -134,7 +139,15 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
 
   it("le mode sobre : le rapport doux de l’appli (ses libellés), sans chapitres", () => {
     const verdict: Verdict = { ...VERDICT, alerte: "detresse", mode_sobre: true, emoji: null };
-    const sobre = { intro: "On met les vannes de côté.", titre: "Ce qui se passe", faits: "Léa ne répond plus.", preuves: ["m0007"], reassurance: "Ce n’est pas toi.", gestes: ["Parle à un ami"], brouillon: null };
+    const sobre = {
+      intro: "On met les vannes de côté.",
+      titre: "Ce qui se passe",
+      faits: "Léa ne répond plus.",
+      preuves: ["m0007"],
+      reassurance: "Ce n’est pas toi.",
+      gestes: ["Parle à un ami"],
+      brouillon: null,
+    };
     const { payload } = apercuDe(sorties({ verdict, rapport: Sortie05.parse({ ...RAPPORT, alerte: "detresse", mode_sobre: true, chapitres: null, sobre }) }));
     expect(payload.report.chapters).toEqual([]);
     expect(payload.sober).toEqual(sobreAffiche({ sobre }));

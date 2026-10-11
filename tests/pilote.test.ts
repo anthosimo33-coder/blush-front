@@ -18,7 +18,12 @@ describe("le pilote de la base", () => {
     /* Tous les octets, le nul et 0xff compris */
     const octets = Buffer.from(Array.from({ length: 256 }, (_, k) => k));
     const quand = new Date("2026-10-10T08:15:30.123Z");
-    const s = (await db().insert(schema.stories).values({ messageCount: 3, meta: octets, conv: Buffer.alloc(0), createdAt: quand }).returning())[0]!;
+    const s = (
+      await db()
+        .insert(schema.stories)
+        .values({ messageCount: 3, meta: octets, conv: Buffer.alloc(0), createdAt: quand })
+        .returning()
+    )[0]!;
     ids.push(s.id);
     expect(Buffer.isBuffer(s.meta)).toBe(true);
     expect(s.meta.equals(octets)).toBe(true);
@@ -36,7 +41,12 @@ describe("le pilote de la base", () => {
     expect(typeof m1.id).toBe("number");
     expect(m2.id).toBeGreaterThan(m1.id);
     /* Une recherche sur un bytea (le paramètre part en binaire) */
-    const { n } = (await db().select({ n: count() }).from(schema.chatMessages).where(sql`${schema.chatMessages.storyId} = ${s.id} and ${schema.chatMessages.data} = ${octets}`))[0]!;
+    const { n } = (
+      await db()
+        .select({ n: count() })
+        .from(schema.chatMessages)
+        .where(sql`${schema.chatMessages.storyId} = ${s.id} and ${schema.chatMessages.data} = ${octets}`)
+    )[0]!;
     expect(n).toBe(2);
   });
 

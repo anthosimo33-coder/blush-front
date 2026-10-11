@@ -49,7 +49,11 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
           script={chat.echanges}
           plusAnciens={chat.plus}
           modeVocalInitial={chat.modeVocal}
-          contact={{ report: { verdict: report.verdict, level: report.level, trend: report.trend, nextStep: report.nextStep }, fiche: { person: fiche.person, summaryShort: fiche.summaryShort }, period: story.period }}
+          contact={{
+            report: { verdict: report.verdict, level: report.level, trend: report.trend, nextStep: report.nextStep },
+            fiche: { person: fiche.person, summaryShort: fiche.summaryShort },
+            period: story.period,
+          }}
           arrive={!arrived}
           fromReport={depuis === "rapport"}
           others={all.filter((c) => !c.current)}

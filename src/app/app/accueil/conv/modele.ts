@@ -141,7 +141,13 @@ export function echangesEnMsgs(script: EchangeScript[]): Msg[] {
     return [
       /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
       ...(ex.mine ? [{ type: "texte" as const, id: id(false), from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
-      { type: "reponse" as const, id: id(true), from: "blush" as const, result: ex.id ? { ...ex.answer, echange: ex.id } : ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
+      {
+        type: "reponse" as const,
+        id: id(true),
+        from: "blush" as const,
+        result: ex.id ? { ...ex.answer, echange: ex.id } : ex.answer,
+        ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }),
+      },
     ];
   });
 }

@@ -98,7 +98,10 @@ export function PaywallSheet({
               onClick={() => setSelected(o.id)}
               className={cn("lift flex items-center gap-3.5 rounded-[20px] bg-white px-4 py-4 text-left text-ink", on ? "shadow-selected" : "shadow-soft")}
             >
-              <span aria-hidden="true" className={cn("flex size-6 shrink-0 items-center justify-center rounded-full transition-colors", on ? "bg-ink" : "bg-white shadow-[inset_0_0_0_2px_#D6D2C8]")}>
+              <span
+                aria-hidden="true"
+                className={cn("flex size-6 shrink-0 items-center justify-center rounded-full transition-colors", on ? "bg-ink" : "bg-white shadow-[inset_0_0_0_2px_#D6D2C8]")}
+              >
                 {on && <span className="size-2 rounded-full bg-white" />}
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -128,9 +131,7 @@ export function PaywallSheet({
             Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.
           </p>
         )}
-        {souci && (
-          <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>
-        )}
+        {souci && <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>}
         <Button arrow loading={occupe} loadingLabel="Paiement en cours" onClick={() => void pay()}>
           Débloquer
         </Button>

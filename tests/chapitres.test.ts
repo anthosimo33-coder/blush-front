@@ -79,11 +79,25 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
     free: false,
     blocks: [
       { kind: "essential", text: "La seule fois où l’un de vous a posé la question, c’était elle." },
-      { kind: "seen", messages: [{ from: "elle", text: "au fait on est quoi toi et moi" }, { from: "toi", text: "mdr" }], factsAfter: ["Ses messages raccourcissent."] },
+      {
+        kind: "seen",
+        messages: [
+          { from: "elle", text: "au fait on est quoi toi et moi" },
+          { from: "toi", text: "mdr" },
+        ],
+        factsAfter: ["Ses messages raccourcissent."],
+      },
       { kind: "play", text: "Pose-lui la question, en face." },
     ],
   };
-  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({ number: n, title: titreDAttente(n, "Maëlys"), tocTitle: titreDAttente(n, "Maëlys"), free: false, locked: true, blocks: [] }));
+  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({
+    number: n,
+    title: titreDAttente(n, "Maëlys"),
+    tocTitle: titreDAttente(n, "Maëlys"),
+    free: false,
+    locked: true,
+    blocks: [],
+  }));
   const payload = (chapters: Chapter[], access: ReportPayload["access"]): ReportPayload => ({
     report: {
       storyId: "s",

@@ -43,7 +43,8 @@ export async function compter(cle: Cle): Promise<void> {
 
 /** Les robots qui ouvrent un lien pour en dessiner l’aperçu (WhatsApp, iMessage, Slack…) : pas des visites. */
 export const estUnRobot = (agent: string | null) =>
-  !agent || /bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|skype|linkedin|embedly|pinterest|iframely|signal|snapchat|instagram|headless/i.test(agent);
+  !agent ||
+  /bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|skype|linkedin|embedly|pinterest|iframely|signal|snapchat|instagram|headless/i.test(agent);
 
 /* Venu d’un verdict partagé : retenu 30 jours, pour compter son import (une marque, pas un identifiant) */
 const VENU = "blush-venu";

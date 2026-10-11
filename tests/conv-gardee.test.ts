@@ -13,12 +13,22 @@ const intro: M[] = [
 /* Les messages de la conv, de leur `type` (accueil/conv/modele.ts) */
 const texte = (id: number, text: string): M => ({ type: "texte", id, from: "toi", text });
 /** Une réponse de BLUSH, de l’échange `echange` (back-end) ou sans (l’aperçu). */
-const reponse = (id: number, echange?: number, plus: Stamp = {}): M => ({ type: "reponse", id, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "r" }], ...(echange ? { echange } : {}) }, ...plus });
+const reponse = (id: number, echange?: number, plus: Stamp = {}): M => ({
+  type: "reponse",
+  id,
+  from: "blush",
+  result: { kind: "bubbles", bubbles: [{ text: "r" }], ...(echange ? { echange } : {}) },
+  ...plus,
+});
 const niveau = (id: number): M => ({ type: "niveau", id, from: "event", level: "dit" });
 /** Un échange de l’historique (ton message, puis la réponse de BLUSH). */
 const echange = (e: number): M[] => [texte(idHistorique(e, false), `q${e}`), reponse(idHistorique(e, true), e)];
 const historique = (...es: number[]) => es.flatMap(echange);
-const conv = (msgs: M[], plus = false): Conv<M> => ({ msgs, plus, plusAncien: msgs.find((m) => m.id <= -1_000_000) ? Math.floor((-1_000_000 - msgs.find((m) => m.id <= -1_000_000)!.id) / 2) : null });
+const conv = (msgs: M[], plus = false): Conv<M> => ({
+  msgs,
+  plus,
+  plusAncien: msgs.find((m) => m.id <= -1_000_000) ? Math.floor((-1_000_000 - msgs.find((m) => m.id <= -1_000_000)!.id) / 2) : null,
+});
 const ids = (c: Conv<M>) => c.msgs.map((m) => m.id);
 
 describe("remonter", () => {

@@ -89,52 +89,51 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
           </Link>
         </header>
         <main className="flex flex-1 flex-col">
-
-        {step === 1 ? (
-          <>
-            <div className="flex flex-1 flex-col gap-3.5 px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
-              <div className="flex-1 lg:flex-none" />
-              {vocal && <div className="mb-3">{vocal}</div>}
-              <p className="m-0 text-[20px] font-extrabold leading-[1.45] text-soft">{data.intro}</p>
-              <h1 ref={titleRef} tabIndex={-1} className="m-0 text-titre-1 font-black leading-[1.08] tracking-[-0.02em] outline-none">
-                {data.title}
-              </h1>
-              <p className="m-0 text-accent font-bold leading-[1.45] text-soft">{data.facts}</p>
-              <p className="m-0 text-accent font-extrabold leading-[1.45] text-ink">{data.reassurance}</p>
-              <div className="flex-1 lg:flex-none" />
-            </div>
-            <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
-              <SoberButton onClick={() => setStep(2)}>{"Et maintenant\u00a0?"}</SoberButton>
-              <SoberLink onClick={() => setHelp(true)}>{data.helpLabel}</SoberLink>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-1 flex-col gap-[18px] px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
-              <h1 ref={titleRef} tabIndex={-1} className="m-0 text-[32px] font-black leading-[1.1] tracking-[-0.02em] outline-none">
-                Passe à autre chose, proprement.
-              </h1>
-              <ol className="m-0 flex list-none flex-col gap-[18px] p-0">
-                {data.steps.map((s, i) => (
-                  <li key={s} className="flex items-start gap-3.5">
-                    <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black text-soft shadow-[inset_0_0_0_2px_#D6D2C8]">{i + 1}</span>
-                    <span className="text-corps font-bold leading-[1.45]">{s}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="rounded-[20px] bg-white p-4 shadow-[inset_0_0_0_1.5px_var(--color-track)]">
-                <span className="text-legende font-extrabold text-grey">{data.draftLabel}</span>
-                <p className="m-0 mt-1.5 text-corps font-bold leading-[1.45]">{data.draft}</p>
+          {step === 1 ? (
+            <>
+              <div className="flex flex-1 flex-col gap-3.5 px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
+                <div className="flex-1 lg:flex-none" />
+                {vocal && <div className="mb-3">{vocal}</div>}
+                <p className="m-0 text-[20px] font-extrabold leading-[1.45] text-soft">{data.intro}</p>
+                <h1 ref={titleRef} tabIndex={-1} className="m-0 text-titre-1 font-black leading-[1.08] tracking-[-0.02em] outline-none">
+                  {data.title}
+                </h1>
+                <p className="m-0 text-accent font-bold leading-[1.45] text-soft">{data.facts}</p>
+                <p className="m-0 text-accent font-extrabold leading-[1.45] text-ink">{data.reassurance}</p>
+                <div className="flex-1 lg:flex-none" />
               </div>
-            </div>
-            <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
-              <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
-              <SoberLink onClick={() => void mettreEnPause()}>
-                Mettre mon abonnement en pause
-              </SoberLink>
-            </div>
-          </>
-        )}
+              <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
+                <SoberButton onClick={() => setStep(2)}>{"Et maintenant\u00a0?"}</SoberButton>
+                <SoberLink onClick={() => setHelp(true)}>{data.helpLabel}</SoberLink>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-1 flex-col gap-[18px] px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
+                <h1 ref={titleRef} tabIndex={-1} className="m-0 text-[32px] font-black leading-[1.1] tracking-[-0.02em] outline-none">
+                  Passe à autre chose, proprement.
+                </h1>
+                <ol className="m-0 flex list-none flex-col gap-[18px] p-0">
+                  {data.steps.map((s, i) => (
+                    <li key={s} className="flex items-start gap-3.5">
+                      <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black text-soft shadow-[inset_0_0_0_2px_#D6D2C8]">
+                        {i + 1}
+                      </span>
+                      <span className="text-corps font-bold leading-[1.45]">{s}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="rounded-[20px] bg-white p-4 shadow-[inset_0_0_0_1.5px_var(--color-track)]">
+                  <span className="text-legende font-extrabold text-grey">{data.draftLabel}</span>
+                  <p className="m-0 mt-1.5 text-corps font-bold leading-[1.45]">{data.draft}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
+                <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
+                <SoberLink onClick={() => void mettreEnPause()}>Mettre mon abonnement en pause</SoberLink>
+              </div>
+            </>
+          )}
         </main>
       </div>
 

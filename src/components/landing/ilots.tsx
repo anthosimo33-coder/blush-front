@@ -125,7 +125,13 @@ export function Demandes({ demandes }: { demandes: Demande[] }) {
             {/* La réponse s’ouvre d’un coup et apparaît en fondu, une fois les questions presque posées ; fermée, elle sort du clavier et des lecteurs d’écran */}
             <div id={`${base}-${i}`} role="region" aria-labelledby={`${base}-${i}-q`} className={cn("grid", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
               <div inert={!on || undefined} className="min-h-0 overflow-hidden">
-                <div data-reponse="" className={cn("mx-auto max-w-[500px] pb-7 pt-3 transition-[opacity,transform] duration-300 ease-out", on ? "translate-y-0 opacity-100 delay-150" : "-translate-y-2 opacity-0")}>
+                <div
+                  data-reponse=""
+                  className={cn(
+                    "mx-auto max-w-[500px] pb-7 pt-3 transition-[opacity,transform] duration-300 ease-out",
+                    on ? "translate-y-0 opacity-100 delay-150" : "-translate-y-2 opacity-0",
+                  )}
+                >
                   <div className="flex flex-col gap-2 rounded-[26px] bg-white p-3.5 text-left text-ink shadow-[0_30px_70px_-30px_rgba(0,0,0,0.8)] lg:p-4">{a.reponse}</div>
                 </div>
               </div>

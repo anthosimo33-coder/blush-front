@@ -55,7 +55,11 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
   const desktop = useDesktop();
   return (
     <header ref={headRef} className="pointer-events-none sticky top-0 z-20 shrink-0 lg:hidden home-head">
-      <span aria-hidden="true" data-c="bg" className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]" />
+      <span
+        aria-hidden="true"
+        data-c="bg"
+        className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]"
+      />
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-start px-4 pb-5 pt-[max(6px,env(safe-area-inset-top))]">
         <div data-c="acc" className="pointer-events-auto mt-3 flex">
           <span data-a="acc" className="flex">
@@ -94,7 +98,10 @@ export function BarreDeLaFenetre({ contact, others, busy, ouvrirDetails, entete 
         {others.length > 0 ? (
           <ConvsButton others={others} flat />
         ) : (
-          <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-note font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
+          <Link
+            href="/rapport"
+            className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-note font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]"
+          >
             <Icon name="back" size={16} stroke={2.6} className="text-ink" />
             Ton rapport
           </Link>

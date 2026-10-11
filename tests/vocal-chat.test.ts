@@ -62,24 +62,48 @@ const vocal = (nom: string, type = nom.endsWith(".webm") ? "audio/webm" : "audio
 const envoyerVocal = (f: File, flux = false) => {
   const fd = new FormData();
   fd.append("vocal", f);
-  return POST(new Request("http://localhost/api/chat", { method: "POST", headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...(flux ? { accept: "application/x-ndjson" } : {}) }, body: fd }));
+  return POST(
+    new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...(flux ? { accept: "application/x-ndjson" } : {}) },
+      body: fd,
+    }),
+  );
 };
 const envoyerTexte = (texte: string) =>
-  POST(new Request("http://localhost/api/chat", { method: "POST", headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ texte }) }));
+  POST(
+    new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "content-type": "application/json", accept: "application/x-ndjson" },
+      body: JSON.stringify({ texte }),
+    }),
+  );
 const lancerApres = async () => {
   while (etat.apres.length) await etat.apres.shift()!();
 };
 const cle = (nom: "vocal" | "voix" | "vocal:secondes") => cleDeLimiteDuCompte(nom, compte.email);
 /** Un vocal de tests/aide/vocaux, lu comme le lit la route (sa durée, et ce qui part à la transcription). */
 const lu = async (nom: string) => (await lireVocal(vocal(nom))) as VocalLu;
-const usages = () => db().select().from(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+const usages = () =>
+  db()
+    .select()
+    .from(schema.aiUsage)
+    .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
 const oublierLesCompteurs = () =>
   db()
     .delete(schema.rateLimits)
     .where(inArray(schema.rateLimits.key, [empreinte(`limite:${cle("vocal")}`), empreinte(`limite:${cle("voix")}`), empreinte(`limite:${cle("vocal:secondes")}`)]));
 /* Le mois de la voix : chaque test qui le remplit le vide ensuite (le mois du test, et ses alertes) */
 const MOIS = { fenetreS: 40 * 86400 };
-const oublierLeMois = () => db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, [cleDuMoisDeLaVoix(), `${cleDuMoisDeLaVoix()}:alerte:1`, `${cleDuMoisDeLaVoix()}:alerte:0.8`].map((c) => empreinte(`limite:${c}`))));
+const oublierLeMois = () =>
+  db()
+    .delete(schema.rateLimits)
+    .where(
+      inArray(
+        schema.rateLimits.key,
+        [cleDuMoisDeLaVoix(), `${cleDuMoisDeLaVoix()}:alerte:1`, `${cleDuMoisDeLaVoix()}:alerte:0.8`].map((c) => empreinte(`limite:${c}`)),
+      ),
+    );
 
 beforeAll(async () => {
   compte = await compteDeTest("vocal-chat", "blushplus");
@@ -99,7 +123,9 @@ afterEach(async () => {
   etat.prestataire = false;
 });
 afterAll(async () => {
-  await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+  await db()
+    .delete(schema.aiUsage)
+    .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
   await oublierLesCompteurs();
   await oublierLeMois();
 });
@@ -153,7 +179,9 @@ describe("un vocal reçu (S-15) : mesuré avant d’être transcrit", () => {
       expect(appels).not.toHaveBeenCalled();
       expect(await compteDe(cle("vocal"), LIMITES.vocalParCompte)).toBe(0);
     } finally {
-      await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte(`limite:${depense}`)));
+      await db()
+        .delete(schema.rateLimits)
+        .where(eq(schema.rateLimits.key, empreinte(`limite:${depense}`)));
       oublierLeBudget();
     }
   });
@@ -240,14 +268,23 @@ describe("la voix (S-13) : un texte coupé, dans le budget du compte et du mois"
     await planifier(id, "vocal");
     await avecFactice(compteur, () => executerChaine(id));
     const derniere = async () =>
-      (await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "vocal"))).orderBy(schema.tasks.createdAt)).at(-1)!;
+      (
+        await db()
+          .select()
+          .from(schema.tasks)
+          .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "vocal")))
+          .orderBy(schema.tasks.createdAt)
+      ).at(-1)!;
     /* Le script du vocal (prompt 06) n’est pas écrit */
     expect(taches).not.toContain("06-vocal");
     expect(await derniere()).toMatchObject({ status: "echec", error: "voix_budget", attempts: 0 });
     expect(await vocalAJour(id)).toBe(false);
     /* Le lendemain : le jour du compte repart de zéro, la tâche aussi */
     await oublierLesCompteurs();
-    await db().update(schema.tasks).set({ updatedAt: new Date(Date.now() - 2 * 86400e3) }).where(eq(schema.tasks.id, (await derniere()).id));
+    await db()
+      .update(schema.tasks)
+      .set({ updatedAt: new Date(Date.now() - 2 * 86400e3) })
+      .where(eq(schema.tasks.id, (await derniere()).id));
     await avecFactice(compteur, () => executerChaine(id));
     expect(taches.filter((t) => t === "06-vocal")).toHaveLength(1);
     expect(await derniere()).toMatchObject({ status: "fini" });
@@ -263,24 +300,42 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
    * identifiant. Les variantes : sans identifiant, la voix en panne (`voix`) ou sans alignement, l’effacement qui répond
    * `effacement`, la transcription dont le dernier mot finit à `fin` secondes.
    */
-  function simuler({ sansIdentifiant = false, voix = 200, sansAlignement = false, effacement = 200, fin }: { sansIdentifiant?: boolean; voix?: number; sansAlignement?: boolean; effacement?: number; fin?: number } = {}) {
+  function simuler({
+    sansIdentifiant = false,
+    voix = 200,
+    sansAlignement = false,
+    effacement = 200,
+    fin,
+  }: { sansIdentifiant?: boolean; voix?: number; sansAlignement?: boolean; effacement?: number; fin?: number } = {}) {
     const appels: { url: string; methode: string; corps?: string; cle?: string }[] = [];
     envoye = undefined;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init: RequestInit = {}) => {
-        appels.push({ url, methode: init.method ?? "GET", corps: typeof init.body === "string" ? init.body : undefined, cle: new Headers(init.headers).get("xi-api-key") ?? undefined });
+        appels.push({
+          url,
+          methode: init.method ?? "GET",
+          corps: typeof init.body === "string" ? init.body : undefined,
+          cle: new Headers(init.headers).get("xi-api-key") ?? undefined,
+        });
         if (init.method === "DELETE") return effacement === 200 ? Response.json({ status: "ok" }) : new Response(null, { status: effacement });
         if (url.includes("/v1/text-to-speech/")) {
           if (voix !== 200) return new Response(null, { status: voix });
           const { text } = JSON.parse(String(init.body)) as { text: string };
           const c = [...text];
           const alignment = { characters: c, character_start_times_seconds: c.map((_, i) => i * 0.05), character_end_times_seconds: c.map((_, i) => (i + 1) * 0.05) };
-          return Response.json({ audio_base64: Buffer.from("son").toString("base64"), ...(sansAlignement ? {} : { alignment }) }, { headers: sansIdentifiant ? {} : { "history-item-id": "element42" } });
+          return Response.json(
+            { audio_base64: Buffer.from("son").toString("base64"), ...(sansAlignement ? {} : { alignment }) },
+            { headers: sansIdentifiant ? {} : { "history-item-id": "element42" } },
+          );
         }
         if (url.includes("/v1/speech-to-text")) {
           envoye = (init.body as FormData).get("file") as File;
-          return Response.json({ text: " bon elle m’a répondu ", ...(sansIdentifiant ? {} : { transcription_id: "transcription42" }), ...(fin ? { words: [{ text: "bon", end: fin }] } : {}) });
+          return Response.json({
+            text: " bon elle m’a répondu ",
+            ...(sansIdentifiant ? {} : { transcription_id: "transcription42" }),
+            ...(fin ? { words: [{ text: "bon", end: fin }] } : {}),
+          });
         }
         return new Response(null, { status: 404 });
       }),
@@ -300,7 +355,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
     await lancerApres();
     expect(appels.slice(1)).toEqual([{ url: "https://api.elevenlabs.io/v1/history/element42", methode: "DELETE", cle: "cle-fictive" }]);
     expect((await usages()).map((u) => [u.task, u.model, u.outputTokens, u.costMicros > 0])).toEqual([["vocal_voix", "eleven_v4", corps.text.length, true]]);
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
   });
 
   it("un vocal transcrit : ce qui part est l’Ogg réécrit, la transcription est effacée après, sa durée et son coût sont notés", async () => {
@@ -313,7 +370,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
     expect(appels.slice(1)).toEqual([{ url: "https://api.elevenlabs.io/v1/speech-to-text/transcripts/transcription42", methode: "DELETE", cle: "cle-fictive" }]);
     expect((await usages()).map((u) => [u.task, u.model, u.inputTokens, u.costMicros > 0])).toEqual([["vocal_transcription", "scribe_v1", 3, true]]);
     expect(await compteDe(cle("vocal:secondes"), LIMITES.secondesVocalParCompte)).toBe(4);
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
   });
 
   it("une transcription facturée plus longue que le vocal mesuré : la durée facturée est notée et comptée pour le compte", async () => {
@@ -323,7 +382,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
     expect(alertes.mock.calls.flat().join("\n")).toContain("transcription plus longue que le vocal mesuré");
     expect((await usages()).map((u) => [u.task, u.inputTokens])).toEqual([["vocal_transcription", 600]]);
     expect(await compteDe(cle("vocal:secondes"), LIMITES.secondesVocalParCompte)).toBe(600);
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
   });
 
   it("une voix ou une transcription réussie sans identifiant : rien à effacer, une alerte au journal (une fois par jour)", async () => {
@@ -336,7 +397,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
     const lignes = alertes.mock.calls.flat().filter((l) => String(l).includes("sans identifiant"));
     expect(lignes).toHaveLength(2);
     expect(lignes.join("\n")).toMatch(/voix[\s\S]*transcription/);
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
   });
 
   it("la voix en panne (rien de facturé) : les caractères sont rendus ; facturée mais illisible : ils restent comptés, et notés", async () => {
@@ -349,7 +412,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
     await expect(dire("Bon. Hugo, assieds-toi.", "A", { sobre: false, storyId: id })).rejects.toMatchObject({ code: "voix_sans_alignement" });
     expect(await compteDe(cle("voix"), LIMITES.voixParCompte)).toBe("Bon. Hugo, assieds-toi.".length);
     expect((await usages()).map((u) => u.task)).toEqual(["vocal_voix"]);
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
     await oublierLeMois();
   });
 
@@ -367,7 +432,9 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
       vi.restoreAllMocks();
       vi.unstubAllGlobals();
     }
-    await db().delete(schema.aiUsage).where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
+    await db()
+      .delete(schema.aiUsage)
+      .where(and(eq(schema.aiUsage.storyId, id), inArray(schema.aiUsage.task, ETIQUETTES)));
     await oublierLeMois();
   });
 });

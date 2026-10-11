@@ -12,7 +12,12 @@ vi.mock("@/server/db", async (original) => ({
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: () =>
-          Promise.reject(Object.assign(new Error("Failed query: insert into counters\nparams: lea@exemple.test"), { name: "DrizzleQueryError", cause: Object.assign(new Error("lea@exemple.test"), { code: "57P01" }) })),
+          Promise.reject(
+            Object.assign(new Error("Failed query: insert into counters\nparams: lea@exemple.test"), {
+              name: "DrizzleQueryError",
+              cause: Object.assign(new Error("lea@exemple.test"), { code: "57P01" }),
+            }),
+          ),
       }),
     }),
   }),
@@ -56,7 +61,16 @@ describe("les pannes du serveur, au journal", () => {
     expect(levee).toBeInstanceOf(ErreurTache);
     expect((levee as ErreurTache).code).toBe("transcription");
     expect(lignes).toEqual([
-      { evenement: "transcription en échec", niveau: "erreur", prestataire: "mistral", statut: 0, panne: "reseau", erreur: "TypeError", cause: "Error", codeCause: "UND_ERR_CONNECT_TIMEOUT" },
+      {
+        evenement: "transcription en échec",
+        niveau: "erreur",
+        prestataire: "mistral",
+        statut: 0,
+        panne: "reseau",
+        erreur: "TypeError",
+        cause: "Error",
+        codeCause: "UND_ERR_CONNECT_TIMEOUT",
+      },
     ]);
     expect(brut).not.toContain("exemple.test");
   });

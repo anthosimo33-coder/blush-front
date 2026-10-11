@@ -13,19 +13,7 @@ import { LogoIlot } from "./LogoIlot";
  */
 
 /* ———— Barre du haut mobile : retour · titre · progression ———— */
-export function MobileTopBar({
-  back,
-  title,
-  progress,
-  right,
-  className,
-}: {
-  back?: BackTarget;
-  title?: string;
-  progress?: number;
-  right?: ReactNode;
-  className?: string;
-}) {
+export function MobileTopBar({ back, title, progress, right, className }: { back?: BackTarget; title?: string; progress?: number; right?: ReactNode; className?: string }) {
   return (
     <header className={cn("flex h-[60px] shrink-0 items-center gap-2 px-4 lg:hidden", className)}>
       {back ? <BoutonRetour target={back} /> : <span className="size-11" />}
@@ -181,7 +169,17 @@ export function Screen({
     <div
       ref={ref}
       className={cn("mx-auto flex min-h-dvh w-full flex-col md:max-w-[560px] lg:max-w-none", className)}
-      style={{ "--main-w": `${mainWidth}px`, "--aside-w": `${asideWidth}px`, "--cols-gap": `${columnsGap}px`, "--gap": `${contentGap}px`, "--footer-w": `${footerWidth}px`, "--top-pad": `${desktopTopPad}px`, "--frame-w": `${frameW}px`, "--aside-mt": `${asideMt}px`, "--gap-m": `${mobileGap ?? contentGap}px` }}
+      style={{
+        "--main-w": `${mainWidth}px`,
+        "--aside-w": `${asideWidth}px`,
+        "--cols-gap": `${columnsGap}px`,
+        "--gap": `${contentGap}px`,
+        "--footer-w": `${footerWidth}px`,
+        "--top-pad": `${desktopTopPad}px`,
+        "--frame-w": `${frameW}px`,
+        "--aside-mt": `${asideMt}px`,
+        "--gap-m": `${mobileGap ?? contentGap}px`,
+      }}
     >
       {mobileTop}
       <DesktopHeader right={desktopHeaderRight} />
@@ -208,7 +206,14 @@ export function Screen({
               {head}
             </div>
           )}
-          <div className={cn("flex flex-1 flex-col gap-[var(--gap-m)] px-[22px] lg:flex-none lg:gap-[var(--gap)] lg:p-0", head ? "mt-[var(--gap-m)] lg:mt-0" : "pt-1", !footer && "pb-6", centered && "lg:w-full")}>
+          <div
+            className={cn(
+              "flex flex-1 flex-col gap-[var(--gap-m)] px-[22px] lg:flex-none lg:gap-[var(--gap)] lg:p-0",
+              head ? "mt-[var(--gap-m)] lg:mt-0" : "pt-1",
+              !footer && "pb-6",
+              centered && "lg:w-full",
+            )}
+          >
             {!head && top}
             {children}
           </div>

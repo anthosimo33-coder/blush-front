@@ -29,7 +29,23 @@ export const MIN_SUITES = 1000;
 export const TAILLE = 10;
 
 /* Les entités nommées qu’un build écrit (React n’échappe que & < > " ', les autres viennent d’un texte écrit à la main) */
-const ENTITES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", laquo: "«", raquo: "»", ldquo: "“", rdquo: "”", hellip: "…", ndash: "–", mdash: "—" };
+const ENTITES = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  rsquo: "’",
+  lsquo: "‘",
+  laquo: "«",
+  raquo: "»",
+  ldquo: "“",
+  rdquo: "”",
+  hellip: "…",
+  ndash: "–",
+  mdash: "—",
+};
 const point = (code) => {
   try {
     return String.fromCodePoint(code);
@@ -51,7 +67,7 @@ export function decoder(contenu) {
   for (let passe = 0; passe < 3; passe++) {
     const avant = t;
     t = t
-      .replace(ECHAPPEMENT, (_, accolades, u, x, blanc, litteral) => (litteral ?? (blanc ? " " : point(parseInt(accolades ?? u ?? x, 16)))))
+      .replace(ECHAPPEMENT, (_, accolades, u, x, blanc, litteral) => litteral ?? (blanc ? " " : point(parseInt(accolades ?? u ?? x, 16))))
       .replace(/&#x([0-9a-f]+);/gi, (_, h) => point(parseInt(h, 16)))
       .replace(/&#(\d+);/g, (_, d) => point(Number(d)))
       .replace(/&([a-z]+);/gi, (m, nom) => ENTITES[nom.toLowerCase()] ?? m);
@@ -73,17 +89,19 @@ const BALISE = /<\/?[a-z][a-z0-9-]*(?:\s+[a-z_:@][\w:.-]*(?:\s*=\s*(?:"[^"<>]*"|
  * glisse `<!-- -->` entre deux morceaux d’un texte, et une phrase mise en forme a ses `<strong>`), des deux côtés.
  */
 export function mots(texte) {
-  return texte
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(BALISE, " ")
-    .toLowerCase()
-    .normalize("NFC")
-    .replace(/[’‘]/g, "'")
-    .replace(/[^\p{L}\p{N}']+/gu, " ")
-    .split(" ")
-    /* Une apostrophe au bord d’un mot est un guillemet (une chaîne 'entre apostrophes' du JavaScript) */
-    .map((m) => m.replace(/^'+|'+$/g, ""))
-    .filter(Boolean);
+  return (
+    texte
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(BALISE, " ")
+      .toLowerCase()
+      .normalize("NFC")
+      .replace(/[’‘]/g, "'")
+      .replace(/[^\p{L}\p{N}']+/gu, " ")
+      .split(" ")
+      /* Une apostrophe au bord d’un mot est un guillemet (une chaîne 'entre apostrophes' du JavaScript) */
+      .map((m) => m.replace(/^'+|'+$/g, ""))
+      .filter(Boolean)
+  );
 }
 
 /** Les suites de TAILLE mots d’une liste de mots, avec la place de leur premier mot. */
@@ -139,13 +157,7 @@ export const ENCODAGES = {
   "chaîne JSON": (ph) => JSON.stringify(ph),
   "chaîne JavaScript en ASCII (\\uXXXX)": enAscii,
   "page HTML (entités, commentaires de React)": (ph) =>
-    `<p>${ph
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#x27;")
-      .replace(/ /, " <!-- -->")}</p>`,
+    `<p>${ph.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/ /, " <!-- -->")}</p>`,
   "flux RSC dans une page (échappé deux fois)": (ph) => `<script>self.__next_f.push([1,${JSON.stringify(ligneRsc(JSON.stringify(ph)))}])</script>`,
   "flux RSC en ASCII dans une page (\\uXXXX échappé deux fois)": (ph) => `<script>self.__next_f.push([1,${JSON.stringify(ligneRsc(enAscii(ph)))}])</script>`,
 };
@@ -187,7 +199,10 @@ export function verifier(dossierNext) {
   if (index.size < MIN_SUITES) return { problemes: [`${index.size} suites de ${TAILLE} mots tirées des prompts (${MIN_SUITES} au moins) : prompts/ est-il bien là ?`], ...lu };
   const manquees = canari(textes, index);
   if (manquees.length) return { problemes: [`le canari n’est pas retrouvé (${manquees.join(", ")}) : la vérification ne verrait pas une fuite écrite ainsi`], ...lu };
-  const cibles = [...fichiers(join(dossierNext, "static"), (p) => /\.(js|css|json|txt|html)$/.test(p)), ...fichiers(join(dossierNext, "server/app"), (p) => /\.(html|rsc|body|meta)$/.test(p))];
+  const cibles = [
+    ...fichiers(join(dossierNext, "static"), (p) => /\.(js|css|json|txt|html)$/.test(p)),
+    ...fichiers(join(dossierNext, "server/app"), (p) => /\.(html|rsc|body|meta)$/.test(p)),
+  ];
   if (!cibles.length) return { problemes: [`aucun fichier envoyé au navigateur dans ${dossierNext} : rien n’a été vérifié`], ...lu };
   const problemes = [];
   for (const f of cibles) {
@@ -213,5 +228,7 @@ if (lanceCommeScript()) {
     console.error(`✗ Vérification des prompts dans ce que reçoit le navigateur :\n${problemes.join("\n")}`);
     process.exit(1);
   }
-  console.log(`✓ Aucune phrase des prompts dans ${cibles} fichiers envoyés au navigateur (${nbSuites} suites de ${TAILLE} mots cherchées, sur tout le texte des ${prompts} prompts, canari retrouvé).`);
+  console.log(
+    `✓ Aucune phrase des prompts dans ${cibles} fichiers envoyés au navigateur (${nbSuites} suites de ${TAILLE} mots cherchées, sur tout le texte des ${prompts} prompts, canari retrouvé).`,
+  );
 }

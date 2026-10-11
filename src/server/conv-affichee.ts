@@ -26,7 +26,16 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
   const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });
   const source: Source = meta.captures
-    ? { id: "s1", app: meta.appli, mode: "captures", screenshotCount: meta.captures, label: `${APPLIS[meta.appli]} · ${meta.captures} captures`, period: periode, messageCount: total, voiceCount: vocaux }
+    ? {
+        id: "s1",
+        app: meta.appli,
+        mode: "captures",
+        screenshotCount: meta.captures,
+        label: `${APPLIS[meta.appli]} · ${meta.captures} captures`,
+        period: periode,
+        messageCount: total,
+        voiceCount: vocaux,
+      }
     : {
         id: "s1",
         app: meta.appli,

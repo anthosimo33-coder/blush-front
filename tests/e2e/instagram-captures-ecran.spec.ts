@@ -289,9 +289,17 @@ test.fixme("captures : après Suppr ou la croix au clavier, le focus reste dans 
   await capture(page, 2, 4).focus();
   await page.keyboard.press("Delete");
   await expect(capture(page, 3, 3)).toBeVisible();
-  await expect(grilleDesCaptures(page).getByRole("button", { name: /^Capture \d+ sur 3$/ }).and(page.locator(":focus"))).toHaveCount(1);
+  await expect(
+    grilleDesCaptures(page)
+      .getByRole("button", { name: /^Capture \d+ sur 3$/ })
+      .and(page.locator(":focus")),
+  ).toHaveCount(1);
   await page.getByRole("button", { name: "Retirer la capture 1", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(capture(page, 2, 2)).toBeVisible();
-  await expect(grilleDesCaptures(page).getByRole("button", { name: /^Capture \d+ sur 2$/ }).and(page.locator(":focus"))).toHaveCount(1);
+  await expect(
+    grilleDesCaptures(page)
+      .getByRole("button", { name: /^Capture \d+ sur 2$/ })
+      .and(page.locator(":focus")),
+  ).toHaveCount(1);
 });

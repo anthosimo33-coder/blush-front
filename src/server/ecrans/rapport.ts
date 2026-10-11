@@ -82,7 +82,12 @@ function bloc(b: Chapitre["blocs"][number], messages: Map<string, Message>): Cha
         }),
       };
     case "duo":
-      return { kind: "duo", title: b.titre ?? "", text: texte, trophies: items.map((i) => ({ title: i.titre ?? "", text: i.texte ?? "", side: i.cote === "toi" ? "toi" : "elle" })) };
+      return {
+        kind: "duo",
+        title: b.titre ?? "",
+        text: texte,
+        trophies: items.map((i) => ({ title: i.titre ?? "", text: i.texte ?? "", side: i.cote === "toi" ? "toi" : "elle" })),
+      };
     case "scenarios":
       return { kind: "scenarios", items: items.map((i) => ({ title: i.titre ?? "", text: i.texte ?? "", tag: i.tag ?? "probable" })) };
     case "plan":
@@ -127,5 +132,14 @@ export const lectureDe = (chapitres: Chapter[]): { free: string; full: string } 
 export function sobreAffiche(r: Pick<Rapport, "sobre">): SoberReport | null {
   if (!r.sobre) return null;
   const s = r.sobre;
-  return { intro: s.intro, title: s.titre, facts: s.faits, reassurance: s.reassurance, steps: s.gestes, draftLabel: LIBELLES_RAPPORT.brouillon, draft: s.brouillon ?? "", helpLabel: LIBELLES_RAPPORT.aide };
+  return {
+    intro: s.intro,
+    title: s.titre,
+    facts: s.faits,
+    reassurance: s.reassurance,
+    steps: s.gestes,
+    draftLabel: LIBELLES_RAPPORT.brouillon,
+    draft: s.brouillon ?? "",
+    helpLabel: LIBELLES_RAPPORT.aide,
+  };
 }

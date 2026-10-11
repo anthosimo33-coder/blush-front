@@ -149,7 +149,10 @@ describe("useSuiviLecture", () => {
   });
 
   it("une lecture arrêtée par une panne : l’échec ; « Relancer » la relance et la suit de nouveau", async () => {
-    suivi.mockResolvedValueOnce(enCours(0)).mockResolvedValueOnce({ ...enCours(1), failed: true, failReason: "panne" }).mockResolvedValue(enCours(2));
+    suivi
+      .mockResolvedValueOnce(enCours(0))
+      .mockResolvedValueOnce({ ...enCours(1), failed: true, failReason: "panne" })
+      .mockResolvedValue(enCours(2));
     const { result } = renderHook(() => useSuiviLecture());
     await arriver();
     expect(result.current.echec).toBe(true);

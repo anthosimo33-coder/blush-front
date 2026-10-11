@@ -53,7 +53,10 @@ export async function seConnecterAdmin(page: Page, { timeout = RESEAU }: { timeo
 export async function partageIllisible(): Promise<{ id: string; effacer: () => Promise<void> }> {
   /* Les octets d’un chiffré de BLUSH (la version 1, puis du bruit) : la version passe, l’authentification échoue */
   const illisible = () => Buffer.concat([Buffer.from([1]), randomBytes(48)]);
-  const id = randomBytes(9).toString("base64").replace(/[^a-zA-Z0-9]/g, "x").slice(0, 12);
+  const id = randomBytes(9)
+    .toString("base64")
+    .replace(/[^a-zA-Z0-9]/g, "x")
+    .slice(0, 12);
   const story = (await sql()<{ id: string }[]>`insert into stories (message_count, meta) values (64, ${illisible()}) returning id`)[0]!;
   await sql()`insert into shares (id, story_id, data) values (${id}, ${story.id}, ${illisible()})`;
   return { id, effacer: async () => void (await sql()`delete from stories where id = ${story.id}`) };

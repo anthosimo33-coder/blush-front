@@ -22,7 +22,10 @@ describe("une tâche « bloquée » au tableau de bord", () => {
 
   it("sans battement depuis PERIME_S (90 s), pas avant", async () => {
     const sansBattementDepuis = async (secondes: number) => {
-      await db().update(schema.tasks).set({ heartbeatAt: sql`now() - make_interval(secs => ${secondes})` }).where(inArray(schema.tasks.id, taches));
+      await db()
+        .update(schema.tasks)
+        .set({ heartbeatAt: sql`now() - make_interval(secs => ${secondes})` })
+        .where(inArray(schema.tasks.id, taches));
       return (await statsAdmin(1)).sante.bloquees;
     };
     const a60s = await sansBattementDepuis(PERIME_S - 30);

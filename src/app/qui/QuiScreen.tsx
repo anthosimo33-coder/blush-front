@@ -109,7 +109,6 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
         </>
       }
     >
-
       {captures ? (
         /* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
         <label className="flex flex-col gap-2">
@@ -124,38 +123,38 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
           />
         </label>
       ) : (
-      <RadioGroup label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
-        {people.map((p, i) => {
-          const me = j.me === p.id;
-          /* Bleu = toi, rose = elle : la couleur suit le rôle choisi. */
-          const tone = j.me ? (me ? "toi" : "elle") : i === 0 ? "toi" : "elle";
-          return (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={me}
-              onClick={() => set({ me: p.id })}
-              /* Hauteur fixe : avatar et prénom centrés dans la carte, « c’est moi » posé en bas sans rien décaler */
-              className={cn(
-                "lift relative flex h-[156px] flex-1 flex-col items-center justify-center gap-2 rounded-[26px] bg-white px-3 pb-4 text-ink",
-                me ? "shadow-selected" : "shadow-soft",
-              )}
-            >
-              {me && (
-                <span className="absolute right-3 top-3">
-                  <SelectedCheck />
-                </span>
-              )}
-              <Avatar tone={tone} size={58} fontSize={24} className="lift-pop">
-                {p.initial}
-              </Avatar>
-              <span className="text-carte font-black">{p.name}</span>
-              {me && <span className="absolute inset-x-0 bottom-3.5 text-center text-micro font-extrabold text-grey">c’est moi</span>}
-            </button>
-          );
-        })}
-      </RadioGroup>
+        <RadioGroup label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
+          {people.map((p, i) => {
+            const me = j.me === p.id;
+            /* Bleu = toi, rose = elle : la couleur suit le rôle choisi. */
+            const tone = j.me ? (me ? "toi" : "elle") : i === 0 ? "toi" : "elle";
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={me}
+                onClick={() => set({ me: p.id })}
+                /* Hauteur fixe : avatar et prénom centrés dans la carte, « c’est moi » posé en bas sans rien décaler */
+                className={cn(
+                  "lift relative flex h-[156px] flex-1 flex-col items-center justify-center gap-2 rounded-[26px] bg-white px-3 pb-4 text-ink",
+                  me ? "shadow-selected" : "shadow-soft",
+                )}
+              >
+                {me && (
+                  <span className="absolute right-3 top-3">
+                    <SelectedCheck />
+                  </span>
+                )}
+                <Avatar tone={tone} size={58} fontSize={24} className="lift-pop">
+                  {p.initial}
+                </Avatar>
+                <span className="text-carte font-black">{p.name}</span>
+                {me && <span className="absolute inset-x-0 bottom-3.5 text-center text-micro font-extrabold text-grey">c’est moi</span>}
+              </button>
+            );
+          })}
+        </RadioGroup>
       )}
 
       {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. Absent des maquettes, relu le 8 octobre */}

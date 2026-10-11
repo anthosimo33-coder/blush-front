@@ -98,7 +98,10 @@ function build(ac: AudioContext): Chain {
 /* Hors du geste : la réverbération (sa préparation par le navigateur est synchrone, quelques ms) */
 function remplirLaPiece(c: Chain) {
   if (c.room.buffer) return;
-  const { sr, piece: [g, d] } = echantillons(c.ac.sampleRate);
+  const {
+    sr,
+    piece: [g, d],
+  } = echantillons(c.ac.sampleRate);
   const b = c.ac.createBuffer(2, g.length, sr);
   b.getChannelData(0).set(g);
   b.getChannelData(1).set(d);
@@ -190,7 +193,10 @@ function grain(o: Out, t: number, into: AudioNode, f: number, peak: number, d: n
   bp.type = "bandpass";
   bp.frequency.value = f;
   bp.Q.value = 0.8;
-  src.connect(bp).connect(env(o, t, peak, 0.0006, d)).connect(into);
+  src
+    .connect(bp)
+    .connect(env(o, t, peak, 0.0006, d))
+    .connect(into);
   src.start(t, Math.random() * 0.5);
   src.stop(t + d + 0.02);
   o.nodes.push(src);
@@ -211,7 +217,10 @@ function toucher(o: Out, t: number, n: Extract<Note, { k: "toucher" }>) {
   c.connect(env(o, t, 0.42 * v, 0.002, d)).connect(lp);
   const tr = osc(o, "triangle", f, t, t + d * 0.6 + 0.05);
   tr.connect(env(o, t, 0.08 * v * br, 0.002, d * 0.5)).connect(lp);
-  if (n.opale) osc(o, "sine", f * 2.004, t, t + d * 1.6 + 0.1).connect(env(o, t, 0.05 * v, 0.006, d * 1.6)).connect(lp);
+  if (n.opale)
+    osc(o, "sine", f * 2.004, t, t + d * 1.6 + 0.1)
+      .connect(env(o, t, 0.05 * v, 0.006, d * 1.6))
+      .connect(lp);
   grain(o, t, lp, 2500, 0.05 * v * br, 0.006);
   route(o, lp, Math.max(-0.2, Math.min(0.2, (n.m - 74) / 40)), 0.08);
 }
@@ -333,7 +342,11 @@ const SCORES = {
   },
   ficheAnnulee: (count: number): Score => {
     const n = Math.max(1, Math.min(RISE.length, count));
-    return { notes: RISE.slice(0, n).reverse().map((m, i) => T(i * 0.06, m, { v: 0.26, d: 0.08 })) };
+    return {
+      notes: RISE.slice(0, n)
+        .reverse()
+        .map((m, i) => T(i * 0.06, m, { v: 0.26, d: 0.08 })),
+    };
   },
   oui: (): Score => ({ notes: [T(0, 74, { v: 0.4, d: 0.1 }), T(0.09, 81, { v: 0.44, d: 0.3, opale: true })], haptic: "succes" }),
   /** Une erreur se dit doucement : deux touchers sourds qui redescendent, sans buzzer. */
