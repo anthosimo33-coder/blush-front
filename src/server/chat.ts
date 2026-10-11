@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { bullesAffichees, messagesAffiches, type MessageAffiche } from "@prompts/lib/front";
+import { parIdentifiant } from "@prompts/lib/ligne";
 import type { Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
@@ -129,7 +130,7 @@ export async function repondre(
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
   const nouvelles = ajout?.ajout.lignes ?? [];
-  const lignes = new Map([...memoire.lignes, ...nouvelles.map((l) => [l.slice(0, l.indexOf(" ")), l] as [string, string])]);
+  const lignes = new Map([...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
   const jour = aujourdhuiParis();
   const vocalAttendu = (parVocal || story.chatVocal) && voixDisponible();

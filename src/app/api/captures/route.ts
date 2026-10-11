@@ -3,7 +3,8 @@ import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSe
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, reponseErreur } from "@/server/http";
-import { importerCaptures, storyAffichee } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
+import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";

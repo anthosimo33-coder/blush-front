@@ -1,7 +1,9 @@
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, reponseErreur } from "@/server/http";
-import { depuisFichier, depuisPaquet, importer, storyAffichee } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
+import { importer } from "@/server/histoires";
+import { depuisFichier, depuisPaquet } from "@/server/import";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 
@@ -10,7 +12,8 @@ export const maxDuration = 60;
 /**
  * Un export (WhatsApp ou Instagram) devient une histoire brouillon. Rien n’est analysé avant l’email.
  * Le navigateur envoie un paquet préparé (« export » : seulement le texte de la conv, compressé) ; un fichier brut
- * (« fichier ») est aussi accepté, sous la limite de taille de Vercel.
+ * (« fichier ») est aussi accepté, sous la limite de taille de Vercel. Le texte est borné avant d’être lu
+ * (src/server/import.ts) : un export forgé est refusé, ou coupé, vite.
  */
 export async function POST(req: Request) {
   const g = await garde(req, { session: "aucune" });

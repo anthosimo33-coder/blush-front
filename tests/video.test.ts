@@ -3,7 +3,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { Captures } from "@prompts/lib/schemas";
 import { enTexte } from "@/server/captures";
 import { db, schema } from "@/server/db";
-import { importerCaptures, storyAffichee } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
+import { importerCaptures } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
 import { decalage, lotsDe } from "@/services/preparer-video";
 import { captures, msg } from "./aide/fabriques";
@@ -48,6 +49,28 @@ describe("les lots d’un enregistrement, rassemblés", () => {
     expect(recouvrement([msg("moi", "ok")], [msg("moi", "ok"), msg("autre", "ça marche")])).toEqual({ garderA: 1, sauterB: 0, long: 0 });
     const f = fusionnerLots([lot([{ repere: null, messages: [msg("moi", "a1"), msg("autre", "a2")] }], 3), lot([{ repere: null, messages: [msg("moi", "b1")] }], 3)], "autre");
     expect(f.blocs.flatMap((x) => x.messages.map((y) => y.texte))).toEqual(["a1", "a2", "b1"]);
+  });
+
+  it("de longs lots qui se recouvrent : chaque bord recollé, comme quand la fusion relisait tout", () => {
+    /* 6 lots de 120 messages ; chacun reprend les 10 derniers du précédent, le premier coupé en haut de l’écran */
+    const texte = (k: number) => `message ${k} ${k % 7 ? "ok" : "on se voit samedi soir ?"}`;
+    const lots = Array.from({ length: 6 }, (_, l) =>
+      lot([{ repere: null, messages: Array.from({ length: 120 }, (_, i) => l * 110 + i).map((k, i) => msg(k % 2 ? "moi" : "autre", texte(k), { coupe: l > 0 && i === 0 })) }], 6),
+    );
+    const f = fusionnerLots(lots, "imessage");
+    expect(f.blocs.flatMap((x) => x.messages.map((y) => y.texte))).toEqual(Array.from({ length: 5 * 110 + 120 }, (_, k) => texte(k)));
+  });
+
+  it("un envoi forgé (40 lots de messages presque pareils, de 600 caractères) : rassemblé en temps borné", () => {
+    /* Chaque fenêtre essayée échoue à son dernier message : la fusion compare des milliers de fois les mêmes messages */
+    const long = `${"on se voit quand tu veux, ".repeat(23)}`.slice(0, 600);
+    const lots = Array.from({ length: 40 }, (_, l) =>
+      lot([{ repere: null, messages: [...Array.from({ length: 74 }, () => msg("moi", long, { coupe: true })), msg("moi", `fin du lot ${l}`)] }], 6),
+    );
+    const t0 = performance.now();
+    const f = fusionnerLots(lots, "imessage");
+    expect(performance.now() - t0).toBeLessThan(1500);
+    expect(f.blocs.flatMap((b) => b.messages)).toHaveLength(40 * 75);
   });
 });
 

@@ -53,7 +53,8 @@ describe("le texte d’une conv : 40 Mo au plus, des deux côtés", () => {
 });
 
 describe("les captures : 20 au plus", () => {
-  const captures = (n: number) => Array.from({ length: n }, (_, k) => vide(16, `capture-${k + 1}.jpg`, "image/jpeg"));
+  /* Des JPEG : leurs premiers octets le disent (le serveur lit le type dans les octets, S-39) */
+  const captures = (n: number) => Array.from({ length: n }, (_, k) => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(12)])], `capture-${k + 1}.jpg`, { type: "image/jpeg" }));
 
   it("le serveur lit les 20 que l’écran garde, pas une de plus", async () => {
     await expect(imagesDe(captures(CAPTURES_MAX))).resolves.toHaveLength(CAPTURES_MAX);

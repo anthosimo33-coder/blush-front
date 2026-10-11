@@ -1,30 +1,27 @@
 import "server-only";
 import { and, desc, eq, getTableColumns, isNull } from "drizzle-orm";
-import { gunzipSync } from "node:zlib";
-import { strFromU8, unzipSync } from "fflate";
-import { z } from "zod";
 import { detecterFormat, erreurImport, lire, participantsDe, principaux, type Devinette, type Format, type Histoire, type Message, type Objectif, type Pronom } from "@prompts/lib/conv";
 import { prenomDe } from "@prompts/lib/ajouts";
-import { choisirParties, estFichierUtile, lireExport, type Appli, type ExportLu } from "@prompts/lib/export";
+import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
-import { CORPS_VERCEL_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 import { pronomOppose } from "@/lib/pronom";
-import { APPLIS, type Story } from "@/types";
-import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte, jeton } from "./chiffrement";
-import { ErreurPublique } from "./erreurs";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
+import { borner, ErreurImport } from "./import";
 
-/** Un export compte quelques fichiers utiles (la conv, ses parties) : au-delà, ce n’est pas un export. */
-const FICHIERS_MAX = 200;
+/*
+ * Les histoires en base : le brouillon d’un import, la conv ouverte, « Qui es-tu ? », l’effacement. L’import d’un export
+ * (le fichier, le paquet, leurs bornes) vit dans import.ts, la conv telle que l’affiche le front dans conv-affichee.ts :
+ * ces noms restent exportés d’ici pour les routes qui les y prennent encore.
+ */
+export { depuisFichier, depuisPaquet, ErreurImport } from "./import";
+export { initialeDe, storyAffichee } from "./conv-affichee";
+
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
 const NOM_MAX = 100;
-
-/** Un import refusé : un fichier illisible, une conv de groupe, une conv trop courte (src/types/erreurs-api.ts). */
-export class ErreurImport extends ErreurPublique<Extract<CodeErreur, "fichier" | "groupe" | "courte">> {}
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
@@ -56,55 +53,6 @@ export type Ligne = Omit<LigneComplete, "conv" | "status">;
 /** Ce que lisent les écrans et les routes : la ligne sans la conv, et si elle est encore en base (`aConv`). */
 export type LigneEcran = Ligne & { aConv: boolean };
 
-/** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */
-export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: string }> {
-  if (fichier.size > TEXTE_CONV_MAX || fichier.size === 0) throw new ErreurImport("fichier");
-  const octets = new Uint8Array(await fichier.arrayBuffer());
-  let fichiers = [{ nom: fichier.name, contenu: "" }];
-  if (octets[0] === 0x50 && octets[1] === 0x4b) {
-    /* Une archive piégée (quelques Mo qui en font des Go) : on compte ce qu’on décompresse, au total, avant de le faire */
-    let total = 0;
-    let nombre = 0;
-    try {
-      const contenu = unzipSync(octets, {
-        filter: (f) => {
-          if (!estFichierUtile(f.name)) return false;
-          total += f.originalSize;
-          if (++nombre > FICHIERS_MAX || total > TEXTE_CONV_MAX) throw new ErreurImport("fichier");
-          return true;
-        },
-      });
-      fichiers = Object.entries(contenu).map(([nom, o]) => ({ nom, contenu: strFromU8(o) }));
-    } catch {
-      throw new ErreurImport("fichier");
-    }
-  } else fichiers[0].contenu = strFromU8(octets);
-  const parties = choisirParties(fichiers);
-  const lu = parties && parties !== "plusieurs" ? lireExport(parties) : null;
-  if (!lu) throw new ErreurImport("fichier");
-  return { ...lu, nom: fichier.name };
-}
-
-const Paquet = z.object({ nom: z.string().max(300), parties: z.array(z.object({ nom: z.string().max(500), contenu: z.string() })).min(1).max(50), coupe: z.boolean().optional() });
-
-/**
- * Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici.
- * `coupe` : la conv était trop longue pour partir en entier, le navigateur n’a gardé que sa partie la plus récente.
- */
-export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string; coupe?: boolean }> {
-  if (paquet.size > CORPS_VERCEL_MAX || paquet.size === 0) throw new ErreurImport("fichier");
-  try {
-    /* La décompression s’arrête d’elle-même à TEXTE_CONV_MAX : un paquet piégé ne remplit pas la mémoire du serveur */
-    const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TEXTE_CONV_MAX });
-    const p = Paquet.parse(JSON.parse(octets.toString("utf8")));
-    const lu = lireExport(p.parties);
-    if (!lu) throw new ErreurImport("fichier");
-    return { ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}) };
-  } catch {
-    throw new ErreurImport("fichier");
-  }
-}
-
 /** Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. */
 const resumeDe = (messages: Message[]): Meta["resume"] => ({
   debut: new Date(messages[0].t).toISOString().slice(0, 10),
@@ -125,8 +73,12 @@ async function creerBrouillon(meta: Meta, texte: string, secret: string): Promis
   return { id: ligne.id, meta, secret };
 }
 
-/** Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. */
-export async function importer({ nom, appli, texte, coupe }: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta; secret: string }> {
+/**
+ * Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. Le texte est
+ * borné ici aussi (import.ts, borner) : depuisFichier et depuisPaquet l’ont fait, un autre appelant n’y échappe pas.
+ */
+export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta; secret: string }> {
+  const { nom, appli, texte, coupe } = borner(recu);
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
   /* Un nom qui n’apparaît qu’à peine (un message collé d’un autre) ne fait pas une conv de groupe : ses lignes restent du texte */
@@ -310,52 +262,6 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
   await db().update(schema.stories).set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
   return meta;
 }
-
-const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
-
-/** L’histoire telle que l’affiche le front. Les participants sont p0 et p1 (dans l’ordre de l’export). */
-export function storyAffichee(id: string, meta: Meta): Story {
-  const { debut, fin, total, vocaux } = meta.resume;
-  const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
-  const jours = Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / 86400e3));
-  const [a, b] = meta.participants;
-  /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
-  const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });
-  return {
-    id,
-    participants: [
-      { id: "p0", name: a.prenom, initial: initialeDe(a.prenom), ...pronom(0) },
-      { id: "p1", name: b.prenom, initial: initialeDe(b.prenom), ...pronom(1) },
-    ],
-    sources: [
-      meta.captures
-        ? { id: "s1", app: meta.appli, mode: "captures", screenshotCount: meta.captures, label: `${APPLIS[meta.appli]} · ${meta.captures} captures`, period: periode, messageCount: total, voiceCount: vocaux }
-        : {
-            id: "s1",
-            app: meta.appli,
-            mode: "export",
-            fileName: meta.fichier,
-            label: `${APPLIS[meta.appli]} · ${dateCourte(debut)}`,
-            period: periode,
-            messageCount: total,
-            voiceCount: vocaux,
-            /* Une conv trop longue, coupée : combien de mois BLUSH en lit */
-            ...(meta.coupe ? { moisLus: Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / (30.44 * 86400e3))) } : {}),
-          },
-    ],
-    totalMessages: total,
-    voiceCount: vocaux,
-    period: periode,
-    durationLabel: `${jours} jour${jours > 1 ? "s" : ""}`,
-    updatedLabel: "aujourd’hui",
-    /* Qui est l’utilisateur : le rapport ouvert depuis le mail (un autre onglet, sans parcours) met les bons avatars */
-    ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),
-  };
-}
-
-/** L’initiale d’un nom : son premier caractère entier (un emoji n’est pas coupé en deux), en majuscule. */
-export const initialeDe = (nom: string) => [...nom.trim()][0]?.toUpperCase() ?? "?";
 
 /** Efface l’histoire et tout ce qui en vient (verdict, rapport, mémoire, chat, tâches : en cascade). */
 export async function supprimerHistoire(id: string): Promise<void> {

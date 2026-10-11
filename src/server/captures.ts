@@ -10,7 +10,8 @@ import { lireSession } from "./cookies";
 import type { LimiteDuCompte } from "./email-canonique";
 import { env } from "./env";
 import { ErreurPublique } from "./erreurs";
-import { brouillonDe, ErreurImport, metaDe, type Meta } from "./histoires";
+import { brouillonDe, metaDe, type Meta } from "./histoires";
+import { ErreurImport } from "./import";
 import { appeler } from "./ia/claude";
 import { LIMITES, sousLaLimite } from "./limites";
 import { sousLaLimiteDuCompte } from "./requete";
@@ -43,14 +44,28 @@ export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promis
 /** La taille d’une capture reçue (déjà réduite par le navigateur) ; leur nombre, CAPTURES_MAX. */
 const TAILLE_IMAGE_MAX = 2 * 1024 * 1024;
 
-/** Les captures envoyées (des fichiers image), vérifiées : type, nombre, taille. */
+/**
+ * Le type d’une image d’après ses premiers octets (sa « signature »), pas d’après celui que le navigateur déclare :
+ * PNG (89 50 4E 47), JPEG (FF D8 FF), WEBP (« RIFF », 4 octets de taille, « WEBP »). Rien d’autre ne part au modèle.
+ */
+function typeImage(octets: Uint8Array): Image["media"] | null {
+  const a = (k: number, ...attendus: number[]) => attendus.every((o, i) => octets[k + i] === o);
+  if (a(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (a(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (a(0, 0x52, 0x49, 0x46, 0x46) && a(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp";
+  return null;
+}
+
+/** Les captures envoyées (des fichiers image), vérifiées : nombre, taille, et type lu dans leurs octets. */
 export async function imagesDe(fichiers: File[]): Promise<Image[]> {
   if (!fichiers.length || fichiers.length > CAPTURES_MAX) throw new ErreurImport("fichier");
   return Promise.all(
     fichiers.map(async (f) => {
-      const media = f.type === "image/png" || f.type === "image/webp" ? f.type : "image/jpeg";
       if (!f.type.startsWith("image/") || f.size > TAILLE_IMAGE_MAX) throw new ErreurImport("fichier");
-      return { media, base64: Buffer.from(await f.arrayBuffer()).toString("base64") };
+      const octets = new Uint8Array(await f.arrayBuffer());
+      const media = typeImage(octets);
+      if (!media) throw new ErreurImport("fichier");
+      return { media, base64: Buffer.from(octets).toString("base64") };
     }),
   );
 }

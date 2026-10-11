@@ -90,7 +90,7 @@ describe("ajouter des captures à sa fiche", () => {
     const avant = await lire();
     expect(avant.updating).toBeUndefined();
     const fd = new FormData();
-    fd.append("captures", new File([new Uint8Array(64)], "profil.jpg", { type: "image/jpeg" }));
+    fd.append("captures", new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(60)])], "profil.jpg", { type: "image/jpeg" }));
     taches.length = 0;
     const r = await POST(requete({ method: "POST", body: fd }));
     expect(r.status).toBe(200);
@@ -168,7 +168,7 @@ describe("un ajout à sa fiche qui échoue", () => {
     };
     etat.alertes.length = 0;
     const fd = new FormData();
-    fd.append("captures", new File([new Uint8Array(64)], "profil.jpg", { type: "image/jpeg" }));
+    fd.append("captures", new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(60)])], "profil.jpg", { type: "image/jpeg" }));
     const r = await avecFactice(enRetard, () => POST(requete({ method: "POST", body: fd })));
     expect(r.status).toBe(502);
     expect(await r.json()).toEqual({ erreur: "panne" });

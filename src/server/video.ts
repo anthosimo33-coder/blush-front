@@ -15,19 +15,38 @@ const norm = (t: string) =>
   t
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, "");
+
+/*
+ * Ce qu’on compare d’un message : son texte normalisé, calculé une fois par message (la fusion compare chacun des
+ * centaines de fois), et ses 300 premiers caractères seulement. Deux lectures d’un même long message se reconnaissent
+ * à leur début ; un bout coupé en haut de l’écran qu’on n’y retrouve pas est sauté en tête de lot (recouvrement).
+ */
+const COMPARES = 300;
+const CLES = new WeakMap<Msg, string>();
+function cle(m: Msg): string {
+  let c = CLES.get(m);
+  if (c === undefined) CLES.set(m, (c = norm(m.texte.slice(0, COMPARES * 4)).slice(0, COMPARES)));
+  return c;
+}
 
 /** Le même message, lu deux fois : même auteur, même média, même texte (ou l’un coupé au bord de l’écran). */
 function memeMessage(a: Msg, b: Msg): boolean {
   if (a.de !== b.de || (a.media ?? null) !== (b.media ?? null)) return false;
-  const x = norm(a.texte);
-  const y = norm(b.texte);
+  const x = cle(a);
+  const y = cle(b);
   if (x === y) return true;
   return (a.coupe || b.coupe) && Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x));
 }
 
 const aplatir = (c: Captures): Ligne[] => c.blocs.flatMap((b) => b.messages.map((m, k) => ({ repere: k === 0 ? b.repere : null, m })));
+
+/* Le recouvrement de deux lots, au plus : 80 messages, et 3 bouts coupés au bord de chaque côté */
+const RECOUVREMENT_MAX = 80;
+const BOUTS_COUPES_MAX = 3;
+/* recouvrement ne lit de `a` que sa fin : la fusion ne lui donne qu’elle */
+const FIN_REGARDEE = RECOUVREMENT_MAX + BOUTS_COUPES_MAX;
 
 /**
  * Où la suite reprend : le plus long recouvrement entre la fin de `a` et le début de `b`. On tolère, au bord,
@@ -36,11 +55,11 @@ const aplatir = (c: Captures): Ligne[] => c.blocs.flatMap((b) => b.messages.map(
  */
 export function recouvrement(a: Msg[], b: Msg[]): { garderA: number; sauterB: number; long: number } {
   let mieux = { long: 0, garderA: a.length, sauterB: 0 };
-  for (let finA = a.length; finA >= Math.max(0, a.length - 3); finA--) {
+  for (let finA = a.length; finA >= Math.max(0, a.length - BOUTS_COUPES_MAX); finA--) {
     /* Les messages laissés en fin de `a` doivent être des bouts coupés au bord de l’écran */
     if (a.slice(finA).some((m) => !m.coupe)) break;
-    for (let debutB = 0; debutB <= Math.min(3, b.length - 1); debutB++) {
-      for (let n = Math.min(finA, b.length - debutB, 80); n > mieux.long; n--) {
+    for (let debutB = 0; debutB <= Math.min(BOUTS_COUPES_MAX, b.length - 1); debutB++) {
+      for (let n = Math.min(finA, b.length - debutB, RECOUVREMENT_MAX); n > mieux.long; n--) {
         let ok = true;
         for (let i = 0; i < n && ok; i++) ok = memeMessage(a[finA - n + i], b[debutB + i]);
         if (ok) {
@@ -51,30 +70,38 @@ export function recouvrement(a: Msg[], b: Msg[]): { garderA: number; sauterB: nu
     }
   }
   /* Un seul message en commun ne prouve rien, sauf s’il est long */
-  if (mieux.long === 1 && norm(b[mieux.sauterB - 1].texte).length < 25) return { garderA: a.length, sauterB: 0, long: 0 };
+  if (mieux.long === 1 && cle(b[mieux.sauterB - 1]).length < 25) return { garderA: a.length, sauterB: 0, long: 0 };
   return mieux;
 }
 
-/** Les lots lus, rassemblés en une seule lecture : messages dans l’ordre, sans doublon au bord de deux lots. */
+/**
+ * Les lots lus, rassemblés en une seule lecture : messages dans l’ordre, sans doublon au bord de deux lots. Chaque
+ * lot ne se compare qu’à la fin de ce qui est déjà rassemblé, et s’y ajoute sans recopier le reste : le temps croît
+ * comme le nombre de messages, pas comme son carré.
+ */
 export function fusionnerLots(lots: Captures[], appli: string): Captures {
-  let lignes: Ligne[] = [];
+  const lignes: Ligne[] = [];
   lots.forEach((lot, k) => {
     const suite = aplatir(lot);
     if (k === 0) {
-      lignes = suite;
+      lignes.push(...suite);
       return;
     }
-    const { garderA, sauterB, long } = recouvrement(
-      lignes.map((l) => l.m),
+    const decalage = Math.max(0, lignes.length - FIN_REGARDEE);
+    const fin = recouvrement(
+      lignes.slice(decalage).map((l) => l.m),
       suite.map((l) => l.m),
     );
+    const { sauterB, long } = fin;
+    const garderA = decalage + fin.garderA;
     /* Un message coupé d’un côté et entier de l’autre : on garde l’entier */
     for (let i = 0; i < long; i++) {
       const a = lignes[garderA - long + i];
       const b = suite[sauterB - long + i];
       if (a.m.coupe && !b.m.coupe) a.m = b.m;
     }
-    lignes = [...lignes.slice(0, garderA), ...suite.slice(sauterB)];
+    lignes.length = garderA;
+    for (let i = sauterB; i < suite.length; i++) lignes.push(suite[i]);
   });
 
   /* Les blocs se reforment là où un repère (une date) commence */

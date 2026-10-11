@@ -5,7 +5,8 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, h
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lireCaptures } from "@/server/captures";
 import { db, schema } from "@/server/db";
-import { definirQui, histoireDe, importerCaptures, metaDe, storyAffichee } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
+import { definirQui, histoireDe, importerCaptures, metaDe } from "@/server/histoires";
 import { captures, msg } from "./aide/fabriques";
 
 describe("des captures à l’histoire", () => {

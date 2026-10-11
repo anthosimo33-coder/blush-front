@@ -5,11 +5,15 @@ import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/cap
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
-import { importerCaptures, storyAffichee } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
+import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { fusionnerLots } from "@/server/video";
 import { ROUTES } from "@/types/api";
+
+/* Rassembler les lots ne fait appel à aucun modèle : quelques dixièmes de seconde, et jamais plus de 30 s */
+export const maxDuration = 30;
 
 /*
  * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
@@ -17,6 +21,8 @@ import { ROUTES } from "@/types/api";
  * est loin (seize lots de six écrans au plus, un peu plus quand des écrans lourds les font couper).
  */
 const MESSAGES_MAX = 3000;
+/* Un lot : six écrans d’une vingtaine de messages, qui se recouvrent */
+const MESSAGES_PAR_LOT_MAX = 300;
 const TEXTE_MAX = 4000;
 /* Tous les messages ensemble : un enregistrement réel en compte une centaine de Ko */
 const TEXTE_TOTAL_MAX = 2_000_000;
@@ -39,7 +45,8 @@ const Envoi = ROUTES["POST /api/captures/video"].corps
     const messages = blocs.flatMap((b) => b.messages);
     const total = messages.reduce((n, m) => n + m.texte.length, 0);
     const reperes = blocs.every((b) => !b.repere || (b.repere.date.length <= 20 && (b.repere.heure?.length ?? 0) <= 20));
-    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && total <= TEXTE_TOTAL_MAX && reperes && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
+    const parLot = lots.every((l) => l.blocs.reduce((n, b) => n + b.messages.length, 0) <= MESSAGES_PAR_LOT_MAX);
+    return blocs.length <= 600 && messages.length <= MESSAGES_MAX && parLot && total <= TEXTE_TOTAL_MAX && reperes && messages.every((m) => m.texte.length <= TEXTE_MAX && (m.reaction?.length ?? 0) <= 50);
   });
 
 /**

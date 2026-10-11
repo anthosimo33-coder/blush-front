@@ -77,3 +77,28 @@ describe("un export Instagram complet", () => {
     expect(resumes[0].derniere).toMatch(/^2026-09-2\d$/);
   });
 });
+
+describe("le HTML d’Instagram, lu sans expression qui se relit", () => {
+  /* Un bloc de message, comme Instagram l’écrit : son nom, son contenu, sa date */
+  const bloc = (nom: string, contenu: string, quand: string) =>
+    `<div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">${nom}</h2><div class="_3-95 _a6-p"><div>${contenu}</div></div><div class="_3-94 _a6-o">${quand}</div></div>`;
+  const riche = [
+    bloc("Malik", "<div>on se voit &amp; on parle ?<br>promis</div>", "sep 18, 2026 9:01 pm"),
+    bloc("Léa", `<div><video src="x/videos/2.mp4" controls="1"><a href="x/videos/2.mp4">x/videos/2.mp4</a></video></div>`, "sep 18, 2026 9:00 pm"),
+    bloc("Léa", `<div>regarde ça</div><div><a target="_blank" href="x/photos/3.jpg"><img src="x/photos/3.jpg" class="_a6_o _3-96" /></a></div>`, "sep 18, 2026 8:59 pm"),
+    bloc("Malik", `<div><AUDIO src="x/audio/4.ogg"><a href="x/audio/4.ogg">x</a></AUDIO></div><ul class="_a6-q"><li>❤Léa</li></ul>`, "sep 18, 2026 8:58 pm"),
+    bloc("Léa", `<div>le lien : <a href="https://exemple.fr/a">https://exemple.fr/a</a> &#x1F600; &lt;3 <> <<b>gras</b></div>`, "18 sept. 2026, 20:57"),
+    bloc("Malik", "<div>Léa a aimé un message</div>", "sep 18, 2026 8:56 pm"),
+  ].join("\n");
+
+  it("donne le même texte qu’avant sa réécriture", () => {
+    expect(depuisInstagramHtml(`<html><body><main>${riche}</main></body></html>`).texte.split("\n")).toEqual([
+      "[19/09/2026 05:57:00] Léa: le lien : https://exemple.fr/a 😀 <3 <> gras",
+      "[19/09/2026 05:58:00] Malik: audio omitted",
+      "[19/09/2026 05:59:00] Léa: regarde ça image omitted",
+      "[19/09/2026 06:00:00] Léa: video omitted",
+      "[19/09/2026 06:01:00] Malik: on se voit & on parle ?",
+      "promis",
+    ]);
+  });
+});
