@@ -55,6 +55,16 @@ export default defineConfig({
       BLUSH_IA_FACTICE: "1",
       BLUSH_ALERTES: "equipe@blush.test",
     },
+    /*
+     * La couverture (`npm run couverture`, et la CI) : le code de src, ts et tsx, fichiers jamais chargés compris, sans les
+     * textes générés des prompts ni les outils de l’équipe (/apercu, /styleguide, jamais en ligne).
+     */
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/server/ia/textes.generated.ts", "src/app/apercu/**", "src/app/styleguide/**"],
+      reporter: ["text-summary", "html"],
+    },
     projects: [
       { extends: true, test: { name: "unit", include: UNITAIRES } },
       {
