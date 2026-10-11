@@ -91,7 +91,7 @@ Ce qui relie les écrans par l’adresse :
 
 ## Confidentialité
 
-- **Chiffrement :** tout ce qui vient de la conv est chiffré en AES-256-GCM (`src/server/chiffrement.ts`), avec `BLUSH_CLE`, qui n’est jamais dans la base.
+- **Chiffrement :** tout ce qui vient de la conv est chiffré en AES-256-GCM (`src/server/chiffrement.ts`), avec `BLUSH_CLE`, qui n’est jamais dans la base. Chaque colonne chiffrée se lit et s’écrit par le coffre (`src/server/coffre.ts`) : son registre dit la forme de ce que garde chaque colonne, `ecrire` n’accepte que celle-là, `lire` la rend (les lignes d’avant remises à la forme d’aujourd’hui). ESLint refuse ailleurs `chiffrer` et `dechiffrer`.
 - **La conv brute ne reste pas :**
   - elle est effacée dès le rapport et la mémoire faits ;
   - un brouillon jamais rattaché à un compte est effacé au bout de 24 h ;

@@ -116,10 +116,10 @@ describe("le coffre", () => {
   });
 
   it("relit les formes d’avant dans celle d’aujourd’hui", () => {
-    /* Le contexte avant le 7 octobre : ni `dernier`, ni trouvailles */
+    /* Le contexte avant le 7 octobre : ni `dernier` (les ajouts repartent de la fin du jour de `fin`), ni trouvailles */
     const contexte = coffre.lire("stories.context", chiffrer({ chiffres: "220 messages", style: "court", fin: "2026-03-10" }));
     expect(contexte.trouvailles).toEqual([]);
-    expect(contexte.dernier).toBeUndefined();
+    expect(contexte.dernier).toBe(Date.UTC(2026, 2, 10, 23, 59, 59));
     /* Le vocal avant le 8 octobre : sans version, c’est la version 1 (il se refera) */
     expect(coffre.lire("vocals.data", chiffrer({ sobre: false, lignes: [] })).version).toBe(1);
     /* Une mémoire sans corrections de la fiche (jamais corrigée, ou écrite avant le chat) */
@@ -131,9 +131,14 @@ describe("le coffre", () => {
     expect(coffre.lire("stories.meta", chiffrer(metaDAvant))).toEqual(metaDAvant);
   });
 
-  it("garde les champs qu’il ne connaît pas (écrits par une version plus récente)", () => {
+  it("garde les champs qu’il ne connaît pas (écrits par une version plus récente), jusque dans les objets imbriqués", () => {
     const plusRecente = { ...EXEMPLES["memories.data"], resumeHebdo: "jeudi" };
     expect(coffre.lire("memories.data", chiffrer(plusRecente))).toEqual(plusRecente);
+    const rapport = EXEMPLES["reports.data"];
+    const lecturePlus = { ...rapport, lecture: { ...rapport.lecture, vocal: "30 s" } };
+    expect(coffre.lire("reports.data", chiffrer(lecturePlus))).toEqual(lecturePlus);
+    const contexte = { ...EXEMPLES["stories.context"], saison: "printemps" };
+    expect(coffre.lire("stories.context", chiffrer(contexte))).toEqual(contexte);
   });
 
   it("refuse une ligne qui n’a pas la forme de sa colonne, en nommant les champs, jamais leur contenu", () => {

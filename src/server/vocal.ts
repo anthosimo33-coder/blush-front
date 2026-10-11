@@ -12,7 +12,8 @@ import { dire, voixPour } from "./ia/voix";
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
  * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres. La forme
- * du script gardé est dans le coffre (src/server/coffre.ts, DonneesVocal) ; les tests la lisent encore ici.
+ * du script gardé est dans le coffre (src/server/coffre.ts, DonneesVocal) ; les tests la lisent encore ici (à retirer
+ * quand ils passeront par le coffre).
  */
 export type { DonneesVocal } from "./coffre";
 

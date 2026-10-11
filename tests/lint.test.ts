@@ -56,12 +56,29 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/app/api/rapport/route.ts", `import { chiffrer } from "@/server/chiffrement";\nexport const x = chiffrer;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/rapport/page.tsx", `import * as c from "../../server/chiffrement";\nexport const x = c;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/apercu/page.tsx", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
+    /* Ajoutés à chiffrement.ts plus tard : seuls ses empreintes et ses jetons sont permis hors du coffre */
+    expect(await regles("src/server/stats.ts", `import { dechiffrerSansForme } from "./chiffrement";\nexport const x = dechiffrerSansForme;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/server/stats.ts", `export { dechiffrer } from "./chiffrement";\n`)).toEqual(["no-restricted-imports"]);
+  });
+
+  it("ni par un import() dynamique de chiffrement.ts, même pour une empreinte", async () => {
+    expect(await regles("src/server/stats.ts", `export const x = async () => (await import("./chiffrement")).dechiffrer;\n`)).toEqual(["no-restricted-syntax"]);
+    expect(await regles("src/app/api/rapport/route.ts", `export const x = () => import("@/server/chiffrement");\n`)).toEqual(["no-restricted-syntax"]);
+    expect(await regles("src/server/env.ts", `export const x = () => import("./chiffrement").then((c) => c.empreinte);\n`)).toEqual(["no-restricted-syntax"]);
+    expect(await regles("src/server/stats.ts", `export const x = () => import("./chiffres");\n`)).toEqual([]);
   });
 
   it("le coffre chiffre ; les empreintes et les jetons restent libres ; les dernières exceptions gardent les autres règles", async () => {
     expect(await regles("src/server/coffre.ts", `import { chiffrer, dechiffrer } from "./chiffrement";\nexport const x = [chiffrer, dechiffrer];\n`)).toEqual([]);
     expect(await regles("src/server/stats.ts", `import { empreinte, jeton } from "./chiffrement";\nexport const x = [empreinte, jeton];\n`)).toEqual([]);
+    expect(await regles("src/server/auth.ts", `import { empreinte, jeton, memeEmpreinte } from "./chiffrement";\nexport const x = [empreinte, jeton, memeEmpreinte];\n`)).toEqual([]);
+    /* Les trois routes du lot 3a, et elles seules : la liste d’attente et les messages ajoutés passent par le coffre */
     expect(await regles("src/app/api/fiche/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([]);
+    expect(await regles("src/app/api/partage/image/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([]);
+    expect(await regles("src/app/api/vocal/chat/[id]/route.ts", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual([]);
+    for (const chemin of ["src/server/attente.ts", "src/server/ajouts.ts", "src/app/api/vocal/audio/route.ts"]) {
+      expect(await regles(chemin, `import { chiffrer } from "./chiffrement";\nexport const x = chiffrer;\n`), chemin).toEqual(["no-restricted-imports"]);
+    }
     expect(await regles("src/server/coffre.ts", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual(["no-restricted-imports"]);
     expect(await regles("src/app/apercu/page.tsx", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual([]);
   });

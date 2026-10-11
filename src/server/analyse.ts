@@ -30,7 +30,10 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
-/* Leurs formes sont dans le coffre (src/server/coffre.ts) ; les routes et les tests les lisent encore ici */
+/*
+ * Leurs formes sont dans le coffre (src/server/coffre.ts). Les routes fiche et partage/image, les tests et
+ * scripts/essai-vrai-modele.mts les lisent encore ici : à retirer quand ils passeront par le coffre.
+ */
 export type { DonneesMemoire, DonneesRapport, DonneesVerdict };
 
 /** Les infos qu’il a retirées de sa fiche que la mémoire garde : les plus récentes (PUT /api/fiche coupe la liste). */

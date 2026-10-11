@@ -9,10 +9,11 @@ import type { Echange } from "@prompts/lib/memoire";
 import { Sortie01 } from "@prompts/lib/schemas";
 import type { FicheUpdate } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
-import { executerChaine, type DonneesMemoire } from "./analyse";
+import { executerChaine } from "./analyse";
+import * as coffre from "./coffre";
+import type { DonneesMemoire } from "./coffre";
 import { ficheDe } from "./donnees";
 import { planifier } from "./taches";
-import { chiffrer } from "./chiffrement";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { appeler } from "./ia/claude";
@@ -33,11 +34,11 @@ export class ErreurAjout extends Error {
 /** Au-delà, les plus anciens des nouveaux messages ne sont pas gardés (un export des mois après l’import). */
 const MESSAGES_MAX = 400;
 
-/** Le dernier message déjà lu. Avant qu’on le garde à la seconde près : la fin de la journée du dernier message. */
+/** Le dernier message déjà lu. Avant qu’on le garde à la seconde près : la fin de la journée du dernier message (le coffre la remplit). */
 const curseurDe = (story: Ligne) => {
   const c = contexteDe(story);
   if (!c) throw new ErreurAjout("rien_de_neuf");
-  return c.dernier ?? Date.parse(`${c.fin}T23:59:59Z`);
+  return c.dernier;
 };
 
 /** Réserve `n` numéros d’un coup (deux envois en même temps n’ont jamais le même) : renvoie le premier. */
@@ -55,8 +56,8 @@ async function avancer(storyId: string, dernier: number | null) {
   if (dernier == null) return;
   const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, storyId));
   const c = contexteDe(story);
-  if (!c || (c.dernier ?? 0) >= dernier) return;
-  await db().update(schema.stories).set({ context: chiffrer({ ...c, dernier }), updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
+  if (!c || c.dernier >= dernier) return;
+  await db().update(schema.stories).set({ context: coffre.ecrire("stories.context", { ...c, dernier }), updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
 }
 
 async function garder(story: Ligne, memoire: DonneesMemoire, messages: Message[], profil: string[]): Promise<Ajout> {

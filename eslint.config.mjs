@@ -35,21 +35,16 @@ const PAS_DE_MOCKS = { group: ["@/mocks", "@/mocks/*"], message: "Pas de donnée
 const PAS_D_APERCU = { group: ["@/app/apercu", "@/app/apercu/*", "**/apercu/*"], message: "Les aperçus (/apercu) gardent des données fictives : aucun écran de l’appli ne les importe." };
 /*
  * Chiffrer et déchiffrer passent par le coffre (src/server/coffre.ts), qui sait ce que garde chaque colonne : ailleurs,
- * chiffrement.ts ne sert qu’à ses empreintes et ses jetons. Par l’alias, ou en chemin relatif depuis src/server.
+ * chiffrement.ts ne sert qu’à ses empreintes et ses jetons. Par l’alias, ou en chemin relatif depuis src/server. Une
+ * liste de noms permis : une fonction ajoutée à chiffrement.ts (une autre façon de déchiffrer) reste au coffre, et
+ * `import * as` est refusé. Un import() dynamique de chiffrement.ts est refusé à part (CHIFFREMENT_DYNAMIQUE).
  */
-const PAR_LE_COFFRE = {
-  regex: "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$",
-  importNames: ["chiffrer", "chiffrerCompresse", "chiffrerOctets", "dechiffrer", "dechiffrerOctets"],
-  message: "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio).",
-};
-/* Les dernières à passer par le coffre (lot 3a) : trois routes, la liste d’attente et les messages ajoutés */
-const PAS_ENCORE_PAR_LE_COFFRE = [
-  "src/app/api/fiche/route.ts",
-  "src/app/api/partage/image/route.ts",
-  "src/app/api/vocal/chat/*/route.ts",
-  "src/server/attente.ts",
-  "src/server/ajouts.ts",
-];
+const CHIFFREMENT = "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$";
+const PAR_LE_COFFRE_MESSAGE = "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio) ; chiffrement.ts ne sert ailleurs qu’à empreinte, memeEmpreinte et jeton.";
+const PAR_LE_COFFRE = { regex: CHIFFREMENT, allowImportNames: ["empreinte", "memeEmpreinte", "jeton"], message: PAR_LE_COFFRE_MESSAGE };
+const CHIFFREMENT_DYNAMIQUE = { selector: `ImportExpression[source.value=/${CHIFFREMENT.replaceAll("/", "\\u002F")}/]`, message: PAR_LE_COFFRE_MESSAGE };
+/* Les dernières à passer par le coffre (lot 3a) : trois routes */
+const PAS_ENCORE_PAR_LE_COFFRE = ["src/app/api/fiche/route.ts", "src/app/api/partage/image/route.ts", "src/app/api/vocal/chat/*/route.ts"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -70,16 +65,16 @@ const eslintConfig = defineConfig([
     files: ["src/server/coffre.ts", ...PAS_ENCORE_PAR_LE_COFFRE],
     rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
   },
-  // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), et la configuration lue à ses deux seuls endroits
-  // (PAS_DE_PROCESS_ENV). Les deux blocs suivants reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax
-  // remplace toute sa liste.
+  // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), la configuration lue à ses deux seuls endroits
+  // (PAS_DE_PROCESS_ENV), et pas de chiffrement.ts par import() (CHIFFREMENT_DYNAMIQUE). Les deux blocs suivants
+  // reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax remplace toute sa liste.
   {
     files: ["src/**/*.tsx", "src/**/*.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE] },
   },
   {
     files: ["src/server/env.ts", "src/server/drapeaux.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, CHIFFREMENT_DYNAMIQUE] },
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
@@ -98,7 +93,7 @@ const eslintConfig = defineConfig([
     ],
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }] }],
-      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
+      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
     },
   },
   // Le serveur ne passe pas par la couche du navigateur. donnees.ts lit encore des types d’api.ts (ils iront dans src/types/api.ts au lot 3).

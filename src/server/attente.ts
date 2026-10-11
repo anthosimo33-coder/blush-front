@@ -1,6 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import { chiffrer, empreinte, memeEmpreinte } from "./chiffrement";
+import { empreinte, memeEmpreinte } from "./chiffrement";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { SourceAttente } from "./db/enums";
 import { envoyerMail } from "./email";
@@ -22,7 +23,7 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
   const emailHash = empreinte(`attente:${propre}`);
   await db()
     .insert(schema.waitlist)
-    .values({ emailHash, email: chiffrer(propre), source })
+    .values({ emailHash, email: coffre.ecrire("waitlist.email", propre), source })
     .onConflictDoNothing({ target: schema.waitlist.emailHash });
   /* Pas de rafale chez une même personne, et un plafond pour tous (le quota de Resend sert d’abord aux codes) : au-delà, on inscrit sans écrire */
   if (!(await sousLaLimite(`attente:mail:${emailHash}`, LIMITES.mailAttenteParEmail))) return;

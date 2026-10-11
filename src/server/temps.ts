@@ -20,7 +20,9 @@ type Pause = (ms: number) => Promise<void>;
 const dormir: Pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
 /*
  * Sous vitest (NODE_ENV vaut « test », lu au chargement), les pauses ne dorment pas : une chaîne relancée trois fois y
- * dormait 3 + 6 + 9 s. Un test qui veut les compter passe la sienne (definirPause).
+ * dormait 3 + 6 + 9 s. Un test qui veut les compter passe la sienne (definirPause). Cette branche ira dans la
+ * préparation des tests (un setupFiles de vitest.config.mts qui appelle definirPause) : ici, elle suppose que vitest
+ * tourne avec NODE_ENV à « test ».
  */
 const parDefaut: Pause = process.env.NODE_ENV === "test" ? () => Promise.resolve() : dormir;
 let pauseCourante = parDefaut;

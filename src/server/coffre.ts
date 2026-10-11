@@ -17,7 +17,9 @@ import type { VerdictPartage } from "./partages";
  * (ses valeurs par défaut), et une ligne qui n’a pas la forme attendue échoue ici, en le disant, plutôt que plus loin.
  * Les autres sont relues telles qu’`ecrire` les a écrites. Dans src, seul ce fichier chiffre et déchiffre
  * (chiffrement.ts ; la règle et ses dernières exceptions : eslint.config.mjs). Il ne dépend ni de la chaîne d’analyse
- * (analyse.ts) ni des écrans (donnees.ts) : les deux lisent ici les formes qu’ils se passent.
+ * (analyse.ts) ni des écrans (donnees.ts) : les deux lisent ici les formes qu’ils se passent. Deux formes restent
+ * chez le module qui les fait, et qui passe par le coffre en retour : Meta (histoires.ts) et VerdictPartage
+ * (partages.ts). Des imports de types seulement, sans effet à l’exécution.
  */
 
 /* ———— Ce que gardent les colonnes ———— */
@@ -35,7 +37,7 @@ export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivan
  * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans
  * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (lib/trouvailles.ts).
  */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number; trouvailles: string[] };
+export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[] };
 /**
  * Ce qu’il a envoyé au chat : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un
  * export, des captures), gardés pour la suite du fil ; `affiche`, ce que l’historique réaffiche (« (3 captures) »).
@@ -99,21 +101,28 @@ const MetaGardee = z
   })
   .pipe(z.custom<Meta>());
 
-const ContexteGarde = z.looseObject({
-  chiffres: z.string(),
-  style: z.string(),
-  fin: z.string(),
-  /* Avant le 7 octobre : absent (les messages ajoutés repartent alors de la fin du jour de `fin`, src/server/ajouts.ts) */
-  dernier: z.number().optional(),
-  /* Avant le 8 octobre : absentes, la lecture n’en montre aucune */
-  trouvailles: z.array(z.string()).default(() => []),
-});
+const ContexteGarde = z
+  .looseObject({
+    chiffres: z.string(),
+    style: z.string(),
+    fin: z.string(),
+    /* Avant le 7 octobre : absent (rempli plus bas) */
+    dernier: z.number().optional(),
+    /* Avant le 8 octobre : absentes, la lecture n’en montre aucune */
+    trouvailles: z.array(z.string()).default(() => []),
+  })
+  /* Sans `dernier`, les messages ajoutés repartent de la fin du jour du dernier message (`fin`, sans fuseau comme lui) */
+  .transform((c) => ({ ...c, dernier: c.dernier ?? Date.parse(`${c.fin}T23:59:59Z`) }));
 
 const MemoireGardee = z.looseObject({
   etat: objet<Memoire>(),
   lignes: z.array(z.tuple([z.string(), z.string()])),
   suivant: z.number(),
-  /* Absentes d’une fiche jamais corrigée à la main, et de toute mémoire écrite avant le chat (le 7 octobre) */
+  /*
+   * Absentes d’une fiche jamais corrigée à la main, et de toute mémoire écrite avant le chat (le 7 octobre). Pas de
+   * valeur par défaut : l’absence se garde telle quelle (une mise à jour ne les écrit pas vides, et le modèle ne
+   * reçoit pas de corrections vides) ; chaque lecteur la lit comme « rien corrigé ».
+   */
   editions: z.looseObject({ parToi: z.array(z.string()), supprimees: z.array(z.string()) }).optional(),
 });
 
@@ -122,7 +131,7 @@ const RapportGarde = z.looseObject({
   sortie: objet<Rapport>(),
   chapitres: z.array(objet<ChapitreAffiche>()),
   sobre: objet<SobreAffiche>().nullable(),
-  lecture: z.object({ free: z.string(), full: z.string() }),
+  lecture: z.looseObject({ free: z.string(), full: z.string() }),
 });
 
 const VocalGarde = z.looseObject({
