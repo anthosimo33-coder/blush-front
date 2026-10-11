@@ -79,13 +79,20 @@ describe("useSondage", () => {
     expect(tour).toHaveBeenCalledTimes(3);
   });
 
-  it("un tour qui lève ne casse pas le sondage : le suivant part à l’intervalle", async () => {
+  it("un tour qui lève ne casse pas le sondage : le suivant part à l’intervalle, l’erreur laisse une trace", async () => {
+    const avertir = vi.spyOn(console, "warn").mockImplementation(() => {});
     const tour = vi.fn(async () => {
-      throw new Error("réseau");
+      throw new TypeError("réseau");
     });
     renderHook(() => useSondage(tour, { intervalle: 1000 }));
     await avancer(3000);
     expect(tour).toHaveBeenCalledTimes(3);
+    expect(avertir).toHaveBeenCalledTimes(3);
+    /* Le nom de l’erreur, jamais son message (tracer) */
+    expect(avertir.mock.calls[0][0]).toContain("sondage");
+    expect(avertir.mock.calls[0][0]).toContain("TypeError");
+    expect(avertir.mock.calls[0][0]).not.toContain("réseau");
+    avertir.mockRestore();
   });
 
   it("démonté pendant un tour : sa réponse arrive, et rien ne repart", async () => {

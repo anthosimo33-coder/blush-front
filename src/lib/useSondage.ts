@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent } from "react";
+import { tracer } from "./tracer";
 
 /** Ce qu’un tour du sondage décide : un délai (ms) avant le prochain tour, `false` pour s’arrêter, rien pour l’intervalle. */
 export type SuiteDuSondage = number | false | void;
@@ -23,7 +24,9 @@ export function useSondage(tour: () => SuiteDuSondage | Promise<SuiteDuSondage>,
       let suite: SuiteDuSondage;
       try {
         suite = await faire();
-      } catch {
+      } catch (e) {
+        /* Une trace dans la console, réduite au nom et au code de l’erreur (tracer) : une erreur qui revient à chaque tour se voit */
+        tracer("sondage", e);
         suite = undefined;
       }
       if (!vivant || suite === false) return;

@@ -267,7 +267,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         </div>
       )}
 
-      <FeuilleSommaire open={menu} onClose={() => setMenu(false)} chapters={chapters} current={current} allerAuChapitre={goTo} ouvrirPaiement={ouvrirPaiement} question={full} />
+      <FeuilleSommaire open={menu} onClose={() => setMenu(false)} chapters={chapters} current={current} allerAuChapitre={goTo} ouvrirPaiement={ouvrirPaiement} phase={phase} />
 
       {toast && <Toast className="fixed inset-x-4 top-3 lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{toast}</Toast>}
 

@@ -6,6 +6,7 @@ import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useEnVue } from "@/lib/hooks";
+import { ID_PARLER_A_BLUSH } from "./ancres";
 
 /* Le chat a-t-il déjà été ouvert une fois sur cet appareil ? Retenu dans le navigateur (une simple commodité) */
 const CLE = "blush.chat.ouvert.v1";
@@ -51,7 +52,7 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
   /* En mode sobre, rien ne s’agite */
   const ouvert = vu || sobre;
   /* Le bouton « Parler à BLUSH » du bas du rapport est à l’écran : la bulle s’efface pour ne pas passer dessus */
-  const cachee = useEnVue("cta-chat");
+  const cachee = useEnVue(ID_PARLER_A_BLUSH);
   return (
     <Link
       href="/app?depuis=rapport"

@@ -12,6 +12,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Screen } from "@/components/shell/Screen";
 import type { Pronom } from "@/types";
+import { ancreDuChapitre } from "../ancres";
 
 /* Ce que l’offre vient d’ouvrir, dit simplement : combien de chapitres restent, d’où la lecture reprend. */
 const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: number, autre?: Pronom) =>
@@ -50,7 +51,7 @@ export function UnlockedScreen({
   useSoundOnce("debloque");
   /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
   useEffect(() => apresDeblocage(), []);
-  const suite = next ?? `/rapport#chapitre-${reprise}`;
+  const suite = next ?? `/rapport#${ancreDuChapitre(reprise)}`;
   return (
     <Screen
       mise="colonne"

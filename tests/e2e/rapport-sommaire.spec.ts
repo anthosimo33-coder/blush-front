@@ -76,11 +76,11 @@ test("sommaire sur téléphone : la feuille suit la lecture, et les chapitres fe
 });
 
 /*
- * Bug : dans la feuille du sommaire, un chapitre fermé n’est dit que par son titre ; le cadenas est une icône muette.
- * La colonne (ordinateur) et la liste du rapport disent « (verrouillé) » (LockRow, src/components/ui/progress.tsx:154).
- * src/app/rapport/ReportScreen.tsx:616-625 : l’InsetRow des chapitres fermés n’a pas ce texte pour les lecteurs d’écran.
+ * Dans la feuille du sommaire, le cadenas d’un chapitre fermé est une icône muette : son titre dit « (verrouillé) » aux
+ * lecteurs d’écran, comme la colonne (ordinateur) et la liste du rapport (LockRow, src/components/ui/progress.tsx).
+ * L’InsetRow des chapitres fermés : FeuilleSommaire, src/app/rapport/Sommaire.tsx.
  */
-test.fixme("sommaire sur téléphone : les chapitres fermés se disent fermés aux lecteurs d’écran", async ({ page }, testInfo) => {
+test("sommaire sur téléphone : les chapitres fermés se disent fermés aux lecteurs d’écran", async ({ page }, testInfo) => {
   test.skip(surOrdinateur(page), "la feuille du sommaire est celle du téléphone");
   await lectureFaite(page, testInfo, emailLibre(testInfo, "sommaire-a11y"));
   await ouvrirLeRapport(page);

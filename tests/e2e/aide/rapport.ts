@@ -139,7 +139,7 @@ export async function allerAuChapitre(page: Page, numero: number, titre: string)
 
 /**
  * Pose où la lecture du rapport de cette histoire s’était arrêtée (son chapitre), dans le navigateur, avant que le rapport
- * ne le lise : il propose alors d’y reprendre (src/app/rapport/ReportScreen.tsx).
+ * ne le lise : il propose alors d’y reprendre (src/app/rapport/useReprise.ts).
  */
 export async function poserLaReprise(page: Page, histoire: string, chapitre: number): Promise<void> {
   await page.addInitScript(({ cle, histoire, chapitre }) => localStorage.setItem(cle, JSON.stringify({ [histoire]: chapitre })), { cle: CLE_REPRISE, histoire, chapitre });

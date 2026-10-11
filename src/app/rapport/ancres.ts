@@ -20,9 +20,7 @@ export function chapitreDeLAncre(hash: string): number | null {
 /** La section d’un chapitre dans la page, si elle y est. */
 export const sectionDuChapitre = (n: number) => document.getElementById(ancreDuChapitre(n));
 
-/** La liste des chapitres qui s’écrivent : la bulle du chat se cache tant qu’elle est à l’écran (src/app/rapport/Ecriture.tsx). */
+/** La liste des chapitres qui s’écrivent : la pastille d’écriture s’efface tant qu’elle est à l’écran (src/app/rapport/Ecriture.tsx). */
 export const ID_SUITE_ECRITURE = "suite-ecriture";
 /** « Parler à BLUSH », au pied du rapport : la bulle du chat se cache tant qu’il est à l’écran (src/app/rapport/ChatBubble.tsx). */
 export const ID_PARLER_A_BLUSH = "cta-chat";
-/** Le titre de la feuille du sommaire (mobile), qui la nomme. */
-export const ID_TITRE_SOMMAIRE = "sommaire-titre";

@@ -7,5 +7,5 @@
 /** Le parcours de l’onglet (sessionStorage) : src/state/journey.tsx. */
 export const CLE_PARCOURS = "blush.journey.v1";
 
-/** Où tu t’étais arrêté dans le rapport, conv par conv (localStorage) : src/app/rapport/ReportScreen.tsx. */
+/** Où tu t’étais arrêté dans le rapport, conv par conv (localStorage) : src/app/rapport/useReprise.ts. */
 export const CLE_REPRISE = "blush.rapport.reprise.v2";
