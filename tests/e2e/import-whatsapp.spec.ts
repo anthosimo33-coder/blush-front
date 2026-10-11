@@ -248,7 +248,7 @@ test.describe("sur un téléphone Android", () => {
 
 /*
  * La durée de la conv se lit deux fois, à quelques secondes d’écart : « 64 messages en 4 jours » pendant la lecture
- * (prompts/lib/trouvailles.ts:92 compte du 4 au 7 septembre compris), puis « 3 jours » sur la première carte du verdict
+ * (src/server/ecrans/trouvailles.ts:91 compte du 4 au 7 septembre compris), puis « 3 jours » sur la première carte du verdict
  * (src/server/conv-affichee.ts, storyAffichee, ne compte pas le premier jour : deux jours de messages y font « 1 jour »). Le bon compte,
  * partout : 4 jours.
  */

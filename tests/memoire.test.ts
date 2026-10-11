@@ -30,9 +30,9 @@ describe("mise à jour de la mémoire (seulement ce qui change)", () => {
         niveau: { niveau: "ensemble", tendance: "↗", pourquoi: "il le dit", preuves: [] },
       }),
     );
-    expect(e.memoire!.moments.map((m) => m.quand)).toEqual(["2026-04-21", "2026-05-17"]);
-    expect(e.fiche!.faits.map((f) => [f.texte, f.statut])).toEqual([["Partiel déplacé au 23 mai", "nouveau"]]);
-    expect(e.memoire!.a_venir).toEqual([]);
+    expect(e.memoire.moments.map((m) => m.quand)).toEqual(["2026-04-21", "2026-05-17"]);
+    expect(e.fiche.faits.map((f) => [f.texte, f.statut])).toEqual([["Partiel déplacé au 23 mai", "nouveau"]]);
+    expect(e.memoire.a_venir).toEqual([]);
     expect(e.niveau!.niveau).toBe("ensemble");
     expect(e.questions).toEqual(etat.questions);
   });

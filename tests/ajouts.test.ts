@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { blocAjout, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import type { Requete } from "@prompts/lib/contextes";
-import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
 import { estLigneProfil } from "@prompts/lib/ligne";
 
 /* after() de Next ne vit que dans une requête : ici, on garde ce qui devait partir après la réponse, pour le lancer soi-même */
@@ -19,6 +18,8 @@ import { problemeAjout } from "@/lib/messages-erreur";
 import { ErreurApi } from "@/types/erreurs-api";
 import { transcrire } from "@/server/ia/transcription";
 import { executerChaine } from "@/server/pipeline";
+import { faitsAffiches } from "@/server/ecrans/fiche";
+import { messagesAffiches } from "@/server/ecrans/messages";
 import { captures, memoire, msg } from "./aide/fabriques";
 import { texteDeConv } from "./aide/fichiers";
 import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";

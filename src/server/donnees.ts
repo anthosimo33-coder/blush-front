@@ -14,6 +14,8 @@ import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_R
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { echecDe } from "./erreurs";
+import { faitsAffiches } from "./ecrans/fiche";
+import { verdictAffiche } from "./ecrans/rapport";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
@@ -25,7 +27,6 @@ import { aRelancer, etatDesTaches } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
 import { jourRelatif } from "./temps";
-import { faitsAffiches, verdictAffiche } from "@prompts/lib/front";
 
 /*
  * Les données des écrans, dans les types du front. Utilisées par les pages serveur et par les routes /api. Ici, ce qui
@@ -136,7 +137,7 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
   };
 }
 
-/** Pendant la lecture : les trouvailles calculées par le code (lib/trouvailles.ts), une de plus tous les 20 %. */
+/** Pendant la lecture : les trouvailles calculées par le code (ecrans/trouvailles.ts), une de plus tous les 20 %. */
 function decouvertes(story: Ligne, p: number): string[] {
   return (contexteDe(story)?.trouvailles ?? []).slice(0, Math.min(3, Math.floor(p * 5)));
 }

@@ -155,7 +155,7 @@ export type Verdict = {
   short: string;
   title: string;
   subtitle: string;
-  /* Le serveur envoie aussi `difficult` (prompts/lib/front.ts), que le front ne lit pas : une alerte de danger se voit à `ReportPayload.sober` (src/services/api.ts) */
+  /* Le serveur envoie aussi `difficult` (src/server/ecrans/rapport.ts), que le front ne lit pas : une alerte de danger se voit à `ReportPayload.sober` (src/services/api.ts) */
 };
 
 /** Une ligne du vocal de BLUSH : ce qu’elle dit, quand (en secondes), mot par mot, et le message de leur conv qu’elle cite. */

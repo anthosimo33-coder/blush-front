@@ -1,12 +1,12 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
-import { messagesAffiches } from "@prompts/lib/front";
 import type { Vocal } from "@prompts/lib/schemas";
 import { minuter, texteDit } from "@/lib/vocal";
 import type { EvenementEcoute, VocalLigne, VocalRapport, Voix } from "@/types";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { PREDICATS } from "./depot";
+import { messagesAffiches } from "./ecrans/messages";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
 import { COUPE_VOIX, dire, scriptQuiTient, voixPour } from "./ia/voix";
 

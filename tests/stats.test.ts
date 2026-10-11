@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
 import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";

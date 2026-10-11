@@ -1,9 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import type { ChapitreAffiche, SobreAffiche } from "@prompts/lib/front";
 import type { Echange } from "@prompts/lib/memoire";
 import type { Memoire, Plan, Rapport } from "@prompts/lib/schemas";
-import type { BlushAnswer, VocalLigne } from "@/types";
+import type { BlushAnswer, Chapter, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import type { Meta } from "./histoires";
 import type { VerdictPartage } from "./partages";
@@ -49,7 +48,7 @@ export type Formes = {
   "reports.plan": Plan;
   "reports.data": DonneesRapport;
   /** Les chapitres déjà finis, le temps que le rapport s’écrive (src/server/analyse.ts, rapportChapitres). */
-  "reports.partiel": ChapitreAffiche[];
+  "reports.partiel": Chapter[];
   "memories.data": DonneesMemoire;
   "chat_messages.data:toi": MessageToi;
   "chat_messages.data:blush": MessageBlush;
@@ -116,8 +115,8 @@ const MemoireGardee = z.looseObject({
 /* Le rapport suit le prompt 05 (sa sortie, ses blocs) : on vérifie ce que les écrans et le vocal lisent sans le modèle */
 const RapportGarde = z.looseObject({
   sortie: objet<Rapport>(),
-  chapitres: z.array(objet<ChapitreAffiche>()),
-  sobre: objet<SobreAffiche>().nullable(),
+  chapitres: z.array(objet<Chapter>()),
+  sobre: objet<SoberReport>().nullable(),
   lecture: z.looseObject({ free: z.string(), full: z.string() }),
 });
 

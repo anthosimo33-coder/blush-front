@@ -3,14 +3,15 @@ import { partialParse } from "@anthropic-ai/sdk/_vendor/partial-json-parser/pars
 import { desc, eq } from "drizzle-orm";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
-import { bullesAffichees, messagesAffiches, type MessageAffiche } from "@prompts/lib/front";
 import { parIdentifiant } from "@prompts/lib/ligne";
-import type { Echange } from "@prompts/lib/memoire";
+import { estFaite, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
-import type { BlushAnswer, EvenementChat, LevelId } from "@/types";
+import type { BlushAnswer, EvenementChat, Message } from "@/types";
 import { ErreurTache } from "./erreurs";
+import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
+import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
@@ -79,7 +80,7 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
  * l’envoi s’arrête aussi. `vocal` : la réponse doit partir en vocal, ses bulles ne s’affichent pas, sauf avec une
  * alerte (elle reste écrite).
  */
-function bullesAuFil(lignes: Map<string, string>, messages: Map<string, MessageAffiche>, vocal: boolean, emettre: (e: EvenementChat) => void) {
+function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>, vocal: boolean, emettre: (e: EvenementChat) => void) {
   let montrees = 0;
   let arret = false;
   let lu = 0;
@@ -100,8 +101,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, MessageA
       const ids = Array.isArray(preuves) ? preuves.filter((x): x is string => typeof x === "string") : [];
       if (typeof t !== "string" || !Array.isArray(preuves) || introuvables(ids, lignes).length || recopieLesPrompts(`${texte} ${t}`, textesSysteme)) return void (arret = true);
       texte += ` ${t}`;
-      /* Seule `lecture` compte pour bullesAffichees ici : la bulle telle que la réponse la montrera */
-      emettre({ bulle: bullesAffichees({ lecture: [{ texte: t, preuves: ids }] } as ReponseChat, messages).bubbles[0] });
+      /* La bulle telle que la réponse la montrera */
+      emettre({ bulle: bulleAffichee({ texte: t, preuves: ids }, messages) });
     }
   };
   return { surAvance, montrees: () => montrees };
@@ -130,6 +131,9 @@ export async function repondre(
   const h = histoireDe(meta);
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
+  /* Une mémoire gardée est toujours faite (la création refuse une sortie sans mémoire ni fiche) */
+  const etat = memoire.etat;
+  if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
   const nouvelles = ajout?.ajout.lignes ?? [];
   const lignes = new Map([...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
@@ -140,7 +144,7 @@ export async function repondre(
     aujourdhui: jour.t,
     chiffres: ctx.chiffres,
     fin: ctx.fin,
-    etat: memoire.etat,
+    etat,
     lignes,
     editions: editionsBornees(memoire.editions),
     style: ctx.style,
@@ -174,7 +178,7 @@ export async function repondre(
   /* Le garde-fou : une réponse qui recopie les prompts est remplacée */
   const fuite = recopieLesPrompts(texteDe(sortie), textesSysteme);
   if (fuite) console.warn(`garde-fou : réponse remplacée (histoire ${story.id})`);
-  const avant = memoire.etat.niveau?.niveau ?? null;
+  const avant = etat.niveau?.niveau ?? null;
   /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
   const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;
   if (modeVocal !== story.chatVocal) await db().update(schema.stories).set({ chatVocal: modeVocal }).where(eq(schema.stories.id, story.id));
@@ -184,7 +188,7 @@ export async function repondre(
     ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })), modeVocal }
     : {
         ...bullesAffichees(sortie, messages),
-        ...(sortie.niveau_atteint && sortie.niveau_atteint !== avant ? { levelUp: sortie.niveau_atteint as LevelId } : {}),
+        ...(sortie.niveau_atteint && sortie.niveau_atteint !== avant ? { levelUp: sortie.niveau_atteint } : {}),
         modeVocal,
       };
   const resumeGarde = fuite ? REFUS_FUITE.join(" / ") : resume(sortie);

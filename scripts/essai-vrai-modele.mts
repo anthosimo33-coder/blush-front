@@ -6,7 +6,8 @@
  */
 import { readFileSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
-import { executerChaine, type DonneesRapport, type DonneesVerdict, type DonneesMemoire } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
+import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "@/server/stockage/types";
 import { repondre } from "@/server/chat";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";

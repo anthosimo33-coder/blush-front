@@ -2,10 +2,10 @@ import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres
 import { peut } from "@/lib/acces";
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
 import type { Chapter, Echec, Plan, VocalRapport } from "@/types";
-import { verdictAffiche, type ChapitreAffiche } from "@prompts/lib/front";
 import type { Plan as PlanDuRapport, Verdict } from "@prompts/lib/schemas";
 import { avanceChapitres, CHAPITRES_PAR_MOITIE, DUREES_MS, ECRITURE_MAX, PART_DU_PLAN, RYTHME_FIABLE } from "../avancement";
 import { echecDe } from "../erreurs";
+import { verdictAffiche } from "../ecrans/rapport";
 import type { DonneesRapport, DonneesVerdict } from "../stockage/types";
 import { enMarche, vocalTente, type EtatTaches } from "../chaine";
 import type { vocalLu } from "../vocal";
@@ -31,7 +31,7 @@ export type RapportLu = {
   /** Le plan du rapport, pendant l’écriture : ses vrais titres. Ignoré sans l’accès. */
   plan: PlanDuRapport | null;
   /** Les chapitres déjà finis, pendant l’écriture. Ignorés sans l’accès. */
-  partiels: ChapitreAffiche[];
+  partiels: Chapter[];
   /** La dernière tâche de chaque genre de la chaîne (vide quand le rapport est fermé : rien n’est regardé). */
   taches: EtatTaches;
   vocal: VocalLu;

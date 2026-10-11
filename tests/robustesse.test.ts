@@ -8,7 +8,7 @@ import type { Requete } from "@prompts/lib/contextes";
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
-import type { DonneesVerdict } from "@/server/analyse";
+import type { DonneesVerdict } from "@/server/stockage/types";
 import { compteDe, preparerCode, prendreCode, type Utilisateur } from "@/server/auth";
 import { dechiffrer, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";

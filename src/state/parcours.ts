@@ -1,4 +1,4 @@
-import type { Goal, Guess } from "@/types";
+import type { Goal, Guess, Pronom } from "@/types";
 import type { JourneyState } from "./journey";
 
 /*
@@ -8,7 +8,7 @@ import type { JourneyState } from "./journey";
  */
 
 /** Le parcours, « Qui es-tu ? » complet. */
-type QuiRempli = JourneyState & { me: string; pronom: "il" | "elle"; guess: Guess; goal: Goal };
+type QuiRempli = JourneyState & { me: string; pronom: Pronom; guess: Guess; goal: Goal };
 
 /**
  * La conv de cet onglet vient-elle de captures ? Son dernier import le dit : un export laisse son nom de fichier dans le

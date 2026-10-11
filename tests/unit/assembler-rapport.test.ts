@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { ChapitreAffiche, SobreAffiche } from "@prompts/lib/front";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
 import { CHAPITRES_PAYANTS, titreDAttente } from "@/contenu/chapitres";
 import type { Tache } from "@/server/taches";
 import { assemblerRapport, type RapportLu } from "@/server/presentation/rapport";
+import type { Chapter, SoberReport } from "@/types";
 
 /*
  * Le rapport tel que le front l’affiche, assemblé d’après ce qui est lu (src/server/presentation/rapport.ts) :
@@ -28,8 +28,8 @@ const VERDICT: Verdict = {
 };
 const ALERTE: Verdict = { ...VERDICT, alerte: "danger", mode_sobre: true };
 const SORTIE: Rapport = { alerte: null, mode_sobre: false, decouvertes: [], these: "Elle avance, il recule.", chapitres: [], sobre: null };
-const chapitre = (n: number): ChapitreAffiche => ({ number: n, title: `Chapitre ${n}`, tocTitle: `Ch. ${n}`, free: n === 1, blocks: [{ kind: "essential", text: `Le contenu du chapitre ${n}.` }] });
-const SOBRE: SobreAffiche = {
+const chapitre = (n: number): Chapter => ({ number: n, title: `Chapitre ${n}`, tocTitle: `Ch. ${n}`, free: n === 1, blocks: [{ kind: "essential", text: `Le contenu du chapitre ${n}.` }] });
+const SOBRE: SoberReport = {
   intro: "On va parler doucement.",
   title: "Ce que tu vis n’est pas normal.",
   facts: "Il revient sans cesse sur tes sorties.",

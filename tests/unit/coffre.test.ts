@@ -1,12 +1,12 @@
 import { getTableColumns, getTableName, is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import type { ChapitreAffiche } from "@prompts/lib/front";
 import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
 import { chiffrer } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import * as schema from "@/server/db/schema";
 import type { Meta } from "@/server/histoires";
+import type { Chapter } from "@/types";
 
 /*
  * Le coffre (src/server/coffre.ts) : chaque colonne chiffrée a sa forme, s’écrit et se relit par elle. Les lignes
@@ -53,7 +53,7 @@ const MEMOIRE: Memoire = {
   niveau: null,
   questions: ["Tu lui proposes quoi ?"],
 };
-const CHAPITRE: ChapitreAffiche = { number: 2, title: "Le premier verre", tocTitle: "Le verre", free: false, blocks: [{ kind: "essential", text: "Elle propose." }] };
+const CHAPITRE: Chapter = { number: 2, title: "Le premier verre", tocTitle: "Le verre", free: false, blocks: [{ kind: "essential", text: "Elle propose." }] };
 const META: Meta = {
   appli: "whatsapp",
   format: "whatsapp-ios",

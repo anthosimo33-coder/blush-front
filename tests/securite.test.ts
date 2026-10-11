@@ -68,7 +68,7 @@ import { POST as postVideo } from "@/app/api/captures/video/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
 import { POST as postImport } from "@/app/api/import/route";
 import { GET as getReveil } from "@/app/api/reveil/route";
-import { editionsBornees, type DonneesMemoire } from "@/server/analyse";
+import { editionsBornees, type DonneesMemoire } from "@/server/stockage/types";
 import { empreinteDeLaListe, inscrire } from "@/server/attente";
 import { envoyerCode, ouvrirSession, preparerCode } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";

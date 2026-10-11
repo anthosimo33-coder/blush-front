@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Chiffres, Message } from "@prompts/lib/conv";
-import { scores } from "@prompts/lib/front";
 import { profil } from "@prompts/lib/style";
+import { scores } from "@/server/ecrans/rapport";
 
 /*
  * Ce que le code calcule seul, sans le modèle ni la base : les scores du chapitre 1 (qui ouvre, qui reprend, qui
@@ -43,8 +43,8 @@ describe("les scores du chapitre 1", () => {
     expect(ouvre(7, 3)).toMatchObject({ captionLeft: "toi, 7 fois sur 10" });
     expect(ouvre(7, 3).captionRight).toBeUndefined();
     expect(ouvre(3, 7)).toMatchObject({ captionRight: "léa, 7 fois sur 10" });
-    /* Le séparateur n’est pas figé : l’insécable avant « : » reste à corriger dans prompts/lib/front.ts */
-    expect(ouvre(5, 5)).toMatchObject({ captionLeft: expect.stringMatching(/^toi\s:\s5$/u), captionRight: expect.stringMatching(/^léa\s:\s5$/u) });
+    /* L’insécable avant « : » : le compte ne part pas seul à la ligne */
+    expect(ouvre(5, 5)).toMatchObject({ captionLeft: "toi\u00a0: 5", captionRight: "léa\u00a0: 5" });
   });
 
   it("rien à comparer (des captures sans heures) : à égalité, au milieu", () => {

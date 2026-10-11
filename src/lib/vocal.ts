@@ -2,10 +2,11 @@
  * Le vocal du rapport : ce que dit BLUSH, et quand elle le dit, calé sur l’audio.
  * Le serveur minute le script une fois (d’après l’alignement que renvoie la voix) ; le front n’a plus qu’à suivre le temps.
  */
+import type { Vocal } from "@prompts/lib/schemas";
 import type { VocalLigne } from "@/types";
 
-/** Une ligne du script, telle que l’écrit le modèle (prompt 06). */
-export type LigneScript = { jeu: string | null; texte: string; punch: boolean; preuve: string | null };
+/** Une ligne du script, telle que l’écrit le modèle (prompt 06, Sortie06). */
+export type LigneScript = Vocal["lignes"][number];
 
 /** L’alignement que renvoie la voix : un temps de début et de fin (en secondes) pour chaque caractère du texte envoyé. */
 export type Alignement = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };

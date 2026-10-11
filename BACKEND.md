@@ -110,7 +110,8 @@ Ce qui relie les écrans par l’adresse :
   ```bash
   git submodule update --init
   ```
-- **La logique partagée :** `prompts/lib/` contient la lecture des exports, les chiffres, le contexte de chaque tâche, les formats de sortie et l’affichage. Le banc de test l’utilise aussi : l’appli envoie au modèle exactement ce qui a été testé.
+- **La logique partagée :** `prompts/lib/` contient la lecture des exports, les chiffres, le contexte de chaque tâche et les formats de sortie : tout ce que le modèle lit et écrit. Le banc de test l’utilise aussi : l’appli envoie au modèle exactement ce qui a été testé.
+- **Ce que l’appli en montre :** les sorties du modèle deviennent les types du front (`src/types`) dans `src/server/ecrans` : le rapport, le verdict, les scores, sa fiche, les bulles du chat, les trouvailles de la lecture, et leurs libellés. Le sous-module ne connaît pas les types du front.
 - **Ils ne quittent pas le serveur :** `scripts/prompts.mjs` (lancé avant `dev`, `build` et `test`) copie les textes dans `src/server/ia/textes.generated.ts`. Ce module n’est importé que côté serveur, et il n’est pas commité.
 - **Le contrôle de fuite :** après chaque build, `scripts/verifier-fuite.mjs` cherche des phrases des prompts dans ce que reçoit le navigateur. S’il en trouve une, le build échoue.
 - **Le garde-fou du chat :** une réponse qui recopie un prompt est remplacée (`src/server/ia/garde.ts`).

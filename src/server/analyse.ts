@@ -2,19 +2,21 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore } from "@prompts/lib/front";
-import { appliquerMaj, citees, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
+import { appliquerMaj, citees, estFaite, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
-import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
+import type { Chapter, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
+import { messagesAffiches } from "./ecrans/messages";
+import { chapitresAffiches, scores, sobreAffiche, tempsDeLecture } from "./ecrans/rapport";
+import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
 import type { Avance } from "./ia/claude";
@@ -33,14 +35,6 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
  * mémoire et ses mises à jour). Chacune lit ce qu’il lui faut, appelle le modèle et garde ce qu’il écrit ; elle ne
  * planifie rien. Le moteur (src/server/pipeline.ts) les exécute une à une et décide de la suite (`suite`).
  */
-
-/*
- * Repris ici pour les modules qui les lisent encore à cette adresse : le moteur est dans pipeline.ts, les formes
- * gardées dans stockage/types.ts. Ces reprises partent au lot 9a (retrait des ré-exportations), ou avant, au fil des
- * lots qui tiennent leurs importeurs : 7c (scripts/essai-vrai-modele.mts), et les tests de leurs zones.
- */
-export { executerChaine } from "./pipeline";
-export { editionsBornees, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -148,13 +142,13 @@ const dansLaMoitie = (n: number, premier: Moitie) => n >= premier && n < premier
  * rapport. `surAvance(premier, signal)` : le suivi du flux d’une moitié ; `enregistre()` : la fin des écritures en cours
  * (l’une après l’autre).
  */
-function suiviDesChapitres(story: Ligne, t: Tache, messages: ReturnType<typeof messagesAffiches>, lignesScores: LigneScore[]) {
+function suiviDesChapitres(story: Ligne, t: Tache, messages: ReturnType<typeof messagesAffiches>, lignesScores: ScoreRow[]) {
   const detail: DetailEcriture = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
   const ecrire = ecrireAvance(t.id);
   const prets = new Map<number, Chapitre>();
   let enregistrement = Promise.resolve();
   const garderPrets = () => {
-    const affiches = chapitresAffiches({ chapitres: [...prets.values()].sort((x, y) => x.numero - y.numero) } as Rapport, messages, lignesScores);
+    const affiches = chapitresAffiches([...prets.values()].sort((x, y) => x.numero - y.numero), messages, lignesScores);
     enregistrement = enregistrement
       .then(() => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
       .then(() => undefined, () => undefined);
@@ -229,14 +223,14 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
 }
 
 /** Le temps de lecture d’un rapport écrit : en entier, et ses chapitres offerts (estOffert, pas le `free` du modèle). */
-export const lectureDe = (chapitres: ChapitreAffiche[]): DonneesRapport["lecture"] => ({
+export const lectureDe = (chapitres: Chapter[]): DonneesRapport["lecture"] => ({
   free: tempsDeLecture(chapitres.filter((c) => estOffert(c.number))),
   full: tempsDeLecture(chapitres),
 });
 
-async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: LigneScore[]) {
+async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
   const h = histoireDe(metaDe(story));
-  const chapitres = chapitresAffiches(r, messagesAffiches(lignes, h.utilisateur.prenom), lignesScores);
+  const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, h.utilisateur.prenom), lignesScores);
   const donnees: DonneesRapport = {
     sortie: r,
     chapitres,
@@ -332,7 +326,7 @@ async function memoire(story: LigneComplete) {
   if (!v || !ligne?.data) throw new ErreurTache("rapport_absent");
   const r = coffre.lire("reports.data", ligne.data).sortie;
   const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, { preuves: preuvesMemoire, lignes: rendu.lignes, storyId: story.id, etiquette: "memoire" });
-  if (!etat.memoire || !etat.fiche) throw new ErreurTache("memoire_vide");
+  if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
   const gardees = [...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!] as [string, string]);
   const data = coffre.ecrire("memories.data", { etat, lignes: gardees, suivant: lu.messages.length + 1 });
   await db()
@@ -356,16 +350,17 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const ecrite = await modifierMemoire(
     story.id,
     async (avant) => {
-      const lignes = new Map(avant.lignes);
-      const suivant = { n: avant.suivant };
-      const nouveau = rendreNouveau(ech, h, lignes, suivant);
-      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
+      /* Une mémoire gardée est toujours faite (la création refuse une sortie sans mémoire ni fiche) */
+      if (!estFaite(avant.etat)) throw new ErreurTache("memoire_vide");
+      const nouveau = rendreNouveau(ech, h, avant.suivant);
+      const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
+      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.texte, editionsBornees(avant.editions));
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
       const maj = await appelVerifie(req, Maj07, { preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, storyId: story.id, etiquette: "memoire_maj", partie: "mise à jour" });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
       const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
-      return { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
+      return { etat, lignes: gardees, suivant: nouveau.suivant, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
     },
     { essais: 2 },
   );

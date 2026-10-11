@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
-import { executerChaine } from "@/server/analyse";
+import { executerChaine } from "@/server/pipeline";
 import type { Utilisateur } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { definirQui, depuisFichier, importer, rattacherBrouillon, type LigneComplete, type Meta } from "@/server/histoires";

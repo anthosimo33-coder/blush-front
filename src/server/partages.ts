@@ -1,7 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { verdictAffiche } from "@prompts/lib/front";
 import type { Plan } from "@/types";
 import type { CibleImage } from "@/types/api";
 import type { CodeErreur } from "@/types/erreurs-api";
@@ -11,6 +10,7 @@ import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { chapitresEcrits, donneesVerdict } from "./depot";
 import { echangeDuChat } from "./historique";
+import { verdictAffiche } from "./ecrans/rapport";
 import { ErreurPublique } from "./erreurs";
 import { metaDe, type Ligne } from "./histoires";
 import { ouvertureDu } from "./presentation/rapport";

@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { blocAjout, numeroter } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, rendre, type Histoire, type Message } from "@prompts/lib/conv";
-import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
 import { estLigneMessage, estLigneProfil, idDeLigne, idMessage, ligneMessage, ligneProfil, lireLigne, parIdentifiant, rangDe } from "@prompts/lib/ligne";
-import { rendreMemoire, rendreNouveau } from "@prompts/lib/memoire";
+import { rendreMemoire, rendreNouveau, type Echange } from "@prompts/lib/memoire";
+import { faitsAffiches } from "@/server/ecrans/fiche";
+import { messagesAffiches } from "@/server/ecrans/messages";
 import { captures, memoire, msg } from "../aide/fabriques";
 
 /*
@@ -79,34 +80,29 @@ describe("les lignes de la conv, à l’octet", () => {
   });
 
   it("la mémoire : les messages ajoutés par capture et les lignes déjà numérotées", () => {
-    const lignes = new Map<string, string>();
-    const suivant = { n: 9998 };
-    const nouveau = rendreNouveau(
-      {
-        date: "2024-02-21",
-        messages: [
-          { qui: "toi", quand: "2024-02-21 10:02", texte: "tu fais quoi" },
-          { qui: "autre", quand: "2024-02-21 10:09", texte: "rien et toi" },
-          { qui: "autre", quand: "2024-02-21 10:10", texte: "mdr" },
-        ],
-        lignes: ["m10001 2024-02-21 mer. 11:00 Inès : ok", "m10002 2024-02-21 mer. --:-- profil de Inès : 24 ans"],
-        dit: "elle m’a répondu",
-        reponse: ["Ok.", "Elle relance."],
-      },
-      h,
-      lignes,
-      suivant,
-    );
-    expect(empreinte(nouveau)).toBe("22202185409dca34");
-    expect(empreinte([...lignes])).toBe("947c162c4461b5e9");
-    expect(suivant.n).toBe(10001);
+    const echange: Echange = {
+      date: "2024-02-21",
+      messages: [
+        { qui: "toi", quand: "2024-02-21 10:02", texte: "tu fais quoi" },
+        { qui: "autre", quand: "2024-02-21 10:09", texte: "rien et toi" },
+        { qui: "autre", quand: "2024-02-21 10:10", texte: "mdr" },
+      ],
+      lignes: ["m10001 2024-02-21 mer. 11:00 Inès : ok", "m10002 2024-02-21 mer. --:-- profil de Inès : 24 ans"],
+      dit: "elle m’a répondu",
+      reponse: ["Ok.", "Elle relance."],
+    };
+    const nouveau = rendreNouveau(echange, h, 9998);
+    expect(empreinte(nouveau.texte)).toBe("22202185409dca34");
+    expect(empreinte([...nouveau.lignes])).toBe("947c162c4461b5e9");
+    expect(nouveau.suivant).toBe(10001);
+    /* Rien de ce qu’elle reçoit ne change : un second essai rend le même bloc, avec les mêmes identifiants */
+    expect(rendreNouveau(echange, h, 9998)).toEqual(nouveau);
   });
 
   it("la mémoire : un message ajouté sur plusieurs lignes reste une ligne (« ⏎ », comme dans la conv)", () => {
-    const lignes = new Map<string, string>();
-    const nouveau = rendreNouveau({ date: "2024-02-21", messages: [{ qui: "autre", quand: "2024-02-21 10:09", texte: "a\nb" }] }, h, lignes, { n: 12 });
-    expect(nouveau).toBe('<nouveau date="2024-02-21 mer.">\nmessages ajoutés à la conv, par capture :\nm0012 2024-02-21 mer. 10:09 Inès : a ⏎ b\n</nouveau>');
-    expect(lignes.get("m0012")).toBe("m0012 2024-02-21 mer. 10:09 Inès : a ⏎ b");
+    const nouveau = rendreNouveau({ date: "2024-02-21", messages: [{ qui: "autre", quand: "2024-02-21 10:09", texte: "a\nb" }] }, h, 12);
+    expect(nouveau.texte).toBe('<nouveau date="2024-02-21 mer.">\nmessages ajoutés à la conv, par capture :\nm0012 2024-02-21 mer. 10:09 Inès : a ⏎ b\n</nouveau>');
+    expect(nouveau.lignes.get("m0012")).toBe("m0012 2024-02-21 mer. 10:09 Inès : a ⏎ b");
   });
 
   it("les preuves affichées et les sources de sa fiche", () => {

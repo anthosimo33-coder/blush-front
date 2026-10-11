@@ -1,4 +1,5 @@
-import { Maj07, Sortie01, Sortie05, Sortie07, type Captures, type Chapitre, type Maj, type Memoire, type Rapport } from "@prompts/lib/schemas";
+import { estFaite, type MemoireFaite } from "@prompts/lib/memoire";
+import { Maj07, Sortie01, Sortie07, type Captures, type Chapitre, type Maj, type Memoire } from "@prompts/lib/schemas";
 
 /*
  * Des sorties des prompts fabriquées pour les tests, sans base ni modèle : le test ne donne que ce qu’il regarde, le
@@ -22,13 +23,16 @@ export const lotVideo = (autre = "Léa", k0 = 0) =>
 const MEMOIRE: NonNullable<Memoire["memoire"]> = { ou_on_en_est: "Vus deux fois.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [] };
 const FICHE: NonNullable<Memoire["fiche"]> = { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [] };
 
-/** Une mémoire (prompt 07) : `memoire` et `fiche` complètent une mémoire et une fiche vides, le reste la remplace. */
+/** Une mémoire faite (prompt 07) : `memoire` et `fiche` complètent une mémoire et une fiche vides, le reste la remplace. */
 export const memoire = ({
   memoire: m,
   fiche: f,
   ...reste
-}: Partial<Omit<Memoire, "memoire" | "fiche">> & { memoire?: Partial<NonNullable<Memoire["memoire"]>>; fiche?: Partial<NonNullable<Memoire["fiche"]>> } = {}): Memoire =>
-  Sortie07.parse({ alerte: null, rien_de_neuf: false, niveau: null, questions: null, ...reste, memoire: { ...MEMOIRE, ...m }, fiche: { ...FICHE, ...f } });
+}: Partial<Omit<Memoire, "memoire" | "fiche">> & { memoire?: Partial<NonNullable<Memoire["memoire"]>>; fiche?: Partial<NonNullable<Memoire["fiche"]>> } = {}): MemoireFaite => {
+  const e = Sortie07.parse({ alerte: null, rien_de_neuf: false, niveau: null, questions: null, ...reste, memoire: { ...MEMOIRE, ...m }, fiche: { ...FICHE, ...f } });
+  if (!estFaite(e)) throw new Error("fabrique : une mémoire sans mémoire ni fiche");
+  return e;
+};
 
 /** Une mise à jour de la mémoire (prompt 07, Maj07) : rien ne change, sauf ce que `m` donne. */
 export const maj = (m: Partial<Maj> = {}): Maj =>
@@ -53,6 +57,3 @@ export const maj = (m: Partial<Maj> = {}): Maj =>
 
 /** Un chapitre du rapport (prompt 05), sans bloc (sauf ce que `autres` change). */
 export const chapitre = (numero: number, autres: Partial<Chapitre> = {}): Chapitre => ({ numero, titre: `Chapitre ${numero}`, titre_court: `Ch. ${numero}`, surtitre: null, blocs: [], ...autres });
-
-/** Un rapport (prompt 05) : ses chapitres, sans alerte ni découverte. */
-export const rapport = (chapitres: Chapitre[]): Rapport => Sortie05.parse({ alerte: null, mode_sobre: false, decouvertes: [], these: "Vous jouez à cache-cache.", chapitres, sobre: null });

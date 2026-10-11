@@ -1,7 +1,6 @@
-import type { ChapitreAffiche, LigneScore, SobreAffiche } from "@prompts/lib/front";
 import type { EditionsFiche } from "@prompts/lib/memoire";
 import type { Memoire, Rapport, Verdict } from "@prompts/lib/schemas";
-import type { VocalLigne } from "@/types";
+import type { Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 
 /*
  * Ce que la chaîne garde en base, chiffré : les formes que la chaîne (analyse.ts) écrit et que les écrans (donnees.ts),
@@ -11,10 +10,10 @@ import type { VocalLigne } from "@/types";
  */
 
 /** Le verdict (prompt 04), et les lignes de scores calculées par le code. */
-export type DonneesVerdict = { sortie: Verdict; scores: LigneScore[] };
+export type DonneesVerdict = { sortie: Verdict; scores: ScoreRow[] };
 
 /** Le rapport (prompt 05), tel que le front l’affiche : ses chapitres, sa partie sobre, son temps de lecture. */
-export type DonneesRapport = { sortie: Rapport; chapitres: ChapitreAffiche[]; sobre: SobreAffiche | null; lecture: { free: string; full: string } };
+export type DonneesRapport = { sortie: Rapport; chapitres: Chapter[]; sobre: SoberReport | null; lecture: { free: string; full: string } };
 
 /**
  * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
@@ -24,7 +23,7 @@ export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivan
 
 /**
  * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans
- * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (lib/trouvailles.ts).
+ * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (ecrans/trouvailles.ts).
  */
 export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[] };
 

@@ -29,7 +29,7 @@ describe("les trouvailles de la lecture", () => {
   it("disent qui ouvre et relance, leur mot à eux sans mot banal ni prénom, et rien de plat", async () => {
     const { readFileSync } = await import("node:fs");
     const { chiffrer, lire } = await import("@prompts/lib/conv");
-    const { trouvailles } = await import("@prompts/lib/trouvailles");
+    const { trouvailles } = await import("@/server/ecrans/trouvailles");
     const h = { utilisateur: { prenom: "Léo", pronom: "il" as const, nomExport: "Léo" }, autre: { prenom: "Inès", pronom: "elle" as const, nomExport: "Inès" }, format: "whatsapp-ios" as const };
     const cas = JSON.parse(readFileSync("prompts/evals/cas.json", "utf8")) as { id: string; fichier: string; utilisateur: typeof h.utilisateur; autre: typeof h.autre }[];
     const c03 = cas.find((c) => c.id === "03")!;
