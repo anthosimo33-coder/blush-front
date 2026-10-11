@@ -6,6 +6,7 @@ import { env } from "./env";
 import { journal, journalErreur } from "./journal";
 import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
+import { NOMS_VOIX } from "./ia/voix";
 import { delaiAppel } from "./echeance";
 import { DELAI_MAIL_MS } from "./email";
 
@@ -116,7 +117,7 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
             "A/B test des voix du vocal, depuis le début :",
             ...voix.map(
               (v) =>
-                `  Voix ${v.voix} (${v.voix === "A" ? "E2" : "L2, Harmonie"}) : ${v.vocaux} vocaux, ${v.ecoutes} écoutés, ${v.finis} jusqu’au bout (${part(v.finis, v.ecoutes)}), ${v.reecoutes} réécoutés${v.jusqua == null ? "" : `, écoutés en moyenne à ${Math.round(v.jusqua * 100)} %`}`,
+                `  Voix ${v.voix} (${NOMS_VOIX[v.voix]}) : ${v.vocaux} vocaux, ${v.ecoutes} écoutés, ${v.finis} jusqu’au bout (${part(v.finis, v.ecoutes)}), ${v.reecoutes} réécoutés${v.jusqua == null ? "" : `, écoutés en moyenne à ${Math.round(v.jusqua * 100)} %`}`,
             ),
           ]
         : []),

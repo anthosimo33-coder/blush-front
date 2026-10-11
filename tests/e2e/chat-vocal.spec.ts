@@ -1,3 +1,4 @@
+import { DUREE_VOCAL_MAX_S, TAILLE_VOCAL_MAX } from "../../src/server/ia/duree-audio";
 import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureBlushPlus, litLeMp3, ouvrir, RESEAU, reponseAuGeste, tesMessagesAuChat, test } from "./aide";
 
 /*
@@ -141,13 +142,6 @@ test("au micro : un vocal annulé ne part pas ; un vocal envoyé est écouté pa
  *   - Partout : un vocal de la durée que le serveur accepte (130 s, mesurées par le serveur), à ce débit, tient
  *     sous la taille maximale du serveur. Si elle baisse, ce test dit si les vocaux de l’iPhone passent encore.
  */
-/**
- * La taille maximale d’un vocal pour le serveur : TAILLE_VOCAL_MAX, src/server/ia/transcription.ts (à suivre s’il
- * change), 130 s à 192 kb/s plus 64 Ko d’enveloppe.
- */
-const TAILLE_VOCAL_MAX_DU_SERVEUR = (130 * 192_000) / 8 + 64 * 1024;
-/** Le plus long vocal que le serveur accepte (le navigateur l’envoie tout seul à 120 s) : DUREE_VOCAL_MAX_S, au même endroit. */
-const DUREE_VOCAL_MAX_DU_SERVEUR = 130;
 
 test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigateur, tient sous sa taille maximale", async ({ page, browserName }, testInfo) => {
   await page.addInitScript(() => {
@@ -200,5 +194,5 @@ test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigat
 
   expect(secondes).toBeGreaterThanOrEqual(3.5);
   if (browserName === "chromium") expect(parSeconde, "Chromium suit les 32 kb/s demandés").toBeLessThanOrEqual(5_000);
-  expect(parSeconde * DUREE_VOCAL_MAX_DU_SERVEUR, `un vocal de ${DUREE_VOCAL_MAX_DU_SERVEUR} s à ce débit`).toBeLessThanOrEqual(TAILLE_VOCAL_MAX_DU_SERVEUR);
+  expect(parSeconde * DUREE_VOCAL_MAX_S, `un vocal de ${DUREE_VOCAL_MAX_S} s à ce débit`).toBeLessThanOrEqual(TAILLE_VOCAL_MAX);
 });

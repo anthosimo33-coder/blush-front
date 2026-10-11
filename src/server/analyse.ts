@@ -26,7 +26,7 @@ import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
 import { editionsBornees, type Contexte, type DonneesRapport } from "./stockage/types";
 import { entreeDe, type Tache } from "./taches";
-import { ErreurVoix, voixDisponible } from "./ia/voix";
+import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
 /*
@@ -238,7 +238,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
    * (la tâche « vocal », planifiée après, le refera).
    */
   const enParallele = vocal(story, v.sortie, { plan }, choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), false).catch((e) =>
-    console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache || e instanceof ErreurVoix ? e.message : (e as Error).name}`),
+    console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache ? e.message : (e as Error).name}`),
   );
   /*
    * Les chapitres sont gardés dès qu’ils sont écrits, sans attendre le vocal : une voix lente ne fait plus perdre (et
@@ -312,14 +312,23 @@ const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flat
 
 /**
  * Le vocal du rapport : le script (prompt 06, sur le verdict et le plan ou le rapport en court, jamais la conv entière),
- * puis la voix (src/server/vocal.ts). Aucun vocal quand il y a une alerte.
+ * puis la voix (src/server/vocal.ts). Aucun vocal quand il y a une alerte. Le budget de la voix (S-13) est regardé
+ * avant d’écrire le script, qui se paie : s’il ne laisse pas dire un vocal entier, ou s’il se ferme entre-temps, l’étape
+ * s’arrête sur « voix_budget » (elle repart après minuit, src/server/pipeline.ts). Une autre erreur de la voix garde
+ * son code (« voix_429 »…).
  */
 async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | { court: string }, lignes: Map<string, string>, sobre: boolean) {
   if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
+  if (await voixBloquee(story.id, "rapport")) throw new ErreurTache("voix_budget");
   const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
   const script = await appelVerifie(req, Sortie06, preuvesVocal, lignes, story.id, "vocal");
   if (script.alerte) return;
-  await enregistrerVocal(story, script, lignes, sobre);
+  try {
+    await enregistrerVocal(story, script, lignes, sobre);
+  } catch (e) {
+    if (e instanceof ErreurVoix) throw new ErreurTache(e.code.startsWith("voix_budget") ? "voix_budget" : e.code);
+    throw e;
+  }
 }
 
 /**

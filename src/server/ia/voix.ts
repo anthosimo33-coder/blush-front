@@ -1,16 +1,16 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { after } from "next/server";
-import { and, eq, gte, sql } from "drizzle-orm";
 import { texteDit, type Alignement, type LigneScript } from "@/lib/vocal";
-import { db, schema } from "../db";
 import type { Voix } from "@/types";
-import { cleDeLimiteDuCompte } from "../email-canonique";
+import { alerter } from "../alertes";
+import { payeurDe, type Payeur } from "../budget";
+import { cleDeLimiteDeLaCle } from "../email-canonique";
 import { env } from "../env";
 import { delaiAppel, tempsRestant } from "../echeance";
-import { journal } from "../journal";
-import { compteDe, compter, LIMITES } from "../limites";
-import { pause } from "../temps";
+import { auMieux, journal } from "../journal";
+import { compteDe, compter, LIMITES, rendre, sousLaLimite } from "../limites";
+import { aujourdhuiParis, pause } from "../temps";
 import { noterCout } from "./usage";
 
 /*
@@ -18,12 +18,16 @@ import { noterCout } from "./usage";
  * morceaux de leur conv : on n’envoie rien d’autre), et rend l’audio avec le temps de chaque caractère.
  *
  * Ce qu’elle peut dire est borné (S-13) : un vocal est coupé à la fin d’une phrase (COUPE_VOIX), un compte a ses
- * caractères du jour (LIMITES.voixParCompte) et tous ensemble ceux du mois (VOIX_PAR_MOIS). Au-delà, la voix ne part
- * pas (ErreurVoix « voix_budget_… ») : la réponse du chat reste écrite, le rapport reste sans vocal.
+ * caractères du jour (LIMITES.voixParCompte, dont le chat laisse au rapport de quoi dire son vocal) et tous ensemble
+ * ceux du mois (VOIX_PAR_MOIS, prévenu à 80 % puis atteint). Ils sont réservés avant l’appel, d’un coup (compter), et
+ * rendus si rien n’a été facturé. Au-delà, la voix ne part pas (ErreurVoix « voix_budget_… ») : la réponse du chat reste
+ * écrite ; le vocal du rapport attend, sans écrire son script (voixBloquee), et repart après minuit. Ce qu’elle coûte
+ * compte dans le budget de l’IA du compte (src/server/budget.ts).
  *
  * Ce qu’elle garde (S-17) : sans la non-conservation (NON_CONSERVATION), chaque vocal dit laisse un élément dans
- * l’historique du compte du prestataire, effacé juste après (effacerChezLePrestataire). La transcription des vocaux
- * reçus (src/server/ia/transcription.ts) passe par les mêmes réglages.
+ * l’historique du compte du prestataire, effacé juste après (effacerChezLePrestataire) ; un vocal rendu sans son
+ * identifiant le dit au journal (signalerSansIdentifiant). La transcription des vocaux reçus
+ * (src/server/ia/transcription.ts) passe par les mêmes réglages.
  */
 
 /* ———— Le prestataire ———— */
@@ -60,6 +64,9 @@ const REGLAGES = {
   posee: { stability: 0.5, similarity_boost: 0.75, style: 0.2 },
   joueuse: { stability: 0, similarity_boost: 0.75, style: 0.6 },
 } as const;
+
+/** Le nom de chaque voix de l’A/B test dans la bibliothèque du prestataire, pour l’équipe (le résumé de la nuit, src/server/alertes.ts). */
+export const NOMS_VOIX: Record<Voix, string> = { A: "E2", B: "L2, Harmonie" };
 
 /** L’identifiant chez le prestataire d’une des deux voix de l’A/B test (BLUSH_VOIX_A, BLUSH_VOIX_B) ; sans voix B, la A. */
 function idDeLaVoix(voix: Voix): string | undefined {
@@ -100,14 +107,82 @@ export class ErreurVoix extends Error {
  */
 export const COUPE_VOIX = { chat: 400, rapport: 700 } as const;
 
+/** Ce que la voix dit : une réponse du chat, ou le vocal du rapport. */
+type UsageVoix = keyof typeof COUPE_VOIX;
+
 /**
- * Les caractères que la voix dit pour tous, par mois (de Paris) : la somme des vocaux du mois dans le suivi des coûts.
+ * Les caractères que la voix dit pour tous, par mois (de Paris), comptés dans rate_limits (« voix:mois:AAAA-MM »).
  * TODO(produit): 100 000, sous les 121 000 de l’abonnement Creator du prestataire, à caler sur l’offre prise.
  */
 export const VOIX_PAR_MOIS = 100_000;
+/** L’équipe est prévenue quand le mois passe 80 % de VOIX_PAR_MOIS, puis quand il est atteint : une fois chacun. */
+const SEUIL_DU_MOIS = 0.8;
+/* La clé du mois porte son nom : sa fenêtre ne sert qu’à faire place nette ensuite */
+const FENETRE_DU_MOIS = { fenetreS: 40 * 86400 };
 
-/** Le premier jour du mois à Paris, à minuit, en SQL : le début du plafond du mois. */
-const DEBUT_DU_MOIS = sql`(date_trunc('month', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`;
+/** La clé du compteur du mois en cours (de Paris), dans rate_limits. */
+export const cleDuMoisDeLaVoix = (mois = aujourdhuiParis().iso.slice(0, 7)) => `voix:mois:${mois}`;
+
+/**
+ * Les caractères du jour d’un compte pour cet usage : le chat s’arrête avant, en laissant au vocal du rapport sa coupe
+ * entière (COUPE_VOIX.rapport). TODO(produit): la réserve du rapport (700 caractères pris sur les 6 000 du jour).
+ */
+const plafondDuCompte = (pour: UsageVoix) => LIMITES.voixParCompte.max - (pour === "chat" ? COUPE_VOIX.rapport : 0);
+
+/**
+ * La voix pourrait-elle dire, pour cette conv, un vocal entier de cet usage (sa coupe) ? Sans rien compter : le vocal
+ * du rapport le demande avant d’écrire son script (src/server/analyse.ts), qui ne serait pas dit. Rend le code qui le
+ * bloque, ou null.
+ */
+export async function voixBloquee(storyId: string, pour: UsageVoix): Promise<"voix_budget_compte" | "voix_budget_mois" | null> {
+  const payeur = await payeurDe(storyId);
+  const longueur = COUPE_VOIX[pour];
+  if (payeur && (await compteDe(cleDeLimiteDeLaCle("voix", payeur), LIMITES.voixParCompte)) + longueur > plafondDuCompte(pour)) return "voix_budget_compte";
+  if ((await compteDe(cleDuMoisDeLaVoix(), FENETRE_DU_MOIS)) + longueur > VOIX_PAR_MOIS) return "voix_budget_mois";
+  return null;
+}
+
+/**
+ * Réserve `longueur` caractères pour ce payeur aujourd’hui et pour tous ce mois-ci, d’un coup (deux appels en même
+ * temps ne dépassent pas ensemble), ou lève ErreurVoix sans rien garder. Rend de quoi les rendre : `tout`, si rien n’a
+ * été facturé ; `mois`, pour la voix muette (le compte du jour compte ce qu’elle dit, le mois ne compte que le facturé).
+ */
+async function reserver(longueur: number, payeur: Payeur, pour: UsageVoix): Promise<{ tout: () => Promise<void>; mois: () => Promise<void> }> {
+  const cleMois = cleDuMoisDeLaVoix();
+  const cleCompte = payeur ? cleDeLimiteDeLaCle("voix", payeur) : null;
+  if (cleCompte && (await compter(cleCompte, LIMITES.voixParCompte, longueur)) > plafondDuCompte(pour)) {
+    await rendre(cleCompte, longueur);
+    throw new ErreurVoix("voix_budget_compte");
+  }
+  const mois = () => rendre(cleMois, longueur);
+  const tout = async () => {
+    await mois();
+    if (cleCompte) await rendre(cleCompte, longueur);
+  };
+  const dansLeMois = await compter(cleMois, FENETRE_DU_MOIS, longueur);
+  if (dansLeMois > VOIX_PAR_MOIS) {
+    await tout();
+    await prevenirDuMois(cleMois, 1);
+    throw new ErreurVoix("voix_budget_mois");
+  }
+  if (dansLeMois >= SEUIL_DU_MOIS * VOIX_PAR_MOIS && dansLeMois - longueur < SEUIL_DU_MOIS * VOIX_PAR_MOIS) await prevenirDuMois(cleMois, SEUIL_DU_MOIS);
+  return { tout, mois };
+}
+
+/** Prévient l’équipe que la voix du mois a passé ce seuil : une fois par seuil et par mois, pour toutes les instances. */
+async function prevenirDuMois(cleMois: string, seuil: number): Promise<void> {
+  await auMieux(async () => {
+    if (!(await sousLaLimite(`${cleMois}:alerte:${seuil}`, { max: 1, fenetreS: FENETRE_DU_MOIS.fenetreS }))) return;
+    await alerter(
+      seuil >= 1 ? "voix du mois atteinte" : `voix : ${Math.round(seuil * 100)} % du mois`,
+      [
+        `Caractères dits ce mois-ci : au moins ${Math.round(seuil * VOIX_PAR_MOIS)} sur ${VOIX_PAR_MOIS}.`,
+        seuil >= 1 ? "Le chat répond par écrit et les rapports attendent leur vocal jusqu’au mois prochain." : "Au-delà, plus aucun vocal jusqu’au mois prochain.",
+      ],
+      { importante: seuil >= 1 },
+    );
+  }, "alerte de la voix du mois");
+}
 
 /* La fin d’une phrase : sa ponctuation (avec le guillemet ou la parenthèse qui la ferme), suivie d’un blanc ou de la fin */
 const FIN_DE_PHRASE = /[.!?…]+(?:\u00a0?[»”)])*(?=\s|$)/g;
@@ -145,54 +220,39 @@ export function scriptQuiTient<L extends LigneScript>(lignes: L[], max: number):
   return [{ ...premiere, texte: couper(premiere.texte.replace(/\[[^\]]*\]/g, ""), Math.max(1, max - jeu)) }];
 }
 
-/** Le compte d’une conv (son email), pour ses caractères du jour ; null sans conv ou sans compte. */
-async function compteDeLaConv(storyId: string | undefined): Promise<string | null> {
-  if (!storyId) return null;
-  const [l] = await db().select({ email: schema.users.email }).from(schema.stories).innerJoin(schema.users, eq(schema.users.id, schema.stories.userId)).where(eq(schema.stories.id, storyId));
-  return l?.email ?? null;
-}
-
-/** Les caractères dits ce mois-ci, pour tous (les vocaux notés dans le suivi des coûts, ceux des convs effacées compris). */
-async function ditCeMois(): Promise<number> {
-  const [l] = await db()
-    .select({ n: sql<number>`coalesce(sum(${schema.aiUsage.outputTokens}), 0)`.mapWith(Number) })
-    .from(schema.aiUsage)
-    .where(and(eq(schema.aiUsage.task, ETIQUETTE_VOIX), gte(schema.aiUsage.createdAt, DEBUT_DU_MOIS)));
-  return l?.n ?? 0;
-}
-
-/** La voix peut-elle dire `longueur` caractères de plus, pour ce compte aujourd’hui et pour tous ce mois-ci ? Sinon, ErreurVoix. */
-async function controlerVoix(longueur: number, email: string | null): Promise<void> {
-  if (email && (await compteDe(cleDeLimiteDuCompte("voix", email), LIMITES.voixParCompte)) + longueur > LIMITES.voixParCompte.max) throw new ErreurVoix("voix_budget_compte");
-  if ((await ditCeMois()) + longueur > VOIX_PAR_MOIS) {
-    journal("plafond du mois de la voix atteint", { plafond: VOIX_PAR_MOIS }, "alerte");
-    throw new ErreurVoix("voix_budget_mois");
-  }
-}
-
 /* ———— Dire ———— */
 
 /**
- * Fait dire le texte par la voix, coupé à `max` caractères (couper ; par défaut, la coupe du chat). Le mode sobre est
+ * Fait dire le texte par la voix, coupé pour son usage (couper ; par défaut, une réponse du chat). Le mode sobre est
  * joué plus posé. Au-delà du budget de la voix, rien ne part (ErreurVoix « voix_budget_… »). Une erreur passagère (trop
  * de requêtes en même temps, une panne) est réessayée deux fois. Ce que le prestataire en garde est effacé ensuite.
  */
-export async function dire(
-  texte: string,
-  voix: Voix,
-  { sobre, storyId, max = COUPE_VOIX.chat }: { sobre: boolean; storyId?: string; max?: number },
-): Promise<{ audio: Buffer; alignement: Alignement }> {
+export async function dire(texte: string, voix: Voix, { sobre, storyId, pour = "chat" }: { sobre: boolean; storyId?: string; pour?: UsageVoix }): Promise<{ audio: Buffer; alignement: Alignement }> {
   const e = env();
-  const dit = couper(texte, max);
+  const dit = couper(texte, COUPE_VOIX[pour]);
   if (!dit) throw new ErreurVoix("voix_vide");
-  const email = await compteDeLaConv(storyId);
-  await controlerVoix(dit.length, email);
-  const rendu = e.ELEVENLABS_API_KEY ? await direChezLePrestataire(dit, voix, sobre, storyId) : muette(dit);
-  if (email) await compter(cleDeLimiteDuCompte("voix", email), LIMITES.voixParCompte, dit.length);
-  return rendu;
+  const payeur = await payeurDe(storyId);
+  const reserve = await reserver(dit.length, payeur, pour);
+  if (!e.ELEVENLABS_API_KEY) {
+    await reserve.mois();
+    return muette(dit);
+  }
+  let facture = false;
+  try {
+    return await direChezLePrestataire(dit, voix, sobre, { storyId, payeur, facture: () => void (facture = true) });
+  } catch (err) {
+    /* Rien de facturé (un refus, une panne, le délai) : les caractères sont rendus */
+    if (!facture) await auMieux(reserve.tout(), "caractères de la voix non rendus");
+    throw err;
+  }
 }
 
-async function direChezLePrestataire(texte: string, voix: Voix, sobre: boolean, storyId: string | undefined): Promise<{ audio: Buffer; alignement: Alignement }> {
+async function direChezLePrestataire(
+  texte: string,
+  voix: Voix,
+  sobre: boolean,
+  { storyId, payeur, facture }: { storyId?: string; payeur: Payeur; facture: () => void },
+): Promise<{ audio: Buffer; alignement: Alignement }> {
   const cle = env().ELEVENLABS_API_KEY!;
   const id = idDeLaVoix(voix);
   if (!id) throw new ErreurVoix("voix_absente");
@@ -208,13 +268,16 @@ async function direChezLePrestataire(texte: string, voix: Voix, sobre: boolean, 
       signal: AbortSignal.timeout(delaiAppel(DELAI_VOIX_MS, 3_000)),
     }).catch(() => null);
     if (r?.ok) {
-      /* L’élément d’historique de ce vocal (S-17) : absent quand rien n’est gardé */
+      /* Facturé dès la réponse : noté avant de la lire, une réponse illisible coûte aussi */
+      facture();
+      await noterCout({ storyId, tache: ETIQUETTE_VOIX, modele: MODELE_VOIX, sortie: texte.length, micros: texte.length * PRIX_CARACTERE * 1e6, ms: Date.now() - debut, payeur: payeur ?? undefined });
+      /* L’élément d’historique de ce vocal (S-17) : sans lui, rien à effacer, et le journal le dit */
       const element = r.headers.get("history-item-id");
       if (element) effacerChezLePrestataire(`/v1/history/${element}`);
+      else signalerSansIdentifiant("voix");
       const corps = (await r.json()) as { audio_base64: string; alignment?: Alignement; normalized_alignment?: Alignement };
       const alignement = corps.alignment ?? corps.normalized_alignment;
       if (!alignement) throw new ErreurVoix("voix_sans_alignement");
-      await noterCout({ storyId, tache: ETIQUETTE_VOIX, modele: MODELE_VOIX, sortie: texte.length, micros: texte.length * PRIX_CARACTERE * 1e6, ms: Date.now() - debut });
       return { audio: Buffer.from(corps.audio_base64, "base64"), alignement };
     }
     /* Jamais le corps de l’erreur dans les logs : il peut reprendre le texte */
@@ -235,6 +298,24 @@ const IDENTIFIANT = /^[A-Za-z0-9_-]{1,128}$/;
 const ESSAIS_EFFACEMENT_MS = [0, 2_000, 6_000];
 const DELAI_EFFACEMENT_MS = 10_000;
 
+/* Le dernier jour où chaque appel sans identifiant a été dit au journal (par instance) */
+const SANS_IDENTIFIANT = new Map<string, string>();
+
+/**
+ * Un appel réussi sans l’identifiant de ce que le prestataire en garde (l’en-tête « history-item-id » de la voix, le
+ * `transcription_id` de la transcription) : rien ne sera effacé. Sans la non-conservation, c’est une fuite à voir :
+ * une ligne d’alerte au journal, une fois par jour et par instance. `quoi` : « voix » ou « transcription ».
+ * TODO(produit): vérifier sur un vrai appel que l’identifiant arrive (curl -i sur le compte du prestataire) ; sinon,
+ * balayer l’historique (GET puis DELETE /v1/history), voir restant.json.
+ */
+export function signalerSansIdentifiant(quoi: "voix" | "transcription"): void {
+  if (NON_CONSERVATION) return;
+  const jour = aujourdhuiParis().iso;
+  if (SANS_IDENTIFIANT.get(quoi) === jour) return;
+  SANS_IDENTIFIANT.set(quoi, jour);
+  journal("prestataire de voix : rien à effacer, sans identifiant", { quoi }, "alerte");
+}
+
 /**
  * Efface chez le prestataire ce qu’il a gardé d’un appel : `chemin` (« /v1/history/<id> » pour un vocal dit,
  * « /v1/speech-to-text/transcripts/<id> » pour une transcription). Ne retient pas la réponse : l’effacement court après
@@ -252,6 +333,11 @@ export function effacerChezLePrestataire(chemin: string): void {
   }
 }
 
+/**
+ * Les essais d’effacement. Au bout : 404 (jamais gardé, ou déjà effacé) n’est pas une fuite, une ligne d’information ;
+ * 401 ou 403, la clé n’a pas le droit d’effacer (une alerte à part, à régler sur le compte) ; le reste (429, 5xx, le
+ * réseau) après les trois essais, une alerte. Le statut seulement, jamais l’identifiant.
+ */
 async function effacer(chemin: string, cle: string): Promise<void> {
   let statut = 0;
   for (const attente of ESSAIS_EFFACEMENT_MS) {
@@ -261,7 +347,10 @@ async function effacer(chemin: string, cle: string): Promise<void> {
     statut = r?.status ?? 0;
     if (statut && statut !== 404 && statut !== 429 && statut < 500) break;
   }
-  journal("prestataire de voix : rien d’effacé", { quoi: chemin.split("/")[2] ?? "", statut }, "alerte");
+  const quoi = chemin.split("/")[2] ?? "";
+  if (statut === 404) journal("prestataire de voix : rien de gardé à effacer", { quoi }, "info");
+  else if (statut === 401 || statut === 403) journal("prestataire de voix : clé sans droit d’effacement", { quoi, statut }, "alerte");
+  else journal("prestataire de voix : rien d’effacé", { quoi, statut }, "alerte");
 }
 
 /* ———— La voix muette (mode factice) : un vrai MP3 de silence, à la durée du texte ———— */

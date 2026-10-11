@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { peut } from "@/lib/acces";
 import { alerter } from "./alertes";
@@ -8,7 +8,7 @@ import { db, schema } from "./db";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
-import { ErreurTache, estBudget, estRefus } from "./erreurs";
+import { ErreurTache, estBudget, estBudgetVoix, estRefus } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
@@ -102,7 +102,7 @@ export async function reparerLaChaine(story: Pick<Ligne, "id">, acces: boolean, 
    * requête de plus. Les mises à jour de la mémoire arrêtées (hors de la chaîne) repartent au suivi (cloreLesAbandons)
    */
   const lu = etat ?? (await lireEtat(story.id));
-  const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && estBudget(t.error));
+  const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && (estBudget(t.error) || estBudgetVoix(t.error)));
   if (arretee && (await reprendreApresMinuit(story.id))) {
     after(() => executerChaine(story.id));
     return true;
@@ -150,10 +150,10 @@ const DETRUIT_SON_ENTREE: ReadonlySet<Genre> = new Set(["memoire"]);
  * (l’écran dit « BLUSH souffle un peu, réessaie demain »), sans user l’essai que `prendre` venait de compter. Pas
  * d’alerte : l’équipe est prévenue du budget lui-même. Elle repart après minuit (reprendreApresMinuit).
  */
-async function suspendre(t: Tache): Promise<void> {
+async function suspendre(t: Tache, code: "budget" | "voix_budget" = "budget"): Promise<void> {
   await db()
     .update(schema.tasks)
-    .set({ status: "echec", error: "budget", attempts: sql`greatest(${schema.tasks.attempts} - 1, 0)`, updatedAt: new Date() })
+    .set({ status: "echec", error: code, attempts: sql`greatest(${schema.tasks.attempts} - 1, 0)`, updatedAt: new Date() })
     .where(eq(schema.tasks.id, t.id));
 }
 
@@ -170,7 +170,8 @@ const repartPourDeBon = or(
 );
 
 /**
- * Les étapes de l’histoire arrêtées par le budget d’un jour passé (avant minuit, heure de Paris) repartent en attente,
+ * Les étapes de l’histoire arrêtées par le budget d’un jour passé (avant minuit, heure de Paris), celui de l’IA ou celui
+ * de la voix (le vocal du rapport : un nouveau jour rend ses caractères au compte), repartent en attente,
  * avec les essais qu’elles avaient. Renvoie leur nombre. Au suivi de la lecture et du rapport (cloreLesAbandons), et à
  * l’ouverture du rapport (reparerLaChaine) : une lecture arrêtée hier reprend quand on revient.
  */
@@ -179,7 +180,13 @@ async function reprendreApresMinuit(storyId: string): Promise<number> {
     .update(schema.tasks)
     .set({ status: "attente", error: null, updatedAt: new Date() })
     .where(
-      and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "echec"), eq(schema.tasks.error, "budget"), lt(schema.tasks.updatedAt, DEBUT_DU_JOUR), repartPourDeBon),
+      and(
+        eq(schema.tasks.storyId, storyId),
+        eq(schema.tasks.status, "echec"),
+        inArray(schema.tasks.error, ["budget", "voix_budget"]),
+        lt(schema.tasks.updatedAt, DEBUT_DU_JOUR),
+        repartPourDeBon,
+      ),
     )
     .returning({ id: schema.tasks.id });
   return reprises.length;
@@ -187,8 +194,12 @@ async function reprendreApresMinuit(storyId: string): Promise<number> {
 
 /* ———— Une tâche ———— */
 
-/** Ce que devient une tâche exécutée : finie, en échec (elle repartira, sauf au dernier essai), ou arrêtée par le budget du jour. */
-type Issue = "finie" | "echec" | "budget";
+/**
+ * Ce que devient une tâche exécutée : finie, en échec (elle repartira, sauf au dernier essai), arrêtée par le budget de
+ * l’IA du jour (la chaîne s’arrête : les étapes suivantes l’attendraient aussi), ou reportée par celui de la voix (le
+ * vocal du rapport : la chaîne continue, la mémoire ne l’attend pas).
+ */
+type Issue = "finie" | "echec" | "budget" | "reportee";
 
 /** Les échecs de ces étapes touchent ce qu’on a promis (la lecture, le rapport, le chat) : leur alerte est importante (S-19). */
 const ALERTE_IMPORTANTE: ReadonlySet<Genre> = new Set(["verdict", "rapport_plan", "rapport_chapitres", "memoire"]);
@@ -235,6 +246,12 @@ async function executer(t: Tache): Promise<Issue> {
       journal("tâche arrêtée par le budget de l’IA", { genre: t.kind, tache: t.id }, "alerte");
       await suspendre(t);
       return "budget";
+    }
+    /* Le budget de la voix : ni alerte ni essai usé, le vocal repart après minuit (reprendreApresMinuit) */
+    if (e instanceof ErreurTache && estBudgetVoix(e)) {
+      journal("vocal reporté par le budget de la voix", { genre: t.kind, tache: t.id });
+      await suspendre(t, "voix_budget");
+      return "reportee";
     }
     const code = e instanceof ErreurTache ? e.code : `erreur:${(e as Error).name}`;
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche (le nom d’une erreur imprévue, jamais son message) */

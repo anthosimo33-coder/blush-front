@@ -171,7 +171,7 @@ describe("après l’import : le chat et sa fiche", () => {
 
   it("un vocal est transcrit (ici, le modèle factice), puis lu comme un message", async () => {
     const id = await convLue();
-    const t = await transcrire(new File([new Uint8Array(16)], "vocal.webm", { type: "audio/webm" }));
+    const t = await transcrire({ duree: 1, fichier: new File([new Uint8Array(16)], "vocal.ogg", { type: "audio/ogg" }) });
     expect(t).toContain("samedi");
     await repondre(await ligneEnBase(id), (await memoireDe(id))!, `(vocal) ${t}`);
     expect(derniere("10-chat")).toContain(`Hugo (à toi) : (vocal) ${t}`);

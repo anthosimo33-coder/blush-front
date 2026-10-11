@@ -35,6 +35,11 @@ export const LIMITES = {
    */
   vocalParCompte: { max: 40, fenetreS: 86400 },
   /**
+   * Les secondes de son transcrites pour un compte, par jour : la durée mesurée, ou celle que le prestataire dit avoir
+   * facturée si elle est plus longue (src/server/ia/transcription.ts). TODO(produit): 1 800, une demi-heure de vocaux.
+   */
+  secondesVocalParCompte: { max: 1800, fenetreS: 86400 },
+  /**
    * Les caractères que la voix dit pour un compte (S-13), par jour : ses réponses du chat en vocal et le vocal de son
    * rapport. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts). TODO(produit): 6 000, environ 6 minutes de voix.
    */
@@ -135,11 +140,14 @@ export async function limiteAtteinte(cle: string, { max, fenetreS }: Limite): Pr
   return ligne?.atteinte ?? false;
 }
 
-/** Rend un passage compté pour `cle` (ce qui l’a compté n’a finalement pas compté : un bon code, par exemple). */
-export async function rendre(cle: string): Promise<void> {
+/**
+ * Rend un passage compté pour `cle` (ce qui l’a compté n’a finalement pas compté : un bon code, par exemple), ou `n` :
+ * des caractères de la voix réservés, puis pas facturés (src/server/ia/voix.ts).
+ */
+export async function rendre(cle: string, n = 1): Promise<void> {
   await db()
     .update(schema.rateLimits)
-    .set({ count: sql`greatest(${schema.rateLimits.count} - 1, 0)` })
+    .set({ count: sql`greatest(${schema.rateLimits.count} - ${n}::int, 0)` })
     .where(eq(schema.rateLimits.key, cleDe(cle)));
 }
 

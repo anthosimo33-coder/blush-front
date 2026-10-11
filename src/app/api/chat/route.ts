@@ -3,6 +3,7 @@ import type { Ajout } from "@prompts/lib/ajouts";
 import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
 import { executerChaine } from "@/server/pipeline";
 import { imagesDe } from "@/server/captures";
+import { controlerBudget } from "@/server/budget";
 import { historique, repondre as blushRepond } from "@/server/chat";
 import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/histoires";
@@ -147,8 +148,11 @@ async function traiter(req: Request) {
       /* Sa durée, mesurée ici (S-15) : un vocal trop long ou illisible ne part pas à la transcription, qui se paie à la durée */
       const lu = await lireVocal(envoi.vocal);
       if (typeof lu === "string") return erreur(lu);
+      /* Le budget de l’IA d’abord : quand BLUSH souffle, le vocal n’est pas transcrit pour rien (sa transcription y compte) */
+      const payeur = await controlerBudget({ storyId: story.id });
       if (!(await sousLaLimiteDuCompte(utilisateur, "vocal"))) return erreur("trop");
-      const t = await transcrire(envoi.vocal, { storyId: story.id, duree: lu.duree });
+      const t = await transcrire(lu, { storyId: story.id, payeur, compte: utilisateur });
+      if (t === "trop") return erreur("trop");
       if (t === null) return erreur("vocal_bientot");
       if (!t) return erreur("vocal_vide");
       dit = `(vocal) ${t}`.slice(0, LONGUEUR_MAX);

@@ -35,6 +35,10 @@ export type CodeTache =
   | "delai"
   /* Le budget de l’IA du jour est atteint (src/server/budget.ts) : l’appel n’est pas parti */
   | "budget"
+  /* Le budget de la voix (src/server/ia/voix.ts) arrête le vocal du rapport : il repart après minuit, la chaîne continue */
+  | "voix_budget"
+  /* La voix n’a pas dit le vocal du rapport (ErreurVoix : « voix_429 », « voix_delai »…) */
+  | `voix_${string}`
   | "contexte_absent"
   | "conv_effacee"
   | "tache_inconnue"
@@ -63,6 +67,9 @@ export const estRefus = (e: ErreurTache | string | null | undefined): boolean =>
 
 /** Le budget de l’IA du jour a arrêté cette étape (une erreur, ou le code gardé en base) : elle repart après minuit, sans user ses essais. */
 export const estBudget = (e: ErreurTache | string | null | undefined): boolean => (typeof e === "string" ? e : e?.code) === "budget";
+
+/** Le budget de la voix a arrêté le vocal du rapport (une erreur, ou le code gardé en base) : il repart après minuit, sans user ses essais. */
+export const estBudgetVoix = (e: ErreurTache | string | null | undefined): boolean => (typeof e === "string" ? e : e?.code) === "voix_budget";
 
 /**
  * Ce que l’écran dit d’une étape en échec, d’après le code gardé en base (tasks.error) : le refus du modèle, le budget du

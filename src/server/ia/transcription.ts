@@ -1,11 +1,14 @@
 import "server-only";
-import { extensionAudio } from "@/lib/limites";
+import type { Payeur } from "../budget";
+import { cleDeLimiteDuCompte } from "../email-canonique";
 import { delaiAppel } from "../echeance";
 import { env } from "../env";
 import { ErreurTache } from "../erreurs";
-import { dureeAudio } from "./duree-audio";
+import { auMieux, journal } from "../journal";
+import { compter, LIMITES, rendre } from "../limites";
+import { DUREE_VOCAL_MAX_S, lireAudio, TAILLE_VOCAL_MAX } from "./duree-audio";
 import { noterCout } from "./usage";
-import { effacerChezLePrestataire, ELEVENLABS, sansConservation } from "./voix";
+import { effacerChezLePrestataire, ELEVENLABS, sansConservation, signalerSansIdentifiant } from "./voix";
 
 /*
  * Ses vocaux à BLUSH, transcrits : par ElevenLabs (Scribe), avec la clé de la voix de BLUSH, ou par Mistral (Voxtral,
@@ -16,68 +19,76 @@ import { effacerChezLePrestataire, ELEVENLABS, sansConservation } from "./voix";
  * non-conservation), puis le dire sur la page Confidentialité.
  *
  * Un vocal est borné par sa durée (S-15), mesurée ici trame par trame (src/server/ia/duree-audio.ts) : la transcription
- * se paie à la durée, et un fichier très compressé tiendrait des heures dans peu d’octets.
+ * se paie à la durée, et un fichier très compressé tiendrait des heures dans peu d’octets. Ce qui part est ce qui a été
+ * mesuré (un Opus réécrit), et la durée facturée que rend le prestataire est notée et comptée pour le compte.
  */
+/**
+ * Les deux prestataires, écrits une fois : le modèle, et le prix d’une minute de son transcrite pour le suivi des coûts
+ * (Voxtral Mini, 0,001 $ la minute ; Scribe au-delà des heures de l’abonnement, environ 0,40 $ l’heure).
+ * TODO(produit): les prix, à vérifier sur les offres prises.
+ */
+const PRESTATAIRES = {
+  mistral: { modele: "voxtral-mini-latest", prixMinute: 0.001 },
+  elevenlabs: { modele: "scribe_v1", prixMinute: 0.4 / 60 },
+} as const;
 const URL_MISTRAL = "https://api.mistral.ai/v1/audio/transcriptions";
-const MODELE_MISTRAL = "voxtral-mini-latest";
-const MODELE_ELEVENLABS = "scribe_v1";
 /* Le plus long qu’on attend une transcription, si l’échéance de la route le permet (src/server/echeance.ts) */
 const DELAI_TRANSCRIPTION_MS = 60_000;
-/**
- * Le prix d’une minute de son transcrite, pour le suivi des coûts : Voxtral Mini (0,001 $ la minute), Scribe au-delà
- * des heures de l’abonnement (environ 0,40 $ l’heure). TODO(produit): à vérifier sur les offres prises.
- */
-const PRIX_MINUTE = { mistral: 0.001, elevenlabs: 0.4 / 60 } as const;
+
+/** Un vocal lu par lireVocal : sa durée mesurée, en secondes, et le fichier qui part à la transcription (réécrit en Opus, ou le MP4 reçu). */
+export type VocalLu = { duree: number; fichier: File };
 
 /**
- * Le plus long vocal que le chat accepte, en secondes : le navigateur l’envoie tout seul à 120 s (src/app/app/voice.tsx),
- * 10 s de marge pour l’enveloppe et l’arrondi. TODO(produit): 130 s.
+ * Lit un vocal reçu par le chat, avant de le transcrire (src/server/ia/duree-audio.ts) : sa durée et ce qui part chez le
+ * prestataire ; « vocal » s’il est trop lourd ou trop long, « vocal_vide » s’il est vide ou illisible (un format qui
+ * n’est pas celui d’un enregistreur, un fichier piégé).
  */
-export const DUREE_VOCAL_MAX_S = 130;
-/**
- * Le débit d’un enregistreur qui ne suit pas les 32 kb/s demandés (le WebKit de Playwright ne les suit pas, 3c l’a
- * mesuré) : celui qu’il prend par défaut, au plus 192 kb/s.
- */
-const DEBIT_PAR_DEFAUT = 192_000;
-/**
- * La taille maximale d’un vocal : DUREE_VOCAL_MAX_S au débit par défaut (environ 3,1 Mo), plus 64 Ko pour l’enveloppe du
- * fichier. La vraie borne est la durée ; celle-ci refuse vite un envoi démesuré, avant de le lire.
- * TODO(produit): ne pas descendre plus bas avant d’avoir mesuré le débit d’un vocal de 2 minutes sur un vrai iPhone
- * (Safari et l’appli installée) ; tests/e2e/chat-vocal.spec.ts mesure le débit des deux navigateurs de test.
- */
-export const TAILLE_VOCAL_MAX = (DUREE_VOCAL_MAX_S * DEBIT_PAR_DEFAUT) / 8 + 64 * 1024;
-
-/**
- * Lit un vocal reçu par le chat, avant de le transcrire : sa durée en secondes ; « vocal » s’il est trop lourd ou trop
- * long, « vocal_vide » s’il est vide ou illisible (un format qui n’est pas celui d’un enregistreur, un fichier piégé).
- */
-export async function lireVocal(vocal: File): Promise<{ duree: number } | "vocal" | "vocal_vide"> {
+export async function lireVocal(vocal: File): Promise<VocalLu | "vocal" | "vocal_vide"> {
   if (!vocal.size) return "vocal_vide";
   if (vocal.size > TAILLE_VOCAL_MAX) return "vocal";
-  const duree = dureeAudio(new Uint8Array(await vocal.arrayBuffer()));
-  if (duree === null || duree <= 0) return "vocal_vide";
-  return duree > DUREE_VOCAL_MAX_S ? "vocal" : { duree };
+  const lu = lireAudio(new Uint8Array(await vocal.arrayBuffer()));
+  if (!lu || lu.secondes <= 0) return "vocal_vide";
+  if (lu.secondes > DUREE_VOCAL_MAX_S) return "vocal";
+  return { duree: lu.secondes, fichier: new File([lu.octets as Uint8Array<ArrayBuffer>], `vocal.${lu.extension}`, { type: lu.type }) };
 }
 
 /**
- * La transcription du vocal, ou null si les vocaux ne sont pas encore branchés (ni clé Mistral, ni clé ElevenLabs).
- * `storyId` et `duree` (lireVocal) : la conv du chat et la durée du son, pour le suivi des coûts.
+ * Les secondes de son transcrites pour un compte, par jour (LIMITES.secondesVocalParCompte) : réservées à la durée
+ * mesurée avant l’appel, complétées par la durée que le prestataire dit avoir facturée si elle est plus longue (un MP4
+ * qui tasserait des trames, voir duree-audio.ts), rendues si l’appel échoue.
  */
-export async function transcrire(vocal: File, { storyId, duree = 0 }: { storyId?: string; duree?: number } = {}): Promise<string | null> {
+const cleDesSecondes = (compte: { email: string }) => cleDeLimiteDuCompte("vocal:secondes", compte.email);
+
+/**
+ * La transcription du vocal (lireVocal), ou null si les vocaux ne sont pas encore branchés (ni clé Mistral, ni clé
+ * ElevenLabs) ; « trop » si le compte a déjà fait transcrire ses secondes du jour. `storyId`, `payeur` (le budget de
+ * l’IA, controlerBudget) et `compte` : pour le suivi des coûts, la dépense du compte et ses secondes du jour.
+ */
+export async function transcrire(
+  { duree, fichier }: VocalLu,
+  { storyId, payeur, compte }: { storyId?: string; payeur?: Payeur; compte?: { email: string } } = {},
+): Promise<string | null | "trop"> {
   const e = env();
-  if (e.BLUSH_IA_FACTICE) return "bon elle m’a répondu ok pour samedi, mais elle a mis trois heures, je lui dis quoi";
-  if (!e.MISTRAL_API_KEY && !e.ELEVENLABS_API_KEY) return null;
-  const fichier = new File([await vocal.arrayBuffer()], `vocal.${extensionAudio(vocal.type)}`, { type: vocal.type || "audio/mp4" });
+  const prestataire = e.MISTRAL_API_KEY ? "mistral" : e.ELEVENLABS_API_KEY ? "elevenlabs" : null;
+  if (!prestataire && !e.BLUSH_IA_FACTICE) return null;
+  /* Les secondes du jour, comptées aussi par le modèle factice (les tests, le développement) : elles bornent pareil */
+  const reservees = Math.ceil(duree);
+  if (compte && (await compter(cleDesSecondes(compte), LIMITES.secondesVocalParCompte, reservees)) > LIMITES.secondesVocalParCompte.max) {
+    await rendre(cleDesSecondes(compte), reservees);
+    return "trop";
+  }
+  if (e.BLUSH_IA_FACTICE || !prestataire) return "bon elle m’a répondu ok pour samedi, mais elle a mis trois heures, je lui dis quoi";
+  const { modele, prixMinute } = PRESTATAIRES[prestataire];
   const fd = new FormData();
   const debut = Date.now();
   let r: Response | null;
-  if (e.MISTRAL_API_KEY) {
-    fd.append("model", MODELE_MISTRAL);
+  if (prestataire === "mistral") {
+    fd.append("model", modele);
     fd.append("language", "fr");
     fd.append("file", fichier);
     r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(() => null);
   } else {
-    fd.append("model_id", MODELE_ELEVENLABS);
+    fd.append("model_id", modele);
     fd.append("language_code", "fr");
     /* Le texte seul : pas de « (rires) » ni de qui parle, c’est lui qui parle */
     fd.append("tag_audio_events", "false");
@@ -92,20 +103,21 @@ export async function transcrire(vocal: File, { storyId, duree = 0 }: { storyId?
   }
   /* Jamais de contenu dans les logs : le statut seulement */
   if (!r?.ok) {
+    if (compte) await auMieux(rendre(cleDesSecondes(compte), reservees), "secondes du vocal non rendues");
     console.error(`transcription : échec ${r?.status ?? "réseau"}`);
     throw new ErreurTache("transcription");
   }
-  const { text, transcription_id } = (await r.json()) as { text?: string; transcription_id?: string };
-  /* Ce que Scribe a gardé de la transcription (S-17) : absent quand rien n’est gardé */
-  if (!e.MISTRAL_API_KEY && transcription_id) effacerChezLePrestataire(`/v1/speech-to-text/transcripts/${transcription_id}`);
-  const minutes = duree / 60;
-  await noterCout({
-    storyId,
-    tache: "vocal_transcription",
-    modele: e.MISTRAL_API_KEY ? MODELE_MISTRAL : MODELE_ELEVENLABS,
-    entree: duree,
-    micros: minutes * (e.MISTRAL_API_KEY ? PRIX_MINUTE.mistral : PRIX_MINUTE.elevenlabs) * 1e6,
-    ms: Date.now() - debut,
-  });
-  return text?.trim() ?? "";
+  const corps = (await r.json()) as { text?: string; transcription_id?: string; usage?: { prompt_audio_seconds?: number }; words?: { end?: number }[] };
+  if (prestataire === "elevenlabs") {
+    /* Ce que Scribe a gardé de la transcription (S-17) : sans son identifiant, rien à effacer, et le journal le dit */
+    if (corps.transcription_id) effacerChezLePrestataire(`/v1/speech-to-text/transcripts/${corps.transcription_id}`);
+    else signalerSansIdentifiant("transcription");
+  }
+  /* La durée facturée : celle que dit le prestataire (Mistral : usage ; Scribe : la fin du dernier mot), si elle dépasse la mesure */
+  const dite = prestataire === "mistral" ? corps.usage?.prompt_audio_seconds : corps.words?.at(-1)?.end;
+  const facturee = Math.max(duree, typeof dite === "number" && Number.isFinite(dite) ? dite : 0);
+  if (facturee > duree * 1.1 + 1) journal("transcription plus longue que le vocal mesuré", { prestataire, mesuree: Math.round(duree), facturee: Math.round(facturee) }, "alerte");
+  if (compte && Math.ceil(facturee) > reservees) await auMieux(compter(cleDesSecondes(compte), LIMITES.secondesVocalParCompte, Math.ceil(facturee) - reservees), "secondes du vocal non comptées");
+  await noterCout({ storyId, tache: "vocal_transcription", modele, entree: facturee, micros: (facturee / 60) * prixMinute * 1e6, ms: Date.now() - debut, payeur });
+  return corps.text?.trim() ?? "";
 }

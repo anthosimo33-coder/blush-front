@@ -44,6 +44,7 @@ export const LIMITES_DU_COMPTE = {
   relance: "relanceParCompte",
   chat: "chatParCompte",
   vocal: "vocalParCompte",
+  "vocal:secondes": "secondesVocalParCompte",
   voix: "voixParCompte",
   ajout: "ajoutParCompte",
   fiche: "ficheParCompte",
@@ -61,4 +62,7 @@ export type LimiteDuCompte = keyof typeof LIMITES_DU_COMPTE;
  * La clé d’une limite de ce compte, écrite ici seulement : `<nom>:<cleDuCompte>`, par exemple
  * `analyse:compte:noe@gmail.com`. Le serveur la compte (sousLaLimiteDuCompte), les tests la posent ou l’effacent.
  */
-export const cleDeLimiteDuCompte = (nom: LimiteDuCompte, email: string) => `${nom}:${cleDuCompte(email)}`;
+export const cleDeLimiteDuCompte = (nom: LimiteDuCompte, email: string) => cleDeLimiteDeLaCle(nom, cleDuCompte(email));
+
+/** La même clé, d’après la clé du compte (cleDuCompte) déjà connue : le payeur d’un appel (src/server/budget.ts) en est une. */
+export const cleDeLimiteDeLaCle = (nom: LimiteDuCompte, cle: string) => `${nom}:${cle}`;

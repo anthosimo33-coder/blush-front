@@ -53,7 +53,7 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
   /* Le script tient dans la coupe du vocal du rapport (S-13) : des lignes entières, pour que les sous-titres suivent l’audio */
   const dites = scriptQuiTient(script.lignes, COUPE_VOIX.rapport);
   const { texte } = texteDit(dites);
-  const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id, max: COUPE_VOIX.rapport });
+  const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id, pour: "rapport" });
   const prenom = histoireDe(metaDe(story)).utilisateur.prenom;
   const messages = messagesAffiches(lignes, prenom);
   const minutees: VocalLigne[] = minuter(dites, alignement).map((l, k) => {

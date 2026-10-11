@@ -105,8 +105,11 @@ function gardeDuJour(): string {
   return jour;
 }
 
-/** Le compte qui paie les appels de cette conv ; null sans conv, ou sans compte. */
-async function payeurDe(storyId: string | undefined): Promise<Payeur> {
+/**
+ * Le compte qui paie les appels de cette conv (sa clé, cleDuCompte) ; null sans conv, ou sans compte. Gardé par
+ * instance : la voix (src/server/ia/voix.ts) y range aussi ses caractères du jour.
+ */
+export async function payeurDe(storyId: string | undefined): Promise<Payeur> {
   if (!storyId) return null;
   const connu = PAYEURS.get(storyId);
   if (connu) return connu;

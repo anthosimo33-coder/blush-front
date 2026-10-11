@@ -3,14 +3,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
-import { db, schema } from "../db";
 import { env } from "../env";
 import { alerter } from "../alertes";
-import { controlerBudget, noterDepense, type Payeur } from "../budget";
+import { controlerBudget, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
-import { auMieux, journal, journalErreur } from "../journal";
+import { journal } from "../journal";
 import { fournisseurFactice, REFUS_FACTICE } from "./factice";
+import { noterCout } from "./usage";
 import { TEXTES } from "./textes.generated";
 
 /*
@@ -244,25 +244,18 @@ export async function appeler<S extends z.ZodType>(
   return { sortie: lireSortie(message.content as { type: string; text?: string }[], schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
 }
 
-/** Le suivi des coûts (ai_usage) et la dépense du jour de qui paie (le budget de l’IA, src/server/budget.ts). */
+/** Le suivi des coûts (ai_usage) et la dépense du jour de qui paie (le budget de l’IA, src/server/budget.ts) : noterCout, src/server/ia/usage.ts. */
 async function noterUsage(u: Usage, micros: number, { storyId, payeur, tache, ms, modele }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string }) {
-  await auMieux(noterDepense(payeur, micros), "dépense non notée", { tache });
-  try {
-    await db()
-      .insert(schema.aiUsage)
-      .values({
-        storyId: storyId ?? null,
-        task: tache,
-        model: modele,
-        inputTokens: u.input_tokens ?? 0,
-        outputTokens: u.output_tokens ?? 0,
-        cacheReadTokens: u.cache_read_input_tokens ?? 0,
-        cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
-        costMicros: micros,
-        ms,
-      });
-  } catch (e) {
-    /* Le suivi des coûts ne doit jamais faire échouer une réponse */
-    journalErreur("usage non noté", e, { tache });
-  }
+  await noterCout({
+    storyId,
+    tache,
+    modele,
+    entree: u.input_tokens ?? 0,
+    sortie: u.output_tokens ?? 0,
+    cacheLu: u.cache_read_input_tokens ?? 0,
+    cacheEcrit: u.cache_creation_input_tokens ?? 0,
+    micros,
+    ms,
+    payeur,
+  });
 }

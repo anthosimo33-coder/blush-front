@@ -25,8 +25,8 @@ const MAX_SECONDS = 120;
  * serveur, c’est la durée du vocal (environ 130 s), et sa taille maximale doit couvrir 130 s au débit par défaut
  * (environ 3,1 Mo à 192 kb/s), pas 130 s à 32 kb/s. tests/e2e/chat-vocal.spec.ts mesure le débit sur les deux
  * navigateurs.
- * TODO(produit): 32 kb/s ; la taille maximale du serveur (4 Mo aujourd’hui) ne descend pas sous ~3,1 Mo tant que le
- * débit réel d’un vocal de 2 minutes sur un vrai iPhone (Safari et l’appli installée) n’est pas mesuré.
+ * TODO(produit): 32 kb/s ; la taille maximale du serveur (TAILLE_VOCAL_MAX, environ 3,1 Mo) ne descend pas plus bas
+ * tant que le débit réel d’un vocal de 2 minutes sur un vrai iPhone (Safari et l’appli installée) n’est pas mesuré.
  */
 const DEBIT_VOCAL = 32_000;
 /** Nombre de barres de l’onde, pendant l’enregistrement et dans la bulle. */
@@ -77,7 +77,9 @@ function creerEcoute() {
 
 /**
  * L’enregistreur au débit de la voix (DEBIT_VOCAL). Un navigateur qui refuse l’option enregistre à son débit par
- * défaut (souvent 128 à 192 kb/s) : le vocal part quand même, tant que le serveur l’accepte à ce débit-là.
+ * défaut (souvent 128 à 192 kb/s) : le vocal part quand même, tant que le serveur l’accepte à ce débit-là. Le format,
+ * lui, reste celui du navigateur : le serveur ne lit que WebM ou Ogg en Opus et MP4 en AAC (src/server/ia/duree-audio.ts).
+ * Un mimeType fixé ici (audio/mp4;codecs=opus, par exemple) doit d’abord y être lisible, sinon chaque vocal serait refusé.
  */
 function enregistreur(stream: MediaStream) {
   try {
