@@ -1,0 +1,10 @@
+# Ce que Prettier laisse tel quel, en plus de ce que .gitignore ignore déjà (Prettier le lit aussi).
+# Le sous-module privé des prompts : un autre dépôt, qui a sa propre mise en forme.
+prompts/
+# Ce qu’un outil écrit : les migrations et leur journal (drizzle-kit), les verrous de npm.
+drizzle/
+package-lock.json
+scripts/deployer/package-lock.json
+# Les polices, les images et les fichiers servis tels quels.
+assets/
+public/
