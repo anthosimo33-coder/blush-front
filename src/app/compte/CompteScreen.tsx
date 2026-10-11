@@ -6,7 +6,7 @@ import { FRAIS_DU_RENDU, invalidate, setQueryData } from "@/lib/query";
 import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { deleteAccount, deleteStory, seDeconnecter, setPaused, type Account } from "@/services/api";
-import { OFFERS } from "@/contenu/offres";
+import { OFFRES, prixDe, type PrixAffiche } from "@/contenu/offres";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -148,15 +148,12 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               <RowIcon icon="bolt" tone={plus ? "ink" : "grey"} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-[16px] font-black">
-                  {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFERS[1].title : "Ton rapport"}
+                  {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFRES.rapport.title : "Ton rapport"}
                   {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
                 </span>
-                <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFERS[1].note : null}</span>
+                <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRES.rapport.note : null}</span>
               </span>
-              <span className="flex shrink-0 flex-col items-end">
-                <span className="text-[18px] font-black leading-none tracking-[-0.01em]">{sub.priceLabel.split(" / ")[0]}</span>
-                {sub.priceLabel.includes(" / ") && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {sub.priceLabel.split(" / ")[1]}</span>}
-              </span>
+              <Prix {...prixDe(sub.plan)} />
             </>
           )}
         </div>
@@ -304,5 +301,15 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         )}
       </Sheet>
     </AppScreen>
+  );
+}
+
+/** Le prix de l’abonnement, à droite de sa ligne : le montant, et sa période dessous (prixDe, src/contenu/offres.ts). */
+function Prix({ montant, periode }: PrixAffiche) {
+  return (
+    <span className="flex shrink-0 flex-col items-end">
+      <span className="text-[18px] font-black leading-none tracking-[-0.01em]">{montant}</span>
+      {periode && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {periode}</span>}
+    </span>
   );
 }

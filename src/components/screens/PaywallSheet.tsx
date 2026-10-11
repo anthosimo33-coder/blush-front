@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
 import { unlock } from "@/services/api";
-import { OFFERS, PAYWALL } from "@/contenu/offres";
+import { OFFERS, PAYWALL, prixDe } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
+import { RadioGroup } from "@/components/ui/controls";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
@@ -38,6 +39,7 @@ export function PaywallSheet({
   const router = useRouter();
   const offers = only ? OFFERS.filter((o) => o.id === only) : OFFERS;
   const [selected, setSelected] = useState<Offer["id"]>(only ?? "blushplus");
+  const titre = useId();
   const [busy, setBusy] = useState(false);
   /*
    * Payé : le bouton reste occupé jusqu’à l’arrivée de « C’est débloqué », la feuille reste ouverte (elle part avec la
@@ -77,16 +79,16 @@ export function PaywallSheet({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} labelledBy="paywall-title">
-      <h2 id="paywall-title" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
+    <Sheet open={open} onClose={onClose} labelledBy={titre}>
+      <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
         {only ? "BLUSH+" : PAYWALL.title(otherName)}
       </h2>
       {!only && <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">{PAYWALL.subtitle(chapitres)}</p>}
       {/* Les offres, comme un choix d’abonnement sur iPhone : un rond à cocher, le prix aligné à droite */}
-      <div role="radiogroup" aria-label="Ton offre" className="flex flex-col gap-2.5">
+      <RadioGroup label="Ton offre" className="flex flex-col gap-2.5">
         {offers.map((o) => {
           const on = selected === o.id;
-          const [amount, period] = o.price.split(" / ");
+          const { montant, periode } = prixDe(o.id);
           return (
             <button
               key={o.id}
@@ -113,13 +115,13 @@ export function PaywallSheet({
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end">
-                <span className="text-[21px] font-black leading-none tracking-[-0.01em] lg:text-[23px]">{amount}</span>
-                {period && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {period}</span>}
+                <span className="text-[21px] font-black leading-none tracking-[-0.01em] lg:text-[23px]">{montant}</span>
+                {periode && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {periode}</span>}
               </span>
             </button>
           );
         })}
-      </div>
+      </RadioGroup>
       <div className="flex flex-col gap-3 lg:w-[360px] lg:gap-4 lg:self-center">
         {later && (
           <p role="status" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-soft">
