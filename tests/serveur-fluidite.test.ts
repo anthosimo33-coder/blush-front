@@ -5,7 +5,6 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
-import { executerChaine, tempsPourCommencer } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { chiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -14,6 +13,7 @@ import { avecEcheance } from "@/server/echeance";
 import { historique } from "@/server/historique";
 import { histoireOuverte, histoiresDuCompte } from "@/server/histoires";
 import { versionImage } from "@/server/partages";
+import { executerChaine, tempsPourCommencer } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { audioDuCompte } from "@/server/vocal";
 import { compteDeTest, convPrete } from "./aide/fixtures";

@@ -4,48 +4,44 @@ import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore } from "@prompts/lib/front";
-import { appliquerMaj, citees, rapportCourt, rendreNouveau, type EditionsFiche } from "@prompts/lib/memoire";
+import { appliquerMaj, citees, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
-import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
-import { peut } from "@/lib/acces";
+import { avanceMoitie, avancePlan, avanceVerdict, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
-import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict } from "./coffre";
 import { db, schema } from "./db";
 import type { AvanceMoitie, Genre } from "./db/enums";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
-import { ErreurTache, estRefus } from "./erreurs";
-import { aujourdhuiParis, pause } from "./temps";
+import { ErreurTache } from "./erreurs";
+import { aujourdhuiParis } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
-import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
-import { alerter } from "./alertes";
+import { tempsRestant } from "./echeance";
 import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
-import { aRelancer, battre, clore, echouer, entreeDe, ESSAIS_MAX, finir, occupee, planifier, prendre, type Tache } from "./taches";
+import type { Etape } from "./pipeline";
+import { editionsBornees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
+import { entreeDe, type Tache } from "./taches";
 import { ErreurVoix, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
-/* ———— Ce qu’on garde, chiffré ———— */
+/*
+ * Les étapes de la chaîne : le travail de chaque tâche (le verdict, le plan et les chapitres du rapport, le vocal, la
+ * mémoire et ses mises à jour). Chacune lit ce qu’il lui faut, appelle le modèle et garde ce qu’il écrit ; elle ne
+ * planifie rien. Le moteur (src/server/pipeline.ts) les exécute une à une et décide de la suite (`suite`).
+ */
 
 /*
- * Leurs formes sont dans le coffre (src/server/coffre.ts). Les routes fiche et partage/image, les tests et
- * scripts/essai-vrai-modele.mts les lisent encore ici : à retirer quand ils passeront par le coffre.
+ * Repris ici pour les modules qui les lisent encore à cette adresse (les routes, le chat, les ajouts, des tests et
+ * scripts/essai-vrai-modele.mts) : le moteur est dans pipeline.ts, les formes gardées dans stockage/types.ts, les
+ * jauges dans avancement.ts. Ces reprises partent au lot 3a.
  */
-export type { DonneesMemoire, DonneesRapport, DonneesVerdict };
-
-/** Les infos qu’il a retirées de sa fiche que la mémoire garde : les plus récentes (PUT /api/fiche coupe la liste). */
-export const SUPPRIMEES_MAX = 100;
-
-/**
- * Ses corrections de la fiche, telles que le modèle les reçoit : une mémoire écrite avant la borne peut garder une
- * liste plus longue, qui renchérirait chaque message du chat et chaque mise à jour.
- */
-export const editionsBornees = (e?: EditionsFiche): EditionsFiche | undefined =>
-  e && e.supprimees.length > SUPPRIMEES_MAX ? { ...e, supprimees: e.supprimees.slice(-SUPPRIMEES_MAX) } : e;
-
+export { executerChaine } from "./pipeline";
+export { editionsBornees, SUPPRIMEES_MAX, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
+export { avanceVerdict } from "./avancement";
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -107,45 +103,6 @@ const lireRapport = async (storyId: string) => {
 
 /* ———— Les étapes ———— */
 
-/**
- * L’avancée du verdict (0 à 100) d’après ce que le modèle a déjà écrit : sa réflexion (sa longueur varie : on s’en
- * approche sans l’atteindre, jusqu’à 70), puis le verdict lui-même (environ 700 caractères), jusqu’à 98.
- */
-export const avanceVerdict = (a: Avance) => Math.min(98, Math.round(a.texte > 0 ? 70 + 28 * Math.min(1, a.texte / 700) : 15 + 55 * (1 - Math.exp(-a.reflexion / 2500))));
-
-/** Les chapitres déjà commencés dans ce que le modèle a écrit (chaque chapitre de sa réponse commence par son numéro). */
-export const chapitresCommences = (ecrit: string) => [...ecrit.matchAll(/"numero"\s*:\s*(\d+)/g)].map((m) => +m[1]);
-
-/** Le plan du rapport (0 à 100) : sa réflexion jusqu’à 50, puis ses huit chapitres, un par un, jusqu’à 98. */
-export const avancePlan = (a: Avance) =>
-  Math.min(98, Math.round(a.texte > 0 ? 50 + 48 * Math.min(1, chapitresCommences(a.ecrit).length / 8) : 50 * (1 - Math.exp(-a.reflexion / 2500))));
-
-/**
- * Les chapitres déjà finis dans ce que le modèle a écrit : un chapitre est fini quand le suivant commence (le dernier,
- * à la fin de la réponse). Chacun est relu par son schéma : un morceau mal formé est simplement ignoré.
- */
-export function chapitresFinis(ecrit: string): Chapitre[] {
-  const debuts = [...ecrit.matchAll(/\{\s*"numero"\s*:/g)].map((m) => m.index!);
-  return debuts.slice(0, -1).flatMap((d, k) => {
-    try {
-      const ok = Chapitre05.safeParse(JSON.parse(ecrit.slice(d, debuts[k + 1]).replace(/[\s,]+$/, "")));
-      return ok.success ? [ok.data] : [];
-    } catch {
-      return [];
-    }
-  });
-}
-
-/** Où en est une moitié du rapport (chapitres 1 à 4, ou 5 à 8), d’après ce que le modèle a déjà écrit. */
-export function avanceMoitie(a: Avance, premier: 1 | 5): AvanceMoitie {
-  const nums = chapitresCommences(a.ecrit).filter((n) => n >= premier && n < premier + 4);
-  /* Avant le premier chapitre, il réfléchit : on s’approche de 45 % sans l’atteindre */
-  if (!nums.length) return { progres: 0.45 * (1 - Math.exp(-a.reflexion / 3000)), ecrits: [], enCours: a.texte > 0 ? premier : null };
-  /* Un chapitre fait environ 2 000 caractères : on avance dans celui en cours, sans jamais le finir avant le suivant */
-  const dansLeChapitre = a.ecrit.length - a.ecrit.lastIndexOf('"numero"');
-  return { progres: Math.min(0.98, 0.45 + (0.55 * (nums.length - 1 + Math.min(0.95, dansLeChapitre / 2000))) / 4), ecrits: nums.slice(0, -1), enCours: nums.at(-1)! };
-}
-
 /** Écrit l’avancée d’une tâche en base (et son détail), au plus une fois par seconde, sans jamais reculer. */
 function ecrireAvance(tacheId: string): (progres: number, detail?: Tache["detail"]) => void {
   let derniere = 0;
@@ -183,11 +140,13 @@ async function verdict(story: LigneComplete, t: Tache) {
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data, createdAt: new Date() } });
   await db().update(schema.stories).set({ context, status: "prete", updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  /* Le rapport s’écrit dès qu’on a l’accès. Une alerte (mode sobre) a sa version douce, offerte : on ne fait pas payer une situation de danger */
-  if (sortie.mode_sobre || (await aAcces(story))) await planifier(story.id, "rapport_plan");
 }
 
-/** Le rapport, étape 1 : le plan. En mode sobre, le rapport entier en un appel. */
+/**
+ * Le rapport, étape 1 : le plan. En mode sobre (une alerte), le rapport doux entier en un appel, offert : sa partie
+ * sobre seulement. Des chapitres que le modèle y aurait écrits ne sont pas gardés : ce rapport ne se paie pas, et ne
+ * doit rien ouvrir de plus (S-25).
+ */
 async function rapportPlan(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
   const v = await lireVerdict(story.id);
@@ -196,10 +155,7 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport", undefined, undefined, (x) => !!x.sobre);
     /* Le rapport sobre sans sa partie sobre : un écran vide. On le refait plutôt que de le garder */
     if (!r.sobre) throw new ErreurTache("sobre_vide");
-    await garderRapport(story, r, rendu.lignes, v.scores);
-    /* Le vocal doux, avant la mémoire */
-    if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
-    if (await aAcces(story)) await planifier(story.id, "memoire");
+    await garderRapport(story, { ...r, chapitres: null }, rendu.lignes, v.scores);
     return;
   }
   const etape = await appelVerifie(
@@ -219,9 +175,10 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     .insert(schema.reports)
     .values({ storyId: story.id, plan })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { plan, updatedAt: new Date() } });
-  await planifier(story.id, "rapport_chapitres");
-  /* Le vocal s’écrit pendant les chapitres (voir rapportChapitres) ; cette tâche ne sert que s’il n’a pas pu s’y faire */
-  if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
+  /*
+   * La suite (pipeline.ts) : les chapitres, et la tâche « vocal ». Le vocal s’écrit d’habitude pendant les chapitres
+   * (voir rapportChapitres) ; sa tâche ne sert que s’il n’a pas pu s’y faire.
+   */
 }
 
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
@@ -297,7 +254,6 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
       sobre: null,
     };
     await garderRapport(story, r, rendu.lignes, v.scores);
-    await planifier(story.id, "memoire");
   } finally {
     await enParallele;
   }
@@ -361,8 +317,9 @@ async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | {
 }
 
 /**
- * La tâche « vocal » : quand il n’a pas pu se faire pendant l’écriture, en mode sobre, ou pour un rapport écrit avant
- * le vocal. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon de la mémoire.
+ * La tâche « vocal » : quand il n’a pas pu se faire pendant l’écriture, pour un rapport écrit avant le vocal, ou d’une
+ * ancienne version du script. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon
+ * de la mémoire.
  */
 async function vocalTache(story: LigneComplete) {
   if (!voixDisponible() || (await vocalAJour(story.id))) return;
@@ -377,6 +334,12 @@ async function vocalTache(story: LigneComplete) {
     const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     lignes = new Map(m ? coffre.lire("memories.data", m.data).lignes : []);
   }
+  /*
+   * Héritage : un rapport sobre n’a de vocal que s’il n’a pas d’alerte, ce qui n’arrive plus depuis le 9 octobre (le
+   * mode sobre suit l’alerte, voir verdict). Avant, un rejet passait aussi en mode sobre, sans alerte : ces rapports
+   * doux restent offerts, et leur vocal doux se refait ici. Leurs verdicts sont chiffrés, sans colonne qui les
+   * distingue : rien à migrer en SQL. À retirer quand plus aucun verdict d’avant le 9 octobre n’a mode_sobre sans alerte.
+   */
   const sobre = r.sobre ? `\nmode sobre : ${r.sobre.intro} ${r.sobre.titre} ${r.sobre.faits} ${r.sobre.reassurance}` : "";
   await vocal(story, v.sortie, { court: rapportCourt(r) + sobre }, lignes, r.mode_sobre || v.sortie.mode_sobre);
 }
@@ -433,96 +396,15 @@ async function memoireMaj(story: Ligne, t: Tache) {
   throw new ErreurTache("memoire_changee");
 }
 
-/* Les étapes reçoivent la ligne complète (executer la relit avec la conv brute) : celles qui lisent la conv en ont besoin */
-const ETAPES: Partial<Record<Genre, (story: LigneComplete, t: Tache) => Promise<void>>> = {
+/**
+ * Le travail de chaque genre de tâche, pour le moteur (src/server/pipeline.ts) : un genre sans étape ne compile pas.
+ * Les étapes reçoivent la ligne complète (le moteur la relit avec la conv brute) : celles qui lisent la conv en ont besoin.
+ */
+export const ETAPES: Record<Genre, Etape> = {
   verdict,
   rapport_plan: rapportPlan,
   rapport_chapitres: rapportChapitres,
+  vocal: vocalTache,
   memoire,
   memoire_maj: memoireMaj,
-  vocal: vocalTache,
 };
-
-/** Une étape a-t-elle encore l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */
-async function aAcces(story: Ligne): Promise<boolean> {
-  if (!story.userId) return false;
-  const [u] = await db().select({ plan: schema.users.plan }).from(schema.users).where(eq(schema.users.id, story.userId));
-  return !!u && peut(u.plan, "rapport");
-}
-
-/* ———— L’exécution ———— */
-
-/**
- * L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction. Les
- * routes qui la lancent vivent DUREE_FONCTION_S (tests/echeance.test.ts).
- */
-export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);
-
-/*
- * Une fonction Vercel vit 5 minutes au plus (plan gratuit) : on ne commence une étape que s’il reste, avant l’échéance,
- * sa durée habituelle et 30 % de marge. Un budget fixe (rien après 100 s) arrêtait la chaîne après le verdict et le
- * plan : les chapitres attendaient qu’un sondage la relance, ce que ne font ni la révélation, ni une appli fermée (et
- * le mail « ton rapport est prêt » avec eux). Durées mesurées sur les rapports de test ; ai_usage.ms donne celles de la production.
- */
-const DUREES_MS: Record<Genre, number> = {
-  verdict: 60_000,
-  rapport_plan: 55_000,
-  /* Les deux moitiés en même temps, et le vocal pendant ce temps */
-  rapport_chapitres: 100_000,
-  vocal: 45_000,
-  memoire: 90_000,
-  memoire_maj: 60_000,
-};
-const MARGE_ETAPE = 1.3;
-/** Le temps qu’il doit rester avant l’échéance pour commencer une étape de ce genre. */
-export const tempsPourCommencer = (kind: Genre) => MARGE_ETAPE * DUREES_MS[kind];
-
-/** Exécute une tâche. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
-async function executer(t: Tache): Promise<boolean> {
-  const coeur = setInterval(() => void battre(t.id).catch(() => {}), 20_000);
-  try {
-    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
-    const etape = ETAPES[t.kind];
-    if (!story || !etape) throw new ErreurTache("tache_inconnue");
-    await etape(story, t);
-    await finir(t.id);
-    return true;
-  } catch (e) {
-    const code = e instanceof ErreurTache ? e.code : `erreur:${(e as Error).name}`;
-    /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche */
-    console.error(`tâche ${t.kind} ${t.id} : ${code}`, e instanceof ErreurTache ? "" : (e as Error).message?.slice(0, 200));
-    /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
-    const definitif = estRefus(code);
-    await echouer(t, code, definitif);
-    /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
-    if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
-    return false;
-  } finally {
-    clearInterval(coeur);
-  }
-}
-
-/**
- * Enchaîne les tâches d’une histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance
- * (sinon elle repart au prochain passage : le suivi de la lecture et du rapport relance la chaîne). Deux appels en même
- * temps ne font jamais deux fois la même tâche : `prendre` est atomique.
- */
-export async function executerChaine(storyId: string): Promise<void> {
-  await cloreLesAbandons(storyId);
-  if (await occupee(storyId)) return;
-  await avecEcheance(ECHEANCE_CHAINE_MS, async () => {
-    for (;;) {
-      const [t] = await aRelancer(storyId);
-      if (!t || tempsRestant() < tempsPourCommencer(t.kind)) return;
-      const pris = await prendre(t.id);
-      if (!pris) return;
-      /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
-      if (!(await executer(pris))) await pause(3000 * pris.attempts);
-    }
-  });
-}
-
-/** Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre échec. */
-export async function cloreLesAbandons(storyId: string): Promise<void> {
-  for (const t of await clore(storyId)) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, "Erreur : coupée à chaque essai (délai dépassé)", `Essais : ${t.attempts}`]);
-}

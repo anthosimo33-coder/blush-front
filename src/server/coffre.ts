@@ -1,12 +1,13 @@
 import "server-only";
 import { z } from "zod";
-import type { ChapitreAffiche, LigneScore, SobreAffiche } from "@prompts/lib/front";
-import type { Echange, EditionsFiche } from "@prompts/lib/memoire";
-import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
+import type { ChapitreAffiche, SobreAffiche } from "@prompts/lib/front";
+import type { Echange } from "@prompts/lib/memoire";
+import type { Memoire, Plan, Rapport } from "@prompts/lib/schemas";
 import type { BlushAnswer, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import type { Meta } from "./histoires";
 import type { VerdictPartage } from "./partages";
+import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesVocal } from "./stockage/types";
 
 /*
  * Le coffre : tout ce qui entre chiffré dans la base, et en sort. Un registre dit ce que garde chaque colonne chiffrée
@@ -17,27 +18,19 @@ import type { VerdictPartage } from "./partages";
  * (ses valeurs par défaut), et une ligne qui n’a pas la forme attendue échoue ici, en le disant, plutôt que plus loin.
  * Les autres sont relues telles qu’`ecrire` les a écrites. Dans src, seul ce fichier chiffre et déchiffre
  * (chiffrement.ts ; la règle et ses dernières exceptions : eslint.config.mjs). Il ne dépend ni de la chaîne d’analyse
- * (analyse.ts) ni des écrans (donnees.ts) : les deux lisent ici les formes qu’ils se passent. Deux formes restent
+ * (analyse.ts) ni des écrans (donnees.ts) : les formes qu’ils se passent sont dans stockage/types.ts. Deux formes restent
  * chez le module qui les fait, et qui passe par le coffre en retour : Meta (histoires.ts) et VerdictPartage
  * (partages.ts). Des imports de types seulement, sans effet à l’exécution.
  */
 
 /* ———— Ce que gardent les colonnes ———— */
 
-/** Le verdict (prompt 04), et les lignes de scores calculées par le code. */
-export type DonneesVerdict = { sortie: Verdict; scores: LigneScore[] };
-/** Le rapport (prompt 05), tel que le front l’affiche : ses chapitres, sa partie sobre, son temps de lecture. */
-export type DonneesRapport = { sortie: Rapport; chapitres: ChapitreAffiche[]; sobre: SobreAffiche | null; lecture: { free: string; full: string } };
-/**
- * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
- * et ce que l’utilisateur a corrigé lui-même dans sa fiche.
+/*
+ * Les formes que la chaîne et les écrans se passent vivent dans src/server/stockage/types.ts. Deux sont reprises ici
+ * pour les modules qui les lisent à cette adresse (le chat, les ajouts, le vocal), jusqu’au lot 3a.
  */
-export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
-/**
- * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans
- * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (lib/trouvailles.ts).
- */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[] };
+export type { DonneesMemoire, DonneesVocal };
+
 /**
  * Ce qu’il a envoyé au chat : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un
  * export, des captures), gardés pour la suite du fil ; `affiche`, ce que l’historique réaffiche (« (3 captures) »).
@@ -45,8 +38,6 @@ export type Contexte = { chiffres: string; style: string; fin: string; dernier: 
 type MessageToi = { texte: string; lignes?: string[]; affiche?: string };
 /** La réponse de BLUSH au chat, et son résumé (ce que le fil des échanges suivants en garde). */
 type MessageBlush = { reponse: BlushAnswer; resume: string };
-/** Le script du vocal du rapport, minuté d’après l’audio. `version` : celle du script (VERSION_VOCAL, src/server/vocal.ts). */
-export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version: number };
 
 /**
  * Le registre : pour chaque colonne chiffrée, la forme de ce qu’elle garde. `chat_messages.data` garde ton message ou

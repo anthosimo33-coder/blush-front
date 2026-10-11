@@ -52,7 +52,7 @@ describe("l’échéance d’une fonction", () => {
 
   it("hors des routes, seule la chaîne des tâches pose une échéance : celle d’une fonction qui vit DUREE_FONCTION_S", () => {
     const ailleurs = sources("src").filter((f) => !f.chemin.startsWith("src/app/") && f.chemin !== "src/server/echeance.ts" && echeancesPosees(f.texte).length);
-    expect(ailleurs.map((f) => f.chemin)).toEqual(["src/server/analyse.ts"]);
+    expect(ailleurs.map((f) => f.chemin)).toEqual(["src/server/pipeline.ts"]);
     expect(echeancesPosees(ailleurs[0].texte)).toEqual(["ECHEANCE_CHAINE_MS"]);
     expect(ailleurs[0].texte).toContain("export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);");
   });

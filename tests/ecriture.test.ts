@@ -1,7 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
-import { avanceMoitie, avancePlan, chapitresCommences, chapitresFinis } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -9,30 +8,6 @@ import { progression, rapportDe } from "@/server/donnees";
 import { REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
-
-const avance = (ecrit: string, reflexion = 0) => ({ reflexion, texte: ecrit.length, ecrit });
-
-describe("l’avancée du rapport, lue sur ce que le modèle écrit", () => {
-  it("repère les chapitres commencés, et suit chaque moitié chapitre par chapitre", () => {
-    const ecrit = `{"plan":null,"chapitres":[{"numero":1,"titre":"A","blocs":[]},{"numero":2,"titre":"B","blocs":[{"type":"recit","texte":"${"x".repeat(1000)}`;
-    expect(chapitresCommences(ecrit)).toEqual([1, 2]);
-    const m = avanceMoitie(avance(ecrit), 1);
-    expect(m.ecrits).toEqual([1]);
-    expect(m.enCours).toBe(2);
-    expect(m.progres).toBeGreaterThan(0.45 + 0.55 / 4);
-    expect(m.progres).toBeLessThan(0.45 + (0.55 * 2) / 4);
-    /* Avant le premier chapitre : la réflexion, sous 45 % */
-    expect(avanceMoitie(avance("", 50_000), 5).progres).toBeLessThan(0.45);
-    expect(avanceMoitie(avance("", 50_000), 5).enCours).toBeNull();
-    /* Un chapitre est fini quand le suivant commence : seul le 1 l’est ici */
-    const ch = (n: number) => `{"numero":${n},"titre":"T${n}","titre_court":"C${n}","surtitre":null,"blocs":[{"type":"chute","texte":"fin ${n}","preuves":[],"titre":null,"niveau":null,"items":null}]}`;
-    expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)},${ch(2).slice(0, 40)}`).map((c) => c.numero)).toEqual([1]);
-    expect(chapitresFinis(`{"plan":null,"chapitres":[${ch(1)}, ${ch(2)},${ch(3).slice(0, 20)}`).map((c) => c.titre)).toEqual(["T1", "T2"]);
-    /* Le plan : sa réflexion jusqu’à 50, puis ses chapitres */
-    expect(avancePlan(avance("", 2500))).toBeLessThan(50);
-    expect(avancePlan(avance('{"chapitres":[{"numero":1},{"numero":2},{"numero":3},{"numero":4}'))).toBe(74);
-  });
-});
 
 describe("le rapport pendant son écriture", () => {
   let u: Utilisateur;

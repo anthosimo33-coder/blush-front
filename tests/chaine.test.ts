@@ -1,12 +1,13 @@
 import { and, desc, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { executerChaine, type DonneesRapport } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { historique, repondre } from "@/server/chat";
 import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
 import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
+import { executerChaine } from "@/server/pipeline";
+import type { DonneesRapport } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
 import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalPret, type DonneesVocal } from "@/server/vocal";
 import { convDeTest } from "./aide/fichiers";

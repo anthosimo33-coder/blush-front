@@ -96,7 +96,7 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
     },
   },
-  // Le serveur ne passe pas par la couche du navigateur. donnees.ts lit encore des types d’api.ts (ils iront dans src/types/api.ts au lot 3).
+  // Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts.
   {
     files: ["src/server/**", "src/app/api/**"],
     rules: {

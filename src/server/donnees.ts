@@ -7,18 +7,22 @@ import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres
 import { SUBSCRIPTIONS } from "@/contenu/offres";
 import { peut } from "@/lib/acces";
 import { pronomOppose } from "@/lib/pronom";
-import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
-import type { Verdict as Verdict04 } from "@prompts/lib/schemas";
+import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
+import type { ChapitreAffiche } from "@prompts/lib/front";
+import type { Plan as PlanDuRapport, Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Echec, Fiche, Plan, Story, VocalRapport } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
+import { ECRITURE_MAX, etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, PART_DU_PLAN, RYTHME_FIABLE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
 import { echecDe } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
-import type { Genre } from "./db/enums";
+import { GENRES_CHAINE } from "./db/enums";
 import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, storyAffichee, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
-import { aRelancer, etatDesTaches, planifier, type Tache } from "./taches";
+import { cloreLesAbandons, DUREES_MS, executerChaine, reparerLaChaine, type EtatTaches } from "./pipeline";
+import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "./stockage/types";
+import { aRelancer, etatDesTaches } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
 import { jourRelatif } from "./temps";
@@ -49,9 +53,6 @@ const contexteMemo = cache(async (parcours: boolean): Promise<{ utilisateur: Uti
  * qui lit plusieurs données (l’accueil en lit six) ne refait pas ces requêtes à chaque fois.
  */
 export const contexteRequete = (parcours = false) => contexteMemo(!!parcours);
-
-/** La chaîne d’analyse, chargée à la demande (le SDK du modèle et les prompts ne servent qu’à elle). */
-const chaine = () => import("./analyse");
 
 export async function storyCourante(parcours = false): Promise<Story | null> {
   const { story } = await contexteRequete(parcours);
@@ -112,7 +113,6 @@ export const finDeLecture = cache(async (storyId: string): Promise<number | null
 
 /** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. Celles coupées à leur dernier essai passent en échec. */
 export async function relancer(storyId: string): Promise<void> {
-  const { cloreLesAbandons, executerChaine } = await chaine();
   await cloreLesAbandons(storyId);
   if ((await aRelancer(storyId)).length) after(() => executerChaine(storyId));
 }
@@ -129,13 +129,12 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
   const echec = verdict?.status === "echec";
   /* Le début de l’essai en cours : `prendre` met updatedAt à jour (le battement de cœur ne touche que heartbeatAt) */
   const ecoule = verdict ? (Date.now() - verdict.updatedAt.getTime()) / 1000 : 0;
-  const lecture = verdict?.status === "en_cours" ? Math.min(0.15, 0.03 + ecoule / 60) : 0.02;
+  const lecture = verdict?.status === "en_cours" ? Math.min(LECTURE_MAX, LECTURE_DEPART + ecoule / LECTURE_RYTHME_S) : LECTURE_ATTENTE;
   const p = fini ? 1 : Math.max(lecture, (verdict?.progress ?? 0) / 100);
-  const etape = p < 0.35 ? 0 : p < 0.55 ? 1 : p < 0.7 ? 2 : 3;
   return {
     progress: p,
-    messagesRead: Math.round(Math.min(1, p / 0.7) * total),
-    stepsDone: fini ? 4 : etape,
+    messagesRead: Math.round(Math.min(1, p / (VERDICT_REFLEXION / 100)) * total),
+    stepsDone: fini ? NB_ETAPES_DE_LECTURE : etapeDeLecture(p),
     discoveries: decouvertes(story, p),
     done: fini,
     ...(echec ? { failed: true, failReason: echecDe(verdict?.error) } : {}),
@@ -149,22 +148,23 @@ function decouvertes(story: Ligne, p: number): string[] {
 
 const duree = (s: number) => (s < 50 ? `${Math.max(10, Math.ceil(s / 10) * 10)}\u00a0s` : `${Math.max(1, Math.round(s / 60))}\u00a0min`);
 
-/* Les durées habituelles des étapes (mesurées sur les rapports de test) : le plan, puis les deux moitiés en même temps */
-const PLAN_S = 55;
-const CHAPITRES_S = 100;
+/* Les durées habituelles des étapes (pipeline.ts), en secondes : le plan, puis les deux moitiés en même temps */
+const PLAN_S = DUREES_MS.rapport_plan / 1000;
+const CHAPITRES_S = DUREES_MS.rapport_chapitres / 1000;
 
 /**
  * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour 35 %, les deux moitiés pour 65 %), l’état
- * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois fait.
+ * de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une fois
+ * fait. `maintenant` : l’heure de la lecture, en millisecondes.
  */
-function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: string, prets: Set<number>): EcritureRapport | undefined {
+function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: string, prets: Set<number>, maintenant: number): EcritureRapport | undefined {
   const { rapport_plan: tp, rapport_chapitres: tc } = taches;
   if (!tp) return undefined;
   const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
   const detail = tc?.detail ?? null;
   const fini = tc?.status === "fini";
   const pChap = fini ? 1 : detail ? (detail.a.progres + detail.b.progres) / 2 : 0;
-  const progres = Math.min(0.99, 0.35 * pPlan + 0.65 * pChap);
+  const progres = Math.min(ECRITURE_MAX, PART_DU_PLAN * pPlan + (1 - PART_DU_PLAN) * pChap);
   const etat = (n: number): EtatChapitre => {
     if (fini || prets.has(n)) return "ecrit";
     const m = n <= 4 ? detail?.a : detail?.b;
@@ -175,9 +175,9 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
    * Le temps qui reste : pendant le plan, sa part restante plus les chapitres ; ensuite, au rythme observé des chapitres
    * une fois qu’ils ont pris un peu d’avance (au début, leur durée habituelle). `updatedAt` : le début de l’essai en cours.
    */
-  const enCoursDepuis = tc?.status === "en_cours" ? (Date.now() - tc.updatedAt.getTime()) / 1000 : 0;
+  const enCoursDepuis = tc?.status === "en_cours" ? (maintenant - tc.updatedAt.getTime()) / 1000 : 0;
   const restant =
-    tp.status !== "fini" ? (1 - pPlan) * PLAN_S + CHAPITRES_S : pChap > 0.25 && enCoursDepuis > 0 ? (enCoursDepuis * (1 - pChap)) / pChap : (1 - pChap) * CHAPITRES_S;
+    tp.status !== "fini" ? (1 - pPlan) * PLAN_S + CHAPITRES_S : pChap > RYTHME_FIABLE && enCoursDepuis > 0 ? (enCoursDepuis * (1 - pChap)) / pChap : (1 - pChap) * CHAPITRES_S;
   return {
     etape: tp.status === "fini" ? "chapitres" : "plan",
     progres,
@@ -186,33 +186,15 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
   };
 }
 
-/**
- * Avec l’accès, ce qui doit s’écrire et n’a jamais été lancé : le rapport (l’accès donné à la main, ou débloqué depuis
- * une autre conv), la mémoire (après un rapport sobre offert, puis l’accès). Rien sans la conv brute (effacée au bout
- * de 30 jours). La chaîne repart après la réponse. `taches` : l’état déjà lu (le rapport le lit une fois pour tout).
- * Vrai si une tâche vient d’être lancée.
+/*
+ * Avec l’accès, ce qui doit s’écrire et n’a jamais été lancé (le rapport d’un accès donné après coup, la mémoire d’un
+ * rapport sobre offert) : reparerLaChaine (pipeline.ts). Repris ici sous son ancien nom pour POST /api/debloquer, qui
+ * passera par pipeline.ts au lot 3a.
  */
-export async function assurerLaSuite(story: LigneEcran | LigneComplete, acces: boolean, taches?: EtatTaches): Promise<boolean> {
-  if (!acces || !aSaConv(story)) return false;
-  const { verdict, rapport_plan, memoire } = taches ?? (await etatDesTaches(story.id, ["verdict", "rapport_plan", "memoire"]));
-  if (verdict?.status !== "fini") return false;
-  if (!rapport_plan) await planifier(story.id, "rapport_plan");
-  else if (!memoire) {
-    const [r] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
-    if (!r?.pret) return false;
-    await planifier(story.id, "memoire");
-  } else return false;
-  after(async () => (await chaine()).executerChaine(story.id));
-  return true;
-}
+export { reparerLaChaine as assurerLaSuite } from "./pipeline";
 
 /** Les étapes du rapport (et la mémoire qui le suit) : celles qu’une relance peut reprendre. */
 export const ETAPES_DU_RAPPORT = ["rapport_plan", "rapport_chapitres", "memoire"] as const;
-
-/** L’état des tâches d’une histoire (la dernière de chaque genre). */
-type EtatTaches = Partial<Record<Genre, Tache>>;
-/* Tout ce que le rapport regarde, lu en une requête : la suite à lancer, l’écriture, son échec, le vocal */
-const TACHES_DU_RAPPORT: Genre[] = ["verdict", "rapport_plan", "rapport_chapitres", "memoire", "vocal"];
 
 /** L’écriture du rapport a-t-elle échoué pour de bon ? `refus` : le modèle refuse, une relance n’y changerait rien. */
 function echecDuRapport({ rapport_plan, rapport_chapitres }: EtatTaches): Echec | undefined {
@@ -239,33 +221,43 @@ export async function contactDe(storyId: string): Promise<EnTete | null> {
   return v ? enTete(coffre.lire("verdicts.data", v.data).sortie) : null;
 }
 
+/** Le vocal de l’histoire, tel que vocalLu le rend (src/server/vocal.ts), ou null. */
+type VocalLu = Awaited<ReturnType<typeof vocalLu>>;
+
+/** Ce que le rapport lit en base, déchiffré : de quoi l’assembler (assemblerRapport) sans rien relire. */
+export type RapportLu = {
+  storyId: string;
+  /** Le prénom de l’autre : les titres d’attente des chapitres. */
+  autre: string;
+  /** Le plan du compte. */
+  access: Plan;
+  verdict: DonneesVerdict;
+  /** Le rapport gardé, ou null tant qu’il s’écrit (ou qu’il n’a pas commencé). */
+  donnees: DonneesRapport | null;
+  /** Le plan du rapport, pendant l’écriture : ses vrais titres. Lu seulement avec l’accès. */
+  plan: PlanDuRapport | null;
+  /** Les chapitres déjà finis, pendant l’écriture. Lus seulement avec l’accès. */
+  partiels: ChapitreAffiche[];
+  /** La dernière tâche de chaque genre de la chaîne (vide quand le rapport est fermé : rien n’est regardé). */
+  taches: EtatTaches;
+  vocal: VocalLu;
+  /** Une voix est configurée (voixDisponible). */
+  voix: boolean;
+  /** L’heure de la lecture, en millisecondes : le temps qui reste de l’écriture en dépend. */
+  maintenant: number;
+};
+
 /**
- * Le rapport tel que l’affiche le front. Sans accès : le chapitre offert (le verdict, src/contenu/chapitres.ts) et les
- * chapitres payants, verrouillés et vides.
+ * Le rapport tel que l’affiche le front, assemblé d’après ce qui est lu (rapportDe), sans rien lire, écrire ni
+ * planifier. Sans accès : le chapitre offert (le verdict, src/contenu/chapitres.ts) et les chapitres payants,
+ * verrouillés et vides. Le mode sobre (une alerte) ouvre sans accès sa partie sobre, et elle seule (S-25).
  */
-export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
-  const access: Plan = utilisateur?.plan ?? "gratuit";
+export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: boolean } {
+  const { access, autre, donnees, taches } = lu;
+  const { sortie, scores } = lu.verdict;
   /* Le rapport entier (src/lib/acces.ts) ; sans, le chapitre offert */
   const aLeRapport = peut(access, "rapport");
-  /*
-   * Tout est lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès, l’état des tâches (lu une
-   * fois pour toutes les étapes ci-dessous) et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
-   */
-  const [[v], [r], tachesLues, vocalLuAvant] = await Promise.all([
-    db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)),
-    db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id)),
-    aLeRapport ? etatDesTaches(story.id, TACHES_DU_RAPPORT) : null,
-    aLeRapport ? vocalLu(story.id) : null,
-  ]);
-  if (!v) return null;
-  const { sortie, scores } = coffre.lire("verdicts.data", v.data);
-  const donnees = r?.data ? coffre.lire("reports.data", r.data) : null;
-  const meta = metaDe(story);
-  const autre = personnesDe(meta).autre.prenom;
   const ouvert = aLeRapport || sortie.mode_sobre;
-  /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
-  const [tachesOuvertes, vocalDeLaConv] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, TACHES_DU_RAPPORT), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
-  let taches = tachesOuvertes;
 
   const verdictLibre: Chapter = {
     number: 1,
@@ -280,8 +272,7 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
     ],
   };
   /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
-  const plan = ouvert && !donnees && r?.plan ? coffre.lire("reports.plan", r.plan) : null;
-  const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
+  const titres = new Map((lu.plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
   const verrouilles: Chapter[] = CHAPITRES_PAYANTS.map((n) => {
     const t = titres.get(n) ?? titreDAttente(n, autre);
     return { number: n, title: t, tocTitle: t, free: estOffert(n), locked: true, blocks: [] };
@@ -290,7 +281,7 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
    * Pendant l’écriture, les chapitres déjà finis se lisent tout de suite, dans l’ordre : un chapitre prêt en avance
    * attend (dans la liste, « Prêt ») que ceux d’avant le soient aussi. Le chapitre 1 complet remplace le verdict seul.
    */
-  const partiels = new Map((ouvert && !donnees && r?.partiel ? coffre.lire("reports.partiel", r.partiel) : []).map((c) => [c.number, c]));
+  const partiels = new Map(lu.partiels.map((c) => [c.number, c]));
   let suite = true;
   const enEcriture: Chapter[] = [partiels.get(1) ? { ...partiels.get(1)!, free: estOffert(1), locked: false } : verdictLibre];
   for (const c of verrouilles) {
@@ -298,17 +289,15 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
     suite = suite && !!pret;
     enEcriture.push(pret && suite ? { ...pret, free: estOffert(c.number), locked: false } : c);
   }
-  /* L’accès est là, mais le rapport (ou la mémoire d’un rapport sobre) n’a jamais été lancé : il part maintenant (et
-     l’état des tâches est relu, pour montrer l’écriture tout de suite) */
-  if (aLeRapport && (!donnees || donnees.sobre) && (await assurerLaSuite(story, true, taches))) taches = await etatDesTaches(story.id, TACHES_DU_RAPPORT);
-  const chapters = ouvert && donnees ? donnees.chapitres : ouvert ? enEcriture : [verdictLibre, ...verrouilles];
+  /* Les chapitres ne s’ouvrent qu’avec l’accès : le rapport sobre offert n’en montre aucun, même s’il en garde (S-25) */
+  const chapters = !aLeRapport ? [verdictLibre, ...verrouilles] : donnees ? donnees.chapitres : enEcriture;
   const echec = ouvert && !donnees ? echecDuRapport(taches) : undefined;
-  const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titres, autre, new Set(partiels.keys())) : undefined;
-  const vocal = ouvert ? await vocalDuRapport(story, sortie, !!donnees, taches, vocalDeLaConv) : undefined;
+  const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titres, autre, new Set(partiels.keys()), lu.maintenant) : undefined;
+  const vocal = ouvert ? vocalAffiche(lu.vocal, sortie, taches, lu.voix) : undefined;
 
   return {
     report: {
-      storyId: story.id,
+      storyId: lu.storyId,
       ...enTete(sortie),
       chapters,
       readingTime: donnees?.lecture ?? { free: "1 min", full: "9 min" },
@@ -324,21 +313,63 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
 }
 
 /**
+ * Le rapport tel que l’affiche le front : lu, réparé, puis assemblé (assemblerRapport). Tout est lu d’un coup, pas
+ * l’un après l’autre : le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches, lu une fois pour
+ * tout, et le vocal. Le rapport se relit toutes les 2 s pendant son écriture.
+ * La réparation (reparerLaChaine, pipeline.ts) lance ce qui devait partir et n’a jamais été lancé : une lecture qui
+ * planifie des tâches payantes, le temps que les routes s’en chargent elles-mêmes (lot 3a).
+ */
+export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<(ReportPayload & { generating: boolean }) | null> {
+  const access: Plan = utilisateur?.plan ?? "gratuit";
+  const aLeRapport = peut(access, "rapport");
+  const [[v], [r], tachesLues, vocalLuAvant] = await Promise.all([
+    db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)),
+    db().select().from(schema.reports).where(eq(schema.reports.storyId, story.id)),
+    aLeRapport ? etatDesTaches(story.id, [...GENRES_CHAINE]) : null,
+    aLeRapport ? vocalLu(story.id) : null,
+  ]);
+  if (!v) return null;
+  const verdict = coffre.lire("verdicts.data", v.data);
+  const donnees = r?.data ? coffre.lire("reports.data", r.data) : null;
+  const ouvert = aLeRapport || verdict.sortie.mode_sobre;
+  /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
+  const [tachesOuvertes, vocal] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, [...GENRES_CHAINE]), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
+  let taches = tachesOuvertes;
+  /* Ce qui n’a jamais été lancé part maintenant ; l’état des tâches est alors relu, pour montrer l’écriture tout de suite */
+  const etat = { conv: aSaConv(story), voix: voixDisponible(), verdict: verdict.sortie, plan: !!r?.plan, rapport: !!donnees, vocal, taches };
+  if (ouvert && (await reparerLaChaine(story, aLeRapport, etat))) taches = await etatDesTaches(story.id, [...GENRES_CHAINE]);
+  /* Le plan et les chapitres finis ne se lisent qu’avec l’accès, pendant l’écriture */
+  const enEcriture = aLeRapport && !donnees;
+  return assemblerRapport({
+    storyId: story.id,
+    autre: personnesDe(metaDe(story)).autre.prenom,
+    access,
+    verdict,
+    donnees,
+    plan: enEcriture && r?.plan ? coffre.lire("reports.plan", r.plan) : null,
+    partiels: enEcriture && r?.partiel ? coffre.lire("reports.partiel", r.partiel) : [],
+    taches,
+    vocal,
+    voix: voixDisponible(),
+    maintenant: Date.now(),
+  });
+}
+
+/**
  * Le vocal du rapport : prêt, en train de s’enregistrer (sa tâche attend ou tourne, ou le rapport s’écrit encore), ou
  * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
- * et un vocal d’une ancienne version du script se refait (une fois : si ça échoue, l’ancien reste).
+ * et un vocal d’une ancienne version du script se refait, une fois (si ça échoue, l’ancien reste) : la réparation
+ * (rapportDe) a déjà planifié sa tâche, qui attend.
  */
-async function vocalDuRapport(story: Ligne, verdict: Verdict04, rapportFini: boolean, taches: EtatTaches, v: Awaited<ReturnType<typeof vocalLu>>): Promise<VocalRapport | undefined> {
+function vocalAffiche(v: VocalLu, verdict: Verdict04, taches: EtatTaches, voix: boolean): VocalRapport | undefined {
   if (v?.aJour) return v.pret;
-  if (!voixDisponible() || verdict.alerte) return v?.pret;
+  if (!voix || verdict.alerte) return v?.pret;
   /* La dernière tâche « vocal » : celle qui tourne, ou la dernière tentative */
   const { vocal: t } = taches;
   if (t?.status === "attente" || t?.status === "en_cours") return { etat: "en_cours" };
   const tenteDepuis = !!t && (!v || t.createdAt > v.fait);
   if (tenteDepuis) return v?.pret;
-  if (!rapportFini) return { etat: "en_cours" };
-  await planifier(story.id, "vocal");
-  after(async () => (await chaine()).executerChaine(story.id));
+  /* Rien de tenté depuis le dernier vocal : il se fera pendant l’écriture du rapport (sa tâche part avec le plan) */
   return { etat: "en_cours" };
 }
 
@@ -350,7 +381,7 @@ export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account
  * La mémoire de l’histoire (après le rapport), ou null. Mémorisée le temps d’un rendu : l’accueil la lit pour la fiche
  * et pour les questions. (Une route /api la relit à chaque appel : `cache` n’y garde rien.)
  */
-export const memoireDe = cache(async (storyId: string): Promise<coffre.DonneesMemoire | null> => {
+export const memoireDe = cache(async (storyId: string): Promise<DonneesMemoire | null> => {
   const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
   return m ? coffre.lire("memories.data", m.data) : null;
 });

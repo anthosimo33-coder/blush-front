@@ -1,12 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
-import { executerChaine } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
 import { histoireOuverte } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
+import { executerChaine } from "@/server/pipeline";
 import { ESSAIS_MAX, planifier, reprendre } from "@/server/taches";
 import { compteDeTest, convImportee, convRattachee, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
