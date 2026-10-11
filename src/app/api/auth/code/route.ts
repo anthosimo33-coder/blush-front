@@ -6,8 +6,9 @@ import { lireBrouillon, poserNavigateur } from "@/server/cookies";
 import { emailCanonique } from "@/server/email-canonique";
 import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre } from "@/server/http";
 import { ipDe, LIMITES, limiteAtteinte, sousLaLimite } from "@/server/limites";
+import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /* Le corps du contrat, l’email vérifié (Email : sa forme, en minuscules) */
@@ -15,7 +16,8 @@ const Corps = ROUTES["POST /api/auth/code"].corps.extend({ email: Email });
 
 /** Le code de connexion, envoyé par email. Il ne vaudra que dans ce navigateur (son cookie, posé ici). */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
+  const g = await garde(req, { session: "aucune" });
+  if (g instanceof Response) return g;
   const lu = await lireCorps(req, Corps);
   if (!lu) return erreur("email");
   const { email } = lu;

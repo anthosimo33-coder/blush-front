@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { utilisateurDeSession } from "@/server/auth";
 import { lireSession, poserChoisie } from "@/server/cookies";
 import { db, schema } from "@/server/db";
+import { UUID } from "@/server/histoires";
 import { connexionPuis } from "@/lib/suite";
 
 /**
@@ -14,7 +15,7 @@ export async function GET(req: Request, { params }: RouteContext<"/ouvrir/[id]">
   const { id } = await params;
   const utilisateur = await utilisateurDeSession(await lireSession());
   if (!utilisateur) return NextResponse.redirect(new URL(connexionPuis(`/ouvrir/${encodeURIComponent(id)}`), req.url));
-  if (utilisateur && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+  if (UUID.test(id)) {
     const [s] = await db()
       .select({ id: schema.stories.id })
       .from(schema.stories)

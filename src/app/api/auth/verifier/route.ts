@@ -1,9 +1,10 @@
 import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
 import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre } from "@/server/http";
 import { brouillonALaConnexion } from "@/server/histoires";
-import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { LIMITES } from "@/server/limites";
+import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /* Le corps du contrat, l’email vérifié comme à la demande du code */
@@ -17,8 +18,8 @@ const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
  * `essais`, pour tous aussi.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  if (!(await sousLaLimite(`verif:${ipDe(req)}`, LIMITES.verificationParIp))) return erreur("trop");
+  const g = await garde(req, { session: "aucune", limite: { cle: "verif", limite: LIMITES.verificationParIp, par: "ip" } });
+  if (g instanceof Response) return g;
   const b = await lireCorps(req, Corps);
   if (!b) return repondre("POST /api/auth/verifier", { ok: false });
   /* Le code d’abord : sans le bon, la réponse est la même, invité ou pas (un email hors de la bêta n’en reçoit jamais) */

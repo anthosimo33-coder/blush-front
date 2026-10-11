@@ -1,6 +1,23 @@
 import "server-only";
 import type { Echec } from "@/types";
-import { codePublic } from "@/types/erreurs-api";
+import { codePublic, type CodeErreur } from "@/types/erreurs-api";
+
+/*
+ * Les erreurs du serveur, en deux familles. Une ErreurPublique porte un code de la liste de l’API
+ * (src/types/erreurs-api.ts) : la route le répond tel quel (reponseErreur, src/server/http.ts). Une ErreurTache porte un
+ * code interne, qui ne sort pas du serveur : le navigateur n’en apprend que codePublic.
+ */
+
+/**
+ * Une erreur attendue que le navigateur peut connaître : son code est celui de la liste de l’API, avec son statut, et
+ * reponseErreur le répond sans rien y ajouter. Chaque module en dérive la sienne, bornée aux codes qu’il peut lever
+ * (ErreurImport, ErreurAjout, ErreurCaptures, LectureRefusee, ErreurPartage).
+ */
+export class ErreurPublique<C extends CodeErreur = CodeErreur> extends Error {
+  constructor(readonly code: C) {
+    super(code);
+  }
+}
 
 /**
  * Le code d’une étape qui échoue : il part dans les logs, dans la tâche (tasks.error) et dans l’alerte à l’équipe, jamais

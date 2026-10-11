@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { Sortie01 } from "@prompts/lib/schemas";
 import { AppliCaptures } from "@/server/appli-captures";
-import { cleEnvoi, enTexte, ErreurCaptures, lecturePermise, uneSeuleLecture } from "@/server/captures";
+import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
-import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
-import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { importerCaptures, storyAffichee } from "@/server/histoires";
+import { LIMITES } from "@/server/limites";
+import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { fusionnerLots } from "@/server/video";
 import { ROUTES } from "@/types/api";
 
@@ -46,13 +47,15 @@ const Envoi = ROUTES["POST /api/captures/video"].corps
  * vus deux fois au bord de deux lots), puis la conv devient une histoire brouillon, comme des captures.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop");
+  const g = await garde(req, { session: "aucune" });
+  if (g instanceof Response) return g;
   /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
   const permis = await lecturePermise(null);
   if (permis !== "ok") return erreur(permis);
   const envoi = await lireCorps(req, Envoi);
   if (!envoi) return erreur("fichier");
+  /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
+  if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const { app, lots, cle } = envoi;
   try {
     const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
@@ -66,8 +69,6 @@ export async function POST(req: Request) {
     const story = storyAffichee(lu.id, lu.meta);
     return repondre("POST /api/captures/video", { source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
-    if (e instanceof ErreurCaptures) return erreur("capture");
-    if (e instanceof ErreurImport) return erreur(e.code);
-    throw e;
+    return reponseErreur(e);
   }
 }

@@ -1,6 +1,7 @@
 import { fermerSession } from "@/server/auth";
 import { lireSession, oublierCetAppareil } from "@/server/cookies";
-import { erreur, lireCorps, memeOrigine, OUBLIER_LE_NAVIGATEUR, repondre } from "@/server/http";
+import { lireCorps, OUBLIER_LE_NAVIGATEUR, repondre } from "@/server/http";
+import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /**
@@ -9,7 +10,9 @@ import { ROUTES } from "@/types/api";
  * de BLUSH (OUBLIER_LE_NAVIGATEUR) : sur un appareil partagé, la personne suivante ne retrouve rien.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
+  /* La session se lit sans la garde : celle d’un compte retiré de la bêta se ferme aussi */
+  const g = await garde(req, { session: "aucune" });
+  if (g instanceof Response) return g;
   /* Un corps mal formé ne déconnecte que cet appareil */
   const partout = (await lireCorps(req, ROUTES["POST /api/auth/deconnexion"].corps))?.partout === true;
   const secret = await lireSession();

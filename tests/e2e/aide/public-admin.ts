@@ -1,14 +1,22 @@
 import { randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
+import { ROUTES, type CleRoute } from "../../../src/types/api";
 import { ADMIN } from "../reglages";
 import { oublierLimiteDesCodes, sql } from "./base";
 import { RESEAU } from "./page";
 import { seConnecter } from "./parcours";
 
 /*
- * Les aides des pages publiques et de l’équipe (public-admin*.spec.ts) : se connecter avec l’email de l’équipe, et
- * préparer en base ce qu’aucun écran ne crée (un partage illisible, une conv importée il y a plus de 24 h).
+ * Les aides des pages publiques et de l’équipe (public-admin*.spec.ts) : se connecter avec l’email de l’équipe,
+ * préparer en base ce qu’aucun écran ne crée (un partage illisible, une conv importée il y a plus de 24 h), et la liste
+ * des routes qui modifient quelque chose.
  */
+
+/**
+ * Toutes les routes qui modifient quelque chose (tout sauf GET), lues dans la table du contrat (src/types/api.ts) : une
+ * route ajoutée y est vérifiée sans qu’on l’écrive ici. [méthode, adresse].
+ */
+export const MUTATIONS: [string, string][] = (Object.keys(ROUTES) as CleRoute[]).filter((cle) => !cle.startsWith("GET ")).map((cle) => cle.split(" ") as [string, string]);
 
 /**
  * Se connecter avec l’email de l’équipe (ADMIN, dans BLUSH_ADMINS), par l’interface. Il n’y en a qu’un pour tous les

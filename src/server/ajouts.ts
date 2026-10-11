@@ -13,6 +13,7 @@ import { executerChaine } from "./analyse";
 import * as coffre from "./coffre";
 import type { DonneesMemoire } from "./coffre";
 import { ficheDe } from "./donnees";
+import { ErreurPublique } from "./erreurs";
 import { planifier } from "./taches";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
@@ -25,11 +26,7 @@ import { aujourdhuiParis } from "./temps";
  */
 
 /** Rien d’utilisable : un fichier illisible, une autre conv, des captures sans rien à lire, ou rien de neuf. */
-export class ErreurAjout extends Error {
-  constructor(readonly code: Extract<CodeErreur, "fichier" | "autre_conv" | "capture" | "rien_de_neuf">) {
-    super(code);
-  }
-}
+export class ErreurAjout extends ErreurPublique<Extract<CodeErreur, "fichier" | "autre_conv" | "capture" | "rien_de_neuf">> {}
 
 /** Au-delà, les plus anciens des nouveaux messages ne sont pas gardés (un export des mois après l’import). */
 const MESSAGES_MAX = 400;

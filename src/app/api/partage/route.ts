@@ -1,27 +1,20 @@
 import { after } from "next/server";
 import { CLES, compter } from "@/server/compteurs";
-import { contexteRequete } from "@/server/donnees";
-import { erreur, memeOrigine, repondre } from "@/server/http";
-import { arreterPartage, ErreurPartage, lienDe, partager, versionImage } from "@/server/partages";
+import { repondre, reponseErreur } from "@/server/http";
+import { arreterPartage, lienDe, partager, versionImage } from "@/server/partages";
+import { garde, lecture } from "@/server/requete";
 
-/** Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
-async function histoire(req?: Request) {
-  if (req && !memeOrigine(req)) return { reponse: erreur("origine") };
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return { reponse: erreur("connexion") };
-  if (!story) return { reponse: erreur("aucune") };
-  return { story };
-}
+/* Le lien de partage du verdict : le lire (GET), le créer (POST, toujours le même), le désactiver (DELETE). */
 
 export async function GET() {
-  const { story, reponse } = await histoire();
-  if (!story) return reponse;
-  return repondre("GET /api/partage", { id: await lienDe(story.id) });
+  const g = await lecture({ session: "requise", histoire: true });
+  return g instanceof Response ? g : repondre("GET /api/partage", { id: await lienDe(g.story.id) });
 }
 
 export async function POST(req: Request) {
-  const { story, reponse } = await histoire(req);
-  if (!story) return reponse;
+  const g = await garde(req, { session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  const { story } = g;
   try {
     /* Le verdict tel que le montre le lien (le prénom de l’autre masqué) : c’est lui que le texte partagé reprend */
     const { id, verdict } = await partager(story);
@@ -33,14 +26,14 @@ export async function POST(req: Request) {
      */
     return repondre("POST /api/partage", { id, verdict: { emoji: verdict.emoji, title: verdict.title }, v: versionImage(id, verdict) });
   } catch (e) {
-    if (e instanceof ErreurPartage) return erreur(e.code);
-    throw e;
+    /* Pas encore de verdict, ou une alerte de danger (ErreurPartage) */
+    return reponseErreur(e);
   }
 }
 
 export async function DELETE(req: Request) {
-  const { story, reponse } = await histoire(req);
-  if (!story) return reponse;
-  await arreterPartage(story.id);
+  const g = await garde(req, { session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  await arreterPartage(g.story.id);
   return repondre("DELETE /api/partage", { id: null });
 }

@@ -169,17 +169,27 @@ export async function prolongerSession(secret: string): Promise<Date | null> {
 }
 
 /**
- * Le compte d’une session, ou null. Bêta fermée : un email retiré de la liste n’entre plus, même avec une session
- * ouverte avant (elle dure tant qu’il revient). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
+ * Le compte d’une session encore valide, ou null, que la bêta le laisse entrer ou non. Seul « Tout effacer » s’en sert
+ * (DELETE /api/compte) : un testeur retiré de la bêta peut toujours effacer ce qu’il a laissé. Partout ailleurs,
+ * utilisateurDeSession.
  */
-export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
+export async function compteDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   if (!secret) return null;
   const [ligne] = await db()
     .select({ user: schema.users })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
     .where(and(eq(schema.sessions.id, empreinte(secret)), gt(schema.sessions.expiresAt, new Date())));
-  return ligne && peutEntrer(ligne.user.email) ? ligne.user : null;
+  return ligne?.user ?? null;
+}
+
+/**
+ * Le compte d’une session, ou null. Bêta fermée : un email retiré de la liste n’entre plus, même avec une session
+ * ouverte avant (elle dure tant qu’il revient). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
+ */
+export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
+  const utilisateur = await compteDeSession(secret);
+  return utilisateur && peutEntrer(utilisateur.email) ? utilisateur : null;
 }
 
 /**

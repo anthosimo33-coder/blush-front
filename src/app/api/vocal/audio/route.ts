@@ -1,5 +1,7 @@
-import { contexteRequete, utilisateurCourant } from "@/server/donnees";
+import { utilisateurCourant } from "@/server/donnees";
+import { UUID } from "@/server/histoires";
 import { erreur, reponseAudio } from "@/server/http";
+import { contexte } from "@/server/requete";
 import { audioDuCompte } from "@/server/vocal";
 
 /**
@@ -12,7 +14,9 @@ export async function GET(req: Request) {
   const conv = new URL(req.url).searchParams.get("conv");
   const utilisateur = await utilisateurCourant();
   if (!utilisateur) return erreur("connexion");
-  const storyId = conv ?? (await contexteRequete()).story?.id;
+  /* Une adresse qui n’est pas celle d’une conv ne va pas jusqu’à la base */
+  if (conv !== null && !UUID.test(conv)) return erreur("aucune");
+  const storyId = conv ?? (await contexte()).story?.id;
   const vocal = storyId ? await audioDuCompte(utilisateur.id, storyId) : null;
   if (!vocal) return erreur("aucune");
   if (!vocal.audio) return erreur("pas_pret");

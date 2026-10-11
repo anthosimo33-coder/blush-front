@@ -12,6 +12,7 @@ import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Story } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte, jeton } from "./chiffrement";
+import { ErreurPublique } from "./erreurs";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
@@ -22,11 +23,7 @@ const FICHIERS_MAX = 200;
 const NOM_MAX = 100;
 
 /** Un import refusé : un fichier illisible, une conv de groupe, une conv trop courte (src/types/erreurs-api.ts). */
-export class ErreurImport extends Error {
-  constructor(readonly code: Extract<CodeErreur, "fichier" | "groupe" | "courte">) {
-    super(code);
-  }
-}
+export class ErreurImport extends ErreurPublique<Extract<CodeErreur, "fichier" | "groupe" | "courte">> {}
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {

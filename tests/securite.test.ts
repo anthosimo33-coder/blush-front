@@ -3,8 +3,8 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * Les correctifs de l’audit de sécurité du 9 octobre (S-01, S-02, S-03, S-05, S-06, et pour la connexion S-07, S-08,
- * S-09, S-16, S-32). Les routes sont appelées comme le ferait le navigateur : les cookies et les en-têtes de next/headers
+ * Les correctifs de l’audit de sécurité du 9 octobre (S-01, S-02, S-03, S-05, S-06, pour la connexion S-07, S-08, S-09,
+ * S-16, S-32, et pour les limites et le compte S-04, S-10, S-28, S-29). Les routes sont appelées comme le ferait le navigateur : les cookies et les en-têtes de next/headers
  * sont simulés (`etat.cookies` est le navigateur du moment : en changer, c’est passer à un autre), et la bêta fermée se
  * règle par test.
  */
@@ -16,6 +16,8 @@ const etat = vi.hoisted(() => ({
   apres: [] as (() => unknown)[],
   /* Une panne simulée pendant la demande d’un code : la base (preparerCode), ou Resend qui refuse le mail */
   panne: null as "base" | "resend" | null,
+  /* Les emails retirés de la bêta depuis l’ouverture de leur session (peutEntrer les refuse) */
+  retires: new Set<string>(),
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -34,7 +36,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("@/server/env", async (original) => {
   const m = await original<typeof import("@/server/env")>();
-  return { ...m, env: () => ({ ...m.env(), BLUSH_BETA_FERMEE: etat.fermee }) };
+  return { ...m, env: () => ({ ...m.env(), BLUSH_BETA_FERMEE: etat.fermee }), peutEntrer: (email: string) => !etat.retires.has(email) && m.peutEntrer(email) };
 });
 /* after() de Next ne vit que dans une requête : ce qui devait partir après la réponse attend ici, lancé par lancerApres */
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
@@ -53,28 +55,31 @@ vi.mock("@/server/email", async (original) => {
   return { ...m, envoyerCodeParEmail: (...a: Parameters<typeof m.envoyerCodeParEmail>) => (etat.panne === "resend" ? Promise.reject(new m.ErreurResend(500)) : m.envoyerCodeParEmail(...a)) };
 });
 
+import { POST as postAnalyse } from "@/app/api/analyse/route";
 import { POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postDeconnexion } from "@/app/api/auth/deconnexion/route";
 import { POST as postVerifier } from "@/app/api/auth/verifier/route";
-import { DELETE as deleteCompte } from "@/app/api/compte/route";
+import { DELETE as deleteCompte, GET as getCompte } from "@/app/api/compte/route";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
+import { POST as postImport } from "@/app/api/import/route";
 import { GET as getReveil } from "@/app/api/reveil/route";
 import { editionsBornees, type DonneesMemoire } from "@/server/analyse";
 import { envoyerCode, ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
 import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
-import { emailCanonique } from "@/server/email-canonique";
+import { cleDuCompte, emailCanonique } from "@/server/email-canonique";
 import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { convDe, depuisFichier, importer, type Meta } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
+import { etatDesTaches } from "@/server/taches";
 import { suiteSure } from "@/lib/suite";
 import { lotVideo, memoire } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
-import { facticePourChaqueTest } from "./aide/fixtures";
+import { compteDeTest, convRattachee, facticePourChaqueTest } from "./aide/fixtures";
 
 /* Le cookie de session des tests, servis en http : sans le préfixe __Host- (src/lib/noms-cookies.ts) */
 const SESSION = nomDuCookie("session", false);
@@ -262,7 +267,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
   });
 
   it("au-delà de la limite du jour : « trop »", async () => {
-    const cle = empreinte(`limite:fiche:${userId}`);
+    const cle = empreinte(`limite:fiche:${cleDuCompte(emails[0])}`);
     await db().insert(schema.rateLimits).values({ key: cle, windowStart: new Date(), count: 60 }).onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 60, windowStart: new Date() } });
     /* Le plafond est retiré même si le test échoue : les autres corrigent la fiche du même compte */
     try {
@@ -554,6 +559,110 @@ describe("S-32 · en https, les cookies du serveur portent le préfixe __Host-",
       expect(etat.cookies.size).toBe(0);
     } finally {
       vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retiré de la bêta ; sans compte, 401", () => {
+  it("retiré de la liste, il n’entre plus, mais son compte, ses sessions et ses convs s’effacent", async () => {
+    const u = await compteDeTest("retire");
+    const { secret } = await ouvrirSession(u.id);
+    etat.retires.add(u.email);
+    try {
+      etat.cookies = new Map([[SESSION, secret]]);
+      /* La garde de tout le reste ne le laisse plus entrer */
+      expect((await getCompte()).status).toBe(401);
+      const r = await deleteCompte(requete("/api/compte", { method: "DELETE" }));
+      expect([r.status, await r.json()]).toEqual([200, { ok: true }]);
+      expect(r.headers.get("clear-site-data")).toBe('"cache", "storage"');
+      expect(await db().select().from(schema.users).where(eq(schema.users.id, u.id))).toHaveLength(0);
+      expect(await db().select().from(schema.sessions).where(eq(schema.sessions.id, empreinte(secret)))).toHaveLength(0);
+    } finally {
+      etat.retires.delete(u.email);
+    }
+  });
+
+  it("sans session (ou une session expirée) : 401 « connexion », jamais un « c’est fait » qui ne l’est pas", async () => {
+    const u = await compteDeTest("expiree");
+    const { secret } = await ouvrirSession(u.id);
+    await db().update(schema.sessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.sessions.id, empreinte(secret)));
+    for (const cookies of [new Map<string, string>(), new Map([[SESSION, secret]])]) {
+      etat.cookies = cookies;
+      const r = await deleteCompte(requete("/api/compte", { method: "DELETE" }));
+      expect([r.status, await r.json()]).toEqual([401, { erreur: "connexion" }]);
+    }
+    expect(await db().select().from(schema.users).where(eq(schema.users.id, u.id))).toHaveLength(1);
+  });
+});
+
+describe("S-04 · S-28 · les lectures du jour se comptent par boîte mail et par adresse IP, pas par compte", () => {
+  const qui = { me: "p0", pronom: "il", guess: "vus", goal: "ensemble" };
+  const ipLecture = `10.${n % 250}.${(n >> 8) % 250}.230`;
+  const lancer = () => postAnalyse(postJson("/api/analyse", qui, ipLecture));
+  /* Les limites posées par ce test, retirées même s’il échoue */
+  const posees: string[] = [];
+  const poser = async (cle: string, count: number) => {
+    posees.push(empreinte(`limite:${cle}`));
+    await poserLimite(cle, count);
+  };
+  afterAll(async () => {
+    await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, posees));
+  });
+
+  it("un alias de la boîte (ou le même email, son compte effacé puis recréé) reprend le compteur où il en était ; une adresse IP aussi, tous comptes confondus", async () => {
+    etat.fermee = false;
+    const boite = `lectures-${n}@blush.test`;
+    const alias = boite.replace("@", "+bis@");
+    emails.push(alias);
+    const [u] = await db().insert(schema.users).values({ email: alias }).returning();
+    const conv = await convRattachee(u, "01-a-deux-doigts.txt");
+    etat.cookies = new Map([[SESSION, (await ouvrirSession(u.id)).secret]]);
+    await poserChoisie(conv.id);
+    const verdict = async () => (await etatDesTaches(conv.id, ["verdict"])).verdict;
+
+    /* La boîte a lu ses cinq convs du jour (sous un autre compte, ou avant d’effacer le sien) */
+    await poser(`analyse:${cleDuCompte(boite)}`, 5);
+    expect(await (await lancer()).json()).toEqual({ erreur: "trop" });
+    expect(await verdict()).toBeUndefined();
+
+    /* Un compte frais, mais une adresse IP qui en a déjà lancé vingt aujourd’hui */
+    await poser(`analyse:${cleDuCompte(boite)}`, 0);
+    await poser(`analyse:${ipLecture}`, 20);
+    const parIp = await lancer();
+    expect([parIp.status, await parIp.json()]).toEqual([429, { erreur: "trop" }]);
+    expect(await verdict()).toBeUndefined();
+
+    /* Sous les deux : la lecture part */
+    await poser(`analyse:${ipLecture}`, 0);
+    expect((await lancer()).status).toBe(200);
+    expect(await verdict()).toBeDefined();
+    /* La chaîne laissée pour après la réponse ne tourne pas ici */
+    etat.apres.length = 0;
+  });
+});
+
+describe("S-10 · les limites par adresse IP", () => {
+  const importer = (ip: string, fichier: boolean) => {
+    const fd = new FormData();
+    if (fichier) fd.append("fichier", convDeTest("01-a-deux-doigts.txt"));
+    return postImport(requete("/api/import", { method: "POST", body: fd, headers: { "x-forwarded-for": ip } }));
+  };
+
+  it("un envoi invalide ne compte pas ; une IPv6 compte pour son /64 : changer d’adresse dans sa box ne remet pas le compteur à zéro", async () => {
+    const reseau = `2001:db8:${(n % 65535).toString(16)}:${((n >> 16) % 65535).toString(16)}`;
+    const cle = `import:${reseau}::/64`;
+    await poserLimite(cle, 19);
+    try {
+      /* Sans fichier : refusé pour ça, sans toucher au compteur */
+      for (let k = 0; k < 3; k++) expect(await (await importer(`${reseau}::${k + 1}`, false)).json()).toEqual({ erreur: "fichier" });
+      expect(await compteDeLimite(cle)).toBe(19);
+      /* Le vingtième import de la box passe ; le suivant, d’une autre adresse de la même box, non */
+      const vingtieme = await importer(`${reseau}::a`, true);
+      expect(vingtieme.status).toBe(200);
+      await db().delete(schema.stories).where(eq(schema.stories.id, ((await vingtieme.json()) as { story: { id: string } }).story.id));
+      expect(await (await importer(`${reseau}:ffff:ffff:ffff:ffff`, true)).json()).toEqual({ erreur: "trop" });
+    } finally {
+      await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte(`limite:${cle}`)));
     }
   });
 });

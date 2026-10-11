@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
 import postgres from "postgres";
-import { emailCanonique } from "../../../src/server/email-canonique";
+import { cleDuCompte, emailCanonique, LIMITES_DU_COMPTE } from "../../../src/server/email-canonique";
 import { CLE, DATABASE_URL } from "../reglages";
 import { oublierMails } from "./boite";
 import { RESEAU } from "./page";
@@ -126,12 +126,13 @@ export async function changerErreur(tache: string, erreur: string): Promise<void
 
 /**
  * Pose une limite anti-abus de ce compte à son maximum (src/server/limites.ts : la clé, sans « limite: », et son maximum),
- * comme après une journée bien remplie : la prochaine fois, le serveur refuse (« trop »). `max: 0` la remet à zéro.
+ * comme après une journée bien remplie : la prochaine fois, le serveur refuse (« trop »). `max: 0` la remet à zéro. `cle`
+ * reçoit ce qui range les limites du compte, son email canonique (cleDuCompte), et rend la clé : (compte) => `chat:${compte}`.
  */
-export async function remplirLaLimite(email: string, cle: (id: string) => string, max: number): Promise<void> {
+export async function remplirLaLimite(email: string, cle: (compte: string) => string, max: number): Promise<void> {
   const [u] = await sql()<{ id: string }[]>`select id from users where email = ${email.toLowerCase()}`;
   if (!u) throw new Error(`aucun compte pour ${email}`);
-  const k = empreinte(`limite:${cle(u.id)}`);
+  const k = empreinte(`limite:${cle(cleDuCompte(email))}`);
   await sql()`insert into rate_limits (key, window_start, count) values (${k}, now(), ${max}) on conflict (key) do update set window_start = now(), count = ${max}`;
 }
 
@@ -152,7 +153,8 @@ export async function oublierLimiteDesCodes(email: string): Promise<void> {
 /**
  * Efface toute trace d’un email : son compte (et en cascade ses histoires, sessions, tâches…), ses codes de connexion, sa
  * place sur la liste d’attente, ses compteurs des limites anti-abus (les codes et les essais par email, les mails de la
- * liste), et ses mails dans la boîte des tests. Pour repartir de zéro avec un email réutilisé d’un test à l’autre (les invités :
+ * liste, et tout ce que compte son compte : rangé sur son email canonique, il survit au compte effacé), et ses mails dans
+ * la boîte des tests. Pour repartir de zéro avec un email réutilisé d’un test à l’autre (les invités :
  * aide/emails.ts) : tout ce que le test lira ensuite vient de lui.
  */
 export async function oublierEmail(email: string): Promise<void> {
@@ -162,7 +164,8 @@ export async function oublierEmail(email: string): Promise<void> {
     await tx`delete from users where email = ${e}`;
     await tx`delete from login_codes where email = ${e}`;
     await tx`delete from waitlist where email_hash = ${attente}`;
-    await tx`delete from rate_limits where key in ${tx([...limitesDesCodes(e), empreinte(`limite:attente:mail:${attente}`)])}`;
+    const duCompte = LIMITES_DU_COMPTE.map((nom) => empreinte(`limite:${nom}:${cleDuCompte(e)}`));
+    await tx`delete from rate_limits where key in ${tx([...limitesDesCodes(e), empreinte(`limite:attente:mail:${attente}`), ...duCompte])}`;
   });
   oublierMails(e);
 }

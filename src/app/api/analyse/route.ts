@@ -1,10 +1,11 @@
 import { after } from "next/server";
 import { executerChaine } from "@/server/analyse";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
-import { contexteRequete, progression, relancer } from "@/server/donnees";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
+import { progression, relancer } from "@/server/donnees";
+import { erreur, lireCorps, repondre } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { LIMITES } from "@/server/limites";
+import { garde, lecture, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { ROUTES } from "@/types/api";
 
@@ -18,24 +19,28 @@ export const maxDuration = 300;
  * suit : un brouillon laissé en plan ne prend pas sa place.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
   /*
    * Le corps de sa ligne : « Qui es-tu ? » rempli (il a `me`), ou `{}`, une relance depuis l’écran de lecture. Un corps
    * qui n’est ni l’un ni l’autre (null) est pris pour une relance aussi, comme avant : y répondre « qui » serait une
-   * autre décision
+   * autre décision. Lu avant la garde : il dit quelle conv suivre (celle du parcours, ou celle qu’on lit)
    */
   const lu = await lireCorps(req, ROUTES["POST /api/analyse"].corps);
   const qui = lu && "me" in lu ? lu : null;
-  const { utilisateur, story } = await contexteRequete(!!qui);
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
+  const g = await garde(req, { session: "requise", histoire: true, parcours: !!qui });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   /* Une relance (l’écran de lecture, un autre onglet) : « Qui es-tu ? » est déjà en base. Pas rempli : /qui d’abord */
   if (!qui && !quiRempli(metaDe(story))) return erreur("qui");
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
-    /* Chaque lecture coûte : un nombre de nouvelles convs par jour et par compte, et quelques relances après un échec */
-    if (!verdict && !(await sousLaLimite(`analyse:${utilisateur.id}`, LIMITES.analyseParCompte))) return erreur("trop");
-    if (verdict && !(await sousLaLimite(`relance:verdict:${utilisateur.id}`, LIMITES.relanceParCompte))) return erreur("trop");
+    /*
+     * Chaque lecture coûte : un nombre de nouvelles convs par jour, par compte (son email canonique : un alias ou un
+     * compte recréé ne repart pas de zéro) et par adresse IP (des comptes ouverts à la chaîne d’une même box), et
+     * quelques relances après un échec
+     */
+    if (!verdict && !(await sousLaLimiteDuCompte(utilisateur, "analyse", LIMITES.analyseParCompte))) return erreur("trop");
+    if (!verdict && !(await sousLaLimiteDeLIp(req, "analyse", LIMITES.analyseParIp))) return erreur("trop");
+    if (verdict && !(await sousLaLimiteDuCompte(utilisateur, "relance:verdict", LIMITES.relanceParCompte))) return erreur("trop");
     if (!story.userId) {
       await rattacherBrouillon(utilisateur, await lireBrouillon());
       await effacerBrouillon();
@@ -50,9 +55,8 @@ export async function POST(req: Request) {
 
 /** La progression de la lecture. Relance au passage une tâche abandonnée. */
 export async function GET() {
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
-  await relancer(story.id);
-  return repondre("GET /api/analyse", await progression(story));
+  const g = await lecture({ session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  await relancer(g.story.id);
+  return repondre("GET /api/analyse", await progression(g.story));
 }

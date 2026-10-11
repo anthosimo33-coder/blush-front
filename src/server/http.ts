@@ -1,7 +1,9 @@
 import "server-only";
+import { unstable_rethrow } from "next/navigation";
 import type { z } from "zod";
 import type { CleJson, ReponseErreur, Routes } from "@/types/api";
-import { ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
+import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
+import { ErreurPublique, ErreurTache } from "./erreurs";
 
 /*
  * Les réponses des routes /api : du JSON, celui que dit leur ligne du contrat (src/types/api.ts), et des erreurs qui ne
@@ -20,6 +22,21 @@ export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse
 
 /** Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. */
 export const erreur = (code: CodeErreur) => json({ erreur: code } satisfies ReponseErreur, ERREURS_API[code], {});
+
+/**
+ * La réponse d’une erreur levée pendant une route, la même partout. Une ErreurPublique (un import refusé, un ajout sans
+ * rien de neuf, un partage pas prêt…) répond son code. Une erreur d’étape (ErreurTache) son code public : le refus du
+ * modèle, le vocal, ou la panne ; son code interne reste dans l’alerte que la route envoie à l’équipe. Le reste (un bug,
+ * la base) répond « panne », sans rien en dire au navigateur : l’erreur va aux logs. Les erreurs de Next lui-même
+ * (redirect, notFound, le rendu dynamique) repartent telles quelles.
+ */
+export function reponseErreur(e: unknown): Response {
+  unstable_rethrow(e);
+  if (e instanceof ErreurPublique) return erreur(e.code);
+  if (e instanceof ErreurTache) return erreur(codePublic(e.code));
+  console.error(e);
+  return erreur("panne");
+}
 
 /**
  * Fait oublier au navigateur ce qu’il garde de BLUSH : son cache, et son stockage (où tu t’étais arrêté dans le rapport,

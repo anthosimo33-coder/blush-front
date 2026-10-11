@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { emailCanonique } from "@/server/email-canonique";
+import { cleDuCompte, emailCanonique } from "@/server/email-canonique";
 
-/* L’email canonique (src/server/email-canonique.ts) : la boîte où arrive un email, pour ranger les limites des codes. */
+/* L’email canonique (src/server/email-canonique.ts) : la boîte où arrive un email, pour ranger les limites (les codes, ce que coûte un compte). */
 describe("l’email canonique", () => {
   it("les alias d’une même boîte Gmail n’en font qu’un : casse, +suffixe, points, googlemail.com", () => {
     for (const alias of ["noe@gmail.com", " Noe@Gmail.com ", "noe+blush@gmail.com", "n.o.e@gmail.com", "N.o.e+1+2@googlemail.com"]) expect(emailCanonique(alias), alias).toBe("noe@gmail.com");
@@ -20,5 +20,11 @@ describe("l’email canonique", () => {
     expect(emailCanonique("Pas-Un-Email")).toBe("pas-un-email");
     expect(emailCanonique("@exemple.fr")).toBe("@exemple.fr");
     expect(emailCanonique("noe@")).toBe("noe@");
+  });
+
+  it("les limites d’un compte se rangent sur sa boîte : ses alias, ou le même email après « Tout effacer », partagent leurs compteurs", () => {
+    expect(cleDuCompte("Noe+bis@gmail.com")).toBe("compte:noe@gmail.com");
+    expect(cleDuCompte("n.o.e@googlemail.com")).toBe(cleDuCompte("noe@gmail.com"));
+    expect(cleDuCompte("lea@exemple.fr")).not.toBe(cleDuCompte("noe@exemple.fr"));
   });
 });

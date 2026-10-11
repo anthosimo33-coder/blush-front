@@ -1,17 +1,18 @@
 import { after } from "next/server";
 import { executerChaine } from "@/server/analyse";
-import { contexteRequete, ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
-import { erreur, memeOrigine, repondre } from "@/server/http";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
+import { erreur, repondre } from "@/server/http";
+import { LIMITES } from "@/server/limites";
+import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { reprendre } from "@/server/taches";
 
 export const maxDuration = 300;
 
 /** Le rapport (ou le verdict seul, sans accès). `generating` : il s’écrit encore ; le front repasse dans quelques secondes. */
 export async function GET() {
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
+  const g = await lecture({ session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   /* Les tâches coupées repartent pendant que le rapport se lit (pas avant) : relu toutes les 2 s pendant l’écriture */
   const [, rapport] = await Promise.all([relancer(story.id), rapportDe(story, utilisateur)]);
   return rapport ? repondre("GET /api/rapport", rapport) : erreur("pas_pret");
@@ -19,14 +20,13 @@ export async function GET() {
 
 /** « Relancer l’écriture » : l’écriture a échoué (une panne, pas un refus du modèle). Chaque essai coûte : quelques-uns par jour. */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
+  const g = await garde(req, { session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   const avant = await rapportDe(story, utilisateur);
   if (!avant) return erreur("pas_pret");
   if (avant.echec !== "panne") return repondre("POST /api/rapport", avant);
-  if (!(await sousLaLimite(`relance:${utilisateur.id}`, LIMITES.relanceParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "relance", LIMITES.relanceParCompte))) return erreur("trop");
   await reprendre(story.id, [...ETAPES_DU_RAPPORT]);
   after(() => executerChaine(story.id));
   const rapport = await rapportDe(story, utilisateur);

@@ -7,7 +7,9 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import { utilisateurDeSession } from "./auth";
 import { empreinte, jeton } from "./chiffrement";
 import { lireSession } from "./cookies";
+import { cleDuCompte, type LimiteDuCompte } from "./email-canonique";
 import { env } from "./env";
+import { ErreurPublique } from "./erreurs";
 import { brouillonDe, ErreurImport, metaDe, type Meta } from "./histoires";
 import { appeler } from "./ia/claude";
 import { LIMITES, sousLaLimite } from "./limites";
@@ -16,7 +18,7 @@ import { aujourdhuiParis } from "./temps";
 const PLAFONDS = {
   captures: { anonymes: "capturesAnonymesParJour", compte: "capturesParCompte" },
   lots: { anonymes: "lotsAnonymesParJour", compte: "lotsParCompte" },
-} as const;
+} as const satisfies Record<string, { anonymes: keyof typeof LIMITES; compte: LimiteDuCompte & keyof typeof LIMITES }>;
 
 /**
  * Peut-on lire des captures (`quoi` : « captures », ou les « lots » d’un enregistrement d’écran) pour cette requête ? Le
@@ -24,7 +26,7 @@ const PLAFONDS = {
  * compte pas. `null` : la règle de la bêta seule (rien ne sera lu par le modèle).
  * - Bêta fermée, sans compte : « connexion ». Qui n’est pas invité ne pourrait pas lancer la lecture ensuite : on ne paie
  *   pas pour lui, et l’invité se connecte d’abord (l’écran des captures l’y envoie).
- * - Un compte connecté : sous sa limite du jour, sinon « trop ».
+ * - Un compte connecté : sous sa limite du jour (rangée sur son email canonique), sinon « trop ».
  * - Bêta ouverte, sans compte : sous un plafond pour tous et par jour, sinon « trop ».
  * Les limites par IP de la route s’appliquent en plus.
  */
@@ -33,7 +35,7 @@ export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promis
   if (!utilisateur && env().BLUSH_BETA_FERMEE) return "connexion";
   if (!quoi) return "ok";
   const { anonymes, compte } = PLAFONDS[quoi];
-  const ok = utilisateur ? await sousLaLimite(`${compte}:${utilisateur.id}`, LIMITES[compte]) : await sousLaLimite(anonymes, LIMITES[anonymes]);
+  const ok = utilisateur ? await sousLaLimite(`${compte}:${cleDuCompte(utilisateur.email)}`, LIMITES[compte]) : await sousLaLimite(anonymes, LIMITES[anonymes]);
   return ok ? "ok" : "trop";
 }
 
@@ -78,15 +80,15 @@ export function enTexte(c: Captures): TexteCaptures {
   return t;
 }
 
-/** Aucune capture ne montre leur conv. */
-export class ErreurCaptures extends Error {}
-
-/** La lecture n’est pas permise (voir lecturePermise) : la route le dit au navigateur. */
-export class LectureRefusee extends Error {
-  constructor(readonly code: Extract<CodeErreur, "connexion" | "trop">) {
-    super(code);
+/** Aucune capture ne montre leur conv : « capture ». */
+export class ErreurCaptures extends ErreurPublique<"capture"> {
+  constructor() {
+    super("capture");
   }
 }
+
+/** La lecture n’est pas permise (voir lecturePermise) : la route le dit au navigateur. */
+export class LectureRefusee extends ErreurPublique<Extract<CodeErreur, "connexion" | "trop">> {}
 
 /* ———— Un envoi coupé, repris ———— */
 

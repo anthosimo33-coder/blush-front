@@ -33,7 +33,15 @@ export function voixDisponible(): boolean {
   return !!(e.ELEVENLABS_API_KEY && e.BLUSH_VOIX_A) || e.BLUSH_IA_FACTICE;
 }
 
-export class ErreurVoix extends Error {}
+/**
+ * La voix n’a pas dit le texte : son code (« voix_delai », « voix_429 »…) part dans les logs, jamais le texte ni la
+ * réponse du prestataire. Une erreur interne, comme ErreurTache : le navigateur n’en voit rien (le vocal manque, c’est tout).
+ */
+export class ErreurVoix extends Error {
+  constructor(readonly code: `voix_${string}`) {
+    super(code);
+  }
+}
 
 /**
  * Fait dire le texte par la voix. Le mode sobre est joué plus posé (stabilité plus haute, moins de style).

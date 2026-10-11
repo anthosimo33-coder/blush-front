@@ -1,18 +1,18 @@
 import { after } from "next/server";
 import type { Ajout } from "@prompts/lib/ajouts";
-import { depuisCaptures, depuisExport, ErreurAjout, resumeAjout } from "@/server/ajouts";
+import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
 import { executerChaine } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
 import { historique, repondre as blushRepond } from "@/server/chat";
-import { contexteRequete, memoireDe } from "@/server/donnees";
+import { memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
-import { depuisPaquet, ErreurImport } from "@/server/histoires";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
+import { depuisPaquet } from "@/server/histoires";
+import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { LIMITES } from "@/server/limites";
+import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
-import { peut } from "@/lib/acces";
 import type { EvenementChat } from "@/types";
 import { ROUTES } from "@/types/api";
 import { codePublic } from "@/types/erreurs-api";
@@ -125,18 +125,16 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
  * première bulle ; la réponse, elle, part en flux.
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!peut(utilisateur.plan, "chat")) return erreur("acces");
-  if (!story) return erreur("aucune");
+  const g = await garde(req, { session: "requise", plan: "chat", histoire: true });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   const envoi = await lireEnvoi(req);
   if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");
   const fichiers = envoi.captures.length > 0 || !!envoi.export;
   if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte");
-  if (!(await sousLaLimite(`chat:${utilisateur.id}`, LIMITES.chatParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "chat", LIMITES.chatParCompte))) return erreur("trop");
   /* Lire des captures coûte plus qu’un message : une limite à part */
-  if (fichiers && !(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop");
+  if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout", LIMITES.ajoutParCompte))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire) return erreur("pas_pret");
   let dit = envoi.texte;
@@ -164,21 +162,17 @@ async function traiter(req: Request) {
     /* Le suivi des coûts attend la fin de la réponse */
     return await enFlux(story.id, (surEvenement) => blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
   } catch (e) {
-    if (e instanceof ErreurAjout) return erreur(e.code);
-    if (e instanceof ErreurImport) return erreur("fichier");
     /* Le code interne (« refus:cyber ») part à l’équipe ; le navigateur n’apprend que le refus, le vocal ou la panne */
-    if (e instanceof ErreurTache) {
-      after(() => alerter(`chat en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]));
-      return erreur(codePublic(e.code));
-    }
-    throw e;
+    if (e instanceof ErreurTache) after(() => alerter(`chat en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]));
+    return reponseErreur(e);
   }
 }
 
 /** L’historique, pour réafficher la conv avec BLUSH : les derniers échanges, ou ceux d’avant `?avant=` (un id d’échange). */
 export async function GET(req: Request) {
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
+  const g = await garde(req, { session: "requise" });
+  if (g instanceof Response) return g;
+  const { story } = g;
   const avant = Number(new URL(req.url).searchParams.get("avant"));
   return repondre("GET /api/chat", story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
 }

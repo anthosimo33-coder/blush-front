@@ -9,6 +9,7 @@ import {
   histoireExiste,
   histoiresDe,
   lectureBlushPlus,
+  MUTATIONS,
   ouvrir,
   reponseAuGeste,
   seConnecter,
@@ -21,8 +22,8 @@ import {
 
 /*
  * Ce qui protège BLUSH sans se voir : les en-têtes de sécurité de chaque réponse (next.config.ts), le refus des
- * requêtes qui modifient quelque chose et ne viennent pas de l’appli (src/server/http.ts, memeOrigine), et la purge
- * de la nuit, réservée à Vercel Cron (CRON_SECRET).
+ * requêtes qui modifient quelque chose et ne viennent pas de l’appli (la garde commune, src/server/requete.ts), et la
+ * purge de la nuit, réservée à Vercel Cron (CRON_SECRET).
  */
 
 /** Les en-têtes de next.config.ts, sur toutes les pages et toutes les routes /api. */
@@ -35,34 +36,6 @@ const ENTETES = {
   "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
 };
 
-/** Toutes les routes qui modifient quelque chose (src/app/api) : chacune vérifie d’abord d’où vient la requête. */
-const MUTATIONS: [string, string][] = [
-  ["POST", "/api/auth/code"],
-  ["POST", "/api/auth/verifier"],
-  ["POST", "/api/auth/deconnexion"],
-  ["POST", "/api/attente"],
-  ["POST", "/api/attente/retrait"],
-  ["POST", "/api/import"],
-  ["POST", "/api/captures"],
-  ["POST", "/api/captures/lot"],
-  ["POST", "/api/captures/video"],
-  ["POST", "/api/analyse"],
-  ["POST", "/api/rapport"],
-  ["POST", "/api/debloquer"],
-  ["POST", "/api/chat"],
-  ["POST", "/api/chat/vocal"],
-  ["POST", "/api/compte"],
-  ["DELETE", "/api/compte"],
-  ["DELETE", "/api/histoire"],
-  ["PUT", "/api/fiche"],
-  ["POST", "/api/fiche"],
-  ["POST", "/api/partage"],
-  ["DELETE", "/api/partage"],
-  ["POST", "/api/partage/compte"],
-  ["POST", "/api/partage/image"],
-  ["POST", "/api/vocal/ecoute"],
-];
-
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
 
@@ -74,7 +47,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 24 routes, depuis quatre origines qui ne sont pas l’appli", async () => {
+  await test.step("les 24 routes de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(24);
     for (const [methode, chemin] of MUTATIONS) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
@@ -93,6 +67,10 @@ test("une route qui modifie refuse (403) une requête venue d’un autre site, d
     const attente = await request.post("/api/attente", { headers: { origin: URL_APPLI }, data: {} });
     expect(attente.status()).toBe(422);
     expect(await attente.json()).toEqual({ erreur: "email" });
+    /* Sans session, « Tout effacer » n’a rien à effacer : il le dit (401), au lieu d’un « c’est fait » */
+    const effacer = await request.delete("/api/compte", { headers: { origin: URL_APPLI } });
+    expect(effacer.status()).toBe(401);
+    expect(await effacer.json()).toEqual({ erreur: "connexion" });
   });
 });
 

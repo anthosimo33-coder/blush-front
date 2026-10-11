@@ -7,6 +7,7 @@ import { empreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
+import { ErreurPublique } from "./erreurs";
 import { metaDe, type Ligne } from "./histoires";
 
 /*
@@ -17,11 +18,8 @@ import { metaDe, type Ligne } from "./histoires";
 /** Ce que montre un lien partagé. */
 export type VerdictPartage = { emoji: string; title: string; subtitle: string };
 
-export class ErreurPartage extends Error {
-  constructor(readonly code: Extract<CodeErreur, "pas_pret" | "sobre">) {
-    super(code);
-  }
-}
+/** Le verdict ne se partage pas : pas encore écrit, ou une alerte de danger (le mode sobre). */
+export class ErreurPartage extends ErreurPublique<Extract<CodeErreur, "pas_pret" | "sobre">> {}
 
 const ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /** 12 caractères sans ambiguïté (ni l, 1, O, 0) : impossible à deviner, facile à recopier. */

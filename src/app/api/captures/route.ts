@@ -1,10 +1,11 @@
 import { AppliCaptures } from "@/server/appli-captures";
-import { cleEnvoi, ErreurCaptures, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
+import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, memeOrigine, repondre } from "@/server/http";
-import { ErreurImport, importerCaptures, storyAffichee } from "@/server/histoires";
-import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { erreur, repondre, reponseErreur } from "@/server/http";
+import { importerCaptures, storyAffichee } from "@/server/histoires";
+import { LIMITES } from "@/server/limites";
+import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 
 /* La lecture de 20 captures prend jusqu’à une minute */
@@ -18,8 +19,8 @@ const Appli = AppliCaptures;
  * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture).
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  if (!(await sousLaLimite(`import:${ipDe(req)}`, LIMITES.importParIp))) return erreur("trop");
+  const g = await garde(req, { session: "aucune" });
+  if (g instanceof Response) return g;
   const fd = await req.formData().catch(() => null);
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = Appli.safeParse(fd?.get("app"));
@@ -27,6 +28,8 @@ async function traiter(req: Request) {
   const app = appli.success ? appli.data : "autre";
   try {
     const images = await imagesDe(fichiers);
+    /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
+    if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
     const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {
       /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
       const permis = await lecturePermise("captures");
@@ -41,10 +44,8 @@ async function traiter(req: Request) {
     const story = storyAffichee(lu.id, lu.meta);
     return repondre("POST /api/captures", { source: story.sources[0], messagesRead: lu.messages, story });
   } catch (e) {
-    if (e instanceof LectureRefusee) return erreur(e.code);
-    if (e instanceof ErreurCaptures) return erreur("capture");
-    if (e instanceof ErreurImport) return erreur(e.code);
-    throw e;
+    /* La lecture refusée (LectureRefusee), rien de lisible (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne */
+    return reponseErreur(e);
   }
 }
 

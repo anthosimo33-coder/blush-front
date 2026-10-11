@@ -1,21 +1,20 @@
 import { and, eq } from "drizzle-orm";
 import { after } from "next/server";
-import { ajouterALaFiche, depuisCaptures, depuisExport, ErreurAjout, majEnCours } from "@/server/ajouts";
+import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours } from "@/server/ajouts";
 import { executerChaine, SUPPRIMEES_MAX, type DonneesMemoire } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { contexteRequete, ficheDe, memoireDe } from "@/server/donnees";
+import { ficheDe, memoireDe } from "@/server/donnees";
 import { alerter } from "@/server/alertes";
 import { ErreurTache } from "@/server/erreurs";
-import { depuisPaquet, ErreurImport, type Ligne } from "@/server/histoires";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { depuisPaquet, type Ligne } from "@/server/histoires";
+import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { LIMITES } from "@/server/limites";
+import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
-import { peut } from "@/lib/acces";
 import type { Fiche } from "@/types";
 import { ROUTES } from "@/types/api";
-import { codePublic } from "@/types/erreurs-api";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 300;
@@ -33,10 +32,8 @@ async function ficheEtMaj(story: Ligne): Promise<Fiche> {
 }
 
 export async function GET() {
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
-  return repondre("GET /api/fiche", await ficheEtMaj(story));
+  const g = await lecture({ session: "requise", histoire: true });
+  return g instanceof Response ? g : repondre("GET /api/fiche", await ficheEtMaj(g.story));
 }
 
 /**
@@ -45,13 +42,12 @@ export async function GET() {
  * entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à jour a appris n’est effacé).
  */
 export async function PUT(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
+  const g = await garde(req, { session: "requise", histoire: true });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);
   if (!corrigee) return erreur("faits");
-  if (!(await sousLaLimite(`fiche:${utilisateur.id}`, LIMITES.ficheParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "fiche", LIMITES.ficheParCompte))) return erreur("trop");
   for (let essai = 0; essai < 3; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
@@ -81,30 +77,23 @@ export async function PUT(req: Request) {
  * sa mémoire se met à jour après la réponse (ajouterALaFiche), et la fiche se relit jusqu’à ce que ce soit fait.
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!peut(utilisateur.plan, "fiche")) return erreur("acces");
-  if (!story) return erreur("aucune");
+  const g = await garde(req, { session: "requise", plan: "fiche", histoire: true });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   const fd = await req.formData().catch(() => null);
   const captures = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const paquet = fd?.get("export");
   if (!captures.length && !(paquet instanceof File)) return erreur("fichier");
-  if (!(await sousLaLimite(`ajout:${utilisateur.id}`, LIMITES.ajoutParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "ajout", LIMITES.ajoutParCompte))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire?.etat.fiche) return erreur("pas_pret");
   try {
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
     return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));
   } catch (e) {
-    if (e instanceof ErreurAjout) return erreur(e.code);
-    if (e instanceof ErreurImport) return erreur("fichier");
     /* Le code interne part à l’équipe ; le navigateur n’apprend que le refus ou la panne */
-    if (e instanceof ErreurTache) {
-      await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]);
-      return erreur(codePublic(e.code));
-    }
-    throw e;
+    if (e instanceof ErreurTache) await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]);
+    return reponseErreur(e);
   }
 }
 

@@ -1,8 +1,8 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
-import { erreur, memeOrigine, repondre } from "@/server/http";
-import { ErreurImport } from "@/server/histoires";
-import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
+import { erreur, repondre, reponseErreur } from "@/server/http";
+import { LIMITES } from "@/server/limites";
+import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 
 /* Un lot de six images : une trentaine de secondes de lecture, une minute au pire */
@@ -13,20 +13,23 @@ export const maxDuration = 180;
  * sa lecture brute. Les images ne sont gardées nulle part. Les lots sont ensuite rassemblés (/api/captures/video).
  */
 async function traiter(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  if (!(await sousLaLimite(`lot:${ipDe(req)}`, LIMITES.lotParIp))) return erreur("trop");
+  const g = await garde(req, { session: "aucune" });
+  if (g instanceof Response) return g;
   const fd = await req.formData().catch(() => null);
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
   try {
     const images = await imagesDe(fichiers);
-    /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
+    /*
+     * Le modèle va lire : la limite de l’adresse IP, la bêta et les plafonds d’abord, une fois l’envoi vérifié (un envoi
+     * invalide ne compte pas : il ne coûte rien, et un voisin derrière la même IP n’y perd rien)
+     */
+    if (!(await sousLaLimiteDeLIp(req, "lot", LIMITES.lotParIp))) return erreur("trop");
     const permis = await lecturePermise("lots");
     if (permis !== "ok") return erreur(permis);
     return repondre("POST /api/captures/lot", { lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });
   } catch (e) {
-    if (e instanceof ErreurImport) return erreur(e.code);
-    throw e;
+    return reponseErreur(e);
   }
 }
 

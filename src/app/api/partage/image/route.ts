@@ -3,10 +3,10 @@ import type { DonneesRapport } from "@/server/analyse";
 import { carteMoment, carteReponse } from "@/server/carte-partage";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { contexteRequete } from "@/server/donnees";
-import { erreur, lireCorps, memeOrigine } from "@/server/http";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { erreur, lireCorps } from "@/server/http";
+import { LIMITES } from "@/server/limites";
 import { masqueDe } from "@/server/partages";
+import { garde } from "@/server/requete";
 import type { BlushAnswer, Chapter } from "@/types";
 import { ROUTES } from "@/types/api";
 
@@ -16,11 +16,9 @@ import { ROUTES } from "@/types/api";
  * et le prénom de l’autre est masqué (le tien reste).
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (!story) return erreur("aucune");
-  if (!(await sousLaLimite(`image:${utilisateur.id}`, LIMITES.imageParCompte))) return erreur("trop");
+  const g = await garde(req, { session: "requise", histoire: true, limite: { cle: "image", limite: LIMITES.imageParCompte, par: "compte" } });
+  if (g instanceof Response) return g;
+  const { story } = g;
   /* Une réponse du chat (son échange) ou la chute d’un chapitre (sa place) : CibleImage, src/types/api.ts */
   const c = await lireCorps(req, ROUTES["POST /api/partage/image"].corps);
   if (!c) return erreur("cible");

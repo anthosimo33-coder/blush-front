@@ -1,13 +1,12 @@
 import { CLES, compter } from "@/server/compteurs";
-import { contexteRequete } from "@/server/donnees";
-import { erreur, memeOrigine, repondre } from "@/server/http";
-import { LIMITES, sousLaLimite } from "@/server/limites";
+import { repondre } from "@/server/http";
+import { LIMITES } from "@/server/limites";
+import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 
 /** Une image vraiment partagée (ou enregistrée) depuis « Partager en image » : c’est ce geste qu’on compte, pas l’aperçu. */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
-  if (await sousLaLimite(`partage-compte:${utilisateur.id}`, LIMITES.imageParCompte)) await compter(CLES.imagePartagee);
+  const g = await garde(req, { session: "requise" });
+  if (g instanceof Response) return g;
+  if (await sousLaLimiteDuCompte(g.utilisateur, "partage-compte", LIMITES.imageParCompte)) await compter(CLES.imagePartagee);
   return repondre("POST /api/partage/compte", { ok: true });
 }

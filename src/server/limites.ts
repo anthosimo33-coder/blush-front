@@ -3,7 +3,10 @@ import { eq, sql } from "drizzle-orm";
 import { empreinte } from "./chiffrement";
 import { db, schema } from "./db";
 
-/** Les limites anti-abus : combien de fois, sur quelle fenêtre. */
+/**
+ * Les limites anti-abus : combien de fois, sur quelle fenêtre. Celles « par compte » se rangent sur son email canonique
+ * (cleDuCompte, src/server/email-canonique.ts), celles « par IP » sur son adresse, IPv6 regroupée par /64 (ipDe).
+ */
 export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
   codeParIp: { max: 20, fenetreS: 3600 },
@@ -27,6 +30,12 @@ export const LIMITES = {
   chatParCompte: { max: 150, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
+  /**
+   * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
+   * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur. TODO(produit): 20 par jour, à
+   * revoir avec les chiffres de l’ouverture.
+   */
+  analyseParIp: { max: 20, fenetreS: 86400 },
   /** Les moments d’écoute du vocal notés pour l’A/B test des voix. */
   ecouteParCompte: { max: 200, fenetreS: 86400 },
   /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
@@ -104,7 +113,43 @@ export async function rendre(cle: string): Promise<void> {
     .where(eq(schema.rateLimits.key, cleDe(cle)));
 }
 
-/** L’adresse IP de la requête (derrière le proxy de Vercel). */
+/**
+ * L’adresse IP de la requête (derrière le proxy de Vercel, qui réécrit x-forwarded-for), telle que les limites la
+ * comptent : une IPv4 telle quelle, une IPv6 par son préfixe /64 (voir groupeIp).
+ */
 export function ipDe(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "inconnue";
+  return groupeIp(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "") || "inconnue";
+}
+
+/* Un groupe de 16 bits d’une IPv6, écrit en hexadécimal */
+const HEXTET = /^[0-9a-f]{1,4}$/;
+
+/**
+ * Ce qui identifie une adresse pour les limites. Une box IPv6 reçoit un bloc /64 entier : changer d’adresse dedans ne
+ * doit pas remettre les compteurs à zéro, on ne garde donc que ses 64 premiers bits (« 2001:db8:0:1::/64 »). Une IPv4
+ * reste telle quelle, aussi écrite en IPv6 (« ::ffff:203.0.113.7 »). Ce qui n’est pas une adresse lisible reste tel quel
+ * (en minuscules) : compté à part, comme avant. Vide : rien à compter.
+ */
+export function groupeIp(brute: string): string {
+  const ip = brute
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\](:\d+)?$/, "$1")
+    .replace(/%.*$/, "");
+  if (!ip.includes(":")) return ip;
+  const v4 = ip.match(/^(?:0{0,4}:){0,5}:?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (v4) return v4[1];
+  const [tete, queue, deTrop] = ip.split("::");
+  if (deTrop !== undefined) return ip;
+  const groupes = (texte: string | undefined) => (texte ? texte.split(":").flatMap((g) => (g.includes(".") ? ["0", "0"] : [g])) : []);
+  const debut = groupes(tete);
+  const fin = queue === undefined ? [] : groupes(queue);
+  const manquants = 8 - debut.length - fin.length;
+  if (queue === undefined ? manquants !== 0 : manquants < 1) return ip;
+  const tous = [...debut, ...Array.from({ length: manquants }, () => "0"), ...fin];
+  if (!tous.every((g) => HEXTET.test(g))) return ip;
+  return `${tous
+    .slice(0, 4)
+    .map((g) => parseInt(g, 16).toString(16))
+    .join(":")}::/64`;
 }

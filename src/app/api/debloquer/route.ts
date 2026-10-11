@@ -2,9 +2,10 @@ import { eq } from "drizzle-orm";
 import { after } from "next/server";
 import { executerChaine } from "@/server/analyse";
 import { db, schema } from "@/server/db";
-import { assurerLaSuite, contexteRequete } from "@/server/donnees";
+import { assurerLaSuite } from "@/server/donnees";
 import { accesLibre } from "@/server/env";
-import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre } from "@/server/http";
+import { garde } from "@/server/requete";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
 import { peut } from "@/lib/acces";
 import { ROUTES } from "@/types/api";
@@ -16,9 +17,9 @@ export const maxDuration = 300;
  * Le rapport, puis la mémoire, s’écrivent après la réponse.
  */
 export async function POST(req: Request) {
-  if (!memeOrigine(req)) return erreur("origine");
-  const { utilisateur, story } = await contexteRequete();
-  if (!utilisateur) return erreur("connexion");
+  const g = await garde(req, { session: "requise" });
+  if (g instanceof Response) return g;
+  const { utilisateur, story } = g;
   /* Une offre qui n’existe pas : « offre » (laquelle, la v1 ne s’en sert pas encore : tout débloque BLUSH+) */
   if (!(await lireCorps(req, ROUTES["POST /api/debloquer"].corps))) return erreur("offre");
   if (!peut(utilisateur.plan, "rapport")) {
