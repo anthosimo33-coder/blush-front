@@ -212,6 +212,14 @@ test("les pages publiques, sans compte", async ({ page }) => {
     try {
       await page.goto(`/v/${partage.id}`);
       await expect(page.getByRole("heading", { level: 1, name: "Ça a coincé de notre côté." })).toBeVisible();
+      /*
+       * Le code de référence (le digest de Next) est une empreinte du message et de la pile de l’erreur : il change avec
+       * les fichiers du build. On vérifie qu’il est là, puis on le fige le temps de la capture (même nombre de chiffres
+       * qu’un digest de Next, au plus 10).
+       */
+      const code = page.getByText(/^Code de référence/).locator("span");
+      await expect(code).toHaveText(/^\d+$/);
+      await code.evaluate((n) => void (n.textContent = "1234567890"));
       await capturer(page, "erreur-serveur");
     } finally {
       await partage.effacer();
