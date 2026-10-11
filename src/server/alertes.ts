@@ -3,33 +3,27 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "./db";
 import type { Genre, StatutTache } from "./db/enums";
 import { env } from "./env";
+import { envoyerMail } from "./email";
 import { journal, journalErreur } from "./journal";
 import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
 import { NOMS_VOIX } from "./ia/voix";
-import { delaiAppel } from "./echeance";
-import { DELAI_MAIL_MS } from "./email";
 
 /*
  * Les alertes de l’équipe, par mail (BLUSH_ALERTES) : un échec définitif, et chaque nuit le résumé de la veille.
  * Jamais de contenu : des codes d’erreur, des identifiants, des comptes et des coûts.
  */
 
+/* Une alerte part par le même chemin que tous les mails (src/server/email.ts) : un refus du prestataire la fait rejeter */
 async function envoyer(sujet: string, lignes: string[]): Promise<void> {
-  const { BLUSH_ALERTES, RESEND_API_KEY, BLUSH_EMAIL_FROM } = env();
+  const { BLUSH_ALERTES, RESEND_API_KEY } = env();
   if (!BLUSH_ALERTES.length) return;
   if (!RESEND_API_KEY) {
     /* En local : l’alerte s’écrit dans le terminal du serveur de dev, en clair, pour qu’on la lise */
     console.log(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
   }
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { authorization: `Bearer ${RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: BLUSH_EMAIL_FROM, to: BLUSH_ALERTES, subject: sujet, text: lignes.join("\n") }),
-    signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
-  });
-  if (!r.ok) journal("alerte non envoyée", { statut: r.status }, "erreur");
+  await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") });
 }
 
 /*

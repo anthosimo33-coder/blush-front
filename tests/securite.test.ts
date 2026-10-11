@@ -69,6 +69,7 @@ import { PUT as putFiche } from "@/app/api/fiche/route";
 import { POST as postImport } from "@/app/api/import/route";
 import { GET as getReveil } from "@/app/api/reveil/route";
 import { editionsBornees, type DonneesMemoire } from "@/server/analyse";
+import { empreinteDeLaListe, inscrire } from "@/server/attente";
 import { envoyerCode, ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
@@ -77,6 +78,7 @@ import { cleDeLimiteDuCompte, emailCanonique } from "@/server/email-canonique";
 import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { convDe, depuisFichier, importer, type Meta } from "@/server/histoires";
+import { LIMITES } from "@/server/limites";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { etatDesTaches } from "@/server/taches";
 import { suiteSure } from "@/lib/suite";
@@ -325,10 +327,12 @@ async function demander(email: string, ip?: string): Promise<Response> {
   await lancerApres();
   return r;
 }
-const verifier = async (email: string, code: string) => {
-  const r = await postVerifier(postJson("/api/auth/verifier", { email, code }));
+const verifier = async (email: string, code: string, ip?: string) => {
+  const r = await postVerifier(postJson("/api/auth/verifier", { email, code }, ip));
   return { statut: r.status, corps: await r.json() };
 };
+/** Un code de six chiffres qui n’est pas celui-là. */
+const autreCode = (code: string) => String((Number(code) + 1) % 1_000_000).padStart(6, "0");
 /** Le compte d’une limite (src/server/limites.ts), posé à `count` pour la fenêtre en cours. */
 const poserLimite = (cle: string, count: number) =>
   db()
@@ -388,7 +392,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     expect((await verifier(e, codesEcrits(e)[0])).corps).toMatchObject({ ok: true });
   });
 
-  it("S-07 · vingt essais ratés par jour pour un email, alias compris : un nouveau code n’y change rien (il n’est plus envoyé), un bon code ne compte pas", async () => {
+  it("S-07 · soixante essais ratés par jour pour un email, alias compris : un nouveau code n’y change rien (il n’est plus envoyé), un bon code ne compte pas", async () => {
     const e = email("essais", "gmail.com");
     const alias = e.replace("essais", "es.sais").replace("@", "+blush@");
     emails.push(alias);
@@ -401,12 +405,12 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     expect((await verifier(e, codesEcrits(e)[0])).corps).toMatchObject({ ok: true });
     expect(await compteDeLimite(echecs)).toBe(5);
 
-    /* Dix-neuf essais ratés : le vingtième, raté aussi, passe encore ; le suivant, même bon, est refusé */
+    /* Tous les essais ratés du jour moins un : le dernier, raté aussi, passe encore ; le suivant, même bon, est refusé */
     autreNavigateur();
-    await poserLimite(echecs, 19);
+    await poserLimite(echecs, LIMITES.echecsCodeParEmail.max - 1);
     await demander(alias);
     const [code] = codesEcrits(alias);
-    expect(await verifier(alias, String((Number(code) + 1) % 1_000_000).padStart(6, "0"))).toEqual({ statut: 200, corps: { ok: false } });
+    expect(await verifier(alias, autreCode(code))).toEqual({ statut: 200, corps: { ok: false } });
     expect(await verifier(alias, code)).toEqual({ statut: 429, corps: { erreur: "essais" } });
     /* Un nouveau code, d’un autre navigateur : refusé d’emblée, sans mail (il n’y pourrait rien), pour l’alias aussi */
     autreNavigateur();
@@ -416,6 +420,46 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     expect(codesEcrits(e)).toHaveLength(ecrits);
     expect(await (await demander(alias)).json()).toEqual({ erreur: "essais" });
     await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte(`limite:${echecs}`)));
+  });
+
+  /** Rate les cinq essais du dernier code de cet email, dans le navigateur du moment, depuis `ip`. */
+  const raterLeCode = async (e: string, ip: string) => {
+    const code = codesEcrits(e).at(-1)!;
+    for (let k = 0; k < 5; k++) expect(await verifier(e, autreCode(code), ip)).toEqual({ statut: 200, corps: { ok: false } });
+  };
+
+  it("S-08 · les essais ratés d’un tiers n’épuisent que son navigateur : la personne, ailleurs, entre", async () => {
+    const e = email("tiers");
+    /* Le tiers rate deux codes entiers (dix essais) : son navigateur n’en a plus pour cet email aujourd’hui */
+    for (let k = 0; k < 2; k++) {
+      expect((await demander(e, ipFixe(2))).status).toBe(200);
+      await raterLeCode(e, ipFixe(2));
+    }
+    expect(LIMITES.echecsCodeParNavigateur.max).toBe(10);
+    const ecrits = codesEcrits(e).length;
+    const refus = await demander(e, ipFixe(2));
+    expect([refus.status, await refus.json()]).toEqual([429, { erreur: "essais" }]);
+    expect(codesEcrits(e)).toHaveLength(ecrits);
+    /* La personne, de chez elle : un code, et elle entre */
+    autreNavigateur();
+    expect((await demander(e, ipFixe(3))).status).toBe(200);
+    expect(await verifier(e, codesEcrits(e).at(-1)!, ipFixe(3))).toEqual({ statut: 200, corps: { ok: true, email: e } });
+  });
+
+  it("S-08 · une adresse IP qui a raté tous ses essais pour un email : un navigateur qui y arrive garde sa réserve, puis plus rien", async () => {
+    const e = email("wifi");
+    const { max, reserveNavigateur } = LIMITES.echecsCodeParEmailEtIp;
+    await poserLimite(`code:echecs-ip:${emailCanonique(e)}:${ipFixe(4)}`, max);
+    /* Sur le même Wi-Fi que le tiers : un code entier d’essais (sa réserve), ratés ici */
+    expect((await demander(e, ipFixe(4))).status).toBe(200);
+    expect(reserveNavigateur).toBe(5);
+    await raterLeCode(e, ipFixe(4));
+    /* Sa réserve épuisée, ce navigateur n’a plus d’essai depuis cette adresse… */
+    expect(await (await demander(e, ipFixe(4))).json()).toEqual({ erreur: "essais" });
+    /* …mais un autre navigateur, sur le même Wi-Fi, a la sienne : le bon code ouvre la session */
+    autreNavigateur();
+    expect((await demander(e, ipFixe(4))).status).toBe(200);
+    expect(await verifier(e, codesEcrits(e).at(-1)!, ipFixe(4))).toEqual({ statut: 200, corps: { ok: true, email: e } });
   });
 
   it("S-09 · un email a sept codes par jour d’une même adresse IP, dix de partout, alias compris : puis « codes »", async () => {
@@ -436,13 +480,13 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   it("S-09 · le plafond des mails de code du jour : l’équipe prévenue à 80 %, puis « codes » pour tout le monde", async () => {
     const e = email("plafond");
     alertes.length = 0;
-    await poserLimite("code:mails", 63);
+    await poserLimite("code:mails", Math.ceil(LIMITES.mailsCodeParJour.max * LIMITES.mailsCodeParJour.alerteA) - 1);
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : 80 % du plafond du jour"]);
     /* Elle touche tout le monde : elle passe dans la réserve des importantes (S-19) */
     expect(alertes[0].importante).toBe(true);
-    await poserLimite("code:mails", 80);
+    await poserLimite("code:mails", LIMITES.mailsCodeParJour.max);
     const r = await demander(email("plafond-apres"));
     expect([r.status, await r.json()]).toEqual([429, { erreur: "codes" }]);
   });
@@ -450,7 +494,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   it("S-09 · le dernier mail du plafond part, et l’équipe le sait ; passé le plafond entre la question et l’envoi, aucun mail", async () => {
     const e = email("plafond-atteint");
     alertes.length = 0;
-    await poserLimite("code:mails", 79);
+    await poserLimite("code:mails", LIMITES.mailsCodeParJour.max - 1);
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : plafond du jour atteint"]);
@@ -661,6 +705,34 @@ describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retir
     expect(ailleurs.headers.get("clear-site-data")).toBeNull();
     expect(etat.cookies.get(SESSION)).toBe(secret);
     expect(await db().select().from(schema.users).where(eq(schema.users.id, u.id))).toHaveLength(1);
+  });
+});
+
+describe("S-30 · « Tout effacer » efface aussi le brouillon de ce navigateur et l’inscription à la liste d’attente", () => {
+  it("le brouillon du cookie et la ligne de la liste partent avec le compte ; le brouillon d’un autre navigateur reste", async () => {
+    const u = await compteDeTest("s30");
+    const { secret } = await ouvrirSession(u.id);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await inscrire(u.email, "accueil");
+    const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
+    const [ici, ailleurs] = [await importer(lu), await importer(lu)];
+    const liste = eq(schema.waitlist.emailHash, empreinteDeLaListe(u.email));
+    expect(await db().select().from(schema.waitlist).where(liste)).toHaveLength(1);
+    try {
+      etat.cookies = new Map([
+        [SESSION, secret],
+        [nomDuCookie("brouillon", false), ici.secret],
+      ]);
+      const r = await deleteCompte(requete("/api/compte", { method: "DELETE" }));
+      expect(r.status).toBe(200);
+      expect(await db().select().from(schema.users).where(eq(schema.users.id, u.id))).toHaveLength(0);
+      expect(await db().select().from(schema.stories).where(eq(schema.stories.id, ici.id))).toHaveLength(0);
+      expect(await db().select().from(schema.waitlist).where(liste)).toHaveLength(0);
+      expect(await db().select().from(schema.stories).where(eq(schema.stories.id, ailleurs.id))).toHaveLength(1);
+    } finally {
+      await db().delete(schema.stories).where(inArray(schema.stories.id, [ici.id, ailleurs.id]));
+      await db().delete(schema.waitlist).where(liste);
+    }
   });
 });
 

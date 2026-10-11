@@ -3,7 +3,7 @@ import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
 import { erreur, lireCorps, repondre } from "@/server/http";
 import { brouillonALaConnexion } from "@/server/histoires";
-import { LIMITES } from "@/server/limites";
+import { ipDe, LIMITES } from "@/server/limites";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
@@ -14,8 +14,8 @@ const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
  * Le code reçu par email, tapé dans le navigateur qui l’a demandé (son cookie) : bon, il ouvre la session. La conv importée
  * sur ce navigateur rejoint le compte et s’ouvre s’il n’en a encore lu aucune ; sinon elle reste un brouillon, et l’accueil
  * garde la conv qu’on suit (brouillonALaConnexion). Un mauvais code répond 200 `{ ok: false }`, pas une erreur de la liste
- * (src/types/erreurs-api.ts) : voulu, la même réponse pour tous. Trop d’essais ratés aujourd’hui pour cet email : 429
- * `essais`, pour tous aussi.
+ * (src/types/erreurs-api.ts) : voulu, la même réponse pour tous. Trop d’essais ratés aujourd’hui pour cet email, depuis ce
+ * navigateur ou cette adresse IP (prendreCode) : 429 `essais`, pour tous aussi.
  */
 export async function POST(req: Request) {
   const g = await garde(req, { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const b = await lireCorps(req, Corps);
   if (!b) return repondre("POST /api/auth/verifier", { ok: false });
   /* Le code d’abord : sans le bon, la réponse est la même, invité ou pas (un email hors de la bêta n’en reçoit jamais) */
-  const essai = await prendreCode(b.email, b.code.trim(), await lireNavigateur());
+  const essai = await prendreCode(b.email, b.code.trim(), { navigateur: await lireNavigateur(), ip: ipDe(req) });
   if (essai === "essais") return erreur("essais");
   if (essai === "faux") return repondre("POST /api/auth/verifier", { ok: false });
   await effacerNavigateur();

@@ -22,10 +22,10 @@ describe("la bêta fermée, sans dire qui est invité", () => {
   it("un email hors de la bêta n’a jamais de code qui marche : la vérification répond comme un mauvais code, sans créer de compte", async () => {
     const navigateur = jeton();
     /* Sans demande, puis avec la ligne d’une demande (posée pour tous : les essais y comptent comme chez un invité) */
-    expect(await prendreCode(email, "123456", navigateur)).toBe("faux");
+    expect(await prendreCode(email, "123456", { navigateur, ip: "198.51.100.8" })).toBe("faux");
     const code = await preparerCode(email, navigateur, { envoye: false });
     expect(code).toMatch(/^\d{6}$/);
-    expect(await prendreCode(email, code!, navigateur)).toBe("faux");
+    expect(await prendreCode(email, code!, { navigateur, ip: "198.51.100.8" })).toBe("faux");
     const [ligne] = await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email));
     expect(ligne.attempts).toBe(1);
     expect(await db().select().from(schema.users).where(eq(schema.users.email, email))).toHaveLength(0);

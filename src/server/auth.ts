@@ -9,7 +9,7 @@ import { db, schema } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { accesLibre, boiteAMails, peutEntrer } from "./env";
-import { compter, LIMITES, limiteAtteinte, rendre } from "./limites";
+import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, rendre } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
 /** Une session dure un mois, et chaque visite la prolonge d’autant (prolongerSession) : un mois sans visite la ferme. */
@@ -36,8 +36,8 @@ const empreinteNavigateur = (navigateur: string) => empreinte(`code:${navigateur
  * `envoye` faux (bêta fermée, un email hors de la liste) : la ligne existe aussi, mais aucun code ne la prend. Les essais
  * y comptent donc comme chez un invité (prendreCode) : rien ne dit qui l’est.
  * Un nouveau code repart de cinq essais : son navigateur est le seul à pouvoir les jouer, et celui qui veut deviner
- * prendrait de toute façon un autre navigateur. La vraie borne est celle des essais ratés de la journée pour l’email
- * (echecsCodeParEmail), qu’aucun code ne remet à zéro.
+ * prendrait de toute façon un autre navigateur. Les vraies bornes sont celles des essais ratés de la journée (prendreCode),
+ * qu’aucun code ne remet à zéro.
  */
 export async function preparerCode(email: string, navigateur: string, { envoye }: { envoye: boolean }): Promise<string | null> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -96,14 +96,57 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
   }
 }
 
+/*
+ * Les essais ratés de la journée (S-07, S-08), comptés pour l’email (canonique : ses alias avec lui), pour son adresse IP
+ * et pour le navigateur qui tape. Un tiers qui rate exprès les codes d’une personne n’épuise que les essais de son
+ * navigateur, puis de son adresse : elle, d’ailleurs, garde les siens. Sur la même adresse que lui (le même Wi-Fi), elle
+ * garde la réserve de son navigateur (LIMITES.echecsCodeParEmailEtIp.reserveNavigateur). Seule la borne de l’email,
+ * celle de tout ce qui se devine en un jour, arrête tout le monde : il faut changer d’adresse et de navigateur pour la
+ * remplir.
+ */
+const clesDesEchecs = (email: string, ip: string) => {
+  const canonique = emailCanonique(email);
+  return { email: `code:echecs:${canonique}`, ip: `code:echecs-ip:${canonique}:${ip}`, navigateur: (jeton: string) => `code:echecs-nav:${canonique}:${jeton}` };
+};
+type Echecs = { email: number; ip: number; navigateur: number };
+
+/** Ces essais ratés ferment-ils la porte ? `de` : au-delà du plafond (un essai qu’on vient de compter), ou dès lui (avant d’en compter un). */
+function porteFermee(n: Echecs, de: "au-dela" | "des-le-plafond"): boolean {
+  const passe = (compte: number, max: number) => (de === "au-dela" ? compte > max : compte >= max);
+  const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur } = LIMITES;
+  if (passe(n.email, echecsCodeParEmail.max) || passe(n.navigateur, echecsCodeParNavigateur.max)) return true;
+  /* L’adresse IP est pleine : seul un navigateur encore dans sa réserve essaie */
+  return passe(n.ip, echecsCodeParEmailEtIp.max) && passe(n.navigateur, echecsCodeParEmailEtIp.reserveNavigateur);
+}
+
+/**
+ * Plus aucun essai aujourd’hui pour cet email, dans ce navigateur (son jeton, s’il en a un) et depuis cette adresse IP ?
+ * Rien n’est compté. La demande d’un code le regarde d’abord : un code qu’on ne pourrait pas taper ne fait que consommer
+ * un mail (src/app/api/auth/code).
+ */
+export async function essaisEpuises(email: string, navigateur: string | undefined, ip: string): Promise<boolean> {
+  const cles = clesDesEchecs(email, ip);
+  const [parEmail, parIp, parNavigateur] = await Promise.all([
+    compteDeLaLimite(cles.email, LIMITES.echecsCodeParEmail),
+    compteDeLaLimite(cles.ip, LIMITES.echecsCodeParEmailEtIp),
+    /* Un navigateur sans cookie n’a encore rien tapé : rien ne lui est compté */
+    navigateur ? compteDeLaLimite(cles.navigateur(navigateur), LIMITES.echecsCodeParNavigateur) : 0,
+  ]);
+  return porteFermee({ email: parEmail, ip: parIp, navigateur: parNavigateur }, "des-le-plafond");
+}
+
 /**
  * Ce que vaut un code tapé : bon (et consommé : il ne sert qu’une fois) ; faux (mauvais, expiré, ses essais épuisés, ou
- * demandé dans un autre navigateur) ; ou « essais », trop d’essais ratés aujourd’hui pour cet email.
+ * demandé dans un autre navigateur) ; ou « essais », trop d’essais ratés aujourd’hui pour cet email, depuis ce
+ * navigateur ou cette adresse IP (essaisEpuises).
  */
 export type Essai = "bon" | "faux" | "essais";
 
-/** Prend le code tapé dans le navigateur dont `navigateur` est le jeton (sans lui, aucun code ne vaut rien). */
-export async function prendreCode(email: string, code: string, navigateur: string | undefined): Promise<Essai> {
+/**
+ * Prend le code tapé dans le navigateur dont `navigateur` est le jeton (sans lui, aucun code ne vaut rien), depuis
+ * l’adresse `ip` (ipDe, src/server/limites.ts).
+ */
+export async function prendreCode(email: string, code: string, { navigateur, ip }: { navigateur: string | undefined; ip: string }): Promise<Essai> {
   /* Sans le cookie du navigateur qui l’a demandé : rien à deviner, donc rien à compter */
   if (!navigateur) return "faux";
   const c = schema.loginCodes;
@@ -118,9 +161,15 @@ export async function prendreCode(email: string, code: string, navigateur: strin
     .where(and(ici, lt(c.attempts, CODE_ESSAIS), gt(c.expiresAt, new Date())))
     .returning({ codeHash: c.codeHash });
   if (!ligne) return "faux";
-  /* Les essais de la journée pour l’email canonique, comptés aussi avant de comparer : un bon code rend le sien */
-  const echecs = `code:echecs:${emailCanonique(email)}`;
-  if ((await compter(echecs, LIMITES.echecsCodeParEmail)) > LIMITES.echecsCodeParEmail.max) return "essais";
+  /* Les essais de la journée, comptés aussi avant de comparer : un bon code rend le sien à chacun */
+  const cles = clesDesEchecs(email, ip);
+  const comptees = [cles.email, cles.ip, cles.navigateur(navigateur)];
+  const [parEmail, parIp, parNavigateur] = await Promise.all([
+    compter(cles.email, LIMITES.echecsCodeParEmail),
+    compter(cles.ip, LIMITES.echecsCodeParEmailEtIp),
+    compter(cles.navigateur(navigateur), LIMITES.echecsCodeParNavigateur),
+  ]);
+  if (porteFermee({ email: parEmail, ip: parIp, navigateur: parNavigateur }, "au-dela")) return "essais";
   if (!/^\d{6}$/.test(code) || !memeEmpreinte(`${email}:${code}`, ligne.codeHash)) return "faux";
   /* Le code ne sert qu’une fois : deux bons essais en même temps, un seul ouvre la session */
   const [pris] = await db()
@@ -128,7 +177,7 @@ export async function prendreCode(email: string, code: string, navigateur: strin
     .where(and(ici, eq(c.codeHash, ligne.codeHash)))
     .returning({ email: c.email });
   if (!pris) return "faux";
-  await rendre(echecs);
+  await Promise.all(comptees.map((cle) => rendre(cle)));
   return "bon";
 }
 

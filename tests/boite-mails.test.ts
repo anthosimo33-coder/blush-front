@@ -21,6 +21,7 @@ beforeEach(() => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("BLUSH_BOITE_MAILS", boite);
   vi.stubEnv("RESEND_API_KEY", undefined);
+  vi.stubEnv("RESEND_API_KEY_CODES", undefined);
   vi.stubEnv("VERCEL", undefined);
   vi.stubEnv("BLUSH_IA_FACTICE", "1");
   vi.stubEnv("ANTHROPIC_API_KEY", undefined);
@@ -45,6 +46,15 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(mails.find((m) => !m.code)).toMatchObject({ pour: "noe@e2e.blush.test", sujet: "Un sujet", texte: "Un texte", html: "<p>Un texte</p>" });
   });
 
+  it("un mail à plusieurs destinataires (les alertes de l’équipe) : un fichier pour chacun ; à personne, rien", async () => {
+    const { envoyerMail } = await charger();
+    await envoyerMail(["equipe@e2e.blush.test", "nuit@e2e.blush.test"], { sujet: "BLUSH · une alerte", texte: "Tâche t1" });
+    await envoyerMail([], { sujet: "Personne", texte: "Rien" });
+    const mails = mailsDeLaBoite();
+    expect(mails.map((m) => m.pour).sort()).toEqual(["equipe@e2e.blush.test", "nuit@e2e.blush.test"]);
+    for (const m of mails) expect(m).toEqual({ pour: m.pour, sujet: "BLUSH · une alerte", texte: "Tâche t1", envoye: expect.any(String) });
+  });
+
   it("sans le modèle factice : la boîte est ignorée, et la production exige Resend", async () => {
     vi.stubEnv("BLUSH_IA_FACTICE", "0");
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
@@ -65,6 +75,25 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(envoi).toHaveBeenCalledOnce();
     expect(envoi.mock.calls[0][0]).toBe("https://api.resend.com/emails");
     expect(readdirSync(boite)).toHaveLength(0);
+  });
+
+  it("S-09 · avec une clé réservée aux codes (RESEND_API_KEY_CODES) : les codes partent avec elle, les autres mails avec RESEND_API_KEY", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
+    vi.stubEnv("RESEND_API_KEY", "re_cle_fictive");
+    vi.stubEnv("RESEND_API_KEY_CODES", "re_cle_des_codes");
+    const envoi = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }));
+    const { envoyerCodeParEmail, envoyerMail, ErreurResend } = await charger();
+    await envoyerCodeParEmail("noe@e2e.blush.test", "042917");
+    await envoyerMail(["equipe@blush.test", "nuit@blush.test"], { sujet: "BLUSH · une alerte", texte: "Tâche t1" });
+    const appels = envoi.mock.calls.map(([, init]) => ({ cle: new Headers(init?.headers).get("authorization"), corps: JSON.parse(String(init?.body)) as Record<string, unknown> }));
+    expect(appels[0]).toMatchObject({ cle: "Bearer re_cle_des_codes", corps: { to: ["noe@e2e.blush.test"], subject: "042917\u00a0: ton code BLUSH" } });
+    expect(appels[1]).toMatchObject({ cle: "Bearer re_cle_fictive", corps: { to: ["equipe@blush.test", "nuit@blush.test"], text: "Tâche t1" } });
+    /* Une alerte n’a que sa version texte */
+    expect(appels[1].corps).not.toHaveProperty("html");
+    /* Un refus du prestataire rejette, avec son statut seul */
+    envoi.mockResolvedValueOnce(new Response("{}", { status: 429 }));
+    await expect(envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" })).rejects.toEqual(new ErreurResend(429));
   });
 });
 

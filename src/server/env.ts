@@ -38,6 +38,11 @@ export const Env = z.object({
   BLUSH_VOIX_B: z.string().min(1).optional(),
   /** Sans clé Resend, le code de connexion s’affiche dans les logs (dev seulement). */
   RESEND_API_KEY: z.string().min(1).optional(),
+  /**
+   * Facultative : une clé réservée aux codes de connexion (S-09), sur un compte Resend à part. Leur quota ne prend alors
+   * plus rien à celui des rapports et des alertes. Sans elle, les codes partent avec RESEND_API_KEY.
+   */
+  RESEND_API_KEY_CODES: z.string().min(1).optional(),
   /** L’expéditeur des mails, sur le domaine vérifié chez Resend. */
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@askblush.com>"),
   /** L’adresse du site : les images des mails viennent de là. */

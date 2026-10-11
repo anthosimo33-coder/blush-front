@@ -19,14 +19,38 @@ export const LIMITES = {
   /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. */
   codeParEmail: { max: 10, fenetreS: 86400 },
   /**
-   * Les mails de code, pour tous et par jour : sous le quota de Resend, pour que les codes partent toujours. L’équipe est
+   * Les mails de code, pour tous et par jour (S-09). Sous le quota du prestataire de mails (QUOTA_MAILS), en laissant sa
+   * réserve aux rapports et aux alertes : les codes ne doivent pas les empêcher de partir, ni l’inverse. L’équipe est
    * prévenue à `alerteA` du plafond (80 %), puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans
-   * la boîte des tests de bout en bout, dont les mails ne partent pas.
+   * la boîte des tests de bout en bout, dont les mails ne partent pas. TODO(produit): 60 par jour (le plan gratuit du
+   * prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes (RESEND_API_KEY_CODES).
    */
-  mailsCodeParJour: { max: 80, fenetreS: 86400, alerteA: 0.8 },
+  mailsCodeParJour: { max: 60, fenetreS: 86400, alerteA: 0.8 },
   verificationParIp: { max: 30, fenetreS: 3600 },
-  /** Les essais de code ratés pour un email (canonique), par jour : un nouveau code ne remet pas ce compte à zéro. */
-  echecsCodeParEmail: { max: 20, fenetreS: 86400 },
+  /*
+   * Les essais de code ratés (S-07, S-08), par jour : un nouveau code ne remet aucun de ces comptes à zéro, un bon code
+   * rend son essai à chacun. Ils se comptent à trois endroits, pour qu’un tiers qui rate exprès les codes d’une personne ne
+   * bloque que lui : le navigateur qui tape (echecsCodeParNavigateur), son adresse IP (echecsCodeParEmailEtIp) et l’email
+   * (echecsCodeParEmail), la borne de tout ce qui se devine en un jour.
+   */
+  /**
+   * Les essais ratés d’un navigateur pour un email (canonique) : deux codes entiers (cinq essais chacun). Au-delà, ce
+   * navigateur n’a plus d’essai aujourd’hui pour cet email ; les autres gardent les leurs.
+   */
+  echecsCodeParNavigateur: { max: 10, fenetreS: 86400 },
+  /**
+   * Les essais ratés pour un email depuis une même adresse IP. Au-delà, cette adresse n’a plus d’essai pour l’email, sauf
+   * la réserve d’un navigateur qui a demandé son code et n’en a pas encore raté `reserveNavigateur` : la personne qui
+   * partage le Wi-Fi de celui qui rate exprès ses codes garde un code entier. TODO(produit): 20, et une réserve de 5.
+   */
+  echecsCodeParEmailEtIp: { max: 20, fenetreS: 86400, reserveNavigateur: 5 },
+  /**
+   * Les essais ratés pour un email (canonique), d’où qu’ils viennent : au-delà, plus personne n’essaie pour lui
+   * aujourd’hui. Un code sur un million par essai : 60 essais, c’est une chance sur plus de 16 000 de deviner un code dans
+   * la journée. Les codes demandés (codeParEmail, cinq essais chacun) la bornent déjà en temps normal : elle ne se
+   * remplit qu’en changeant d’adresse et de navigateur. TODO(produit): 60 par jour (20 avant).
+   */
+  echecsCodeParEmail: { max: 60, fenetreS: 86400 },
   importParIp: { max: 20, fenetreS: 3600 },
   chatParCompte: { max: 150, fenetreS: 86400 },
   /**
@@ -68,8 +92,11 @@ export const LIMITES = {
   attenteParIp: { max: 10, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
-  /** Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent pas épuiser le quota des codes. */
-  mailsAttenteParJour: { max: 50, fenetreS: 86400 },
+  /**
+   * Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent épuiser ni le quota
+   * des codes, ni la réserve des rapports et des alertes (QUOTA_MAILS). Au-delà, on inscrit sans écrire. TODO(produit): 20.
+   */
+  mailsAttenteParJour: { max: 20, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
@@ -92,6 +119,15 @@ export const LIMITES = {
   /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
   ficheParCompte: { max: 60, fenetreS: 86400 },
 } as const;
+
+/**
+ * Le quota du prestataire de mails (S-09), par jour : 100 sur son plan gratuit, pour tous les mails qui partent avec
+ * RESEND_API_KEY. Les codes (mailsCodeParJour) et la liste d’attente (mailsAttenteParJour) ont chacun leur plafond, et
+ * leur somme laisse au moins `reserve` mails aux rapports (« ton rapport est prêt ») et aux alertes de l’équipe
+ * (tests/unit/limites.test.ts y veille). TODO(produit): 100 et une réserve de 20 ; les alertes peuvent à elles seules en
+ * demander 30 par jour (alertesParJour) : un plan payant, ou une clé réservée aux codes, desserre tout.
+ */
+export const QUOTA_MAILS = { parJour: 100, reserve: 20 } as const;
 
 /** Une limite : combien de passages au plus, sur quelle fenêtre (en secondes). */
 export type Limite = { max: number; fenetreS: number };

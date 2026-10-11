@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, extensionAudio, TEXTE_CONV_MAX } from "@/lib/limites";
 import { imagesDe } from "@/server/captures";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
+import { LIMITES, QUOTA_MAILS } from "@/server/limites";
 import { mailCode } from "@/server/mail-code";
 import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
 
@@ -70,6 +71,29 @@ describe("le reste", () => {
     /* S-08 : le code ne vaut que là où on l’a demandé, et le mail le dit */
     expect(m.texte).toContain("Tape-le dans BLUSH, sur l’appareil où tu l’as demandé.");
     expect(m.html).toContain("Tape-le dans BLUSH, sur l’appareil où tu l’as demandé.");
+  });
+
+  it("une autre durée de code se dit partout dans son mail", () => {
+    const m = mailCode("159714", "https://www.askblush.com", 15);
+    expect(m.texte).toContain("Il marche 15 minutes.");
+    expect(m.html).toContain("Il marche 15 minutes.");
+    expect(m.html).not.toContain(`Il marche ${CODE_MINUTES} minutes.`);
+  });
+
+  it("S-09 · les codes et la liste d’attente restent sous le quota des mails, en laissant sa réserve aux rapports et aux alertes", () => {
+    expect(LIMITES.mailsCodeParJour.max + LIMITES.mailsAttenteParJour.max + QUOTA_MAILS.reserve).toBeLessThanOrEqual(QUOTA_MAILS.parJour);
+    expect([LIMITES.mailsCodeParJour.max, LIMITES.mailsAttenteParJour.max]).toEqual([60, 20]);
+  });
+
+  it("S-08 · les essais ratés : la réserve d’un navigateur tient sous ses plafonds, et l’email borne tout ce qui se devine", () => {
+    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail } = LIMITES;
+    expect(echecsCodeParEmailEtIp.reserveNavigateur).toBeLessThan(echecsCodeParNavigateur.max);
+    expect(echecsCodeParNavigateur.max).toBeLessThan(echecsCodeParEmailEtIp.max);
+    expect(echecsCodeParEmailEtIp.max).toBeLessThan(echecsCodeParEmail.max);
+    /* Une chance sur plus de 10 000 de deviner un code (un sur un million) dans la journée */
+    expect(echecsCodeParEmail.max / 1e6).toBeLessThan(1e-4);
+    /* En temps normal, les codes demandés (cinq essais chacun) arrêtent avant la borne de l’email */
+    expect(codeParEmail.max * 5).toBeLessThan(echecsCodeParEmail.max);
   });
 
   it.each([

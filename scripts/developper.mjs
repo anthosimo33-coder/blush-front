@@ -38,7 +38,7 @@ if (!process.env.BLUSH_CLE) arreter("BLUSH_CLE manque : copie la configuration d
  * Le modèle factice ne coûte rien, mais une vraie clé qui traîne ferait quand même partir de vrais appels (une voix
  * ElevenLabs, un mail par Resend). On refuse plutôt que de la laisser passer.
  */
-const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "MISTRAL_API_KEY", "ELEVENLABS_API_KEY"];
+const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "RESEND_API_KEY_CODES", "MISTRAL_API_KEY", "ELEVENLABS_API_KEY"];
 const trouvees = process.env.BLUSH_IA_FACTICE === "1" ? INTERDITES.filter((cle) => process.env[cle]) : [];
 if (trouvees.length) arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${trouvees.join(", ")} : de vrais appels partiraient. Retire-les, ou lance le vrai modèle avec BLUSH_IA_FACTICE=0`);
 

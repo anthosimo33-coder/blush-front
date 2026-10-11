@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { alerter, resumerLaVeille } from "@/server/alertes";
-import { inscrire } from "@/server/attente";
+import { ATTENTE_GARDEE_JOURS, empreinteDeLaListe, inscrire, purgerLaListe } from "@/server/attente";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 
@@ -9,10 +9,12 @@ const n = Date.now();
 const email = `pote-${n}@exemple.fr`;
 /* L’inscription du résumé de la veille : la sienne, pour qu’il ait toujours de quoi parler, quel que soit l’ordre des tests */
 const emailDeLaVeille = `pote-veille-${n}@exemple.fr`;
+/* Les inscriptions de la purge : une trop vieille, une encore gardée */
+const [ancien, recent] = [`pote-ancien-${n}@exemple.fr`, `pote-recent-${n}@exemple.fr`];
 afterAll(async () => {
   await db()
     .delete(schema.waitlist)
-    .where(inArray(schema.waitlist.emailHash, [email, emailDeLaVeille].map((e) => empreinte(`attente:${e}`))));
+    .where(inArray(schema.waitlist.emailHash, [email, emailDeLaVeille, ancien, recent].map((e) => empreinte(`attente:${e}`))));
 });
 
 describe("la liste d’attente", () => {
@@ -23,6 +25,22 @@ describe("la liste d’attente", () => {
     expect(lignes).toHaveLength(1);
     expect(lignes[0].source).toBe("accueil");
     expect(Buffer.from(lignes[0].email).toString("utf8")).not.toContain("exemple");
+    expect(empreinteDeLaListe(` ${email.toUpperCase()} `)).toBe(empreinte(`attente:${email}`));
+  });
+
+  it("S-30 · une inscription est gardée un an (ATTENTE_GARDEE_JOURS) : la purge de nuit efface les plus vieilles", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await inscrire(ancien, "accueil");
+    await inscrire(recent, "accueil");
+    const ligne = (e: string) => eq(schema.waitlist.emailHash, empreinteDeLaListe(e));
+    const maintenant = new Date();
+    const il_y_a = (jours: number) => new Date(maintenant.getTime() - jours * 86400e3);
+    await db().update(schema.waitlist).set({ createdAt: il_y_a(ATTENTE_GARDEE_JOURS + 1) }).where(ligne(ancien));
+    await db().update(schema.waitlist).set({ createdAt: il_y_a(ATTENTE_GARDEE_JOURS - 1) }).where(ligne(recent));
+    expect(ATTENTE_GARDEE_JOURS).toBe(365);
+    expect(await purgerLaListe(maintenant)).toBeGreaterThanOrEqual(1);
+    expect(await db().select().from(schema.waitlist).where(ligne(ancien))).toHaveLength(0);
+    expect(await db().select().from(schema.waitlist).where(ligne(recent))).toHaveLength(1);
   });
 });
 

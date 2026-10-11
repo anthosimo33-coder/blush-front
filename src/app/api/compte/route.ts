@@ -1,5 +1,5 @@
 import { mettreEnPause, supprimerCompte } from "@/server/comptes";
-import { oublierCetAppareil } from "@/server/cookies";
+import { lireBrouillon, oublierCetAppareil } from "@/server/cookies";
 import { compteDe } from "@/server/donnees";
 import { erreur, lireCorps, OUBLIER_LE_NAVIGATEUR, repondre } from "@/server/http";
 import { garde, lecture } from "@/server/requete";
@@ -21,8 +21,9 @@ export async function POST(req: Request) {
 }
 
 /**
- * « Tout effacer » : le compte, ses sessions (sur tous ses appareils) et ses histoires, en cascade. Ce navigateur oublie
- * aussi ce qu’il gardait de BLUSH, comme à la déconnexion. La session se lit sans le filtre de la bêta : un testeur
+ * « Tout effacer » : le compte, ses sessions (sur tous ses appareils) et ses histoires, en cascade, avec le brouillon de
+ * ce navigateur et l’inscription de son email à la liste d’attente (supprimerCompte). Ce navigateur oublie aussi ce
+ * qu’il gardait de BLUSH, comme à la déconnexion. La session se lit sans le filtre de la bêta : un testeur
  * retiré de la liste peut toujours tout effacer (l’écran /effacer). Sans compte (la session a expiré, ou on s’est
  * déconnecté de partout depuis un autre appareil), rien à effacer sur le serveur : 401, jamais un « c’est fait » qui ne
  * l’est pas ; mais cet appareil oublie quand même ce qu’il gardait, comme avant.
@@ -35,7 +36,7 @@ export async function DELETE(req: Request) {
     await oublierCetAppareil();
     return erreur("connexion", OUBLIER_LE_NAVIGATEUR);
   }
-  await supprimerCompte(g.utilisateur.id);
+  await supprimerCompte(g.utilisateur, { brouillon: await lireBrouillon() });
   await oublierCetAppareil();
   return repondre("DELETE /api/compte", { ok: true }, 200, OUBLIER_LE_NAVIGATEUR);
 }

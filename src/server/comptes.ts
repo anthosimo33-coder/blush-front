@@ -1,5 +1,7 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import { empreinteDeLaListe } from "./attente";
+import { empreinte } from "./chiffrement";
 import { db, schema } from "./db";
 
 /*
@@ -20,7 +22,15 @@ export async function mettreEnPause(userId: string, paused: boolean): Promise<vo
   await db().update(schema.users).set({ paused }).where(eq(schema.users.id, userId));
 }
 
-/** Efface le compte, ses sessions et ses convs (et tout ce qui en vient), en cascade. */
-export async function supprimerCompte(userId: string): Promise<void> {
-  await db().delete(schema.users).where(eq(schema.users.id, userId));
+/**
+ * « Tout effacer » (S-30) : le compte, ses sessions et ses convs (et tout ce qui en vient), en cascade ; et ce qui ne lui
+ * est pas rattaché : le brouillon de ce navigateur (une conv importée pas encore lue, `brouillon` : le secret de son
+ * cookie, src/server/cookies.ts), et l’inscription de son email à la liste d’attente. Tout ou rien.
+ */
+export async function supprimerCompte({ id, email }: { id: string; email: string }, { brouillon }: { brouillon?: string } = {}): Promise<void> {
+  await db().transaction(async (tx) => {
+    if (brouillon) await tx.delete(schema.stories).where(and(eq(schema.stories.draftToken, empreinte(brouillon)), isNull(schema.stories.userId)));
+    await tx.delete(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinteDeLaListe(email)));
+    await tx.delete(schema.users).where(eq(schema.users.id, id));
+  });
 }

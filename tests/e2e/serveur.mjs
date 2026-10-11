@@ -47,7 +47,7 @@ if (marque?.buildId !== buildId) arreter("le build de .next n’est pas celui de
  * ferait partir de vrais appels (une voix ElevenLabs, une alerte par Resend), et BLUSH_APERCU ou BLUSH_DEMANDER ouvriraient
  * les aperçus sur de vrais rapports des prompts (les tests y attendent une 404). On refuse plutôt que de les laisser passer.
  */
-const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "MISTRAL_API_KEY", "ELEVENLABS_API_KEY", "VERCEL", "BLUSH_APERCU", "BLUSH_DEMANDER"];
+const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "RESEND_API_KEY_CODES", "MISTRAL_API_KEY", "ELEVENLABS_API_KEY", "VERCEL", "BLUSH_APERCU", "BLUSH_DEMANDER"];
 for (const fichier of [".env", ".env.local", ".env.production", ".env.production.local"]) {
   const contenu = lire(fichier) ?? "";
   const trouvees = INTERDITES.filter((cle) => new RegExp(`^\\s*(?:export\\s+)?${cle}\\s*=`, "m").test(contenu));

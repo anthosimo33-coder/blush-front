@@ -55,7 +55,7 @@ describe("le code de connexion", () => {
     return { navigateur, code: (await preparerCode(email, navigateur, { envoye: true }))! };
   };
   /* Le code tapé : bon, le compte s’ouvre (comme /api/auth/verifier) */
-  const entrer = async (navigateur: string, code: string) => ((await prendreCode(email, code, navigateur)) === "bon" ? compteDe(email) : null);
+  const entrer = async (navigateur: string, code: string) => ((await prendreCode(email, code, { navigateur, ip: "198.51.100.7" })) === "bon" ? compteDe(email) : null);
 
   it("ne laisse pas passer plus de 5 essais, même envoyés en même temps", async () => {
     const { navigateur, code } = await nouveauCode();
