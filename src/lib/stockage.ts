@@ -31,6 +31,14 @@ function lireBrut(cle: string, zone: Zone): string | null | undefined {
   }
 }
 
+/**
+ * Le stockage de la zone répond-il ? Faux côté serveur, ou refusé. Pour une valeur dont l’absence (« jamais ») et le
+ * refus (« on ne peut pas savoir ») ne disent pas la même chose, que lire et lireJson confondent.
+ */
+export function stockageDisponible(zone: Zone = "local"): boolean {
+  return lireBrut("blush.sonde", zone) !== undefined;
+}
+
 /** La valeur sous `cle`, ou null : absente, ou stockage indisponible. */
 export function lire(cle: string, zone: Zone = "local"): string | null {
   return lireBrut(cle, zone) ?? null;

@@ -7,7 +7,7 @@ import { Composer } from "@/app/app/accueil/Composer";
  * La barre de saisie de l’accueil (src/app/app/accueil/Composer.tsx), seule : ce qu’on y écrit ou touche part vers
  * l’accueil, qui l’envoie à BLUSH. Les sons et le réveil du serveur sont muets (ils ne se testent pas ici).
  */
-vi.mock("@/lib/sound", () => ({ play: vi.fn(), setRecording: vi.fn(), setForceSound: vi.fn() }));
+vi.mock("@/lib/sound", () => ({ play: vi.fn() }));
 vi.mock("@/components/shell/Reveil", () => ({ reveiller: vi.fn() }));
 
 type Props = ComponentProps<typeof Composer>;

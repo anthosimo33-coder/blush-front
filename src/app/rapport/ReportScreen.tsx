@@ -23,7 +23,7 @@ import { useHydrated, useJourneyMe } from "@/state/journey";
 import type { Chapter, ChapterBlock, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
-import { ancreDuChapitre, chapitreDeLAncre, ID_PARLER_A_BLUSH, sectionDuChapitre, titreDuChapitre } from "./ancres";
+import { ancreDuChapitre, chapitreDeLAncre, PARLER_A_BLUSH, PASTILLE_REPRISE, sectionDuChapitre, titreDuChapitre } from "./ancres";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
 import { EnTeteRapport } from "./EnTeteRapport";
 import { PartageEtConfidentialite } from "./PartageVerdict";
@@ -206,7 +206,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         /* Le rapport écrit : on continue avec BLUSH, dans le chat. Pendant l’écriture, le chat n’est pas encore prêt */
         phase.nom === "complet" ? (
           /* scroll={false} : l’accueil se pose lui-même en bas de la conv, Next ne doit pas le remettre en haut. Préchargé en entier (voir ChatBubble) */
-          <ButtonLink id={ID_PARLER_A_BLUSH} href="/app?depuis=rapport" scroll={false} prefetch onClick={marquerChatOuvert} arrow>
+          <ButtonLink ref={PARLER_A_BLUSH} href="/app?depuis=rapport" scroll={false} prefetch onClick={marquerChatOuvert} arrow>
             Parler à BLUSH
           </ButtonLink>
         ) : full ? undefined : (
@@ -243,12 +243,12 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
       <Suite phase={phase} fermes={locked} access={access} ouvrirPaiement={ouvrirPaiement} />
 
       {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
-      {peut(access, "chat") && !ecritureInachevee(phase) && <ChatBubble raised={!!resume} />}
+      {peut(access, "chat") && !ecritureInachevee(phase) && <ChatBubble />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[max(20px,env(safe-area-inset-bottom))] z-40 flex justify-center px-4 lg:bottom-8">
-          <div data-popin="" className="pointer-events-auto flex max-w-[420px] items-center gap-1 rounded-full bg-ink py-1.5 pl-1.5 pr-1 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]">
+          <div ref={PASTILLE_REPRISE} data-popin="" className="pointer-events-auto flex max-w-[420px] items-center gap-1 rounded-full bg-ink py-1.5 pl-1.5 pr-1 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]">
             <button type="button" onClick={() => goTo(resume)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-1 pr-2 text-left">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.14)]">
                 <Icon name="arrow" size={15} color="#FFFFFF" stroke={2.6} className="rotate-90" />

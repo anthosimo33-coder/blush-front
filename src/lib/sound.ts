@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef } from "react";
+import { appliquerSession, audioContextDisponible, creerAudioContext } from "./audio";
 import { auRepos } from "./repos";
+import { drapeauLocal, useDrapeau } from "./stockage";
 
 /*
  * Le son de BLUSH (v2, « sobre ») : des touchers courts et ronds, tirés des trois perles du logo, en Ré pentatonique.
  * Tout est synthétisé par le navigateur (Web Audio) : aucun fichier à charger, une note se change en une ligne.
  * - Un son suit toujours un geste, ou BLUSH qui te répond. Jamais pour attirer ton attention.
  * - Il se mélange à ta musique sans la couper, et l’interrupteur silencieux le coupe (session audio « ambient »).
- *   Seule la révélation du verdict, quand on touche son bouton son, joue même en silencieux (« playback »).
+ *   Seule la révélation du verdict, quand on touche son bouton son, joue même en silencieux (« playback »,
+ *   prendreSonForce dans audio.ts, qui tient aussi la session de Safari).
  * - Le mode sobre (une alerte de danger) ne sonne pas : la scène n’existe pas.
  * - Chaque son qui suit un geste a sa vibration. Un seul réglage pour les deux : « Sons et vibrations », dans Mon compte.
  * Partitions et essais à l’oreille : https://claude.ai/artifact/5hiJBPv1egEEpVbwqY2WC5
@@ -16,72 +19,18 @@ import { auRepos } from "./repos";
 
 /* ———— Le réglage ———— */
 
-const KEY = "blush.sons.v1";
-const listeners = new Set<() => void>();
-let memo: boolean | null = null;
-
-function soundsEnabled() {
-  try {
-    return localStorage.getItem(KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
+/* Allumé tant qu’on ne l’a pas coupé (et quand le navigateur ne sait pas le dire) */
+const REGLAGE = drapeauLocal("blush.sons.v1", { defaut: true });
+const enabled = REGLAGE.lire;
 
 export function setSoundsEnabled(on: boolean) {
-  try {
-    localStorage.setItem(KEY, on ? "1" : "0");
-  } catch {
-    /* Stockage refusé : le réglage vaut pour la visite */
-  }
-  memo = on;
-  listeners.forEach((l) => l());
+  REGLAGE.poser(on);
   /* Réactivé d’un toucher : le son se réveille tout de suite, pour la confirmation qui suit */
   if (on) wake();
 }
 
-const enabled = () => (memo ??= soundsEnabled());
-
 export function useSoundsEnabled() {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    enabled,
-    () => true,
-  );
-}
-
-/* ———— La session audio de Safari ———— */
-
-type SessionType = "auto" | "ambient" | "playback";
-type AudioSessionNav = Navigator & { audioSession?: { type: string }; userActivation?: { isActive: boolean } };
-
-let forced = false;
-let recording = false;
-
-function applySession() {
-  const s = (navigator as AudioSessionNav).audioSession;
-  if (!s) return;
-  const type: SessionType = recording ? "auto" : forced ? "playback" : "ambient";
-  try {
-    if (s.type !== type) s.type = type;
-  } catch {
-    /* Ancien Safari : il garde son choix */
-  }
-}
-
-/** La révélation du verdict, bouton son touché : ses sons jouent même en mode silencieux (comme une story). */
-export function setForceSound(on: boolean) {
-  forced = on;
-  applySession();
-}
-
-/** Pendant un vocal, Safari doit pouvoir ouvrir le micro : on lui rend la main, puis on revient en « ambient ». */
-export function setRecording(on: boolean) {
-  recording = on;
-  applySession();
+  return useDrapeau(REGLAGE);
 }
 
 /* ———— Le moteur ———— */
@@ -157,17 +106,11 @@ function remplirLaPiece(c: Chain) {
 
 /** Réveille le son pendant un geste : Safari garde une page muette tant qu’on ne l’a pas touchée. */
 function wake() {
-  if (!enabled()) return;
-  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return;
-  applySession();
+  if (!enabled() || !audioContextDisponible()) return;
+  appliquerSession();
   if (!chain) {
-    let ac: AudioContext;
-    try {
-      ac = new AC({ latencyHint: "interactive" });
-    } catch {
-      return;
-    }
+    const ac = creerAudioContext({ latencyHint: "interactive" });
+    if (!ac) return;
     const c = (chain = build(ac));
     /* iPhone : un son vide joué dans le geste ouvre la sortie */
     const s = ac.createBufferSource();
@@ -436,7 +379,7 @@ export function play<K extends SoundName>(name: K, ...args: Parameters<(typeof S
   if (score.haptic) haptic(score.haptic, score.hapticAt);
   const c = chain;
   if (!c) return;
-  const inGesture = (navigator as AudioSessionNav).userActivation?.isActive ?? false;
+  const inGesture = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive ?? false;
   if (c.ac.state !== "running") {
     if (!inGesture) return;
     c.ac.resume().catch(() => {});

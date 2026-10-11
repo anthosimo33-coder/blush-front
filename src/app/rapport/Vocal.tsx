@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { setForceSound } from "@/lib/sound";
+import { chargerEnMemoire, useLecteurAudio } from "@/lib/audio";
+import { ecrireJson, lireJson, stockageDisponible } from "@/lib/stockage";
 import { ligneA } from "@/lib/vocal";
 import { noterEcouteVocal } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -24,22 +25,16 @@ type Pret = Extract<VocalRapport, { etat: "pret" }>;
 /** L’écran de fin : le verdict (ou le titre du mode sobre), et le bouton qui ramène au rapport. */
 export type FinVocal = { emoji?: string; titre: string; sousTitre: string; action: string };
 
-/* Les vocaux déjà écoutés (ce navigateur) : la tuile ne bouge plus pour eux */
-const ECOUTES_KEY = "blush.vocal.ecoutes.v1";
-function dejaEcoute(audio: string): boolean {
-  try {
-    return (JSON.parse(localStorage.getItem(ECOUTES_KEY) ?? "[]") as string[]).includes(audio);
-  } catch {
-    return true;
-  }
-}
+/* Les vocaux déjà écoutés (ce navigateur, les 20 derniers) : la tuile ne bouge plus pour eux */
+const CLE_ECOUTES = "blush.vocal.ecoutes.v1";
+const estListe = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+const ecoutes = () => lireJson(CLE_ECOUTES, estListe, []);
+/* Stockage refusé : on ne peut pas savoir, la tuile reste calme (et ne prépare son son qu’à l’écran) */
+const dejaEcoute = (audio: string) => !stockageDisponible() || ecoutes().includes(audio);
 function marquerEcoute(audio: string) {
-  try {
-    const l = JSON.parse(localStorage.getItem(ECOUTES_KEY) ?? "[]") as string[];
-    if (!l.includes(audio)) localStorage.setItem(ECOUTES_KEY, JSON.stringify([...l, audio].slice(-20)));
-  } catch {
-    /* stockage indisponible : la tuile bougera encore la prochaine fois */
-  }
+  const l = ecoutes();
+  /* Refusé : la tuile bougera encore la prochaine fois */
+  if (!l.includes(audio)) ecrireJson(CLE_ECOUTES, [...l, audio].slice(-20));
 }
 
 /**
@@ -100,16 +95,28 @@ function TuileEnregistre({ ecrit, sobre }: { ecrit: boolean; sobre: boolean }) {
 /* ———— Le lecteur : la tuile, puis la story ———— */
 
 function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin: FinVocal; sobre: boolean }) {
-  const audio = useRef<HTMLAudioElement | null>(null);
   const debutNote = useRef(false);
   const [ouvert, setOuvert] = useState(false);
-  const [joue, setJoue] = useState(false);
   const [termine, setTermine] = useState(false);
-  const [t, setT] = useState(0);
   const [nouveau, setNouveau] = useState(false);
-  /* Le son se charge (réseau lent) : le logo ne « parle » pas dans le vide. Le son ne vient pas (réseau coupé) : on le dit */
-  const [attente, setAttente] = useState(false);
-  const [coupe, setCoupe] = useState(false);
+  /* Le son, préparé en mémoire avant le toucher (plus bas) : le premier élément audio part de lui */
+  const enMemoire = useRef<string | null>(null);
+  /*
+   * L’élément audio naît dans le toucher (sinon Safari refuse de jouer) et lit le fichier au fil de l’eau. Comme une
+   * story, le vocal s’entend même quand le téléphone est en silencieux. Le son se charge (réseau lent) : le logo ne
+   * « parle » pas dans le vide (`attente`). Le son ne vient pas (réseau coupé) : on le dit (`coupe`).
+   */
+  const lecteur = useLecteurAudio({
+    source: (refait) => (!refait && enMemoire.current) || vocal.audio,
+    forcerSon: true,
+    /* Au bout : l’écran de fin, la barre pleine */
+    surFin: (a) => {
+      setTermine(true);
+      lecteur.poserTemps(vocal.duree);
+      noterEcouteVocal("fin", a.currentTime || vocal.duree);
+    },
+  });
+  const { element: audio, joue, attente, coupe, temps: t, poserTemps: setT } = lecteur;
   /* Où en est l’écoute, pour la noter « fermée avant la fin » si on quitte la page (les états ne se lisent pas au démontage) */
   const enCours = useRef(false);
   useEffect(() => {
@@ -145,7 +152,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     };
     raf = requestAnimationFrame(suivre);
     return () => cancelAnimationFrame(raf);
-  }, [joue, vocal]);
+  }, [joue, vocal, audio, setT]);
   /* La barre suit aussi les sauts (retour de 5 s, réécoute, fin) et l’ouverture de la story : posée avant l’image */
   useLayoutEffect(() => {
     if (barre.current) barre.current.style.transform = `scaleX(${Math.min(1, t / vocal.duree)})`;
@@ -156,7 +163,6 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
    * à l’écran, ou tout de suite pour un vocal jamais écouté. Au toucher, l’élément audio part de lui, sans attendre le réseau.
    */
   const tuile = useRef<HTMLButtonElement>(null);
-  const enMemoire = useRef<string | null>(null);
   useEffect(() => {
     const el = tuile.current;
     if (!el) return;
@@ -167,14 +173,9 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
       if (lance) return;
       lance = true;
       annuler = auRepos(() => {
-        fetch(vocal.audio, { credentials: "same-origin", signal: arret.signal })
-          .then((r) => (r.ok ? r.blob() : null))
-          .then((b) => {
-            if (b && !arret.signal.aborted) enMemoire.current = URL.createObjectURL(b);
-          })
-          .catch(() => {
-            /* Rien en mémoire : le toucher lira le son sur le réseau, comme avant */
-          });
+        void chargerEnMemoire(vocal.audio, arret.signal).then((url) => {
+          if (url) enMemoire.current = url;
+        });
       }, 300);
     };
     const obs = new IntersectionObserver(([e]) => e.isIntersecting && precharger());
@@ -189,7 +190,10 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     };
   }, [vocal.audio]);
 
-  /* On quitte le rapport (ou la page) : l’écoute en cours est notée fermée, le son s’arrête, les sons de BLUSH retrouvent le mode silencieux */
+  /*
+   * On quitte le rapport (ou la page) : l’écoute en cours est notée fermée. En quittant le rapport, le lecteur arrête
+   * aussi le son, et les sons de BLUSH retrouvent le mode silencieux (useLecteurAudio).
+   */
   useEffect(() => {
     const quitter = () => {
       if (enCours.current && audio.current) noterEcouteVocal("ferme", audio.current.currentTime);
@@ -199,54 +203,10 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     return () => {
       window.removeEventListener("pagehide", quitter);
       quitter();
-      audio.current?.pause();
-      setForceSound(false);
     };
-  }, []);
+  }, [audio]);
 
-  /* L’élément audio naît dans le toucher (sinon Safari refuse de jouer) et lit le fichier au fil de l’eau */
-  const lecteur = () => {
-    /* Un élément en erreur ne repart pas : on en refait un, sur le réseau (le réseau est peut-être revenu) */
-    if (audio.current && !audio.current.error) return audio.current;
-    const a = new Audio((!audio.current && enMemoire.current) || vocal.audio);
-    a.preload = "auto";
-    a.onplay = () => setJoue(true);
-    /* En pause, l’écran se recale sur le temps exact (la boucle ne le suit plus) */
-    a.onpause = () => {
-      setJoue(false);
-      setT(a.currentTime);
-    };
-    a.onwaiting = a.onstalled = () => setAttente(true);
-    a.onplaying = () => setAttente(false);
-    a.onerror = () => {
-      setJoue(false);
-      setAttente(false);
-      setCoupe(true);
-      setForceSound(false);
-    };
-    a.onended = () => {
-      setJoue(false);
-      setTermine(true);
-      setT(vocal.duree);
-      setForceSound(false);
-      noterEcouteVocal("fin", a.currentTime || vocal.duree);
-    };
-    audio.current = a;
-    return a;
-  };
-
-  const jouer = (depuis?: number) => {
-    setCoupe(false);
-    const a = lecteur();
-    if (depuis !== undefined) {
-      a.currentTime = depuis;
-      setT(depuis);
-    }
-    /* Comme une story : le vocal s’entend même quand le téléphone est en silencieux */
-    setForceSound(true);
-    a.play().catch(() => setJoue(false));
-  };
-
+  const { jouer } = lecteur;
   const ouvrir = () => {
     setOuvert(true);
     setTermine(false);
@@ -263,15 +223,8 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     const a = audio.current;
     if (a && !termine) noterEcouteVocal("ferme", a.currentTime);
     enCours.current = false;
-    a?.pause();
-    setForceSound(false);
+    lecteur.pause();
     setOuvert(false);
-  };
-
-  const basculer = () => {
-    const a = lecteur();
-    if (a.paused) jouer();
-    else a.pause();
   };
 
   const reecouter = () => {
@@ -280,11 +233,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
     jouer(0);
   };
 
-  const reculer = () => {
-    const a = lecteur();
-    a.currentTime = Math.max(0, a.currentTime - 5);
-    setT(a.currentTime);
-  };
+  const reculer = () => lecteur.aller(Math.max(0, (audio.current?.currentTime ?? 0) - 5));
 
   const duree = Math.max(1, Math.round(vocal.duree));
   /* La tuile ne dépend pas du temps : pendant l’écoute, la story se re-rend sans elle */
@@ -334,7 +283,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
             termine={termine}
             coupe={coupe}
             onFermer={fermer}
-            onBasculer={basculer}
+            onBasculer={lecteur.basculer}
             onReculer={reculer}
             onReecouter={reecouter}
           />,

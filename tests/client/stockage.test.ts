@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { drapeauLocal, ecrire, ecrireJson, lire, lireJson, useDrapeau } from "@/lib/stockage";
+import { drapeauLocal, ecrire, ecrireJson, lire, lireJson, stockageDisponible, useDrapeau } from "@/lib/stockage";
 
 /*
  * Le stockage du navigateur (src/lib/stockage.ts) : il ne lève jamais. Un stockage refusé (navigation privée, quota
@@ -56,6 +56,16 @@ describe("lire, ecrire", () => {
     vi.spyOn(window, "localStorage", "get").mockReturnValue(plein);
     expect(ecrire("blush.test.cle", "apres")).toBe(false);
     expect(lire("blush.test.cle")).toBe("avant");
+  });
+});
+
+describe("stockageDisponible : l’absence et le refus ne disent pas la même chose", () => {
+  it("vrai quand le stockage répond, même vide ; faux quand il est refusé", () => {
+    expect(stockageDisponible()).toBe(true);
+    expect(stockageDisponible("session")).toBe(true);
+    stockageRefuse();
+    expect(stockageDisponible()).toBe(false);
+    expect(stockageDisponible("session")).toBe(false);
   });
 });
 

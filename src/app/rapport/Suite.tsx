@@ -12,7 +12,7 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { LockRow } from "@/components/ui/progress";
 import { ChapterRule } from "@/components/ui/report";
 import type { Chapter, Echec, Plan } from "@/types";
-import { ID_SUITE_ECRITURE } from "./ancres";
+import { SUITE_ECRITURE } from "./ancres";
 import type { PhaseDuRapport } from "./phase";
 
 /*
@@ -87,7 +87,7 @@ export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseD
         <>
           <ChapterRule />
           <div className="text-[13px] font-black text-grey">La suite de ton rapport s’écrit · {fermes.length} chapitres</div>
-          <div id={ID_SUITE_ECRITURE} className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
+          <div ref={SUITE_ECRITURE} className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
             {fermes.map((c, k) => (
               <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === fermes.length - 1} />
             ))}

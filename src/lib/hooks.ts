@@ -71,26 +71,74 @@ async function writeClipboard(text: string) {
 }
 
 /**
- * L’élément d’identifiant `id` est-il à l’écran ? (Une pastille flottante s’efface quand ce qu’elle montre est déjà visible.)
+ * Un élément de la page que d’autres écrans suivent, sans le chercher dans le DOM : celui qui le montre lui passe le
+ * repère en `ref` (il rend de quoi l’oublier quand React l’enlève), ceux qui le suivent le lisent (useEnVue,
+ * useHauteur) et sont prévenus quand il arrive ou s’en va.
+ */
+export type Repere = ((el: HTMLElement | null) => () => void) & {
+  lire: () => HTMLElement | null;
+  abonner: (f: () => void) => () => void;
+};
+
+/** Un repère (voir Repere), créé une fois pour toute la page (au niveau du module). */
+export function creerRepere(): Repere {
+  let el: HTMLElement | null = null;
+  const abonnes = new Set<() => void>();
+  const poser = (nouveau: HTMLElement | null) => {
+    if (nouveau === el) return;
+    el = nouveau;
+    abonnes.forEach((f) => f());
+  };
+  /* Un élément qui s’en va n’efface pas celui qui l’a déjà remplacé */
+  const attacher = (nouveau: HTMLElement | null) => {
+    poser(nouveau);
+    return () => {
+      if (el === nouveau) poser(null);
+    };
+  };
+  return Object.assign(attacher, {
+    lire: () => el,
+    abonner: (f: () => void) => {
+      abonnes.add(f);
+      return () => void abonnes.delete(f);
+    },
+  });
+}
+
+/** L’élément d’un repère, et l’écran se re-rend quand il arrive ou s’en va (null côté serveur). */
+const useElement = (repere: Repere) => useSyncExternalStore(repere.abonner, repere.lire, () => null);
+
+/**
+ * L’élément du repère est-il à l’écran ? (Une pastille flottante s’efface quand ce qu’elle montre est déjà visible.)
  * Faux tant que l’élément n’existe pas.
  */
-export function useEnVue(id: string): boolean {
+export function useEnVue(repere: Repere): boolean {
+  const el = useElement(repere);
   const [vu, setVu] = useState(false);
   useEffect(() => {
-    let obs: IntersectionObserver | null = null;
-    /* L’élément peut arriver après le premier rendu (le rapport se met à jour) : on le cherche à chaque passage */
-    const brancher = () => {
-      const el = document.getElementById(id);
-      if (!el || obs) return;
-      obs = new IntersectionObserver(([e]) => setVu(e.isIntersecting), { threshold: 0.15 });
-      obs.observe(el);
-    };
-    brancher();
-    const t = window.setInterval(brancher, 1000);
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => setVu(e.isIntersecting), { threshold: 0.15 });
+    obs.observe(el);
     return () => {
-      window.clearInterval(t);
-      obs?.disconnect();
+      obs.disconnect();
+      setVu(false);
     };
-  }, [id]);
-  return vu;
+  }, [el]);
+  return !!el && vu;
+}
+
+/** La hauteur de l’élément du repère, en px (suivie quand elle change) ; 0 tant qu’il n’existe pas. */
+export function useHauteur(repere: Repere): number {
+  const el = useElement(repere);
+  const [hauteur, setHauteur] = useState(0);
+  useEffect(() => {
+    if (!el) return;
+    const obs = new ResizeObserver(([e]) => setHauteur(e.borderBoxSize[0]?.blockSize ?? el.offsetHeight));
+    obs.observe(el);
+    return () => {
+      obs.disconnect();
+      setHauteur(0);
+    };
+  }, [el]);
+  return el ? hauteur : 0;
 }

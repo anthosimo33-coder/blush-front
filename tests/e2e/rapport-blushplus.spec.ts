@@ -181,6 +181,18 @@ test("BLUSH+ : « Reprendre ta lecture » propose de revenir au chapitre où tu 
     await expect(chapitre3).not.toBeInViewport();
   });
 
+  await test.step("sur un téléphone, la bulle du chat se pose au-dessus de la proposition, à sa hauteur et 20 px plus haut", async () => {
+    /* Sur grand écran, l’une est au centre, l’autre à droite : rien à empiler */
+    if ((page.viewportSize()?.width ?? 0) >= 1024) return;
+    const pastille = reprendre.locator("xpath=..");
+    const bulle = page.locator("a[aria-label='Parler à BLUSH']");
+    /* La proposition arrive en sautant (data-popin) : on mesure une fois posée */
+    await expect(async () => {
+      const [p, b] = [await pastille.boundingBox(), await bulle.boundingBox()];
+      expect(p!.y - (b!.y + b!.height)).toBeCloseTo(20, 0);
+    }).toPass();
+  });
+
   await test.step("« Reprendre ta lecture » mène au chapitre 3, et la proposition s’efface", async () => {
     await reprendre.click();
     await expect(chapitre3).toBeInViewport();

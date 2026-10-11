@@ -3,7 +3,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
-import { play, setForceSound, useSoundsEnabled } from "@/lib/sound";
+import { prendreSonForce } from "@/lib/audio";
+import { play, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useRapport } from "@/lib/requetes";
 import type { ReportPayload } from "@/types/api";
@@ -124,11 +125,17 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
   useEffect(() => {
     if (onVerdict && !payload.sober) play("verdict", verdict.emoji);
   }, [onVerdict, payload.sober, verdict.emoji]);
-  useEffect(() => () => setForceSound(false), []);
+  /* Le son forcé que tient le bouton son touché : lâché quand on le retouche, ou qu’on quitte le verdict */
+  const sonForce = useRef<(() => void) | null>(null);
+  useEffect(() => () => sonForce.current?.(), []);
   const toggleLoud = () => {
     const on = !loud;
     setLoud(on);
-    setForceSound(on);
+    if (on) sonForce.current ??= prendreSonForce();
+    else {
+      sonForce.current?.();
+      sonForce.current = null;
+    }
     if (on && onVerdict) play("verdict", verdict.emoji);
   };
 

@@ -1,6 +1,6 @@
 import { fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ancreDuChapitre, chapitreDeLAncre, ID_SUITE_ECRITURE, titreDuChapitre } from "@/app/rapport/ancres";
+import { ancreDuChapitre, chapitreDeLAncre, SUITE_ECRITURE, titreDuChapitre } from "@/app/rapport/ancres";
 import { ecritureInachevee, phaseDuRapport, type PhaseDuRapport } from "@/app/rapport/phase";
 import { etatDeLaLigne, FeuilleSommaire, Sommaire } from "@/app/rapport/Sommaire";
 import { Suite } from "@/app/rapport/Suite";
@@ -71,7 +71,9 @@ describe("Suite : ce que la phase montre après les chapitres ouverts", () => {
     const ouvrirPaiement = vi.fn();
     const { container } = rendre({ nom: "ecriture" }, "rapport", ouvrirPaiement);
     expect(screen.getByText("La suite de ton rapport s’écrit · 2 chapitres")).toBeTruthy();
-    const liste = container.querySelector<HTMLElement>(`#${ID_SUITE_ECRITURE}`)!;
+    /* La liste que la pastille suit, par son repère */
+    const liste = SUITE_ECRITURE.lire()!;
+    expect(container.contains(liste)).toBe(true);
     /* Ses lignes sont chargées à part (next/dynamic) */
     expect(await within(liste).findByText("Chapitre inventé 2")).toBeTruthy();
     expect(within(liste).getByText("Chapitre inventé 3")).toBeTruthy();

@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { auRepos } from "@/lib/repos";
+import { drapeauLocal, useDrapeau } from "@/lib/stockage";
 import { Icon } from "@/components/ui/icons";
 import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
 import { PROMESSE_PARTAGE } from "@/contenu/confidentialite";
@@ -14,34 +15,11 @@ import { PROMESSE_PARTAGE } from "@/contenu/confidentialite";
 const PartageSheet = dynamic(() => import("./Partage").then((m) => m.PartageSheet), { ssr: false });
 const ConfidentialiteSheet = dynamic(() => import("./Partage").then((m) => m.ConfidentialiteSheet), { ssr: false });
 
-/* « Partager mon verdict » sonne (dring dring) tant qu’on ne l’a jamais ouvert, sur ce navigateur */
-const CLE_OUVERT = "blush.partage.ouvert.v1";
-const abonnes = new Set<() => void>();
-const dejaOuvert = () => {
-  try {
-    return localStorage.getItem(CLE_OUVERT) === "1";
-  } catch {
-    return true;
-  }
-};
-function marquerPartageOuvert() {
-  try {
-    localStorage.setItem(CLE_OUVERT, "1");
-  } catch {
-    /* Stockage refusé (navigation privée) : le bouton sonnera encore, sans gravité */
-  }
-  abonnes.forEach((f) => f());
-}
-const usePartageOuvert = () =>
-  useSyncExternalStore(
-    (f) => {
-      abonnes.add(f);
-      return () => abonnes.delete(f);
-    },
-    dejaOuvert,
-    /* Côté serveur : calme, le bouton ne sonne qu’une fois le navigateur lu */
-    () => true,
-  );
+/*
+ * « Partager mon verdict » sonne (dring dring) tant qu’on ne l’a jamais ouvert, sur ce navigateur. Stockage refusé
+ * (navigation privée), et côté serveur : calme, le bouton ne sonne qu’une fois le navigateur lu.
+ */
+const PARTAGE_OUVERT = drapeauLocal("blush.partage.ouvert.v1", { defaut: false, indisponible: true, serveur: true });
 
 /** Sous l’en-tête du rapport : partager son verdict, et la promesse de confidentialité (avec le détail à un toucher). */
 export function PartageEtConfidentialite() {
@@ -67,14 +45,14 @@ export function PartageEtConfidentialite() {
       ),
     [],
   );
-  const sonne = !usePartageOuvert();
+  const sonne = !useDrapeau(PARTAGE_OUVERT);
   return (
     <div className="flex flex-col gap-3">
       <button
         type="button"
         onClick={() => {
           setPartage(true);
-          marquerPartageOuvert();
+          PARTAGE_OUVERT.poser(true);
         }}
         aria-haspopup="dialog"
         data-dring={sonne ? "" : undefined}

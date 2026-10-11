@@ -22,7 +22,7 @@ vi.mock("@/app/app/voice", async (vrai) => {
   const m = await vrai<typeof import("@/app/app/voice")>();
   return { ...m, RecordingBar: (p: Parameters<typeof m.RecordingBar>[0]) => (rendus.barre++, m.RecordingBar(p)) };
 });
-vi.mock("@/lib/sound", () => ({ play: vi.fn(), setRecording: vi.fn(), setForceSound: vi.fn() }));
+vi.mock("@/lib/sound", () => ({ play: vi.fn() }));
 vi.mock("@/components/shell/Reveil", () => ({ reveiller: vi.fn() }));
 
 /* Le volume que lit l’analyseur, de 0 (silence) à 127 (le plus fort) */

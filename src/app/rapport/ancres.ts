@@ -1,3 +1,5 @@
+import { creerRepere } from "@/lib/hooks";
+
 /*
  * Les ancres du rapport, écrites en un seul endroit. Chaque chapitre est une section `chapitre-N` : le sommaire et la
  * reprise y mènent, la lecture suivie les mesure, et on y arrive par l’adresse (/rapport#chapitre-N : « Lire la suite »
@@ -20,7 +22,14 @@ export function chapitreDeLAncre(hash: string): number | null {
 /** La section d’un chapitre dans la page, si elle y est. */
 export const sectionDuChapitre = (n: number) => document.getElementById(ancreDuChapitre(n));
 
+/*
+ * Les pastilles flottantes et ce qu’elles surveillent, par repère (src/lib/hooks.ts) plutôt que par un id cherché dans
+ * la page : celui qui montre l’élément lui passe son repère en `ref`, la pastille le suit.
+ */
+
 /** La liste des chapitres qui s’écrivent : la pastille d’écriture s’efface tant qu’elle est à l’écran (src/app/rapport/Ecriture.tsx). */
-export const ID_SUITE_ECRITURE = "suite-ecriture";
+export const SUITE_ECRITURE = creerRepere();
 /** « Parler à BLUSH », au pied du rapport : la bulle du chat se cache tant qu’il est à l’écran (src/app/rapport/ChatBubble.tsx). */
-export const ID_PARLER_A_BLUSH = "cta-chat";
+export const PARLER_A_BLUSH = creerRepere();
+/** « Reprendre ta lecture », en bas de l’écran : sur mobile, la bulle du chat se pose au-dessus d’elle (src/app/rapport/ChatBubble.tsx). */
+export const PASTILLE_REPRISE = creerRepere();

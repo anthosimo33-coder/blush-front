@@ -1,58 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { useEnVue } from "@/lib/hooks";
-import { ID_PARLER_A_BLUSH } from "./ancres";
+import { useEnVue, useHauteur } from "@/lib/hooks";
+import { drapeauLocal, useDrapeau } from "@/lib/stockage";
+import { PARLER_A_BLUSH, PASTILLE_REPRISE } from "./ancres";
 
-/* Le chat a-t-il déjà été ouvert une fois sur cet appareil ? Retenu dans le navigateur (une simple commodité) */
-const CLE = "blush.chat.ouvert.v1";
-const abonnes = new Set<() => void>();
-const lire = () => {
-  try {
-    return localStorage.getItem(CLE) === "1";
-  } catch {
-    return true;
-  }
-};
+/*
+ * Le chat a-t-il déjà été ouvert une fois sur cet appareil ? Retenu dans le navigateur (une simple commodité). Stockage
+ * refusé (navigation privée), et côté serveur : calme, la bulle ne s’agite qu’une fois le navigateur lu.
+ */
+const CHAT_OUVERT = drapeauLocal("blush.chat.ouvert.v1", { defaut: false, indisponible: true, serveur: true });
 
 /** À l’ouverture du chat (la bulle, ou l’accueil lui-même) : la bulle arrête de s’agiter. */
 export function marquerChatOuvert() {
-  try {
-    localStorage.setItem(CLE, "1");
-  } catch {
-    /* Stockage refusé (navigation privée) : la bulle s’agitera encore, sans gravité */
-  }
-  abonnes.forEach((f) => f());
+  CHAT_OUVERT.poser(true);
 }
 
-function useChatOuvert() {
-  return useSyncExternalStore(
-    (f) => {
-      abonnes.add(f);
-      return () => abonnes.delete(f);
-    },
-    lire,
-    /* Côté serveur : calme, la bulle ne s’agite qu’une fois le navigateur lu */
-    () => true,
-  );
-}
+/** L’écart entre la bulle et la pastille « Reprendre ta lecture » qu’elle surmonte, sur mobile. */
+const ECART_PASTILLE = 20;
 
 /**
  * Le chat, toujours à portée depuis le rapport : la bulle de BLUSH en bas à droite, qui mène à l’accueil (la conv).
  * Tant qu’on ne l’a jamais ouverte, elle s’agite doucement, porte une pastille rose, et dit son nom sur grand écran.
- * `raised` : une autre pastille occupe le bas de l’écran (reprendre la lecture) ; sur mobile, la bulle passe au-dessus.
+ * Sur mobile, quand « Reprendre ta lecture » occupe le bas de l’écran, la bulle se pose au-dessus d’elle (à sa hauteur).
  * `sobre` : le rapport en mode sobre (encre et papier, pas de 3D) : une bulle à l’encre, calme, son nom toujours affiché.
  */
-export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean; sobre?: boolean }) {
-  const vu = useChatOuvert();
+export function ChatBubble({ sobre = false }: { sobre?: boolean }) {
+  const vu = useDrapeau(CHAT_OUVERT);
   /* En mode sobre, rien ne s’agite */
   const ouvert = vu || sobre;
   /* Le bouton « Parler à BLUSH » du bas du rapport est à l’écran : la bulle s’efface pour ne pas passer dessus */
-  const cachee = useEnVue(ID_PARLER_A_BLUSH);
+  const cachee = useEnVue(PARLER_A_BLUSH);
+  const sousLaBulle = useHauteur(PASTILLE_REPRISE);
   return (
     <Link
       href="/app?depuis=rapport"
@@ -67,8 +49,9 @@ export function ChatBubble({ raised = false, sobre = false }: { raised?: boolean
       className={cn(
         "group fixed right-4 z-40 flex items-center gap-2.5 no-underline transition-[opacity,translate] duration-300 lg:bottom-8 lg:right-8",
         cachee && "pointer-events-none translate-y-3 opacity-0",
-        raised ? "bottom-[calc(max(20px,env(safe-area-inset-bottom))+72px)]" : "bottom-[max(20px,env(safe-area-inset-bottom))]",
+        "bottom-[calc(max(20px,env(safe-area-inset-bottom))+var(--sous-la-bulle))]",
       )}
+      style={{ "--sous-la-bulle": `${sousLaBulle > 0 ? sousLaBulle + ECART_PASTILLE : 0}px` }}
     >
       <span
         aria-hidden="true"

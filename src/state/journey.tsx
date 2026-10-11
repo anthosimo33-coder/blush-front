@@ -5,7 +5,8 @@
  * Gardé dans sessionStorage : il survit au rechargement de la page.
  */
 import { useSyncExternalStore } from "react";
-import type { AppKind, ExportApp, Goal, Guess, Pronom } from "@/types";
+import { ecrireJson, lireJson } from "@/lib/stockage";
+import { APPLIS, GOALS, GUESSES, PRONOMS, type AppKind, type ExportApp, type Goal, type Guess, type Pronom } from "@/types";
 import { CLE_PARCOURS } from "./cles";
 
 export type JourneyState = {
@@ -38,6 +39,55 @@ const JOURNEY_DEFAULTS: JourneyState = {
   email: "",
 };
 
+const EXPORTS: readonly ExportApp[] = ["whatsapp", "instagram"];
+
+const dans =
+  <T extends string>(liste: readonly T[]) =>
+  (v: unknown): v is T =>
+    (liste as readonly unknown[]).includes(v);
+const estApp = (v: unknown): v is AppKind => typeof v === "string" && Object.hasOwn(APPLIS, v);
+const estTexte = (v: unknown): v is string => typeof v === "string";
+const ouNull =
+  <T,>(est: (v: unknown) => v is T) =>
+  (v: unknown): v is T | null =>
+    v === null || est(v);
+
+/* Ce que chaque champ peut valoir : un champ d’une autre forme (une ancienne version, une main dans les outils du navigateur) reprend sa valeur par défaut */
+const CHAMPS: { [K in keyof JourneyState]: (v: unknown) => v is JourneyState[K] } = {
+  app: ouNull(estApp),
+  exportApp: dans(EXPORTS),
+  exportFileName: ouNull(estTexte),
+  capturesAdded: (v): v is boolean => typeof v === "boolean",
+  me: ouNull(estTexte),
+  pronom: ouNull(dans(PRONOMS)),
+  prenom: estTexte,
+  guess: ouNull(dans(GUESSES)),
+  goal: ouNull(dans(GOALS)),
+  email: estTexte,
+};
+
+const estObjet = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** L’état gardé dans l’onglet, champ par champ : ce qui manque, ou n’a pas la bonne forme, prend sa valeur par défaut. */
+function valider(brut: Record<string, unknown>): JourneyState {
+  const champ = <K extends keyof JourneyState>(k: K): JourneyState[K] => {
+    const v = brut[k];
+    return CHAMPS[k](v) ? v : JOURNEY_DEFAULTS[k];
+  };
+  return {
+    app: champ("app"),
+    exportApp: champ("exportApp"),
+    exportFileName: champ("exportFileName"),
+    capturesAdded: champ("capturesAdded"),
+    me: champ("me"),
+    pronom: champ("pronom"),
+    prenom: champ("prenom"),
+    guess: champ("guess"),
+    goal: champ("goal"),
+    email: champ("email"),
+  };
+}
+
 let state: JourneyState = JOURNEY_DEFAULTS;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -45,12 +95,9 @@ const listeners = new Set<() => void>();
 function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
-  try {
-    const raw = window.sessionStorage.getItem(CLE_PARCOURS);
-    if (raw) state = { ...JOURNEY_DEFAULTS, ...JSON.parse(raw) };
-  } catch {
-    /* stockage indisponible */
-  }
+  /* Rien, un JSON abîmé, ou le stockage refusé : le parcours part de zéro */
+  const brut = lireJson(CLE_PARCOURS, estObjet, null, "session");
+  if (brut) state = valider(brut);
 }
 
 function getSnapshot() {
@@ -74,11 +121,8 @@ export function setJourney(patch: Partial<JourneyState> | ((s: JourneyState) => 
   load();
   const p = typeof patch === "function" ? patch(state) : patch;
   state = { ...state, ...p };
-  try {
-    window.sessionStorage.setItem(CLE_PARCOURS, JSON.stringify(state));
-  } catch {
-    /* ignoré */
-  }
+  /* Refusé : le parcours vaut pour la page */
+  ecrireJson(CLE_PARCOURS, state, "session");
   listeners.forEach((l) => l());
 }
 

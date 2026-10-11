@@ -5,7 +5,7 @@ import { useEnVue } from "@/lib/hooks";
 import type { EcritureRapport, EtatChapitre } from "@/types/api";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
-import { ID_SUITE_ECRITURE } from "./ancres";
+import { SUITE_ECRITURE } from "./ancres";
 
 /*
  * Pendant que BLUSH écrit le rapport : la vraie avancée, lue sur ce que le modèle écrit (le plan, puis les deux
@@ -94,7 +94,7 @@ export function PastilleEcriture({ ecriture }: { ecriture: EcritureRapport }) {
   const r = 13;
   const c = 2 * Math.PI * r;
   /* La liste « La suite s’écrit » est à l’écran : elle dit déjà tout, la pastille s’efface pour ne pas flotter dessus */
-  const cachee = useEnVue(ID_SUITE_ECRITURE);
+  const cachee = useEnVue(SUITE_ECRITURE);
   return (
     <div
       role="status"

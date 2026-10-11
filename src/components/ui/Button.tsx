@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, MouseEvent, ReactNode } from "react";
+import type { ComponentProps, ComponentPropsWithoutRef, MouseEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { AttributsLibres } from "./attributs";
 import { EnRoute } from "./EnRoute";
@@ -102,7 +102,7 @@ export function ButtonLink({
   href,
   disabled,
   ...rest
-}: CommonProps & { href: string; disabled?: boolean } & Omit<ComponentPropsWithoutRef<typeof Link>, "href">) {
+}: CommonProps & { href: string; disabled?: boolean } & Omit<ComponentProps<typeof Link>, "href">) {
   return (
     <Link
       href={href}
