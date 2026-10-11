@@ -10,13 +10,14 @@ import { ErreurTache } from "@/server/erreurs";
 import { definirQui, histoireDe, importerCaptures, metaDe } from "@/server/histoires";
 import { ErreurImport } from "@/server/import";
 import { refusFactice, REFUS_FACTICE } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { captures, msg } from "./aide/fabriques";
 import { avecFactice } from "./aide/fixtures";
 
 describe("des captures à l’histoire", () => {
   it("transcrit, crée le brouillon, et prend le prénom de l’utilisateur", async () => {
     const t = await lireCaptures([{ media: "image/png", base64: "AA==" }, { media: "image/png", base64: "AA==" }], "instagram");
-    expect(t.messages).toBe(24);
+    expect(t.messages).toBe(FACTICE.messagesCaptures);
     /* Le modèle factice date ses messages de l’avant-veille et de la veille */
     expect(t.texte).toMatch(/^# captures · instagram · 2 captures\n== \d{4}-\d{2}-\d{2} 13:12 ==\nElias: message 1/);
     expect(t.texte).toContain("Moi: suite 3\nElias: suite 4 image omitted");

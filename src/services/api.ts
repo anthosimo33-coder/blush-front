@@ -285,8 +285,11 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
       const k = suivant++;
       try {
         lus[k] = await lireLot(k).catch(async (e: unknown) => {
-          /* Une erreur passagère (réseau, serveur) : un nouvel essai, le reste n’est pas à refaire. Pas le budget de l’IA du jour (« souffle ») : il tient jusqu’à minuit */
-          if (arret.signal.aborted || (e instanceof ErreurApi && ((e.status < 500 && e.code !== "erreur") || e.code === "souffle"))) throw e;
+          /*
+           * Une erreur passagère (réseau, serveur) : un nouvel essai, le reste n’est pas à refaire. Pas le budget de l’IA du
+           * jour (« souffle ») : il tient jusqu’à minuit ; ni un refus de l’IA (« refus », malgré son repli) : il reviendrait
+           */
+          if (arret.signal.aborted || (e instanceof ErreurApi && ((e.status < 500 && e.code !== "erreur") || e.code === "souffle" || e.code === "refus"))) throw e;
           /* Le réseau : on attend que Safari soit revenu au premier plan (en arrière-plan, l’essai échouerait encore) */
           await (e instanceof ErreurApi ? new Promise((r) => setTimeout(r, 1500)) : quandVisible());
           return lireLot(k);

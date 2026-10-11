@@ -9,16 +9,17 @@ import { controlerBudget, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
 import { journal } from "../journal";
-import { fournisseurFactice, iaFactice, REFUS_FACTICE, type EtapeDuModele, type RequeteFactice } from "./factice";
+import { fournisseurFactice, iaFactice, prestataireFactice, REFUS_FACTICE, type RequeteFactice } from "./factice";
 import { noterCout } from "./usage";
 import { TEXTES } from "./textes.generated";
 
 /*
  * Le seul endroit qui parle au modèle. Les prompts (TEXTES) ne sortent pas d’ici : on renvoie la sortie
  * structurée, vérifiée par son schéma, jamais le texte envoyé.
- * Un appel se fait en trois temps : ses paramètres (parametres), l’envoi au prestataire (un Fournisseur, le SDK en vrai,
- * un faux dans les tests), suivi au fil de l’eau s’il passe en flux (suivreFlux), puis la lecture de la réponse
- * (lireMessage). Le coût de chaque appel est noté par src/server/ia/usage.ts.
+ * Un appel se fait en trois temps : ses paramètres (parametres), l’envoi au prestataire (un Fournisseur : le SDK en vrai,
+ * le modèle factice en mode factice, un faux dans les tests du vrai chemin), suivi au fil de l’eau s’il passe en flux
+ * (suivreFlux), puis la lecture de la réponse (lireMessage). Les deux prestataires passent par le même chemin : le
+ * budget, l’échéance, la lecture et le refus. Le coût de chaque vrai appel est noté par src/server/ia/usage.ts.
  */
 const MODELE = "claude-opus-5-5";
 /* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
@@ -34,10 +35,24 @@ type Usage = { input_tokens?: number | null; output_tokens?: number | null; cach
 /** Moins de temps que ça avant l’échéance (src/server/echeance.ts) : l’appel ne part pas, il serait coupé avant de répondre. */
 const TEMPS_MIN_APPEL = 20_000;
 
-/** En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. */
+/*
+ * En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. Reprise ici pour les tests qui la lisent à
+ * cette adresse (robustesse, ecriture) : elle part avec eux, au plus tard au lot 9a (retrait des ré-exportations).
+ */
 export { REFUS_FACTICE };
 
-/** En mode factice (tests, dev sans coût) : une fonction qui rend une sortie pour une requête (et son étape, RequeteFactice). */
+/**
+ * La partie d’une tâche qui en a plusieurs : le plan ou une moitié des chapitres du rapport (05), la mise à jour de la
+ * mémoire (07, sa création sinon). Le vrai modèle la lit dans la demande ; le modèle factice la reçoit avec la requête
+ * (RequeteFactice), au lieu de la deviner au libellé de la demande.
+ */
+export type Partie = "plan" | "chapitres 1 à 4" | "chapitres 5 à 8" | "mise à jour";
+
+/**
+ * Ce que dit le modèle factice (tests, dev sans coût) : une fonction qui rend une sortie pour une requête et sa partie
+ * (RequeteFactice). Les tests en changent par definirFactice (tests/aide/fixtures.ts) ; le prestataire reste le modèle
+ * factice (prestataireFactice). Le vrai chemin, lui, se teste en changeant de prestataire : definirFournisseur.
+ */
 type Factice = (req: RequeteFactice) => unknown;
 let factice: Factice = fournisseurFactice;
 export function definirFactice(f: Factice | null) {
@@ -46,14 +61,22 @@ export function definirFactice(f: Factice | null) {
 
 /* ———— Le prestataire ———— */
 
-/** Les paramètres d’un appel (parametres), avec le repli du prestataire quand on le demande. */
+/** Les paramètres d’un appel (parametres), avec le repli du prestataire quand le SDK le demande. */
 type Parametres = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
 /** Ce que l’envoi passe au SDK : son délai, ses nouvelles tentatives, et de quoi l’arrêter. */
 type OptionsEnvoi = { timeout: number; maxRetries: number; signal?: AbortSignal };
 /** Ce qu’on suit d’un appel en flux : un bloc qui commence (son type : « fallback » pour un repli), la réflexion, le texte. */
-type Ecoute = { bloc: (type: string) => void; reflexion: (morceau: string) => void; texte: (morceau: string) => void };
-/** Un bloc de la réponse, tel qu’on le lit : du texte, ou un repli sur un autre modèle (de qui, vers qui, pourquoi). */
-type BlocRecu = { type: string; text?: string; from?: { model: string }; to?: { model: string }; trigger?: { category?: string | null } };
+export type Ecoute = { bloc: (type: string) => void; reflexion: (morceau: string) => void; texte: (morceau: string) => void };
+/** Ce qu’un appel envoie au prestataire : la requête et sa partie (le modèle factice les lit), et ses paramètres (le SDK les lit). */
+export type Demande = { requete: Requete; partie: Partie | null; params: Parametres };
+/**
+ * Un bloc de la réponse, tel qu’on le lit : du texte, un repli sur un autre modèle (de qui, vers qui, pourquoi), ou un
+ * bloc qu’on ne lit pas (la réflexion…).
+ */
+type BlocRecu =
+  | { type: "text"; text: string }
+  | { type: "fallback"; from: { model: string }; to: { model: string }; trigger: { category?: string | null } }
+  | { type: Exclude<Anthropic.Beta.Messages.BetaContentBlock["type"], "text" | "fallback"> };
 /** Ce qu’on lit d’une réponse du modèle (un BetaMessage du SDK l’est). */
 export type MessageRecu = {
   content: BlocRecu[];
@@ -65,11 +88,15 @@ export type MessageRecu = {
 };
 
 /**
- * Ce qui envoie une requête au modèle et rend sa réponse entière : le SDK du prestataire, ou un faux dans les tests
- * (definirFournisseur). `flux` : la réponse passe en flux (les longues sorties, une sortie suivie) ; `ecoute` : ce qui
- * s’écrit, au fil de l’eau.
+ * Ce qui envoie une requête au modèle et rend sa réponse entière : le SDK du prestataire (prestataireSDK), le modèle
+ * factice (prestataireFactice, src/server/ia/factice.ts), ou un faux dans les tests (definirFournisseur). `flux` : la
+ * réponse passe en flux (les longues sorties, une sortie suivie) ; `ecoute` : ce qui s’écrit, au fil de l’eau.
  */
-export type Fournisseur = { envoyer: (params: Parametres, options: OptionsEnvoi, envoi: { flux: boolean; ecoute: Ecoute | null }) => Promise<MessageRecu> };
+export type Fournisseur = {
+  envoyer: (demande: Demande, options: OptionsEnvoi, envoi: { flux: boolean; ecoute: Ecoute | null }) => Promise<MessageRecu>;
+  /** Un prestataire qui ne coûte rien (le modèle factice) : ses appels ne sont pas notés au suivi des coûts. */
+  gratuit?: boolean;
+};
 
 let client: Anthropic | null = null;
 function anthropic() {
@@ -80,11 +107,22 @@ function anthropic() {
   }));
 }
 
-/** Le vrai prestataire, par son SDK. */
-const SDK: Fournisseur = {
-  async envoyer(params, options, { flux, ecoute }) {
-    if (!flux) return anthropic().beta.messages.create(params, options);
-    const f = anthropic().beta.messages.stream(params, options);
+/*
+ * Le repli d’Anthropic (bêta) : quand un filtre de sécurité refuse une requête, souvent à tort, l’API la rejoue
+ * d’elle-même sur le modèle qu’Anthropic recommande pour ce cas, dans le même appel. Si l’API refusait l’option,
+ * on s’en passe et tout marche comme avant.
+ */
+const BETA_REPLI = "server-side-fallback-2026-07-01";
+
+/**
+ * Le vrai prestataire, par le client de son SDK (`client` : un client au faux `fetch` dans tests/unit/claude.test.ts).
+ * Il demande le repli du prestataire ; si l’API refuse l’option, il renvoie sans elle, et ne la redemande plus.
+ */
+export function prestataireSDK(client: () => Anthropic): Fournisseur {
+  let repliDisponible = true;
+  const envoyer = async (params: Parametres, options: OptionsEnvoi, flux: boolean, ecoute: Ecoute | null): Promise<MessageRecu> => {
+    if (!flux) return client().beta.messages.create(params, options);
+    const f = client().beta.messages.stream(params, options);
     if (ecoute) {
       f.on("streamEvent", (ev) => {
         if (ev.type === "content_block_start") ecoute.bloc(ev.content_block.type);
@@ -93,11 +131,29 @@ const SDK: Fournisseur = {
       f.on("text", (d) => ecoute.texte(d));
     }
     return f.finalMessage();
-  },
-};
+  };
+  return {
+    async envoyer({ requete, params }, options, { flux, ecoute }) {
+      if (!repliDisponible) return envoyer(params, options, flux, ecoute);
+      try {
+        return await envoyer({ ...params, fallbacks: "default", betas: [BETA_REPLI] }, options, flux, ecoute);
+      } catch (e) {
+        /* L’API refuse la requête avant d’écrire quoi que ce soit : le suivi n’a rien vu, il resert tel quel */
+        if (!(e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
+        journal("repli refusé par l’API : on s’en passe", { tache: requete.tache }, "alerte");
+        repliDisponible = false;
+        return envoyer(params, options, flux, ecoute);
+      }
+    },
+  };
+}
+
+const SDK = prestataireSDK(anthropic);
+/** Le modèle factice, avec ce qu’il dit au moment de l’appel (definirFactice). */
+const MODELE_FACTICE = prestataireFactice((req) => factice(req));
 
 let fournisseur: Fournisseur = SDK;
-/** Pour les tests du vrai chemin (sans le modèle factice) : un faux prestataire, puis de nouveau le SDK (`null`). */
+/** Pour les tests du vrai chemin (hors du mode factice) : un faux prestataire, puis de nouveau le SDK (`null`). */
 export function definirFournisseur(f: Fournisseur | null) {
   fournisseur = f ?? SDK;
 }
@@ -172,18 +228,18 @@ function suivreFlux(surAvance: (a: Avance) => void): Ecoute {
 type Repli = { categorie: string | null; de: string; vers: string };
 
 /**
- * Ce que dit une réponse : la sortie vérifiée par son schéma, ou le refus (sa catégorie, son identifiant de requête), et
- * le repli s’il y en a eu un. Après un repli (bloc « fallback »), seul ce que le second modèle a écrit compte.
+ * Ce que dit une réponse : la sortie vérifiée par son schéma, ou le refus (et sa catégorie), son coût, et le repli s’il
+ * y en a eu un. Après un repli (bloc « fallback »), seul ce que le second modèle a écrit compte.
  */
 function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { appel: Appel<z.infer<S>>; repli: Repli | null } {
   const c = cout(message.usage);
-  const bloc = message.content.find((b) => b.type === "fallback");
-  const repli = bloc ? { categorie: bloc.trigger?.category ?? null, de: bloc.from?.model ?? "?", vers: bloc.to?.model ?? "?" } : null;
+  const bloc = message.content.find((b): b is Extract<BlocRecu, { type: "fallback" }> => b.type === "fallback");
+  const repli = bloc ? { categorie: bloc.trigger.category ?? null, de: bloc.from.model, vers: bloc.to.model } : null;
   if (message.stop_reason === "refusal") return { appel: { sortie: null, refus: true, stop: message.stop_reason, cout: c, categorie: message.stop_details?.category ?? null }, repli };
   const depuis = message.content.map((b) => b.type).lastIndexOf("fallback");
   const texte = message.content
     .slice(depuis + 1)
-    .flatMap((b) => (b.type === "text" && b.text ? [b.text] : []))
+    .flatMap((b) => (b.type === "text" ? [b.text] : []))
     .join("");
   let sortie: z.infer<S> | null = null;
   try {
@@ -199,40 +255,14 @@ const cout = (u: Usage) =>
   ((u.input_tokens ?? 0) * PRIX.entree + (u.output_tokens ?? 0) * PRIX.sortie + (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache + (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
   1e6;
 
-/*
- * Le repli d’Anthropic (bêta) : quand un filtre de sécurité refuse une requête, souvent à tort, l’API la rejoue
- * d’elle-même sur le modèle qu’Anthropic recommande pour ce cas, dans le même appel. Si l’API refusait l’option,
- * on s’en passe et tout marche comme avant.
- */
-const BETA_REPLI = "server-side-fallback-2026-07-01";
-let repliDisponible = true;
-
-/**
- * En mode factice, le chat suivi passe par le même chemin qu’en vrai : son texte arrive par morceaux, à chaque fois en
- * entier depuis le début, à un rythme qu’on voit (ses bulles arrivent une à une en dev). Les autres tâches suivies (la
- * jauge de la lecture) restent d’un bloc, comme avant.
- */
-async function ecrireFactice(texte: string, surAvance: (a: Avance) => void) {
-  for (let n = 16; ; n += 16) {
-    await new Promise((ok) => setTimeout(ok, 8));
-    const ecrit = texte.slice(0, n);
-    try {
-      surAvance({ reflexion: 0, texte: ecrit.length, ecrit });
-    } catch {
-      /* comme en vrai : le suivi ne fait jamais échouer la réponse */
-    }
-    if (n >= texte.length) return;
-  }
-}
-
 /** Les options d’un appel (appeler). */
 export type OptionsAppel = {
   /** La conv de l’appel : le suivi des coûts, et le budget du jour de son compte. */
   storyId?: string;
   /** Le nom de l’appel dans le suivi des coûts (ai_usage.task) ; la tâche sinon. */
   etiquette?: string;
-  /** L’étape d’une tâche qui en a plusieurs, pour le modèle factice (EtapeDuModele) : le vrai la lit dans la demande. */
-  etape?: EtapeDuModele;
+  /** La partie d’une tâche qui en a plusieurs (Partie), pour le modèle factice : le vrai la lit dans la demande. */
+  partie?: Partie;
   /** La réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment, les bulles du chat). */
   surAvance?: (a: Avance) => void;
   /** L’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué). */
@@ -248,20 +278,12 @@ export type OptionsAppel = {
  * au-delà de celui de tous ou de celui du compte de la conv (sans conv, celui de `compte`, le compte connecté qui
  * envoie des captures avant l’import ; sans compte, la part sans compte), l’appel ne part pas (ErreurTache « budget »,
  * src/server/budget.ts), en mode factice aussi. Les autres options : OptionsAppel.
- * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps.
+ * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps (en
+ * mode factice aussi : il passe par le même chemin, prestataireFactice à la place du SDK).
  */
-export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { storyId, etiquette, etape, surAvance, signal, compte, differer }: OptionsAppel = {}): Promise<Appel<z.infer<S>>> {
+export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { storyId, etiquette, partie, surAvance, signal, compte, differer }: OptionsAppel = {}): Promise<Appel<z.infer<S>>> {
   const payeur = await controlerBudget({ storyId, compte });
-  if (iaFactice()) {
-    /* Comme le SDK : un appel arrêté lève son erreur d’abandon */
-    if (signal?.aborted) throw new Anthropic.APIUserAbortError();
-    const brut = factice({ ...req, ...(etape ? { etape } : {}) });
-    /* REFUS_FACTICE, ou refusFactice(categorie) */
-    if (typeof brut === "string" && brut.startsWith(REFUS_FACTICE)) return { sortie: null, refus: true, stop: "refusal", cout: 0, categorie: brut.slice(REFUS_FACTICE.length + 1) || null };
-    if (surAvance && req.tache === "10-chat") await ecrireFactice(JSON.stringify(brut), surAvance);
-    const ok = schema.safeParse(brut);
-    return { sortie: ok.success ? ok.data : null, refus: false, stop: "end_turn", cout: 0 };
-  }
+  const prestataire = iaFactice() ? MODELE_FACTICE : fournisseur;
   /* Tout de suite, ou après la réponse */
   const ensuite = async (tache: () => Promise<unknown>) => {
     if (differer) differer(tache);
@@ -273,25 +295,12 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
   const flux = REGLAGES[req.tache].flux || !!surAvance;
   const debut = Date.now();
   /* Le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste (600 s et 2 tentatives sans échéance) */
-  const options = (): OptionsEnvoi => {
-    const reste = tempsRestant();
-    return { timeout: delaiAppel(600_000), maxRetries: reste === Infinity ? 2 : reste > 150_000 ? 1 : 0, ...(signal ? { signal } : {}) };
-  };
-  /* Chaque envoi a son suivi : un envoi refait sans le repli repart de zéro */
-  const envoyer = (avecRepli: boolean) =>
-    fournisseur.envoyer(avecRepli ? { ...base, fallbacks: "default", betas: [BETA_REPLI] } : base, options(), { flux, ecoute: surAvance ? suivreFlux(surAvance) : null });
-  let message: MessageRecu;
-  try {
-    message = await envoyer(repliDisponible);
-  } catch (e) {
-    if (!(repliDisponible && e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
-    journal("repli refusé par l’API : on s’en passe", { tache: req.tache }, "alerte");
-    repliDisponible = false;
-    message = await envoyer(false);
-  }
+  const reste = tempsRestant();
+  const options: OptionsEnvoi = { timeout: delaiAppel(600_000), maxRetries: reste === Infinity ? 2 : reste > 150_000 ? 1 : 0, ...(signal ? { signal } : {}) };
+  const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance) : null });
   const { usage, model } = message;
   const ms = Date.now() - debut;
-  await ensuite(() => noterUsage(usage, Math.round(cout(usage) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));
+  if (!prestataire.gratuit) await ensuite(() => noterUsage(usage, Math.round(cout(usage) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));
   const { appel, repli } = lireMessage(message, schema);
   /*
    * Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le
@@ -305,7 +314,7 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
         alerter("repli sur un autre modèle", [`Tâche ${req.tache}`, `Catégorie du refus : ${repli.categorie ?? "aucune (refus sans catégorie)"}`, `De ${repli.de} vers ${repli.vers}`, `Histoire ${storyId}`]),
       );
   }
-  /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête : jamais de contenu */
+  /* La catégorie du refus (cyber, bio, general_harms…) et l’identifiant de la requête (de la réponse, pas de lireMessage) : jamais de contenu */
   if (appel.refus) journal("refus du modèle", { tache: req.tache, categorie: appel.categorie ?? null, requete: message._request_id }, "alerte");
   return appel;
 }

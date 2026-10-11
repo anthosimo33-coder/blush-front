@@ -116,17 +116,17 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     await garderRapport(story, { ...r, chapitres: null }, rendu.lignes, v.scores);
     return;
   }
-  const etape = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN), Etape05, {
+  const sortiePlan = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN), Etape05, {
     preuves: (e) => (e.plan ? preuvesPlan(e.plan) : []),
     lignes: rendu.lignes,
     storyId: story.id,
     etiquette: "rapport_plan",
-    etape: "plan",
+    partie: "plan",
     surAvance: suivreAvance(t.id, avancePlan),
     complet: (e) => !!e.plan,
   });
-  if (!etape.plan) throw new ErreurTache("plan_vide");
-  const plan = coffre.ecrire("reports.plan", etape.plan);
+  if (!sortiePlan.plan) throw new ErreurTache("plan_vide");
+  const plan = coffre.ecrire("reports.plan", sortiePlan.plan);
   await db()
     .insert(schema.reports)
     .values({ storyId: story.id, plan })
@@ -188,7 +188,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
       lignes: rendu.lignes,
       storyId: story.id,
       etiquette: "rapport_chapitres",
-      etape: `chapitres ${quels}`,
+      partie: `chapitres ${quels}`,
       surAvance: suivi.surAvance(quels === "1 à 4" ? 1 : 5, abandon.signal),
       signal: abandon.signal,
       complet: (e) => !!e.chapitres?.length,
@@ -361,7 +361,7 @@ async function memoireMaj(story: Ligne, t: Tache) {
       const nouveau = rendreNouveau(ech, h, lignes, suivant);
       const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-      const maj = await appelVerifie(req, Maj07, { preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, storyId: story.id, etiquette: "memoire_maj", etape: "mise à jour" });
+      const maj = await appelVerifie(req, Maj07, { preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, storyId: story.id, etiquette: "memoire_maj", partie: "mise à jour" });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
       const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);

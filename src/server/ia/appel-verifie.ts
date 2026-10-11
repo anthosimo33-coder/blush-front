@@ -17,35 +17,47 @@ const erreurDeRefus = (a: Appel<unknown>) => new ErreurTache(a.categorie ? `refu
 
 /**
  * La sortie d’un appel fait une fois (la lecture de captures) : un refus du modèle lève son ErreurTache, une sortie
- * illisible lève `sinon` (l’erreur que la route sait dire : « fichier », « capture »).
+ * illisible lève l’erreur que fait `sinon` (celle que la route sait dire : « fichier », « capture »).
  */
-export function exigerSortie<T>(a: Appel<T>, sinon: Error): T {
+export function exigerSortie<T>(a: Appel<T>, sinon: () => Error): T {
   if (a.refus) throw erreurDeRefus(a);
-  if (a.sortie === null) throw sinon;
+  if (a.sortie === null) throw sinon();
   return a.sortie;
 }
 
 /** Le temps qu’il faut encore pour rejouer un appel dont la sortie ne convient pas (des preuves introuvables, ou incomplète). */
 export const TEMPS_RELANCE = 90_000;
 
-/** Les options d’appelVerifie : celles d’appeler (OptionsAppel), et de quoi vérifier la sortie. */
-export type OptionsVerifie<T> = Pick<OptionsAppel, "etape" | "surAvance" | "signal" | "differer"> & {
-  /** Les identifiants que la sortie cite en preuve : chacun doit exister dans `lignes`. */
-  preuves: (s: T) => string[];
-  /** Les messages qu’elle peut citer, par identifiant. */
-  lignes: Map<string, string>;
-  /** La conv de l’appel, et son nom dans le suivi des coûts. */
-  storyId: string;
-  etiquette: string;
-  /** Ce que l’étape attend de la sortie (des chapitres, la partie sobre) : sans, on la rejoue une fois. */
-  complet?: (s: T) => boolean;
-  /**
-   * Le suivi de chaque essai, neuf à chaque fois, à la place de `surAvance` (le chat : ses bulles montrées pendant qu’il
-   * écrit). `rejouable()`, demandé après l’essai : faux, il n’y en aura pas d’autre (une bulle déjà montrée, qu’un
-   * nouvel essai réécrirait autrement) ; sa sortie est rendue telle quelle, et sans sortie, l’appel échoue.
-   */
-  parEssai?: () => { surAvance: (a: Avance) => void; rejouable: () => boolean };
-};
+/**
+ * Le suivi de ce qui s’écrit : le même pour tous les essais (`surAvance`, OptionsAppel), ou un neuf à chaque essai
+ * (`parEssai`), jamais les deux.
+ */
+type Suivi =
+  | { surAvance?: OptionsAppel["surAvance"]; parEssai?: never }
+  | {
+      surAvance?: never;
+      /**
+       * Le suivi de chaque essai, neuf à chaque fois (le chat : ses bulles montrées pendant qu’il écrit). `rejouable()`,
+       * demandé après l’essai : faux, il n’y en aura pas d’autre (une bulle déjà montrée, qu’un nouvel essai réécrirait
+       * autrement) ; sa sortie est rendue telle quelle, et sans sortie, l’appel échoue.
+       */
+      parEssai: () => { surAvance: (a: Avance) => void; rejouable: () => boolean };
+    };
+
+/** Les options d’appelVerifie : celles d’appeler (OptionsAppel), le suivi (Suivi), et de quoi vérifier la sortie. */
+export type OptionsVerifie<T> = Pick<OptionsAppel, "partie" | "signal" | "differer"> &
+  Suivi & {
+    /** Les identifiants que la sortie cite en preuve : chacun doit exister dans `lignes`. */
+    preuves: (s: T) => string[];
+    /** Les messages qu’elle peut citer, par identifiant. */
+    lignes: Map<string, string>;
+    /** La conv de l’appel : le suivi des coûts, et le budget du jour de son compte. */
+    storyId: string;
+    /** Le nom de l’appel dans le suivi des coûts (ai_usage.task). */
+    etiquette: string;
+    /** Ce que l’étape attend de la sortie (des chapitres, la partie sobre) : sans, on la rejoue une fois. */
+    complet?: (s: T) => boolean;
+  };
 
 /**
  * Un appel dont chaque preuve doit exister. Une sortie illisible, une preuve introuvable, ou une sortie incomplète
@@ -59,7 +71,7 @@ export async function appelVerifie<S extends z.ZodType>(req: Requete, format: S,
     const a = await appeler(req, format, {
       storyId: o.storyId,
       etiquette: o.etiquette,
-      ...(o.etape ? { etape: o.etape } : {}),
+      ...(o.partie ? { partie: o.partie } : {}),
       ...(suivi ? { surAvance: suivi.surAvance } : o.surAvance ? { surAvance: o.surAvance } : {}),
       ...(o.signal ? { signal: o.signal } : {}),
       ...(o.differer ? { differer: o.differer } : {}),

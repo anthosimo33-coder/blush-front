@@ -1,18 +1,21 @@
 import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-/* Le budget de l’IA lit la base : ici, sans base, tout le monde paie, personne n’est arrêté */
+/* Le budget de l’IA lit la base : ici, sans base, tout le monde paie, personne n’est arrêté. Le suivi des coûts aussi : on regarde s’il est appelé */
 vi.mock("@/server/budget", () => ({ controlerBudget: async () => null }));
+vi.mock("@/server/ia/usage", () => ({ noterCout: vi.fn(async () => {}) }));
 import type { Requete } from "@prompts/lib/contextes";
 import { Etape05, Maj07, Sortie01, Sortie04, Sortie05, Sortie06, Sortie07, Sortie10 } from "@prompts/lib/schemas";
-import { appeler } from "@/server/ia/claude";
-import { FACTICE, fournisseurFactice, iaFactice, REFUS_FACTICE, type EtapeDuModele, type RequeteFactice } from "@/server/ia/factice";
-import { ALERTE_FACTICE, REFUS_FACTICE as REFUS_DES_E2E } from "../e2e/aide/exports";
+import { avecEcheance } from "@/server/echeance";
+import { appeler, definirFactice, type Avance, type Partie } from "@/server/ia/claude";
+import { fournisseurFactice, iaFactice, refusFactice, REFUS_FACTICE, type RequeteFactice } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
+import { noterCout } from "@/server/ia/usage";
 
 /*
  * Le modèle factice (src/server/ia/factice.ts), sans base : chacune de ses sorties passe le schéma de sa tâche (sinon
  * appeler la rejouerait en silence, comme une sortie illisible), et l’étape demandée lui arrive par appeler, pas par le
- * libellé de la demande. Les conv sont inventées : douze lignes au format de la conversation.
+ * libellé de la demande. Ce qu’il écrit vient de FACTICE (src/server/ia/factice-valeurs.ts). Les conv sont inventées : douze lignes au format de la conversation.
  */
 
 const LIGNES = Array.from({ length: 12 }, (_, k) => `m${String(k + 1).padStart(4, "0")} 2026-09-0${1 + (k % 9)} mar. 20:${String(10 + k).padStart(2, "0")} ${k % 2 ? "Inès" : "Hugo"} : message ${k + 1}`);
@@ -21,7 +24,7 @@ const IDS = new Set(LIGNES.map((l) => l.slice(0, 5)));
 
 /** Une requête d’une tâche, sur la conv inventée, avec une demande en dernier bloc. */
 const requete = (tache: Requete["tache"], demande = "La demande.", conv = CONV): Requete => ({ tache, blocs: [{ texte: conv, cache: true }, { texte: demande }] });
-const avec = (req: Requete, etape: EtapeDuModele): RequeteFactice => ({ ...req, etape });
+const avec = (req: Requete, partie: Partie): RequeteFactice => ({ ...req, partie });
 
 /** Les identifiants cités, où qu’ils soient dans la sortie : tous existent dans la conv. */
 const cites = (sortie: unknown): string[] => JSON.stringify(sortie).match(/"m\d{4}"/g)?.map((m) => m.slice(1, -1)) ?? [];
@@ -48,11 +51,11 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
     for (const id of cites(sortie)) expect(IDS.has(id) || id === "m0013").toBe(true);
   });
 
-  it("l’étape choisit la sortie : le plan, chaque moitié, la mise à jour (sans elle, les chapitres 5 à 8 et la création)", () => {
+  it("la partie choisit la sortie : le plan, chaque moitié, la mise à jour (sans elle, les chapitres 5 à 8 et la création)", () => {
     const rapport = requete("05-rapport", "Étape : le plan. Remplis seulement `plan`.");
-    /* Le libellé de la demande ne compte plus : seule l’étape */
+    /* Le libellé de la demande ne compte plus : seule la partie */
     expect(Etape05.parse(fournisseurFactice(rapport)).plan).toBeNull();
-    expect(Etape05.parse(fournisseurFactice(avec(rapport, "plan"))).plan?.chapitres).toHaveLength(8);
+    expect(Etape05.parse(fournisseurFactice(avec(rapport, "plan"))).plan?.chapitres.map((c) => c.titre_court)).toEqual(Array.from({ length: FACTICE.chapitres }, (_, k) => FACTICE.titreCourt(k + 1)));
     expect(Etape05.parse(fournisseurFactice(avec(rapport, "chapitres 1 à 4"))).chapitres?.map((c) => c.numero)).toEqual([1, 2, 3, 4]);
     expect(Etape05.parse(fournisseurFactice(avec(rapport, "chapitres 5 à 8"))).chapitres?.map((c) => c.numero)).toEqual([5, 6, 7, 8]);
     expect(Etape05.parse(fournisseurFactice(rapport)).chapitres?.map((c) => c.numero)).toEqual([5, 6, 7, 8]);
@@ -72,9 +75,16 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
     expect(fournisseurFactice(requete("10-chat", `Hugo (à toi) : ${FACTICE.refus}\nHugo (à toi) : et sinon ?`))).not.toBe(REFUS_FACTICE);
   });
 
-  it("les déclencheurs des tests de bout en bout sont les mêmes textes", () => {
-    expect(ALERTE_FACTICE).toBe(FACTICE.alerte);
-    expect(REFUS_DES_E2E).toBe(FACTICE.refus);
+  it("les captures : FACTICE.messagesCaptures messages et la ligne de profil FACTICE.profil", () => {
+    const lues = Sortie01.parse(fournisseurFactice({ tache: "01-captures", blocs: [{ texte: "aujourd’hui : mer. 2026-09-09" }] }));
+    expect(lues.blocs.flatMap((b) => b.messages)).toHaveLength(FACTICE.messagesCaptures);
+    expect(lues.blocs.map((b) => b.repere?.date)).toEqual(["2026-09-07", "2026-09-08"]);
+    expect(lues.profil).toEqual([FACTICE.profil]);
+  });
+
+  it("un libellé qu’il lit et qui n’est plus dans la demande : il le dit, au lieu de répondre à côté", () => {
+    expect(() => fournisseurFactice({ tache: "01-captures", blocs: [{ texte: "today: 2026-09-09" }] })).toThrow(/« aujourd’hui : » introuvable/);
+    expect(() => fournisseurFactice(requete("10-chat", "Hugo : je lui envoie quoi ?"))).toThrow(/son message .* introuvable/);
   });
 });
 
@@ -83,10 +93,34 @@ describe("appeler en mode factice", () => {
     expect(iaFactice()).toBe(true);
   });
 
-  it("passe l’étape au modèle factice : le plan, puis une moitié", async () => {
+  it("passe la partie au modèle factice : le plan, puis une moitié ; sans rien noter au suivi des coûts", async () => {
     const req = requete("05-rapport");
-    expect((await appeler(req, Etape05, { etape: "plan" })).sortie?.plan).not.toBeNull();
-    expect((await appeler(req, Etape05, { etape: "chapitres 1 à 4" })).sortie?.chapitres?.[0].numero).toBe(1);
+    expect((await appeler(req, Etape05, { partie: "plan", storyId: "histoire" })).sortie?.plan).not.toBeNull();
+    expect((await appeler(req, Etape05, { partie: "chapitres 1 à 4", storyId: "histoire" })).sortie?.chapitres?.[0].numero).toBe(1);
+    expect(noterCout).not.toHaveBeenCalled();
+  });
+
+  it("un refus factice est lu comme un vrai : refus, avec sa catégorie", async () => {
+    definirFactice(() => refusFactice("cyber"));
+    try {
+      expect(await appeler(requete("04-verdict"), Sortie04)).toMatchObject({ sortie: null, refus: true, stop: "refusal", categorie: "cyber" });
+      definirFactice(() => REFUS_FACTICE);
+      expect(await appeler(requete("04-verdict"), Sortie04)).toMatchObject({ refus: true, categorie: null });
+    } finally {
+      definirFactice(null);
+    }
+  });
+
+  it("le chat suivi écrit par morceaux, comme en vrai ; sa sortie est la même que d’un bloc", async () => {
+    const vues: Avance[] = [];
+    const a = await appeler(requete("10-chat", "Hugo (à toi) : je lui envoie quoi ?"), Sortie10, { surAvance: (x) => vues.push(x) });
+    expect(vues.length).toBeGreaterThan(1);
+    expect(JSON.parse(vues.at(-1)!.ecrit)).toEqual(a.sortie);
+    expect(a.sortie).toEqual((await appeler(requete("10-chat", "Hugo (à toi) : je lui envoie quoi ?"), Sortie10)).sortie);
+  });
+
+  it("comme en vrai, plus le temps avant l’échéance : l’appel ne part pas (« delai »)", async () => {
+    await expect(avecEcheance(10_000, () => appeler(requete("04-verdict"), Sortie04))).rejects.toMatchObject({ code: "delai" });
   });
 
   it("un appel déjà arrêté lève l’erreur d’abandon du SDK, comme en vrai", async () => {

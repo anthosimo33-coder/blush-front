@@ -1,14 +1,20 @@
 import "server-only";
+import { APIUserAbortError } from "@anthropic-ai/sdk";
 import type { z } from "zod";
 import type { Requete } from "@prompts/lib/contextes";
 import { estLigneMessage, idDeLigne, lireLigne } from "@prompts/lib/ligne";
 import type { Captures, Chapitre, Etape05, Maj, Memoire, Rapport, ReponseChat, Verdict, Vocal } from "@prompts/lib/schemas";
 import { env } from "../env";
+import type { Ecoute, Fournisseur, MessageRecu, Partie } from "./claude";
+import { FACTICE } from "./factice-valeurs";
 
 /*
  * Un modèle factice (BLUSH_IA_FACTICE=1, pour les tests et le dev sans coût) : des sorties valides, qui citent de vrais
  * identifiants de la conv. Chacune est écrite au type de son schéma (`satisfies`), et tests/unit/factice.test.ts les
- * passe toutes par leur schéma : une sortie factice qui ne le passerait plus serait rejouée en silence (appeler).
+ * passe toutes par leur schéma : une sortie factice qui ne le passerait plus serait rejouée en silence (appeler). Ce
+ * qu’elles écrivent (24 messages, 8 chapitres, la ligne de profil) et leurs déclencheurs sont dans FACTICE
+ * (src/server/ia/factice-valeurs.ts), que les tests lisent. Il répond comme un prestataire (prestataireFactice) : appeler
+ * (src/server/ia/claude.ts) le lit comme le vrai, refus et flux compris.
  */
 
 /**
@@ -18,40 +24,33 @@ import { env } from "../env";
  */
 export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
 
-/**
- * L’étape d’une tâche qui en a plusieurs : le plan ou une moitié des chapitres du rapport (05), la mise à jour de la
- * mémoire (07, sa création sinon). Le vrai modèle la lit dans la demande ; appeler (src/server/ia/claude.ts) la passe
- * au modèle factice avec la requête, au lieu qu’il la devine au libellé de la demande.
- */
-export type EtapeDuModele = "plan" | "chapitres 1 à 4" | "chapitres 5 à 8" | "mise à jour";
-
-/** La requête telle que la reçoit le modèle factice : avec son étape (appeler l’ajoute). */
-export type RequeteFactice = Requete & { etape?: EtapeDuModele };
+/** La requête telle que la reçoit le modèle factice : avec sa partie (appeler l’ajoute ; le vrai modèle la lit dans la demande). */
+export type RequeteFactice = Requete & { partie?: Partie };
 
 const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
 const ids = (req: Requete) => [...new Set(textes(req).join("\n").split("\n").filter(estLigneMessage).map(idDeLigne))];
 
-/** Ce qu’une sortie factice rend pour simuler un refus du modèle (src/server/ia/claude.ts le traite comme un vrai refus). */
+/** Ce qu’une sortie factice rend pour simuler un refus du modèle (prestataireFactice le rend comme un vrai refus). */
 export const REFUS_FACTICE = "@@refus@@";
 /** Un refus avec sa catégorie, comme les filtres du prestataire (« cyber ») : le code d’erreur la porte (« refus:cyber »). */
 export const refusFactice = (categorie: string) => `${REFUS_FACTICE}:${categorie}` as const;
 
-/**
- * Les déclencheurs, pour les tests (tests/e2e/aide/exports.ts les écrit dans une conv, avec les mêmes textes, que
- * tests/unit/factice.test.ts compare) : des marqueurs inventés, qui font prendre au modèle factice un chemin qu’il ne
- * prend jamais sinon. Le modèle factice n’existe pas sur Vercel (src/server/env.ts) : la production ne les lit jamais.
- * `alerte` : dans la conv, le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts).
- * `refus` : dans la conv, le modèle refuse de la lire (le verdict) ; dans un message au chat, il refuse d’y répondre.
- */
-export const FACTICE = { alerte: "#factice-alerte", refus: "#factice-refus" } as const;
-
 /** Ce que rend le modèle factice : la sortie d’une tâche, au type de son schéma, ou un refus (REFUS_FACTICE, refusFactice). */
-export type SortieFactice = Captures | Verdict | Rapport | z.infer<typeof Etape05> | Vocal | Memoire | Maj | ReponseChat | typeof REFUS_FACTICE | ReturnType<typeof refusFactice>;
+type SortieFactice = Captures | Verdict | Rapport | z.infer<typeof Etape05> | Vocal | Memoire | Maj | ReponseChat | typeof REFUS_FACTICE | ReturnType<typeof refusFactice>;
+
+/** Un libellé que le modèle factice doit lire dans la demande : absent, il le dit, au lieu de répondre à côté en silence. */
+function lu<T>(valeur: T | undefined | null, quoi: string, req: Requete): T {
+  if (valeur == null) throw new Error(`modèle factice : ${quoi} introuvable dans la demande (${req.tache}), le libellé a changé ?`);
+  return valeur;
+}
+
+/** Les numéros des chapitres d’une moitié du rapport (FACTICE.chapitres, en deux moitiés égales). */
+const moitie = (premiere: boolean) => Array.from({ length: FACTICE.chapitres / 2 }, (_, k) => k + 1 + (premiere ? 0 : FACTICE.chapitres / 2));
 
 const chapitre = (numero: number, p: string[]): Chapitre => ({
   numero,
   titre: `Chapitre ${numero}`,
-  titre_court: `Ch. ${numero}`,
+  titre_court: FACTICE.titreCourt(numero),
   surtitre: null,
   blocs: [
     { type: "accroche", texte: "Assieds-toi.", preuves: [], titre: null, niveau: null, items: null },
@@ -61,19 +60,20 @@ const chapitre = (numero: number, p: string[]): Chapitre => ({
 });
 
 export function fournisseurFactice(req: RequeteFactice): SortieFactice {
-  /* Lire des captures : une transcription fixe de 24 messages, l’avant-veille et la veille du jour de la requête, et une ligne de son profil */
+  /* Lire des captures : une transcription fixe (FACTICE.messagesCaptures, en deux soirées), l’avant-veille et la veille du jour de la requête, et une ligne de son profil */
   if (req.tache === "01-captures") {
-    const auj = Date.parse(`${textes(req)[0].match(/aujourd’hui : \S+ (\d{4}-\d{2}-\d{2})/)?.[1] ?? "2026-09-09"}T00:00:00Z`);
+    const auj = Date.parse(`${lu(textes(req)[0]?.match(/aujourd’hui : \S+ (\d{4}-\d{2}-\d{2})/)?.[1], "« aujourd’hui : »", req)}T00:00:00Z`);
+    const parSoiree = FACTICE.messagesCaptures / 2;
     const veille = (k: number) => new Date(auj - k * 86400e3).toISOString().slice(0, 10);
     return {
       appli: "instagram",
       autre: "Elias",
       captures: req.blocs.filter((b) => "image" in b).map((_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
       blocs: [
-        { repere: { date: veille(2), heure: "13:12" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
-        { repere: { date: veille(1), heure: "21:05" }, messages: Array.from({ length: 12 }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
+        { repere: { date: veille(2), heure: "13:12" }, messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })) },
+        { repere: { date: veille(1), heure: "21:05" }, messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "autre" : "moi", texte: `suite ${k + 1}`, media: k === 3 ? "photo" : null, coupe: false, reaction: null })) },
       ],
-      profil: ["Étudiante en droit à Lyon"],
+      profil: [FACTICE.profil],
       doutes: [],
     } satisfies Captures;
   }
@@ -134,14 +134,14 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       prochain_pas: "Samedi, tu lui réponds en face.",
       devinette: "C’est flou parce que t’as esquivé.",
     } satisfies Verdict;
-  if (req.tache === "05-rapport" && req.etape === "plan")
+  if (req.tache === "05-rapport" && req.partie === "plan")
     return {
       plan: {
         alerte: null,
         mode_sobre: false,
         these: "Vous jouez à cache-cache.",
         decouvertes: [1, 2, 3].map((k) => ({ texte: `Découverte ${k}`, preuves: [p[k]] })),
-        chapitres: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: `Ch. ${n}`, surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [p[n]] }], epice: "une vanne" })),
+        chapitres: [...moitie(true), ...moitie(false)].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: FACTICE.titreCourt(n), surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [p[n]] }], epice: "une vanne" })),
       },
       chapitres: null,
     } satisfies z.infer<typeof Etape05>;
@@ -156,8 +156,8 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
       ],
     } satisfies Vocal;
-  if (req.tache === "05-rapport") return { plan: null, chapitres: (req.etape === "chapitres 1 à 4" ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) } satisfies z.infer<typeof Etape05>;
-  if (req.tache === "07-memoire" && req.etape === "mise à jour")
+  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, p)) } satisfies z.infer<typeof Etape05>;
+  if (req.tache === "07-memoire" && req.partie === "mise à jour")
     return {
       alerte: null,
       rien_de_neuf: false,
@@ -184,7 +184,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
     } satisfies Maj;
   if (req.tache === "10-chat") {
     /* Le vocal : « parle-moi en vocal » l’active, « écris-moi » l’arrête ; <vocal> dit que la réponse part en vocal */
-    const dernier = demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1) ?? "";
+    const dernier = lu(demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1), "son message (« (à toi) : »)", req);
     if (dernier.includes(FACTICE.refus)) return REFUS_FACTICE;
     const modeVocal = dernier.includes("parle-moi en vocal") ? "activer" : dernier.includes("écris-moi") ? "arreter" : null;
     const enVocal = modeVocal === "activer" || (modeVocal !== "arreter" && demande.includes("<vocal>"));
@@ -231,4 +231,39 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       questions: ["pourquoi elle vanne ?", "je relance trop ?", "samedi je fais quoi ?", "qui craque en premier ?"],
     } satisfies Memoire;
   throw new Error(`tâche factice inconnue : ${req.tache}`);
+}
+
+/**
+ * En flux, le chat factice écrit comme le vrai : son texte arrive par morceaux, à un rythme qu’on voit (ses bulles
+ * arrivent une à une en dev). Les autres tâches suivies (la jauge de la lecture) restent d’un bloc.
+ */
+async function ecrireParMorceaux(texte: string, ecoute: Ecoute) {
+  for (let n = 0; n < texte.length; n += 16) {
+    await new Promise((ok) => setTimeout(ok, 8));
+    ecoute.texte(texte.slice(n, n + 16));
+  }
+}
+
+/**
+ * Le modèle factice vu comme un prestataire (src/server/ia/claude.ts le prend à la place du SDK en mode factice) : la
+ * sortie de `sorties` pour la requête et sa partie, rendue comme une réponse du modèle. Un refus (REFUS_FACTICE,
+ * refusFactice) devient un arrêt « refusal » avec sa catégorie ; une sortie, son texte JSON (lu et vérifié par son
+ * schéma, comme en vrai). Un appel déjà arrêté lève l’erreur d’abandon du SDK. Il ne coûte rien (`gratuit`) : ses
+ * appels ne sont pas notés au suivi des coûts (ai_usage), qui ne compte que de vrais appels (le budget, les durées des
+ * imports de captures, le tableau de bord).
+ */
+export function prestataireFactice(sorties: (req: RequeteFactice) => unknown): Fournisseur {
+  return {
+    gratuit: true,
+    async envoyer({ requete, partie }, { signal }, { ecoute }) {
+      if (signal?.aborted) throw new APIUserAbortError();
+      const brut = sorties({ ...requete, ...(partie ? { partie } : {}) });
+      const reponse = { usage: {}, model: "factice" } satisfies Partial<MessageRecu>;
+      if (typeof brut === "string" && brut.startsWith(REFUS_FACTICE))
+        return { ...reponse, content: [], stop_reason: "refusal", stop_details: { category: brut.slice(REFUS_FACTICE.length + 1) || null } };
+      const texte = JSON.stringify(brut) ?? "";
+      if (ecoute && requete.tache === "10-chat") await ecrireParMorceaux(texte, ecoute);
+      return { ...reponse, content: [{ type: "text", text: texte }], stop_reason: "end_turn" };
+    },
+  };
 }

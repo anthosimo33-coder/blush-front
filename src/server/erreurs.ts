@@ -31,7 +31,6 @@ export type CodeTache =
   | `refus:${string}`
   | "sortie_illisible"
   | "transcription"
-  | "annule"
   | "delai"
   /* Le budget de l’IA du jour est atteint (src/server/budget.ts) : l’appel n’est pas parti */
   | "budget"

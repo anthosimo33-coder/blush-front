@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { deflateSync } from "node:zlib";
 import type { TestInfo } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
+import { FACTICE } from "../../../src/server/ia/factice-valeurs";
 
 /*
  * Des fichiers à importer, fictifs, au format réel des applis : deux prénoms inventés, une conv inventée. Jamais une
@@ -64,13 +65,15 @@ const CONV: Message[] = [
 ];
 
 /*
- * Les déclencheurs du modèle factice (src/server/ia/factice.ts, les mêmes textes) : écrits dans une conv, ils lui font
- * prendre un chemin qu’il ne prend jamais sinon. Des marqueurs inventés, que personne n’écrit dans une vraie conv.
+ * Les déclencheurs du modèle factice (FACTICE, src/server/ia/factice-valeurs.ts, lus là, jamais recopiés) : écrits dans
+ * une conv, ils lui font prendre un chemin qu’il ne prend jamais sinon. Des marqueurs inventés, que personne n’écrit
+ * dans une vraie conv. (REFUS_FACTICE, ici, est le déclencheur écrit dans la conv ; celui de src/server/ia/factice.ts,
+ * du même nom, est ce que rend une sortie factice qui refuse.)
  */
 /** Le verdict lève une alerte (danger) : le rapport passe en mode sobre. */
-export const ALERTE_FACTICE = "#factice-alerte";
+export const ALERTE_FACTICE = FACTICE.alerte;
 /** Le modèle refuse de lire la conv (ou, dans un message au chat, d’y répondre). */
-export const REFUS_FACTICE = "#factice-refus";
+export const REFUS_FACTICE = FACTICE.refus;
 
 /** Un message ajouté au bout de la conv : qui l’écrit, et quoi (un déclencheur du modèle factice, par exemple). */
 export type Ajout = { de: "toi" | "autre"; texte: string };

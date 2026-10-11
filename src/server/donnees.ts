@@ -158,11 +158,11 @@ type RapportAffiche = ReportPayload & { generating: boolean };
 
 /**
  * Le rapport lu, prêt à assembler (`lu`, pour assemblerRapport), et de quoi lancer ce qui lui manque sans tout relire :
- * l’état de sa chaîne (`chaine`), quand le rapport est ouvert (l’accès, ou le mode sobre). Tout est
+ * l’état de sa chaîne (`etat`), quand le rapport est ouvert (l’accès, ou le mode sobre). Tout est
  * lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches,
  * lu une fois pour tout, et le vocal.
  */
-async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ lu: RapportLu; chaine: { etat: EtatChaine } | null } | null> {
+async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ lu: RapportLu; etat: EtatChaine | null } | null> {
   const access: Plan = utilisateur?.plan ?? "gratuit";
   const aLeRapport = peut(access, "rapport");
   const [verdict, r, tachesLues, vocalLuAvant] = await Promise.all([
@@ -191,7 +191,7 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
     voix: voixDisponible(),
     maintenant: Date.now(),
   };
-  return { lu, chaine: ouvert ? { etat: etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches }) } : null };
+  return { lu, etat: ouvert ? etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches }) : null };
 }
 
 /**
@@ -214,8 +214,8 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
 export async function ouvrirLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<RapportAffiche | null> {
   const lecture = await lireLeRapport(story, utilisateur);
   if (!lecture) return null;
-  const { lu, chaine } = lecture;
-  if (!chaine || !(await reparerLaChaine(story, chaine.etat))) return assemblerRapport(lu);
+  const { lu, etat } = lecture;
+  if (!etat || !(await reparerLaChaine(story, etat))) return assemblerRapport(lu);
   return assemblerRapport({ ...lu, taches: await etatDesTaches(story.id, [...GENRES_CHAINE]), maintenant: Date.now() });
 }
 

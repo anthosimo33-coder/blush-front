@@ -89,7 +89,7 @@ export async function lireLot(images: Image[], appli: string, etiquette: "captur
   /* Le budget de l’IA du jour (src/server/budget.ts) : la lecture est payée par le compte connecté, sinon par la part sans compte */
   const compte = await utilisateurDeSession(await lireSession());
   const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette, compte });
-  return exigerSortie(a, new ErreurImport("fichier"));
+  return exigerSortie(a, () => new ErreurImport("fichier"));
 }
 
 /** Une lecture au format « captures » que la lecture de la conv connaît. Rien de lisible : l’erreur « capture ». */

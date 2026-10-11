@@ -301,8 +301,8 @@ export type FicheUpdate = {
    * la réponse ; `added` arrive quand la fiche ne dit plus `updating`.
    */
   pending?: { profile: string[]; messages: number };
-  /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, le budget de l’IA du jour, un bug. */
-  problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle"> | "bug";
+  /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, le budget de l’IA du jour, un refus de l’IA, un bug. */
+  problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle" | "refus"> | "bug";
 };
 
 export type Subscription = {

@@ -32,8 +32,9 @@ import { empreinte } from "@/server/chiffrement";
 import { aujourdhuiParis } from "@/server/temps";
 import { historique } from "@/server/chat";
 import { db, schema } from "@/server/db";
-import { REFUS_FACTICE } from "@/server/ia/claude";
-import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
+import { avecEcheance } from "@/server/echeance";
+import { TEMPS_RELANCE } from "@/server/ia/appel-verifie";
+import { fournisseurFactice, refusFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { REFUS_FUITE } from "@/server/ia/garde";
 import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
 import type { ErreurApi } from "@/types/erreurs-api";
@@ -159,6 +160,27 @@ describe("POST /api/chat en flux", () => {
       ["inventée", 0],
       ["la fin", 0],
     ]);
+    await lancerApres();
+  });
+
+  it("une preuve introuvable, plus le temps de rejouer avant l’échéance : pas de nouvel essai, la réponse sans la citation", async () => {
+    chat = (req) => reponseChat(req, (r) => ({ ...r, lecture: [{ texte: "inventée", preuves: ["m9999"] }, { texte: "la suite", preuves: [] }] }));
+    const evenements = await avecEcheance(TEMPS_RELANCE - 10_000, async () => (await lectures(await envoyer("elle veut quoi ?"))).flat());
+    expect(appels).toBe(1);
+    /* La bulle sans preuve est retenue : tout arrive avec la réponse validée, la citation en moins */
+    expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse"]);
+    expect((evenements[0] as { reponse: { bubbles: BulleChat[] } }).reponse.bubbles.map((b) => [b.text, b.messages?.length ?? 0])).toEqual([
+      ["inventée", 0],
+      ["la suite", 0],
+    ]);
+    await lancerApres();
+  });
+
+  it("une sortie illisible, même sans le temps de rejouer une preuve : rejouée une fois", async () => {
+    chat = (req) => (appels === 1 ? { illisible: true } : fournisseurFactice(req));
+    const evenements = await avecEcheance(TEMPS_RELANCE - 10_000, async () => (await lectures(await envoyer("elle veut quoi ?"))).flat());
+    expect(appels).toBe(2);
+    expect(evenements.at(-1)).toHaveProperty("reponse");
     await lancerApres();
   });
 

@@ -94,8 +94,9 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  * lancé, puis la chaîne repart après la réponse. Le rapport et la mémoire d’un accès donné après coup, la mémoire
  * d’un rapport sobre offert puis débloqué, le vocal d’un rapport écrit avant lui ou d’une ancienne version du script.
  * L’accès est celui du compte de l’histoire, lu en base comme à la fin de chaque étape (aAcces) : jamais celui que
- * croit l’appelant. `etat` : celui déjà lu par l’appelant (le rapport le lit une fois pour tout). Vrai si une tâche
- * vient d’être lancée.
+ * croit l’appelant. Il n’est lu que s’il change ce qui reste à lancer : le rapport ouvert, sondé toutes les 2 s pendant
+ * qu’il s’écrit, ne paie pas une requête de plus à chaque sondage. `etat` : celui déjà lu par l’appelant (le rapport le
+ * lit une fois pour tout). Vrai si une tâche vient d’être lancée.
  */
 export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?: EtatChaine): Promise<boolean> {
   /*
@@ -103,13 +104,14 @@ export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?
    * Tenté seulement si l’état déjà lu montre une étape arrêtée par lui : sinon, l’ouverture du rapport ne paie pas une
    * requête de plus. Les mises à jour de la mémoire arrêtées (hors de la chaîne) repartent au suivi (cloreLesAbandons)
    */
-  const [lu, acces] = await Promise.all([etat ?? lireEtat(story.id), aAcces(story)]);
+  const lu = etat ?? (await lireEtat(story.id));
   const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && (estBudget(t.error) || estBudgetVoix(t.error)));
   if (arretee && (await reprendreApresMinuit(story.id))) {
     after(() => executerChaine(story.id));
     return true;
   }
-  const genres = suite(lu, acces);
+  const [sans, avec] = [suite(lu, false), suite(lu, true)];
+  const genres = sans.join() === avec.join() ? sans : (await aAcces(story)) ? avec : sans;
   if (!genres.length) return false;
   for (const g of genres) await planifier(story.id, g);
   after(() => executerChaine(story.id));

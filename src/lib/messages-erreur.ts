@@ -56,6 +56,8 @@ const MESSAGES = {
     trop: "BLUSH a lu beaucoup de captures d’un coup\u00a0: réessaie un peu plus tard. Tes captures restent là.",
     /* La lecture des captures est payée par le compte connecté, ou par la part sans compte (src/server/budget.ts) */
     souffle: `${SOUFFLE} Tes captures restent là.`,
+    /* Un refus de l’IA : réessayer n’y changerait rien. TODO(produit): texte à valider */
+    refus: "BLUSH ne peut pas lire ces captures. Essaie avec d’autres.",
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* « Lancer la lecture », sur « Qui es-tu ? » */
@@ -148,6 +150,8 @@ const AJOUT_FICHE = {
   autre_conv: (_, prenom) => ({ title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${prenom}.` }),
   trop: () => ({ title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." }),
   souffle: () => ({ title: SOUFFLE_TITRE, detail: "Réessaie demain." }),
+  /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug ; réessayer n’y changerait rien. TODO(produit): texte à valider */
+  refus: (quoi) => ({ title: `BLUSH ne peut pas lire ${quoi}`, detail: "Essaie avec d’autres captures." }),
   bug: () => ({ title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." }),
 } satisfies Record<NonNullable<FicheUpdate["problem"]>, (quoi: string, prenom: string) => { title: string; detail: string }>;
 
@@ -155,7 +159,7 @@ const AJOUT_FICHE = {
 export const messageAjoutFiche = (probleme: NonNullable<FicheUpdate["problem"]>, quoi: string, prenom: string) => AJOUT_FICHE[probleme](quoi, prenom);
 
 /* Les erreurs d’un ajout que l’écran de la fiche sait dire ; les autres sont un bug */
-const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop", "souffle"] as const satisfies readonly NonNullable<FicheUpdate["problem"]>[];
+const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop", "souffle", "refus"] as const satisfies readonly NonNullable<FicheUpdate["problem"]>[];
 
 /** Pourquoi un ajout à sa fiche n’a rien rangé : ce que l’écran sait dire, un bug pour le reste, rien si rien n’était neuf. */
 export function problemeAjout(e: unknown): FicheUpdate["problem"] {

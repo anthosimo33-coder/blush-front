@@ -65,7 +65,7 @@ describe("le serveur", () => {
     expect(codePublic("budget")).toBe("souffle");
     /* Un code déjà public le reste : la route du chat applique codePublic au code de codeDErreur */
     for (const publique of ["refus", "transcription", "souffle", "panne"] as const) expect(codePublic(publique)).toBe(publique);
-    for (const interne of ["sortie_illisible", "contexte_absent", "delai", "annule"]) expect(codePublic(interne)).toBe("panne");
+    for (const interne of ["sortie_illisible", "contexte_absent", "delai"]) expect(codePublic(interne)).toBe("panne");
   });
 
   it("un refus du modèle se reconnaît sur l’erreur comme sur le code gardé en base", () => {
@@ -148,10 +148,17 @@ describe("les écrans", () => {
   it("un ajout à la fiche : ce que l’écran sait dire, rien si rien n’était neuf, un bug pour le reste", () => {
     expect(problemeAjout(api("rien_de_neuf"))).toBeUndefined();
     expect(problemeAjout(api("autre_conv"))).toBe("autre_conv");
-    expect(problemeAjout(api("refus"))).toBe("bug");
+    expect(problemeAjout(api("panne"))).toBe("bug");
     expect(problemeAjout(new Error("réseau"))).toBe("bug");
     expect(messageAjoutFiche("autre_conv", "votre conv", "Inès")).toEqual({ title: "Ce n’est pas votre conv", detail: "Envoie l’export de ta conv avec Inès." });
     expect(messageAjoutFiche("capture", "ta capture", "Inès").detail).toBe("Renvoie-la en entier, sans la rogner.");
+  });
+
+  it("un refus de l’IA (malgré son repli) se dit, jamais comme un bug ni comme le réseau : à la fiche et à l’import de captures", () => {
+    expect(problemeAjout(api("refus"))).toBe("refus");
+    expect(messageAjoutFiche("refus", "tes 3 captures", "Inès")).toEqual({ title: "BLUSH ne peut pas lire tes 3 captures", detail: "Essaie avec d’autres captures." });
+    expect(messageErreur("captures", api("refus"))).toBe("BLUSH ne peut pas lire ces captures. Essaie avec d’autres.");
+    expect(erreurDeParcours("captures", api("refus"))).toBeNull();
   });
 
   it("seule une ErreurApi a un code", () => {

@@ -11,6 +11,7 @@ import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
 import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import type { DonneesRapport, DonneesVocal } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
@@ -67,10 +68,10 @@ describe("de l’import à la mémoire", () => {
     ]);
   });
 
-  it("le rapport : huit chapitres, le verdict d’abord avec ses scores, et des preuves devenues des messages datés", async () => {
+  it("le rapport : ses chapitres (ceux du modèle factice), le verdict d’abord avec ses scores, et des preuves devenues des messages datés", async () => {
     const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id));
     const rapport = dechiffrer<DonneesRapport>(r.data!);
-    expect(rapport.chapitres).toHaveLength(8);
+    expect(rapport.chapitres).toHaveLength(FACTICE.chapitres);
     expect(rapport.chapitres[0].title).toBe("Le verdict");
     expect(rapport.chapitres[0].blocks.some((b) => b.kind === "scores")).toBe(true);
     const recit = rapport.chapitres[1].blocks.find((b) => b.kind === "story");

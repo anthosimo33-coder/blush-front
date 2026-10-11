@@ -5,7 +5,9 @@ import { z } from "zod";
 /*
  * Le vrai chemin d’un appel au modèle (src/server/ia/claude.ts), sans base ni prestataire : le mode factice éteint, le
  * prestataire remplacé par un faux (definirFournisseur) qui rend la réponse que le test lui donne. Le budget, le suivi
- * des coûts, les alertes et le journal sont simulés : on regarde ce qu’ils reçoivent.
+ * des coûts, les alertes et le journal sont simulés : on regarde ce qu’ils reçoivent. L’adaptateur du SDK
+ * (prestataireSDK) est lu à part, avec le vrai client du SDK sur un faux `fetch` : ce que le SDK envoie, et ce qu’il
+ * rend au suivi en flux.
  */
 vi.mock("@/server/env", async (original) => {
   const o = await original<typeof import("@/server/env")>();
@@ -22,7 +24,7 @@ import { controlerBudget } from "@/server/budget";
 import { avecEcheance } from "@/server/echeance";
 import { ErreurTache } from "@/server/erreurs";
 import { journal } from "@/server/journal";
-import { appeler, definirFournisseur, type Avance, type Fournisseur, type MessageRecu } from "@/server/ia/claude";
+import { appeler, definirFournisseur, prestataireSDK, type Avance, type Demande, type Ecoute, type Fournisseur, type MessageRecu } from "@/server/ia/claude";
 import { noterCout } from "@/server/ia/usage";
 
 const Format = z.object({ ok: z.boolean() });
@@ -31,8 +33,8 @@ const USAGE = { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_
 
 /** Une réponse du modèle : ses blocs, et comment il s’est arrêté. */
 const message = (content: MessageRecu["content"], autres: Partial<MessageRecu> = {}): MessageRecu => ({ content, usage: USAGE, model: "modele-de-test", stop_reason: "end_turn", ...autres });
-const texte = (t: string) => ({ type: "text", text: t });
-const repli = { type: "fallback", from: { model: "premier" }, to: { model: "second" }, trigger: { category: "cyber" } };
+const texte = (t: string) => ({ type: "text" as const, text: t });
+const repli = { type: "fallback" as const, from: { model: "premier" }, to: { model: "second" }, trigger: { category: "cyber" } };
 
 type Envoi = Parameters<Fournisseur["envoyer"]>;
 /** Le faux prestataire : ce qu’il reçoit, et ce qu’il fait de chaque envoi (rendre un message, lever une erreur, écrire en flux). */
@@ -92,25 +94,6 @@ describe("appeler : la réponse du modèle", () => {
 });
 
 describe("appeler : l’envoi", () => {
-  it("demande le repli du prestataire ; s’il le refuse, renvoie sans lui, et ne le redemande plus", async () => {
-    /* Le repli refusé reste refusé pour l’instance : un module neuf, pour ne pas le refuser aux autres tests */
-    vi.resetModules();
-    const claude = await import("@/server/ia/claude");
-    const envois: Envoi[] = [];
-    const reponses = [
-      async () => {
-        throw new Anthropic.BadRequestError(400, undefined, "fallbacks: unknown option", new Headers());
-      },
-      async () => message([texte('{"ok":true}')]),
-      async () => message([texte('{"ok":true}')]),
-    ];
-    claude.definirFournisseur({ envoyer: async (...envoi) => (envois.push(envoi), reponses[envois.length - 1]()) });
-    expect((await claude.appeler(VERDICT, Format)).sortie).toEqual({ ok: true });
-    await claude.appeler(VERDICT, Format);
-    expect(envois.map(([p]) => "fallbacks" in p)).toEqual([true, false, false]);
-    claude.definirFournisseur(null);
-  });
-
   it("une autre erreur du prestataire remonte telle quelle", async () => {
     faux(async () => {
       throw new Anthropic.InternalServerError(500, undefined, "panne", new Headers());
@@ -171,5 +154,103 @@ describe("appeler : l’envoi", () => {
     const envois = faux();
     await expect(appeler(VERDICT, Format)).rejects.toMatchObject({ code: "budget" });
     expect(envois).toHaveLength(0);
+  });
+
+  it("passe au prestataire la requête et sa partie, avec les paramètres du SDK", async () => {
+    const envois = faux(rend(message([texte('{"ok":true}')])));
+    await appeler(VERDICT, Format, { partie: "plan" });
+    expect(envois[0][0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
+  });
+});
+
+/* ———— L’adaptateur du SDK, sur un faux `fetch` ———— */
+
+const PARAMS: Demande["params"] = { model: "claude-opus-5-5", max_tokens: 100, messages: [{ role: "user", content: "la conv" }] };
+const DEMANDE: Demande = { requete: VERDICT, partie: null, params: PARAMS };
+const OPTIONS = { timeout: 5_000, maxRetries: 0 };
+const MESSAGE_SDK = { id: "msg_1", type: "message", role: "assistant", model: "claude-opus-5-5", stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } };
+
+/** Une réponse en flux, comme l’API l’écrit : un événement par bloc `event:` / `data:`. */
+const flux = (...evenements: Record<string, unknown>[]) =>
+  new Response(evenements.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join(""), { headers: { "content-type": "text/event-stream", "request-id": "req_flux" } });
+const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps), { status, headers: { "content-type": "application/json", "request-id": "req_1" } });
+
+/** Un client du SDK dont `fetch` rend, envoi après envoi, les réponses données ; et ce qu’il a reçu (corps, en-têtes). */
+function clientSDK(...reponses: (() => Response)[]) {
+  const recus: { corps: Record<string, unknown>; beta: string | null }[] = [];
+  const client = new Anthropic({
+    apiKey: "cle-fictive",
+    maxRetries: 0,
+    fetch: async (_url, init) => {
+      recus.push({ corps: JSON.parse(String(init?.body)) as Record<string, unknown>, beta: new Headers(init?.headers).get("anthropic-beta") });
+      return reponses[recus.length - 1]();
+    },
+  });
+  return { sdk: prestataireSDK(() => client), recus };
+}
+
+/** Un suivi qui note tout ce qu’il reçoit, dans l’ordre. */
+function ecouteNotee() {
+  const vu: string[] = [];
+  const ecoute: Ecoute = { bloc: (t) => vu.push(`bloc ${t}`), reflexion: (d) => vu.push(`réflexion ${d}`), texte: (d) => vu.push(`texte ${d}`) };
+  return { ecoute, vu };
+}
+
+describe("prestataireSDK : le vrai client du SDK", () => {
+  it("d’un bloc : une seule requête, sans flux, et le message rendu tel quel", async () => {
+    const { sdk, recus } = clientSDK(() => json({ ...MESSAGE_SDK, content: [{ type: "text", text: '{"ok":true}', citations: null }] }));
+    const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null });
+    expect(m.content).toEqual([{ type: "text", text: '{"ok":true}', citations: null }]);
+    expect(m._request_id).toBe("req_1");
+    expect(recus[0].corps.stream).toBeUndefined();
+  });
+
+  it("en flux : chaque bloc qui commence, la réflexion et le texte arrivent au suivi, repli compris ; puis le message entier", async () => {
+    const { sdk, recus } = clientSDK(() =>
+      flux(
+        { type: "message_start", message: { ...MESSAGE_SDK, content: [], stop_reason: null } },
+        { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "", signature: "" } },
+        { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "hmm" } },
+        { type: "content_block_stop", index: 0 },
+        { type: "content_block_start", index: 1, content_block: { type: "fallback", from: { model: "premier" }, to: { model: "second" }, trigger: { category: "cyber" } } },
+        { type: "content_block_stop", index: 1 },
+        { type: "content_block_start", index: 2, content_block: { type: "text", text: "", citations: null } },
+        { type: "content_block_delta", index: 2, delta: { type: "text_delta", text: '{"ok":' } },
+        { type: "content_block_delta", index: 2, delta: { type: "text_delta", text: "true}" } },
+        { type: "content_block_stop", index: 2 },
+        { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 5 } },
+        { type: "message_stop" },
+      ),
+    );
+    const { ecoute, vu } = ecouteNotee();
+    const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: true, ecoute });
+    expect(recus[0].corps.stream).toBe(true);
+    expect(vu).toEqual(["bloc thinking", "réflexion hmm", "bloc fallback", "bloc text", 'texte {"ok":', "texte true}"]);
+    expect(m.content.map((b) => b.type)).toEqual(["thinking", "fallback", "text"]);
+    expect(m.content.at(-1)).toMatchObject({ type: "text", text: '{"ok":true}' });
+    expect(m.stop_reason).toBe("end_turn");
+  });
+
+  it("demande le repli du prestataire ; s’il le refuse, renvoie sans lui, et ne le redemande plus", async () => {
+    const ok = () => json({ ...MESSAGE_SDK, content: [{ type: "text", text: '{"ok":true}', citations: null }] });
+    const { sdk, recus } = clientSDK(() => json({ type: "error", error: { type: "invalid_request_error", message: "fallbacks: unknown option" } }, 400), ok, ok);
+    expect((await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null })).content).toHaveLength(1);
+    await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null });
+    expect(recus.map((r) => [r.corps.fallbacks ?? null, r.beta?.includes("server-side-fallback") ?? false])).toEqual([
+      ["default", true],
+      [null, false],
+      [null, false],
+    ]);
+    expect(journal).toHaveBeenCalledWith("repli refusé par l’API : on s’en passe", { tache: "04-verdict" }, "alerte");
+  });
+
+  it("une autre requête refusée remonte telle quelle, et le repli reste demandé", async () => {
+    const { sdk, recus } = clientSDK(
+      () => json({ type: "error", error: { type: "invalid_request_error", message: "max_tokens: trop grand" } }, 400),
+      () => json({ ...MESSAGE_SDK, content: [] }),
+    );
+    await expect(sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null })).rejects.toBeInstanceOf(Anthropic.BadRequestError);
+    await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null });
+    expect(recus.map((r) => r.corps.fallbacks)).toEqual(["default", "default"]);
   });
 });

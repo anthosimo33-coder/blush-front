@@ -13,6 +13,10 @@ import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours, resumeAjout 
 import { historique, repondre } from "@/server/chat";
 import { ficheDe, memoireDe } from "@/server/donnees";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
+import { reponseErreur } from "@/server/http";
+import { problemeAjout } from "@/lib/messages-erreur";
+import { ErreurApi } from "@/types/erreurs-api";
 import { transcrire } from "@/server/ia/transcription";
 import { executerChaine } from "@/server/pipeline";
 import { captures, memoire, msg } from "./aide/fabriques";
@@ -146,7 +150,7 @@ describe("après l’import : le chat et sa fiche", () => {
 
     it("des captures : leurs messages et son profil, numérotés à la suite de l’export", async () => {
       const ajout = await depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
-      expect(ajout.messages).toBe(24);
+      expect(ajout.messages).toBe(FACTICE.messagesCaptures);
       expect(ajout.profil).toBe(1);
       expect(numero(ajout.lignes[0])).toBe(numero(exporte.lignes.at(-1)!) + 1);
       expect(derniere("01-captures")).toContain("autre personne : Sophie");
@@ -154,7 +158,13 @@ describe("après l’import : le chat et sa fiche", () => {
 
     it("des captures que le modèle refuse de lire : le refus (que le chat et la fiche savent dire), jamais « capture »", async () => {
       const lire = async () => depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
-      await expect(avecFactice(() => refusFactice("cyber"), lire)).rejects.toMatchObject({ code: "refus:cyber" });
+      const refus = await avecFactice(() => refusFactice("cyber"), lire).catch((e: unknown) => e);
+      expect(refus).toMatchObject({ code: "refus:cyber" });
+      /* Ce que la route en répond (POST /api/fiche : reponseErreur), lu par le navigateur : l’écran de la fiche dit le refus, pas un bug */
+      const r = reponseErreur(refus);
+      const { erreur } = (await r.json()) as { erreur: "refus" };
+      expect([r.status, erreur]).toEqual([502, "refus"]);
+      expect(problemeAjout(new ErreurApi(erreur, r.status))).toBe("refus");
       /* Illisible : « capture » */
       await expect(avecFactice(() => ({ rien: "de lisible" }), lire)).rejects.toMatchObject({ code: "capture" });
     });
@@ -166,14 +176,14 @@ describe("après l’import : le chat et sa fiche", () => {
     const ajout = await depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
     const r = await ajouterALaFiche(await ligneEnBase(id), ajout);
     /* La réponse n’attend pas la mémoire : son profil est « en cours d’ajout », la fiche dit qu’elle se met à jour */
-    expect(r).toMatchObject({ added: [], pending: { profile: ["Étudiante en droit à Lyon"], messages: ajout.messages }, fiche: { updating: true } });
+    expect(r).toMatchObject({ added: [], pending: { profile: [FACTICE.profil], messages: ajout.messages }, fiche: { updating: true } });
     expect(r.fiche.facts.length).toBe(avant.size);
     expect(await majEnCours(id)).toBe(true);
     /* Après la réponse, la mise à jour tourne : la fiche relue a l’info, avec sa source */
     while (apres.length) await apres.shift()!();
     expect(await majEnCours(id)).toBe(false);
     const fiche = await ficheDe(await ligneEnBase(id));
-    expect(fiche.facts.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
+    expect(fiche.facts.find((f) => f.text === FACTICE.profil)).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /), sources: ["capture"] });
     expect(fiche.facts.length).toBeGreaterThan(avant.size);
   });
 

@@ -86,7 +86,7 @@ export async function depuisCaptures(story: Ligne, memoire: DonneesMemoire, imag
   const h = histoireDe(meta);
   const j = aujourdhuiParis();
   const a = await appeler(requeteCaptures({ prenom: h.utilisateur.prenom, autre: h.autre.prenom, appli: meta.appli, aujourdhui: j.t, images }), Sortie01, { storyId: story.id, etiquette: "captures" });
-  const lues = exigerSortie(a, new ErreurAjout("capture"));
+  const lues = exigerSortie(a, () => new ErreurAjout("capture"));
   const profil = lues.profil.map((p) => p.trim()).filter(Boolean);
   const lus = lues.blocs.some((b) => b.messages.length);
   if (!lus && !profil.length) throw new ErreurAjout("capture");

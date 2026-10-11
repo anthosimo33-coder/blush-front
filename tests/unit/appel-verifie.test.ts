@@ -73,12 +73,12 @@ describe("appelVerifie : le second essai", () => {
     expect(appels).toHaveBeenCalledTimes(2);
   });
 
-  it("passe à appeler ses options nommées : la conv, l’étiquette, l’étape, le suivi, le signal", async () => {
+  it("passe à appeler ses options nommées : la conv, l’étiquette, la partie, le suivi, le signal", async () => {
     essais(sortie(["m0001"]));
     const surAvance = () => {};
     const signal = new AbortController().signal;
-    await verifie({ etape: "plan", surAvance, signal });
-    expect(appels).toHaveBeenCalledWith(REQ, Format, { storyId: "histoire", etiquette: "chat", etape: "plan", surAvance, signal });
+    await verifie({ partie: "plan", surAvance, signal });
+    expect(appels).toHaveBeenCalledWith(REQ, Format, { storyId: "histoire", etiquette: "chat", partie: "plan", surAvance, signal });
   });
 });
 
@@ -115,9 +115,12 @@ describe("appelVerifie : un suivi par essai (le chat)", () => {
 
 describe("exigerSortie : un appel fait une fois", () => {
   it("rend la sortie ; illisible, l’erreur que la route sait dire ; un refus, son ErreurTache", () => {
-    const sinon = new Error("capture");
+    const erreur = new Error("capture");
+    const sinon = vi.fn(() => erreur);
     expect(exigerSortie(sortie(["m0001"]), sinon).texte).toBe("ok");
-    expect(() => exigerSortie(illisible, sinon)).toThrow(sinon);
+    /* L’erreur n’est faite que s’il faut la lever */
+    expect(sinon).not.toHaveBeenCalled();
+    expect(() => exigerSortie(illisible, sinon)).toThrow(erreur);
     expect(() => exigerSortie(refus("cyber"), sinon)).toThrow(expect.objectContaining({ code: "refus:cyber" }));
     expect(() => exigerSortie(refus(null), sinon)).toThrow(ErreurTache);
   });
