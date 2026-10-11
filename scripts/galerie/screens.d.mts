@@ -2,6 +2,8 @@
  * Les types de scripts/galerie/screens.mjs, pour scripts/galerie/galerie.spec.ts : sans allowJs, tsc ne lit plus un
  * .mjs. La liste reste en JavaScript (capture.mjs la lit aussi, sans compiler) ; ces déclarations reprennent ses
  * @typedef, et changent avec eux.
+ * tests/unit/declarations-scripts.test.ts vérifie que les deux exportent les mêmes noms, les fonctions en
+ * fonctions ; les signatures, elles, se relisent à la main.
  */
 import type { Page } from "@playwright/test";
 

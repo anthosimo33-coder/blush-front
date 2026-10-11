@@ -1,10 +1,12 @@
 # Ce que Prettier laisse tel quel, en plus de ce que .gitignore ignore déjà (Prettier le lit aussi).
+# Les réglages et les dossiers de travail des agents (.claude/worktrees : d’autres branches, d’autres sessions) : jamais
+# vérifiés ni réécrits d’ici.
+/.claude/
 # Le sous-module privé des prompts : un autre dépôt, qui a sa propre mise en forme.
-prompts/
-# Ce qu’un outil écrit : les migrations et leur journal (drizzle-kit), les verrous de npm.
-drizzle/
+/prompts/
+# Ce qu’un outil écrit : les migrations et leur journal (drizzle-kit), les verrous de npm (à toute profondeur).
+/drizzle/
 package-lock.json
-scripts/deployer/package-lock.json
 # Les polices, les images et les fichiers servis tels quels.
-assets/
-public/
+/assets/
+/public/

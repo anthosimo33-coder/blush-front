@@ -20,7 +20,7 @@
     "test:unit": "node scripts/prompts.mjs && vitest run --project unit --project client",
     "check": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && next typegen && tsc --noEmit && eslint . && node scripts/verifier-typo.mjs && npm run mort && vitest run",
     "mort": "knip --no-progress",
-    "couverture": "node scripts/prompts.mjs && vitest run --coverage --coverage.include='src/**'",
+    "couverture": "node scripts/prompts.mjs && vitest run --coverage --coverage.include='src/**/*.{ts,tsx}' --coverage.exclude='src/server/ia/textes.generated.ts' --coverage.exclude='src/app/apercu/**' --coverage.exclude='src/app/styleguide/**'",
     "forme": "prettier --check .",
     "todo": "git grep -n -F 'TODO(produit)' -- src scripts tests || true",
     "e2e:build": "node tests/e2e/construire.mjs",
@@ -57,7 +57,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "4.1.11",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
@@ -68,6 +68,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vitest": "4.1.11"
   }
 }

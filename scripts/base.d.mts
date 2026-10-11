@@ -2,6 +2,8 @@
  * Les types de scripts/base.mjs, pour le TypeScript qui l’importe (drizzle.config.ts, scripts/acces.mts,
  * tests/verifier-migrations.test.ts) : sans allowJs, tsc ne lit plus un .mjs. Le script reste en JavaScript (node le
  * lance sans compiler, au build) ; ces déclarations se tiennent à la main, à côté de lui, et changent avec lui.
+ * tests/unit/declarations-scripts.test.ts vérifie que les deux exportent les mêmes noms, les fonctions en
+ * fonctions ; les signatures, elles, se relisent à la main.
  */
 
 /** L’URL vise-t-elle le Postgres de la machine (ou un socket local) ? */

@@ -1,6 +1,8 @@
 /*
  * Les types de scripts/verifier-fuite.mjs, pour tests/verifier-fuite.test.ts : sans allowJs, tsc ne lit plus un .mjs.
  * Le script reste en JavaScript (node le lance après le build) ; ces déclarations changent avec lui.
+ * tests/unit/declarations-scripts.test.ts vérifie que les deux exportent les mêmes noms, les fonctions en
+ * fonctions ; les signatures, elles, se relisent à la main.
  */
 
 /** Un prompt copié côté serveur : son nom de fichier (dans prompts/), et son texte. */
