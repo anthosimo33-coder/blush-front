@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
-import { chiffrer, dechiffrer } from "./chiffrement";
+import type { Echange } from "@prompts/lib/memoire";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { Genre } from "./db/enums";
 
@@ -18,12 +19,17 @@ export const PERIME_S = 90;
 /**
  * Planifie une étape. Celles de la chaîne (verdict, rapport, vocal, mémoire) n’existent qu’une fois en attente ou en
  * cours par histoire (un index unique) : planifiée deux fois en même temps, c’est la même tâche qui revient.
+ * `input` : l’échange d’une mise à jour de la mémoire (memoire_maj, la seule étape qui en a une), relu par entreeDe.
+ * Encore `unknown` : des tests empilent des mises à jour aux entrées factices (`{ a: 1 }`), jamais exécutées ; elle
+ * deviendra `Echange` quand ils passeront de vrais échanges (lot 5).
  */
 export async function planifier(storyId: string, kind: Genre, input?: unknown): Promise<string> {
+  /* Chiffrée une fois pour les deux essais */
+  const entree = input === undefined ? undefined : coffre.ecrire("tasks.input", input as Echange);
   for (let essai = 0; essai < 2; essai++) {
     const [t] = await db()
       .insert(schema.tasks)
-      .values({ storyId, kind, ...(input === undefined ? {} : { input: chiffrer(input) }) })
+      .values({ storyId, kind, ...(entree ? { input: entree } : {}) })
       .onConflictDoNothing()
       .returning({ id: schema.tasks.id });
     if (t) return t.id;
@@ -153,4 +159,5 @@ export async function etatDesTaches(storyId: string, genres: Genre[]): Promise<P
   return Object.fromEntries(lignes.map((t) => [t.kind, t]));
 }
 
-export const entreeDe = <T>(t: Tache) => (t.input ? dechiffrer<T>(t.input) : null);
+/** L’entrée d’une tâche (l’échange d’une mise à jour de la mémoire), ou null. */
+export const entreeDe = (t: Tache) => (t.input ? coffre.lire("tasks.input", t.input) : null);

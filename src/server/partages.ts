@@ -3,8 +3,8 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { verdictAffiche } from "@prompts/lib/front";
 import type { CodeErreur } from "@/types/erreurs-api";
-import type { DonneesVerdict } from "./analyse";
-import { chiffrer, dechiffrer, empreinte } from "./chiffrement";
+import { empreinte } from "./chiffrement";
+import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { metaDe, type Ligne } from "./histoires";
@@ -65,13 +65,13 @@ export function masqueDe(story: Ligne): (texte: string) => string {
 export async function partager(story: Ligne): Promise<{ id: string; verdict: VerdictPartage }> {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id));
   if (!v) throw new ErreurPartage("pas_pret");
-  const { sortie } = dechiffrer<DonneesVerdict>(v.data);
+  const { sortie } = coffre.lire("verdicts.data", v.data);
   /* Une situation difficile ne se partage pas */
   if (sortie.mode_sobre) throw new ErreurPartage("sobre");
   const affiche = verdictAffiche(sortie);
   const masquer = masqueDe(story);
   const verdict: VerdictPartage = { emoji: affiche.emoji, title: masquer(affiche.title), subtitle: masquer(affiche.subtitle) };
-  const data = chiffrer(verdict);
+  const data = coffre.ecrire("shares.data", verdict);
   /* Déjà partagé : le même lien, masqué comme aujourd’hui (un lien créé avant le 9 octobre masquait aussi ton prénom) */
   const [deja] = await db().update(schema.shares).set({ data }).where(eq(schema.shares.storyId, story.id)).returning({ id: schema.shares.id });
   if (deja) return { id: deja.id, verdict };
@@ -107,5 +107,5 @@ export const versionImage = (id: string, v: VerdictPartage) => empreinte(`partag
 export async function verdictPartage(id: string): Promise<VerdictPartage | null> {
   if (!ID_PARTAGE.test(id)) return null;
   const [l] = await db().select({ data: schema.shares.data }).from(schema.shares).where(eq(schema.shares.id, id));
-  return l ? dechiffrer<VerdictPartage>(l.data) : null;
+  return l ? coffre.lire("shares.data", l.data) : null;
 }

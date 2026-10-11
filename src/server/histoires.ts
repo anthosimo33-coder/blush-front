@@ -11,7 +11,8 @@ import { CORPS_VERCEL_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Story } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
-import { chiffrer, chiffrerCompresse, dechiffrer, empreinte, jeton } from "./chiffrement";
+import { empreinte, jeton } from "./chiffrement";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { Utilisateur } from "./auth";
 
@@ -46,12 +47,6 @@ export type Meta = {
   devinette?: Devinette;
   objectif?: Objectif;
 };
-
-/**
- * Ce qu’on garde de la conv une fois effacée, chiffré dans `stories.context`. `dernier` : l’heure du dernier
- * message lu (celle de l’export, sans fuseau), d’où repartent les messages ajoutés ensuite.
- */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier?: number; trouvailles?: string[] };
 
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (analyse.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
@@ -127,7 +122,7 @@ const resumeDe = (messages: Message[]): Meta["resume"] => ({
 async function creerBrouillon(meta: Meta, texte: string, secret: string): Promise<{ id: string; meta: Meta; secret: string }> {
   const [ligne] = await db()
     .insert(schema.stories)
-    .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: chiffrer(meta), conv: chiffrerCompresse(texte) })
+    .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", texte) })
     .returning({ id: schema.stories.id });
   return { id: ligne.id, meta, secret };
 }
@@ -281,9 +276,9 @@ export async function rattacherBrouillon(utilisateur: Utilisateur, secret: strin
   return ligne?.id ?? null;
 }
 
-export const metaDe = (ligne: Pick<Ligne, "meta">) => dechiffrer<Meta>(ligne.meta);
-export const contexteDe = (ligne: Pick<Ligne, "context">) => (ligne.context ? dechiffrer<Contexte>(ligne.context) : null);
-export const convDe = (ligne: LigneComplete) => (ligne.conv ? dechiffrer<string>(ligne.conv) : null);
+export const metaDe = (ligne: Pick<Ligne, "meta">) => coffre.lire("stories.meta", ligne.meta);
+export const contexteDe = (ligne: Pick<Ligne, "context">) => (ligne.context ? coffre.lire("stories.context", ligne.context) : null);
+export const convDe = (ligne: LigneComplete) => (ligne.conv ? coffre.lire("stories.conv", ligne.conv) : null);
 
 /** « Qui es-tu ? » est rempli (en base) : la lecture peut partir sans le parcours du navigateur. */
 export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> =>
@@ -318,7 +313,7 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
   /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
   const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;
   const meta = { ...avant, ...qui, participants };
-  await db().update(schema.stories).set({ meta: chiffrer(meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
+  await db().update(schema.stories).set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
   return meta;
 }
 

@@ -3,20 +3,21 @@ import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
-import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore, type SobreAffiche } from "@prompts/lib/front";
-import { appliquerMaj, citees, rapportCourt, rendreNouveau, type EditionsFiche, type Echange } from "@prompts/lib/memoire";
+import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore } from "@prompts/lib/front";
+import { appliquerMaj, citees, rapportCourt, rendreNouveau, type EditionsFiche } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
-import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Memoire, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { Chapitre05, Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
 import { peut } from "@/lib/acces";
-import { chiffrer, dechiffrer } from "./chiffrement";
+import * as coffre from "./coffre";
+import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict } from "./coffre";
 import { db, schema } from "./db";
 import type { AvanceMoitie, Genre } from "./db/enums";
-import { contexteDe, convDe, histoireDe, metaDe, type Contexte, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache, estRefus } from "./erreurs";
-import { aujourdhuiParis } from "./temps";
+import { aujourdhuiParis, pause } from "./temps";
 import { appeler, type Avance } from "./ia/claude";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
 import { alerter } from "./alertes";
@@ -29,13 +30,8 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
 
 /* ———— Ce qu’on garde, chiffré ———— */
 
-export type DonneesVerdict = { sortie: Verdict; scores: LigneScore[] };
-export type DonneesRapport = { sortie: Rapport; chapitres: ChapitreAffiche[]; sobre: SobreAffiche | null; lecture: { free: string; full: string } };
-/**
- * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
- * et ce que l’utilisateur a corrigé lui-même dans sa fiche.
- */
-export type DonneesMemoire = { etat: Memoire; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
+/* Leurs formes sont dans le coffre (src/server/coffre.ts) ; les routes et les tests les lisent encore ici */
+export type { DonneesMemoire, DonneesRapport, DonneesVerdict };
 
 /** Les infos qu’il a retirées de sa fiche que la mémoire garde : les plus récentes (PUT /api/fiche coupe la liste). */
 export const SUPPRIMEES_MAX = 100;
@@ -99,7 +95,7 @@ const TEMPS_RELANCE = 90_000;
 
 const lireVerdict = async (storyId: string) => {
   const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
-  return v ? dechiffrer<DonneesVerdict>(v.data) : null;
+  return v ? coffre.lire("verdicts.data", v.data) : null;
 };
 const lireRapport = async (storyId: string) => {
   const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, storyId));
@@ -172,16 +168,18 @@ async function verdict(story: LigneComplete, t: Tache) {
   const chiffres = chiffresDe(h, lu.messages);
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
   const contexte: Contexte = { chiffres: rendu.chiffres, style: profil(h, lu.messages).bloc, fin: rendu.fin, dernier: lu.messages.at(-1)!.t, trouvailles: trouvailles(chiffres, h, lu.messages) };
-  await db().update(schema.stories).set({ context: chiffrer(contexte), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
+  /* Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
+  const context = coffre.ecrire("stories.context", contexte);
+  await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
   const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
   /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
   const sortie: Verdict = { ...brute, mode_sobre: !!brute.alerte };
-  const donnees: DonneesVerdict = { sortie, scores: scores(chiffres) };
+  const data = coffre.ecrire("verdicts.data", { sortie, scores: scores(chiffres) });
   await db()
     .insert(schema.verdicts)
-    .values({ storyId: story.id, data: chiffrer(donnees) })
-    .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data: chiffrer(donnees), createdAt: new Date() } });
-  await db().update(schema.stories).set({ context: chiffrer(contexte), status: "prete", updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
+    .values({ storyId: story.id, data })
+    .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data, createdAt: new Date() } });
+  await db().update(schema.stories).set({ context, status: "prete", updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
   /* Le rapport s’écrit dès qu’on a l’accès. Une alerte (mode sobre) a sa version douce, offerte : on ne fait pas payer une situation de danger */
   if (sortie.mode_sobre || (await aAcces(story))) await planifier(story.id, "rapport_plan");
 }
@@ -213,10 +211,11 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     (e) => !!e.plan,
   );
   if (!etape.plan) throw new ErreurTache("plan_vide");
+  const plan = coffre.ecrire("reports.plan", etape.plan);
   await db()
     .insert(schema.reports)
-    .values({ storyId: story.id, plan: chiffrer(etape.plan) })
-    .onConflictDoUpdate({ target: schema.reports.storyId, set: { plan: chiffrer(etape.plan), updatedAt: new Date() } });
+    .values({ storyId: story.id, plan })
+    .onConflictDoUpdate({ target: schema.reports.storyId, set: { plan, updatedAt: new Date() } });
   await planifier(story.id, "rapport_chapitres");
   /* Le vocal s’écrit pendant les chapitres (voir rapportChapitres) ; cette tâche ne sert que s’il n’a pas pu s’y faire */
   if (voixDisponible() && !v.sortie.alerte) await planifier(story.id, "vocal");
@@ -228,7 +227,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
-  const plan = dechiffrer<Plan>(ligne.plan);
+  const plan = coffre.lire("reports.plan", ligne.plan);
   /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre (la lecture du rapport l’affiche) */
   const detail: { a: AvanceMoitie; b: AvanceMoitie } = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
   const ecrire = ecrireAvance(t.id);
@@ -240,7 +239,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   const garderPrets = () => {
     const affiches = chapitresAffiches({ chapitres: [...prets.values()].sort((x, y) => x.numero - y.numero) } as Rapport, messages, v.scores);
     enregistrement = enregistrement
-      .then(() => db().update(schema.reports).set({ partiel: chiffrer(affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
+      .then(() => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
       .then(() => undefined, () => undefined);
   };
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
@@ -318,10 +317,11 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
   };
   const [avant] = await db().select({ pret: sql<boolean>`${schema.reports.data} is not null` }).from(schema.reports).where(eq(schema.reports.storyId, story.id));
   /* Le rapport assemblé : les chapitres gardés au fil de l’écriture ne servent plus */
+  const data = coffre.ecrire("reports.data", donnees);
   await db()
     .insert(schema.reports)
-    .values({ storyId: story.id, data: chiffrer(donnees) })
-    .onConflictDoUpdate({ target: schema.reports.storyId, set: { data: chiffrer(donnees), partiel: null, updatedAt: new Date() } });
+    .values({ storyId: story.id, data })
+    .onConflictDoUpdate({ target: schema.reports.storyId, set: { data, partiel: null, updatedAt: new Date() } });
   /* La première fois seulement (pas à une relance) : le mail « ton rapport est prêt » */
   if (!avant?.pret) await prevenirRapportPret(story, donnees, h.autre.prenom);
 }
@@ -367,12 +367,12 @@ async function vocalTache(story: LigneComplete) {
   const ligne = await lireRapport(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (!ligne?.data) throw new ErreurTache("rapport_absent");
-  const r = dechiffrer<DonneesRapport>(ligne.data).sortie;
+  const r = coffre.lire("reports.data", ligne.data).sortie;
   let lignes: Map<string, string>;
   if (convDe(story)) lignes = choisir(relire(story).rendu.lignes, [...preuvesRapport(r), ...preuvesVerdict(v.sortie)]);
   else {
     const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
-    lignes = new Map(m ? dechiffrer<DonneesMemoire>(m.data).lignes : []);
+    lignes = new Map(m ? coffre.lire("memories.data", m.data).lignes : []);
   }
   const sobre = r.sobre ? `\nmode sobre : ${r.sobre.intro} ${r.sobre.titre} ${r.sobre.faits} ${r.sobre.reassurance}` : "";
   await vocal(story, v.sortie, { court: rapportCourt(r) + sobre }, lignes, r.mode_sobre || v.sortie.mode_sobre);
@@ -384,15 +384,15 @@ async function memoire(story: LigneComplete) {
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
   if (!v || !ligne?.data) throw new ErreurTache("rapport_absent");
-  const r = dechiffrer<DonneesRapport>(ligne.data).sortie;
+  const r = coffre.lire("reports.data", ligne.data).sortie;
   const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, preuvesMemoire, rendu.lignes, story.id, "memoire");
   if (!etat.memoire || !etat.fiche) throw new ErreurTache("memoire_vide");
   const gardees = [...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!] as [string, string]);
-  const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: lu.messages.length + 1 };
+  const data = coffre.ecrire("memories.data", { etat, lignes: gardees, suivant: lu.messages.length + 1 });
   await db()
     .insert(schema.memories)
-    .values({ storyId: story.id, data: chiffrer(donnees) })
-    .onConflictDoUpdate({ target: schema.memories.storyId, set: { data: chiffrer(donnees), version: sql`${schema.memories.version} + 1`, updatedAt: new Date() } });
+    .values({ storyId: story.id, data })
+    .onConflictDoUpdate({ target: schema.memories.storyId, set: { data, version: sql`${schema.memories.version} + 1`, updatedAt: new Date() } });
   /* Le rapport et la mémoire sont faits : la conv brute n’a plus de raison d’être gardée */
   if (contexteDe(story)) await db().update(schema.stories).set({ conv: null, convPurgedAt: new Date(), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
 }
@@ -403,13 +403,13 @@ async function memoire(story: LigneComplete) {
  * 60 s), elle recommence sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
  */
 async function memoireMaj(story: Ligne, t: Tache) {
-  const ech = entreeDe<Echange>(t);
+  const ech = entreeDe(t);
   if (!ech) throw new ErreurTache("memoire_absente");
   const h = histoireDe(metaDe(story));
   for (let essai = 0; essai < 2; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     if (!ligne) throw new ErreurTache("memoire_absente");
-    const avant = dechiffrer<DonneesMemoire>(ligne.data);
+    const avant = coffre.lire("memories.data", ligne.data);
     const lignes = new Map(avant.lignes);
     const suivant = { n: avant.suivant };
     const nouveau = rendreNouveau(ech, h, lignes, suivant);
@@ -422,7 +422,7 @@ async function memoireMaj(story: Ligne, t: Tache) {
     const donnees: DonneesMemoire = { etat, lignes: gardees, suivant: suivant.n, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
     const ecrite = await db()
       .update(schema.memories)
-      .set({ data: chiffrer(donnees), version: ligne.version + 1, updatedAt: new Date() })
+      .set({ data: coffre.ecrire("memories.data", donnees), version: ligne.version + 1, updatedAt: new Date() })
       .where(and(eq(schema.memories.storyId, story.id), eq(schema.memories.version, ligne.version)))
       .returning({ version: schema.memories.version });
     if (ecrite.length) return;
@@ -514,7 +514,7 @@ export async function executerChaine(storyId: string): Promise<void> {
       const pris = await prendre(t.id);
       if (!pris) return;
       /* Un échec (l’API surchargée, une coupure) : on laisse passer quelques secondes avant de réessayer */
-      if (!(await executer(pris))) await new Promise((r) => setTimeout(r, 3000 * pris.attempts));
+      if (!(await executer(pris))) await pause(3000 * pris.attempts);
     }
   });
 }

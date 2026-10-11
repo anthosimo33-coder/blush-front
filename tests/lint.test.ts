@@ -50,6 +50,22 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     }
   });
 
+  it("chiffrer et déchiffrer seulement par le coffre : par l’alias, en chemin relatif ou d’un coup (`* as`)", async () => {
+    expect(await regles("src/server/stats.ts", `import { dechiffrer } from "./chiffrement";\nexport const x = dechiffrer;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/server/ia/voix.ts", `import { chiffrerOctets } from "../chiffrement";\nexport const x = chiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/api/rapport/route.ts", `import { chiffrer } from "@/server/chiffrement";\nexport const x = chiffrer;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/rapport/page.tsx", `import * as c from "../../server/chiffrement";\nexport const x = c;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/apercu/page.tsx", `import { dechiffrerOctets } from "@/server/chiffrement";\nexport const x = dechiffrerOctets;\n`)).toEqual(["no-restricted-imports"]);
+  });
+
+  it("le coffre chiffre ; les empreintes et les jetons restent libres ; les dernières exceptions gardent les autres règles", async () => {
+    expect(await regles("src/server/coffre.ts", `import { chiffrer, dechiffrer } from "./chiffrement";\nexport const x = [chiffrer, dechiffrer];\n`)).toEqual([]);
+    expect(await regles("src/server/stats.ts", `import { empreinte, jeton } from "./chiffrement";\nexport const x = [empreinte, jeton];\n`)).toEqual([]);
+    expect(await regles("src/app/api/fiche/route.ts", `import { dechiffrer } from "@/server/chiffrement";\nexport const x = dechiffrer;\n`)).toEqual([]);
+    expect(await regles("src/server/coffre.ts", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual(["no-restricted-imports"]);
+    expect(await regles("src/app/apercu/page.tsx", `import { x } from "@/mocks";\nexport const y = x;\n`)).toEqual([]);
+  });
+
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual(["no-restricted-syntax"]);
     expect(await regles("prompts/lib/essai.ts", `import { NBSP } from "@/lib/format";\nexport const x = NBSP;\n`)).toEqual(["no-restricted-imports"]);

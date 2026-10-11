@@ -8,16 +8,11 @@ import { SUBSCRIPTIONS } from "@/contenu/offres";
 import { peut } from "@/lib/acces";
 import { pronomOppose } from "@/lib/pronom";
 import type { Account, EcritureRapport, EtatChapitre, ReportPayload } from "@/services/api";
-import type { Plan as Plan05, Verdict as Verdict04 } from "@prompts/lib/schemas";
+import type { Verdict as Verdict04 } from "@prompts/lib/schemas";
 import type { AnalysisProgress, Chapter, ConvSummary, Echec, Fiche, Plan, Story, VocalRapport } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
-/*
- * Seulement des types : la chaîne d’analyse (le SDK du modèle, tous les prompts) ne se charge qu’au moment de la
- * lancer (voir chaine()), pas à chaque première page d’une instance.
- */
-import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "./analyse";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
-import { dechiffrer } from "./chiffrement";
+import * as coffre from "./coffre";
 import { echecDe } from "./erreurs";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
@@ -83,7 +78,7 @@ export async function convsDe(utilisateur: Utilisateur, ouverte: Ligne | null): 
       .from(schema.stories)
       .where(inArray(schema.stories.id, ids)),
   ]);
-  const sortieDe = new Map(verdicts.map((v) => [v.storyId, dechiffrer<DonneesVerdict>(v.data).sortie]));
+  const sortieDe = new Map(verdicts.map((v) => [v.storyId, coffre.lire("verdicts.data", v.data).sortie]));
   const parleDe = new Map(derniers.map((d) => [d.storyId, d.at]));
   const maintenant = new Date();
   return lignes
@@ -241,7 +236,7 @@ const enTete = (sortie: Verdict04): EnTete => ({
  */
 export async function contactDe(storyId: string): Promise<EnTete | null> {
   const [v] = await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
-  return v ? enTete(dechiffrer<DonneesVerdict>(v.data).sortie) : null;
+  return v ? enTete(coffre.lire("verdicts.data", v.data).sortie) : null;
 }
 
 /**
@@ -263,8 +258,8 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
     aLeRapport ? vocalLu(story.id) : null,
   ]);
   if (!v) return null;
-  const { sortie, scores } = dechiffrer<DonneesVerdict>(v.data);
-  const donnees = r?.data ? dechiffrer<DonneesRapport>(r.data) : null;
+  const { sortie, scores } = coffre.lire("verdicts.data", v.data);
+  const donnees = r?.data ? coffre.lire("reports.data", r.data) : null;
   const meta = metaDe(story);
   const autre = personnesDe(meta).autre.prenom;
   const ouvert = aLeRapport || sortie.mode_sobre;
@@ -285,7 +280,7 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
     ],
   };
   /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
-  const plan = ouvert && !donnees && r?.plan ? dechiffrer<Plan05>(r.plan) : null;
+  const plan = ouvert && !donnees && r?.plan ? coffre.lire("reports.plan", r.plan) : null;
   const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
   const verrouilles: Chapter[] = CHAPITRES_PAYANTS.map((n) => {
     const t = titres.get(n) ?? titreDAttente(n, autre);
@@ -295,7 +290,7 @@ export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: 
    * Pendant l’écriture, les chapitres déjà finis se lisent tout de suite, dans l’ordre : un chapitre prêt en avance
    * attend (dans la liste, « Prêt ») que ceux d’avant le soient aussi. Le chapitre 1 complet remplace le verdict seul.
    */
-  const partiels = new Map((ouvert && !donnees && r?.partiel ? dechiffrer<Chapter[]>(r.partiel) : []).map((c) => [c.number, c]));
+  const partiels = new Map((ouvert && !donnees && r?.partiel ? coffre.lire("reports.partiel", r.partiel) : []).map((c) => [c.number, c]));
   let suite = true;
   const enEcriture: Chapter[] = [partiels.get(1) ? { ...partiels.get(1)!, free: estOffert(1), locked: false } : verdictLibre];
   for (const c of verrouilles) {
@@ -355,9 +350,9 @@ export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account
  * La mémoire de l’histoire (après le rapport), ou null. Mémorisée le temps d’un rendu : l’accueil la lit pour la fiche
  * et pour les questions. (Une route /api la relit à chaque appel : `cache` n’y garde rien.)
  */
-export const memoireDe = cache(async (storyId: string): Promise<DonneesMemoire | null> => {
+export const memoireDe = cache(async (storyId: string): Promise<coffre.DonneesMemoire | null> => {
   const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
-  return m ? dechiffrer<DonneesMemoire>(m.data) : null;
+  return m ? coffre.lire("memories.data", m.data) : null;
 });
 
 /** Sa fiche, remplie par la mémoire. Avant la mémoire : vide, avec son prénom. */

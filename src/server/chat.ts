@@ -9,9 +9,9 @@ import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, LevelId } from "@/types";
-import { editionsBornees, type DonneesMemoire } from "./analyse";
+import { editionsBornees } from "./analyse";
 import { ErreurTache } from "./erreurs";
-import { chiffrer, chiffrerOctets, dechiffrer } from "./chiffrement";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { appeler, textesSysteme, type Avance } from "./ia/claude";
@@ -22,12 +22,6 @@ import { aujourdhuiParis } from "./temps";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
 
-/**
- * Ce qu’il a envoyé : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un export,
- * des captures), gardés pour la suite du fil ; `affiche`, ce que l’historique réaffiche (« (3 captures) »).
- */
-export type MessageToi = { texte: string; lignes?: string[]; affiche?: string };
-export type MessageBlush = { reponse: BlushAnswer; resume: string };
 const ECHANGES_DANS_LE_FIL = 6;
 /** Des messages envoyés avec un échange, le fil garde les derniers. */
 const LIGNES_DANS_LE_FIL = 15;
@@ -38,8 +32,8 @@ export { historique } from "./historique";
 async function fil(storyId: string): Promise<Fil> {
   const lignes = (await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, storyId)).orderBy(desc(schema.chatMessages.id)).limit(ECHANGES_DANS_LE_FIL * 2)).reverse();
   return lignes.map((l) => {
-    if (l.role !== "toi") return { de: "blush" as const, texte: dechiffrer<MessageBlush>(l.data).resume };
-    const toi = dechiffrer<MessageToi>(l.data);
+    if (l.role !== "toi") return { de: "blush" as const, texte: coffre.lire("chat_messages.data:blush", l.data).resume };
+    const toi = coffre.lire("chat_messages.data:toi", l.data);
     return { de: "toi" as const, texte: toi.texte, ...(toi.lignes?.length ? { lignes: toi.lignes } : {}) };
   });
 }
@@ -66,7 +60,7 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
     const duree = Math.max(0.5, ...alignement.character_end_times_seconds);
     const [v] = await db()
       .insert(schema.chatVocals)
-      .values({ storyId: story.id, voix, audio: chiffrerOctets(audio), dureeMs: Math.round(duree * 1000) })
+      .values({ storyId: story.id, voix, audio: coffre.ecrireAudio(audio), dureeMs: Math.round(duree * 1000) })
       .returning({ id: schema.chatVocals.id });
     return { audio: `/api/vocal/chat/${v.id}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
   } catch (e) {
@@ -121,7 +115,7 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, MessageA
  */
 export async function repondre(
   story: Ligne,
-  memoire: DonneesMemoire,
+  memoire: coffre.DonneesMemoire,
   ditBrut: string,
   ajout?: { ajout: Ajout; affiche: string },
   {
@@ -193,9 +187,9 @@ export async function repondre(
       {
         storyId: story.id,
         role: "toi",
-        data: chiffrer({ texte: dit, ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}) } satisfies MessageToi),
+        data: coffre.ecrire("chat_messages.data:toi", { texte: dit, ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}) }),
       },
-      { storyId: story.id, role: "blush", data: chiffrer({ reponse, resume: resumeGarde } satisfies MessageBlush) },
+      { storyId: story.id, role: "blush", data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde }) },
     ])
     .returning({ id: schema.chatMessages.id, role: schema.chatMessages.role });
   /* L’échange (l’id de ton message) part avec la réponse : de quoi la partager en image ensuite */
@@ -213,7 +207,7 @@ export async function repondre(
   if (vocal && blushId !== undefined)
     await db()
       .update(schema.chatMessages)
-      .set({ data: chiffrer({ reponse: { ...reponse, vocal }, resume: resumeGarde } satisfies MessageBlush) })
+      .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde }) })
       .where(eq(schema.chatMessages.id, blushId));
   if (voix) surEvenement?.({ vocal });
   return { reponse: { ...reponse, ...(vocal ? { vocal } : {}), echange: echangeId }, majMemoire };

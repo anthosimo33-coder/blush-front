@@ -1,8 +1,7 @@
 import "server-only";
 import { and, desc, eq, lt } from "drizzle-orm";
 import type { BlushAnswer } from "@/types";
-import type { MessageBlush, MessageToi } from "./chat";
-import { dechiffrer } from "./chiffrement";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 
 /*
@@ -28,8 +27,9 @@ export async function historique(
   const echanges: EchangeAffiche[] = [];
   for (let i = 0; i < lignes.length - 1; i++) {
     if (lignes[i].role !== "toi" || lignes[i + 1].role !== "blush") continue;
-    const toi = dechiffrer<MessageToi>(lignes[i].data);
-    echanges.push({ id: lignes[i].id, mine: toi.affiche ?? toi.texte, answer: dechiffrer<MessageBlush>(lignes[i + 1].data).reponse, at: lignes[i].createdAt.getTime() });
+    const toi = coffre.lire("chat_messages.data:toi", lignes[i].data);
+    const blush = coffre.lire("chat_messages.data:blush", lignes[i + 1].data);
+    echanges.push({ id: lignes[i].id, mine: toi.affiche ?? toi.texte, answer: blush.reponse, at: lignes[i].createdAt.getTime() });
   }
   /* Le mode vocal, tel qu’il est en base : « Repasser à l’écrit » le coupe sans nouvelle réponse */
   if (modeVocal !== undefined) return { echanges, plus: lignes.length === limite, modeVocal };

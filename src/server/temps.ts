@@ -14,3 +14,21 @@ export function jourRelatif(quand: Date, maintenant = new Date()): string {
   const format = ecart < 7 ? ({ weekday: "short" } as const) : ({ day: "numeric", month: "short" } as const);
   return new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", ...format }).format(quand);
 }
+
+/** Attendre `ms` millisecondes (sans rien bloquer d’autre). */
+type Pause = (ms: number) => Promise<void>;
+const dormir: Pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
+/*
+ * Sous vitest (NODE_ENV vaut « test », lu au chargement), les pauses ne dorment pas : une chaîne relancée trois fois y
+ * dormait 3 + 6 + 9 s. Un test qui veut les compter passe la sienne (definirPause).
+ */
+const parDefaut: Pause = process.env.NODE_ENV === "test" ? () => Promise.resolve() : dormir;
+let pauseCourante = parDefaut;
+
+/** La pause avant un nouvel essai : la chaîne après une tâche en échec, la voix après une erreur passagère. */
+export const pause: Pause = (ms) => pauseCourante(ms);
+
+/** Pour les tests : une autre pause (null : celle par défaut). */
+export function definirPause(p: Pause | null) {
+  pauseCourante = p ?? parDefaut;
+}

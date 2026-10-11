@@ -15,12 +15,15 @@ import type { VerdictPartage } from "./partages";
 const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 1080, height: 1920 } } as const;
 export type Format = keyof typeof TAILLES;
 
-/* Des chemins écrits en entier : le build n’embarque que ces trois fichiers dans la fonction (pas tout le projet) */
+/*
+ * Des chemins écrits en entier : le build n’embarque que ces trois fichiers dans la fonction (pas tout le projet).
+ * La bulle de la marque, en data-URL, faite une fois par instance (les cartes la dessinent toutes).
+ */
 export const ressources = Promise.all([
   readFile(join(process.cwd(), "assets/fonts/Nunito-Black.ttf")),
   readFile(join(process.cwd(), "assets/fonts/Nunito-ExtraBold.ttf")),
   readFile(join(process.cwd(), "public/mail/bulle.png")),
-]);
+]).then(([noir, extra, png]) => ({ noir, extra, bulle: `data:image/png;base64,${png.toString("base64")}` }));
 
 export const ENCRE = "#121214";
 export const DOUX = "#4B4A47";
@@ -54,8 +57,7 @@ const taille = (titre: string, grand: number) => Math.round(titre.length > 64 ? 
  * lien doit repasser par le serveur, qui le compte).
  */
 export async function carteVerdict(v: VerdictPartage, format: Format, cache = "public, max-age=60"): Promise<ImageResponse> {
-  const [noir, extra, png] = await ressources;
-  const bulle = `data:image/png;base64,${png.toString("base64")}`;
+  const { noir, extra, bulle } = await ressources;
   const story = format === "story";
 
   /* La marque : la bulle en volume, en grand, et l’adresse du site (c’est elle qu’on retient) */

@@ -5,6 +5,7 @@ import { db, schema } from "../db";
 import type { Voix } from "@/types";
 import { env } from "../env";
 import { delaiAppel, tempsRestant } from "../echeance";
+import { pause } from "../temps";
 
 /*
  * La voix de BLUSH (ElevenLabs) : le seul endroit qui lui parle. Elle reçoit le script du vocal (des prénoms et des
@@ -70,7 +71,7 @@ export async function dire(texte: string, voix: Voix, { sobre, storyId }: { sobr
     /* Jamais le corps de l’erreur dans les logs : il peut reprendre le texte */
     const statut = r?.status ?? 0;
     if (essai >= 2 || (statut >= 400 && statut < 500 && statut !== 429)) throw new ErreurVoix(`voix_${statut || "reseau"}`);
-    await new Promise((ok) => setTimeout(ok, 2000 * (essai + 1)));
+    await pause(2000 * (essai + 1));
   }
 }
 

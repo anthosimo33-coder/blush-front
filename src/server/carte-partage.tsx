@@ -16,8 +16,7 @@ const TAILLE_STORY = { width: 1080, height: 1920 } as const;
 const couper = (t: string, max: number) => (t.length <= max ? t : `${t.slice(0, max).replace(/\s+\S*$/, "")}…`);
 
 async function story(contenu: ReactNode): Promise<ImageResponse> {
-  const [noir, extra, png] = await ressources;
-  const bulle = `data:image/png;base64,${png.toString("base64")}`;
+  const { noir, extra, bulle } = await ressources;
   return new ImageResponse(
     (
       /* Rien d’important dans les 250 px du haut et du bas, où Instagram pose ses boutons */
@@ -50,8 +49,7 @@ async function story(contenu: ReactNode): Promise<ImageResponse> {
 
 /** Une réponse de BLUSH dans le chat : ta question (bulle bleue, à droite), puis ses bulles (blanches, à gauche). */
 export async function carteReponse({ question, bulles }: { question: string | null; bulles: string[] }): Promise<ImageResponse> {
-  const [, , png] = await ressources;
-  const logo = `data:image/png;base64,${png.toString("base64")}`;
+  const { bulle } = await ressources;
   /* Les premières bulles, tant qu’elles tiennent (environ 420 caractères) */
   const gardees: string[] = [];
   let place = 420;
@@ -71,7 +69,7 @@ export async function carteReponse({ question, bulles }: { question: string | nu
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 18 }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- dessin de l’image, pas une page */}
-        <img src={logo} width={78} height={78} alt="" style={{ marginBottom: 6 }} />
+        <img src={bulle} width={78} height={78} alt="" style={{ marginBottom: 6 }} />
         <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 820 }}>
           {gardees.map((b, k) => (
             <div

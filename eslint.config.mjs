@@ -26,26 +26,49 @@ const PAS_DE_PROCESS_ENV = [
   { selector: ":not(MemberExpression) > MemberExpression[object.name='process'][property.name='env']", message: LA_CONFIG },
 ];
 
+/*
+ * L’appli tourne toujours sur son back-end : jamais de données factices dans son code (le contenu du produit est dans
+ * src/contenu). Les seules qui restent servent aux aperçus (src/app/apercu, jamais sur Vercel : src/proxy.ts) : aucun
+ * autre fichier ne les importe. src/mocks n’existe plus : la règle empêche seulement qu’il revienne.
+ */
+const PAS_DE_MOCKS = { group: ["@/mocks", "@/mocks/*"], message: "Pas de données factices dans l’appli : le contenu du produit vit dans src/contenu." };
+const PAS_D_APERCU = { group: ["@/app/apercu", "@/app/apercu/*", "**/apercu/*"], message: "Les aperçus (/apercu) gardent des données fictives : aucun écran de l’appli ne les importe." };
+/*
+ * Chiffrer et déchiffrer passent par le coffre (src/server/coffre.ts), qui sait ce que garde chaque colonne : ailleurs,
+ * chiffrement.ts ne sert qu’à ses empreintes et ses jetons. Par l’alias, ou en chemin relatif depuis src/server.
+ */
+const PAR_LE_COFFRE = {
+  regex: "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$",
+  importNames: ["chiffrer", "chiffrerCompresse", "chiffrerOctets", "dechiffrer", "dechiffrerOctets"],
+  message: "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio).",
+};
+/* Les dernières à passer par le coffre (lot 3a) : trois routes, la liste d’attente et les messages ajoutés */
+const PAS_ENCORE_PAR_LE_COFFRE = [
+  "src/app/api/fiche/route.ts",
+  "src/app/api/partage/image/route.ts",
+  "src/app/api/vocal/chat/*/route.ts",
+  "src/server/attente.ts",
+  "src/server/ajouts.ts",
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // L’appli tourne toujours sur son back-end : jamais de données factices dans son code (le contenu du produit est dans src/contenu).
-  // Les seules qui restent servent aux aperçus (src/app/apercu, jamais sur Vercel : src/proxy.ts) : aucun autre fichier ne les importe.
-  // src/mocks n’existe plus : la règle empêche seulement qu’il revienne.
+  // Ni données factices, ni aperçus, ni chiffrement hors du coffre (PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE). Les deux
+  // blocs suivants reprennent ces motifs : un bloc qui redonne no-restricted-imports remplace toute sa liste.
   {
     files: ["src/**"],
-    ignores: ["src/app/apercu/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            { group: ["@/mocks", "@/mocks/*"], message: "Pas de données factices dans l’appli : le contenu du produit vit dans src/contenu." },
-            { group: ["@/app/apercu", "@/app/apercu/*", "**/apercu/*"], message: "Les aperçus (/apercu) gardent des données fictives : aucun écran de l’appli ne les importe." },
-          ],
-        },
-      ],
-    },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE] }] },
+  },
+  // Les aperçus (src/app/apercu) gardent leurs données fictives, sans chiffrer pour autant.
+  {
+    files: ["src/app/apercu/**"],
+    rules: { "no-restricted-imports": ["error", { patterns: [PAR_LE_COFFRE] }] },
+  },
+  // Le coffre chiffre, comme ce qui n’y passe pas encore (PAS_ENCORE_PAR_LE_COFFRE).
+  {
+    files: ["src/server/coffre.ts", ...PAS_ENCORE_PAR_LE_COFFRE],
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
   },
   // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), et la configuration lue à ses deux seuls endroits
   // (PAS_DE_PROCESS_ENV). Les deux blocs suivants reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax

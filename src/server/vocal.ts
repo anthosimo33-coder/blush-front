@@ -4,16 +4,17 @@ import { messagesAffiches } from "@prompts/lib/front";
 import type { Vocal } from "@prompts/lib/schemas";
 import { minuter, texteDit } from "@/lib/vocal";
 import type { EvenementEcoute, VocalLigne, VocalRapport, Voix } from "@/types";
-import { chiffrer, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
+import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
 import { dire, voixPour } from "./ia/voix";
 
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
- * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres.
+ * test, on le minute d’après l’audio, et on garde les deux, chiffrés. Le front le lit avec ses sous-titres. La forme
+ * du script gardé est dans le coffre (src/server/coffre.ts, DonneesVocal) ; les tests la lisent encore ici.
  */
-export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version?: number };
+export type { DonneesVocal } from "./coffre";
 
 /**
  * La version du script (prompt 06). Quand le prompt change, on l’augmente : les vocaux faits avant se refont à leur
@@ -28,10 +29,11 @@ export async function vocalLu(storyId: string): Promise<{ pret: Extract<VocalRap
     .from(schema.vocals)
     .where(eq(schema.vocals.storyId, storyId));
   if (!v) return null;
-  const d = dechiffrer<DonneesVocal>(v.data);
+  /* Un vocal d’avant la version 2 n’en a pas : le coffre le relit en version 1 */
+  const d = coffre.lire("vocals.data", v.data);
   return {
     pret: { etat: "pret", audio: `/api/vocal/audio?conv=${storyId}&v=${v.createdAt.getTime().toString(36)}`, duree: v.dureeMs / 1000, voix: v.voix, sobre: d.sobre, lignes: d.lignes },
-    aJour: (d.version ?? 1) >= VERSION_VOCAL,
+    aJour: d.version >= VERSION_VOCAL,
     fait: v.createdAt,
   };
 }
@@ -57,8 +59,8 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
     return recu ? { ...l, recu } : l;
   });
   const fin = Math.max(...alignement.character_end_times_seconds, ...minutees.map((l) => l.fin));
-  const donnees: DonneesVocal = { sobre, lignes: minutees, version: VERSION_VOCAL };
-  const valeurs = { voix, data: chiffrer(donnees), audio: chiffrerOctets(audio), dureeMs: Math.round(fin * 1000), createdAt: new Date() };
+  const data = coffre.ecrire("vocals.data", { sobre, lignes: minutees, version: VERSION_VOCAL });
+  const valeurs = { voix, data, audio: coffre.ecrireAudio(audio), dureeMs: Math.round(fin * 1000), createdAt: new Date() };
   /* Un vocal d’une version plus ancienne est remplacé (sa nouvelle date change l’adresse de l’audio) */
   await db()
     .insert(schema.vocals)
@@ -118,7 +120,7 @@ export async function audioDuCompte(userId: string, storyId: string): Promise<{ 
   const chiffre = l.chiffre ?? garde?.chiffre;
   if (!chiffre) return { audio: null };
   garder(storyId, l.fait.getTime(), chiffre);
-  return { audio: dechiffrerOctets(chiffre) };
+  return { audio: coffre.lireAudio(chiffre) };
 }
 
 /** Note un moment de l’écoute (pour comparer les deux voix). Sans vocal, rien. */

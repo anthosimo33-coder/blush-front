@@ -27,48 +27,53 @@ function deriver() {
 let derivees: ReturnType<typeof deriver> | null = null;
 const cles = () => (derivees ??= deriver());
 
-export function chiffrer(valeur: unknown): Buffer {
+/** Chiffre des octets dans un format : [format][iv][tag][texte chiffré]. */
+function sceller(format: number, clair: Buffer): Buffer {
   const iv = randomBytes(12);
   const c = createCipheriv("aes-256-gcm", cles().chiffrement, iv);
-  const corps = Buffer.concat([c.update(JSON.stringify(valeur), "utf8"), c.final()]);
-  return Buffer.concat([Buffer.from([VERSION]), iv, c.getAuthTag(), corps]);
+  const corps = Buffer.concat([c.update(clair), c.final()]);
+  return Buffer.concat([Buffer.from([format]), iv, c.getAuthTag(), corps]);
 }
+
+/** Les octets en clair d’une donnée chiffrée (le tag est vérifié : une donnée modifiée est refusée). */
+function ouvrir(b: Buffer): Buffer {
+  const d = createDecipheriv("aes-256-gcm", cles().chiffrement, b.subarray(1, 13));
+  d.setAuthTag(b.subarray(13, 29));
+  return Buffer.concat([d.update(b.subarray(29)), d.final()]);
+}
+
+const json = (valeur: unknown) => Buffer.from(JSON.stringify(valeur), "utf8");
+
+/*
+ * Ce module ne connaît que des octets et du JSON. Ce que garde chaque colonne est dans le coffre (src/server/coffre.ts,
+ * lire et ecrire) : dans src, seul lui appelle les cinq fonctions suivantes (eslint.config.mjs, avec les exceptions
+ * qui restent).
+ */
+
+/** Chiffre des octets bruts (l’audio du vocal), sans passer par le JSON. */
+export const chiffrerOctets = (octets: Buffer): Buffer => sceller(VERSION, octets);
+
+/** Chiffre une valeur, écrite en JSON : les mêmes octets que `chiffrerOctets`, une fois le JSON écrit. */
+export const chiffrer = (valeur: unknown): Buffer => chiffrerOctets(json(valeur));
 
 /**
  * Comme `chiffrer`, après avoir compressé le JSON. Pour la conv brute : un chiffré ne se compresse plus, et sans ça un
  * texte très répétitif, envoyé compressé (quelques Ko), prenait sa pleine taille en base (des dizaines de Mo). Une vraie
  * conv y prend aussi plusieurs fois moins de place. `dechiffrer` relit les deux formats.
  */
-export function chiffrerCompresse(valeur: unknown): Buffer {
-  const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", cles().chiffrement, iv);
-  const corps = Buffer.concat([c.update(deflateRawSync(Buffer.from(JSON.stringify(valeur), "utf8"))), c.final()]);
-  return Buffer.concat([Buffer.from([COMPRESSE]), iv, c.getAuthTag(), corps]);
-}
+export const chiffrerCompresse = (valeur: unknown): Buffer => sceller(COMPRESSE, deflateRawSync(json(valeur)));
 
 export function dechiffrer<T>(donnee: Buffer | Uint8Array): T {
   const b = Buffer.from(donnee);
   if (b[0] !== VERSION && b[0] !== COMPRESSE) throw new Error(`Version de chiffrement inconnue : ${b[0]}`);
-  const d = createDecipheriv("aes-256-gcm", cles().chiffrement, b.subarray(1, 13));
-  d.setAuthTag(b.subarray(13, 29));
-  const clair = Buffer.concat([d.update(b.subarray(29)), d.final()]);
+  const clair = ouvrir(b);
   return JSON.parse((b[0] === COMPRESSE ? inflateRawSync(clair, { maxOutputLength: DECOMPRESSE_MAX }) : clair).toString("utf8")) as T;
-}
-
-/** Le même chiffrement pour des octets bruts (l’audio du vocal), sans passer par le JSON. */
-export function chiffrerOctets(octets: Buffer): Buffer {
-  const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", cles().chiffrement, iv);
-  const corps = Buffer.concat([c.update(octets), c.final()]);
-  return Buffer.concat([Buffer.from([VERSION]), iv, c.getAuthTag(), corps]);
 }
 
 export function dechiffrerOctets(donnee: Buffer | Uint8Array): Buffer {
   const b = Buffer.from(donnee);
   if (b[0] !== VERSION) throw new Error(`Version de chiffrement inconnue : ${b[0]}`);
-  const d = createDecipheriv("aes-256-gcm", cles().chiffrement, b.subarray(1, 13));
-  d.setAuthTag(b.subarray(13, 29));
-  return Buffer.concat([d.update(b.subarray(29)), d.final()]);
+  return ouvrir(b);
 }
 
 /** Empreinte d’un secret (jeton, code) : on ne garde que ça en base. */
