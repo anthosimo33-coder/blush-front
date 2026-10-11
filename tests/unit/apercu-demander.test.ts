@@ -111,15 +111,19 @@ describe("/apercu/demander : ce poste seulement", () => {
     expect(JSON.parse(args[args.indexOf("--historique") + 1])).toEqual([]);
     writeFileSync(join(dossier, "muet.mjs"), `console.log("@@BLUSH@@" + JSON.stringify(${reponse("null")}));`);
     writeFileSync(join(dossier, "illisible.mjs"), `console.log("@@BLUSH@@{ pas du json");`);
+    /* Un ancien lanceur (lancer.mjs), qui rendait la réponse déjà en bulles */
+    writeFileSync(join(dossier, "ancien.mjs"), `console.log("@@BLUSH@@" + JSON.stringify({ kind: "bubbles", bubbles: [{ text: "salut" }] }));`);
     const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      for (const lanceur of ["absent.mjs", "muet.mjs", "illisible.mjs"]) {
+      for (const lanceur of ["absent.mjs", "muet.mjs", "illisible.mjs", "ancien.mjs"]) {
         configurer(lanceur);
         const r = await POST(demande({ text: "salut" }));
         expect(r.status, lanceur).toBe(200);
         expect(await r.json(), lanceur).toEqual(PAS_DE_REPONSE);
       }
-      expect(erreur).toHaveBeenCalledTimes(3);
+      expect(erreur).toHaveBeenCalledTimes(4);
+      /* Une réponse d’un autre format dit pourquoi : le lanceur à changer */
+      expect(erreur.mock.calls.slice(2).map(([m]) => String(m).startsWith("format de lanceur inconnu"))).toEqual([true, true]);
     } finally {
       erreur.mockRestore();
     }

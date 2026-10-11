@@ -13,6 +13,9 @@ import { FIL_MAX, PAS_DE_REPONSE, TEXTE_MAX } from "./bornes";
 
 export const dynamic = "force-dynamic";
 
+/** Le temps laissé au lanceur pour une réponse : au-delà, il est arrêté et la question reste sans réponse. */
+const DELAI_MAX = 180_000;
+
 /* `lanceur` : prompts/evals/lancer.mts ; `memoires` : le dossier des mémoires des convs de test (une par conv, `01.json`…) */
 type Config = { lanceur: string; cas: string; memoire: string; memoires?: string; cle: string; workspace?: string };
 
@@ -53,7 +56,8 @@ export async function POST(req: Request) {
     ...(conf.workspace ? { ANTHROPIC_WORKSPACE_ID: (await readFile(conf.workspace, "utf8")).trim() } : {}),
   };
   const sortie = await new Promise<string>((ok, ko) => {
-    const p = spawn(process.execPath, ["--import", "tsx", conf.lanceur, "10", ...quelle, "--demande", text, "--historique", JSON.stringify(history)], { env });
+    /* La question est la valeur de --demande, même si elle commence par « -- » : le lanceur lit ses options ainsi (lancer.mts) */
+    const p = spawn(process.execPath, ["--import", "tsx", conf.lanceur, "10", ...quelle, "--demande", text, "--historique", JSON.stringify(history)], { env, timeout: DELAI_MAX });
     let s = "";
     p.stdout.on("data", (d) => (s += d));
     p.stderr.on("data", (d) => (s += d));
@@ -63,7 +67,8 @@ export async function POST(req: Request) {
   const ligne = sortie.split("\n").find((l) => l.startsWith("@@BLUSH@@"));
   const lu = ligne ? reponseLue(ligne.slice("@@BLUSH@@".length)) : null;
   if (!lu?.sortie) {
-    console.error(sortie.slice(-1500));
+    /* Une réponse d’un autre format : un ancien lanceur (lancer.mjs), qui mettait lui-même la réponse en bulles */
+    console.error(ligne && !lu ? `format de lanceur inconnu : le champ « lanceur » de BLUSH_DEMANDER doit pointer vers prompts/evals/lancer.mts (${conf.lanceur})` : sortie.slice(-1500));
     return Response.json(PAS_DE_REPONSE);
   }
   return Response.json(bullesAffichees(lu.sortie, messagesAffiches(new Map(lu.lignes), lu.prenom)));

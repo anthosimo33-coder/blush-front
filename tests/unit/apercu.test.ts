@@ -6,6 +6,7 @@ import { SortiesDuBanc } from "@prompts/lib/apercu";
 import { Sortie05, Sortie10, type ReponseChat, type Verdict } from "@prompts/lib/schemas";
 import { TITRE_DU_VERDICT } from "@/contenu/chapitres";
 import { apercuDe, lireApercu, lireTous } from "@/server/apercu";
+import { sobreAffiche } from "@/server/ecrans/rapport";
 import { enTete } from "@/server/presentation/rapport";
 import { chapitre, memoire } from "../aide/fabriques";
 
@@ -128,6 +129,23 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
     expect(quotidien).toMatchObject({ mine: "je lui réponds quoi ?", answer: { incoming: [SAMEDI], bubbles: [{ text: "elle te tend la perche", messages: [] }] } });
     expect(ouverture).not.toHaveProperty("mine");
     expect(ouverture.answer).not.toHaveProperty("incoming");
+  });
+
+  it("le mode sobre : le rapport doux de l’appli (ses libellés), sans chapitres", () => {
+    const verdict: Verdict = { ...VERDICT, alerte: "detresse", mode_sobre: true, emoji: null };
+    const sobre = { intro: "On met les vannes de côté.", titre: "Ce qui se passe", faits: "Léa ne répond plus.", preuves: ["m0007"], reassurance: "Ce n’est pas toi.", gestes: ["Parle à un ami"], brouillon: null };
+    const { payload } = apercuDe(sorties({ verdict, rapport: Sortie05.parse({ ...RAPPORT, alerte: "detresse", mode_sobre: true, chapitres: null, sobre }) }));
+    expect(payload.report.chapters).toEqual([]);
+    expect(payload.sober).toEqual(sobreAffiche({ sobre }));
+    expect(payload.sober).toMatchObject({ title: "Ce qui se passe", steps: ["Parle à un ami"], draft: "" });
+  });
+
+  it("des captures : la conv se décrit par ses captures, pas comme un export", () => {
+    const texte = ["# captures · instagram · 3 captures", "== 2026-03-01 10:00 ==", ...Array.from({ length: 24 }, (_, k) => `${k % 2 ? "Tom" : "Léa"}: message ${k}`)].join("\n");
+    const base = sorties();
+    const { story } = apercuDe(sorties({ texte, histoire: { ...base.histoire, appli: "instagram", format: "captures" } }));
+    expect(story).toMatchObject({ totalMessages: 24, voiceCount: 0 });
+    expect(story.sources[0]).toMatchObject({ app: "instagram", mode: "captures", screenshotCount: 3, label: "Instagram · 3 captures", messageCount: 24 });
   });
 
   it("sans mémoire : le rapport seul, ni fiche ni accueil", () => {

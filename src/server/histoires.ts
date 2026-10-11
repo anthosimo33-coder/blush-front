@@ -54,7 +54,7 @@ export type Ligne = Omit<LigneComplete, "conv" | "status">;
 export type LigneEcran = Ligne & { aConv: boolean };
 
 /** Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. */
-const resumeDe = (messages: Message[]): Meta["resume"] => ({
+export const resumeDe = (messages: Message[]): Meta["resume"] => ({
   debut: new Date(messages[0].t).toISOString().slice(0, 10),
   fin: new Date(messages.at(-1)!.t).toISOString().slice(0, 10),
   total: messages.length,

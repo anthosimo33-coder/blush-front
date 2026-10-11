@@ -2,7 +2,7 @@ import "server-only";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { SortiesDuBanc } from "@prompts/lib/apercu";
-import { chiffrer, jour, lire, rendre } from "@prompts/lib/conv";
+import { chiffrer, lire, rendre } from "@prompts/lib/conv";
 import { estFaite } from "@prompts/lib/memoire";
 import type { ReponseChat } from "@prompts/lib/schemas";
 import { estOffert } from "@/contenu/chapitres";
@@ -13,7 +13,7 @@ import { bullesAffichees } from "./ecrans/chat";
 import { ficheAffichee } from "./ecrans/fiche";
 import { messagesAffiches, resoudre } from "./ecrans/messages";
 import { chapitresAffiches, scores, sobreAffiche, tempsDeLecture } from "./ecrans/rapport";
-import type { Meta } from "./histoires";
+import { resumeDe, type Meta } from "./histoires";
 import { enTete } from "./presentation/rapport";
 
 /*
@@ -57,7 +57,7 @@ export function apercuDe(b: SortiesDuBanc): Apercu {
     format: h.format,
     fichier: "conv de test",
     participants: [h.utilisateur, h.autre].map((p) => ({ nom: p.nomExport, prenom: p.prenom, messages: tous.filter((m) => m.nom === p.nomExport).length })),
-    resume: { debut: jour(tous[0].t), fin: jour(tous.at(-1)!.t), total: tous.length, vocaux: tous.filter((m) => m.media === "vocal").length },
+    resume: resumeDe(tous),
     ...(h.format === "captures" ? { captures: lu.captures ?? 0 } : {}),
     moi: 0,
     pronom: h.utilisateur.pronom,
@@ -93,6 +93,13 @@ async function lireFichier(chemin: string): Promise<Apercu> {
   return "banc" in json ? apercuDe(SortiesDuBanc.parse(json)) : json;
 }
 
+/** Les convs d’un dossier d’aperçus (un fichier `NN.json` par conv), dans l’ordre. */
+const casDuDossier = async (dossier: string) =>
+  (await readdir(dossier))
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => f.slice(0, -5))
+    .sort();
+
 /**
  * `chemin` désigne un fichier (une conv) ou un dossier (une conv par fichier, `?cas=01`). C’est BLUSH_APERCU, que la
  * page lit (cheminDesApercus) et passe ici. Renvoie null sans aperçu.
@@ -100,18 +107,15 @@ async function lireFichier(chemin: string): Promise<Apercu> {
 export async function lireApercu(chemin: string | null, cas?: string): Promise<{ data: Apercu; cas: string | null; tous: string[] } | null> {
   if (!chemin) return null;
   if (!(await stat(chemin)).isDirectory()) return { data: await lireFichier(chemin), cas: null, tous: [] };
-  const tous = (await readdir(chemin))
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => f.slice(0, -5))
-    .sort();
+  const tous = await casDuDossier(chemin);
   const choisi = cas && tous.includes(cas) ? cas : tous[0];
   if (!choisi) return null;
   return { data: await lireFichier(join(chemin, `${choisi}.json`)), cas: choisi, tous };
 }
 
-/** Tous les aperçus du dossier, pour la liste. */
+/** Tous les aperçus du dossier, pour la liste : le dossier lu une fois, chaque fichier traduit une fois. */
 export async function lireTous(chemin: string | null): Promise<{ cas: string; data: Apercu }[]> {
-  const premier = await lireApercu(chemin);
-  if (!premier?.cas) return premier ? [{ cas: "", data: premier.data }] : [];
-  return Promise.all(premier.tous.map(async (cas) => ({ cas, data: (await lireApercu(chemin, cas))!.data })));
+  if (!chemin) return [];
+  if (!(await stat(chemin)).isDirectory()) return [{ cas: "", data: await lireFichier(chemin) }];
+  return Promise.all((await casDuDossier(chemin)).map(async (cas) => ({ cas, data: await lireFichier(join(chemin, `${cas}.json`)) })));
 }
