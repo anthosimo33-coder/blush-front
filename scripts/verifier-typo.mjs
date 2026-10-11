@@ -29,7 +29,8 @@ const GENERES = new Set(["src/server/ia/textes.generated.ts"]);
  * Les fichiers du serveur dont les textes ne s’affichent ni dans l’appli ni dans un mail : le rapport de la veille à
  * l’équipe (alertes.ts), ce que lit et écrit le modèle (ia/, modèle factice compris ; chat.ts et analyse.ts, qui lui
  * écrivent, la demande du chat telle qu’on l’a testée sur les évals) et env.ts, dont les messages vont aux logs. Les
- * alertes envoyées d’ailleurs (`alerter(…)`) se reconnaissent à l’appel (horsDesTextes).
+ * alertes et les lignes du journal écrites d’ailleurs (`alerter(…)`, `journal(…)`…) se reconnaissent à l’appel
+ * (horsDesTextes).
  */
 const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts|ia\/)/;
 
@@ -86,15 +87,21 @@ function texteExpression(e) {
 /* Le commentaire qui dispense une déclaration : une chaîne qui contient du code (le Worker de preparer-captures.ts) */
 const MARQUE = /typo\s*:\s*du code/;
 
+/*
+ * Les appels qui n’écrivent qu’à l’équipe : une alerte, le journal du serveur (src/server/journal.ts : journal,
+ * journalErreur, auMieux, et enLocal, ce que le développeur lit en local) et la trace du navigateur (tracer).
+ */
+const A_L_EQUIPE = new Set(["alerter", "journal", "journalErreur", "auMieux", "enLocal", "tracer"]);
+
 /**
- * Une chaîne qui n’est jamais affichée : un message de console.*, d’une erreur (`new …Error(…)`) ou d’une alerte à
- * l’équipe (`alerter(…)`), lu dans les logs ou par l’équipe ; ou une déclaration marquée `typo: du code` dans le
+ * Une chaîne qui n’est jamais affichée : un message de console.*, du journal, d’une erreur (`new …Error(…)`) ou d’une
+ * alerte à l’équipe (A_L_EQUIPE), lu dans les logs ou par l’équipe ; ou une déclaration marquée `typo: du code` dans le
  * commentaire qui la précède.
  */
 function horsDesTextes(n, source) {
   for (let p = n.parent; p; p = p.parent) {
     if (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ts.isIdentifier(p.expression.expression) && p.expression.expression.text === "console") return true;
-    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && p.expression.text === "alerter") return true;
+    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text)) return true;
     if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && p.expression.text.endsWith("Error")) return true;
     /* L’instruction qui contient la chaîne : le commentaire juste au-dessus d’elle peut la dispenser */
     if (p.parent && (ts.isSourceFile(p.parent) || ts.isBlock(p.parent))) return (ts.getLeadingCommentRanges(source, p.pos) ?? []).some((c) => MARQUE.test(source.slice(c.pos, c.end)));

@@ -126,6 +126,8 @@ describe("la boîte à mails des tests de bout en bout", () => {
 
   it("S-09 · au-delà de sa part du quota, un mail ne part pas : la réponse le dit, et le journal aussi", async () => {
     vi.stubEnv("VERCEL", "1");
+    /* Le modèle factice des tests serait ignoré sur Vercel, et le journal le dirait (env()) : ici, il n’y est pas */
+    vi.stubEnv("BLUSH_IA_FACTICE", "0");
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
     vi.stubEnv("RESEND_API_KEY", "re_cle_fictive");
     const envoi = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }));
@@ -135,7 +137,7 @@ describe("la boîte à mails des tests de bout en bout", () => {
     quota.libre = false;
     expect(await envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" }, { sorte: "attente" })).toBe(false);
     expect(envoi).toHaveBeenCalledOnce();
-    /* Les lignes du journal (du JSON), pas les avertissements de env() sur les variables des tests */
+    /* Les lignes du journal (du JSON) */
     const lignes = journal.mock.calls.map(([l]) => String(l)).filter((l) => l.startsWith("{"));
     expect(lignes.map((l) => JSON.parse(l) as Record<string, unknown>)).toEqual([expect.objectContaining({ evenement: "mail retenu", sorte: "attente", destinataires: 1 })]);
   });

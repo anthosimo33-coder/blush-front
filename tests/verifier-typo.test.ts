@@ -57,6 +57,11 @@ describe("la vérification de la typographie", () => {
     expect(ecran(`const c = "!size-10 !shadow-soft";`)).toEqual([]);
     expect(ecran(`console.error("alerte : envoi impossible");\nthrow new Error("useContact : hors de HomeScreen");`)).toEqual([]);
     expect(ecran("await alerter(`chat en échec`, [`Histoire ${id}`, `Erreur : ${e.message}`]);")).toEqual([]);
+    /* Le journal du serveur et la trace du navigateur : à l’équipe aussi */
+    expect(ecran(`journal("garde-fou : réponse remplacée", { histoire: id }, "alerte");\njournalErreur("code : non envoyé", e);`)).toEqual([]);
+    expect(ecran(`after(() => auMieux(() => inscrire(email), "liste d’attente : non inscrit"));\nenLocal(\`[dev] mail « \${sujet} » pour \${pour}\`);\ntracer("son : non joué", e);`)).toEqual([]);
+    /* Le même texte hors de ces appels reste lu */
+    expect(ecran(`const t = "liste d’attente : non inscrit";`)).toEqual([expect.stringContaining("espace normale avant « : »")]);
     expect(ecran("/* typo: du code */\nconst CODE = `const x = a ? b : c;`;")).toEqual([]);
   });
 
