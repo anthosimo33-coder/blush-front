@@ -10,10 +10,10 @@ import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, 
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
 import { estOffert } from "@/contenu/chapitres";
-import { avanceMoitie, avancePlan, avanceVerdict, chapitresFinis } from "./avancement";
+import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
-import type { AvanceMoitie, Genre } from "./db/enums";
+import type { DetailEcriture, Genre } from "./db/enums";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
@@ -35,13 +35,13 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
  */
 
 /*
- * Repris ici pour les modules qui les lisent encore à cette adresse (les routes, le chat, les ajouts, des tests et
- * scripts/essai-vrai-modele.mts) : le moteur est dans pipeline.ts, les formes gardées dans stockage/types.ts, les
- * jauges dans avancement.ts. Ces reprises partent au lot 3a.
+ * Repris ici pour les modules qui les lisent encore à cette adresse : le moteur est dans pipeline.ts, les formes
+ * gardées dans stockage/types.ts. Ces reprises partent au lot 9a (retrait des ré-exportations), ou avant, au fil des
+ * lots qui tiennent leurs importeurs : 3a (les routes), 5b (le chat, les ajouts), 7c (scripts/essai-vrai-modele.mts),
+ * et les tests de leurs zones.
  */
 export { executerChaine } from "./pipeline";
 export { editionsBornees, SUPPRIMEES_MAX, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
-export { avanceVerdict } from "./avancement";
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -181,6 +181,39 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
    */
 }
 
+/** Les deux moitiés du rapport : la première (chapitres 1 à 4) et la seconde (5 à 8), par leur premier chapitre. */
+type Moitie = 1 | 5;
+/** Les chapitres de la moitié qui commence à `premier` : de lui à CHAPITRES_PAR_MOITIE plus loin. */
+const dansLaMoitie = (n: number, premier: Moitie) => n >= premier && n < premier + CHAPITRES_PAR_MOITIE;
+
+/**
+ * Le suivi des deux moitiés pendant qu’elles s’écrivent : leur avancée, chapitre par chapitre, écrite en base (la
+ * lecture du rapport l’affiche), et chaque chapitre fini gardé tout de suite, prêt à lire, sans attendre la fin du
+ * rapport. `surAvance(premier, signal)` : le suivi du flux d’une moitié ; `enregistre()` : la fin des écritures en cours
+ * (l’une après l’autre).
+ */
+function suiviDesChapitres(story: Ligne, t: Tache, messages: ReturnType<typeof messagesAffiches>, lignesScores: LigneScore[]) {
+  const detail: DetailEcriture = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
+  const ecrire = ecrireAvance(t.id);
+  const prets = new Map<number, Chapitre>();
+  let enregistrement = Promise.resolve();
+  const garderPrets = () => {
+    const affiches = chapitresAffiches({ chapitres: [...prets.values()].sort((x, y) => x.numero - y.numero) } as Rapport, messages, lignesScores);
+    enregistrement = enregistrement
+      .then(() => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
+      .then(() => undefined, () => undefined);
+  };
+  const surAvance = (premier: Moitie, signal: AbortSignal) => (av: Avance) => {
+    if (signal.aborted) return;
+    detail[premier === 1 ? "a" : "b"] = avanceMoitie(av, premier);
+    ecrire(Math.round(100 * avanceChapitres(detail)), detail);
+    const nouveaux = chapitresFinis(av.ecrit).filter((c) => dansLaMoitie(c.numero, premier) && !prets.has(c.numero));
+    nouveaux.forEach((c) => prets.set(c.numero, c));
+    if (nouveaux.length) garderPrets();
+  };
+  return { surAvance, enregistre: () => enregistrement };
+}
+
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
 async function rapportChapitres(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
@@ -188,20 +221,9 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   const ligne = await lireRapport(story.id);
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
   const plan = coffre.lire("reports.plan", ligne.plan);
-  /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre (la lecture du rapport l’affiche) */
-  const detail: { a: AvanceMoitie; b: AvanceMoitie } = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
-  const ecrire = ecrireAvance(t.id);
-  /* Chaque chapitre fini est gardé tout de suite, prêt à lire : on n’attend pas la fin du rapport (écritures l’une après l’autre) */
   const h = histoireDe(metaDe(story));
-  const messages = messagesAffiches(rendu.lignes, h.utilisateur.prenom);
-  const prets = new Map<number, Chapitre>();
-  let enregistrement = Promise.resolve();
-  const garderPrets = () => {
-    const affiches = chapitresAffiches({ chapitres: [...prets.values()].sort((x, y) => x.numero - y.numero) } as Rapport, messages, v.scores);
-    enregistrement = enregistrement
-      .then(() => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
-      .then(() => undefined, () => undefined);
-  };
+  /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre */
+  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, h.utilisateur.prenom), v.scores);
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
@@ -212,15 +234,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
       rendu.lignes,
       story.id,
       "rapport_chapitres",
-      (av) => {
-        if (abandon.signal.aborted) return;
-        const premier = quels === "1 à 4" ? 1 : 5;
-        detail[premier === 1 ? "a" : "b"] = avanceMoitie(av, premier);
-        ecrire(Math.round(50 * (detail.a.progres + detail.b.progres)), detail);
-        const nouveaux = chapitresFinis(av.ecrit).filter((c) => c.numero >= premier && c.numero < premier + 4 && !prets.has(c.numero));
-        nouveaux.forEach((c) => prets.set(c.numero, c));
-        if (nouveaux.length) garderPrets();
-      },
+      suivi.surAvance(quels === "1 à 4" ? 1 : 5, abandon.signal),
       abandon.signal,
       (e) => !!e.chapitres?.length,
     ).catch((e: unknown) => {
@@ -240,9 +254,9 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
    */
   try {
     const [a, b] = await Promise.all([moitie("1 à 4"), moitie("5 à 8")]);
-    await enregistrement;
+    await suivi.enregistre();
     /* Chaque moitié ne garde que ses chapitres (1 à 4, 5 à 8), une fois chacun : un chapitre en double ou hors de sa moitié ne s’affiche pas deux fois */
-    const garder = (cs: Chapitre[] | null, de: number) => [...new Map((cs ?? []).filter((c) => c.numero >= de && c.numero < de + 4).map((c) => [c.numero, c])).values()];
+    const garder = (cs: Chapitre[] | null, de: Moitie) => [...new Map((cs ?? []).filter((c) => dansLaMoitie(c.numero, de)).map((c) => [c.numero, c])).values()];
     const [ca, cb] = [garder(a.chapitres, 1), garder(b.chapitres, 5)];
     if (!ca.length || !cb.length) throw new ErreurTache("chapitres_vides");
     const r: Rapport = {
@@ -318,7 +332,7 @@ async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | {
 
 /**
  * La tâche « vocal » : quand il n’a pas pu se faire pendant l’écriture, pour un rapport écrit avant le vocal, ou d’une
- * ancienne version du script. Sur le rapport fini ; les messages cités viennent de la conv tant qu’elle est là, sinon
+ * ancienne version du script. Sur le rapport fini (sans lui, elle rend la main) ; les messages cités viennent de la conv tant qu’elle est là, sinon
  * de la mémoire.
  */
 async function vocalTache(story: LigneComplete) {
@@ -326,7 +340,12 @@ async function vocalTache(story: LigneComplete) {
   const v = await lireVerdict(story.id);
   const ligne = await lireRapport(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
-  if (!ligne?.data) throw new ErreurTache("rapport_absent");
+  /*
+   * Pas encore de rapport : le plan seul est gardé (le vocal se fait pendant les chapitres), ou les chapitres ont échoué.
+   * Rien à dire sans erreur : la tâche, tentée, ne repart pas d’elle-même (vocalTente, src/server/chaine.ts), et le vocal
+   * s’écrira pendant les chapitres quand ils seront relancés. Une alerte « vocal en échec » n’aurait pas d’objet.
+   */
+  if (!ligne?.data) return;
   const r = coffre.lire("reports.data", ligne.data).sortie;
   let lignes: Map<string, string>;
   if (convDe(story)) lignes = choisir(relire(story).rendu.lignes, [...preuvesRapport(r), ...preuvesVerdict(v.sortie)]);

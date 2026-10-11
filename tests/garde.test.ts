@@ -25,18 +25,6 @@ describe("le mail du code", () => {
   });
 });
 
-describe("l’avancée du verdict", () => {
-  it("monte avec la réflexion sans dépasser 70, puis avec le verdict jusqu’à 98", async () => {
-    const { avanceVerdict } = await import("@/server/analyse");
-    const r = [0, 1000, 3000, 8000, 30000].map((reflexion) => avanceVerdict({ reflexion, texte: 0, ecrit: "" }));
-    expect(r[0]).toBe(15);
-    expect(r).toEqual([...r].sort((a, b) => a - b));
-    expect(Math.max(...r)).toBeLessThanOrEqual(70);
-    expect(avanceVerdict({ reflexion: 4000, texte: 350, ecrit: "" })).toBe(84);
-    expect(avanceVerdict({ reflexion: 4000, texte: 5000, ecrit: "" })).toBe(98);
-  });
-});
-
 describe("les trouvailles de la lecture", () => {
   it("disent qui ouvre et relance, leur mot à eux sans mot banal ni prénom, et rien de plat", async () => {
     const { readFileSync } = await import("node:fs");

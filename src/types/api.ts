@@ -24,7 +24,7 @@ export type EtatChapitre = "attente" | "en_cours" | "ecrit";
 /** Pendant que le rapport s’écrit : la vraie avancée, lue sur ce que le modèle écrit. */
 export type EcritureRapport = {
   etape: "plan" | "chapitres";
-  /** De 0 à 1 : le plan jusqu’à 0,3, puis les chapitres. */
+  /** De 0 à 1 : le plan jusqu’à 0,35 (PART_DU_PLAN, src/server/avancement.ts), puis les chapitres. */
   progres: number;
   chapitres: { number: number; title: string; etat: EtatChapitre }[];
   /** Le temps qui reste, estimé (« 1 min »), ou null tant qu’on ne sait pas. */

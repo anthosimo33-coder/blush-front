@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GENRES, type Genre, type StatutTache } from "@/server/db/enums";
-import { DUREES_MS, ECHEANCE_CHAINE_MS, suite, tempsPourCommencer, type EtatChaine } from "@/server/pipeline";
+import { DUREES_MS } from "@/server/avancement";
+import { ECHEANCE_CHAINE_MS, tempsPourCommencer } from "@/server/pipeline";
+import { suite, vocalTente, type EtatChaine } from "@/server/chaine";
 
 /*
- * La suite de la chaîne (src/server/pipeline.ts, `suite`) : ce qui vient après une étape, d’après ce qui est écrit
+ * La suite de la chaîne (src/server/chaine.ts, `suite`) : ce qui vient après une étape, d’après ce qui est écrit
  * et les tâches déjà lancées. Une règle pure, en table : chaque ligne est un moment de la vie d’une histoire. Sans
  * base ni modèle.
  */
@@ -46,8 +48,25 @@ const LIGNES: Ligne[] = [
   /* Le rapport */
   ["après le plan : les chapitres, et le vocal", etat({ plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), true, ["rapport_chapitres", "vocal"]],
   ["après le plan, sans voix : les chapitres", etat({ voix: false, plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), true, ["rapport_chapitres"]],
-  ["le plan en cours : il planifiera lui-même la suite", etat({ taches: taches({ verdict: "fini", rapport_plan: "en_cours" }) }), true, []],
+  ["le plan en cours : le moteur planifiera la suite à sa fin", etat({ taches: taches({ verdict: "fini", rapport_plan: "en_cours" }) }), true, []],
   ["le plan en échec : « Relancer l’écriture », pas ici", etat({ taches: taches({ verdict: "fini", rapport_plan: "echec" }) }), true, []],
+  /*
+   * L’accès retiré pendant le plan, puis rendu : la réparation planifie les chapitres et le vocal (comme après le plan,
+   * plus haut). Si les chapitres échouent pour de bon, la tâche vocal rend la main sans rapport (vocalTache,
+   * src/server/analyse.ts) : tentée, elle ne repart plus, et rien n’échoue.
+   */
+  [
+    "le plan gardé, les chapitres en échec, le vocal jamais tenté : le vocal, qui rendra la main sans rapport",
+    etat({ plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "echec" }) }),
+    true,
+    ["vocal"],
+  ],
+  [
+    "le plan gardé, les chapitres en échec, le vocal tenté sans rapport : plus rien",
+    etat({ plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "echec", vocal: "fini" }) }),
+    true,
+    [],
+  ],
   [
     "les chapitres en cours, le vocal fait pendant : rien",
     etat({ plan: true, vocal: VOCAL_A_JOUR, taches: taches({ verdict: "fini", rapport_plan: "fini", rapport_chapitres: "en_cours", vocal: "attente" }) }),
@@ -145,6 +164,15 @@ describe("la suite de la chaîne", () => {
       expect(new Set(genres).size).toBe(genres.length);
       for (const g of genres) if (g !== "vocal") expect(e.taches[g]).toBeUndefined();
     }
+  });
+});
+
+describe("le vocal tenté depuis le dernier fait", () => {
+  it("toute tâche compte sans vocal fait ; sinon, seulement une tâche planifiée après lui", () => {
+    expect(vocalTente(undefined, null)).toBe(false);
+    expect(vocalTente({ createdAt: T0 }, null)).toBe(true);
+    expect(vocalTente({ createdAt: T0 }, { fait: APRES })).toBe(false);
+    expect(vocalTente({ createdAt: APRES }, { fait: T0 })).toBe(true);
   });
 });
 

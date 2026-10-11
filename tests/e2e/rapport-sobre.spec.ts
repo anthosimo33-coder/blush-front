@@ -80,10 +80,11 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
 
 /*
  * Bug : avec une alerte, la scène du verdict se joue tant que le rapport doux n’est pas écrit. La scène ne regarde que le
- * rapport sobre (src/app/rapport/verdict/VerdictReveal.tsx:72-75), présent une fois le rapport doux écrit
- * (src/server/donnees.ts:315), alors que le verdict sait déjà qu’il y a une alerte (mode_sobre). Avec le vrai
- * modèle, le rapport doux s’écrit après le verdict : « Voir mon rapport », touché tout de suite, joue la mise en scène
- * (les cartes, les sons, l’emoji 🧊 par défaut) sur une alerte danger, puis le rapport en cours d’écriture.
+ * rapport sobre (src/app/rapport/verdict/VerdictReveal.tsx:72-75), présent une fois le rapport doux écrit (`sober`,
+ * assemblerRapport, src/server/presentation/rapport.ts), alors que le verdict sait déjà qu’il y a une alerte
+ * (mode_sobre). Avec le vrai modèle, le rapport doux s’écrit après le verdict : « Voir mon rapport », touché tout de
+ * suite, joue la mise en scène (les cartes, les sons, l’emoji 🧊 par défaut) sur une alerte danger, puis le rapport en
+ * cours d’écriture.
  */
 test.fixme("une alerte : pas de scène du verdict, même avant que le rapport doux soit écrit", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "sobre-tot");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avanceMoitie, avancePlan, avanceVerdict, chapitresCommences, chapitresFinis, etapeDeLecture, ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "@/server/avancement";
+import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresCommences, chapitresFinis, etapeDeLecture, ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "@/server/avancement";
 
 /*
  * Les jauges (src/server/avancement.ts) : où en est une étape, lu sur ce que le modèle a déjà écrit. Sans base ni
@@ -40,6 +40,26 @@ describe("l’avancée du rapport, lue sur ce que le modèle écrit", () => {
     expect(avanceMoitie(avance(quatre), 1)).toEqual({ progres: 0, ecrits: [], enCours: 1 });
     /* Un plan qui a annoncé ses huit chapitres plafonne à 98, jamais 100 avant la fin */
     expect(avancePlan(avance(Array.from({ length: 9 }, (_, k) => `{"numero":${k + 1}}`).join(",")))).toBe(98);
+  });
+
+  it("les chapitres avancent comme la moyenne des deux moitiés, et la première moitié finit au chapitre 4", () => {
+    const moitie = (progres: number) => ({ progres, ecrits: [], enCours: null });
+    expect(avanceChapitres(null)).toBe(0);
+    expect(avanceChapitres({ a: moitie(0.5), b: moitie(0.25) })).toBe(0.375);
+    expect(avanceChapitres({ a: moitie(0.98), b: moitie(0.98) })).toBe(0.98);
+    expect(CHAPITRES_PAR_MOITIE).toBe(4);
+    expect(avanceMoitie(avance('{"chapitres":[{"numero":4},{"numero":5}'), 1).enCours).toBe(4);
+  });
+});
+
+describe("l’avancée du verdict", () => {
+  it("monte avec la réflexion sans dépasser 70, puis avec le verdict jusqu’à 98", () => {
+    const r = [0, 1000, 3000, 8000, 30000].map((reflexion) => avanceVerdict({ reflexion, texte: 0, ecrit: "" }));
+    expect(r[0]).toBe(15);
+    expect(r).toEqual([...r].sort((a, b) => a - b));
+    expect(Math.max(...r)).toBeLessThanOrEqual(70);
+    expect(avanceVerdict({ reflexion: 4000, texte: 350, ecrit: "" })).toBe(84);
+    expect(avanceVerdict({ reflexion: 4000, texte: 5000, ecrit: "" })).toBe(98);
   });
 });
 

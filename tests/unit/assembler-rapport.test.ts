@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ChapitreAffiche, SobreAffiche } from "@prompts/lib/front";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
-import { CHAPITRES_PAYANTS } from "@/contenu/chapitres";
+import { CHAPITRES_PAYANTS, titreDAttente } from "@/contenu/chapitres";
 import type { Tache } from "@/server/taches";
-import { assemblerRapport, type RapportLu } from "@/server/donnees";
+import { assemblerRapport, type RapportLu } from "@/server/presentation/rapport";
 
 /*
- * Le rapport tel que le front l’affiche, assemblé d’après ce qui est lu (src/server/donnees.ts, assemblerRapport) :
+ * Le rapport tel que le front l’affiche, assemblé d’après ce qui est lu (src/server/presentation/rapport.ts) :
  * sans base ni modèle, sans rien planifier. Des exemples inventés : Tom importe sa conv avec Léa.
  */
 
@@ -123,9 +123,15 @@ describe("le mode sobre (S-25)", () => {
   });
 
   it("sans l’accès, pendant l’écriture : ni plan ni chapitre fini, même si la lecture en apportait", () => {
-    const r = assemblerRapport(lu({ verdict: { sortie: ALERTE, scores: [] }, partiels: [chapitre(2)], taches: { rapport_plan: tache("en_cours") } }));
+    const plan = { alerte: null, mode_sobre: false, these: "", decouvertes: [], chapitres: [{ numero: 2, titre: "SECRET", titre_court: "SECRET", surtitre: null, periode: "mars", scenes: [], epice: "doux" }] };
+    const r = assemblerRapport(lu({ verdict: { sortie: ALERTE, scores: [] }, plan, partiels: [chapitre(2)], taches: { rapport_plan: tache("en_cours") } }));
     expect(r.generating).toBe(true);
     expect(r.report.chapters.slice(1).every((c) => c.locked && !c.blocks.length)).toBe(true);
+    /* Les chapitres fermés, et ceux de l’écriture, gardent leurs titres d’attente : rien du plan */
+    const attente = CHAPITRES_PAYANTS.map((n) => titreDAttente(n, "Léa"));
+    expect(r.report.chapters.slice(1).map((c) => c.title)).toEqual(attente);
+    expect(r.ecriture?.chapitres.map((c) => c.title)).toEqual(attente);
+    expect(JSON.stringify(r)).not.toContain("SECRET");
   });
 
   it("avec l’accès : ce que le rapport garde", () => {

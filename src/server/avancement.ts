@@ -1,13 +1,13 @@
 import { Chapitre05, type Chapitre } from "@prompts/lib/schemas";
-import type { AvanceMoitie } from "./db/enums";
+import type { AvanceMoitie, DetailEcriture, Genre } from "./db/enums";
 import type { Avance } from "./ia/claude";
 
 /*
  * Les jauges : où en est une étape, lu sur ce que le modèle a déjà écrit (sa réflexion, puis sa réponse), et les seuils
  * des écrans qui les montrent (la lecture, l’écriture du rapport). Des calculs purs, sans base ni modèle : la chaîne
- * (analyse.ts) les écrit en base pendant l’appel, les écrans (donnees.ts) les relisent. Testés seuls
- * (tests/unit/avancement.test.ts). Les chiffres viennent des rapports de test : la longueur habituelle de chaque
- * sortie, et le rythme de la réflexion.
+ * (analyse.ts) les écrit en base pendant l’appel, les écrans (presentation/rapport.ts, donnees.ts) les relisent.
+ * Testés seuls (tests/unit/avancement.test.ts). Les chiffres viennent des rapports de test : la longueur habituelle de
+ * chaque sortie, et le rythme de la réflexion.
  */
 
 /* ———— Le verdict ———— */
@@ -73,8 +73,8 @@ const CHAPITRE_LONGUEUR = 2000;
 const CHAPITRE_EN_COURS_MAX = 0.95;
 /** Une moitié ne dit jamais 1 avant la fin de l’étape. */
 const MOITIE_PLAFOND = 0.98;
-/** Les chapitres d’une moitié (1 à 4, ou 5 à 8). */
-const CHAPITRES_PAR_MOITIE = 4;
+/** Les chapitres d’une moitié (1 à 4, ou 5 à 8) : la première finit au chapitre CHAPITRES_PAR_MOITIE. */
+export const CHAPITRES_PAR_MOITIE = 4;
 
 /**
  * Les chapitres déjà finis dans ce que le modèle a écrit : un chapitre est fini quand le suivant commence (le dernier,
@@ -102,6 +102,29 @@ export function avanceMoitie(a: Avance, premier: 1 | 5): AvanceMoitie {
   const chapitres = nums.length - 1 + Math.min(CHAPITRE_EN_COURS_MAX, dansLeChapitre / CHAPITRE_LONGUEUR);
   return { progres: Math.min(MOITIE_PLAFOND, MOITIE_REFLEXION + ((1 - MOITIE_REFLEXION) * chapitres) / CHAPITRES_PAR_MOITIE), ecrits: nums.slice(0, -1), enCours: nums.at(-1)! };
 }
+
+/**
+ * L’avancée des chapitres (0 à 1) : la moyenne des deux moitiés, qui s’écrivent en même temps. L’étape l’écrit en base
+ * (sur 100), l’écran de l’écriture la relit (ecritureDe, src/server/presentation/rapport.ts). 0 avant le premier suivi.
+ */
+export const avanceChapitres = (detail: DetailEcriture | null | undefined): number => (detail ? (detail.a.progres + detail.b.progres) / 2 : 0);
+
+/* ———— Les durées des étapes ———— */
+
+/**
+ * La durée habituelle de chaque étape, mesurée sur les rapports de test (ai_usage.ms donne celles de la production).
+ * Elle décide si une étape a le temps de commencer (tempsPourCommencer, src/server/pipeline.ts), et donne aux écrans
+ * le temps qui reste.
+ */
+export const DUREES_MS: Record<Genre, number> = {
+  verdict: 60_000,
+  rapport_plan: 55_000,
+  /* Les deux moitiés en même temps, et le vocal pendant ce temps */
+  rapport_chapitres: 100_000,
+  vocal: 45_000,
+  memoire: 90_000,
+  memoire_maj: 60_000,
+};
 
 /* ———— Ce que montrent les écrans ———— */
 

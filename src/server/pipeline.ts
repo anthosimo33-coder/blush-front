@@ -1,25 +1,27 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { after } from "next/server";
-import type { Verdict } from "@prompts/lib/schemas";
 import { peut } from "@/lib/acces";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
+import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
 import { ErreurTache, estRefus } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, planifier, prendre, type Tache } from "./taches";
+import type { DonneesVerdict } from "./stockage/types";
+import { suite, type EtatChaine } from "./chaine";
 import { pause } from "./temps";
 import { vocalLu } from "./vocal";
 
 /*
  * Le moteur des tâches : il prend les tâches d’une histoire une à une (executerChaine), fait le travail de chacune
  * (son étape, src/server/analyse.ts), puis décide de la suite. Ce qui vient après une étape ne dépend que de ce qui
- * est écrit en base et des tâches déjà lancées : `suite`, une règle pure, le dit, à la fin de chaque étape comme à
- * l’ouverture du rapport (reparerLaChaine). Les étapes ne planifient rien elles-mêmes.
+ * est écrit en base et des tâches déjà lancées : `suite` (src/server/chaine.ts), une règle pure, le dit, à la fin de
+ * chaque étape comme à l’ouverture du rapport (reparerLaChaine). Les étapes ne planifient rien elles-mêmes.
  * Les étapes sont chargées à la demande (le SDK du modèle et les prompts ne servent qu’à elles) : les écrans
  * (donnees.ts) importent ce module sans les charger.
  */
@@ -31,67 +33,27 @@ const etapes = async () => (await import("./analyse")).ETAPES;
 
 /* ———— La suite ———— */
 
-/** Les tâches d’une histoire, la dernière de chaque genre (etatDesTaches). */
-export type EtatTaches = Partial<Record<Genre, Tache>>;
-
-/** Ce que la chaîne regarde pour décider de la suite : ce qui est écrit en base, et les tâches déjà lancées. */
-export type EtatChaine = {
-  /** La conv brute est encore en base : le rapport et la mémoire la lisent (elle part après la mémoire, ou au bout de 30 jours). */
+/** Ce que la chaîne lit d’une histoire, déchiffré : de quoi tirer son état (etatDepuis). */
+type LuDeLaChaine = {
+  /** La conv brute est encore en base. */
   conv: boolean;
-  /** Une voix est configurée (voixDisponible). */
-  voix: boolean;
-  /** Le verdict écrit (son alerte, et le mode sobre qu’elle ouvre), ou null. */
-  verdict: Pick<Verdict, "alerte" | "mode_sobre"> | null;
-  /** Le plan du rapport est gardé (reports.plan). */
-  plan: boolean;
-  /** Le rapport est gardé (reports.data) : complet, ou sobre. */
-  rapport: boolean;
-  /** Le vocal du rapport, s’il est fait : à la version du script, et quand. */
-  vocal: { aJour: boolean; fait: Date } | null;
-  /** La dernière tâche de chaque genre de la chaîne. */
-  taches: Partial<Record<Genre, Pick<Tache, "status" | "createdAt">>>;
+  verdict: DonneesVerdict | null;
+  /** La ligne du rapport (reports), ou rien : seul compte ce qui y est gardé. */
+  rapport: { plan: unknown; data: unknown } | null | undefined;
+  vocal: EtatChaine["vocal"];
+  taches: EtatChaine["taches"];
 };
 
-/** Une tâche qui attend ou tourne : elle n’est pas encore faite, mais rien ne sert de la planifier à nouveau. */
-const enMarche = (t?: Pick<Tache, "status">) => t?.status === "attente" || t?.status === "en_cours";
-
-/**
- * Le vocal du rapport est-il à faire ? Avec une voix, jamais sur une alerte, une fois le plan (il s’écrit pendant les
- * chapitres) ou le rapport gardé. Pas s’il est déjà à la version du script, ni si une tâche « vocal » l’a tenté
- * depuis le dernier fait (elle attend, tourne, ou a échoué : un échec n’est pas relancé à chaque ouverture). Un vocal
- * d’une ancienne version du script se refait ainsi une fois.
- */
-function vocalAFaire({ voix, verdict, plan, rapport, vocal, taches }: EtatChaine): boolean {
-  if (!voix || !verdict || verdict.alerte || !(plan || rapport) || vocal?.aJour) return false;
-  const t = taches.vocal;
-  if (enMarche(t)) return false;
-  return !t || (!!vocal && t.createdAt <= vocal.fait);
-}
-
-/**
- * Ce qui vient ensuite, dans l’ordre où ça doit partir (aRelancer prend les tâches par date de planification) : le
- * plan du rapport après le verdict, les chapitres après le plan, le vocal, puis la mémoire une fois le rapport gardé.
- * Une règle pure. Chaque étape n’est lancée qu’une fois : une tâche de ce genre qui existe déjà (en attente, en cours,
- * finie ou en échec) n’est pas replanifiée. Un échec repart par « Relancer l’écriture » (reprendre), pas par ici.
- * - Rien tant que le verdict n’est pas fini (sa tâche finie : à la fin de l’étape, le moteur la compte pour finie).
- * - `acces` : le compte peut lire le rapport (src/lib/acces.ts). Sans lui, seul le mode sobre (une alerte) ouvre le
- *   rapport doux, offert ; rien au-delà : ni la mémoire, ni le rapport complet.
- * - Le rapport et la mémoire lisent la conv brute : sans elle, ils ne partent plus. Le vocal, lui, se refait sur la
- *   mémoire.
- */
-export function suite(etat: EtatChaine, acces: boolean): Genre[] {
-  const { verdict, taches } = etat;
-  if (!verdict || taches.verdict?.status !== "fini") return [];
-  if (!acces && !verdict.mode_sobre) return [];
-  const jamaisLancee = (g: Genre) => !taches[g];
-  const genres: Genre[] = [];
-  /* En mode sobre, le plan écrit tout le rapport doux en un appel (rapport sans plan) */
-  if (etat.conv && !etat.plan && !etat.rapport && jamaisLancee("rapport_plan")) genres.push("rapport_plan");
-  if (etat.conv && etat.plan && !etat.rapport && jamaisLancee("rapport_chapitres")) genres.push("rapport_chapitres");
-  if (vocalAFaire(etat)) genres.push("vocal");
-  if (acces && etat.conv && etat.rapport && jamaisLancee("memoire")) genres.push("memoire");
-  return genres;
-}
+/** L’état de la chaîne (suite, src/server/chaine.ts) d’après ce qui est lu : par lireEtat, et par le rapport qui l’a déjà lu. */
+export const etatDepuis = ({ conv, verdict, rapport, vocal, taches }: LuDeLaChaine): EtatChaine => ({
+  conv,
+  voix: voixDisponible(),
+  verdict: verdict?.sortie ?? null,
+  plan: !!rapport?.plan,
+  rapport: !!rapport?.data,
+  vocal,
+  taches,
+});
 
 /** L’état de la chaîne d’une histoire, lu en base (tout d’un coup). */
 async function lireEtat(storyId: string): Promise<EtatChaine> {
@@ -102,21 +64,13 @@ async function lireEtat(storyId: string): Promise<EtatChaine> {
       .where(eq(schema.stories.id, storyId)),
     db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId)),
     db()
-      .select({ plan: sql<boolean>`${schema.reports.plan} is not null`, rapport: sql<boolean>`${schema.reports.data} is not null` })
+      .select({ plan: sql<boolean>`${schema.reports.plan} is not null`, data: sql<boolean>`${schema.reports.data} is not null` })
       .from(schema.reports)
       .where(eq(schema.reports.storyId, storyId)),
     etatDesTaches(storyId, [...GENRES_CHAINE]),
     vocalLu(storyId),
   ]);
-  return {
-    conv: !!s?.conv,
-    voix: voixDisponible(),
-    verdict: v ? coffre.lire("verdicts.data", v.data).sortie : null,
-    plan: !!r?.plan,
-    rapport: !!r?.rapport,
-    vocal,
-    taches,
-  };
+  return etatDepuis({ conv: !!s?.conv, verdict: v ? coffre.lire("verdicts.data", v.data) : null, rapport: r, vocal, taches });
 }
 
 /** Le compte de l’histoire a-t-il l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */
@@ -152,23 +106,10 @@ export async function reparerLaChaine(story: Pick<Ligne, "id">, acces: boolean, 
 
 /**
  * L’échéance de la chaîne (src/server/echeance.ts) : les appels s’arrêtent avant que Vercel coupe la fonction. Les
- * routes qui la lancent vivent DUREE_FONCTION_S (tests/echeance.test.ts).
+ * routes qui la lancent vivent DUREE_FONCTION_S (tests/echeance.test.ts). La durée habituelle de chaque étape
+ * (DUREES_MS) est dans src/server/avancement.ts : les écrans en tirent aussi le temps qui reste.
  */
 export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);
-
-/**
- * La durée habituelle de chaque étape, mesurée sur les rapports de test (ai_usage.ms donne celles de la production).
- * Elle décide si une étape a le temps de commencer, et donne aux écrans le temps qui reste.
- */
-export const DUREES_MS: Record<Genre, number> = {
-  verdict: 60_000,
-  rapport_plan: 55_000,
-  /* Les deux moitiés en même temps, et le vocal pendant ce temps */
-  rapport_chapitres: 100_000,
-  vocal: 45_000,
-  memoire: 90_000,
-  memoire_maj: 60_000,
-};
 
 /*
  * Une fonction Vercel vit 5 minutes au plus (plan gratuit) : on ne commence une étape que s’il reste, avant l’échéance,
@@ -187,13 +128,27 @@ const BATTEMENT_MS = 20_000;
 
 /* ———— L’exécution ———— */
 
+/** Les étapes qui effacent ce qu’elles lisent : rejouées, elles ne trouveraient plus leur entrée. */
+const DETRUIT_SON_ENTREE: ReadonlySet<Genre> = new Set(["memoire"]);
+
 /** Exécute une tâche, puis planifie la suite. Renvoie false si elle a échoué (elle repartira, sauf au dernier essai). */
 async function executer(t: Tache): Promise<boolean> {
   const coeur = setInterval(() => void battre(t.id).catch(() => {}), BATTEMENT_MS);
   try {
     const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
-    if (!story) throw new ErreurTache("tache_inconnue");
-    await (await etapes())[t.kind](story, t);
+    /* tasks.kind est un text que la base ne contrôle pas (src/server/db/enums.ts) : un genre sans étape est une tâche inconnue */
+    const etape = (await etapes())[t.kind] as Etape | undefined;
+    if (!story || !etape) throw new ErreurTache("tache_inconnue");
+    await etape(story, t);
+    if (DETRUIT_SON_ENTREE.has(t.kind)) {
+      /*
+       * La mémoire efface la conv brute : rejouée, elle échouerait sur « conv_effacee ». Elle est dite finie d’abord ; une
+       * suite qui n’a pas pu être planifiée (seul un vocal peut venir après elle) le sera par la réparation, à l’ouverture.
+       */
+      await finir(t.id);
+      await enchainer(story, t).catch((e: unknown) => console.error(`suite de ${t.kind} ${t.id} non planifiée : ${(e as Error).name}`));
+      return true;
+    }
     /* La suite est planifiée avant que l’étape soit dite finie : un échec ici fait rejouer l’étape, rien ne se perd */
     await enchainer(story, t);
     await finir(t.id);
