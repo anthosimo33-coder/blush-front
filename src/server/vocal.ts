@@ -88,6 +88,19 @@ function garder(storyId: string, fait: number, chiffre: Buffer) {
 }
 
 /**
+ * L’audio d’une réponse du chat dite en vocal (MP3), déchiffré, si elle est dans une conv de ce compte ; null sinon. Le
+ * compte seul suffit : pas besoin de la conv ouverte.
+ */
+export async function audioDuChat(userId: string, id: number): Promise<Buffer | null> {
+  const [v] = await db()
+    .select({ audio: schema.chatVocals.audio })
+    .from(schema.chatVocals)
+    .innerJoin(schema.stories, eq(schema.stories.id, schema.chatVocals.storyId))
+    .where(and(eq(schema.chatVocals.id, id), eq(schema.stories.userId, userId)));
+  return v ? coffre.lireAudio(v.audio) : null;
+}
+
+/**
  * L’audio du vocal d’une conv de ce compte (MP3), déchiffré, en une seule requête qui vérifie aussi que la conv est à
  * lui. null : pas de conv à ce compte ; `audio` null : son vocal n’est pas prêt.
  */

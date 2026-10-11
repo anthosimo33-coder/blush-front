@@ -16,6 +16,7 @@ import nextEnv from "@next/env";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { estLocale } from "./base.mjs";
 
 const RACINE = fileURLToPath(new URL("..", import.meta.url));
 
@@ -44,7 +45,7 @@ if (trouvees.length) arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${tro
 /* 3. La base : créée si elle manque, jamais effacée, puis migrée. Seulement sur ce poste : une base distante reste telle quelle */
 const url = new URL(process.env.DATABASE_URL);
 const nom = decodeURIComponent(url.pathname.slice(1));
-if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+if (estLocale(url.href)) {
   const serveurPg = new URL(url.href);
   serveurPg.pathname = "/postgres";
   try {

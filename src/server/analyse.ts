@@ -14,7 +14,7 @@ import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
-import { donneesMemoire, donneesVerdict as lireVerdict, ligneRapport as lireRapport, modifierMemoire } from "./depot";
+import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
@@ -38,11 +38,11 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
 /*
  * Repris ici pour les modules qui les lisent encore à cette adresse : le moteur est dans pipeline.ts, les formes
  * gardées dans stockage/types.ts. Ces reprises partent au lot 9a (retrait des ré-exportations), ou avant, au fil des
- * lots qui tiennent leurs importeurs : 3a (les routes), 5b (le chat, les ajouts), 7c (scripts/essai-vrai-modele.mts),
- * et les tests de leurs zones.
+ * lots qui tiennent leurs importeurs : 5b (le chat, les ajouts), 7c (scripts/essai-vrai-modele.mts), et les tests de
+ * leurs zones.
  */
 export { executerChaine } from "./pipeline";
-export { editionsBornees, SUPPRIMEES_MAX, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
+export { editionsBornees, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
 
 /* ———— La conv, relue tant qu’elle n’est pas effacée ———— */
 
@@ -141,7 +141,7 @@ async function verdict(story: LigneComplete, t: Tache) {
  */
 async function rapportPlan(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
-  const v = await lireVerdict(story.id);
+  const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (v.sortie.mode_sobre) {
     const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport", undefined, undefined, (x) => !!x.sobre);
@@ -209,8 +209,8 @@ function suiviDesChapitres(story: Ligne, t: Tache, messages: ReturnType<typeof m
 /** Le rapport, étape 2 : les chapitres 1 à 4 et 5 à 8, écrits en même temps d’après le plan. */
 async function rapportChapitres(story: LigneComplete, t: Tache) {
   const { rendu } = relire(story);
-  const v = await lireVerdict(story.id);
-  const ligne = await lireRapport(story.id);
+  const v = await donneesVerdict(story.id);
+  const ligne = await ligneRapport(story.id);
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
   const plan = coffre.lire("reports.plan", ligne.plan);
   const h = histoireDe(metaDe(story));
@@ -329,8 +329,8 @@ async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | {
  */
 async function vocalTache(story: LigneComplete) {
   if (!voixDisponible() || (await vocalAJour(story.id))) return;
-  const v = await lireVerdict(story.id);
-  const ligne = await lireRapport(story.id);
+  const v = await donneesVerdict(story.id);
+  const ligne = await ligneRapport(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   /*
    * Pas encore de rapport : le plan seul est gardé (le vocal se fait pendant les chapitres), ou les chapitres ont échoué.
@@ -355,8 +355,8 @@ async function vocalTache(story: LigneComplete) {
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
 async function memoire(story: LigneComplete) {
   const { rendu, lu } = relire(story);
-  const v = await lireVerdict(story.id);
-  const ligne = await lireRapport(story.id);
+  const v = await donneesVerdict(story.id);
+  const ligne = await ligneRapport(story.id);
   if (!v || !ligne?.data) throw new ErreurTache("rapport_absent");
   const r = coffre.lire("reports.data", ligne.data).sortie;
   const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, preuvesMemoire, rendu.lignes, story.id, "memoire");

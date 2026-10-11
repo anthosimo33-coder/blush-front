@@ -2,14 +2,19 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { verdictAffiche } from "@prompts/lib/front";
+import type { Plan } from "@/types";
+import type { CibleImage } from "@/types/api";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
-import { donneesVerdict } from "./depot";
+import { chapitresEcrits, donneesVerdict } from "./depot";
+import { echangeDuChat } from "./historique";
 import { ErreurPublique } from "./erreurs";
 import { metaDe, type Ligne } from "./histoires";
+import { ouvertureDu } from "./presentation/rapport";
+import type { DonneesVerdict } from "./stockage/types";
 
 /*
  * Le partage du verdict : un lien public (/v/<id>) qui montre l’emoji, le titre et le sous-titre du verdict, le prénom
@@ -57,6 +62,9 @@ export function masqueDe(story: Ligne): (texte: string) => string {
   return (texte) => masquerPrenoms(texte, autres, toi);
 }
 
+/** Une situation difficile (le mode sobre : une alerte de danger) ne se partage pas : ni son verdict, ni ses chapitres. */
+const partageable = (sortie: Pick<DonneesVerdict["sortie"], "mode_sobre">) => !sortie.mode_sobre;
+
 /**
  * Le lien de partage de l’histoire, créé s’il n’existe pas encore, et ce qu’il montre (refait à chaque partage) : la
  * feuille de partage a les deux sans relire le lien qu’on vient d’écrire.
@@ -65,8 +73,7 @@ export async function partager(story: Ligne): Promise<{ id: string; verdict: Ver
   const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurPartage("pas_pret");
   const { sortie } = v;
-  /* Une situation difficile ne se partage pas */
-  if (sortie.mode_sobre) throw new ErreurPartage("sobre");
+  if (!partageable(sortie)) throw new ErreurPartage("sobre");
   const affiche = verdictAffiche(sortie);
   const masquer = masqueDe(story);
   const verdict: VerdictPartage = { emoji: affiche.emoji, title: masquer(affiche.title), subtitle: masquer(affiche.subtitle) };
@@ -101,4 +108,38 @@ export async function verdictPartage(id: string): Promise<VerdictPartage | null>
   if (!ID_PARTAGE.test(id)) return null;
   const [l] = await db().select({ data: schema.shares.data }).from(schema.shares).where(eq(schema.shares.id, id));
   return l ? coffre.lire("shares.data", l.data) : null;
+}
+
+/** Ce que dessine « Partager en image » (src/server/carte-partage.tsx), déjà masqué : une réponse du chat, ou une chute. */
+type MomentPartage = { type: "reponse"; question: string; bulles: string[] } | { type: "moment"; surtitre: string; texte: string };
+
+/**
+ * Le moment que « Partager en image » dessine (POST /api/partage/image), relu dans le compte (jamais pris de la requête :
+ * pas de fausse image « askblush.com ») et masqué comme le lien ; ou pourquoi il ne se dessine pas. L’image ne montre
+ * jamais ce que l’écran ne montre pas (S-25) :
+ * - une réponse du chat, telle que le fil l’affiche, même en mode sobre : le chat y reste ouvert, et chaque réponse y a
+ *   son « Partager » ;
+ * - la chute d’un chapitre, seulement quand l’écran montre les chapitres (ouvertureDu, `entier` : l’accès au rapport ;
+ *   sans lui, le chapitre 1 offert n’est que le verdict, sans chute), et jamais d’une situation difficile (partageable).
+ */
+export async function momentAPartager(story: Ligne, plan: Plan, cible: CibleImage): Promise<MomentPartage | Extract<CodeErreur, "introuvable" | "sobre" | "acces">> {
+  const masquer = masqueDe(story);
+  if (cible.type === "reponse") {
+    const echange = await echangeDuChat(story.id, cible.echange);
+    const r = echange?.blush.reponse;
+    if (!echange || r?.kind !== "bubbles") return "introuvable";
+    return {
+      type: "reponse",
+      question: masquer((echange.toi.affiche ?? echange.toi.texte).replace(/^\(vocal\)\s*/, "")),
+      bulles: [...r.bubbles.map((b) => b.text), ...(r.ask ? [r.ask] : [])].map(masquer),
+    };
+  }
+  const verdict = await donneesVerdict(story.id);
+  if (!verdict) return "introuvable";
+  if (!partageable(verdict.sortie)) return "sobre";
+  if (!ouvertureDu(plan, verdict.sortie).entier) return "acces";
+  const chapitre = (await chapitresEcrits(story.id)).find((ch) => ch.number === cible.chapitre);
+  const bloc = chapitre?.blocks[cible.bloc];
+  if (!chapitre || bloc?.kind !== "punchline") return "introuvable";
+  return { type: "moment", surtitre: masquer(`Chapitre ${chapitre.number} · ${chapitre.tocTitle}`), texte: masquer(bloc.text) };
 }

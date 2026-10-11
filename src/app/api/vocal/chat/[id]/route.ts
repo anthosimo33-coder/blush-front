@@ -1,4 +1,4 @@
-import { audioDuChat } from "@/server/depot";
+import { audioDuChat } from "@/server/vocal";
 import { utilisateurCourant } from "@/server/donnees";
 import { erreur, reponseAudio } from "@/server/http";
 

@@ -110,7 +110,8 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
  * Le vocal du rapport : prêt, en train de s’enregistrer (sa tâche attend ou tourne, ou le rapport s’écrit encore), ou
  * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
  * et un vocal d’une ancienne version du script se refait, une fois (si ça échoue, l’ancien reste) : la réparation
- * (rapportDe) a déjà planifié sa tâche, qui attend. La même règle que la chaîne (vocalTente, src/server/chaine.ts).
+ * (ouvrirLeRapport, src/server/donnees.ts) a déjà planifié sa tâche, qui attend. La même règle que la chaîne
+ * (vocalTente, src/server/chaine.ts).
  */
 function vocalAffiche(v: VocalLu, verdict: Verdict, taches: EtatTaches, voix: boolean): VocalRapport | undefined {
   if (v?.aJour) return v.pret;

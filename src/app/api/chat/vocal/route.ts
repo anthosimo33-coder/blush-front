@@ -1,4 +1,4 @@
-import { definirChatVocal } from "@/server/depot";
+import { definirChatVocal } from "@/server/historique";
 import { erreur, lireCorps, repondre } from "@/server/http";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";

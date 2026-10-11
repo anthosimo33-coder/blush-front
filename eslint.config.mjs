@@ -12,6 +12,8 @@ const PAS_DE_CAST_CSS = [
   { selector: "TSAsExpression > TSTypeReference > Identifier[name='CSSProperties']", message: "Pas de `as CSSProperties` : les variables CSS (--d, --r…) sont permises dans `style` (src/types/css.d.ts)." },
   { selector: "TSAsExpression > TSTypeReference > TSQualifiedName[right.name='CSSProperties']", message: "Pas de `as CSSProperties` : les variables CSS (--d, --r…) sont permises dans `style` (src/types/css.d.ts)." },
 ];
+/* Le sélecteur d’un import() dynamique dont le chemin suit cette regex (un motif de no-restricted-imports) */
+const dynamique = (regex, message) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\u002F")}/]`, message });
 const NAVIGATEUR_SANS_SERVEUR = "Le navigateur ne lit pas le serveur : une page serveur passe par src/services/serveur.ts, un écran par les routes /api (src/services/api.ts).";
 /*
  * La configuration se lit à deux endroits : env() (src/server/env.ts, son schéma) et src/server/drapeaux.ts (le proxy et
@@ -42,7 +44,7 @@ const PAS_D_APERCU = { group: ["@/app/apercu", "@/app/apercu/*", "**/apercu/*"],
 const CHIFFREMENT = "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$";
 const PAR_LE_COFFRE_MESSAGE = "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio) ; chiffrement.ts ne sert ailleurs qu’à empreinte, memeEmpreinte et jeton.";
 const PAR_LE_COFFRE = { regex: CHIFFREMENT, allowImportNames: ["empreinte", "memeEmpreinte", "jeton"], message: PAR_LE_COFFRE_MESSAGE };
-const CHIFFREMENT_DYNAMIQUE = { selector: `ImportExpression[source.value=/${CHIFFREMENT.replaceAll("/", "\\u002F")}/]`, message: PAR_LE_COFFRE_MESSAGE };
+const CHIFFREMENT_DYNAMIQUE = dynamique(CHIFFREMENT, PAR_LE_COFFRE_MESSAGE);
 /*
  * La base se lit et s’écrit dans src/server : les routes /api et les pages (tout src/app) passent par le dépôt
  * (src/server/depot.ts), les comptes (comptes.ts) ou les modules de leur domaine, jamais par la base (src/server/db) ni
@@ -53,6 +55,17 @@ const PAR_LE_DEPOT = [
   { regex: `${versSrc("server/db")}(/|$)`, message: PAR_LE_DEPOT_MESSAGE },
   { regex: "^drizzle-orm(/|$)", message: PAR_LE_DEPOT_MESSAGE },
 ];
+/* Les mêmes par un import() dynamique. La base (src/server/db) l’est déjà pour le navigateur (NAVIGATEUR_SANS_SERVEUR) */
+const DRIZZLE_DYNAMIQUE = dynamique(PAR_LE_DEPOT[1].regex, PAR_LE_DEPOT_MESSAGE);
+const PAR_LE_DEPOT_DYNAMIQUE = [dynamique(PAR_LE_DEPOT[0].regex, PAR_LE_DEPOT_MESSAGE), DRIZZLE_DYNAMIQUE];
+/*
+ * Le contrat des routes (src/types/api.ts) : ses types pour tout src, ses schémas zod (et zod avec eux) pour le serveur
+ * seulement. Hors de src/server et des routes /api, il ne s’importe qu’en `import type` : zod n’entre pas dans les pages.
+ * Ni par un import() dynamique, nulle part : il n’a rien à charger à la demande.
+ */
+const CONTRAT_MESSAGE = "Hors du serveur (src/server, les routes /api), le contrat (src/types/api.ts) ne s’importe qu’en `import type` : ses schémas zod n’entrent pas dans les pages.";
+const CONTRAT = { regex: `${versSrc("types/api")}$`, allowTypeImports: true, message: CONTRAT_MESSAGE };
+const CONTRAT_DYNAMIQUE = dynamique(CONTRAT.regex, CONTRAT_MESSAGE);
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -79,15 +92,26 @@ const eslintConfig = defineConfig([
     rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
   },
   // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), la configuration lue à ses deux seuls endroits
-  // (PAS_DE_PROCESS_ENV), et pas de chiffrement.ts par import() (CHIFFREMENT_DYNAMIQUE). Les deux blocs suivants
+  // (PAS_DE_PROCESS_ENV), et ni chiffrement.ts ni le contrat par import() (CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE) ;
+  // dans src/app, ni la base ni drizzle-orm par import() non plus (PAR_LE_DEPOT_DYNAMIQUE). Les blocs suivants
   // reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax remplace toute sa liste.
   {
     files: ["src/**/*.tsx", "src/**/*.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
+  },
+  {
+    files: ["src/app/**/*.{ts,tsx}"],
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, ...PAR_LE_DEPOT_DYNAMIQUE] },
   },
   {
     files: ["src/server/env.ts", "src/server/drapeaux.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, CHIFFREMENT_DYNAMIQUE] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
+  },
+  // Le contrat ne s’importe qu’en `import type` hors du serveur (CONTRAT) ; le bloc suivant, le navigateur, le reprend.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/server/**", "src/app/api/**", "src/types/api.ts"],
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [CONTRAT] }] },
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
@@ -105,8 +129,9 @@ const eslintConfig = defineConfig([
       "src/proxy.ts",
     ],
     rules: {
-      "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }] }],
-      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, { selector: `ImportExpression[source.value=/${versSrc("server").replaceAll("/", "\\u002F")}/]`, message: NAVIGATEUR_SANS_SERVEUR }],
+      "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }, CONTRAT] }],
+      /* Dans src/app, drizzle-orm par import() aussi : la base, elle, est déjà du serveur */
+      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, DRIZZLE_DYNAMIQUE, dynamique(versSrc("server"), NAVIGATEUR_SANS_SERVEUR)],
     },
   },
   // Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts.

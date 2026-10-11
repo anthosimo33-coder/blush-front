@@ -129,7 +129,6 @@ type Reponses = {
   "GET /api/histoire": Story;
   "DELETE /api/histoire": Ok;
   "POST /api/import": ConvImportee;
-  /** null : pas de lien (ou plus). */
   /** `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`). */
   "POST /api/partage": { id: string; verdict: VerdictMontre; v: string };
   "DELETE /api/partage": { id: null };

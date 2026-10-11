@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, isNull } from "drizzle-orm";
 import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
@@ -49,10 +49,10 @@ export type Meta = {
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
 /**
- * Une histoire, sans sa conv brute : ce dont ont besoin le chat, le partage, la fiche, le vocal… Une ligne complète
- * comme une ligne d’écran s’y passe.
+ * Une histoire, sans sa conv brute (ni `status`, que rien ne lit) : ce dont ont besoin le chat, le partage, la fiche, le
+ * vocal… Une ligne complète comme une ligne d’écran s’y passe.
  */
-export type Ligne = Omit<LigneComplete, "conv">;
+export type Ligne = Omit<LigneComplete, "conv" | "status">;
 /** Ce que lisent les écrans et les routes : la ligne sans la conv, et si elle est encore en base (`aConv`). */
 export type LigneEcran = Ligne & { aConv: boolean };
 
@@ -184,9 +184,11 @@ export type Designation = { brouillon?: string; choisie?: string; affichee?: str
 /*
  * Les colonnes d’une ligne d’écran : tout sauf la conv brute, que le pilote recevrait en hexadécimal (deux fois sa
  * taille) à chaque page, appel et sondage. Aucun écran ne la lit : la chaîne d’analyse relit sa ligne elle-même.
+ * Ni `status`, que plus rien ne lit (src/server/db/schema.ts) : sa migration de retrait ne touchera pas cette lecture.
  */
-const { conv, ...sansConv } = getTableColumns(schema.stories);
-const ECRAN = { ...sansConv, aConv: sql<boolean>`${conv} is not null` };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- status est écartée, pas lue
+const { conv, status, ...ecran } = getTableColumns(schema.stories);
+const ECRAN = { ...ecran, aConv: PREDICATS.convGardee };
 
 /** La conv brute est-elle encore en base ? (Une ligne d’écran le dit, une ligne complète l’a.) */
 export const aSaConv = (ligne: LigneEcran | LigneComplete) => ("aConv" in ligne ? ligne.aConv : !!ligne.conv);

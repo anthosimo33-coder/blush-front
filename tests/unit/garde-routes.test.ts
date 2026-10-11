@@ -28,7 +28,6 @@ vi.mock("@/server/donnees", async (original) => ({
   ...(await original<typeof import("@/server/donnees")>()),
   contexteRequete: async () => ({ utilisateur: etat.utilisateur, story: etat.story }),
   utilisateurCourant: async () => etat.utilisateur,
-  storyCourante: async () => null,
 }));
 vi.mock("@/server/auth", async (original) => ({ ...(await original<typeof import("@/server/auth")>()), compteDeSession: async () => etat.sansBeta }));
 vi.mock("@/server/limites", async (original) => ({

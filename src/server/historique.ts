@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { BlushAnswer } from "@/types";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -35,4 +35,33 @@ export async function historique(
   if (modeVocal !== undefined) return { echanges, plus: lignes.length === limite, modeVocal };
   const [s] = await db().select({ chatVocal: schema.stories.chatVocal }).from(schema.stories).where(eq(schema.stories.id, storyId));
   return { echanges, plus: lignes.length === limite, modeVocal: !!s?.chatVocal };
+}
+
+/** Un échange du chat, déchiffré : ton message et la réponse de BLUSH qui le suit. */
+type EchangeLu = { toi: coffre.Formes["chat_messages.data:toi"]; blush: coffre.Formes["chat_messages.data:blush"] };
+
+/**
+ * L’échange du chat de cette conv qui commence par ton message `idToi` : lui, et le message de BLUSH qui le suit. null :
+ * pas de tel message de toi dans cette conv, ou pas encore de réponse juste après.
+ */
+export async function echangeDuChat(storyId: string, idToi: number): Promise<EchangeLu | null> {
+  const c = schema.chatMessages;
+  const [toi] = await db()
+    .select({ id: c.id, data: c.data })
+    .from(c)
+    .where(and(eq(c.id, idToi), eq(c.storyId, storyId), eq(c.role, "toi")));
+  if (!toi) return null;
+  const [blush] = await db()
+    .select({ role: c.role, data: c.data })
+    .from(c)
+    .where(and(eq(c.storyId, storyId), gt(c.id, toi.id)))
+    .orderBy(asc(c.id))
+    .limit(1);
+  if (blush?.role !== "blush") return null;
+  return { toi: coffre.lire("chat_messages.data:toi", toi.data), blush: coffre.lire("chat_messages.data:blush", blush.data) };
+}
+
+/** Le chat en vocal (il a demandé à BLUSH de lui parler en vocal), ou de nouveau à l’écrit. */
+export async function definirChatVocal(storyId: string, actif: boolean): Promise<void> {
+  await db().update(schema.stories).set({ chatVocal: actif }).where(eq(schema.stories.id, storyId));
 }

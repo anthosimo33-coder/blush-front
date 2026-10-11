@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, gt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DonneesMemoire, DonneesRapport, DonneesVerdict } from "./stockage/types";
@@ -111,50 +111,6 @@ export function modifierMemoire(storyId: string, modifier: (avant: DonneesMemoir
     modifier,
     essais,
   );
-}
-
-/* ———— Le chat ———— */
-
-/** Un échange du chat, déchiffré : ton message et la réponse de BLUSH qui le suit. */
-export type EchangeLu = { toi: coffre.Formes["chat_messages.data:toi"]; blush: coffre.Formes["chat_messages.data:blush"] };
-
-/**
- * L’échange du chat de cette conv qui commence par ton message `idToi` : lui, et le message de BLUSH qui le suit. null :
- * pas de tel message de toi dans cette conv, ou pas encore de réponse juste après.
- */
-export async function echangeDuChat(storyId: string, idToi: number): Promise<EchangeLu | null> {
-  const c = schema.chatMessages;
-  const [toi] = await db()
-    .select({ id: c.id, data: c.data })
-    .from(c)
-    .where(and(eq(c.id, idToi), eq(c.storyId, storyId), eq(c.role, "toi")));
-  if (!toi) return null;
-  const [blush] = await db()
-    .select({ role: c.role, data: c.data })
-    .from(c)
-    .where(and(eq(c.storyId, storyId), gt(c.id, toi.id)))
-    .orderBy(asc(c.id))
-    .limit(1);
-  if (blush?.role !== "blush") return null;
-  return { toi: coffre.lire("chat_messages.data:toi", toi.data), blush: coffre.lire("chat_messages.data:blush", blush.data) };
-}
-
-/** Le chat en vocal (il a demandé à BLUSH de lui parler en vocal), ou de nouveau à l’écrit. */
-export async function definirChatVocal(storyId: string, actif: boolean): Promise<void> {
-  await db().update(schema.stories).set({ chatVocal: actif }).where(eq(schema.stories.id, storyId));
-}
-
-/**
- * L’audio d’une réponse du chat dite en vocal (MP3), déchiffré, si elle est dans une conv de ce compte ; null sinon. Le
- * compte seul suffit : pas besoin de la conv ouverte.
- */
-export async function audioDuChat(userId: string, id: number): Promise<Buffer | null> {
-  const [v] = await db()
-    .select({ audio: schema.chatVocals.audio })
-    .from(schema.chatVocals)
-    .innerJoin(schema.stories, eq(schema.stories.id, schema.chatVocals.storyId))
-    .where(and(eq(schema.chatVocals.id, id), eq(schema.stories.userId, userId)));
-  return v ? coffre.lireAudio(v.audio) : null;
 }
 
 /* ———— Les convs ———— */

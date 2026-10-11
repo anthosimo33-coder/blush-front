@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, sep } from "node:path";
 import { beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 import { sensDeTendance } from "@/lib/tendance";
 import { ROUTES, type CleFixe, type CleJson, type CleRoute, type Moi, type Routes } from "@/types/api";
@@ -7,8 +7,8 @@ import { ROUTES, type CleFixe, type CleJson, type CleRoute, type Moi, type Route
 /*
  * Le contrat HTTP (src/types/api.ts) : chaque route de src/app/api y a sa ligne, et chaque ligne sa route ; chaque route
  * répond sous sa propre ligne (repondre) et lit son corps par le schéma de cette ligne (lireCorps). Le navigateur n’en
- * importe que des types (zod reste au serveur), et appelle les routes par la couche de service, pas par un fetch à
- * lui. Ce que le compilateur vérifie (les deux bouts sous le même type) est écrit plus bas, en @ts-expect-error :
+ * importe que des types (zod reste au serveur : ESLint, tests/lint.test.ts), et appelle les routes par la couche de
+ * service, pas par un fetch à lui. Ce que le compilateur vérifie (les deux bouts sous le même type) est écrit plus bas, en @ts-expect-error :
  * `npm run check` (tsc) le relit. La couche de service elle-même : tests/unit/api-client.test.ts.
  */
 
@@ -137,31 +137,7 @@ describe("« Qui es-tu ? » (POST /api/analyse)", () => {
   });
 });
 
-describe("le navigateur n’importe du contrat que des types", () => {
-  it("hors du serveur (src/server, les routes /api), src/types/api.ts ne s’importe qu’en `import type` : zod n’entre pas dans les pages", async () => {
-    const src = (await fichiers(join(RACINE, "src"))).filter((f) => /\.tsx?$/.test(f));
-    const contrat = join(RACINE, "src/types/api");
-    /* Le contrat, par l’alias ou en chemin relatif */
-    const designeLeContrat = (f: string, chemin: string) => chemin === "@/types/api" || (chemin.startsWith(".") && resolve(dirname(f), chemin) === contrat);
-    const fautifs: string[] = [];
-    for (const f of src) {
-      const chemin = relative(RACINE, f).split(sep).join("/");
-      if (chemin.startsWith("src/server/") || chemin.startsWith("src/app/api/") || chemin === "src/types/api.ts") continue;
-      const source = await readFile(f, "utf8");
-      for (const [instruction, type, noms, vers] of source.matchAll(/(?:import|export)\s+(type\s+)?(\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+["']([^"']+)["']/g)) {
-        if (!designeLeContrat(f, vers)) continue;
-        /* `import { type A, type B }` ne laisse rien non plus */
-        const queDesTypes = !!type || (noms.startsWith("{") && noms.slice(1, -1).split(",").every((n) => !n.trim() || n.trim().startsWith("type ")));
-        if (!queDesTypes) fautifs.push(`${chemin} : ${instruction}`);
-      }
-      /* Un import() dynamique, ou un import sans nom (pour ses effets) : du code aussi */
-      for (const [instruction, dynamique, nu] of source.matchAll(/import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']/g)) {
-        if (designeLeContrat(f, dynamique ?? nu)) fautifs.push(`${chemin} : ${instruction}`);
-      }
-    }
-    expect(fautifs).toEqual([]);
-  });
-});
+/* Hors du serveur, le contrat ne s’importe qu’en `import type` : une règle d’ESLint (CONTRAT, eslint.config.mjs), essayée dans tests/lint.test.ts */
 
 describe("le navigateur appelle les routes par le contrat", () => {
   /* Le seul appel qui passe encore à côté, par un fetch direct : le réveil de la base, une balise dont la réponse n’est pas lue */

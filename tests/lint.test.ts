@@ -97,6 +97,32 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     expect(await regles("src/app/api/rapport/route.ts", `import { dbg } from "@/server/dbg";\nexport const x = dbg;\n`)).toEqual([]);
   });
 
+  it("ni par un import() dynamique de la base ou de drizzle-orm dans src/app ; le serveur, si", async () => {
+    for (const chemin of ["src/app/api/rapport/route.ts", "src/app/ouvrir/[id]/route.ts", "src/app/rapport/page.tsx", "src/app/rapport/Essai.tsx"]) {
+      expect(await regles(chemin, `export const x = async () => (await import("@/server/db")).db;\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `export const x = () => import("drizzle-orm");\n`), chemin).toEqual(["no-restricted-syntax"]);
+    }
+    expect(await regles("src/app/api/rapport/route.ts", `export const x = () => import("../../../server/db/schema");\n`)).toEqual(["no-restricted-syntax"]);
+    expect(await regles("src/server/stats.ts", `export const x = () => import("drizzle-orm");\n`)).toEqual([]);
+    expect(await regles("src/app/api/rapport/route.ts", `export const x = () => import("@/server/depot");\n`)).toEqual([]);
+  });
+
+  it("hors du serveur, le contrat (src/types/api.ts) ne s’importe qu’en `import type` : ni ses schémas, ni par import()", async () => {
+    for (const chemin of ["src/app/rapport/Essai.tsx", "src/app/rapport/page.tsx", "src/services/api.ts", "src/lib/essai.ts", "src/components/ui/Essai.tsx"]) {
+      expect(await regles(chemin, `import { ROUTES } from "@/types/api";\nexport const x = ROUTES;\n`), chemin).toEqual(["@typescript-eslint/no-restricted-imports"]);
+      expect(await regles(chemin, `export { ROUTES } from "@/types/api";\n`), chemin).toEqual(["@typescript-eslint/no-restricted-imports"]);
+      expect(await regles(chemin, `import "@/types/api";\n`), chemin).toEqual(["@typescript-eslint/no-restricted-imports"]);
+      expect(await regles(chemin, `export const x = () => import("@/types/api");\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `import type { Routes } from "@/types/api";\nexport type R = Routes;\n`), chemin).toEqual([]);
+      expect(await regles(chemin, `import { type Routes, type CibleImage } from "@/types/api";\nexport type R = [Routes, CibleImage];\n`), chemin).toEqual([]);
+    }
+    expect(await regles("src/app/rapport/Essai.tsx", `import { ROUTES } from "../../types/api";\nexport const x = ROUTES;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    /* Le serveur et les routes lisent ses schémas */
+    for (const chemin of ["src/server/stats.ts", "src/app/api/rapport/route.ts"]) {
+      expect(await regles(chemin, `import { ROUTES } from "@/types/api";\nexport const x = ROUTES;\n`), chemin).toEqual([]);
+    }
+  });
+
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual(["no-restricted-syntax"]);
     expect(await regles("prompts/lib/essai.ts", `import { NBSP } from "@/lib/format";\nexport const x = NBSP;\n`)).toEqual(["no-restricted-imports"]);

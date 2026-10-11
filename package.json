@@ -10,8 +10,8 @@
     "galerie": "node scripts/galerie/capture.mjs",
     "fluidite": "node scripts/galerie/capture.mjs --fluidite",
     "predev": "node scripts/prompts.mjs",
-    "prebuild": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && node scripts/migrer.mjs",
-    "postbuild": "node scripts/verifier-fuite.mjs",
+    "prebuild": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs",
+    "postbuild": "node scripts/verifier-fuite.mjs && node scripts/migrer.mjs",
     "pretest": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs",
     "test": "vitest run",
     "test:unit": "node scripts/prompts.mjs && vitest run --project unit --project client",
@@ -23,7 +23,7 @@
     "e2e:ui": "playwright test --ui",
     "e2e:visuel": ": \"${E2E_VISUEL_DIR:?le dossier des captures de référence, hors du dépôt (voir tests/e2e/visuel.spec.ts)}\" && playwright test --project=visuel-chromium --project=visuel-webkit",
     "db:generer": "drizzle-kit generate",
-    "db:migrer": "drizzle-kit migrate",
+    "db:migrer": "node scripts/migrer.mjs --ici",
     "acces": "tsx scripts/acces.mts"
   },
   "dependencies": {

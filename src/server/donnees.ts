@@ -20,7 +20,7 @@ import { GENRES_CHAINE } from "./db/enums";
 import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
 import { cloreLesAbandons, etatDepuis, executerChaine, reparerLaChaine } from "./pipeline";
 import type { EtatChaine } from "./chaine";
-import { assemblerRapport, enTete, ouvertureDu, type EnTete } from "./presentation/rapport";
+import { assemblerRapport, enTete, ouvertureDu, type EnTete, type RapportLu } from "./presentation/rapport";
 import { aRelancer, etatDesTaches } from "./taches";
 import { voixDisponible } from "./ia/voix";
 import { vocalLu } from "./vocal";
@@ -157,11 +157,12 @@ export async function contactDe(storyId: string): Promise<EnTete | null> {
 type RapportAffiche = ReportPayload & { generating: boolean };
 
 /**
- * Le rapport lu, et de quoi lancer ce qui lui manque sans rien relire : l’accès du compte et l’état de sa chaîne
- * (`chaine`), quand le rapport est ouvert (l’accès, ou le mode sobre). Tout est lu d’un coup, pas l’un après l’autre :
- * le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches, lu une fois pour tout, et le vocal.
+ * Le rapport lu, prêt à assembler (`lu`, pour assemblerRapport), et de quoi lancer ce qui lui manque sans rien relire :
+ * l’accès du compte et l’état de sa chaîne (`chaine`), quand le rapport est ouvert (l’accès, ou le mode sobre). Tout est
+ * lu d’un coup, pas l’un après l’autre : le verdict, le rapport, et avec l’accès (ou en mode sobre) l’état des tâches,
+ * lu une fois pour tout, et le vocal.
  */
-async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ rapport: RapportAffiche; chaine: { acces: boolean; etat: EtatChaine } | null } | null> {
+async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ lu: RapportLu; chaine: { acces: boolean; etat: EtatChaine } | null } | null> {
   const access: Plan = utilisateur?.plan ?? "gratuit";
   const aLeRapport = peut(access, "rapport");
   const [verdict, r, tachesLues, vocalLuAvant] = await Promise.all([
@@ -177,7 +178,7 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
   const [taches, vocal] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, [...GENRES_CHAINE]), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
   /* Le plan et les chapitres finis ne sont lus (et déchiffrés) qu’avec l’accès, pendant l’écriture ; assemblerRapport les ignore sans lui */
   const enEcriture = aLeRapport && !donnees;
-  const rapport = assemblerRapport({
+  const lu: RapportLu = {
     storyId: story.id,
     autre: personnesDe(metaDe(story)).autre.prenom,
     access,
@@ -189,8 +190,8 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
     vocal,
     voix: voixDisponible(),
     maintenant: Date.now(),
-  });
-  return { rapport, chaine: ouvert ? { acces: aLeRapport, etat: etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches }) } : null };
+  };
+  return { lu, chaine: ouvert ? { acces: aLeRapport, etat: etatDepuis({ conv: aSaConv(story), verdict, rapport: r, vocal, taches }) } : null };
 }
 
 /**
@@ -199,20 +200,23 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
  * relit toutes les 2 s pendant son écriture.
  */
 export async function rapportDe(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<RapportAffiche | null> {
-  return (await lireLeRapport(story, utilisateur))?.rapport ?? null;
+  const lecture = await lireLeRapport(story, utilisateur);
+  return lecture ? assemblerRapport(lecture.lu) : null;
 }
 
 /**
  * Le rapport qu’on ouvre (GET /api/rapport, les pages du rapport par getReport, src/services/serveur.ts) : lu comme par
  * rapportDe, après avoir lancé ce qui devait partir et ne l’a jamais été (reparerLaChaine, pipeline.ts : le rapport d’un
  * accès donné après coup, la mémoire d’un rapport sobre offert, un vocal d’une ancienne version). La seule lecture du
- * rapport qui planifie des tâches payantes, et elle le dit par son nom. Ce qui part est relu tout de suite, pour montrer
- * l’écriture.
+ * rapport qui planifie des tâches payantes, et elle le dit par son nom. Ce qui part ne change que l’état des tâches :
+ * lui seul est relu, pour montrer l’écriture (le verdict, le rapport et le vocal, déjà lus, ne bougent pas).
  */
 export async function ouvrirLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<RapportAffiche | null> {
-  const lu = await lireLeRapport(story, utilisateur);
-  if (!lu?.chaine || !(await reparerLaChaine(story, lu.chaine.acces, lu.chaine.etat))) return lu?.rapport ?? null;
-  return rapportDe(story, utilisateur);
+  const lecture = await lireLeRapport(story, utilisateur);
+  if (!lecture) return null;
+  const { lu, chaine } = lecture;
+  if (!chaine || !(await reparerLaChaine(story, chaine.acces, chaine.etat))) return assemblerRapport(lu);
+  return assemblerRapport({ ...lu, taches: await etatDesTaches(story.id, [...GENRES_CHAINE]), maintenant: Date.now() });
 }
 
 export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account {
