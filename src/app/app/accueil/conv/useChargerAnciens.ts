@@ -1,0 +1,197 @@
+"use client";
+
+/*
+ * L’historique de la conv de l’accueil : frais du serveur à l’ouverture (sauf quand la page vient de le rendre), et ses
+ * morceaux plus anciens, demandés d’avance et posés devant en remontant la conv. Les messages eux-mêmes sont à
+ * useConversation (./useConversation.ts), qui appelle ce hook : il ne les change que par les deux actions qu’elle lui
+ * donne (fondre l’historique frais, poser des anciens devant). Ce qui touche à l’écran (mesurer la conv, attendre
+ * qu’elle soit au repos, la recaler au rendu qui pose les anciens) reste à HomeScreen, par `Devant` et ses fonctions.
+ */
+import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { getChatHistory } from "@/services/api";
+import { renduFrais } from "@/lib/query";
+import type { HistoriqueChat } from "@/types/api";
+import { fusion, memesMessages, type Conv } from "../../garde";
+import { echangesEnMsgs, type Msg } from "./modele";
+
+/**
+ * Des messages posés devant (ou fondus dans la conv) : la hauteur d’avant, pour garder la conv là où on la lisait.
+ * `marque` : un message du morceau, pour reconnaître le rendu qui le pose ; `pose` : prévient qu’il est posé.
+ * HomeScreen le lit au rendu qui suit, recale la conv, puis appelle `pose`.
+ */
+export type Devant = { desk: boolean; h: number; marque?: number; pose?: () => void };
+
+/** Ce que le chargement demande à l’écran : où ranger la mesure d’avant, la prendre, et attendre que la conv soit au repos. */
+export type EcranDeLHistorique = {
+  devant: RefObject<Devant | null>;
+  /** La hauteur de la conv avant d’y poser des messages (`marque` : voir Devant). */
+  mesurer: (marque?: number) => Devant;
+  /** Attend que la conv soit au repos (un morceau posé pendant l’élan d’un geste le couperait). */
+  auRepos: () => Promise<void>;
+};
+
+/*
+ * L’historique rendu par la page il y a moins de 10 s, et monté pour la première fois, dispense de le relire à
+ * l’ouverture (Q63) : la même règle que les lectures de useQuery (renduFrais, src/lib/query.ts). Une page revue par
+ * l’historique du navigateur repasse le même rendu : elle est relue.
+ */
+const FRAIS = 10_000;
+
+export function useChargerAnciens({
+  depart,
+  depuis,
+  derniers,
+  rendu,
+  modeVocalDuRendu,
+  fondre,
+  poserDevant,
+  suivreModeVocal,
+  ecran,
+}: {
+  /** La conv de départ (voir useConversation). */
+  depart: Conv<Msg>;
+  /** Le premier identifiant de cette visite : une visite qui a déjà écrit ne reprend pas l’historique frais. */
+  depuis: number;
+  /** La conv affichée, à jour après chaque rendu (pour ce qui arrive après coup). */
+  derniers: RefObject<Conv<Msg>>;
+  /** L’heure du rendu serveur de la page (voir FRAIS). Sans elle (l’aperçu), l’historique est toujours relu. */
+  rendu?: number;
+  /** Le mode vocal rendu par la page avec l’historique : il vaut celui qu’une relecture aurait rapporté. */
+  modeVocalDuRendu?: boolean;
+  /** L’historique frais, fondu dans la conv affichée : ses nouveaux messages. */
+  fondre: (msgs: Msg[]) => void;
+  /** Des échanges plus anciens, posés devant la conv (après l’intro). */
+  poserDevant: (nouveaux: Msg[]) => void;
+  /** Le mode vocal tel qu’il est en base. */
+  suivreModeVocal: (actif: boolean) => void;
+  ecran: EcranDeLHistorique;
+}) {
+  /* L’historique se charge par morceaux : y en a-t-il de plus anciens, et le plus ancien déjà affiché */
+  const [plus, setPlus] = useState(depart.plus);
+  const [anciens, setAnciens] = useState(false);
+  const plusAncien = useRef(depart.plusAncien);
+  /* Le morceau d’avant, demandé d’avance : il se pose sans attendre le réseau quand le haut de la conv approche */
+  const suivant = useRef<{ avant: number; reponse: Promise<HistoriqueChat> } | null>(null);
+  const chargement = useRef(false);
+  /* Reste-t-il plus ancien ? Comme `plus`, mais su tout de suite : le rendu qui retire le bouton peut tarder, et d’ici là
+     l’élan du doigt redemanderait un morceau vide */
+  const ilEnReste = useRef(depart.plus);
+  const montage = useRef(true);
+  /* Les actions et l’écran du dernier rendu : les lectures en route s’en servent à leur retour */
+  const actions = useRef({ fondre, poserDevant, suivreModeVocal, ecran });
+  useEffect(() => {
+    actions.current = { fondre, poserDevant, suivreModeVocal, ecran };
+  });
+  const auMontage = useRef({ rendu, modeVocalDuRendu });
+
+  /*
+   * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
+   * (sans les derniers échanges), et un onglet laissé ouvert peut dater. Il se fond dans la conv affichée (garde.ts) :
+   * rien n’est remplacé ni déplacé, ce qui manque se pose à sa place, et la conv garde la sienne. Rien ne bouge si la
+   * visite a déjà écrit (ses messages sont les plus récents). La page qui vient de le rendre n’est pas relue (FRAIS).
+   */
+  useEffect(() => {
+    let fini = false;
+    const recharger = () =>
+      getChatHistory()
+        .then((h) => {
+          if (fini) return;
+          /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
+          if (h.modeVocal !== undefined) actions.current.suivreModeVocal(h.modeVocal);
+          const s = derniers.current;
+          if (s.msgs.some((m) => m.id >= depuis)) return;
+          const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
+          /* Le même historique que celui affiché : rien ne bouge */
+          if (memesMessages(r.msgs, s.msgs)) return;
+          plusAncien.current = r.plusAncien;
+          ilEnReste.current = r.plus;
+          suivant.current = null;
+          /* Un morceau plus ancien attend d’être posé : sa mesure, prise avant, couvre aussi ce rendu */
+          const { devant, mesurer } = actions.current.ecran;
+          devant.current ??= mesurer();
+          setPlus(r.plus);
+          actions.current.fondre(r.msgs);
+        })
+        .catch(() => {});
+    const premier = montage.current;
+    montage.current = false;
+    const page = auMontage.current;
+    if (premier && renduFrais("chat", page.rendu, FRAIS)) {
+      /* Ce que la relecture aurait rapporté : la conv de départ a déjà l’historique de la page, reste le mode vocal en base */
+      if (page.modeVocalDuRendu !== undefined) actions.current.suivreModeVocal(page.modeVocalDuRendu);
+    } else recharger();
+    /* Revenu sur la page par le bouton retour du navigateur (la page gardée en mémoire) */
+    const auRetour = (e: PageTransitionEvent) => {
+      if (e.persisted) recharger();
+    };
+    window.addEventListener("pageshow", auRetour);
+    return () => {
+      fini = true;
+      window.removeEventListener("pageshow", auRetour);
+    };
+  }, [depuis, derniers]);
+
+  /** Le morceau d’avant le plus ancien affiché, demandé d’avance (une seule fois). */
+  const precharger = useCallback(() => {
+    const avant = plusAncien.current;
+    if (!avant || !ilEnReste.current || chargement.current || suivant.current?.avant === avant) return;
+    const reponse = getChatHistory(avant);
+    suivant.current = { avant, reponse };
+    /* Raté (réseau coupé) : il sera redemandé */
+    reponse.catch(() => {
+      if (suivant.current?.reponse === reponse) suivant.current = null;
+    });
+  }, []);
+
+  /**
+   * Les échanges d’avant le plus ancien affiché, posés devant (la conv garde sa place). Demandés d’avance, ils sont
+   * souvent déjà là. Ils se posent quand la conv est au repos (tout de suite tout près du haut), dans une transition :
+   * leur rendu ne bloque pas l’écran. Un morceau à la fois : le suivant n’est demandé qu’une fois celui-ci posé (sinon
+   * sa mesure remplacerait la sienne, et la conv sauterait en bas au rendu du premier).
+   */
+  const chargerAnciens = useCallback(async () => {
+    const avant = plusAncien.current;
+    const { devant, mesurer, auRepos } = actions.current.ecran;
+    if (!avant || !ilEnReste.current || chargement.current || devant.current) return;
+    chargement.current = true;
+    setAnciens(true);
+    let h: HistoriqueChat;
+    try {
+      const deja = suivant.current?.avant === avant ? suivant.current.reponse : null;
+      suivant.current = null;
+      h = await (deja ?? getChatHistory(avant));
+      await auRepos();
+    } catch {
+      /* Réseau coupé : le bouton reste là, on réessaiera */
+      chargement.current = false;
+      setAnciens(false);
+      return;
+    }
+    /* Entre-temps, l’historique frais s’est fondu dans la conv : ce morceau n’est peut-être plus le bon */
+    if (plusAncien.current !== avant) {
+      chargement.current = false;
+      setAnciens(false);
+      return;
+    }
+    const nouveaux = echangesEnMsgs(h.echanges);
+    const encore = h.plus && nouveaux.length > 0;
+    ilEnReste.current = encore;
+    const afficher = () => {
+      setAnciens(false);
+      setPlus(encore);
+      if (nouveaux.length) actions.current.poserDevant(nouveaux);
+    };
+    if (nouveaux.length) {
+      plusAncien.current = h.echanges[0].id;
+      /* Le rendu qui les pose recale la conv (voir Devant), puis prévient : alors seulement, le suivant peut partir */
+      await new Promise<void>((pose) => {
+        devant.current = { ...mesurer(nouveaux[0].id), pose };
+        startTransition(afficher);
+      });
+    } else startTransition(afficher);
+    chargement.current = false;
+    if (encore) precharger();
+  }, [precharger]);
+
+  return { plus, anciens, plusAncien, chargerAnciens, precharger };
+}

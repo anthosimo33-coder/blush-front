@@ -3,7 +3,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 /*
  * Les tests sans base : des règles pures (tests/unit), les lectures de conv de prompts/lib, les scripts de vérification.
- * Ils forment le projet `unit`, lancé seul par `npm run test:unit`, sans Postgres. Les autres fichiers de tests/ gardent
+ * Ils forment le projet `unit`, lancé seul par `npm run test:unit`, sans Postgres (avec le projet `client`, plus bas). Les autres fichiers de tests/ gardent
  * leur nom : la liste les désigne. Un test qui touche à la base va dans le projet `db`, ailleurs que dans cette liste.
  */
 const SANS_BASE = [
@@ -29,6 +29,11 @@ const SANS_BASE = [
   "zip",
 ].map((nom) => `tests/${nom}.test.ts`);
 const UNITAIRES = [...SANS_BASE, "tests/unit/**/*.test.ts"];
+/*
+ * Les tests du navigateur : les hooks et les composants des écrans (tests/client), dans un DOM simulé (happy-dom), rendus
+ * par @testing-library/react. Sans base ni réseau : ce qu’ils appellent du serveur, ils le simulent (vi.mock).
+ */
+const CLIENT = ["tests/client/**/*.test.{ts,tsx}"];
 
 export default defineConfig({
   resolve: {
@@ -54,9 +59,20 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          name: "client",
+          include: CLIENT,
+          environment: "happy-dom",
+          /* Chaque test démonte ce qu’il a rendu (tests/client/preparer.ts), et rend ses espions */
+          setupFiles: ["tests/client/preparer.ts"],
+          restoreMocks: true,
+        },
+      },
+      {
+        extends: true,
+        test: {
           name: "db",
           include: ["tests/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, ...UNITAIRES],
+          exclude: [...configDefaults.exclude, ...UNITAIRES, ...CLIENT],
           /*
            * La base des tests : DATABASE_URL_TEST (en CI, celle du service Postgres), ou blush_test en local. Un clone neuf
            * ou la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, la migre (drizzle/)

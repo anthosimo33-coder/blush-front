@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { heureDuRendu } from "@/lib/rendu";
 import { convChoisie, getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, sansHistoire } from "@/services/serveur";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
@@ -16,6 +17,8 @@ export const metadata: Metadata = { title: "Accueil" };
  */
 export default async function Page({ searchParams }: PageProps<"/app">) {
   const { depuis } = await searchParams;
+  /* L’historique du chat rendu ici n’est pas relu à l’ouverture (HomeScreen, `rendu`) */
+  const rendu = heureDuRendu();
   const [storyId, jar] = await Promise.all([convChoisie(), cookies()]);
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
@@ -54,6 +57,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
           introAt={chat.introAt}
           ideesMasquees={jar.get(IDEES_MASQUEES)?.value === "1"}
           storyId={storyId ?? ""}
+          rendu={rendu}
         />
       </div>
     </>

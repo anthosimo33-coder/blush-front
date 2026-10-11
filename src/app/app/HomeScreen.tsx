@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   createContext,
   memo,
-  startTransition,
   use,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -28,7 +26,7 @@ import { basDePage } from "@/lib/defilement";
 import { pagePrecedente } from "@/lib/navigation";
 import { bumpPearl, delai, flipFrom, flyBox, flyText, pearlsOf, prefersReducedMotion, restingBox, snapshotTops, spring, textWidth, visible, wavePearls, type BubbleLook, type Box, type Spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { CoupureChat, getChatHistory, modeVocalChat, prechargerExport, sendToBlush, sendVoiceToBlush, type BlushAnswer, type HistoriqueChat, type SuiviChat } from "@/services/api";
+import { prechargerExport, sendToBlush, sendVoiceToBlush } from "@/services/api";
 import { markArrivalPlayed } from "@/services/session";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -46,10 +44,9 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { figtree } from "@/lib/fonts";
 import { reveiller } from "@/components/shell/Reveil";
 import { useHydrated } from "@/state/journey";
-import type { BulleChat, ConvSummary, Fiche, LevelId, Pronom, Report } from "@/types";
+import type { BlushAnswer, BulleChat, ConvSummary, Fiche, LevelId, Pronom, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { IDEES_MASQUEES } from "./idees";
-import { fusion, memesMessages, remonter, type Conv } from "./garde";
 import {
   CLE_INTRO,
   CLE_JOUR_INTRO,
@@ -58,19 +55,17 @@ import {
   clock,
   dayLabel,
   depli,
-  echangesEnMsgs,
-  introDe,
   maintenantDe,
-  PREMIER_ID_VISITE,
   rowsOf,
   tapeEncore,
   typeInconnu,
   type EchangeScript,
   type Msg,
   type MsgABulles,
-  type NewMsg,
   type Row,
 } from "./accueil/conv/modele";
+import { nouvelId, useConversation } from "./accueil/conv/useConversation";
+import type { Devant } from "./accueil/conv/useChargerAnciens";
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/app/rapport/Partage.tsx) arrive à part, après l’affichage */
 const PartageImageSheet = dynamic(() => import("../rapport/Partage").then((m) => m.PartageImageSheet), { ssr: false });
@@ -193,21 +188,18 @@ let arriveeJouee = false;
 /*
  * Un retour par l’historique (le geste retour, « Retour » sur sa fiche) : l’adresse et le moment du dernier. Et où en
  * était la conv quand on a quitté l’accueil (mobile) ? Tout en bas, elle y revient ; lue plus haut, elle revient à
- * cette place (la conv gardée est la même, voir `gardee`).
+ * cette place (la conv gardée est la même, voir useConversation).
  */
 let traversee: { href: string; at: number } | null = null;
 let quittee = { enBas: true, y: 0 };
 if (typeof window !== "undefined") window.addEventListener("popstate", () => (traversee = { href: location.href, at: performance.now() }));
 
 /*
- * La conv de la visite, gardée hors de l’accueil (celle de la conv ouverte seulement : une autre conv la remplace),
- * avec le mode vocal et les questions déjà posées. Revenu sur l’accueil, il repart d’elle au lieu de la page d’avant
- * la visite que Next garde en cache (voir ./garde.ts).
+ * Les questions toutes prêtes déjà posées pendant la visite, gardées hors de l’accueil avec la conv (celle de la conv
+ * ouverte seulement, voir useConversation) : revenu sur l’accueil, elles ne reviennent pas dans la rangée.
  * Seuls les effets l’écrivent : rien au rendu serveur ni à l’hydratation.
  */
-let gardee: (Conv<Msg> & { cle: string; modeVocal: boolean; asked: string[] }) | null = null;
-/* Les identifiants des messages de la visite (1, 2, 3…) : ils continuent d’une visite à l’autre, la conv gardée garde les siens */
-let prochainId = PREMIER_ID_VISITE;
+let posees: { cle: string; asked: string[] } | null = null;
 /* Les questions toutes prêtes ont fait leur entrée : revenu sur l’accueil, elles sont déjà là (elles la refont après une réponse) */
 let pastillesPosees = false;
 
@@ -243,6 +235,7 @@ export function HomeScreen({
   introAt,
   ideesMasquees = false,
   storyId,
+  rendu,
 }: {
   quick?: string[];
   /** Des réponses déjà prêtes, par question (l’aperçu des vraies réponses du chat). */
@@ -267,36 +260,14 @@ export function HomeScreen({
   ideesMasquees?: boolean;
   /** La conv ouverte : la conv gardée pendant la visite n’est reprise que pour elle (sans elle, comme l’aperçu, rien n’est gardé). */
   storyId?: string;
+  /** Back-end : l’heure du rendu serveur de la page (heureDuRendu). L’historique qu’elle vient de rendre n’est pas relu à l’ouverture. */
+  rendu?: number;
 }) {
   const router = useRouter();
-  /*
-   * La conv de départ : celle de la page, où se fond la conv gardée pendant la visite quand on revient sur l’accueil
-   * (les échanges de la visite, les morceaux d’historique déjà chargés : voir ./garde.ts).
-   */
   const cle = storyId;
-  const [reprise] = useState(() => (cle !== undefined && gardee?.cle === cle ? gardee : null));
-  const [depart] = useState((): Conv<Msg> => {
-    const page = { msgs: [...introDe(introAt), ...echangesEnMsgs(script)], plus: plusAnciens, plusAncien: script[0]?.id ?? null };
-    return reprise ? fusion(remonter(reprise), page) : page;
-  });
-  const [msgs, setMsgs] = useState(depart.msgs);
-  /* L’historique se charge par morceaux : y en a-t-il de plus anciens, et le plus ancien déjà affiché */
-  const [plus, setPlus] = useState(depart.plus);
-  const [anciens, setAnciens] = useState(false);
-  const plusAncien = useRef(depart.plusAncien);
-  /* Le morceau d’avant, demandé d’avance : il se pose sans attendre le réseau quand le haut de la conv approche */
-  const suivant = useRef<{ avant: number; reponse: Promise<HistoriqueChat> } | null>(null);
-  const chargement = useRef(false);
-  /* Reste-t-il plus ancien ? Comme `plus`, mais su tout de suite : le rendu qui retire le bouton peut tarder, et d’ici là
-     l’élan du doigt redemanderait un morceau vide */
-  const ilEnReste = useRef(depart.plus);
-  const derniers = useRef(depart);
-  /* Des messages posés devant (ou fondus dans la conv) : la hauteur d’avant, pour garder la conv là où on la lisait.
-     `marque` : un message du morceau, pour reconnaître le rendu qui le pose ; `pose` : prévient qu’il est posé */
-  const devant = useRef<{ desk: boolean; h: number; marque?: number; pose?: () => void } | null>(null);
+  /* Des messages posés devant (ou fondus dans la conv) : voir Devant (accueil/conv/useChargerAnciens.ts) */
+  const devant = useRef<Devant | null>(null);
   const haut = useRef<HTMLDivElement>(null);
-  /* Les messages nés à partir d’ici sont ceux de cette visite : eux seuls font leur entrée, le reste est déjà lu */
-  const [depuis] = useState(() => prochainId);
   /* Les questions toutes prêtes font leur entrée au premier affichage de l’accueil, puis à leur retour après une réponse */
   const [entreeIdees, setEntreeIdees] = useState(() => !pastillesPosees);
   /* « Partager en image » : la réponse choisie */
@@ -310,8 +281,6 @@ export function HomeScreen({
   };
   /* 7 · Le point creusé : ta prochaine question porte dessus */
   const [about, setAbout] = useState<string | null>(null);
-  /* Le chat en vocal : BLUSH répond en vocal tant qu’il ne repasse pas à l’écrit (le serveur le sait ; sans lui, l’aperçu, d’après la dernière réponse) */
-  const [modeVocal, setModeVocal] = useState(() => reprise?.modeVocal ?? modeVocalInitial ?? !!script.at(-1)?.answer.modeVocal);
   /* 11 · Où vous en êtes : un message peut vous faire passer un cap pendant la visite */
   const [level, setLevel] = useState(contact.report.level);
   const levelNow = useRef(contact.report.level);
@@ -329,11 +298,47 @@ export function HomeScreen({
   /* Avant chaque changement de la conv : où étaient ses lignes (pour les faire glisser), et la bulle qui doit voler */
   const before = useRef<Map<string, number> | null>(null);
   const flight = useRef<Flight | null>(null);
-  const shown = useRef(msgs);
   /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
-  const [asked, setAsked] = useState<string[]>(() => reprise?.asked ?? []);
+  const [asked, setAsked] = useState<string[]>(() => (cle !== undefined && posees?.cle === cle ? posees.asked : []));
+
+  /*
+   * La conv elle-même : ses messages, ses actions, le mode vocal et l’historique (accueil/conv/useConversation.ts).
+   * L’accueil l’habille : ce que fait l’écran pendant qu’elle change, c’est sa scène.
+   */
+  const conv = useConversation({
+    cle,
+    introAt,
+    script,
+    plusAnciens,
+    modeVocalInitial,
+    rendu,
+    scene: {
+      devant,
+      mesurer: (marque) => mesurer(thread.current, marque),
+      auRepos: () => auRepos(thread.current),
+      /* On note d’abord où sont les lignes de la conv, pour les faire glisser ensuite */
+      avantChangement: () => {
+        if (!before.current && thread.current) before.current = snapshotTops(dernieresLignes(thread.current), (el) => el.dataset.row);
+      },
+      /* Les questions toutes prêtes s’effacent le temps de la réponse : à leur retour, elles refont leur entrée */
+      echangeCommence: () => setEntreeIdees(true),
+      ecritCede: (reponse) => {
+        if (prefersReducedMotion()) return;
+        /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
+        const typing = thread.current?.querySelector(`[data-reading="${cleBulle(reponse, "ecrit")}"] svg`);
+        if (typing) flight.current = { kind: "logo", bubble: cleBulle(reponse, 0), from: typing.getBoundingClientRect() };
+      },
+      /* Un pop quand la réponse remplace les perles. Rien si tu écris déjà la suite */
+      reponsePosee: () => {
+        if (!input.current?.value) play("reponse");
+      },
+      niveau: (to) => levelUp(to),
+    },
+  });
+  const { msgs, depuis, plus, anciens, chargerAnciens, precharger, modeVocal } = conv;
+  const shown = useRef(msgs);
   /* BLUSH « écrit » (ses bulles arrivent encore) : sa bulle s’anime en haut de la conv. Une réponse coupée attend « Réessayer » */
-  const busy = msgs.some((m) => m.type === "ecrit" && !m.coupee);
+  const busy = conv.occupe;
   const opened = useOpenedAt();
   const desktop = useDesktop();
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
@@ -515,122 +520,15 @@ export function HomeScreen({
     [],
   );
 
-  /* La conv affichée, pour ce qui arrive après coup (l’historique frais) ; et gardée pour un retour sur l’accueil */
+  /* Les questions posées, gardées avec la conv pour un retour sur l’accueil */
   useEffect(() => {
-    derniers.current = { msgs, plus, plusAncien: plusAncien.current };
-    if (cle !== undefined) gardee = { cle, ...derniers.current, modeVocal, asked };
-  }, [cle, msgs, plus, modeVocal, asked]);
+    if (cle !== undefined) posees = { cle, asked };
+  }, [cle, asked]);
 
   /* Les questions toutes prêtes ont fait leur entrée : un retour sur l’accueil ne la rejoue pas */
   useEffect(() => {
     pastillesPosees = true;
   }, []);
-
-  /*
-   * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
-   * (sans les derniers échanges), et un onglet laissé ouvert peut dater. Il se fond dans la conv affichée (garde.ts) :
-   * rien n’est remplacé ni déplacé, ce qui manque se pose à sa place, et la conv garde la sienne. Rien ne bouge si la
-   * visite a déjà écrit (ses messages sont les plus récents).
-   */
-  useEffect(() => {
-    let fini = false;
-    const recharger = () =>
-      getChatHistory()
-        .then((h) => {
-          if (fini) return;
-          /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
-          if (h.modeVocal !== undefined) setModeVocal(h.modeVocal);
-          const s = derniers.current;
-          if (s.msgs.some((m) => m.id >= depuis)) return;
-          const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
-          /* Le même historique que celui affiché : rien ne bouge */
-          if (memesMessages(r.msgs, s.msgs)) return;
-          plusAncien.current = r.plusAncien;
-          ilEnReste.current = r.plus;
-          suivant.current = null;
-          /* Un morceau plus ancien attend d’être posé : sa mesure, prise avant, couvre aussi ce rendu */
-          devant.current ??= mesurer(thread.current);
-          setPlus(r.plus);
-          setMsgs(r.msgs);
-        })
-        .catch(() => {});
-    recharger();
-    /* Revenu sur la page par le bouton retour du navigateur (la page gardée en mémoire) */
-    const auRetour = (e: PageTransitionEvent) => {
-      if (e.persisted) recharger();
-    };
-    window.addEventListener("pageshow", auRetour);
-    return () => {
-      fini = true;
-      window.removeEventListener("pageshow", auRetour);
-    };
-  }, [depuis]);
-
-  /** Le morceau d’avant le plus ancien affiché, demandé d’avance (une seule fois). */
-  const precharger = useCallback(() => {
-    const avant = plusAncien.current;
-    if (!avant || !ilEnReste.current || chargement.current || suivant.current?.avant === avant) return;
-    const reponse = getChatHistory(avant);
-    suivant.current = { avant, reponse };
-    /* Raté (réseau coupé) : il sera redemandé */
-    reponse.catch(() => {
-      if (suivant.current?.reponse === reponse) suivant.current = null;
-    });
-  }, []);
-
-  /**
-   * Les échanges d’avant le plus ancien affiché, posés devant (la conv garde sa place). Demandés d’avance, ils sont
-   * souvent déjà là. Ils se posent quand la conv est au repos (tout de suite tout près du haut), dans une transition :
-   * leur rendu ne bloque pas l’écran. Un morceau à la fois : le suivant n’est demandé qu’une fois celui-ci posé (sinon
-   * sa mesure remplacerait la sienne, et la conv sauterait en bas au rendu du premier).
-   */
-  const chargerAnciens = useCallback(async () => {
-    const avant = plusAncien.current;
-    if (!avant || !ilEnReste.current || chargement.current || devant.current) return;
-    chargement.current = true;
-    setAnciens(true);
-    let h: HistoriqueChat;
-    try {
-      const deja = suivant.current?.avant === avant ? suivant.current.reponse : null;
-      suivant.current = null;
-      h = await (deja ?? getChatHistory(avant));
-      await auRepos(thread.current);
-    } catch {
-      /* Réseau coupé : le bouton reste là, on réessaiera */
-      chargement.current = false;
-      setAnciens(false);
-      return;
-    }
-    /* Entre-temps, l’historique frais s’est fondu dans la conv : ce morceau n’est peut-être plus le bon */
-    if (plusAncien.current !== avant) {
-      chargement.current = false;
-      setAnciens(false);
-      return;
-    }
-    const nouveaux = echangesEnMsgs(h.echanges);
-    const encore = h.plus && nouveaux.length > 0;
-    ilEnReste.current = encore;
-    const afficher = () => {
-      setAnciens(false);
-      setPlus(encore);
-      if (nouveaux.length)
-        setMsgs((prev) => {
-          const deja = new Set(prev.map((m) => m.id));
-          const intro = prev.filter((m) => m.type === "intro");
-          return [...intro, ...nouveaux.filter((m) => !deja.has(m.id)), ...prev.filter((m) => m.type !== "intro")];
-        });
-    };
-    if (nouveaux.length) {
-      plusAncien.current = h.echanges[0].id;
-      /* Le rendu qui les pose recale la conv (voir `devant`), puis prévient : alors seulement, le suivant peut partir */
-      await new Promise<void>((pose) => {
-        devant.current = { ...mesurer(thread.current, nouveaux[0].id), pose };
-        startTransition(afficher);
-      });
-    } else startTransition(afficher);
-    chargement.current = false;
-    if (encore) precharger();
-  }, [precharger]);
 
   /*
    * En remontant la conv, les échanges plus anciens arrivent d’eux-mêmes : à la première remontée, le morceau d’avant
@@ -685,14 +583,6 @@ export function HomeScreen({
     if (cheer && !prefersReducedMotion()) celebrate();
   }, [cheer]);
 
-  const id = () => prochainId++;
-
-  /** Toute modification de la conv passe par ici : on note d’abord où sont ses lignes, pour les faire glisser ensuite. */
-  const update = (fn: (m: Msg[]) => Msg[]) => {
-    if (!before.current && thread.current) before.current = snapshotTops(dernieresLignes(thread.current), (el) => el.dataset.row);
-    setMsgs(fn);
-  };
-
   /** 11 · Un cran de plus sur votre échelle : une seule fois par niveau. */
   const levelUp = (to: LevelId) => {
     const now = scaleOf(levelNow.current);
@@ -701,107 +591,18 @@ export function HomeScreen({
     levelNow.current = to;
     setLevel(to);
     play("niveau", next.temperature);
-    update((m) => [...m, { type: "niveau", id: id(), from: "event", level: to, at: Date.now() }]);
+    conv.marquerNiveau(to);
     setCheer((c) => c + 1);
-  };
-
-  /* « Réessayer » une réponse coupée par le réseau : ce qu’elle demandait, par réponse (voir exchange) */
-  const relances = useRef(new Map<number, { label: string; answer: (suivi: SuiviChat) => Promise<NewMsg>; vocal: boolean }>());
-
-  /**
-   * Ton message part, BLUSH tape « … », puis sa réponse remplace les trois points. Back-end : elle arrive au fil de
-   * l’eau, ses bulles une à une (chaque arrivée se déplie, ce qui est posé ne bouge plus), puis la réponse validée, qui
-   * les complète (ou les remplace) ; un vocal se prépare encore après elle, sa bulle attend. Le réseau qui coupe : les
-   * bulles reçues restent, avec « Réessayer ». `relance` : la réponse coupée qui repart, à sa place.
-   */
-  const exchange = async (mine: Msg | null, label: string, answer: (suivi: SuiviChat) => Promise<NewMsg>, vocal = false, relance?: number) => {
-    const readingId = relance ?? id();
-    const sent = Date.now();
-    /* Les questions toutes prêtes s’effacent le temps de la réponse : à leur retour, elles refont leur entrée */
-    setEntreeIdees(true);
-    const ecrit: Msg = { type: "ecrit", id: readingId, from: "blush", reading: label, vocal, at: sent };
-    if (mine) update((m) => [...m, { ...mine, at: sent }, ecrit]);
-    else update((m) => m.map((x) => (x.id === readingId ? ecrit : x)));
-    /* Ce qui est déjà à l’écran : l’heure de la réponse (à sa première bulle), ses bulles, où commence chaque arrivée */
-    let at = 0;
-    let poses = 0;
-    let vagues: number[] = [];
-    /* Les arrivées se posent dans l’ordre (« BLUSH écrit » peut d’abord se replier) */
-    let file = Promise.resolve();
-    let finie = false;
-    /* Le vocal, s’il arrive avant que la réponse soit posée */
-    let vocalTot: NonNullable<BlushAnswer["vocal"]> | null | undefined;
-    let posee = false;
-    /* « BLUSH écrit » laisse sa place à ce qui arrive en premier : des bulles, ou la réponse entière. Vrai la première fois */
-    const remplacer = async () => {
-      if (at) return false;
-      at = Date.now();
-      if (!prefersReducedMotion()) {
-        /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
-        const typing = thread.current?.querySelector(`[data-reading="${cleBulle(readingId, "ecrit")}"] svg`);
-        if (typing) flight.current = { kind: "logo", bubble: cleBulle(readingId, 0), from: typing.getBoundingClientRect() };
-      }
-      return true;
-    };
-    /* Un pop quand la réponse remplace les perles. Rien si tu écris déjà la suite */
-    const pop = () => {
-      if (!input.current?.value) play("reponse");
-    };
-    /* Des bulles arrivées pendant qu’il écrit : elles se posent, BLUSH écrit encore (rien d’animé à part dans une bulle : elle se déplie entière) */
-    const poser = (recues: BulleChat[], coupee = false) => async () => {
-      if (finie && !coupee) return;
-      const premiere = await remplacer();
-      vagues = [...vagues, poses];
-      poses = noeudsDe(recues);
-      if (coupee) vagues = [...vagues, poses];
-      const v = vagues;
-      update((m) => m.map((x) => (x.id === readingId ? { type: "ecrit", id: readingId, from: "blush", reading: label, vocal, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v } : x)));
-      if (premiere && recues.length) pop();
-    };
-    const suivi: SuiviChat = {
-      bulles: (recues) => void (file = file.then(poser(recues))),
-      vocal: (v) => {
-        if (!posee) return void (vocalTot = v);
-        update((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v) } : x)));
-      },
-    };
-    let next: NewMsg;
-    try {
-      next = await answer(suivi);
-    } catch (e) {
-      if (!(e instanceof CoupureChat)) throw e;
-      await file;
-      finie = true;
-      /* Le réseau a coupé : ce qui est arrivé reste, « Réessayer » relance la même demande, à la même place */
-      relances.current.set(readingId, { label, answer, vocal });
-      await poser(e.recues, true)();
-      return;
-    }
-    await file;
-    finie = true;
-    const premiere = await remplacer();
-    const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
-    posee = true;
-    /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
-    update((m) => m.map((x) => (x.id === readingId ? { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } : x)));
-    if (premiere) pop();
-    if (next.type === "reponse" && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
-    const up = next.type === "reponse" ? next.result.levelUp : undefined;
-    if (up) window.setTimeout(() => levelUp(up), 700);
   };
 
   /* « Réessayer » : la même demande repart, à la place de la réponse coupée */
   const relancer = (reponse: number) => {
-    const r = relances.current.get(reponse);
-    if (!r) return;
-    relances.current.delete(reponse);
-    play("envoi");
-    void exchange(null, r.label, r.answer, r.vocal, reponse);
+    if (conv.relancer(reponse)) play("envoi");
   };
 
   const ask = (mine: Msg, payload: { text?: string; files?: File[]; about?: string }) => {
     play("envoi");
-    return exchange(mine, modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse", async (suivi) => {
+    return conv.envoyer(mine, modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse", async (suivi) => {
       const ready = payload.text ? answers[payload.text] : undefined;
       const result = ready
         ? await new Promise<BlushAnswer>((ok) => setTimeout(() => ok(ready), 1600))
@@ -815,14 +616,14 @@ export function HomeScreen({
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite. 3 · La pastille elle-même devient ta bulle */
   const sendQuick = (q: string, chip?: HTMLElement) => {
     setAsked((a) => [...a, q]);
-    const mine = id();
+    const mine = nouvelId();
     if (chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: cleBulle(mine, 0), text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
     ask({ type: "texte", id: mine, from: "toi", text: q }, { text: q });
   };
 
   /* Ton message, depuis la barre de saisie : le champ montre encore ton texte, il s’envole de là */
   const sendText = (t: string) => {
-    const mine = id();
+    const mine = nouvelId();
     const field = input.current;
     /* 4 · L’envoi façon Messages : ton texte quitte le champ et devient une bulle bleue */
     if (field && !about && !prefersReducedMotion()) {
@@ -838,39 +639,31 @@ export function HomeScreen({
   const sendImages = (files: File[]) => {
     const list = files.map((f) => URL.createObjectURL(f));
     urls.current.push(...list);
-    ask({ type: "images", id: id(), from: "toi", images: list }, { files });
+    ask({ type: "images", id: nouvelId(), from: "toi", images: list }, { files });
   };
 
-  const sendExport = ([file]: File[]) => ask({ type: "fichier", id: id(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
+  const sendExport = ([file]: File[]) => ask({ type: "fichier", id: nouvelId(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
 
   /* Le vocal : le micro est demandé au premier toucher ; sans micro, BLUSH le dit dans la conv */
   const micRefused = (e: VoiceError) =>
-    update((m) => [
-      ...m,
-      {
-        type: "mot",
-        id: id(),
-        from: "blush",
-        at: Date.now(),
-        notice:
-          e === "denied"
-            ? "Je n’ai pas accès à ton micro. Autorise-le dans les réglages de ton navigateur, ou écris-moi."
-            : "Les vocaux ne marchent pas sur ce navigateur. Écris-moi, je te réponds pareil.",
-      },
-    ]);
+    conv.direMot(
+      e === "denied"
+        ? "Je n’ai pas accès à ton micro. Autorise-le dans les réglages de ton navigateur, ou écris-moi."
+        : "Les vocaux ne marchent pas sur ce navigateur. Écris-moi, je te réponds pareil.",
+    );
   const quickLeft = quick.filter((q) => !asked.includes(q));
 
   /* Ton vocal, depuis la barre de saisie (ou rien d’entendu : BLUSH le dit) */
   const sendVoice = (clip: VoiceClip | "empty") => {
     if (clip === "empty") {
-      update((m) => [...m, { type: "mot", id: id(), from: "blush", at: Date.now(), notice: "Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi." }]);
+      conv.direMot("Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi.");
       return;
     }
     play("vocalEnvoye");
     urls.current.push(clip.url);
     /* Tu lui parles en vocal : elle te répond en vocal */
-    exchange(
-      { type: "vocal", id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
+    void conv.envoyer(
+      { type: "vocal", id: nouvelId(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
       "BLUSH enregistre un vocal",
       async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
       true,
@@ -987,10 +780,7 @@ export function HomeScreen({
               about={about}
               onAboutClear={() => setAbout(null)}
               modeVocal={modeVocal}
-              onEcrit={() => {
-                setModeVocal(false);
-                modeVocalChat(false);
-              }}
+              onEcrit={() => void conv.repasserAEcrit()}
               busy={busy}
               onText={sendText}
               onQuick={sendQuick}
@@ -2068,12 +1858,6 @@ function bulleEcrite(b: BulleChat): BubbleNode[] {
     })),
   ];
 }
-
-/** Combien de bulles de la conv font ces bulles de BLUSH (voir bulleEcrite). */
-const noeudsDe = (bulles: BulleChat[]) => bulles.reduce((n, b) => n + 1 + (b.messages?.length ?? 0), 0);
-
-/** La réponse avec son vocal arrivé, ou sans (la voix a échoué : elle reste écrite). Sa bulle n’attend plus. */
-const avecVocal = (r: BlushAnswer, vocal: NonNullable<BlushAnswer["vocal"]> | null): BlushAnswer => ({ ...r, vocalEnCours: undefined, ...(vocal ? { vocal } : {}) });
 
 /** Le vocal de la réponse se fait encore : sa bulle attend, à la taille du lecteur qui la remplacera. */
 function VocalEnCours() {
