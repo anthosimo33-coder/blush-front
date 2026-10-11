@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { invalidate, setQueryData } from "@/lib/query";
+import { FRAIS_DU_RENDU, invalidate, setQueryData } from "@/lib/query";
 import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { deleteAccount, deleteStory, seDeconnecter, setPaused, type Account } from "@/services/api";
@@ -41,7 +41,7 @@ export type NomsDuCompte = { me: Person; other: Person; period: string };
  */
 export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
   const router = useRouter();
-  const { data: account } = useCompte(compte ?? undefined, { rendu, frais: 10_000 });
+  const { data: account } = useCompte(compte ?? undefined, { rendu, frais: FRAIS_DU_RENDU });
   /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
   const [ouverture, demarrer] = useTransition();
   const [ouverte, setOuverte] = useState<string | null>(null);

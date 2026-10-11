@@ -10,7 +10,7 @@ import { copyText } from "@/lib/hooks";
 import { formatCount } from "@/lib/format";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { peut } from "@/lib/acces";
-import { setQueryData } from "@/lib/query";
+import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import { messageErreur } from "@/lib/messages-erreur";
 import { relancerRapport } from "@/services/api";
@@ -107,7 +107,7 @@ const brancherBarre = (el: HTMLDivElement | null) => {
  */
 export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu }: { initial: ReportPayload; story: Story; openPaywall: boolean; fixed?: boolean; rendu?: number }) {
   /* `rendu` : l’heure du rendu serveur. Tout juste rendu, le rapport n’est pas relu au montage (src/lib/query.ts) */
-  const { data, refresh } = useRapport(initial, { fetch: !fixed, rendu, frais: 10_000 });
+  const { data, refresh } = useRapport(initial, { fetch: !fixed, rendu, frais: FRAIS_DU_RENDU });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
   const payload = fixed ? initial : (data ?? initial);
   /* Le rapport s’écrit encore, ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */

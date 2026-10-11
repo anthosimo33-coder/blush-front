@@ -45,7 +45,7 @@ export type Meta = {
   objectif?: Objectif;
 };
 
-/** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (analyse.ts, executer). */
+/** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
 /**
  * Une histoire, sans sa conv brute : ce dont ont besoin le chat, le partage, la fiche, le vocal… Une ligne complète

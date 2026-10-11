@@ -28,7 +28,7 @@ export const prechargerVideo = () => void pVideo().catch(() => {});
  * Les types du réseau vivent dans src/types/api.ts. Repris ici pour les modules qui les lisent encore à cette adresse
  * (l’accueil, src/lib/requetes.ts, « Mon compte », « Partager », l’import de captures) : ces reprises partent au lot 9a.
  */
-export type { Account, AvanceVideo, CibleImage, HistoriqueChat, ReportPayload, VerdictMontre } from "@/types/api";
+export type { Account, AvanceVideo, CibleImage, ReportPayload, VerdictMontre } from "@/types/api";
 
 /** Le chat : la réponse n’est pas arrivée en entier (le réseau a coupé, ou une erreur après des bulles). Les bulles déjà reçues, peut-être aucune. */
 export class CoupureChat extends Error {
@@ -410,8 +410,6 @@ export async function askQuestion(question: string): Promise<QuestionAnswer> {
 }
 
 /* ———— Au quotidien ———— */
-
-export type { BlushAnswer };
 
 /** L’historique du chat : les derniers échanges, ou ceux d’avant `avant`, un échange déjà affiché. */
 export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
