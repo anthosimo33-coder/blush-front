@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import type { AppKind } from "@/types";
@@ -82,6 +82,56 @@ export function CopyPill({ text, label, className }: { text: string; label: stri
   );
 }
 
+/* ———— Groupe de radios au clavier ———— */
+/** Les touches qui passent d’une option à l’autre : la suivante, la précédente, la première, la dernière. */
+const DEPLACEMENTS: Record<string, (i: number, n: number) => number> = {
+  ArrowRight: (i, n) => (i + 1) % n,
+  ArrowDown: (i, n) => (i + 1) % n,
+  ArrowLeft: (i, n) => (i - 1 + n) % n,
+  ArrowUp: (i, n) => (i - 1 + n) % n,
+  Home: () => 0,
+  End: (_, n) => n - 1,
+};
+
+/**
+ * Un groupe de radios comme le veut l’ARIA : un seul arrêt de tabulation (l’option cochée, ou la première si rien ne
+ * l’est), et les flèches qui passent à l’option voisine en la choisissant (en boucle), Début et Fin aux extrémités.
+ * Les options sont les `[role="radio"]` du groupe, des boutons qui choisissent au toucher : la flèche les touche
+ * (`click()`), l’écran ne fait rien de plus. À poser sur l’élément `role="radiogroup"` (`ref` et `onKeyDown`).
+ */
+function useRovingRadio<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const options = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [])].filter((o) => !o.matches(":disabled"));
+  /* Après chaque rendu (une option cochée a pu changer) : l’arrêt de tabulation suit l’option cochée */
+  useLayoutEffect(() => {
+    const os = options();
+    const arret = os.find((o) => o.getAttribute("aria-checked") === "true") ?? os[0];
+    os.forEach((o) => (o.tabIndex = o === arret ? 0 : -1));
+  });
+  const onKeyDown = (e: KeyboardEvent<T>) => {
+    const deplacer = DEPLACEMENTS[e.key];
+    if (!deplacer || e.altKey || e.ctrlKey || e.metaKey) return;
+    const os = options();
+    const i = os.indexOf(e.target as HTMLElement);
+    if (i < 0) return;
+    e.preventDefault();
+    const suivante = os[deplacer(i, os.length)];
+    suivante.focus();
+    if (suivante.getAttribute("aria-checked") !== "true") suivante.click();
+  };
+  return { ref, onKeyDown };
+}
+
+/** Un groupe de radios (`role="radiogroup"`), parcouru aux flèches du clavier (useRovingRadio). Son nom : `label`, ou l’id de son titre. */
+export function RadioGroup({ label, labelledBy, className, children }: { label?: string; labelledBy?: string; className?: string; children: ReactNode }) {
+  const { ref, onKeyDown } = useRovingRadio<HTMLDivElement>();
+  return (
+    <div ref={ref} role="radiogroup" aria-label={label} aria-labelledby={labelledBy} onKeyDown={onKeyDown} className={className}>
+      {children}
+    </div>
+  );
+}
+
 /* ———— Segmented (deux options) ———— */
 export function Segmented<T extends string>({
   options,
@@ -97,7 +147,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("flex h-12 rounded-3xl bg-segment p-1", className)}>
+    <RadioGroup label={label} className={cn("flex h-12 rounded-3xl bg-segment p-1", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -116,7 +166,7 @@ export function Segmented<T extends string>({
           </button>
         );
       })}
-    </div>
+    </RadioGroup>
   );
 }
 
@@ -189,7 +239,7 @@ export function AppTile({
   );
 }
 
-/* ———— Tuile de choix (écran 06) ———— */
+/* ———— Tuile de choix (écran 06) : une option d’un RadioGroup ———— */
 /** La teinte d’une tuile de choix : une couleur de globals.css (--toi, --elle, --vrai, --flou, --attente). */
 export type TileTone = "toi" | "elle" | "vrai" | "flou" | "attente";
 

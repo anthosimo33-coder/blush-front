@@ -1,19 +1,22 @@
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { AttributsLibres } from "./attributs";
 import { EnRoute } from "./EnRoute";
 import { Icon, type IconName } from "./icons";
 
-/*
+/**
  * Listes groupées, à la manière des Réglages et de Contacts sur iPhone :
  * un titre de section discret, une carte blanche, des lignes séparées par un filet.
+ * Avec un `title`, la section porte son nom : l’id de son titre est `id` (une ancre), sinon un id unique de la page.
  */
 export function InsetGroup({ title, footer, children, className, id }: { title?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string; id?: string }) {
+  const auto = useId();
+  const titreId = id ?? auto;
   return (
-    <section aria-labelledby={title && id ? id : undefined} className={cn("flex flex-col gap-2", className)}>
+    <section aria-labelledby={title ? titreId : undefined} className={cn("flex flex-col gap-2", className)}>
       {title && (
-        <h2 id={id} className="m-0 pl-4 text-[13px] font-black text-grey">
+        <h2 id={titreId} className="m-0 pl-4 text-[13px] font-black text-grey">
           {title}
         </h2>
       )}

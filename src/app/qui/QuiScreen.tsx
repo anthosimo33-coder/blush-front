@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { PRENOM_MAX } from "@/lib/limites";
@@ -10,7 +10,7 @@ import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
-import { ChoiceTile, SelectedCheck, type TileTone } from "@/components/ui/controls";
+import { ChoiceTile, RadioGroup, SelectedCheck, type TileTone } from "@/components/ui/controls";
 import type { IconName } from "@/components/ui/icons";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
@@ -53,6 +53,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const [busy, setBusy] = useState(false);
   /* La lecture n’est pas partie : pourquoi, dit simplement (textes relus le 8 octobre) */
   const [problem, setProblem] = useState<string | null>(null);
+  /* Les titres des trois groupes de tuiles, qui les nomment */
+  const titres = { pronom: useId(), guess: useId(), goal: useId() };
   const goals = goalsFor(j.guess);
   const ready = quiComplet(j, { captures });
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
@@ -122,7 +124,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
           />
         </label>
       ) : (
-      <div role="radiogroup" aria-label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
+      <RadioGroup label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
         {people.map((p, i) => {
           const me = j.me === p.id;
           /* Bleu = toi, rose = elle : la couleur suit le rôle choisi. */
@@ -153,35 +155,35 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
             </button>
           );
         })}
-      </div>
+      </RadioGroup>
       )}
 
       {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. Absent des maquettes, relu le 8 octobre */}
-      <div id="pronom-label" className="text-[13px] font-black text-grey">
+      <div id={titres.pronom} className="text-[13px] font-black text-grey">
         Tu es
       </div>
-      <div role="radiogroup" aria-labelledby="pronom-label" className="flex gap-2.5">
+      <RadioGroup labelledBy={titres.pronom} className="flex gap-2.5">
         <ChoiceTile icon="user" tone="toi" label="Un garçon" selected={j.pronom === "il"} onClick={() => set({ pronom: "il" })} />
         <ChoiceTile icon="user" tone="elle" label="Une fille" selected={j.pronom === "elle"} onClick={() => set({ pronom: "elle" })} />
-      </div>
+      </RadioGroup>
 
-      <div id="guess-label" className="text-[13px] font-black text-grey">
+      <div id={titres.guess} className="text-[13px] font-black text-grey">
         Où vous en êtes, selon toi
       </div>
-      <div role="radiogroup" aria-labelledby="guess-label" className="flex gap-2.5">
+      <RadioGroup labelledBy={titres.guess} className="flex gap-2.5">
         {GUESSES.map((g) => (
           <ChoiceTile key={g.id} icon={g.icon} tone={g.tone} label={GUESS_LABELS[g.id].tile} selected={j.guess === g.id} onClick={() => pickGuess(g.id)} />
         ))}
-      </div>
+      </RadioGroup>
 
-      <div id="goal-label" className="text-[13px] font-black text-grey">
+      <div id={titres.goal} className="text-[13px] font-black text-grey">
         Ce que tu veux
       </div>
-      <div role="radiogroup" aria-labelledby="goal-label" className="flex gap-2.5">
+      <RadioGroup labelledBy={titres.goal} className="flex gap-2.5">
         {goals.map((g) => (
           <ChoiceTile key={g.id} icon={g.icon} tone={g.tone} label={g.label} selected={j.goal === g.id} onClick={() => set({ goal: g.id })} />
         ))}
-      </div>
+      </RadioGroup>
     </ParcoursScreen>
   );
 }
