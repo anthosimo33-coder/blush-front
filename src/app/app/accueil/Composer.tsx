@@ -2,48 +2,32 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
-import { copyText, useFilePicker } from "@/lib/hooks";
+import { useFilePicker } from "@/lib/hooks";
 import { bumpPearl, delai, pearlsOf, prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
+import { drapeauLocal } from "@/lib/stockage";
 import { prechargerExport } from "@/services/api";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { Tag } from "@/components/ui/messages";
 import { reveiller } from "@/components/shell/Reveil";
 import { IDEES_MASQUEES } from "../idees";
 import { RecordingBar, useVoiceRecorder, type EcouteEnDirect, type VoiceClip, type VoiceError } from "../voice";
 
 /*
  * La barre de saisie de l’accueil (Composer) et ce qui va avec : le menu du « + », les questions toutes prêtes (et leur
- * choix « masquées », retenu sur cet appareil), les perles du logo qui t’écoutent pendant que tu écris ou que tu parles,
- * et la réponse à lui envoyer (SendReply) et la taille d’un fichier (formatSize), que les bulles de l’accueil montrent.
+ * choix « masquées », retenu sur cet appareil), et les perles du logo qui t’écoutent pendant que tu écris ou que tu
+ * parles. Ce que la conv montre de ce qui part (tes bulles, la réponse à lui envoyer) : ./bulles.tsx.
  */
 
-/** Les questions toutes prêtes, masquées par l’utilisateur (retenu sur cet appareil). */
-const QUICK_HIDDEN = "blush.quick-hidden";
-const quickListeners = new Set<() => void>();
-let quickMemo: boolean | null = null;
-
-function quickHiddenNow() {
-  if (quickMemo === null) {
-    try {
-      quickMemo = localStorage.getItem(QUICK_HIDDEN) === "1";
-    } catch {
-      quickMemo = false;
-    }
-  }
-  return quickMemo;
-}
+/**
+ * Les questions toutes prêtes, masquées par l’utilisateur (retenu sur cet appareil, « 1 » ou « 0 »). Stockage refusé :
+ * montrées, et le choix vaut pour la visite. Au rendu serveur, c’est le cookie qui dit (useQuickHidden).
+ */
+const QUICK_HIDDEN = drapeauLocal("blush.quick-hidden", { defaut: false });
 
 function setQuickHidden(hidden: boolean) {
-  try {
-    localStorage.setItem(QUICK_HIDDEN, hidden ? "1" : "0");
-  } catch {
-    /* Stockage refusé : le choix vaut pour la visite */
-  }
-  quickMemo = hidden;
+  QUICK_HIDDEN.poser(hidden);
   retenirIdees(hidden);
-  quickListeners.forEach((l) => l());
 }
 
 /** Le cookie lu par la page (src/app/app/idees.ts) : le rendu serveur connaît le choix. */
@@ -51,16 +35,12 @@ function retenirIdees(hidden: boolean) {
   document.cookie = hidden ? `${IDEES_MASQUEES}=1; path=/; max-age=31536000; samesite=lax` : `${IDEES_MASQUEES}=; path=/; max-age=0; samesite=lax`;
 }
 
-/** `serveur` : le choix lu dans le cookie par la page, le même au rendu serveur et à l’hydratation. */
+/**
+ * `serveur` : le choix lu dans le cookie par la page, le même au rendu serveur et à l’hydratation (à la place de la
+ * valeur serveur du drapeau, la même pour tous : d’où useSyncExternalStore plutôt que useDrapeau).
+ */
 function useQuickHidden(serveur: boolean) {
-  const hidden = useSyncExternalStore(
-    (l) => {
-      quickListeners.add(l);
-      return () => quickListeners.delete(l);
-    },
-    quickHiddenNow,
-    () => serveur,
-  );
+  const hidden = useSyncExternalStore(QUICK_HIDDEN.abonner, QUICK_HIDDEN.lire, () => serveur);
   /* Un choix fait avant le cookie : il le rejoint, le prochain rendu serveur sera juste */
   useEffect(() => {
     if (hidden !== serveur) retenirIdees(hidden);
@@ -386,53 +366,6 @@ function usePerlesALEcoute({ busy, recording, ecoute, logo: logoVu }: { busy: bo
     window.clearTimeout(listen.current.idle);
     listen.current.idle = window.setTimeout(() => logo.removeAttribute("data-lean"), 900);
   };
-}
-
-/** Un bouton secondaire de bulle : il copie, puis confirme. */
-function CopyPill({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        if (!(await copyText(text))) return;
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-      className="lift lift-sm inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-black text-ink shadow-soft"
-    >
-      <Icon name={copied ? "check" : "copy"} size={14} color="#121214" stroke={2.6} />
-      {copied ? "Copié" : label}
-    </button>
-  );
-}
-
-/** Les messages à lui envoyer, une bulle chacun, à copier en un geste. */
-export function SendReply({ lines, why, shine = false }: { lines: string[]; why?: string; shine?: boolean }) {
-  return (
-    <span className="flex flex-col gap-2">
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
-        <Tag tone="recommandee" />
-      </span>
-      <span className="flex flex-col items-start gap-[3px]">
-        {lines.map((l, i) => (
-          <span key={i} data-shine={shine && i === 0 ? "" : undefined} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold leading-[1.35] text-white">
-            {l}
-          </span>
-        ))}
-      </span>
-      {why && <span className="text-[13px] font-extrabold leading-[1.45] text-grey">{why}</span>}
-      <span className="mt-1 flex">
-        <CopyPill text={lines.join("\n")} label="Copier" />
-      </span>
-    </span>
-  );
-}
-
-/** La taille d’un fichier, à la française (« 340 ko », « 2,4 Mo »). */
-export function formatSize(bytes: number) {
-  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} ko` : `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
 }
 
 /* ———— Le menu du « + » ———— */

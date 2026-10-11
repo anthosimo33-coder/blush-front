@@ -25,7 +25,7 @@ let gardee: (Conv<Msg> & { cle: string; modeVocal: boolean }) | null = null;
 /* Les identifiants des messages de la visite (1, 2, 3…) : ils continuent d’une visite à l’autre, la conv gardée garde les siens */
 let prochainId = PREMIER_ID_VISITE;
 
-/** L’identifiant d’un nouveau message de la visite (ton message, que HomeScreen fait voler avant de l’envoyer). */
+/** L’identifiant d’un nouveau message de la visite (ton message, que l’accueil fait voler avant de l’envoyer : ../envois.ts). */
 export const nouvelId = () => prochainId++;
 
 /** Ce que l’écran fait pendant que la conv change (HomeScreen) : rien ici ne touche au DOM. */
@@ -51,7 +51,7 @@ type Demande = (suivi: SuiviChat) => Promise<NewMsg>;
  */
 export type Echange = { label: string; demande: Demande; vocal?: boolean };
 
-/** Combien de bulles de la conv font ces bulles de BLUSH (une bulle, et chacun de ses messages à copier : bulleEcrite, HomeScreen). */
+/** Combien de bulles de la conv font ces bulles de BLUSH (une bulle, et chacun de ses messages à copier : bulleEcrite, ../bulles.tsx). */
 const noeudsDe = (bulles: BulleChat[]) => bulles.reduce((n, b) => n + 1 + (b.messages?.length ?? 0), 0);
 
 /** La réponse avec son vocal arrivé, ou sans (la voix a échoué : elle reste écrite). Sa bulle n’attend plus. */

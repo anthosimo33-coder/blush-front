@@ -5,19 +5,11 @@ import { BubbleLogo } from "@/components/brand/objects3d";
 import { Icon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useEnVue, useHauteur } from "@/lib/hooks";
-import { drapeauLocal, useDrapeau } from "@/lib/stockage";
+import { marquerChatOuvert, useChatOuvert } from "@/components/chat/ouvert";
 import { PARLER_A_BLUSH, PASTILLE_REPRISE } from "./ancres";
 
-/*
- * Le chat a-t-il déjà été ouvert une fois sur cet appareil ? Retenu dans le navigateur (une simple commodité). Stockage
- * refusé (navigation privée), et côté serveur : calme, la bulle ne s’agite qu’une fois le navigateur lu.
- */
-const CHAT_OUVERT = drapeauLocal("blush.chat.ouvert.v1", { defaut: false, indisponible: true, serveur: true });
-
-/** À l’ouverture du chat (la bulle, ou l’accueil lui-même) : la bulle arrête de s’agiter. */
-export function marquerChatOuvert() {
-  CHAT_OUVERT.poser(true);
-}
+/* Le rapport le prend encore ici (ReportScreen.tsx) : il vit avec l’accueil qui le pose, dans src/components/chat/ouvert.ts */
+export { marquerChatOuvert };
 
 /** L’écart entre la bulle et la pastille « Reprendre ta lecture » qu’elle surmonte, sur mobile. */
 const ECART_PASTILLE = 20;
@@ -29,7 +21,7 @@ const ECART_PASTILLE = 20;
  * `sobre` : le rapport en mode sobre (encre et papier, pas de 3D) : une bulle à l’encre, calme, son nom toujours affiché.
  */
 export function ChatBubble({ sobre = false }: { sobre?: boolean }) {
-  const vu = useDrapeau(CHAT_OUVERT);
+  const vu = useChatOuvert();
   /* En mode sobre, rien ne s’agite */
   const ouvert = vu || sobre;
   /* Le bouton « Parler à BLUSH » du bas du rapport est à l’écran : la bulle s’efface pour ne pas passer dessus */

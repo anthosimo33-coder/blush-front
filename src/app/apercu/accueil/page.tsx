@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { cheminDesApercus, configDuChatLocal } from "@/server/drapeaux";
-import { HomeScreen } from "../../app/HomeScreen";
 import { ApercuNav } from "../ApercuNav";
 import { lireApercu } from "../lire";
+import { ApercuAccueil } from "./ApercuAccueil";
 
 export const metadata: Metadata = { title: "Aperçu de l’accueil" };
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/accueil"
   const live = configDuChatLocal() ? `/apercu/demander${a.cas ? `?cas=${a.cas}` : ""}` : undefined;
   return (
     <div className="[background:var(--paper-light)]">
-      <HomeScreen
+      <ApercuAccueil
         key={a.cas}
         quick={home.quick}
         answers={home.answers}

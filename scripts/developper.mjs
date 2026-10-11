@@ -7,7 +7,10 @@
  * 2. BLUSH_CLE est exigée : sans fichier .env (cp .env.example .env.development.local) ni BLUSH_CLE dans le shell, rien
  *    ne démarre. Et le modèle factice refuse les vraies clés d’API ;
  * 3. une base locale est créée si elle manque (jamais effacée), puis les migrations de drizzle/ y sont appliquées ;
- * 4. puis `next dev`, avec les arguments donnés (npm run dev -- -p 3001).
+ * 4. puis `next dev`, avec les arguments donnés (npm run dev -- -p 3001), sur ce poste seulement (127.0.0.1) : next dev
+ *    écoute sinon sur toutes les interfaces (0.0.0.0), et le Wi-Fi joindrait l’appli et les outils de l’équipe (/apercu,
+ *    dont /apercu/demander, qui appelle le vrai modèle avec ta clé). Pour un téléphone du réseau, le dire soi-même :
+ *    npm run dev -- -H 0.0.0.0.
  */
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -71,8 +74,10 @@ if (estLocale(url.href)) {
   console.log(`base ${nom} à jour`);
 } else console.log(`base ${nom} sur ${url.host} : ni créée ni migrée ici (npm run db:migrer)`);
 
-/* 4. next dev, avec l’environnement du shell et les valeurs par défaut (les fichiers .env, il les lit lui-même) */
-const next = spawn(process.execPath, [join(RACINE, "node_modules/next/dist/bin/next"), "dev", ...process.argv.slice(2)], {
+/* 4. next dev, avec l’environnement du shell et les valeurs par défaut (les fichiers .env, il les lit lui-même), sur 127.0.0.1 sauf -H donné */
+const args = process.argv.slice(2);
+const hote = args.some((a) => a === "-H" || a === "--hostname" || a.startsWith("--hostname=")) ? [] : ["-H", "127.0.0.1"];
+const next = spawn(process.execPath, [join(RACINE, "node_modules/next/dist/bin/next"), "dev", ...hote, ...args], {
   cwd: RACINE,
   env: { ...shell, ...parDefaut },
   stdio: "inherit",

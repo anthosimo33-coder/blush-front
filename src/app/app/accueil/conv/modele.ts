@@ -1,7 +1,7 @@
 /*
  * Le modèle de la conv de l’accueil, sans React : ses messages (`Msg`, chacun de son `type`), d’où viennent leurs
  * identifiants, l’historique et l’intro de BLUSH mis en messages, les heures et les jours, et les lignes de la conv
- * (`rowsOf`). Des données seulement : HomeScreen habille chaque message de ses bulles (bubblesOf), et la conv gardée
+ * (`rowsOf`). Des données seulement : ../bulles.tsx habille chaque message de ses bulles (bubblesOf), et la conv gardée
  * pendant la visite (../../garde.ts) lit les mêmes identifiants. Testé dans tests/unit/accueil-modele.test.ts.
  */
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
@@ -13,7 +13,7 @@ import type { BlushAnswer, BulleChat, LevelId } from "@/types";
  * - l’intro de BLUSH : −2 (ton prochain pas) et −1 (« elle vient de répondre ? ») ;
  * - l’aperçu (/apercu, des échanges sans identifiant) : −100 − 2 × le rang de l’échange pour ton message, − 1 pour la réponse ;
  * - l’historique du back-end : −1 000 000 − 2 × l’échange (l’id de ton message en base), − 1 pour la réponse de BLUSH ;
- * - la visite : 1, 2, 3… (PREMIER_ID_VISITE, puis HomeScreen les compte), qui continuent d’une visite à l’autre.
+ * - la visite : 1, 2, 3… (PREMIER_ID_VISITE, puis nouvelId les compte : ./useConversation.ts), qui continuent d’une visite à l’autre.
  * Rien n’est attribué entre les deux (0, −3 à −99). Un échange de l’historique a toujours les mêmes identifiants : d’un
  * chargement à l’autre, les morceaux plus anciens se posent devant sans doublon, et la conv gardée reconnaît ses messages.
  */
@@ -64,7 +64,7 @@ export const cleBulle = (id: number, rang: number | "ecrit") => `${id}-${rang}`;
 
 /**
  * La clé de la bulle `k` du message `m`, la seule règle : « BLUSH écrit » qui tape encore a la sienne (c’est sa seule
- * bulle). Un groupe prend celle de sa première bulle (rowsOf), et l’habillage des bulles la même (HomeScreen).
+ * bulle). Un groupe prend celle de sa première bulle (rowsOf), et l’habillage des bulles la même (../bulles.tsx).
  */
 export const cleDeBulle = (m: Msg, k: number) => cleBulle(m.id, tapeEncore(m) ? "ecrit" : k);
 
