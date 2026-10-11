@@ -27,6 +27,8 @@ vi.mock("@/server/env", async (original) => {
   return {
     ...o,
     env: () => (etat.prestataire ? { ...o.env(), BLUSH_IA_FACTICE: false, ELEVENLABS_API_KEY: "cle-fictive", BLUSH_VOIX_A: "voix-fictive", MISTRAL_API_KEY: undefined } : o.env()),
+    /* iaFactice lit l’env() de son module, pas celui-ci : on le remplace aussi */
+    iaFactice: () => !etat.prestataire && o.iaFactice(),
   };
 });
 

@@ -1,26 +1,11 @@
 import type { Chiffres } from "@prompts/lib/conv";
 import type { Chapitre, Rapport, Verdict } from "@prompts/lib/schemas";
-import { CHAPITRE_DU_VERDICT, estOffert, TITRE_DU_VERDICT, titreDAttente } from "@/contenu/chapitres";
+import { CHAPITRE_DU_VERDICT, estOffert, TITRE_DU_VERDICT } from "@/contenu/chapitres";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
 import type { Chapter, ChapterBlock, Message, ScoreRow, SoberReport, Verdict as VerdictAffiche } from "@/types";
-import { ErreurInvariant } from "../erreurs";
 import { resoudre } from "./messages";
 
 /* Le verdict, les scores du chapitre 1 et le rapport, tels que les montrent ses écrans (src/server/ecrans/messages.ts). */
-
-/**
- * Le titre d’un chapitre avant que le plan donne le sien (titreDAttente, src/contenu/chapitres.ts) : chacun des
- * NB_CHAPITRES en a un. Un autre numéro est une erreur du code, levée ici plutôt qu’un titre vide à l’écran ou dans le mail.
- * TODO(9a) : un pansement du lot 8 (src/contenu est à 8c) ; titreDAttente doit rendre une chaîne (TITRES typé sur les
- * numéros des chapitres, ou une erreur levée chez lui), puis cette fonction disparaît et ses appelants
- * (presentation/rapport.ts, mail-rapport.ts) reprennent titreDAttente de @/contenu/chapitres.
- */
-export function titreAttendu(numero: number, autre: string): string {
-  const titre = titreDAttente(numero, autre);
-  /* typo: du code, le message d’une erreur (jamais affiché ; scripts/verifier-typo.mjs ne reconnaît que les classes en …Error) */
-  if (titre === undefined) throw new ErreurInvariant("chapitre:sans_titre_d_attente", `chapitre ${numero} : pas de titre d’attente`);
-  return titre;
-}
 
 /* ———— Les scores du chapitre 1 : calculés par le code, jamais par le modèle ———— */
 
@@ -131,6 +116,12 @@ export function chapitresAffiches(chapitres: Chapitre[], messages: Map<string, M
 
 /** Le temps de lecture, à 230 mots par minute. */
 export const tempsDeLecture = (valeur: unknown) => `${Math.max(1, Math.round(JSON.stringify(valeur).split(/\s+/).length / 230))} min`;
+
+/** Le temps de lecture d’un rapport écrit : en entier, et ses chapitres offerts (estOffert, pas le `free` du modèle). */
+export const lectureDe = (chapitres: Chapter[]): { free: string; full: string } => ({
+  free: tempsDeLecture(chapitres.filter((c) => estOffert(c.number))),
+  full: tempsDeLecture(chapitres),
+});
 
 /** Le rapport doux du mode sobre, s’il en a un. */
 export function sobreAffiche(r: Pick<Rapport, "sobre">): SoberReport | null {

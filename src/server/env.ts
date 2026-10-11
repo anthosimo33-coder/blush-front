@@ -137,6 +137,14 @@ export function env(): Env {
 export const boiteAMails = () => boiteDe(env());
 
 /**
+ * Le mode factice : le modèle, la voix et la transcription ne partent jamais chez un prestataire, ils rendent des
+ * réponses fixes (src/server/ia/factice.ts, lu par claude.ts, voix.ts et transcription.ts), sans rien noter dans ai_usage.
+ * La seule question à poser pour le savoir : jamais sur Vercel (env() l’éteint), et jamais « une clé manque ». Ici, et
+ * non dans factice.ts : la voix et la transcription le demandent sans charger les sorties factices.
+ */
+export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
+
+/**
  * Le serveur des tests de bout en bout : `next start` sur http://localhost, avec le modèle factice et la boîte à mails.
  * Jamais sur Vercel. Lu directement dans process.env, sans env() : les cookies le demandent avant toute autre variable.
  */

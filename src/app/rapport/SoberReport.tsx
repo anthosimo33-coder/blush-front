@@ -13,7 +13,7 @@ import type { SoberReport as SoberData } from "@/types";
 import { pagePrecedente } from "@/lib/navigation";
 
 /*
- * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH sort du jeu.
+ * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH laisse la taquinerie de côté.
  * Pas de couleur de sens, pas de 3D, pas de score, pas de logo en volume. Encre et papier seulement.
  */
 /* « Quitter vite » et « OK, merci » mènent à l’écran 01, comme dans la maquette */

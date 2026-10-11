@@ -2,7 +2,9 @@
  * La marque BLUSH, écrite une fois pour ce que le serveur dessine lui-même : ses mails (le code, la liste d’attente,
  * « ton rapport est prêt ») et ses images de partage (src/server/carte-verdict.tsx, src/server/carte-partage.tsx). Les
  * couleurs, la police, l’adresse affichée, et le gabarit commun des mails : le papier, la bulle et « blush » en tête, la
- * carte blanche, le pied, la version sombre pour Apple Mail. Les écrans de l’appli ont les leurs (src/app/globals.css).
+ * carte blanche, le pied, la version sombre pour Apple Mail. Et la teinte des barres du navigateur (themeColor des
+ * métadonnées), que le CSS ne donne pas. Les écrans de l’appli ont leurs tokens (src/app/globals.css) : une couleur qui
+ * en a un s’écrit ici en hex, et seulement ici (la règle couleur-en-jeton d’eslint.config.mjs).
  * Sans server-only : l’aperçu des mails (/apercu/mail) et les tests le lisent aussi.
  */
 
@@ -21,6 +23,8 @@ export const ROSE = "#FF4F9A";
 /* Le dégradé des bulles de BLUSH, du clair au foncé (160°) : DEGRADE_ROSE */
 const ROSE_CLAIR = "#FF9BCB";
 const ROSE_FONCE = "#E8358A";
+/** Les traits fins d’une carte (le sommaire du mail du rapport). */
+export const TRAIT = "#EFEDE8";
 /** Le bleu des bulles envoyées (la tienne). */
 export const BLEU = "#1A66DB";
 /** Le dégradé des bulles de BLUSH, tel que les mails et les images l’écrivent. */

@@ -7,9 +7,6 @@ import { DoneCheck } from "./feedback";
 import { Icon } from "./icons";
 import { Dot } from "./messages";
 
-/* Les niveaux vivent dans src/contenu/niveaux.ts : la réexportation garde l’accueil tel quel, le temps que 9a le bascule */
-export { scaleOf } from "@/contenu/niveaux";
-
 /* Couleur du nom du gagnant : les teintes foncées, lisibles en petit (au moins 4,5:1) */
 const SIDE_CLASS = { toi: "text-toi-ink", elle: "text-elle-ink", pareil: "text-vrai-ink" } as const;
 

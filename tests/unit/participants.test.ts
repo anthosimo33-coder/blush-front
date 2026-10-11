@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { IlOuElle, pronomOppose } from "@/lib/pronom";
-import { personnesDe, storyAffichee, type Meta } from "@/server/histoires";
+import { personnesDe, type Meta } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
 import type { Person, Story } from "@/types";
 
 /* Deux prénoms inventés, dans l’ordre de l’export : Tom (p0), puis Léa (p1) */

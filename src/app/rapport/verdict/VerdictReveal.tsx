@@ -10,7 +10,7 @@ import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import type { ReportPayload } from "@/types/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
-import { TypingDots } from "@/components/ui/FileInput";
+import { TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import type { Confidence, Message, Story } from "@/types";
 import { moiEtAutre } from "@/lib/participants";

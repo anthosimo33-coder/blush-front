@@ -1,6 +1,5 @@
-import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { titreAttendu } from "./ecrans/rapport";
-import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, PAPIER, POLICE, type MailDessine } from "./marque";
+import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
+import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gabaritMail, GRIS, PAPIER, POLICE, TRAIT, type MailDessine } from "./marque";
 
 /*
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
@@ -26,7 +25,7 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;"><tr><td style="background-color:#F0479A;background-image:${DEGRADE_ROSE};border-radius:20px 20px 20px 6px;padding:9px 16px 11px;font-family:${POLICE};font-size:16px;line-height:20px;font-weight:900;color:#FFFFFF;">${t}</td></tr></table>`;
 
   const chapitre = (numero: number) =>
-    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreAttendu(numero, autre))}</td></tr></table></td>`;
+    `<td width="50%" style="padding:6px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" style="width:26px;vertical-align:middle;"><div class="pastille" style="width:26px;height:26px;background:${ENCRE};border-radius:13px;text-align:center;font-family:${POLICE};font-size:12px;line-height:26px;font-weight:900;color:#FFFFFF;">${numero}</div></td><td class="encre" style="padding-left:10px;vertical-align:middle;font-family:${POLICE};font-size:15px;line-height:19px;font-weight:800;color:${ENCRE};">${enHtml(titreDAttente(numero, autre))}</td></tr></table></td>`;
   /* Le sommaire : tous les chapitres, deux par ligne, sous les titres du rapport */
   const sommaire = Array.from({ length: Math.ceil(NB_CHAPITRES / 2) }, (_, k) => `<tr>${chapitre(2 * k + 1)}${chapitre(2 * k + 2)}</tr>`).join("");
 
@@ -37,7 +36,7 @@ export function mailRapport({ base, lien, chapitres, lecture, autre, sobre }: { 
     : `${bulle("j’ai fini ton rapport 📖")}${bulle(`${n} chapitres. j’ai pas été tendre 😏`)}
             <div class="encre" style="padding-top:18px;font-family:${POLICE};font-size:32px;line-height:37px;font-weight:900;letter-spacing:-0.025em;color:${ENCRE};">Ton rapport<br>est prêt.</div>
             <div class="doux" style="padding-top:10px;font-family:${POLICE};font-size:16px;line-height:24px;font-weight:700;color:${DOUX};">Le verdict, la bascule, ce qui coince, ton portrait sans filtre, et ton prochain&nbsp;pas.</div>
-            <table role="presentation" class="sommaire" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;border-top:1px solid #EFEDE8;border-bottom:1px solid #EFEDE8;padding:10px 0;">${sommaire}</table>
+            <table role="presentation" class="sommaire" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;border-top:1px solid ${TRAIT};border-bottom:1px solid ${TRAIT};padding:10px 0;">${sommaire}</table>
             <div class="gris" style="padding-top:12px;font-family:${POLICE};font-size:13px;line-height:18px;font-weight:800;color:${GRIS};">${n}&nbsp;chapitres · ${lecture.replace(" ", "&nbsp;")} de lecture</div>`;
 
   const html = gabaritMail({

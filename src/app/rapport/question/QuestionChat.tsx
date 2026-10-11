@@ -128,7 +128,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           type="submit"
           aria-label="Poser ma question"
           disabled={!typed}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:bg-[#D9D6CF] disabled:shadow-none"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:bg-disabled disabled:shadow-none"
         >
           <Icon name="arrow" size={18} stroke={2.8} className="-rotate-90 text-white" />
         </button>

@@ -1,7 +1,7 @@
 import { ALERTE_FACTICE, attendreMail, compteDe, emailLibre, expect, lectureFaite, mailsPour, pagePrete, rapportPasEncoreEcrit, tachesDe, test } from "./aide";
 
 /*
- * Le mode sobre : quand la conv montre un danger (une détresse, un mineur), BLUSH sort du jeu. Pas de mise en scène du
+ * Le mode sobre : quand la conv montre un danger (une détresse, un mineur), BLUSH laisse la taquinerie de côté. Pas de mise en scène du
  * verdict, pas de score, pas de vocal, pas de partage, pas de paiement : un rapport court et doux, offert, des gestes
  * pour soi, et de l’aide à un toucher. Le modèle factice lève l’alerte quand la conv porte son déclencheur (une conv
  * inventée, ALERTE_FACTICE). C’est le seul parcours de sécurité de l’appli.

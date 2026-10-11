@@ -71,7 +71,7 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       </span>
       {/* Sans préchargement, l’accueil se rend au toucher : le chevron laisse place aux trois points pendant ce temps */}
       <EnRoute>
-        <Icon name="chevron" size={17} color="#B4B1A9" stroke={2.6} className="lift-chev shrink-0" />
+        <Icon name="chevron" size={17} stroke={2.6} className="lift-chev shrink-0 text-pale" />
       </EnRoute>
     </Link>
   );

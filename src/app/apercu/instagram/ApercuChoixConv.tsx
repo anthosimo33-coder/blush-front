@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { ExportScreen } from "../../importer/export/ExportScreen";
-import { ChoixConv, type ConvInstagram } from "../../importer/export/ChoixConv";
+import { ChoixConv } from "../../importer/export/ChoixConv";
+import type { ConvInstagram } from "@/services/preparer-export";
 
 /* Des convs inventées, comme dans un vrai export : beaucoup de petites, quelques longues, des groupes */
 const CONVS: ConvInstagram[] = [

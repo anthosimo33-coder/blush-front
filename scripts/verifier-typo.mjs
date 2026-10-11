@@ -103,7 +103,8 @@ const A_L_EQUIPE = new Map([
 ]);
 
 /**
- * Une chaîne qui n’est jamais affichée : un message de console.*, du journal, d’une erreur (`new …Error(…)`) ou d’une
+ * Une chaîne qui n’est jamais affichée : un message de console.*, du journal, d’une erreur (`new …Error(…)`, ou
+ * `new Erreur…(…)` : les erreurs de BLUSH, dont le message reste au serveur) ou d’une
  * alerte à l’équipe (A_L_EQUIPE), lu dans les logs ou par l’équipe ; ou une déclaration marquée `typo: du code` dans le
  * commentaire qui la précède.
  */
@@ -112,7 +113,7 @@ function horsDesTextes(n, source) {
   for (let enfant = n, p = n.parent; p; enfant = p, p = p.parent) {
     if (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ts.isIdentifier(p.expression.expression) && p.expression.expression.text === "console") return true;
     if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text) && p.arguments.indexOf(enfant) >= A_L_EQUIPE.get(p.expression.text)) return true;
-    if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && p.expression.text.endsWith("Error")) return true;
+    if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && /Error$|^Erreur/.test(p.expression.text)) return true;
     /* L’instruction qui contient la chaîne : le commentaire juste au-dessus d’elle peut la dispenser */
     if (p.parent && (ts.isSourceFile(p.parent) || ts.isBlock(p.parent))) return (ts.getLeadingCommentRanges(source, p.pos) ?? []).some((c) => MARQUE.test(source.slice(c.pos, c.end)));
   }

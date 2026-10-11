@@ -6,6 +6,7 @@ import { SuiviNavigation } from "@/lib/navigation";
 import { ErreurDeParcours } from "@/components/screens/ErreurDeParcours";
 import { surVercel } from "@/server/drapeaux";
 import { URL_SITE } from "@/server/env";
+import { PAPIER } from "@/server/marque";
 import { classesDesPolices } from "./polices";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#F4F2ED",
+  themeColor: PAPIER,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

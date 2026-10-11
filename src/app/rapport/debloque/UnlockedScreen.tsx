@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useEffect } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { OFFRE_PAR_PLAN } from "@/contenu/offres";
@@ -39,7 +40,7 @@ export function UnlockedScreen({
   autre,
 }: {
   offer: "blushplus" | "rapport";
-  next: string | null;
+  next: Route | null;
   /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
   restants: number;
   reprise: number;

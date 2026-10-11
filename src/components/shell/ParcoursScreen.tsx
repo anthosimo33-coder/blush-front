@@ -1,5 +1,6 @@
 import { FlowSteps } from "@/components/ui/progress";
-import { MobileTopBar, Screen, type BackTarget, type ScreenProps } from "./Screen";
+import { MobileTopBar, Screen, type ScreenProps } from "./Screen";
+import type { BackTarget } from "./BoutonRetour";
 
 /** L’étape du parcours : ta conv, qui est qui, ton email (FlowSteps). */
 export type EtapeParcours = 1 | 2 | 3;

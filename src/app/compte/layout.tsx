@@ -1,4 +1,3 @@
-import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
 import { compteRetireDeLaBeta } from "@/server/auth";
@@ -17,6 +16,6 @@ export default async function Layout({ children }: LayoutProps<"/compte">) {
    * Sans compte connecté (session expirée, autre appareil) : la connexion d’abord, puis retour ici. Une session ouverte
    * que la bêta refuse désormais (un testeur retiré de la liste) : l’écran où il peut tout effacer
    */
-  if (!(await estConnecte())) redirect((await compteRetireDeLaBeta(await lireSession())) ? "/effacer" : (connexionPuis("/compte") as Route));
+  if (!(await estConnecte())) redirect((await compteRetireDeLaBeta(await lireSession())) ? "/effacer" : connexionPuis("/compte"));
   return children;
 }

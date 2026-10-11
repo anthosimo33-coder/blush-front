@@ -178,7 +178,6 @@ export function lire<C extends Colonne>(colonne: C, octets: Buffer | Uint8Array)
   if (!relecture) return valeur;
   const lue = relecture.safeParse(valeur);
   if (lue.success) return lue.data;
-  /* typo: du code, le message d’une erreur (jamais affiché ; scripts/verifier-typo.mjs ne reconnaît que les classes en …Error) */
   throw new ErreurInvariant(`${colonne}:forme_inattendue`, `${colonne} : forme inattendue (${lue.error.issues.map((i) => i.path.join(".") || "racine").join(", ")})`);
 }
 

@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Alert, DoneCheck, NoteIcone, TypingDots } from "@/components/ui/feedback";
-import { TypingDots as TypingDotsDeFileInput } from "@/components/ui/FileInput";
 import { citation, coinsDeBulle, GroupeBulles, placeDansLeGroupe } from "@/components/ui/messages";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { auMoins } from "../aide/listes";
@@ -127,10 +126,6 @@ describe("TypingDots", () => {
     expect(points.map((p) => p.style.width)).toEqual(["4px", "4px", "4px"]);
     expect(points.slice(0, 2).every((p) => p.className.includes("bg-current"))).toBe(true);
     expect(points[2]!.style.background).toContain("--degrade-perle");
-  });
-
-  it("reste importable depuis FileInput, le temps que 9a bascule ses importeurs", () => {
-    expect(TypingDotsDeFileInput).toBe(TypingDots);
   });
 });
 

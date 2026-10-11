@@ -1,4 +1,4 @@
-import type { Metadata, Route } from "next";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
 import { getReport, getStory, sansHistoire } from "@/services/serveur";
@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
    * Les gardes sont dans layout.tsx (une vraie 307, avant le squelette) : celles-ci ne servent qu’au type, et à une
    * navigation qui ne rejoue pas le layout (la même page, d’autres paramètres : ?paiement=1)
    */
-  if (!story) redirect((await sansHistoire("/rapport")) as Route);
+  if (!story) redirect(await sansHistoire("/rapport"));
   if (!initial) redirect("/lecture");
   return (
     <PageDeConv rendu={rendu}>

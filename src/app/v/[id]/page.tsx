@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { cache, type ReactNode } from "react";
@@ -94,7 +94,8 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
         <section className="mt-6 flex flex-col items-center gap-3 rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-card lg:px-7">
           <h2 className="m-0 text-titre-3 font-black leading-[1.12] tracking-[-0.025em] [text-wrap:balance]">Ta conv en dit plus que tu crois.</h2>
           <p className="m-0 text-detail font-bold leading-[1.45] text-soft [text-wrap:balance]">Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.</p>
-          <ButtonLink href={`/v/${id}/essayer`} arrow className="mt-1 whitespace-nowrap">
+          {/* Une route (essayer/route.ts, qui pose le cookie et redirige), pas une page : typedRoutes ne connaît que les pages */}
+          <ButtonLink href={`/v/${id}/essayer` as Route} arrow className="mt-1 whitespace-nowrap">
             Analyser ma conv
           </ButtonLink>
         </section>

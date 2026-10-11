@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import { useId, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -86,7 +87,7 @@ export function InsetRow({
   sub?: ReactNode;
   trailing?: ReactNode;
   chevron?: boolean;
-  href?: string;
+  href?: Route;
   /** false : le lien ne remet pas la page en haut (vers l’accueil, qui s’ouvre sur le dernier échange). */
   scroll?: boolean;
   prefetch?: ComponentProps<typeof Link>["prefetch"];

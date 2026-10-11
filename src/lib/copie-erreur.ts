@@ -1,8 +1,9 @@
+import type { Route } from "next";
 import { MIN_MESSAGES, MIN_MESSAGES_CAPTURES } from "@prompts/lib/conv";
 import type { ErreurParcours } from "@/lib/messages-erreur";
 
 /* Écrans d’erreur du parcours d’import (ERREURS_PARCOURS) : un titre, une phrase, une action. Textes absents des maquettes, relus le 8 octobre. */
-const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: string; back: string }> = {
+const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: string; href: Route; back: Route }> = {
   fichier: {
     title: "On n’arrive pas à lire ce fichier.",
     text: "Exporte à nouveau votre discussion, sans médias, puis choisis le fichier enregistré.",
@@ -68,7 +69,8 @@ export function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchP
   const reste = new URLSearchParams(params);
   reste.delete("erreur");
   const requete = reste.toString();
-  const ici = requete ? `${chemin}?${requete}` : chemin;
+  /* La page où l’erreur arrive (usePathname) : une route du site */
+  const ici = (requete ? `${chemin}?${requete}` : chemin) as Route;
   const app = params.get("app");
   if (kind === "courte" && chemin === "/importer/captures")
     return {

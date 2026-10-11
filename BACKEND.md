@@ -156,7 +156,7 @@ En production (`VERCEL_ENV=production`, pas les préversions), `env()` refuse au
 | `BLUSH_ALERTES` | Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules | aucune : pas d’alerte | À écrire, sinon un échec ne prévient personne |
 | `BLUSH_ADMINS` | Qui peut ouvrir le tableau de bord (`/admin`) : un ou des emails, séparés par des virgules | ceux de `BLUSH_ALERTES` | Pour tous les autres, `/admin` n’existe pas (404) |
 | `CRON_SECRET` | Le secret que Vercel Cron envoie à `/api/cron/purge` (16 caractères au moins) | aucun | Exigé : sans lui, la purge de nuit répondrait 401 et ne tournerait jamais |
-| `BLUSH_IA_FACTICE` | `1` en dev et en tests : le modèle rejoue des sorties enregistrées, sans aucun coût (`src/server/ia/factice.ts`) | `0` | Ignorée sur Vercel, avec un avertissement dans les logs : la production appelle toujours le vrai modèle |
+| `BLUSH_IA_FACTICE` | `1` en dev et en tests : le modèle rejoue des sorties enregistrées, sans aucun coût (`src/server/ia/factice.ts`) ; la voix est muette et la transcription rend une phrase fixe. Rien ne part chez un prestataire, et rien ne s’écrit dans `ai_usage` (`iaFactice`, `src/server/env.ts`) | `0` | Ignorée sur Vercel, avec un avertissement dans les logs : la production appelle toujours le vrai modèle |
 | `BLUSH_BOITE_MAILS` | Tests de bout en bout : le dossier où les mails sont écrits au lieu de partir. Avec le modèle factice seulement | aucune | Ignorée sur Vercel : les mails partent toujours par Resend |
 
 `tests/documentation.test.ts` échoue si une variable du schéma manque à ce tableau, ou si ce tableau en cite une qu’il ne connaît pas.

@@ -9,7 +9,8 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours, resumeAjout } from "@/server/ajouts";
-import { historique, repondre } from "@/server/chat";
+import { repondre } from "@/server/chat";
+import { historique } from "@/server/historique";
 import { ficheDe, memoireDe } from "@/server/donnees";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { FACTICE } from "@/server/ia/factice-valeurs";

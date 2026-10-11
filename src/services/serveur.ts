@@ -1,11 +1,13 @@
 import "server-only";
+import type { Route } from "next";
 import type { ConvSummary, Fiche, Story } from "@/types";
 import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
-import { histoiresDuCompte, metaDe, quiRempli, storyAffichee } from "@/server/histoires";
+import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
 import { contexte } from "@/server/requete";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
@@ -42,7 +44,7 @@ export async function quiAttendu(): Promise<boolean> {
  * Rien à montrer sur une page d’une conv (accueil, rapport…) : sans compte connecté (le lien du mail ouvert dans un autre
  * navigateur, une session expirée), la connexion, qui ramène ensuite à `suite`. Connecté sans conv : commencer.
  */
-export async function sansHistoire(suite: string): Promise<string> {
+export async function sansHistoire(suite: string): Promise<Route> {
   return !(await contexte()).utilisateur ? connexionPuis(suite) : "/commencer";
 }
 
@@ -124,7 +126,7 @@ export async function getNomsDuCompte(): Promise<{ me: Story["participants"][num
  * (/app → /rapport → /lecture → /qui), un aller-retour et un rendu serveur par saut. Jamais le prénom de l’autre : la
  * landing s’ouvre à qui tient l’appareil, sans rien toucher.
  */
-export async function getRetour(): Promise<{ destination: string } | null> {
+export async function getRetour(): Promise<{ destination: Route } | null> {
   const { utilisateur, story } = await contexte();
   if (!utilisateur || !story) return null;
   if (!quiRempli(metaDe(story))) return { destination: "/qui" };

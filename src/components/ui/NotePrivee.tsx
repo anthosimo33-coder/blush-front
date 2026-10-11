@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -32,7 +33,7 @@ const LIEN_DISCRET = "font-black text-ink underline decoration-[rgba(17,17,20,0.
  * avec `onClick`, un bouton qui ouvre une feuille (« En savoir plus ») ou agit sur place (« Désactiver le lien »), sa
  * zone de toucher élargie au-delà du texte.
  */
-export function LienDiscret(props: { href: string; children: ReactNode } | { onClick: () => void; ouvreFeuille?: boolean; children: ReactNode }) {
+export function LienDiscret(props: { href: Route; children: ReactNode } | { onClick: () => void; ouvreFeuille?: boolean; children: ReactNode }) {
   if ("href" in props)
     return (
       <Link href={props.href} className={LIEN_DISCRET}>

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { nomErreur, tracer } from "@/lib/tracer";
-import { compterImagePartagee, imagePartage, type CibleImage } from "@/services/api";
+import { compterImagePartagee, imagePartage } from "@/services/api";
+import type { CibleImage } from "@/types/api";
 import { Alert, TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";

@@ -24,6 +24,8 @@ const SECURITE = [
 const avecSession = (source: string, destination: string) => NOMS_DE_SESSION.map((key) => ({ source, has: [{ type: "cookie" as const, key }], destination }));
 
 const nextConfig: NextConfig = {
+  /* Les liens et les navigations (next/link, useRouter, redirect) ne visent qu’une route qui existe : tsc le vérifie */
+  typedRoutes: true,
   async redirects() {
     return [
       /* L’écran 14 (son message) vit désormais dans le chat de l’accueil ; l’écran 15 (relire ma réponse) a été retiré */

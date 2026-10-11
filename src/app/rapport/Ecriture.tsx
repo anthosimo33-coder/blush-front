@@ -3,8 +3,7 @@
 import { cn } from "@/lib/cn";
 import { useEnVue } from "@/lib/hooks";
 import type { EcritureRapport, EtatChapitre } from "@/types/api";
-import { DoneCheck } from "@/components/ui/feedback";
-import { TypingDots } from "@/components/ui/FileInput";
+import { DoneCheck, TypingDots } from "@/components/ui/feedback";
 import { SUITE_ECRITURE } from "./ancres";
 
 /*

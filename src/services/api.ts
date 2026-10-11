@@ -26,12 +26,6 @@ const pVideo = () => import("./preparer-video");
 export const prechargerExport = () => void pExport().catch((e: unknown) => tracer("prechargement:export", e));
 export const prechargerVideo = () => void pVideo().catch((e: unknown) => tracer("prechargement:video", e));
 
-/*
- * Les types du réseau vivent dans src/types/api.ts. Repris ici pour les modules qui les lisent encore à cette adresse
- * (l’accueil, src/lib/requetes.ts, « Mon compte », « Partager », l’import de captures) : ces reprises partent au lot 9a.
- */
-export type { Account, AvanceVideo, CibleImage, ReportPayload, VerdictMontre } from "@/types/api";
-
 /** Le chat : la réponse n’est pas arrivée en entier (le réseau a coupé, ou une erreur après des bulles). Les bulles déjà reçues, peut-être aucune. */
 export class CoupureChat extends Error {
   constructor(readonly recues: BulleChat[]) {

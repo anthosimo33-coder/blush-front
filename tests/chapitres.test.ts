@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { cardsOf } from "@/app/rapport/verdict/cartes";
 import { CHAPITRES_OFFERTS, CHAPITRES_PAYANTS, estOffert, NB_CHAPITRES, PREMIER_PAYANT, titreDAttente } from "@/contenu/chapitres";
-import { lectureDe } from "@/server/analyse";
-import { chapitresAffiches, tempsDeLecture } from "@/server/ecrans/rapport";
+import { chapitresAffiches, lectureDe, tempsDeLecture } from "@/server/ecrans/rapport";
 import { mailRapport } from "@/server/mail-rapport";
-import type { ReportPayload } from "@/services/api";
+import type { ReportPayload } from "@/types/api";
 import type { Chapter } from "@/types";
 import { chapitre } from "./aide/fabriques";
 
@@ -84,7 +83,7 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
       { kind: "play", text: "Pose-lui la question, en face." },
     ],
   };
-  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({ number: n, title: titreDAttente(n, "Maëlys")!, tocTitle: titreDAttente(n, "Maëlys")!, free: false, locked: true, blocks: [] }));
+  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({ number: n, title: titreDAttente(n, "Maëlys"), tocTitle: titreDAttente(n, "Maëlys"), free: false, locked: true, blocks: [] }));
   const payload = (chapters: Chapter[], access: ReportPayload["access"]): ReportPayload => ({
     report: {
       storyId: "s",

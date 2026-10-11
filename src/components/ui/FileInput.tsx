@@ -33,6 +33,3 @@ export function FileInput({
     />
   );
 }
-
-/* TypingDots vit dans feedback.tsx : la réexportation garde ses importeurs tels quels, le temps que 9a les bascule */
-export { TypingDots } from "./feedback";

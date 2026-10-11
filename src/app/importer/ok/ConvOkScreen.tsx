@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { DoneCheck } from "@/components/ui/feedback";
@@ -21,7 +22,7 @@ export function ConvOkScreen({ source }: { source: Source }) {
   const [j] = useJourney();
   /* Ta conv est bien arrivée : le « oui » */
   useSoundOnce("oui");
-  const back = `/importer/export?app=${j.exportApp}`;
+  const back: Route = `/importer/export?app=${j.exportApp}`;
   const fileName = j.exportFileName ?? source.fileName;
   return (
     <ParcoursScreen

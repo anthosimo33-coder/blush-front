@@ -25,7 +25,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
     etape: s.etape,
     progres: s.progres,
     restant: s.restant,
-    chapitres: suite.map((c, k) => ({ number: c.number, title: (s.etape === "plan" ? titreDAttente(c.number, AUTRE) : undefined) ?? c.tocTitle, etat: s.e[k] ?? "attente" })),
+    chapitres: suite.map((c, k) => ({ number: c.number, title: s.etape === "plan" ? titreDAttente(c.number, AUTRE) : c.tocTitle, etat: s.e[k] ?? "attente" })),
   };
   const payload: ReportPayload = {
     report: {

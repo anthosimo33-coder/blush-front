@@ -36,7 +36,7 @@ import { cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/s
 import { chiffrer, empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import { aujourdhuiParis } from "@/server/temps";
-import { historique } from "@/server/chat";
+import { historique } from "@/server/historique";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
 import { avecEcheance } from "@/server/echeance";

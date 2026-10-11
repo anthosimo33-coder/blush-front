@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { BubbleLogo } from "./objects3d";
@@ -15,7 +16,7 @@ export function Logo({
   fontSize?: number;
   onInk?: boolean;
   animated?: boolean;
-  href?: string;
+  href?: Route;
   className?: string;
 }) {
   const mark = (

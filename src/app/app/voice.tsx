@@ -414,7 +414,7 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
       </button>
       <span aria-hidden="true" className="flex h-7 flex-1 items-center justify-between gap-[2px]">
         {vocal.peaks.map((p, i) => (
-          <span key={i} className={cn("w-[3px] rounded-full", (i + 0.5) / vocal.peaks.length <= t / duree ? "bg-[#E8358A]" : "bg-[#D9D6CF]")} style={{ height: 5 + p * 22 }} />
+          <span key={i} className={cn("w-[3px] rounded-full", (i + 0.5) / vocal.peaks.length <= t / duree ? "bg-[#E8358A]" : "bg-disabled")} style={{ height: 5 + p * 22 }} />
         ))}
       </span>
       <span className="shrink-0 text-legende font-black tabular-nums text-grey">{formatClock(playing || t > 0 ? t : Math.round(duree))}</span>

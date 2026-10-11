@@ -4,7 +4,8 @@
  * Ce que le cache des requêtes (src/lib/query.ts) garde du compte et de la conv ouverte, et ce qui le fait relire : les
  * écrans passent par ici, pour qu’un changement de conv ou un paiement n’oublie aucune donnée.
  */
-import { getAccount, getReport, openConv, type Account, type ReportPayload } from "@/services/api";
+import { getAccount, getReport, openConv } from "@/services/api";
+import type { Account, ReportPayload } from "@/types/api";
 import { invalidate, useQuery, type Cle, type OptionsLecture } from "./query";
 
 /**

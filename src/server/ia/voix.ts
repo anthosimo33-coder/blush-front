@@ -6,12 +6,11 @@ import type { Voix } from "@/types";
 import { alerter } from "../alertes";
 import { payeurDe, type Payeur } from "../budget";
 import { cleDeLimiteDeLaCle } from "../email-canonique";
-import { env } from "../env";
+import { env, iaFactice } from "../env";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { auMieux, journal } from "../journal";
 import { compteDe, compter, LIMITES, rendre, sousLaLimite } from "../limites";
 import { aujourdhuiParis, pause } from "../temps";
-import { iaFactice } from "./factice";
 import { noterCout } from "./usage";
 
 /*

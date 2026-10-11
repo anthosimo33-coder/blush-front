@@ -1,6 +1,5 @@
 "use client";
 
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -11,11 +10,12 @@ import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
-import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
+import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/api";
+import type { AvanceVideo } from "@/types/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
-import { DoneCheck } from "@/components/ui/feedback";
-import { FileInput, TypingDots } from "@/components/ui/FileInput";
+import { DoneCheck, TypingDots } from "@/components/ui/feedback";
+import { FileInput } from "@/components/ui/FileInput";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { ReorderGrid } from "@/components/ui/ReorderGrid";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
@@ -163,7 +163,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     } catch (e) {
       if (!monte.current) return;
       /* Bêta fermée : BLUSH ne lit des captures que pour un compte (la session a pu expirer sur cet écran). La connexion, puis retour ici */
-      if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`) as Route);
+      if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
       /* La limite du jour, ou le budget de l’IA du jour atteint (« souffle ») : les captures ne sont pas en cause */

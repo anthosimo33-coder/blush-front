@@ -13,7 +13,6 @@ import { NBSP } from "@/lib/format";
  * Seule celle-là part chez BLUSH, les autres ne quittent jamais le téléphone. Textes relus le 8 octobre (voix de BLUSH).
  */
 
-export type { ConvInstagram } from "@/services/preparer-export";
 import type { ConvInstagram } from "@/services/preparer-export";
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];

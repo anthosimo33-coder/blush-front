@@ -127,7 +127,7 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
               <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
             </span>
             <span className="flex-1 text-note font-black">Ta question</span>
-            <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
+            <Icon name="chevron" size={15} stroke={2.6} className="text-pale" />
           </Link>
         </div>
       )}

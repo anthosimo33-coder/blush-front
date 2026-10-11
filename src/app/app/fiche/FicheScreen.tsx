@@ -451,7 +451,7 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
         <ul className="m-0 list-none border-t border-[rgba(17,17,20,0.06)] p-0 py-1">
           {rows.map((t, i) => (
             <li key={`${i}-${t}`} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
-              <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-[#D9D6CF] motion-safe:animate-pulse" />
+              <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-disabled motion-safe:animate-pulse" />
               <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35] text-soft">{t}</span>
               <span className="shrink-0 text-[12.5px] font-extrabold text-grey">en cours d’ajout</span>
             </li>

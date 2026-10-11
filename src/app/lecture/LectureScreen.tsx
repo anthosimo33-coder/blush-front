@@ -10,8 +10,7 @@ import { play } from "@/lib/sound";
 import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { DoneCheck } from "@/components/ui/feedback";
-import { TypingDots } from "@/components/ui/FileInput";
+import { DoneCheck, TypingDots } from "@/components/ui/feedback";
 import { Screen } from "@/components/shell/Screen";
 import { useSuiviLecture } from "./suivi";
 

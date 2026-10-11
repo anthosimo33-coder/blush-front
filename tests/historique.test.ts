@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { historique } from "@/server/chat";
+import { historique } from "@/server/historique";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { compteDeTest, convRattachee } from "./aide/fixtures";

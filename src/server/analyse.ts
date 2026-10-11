@@ -4,10 +4,9 @@ import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { appliquerMaj, citees, estFaite, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
-import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
-import { estOffert } from "@/contenu/chapitres";
-import type { Chapter, Message, ScoreRow } from "@/types";
+import type { Message, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -15,7 +14,7 @@ import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
-import { chapitresAffiches, scores, sobreAffiche, tempsDeLecture } from "./ecrans/rapport";
+import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
@@ -91,7 +90,7 @@ async function verdict(story: LigneComplete, t: Tache) {
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
   const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, { preuves: preuvesVerdict, lignes: rendu.lignes, storyId: story.id, etiquette: "verdict", surAvance: suivreAvance(t.id, avanceVerdict) });
   /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
-  const sortie: Verdict = { ...brute, mode_sobre: !!brute.alerte };
+  const sortie = verdictNormalise(brute);
   const data = coffre.ecrire("verdicts.data", { sortie, scores: scores(chiffres) });
   await db()
     .insert(schema.verdicts)
@@ -234,12 +233,6 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
     await enParallele;
   }
 }
-
-/** Le temps de lecture d’un rapport écrit : en entier, et ses chapitres offerts (estOffert, pas le `free` du modèle). */
-export const lectureDe = (chapitres: Chapter[]): DonneesRapport["lecture"] => ({
-  free: tempsDeLecture(chapitres.filter((c) => estOffert(c.number))),
-  full: tempsDeLecture(chapitres),
-});
 
 async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
   const h = histoireDe(metaDe(story));

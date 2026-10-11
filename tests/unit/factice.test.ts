@@ -8,7 +8,8 @@ import type { Requete } from "@prompts/lib/contextes";
 import { Etape05, Maj07, Sortie01, Sortie04, Sortie05, Sortie06, Sortie07, Sortie10 } from "@prompts/lib/schemas";
 import { avecEcheance } from "@/server/echeance";
 import { appeler, definirFactice, type Avance, type Partie } from "@/server/ia/claude";
-import { fournisseurFactice, iaFactice, refusFactice, REFUS_FACTICE, type RequeteFactice } from "@/server/ia/factice";
+import { iaFactice } from "@/server/env";
+import { fournisseurFactice, refusFactice, REFUS_FACTICE, type RequeteFactice } from "@/server/ia/factice";
 import { FACTICE } from "@/server/ia/factice-valeurs";
 import { noterCout } from "@/server/ia/usage";
 

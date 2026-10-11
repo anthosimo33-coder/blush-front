@@ -7,7 +7,6 @@
  * et la fête d’un niveau le prennent là, sans le chercher dans la page. Et l’avatar de BLUSH sous chaque réponse de la
  * conv (LogoDuFil), dessiné une fois par conv.
  */
-import type { Route } from "next";
 import Link from "next/link";
 import { createContext, use, useId, ViewTransition, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/cn";
@@ -15,7 +14,7 @@ import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { ContactRing } from "@/components/ui/contact";
 import { Icon } from "@/components/ui/icons";
-import { scaleOf } from "@/components/ui/progress";
+import { scaleOf } from "@/contenu/niveaux";
 import type { ConvSummary } from "@/types";
 import type { HomeContact } from "./contact";
 import { useHomeMotion } from "./mouvement/contexte";
@@ -120,7 +119,7 @@ export function SophieButton({
   const where = temperature ? (levels[idx]?.label ?? "") : `niveau ${idx + 1} sur ${levels.length}`;
   return (
     <Link
-      href={ficheHref as Route}
+      href={ficheHref}
       prefetch
       transitionTypes={["nav-forward", "accueil-vers-fiche"]}
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}

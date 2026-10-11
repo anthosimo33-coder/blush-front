@@ -3,7 +3,7 @@ import { imagesDe } from "@/server/captures";
 import { modifierMemoire } from "@/server/depot";
 import { memoireDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
-import { depuisPaquet } from "@/server/histoires";
+import { depuisPaquet } from "@/server/import";
 import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";

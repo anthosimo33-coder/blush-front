@@ -6,11 +6,14 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import type { Utilisateur } from "@/server/auth";
-import { historique, repondre } from "@/server/chat";
+import { repondre } from "@/server/chat";
+import { historique } from "@/server/historique";
 import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
-import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
+import { importer, metaDe, type LigneComplete } from "@/server/histoires";
+import { depuisFichier, ErreurImport } from "@/server/import";
+import { storyAffichee } from "@/server/conv-affichee";
 import { FACTICE } from "@/server/ia/factice-valeurs";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import type { DonneesVocal } from "@/server/stockage/types";

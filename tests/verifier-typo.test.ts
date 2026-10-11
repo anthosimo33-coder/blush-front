@@ -56,6 +56,8 @@ describe("la vérification de la typographie", () => {
     expect(ecran(`const css = ":root { color-scheme: light } .carte { background: #FFF !important; }";`)).toEqual([]);
     expect(ecran(`const c = "!size-10 !shadow-soft";`)).toEqual([]);
     expect(ecran(`console.error("alerte : envoi impossible");\nthrow new Error("useContact : hors de HomeScreen");`)).toEqual([]);
+    /* Les erreurs de BLUSH (ErreurInvariant, ErreurImport…) : leur message reste au serveur */
+    expect(ecran("throw new ErreurInvariant(`${colonne}:forme`, `${colonne} : forme inattendue`);")).toEqual([]);
     expect(ecran("await alerter(`chat en échec`, [`Histoire ${id}`, `Erreur : ${e.message}`]);")).toEqual([]);
     /* Le journal du serveur et la trace du navigateur : à l’équipe aussi */
     expect(ecran(`journal("garde-fou : réponse remplacée", { histoire: id }, "alerte");\njournalErreur("code : non envoyé", e);`)).toEqual([]);

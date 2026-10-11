@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -99,6 +100,47 @@ const EN_LOCAL = {
   message: "enLocal écrit en clair, à la place d’un mail en local : seuls email.ts et alertes.ts s’en servent. Ailleurs : journal, journalErreur ou auMieux.",
 };
 
+/*
+ * Les textes des prompts (src/server/ia/textes.generated.ts, généré depuis le sous-module privé) ne s’importent que dans
+ * src/server/ia/claude.ts, qui les envoie au modèle : importés ailleurs, ils pourraient finir dans une page ou une
+ * réponse (S-42 ; scripts/verifier-fuite.mjs les cherche aussi dans le build).
+ */
+const TEXTES_DES_PROMPTS = { regex: "(^|/)textes\\.generated(\\.ts)?$", message: "Les textes des prompts ne s’importent que dans src/server/ia/claude.ts, qui les envoie au modèle (S-42)." };
+
+/*
+ * Une couleur qui a son token (src/app/globals.css, Q59) ne s’écrit pas en hex dans le code : la classe du token
+ * (text-pale, bg-disabled…) ou var(--…), pour qu’un token changé change tout l’écran. La règle lit les tokens dans
+ * globals.css, et cherche leurs hex (six chiffres, ou huit avec l’opacité) dans les chaînes, les gabarits et le texte JSX,
+ * valeurs arbitraires de Tailwind comprises (`bg-[#D9D6CF]`). Un hex sans token (les marques de WhatsApp, les maquettes)
+ * reste permis. tests/unit/jetons.test.ts vérifie le reste : les classes et les var() citées existent.
+ */
+const JETONS = new Map(
+  [...readFileSync(new URL("./src/app/globals.css", import.meta.url), "utf8").matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{6})\s*;/gim)].map(([, nom, hex]) => [hex.toLowerCase(), nom]),
+);
+const HEX = /#([0-9a-f]{6})(?:[0-9a-f]{2})?(?![0-9a-f])/gi;
+const COULEUR_EN_JETON = {
+  meta: {
+    type: "problem",
+    schema: [],
+    messages: { jeton: "{{hex}} est la couleur du token {{jeton}} (src/app/globals.css) : sa classe (text-…, bg-…) ou var({{jeton}}), pas son hex." },
+  },
+  create(context) {
+    const verifier = (node, texte) => {
+      for (const [hex, rgb] of texte.matchAll(HEX)) {
+        const jeton = JETONS.get(`#${rgb.toLowerCase()}`);
+        if (jeton) context.report({ node, messageId: "jeton", data: { hex, jeton } });
+      }
+    };
+    return {
+      Literal: (node) => typeof node.value === "string" && verifier(node, node.value),
+      TemplateElement: (node) => verifier(node, node.value.raw),
+      JSXText: (node) => verifier(node, node.value),
+    };
+  },
+};
+/* Les règles propres à BLUSH, écrites ici */
+const BLUSH = { rules: { "couleur-en-jeton": COULEUR_EN_JETON } };
+
 /* Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts */
 const SERVEUR_SANS_NAVIGATEUR = [
   { regex: `${versSrc("services/api")}$`, allowTypeImports: true, message: "src/services/api.ts appelle les routes /api depuis le navigateur : le serveur lit ses propres modules (src/server)." },
@@ -109,26 +151,31 @@ const SERVEUR_SANS_NAVIGATEUR = [
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Ni données factices, ni aperçus, ni chiffrement hors du coffre (PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE), ni la
-  // base dans src/app (PAR_LE_DEPOT). Les trois blocs suivants reprennent ces motifs : un bloc qui redonne
-  // no-restricted-imports remplace toute sa liste.
+  // Ni données factices, ni aperçus, ni chiffrement hors du coffre (PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE), ni les
+  // textes des prompts hors de claude.ts (TEXTES_DES_PROMPTS), ni la base dans src/app (PAR_LE_DEPOT). Les quatre blocs
+  // suivants reprennent ces motifs : un bloc qui redonne no-restricted-imports remplace toute sa liste.
   {
     files: ["src/**"],
-    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE, TEXTES_DES_PROMPTS] }] },
   },
   {
     files: ["src/app/**"],
-    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE, ...PAR_LE_DEPOT] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE, TEXTES_DES_PROMPTS, ...PAR_LE_DEPOT] }] },
   },
   // Les aperçus (src/app/apercu) gardent leurs données fictives, sans chiffrer ni lire la base pour autant.
   {
     files: ["src/app/apercu/**"],
-    rules: { "no-restricted-imports": ["error", { patterns: [PAR_LE_COFFRE, ...PAR_LE_DEPOT] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAR_LE_COFFRE, TEXTES_DES_PROMPTS, ...PAR_LE_DEPOT] }] },
   },
   // Le coffre chiffre.
   {
     files: ["src/server/coffre.ts"],
-    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, TEXTES_DES_PROMPTS] }] },
+  },
+  // claude.ts envoie les textes des prompts au modèle.
+  {
+    files: ["src/server/ia/claude.ts"],
+    rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU, PAR_LE_COFFRE] }] },
   },
   // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), la configuration lue à ses deux seuls endroits
   // (PAS_DE_PROCESS_ENV), une valeur levée jamais supposée Error (PAS_D_ERREUR_SUPPOSEE), et ni chiffrement.ts ni le
@@ -198,15 +245,25 @@ const eslintConfig = defineConfig([
     ignores: ["src/app/apercu/**", "src/server/journal.ts", "src/lib/tracer.ts"],
     rules: { "no-console": "error" },
   },
-  // Les promesses du serveur : une promesse oubliée (ni attendue, ni `void`) échoue sans que personne le voie.
-  // Avertissements pour l’instant, des erreurs au lot 3. Ces règles lisent les types (projectService) : seulement ici.
+  // Les promesses, partout dans src : une promesse oubliée (ni attendue, ni `void`, ni suivie d’un catch) échoue sans que
+  // personne le voie, et une fonction async passée là où on attend un retour sans promesse (onClick, un forEach) aussi.
+  // Ces règles lisent les types (projectService) : seulement sur src.
   {
-    files: ["src/server/**/*.{ts,tsx}", "src/app/api/**/*.ts"],
+    files: ["src/**/*.{ts,tsx}"],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
     rules: {
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/no-misused-promises": "warn",
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
     },
+  },
+  // Une couleur qui a son token ne s’écrit pas en hex (COULEUR_EN_JETON). Sauf dans les dessins (les objets en volume, les
+  // éclats de la fête et les bulles de l’envol, peints en JS) et dans src/server/marque.ts : les mails, les images de
+  // partage et la teinte des barres du navigateur n’ont pas le CSS de l’appli, ils lisent ses couleurs en hex là.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/components/brand/objects3d.tsx", "src/app/app/accueil/mouvement/{fete,vol}.ts", "src/server/marque.ts"],
+    plugins: { blush: BLUSH },
+    rules: { "blush/couleur-en-jeton": "error" },
   },
   // Un `eslint-disable` qui ne désactive plus rien est une erreur : il cacherait la prochaine vraie.
   { linterOptions: { reportUnusedDisableDirectives: "error" } },
@@ -223,6 +280,10 @@ const eslintConfig = defineConfig([
     // Les résultats des tests de bout en bout (le rapport HTML de Playwright embarque son propre code).
     "test-results/**",
     "playwright-report*/**",
+    // La couverture (npm run couverture : son rapport HTML), et les dossiers de travail des agents (.claude/worktrees :
+    // d’autres branches, d’autres sessions), jamais vérifiés d’ici.
+    "coverage/**",
+    ".claude/**",
   ]),
 ]);
 

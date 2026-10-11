@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import type { ComponentProps, ComponentPropsWithoutRef, MouseEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -103,7 +104,7 @@ export function ButtonLink({
   href,
   disabled,
   ...rest
-}: CommonProps & { href: string; disabled?: boolean } & Omit<ComponentProps<typeof Link>, "href">) {
+}: CommonProps & { href: Route; disabled?: boolean } & Omit<ComponentProps<typeof Link>, "href">) {
   return (
     <Link
       href={href}
@@ -148,7 +149,7 @@ export function IconButton({
 }: {
   icon: IconName;
   label: string;
-  href?: string;
+  href?: Route;
   onClick?: () => void;
   plain?: boolean;
   size?: "md" | "sm";

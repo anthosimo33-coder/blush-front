@@ -13,9 +13,8 @@ import { compteDe, preparerCode, prendreCode, type Utilisateur } from "@/server/
 import { dechiffrer, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { ouvrirLeRapport } from "@/server/donnees";
-import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/histoires";
-import { REFUS_FACTICE } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
+import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { planifier, prendre } from "@/server/taches";
 import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 

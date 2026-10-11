@@ -5,14 +5,13 @@ import { SortiesDuBanc } from "@prompts/lib/apercu";
 import { chiffrer, lire, rendre } from "@prompts/lib/conv";
 import { estFaite } from "@prompts/lib/memoire";
 import type { ReponseChat } from "@prompts/lib/schemas";
-import { estOffert } from "@/contenu/chapitres";
 import { APPLIS, type BlushAnswer, type Fiche, type Person, type Story } from "@/types";
 import type { EchangeChat, ReportPayload } from "@/types/api";
 import { initialeDe, storyAffichee } from "./conv-affichee";
 import { bullesAffichees } from "./ecrans/chat";
 import { ficheAffichee } from "./ecrans/fiche";
 import { messagesAffiches, resoudre } from "./ecrans/messages";
-import { chapitresAffiches, scores, sobreAffiche, tempsDeLecture } from "./ecrans/rapport";
+import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { resumeDe, type Meta, type Participant } from "./histoires";
 import { enTete } from "./presentation/rapport";
 
@@ -47,7 +46,7 @@ export function apercuDe(b: SortiesDuBanc): Apercu {
   const messages = messagesAffiches(rendu.lignes, h.utilisateur.prenom);
   const chapters = chapitresAffiches(b.rapport.chapitres ?? [], messages, scores(chiffrer(h, lu.messages)));
   const payload: ReportPayload = {
-    report: { storyId: "apercu", ...enTete(b.verdict), chapters, readingTime: { free: tempsDeLecture(chapters.filter((c) => estOffert(c.number))), full: tempsDeLecture(chapters) } },
+    report: { storyId: "apercu", ...enTete(b.verdict), chapters, readingTime: lectureDe(chapters) },
     sober: sobreAffiche(b.rapport),
     access: "blushplus",
   };

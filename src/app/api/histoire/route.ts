@@ -1,6 +1,7 @@
 import { effacerBrouillon, effacerChoisie } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
-import { metaDe, storyAffichee, supprimerHistoire } from "@/server/histoires";
+import { metaDe, supprimerHistoire } from "@/server/histoires";
+import { storyAffichee } from "@/server/conv-affichee";
 import { garde, lecture } from "@/server/requete";
 
 /** L’histoire du parcours : la conv qu’on importe, sinon celle qui est ouverte. */

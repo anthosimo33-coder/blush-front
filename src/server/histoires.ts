@@ -15,11 +15,8 @@ import { borner, ErreurImport } from "./import";
 
 /*
  * Les histoires en base : le brouillon d’un import, la conv ouverte, « Qui es-tu ? », l’effacement. L’import d’un export
- * (le fichier, le paquet, leurs bornes) vit dans import.ts, la conv telle que l’affiche le front dans conv-affichee.ts :
- * ces noms restent exportés d’ici pour les routes qui les y prennent encore.
+ * (le fichier, le paquet, leurs bornes) vit dans import.ts, la conv telle que l’affiche le front dans conv-affichee.ts.
  */
-export { depuisFichier, depuisPaquet, ErreurImport } from "./import";
-export { initialeDe, storyAffichee } from "./conv-affichee";
 
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
 const NOM_MAX = 100;

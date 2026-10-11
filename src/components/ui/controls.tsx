@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -11,7 +12,7 @@ import { Icon, type IconName } from "./icons";
 
 /* ———— Chip ———— */
 /** Ce qui fait une pastille : un lien (`href`), un bouton à bascule (`onClick`, le seul qu’on désactive), ou une étiquette. */
-type FormeChip = { href: string; onClick?: undefined; disabled?: undefined } | { onClick: () => void; disabled?: boolean; href?: undefined } | { href?: undefined; onClick?: undefined; disabled?: undefined };
+type FormeChip = { href: Route; onClick?: undefined; disabled?: undefined } | { onClick: () => void; disabled?: boolean; href?: undefined } | { href?: undefined; onClick?: undefined; disabled?: undefined };
 
 /** Une pastille : un lien avec `href`, un bouton à bascule avec `onClick` (`disabled` possible), une étiquette sinon ; les aria-* et data-* vont sur l’élément. */
 export function Chip({
@@ -216,7 +217,7 @@ export function AppTile({
   app: AppKind;
   title: string;
   subtitle: string;
-  href: string;
+  href: Route;
   wide?: boolean;
   onClick?: () => void;
   className?: string;

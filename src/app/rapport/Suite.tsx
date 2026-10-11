@@ -7,7 +7,7 @@ import { messageErreur, SOUFFLE } from "@/lib/messages-erreur";
 import { relancerRapport } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/cards";
-import { TypingDots } from "@/components/ui/FileInput";
+import { TypingDots } from "@/components/ui/feedback";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { LockRow } from "@/components/ui/progress";
 import { ChapterRule } from "@/components/ui/report";

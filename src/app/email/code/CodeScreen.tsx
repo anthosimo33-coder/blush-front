@@ -31,7 +31,7 @@ const LENGTH = 6;
  * `fermee` : la bêta est fermée. Tout le monde arrive ici, invité ou pas (personne ne peut savoir si un email est invité) :
  * l’invité a reçu son code, les autres le mail de la liste d’attente. L’écran le dit sans savoir lequel.
  */
-export function CodeScreen({ connexion = false, suite = "/app", fermee = false }: { connexion?: boolean; suite?: string; fermee?: boolean }) {
+export function CodeScreen({ connexion = false, suite = "/app", fermee = false }: { connexion?: boolean; suite?: Route; fermee?: boolean }) {
   const router = useRouter();
   const [j] = useJourney();
   const [code, setCode] = useState("");
@@ -94,7 +94,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
     router.refresh();
     if (connexion) {
       /* L’accueil se pose lui-même sur le dernier échange : Next ne doit pas le remettre en haut */
-      router.push(suite as Route, { scroll: cheminDe(suite) !== "/app" });
+      router.push(suite, { scroll: cheminDe(suite) !== "/app" });
       return;
     }
     /*
@@ -225,7 +225,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         <button type="button" onClick={() => void resend()} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
-        <Link href={retour as Route} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
+        <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
           Changer d’email
         </Link>
       </div>

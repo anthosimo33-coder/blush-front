@@ -11,7 +11,8 @@ import { z } from "zod";
  */
 vi.mock("@/server/env", async (original) => {
   const o = await original<typeof import("@/server/env")>();
-  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, ANTHROPIC_API_KEY: "cle-fictive" }) };
+  /* iaFactice lit l’env() de son module, pas celui-ci : on le remplace aussi */
+  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, ANTHROPIC_API_KEY: "cle-fictive" }), iaFactice: () => false };
 });
 vi.mock("@/server/budget", () => ({ controlerBudget: vi.fn(async () => "payeur") }));
 vi.mock("@/server/ia/usage", () => ({ noterCout: vi.fn(async () => {}) }));

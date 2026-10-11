@@ -7,7 +7,7 @@
  * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
  * lisent ici.
  * Les chapitres écrits par le modèle prennent leur `free` et le titre du verdict ici (src/server/ecrans/rapport.ts), comme
- * le temps de lecture « offert » d’un rapport écrit (readingTime.free, src/server/analyse.ts).
+ * le temps de lecture « offert » d’un rapport écrit (readingTime.free, lectureDe dans src/server/ecrans/rapport.ts).
  */
 
 export const NB_CHAPITRES = 8;
@@ -50,5 +50,14 @@ const TITRES: Record<number, string> = {
   8: "Ton prochain pas",
 };
 
-/** Le titre d’un chapitre avant que le plan donne le sien (et dans le mail). `autre` : le prénom de l’autre personne. */
-export const titreDAttente = (numero: number, autre: string) => (numero === DE_L_AUTRE ? autre : TITRES[numero]);
+/**
+ * Le titre d’un chapitre avant que le plan donne le sien (et dans le mail). `autre` : le prénom de l’autre personne.
+ * Chacun des NB_CHAPITRES en a un : un autre numéro est une erreur du code, levée ici plutôt qu’un titre vide à l’écran
+ * ou dans le mail.
+ */
+export function titreDAttente(numero: number, autre: string): string {
+  if (numero === DE_L_AUTRE) return autre;
+  const titre = TITRES[numero];
+  if (titre === undefined) throw new RangeError(`chapitre ${numero} : pas de titre d’attente`);
+  return titre;
+}

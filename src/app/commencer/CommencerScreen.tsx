@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
@@ -14,7 +15,7 @@ import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
 import { NBSP } from "@/lib/format";
 
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
-const TILES: { app: AppKind; title: string; subtitle: string; href: string; wide?: boolean }[] = [
+const TILES: { app: AppKind; title: string; subtitle: string; href: Route; wide?: boolean }[] = [
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
   /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
   { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
@@ -64,7 +65,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
             <span className="text-detail font-black">Bêta privée, sur invitation</span>
             <span className="text-legende font-extrabold text-grey">Pas encore d’invitation{NBSP}? Rejoins la liste d’attente.</span>
           </span>
-          <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
+          <Icon name="chevron" size={15} stroke={2.6} className="text-pale" />
         </Link>
       )}
     </ParcoursScreen>

@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/accueil"
         answers={home.answers}
         script={home.script}
         liveUrl={live}
-        contact={{ report: { verdict, level, trend, nextStep }, fiche: home.fiche, period: story.period, ficheHref: `/apercu/fiche${a.cas ? `?cas=${a.cas}` : ""}` }}
+        contact={{ report: { verdict, level, trend, nextStep }, fiche: home.fiche, period: story.period, ficheHref: a.cas ? `/apercu/fiche?cas=${a.cas}` : "/apercu/fiche" }}
       />
       <ApercuNav cas={a.cas} ici="accueil" />
     </div>

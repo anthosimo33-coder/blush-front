@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
@@ -16,7 +17,7 @@ import { Icon } from "@/components/ui/icons";
  * `{ repli }` : la page d’avant, quelle qu’elle soit, et `repli` quand on arrive d’ailleurs (un lien, un nouvel onglet),
  * où revenir en arrière quitterait BLUSH. Une fonction : l’écran décide (un composant client seulement).
  */
-export type BackTarget = string | { repli: string } | (() => void);
+export type BackTarget = Route | { repli: Route } | (() => void);
 
 /** L’API Navigation, là où le navigateur l’a (pas encore partout : sans elle, on s’en tient à la page d’avant). */
 type HistoriqueNavigation = { currentEntry: { index: number } | null };

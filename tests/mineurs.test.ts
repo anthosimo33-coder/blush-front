@@ -9,7 +9,7 @@ import { depuisInstagramJson } from "@prompts/lib/instagram";
 import { rendreMemoire } from "@prompts/lib/memoire";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { initialeDe } from "@/server/histoires";
+import { initialeDe } from "@/server/conv-affichee";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { masquerPrenoms } from "@/server/partages";

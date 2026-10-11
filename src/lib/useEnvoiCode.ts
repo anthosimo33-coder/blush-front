@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { sendLoginCode } from "@/services/api";
@@ -16,7 +17,7 @@ export type EnvoiCode = SaisieEmail & { occupe: boolean };
  * statique : préchargé pendant qu’on tape son email, il s’ouvre tout de suite après l’envoi. Un envoi raté dit pourquoi,
  * et le bouton se libère.
  */
-export function useEnvoiCode(versCode: string): EnvoiCode {
+export function useEnvoiCode(versCode: Route): EnvoiCode {
   const router = useRouter();
   const [j, set] = useJourney();
   const [occupe, setOccupe] = useState(false);

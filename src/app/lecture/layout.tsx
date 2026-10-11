@@ -1,4 +1,3 @@
-import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getStory, quiAttendu, sansHistoire } from "@/services/serveur";
 
@@ -10,7 +9,7 @@ import { getStory, quiAttendu, sansHistoire } from "@/services/serveur";
  */
 export default async function Layout({ children }: LayoutProps<"/lecture">) {
   const [story, qui] = await Promise.all([getStory(), quiAttendu()]);
-  if (!story) redirect((await sansHistoire("/lecture")) as Route);
+  if (!story) redirect(await sansHistoire("/lecture"));
   /* Une conv ouverte avant « Qui es-tu ? » (importée, puis une connexion) : pas de lecture sans, on y retourne */
   if (qui) redirect("/qui");
   return children;

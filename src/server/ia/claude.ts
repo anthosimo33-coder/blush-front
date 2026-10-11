@@ -3,13 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
-import { env } from "../env";
+import { env, iaFactice } from "../env";
 import { alerter } from "../alertes";
 import { controlerBudget, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
 import { journal, journalErreur } from "../journal";
-import { fournisseurFactice, iaFactice, prestataireFactice, REFUS_FACTICE, type RequeteFactice } from "./factice";
+import { fournisseurFactice, prestataireFactice, type RequeteFactice } from "./factice";
 import { noterCout } from "./usage";
 import { TEXTES } from "./textes.generated";
 
@@ -34,12 +34,6 @@ type Usage = { input_tokens?: number | null; output_tokens?: number | null; cach
 
 /** Moins de temps que ça avant l’échéance (src/server/echeance.ts) : l’appel ne part pas, il serait coupé avant de répondre. */
 const TEMPS_MIN_APPEL = 20_000;
-
-/*
- * En mode factice : ce qu’une fonction rend pour simuler un refus du modèle. Reprise ici pour les tests qui la lisent à
- * cette adresse (robustesse, ecriture) : elle part avec eux, au plus tard au lot 9a (retrait des ré-exportations).
- */
-export { REFUS_FACTICE };
 
 /**
  * La partie d’une tâche qui en a plusieurs : le plan ou une moitié des chapitres du rapport (05), la mise à jour de la

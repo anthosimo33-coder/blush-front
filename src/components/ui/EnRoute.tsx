@@ -2,7 +2,7 @@
 
 import { useLinkStatus } from "next/link";
 import type { ReactNode } from "react";
-import { TypingDots } from "./FileInput";
+import { TypingDots } from "./feedback";
 
 /**
  * Dans un lien, à la place de son icône (la flèche, le chevron) : les trois points de BLUSH tant que la page demandée

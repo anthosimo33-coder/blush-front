@@ -13,15 +13,16 @@ import { EXPORT_STEPS } from "@/contenu/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/controls";
-import { Alert } from "@/components/ui/feedback";
-import { FileInput, TypingDots } from "@/components/ui/FileInput";
+import { Alert, TypingDots } from "@/components/ui/feedback";
+import { FileInput } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
 import type { ExportApp } from "@/types";
-import { ChoixConv, type ConvInstagram } from "./ChoixConv";
+import { ChoixConv } from "./ChoixConv";
+import type { ConvInstagram } from "@/services/preparer-export";
 
 type Menu = { contact: string; items: readonly string[]; highlight: number };
 

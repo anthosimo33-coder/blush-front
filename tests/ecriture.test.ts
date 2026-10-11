@@ -5,8 +5,7 @@ import type { Utilisateur } from "@/server/auth";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { progression, rapportDe } from "@/server/donnees";
-import { REFUS_FACTICE } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 describe("le rapport pendant son écriture", () => {

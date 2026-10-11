@@ -166,7 +166,7 @@ export function useSuiviLecture() {
       if (enCours.current !== pour) return false;
       rates.current += 1;
       const apres = apresUnRate(codeDe(e), rates.current);
-      if (apres.faire === "connexion") router.replace(connexionPuis("/lecture") as Route);
+      if (apres.faire === "connexion") router.replace(connexionPuis("/lecture"));
       if (apres.faire === "echec") setEchec(true);
       return apres.faire === "relire" ? apres.dans : false;
     }

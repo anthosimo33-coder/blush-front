@@ -1,4 +1,4 @@
-import { TypingDots } from "@/components/ui/FileInput";
+import { TypingDots } from "@/components/ui/feedback";
 import { DesktopHeader, MobileTopBar } from "./Screen";
 
 /**

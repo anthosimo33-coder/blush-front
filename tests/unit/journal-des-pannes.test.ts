@@ -19,7 +19,8 @@ vi.mock("@/server/db", async (original) => ({
 }));
 vi.mock("@/server/env", async (original) => {
   const o = await original<typeof import("@/server/env")>();
-  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, MISTRAL_API_KEY: "cle-fictive" }) };
+  /* iaFactice lit l’env() de son module, pas celui-ci : on le remplace aussi */
+  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, MISTRAL_API_KEY: "cle-fictive" }), iaFactice: () => false };
 });
 
 import { CLES, compter } from "@/server/compteurs";

@@ -12,8 +12,6 @@ import { LogoIlot } from "./LogoIlot";
  * (LogoIlot.tsx) y est un îlot pour ne pas peser sur la charge de chaque page.
  */
 
-export type { BackTarget };
-
 /* ———— Barre du haut mobile : retour · titre · progression ———— */
 export function MobileTopBar({
   back,

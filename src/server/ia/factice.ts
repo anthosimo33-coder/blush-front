@@ -4,7 +4,6 @@ import type { z } from "zod";
 import type { Requete } from "@prompts/lib/contextes";
 import { estLigneMessage, idDeLigne, lireLigne } from "@prompts/lib/ligne";
 import type { Captures, Chapitre, Etape05, Maj, Memoire, Rapport, ReponseChat, Verdict, Vocal } from "@prompts/lib/schemas";
-import { env } from "../env";
 import type { Ecoute, Fournisseur, MessageRecu, Partie } from "./claude";
 import { FACTICE } from "./factice-valeurs";
 
@@ -16,13 +15,6 @@ import { FACTICE } from "./factice-valeurs";
  * (src/server/ia/factice-valeurs.ts), que les tests lisent. Il répond comme un prestataire (prestataireFactice) : appeler
  * (src/server/ia/claude.ts) le lit comme le vrai, refus et flux compris.
  */
-
-/**
- * Le mode factice : le modèle, la voix et la transcription ne partent jamais chez un prestataire, ils rendent des
- * réponses fixes (src/server/ia/claude.ts, voix.ts, transcription.ts). La seule question à poser pour le savoir : jamais
- * sur Vercel (src/server/env.ts l’éteint), et jamais « une clé manque ».
- */
-export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
 
 /** La requête telle que la reçoit le modèle factice : avec sa partie (appeler l’ajoute ; le vrai modèle la lit dans la demande). */
 export type RequeteFactice = Requete & { partie?: Partie };
