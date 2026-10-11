@@ -11,7 +11,7 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { reveiller } from "@/components/shell/Reveil";
 import { IDEES_MASQUEES } from "../idees";
-import { RecordingBar, useVoiceRecorder, type VoiceClip, type VoiceError } from "../voice";
+import { RecordingBar, useVoiceRecorder, type EcouteEnDirect, type VoiceClip, type VoiceError } from "../voice";
 
 /*
  * La barre de saisie de l’accueil (Composer) et ce qui va avec : le menu du « + », les questions toutes prêtes (et leur
@@ -336,7 +336,7 @@ export function Composer({
  * l’appel à chaque lettre). En vocal, les perles suivent ta voix : abonnées au direct de l’enregistreur, elles bougent
  * à chaque relevé du micro sans rien refaire de React. Le logo et ses perles sont cherchés une fois, au début du vocal.
  */
-function usePerlesALEcoute({ busy, recording, ecoute }: { busy: boolean; recording: boolean; ecoute: ReturnType<typeof useVoiceRecorder>["ecoute"] }) {
+function usePerlesALEcoute({ busy, recording, ecoute }: { busy: boolean; recording: boolean; ecoute: EcouteEnDirect }) {
   const listen = useRef({ k: 0, idle: 0 });
 
   useEffect(() => {

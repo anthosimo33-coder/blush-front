@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef, type ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "@/app/app/accueil/Composer";
 
 /*
@@ -11,6 +11,17 @@ vi.mock("@/lib/sound", () => ({ play: vi.fn(), setRecording: vi.fn(), setForceSo
 vi.mock("@/components/shell/Reveil", () => ({ reveiller: vi.fn() }));
 
 type Props = ComponentProps<typeof Composer>;
+
+/*
+ * Le choix « idées masquées » vit hors du composant (le stockage local, un cookie, la mémoire du module) : un test qui
+ * s’arrête entre « Masquer » et « Idées de questions », ou un ordre mélangé, ne le laisse pas aux suivants. Ce afterEach
+ * passe avant le démontage (tests/client/preparer.ts) : la barre est encore là pour le rendre.
+ */
+afterEach(() => {
+  const rendre = screen.queryByRole("button", { name: "Idées de questions" });
+  if (rendre) fireEvent.click(rendre);
+  localStorage.clear();
+});
 
 const QUESTIONS = ["elle pense quoi ?", "je lui réponds quoi ?"];
 

@@ -16,10 +16,17 @@ export type VoiceError = "denied" | "unsupported";
 
 /** Au-delà, le vocal part tout seul. */
 const MAX_SECONDS = 120;
-/*
- * Le débit demandé à l’enregistreur : la voix y reste nette, et un vocal de 2 minutes pèse environ 500 ko (au lieu de
- * 1 à 2 Mo au débit par défaut). Le serveur peut donc borner un vocal plus bas que ses 4 Mo (S-15, côté serveur).
- * TODO(produit): 32 kb/s, à revoir avec la taille maximale qu’accepte le serveur (1 Mo prévu).
+/**
+ * Le débit demandé à l’enregistreur (S-15). Chromium le suit : la voix y reste nette, et un vocal de 2 minutes pèse
+ * environ 500 ko (au lieu de 2 Mo à ses 128 kb/s par défaut). Mais rien n’oblige un navigateur à le suivre : le WebKit
+ * de Playwright (26.6, le moteur de Safari) l’accepte, l’annonce, puis encode en AAC à un débit qui ne dépend que du son
+ * (de 33 à 169 kb/s mesurés, environ 2,5 Mo pour 2 minutes de bruit) ; et un navigateur qui refuse l’option enregistre
+ * à son débit par défaut (`enregistreur`). Les 500 ko ne valent donc que là où l’option est suivie : la borne du
+ * serveur, c’est la durée du vocal (environ 130 s), et sa taille maximale doit couvrir 130 s au débit par défaut
+ * (environ 3,1 Mo à 192 kb/s), pas 130 s à 32 kb/s. tests/e2e/chat-vocal.spec.ts mesure le débit sur les deux
+ * navigateurs.
+ * TODO(produit): 32 kb/s ; la taille maximale du serveur (4 Mo aujourd’hui) ne descend pas sous ~3,1 Mo tant que le
+ * débit réel d’un vocal de 2 minutes sur un vrai iPhone (Safari et l’appli installée) n’est pas mesuré.
  */
 const DEBIT_VOCAL = 32_000;
 /** Nombre de barres de l’onde, pendant l’enregistrement et dans la bulle. */
@@ -37,21 +44,22 @@ type Session = {
   timer: number;
 };
 
-/**
- * Ce que l’enregistrement montre en direct : le temps écoulé (à la seconde) et les derniers niveaux du micro, relevés
- * environ 14 fois par seconde. Il se lit par abonnement : seuls ceux qui le montrent se refont (la barre
- * d’enregistrement, RecordingBar) ou le suivent hors de React (les perles du logo, accueil/Composer.tsx), pas l’écran
- * qui tient l’enregistreur.
- */
+/** Ce que l’enregistrement montre en direct : le temps écoulé (à la seconde) et les derniers niveaux du micro. */
 type Ecoute = { seconds: number; levels: readonly number[] };
 
-/** Le direct d’un enregistrement : la dernière valeur, et l’abonnement à ses changements (useSyncExternalStore). */
-type EcouteEnDirect = { lire: () => Ecoute; abonner: (suivre: () => void) => () => void };
+/**
+ * Le direct d’un enregistrement : la dernière valeur, et l’abonnement à ses changements (useSyncExternalStore). Les
+ * niveaux changent environ 14 fois par seconde : seuls ceux qui les montrent se refont (la barre d’enregistrement,
+ * RecordingBar) ou les suivent hors de React (les perles du logo, accueil/Composer.tsx), pas l’écran qui tient
+ * l’enregistreur.
+ */
+export type EcouteEnDirect = { lire: () => Ecoute; abonner: (suivre: () => void) => () => void };
 
-const AU_REPOS: Ecoute = { seconds: 0, levels: [] };
+/** Le direct quand rien ne s’enregistre : zéro seconde, aucun niveau. */
+const SILENCE: Ecoute = { seconds: 0, levels: [] };
 
 function creerEcoute() {
-  let valeur = AU_REPOS;
+  let valeur = SILENCE;
   const abonnes = new Set<() => void>();
   return {
     lire: () => valeur,
@@ -69,7 +77,7 @@ function creerEcoute() {
 
 /**
  * L’enregistreur au débit de la voix (DEBIT_VOCAL). Un navigateur qui refuse l’option enregistre à son débit par
- * défaut : le vocal part quand même.
+ * défaut (souvent 128 à 192 kb/s) : le vocal part quand même, tant que le serveur l’accepte à ce débit-là.
  */
 function enregistreur(stream: MediaStream) {
   try {
@@ -197,7 +205,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     /* Par tranches de 250 ms : Safari livre le son au fil de l’eau (à l’arrêt seul, il peut ne rien rendre) */
     recorder.start(250);
     session.current = s;
-    ecoute.poser(AU_REPOS);
+    ecoute.poser(SILENCE);
     setPhase("recording");
   };
 
@@ -211,7 +219,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       const done = () => {
         release(s);
         setPhase("idle");
-        ecoute.poser(AU_REPOS);
+        ecoute.poser(SILENCE);
         const blob = new Blob(s.chunks, { type: s.recorder.mimeType || "audio/mp4" });
         /* Un toucher trop court (moins d’une demi-seconde) ne fait pas de vocal */
         if (!keep || secs < 0.5) return resolve(null);
@@ -267,7 +275,7 @@ export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSen
         <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-[#E5484D]" />
         <span className="w-[38px] text-[15px] font-black tabular-nums text-ink">{formatClock(seconds)}</span>
       </span>
-      <span aria-hidden="true" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">
+      <span aria-hidden="true" data-onde="" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">
         {bars.map((l, i) => (
           /* Une échelle plutôt qu’une hauteur : 14 fois par seconde pendant l’enregistrement, sans recalculer la page */
           <span key={i} className="h-[25px] w-[3px] shrink-0 rounded-full bg-ink transition-transform duration-75" style={{ transform: `scaleY(${(3 + l * 22) / 25})`, opacity: l === 0 ? 0.18 : 0.85 }} />

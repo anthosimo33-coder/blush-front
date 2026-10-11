@@ -131,3 +131,71 @@ test("au micro : un vocal annulé ne part pas ; un vocal envoyé est écouté pa
     expect(await tesMessagesAuChat(email)).toEqual([expect.stringMatching(/^\(vocal\) .+/)]);
   });
 });
+
+/*
+ * Le poids d’un vocal (S-15) : l’enregistreur demande 32 kb/s (src/app/app/voice.tsx, DEBIT_VOCAL), mais seul Chromium
+ * suit l’option ; le WebKit de Playwright l’accepte puis encode en AAC au débit que le son lui dicte. Ce test mesure ce
+ * qui part vraiment au serveur, sur les deux navigateurs, avec le même micro de synthèse : un souffle et un la, plus durs
+ * à compresser qu’une voix (le pire cas).
+ *   - Chromium : au plus 5 ko par seconde (32 kb/s et l’enveloppe), pour que le débit ne remonte pas en silence.
+ *   - Partout : un vocal de la durée que le serveur accepte (environ 130 s, la limite prévue par 4a), à ce débit, tient
+ *     sous la taille maximale du serveur. Si elle baisse, ce test dit si les vocaux de l’iPhone passent encore.
+ */
+/** La taille maximale d’un vocal pour le serveur : TAILLE_VOCAL_MAX, src/server/ia/transcription.ts (à suivre s’il change). */
+const TAILLE_VOCAL_MAX_DU_SERVEUR = 4 * 1024 * 1024;
+/** Le plus long vocal que le serveur accepte (le navigateur l’envoie tout seul à 120 s). */
+const DUREE_VOCAL_MAX_DU_SERVEUR = 130;
+
+test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigateur, tient sous sa taille maximale", async ({ page, browserName }, testInfo) => {
+  await page.addInitScript(() => {
+    /* Le micro de synthèse : un souffle (un bruit blanc) et un la, mêlés dans un flux de l’audio du navigateur */
+    const ouvrir = async () => {
+      const ctx = new AudioContext();
+      await ctx.resume().catch(() => {});
+      const sortie = ctx.createMediaStreamDestination();
+      const son = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const echantillons = son.getChannelData(0);
+      for (let i = 0; i < echantillons.length; i++) echantillons[i] = (Math.random() * 2 - 1) * 0.2;
+      const souffle = ctx.createBufferSource();
+      souffle.buffer = son;
+      souffle.loop = true;
+      const la = ctx.createOscillator();
+      la.frequency.value = 440;
+      souffle.connect(sortie);
+      la.connect(sortie);
+      souffle.start();
+      la.start();
+      return sortie.stream;
+    };
+    /* Sur le prototype : WebKit remplace l’objet navigator.mediaDevices après le chargement, et une simple affectation s’y perd */
+    Object.defineProperty(MediaDevices.prototype, "getUserMedia", { configurable: true, value: ouvrir });
+    /* Ce qui part au chat : le poids du vocal, lu dans le formulaire envoyé */
+    const vrai = window.fetch.bind(window);
+    window.fetch = (entree, init) => {
+      const vocal = init?.body instanceof FormData ? init.body.get("vocal") : null;
+      if (vocal instanceof Blob) Object.assign(window, { vocalEnvoye: vocal });
+      return vrai(entree, init);
+    };
+  });
+  await lectureBlushPlus(page, testInfo);
+  await ouvrir(page, "/app");
+  await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Enregistrement du vocal en cours" })).toBeAttached();
+  /* Quatre secondes : l’enveloppe du fichier compte peu devant le son */
+  await expect(page.getByText("0:04", { exact: true })).toBeVisible({ timeout: 10_000 });
+  const reponse = await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Envoyer le vocal" }).click());
+  expect(reponse.status()).toBe(200);
+  await expect(filDuChat(page).getByRole("button", { name: /^Écouter ton vocal \(\d+:\d{2}\)$/ })).toBeVisible();
+  /* Sa durée exacte, celle du son décodé (la bulle l’arrondit à la seconde) */
+  const { octets, type, secondes } = await page.evaluate(async () => {
+    const vocal = (window as unknown as { vocalEnvoye: Blob }).vocalEnvoye;
+    const son = await new AudioContext().decodeAudioData(await vocal.arrayBuffer());
+    return { octets: vocal.size, type: vocal.type, secondes: son.duration };
+  });
+  const parSeconde = octets / secondes;
+  testInfo.annotations.push({ type: "débit d’un vocal", description: `${browserName} : ${type}, ${octets} octets pour ${secondes.toFixed(2)} s, ${Math.round((parSeconde * 8) / 1000)} kb/s` });
+
+  expect(secondes).toBeGreaterThanOrEqual(3.5);
+  if (browserName === "chromium") expect(parSeconde, "Chromium suit les 32 kb/s demandés").toBeLessThanOrEqual(5_000);
+  expect(parSeconde * DUREE_VOCAL_MAX_DU_SERVEUR, `un vocal de ${DUREE_VOCAL_MAX_DU_SERVEUR} s à ce débit`).toBeLessThanOrEqual(TAILLE_VOCAL_MAX_DU_SERVEUR);
+});

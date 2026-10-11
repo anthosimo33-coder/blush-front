@@ -133,7 +133,7 @@ async function enregistrer() {
 }
 
 /* Les barres de l’onde, de gauche à droite : leur échelle (3/25 au repos, 25/25 au plus fort) */
-const onde = () => [...document.querySelectorAll<HTMLElement>(".h-\\[25px\\]")].map((b) => b.style.transform);
+const onde = () => [...document.querySelectorAll<HTMLElement>("[data-onde] > *")].map((b) => b.style.transform);
 
 describe("le vocal de la barre de saisie", () => {
   it("s’enregistre au débit de la voix, 32 kb/s (S-15)", async () => {
@@ -184,5 +184,18 @@ describe("le vocal de la barre de saisie", () => {
     expect(perles.hasAttribute("data-listen")).toBe(false);
     expect(perles.hasAttribute("data-lean")).toBe(false);
     expect([...perles.querySelectorAll<HTMLElement>("[data-pearl], [data-shade]")].map((p) => p.style.transform)).toEqual(Array(6).fill(""));
+  });
+
+  it("à 2 minutes, le vocal part tout seul, une seule fois, avec ses 120 secondes", async () => {
+    const props = monter();
+    await enregistrer();
+    /* Le minuteur du temps et l’horloge avancent ensemble jusqu’à la limite : le vocal part par la fonction rendue au début de l’enregistrement */
+    await act(async () => void vi.advanceTimersByTime(120_000));
+    expect(props.onVoice).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ seconds: 120 }));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("button", { name: "Enregistrer un vocal" })).toBeTruthy();
+    /* Le minuteur est arrêté : le temps qui passe ne renvoie rien */
+    await act(async () => void vi.advanceTimersByTime(5_000));
+    expect(props.onVoice).toHaveBeenCalledTimes(1);
   });
 });

@@ -1278,8 +1278,10 @@ function groupeAffiche({ msgs, ...groupe }: Extract<Row, { kind: "group" }>, env
 }
 
 /*
- * Mémorisée : taper une lettre ou parler ne refait que la barre de saisie (accueil/Composer.tsx), et ce qui refait
- * l’accueil (le point creusé, la feuille du contact, un niveau) ne recalcule pas toute la conv. Et chaque groupe aussi : un nouveau message, un morceau d’historique ou la fin de l’arrivée ne refont que ce qui change.
+ * Mémorisée : taper une lettre ne refait que la barre de saisie (accueil/Composer.tsx), parler que la barre
+ * d’enregistrement (RecordingBar), et ce qui refait l’accueil (le point creusé, la feuille du contact, un niveau) ne
+ * recalcule pas toute la conv. Et chaque groupe aussi : un nouveau message, un morceau d’historique ou la fin de
+ * l’arrivée ne refont que ce qui change.
  */
 const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; opened: number | null; depuis: number }) {
   const { report, fiche } = useContact();
