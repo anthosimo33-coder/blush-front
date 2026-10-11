@@ -4,14 +4,13 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { figtree } from "@/lib/fonts";
 import { REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
-import { Logo } from "@/components/brand/Logo";
-import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/icons";
 import { ConfidenceLine, Tag } from "@/components/ui/messages";
+import { LogoIlot } from "@/components/shell/LogoIlot";
 import type { Testimonial } from "@/types";
 import { ctaDe, type Retour } from "./cta";
-import { AvisDefilants, BigHand, Demandes, type Demande } from "./ilots";
+import { AvisDefilants, BigHand, Cloche, Demandes, LogoBulle, type Demande } from "./ilots";
 
 /*
  * Les morceaux de la landing, rendus sur le serveur : aucun « use client » ici. Ce qui tourne dans le navigateur vit
@@ -61,7 +60,7 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
     <div className={cn("min-h-dvh overflow-x-clip", figtree.variable)}>
       <header className="sticky top-0 z-40 border-b border-[rgba(17,17,20,0.05)] bg-[rgba(244,242,237,0.82)] backdrop-blur-xl">
         <Container className="flex h-16 items-center justify-between">
-          <Logo size={30} fontSize={22} href="/" />
+          <LogoIlot size={30} fontSize={22} href="/" />
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Déjà un compte, sur un autre appareil : on retrouve ses convs avec son email */}
             {!retour && (
@@ -81,7 +80,7 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
       <footer className="border-t border-[rgba(17,17,20,0.06)] py-10">
         <Container className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Logo size={26} fontSize={19} href="/" />
+            <LogoIlot size={26} fontSize={19} href="/" />
             <span className="text-[13px] font-extrabold text-grey">© 2026</span>
           </div>
           <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-extrabold">
@@ -176,10 +175,10 @@ export function BlushPlus() {
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(52%_62%_at_50%_0%,rgba(255,79,154,0.2),rgba(255,79,154,0))]" />
           {/* L’objet 3D : la cloche d’un nouveau message. Et le logo, en bas. */}
           <div aria-hidden="true" data-float="" className="pointer-events-none absolute -right-5 -top-5 w-[96px] lg:right-6 lg:top-8 lg:w-[132px]" style={{ "--r": "12deg", transform: "rotate(12deg)" }}>
-            <Bell3D size={132} className="h-auto w-full" />
+            <Cloche size={132} className="h-auto w-full" />
           </div>
           <div aria-hidden="true" data-float="" className="pointer-events-none absolute -bottom-8 -left-6 hidden lg:block" style={{ "--r": "-12deg", transform: "rotate(-12deg)", animationDelay: "1.4s" }}>
-            <BubbleLogo size={150} />
+            <LogoBulle size={150} />
           </div>
 
           <div className="relative flex flex-col items-center text-center">
@@ -234,7 +233,7 @@ export function BlushPlus() {
 function FromBlush({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-end gap-2">
-      <BubbleLogo size={28} className="mb-0.5 shrink-0" />
+      <LogoBulle size={28} className="mb-0.5 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[20px] rounded-bl-[6px] bg-[#F4F2ED] px-4 py-3">{children}</div>
     </div>
   );
@@ -308,7 +307,7 @@ export function FinalCta({ retour }: { retour: Retour }) {
     <section className="pb-20 pt-6 lg:pb-28 lg:pt-10">
       <Container>
         <div data-reveal="" className="flex flex-col items-center text-center">
-          <BubbleLogo size={68} animated />
+          <LogoBulle size={68} animated />
           <h2 className="m-0 mt-6 max-w-[640px] text-[36px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-[56px]">Ta conv a déjà la réponse.</h2>
           <CtaButton retour={retour} className="mt-8" />
           <span className="mt-3.5 text-[14px] font-extrabold text-grey">{cta.note}</span>

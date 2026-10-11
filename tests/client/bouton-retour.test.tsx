@@ -55,6 +55,29 @@ describe("BoutonRetour", () => {
     expect(routeur.back).toHaveBeenCalledTimes(1);
   });
 
+  it("le repli après un retour du système : sans entrée de BLUSH avant (API Navigation), le lien mène au repli", () => {
+    /*
+     * Arrivé par un lien, « Retour » a poussé le repli, puis le retour du système est revenu ici : BLUSH garde une page
+     * d’avant, mais l’entrée d’avant est le site d’où l’on vient. L’API Navigation le dit (index 0, rien de BLUSH avant).
+     */
+    avant.mockReturnValue("/");
+    vi.stubGlobal("navigation", { currentEntry: { index: 0 } });
+    try {
+      const { unmount } = render(<BoutonRetour target={{ repli: "/" }} />);
+      expect(cliquer(screen.getByRole("link", { name: "Retour" }))).toBe(true);
+      expect(routeur.back).not.toHaveBeenCalled();
+      unmount();
+
+      /* Une entrée de BLUSH avant celle-ci : en arrière */
+      vi.stubGlobal("navigation", { currentEntry: { index: 2 } });
+      render(<BoutonRetour target={{ repli: "/" }} />);
+      expect(cliquer(screen.getByRole("link", { name: "Retour" }))).toBe(false);
+      expect(routeur.back).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("un clic modifié (nouvel onglet) reste au lien, même vers la page d’avant", () => {
     avant.mockReturnValue("/compte");
     render(<BoutonRetour target={{ repli: "/" }} />);

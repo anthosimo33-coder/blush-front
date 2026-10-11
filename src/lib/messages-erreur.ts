@@ -1,7 +1,7 @@
 /*
  * Ce que les écrans disent d’une erreur, d’après son code (src/types/erreurs-api.ts) : une seule table, action par
  * action. Un code absent d’une action prend son texte par défaut (le réseau, un bug). Les textes des écrans d’erreur de
- * l’import, avec leur action, restent dans ErrorScreen.
+ * l’import, avec leur action, sont dans src/lib/copie-erreur.ts.
  */
 import type { FicheUpdate } from "@/types";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
@@ -116,7 +116,7 @@ export function messageErreur<A extends Action>(action: A, e: unknown): TexteDe<
 
 /**
  * Les erreurs du parcours d’import, posées dans l’adresse (`?erreur=<code>`) : voir ErreurDeParcours, et leurs textes
- * dans ErrorScreen. « lecture » n’est pas un code de l’API : plus aucun écran ne la pose (l’échec de la lecture se dit
+ * dans src/lib/copie-erreur.ts. « lecture » n’est pas un code de l’API : plus aucun écran ne la pose (l’échec de la lecture se dit
  * sur /lecture), on n’y arrive qu’en tapant l’adresse.
  */
 export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"] as const satisfies readonly (CodeApi | "lecture")[];

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { ReactNode, Ref } from "react";
 import { cn } from "@/lib/cn";
-import { Logo } from "@/components/brand/Logo";
 import { Icon } from "@/components/ui/icons";
 import { ProgressDots } from "@/components/ui/progress";
 import { BoutonRetour, LienRetourDesktop, type BackTarget } from "./BoutonRetour";
+import { LogoIlot } from "./LogoIlot";
 
 /*
  * La structure des écrans, sans « use client » : rendue sur le serveur pour un écran serveur (la confidentialité),
- * dans le navigateur pour un écran client. Seuls les « Retour » (BoutonRetour.tsx) y tournent toujours.
+ * dans le navigateur pour un écran client. Seuls les « Retour » (BoutonRetour.tsx) y tournent toujours, et le logo
+ * (LogoIlot.tsx) y est un îlot pour ne pas peser sur la charge de chaque page.
  */
 
 export type { BackTarget };
@@ -42,7 +43,7 @@ export function DesktopHeader({ right, className }: { right?: ReactNode; classNa
     <header className={cn("hidden h-[84px] shrink-0 lg:flex", className)}>
       {/* Même cadre que les colonnes : le logo s’aligne sur le contenu, « Mon compte » sur la colonne d’appoint */}
       <div className="mx-auto flex w-[min(100%_-_96px,var(--frame-w,1020px))] items-center justify-between">
-        <Logo href="/" />
+        <LogoIlot href="/" />
         {right}
       </div>
     </header>

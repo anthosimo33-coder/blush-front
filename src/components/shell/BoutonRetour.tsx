@@ -18,6 +18,22 @@ import { Icon } from "@/components/ui/icons";
  */
 export type BackTarget = string | { repli: string } | (() => void);
 
+/** L’API Navigation, là où le navigateur l’a (pas encore partout : sans elle, on s’en tient à la page d’avant). */
+type HistoriqueNavigation = { currentEntry: { index: number } | null };
+
+/**
+ * L’entrée d’avant dans l’historique est-elle à BLUSH ? `pagePrecedente` est la dernière page de BLUSH vue, pas l’entrée
+ * d’avant : arrivé par un lien, un « Retour » (le repli, poussé) puis le retour du système ramènent sur la page avec une
+ * page d’avant, alors que l’entrée d’avant est le site d’où l’on vient. L’API Navigation ne liste que les entrées de
+ * BLUSH (même origine) : un index au-dessus de 0 dit qu’en arrière, on reste chez nous. Sans l’API (des navigateurs
+ * plus anciens), cette limite reste : le repli ne protège que la première arrivée.
+ */
+function entreeDAvantDansBlush() {
+  const historique = (window as Window & { navigation?: HistoriqueNavigation }).navigation;
+  const entree = historique?.currentEntry;
+  return entree ? entree.index > 0 : true;
+}
+
 /**
  * Le toucher d’un lien « Retour » : en arrière quand c’est la bonne page d’avant (l’historique reste propre, et le
  * retour suivant mène bien plus loin) ; sinon, le lien s’ouvre. Un clic modifié (nouvel onglet) reste au lien.
@@ -27,7 +43,7 @@ function useRetour(target: Exclude<BackTarget, () => void>) {
   return (e: MouseEvent) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     const avant = pagePrecedente();
-    if (typeof target === "string" ? avant === cheminDe(target) : avant) {
+    if (typeof target === "string" ? avant === cheminDe(target) : avant && entreeDAvantDansBlush()) {
       e.preventDefault();
       router.back();
     }

@@ -31,7 +31,7 @@ const libelle = (plan: Plan) => {
 };
 
 /** Les offres, chacune par son plan (Mon compte lit celle du rapport). */
-export const OFFRES: Record<Offer["id"], Offer> = {
+export const OFFRE_PAR_PLAN: Record<Offer["id"], Offer> = {
   blushplus: {
     id: "blushplus",
     title: "BLUSH+ · le rapport et l’aide à chaque message",
@@ -53,7 +53,7 @@ export const OFFRES: Record<Offer["id"], Offer> = {
 };
 
 /** Les offres dans l’ordre du paywall : BLUSH+ (conseillé), puis le rapport. */
-export const OFFERS: Offer[] = [OFFRES.blushplus, OFFRES.rapport];
+export const OFFERS: Offer[] = [OFFRE_PAR_PLAN.blushplus, OFFRE_PAR_PLAN.rapport];
 
 export const PAYWALL = {
   title: (other?: string) => (other ? `La suite parle de vous deux\u00a0: toi et ${other}.` : "La suite parle de vous deux."),

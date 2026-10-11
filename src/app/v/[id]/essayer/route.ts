@@ -9,6 +9,6 @@ export async function GET(req: Request, { params }: RouteContext<"/v/[id]/essaye
     await compter(CLES.lienEssai);
     await marquerVenuDuPartage();
   }
-  /* Le début du parcours, comme le bouton de la landing (CTA, src/components/landing/parts.tsx) */
+  /* Le début du parcours, comme le bouton de la landing (CTA, src/components/landing/cta.ts) */
   return NextResponse.redirect(new URL("/commencer", req.url));
 }

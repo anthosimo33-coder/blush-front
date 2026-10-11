@@ -122,8 +122,11 @@ function useRovingRadio<T extends HTMLElement>() {
   return { ref, onKeyDown };
 }
 
+/** Le nom d’un groupe de radios, obligatoire : son texte (`label`), ou l’id de son titre visible (`labelledBy`). */
+type NomDuGroupe = { label: string; labelledBy?: never } | { labelledBy: string; label?: never };
+
 /** Un groupe de radios (`role="radiogroup"`), parcouru aux flèches du clavier (useRovingRadio). Son nom : `label`, ou l’id de son titre. */
-export function RadioGroup({ label, labelledBy, className, children }: { label?: string; labelledBy?: string; className?: string; children: ReactNode }) {
+export function RadioGroup({ label, labelledBy, className, children }: NomDuGroupe & { className?: string; children: ReactNode }) {
   const { ref, onKeyDown } = useRovingRadio<HTMLDivElement>();
   return (
     <div ref={ref} role="radiogroup" aria-label={label} aria-labelledby={labelledBy} onKeyDown={onKeyDown} className={className}>

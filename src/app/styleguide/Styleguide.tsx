@@ -6,7 +6,7 @@ import { Logo } from "@/components/brand/Logo";
 import { AppBadge, Avatar, AvatarPair } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Card, CardLabel, PlayCard, StepList } from "@/components/ui/cards";
-import { AppTile, Chip, ChoiceCard, ChoiceTile, Segmented, Switch } from "@/components/ui/controls";
+import { AppTile, Chip, ChoiceCard, ChoiceTile, RadioGroup, Segmented, Switch } from "@/components/ui/controls";
 import { EmailField } from "@/components/ui/EmailField";
 import { emailValide } from "@/lib/email";
 import { Bubble, PariTag, ProofCard, Tag } from "@/components/ui/messages";
@@ -263,11 +263,11 @@ export function Styleguide() {
             </div>
           </Spec>
           <Spec label="TUILE DE CHOIX" width={360}>
-            <div role="radiogroup" aria-label="Exemple" className="flex gap-2.5">
+            <RadioGroup label="Exemple" className="flex gap-2.5">
               <ChoiceTile icon="imessage" tone="toi" label="On se parle" selected={tile === "parle"} onClick={() => setTile("parle")} />
               <ChoiceTile icon="people" tone="vrai" label="On s’est vus" selected={tile === "vus"} onClick={() => setTile("vus")} />
               <ChoiceTile icon="cloud" tone="flou" label="C’est flou" selected={tile === "flou"} onClick={() => setTile("flou")} />
-            </div>
+            </RadioGroup>
           </Spec>
         </Row>
         <Row>

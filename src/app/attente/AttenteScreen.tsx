@@ -66,7 +66,7 @@ export function AttenteScreen() {
 
   return (
     <Screen
-      mobileTop={<MobileTopBar back={() => router.back()} />}
+      mobileTop={<MobileTopBar back={{ repli: "/" }} />}
       desktopBack={{ target: "/" }}
       head={
         <>

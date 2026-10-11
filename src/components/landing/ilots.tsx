@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
+import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import type { Testimonial } from "@/types";
@@ -12,6 +13,20 @@ import type { Testimonial } from "@/types";
  * de BLUSH+, la grosse main, les avis qui glissent). Le reste de la page est rendu sur le serveur (parts.tsx), et les
  * convs qui défilent ont leur îlot à elles (ConvsExemples.tsx).
  */
+
+/*
+ * Le logo, en îlot : rendu par le serveur, chaque bulle partait en entier dans la charge de la page (ses dégradés, ses
+ * filtres, ses perles), alors que son code est déjà dans le navigateur (les convs qui défilent l’importent, et avec
+ * elles tout objects3d). En îlot, la page n’en envoie que les props, sans un octet de JS en plus.
+ */
+export function LogoBulle(props: ComponentProps<typeof BubbleLogo>) {
+  return <BubbleLogo {...props} />;
+}
+
+/** La cloche d’un nouveau message (BLUSH+), en îlot pour la même raison : son code part déjà avec le logo. */
+export function Cloche(props: ComponentProps<typeof Bell3D>) {
+  return <Bell3D {...props} />;
+}
 
 /** Les blocs apparaissent en douceur au défilement (rien ne bouge si l’appareil demande moins d’animations). `cle` : la relance. */
 export function Apparitions({ cle }: { cle: number }) {
@@ -49,6 +64,8 @@ export type Demande = { q: string; reponse: ReactNode };
 export function Demandes({ demandes }: { demandes: Demande[] }) {
   const [open, setOpen] = useState(0);
   const [touched, setTouched] = useState(false);
+  /* Les ids des questions et de leurs réponses, propres à cette liste (le FLIP les prend aussi pour clés) */
+  const base = useId();
   /*
    * Une autre question s’ouvre d’un coup (animer la hauteur refaisait la mise en page de toute la suite à chaque image) :
    * les questions glissent de leur ancienne place à la nouvelle (FLIP, en transform), puis la réponse apparaît.
@@ -89,10 +106,10 @@ export function Demandes({ demandes }: { demandes: Demande[] }) {
             )}
             <button
               type="button"
-              id={`demande-${i}-q`}
+              id={`${base}-${i}-q`}
               data-demande=""
               aria-expanded={on}
-              aria-controls={`demande-${i}`}
+              aria-controls={`${base}-${i}`}
               onClick={() => {
                 if (i !== open) avant.current = snapshotTops(questions(), cle);
                 setOpen(i);
@@ -106,7 +123,7 @@ export function Demandes({ demandes }: { demandes: Demande[] }) {
               {a.q}
             </button>
             {/* La réponse s’ouvre d’un coup et apparaît en fondu, une fois les questions presque posées ; fermée, elle sort du clavier et des lecteurs d’écran */}
-            <div id={`demande-${i}`} role="region" aria-labelledby={`demande-${i}-q`} className={cn("grid", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+            <div id={`${base}-${i}`} role="region" aria-labelledby={`${base}-${i}-q`} className={cn("grid", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
               <div inert={!on || undefined} className="min-h-0 overflow-hidden">
                 <div data-reponse="" className={cn("mx-auto max-w-[500px] pb-7 pt-3 transition-[opacity,transform] duration-300 ease-out", on ? "translate-y-0 opacity-100 delay-150" : "-translate-y-2 opacity-0")}>
                   <div className="flex flex-col gap-2 rounded-[26px] bg-white p-3.5 text-left text-ink shadow-[0_30px_70px_-30px_rgba(0,0,0,0.8)] lg:p-4">{a.reponse}</div>
