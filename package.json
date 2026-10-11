@@ -2,6 +2,9 @@
   "name": "front",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "node scripts/developper.mjs",
     "build": "next build",
@@ -24,7 +27,11 @@
     "e2e:visuel": ": \"${E2E_VISUEL_DIR:?le dossier des captures de référence, hors du dépôt (voir tests/e2e/visuel.spec.ts)}\" && playwright test --project=visuel-chromium --project=visuel-webkit",
     "db:generer": "drizzle-kit generate",
     "db:migrer": "node scripts/migrer.mjs --ici",
-    "acces": "tsx scripts/acces.mts"
+    "acces": "tsx scripts/acces.mts",
+    "essai:vrai-modele": "tsx --conditions=react-server scripts/essai-vrai-modele.mts",
+    "essai:memoire": "tsx --conditions=react-server scripts/essai-memoire.mts",
+    "essai:ajouts": "tsx --conditions=react-server scripts/essai-ajouts.mts",
+    "essai:captures": "tsx --conditions=react-server scripts/essai-captures.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -44,7 +51,7 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",

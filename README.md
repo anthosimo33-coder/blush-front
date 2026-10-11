@@ -18,7 +18,7 @@ Le code de connexion s’affiche dans le terminal (pas de Resend en local). Pour
 GitHub (`blush-front`) est la seule source : on travaille sur une branche, on pousse, et la CI vérifie chaque pull request, et chaque push sur `main`.
 
 ```bash
-nvm use                                 # Node 24, celui de Vercel (.nvmrc)
+nvm use                                 # Node 24, celui de Vercel (.nvmrc, et `engines` de package.json, que Vercel lit aussi)
 git submodule update --init             # les prompts (dépôt privé blush-prompts)
 npm ci
 npm run check                           # types, lint, migrations, typographie, code mort (knip), tests (Postgres local : blush_test, créée au besoin)
@@ -31,8 +31,10 @@ npm run todo                            # les décisions produit en attente (les
 
 La CI (`.github/workflows/ci.yml`), à chaque pull request et à chaque push sur `main` :
 
-1. **Vérifications et build** : `npm run check` (dont la cohérence des migrations, `scripts/verifier-migrations.mjs`), puis le build du back-end et sa vérification qu’aucun prompt n’arrive au navigateur (`scripts/verifier-fuite.mjs`).
+1. **Vérifications et build** : `npm run check` (dont la cohérence des migrations, `scripts/verifier-migrations.mjs`), puis le build du back-end et sa vérification qu’aucun prompt n’arrive au navigateur (`scripts/verifier-fuite.mjs` : aucune suite de 10 mots des prompts dans ce qu’il envoie, quelle que soit sa forme, échappée ou en entités HTML, et un canari qui prouve qu’elle la verrait).
 2. **E2E (chromium)** et **E2E (webkit)** : chacun refait le build, puis les tests de bout en bout avec un Postgres neuf. En cas d’échec, le rapport et les traces (données de test inventées, jamais les prompts) sont dans les artefacts du run.
+
+Les dépendances : chaque lundi, Dependabot (`.github/dependabot.yml`) ouvre une pull request pour les versions mineures et correctives des paquets npm, une par version majeure, et une pour les actions de la CI ; la CI les vérifie comme les autres. Elle lit le sous-module privé : `PROMPTS_TOKEN` doit aussi être un secret de Dependabot (Settings › Secrets and variables › Dependabot).
 
 **La mise en production est un geste, jamais l’effet d’un push** : sur `main`, « Run workflow » dans l’onglet Actions (ou `gh workflow run CI --ref main`). Ce lancement refait les vérifications et les tests de bout en bout sur la tête de `main`, puis lance `vercel deploy --prod` : Vercel construit sur ses serveurs avec ses variables, et y migre la base. Relancer un ancien run ne redéploie pas une version passée : seule la tête de `main` part. On ne déploie plus depuis un dossier local.
 
@@ -56,7 +58,7 @@ Le dépôt `blush-front` est public : tout ce qu’on y commite (le code, les te
 | `drizzle/` | Les migrations SQL de la base et leur journal (`meta/`). Le schéma est `src/server/db/schema.ts`, et les valeurs fermées de ses colonnes `src/server/db/enums.ts` (celles que le navigateur lit aussi : `src/types`) ; `npm run db:generer` écrit la migration qui va avec, et le build s’arrête sans elle. `npm run dev`, les tests et le build de la production (après `next build`) les appliquent d’eux-mêmes ; `npm run db:migrer` à la main, sur une autre base. |
 | `tests/` | Les tests vitest (`npm test`, dans `npm run check`), en trois projets (`vitest.config.mts`) : `unit`, sans base (`tests/unit`, et les fichiers purs que la config liste), `client`, les hooks et les composants des écrans dans un DOM simulé (`tests/client`, happy-dom et @testing-library/react), et `db`, sur la base de test. Dont `documentation.test.ts` : chaque route `/api` et chaque variable d’environnement a sa ligne dans BACKEND.md. |
 | `tests/e2e/` | Les tests de bout en bout (Playwright, Chromium et WebKit) et leurs aides (`tests/e2e/aide`) : voir BACKEND.md, « Les tests de bout en bout ». |
-| `scripts/` | Les commandes du dépôt : `npm run dev` (`developper.mjs`), la copie des prompts côté serveur (`prompts.mjs`), les vérifications (`verifier-*.mjs` : les migrations et la typographie dans `npm run check`, la fuite des prompts après le build), les migrations du build de la production et de `npm run db:migrer` (`migrer.mjs`), l’accès donné à un compte sans paiement (`npm run acces`, `acces.mts`), la galerie (`galerie/`), le banc de fluidité de l’accueil (`fluidite/`), les essais avec le vrai modèle (`essai-*.mts`), et la CLI Vercel de la mise en production, aux versions figées (`deployer/`). |
+| `scripts/` | Les commandes du dépôt : `npm run dev` (`developper.mjs`), la copie des prompts côté serveur (`prompts.mjs`), les vérifications (`verifier-*.mjs` : les migrations et la typographie dans `npm run check`, la fuite des prompts après le build), les migrations du build de la production et de `npm run db:migrer` (`migrer.mjs`), l’accès donné à un compte sans paiement (`npm run acces`, `acces.mts`), la galerie (`galerie/`), le banc de fluidité de l’accueil (`fluidite/`), les essais avec le vrai modèle (`npm run essai:*`, `essai-*.mts`, et leurs outils partagés avec les tests : `tests/aide/essai.ts`), et la CLI Vercel de la mise en production, aux versions figées (`deployer/`). |
 
 Le back-end en détail (les routes et leurs gardes, la file des tâches, les variables d’environnement, les paramètres d’URL qui relient les écrans) : BACKEND.md.
 
@@ -76,3 +78,14 @@ npm run fluidite                       # le banc de fluidité de l’accueil, su
 ```
 
 Les états sont dans `scripts/galerie/screens.mjs` : la route, le compte, les gestes, les notes à valider, et ce qui a changé depuis l’ancienne galerie ; les états retirés y sont listés, avec leur raison. Les maquettes (`../maquettes/png`, ou `MAQUETTES=<dossier>`) s’affichent à côté quand elles sont là. `E2E_PORT` (3480 par défaut, et le port suivant) et `E2E_DB` changent le port et la base : la galerie et le banc de fluidité n’acceptent qu’une base dont le nom commence par `blush_e2e_galerie` (celle qu’ils effacent à la fin), une par dossier de travail (`E2E_PORT=3700 E2E_DB=blush_e2e_galerie_<nom> npm run galerie`). Les captures se prennent dans Chromium, dans les projets `galerie-*` de `playwright.config.ts`, que seul `BLUSH_GALERIE=1` (posé par la commande) fait apparaître : `npm run e2e` et la CI ne les voient pas.
+
+## Les essais avec le vrai modèle
+
+Ils paient de vrais appels (de quelques centimes à 1 $ l’essai), avec une vraie clé, sur la base de `DATABASE_URL` : une base à soi, jamais celle de la production. Avec `BLUSH_IA_FACTICE=1` à la place de la clé, ils tournent à blanc sur le modèle factice, pour vérifier un script. Les chemins se lisent depuis le dossier où la commande est tapée ; les convs et les cas, dans le banc d’essai du sous-module (`prompts/evals`).
+
+```bash
+DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:vrai-modele   # une conv courte de bout en bout (verdict, rapport, mémoire, chat), puis tout s’efface, même après une erreur
+npm run essai:memoire -- <résultat 07 .json> <echanges .json> <cas .json>     # les mises à jour de la mémoire, échange par échange, et leur coût
+npm run essai:ajouts -- <résultat 07 .json> <suite .txt> [ligne de profil…]   # des messages ajoutés après l’import : la réponse du chat, puis la mémoire
+npm run essai:captures -- <dossier des captures> [ordre]                        # la lecture des captures (prompt 01), comparée à sa vérité s’il y en a une
+```

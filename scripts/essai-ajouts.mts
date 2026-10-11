@@ -1,13 +1,13 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S npx tsx --conditions=react-server
 /*
  * Des messages et un profil envoyés après l’import, avec le VRAI modèle (quelques centimes) : la réponse du chat
  * (prompt 10), puis la mise à jour de la mémoire (prompt 07), sur une mémoire déjà créée (un résultat du 07).
- *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \
- *     npx tsx scripts/essai-ajouts.mts <résultat 07 .json> <suite .txt> [ligne de profil…]
- * `suite` : la suite de leur conv, au format de l’export (les lignes d’après la fin de la conv de test).
+ *   DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:ajouts -- <résultat 07 .json> <suite .txt> [ligne de profil…]
+ * `suite` : la suite de leur conv, au format de l’export (les lignes d’après la fin de la conv de test). Les chemins se
+ * lisent depuis le dossier où la commande est tapée ; la conv du cas, dans le banc d’essai (prompts/evals).
  */
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { blocAjout, messagesDeLExport, numeroter } from "@prompts/lib/ajouts";
 import { requeteChat, requeteMemoireMaj } from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
@@ -16,10 +16,10 @@ import { introuvables, preuvesChat, preuvesMaj } from "@prompts/lib/preuves";
 import { Maj07, Sortie10, type Memoire } from "@prompts/lib/schemas";
 import { profil as style } from "@prompts/lib/style";
 import { appeler } from "@/server/ia/claude";
+import { cheminDonne, EVALS } from "../tests/aide/essai";
 
 const [fichier07, fichierSuite, ...profil] = process.argv.slice(2);
-const r07 = JSON.parse(readFileSync(fichier07, "utf8"));
-const EVALS = join(dirname(new URL(import.meta.url).pathname), "../prompts/evals");
+const r07 = JSON.parse(readFileSync(cheminDonne(fichier07), "utf8"));
 const cas = (JSON.parse(readFileSync(join(EVALS, "cas.json"), "utf8")) as (Histoire & { id: string; fichier: string })[]).find((c) => c.id === r07.cas)!;
 const etat = r07.etapes.find((e: { moment: string }) => e.moment === "création").sortie as Memoire;
 if (!estFaite(etat)) throw new Error("la création du 07 n’a ni mémoire ni fiche");
@@ -30,7 +30,7 @@ const rendu = rendre(h, lu);
 const lignes = new Map([...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!]));
 
 /* La suite : les messages d’après le dernier lu, numérotés à la suite, et son profil */
-const nouveaux = messagesDeLExport(`${texte}\n${readFileSync(fichierSuite, "utf8").trim()}`, h, lu.messages.at(-1)!.t);
+const nouveaux = messagesDeLExport(`${texte}\n${readFileSync(cheminDonne(fichierSuite), "utf8").trim()}`, h, lu.messages.at(-1)!.t);
 if (typeof nouveaux === "string") throw new Error(nouveaux);
 const jour = new Date(Math.max(...nouveaux.map((m) => m.t)) + 86400e3).toISOString().slice(0, 10);
 const ajout = numeroter(nouveaux, profil, h, { debut: lu.messages.length + 1, aujourdhui: jour });
@@ -54,7 +54,7 @@ console.log(`  preuves introuvables : ${introuvables(preuvesChat(r), avec).join(
 /* La mémoire relit ce qui est arrivé */
 const nouveau = rendreNouveau({ date: jour, lignes: ajout.lignes, dit: "ça veut dire quoi ? je lui réponds quoi ?", reponse: r.lecture.map((b) => b.texte).concat(r.a_envoyer ?? []) }, h, 0);
 const pourMaj = new Map([...lignes, ...nouveau.lignes]);
-const maj = await appeler(requeteMemoireMaj(h, Date.parse(`${jour}T00:00:00Z`), etat, pourMaj, nouveau.texte), Maj07, { etiquette: "essai_ajouts" });
+const maj = await appeler(requeteMemoireMaj(h, Date.parse(`${jour}T00:00:00Z`), etat, pourMaj, nouveau.texte), Maj07, { etiquette: "essai_ajouts", partie: "mise à jour" });
 const m = maj.sortie;
 if (!m) throw new Error(`mise à jour illisible (${maj.stop})`);
 console.log(`\nmémoire · ${maj.cout.toFixed(3)} $ · ${m.rien_de_neuf ? "rien de neuf" : "mise à jour"}`);

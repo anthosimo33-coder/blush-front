@@ -1,34 +1,37 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S npx tsx --conditions=react-server
 /*
  * La mise à jour de la mémoire avec le VRAI modèle, échange par échange (quelques centimes) : on part d’une mémoire
  * déjà créée (un résultat du 07), et on mesure ce que coûte chaque mise à jour.
- *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \
- *     npx tsx scripts/essai-memoire.mts <résultat 07 .json> <echanges .json> <cas .json>
+ *   DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:memoire -- <résultat 07 .json> <echanges .json> <cas .json>
+ * `cas` : un cas du banc d’essai (une entrée de prompts/evals/cas.json), dont la conv (`fichier`) se lit dans le banc.
+ * Les trois chemins se lisent depuis le dossier où la commande est tapée.
  */
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
 import { appliquerMaj, citees, estFaite, rendreNouveau, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
 import { requeteMemoireMaj } from "@prompts/lib/contextes";
 import { Maj07, type Memoire } from "@prompts/lib/schemas";
 import { appeler } from "@/server/ia/claude";
+import { cheminDonne, EVALS } from "../tests/aide/essai";
 
 const [fichier07, fichierEchanges, fichierCas] = process.argv.slice(2);
-const r07 = JSON.parse(readFileSync(fichier07, "utf8"));
-const cas = JSON.parse(readFileSync(fichierCas, "utf8")) as Histoire & { id: string; fichier: string };
+const r07 = JSON.parse(readFileSync(cheminDonne(fichier07), "utf8"));
+const cas = JSON.parse(readFileSync(cheminDonne(fichierCas), "utf8")) as Histoire & { id: string; fichier: string };
 const creation = r07.etapes.find((e: { moment: string }) => e.moment === "création").sortie as Memoire;
 if (!estFaite(creation)) throw new Error("la création du 07 n’a ni mémoire ni fiche");
 let etat: MemoireFaite = creation;
 const h: Histoire = { ...cas, format: cas.format ?? "whatsapp-ios" };
-const lu = lire(readFileSync(cas.fichier, "utf8"), h);
+const lu = lire(readFileSync(join(EVALS, cas.fichier), "utf8"), h);
 const tout = rendre(h, lu).lignes;
 const lignes = new Map([...new Set(citees(etat))].filter((id) => tout.has(id)).map((id) => [id, tout.get(id)!]));
 let suivant = lu.messages.length + 1;
 let total = 0;
-for (const ech of (JSON.parse(readFileSync(fichierEchanges, "utf8")) as Record<string, (Echange & { attendu?: string })[]>)[cas.id] ?? []) {
+for (const ech of (JSON.parse(readFileSync(cheminDonne(fichierEchanges), "utf8")) as Record<string, (Echange & { attendu?: string })[]>)[cas.id] ?? []) {
   const nouveau = rendreNouveau(ech, h, suivant);
   suivant = nouveau.suivant;
   for (const [id, l] of nouveau.lignes) lignes.set(id, l);
-  const a = await appeler(requeteMemoireMaj(h, Date.parse(`${ech.date}T00:00:00Z`), etat, lignes, nouveau.texte), Maj07, { etiquette: "essai_memoire" });
+  const a = await appeler(requeteMemoireMaj(h, Date.parse(`${ech.date}T00:00:00Z`), etat, lignes, nouveau.texte), Maj07, { etiquette: "essai_memoire", partie: "mise à jour" });
   total += a.cout;
   const m = a.sortie;
   console.log(`\n${ech.date} · ${a.cout.toFixed(3)} $ · ${m?.rien_de_neuf ? "rien de neuf" : "mise à jour"}${ech.attendu ? `\n  attendu : ${ech.attendu}` : ""}`);

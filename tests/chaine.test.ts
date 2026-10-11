@@ -13,9 +13,10 @@ import { memoireDe } from "@/server/donnees";
 import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
 import { FACTICE } from "@/server/ia/factice-valeurs";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
-import type { DonneesRapport, DonneesVocal } from "@/server/stockage/types";
+import type { DonneesVocal } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
 import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalLu } from "@/server/vocal";
+import { rapportEnBase, tachesDe } from "./aide/essai";
 import { convDeTest } from "./aide/fichiers";
 import { compteDeTest, convImportee, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
 
@@ -39,7 +40,7 @@ describe("de l’import à la mémoire", () => {
   let imp: Importee;
   /** La ligne de l’histoire juste après l’import, conv brute comprise (la lecture l’efface ensuite). */
   let importee: LigneComplete;
-  /** Les tâches de la première lecture, triées par création (sans tri, Postgres les rend dans l’ordre de leur mise à jour) : le chat et le vocal en ajoutent ensuite. */
+  /** Les tâches de la première lecture, dans l’ordre de leur création (tachesDe) : le chat et le vocal en ajoutent ensuite. */
   let taches: (typeof schema.tasks.$inferSelect)[];
   const relire = () => ligneEnBase(imp.id);
   const memoire = async () => (await memoireDe(imp.id))!;
@@ -49,7 +50,7 @@ describe("de l’import à la mémoire", () => {
     imp = await convImportee("01-a-deux-doigts.txt");
     importee = await ligneEnBase(imp.id);
     await histoireLue(u, imp, { qui: { moi: "Hugo" } });
-    taches = await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, imp.id)).orderBy(schema.tasks.createdAt);
+    taches = await tachesDe(imp.id);
   });
 
   it("l’import : deux participants, plus de 50 messages, et la conv chiffrée en base", () => {
@@ -69,8 +70,7 @@ describe("de l’import à la mémoire", () => {
   });
 
   it("le rapport : ses chapitres (ceux du modèle factice), le verdict d’abord avec ses scores, et des preuves devenues des messages datés", async () => {
-    const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id));
-    const rapport = dechiffrer<DonneesRapport>(r.data!);
+    const rapport = (await rapportEnBase(imp.id))!;
     expect(rapport.chapitres).toHaveLength(FACTICE.chapitres);
     expect(rapport.chapitres[0].title).toBe("Le verdict");
     expect(rapport.chapitres[0].blocks.some((b) => b.kind === "scores")).toBe(true);

@@ -1,8 +1,8 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S npx tsx --conditions=react-server
 /*
  * Le prompt 01 (lire des captures) avec le VRAI modèle, comparé mot pour mot à la vérité (prompts/evals/captures/fabriquer.mjs).
- *   NODE_OPTIONS=--conditions=react-server DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… \
- *     npx tsx scripts/essai-captures.mts <dossier des captures> [ordre=1,2,3…]
+ *   DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:captures -- <dossier des captures> [ordre=1,2,3…]
+ * Le dossier se lit depuis le dossier où la commande est tapée.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -11,8 +11,10 @@ import { requeteCaptures } from "@prompts/lib/contextes";
 import { lire } from "@prompts/lib/conv";
 import { Sortie01 } from "@prompts/lib/schemas";
 import { appeler } from "@/server/ia/claude";
+import { cheminDonne } from "../tests/aide/essai";
 
-const [dossier, ordreArg] = process.argv.slice(2);
+const [dossierDonne, ordreArg] = process.argv.slice(2);
+const dossier = cheminDonne(dossierDonne);
 /* Sans vérité (de vraies captures) : on affiche seulement la transcription */
 const sansVerite = !existsSync(join(dossier, "verite.json"));
 const verite = (sansVerite ? { aujourdhui: new Date().toISOString().slice(0, 10), autre: "", blocs: [] } : JSON.parse(readFileSync(join(dossier, "verite.json"), "utf8"))) as {

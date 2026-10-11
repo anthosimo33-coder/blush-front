@@ -1,0 +1,31 @@
+# Dependabot : chaque semaine, une pull request par écosystème qui regroupe les mises à jour mineures et correctives
+# (les majeures arrivent une à une, à relire). La CI de chaque pull request refait `npm run check`, le build et les tests
+# de bout en bout : elle lit le sous-module privé des prompts avec PROMPTS_TOKEN, qui doit aussi exister dans les secrets
+# de Dependabot (Settings › Secrets and variables › Dependabot), sinon ses pull requests échouent dès le checkout.
+# Hors d’ici : scripts/deployer (la CLI de Vercel aux versions figées, montée à la main) et le sous-module prompts/
+# (un dépôt privé, avec ses propres dépendances).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      mineures:
+        update-types: [minor, patch]
+    # Node suit la version de Vercel (.nvmrc, engines) : ses types changent de version majeure avec elle, pas avant
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    groups:
+      actions:
+        patterns: ["*"]
