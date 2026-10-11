@@ -57,8 +57,8 @@ function Content({ arrow, icon, variant, children, lien = false }: Pick<CommonPr
 }
 
 /**
- * Un bouton. `loading` : l’action est partie ; les trois points de BLUSH prennent la place du texte (dits aux lecteurs
- * d’écran par `loadingLabel`), la flèche s’efface et un nouveau toucher ne fait rien (même un bouton d’envoi de
+ * Un bouton. `loading` : l’action est partie ; les trois points de BLUSH prennent la place du texte (le bouton prend
+ * pour nom `loadingLabel`, ou garde son texte, caché à l’œil, sans lui), la flèche s’efface et un nouveau toucher ne fait rien (même un bouton d’envoi de
  * formulaire). Le bouton garde son allure : `disabled` en plus le grise, comme avant.
  */
 export function Button({
@@ -78,7 +78,15 @@ export function Button({
   return (
     <button type="button" className={cn(classes(variant, size), className)} onClick={toucher} {...rest} aria-busy={loading || rest["aria-busy"]}>
       <Content arrow={arrow && !rest.disabled && !loading} icon={loading ? undefined : icon} variant={variant}>
-        {loading ? <TypingDots color={variant === "primary" ? "#FFFFFF" : undefined} label={loadingLabel} /> : children}
+        {loading ? (
+          <>
+            <TypingDots color={variant === "primary" ? "#FFFFFF" : undefined} label={loadingLabel} />
+            {/* Sans loadingLabel, le bouton garde son nom pour les lecteurs d’écran : son texte, caché à l’œil */}
+            {!loadingLabel && <span className="sr-only">{children}</span>}
+          </>
+        ) : (
+          children
+        )}
       </Content>
     </button>
   );
@@ -152,7 +160,17 @@ export function IconButton({
   const glyph = <Icon name={icon} size={iconSize} color="#121214" stroke={icon === "user" ? 2.2 : 2.6} />;
   if (href)
     return (
-      <Link href={href} aria-label={label} aria-disabled={disabled || undefined} tabIndex={disabled ? -1 : undefined} className={cls} {...rest}>
+      <Link
+        href={href}
+        aria-label={label}
+        aria-disabled={disabled || undefined}
+        tabIndex={disabled ? -1 : undefined}
+        /* Désactivé : ni clic, ni toucher, ni soulèvement au survol (un lien n’a pas de :disabled) ; un clic qui passerait
+           quand même (un lecteur d’écran) ne navigue pas */
+        onClick={disabled ? (e) => e.preventDefault() : undefined}
+        className={cn(cls, "aria-disabled:pointer-events-none")}
+        {...rest}
+      >
         <EnRoute>{glyph}</EnRoute>
       </Link>
     );

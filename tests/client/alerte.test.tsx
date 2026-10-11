@@ -44,15 +44,19 @@ describe("DoneCheck", () => {
         <DoneCheck size={20} />
         <DoneCheck size={26} />
         <DoneCheck size={48} glyphe={22} trait={3.2} />
-        <DoneCheck size={32} ombre={false} />
+        <DoneCheck size={32} glyphe={16} trait={3.2} ombre={false} />
+        <DoneCheck size={40} />
       </>,
     );
     const pastilles = Array.from(container.children) as HTMLElement[];
-    expect(pastilles.map((p) => p.querySelector("svg")!.getAttribute("width"))).toEqual(["11", "14", "22", "17"]);
-    expect(pastilles[2].querySelector("svg")!.getAttribute("stroke-width")).toBe("3.2");
+    expect(pastilles.map((p) => p.querySelector("svg")!.getAttribute("width"))).toEqual(["11", "14", "22", "16", "22"]);
+    expect(pastilles.map((p) => p.querySelector("svg")!.getAttribute("stroke-width"))).toEqual(["3.4", "3.4", "3.2", "3.2", "3.4"]);
     expect(pastilles[0].style.boxShadow).toContain("3px 8px -3px");
     expect(pastilles[2].style.boxShadow).toContain("8px 18px -8px");
+    /* La coche du tableau de bord (32 px, coche de 16, trait de 3,2, sans ombre) */
     expect(pastilles[3].style.boxShadow).toBe("");
+    /* 40 px : encore la petite ombre, la grande commence au-delà */
+    expect(pastilles[4].style.boxShadow).toContain("3px 8px -3px");
     for (const p of pastilles) {
       expect(p.className).toContain("bg-ok");
       expect(p.getAttribute("aria-hidden")).toBe("true");
@@ -76,7 +80,8 @@ describe("NoteIcone et NotePrivee", () => {
     expect(note.className).toContain("gap-1.5");
     expect(note.className).toContain("text-[12px]");
     const icone = note.querySelector("svg")!;
-    expect([icone.getAttribute("width"), icone.getAttribute("stroke")]).toEqual(["15", "#6B6862"]);
+    /* L’icône suit le token du gris du texte (currentColor teinté par text-grey), pas un hex écrit à la main */
+    expect([icone.getAttribute("width"), icone.getAttribute("stroke"), icone.getAttribute("class")]).toEqual(["15", "currentColor", "text-grey"]);
     expect(note.textContent).toBe("Rien n’est gardé.");
   });
 
@@ -88,11 +93,12 @@ describe("NoteIcone et NotePrivee", () => {
         <NotePrivee icone="shield">c</NotePrivee>
       </>,
     );
-    const icones = Array.from(container.querySelectorAll("svg")).map((s) => [s.getAttribute("width"), s.getAttribute("stroke"), s.getAttribute("stroke-width")]);
+    /* Les gris par leurs tokens : muted (#8A8780) pour le cadenas doux, grey (#6B6862) pour les deux autres */
+    const icones = Array.from(container.querySelectorAll("svg")).map((s) => [s.getAttribute("width"), s.getAttribute("stroke"), s.getAttribute("class"), s.getAttribute("stroke-width")]);
     expect(icones).toEqual([
-      ["16", "#8A8780", "2.2"],
-      ["15", "#6B6862", "2.2"],
-      ["16", "#6B6862", "2.2"],
+      ["16", "currentColor", "text-muted", "2.2"],
+      ["15", "currentColor", "text-grey", "2.2"],
+      ["16", "currentColor", "text-grey", "2.2"],
     ]);
     const notes = Array.from(container.children) as HTMLElement[];
     expect(notes.map((n) => n.className.includes("text-[12.5px]"))).toEqual([false, true, false]);

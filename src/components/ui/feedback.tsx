@@ -38,7 +38,7 @@ export function Alert({ children, variant = "texte", className, ...rest }: { chi
 
 /* ———— L’étape faite ———— */
 
-/** L’ombre verte sous la coche : petite sous les pastilles de texte, grande sous celles d’un écran de fin (48 px). */
+/** L’ombre verte sous la coche : petite sous les pastilles de texte (40 px et moins), grande sous celles d’un écran de fin (48 px). */
 const OMBRES = {
   petite: "0 3px 8px -3px rgba(18,192,138,0.6)",
   grande: "0 8px 18px -8px rgba(18,192,138,0.6)",
@@ -46,14 +46,16 @@ const OMBRES = {
 
 /**
  * La pastille verte « c’est fait » : une coche blanche sur le vert brillant de la vérité. `glyphe` : la taille de la coche
- * (par défaut un peu plus de la moitié de la pastille) ; `ombre` : petite jusqu’à 40 px, grande au-delà, ou aucune.
+ * (par défaut un peu plus de la moitié de la pastille), `trait` son épaisseur ; `ombre` : petite jusqu’à 40 px compris,
+ * grande au-delà, ou aucune (`false`). Une pastille qui avait sa coche à elle la garde par `glyphe` et `trait` (le tableau
+ * de bord : 32 px, `glyphe={16} trait={3.2} ombre={false}`).
  * `label` : la pastille dit ce qu’elle montre (« prêt ») ; sans lui, elle est décorative.
  */
 export function DoneCheck({
   size = 26,
   glyphe = Math.round(size * 0.54),
   trait = 3.4,
-  ombre = size >= 40 ? "grande" : "petite",
+  ombre = size > 40 ? "grande" : "petite",
   label,
   className,
   style,
@@ -85,27 +87,28 @@ export function DoneCheck({
 
 /**
  * Une note discrète : une petite icône grise, puis le texte (la confidentialité, l’effacement, le tableau de bord).
- * `couleur` : le gris de l’icône, plus foncé (#6B6862, le gris du texte) ou plus doux (#8A8780) ; `serree` : l’icône
- * plus près du texte (une note centrée). `className` : la taille du texte, l’interligne et la marge de l’écran.
+ * `ton` : le gris de l’icône, celui du texte (`grey`, le token --grey) ou plus doux (`muted`, --color-muted) ; `serree` :
+ * l’icône plus près du texte (une note centrée). `className` : la taille du texte, l’interligne et la marge de l’écran.
  */
 export function NoteIcone({
   icone,
   children,
   taille = 16,
-  couleur = "#6B6862",
+  ton = "grey",
   serree = false,
   className,
 }: {
   icone: IconName;
   children: ReactNode;
   taille?: number;
-  couleur?: "#6B6862" | "#8A8780";
+  ton?: "grey" | "muted";
   serree?: boolean;
   className?: string;
 }) {
   return (
     <p className={cn("m-0 flex items-start font-extrabold text-grey", serree ? "gap-1.5" : "gap-2", className)}>
-      <Icon name={icone} size={taille} color={couleur} stroke={2.2} style={{ marginTop: 1 }} />
+      {/* L’icône en currentColor, teintée par le token : le gris du texte autour, ou le gris doux */}
+      <Icon name={icone} size={taille} stroke={2.2} className={ton === "muted" ? "text-muted" : "text-grey"} style={{ marginTop: 1 }} />
       <span>{children}</span>
     </p>
   );

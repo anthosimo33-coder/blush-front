@@ -27,13 +27,17 @@ export function sortieDeFeuille(desk: boolean, sortie?: SortieFeuille) {
   return { temps, panneau, voile };
 }
 
+/** Un titre qui se voit : ni vide (null, undefined), ni un booléen (`cond && "…"`), que React ne rendrait pas. */
+type TitreVisible = Exclude<ReactNode, null | undefined | boolean>;
+
 /**
  * Le titre d’une feuille : `labelledBy`, l’id d’un titre que l’écran pose dans la feuille ; ou `title`, que la feuille
  * pose elle-même en tête (TitreFeuille, son id tiré de useId), `titleSize` sa taille, `titleClose` le bouton Fermer à côté.
+ * Pendant la sortie, la feuille garde le titre qu’elle montrait, comme son contenu.
  */
 type TitreDeLaFeuille =
   | { labelledBy: string; title?: undefined; titleSize?: undefined; titleClose?: undefined }
-  | { title: ReactNode; titleSize?: TailleTitreFeuille; titleClose?: boolean; labelledBy?: undefined };
+  | { title: TitreVisible; titleSize?: TailleTitreFeuille; titleClose?: boolean; labelledBy?: undefined };
 
 /**
  * Sheet : panneau du bas sur mobile, fenêtre centrée sur desktop.
@@ -105,6 +109,9 @@ export function Sheet({
   /* Pendant la sortie, elle garde ce qu’elle montrait : l’écran a souvent déjà effacé sa sélection (la conv, l’image choisie) */
   const [montre, setMontre] = useState(children);
   if (open && montre !== children) setMontre(children);
+  /* De même pour le titre qu’elle pose : l’écran le tire souvent de cette sélection (« Supprimer … ? ») */
+  const [titreMontre, setTitreMontre] = useState(titre.title);
+  if (open && titreMontre !== titre.title) setTitreMontre(titre.title);
   /* La sortie demandée par l’écran, en valeurs simples : l’effet ne repart pas à chaque rendu */
   const dureeSortie = sortie?.duration;
   const courbeSortie = sortie?.easing;
@@ -188,9 +195,9 @@ export function Sheet({
               )}
             >
               <span aria-hidden="true" className="h-[5px] w-11 shrink-0 self-center rounded-[3px] bg-track lg:hidden" />
-              {titre.title !== undefined && (
+              {titre.labelledBy === undefined && (
                 <TitreFeuille id={labelledBy} taille={titre.titleSize} fermer={titre.titleClose ? onClose : undefined}>
-                  {titre.title}
+                  {open ? titre.title : titreMontre}
                 </TitreFeuille>
               )}
               {open ? children : montre}

@@ -19,7 +19,7 @@ export function NotePrivee({ children, icone = "lock", petite = false, className
   /* Le cadenas des écrans du parcours reste dans le gris doux ; le bouclier et le petit cadenas, dans le gris du texte */
   const doux = icone === "lock" && !petite;
   return (
-    <NoteIcone icone={icone} taille={icone === "lock" && petite ? 15 : 16} couleur={doux ? "#8A8780" : "#6B6862"} className={cn(petite ? "text-[12.5px]" : "text-legende", className)}>
+    <NoteIcone icone={icone} taille={icone === "lock" && petite ? 15 : 16} ton={doux ? "muted" : "grey"} className={cn(petite ? "text-[12.5px]" : "text-legende", className)}>
       {children}
     </NoteIcone>
   );

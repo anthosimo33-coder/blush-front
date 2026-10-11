@@ -84,6 +84,14 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Continuer" }).querySelector("svg")).toBeNull();
   });
 
+  it("en route sans loadingLabel : le bouton garde son nom, son texte caché à l’œil", () => {
+    render(<Button loading>Recevoir mon code</Button>);
+    const bouton = screen.getByRole("button", { name: "Recevoir mon code" });
+    expect(bouton.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByText("Recevoir mon code").className).toBe("sr-only");
+    expect(bouton.querySelector("[data-dots]")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("un aria-busy posé par l’écran reste le sien hors de loading", () => {
     render(<Button aria-busy={false}>Effacer</Button>);
     expect(screen.getByRole("button", { name: "Effacer" }).getAttribute("aria-busy")).toBe("false");
@@ -148,6 +156,17 @@ describe("IconButton", () => {
     expect(lien.getAttribute("aria-disabled")).toBe("true");
     expect(lien.getAttribute("tabindex")).toBe("-1");
     expect(lien.dataset.a).toBe("compte");
+    /* Ni la souris ni le toucher ne l’atteignent, et un clic qui passe quand même ne navigue pas */
+    expect(lien.className).toContain("aria-disabled:pointer-events-none");
+    expect(fireEvent.click(lien)).toBe(false);
+  });
+
+  it("un lien actif, lui, laisse passer son clic", () => {
+    render(<IconButton icon="user" label="Mon compte" href="/compte" />);
+    const lien = screen.getByRole("link", { name: "Mon compte" });
+    expect(lien.hasAttribute("aria-disabled")).toBe(false);
+    /* Hors du routeur de l’app, le lien suit la navigation du navigateur : rien ne retient le clic */
+    expect(fireEvent.click(lien)).toBe(true);
   });
 });
 
@@ -167,6 +186,20 @@ describe("Chip", () => {
     expect(bascule.dataset.choix).toBe("flou");
     expect(screen.getByText("12 messages").dataset.compte).toBe("12");
   });
+
+  it("disabled ne se pose que sur une pastille à bascule : sur un lien ou une étiquette, le type le refuse", () => {
+    render(
+      <>
+        {/* @ts-expect-error un lien ne se désactive pas */}
+        <Chip href="/rapport" disabled>
+          Le rapport
+        </Chip>
+        {/* @ts-expect-error une étiquette ne se désactive pas */}
+        <Chip disabled>Une étiquette</Chip>
+      </>,
+    );
+    expect(screen.getByRole("link", { name: "Le rapport" })).toBeTruthy();
+  });
 });
 
 describe("InsetRow", () => {
@@ -182,7 +215,7 @@ describe("InsetRow", () => {
 
   it("compacte (la feuille du contact) : le titre à 15 px, le sous-titre coupé, un lien préchargé avec son onNavigate", () => {
     const onNavigate = vi.fn();
-    render(<InsetRow size="compact" href="/rapport" prefetch onNavigate={onNavigate} title="Le rapport" sub="Depuis mars" chevron data-ligne="rapport" />);
+    render(<InsetRow variant="compact" href="/rapport" prefetch onNavigate={onNavigate} title="Le rapport" sub="Depuis mars" chevron data-ligne="rapport" />);
     const lien = screen.getByRole("link");
     expect(lien.className).not.toContain("min-h-[58px]");
     expect(lien.className).toContain("py-3.5");
@@ -190,6 +223,16 @@ describe("InsetRow", () => {
     expect(screen.getByText("Le rapport").className).toContain("text-[15px]");
     expect(screen.getByText("Depuis mars").className).toContain("truncate");
     expect(lien.querySelector("svg")?.getAttribute("width")).toBe("16");
+  });
+
+  it("compacte et bouton : toute la largeur de la carte, le texte à gauche (comme la normale)", () => {
+    const onClick = vi.fn();
+    render(<InsetRow variant="compact" onClick={onClick} title="Renommer" chevron />);
+    const ligne = screen.getByRole("button", { name: "Renommer" });
+    expect(ligne.className).toContain("w-full");
+    expect(ligne.className).toContain("text-left");
+    fireEvent.click(ligne);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it("un bouton désactivé ne répond plus", () => {

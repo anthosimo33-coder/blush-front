@@ -159,6 +159,29 @@ describe("Sheet : la sortie animée", () => {
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
 
+  it("garde son titre pendant la sortie, même quand l’écran a déjà vidé ce dont il le tirait", async () => {
+    /* Comme le compte : le titre vient de la demande en cours, que la fermeture remet à null tout de suite */
+    function Confirmation() {
+      const [demande, setDemande] = useState<string | null>("Supprimer ton compte ?");
+      return (
+        <Sheet open={demande !== null} onClose={() => setDemande(null)} title={demande ?? ""}>
+          <button type="button" onClick={() => setDemande(null)}>
+            annuler
+          </button>
+        </Sheet>
+      );
+    }
+    render(<Confirmation />);
+    const titre = screen.getByRole("heading", { name: "Supprimer ton compte ?" });
+    fireEvent.click(screen.getByText("annuler"));
+    /* La feuille redescend : le même titre, toujours lu par le dialogue */
+    expect(animees).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Supprimer ton compte ?" })).toBe(titre);
+    expect(dialogue().getAttribute("aria-labelledby")).toBe(titre.id);
+    await act(async () => animees[0].finir());
+    expect(dialogue().open).toBe(false);
+  });
+
   it("prend la durée et la courbe que l’écran lui donne", () => {
     render(<Ecran sortie={{ duration: 300, easing: "linear" }} />);
     fireEvent.click(screen.getByText("basculer"));

@@ -45,18 +45,18 @@ export function RowIcon({ icon, tone = "grey", children }: { icon?: IconName; to
 }
 
 /*
- * Les deux tailles d’une ligne. `normal` : celle des Réglages (58 px au moins, le titre à 16 px). `compact` : celle des
+ * Les deux formes d’une ligne (`variant`). `normal` : celle des Réglages (58 px au moins, le titre à 16 px). `compact` : celle des
  * feuilles (le contact de l’accueil) ; le titre à 15 px, le sous-titre sur une ligne, coupé, et le chevron d’un lien
  * laisse place aux trois points de BLUSH tant que la page n’arrive pas.
  */
 const TAILLES_LIGNE = {
   normal: { ligne: "flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline", titre: "text-[16px] font-black leading-[1.3]", sous: "text-[13px] font-extrabold leading-[1.4] text-grey" },
-  compact: { ligne: "flex items-center gap-3 px-4 py-3.5 text-ink no-underline", titre: "text-[15px] font-black", sous: "truncate text-[13px] font-extrabold text-grey" },
+  compact: { ligne: "flex w-full items-center gap-3 px-4 py-3.5 text-left text-ink no-underline", titre: "text-[15px] font-black", sous: "truncate text-[13px] font-extrabold text-grey" },
 } as const;
 
 /**
  * Une ligne de liste groupée. Lien, bouton ou simple ligne selon `href` / `onClick`.
- * `danger` : action destructive, en rouge, comme sur iPhone. `size` : normal, ou compact dans une feuille.
+ * `danger` : action destructive, en rouge, comme sur iPhone. `variant` : normal, ou compact dans une feuille (le même nom que LevelPath).
  * Un lien prend aussi `prefetch` et `onNavigate` (ceux de next/link) ; un bouton, `disabled` ; tous, les aria-* et data-*.
  */
 export function InsetRow({
@@ -72,7 +72,7 @@ export function InsetRow({
   onClick,
   disabled,
   danger,
-  size = "normal",
+  variant = "normal",
   className,
   ...rest
 }: {
@@ -89,11 +89,11 @@ export function InsetRow({
   onClick?: () => void;
   disabled?: boolean;
   danger?: boolean;
-  size?: keyof typeof TAILLES_LIGNE;
+  variant?: keyof typeof TAILLES_LIGNE;
   className?: string;
 } & AttributsLibres) {
-  const t = TAILLES_LIGNE[size];
-  const compact = size === "compact";
+  const t = TAILLES_LIGNE[variant];
+  const compact = variant === "compact";
   /* EnRoute suit le lien qui l’entoure (useLinkStatus) : seulement dans un lien */
   const chevronCompact = <Icon name="chevron" size={16} color="#8A8780" stroke={2.6} />;
   const body = (

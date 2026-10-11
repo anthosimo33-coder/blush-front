@@ -10,6 +10,9 @@ import { AppBadge } from "./Avatar";
 import { Icon, type IconName } from "./icons";
 
 /* ———— Chip ———— */
+/** Ce qui fait une pastille : un lien (`href`), un bouton à bascule (`onClick`, le seul qu’on désactive), ou une étiquette. */
+type FormeChip = { href: string; onClick?: undefined; disabled?: undefined } | { onClick: () => void; disabled?: boolean; href?: undefined } | { href?: undefined; onClick?: undefined; disabled?: undefined };
+
 /** Une pastille : un lien avec `href`, un bouton à bascule avec `onClick` (`disabled` possible), une étiquette sinon ; les aria-* et data-* vont sur l’élément. */
 export function Chip({
   children,
@@ -22,11 +25,9 @@ export function Chip({
 }: {
   children: ReactNode;
   selected?: boolean;
-  onClick?: () => void;
-  href?: string;
-  disabled?: boolean;
   className?: string;
-} & AttributsLibres) {
+} & FormeChip &
+  AttributsLibres) {
   const cls = cn(
     "inline-flex h-9 items-center whitespace-nowrap rounded-[18px] px-3.5 text-[14px] font-black",
     selected ? "bg-ink text-white shadow-ink" : "bg-white text-ink shadow-soft",
@@ -63,15 +64,16 @@ export function CopyPill({ text, label, className }: { text: string; label: stri
   const minuteur = useRef<number | undefined>(undefined);
   /* Démontée pendant ses deux secondes de « Copié » : le minuteur part avec elle */
   useEffect(() => () => window.clearTimeout(minuteur.current), []);
+  const copier = async () => {
+    if (!(await copyText(text))) return;
+    setCopied(true);
+    window.clearTimeout(minuteur.current);
+    minuteur.current = window.setTimeout(() => setCopied(false), 2000);
+  };
   return (
     <button
       type="button"
-      onClick={async () => {
-        if (!(await copyText(text))) return;
-        setCopied(true);
-        window.clearTimeout(minuteur.current);
-        minuteur.current = window.setTimeout(() => setCopied(false), 2000);
-      }}
+      onClick={() => void copier()}
       className={cn("lift lift-sm inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-black text-ink shadow-soft", className)}
     >
       <Icon name={copied ? "check" : "copy"} size={14} color="#121214" stroke={2.6} />
