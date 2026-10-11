@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { heureDuRendu } from "@/lib/rendu";
 import { getCompte, getConvs, getNomsDuCompte } from "@/services/serveur";
 import { CompteScreen } from "./CompteScreen";
-import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
+import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "Mon compte" };
 
@@ -12,9 +12,8 @@ export default async function Page() {
   const rendu = heureDuRendu();
   const [noms, convs, compte] = await Promise.all([getNomsDuCompte(), getConvs(), getCompte()]);
   return (
-    <>
-      <ConvDeLaPage />
+    <PageDeConv>
       <CompteScreen noms={noms} convs={convs} compte={compte} rendu={rendu} />
-    </>
+    </PageDeConv>
   );
 }

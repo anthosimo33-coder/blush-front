@@ -6,7 +6,7 @@
 export const STORY_COOKIE = "blush-story";
 
 /**
- * La conv que montre la page ouverte dans cet onglet (posée par src/components/shell/ConvDeLaPage.tsx). Chaque appel
+ * La conv que montre la page ouverte dans cet onglet (posée par src/components/shell/PageDeConv.tsx). Chaque appel
  * au serveur la désigne dans cet en-tête : un geste (supprimer, écrire à BLUSH, corriger sa fiche) vise la conv à
  * l’écran, même si un autre onglet en a ouvert une autre entre-temps (le cookie, lui, est commun aux onglets).
  */

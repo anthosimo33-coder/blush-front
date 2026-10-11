@@ -4,7 +4,7 @@ import { moiEtAutre } from "@/lib/participants";
 import { suiteSure } from "@/lib/suite";
 import { getReport, getStory } from "@/services/serveur";
 import { UnlockedScreen } from "./UnlockedScreen";
-import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
+import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
 
@@ -23,9 +23,8 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
   const autre = story ? moiEtAutre(story).autre.pronoun : undefined;
   return (
-    <>
-      <ConvDeLaPage />
+    <PageDeConv>
       <UnlockedScreen offer={offer} next={next} restants={restants} reprise={PREMIER_PAYANT} autre={autre} />
-    </>
+    </PageDeConv>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { after } from "next/server";
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -16,9 +16,15 @@ import { verdictPartage } from "@/server/partages";
  * Le verdict seul (le prénom de l’autre masqué) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  */
 
+/*
+ * Le verdict du lien, lu une fois par requête : les métadonnées (l’aperçu dans WhatsApp ou iMessage) et la page le
+ * lisent toutes les deux, et chaque lecture est un SELECT et un déchiffrement.
+ */
+const verdictDuLien = cache(verdictPartage);
+
 export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const v = await verdictPartage(id);
+  const v = await verdictDuLien(id);
   if (!v) return { title: "Lien désactivé" };
   const titre = `${v.emoji} ${v.title}`;
   return {
@@ -48,7 +54,7 @@ function Bulle({ moi = false, angle, children }: { moi?: boolean; angle: number;
 
 export default async function Page({ params }: PageProps<"/v/[id]">) {
   const { id } = await params;
-  const v = await verdictPartage(id);
+  const v = await verdictDuLien(id);
   /* Une visite, si c’est une personne (les robots d’aperçu de WhatsApp ou iMessage ne comptent pas) */
   if (v && !estUnRobot((await headers()).get("user-agent"))) after(() => compter(CLES.lienVu));
   return (

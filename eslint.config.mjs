@@ -115,7 +115,7 @@ const eslintConfig = defineConfig([
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
-  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, ConvDeLaPage et le proxy). Ni par l’alias, ni en chemin
+  // fichiers que Next rend sur le serveur, serveur.ts qui les sert, et le proxy). Ni par l’alias, ni en chemin
   // relatif, ni par un import() dynamique. Seul server-only le disait, et au build ; schema.ts et les mails ne l’ont pas.
   {
     files: ["src/**/*.{ts,tsx}"],
@@ -125,7 +125,6 @@ const eslintConfig = defineConfig([
       "src/app/**/{page,layout,route,loading,not-found,template,default}.{ts,tsx}",
       "src/app/**/{opengraph-image,twitter-image,icon,apple-icon,sitemap,robots,manifest}.{ts,tsx}",
       "src/services/serveur.ts",
-      "src/components/shell/ConvDeLaPage.tsx",
       "src/proxy.ts",
     ],
     rules: {

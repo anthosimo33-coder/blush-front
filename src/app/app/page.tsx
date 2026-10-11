@@ -6,7 +6,7 @@ import { convChoisie, getChat, getContact, getConvs, getFiche, getRetour, getSto
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
 import { IDEES_MASQUEES } from "./idees";
-import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
+import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "Accueil" };
 
@@ -42,8 +42,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
    * capturé sur toute la hauteur de la conv, et le départ attendrait cette image (HomeScreen, « 10 · »).
    */
   return (
-    <>
-      <ConvDeLaPage />
+    <PageDeConv>
       <div className="[background:var(--paper-light)]">
         <HomeScreen
           quick={quick}
@@ -60,6 +59,6 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
           rendu={rendu}
         />
       </div>
-    </>
+    </PageDeConv>
   );
 }

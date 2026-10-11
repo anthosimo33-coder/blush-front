@@ -1,7 +1,7 @@
 "use client";
 
 /* Petit cache de lecture autour de src/services/api.ts (pas de dépendance externe). */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Account, ReportPayload } from "@/types/api";
 import type { Fiche } from "@/types";
 
@@ -25,8 +25,19 @@ const modifieLe = new Map<string, number>();
  * qu’une. Une invalidation l’oublie : la lecture d’après repart du serveur.
  */
 const lectures = new Map<string, Promise<unknown>>();
-/* Les rendus serveur déjà montés (clé et heure du rendu) : une page revue par l’historique repasse le même, peut-être périmé */
-const rendusVus = new Set<string>();
+/*
+ * Les rendus serveur déjà montés (clé et heure du rendu), et le montage de page qui les a pris (MontageDeLaPage) : une
+ * page revue par l’historique repasse le même, peut-être périmé
+ */
+const rendusVus = new Map<string, object | undefined>();
+
+/**
+ * Le montage de la page (un objet neuf à chaque fois qu’elle est montée : src/components/shell/PoseConv.tsx). Les écrans
+ * d’une même page qui lisent la même clé, rendue par le serveur au même moment (la coque et son écran lisent le compte),
+ * la prennent tous pour fraîche ; la page revue par l’historique est un autre montage : elle relit. Hors d’une page qui
+ * le donne, chaque rendu n’est frais qu’une fois.
+ */
+export const MontageDeLaPage = createContext<object | undefined>(undefined);
 
 function ecrire(key: string, data: unknown) {
   cache.set(key, data);
@@ -79,14 +90,15 @@ export function depart<T>(key: string, initial: T | undefined, rendu?: number): 
 
 /**
  * La donnée rendue par le serveur dispense de la relire au montage : rendue il y a moins de `frais` ms, et montée pour la
- * première fois (une page revue par l’historique repasse le même rendu : elle est relue). L’écart compare l’horloge du
- * serveur à celle du téléphone : un rendu « dans le futur » de plus de 2 s (horloges décalées) ne compte pas comme frais.
+ * première fois (une page revue par l’historique repasse le même rendu : elle est relue), ou par le même `montage` de
+ * page (MontageDeLaPage : ses écrans montés ensemble). L’écart compare l’horloge du serveur à celle du téléphone : un
+ * rendu « dans le futur » de plus de 2 s (horloges décalées) ne compte pas comme frais.
  */
-export function renduFrais(key: string, rendu: number | undefined, frais: number): boolean {
+export function renduFrais(key: string, rendu: number | undefined, frais: number, montage?: object): boolean {
   if (rendu === undefined) return false;
   const vu = `${key}@${rendu}`;
-  if (rendusVus.has(vu)) return false;
-  rendusVus.add(vu);
+  if (rendusVus.has(vu) && (montage === undefined || rendusVus.get(vu) !== montage)) return false;
+  rendusVus.set(vu, montage);
   const age = Date.now() - rendu;
   return frais > 0 && age > -2000 && age < frais;
 }
@@ -148,6 +160,7 @@ export type OptionsLecture = { fetch?: boolean; rendu?: number; frais?: number }
 export function useQuery<K extends Cle>(key: K, fn: () => Promise<Requetes[K]>, initial?: Requetes[K], { fetch = true, rendu, frais = 0 }: OptionsLecture = {}) {
   type T = Requetes[K];
   const [premier] = useState(() => depart(key, initial, rendu));
+  const montageDeLaPage = useContext(MontageDeLaPage);
   const [data, setData] = useState<T | undefined>(premier.valeur);
   const [error, setError] = useState(false);
   const [version, setVersion] = useState(0);
@@ -182,7 +195,7 @@ export function useQuery<K extends Cle>(key: K, fn: () => Promise<Requetes[K]>, 
     /* Au montage, une donnée que le serveur vient de rendre n’est pas relue : elle sert aussi aux autres écrans de la clé */
     const auMontage = montage.current;
     montage.current = false;
-    if (auMontage && premier.duServeur && renduFrais(key, rendu, frais)) {
+    if (auMontage && premier.duServeur && renduFrais(key, rendu, frais, montageDeLaPage)) {
       ecrire(key, premier.valeur);
       return;
     }
@@ -218,7 +231,7 @@ export function useQuery<K extends Cle>(key: K, fn: () => Promise<Requetes[K]>, 
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `premier`, `rendu` et `frais` ne comptent qu’au montage
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `premier`, `rendu`, `frais` et le montage de la page ne comptent qu’au montage
   }, [key, version, fetch]);
 
   return { data, error, loading: data === undefined && !error, refresh: useCallback(() => invalidate(key), [key]) };

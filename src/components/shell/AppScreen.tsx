@@ -4,8 +4,10 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { offreAProposer, peut, type Besoin } from "@/lib/acces";
+import { FRAIS_DU_RENDU } from "@/lib/query";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
+import { useCompteDeLaPage } from "./PoseConv";
 import { AccountPill, Screen } from "./Screen";
 
 /* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */
@@ -15,9 +17,12 @@ const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").t
  * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la table que l’écran et le serveur lisent ; « Ta question »
  * et la lecture de sa fiche ne sont encore refusées qu’ici, voir là-bas) : gratuit (le chapitre 1, le verdict), rapport
  * (tous les chapitres, « Ta question »), BLUSH+ (en plus : le chat, sa fiche).
+ * Dans la page d’une conv, le compte part de celui qu’elle a rendu (PageDeConv) : tout juste rendu, il n’est pas relu au
+ * montage, et le plan est là dès l’affichage.
  */
 export function useAccess() {
-  const { data } = useCompte();
+  const page = useCompteDeLaPage();
+  const { data } = useCompte(page?.compte ?? undefined, { rendu: page?.rendu, frais: FRAIS_DU_RENDU });
   const plan = data?.subscription.plan;
   return {
     initiale: data?.email ? [...data.email][0].toUpperCase() : undefined,

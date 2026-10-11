@@ -64,6 +64,20 @@ describe("renduFrais", () => {
     expect(renduFrais("rapport-d", Date.now(), 0)).toBe(false);
   });
 
+  it("les écrans d’un même montage de page partagent le rendu ; un autre montage (la page revue) le relit", () => {
+    const rendu = Date.now() - 500;
+    const page = {};
+    expect(renduFrais("compte-g", rendu, 10_000, page)).toBe(true);
+    /* La coque et son écran, montés ensemble, lisent le même compte */
+    expect(renduFrais("compte-g", rendu, 10_000, page)).toBe(true);
+    /* La page revue par l’historique est montée de nouveau : un autre objet */
+    expect(renduFrais("compte-g", rendu, 10_000, {})).toBe(false);
+    /* Hors d’une page qui donne son montage : déjà vu, relu */
+    expect(renduFrais("compte-g", rendu, 10_000)).toBe(false);
+    /* Le même montage ne rend pas frais un rendu trop ancien */
+    expect(renduFrais("compte-h", Date.now() - 20_000, 10_000, page)).toBe(false);
+  });
+
   it("un rendu « dans le futur » (horloges décalées) n’est pas frais", () => {
     expect(renduFrais("rapport-e", Date.now() + 60_000, 10_000)).toBe(false);
     expect(renduFrais("rapport-f", Date.now() + 1000, 10_000)).toBe(true);

@@ -101,19 +101,25 @@ export async function reponseAuGeste(page: Page, { chemin, methode = "POST", fil
 }
 
 /**
- * Ouvre une page qui lit le compte une fois vivante (l’accueil, sa fiche, Mon compte, « Tes convs »), ou recharge
- * celle-ci, et attend cette lecture (GET /api/compte) : ses interrupteurs, ses convs et son chat ne répondent bien
- * qu’ensuite (touché plus tôt, un interrupteur revient en arrière, une conv suit son lien sans être choisie). Le
- * chargement, l’hydratation puis la lecture se suivent : deux attentes de suite au plus.
+ * Ouvre une page qui a besoin du compte (l’accueil, sa fiche, Mon compte, « Tes convs »), ou recharge celle-ci, et attend
+ * qu’elle soit vivante : ses interrupteurs, ses convs et son chat ne répondent bien qu’ensuite (touché plus tôt, un
+ * interrupteur revient en arrière, une conv suit son lien sans être choisie, un geste vise la conv du cookie). Une page
+ * d’une conv rend le compte avec elle (PageDeConv) : elle est vivante une fois sa conv posée (`data-conv-posee` sur
+ * <html>, src/components/shell/PoseConv.tsx), son contenu hydraté. « Tes convs » lit le compte une fois vivante : on
+ * attend cette lecture (GET /api/compte). Le chargement, l’hydratation puis la lecture se suivent : deux attentes de
+ * suite au plus.
  */
 export async function ouvrir(page: Page, adresse?: string): Promise<void> {
   /* Une lecture partie de cette page-ci : pas celle, encore en route, de la page d’avant */
   const depuis = Date.now();
-  await reponseAuGeste(
-    page,
-    { chemin: "/api/compte", methode: "GET", filtre: (r) => r.request().timing().startTime >= depuis, timeout: 2 * RESEAU },
-    () => (adresse ? page.goto(adresse) : page.reload()),
+  const lecture = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/api/compte" && r.request().method() === "GET" && r.request().timing().startTime >= depuis,
+    { timeout: 2 * RESEAU },
   );
+  /* Celle des deux attentes qui ne vient pas (la lecture, sur une page d’une conv) ne reste pas sans personne pour l’écouter */
+  lecture.catch(() => {});
+  await (adresse ? page.goto(adresse) : page.reload());
+  await Promise.race([lecture, page.waitForFunction(() => "convPosee" in document.documentElement.dataset, undefined, { timeout: 2 * RESEAU })]);
 }
 
 /**

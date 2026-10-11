@@ -1,30 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useReducedMotion } from "@/lib/hooks";
-import { codeDe, SOUFFLE } from "@/lib/messages-erreur";
+import { SOUFFLE } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { connexionPuis } from "@/lib/suite";
-import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
-import { lectureLancee } from "@/state/lecture";
-import type { AnalysisProgress } from "@/types";
-
-const START: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false };
-/** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */
-const RATES_MAX = 8;
-
-/** reading : la bulle écrit, l’anneau se remplit · leaving : l’anneau s’efface · done : la gerbe marque la fin. */
-type Phase = "reading" | "leaving" | "done";
+import { useSuiviLecture } from "./suivi";
 
 /*
  * Écran 08 — Lecture. Une seule composition centrée, du début à la fin :
@@ -32,18 +21,10 @@ type Phase = "reading" | "leaving" | "done";
  * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ».
  */
 export function LectureScreen({ total }: { total: number }) {
-  const router = useRouter();
   const reduced = useReducedMotion();
-  const [p, setP] = useState<AnalysisProgress>(START);
-  const [phase, setPhase] = useState<Phase>("reading");
-  /* Vrai dès qu’on voit la lecture se faire : une analyse déjà finie à l’arrivée ne rejoue pas ses sons */
-  const live = useRef(false);
+  /* La lecture lancée en arrivant, puis suivie jusqu’à son verdict (suivi.ts). `failed` : le serveur a tout essayé, on le dit et on propose de relancer */
+  const { p, phase, echec: failed, trop, enDirect: live, relancer: retry } = useSuiviLecture();
   const heard = useRef(0);
-  /* La lecture a échoué (le serveur a tout essayé) : on le dit, et on propose de relancer. `run` relance l’effet */
-  const [failed, setFailed] = useState(false);
-  /* Trop de relances aujourd’hui (chaque lecture coûte) : on le dit, plutôt qu’un bouton qui ne fait rien */
-  const [trop, setTrop] = useState(false);
-  const [run, setRun] = useState(0);
   /* « Voir mon rapport » touché : le bouton le montre jusqu’au chargement du verdict (un vrai chargement, voulu) */
   const [enRoute, setEnRoute] = useState(false);
   useEffect(() => {
@@ -54,124 +35,16 @@ export function LectureScreen({ total }: { total: number }) {
     window.addEventListener("pageshow", remettre);
     return () => window.removeEventListener("pageshow", remettre);
   }, []);
-  const retry = () => {
-    setFailed(false);
-    setTrop(false);
-    setP(START);
-    setRun((r) => r + 1);
-  };
-
-  useEffect(() => {
-    let alive = true;
-    let first = true;
-    let timer: ReturnType<typeof setTimeout>;
-    (async () => {
-      /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) : pas de second POST, on suit tout de suite */
-      const deja = run === 0 && lectureLancee();
-      /*
-       * En arrivant (un rechargement, un onglet rouvert), on lit d’abord où en est la lecture. Arrêtée par le budget de
-       * l’IA du jour (« souffle ») : pas de POST, qui userait une relance du jour et planifierait une lecture arrêtée
-       * aussitôt ; ce suivi suffit à la reprendre après minuit (GET /api/analyse). Sinon, le POST la lance ou la relance,
-       * comme avant
-       */
-      const avant = run === 0 && !deja ? await getAnalysisProgress().catch(() => null) : null;
-      if (!alive) return;
-      const rienARelancer = !!avant?.failed && avant.failReason === "souffle";
-      /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
-      const lance =
-        deja ||
-        rienARelancer ||
-        (await resumeAnalysis().then(
-          () => true,
-          (e: unknown) => {
-            const code = codeDe(e);
-            return code === "qui" || code === "connexion" || code === "trop" ? code : null;
-          },
-        ));
-      if (!alive) return;
-      if (lance === "trop") {
-        setTrop(true);
-        setFailed(true);
-        return;
-      }
-      /* Plus de session (expirée, ou ouverte ailleurs) : on se reconnecte, la lecture reprend ensuite */
-      if (lance === "connexion") {
-        router.replace(connexionPuis("/lecture"));
-        return;
-      }
-      /* La conv ouverte n’est pas passée par « Qui es-tu ? » (la page le vérifie déjà avant) : rien à relancer, c’est là qu’on va */
-      if (lance === "qui") {
-        router.replace("/qui");
-        return;
-      }
-      if (!lance) {
-        setFailed(true);
-        return;
-      }
-      let rates = 0;
-      const tick = async () => {
-        let next: AnalysisProgress;
-        try {
-          next = await getAnalysisProgress();
-        } catch (e) {
-          if (!alive) return;
-          if (codeDe(e) === "connexion") {
-            router.replace(connexionPuis("/lecture"));
-            return;
-          }
-          rates += 1;
-          /* La conv a disparu, ou le serveur ne répond plus depuis un moment : l’écran d’échec, avec « Relancer » */
-          if (codeDe(e) === "aucune" || rates >= RATES_MAX) {
-            setFailed(true);
-            return;
-          }
-          timer = setTimeout(tick, Math.min(8000, 1000 * 2 ** (rates - 1)));
-          return;
-        }
-        if (!alive) return;
-        rates = 0;
-        setP(next);
-        const arrivedDone = first;
-        first = false;
-        if (next.failed) {
-          setFailed(true);
-          return;
-        }
-        if (!next.done) {
-          live.current = true;
-          /* L’avancée se relit chaque seconde */
-          timer = setTimeout(tick, 1000);
-          return;
-        }
-        /* Lecture déjà finie à l’arrivée, ou mouvement réduit : la fin s’affiche directement. */
-        if (arrivedDone || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          setPhase("done");
-          return;
-        }
-        /* Sinon on laisse voir l’anneau plein et la coche « Ton verdict », puis la gerbe arrive. */
-        timer = setTimeout(() => {
-          setPhase("leaving");
-          timer = setTimeout(() => setPhase("done"), 280);
-        }, 700);
-      };
-      tick();
-    })();
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-    /* Lancé à l’arrivée sur l’écran, puis à chaque « Relancer » */
-  }, [run, router]);
 
   /* Chaque découverte, un toucher un cran plus haut ; la coche, la signature sur un accord chaud */
   const found = p.discoveries.length;
   useEffect(() => {
     if (live.current && found > heard.current) play("decouverte", found - 1);
     heard.current = found;
-  }, [found]);
+  }, [found, live]);
   useEffect(() => {
     if (phase === "done" && live.current) play("analyseFinie");
-  }, [phase]);
+  }, [phase, live]);
 
   const done = phase === "done";
   /* Pourquoi la lecture a échoué, d’après le suivi : le refus du modèle, le budget de l’IA du jour, ou une panne */

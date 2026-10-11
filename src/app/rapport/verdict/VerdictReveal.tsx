@@ -6,6 +6,7 @@ import { delai } from "@/lib/motion";
 import { useSonForce } from "@/lib/audio";
 import { play, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
+import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import type { ReportPayload } from "@/types/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
@@ -51,8 +52,9 @@ const CONFIDENCE: Record<Confidence, string> = { sur: "Sûr", probable: "Probabl
  */
 const toReport = () => window.location.replace("/rapport");
 
-export function VerdictReveal({ initial, story }: { initial: ReportPayload; story: Story }) {
-  const { data } = useRapport(initial);
+/* `rendu` : l’heure du rendu serveur. Tout juste rendu (la scène s’ouvre par un chargement complet), le rapport n’est pas relu au montage (src/lib/query.ts) */
+export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayload; story: Story; rendu?: number }) {
+  const { data } = useRapport(initial, { rendu, frais: FRAIS_DU_RENDU });
   const payload = data ?? initial;
   const cards = cardsOf(payload);
   const last = cards.length - 1;

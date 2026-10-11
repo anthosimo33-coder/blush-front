@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getStory, sansHistoire } from "@/services/serveur";
 import { LectureScreen } from "./LectureScreen";
-import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
+import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "BLUSH analyse votre histoire" };
 
@@ -14,9 +14,8 @@ export default async function Page() {
    */
   if (!story) redirect(await sansHistoire("/lecture"));
   return (
-    <>
-      <ConvDeLaPage />
+    <PageDeConv>
       <LectureScreen total={story.totalMessages} />
-    </>
+    </PageDeConv>
   );
 }

@@ -21,13 +21,15 @@ async function regles(chemin: string, source: string) {
 describe("les règles du lint", { timeout: 60_000 }, () => {
   it("le navigateur ne lit pas le serveur : par l’alias, en chemin relatif ou par import(), d’un écran ou de tout composant", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    /* Même un composant serveur de la coque (PageDeConv) : il passe par src/services/serveur.ts */
+    expect(await regles("src/components/shell/PageDeConv.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
     expect(await regles("src/app/rapport/Essai.tsx", `"use client";\nimport { rapportDe } from "../../server/donnees";\nexport const x = rapportDe;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
     expect(await regles("src/lib/essai.ts", `export const x = () => import("@/server/db");\n`)).toEqual(["no-restricted-syntax"]);
   });
 
-  it("un `import type` du serveur, une page, ConvDeLaPage et next/server passent", async () => {
+  it("un `import type` du serveur, une page, serveur.ts et next/server passent", async () => {
     expect(await regles("src/app/admin/Essai.tsx", `import type { Stats } from "@/server/stats";\nexport type S = Stats;\n`)).toEqual([]);
-    expect(await regles("src/components/shell/ConvDeLaPage.tsx", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual([]);
+    expect(await regles("src/services/serveur.ts", `import { db } from "@/server/db";\nexport const x = db;\n`)).toEqual([]);
     expect(await regles("src/app/rapport/page.tsx", `import { rapportDe } from "@/server/donnees";\nexport const x = rapportDe;\n`)).toEqual([]);
     expect(await regles("src/lib/essai.ts", `import { NextResponse } from "next/server";\nexport const x = NextResponse;\n`)).toEqual([]);
   });

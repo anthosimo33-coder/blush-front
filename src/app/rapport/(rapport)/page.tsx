@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
 import { getReport, getStory, sansHistoire } from "@/services/serveur";
 import { ReportScreen } from "../ReportScreen";
-import { ConvDeLaPage } from "@/components/shell/ConvDeLaPage";
+import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "Ton rapport" };
 
@@ -18,9 +18,8 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
   if (!story) redirect(await sansHistoire("/rapport"));
   if (!initial) redirect("/lecture");
   return (
-    <>
-      <ConvDeLaPage />
+    <PageDeConv>
       <ReportScreen initial={initial} story={story} openPaywall={paiement === "1"} rendu={rendu} />
-    </>
+    </PageDeConv>
   );
 }

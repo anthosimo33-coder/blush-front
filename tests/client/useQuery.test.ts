@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { invalidate, setQueryData, useQuery } from "@/lib/query";
+import { invalidate, MontageDeLaPage, setQueryData, useQuery } from "@/lib/query";
 import type { Account } from "@/types/api";
 import { renduNeuf } from "./temps";
 
@@ -32,6 +33,26 @@ describe("useQuery : rendu par le serveur, ou relu", () => {
 
     /* La même page revue par l’historique : le même rendu, peut-être périmé, est relu */
     const revue = renderHook(() => useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }));
+    await waitFor(() => expect(revue.result.current.data?.email).toBe("relu@blush.test"));
+    expect(lire).toHaveBeenCalledTimes(1);
+  });
+
+  it("dans une page qui donne son montage, deux écrans de la même clé (la coque et son écran) ne relisent pas le rendu ; la page remontée, si", async () => {
+    const lire = vi.fn(async () => compte("relu@blush.test"));
+    const rendu = renduNeuf();
+    const montage = {};
+    const page = ({ children }: { children: ReactNode }) => createElement(MontageDeLaPage, { value: montage }, children);
+    const useDeuxEcrans = () => [useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }), useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 })];
+    const { result } = renderHook(useDeuxEcrans, { wrapper: page });
+    await act(() => Promise.resolve());
+    expect(lire).not.toHaveBeenCalled();
+    expect(result.current.map((r) => r.data?.email)).toEqual(["rendu@blush.test", "rendu@blush.test"]);
+
+    /* Revue par l’historique, la page est un autre montage : le même rendu est relu */
+    const autreMontage = {};
+    const revue = renderHook(() => useQuery("account", lire, compte("rendu@blush.test"), { rendu, frais: 10_000 }), {
+      wrapper: ({ children }: { children: ReactNode }) => createElement(MontageDeLaPage, { value: autreMontage }, children),
+    });
     await waitFor(() => expect(revue.result.current.data?.email).toBe("relu@blush.test"));
     expect(lire).toHaveBeenCalledTimes(1);
   });
