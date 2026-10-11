@@ -42,17 +42,22 @@ export function BarreEcriture({ ecriture }: { ecriture: EcritureRapport }) {
   );
 }
 
-/** L’état d’un chapitre, à droite de sa ligne : prêt, en cours d’écriture, ou en attente. */
-export function MarqueChapitre({ etat }: { etat: EtatChapitre }) {
+/**
+ * L’état d’un chapitre, à droite de sa ligne : prêt, en cours d’écriture, ou en attente. Les trois états se disent de la
+ * même façon aux lecteurs d’écran (une image nommée) ; `decorative` les tait quand un texte visible dit déjà l’état à côté
+ * (la ligne de « La suite s’écrit »), pour ne pas l’annoncer deux fois.
+ */
+export function MarqueChapitre({ etat, decorative = false }: { etat: EtatChapitre; decorative?: boolean }) {
+  const nom = (label: string) => (decorative ? { "aria-hidden": true as const } : { role: "img", "aria-label": label });
   if (etat === "ecrit")
-    return <DoneCheck size={20} ombre={false} label="prêt" />;
+    return <DoneCheck size={20} ombre={false} label={decorative ? undefined : "prêt"} />;
   if (etat === "en_cours")
     return (
-      <span className="flex h-5 shrink-0 items-center" aria-label="en cours d’écriture">
+      <span className="flex h-5 shrink-0 items-center" {...nom("en cours d’écriture")}>
         <TypingDots size={4} />
       </span>
     );
-  return <span className="size-5 shrink-0 rounded-full border-2 border-track" aria-label="en attente" />;
+  return <span className="size-5 shrink-0 rounded-full border-2 border-track" {...nom("en attente")} />;
 }
 
 /** Dans la colonne du rapport (tous les écrans) : un chapitre qui s’écrit, avec ses lignes qui se remplissent. */
@@ -78,7 +83,7 @@ export function LigneEcriture({ number, title, etat, last = false }: { number: n
       </span>
       <span className="flex shrink-0 items-center gap-1.5 text-micro font-black">
         <span className={cn(etat === "ecrit" ? "text-vrai-ink" : etat === "en_cours" ? "text-ink" : "text-grey")}>{etat === "ecrit" ? "Prêt" : etat === "en_cours" ? "S’écrit" : "En attente"}</span>
-        <MarqueChapitre etat={etat} />
+        <MarqueChapitre etat={etat} decorative />
       </span>
     </div>
   );

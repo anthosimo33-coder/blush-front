@@ -408,7 +408,7 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
         onClick={toggle}
         aria-label={playing ? "Mettre le vocal de BLUSH en pause" : `Écouter le vocal de BLUSH (${formatClock(Math.round(duree))})`}
         className="flex size-[42px] shrink-0 items-center justify-center rounded-full shadow-[0_6px_14px_-6px_rgba(200,29,107,0.7)]"
-        style={{ background: "linear-gradient(160deg, #FF94C8 0%, #E8358A 60%, #C81D6B 100%)" }}
+        style={{ background: "linear-gradient(160deg, #FF94C8 0%, #E8358A 60%, var(--color-elle-ink) 100%)" }}
       >
         {playing ? <Icon name="pause" size={15} stroke={3.2} className="text-white" /> : <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-white" />}
       </button>

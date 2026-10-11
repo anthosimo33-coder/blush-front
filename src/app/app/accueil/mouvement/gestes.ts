@@ -54,9 +54,9 @@ export function useThreadGestures(ref: RefObject<HTMLElement | null>, onDig: (qu
         g.x += Math.sign(dx) * 10;
         try {
           root.setPointerCapture(e.pointerId);
-        } catch (e) {
+        } catch (erreur) {
           /* Pas de capture : le geste suit quand même tant que le doigt reste sur la conv */
-          tracer("geste:capture", e);
+          tracer("geste:capture", erreur);
         }
       }
       const d = e.clientX - g.x;

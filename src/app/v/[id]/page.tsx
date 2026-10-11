@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { cache, type ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/icons";
+import { NoteIcone } from "@/components/ui/feedback";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
@@ -99,10 +99,9 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
           </ButtonLink>
         </section>
         {v && (
-          <p className="m-0 mt-4 flex items-start justify-center gap-1.5 px-1 text-center text-[12.5px] font-extrabold leading-[1.45] text-grey">
-            <Icon name="shield" size={15} stroke={2.2} style={{ marginTop: 1 }} className="text-grey" />
+          <NoteIcone icone="shield" taille={15} serree className="mt-4 justify-center px-1 text-center text-[12.5px] leading-[1.45]">
             Leur conv reste privée{NBSP}: seul le verdict est partagé, sans le prénom de l’autre.
-          </p>
+          </NoteIcone>
         )}
       </div>
     </main>

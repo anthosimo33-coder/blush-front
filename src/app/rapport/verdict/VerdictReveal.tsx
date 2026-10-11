@@ -229,6 +229,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
               </button>
             )}
             <a href="/rapport" onClick={partir} aria-busy={enRoute} className="relative rounded-full px-1 text-note font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+              {/* Les points en blanc plein, plus lisibles que le texte à 70 % sur le fond sombre de la révélation */}
               {enRoute ? <TypingDots size={5} color="white" label="Ton rapport arrive" /> : "Passer"}
             </a>
           </span>

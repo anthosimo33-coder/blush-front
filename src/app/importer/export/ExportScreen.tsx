@@ -99,7 +99,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </Alert>
           )}
-          <Button onClick={() => void choisirFichier()} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
+          {/* aria-busy pour la phase « Je lis ton export · N % » aussi, où loading est faux (Button ne le pose qu’avec loading) */}
+          <Button onClick={choisirFichier} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
             {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
             {busy && avance != null ? (
               <span className="flex min-w-0 items-center gap-2.5">
