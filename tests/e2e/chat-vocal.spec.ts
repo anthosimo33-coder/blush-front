@@ -176,6 +176,32 @@ test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigat
   });
   await lectureBlushPlus(page, testInfo);
   await ouvrir(page, "/app");
+  /* Le WebKit de Linux (la CI) n’a pas d’encodeur audio : un flux n’y donne aucun morceau, et l’enregistrement ne part pas */
+  const enregistre = await page.evaluate(async () => {
+    try {
+      const ctx = new AudioContext();
+      const sortie = ctx.createMediaStreamDestination();
+      const la = ctx.createOscillator();
+      la.connect(sortie);
+      la.start();
+      const enregistreur = new MediaRecorder(sortie.stream);
+      const morceau = new Promise<boolean>((fin) => {
+        enregistreur.ondataavailable = (e) => fin(e.data.size > 0);
+        enregistreur.onerror = () => fin(false);
+        setTimeout(() => fin(false), 3_000);
+      });
+      enregistreur.start();
+      await new Promise((attente) => setTimeout(attente, 500));
+      enregistreur.stop();
+      const vu = await morceau;
+      la.stop();
+      await ctx.close();
+      return vu;
+    } catch {
+      return false;
+    }
+  });
+  test.skip(!enregistre, "ce navigateur n’enregistre pas un flux audio (le WebKit de Linux, sans encodeur)");
   await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Enregistrement du vocal en cours" })).toBeAttached();
   /* Quatre secondes : l’enveloppe du fichier compte peu devant le son */
