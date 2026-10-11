@@ -88,12 +88,19 @@
   --color-skeleton: #e7e4dd;
   --color-segment: #e9e6df;
   --color-disabled: #d9d6cf;
-  /* L’erreur et la réussite (Q59). Un seul rouge pour les soucis (décidé) : les quatre qu’on écrivait en dur (#D93036,
-     #E5484D, #C2363B, #C2373C) l’ont rejoint. danger-ink, le même plus foncé, ne sert qu’au texte posé sur le voile rouge
-     pâle (Alert variant="voile") : le rouge des soucis y tomberait à 4,2:1, sous les 4,5:1 d’un petit texte.
-     TODO(produit): garder ce rouge foncé pour ce seul cas (proposé), ou passer le voile au rouge des soucis malgré le contraste.
+  /* L’erreur et la réussite (Q59). Un seul rouge pour les soucis (décidé) : #E5484D, qu’on écrivait en dur, a rejoint
+     #D93036 ; #C2373C, à un point près, est devenu danger-ink. Car danger-ink (#C2363B), le même rouge plus foncé, reste à
+     part pour un petit texte rouge posé sur le papier ou sur le voile rouge pâle (posé sur une feuille blanche) : le message
+     sous le champ email, Alert variant="voile". Le rouge des soucis y tomberait à 4,2:1, sous les 4,5:1 d’un petit texte ;
+     danger-ink y tient 4,8:1 (5,4:1 sur le blanc).
+     TODO(produit): le texte rouge sur le papier. Proposé : un seul rouge, #C2363B, pour --danger (4,8:1 sur le papier et sur
+     le voile, 5,4:1 sur le blanc) ; danger-ink disparaîtrait, et la ligne d’Alert « texte » posée sur le papier (aujourd’hui
+     #D93036, 4,2:1) passerait du même coup. En attendant, danger-ink garde le texte lisible là où on l’a mesuré.
+     danger est écrit en littéral, la valeur de --danger (lui sert aux var() du code ; tests/unit/jetons.test.ts les garde
+     égaux) : Tailwind calcule alors ses opacités (bg-danger/8, le voile) pour tous les navigateurs, sans dépendre de
+     color-mix().
      Le vert de « c’est fait », celui de la vérité. */
-  --color-danger: var(--danger);
+  --color-danger: #d93036;
   --color-danger-ink: #c2363b;
   --color-ok: var(--vrai);
 
@@ -366,8 +373,8 @@ html:has(dialog[open]) :is([data-marquee], [data-float], [data-nudge], [data-dri
 /* 6 · Glisse pour l’heure : l’heure de chaque bulle attend hors champ, à droite */
 .swipe-time { position: absolute; top: 50%; right: -60px; translate: 0 -50%; font-size: 11px; font-weight: 700; line-height: 1; color: var(--grey); white-space: nowrap; pointer-events: none; }
 /* 7 · Glisse pour creuser : la flèche apparaît derrière la bulle, puis vire au rose quand ça suffit */
-[data-dig-icon] { position: absolute; left: 46px; top: 50%; z-index: 0; display: flex; width: 30px; height: 30px; align-items: center; justify-content: center; border-radius: 50%; background: #E6E3DC; color: var(--soft); opacity: 0; transform: translateY(-50%) scale(0.4); transition: background-color 0.15s, color 0.15s; pointer-events: none; }
-[data-dig-icon][data-armed] { background: #E8358A; color: #FFFFFF; }
+[data-dig-icon] { position: absolute; left: 46px; top: 50%; z-index: 0; display: flex; width: 30px; height: 30px; align-items: center; justify-content: center; border-radius: 50%; background: var(--line); color: var(--soft); opacity: 0; transform: translateY(-50%) scale(0.4); transition: background-color 0.15s, color 0.15s; pointer-events: none; }
+[data-dig-icon][data-armed] { background: #E8358A; color: white; } /* le rose foncé du dégradé --rose-blush, sans token à lui */
 @keyframes quoteIn { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
 [data-quote-strip] { transform-origin: 50% 100%; animation: quoteIn var(--spring-pop-d) var(--spring-pop) both; }
 

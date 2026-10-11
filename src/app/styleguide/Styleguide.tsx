@@ -117,7 +117,7 @@ const PAPIER_ET_ENCRE: Nuance[] = [
   { nom: "Doux", jeton: "--color-soft", classe: "bg-soft", texte: "Le texte secondaire.", sombre: true },
   { nom: "Gris", jeton: "--color-grey", classe: "bg-grey", texte: "Les légendes, en 13 px gras minimum (4,96:1 sur le papier).", sombre: true },
   { nom: "Gris doux", jeton: "--color-muted", classe: "bg-muted", texte: "Des icônes, des points, des chevrons. Jamais un texte.", sombre: true },
-  { nom: "Gris pâle", jeton: "--color-pale", classe: "bg-pale", texte: "Un glyphe en retrait\u00a0: un chevron, un cadenas à venir.", sombre: true },
+  { nom: "Gris pâle", jeton: "--color-pale", classe: "bg-pale", texte: "Un glyphe en retrait\u00a0: un chevron, un cadenas à venir." },
 ];
 
 const SENS: Nuance[] = [
@@ -158,16 +158,19 @@ const DEGRADES = [
   { nom: "Bouton encre", jeton: "--btn-ink-bg", texte: "Le relief du bouton principal." },
 ];
 
-/** L’échelle du texte (--text-*, globals.css), de la plus grande à la plus petite. */
+/**
+ * L’échelle du texte (--text-*, globals.css), de la plus grande à la plus petite. Un nom dit une taille, pas un rôle : l’usage
+ * est celui qu’on voit le plus, et un titre de 52 px prend text-chiffre comme un score.
+ */
 const ECHELLE = [
   { nom: "Affiche", jeton: "--text-affiche", classe: "text-affiche", poids: 900, usage: "Titres de pages, couverture", exemple: "Vous êtes à deux doigts." },
-  { nom: "Chiffre", jeton: "--text-chiffre", classe: "text-chiffre", poids: 900, usage: "Scores, compteurs", exemple: "1 202 · 4 / 7" },
+  { nom: "Chiffre", jeton: "--text-chiffre", classe: "text-chiffre", poids: 900, usage: "Scores, compteurs, titres de l’accueil sur grand écran", exemple: "1 202 · 4 / 7" },
   { nom: "Titre 1", jeton: "--text-titre-1", classe: "text-titre-1", poids: 900, usage: "Question, verdict", exemple: "Qui tient le plus à l’autre\u00a0?" },
   { nom: "Titre 2", jeton: "--text-titre-2", classe: "text-titre-2", poids: 900, usage: "Titre d’écran", exemple: "Ajoute votre conv, comme tu veux." },
   { nom: "Titre 3", jeton: "--text-titre-3", classe: "text-titre-3", poids: 900, usage: "Chapitres du rapport", exemple: "Le moment où tout a basculé" },
   { nom: "Carte", jeton: "--text-carte", classe: "text-carte", poids: 900, usage: "Options, cartes, grand bouton", exemple: "Des captures" },
   { nom: "Accent", jeton: "--text-accent", classe: "text-accent", poids: 800, usage: "Un champ, un sous-titre", exemple: "Ton email" },
-  { nom: "Corps", jeton: "--text-corps", classe: "text-corps", poids: 800, usage: "Texte courant", exemple: "Devine ce qu’elle ressent. Votre conv te dit si tu as raison." },
+  { nom: "Corps", jeton: "--text-corps", classe: "text-corps", poids: 800, usage: "Texte courant", exemple: "Ce qu’elle ressent, et ce que ta réponse peut changer." },
   { nom: "Détail", jeton: "--text-detail", classe: "text-detail", poids: 800, usage: "Une carte, une bulle de message", exemple: "Répond le soir · peu d’emojis" },
   { nom: "Note", jeton: "--text-note", classe: "text-note", poids: 800, usage: "Un souci, une note", exemple: "Vérifie ta connexion et réessaie." },
   { nom: "Légende", jeton: "--text-legende", classe: "text-legende", poids: 900, usage: "Repères, étiquettes", exemple: "Chapitre 3 · sa façon d’écrire" },
@@ -744,12 +747,12 @@ export function Styleguide() {
       </Section>
 
       {/* 07 Mode sobre */}
-      <Section title="Mode sobre" sub="Quand il y a une alerte (danger, détresse, mineur), BLUSH sort du jeu. Même structure, mais tout ce qui est ludique disparaît.">
+      <Section title="Mode sobre" sub="Seulement quand il y a une alerte (danger, détresse, mineur). Même structure, mais tout ce qui amuse disparaît. Un «\u00a0non\u00a0», un ghosting, une rupture ne sont pas des alertes\u00a0: ils ont le rapport complet.">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { t: "Pas de couleur de sens", d: "Ni bleu, ni rose, ni vert. Encre et papier seulement." },
-            { t: "Pas d’objet 3D", d: "Ni billes, ni emoji, et pas de logo en volume." },
-            { t: "Pas de jeu", d: "Pas de score, pas de niveau, pas de partage." },
+            { t: "Pas d’objet 3D", d: "Pas d’objet en volume, ni emoji, ni logo en volume." },
+            { t: "Rien de ludique", d: "Pas de score, pas de niveau, pas de partage." },
             { t: "Une sortie visible", d: "Le bouton «\u00a0Quitter vite\u00a0» reste en haut à droite." },
             { t: "Une aide proposée", d: "«\u00a0Besoin d’en parler à quelqu’un\u00a0?\u00a0» mène vers des ressources." },
             { t: "Des mots doux et vrais", d: "«\u00a0Ça ne dit rien de ce que tu vaux.\u00a0»" },
@@ -768,12 +771,12 @@ export function Styleguide() {
           {[
             { t: "Un seul bouton noir par écran", d: "C’est l’action principale. Le reste est blanc et s’efface." },
             { t: "Bleu toi, rose elle, vert la vérité", d: "Toujours le même sens, partout." },
-            { t: "On devine, puis on sait", d: "Chaque révélation commence par une question. Tu réponds, la conv tranche." },
+            { t: "La vérité, puis un sourire", d: "BLUSH dit ce que la conv montre, sans faux espoir, puis une vanne en ta faveur. Jamais contre toi." },
             { t: "Chaque affirmation a sa preuve", d: "Un vrai message, daté, dans une bulle." },
             { t: "La confiance est affichée", d: "Sûr, probable, à vérifier. BLUSH dit ce qu’il ne peut pas savoir." },
             { t: "Toujours un prochain pas", d: "Chaque écran finit sur une action concrète." },
             { t: "Un objet 3D au maximum, en plus du logo", d: "Pour marquer un moment, jamais pour décorer." },
-            { t: "Le mode sobre quand c’est dur", d: "Pas de jeu sur une mauvaise nouvelle." },
+            { t: "Le mode sobre, seulement pour une alerte", d: "Danger, détresse, mineur. Un «\u00a0non\u00a0» reçoit le rapport complet, dit avec tact." },
             { t: "Une couleur, un token", d: "Jamais un code couleur écrit à la main dans un écran\u00a0: il vient de globals.css." },
           ].map(({ t, d }, i) => (
             <li key={t} className="flex items-start gap-4 rounded-card bg-white px-5 py-5 shadow-card">

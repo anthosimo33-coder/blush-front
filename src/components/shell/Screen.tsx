@@ -218,7 +218,7 @@ export function Screen({
             <div
               className={cn(
                 "z-10 mt-auto flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3",
-                stickyFooter && "sticky bottom-0 bg-[linear-gradient(180deg,rgba(244,242,237,0)_0%,#F4F2ED_22%)]",
+                stickyFooter && "sticky bottom-0 bg-[linear-gradient(180deg,rgba(244,242,237,0)_0%,var(--paper)_22%)]",
                 "lg:static lg:w-[min(100%,var(--footer-w))] lg:bg-none lg:p-0",
                 grid ? "lg:mt-2.5 lg:self-start" : "lg:mt-6",
               )}

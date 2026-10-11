@@ -124,7 +124,7 @@ export function LevelPath({ current, variant = "normal", className }: { current:
                 {now && (temperature ? <span className="size-3 rounded-full bg-white" /> : <span className="text-carte font-black text-white">{i + 1}</span>)}
                 {!done && !now && !temperature && <Icon name="lock" size={18} className="text-pale" />}
               </span>
-              <span className={cn("text-legende font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
+              <span className={cn("text-legende font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
                 {l.label}
                 <span className="sr-only">{etatDuNiveau(i, idx, temperature)}</span>
               </span>

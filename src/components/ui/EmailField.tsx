@@ -60,7 +60,7 @@ export function EmailField({
         />
       </span>
       {invalid && errorText && (
-        <span id={errId} role="alert" className="text-legende font-extrabold text-danger">
+        <span id={errId} role="alert" className="text-legende font-extrabold text-danger-ink">
           {errorText}
         </span>
       )}

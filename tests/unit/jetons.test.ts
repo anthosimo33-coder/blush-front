@@ -64,21 +64,52 @@ describe("les tokens de couleur", () => {
    * (src/app) suivent avec le codemod de 8b, et la règle d’ESLint de 9a le tiendra partout. Les objets en volume
    * (objects3d.tsx) gardent leurs teintes : ce sont des dessins, pas l’interface.
    */
+  /** Les hex à 6 chiffres déclarés comme tokens, et le token de chacun. */
+  const VALEURS = new Map<string, string>();
+  for (const [, nom, hex] of CSS.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{6})\s*;/gim)) if (nom && hex) VALEURS.set(hex.toLowerCase(), nom);
+  /*
+   * Un hex écrit dans une ligne, et le token qui porte sa couleur. Pas de \b pour le finir : dans une valeur arbitraire de
+   * Tailwind, l’espace s’écrit « _ » (`#F4F2ED_22%`), un caractère de mot. Un #RRGGBBAA compte par ses six premiers chiffres.
+   */
+  const hexAvecJeton = (ligne: string) =>
+    [...ligne.matchAll(/#([0-9a-fA-F]{6})(?:[0-9a-fA-F]{2})?(?![0-9a-fA-F])/g)].flatMap(([hex, rgb]) => {
+      const jeton = rgb && VALEURS.get(`#${rgb.toLowerCase()}`);
+      return jeton ? [`${hex} (${jeton})`] : [];
+    });
+
+  it("la recherche des hex voit ceux d’une valeur arbitraire et ceux à huit chiffres (le test ne passe pas à vide)", () => {
+    expect(VALEURS.size).toBeGreaterThan(15);
+    expect(hexAvecJeton("bg-[linear-gradient(180deg,#F4F2ED_22%)]")).toEqual(["#F4F2ED (--paper)"]);
+    expect(hexAvecJeton("shadow-[0_0_0_1px_#121214cc]")).toEqual(["#121214cc (--ink)"]);
+    expect(hexAvecJeton("#f4f2ed1 #f4f2ed12345 url(#f4f2ed-x)")).toEqual(["#f4f2ed (--paper)"]);
+  });
+
   it("hors des dessins, src/components, src/lib et src/services n’écrivent pas en hex une couleur qui a son token", () => {
-    const valeurs = new Map<string, string>();
-    for (const [, nom, hex] of CSS.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{6})\s*;/gim)) if (nom && hex) valeurs.set(hex.toLowerCase(), nom);
-    expect(valeurs.size).toBeGreaterThan(15);
     const DESSINS = ["src/components/brand/objects3d.tsx"];
     const ecrits: string[] = [];
     for (const f of SRC.filter((f) => /^src\/(components|lib|services|state|contenu|types)\//.test(f) && !DESSINS.includes(f)))
       lire(f)
         .split("\n")
         .forEach((ligne, i) => {
-          for (const [hex] of ligne.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
-            const jeton = valeurs.get(hex.toLowerCase());
-            if (jeton) ecrits.push(`${f}:${i + 1} ${hex} (${jeton})`);
-          }
+          for (const trouve of hexAvecJeton(ligne)) ecrits.push(`${f}:${i + 1} ${trouve}`);
         });
     expect(ecrits).toEqual([]);
+  });
+
+  it("dans globals.css, hors des déclarations de tokens, une règle cite le token plutôt que son hex", () => {
+    const ecrits: string[] = [];
+    /* Les commentaires citent les valeurs exprès (l’histoire des rouges) : on les blanchit, lignes gardées */
+    const regles = CSS.replace(/\/\*[\s\S]*?\*\//g, (commentaire) => commentaire.replace(/[^\n]/g, " "));
+    regles.split("\n").forEach((ligne, i) => {
+      if (/^\s*--[a-z0-9-]+\s*:/.test(ligne)) return;
+      for (const trouve of hexAvecJeton(ligne)) ecrits.push(`src/app/globals.css:${i + 1} ${trouve}`);
+    });
+    expect(ecrits).toEqual([]);
+  });
+
+  it("danger, écrit en littéral pour que Tailwind en calcule les opacités, garde la valeur de --danger", () => {
+    const valeur = (nom: string) => CSS.match(new RegExp(`^\\s*${nom}\\s*:\\s*(#[0-9a-f]{6})\\s*;`, "im"))?.[1];
+    expect(valeur("--color-danger")).toBeDefined();
+    expect(valeur("--color-danger")).toBe(valeur("--danger"));
   });
 });
