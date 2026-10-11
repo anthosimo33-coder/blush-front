@@ -2,7 +2,7 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, repondre, reponseErreur } from "@/server/http";
+import { erreur, repondre, reponseErreur, route } from "@/server/http";
 import { convImportee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
@@ -51,6 +51,6 @@ async function traiter(req: Request) {
 }
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
-export function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   return avecEcheance(echeancePour(maxDuration), () => traiter(req));
-}
+});

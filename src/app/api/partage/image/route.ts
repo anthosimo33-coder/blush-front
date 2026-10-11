@@ -1,5 +1,5 @@
 import { carteMoment, carteReponse } from "@/server/carte-partage";
-import { erreur, lireCorps } from "@/server/http";
+import { erreur, lireCorps, route } from "@/server/http";
 import { momentAPartager } from "@/server/partages";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { ROUTES } from "@/types/api";
@@ -9,7 +9,7 @@ import { ROUTES } from "@/types/api";
  * de l’autre masqué (le tien reste). Ce qui se dessine, et ce qui ne se dessine pas (le mode sobre, un chapitre sans
  * l’accès) : momentAPartager, src/server/partages.ts.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -21,4 +21,4 @@ export async function POST(req: Request) {
   /* Compté une fois le moment trouvé : un refus ne dessine rien, et ne coûte rien */
   if (!(await sousLaLimiteDuCompte(utilisateur, "image"))) return erreur("trop");
   return moment.type === "reponse" ? carteReponse(moment) : carteMoment(moment);
-}
+});

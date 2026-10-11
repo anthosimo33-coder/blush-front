@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { CLES, compter } from "@/server/compteurs";
-import { repondre, reponseErreur } from "@/server/http";
+import { repondre, reponseErreur, route } from "@/server/http";
 import { arreterPartage, partager, versionImage } from "@/server/partages";
 import { garde } from "@/server/requete";
 
@@ -9,7 +9,7 @@ import { garde } from "@/server/requete";
  * le lien en le créant : rien ne le relit.
  */
 
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { story } = g;
@@ -27,11 +27,11 @@ export async function POST(req: Request) {
     /* Pas encore de verdict, ou une alerte de danger (ErreurPartage) */
     return reponseErreur(e);
   }
-}
+});
 
-export async function DELETE(req: Request) {
+export const DELETE = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   await arreterPartage(g.story.id);
   return repondre("DELETE /api/partage", { id: null });
-}
+});

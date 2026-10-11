@@ -1,5 +1,5 @@
 import { utilisateurCourant } from "@/server/donnees";
-import { erreur, reponseAudio } from "@/server/http";
+import { erreur, reponseAudio, route } from "@/server/http";
 import { contexte } from "@/server/requete";
 import { audioDuCompte } from "@/server/vocal";
 
@@ -9,7 +9,7 @@ import { audioDuCompte } from "@/server/vocal";
  * octets, puis le reste) : chaque requête lit le compte, puis sa conv et son vocal en une seule requête, sans relire
  * l’histoire ni sa conv brute.
  */
-export async function GET(req: Request) {
+export const GET = route(async (req: Request) => {
   const conv = new URL(req.url).searchParams.get("conv");
   const utilisateur = await utilisateurCourant();
   if (!utilisateur) return erreur("connexion");
@@ -18,4 +18,4 @@ export async function GET(req: Request) {
   if (!vocal) return erreur("aucune");
   if (!vocal.audio) return erreur("pas_pret");
   return reponseAudio(req, vocal.audio);
-}
+});

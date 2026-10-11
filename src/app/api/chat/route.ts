@@ -7,7 +7,7 @@ import { controlerBudget } from "@/server/budget";
 import { historique, repondre as blushRepond } from "@/server/chat";
 import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/histoires";
-import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, signalerErreur } from "@/server/http";
+import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, route, signalerErreur } from "@/server/http";
 import { lireVocal, transcrire } from "@/server/ia/transcription";
 import { auMieux } from "@/server/journal";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
@@ -183,15 +183,15 @@ async function traiter(req: Request) {
 }
 
 /** L’historique, pour réafficher la conv avec BLUSH : les derniers échanges, ou ceux d’avant `?avant=` (un id d’échange). */
-export async function GET(req: Request) {
+export const GET = route(async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const { story } = g;
   const avant = Number(new URL(req.url).searchParams.get("avant"));
   return repondre("GET /api/chat", story ? await historique(story.id, Number.isSafeInteger(avant) && avant > 0 ? { avant } : {}) : { echanges: [], plus: false });
-}
+});
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
-export function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   return avecEcheance(echeancePour(maxDuration), () => traiter(req));
-}
+});

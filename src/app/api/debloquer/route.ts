@@ -1,6 +1,6 @@
 import { passerEnBlushPlus } from "@/server/comptes";
 import { accesLibre } from "@/server/env";
-import { erreur, lireCorps, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { relancerApres, reparerLaChaine } from "@/server/pipeline";
 import { garde } from "@/server/requete";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
@@ -13,7 +13,7 @@ export const maxDuration = 300;
  * Débloquer le rapport. v1, sans paiement : seulement pour les emails de la bêta (BLUSH_ACCES_LIBRE).
  * Le rapport, puis la mémoire, s’écrivent après la réponse.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -29,4 +29,4 @@ export async function POST(req: Request) {
     relancerApres(story.id);
   }
   return repondre("POST /api/debloquer", SUBSCRIPTIONS.blushplus);
-}
+});

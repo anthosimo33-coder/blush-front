@@ -4,7 +4,7 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http";
 import { convImportee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
@@ -53,7 +53,7 @@ const Envoi = ROUTES["POST /api/captures/video"].corps
  * Un enregistrement d’écran, lu lot par lot (/api/captures/lot) : les lectures sont rassemblées (sans les messages
  * vus deux fois au bord de deux lots), puis la conv devient une histoire brouillon, comme des captures.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
@@ -78,4 +78,4 @@ export async function POST(req: Request) {
   } catch (e) {
     return reponseErreur(e);
   }
-}
+});

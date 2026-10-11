@@ -1,7 +1,7 @@
 import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
 import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
-import { erreur, lireCorps, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { brouillonALaConnexion } from "@/server/histoires";
 import { ipDe, LIMITES } from "@/server/limites";
 import { garde } from "@/server/requete";
@@ -17,7 +17,7 @@ const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
  * (src/types/erreurs-api.ts) : voulu, la même réponse pour tous. Trop d’essais ratés aujourd’hui pour cet email, depuis ce
  * navigateur ou cette adresse IP (prendreCode) : 429 `essais`, pour tous aussi.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
   if (g instanceof Response) return g;
   const b = await lireCorps(req, Corps);
@@ -38,4 +38,4 @@ export async function POST(req: Request) {
     await poserChoisie(rattachee);
   }
   return repondre("POST /api/auth/verifier", { ok: true, email: utilisateur.email });
-}
+});

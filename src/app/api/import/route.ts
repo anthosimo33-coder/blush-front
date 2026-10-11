@@ -1,6 +1,6 @@
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, repondre, reponseErreur } from "@/server/http";
+import { erreur, repondre, reponseErreur, route } from "@/server/http";
 import { convImportee } from "@/server/conv-affichee";
 import { importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
@@ -15,7 +15,7 @@ export const maxDuration = 60;
  * (« fichier ») est aussi accepté, sous la limite de taille de Vercel. Le texte est borné avant d’être lu
  * (src/server/import.ts) : un export forgé est refusé, ou coupé, vite.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   const fd = await req.formData().catch(() => null);
@@ -37,4 +37,4 @@ export async function POST(req: Request) {
   } catch (e) {
     return reponseErreur(e);
   }
-}
+});

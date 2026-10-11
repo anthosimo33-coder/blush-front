@@ -4,7 +4,7 @@ import { modifierMemoire } from "@/server/depot";
 import { memoireDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
 import { depuisPaquet } from "@/server/histoires";
-import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { ROUTES } from "@/types/api";
@@ -13,10 +13,10 @@ import { ROUTES } from "@/types/api";
 export const maxDuration = 300;
 
 /** Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). */
-export async function GET() {
+export const GET = route(async () => {
   const g = await lecture({ session: "requise", histoire: true });
   return g instanceof Response ? g : repondre("GET /api/fiche", await ficheEtMaj(g.story));
-}
+});
 
 /**
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
@@ -24,7 +24,7 @@ export async function GET() {
  * lue : si une mise à jour l’a changée entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à
  * jour a appris n’est effacé).
  */
-export async function PUT(req: Request) {
+export const PUT = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -37,7 +37,7 @@ export async function PUT(req: Request) {
   if (modifiee !== "ecrite") return erreur("pas_pret");
   /* Avec l’état de la mise à jour : la fiche, en train de se relire, continue de le faire */
   return repondre("PUT /api/fiche", await ficheEtMaj(story));
-}
+});
 
 /**
  * Des captures (son profil, leur conv) ou un nouvel export, pour sa fiche : BLUSH les lit et répond avec ce qu’il a lu ;
@@ -64,6 +64,6 @@ async function traiter(req: Request) {
 }
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
-export function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   return avecEcheance(echeancePour(maxDuration), () => traiter(req));
-}
+});

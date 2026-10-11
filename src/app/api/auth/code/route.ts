@@ -5,7 +5,7 @@ import { codeAccorde, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, pre
 import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies";
 import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
-import { erreur, lireCorps, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { journalErreur } from "@/server/journal";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { garde } from "@/server/requete";
@@ -15,7 +15,7 @@ import { ROUTES } from "@/types/api";
 const Corps = ROUTES["POST /api/auth/code"].corps.extend({ email: Email });
 
 /** Le code de connexion, envoyé par email. Il ne vaudra que dans ce navigateur (son cookie, posé ici). */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   const lu = await lireCorps(req, Corps);
@@ -63,4 +63,4 @@ export async function POST(req: Request) {
     }
   });
   return repondre("POST /api/auth/code", { email });
-}
+});

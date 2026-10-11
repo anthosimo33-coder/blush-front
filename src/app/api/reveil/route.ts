@@ -1,7 +1,7 @@
 import { prolongerSession } from "@/server/auth";
 import { lireSession, poserSession } from "@/server/cookies";
 import { reveillerLaBase } from "@/server/depot";
-import { repondre } from "@/server/http";
+import { repondre, route } from "@/server/http";
 
 /*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes
@@ -10,7 +10,7 @@ import { repondre } from "@/server/http";
  * dit rien d’autre que « ok ». Seul effet : une visite prolonge la session (un mois, une fois par jour au plus), et son
  * cookie avec elle.
  */
-export async function GET() {
+export const GET = route(async () => {
   try {
     await reveillerLaBase();
     const secret = await lireSession();
@@ -20,4 +20,4 @@ export async function GET() {
   } catch {
     return repondre("GET /api/reveil", { ok: false }, 503);
   }
-}
+});

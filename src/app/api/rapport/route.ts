@@ -1,6 +1,6 @@
 import { relancerApres } from "@/server/pipeline";
 import { ETAPES_DU_RAPPORT, ouvrirLeRapport, rapportDe, relancer } from "@/server/donnees";
-import { erreur, repondre } from "@/server/http";
+import { erreur, repondre, route } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { reprendre } from "@/server/taches";
 
@@ -11,17 +11,17 @@ export const maxDuration = 300;
  * Ouvert (ouvrirLeRapport) : ce qui devait partir et ne l’a jamais été part maintenant (reparerLaChaine), comme à
  * l’ouverture de la page.
  */
-export async function GET() {
+export const GET = route(async () => {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
   /* Les tâches coupées repartent pendant que le rapport se lit (pas avant) : relu toutes les 2 s pendant l’écriture */
   const [, rapport] = await Promise.all([relancer(story.id), ouvrirLeRapport(story, utilisateur)]);
   return rapport ? repondre("GET /api/rapport", rapport) : erreur("pas_pret");
-}
+});
 
 /** « Relancer l’écriture » : l’écriture a échoué (une panne, pas un refus du modèle). Chaque essai coûte : quelques-uns par jour. */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -33,4 +33,4 @@ export async function POST(req: Request) {
   relancerApres(story.id);
   const rapport = await rapportDe(story, utilisateur);
   return rapport ? repondre("POST /api/rapport", rapport) : erreur("pas_pret");
-}
+});

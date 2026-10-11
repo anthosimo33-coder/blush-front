@@ -1,7 +1,7 @@
 import { relancerApres } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
-import { erreur, lireCorps, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
@@ -17,7 +17,7 @@ export const maxDuration = 300;
  * déjà connecté, elle rejoint ici le compte, et devient la conv ouverte. Sans (l’écran de lecture), c’est la conv qu’on
  * suit : un brouillon laissé en plan ne prend pas sa place.
  */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   /* L’origine d’abord, comme partout : une requête venue d’un autre site n’est même pas lue */
   const origine = await garde(req, { session: "aucune" });
   if (origine instanceof Response) return origine;
@@ -57,12 +57,12 @@ export async function POST(req: Request) {
   }
   relancerApres(story.id);
   return repondre("POST /api/analyse", { ok: true });
-}
+});
 
 /** La progression de la lecture. Relance au passage une tâche abandonnée. */
-export async function GET() {
+export const GET = route(async () => {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
   await relancer(g.story.id);
   return repondre("GET /api/analyse", await progression(g.story));
-}
+});

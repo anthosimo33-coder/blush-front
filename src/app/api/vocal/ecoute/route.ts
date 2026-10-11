@@ -1,10 +1,10 @@
-import { erreur, lireCorps, repondre } from "@/server/http";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { noterEcoute } from "@/server/vocal";
 import { ROUTES } from "@/types/api";
 
 /** Un moment de l’écoute du vocal (début, fin, réécoute, fermé avant la fin), pour comparer les deux voix. */
-export async function POST(req: Request) {
+export const POST = route(async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -14,4 +14,4 @@ export async function POST(req: Request) {
   if (!(await sousLaLimiteDuCompte(utilisateur, "ecoute"))) return repondre("POST /api/vocal/ecoute", { ok: true });
   await noterEcoute(story.id, ecoute.evenement, ecoute.position * 1000);
   return repondre("POST /api/vocal/ecoute", { ok: true });
-}
+});
