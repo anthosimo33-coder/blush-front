@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { enProduction, surVercel } from "./drapeaux";
+import { journal } from "./journal";
 
 /*
  * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build : `next build` n’a pas
@@ -120,7 +121,7 @@ export function env(): Env {
   }
   if (surVercel() && lu.data.BLUSH_IA_FACTICE) {
     /* Ignorée, mais dite : elle n’a rien à faire sur Vercel */
-    console.warn("BLUSH_IA_FACTICE=1 sur Vercel : ignorée (le vrai modèle répond), à retirer des variables du projet");
+    journal("BLUSH_IA_FACTICE=1 sur Vercel : ignorée (le vrai modèle répond), à retirer des variables du projet", {}, "alerte");
     lu.data.BLUSH_IA_FACTICE = false;
   }
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");

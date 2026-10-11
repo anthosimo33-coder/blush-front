@@ -22,6 +22,7 @@ import { aujourdhuiParis } from "./temps";
 import type { Avance } from "./ia/claude";
 import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
+import { auMieux, journalErreur } from "./journal";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
@@ -63,11 +64,16 @@ function ecrireAvance(tacheId: string): (progres: number, detail?: Tache["detail
     if (p <= ecrite || Date.now() - derniere < 1000) return;
     derniere = Date.now();
     ecrite = p;
-    void db()
-      .update(schema.tasks)
-      .set({ progress: sql`greatest(${schema.tasks.progress}, ${p})`, ...(detail === undefined ? {} : { detail }) })
-      .where(eq(schema.tasks.id, tacheId))
-      .catch(() => {});
+    /* Une jauge qui ne s’écrit pas n’arrête pas l’étape : le journal le dit */
+    void auMieux(
+      () =>
+        db()
+          .update(schema.tasks)
+          .set({ progress: sql`greatest(${schema.tasks.progress}, ${p})`, ...(detail === undefined ? {} : { detail }) })
+          .where(eq(schema.tasks.id, tacheId)),
+      "avancée de la tâche non écrite",
+      { tache: tacheId },
+    );
   };
 }
 const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
@@ -194,8 +200,10 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
    * Le vocal s’écrit en même temps, sur le plan : il est prêt avant les chapitres. Son échec n’arrête pas le rapport
    * (la tâche « vocal », planifiée après, le refera).
    */
-  const enParallele = vocal(story, { verdict: v.sortie, rapport: { plan }, lignes: choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), sobre: false }).catch((e) =>
-    console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache ? e.message : (e as Error).name}`),
+  const enParallele = auMieux(
+    vocal(story, { verdict: v.sortie, rapport: { plan }, lignes: choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), sobre: false }),
+    "vocal pendant l’écriture",
+    { histoire: story.id },
   );
   /*
    * Les chapitres sont gardés dès qu’ils sont écrits, sans attendre le vocal : une voix lente ne fait plus perdre (et
@@ -260,7 +268,7 @@ async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre:
     const base = env().BLUSH_URL;
     await envoyerMail(u.email, mailRapport({ base, lien: `${base}/ouvrir/${story.id}`, chapitres: donnees.chapitres.length, lecture: donnees.lecture.full, autre, sobre: !!donnees.sobre }));
   } catch (e) {
-    console.error(`mail du rapport non envoyé (${story.id}) :`, e instanceof Error ? e.message : "erreur");
+    journalErreur("mail du rapport non envoyé", e, { histoire: story.id });
   }
 }
 

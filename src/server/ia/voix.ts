@@ -94,7 +94,7 @@ export function voixDisponible(): boolean {
  */
 export class ErreurVoix extends Error {
   constructor(readonly code: `voix_${string}`) {
-    /* Le message est le code : les logs du chat et du rapport le lisent (e.message), jamais rien d’autre */
+    /* Le message est le code ; le journal du chat et du rapport n’en lit que `code` (journalErreur), jamais le message */
     super(code);
     this.name = "ErreurVoix";
   }

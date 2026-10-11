@@ -4,7 +4,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { boiteAMails, env } from "./env";
 import { delaiAppel } from "./echeance";
-import { auMieux, journal } from "./journal";
+import { auMieux, enLocal, journal } from "./journal";
 import { dansLeQuotaDesMails, rendreAuQuotaDesMails, type SorteDeMail } from "./limites";
 import { mailCode } from "./mail-code";
 import type { Mail } from "./marque";
@@ -62,7 +62,7 @@ export async function envoyerMail(destinataires: string | string[], mail: Mail, 
   }
   const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM } = env();
   if (!RESEND_API_KEY) {
-    console.log(`[dev] mail « ${mail.sujet} » pour ${pour.join(", ")}`);
+    enLocal(`[dev] mail « ${mail.sujet} » pour ${pour.join(", ")}`);
     return true;
   }
   /* Chaque destinataire compte pour le prestataire */
@@ -90,7 +90,7 @@ export async function envoyerCodeParEmail(email: string, code: string): Promise<
   const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM, BLUSH_EMAIL_FROM_CODES } = env();
   const cle = RESEND_API_KEY_CODES ?? RESEND_API_KEY;
   if (!cle) {
-    console.log(`[dev] code de connexion pour ${email} : ${code}`);
+    enLocal(`[dev] code de connexion pour ${email} : ${code}`);
     return;
   }
   /* Leur part du quota se compte avant (LIMITES.mailsCodeParJour, src/server/auth.ts : envoyerCode) */

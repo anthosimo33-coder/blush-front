@@ -6,6 +6,7 @@ import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies
 import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
 import { erreur, lireCorps, repondre } from "@/server/http";
+import { journalErreur } from "@/server/journal";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
@@ -55,8 +56,8 @@ export async function POST(req: Request) {
       /* Le mail de la liste suit le même rythme qu’un code : pas un par demande */
       if (code) await inscrire(email, "connexion", { convEffacee: !!conv });
     } catch (e) {
-      /* Le message d’une erreur SQL peut contenir l’email : seul son nom va aux logs, et rien de lui à l’alerte */
-      console.error("code de connexion : la demande n’a pas abouti après la réponse", (e as Error).name);
+      /* Le message d’une erreur SQL peut contenir l’email : seuls son nom et son code vont au journal, et rien d’elle à l’alerte */
+      journalErreur("code de connexion : la demande n’a pas abouti après la réponse", e);
       /* L’invité lit « regarde tes mails » et n’en reçoit aucun : l’équipe le sait */
       if (invite) await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", "Erreur : la base"]);
     }

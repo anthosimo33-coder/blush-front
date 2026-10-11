@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cookieSecurise } from "./cookies";
 import { db, schema } from "./db";
+import { auMieux } from "./journal";
 
 /*
  * Les compteurs du tableau de bord : un nom, un jour (heure de Paris), un nombre. Rien d’autre : ni contenu,
@@ -27,15 +28,17 @@ export const CLES = {
 } as const;
 export type Cle = (typeof CLES)[keyof typeof CLES];
 
+/** Compte un passage ; un échec laisse une ligne au journal (le nom de l’erreur, jamais son message), sans rien faire échouer. */
 export async function compter(cle: Cle): Promise<void> {
-  try {
-    await db()
-      .insert(schema.counters)
-      .values({ day: sql`(now() at time zone 'Europe/Paris')::date`, key: cle, count: 1 })
-      .onConflictDoUpdate({ target: [schema.counters.day, schema.counters.key], set: { count: sql`${schema.counters.count} + 1` } });
-  } catch (e) {
-    console.error(`compteur ${cle} non noté :`, e instanceof Error ? e.message : "erreur");
-  }
+  await auMieux(
+    () =>
+      db()
+        .insert(schema.counters)
+        .values({ day: sql`(now() at time zone 'Europe/Paris')::date`, key: cle, count: 1 })
+        .onConflictDoUpdate({ target: [schema.counters.day, schema.counters.key], set: { count: sql`${schema.counters.count} + 1` } }),
+    "compteur non noté",
+    { cle },
+  );
 }
 
 /** Les robots qui ouvrent un lien pour en dessiner l’aperçu (WhatsApp, iMessage, Slack…) : pas des visites. */

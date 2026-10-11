@@ -8,7 +8,7 @@ import { alerter } from "../alertes";
 import { controlerBudget, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
-import { journal } from "../journal";
+import { journal, journalErreur } from "../journal";
 import { fournisseurFactice, iaFactice, prestataireFactice, REFUS_FACTICE, type RequeteFactice } from "./factice";
 import { noterCout } from "./usage";
 import { TEXTES } from "./textes.generated";
@@ -197,15 +197,18 @@ function parametres(req: Requete, schema: z.ZodType) {
 
 /**
  * Ce qui s’écrit pendant un appel en flux, rendu à `surAvance` à chaque morceau. Un repli sur un autre modèle repart de
- * zéro, la jauge aussi. Le suivi ne doit jamais faire échouer la réponse : une erreur de `surAvance` est ignorée.
+ * zéro, la jauge aussi. Le suivi ne doit jamais faire échouer la réponse : une erreur de `surAvance` est passée, et
+ * dite au journal une fois par appel (elle reviendrait à chaque morceau).
  */
 function suivreFlux(surAvance: (a: Avance) => void): Ecoute {
   let a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
+  let dite = false;
   const suivre = () => {
     try {
       surAvance({ ...a });
-    } catch {
-      /* rien */
+    } catch (e) {
+      if (!dite) journalErreur("suivi de l’avance en erreur", e);
+      dite = true;
     }
   };
   return {

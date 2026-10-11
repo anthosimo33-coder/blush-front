@@ -5,7 +5,8 @@ import { champsDErreur, ligneDuJournal, type Champs } from "@/lib/tracer";
  * Le journal du serveur : une ligne JSON par événement, dans les logs de Vercel (la sortie de la fonction). Un nom
  * d’événement, puis des champs courts : des codes, des identifiants, des nombres. Jamais de contenu : ni la conv, ni un
  * email, ni le message d’une erreur (champsDErreur, src/lib/tracer.ts, n’en garde que le nom et le code).
- * Le lot 7 y fera passer les console.* qui restent (et la règle no-console).
+ * Tout le serveur écrit par ici : la règle no-console (eslint.config.mjs) n’y laisse la console qu’à ce fichier et à
+ * src/lib/tracer.ts (le navigateur). Pour le nom d’une erreur dans un code : nomErreur (src/lib/tracer.ts).
  */
 
 /** info : ce qui s’est passé ; alerte : ce qui mérite un coup d’œil (un repli, un refus du modèle) ; erreur : ce qui a échoué. */
@@ -38,4 +39,14 @@ export async function auMieux(travail: Promise<unknown> | (() => Promise<unknown
   } catch (e) {
     journalErreur(evenement, e, champs);
   }
+}
+
+/**
+ * En local seulement, ce que le développeur lit en clair dans le terminal du serveur, à la place d’un mail que rien
+ * n’envoie (sans clé de Resend ni boîte des tests) : le code de connexion, le sujet d’un mail, une alerte à l’équipe.
+ * Pas une ligne du journal : un texte libre, que les tests lisent tel quel (console.log). Jamais en ligne : env() y
+ * exige RESEND_API_KEY (seuls le dev et les tests s’en passent).
+ */
+export function enLocal(texte: string): void {
+  console.log(texte);
 }

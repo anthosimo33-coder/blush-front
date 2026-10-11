@@ -66,6 +66,16 @@ const PAR_LE_DEPOT_DYNAMIQUE = [dynamique(PAR_LE_DEPOT[0].regex, PAR_LE_DEPOT_ME
 const CONTRAT_MESSAGE = "Hors du serveur (src/server, les routes /api), le contrat (src/types/api.ts) ne s’importe qu’en `import type` : ses schémas zod n’entrent pas dans les pages.";
 const CONTRAT = { regex: `${versSrc("types/api")}$`, allowTypeImports: true, message: CONTRAT_MESSAGE };
 const CONTRAT_DYNAMIQUE = dynamique(CONTRAT.regex, CONTRAT_MESSAGE);
+/*
+ * Une valeur levée peut être n’importe quoi (une chaîne, null) : `(e as Error).name` le cache, et `.catch((e: Error) =>`
+ * aussi. Son nom se lit par nomErreur (src/lib/tracer.ts), une erreur s’écrit au journal par journalErreur ou auMieux
+ * (src/server/journal.ts), qui n’en gardent que le nom et le code.
+ */
+const ERREUR_SUPPOSEE_MESSAGE = "Une valeur levée n’est pas forcément une Error : nomErreur(e) (src/lib/tracer.ts), ou journalErreur / auMieux (src/server/journal.ts).";
+const PAS_D_ERREUR_SUPPOSEE = [
+  { selector: "TSAsExpression > TSTypeReference.typeAnnotation > Identifier[name='Error']", message: ERREUR_SUPPOSEE_MESSAGE },
+  { selector: "CallExpression[callee.property.name='catch'] > :function > Identifier.params > TSTypeAnnotation > TSTypeReference > Identifier[name='Error']", message: ERREUR_SUPPOSEE_MESSAGE },
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -92,20 +102,21 @@ const eslintConfig = defineConfig([
     rules: { "no-restricted-imports": ["error", { patterns: [PAS_DE_MOCKS, PAS_D_APERCU] }] },
   },
   // Une variable CSS sans `as CSSProperties` (PAS_DE_CAST_CSS), la configuration lue à ses deux seuls endroits
-  // (PAS_DE_PROCESS_ENV), et ni chiffrement.ts ni le contrat par import() (CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE) ;
+  // (PAS_DE_PROCESS_ENV), une valeur levée jamais supposée Error (PAS_D_ERREUR_SUPPOSEE), et ni chiffrement.ts ni le
+  // contrat par import() (CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE) ;
   // dans src/app, ni la base ni drizzle-orm par import() non plus (PAR_LE_DEPOT_DYNAMIQUE). Les blocs suivants
   // reprennent ces sélecteurs : un bloc qui redonne no-restricted-syntax remplace toute sa liste.
   {
     files: ["src/**/*.tsx", "src/**/*.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, ...PAS_D_ERREUR_SUPPOSEE, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
   },
   {
     files: ["src/app/**/*.{ts,tsx}"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, ...PAR_LE_DEPOT_DYNAMIQUE] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, ...PAS_D_ERREUR_SUPPOSEE, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, ...PAR_LE_DEPOT_DYNAMIQUE] },
   },
   {
     files: ["src/server/env.ts", "src/server/drapeaux.ts"],
-    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
+    rules: { "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_D_ERREUR_SUPPOSEE, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE] },
   },
   // Le contrat ne s’importe qu’en `import type` hors du serveur (CONTRAT) ; le bloc suivant, le navigateur, le reprend.
   {
@@ -130,7 +141,7 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: [{ regex: `${versSrc("server")}(/|$)`, allowTypeImports: true, message: NAVIGATEUR_SANS_SERVEUR }, CONTRAT] }],
       /* Dans src/app, drizzle-orm par import() aussi : la base, elle, est déjà du serveur */
-      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, DRIZZLE_DYNAMIQUE, dynamique(versSrc("server"), NAVIGATEUR_SANS_SERVEUR)],
+      "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, ...PAS_D_ERREUR_SUPPOSEE, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, DRIZZLE_DYNAMIQUE, dynamique(versSrc("server"), NAVIGATEUR_SANS_SERVEUR)],
     },
   },
   // Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts.
@@ -155,6 +166,14 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": ["error", { patterns: [{ regex: "^@/", message: "prompts/lib est un sous-module à part : il n’importe rien de l’appli (src)." }] }],
     },
+  },
+  // Pas de console dans src : le serveur écrit au journal (journal, journalErreur, auMieux ; enLocal pour ce que le
+  // développeur lit en local, src/server/journal.ts), le navigateur par tracer (src/lib/tracer.ts). Ces deux fichiers
+  // seuls écrivent dans la console. Les aperçus (src/app/apercu, jamais en ligne), scripts/ et tests/ restent libres.
+  {
+    files: ["src/**/*.{ts,tsx,js,mjs}"],
+    ignores: ["src/app/apercu/**", "src/server/journal.ts", "src/lib/tracer.ts"],
+    rules: { "no-console": "error" },
   },
   // Les promesses du serveur : une promesse oubliée (ni attendue, ni `void`) échoue sans que personne le voie.
   // Avertissements pour l’instant, des erreurs au lot 3. Ces règles lisent les types (projectService) : seulement ici.

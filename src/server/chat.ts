@@ -19,7 +19,8 @@ import { editionsBornees, type DonneesMemoire } from "./stockage/types";
 import { appelVerifie } from "./ia/appel-verifie";
 import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
-import { dire, ErreurVoix, voixDisponible, voixPour } from "./ia/voix";
+import { dire, voixDisponible, voixPour } from "./ia/voix";
+import { journal, journalErreur } from "./journal";
 import { planifier } from "./taches";
 import { aujourdhuiParis } from "./temps";
 
@@ -67,7 +68,8 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
       .returning({ id: schema.chatVocals.id });
     return { audio: `/api/vocal/chat/${v.id}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
   } catch (e) {
-    console.error(`chat en vocal : ${e instanceof ErreurVoix ? e.message : (e as Error).name}`);
+    /* Le code d’une ErreurVoix (« voix_429 »), ou le nom d’une autre erreur : jamais son message */
+    journalErreur("chat en vocal : la voix n’est pas partie", e, { histoire: story.id });
     return null;
   }
 }
@@ -174,7 +176,7 @@ export async function repondre(
 
   /* Le garde-fou : une réponse qui recopie les prompts est remplacée */
   const fuite = recopieLesPrompts(texteDe(sortie), textesSysteme);
-  if (fuite) console.warn(`garde-fou : réponse remplacée (histoire ${story.id})`);
+  if (fuite) journal("garde-fou : réponse remplacée", { histoire: story.id }, "alerte");
   const avant = memoire.etat.niveau?.niveau ?? null;
   /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
   const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;

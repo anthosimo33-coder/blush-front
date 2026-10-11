@@ -4,7 +4,7 @@ import { db, schema } from "./db";
 import type { Genre, StatutTache } from "./db/enums";
 import { env } from "./env";
 import { envoyerMail } from "./email";
-import { journal, journalErreur } from "./journal";
+import { enLocal, journal, journalErreur } from "./journal";
 import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
 import { statsVocal } from "./vocal";
 import { NOMS_VOIX } from "./ia/voix";
@@ -20,7 +20,7 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
   if (!BLUSH_ALERTES.length) return;
   if (!RESEND_API_KEY) {
     /* En local : l’alerte s’écrit dans le terminal du serveur de dev, en clair, pour qu’on la lise */
-    console.log(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
+    enLocal(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
   }
   /* Dans le quota du prestataire, une alerte passe avant la liste d’attente, après les rapports (QUOTA_MAILS) */

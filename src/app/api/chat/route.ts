@@ -9,6 +9,7 @@ import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/histoires";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, signalerErreur } from "@/server/http";
 import { lireVocal, transcrire } from "@/server/ia/transcription";
+import { auMieux } from "@/server/journal";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
@@ -88,32 +89,33 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
     }
     sortie = null;
   };
-  const fin = travail(emettre).then(
-    async (r) => {
-      ouvrir(true);
-      fermer();
-      if (r.majMemoire) await executerChaine(storyId);
-    },
-    async (e: unknown) => {
-      /* Rien n’est parti : la route répond l’erreur elle-même (voir traiter) */
-      if (!parti) {
-        echec = e;
-        return ouvrir(false);
-      }
-      /*
-       * La même traduction que la réponse d’un bloc (codeDErreur) ; le flux ne porte que les codes d’une étape
-       * (EvenementChat) : une erreur publique levée après la première bulle y devient une panne
-       */
-      emettre({ erreur: codePublic(codeDErreur(e)) });
-      fermer();
-      await signalerErreur(e, alerteDuChat(storyId));
-    },
+  /* Une erreur après la réponse (la mise à jour de la mémoire, son signalement) laisse une ligne au journal : `fin` ne rejette jamais */
+  const fin = auMieux(
+    travail(emettre).then(
+      async (r) => {
+        ouvrir(true);
+        fermer();
+        if (r.majMemoire) await executerChaine(storyId);
+      },
+      async (e: unknown) => {
+        /* Rien n’est parti : la route répond l’erreur elle-même (voir traiter) */
+        if (!parti) {
+          echec = e;
+          return ouvrir(false);
+        }
+        /*
+         * La même traduction que la réponse d’un bloc (codeDErreur) ; le flux ne porte que les codes d’une étape
+         * (EvenementChat) : une erreur publique levée après la première bulle y devient une panne
+         */
+        emettre({ erreur: codePublic(codeDErreur(e)) });
+        fermer();
+        await signalerErreur(e, alerteDuChat(storyId));
+      },
+    ),
+    "chat : la suite de la réponse a échoué",
+    { histoire: storyId },
   );
-  /*
-   * La fonction reste en vie jusqu’au bout du travail, même si la réponse est partie (ou que plus personne ne la lit).
-   * Une erreur de la mise à jour de la mémoire est signalée par after, pas comme une promesse oubliée en attendant
-   */
-  fin.catch(() => {});
+  /* La fonction reste en vie jusqu’au bout du travail, même si la réponse est partie (ou que plus personne ne la lit) */
   after(() => fin);
   if (!(await ouverte)) {
     fermer();
@@ -166,7 +168,7 @@ async function traiter(req: Request) {
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
       const r = await blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal });
-      if (r.majMemoire) after(() => executerChaine(story.id));
+      if (r.majMemoire) after(() => auMieux(() => executerChaine(story.id), "chat : la mise à jour de la mémoire a échoué", { histoire: story.id }));
       return repondre("POST /api/chat", r.reponse);
     }
     /* Le suivi des coûts attend la fin de la réponse */

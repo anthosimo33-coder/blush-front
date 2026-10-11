@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { peut } from "@/lib/acces";
+import { nomErreur } from "@/lib/tracer";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -257,7 +258,7 @@ async function executer(t: Tache): Promise<Issue> {
       await suspendre(t, "voix_budget");
       return "reportee";
     }
-    const code = e instanceof ErreurTache ? e.code : `erreur:${(e as Error).name}`;
+    const code = e instanceof ErreurTache ? e.code : `erreur:${nomErreur(e)}`;
     /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche (le nom d’une erreur imprévue, jamais son message) */
     if (e instanceof ErreurTache) journal("tâche en échec", { genre: t.kind, tache: t.id, code }, "erreur");
     else journalErreur("tâche en échec", e, { genre: t.kind, tache: t.id });

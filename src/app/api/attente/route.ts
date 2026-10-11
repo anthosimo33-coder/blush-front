@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { Email } from "@/server/auth";
 import { inscrire } from "@/server/attente";
 import { erreur, lireCorps, repondre } from "@/server/http";
+import { auMieux } from "@/server/journal";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { ROUTES } from "@/types/api";
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   if (!lu) return erreur("email");
   const { email } = lu;
   if (!(await sousLaLimiteDeLIp(req, "attente", LIMITES.attenteParIp))) return erreur("trop");
-  /* Après la réponse : un mail qui ne part pas ne change pas ce qu’elle dit, ni son temps */
-  after(() => inscrire(email, "accueil").catch((e: Error) => console.error("liste d’attente : l’inscription ou son mail n’est pas passé", e.name)));
+  /* Après la réponse : un mail qui ne part pas ne change pas ce qu’elle dit, ni son temps (le journal le dit, sans l’email) */
+  after(() => auMieux(() => inscrire(email, "accueil"), "liste d’attente : l’inscription ou son mail n’est pas passé"));
   return repondre("POST /api/attente", { ok: true });
 }

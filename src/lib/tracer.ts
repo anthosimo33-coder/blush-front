@@ -15,8 +15,11 @@ const CODE_SUR = /^[\w:.-]{1,60}$/;
 /** Une empreinte de Next : des chiffres, suivis du code de l’erreur de Next quand elle en a un (« 2345678901@E394 »). */
 const DIGEST_SUR = /^[\w@:.-]{1,60}$/;
 
-/** Le nom d’une erreur (« TypeError », « DrizzleQueryError ») ; pour ce qui n’en est pas une, son type. */
-const nomDe = (e: unknown): string => (e instanceof Error ? e.name : e === null ? "null" : typeof e);
+/**
+ * Le nom d’une erreur (« TypeError », « DrizzleQueryError ») ; pour ce qui n’en est pas une (une chaîne levée, null),
+ * son type. À la place d’un `(e as Error).name`, qui ment quand la valeur levée n’est pas une Error.
+ */
+export const nomErreur = (e: unknown): string => (e instanceof Error ? e.name : e === null ? "null" : typeof e);
 
 /** Le champ `cle` de `e`, s’il est un code sûr à écrire. */
 function codeSur(e: unknown, cle: "code" | "digest"): string | undefined {
@@ -34,10 +37,10 @@ function codeSur(e: unknown, cle: "code" | "digest"): string | undefined {
 export function champsDErreur(e: unknown): Champs {
   const cause = e instanceof Error ? e.cause : undefined;
   return {
-    erreur: nomDe(e),
+    erreur: nomErreur(e),
     code: codeSur(e, "code"),
     digest: codeSur(e, "digest"),
-    ...(cause === undefined ? {} : { cause: nomDe(cause), codeCause: codeSur(cause, "code") }),
+    ...(cause === undefined ? {} : { cause: nomErreur(cause), codeCause: codeSur(cause, "code") }),
   };
 }
 

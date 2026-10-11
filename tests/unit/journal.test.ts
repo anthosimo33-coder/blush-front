@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { champsDErreur, ligneDuJournal, tracer } from "@/lib/tracer";
+import { champsDErreur, ligneDuJournal, nomErreur, tracer } from "@/lib/tracer";
 import { ErreurTache } from "@/server/erreurs";
-import { auMieux, journal, journalErreur } from "@/server/journal";
+import { auMieux, enLocal, journal, journalErreur } from "@/server/journal";
 
 /* Le journal du serveur (src/server/journal.ts) et la trace du navigateur (src/lib/tracer.ts) : des lignes JSON, jamais de contenu */
 
@@ -31,6 +31,14 @@ describe("ce qu’on garde d’une erreur", () => {
     expect(champsDErreur(Object.assign(new Error("x"), { code: "un texte avec des espaces" })).code).toBeUndefined();
     expect(champsDErreur("une chaîne")).toEqual({ erreur: "string", code: undefined, digest: undefined });
     expect(champsDErreur(null).erreur).toBe("null");
+  });
+
+  it("nomErreur : le nom d’une erreur, le type de ce qui n’en est pas une (là où `(e as Error).name` donnait undefined)", () => {
+    expect(nomErreur(erreurSql())).toBe("DrizzleQueryError");
+    expect(nomErreur(new ErreurTache("delai"))).toBe("Error");
+    expect(nomErreur("une chaîne")).toBe("string");
+    expect(nomErreur(undefined)).toBe("undefined");
+    expect(nomErreur(null)).toBe("null");
   });
 
   it("une ligne JSON : l’événement, puis des champs bornés, sans les vides", () => {
@@ -64,6 +72,14 @@ describe("le journal du serveur", () => {
       expect.objectContaining({ evenement: "battement de cœur perdu", tache: "t1", erreur: "DrizzleQueryError" }),
       expect.objectContaining({ evenement: "alerte non envoyée", erreur: "TypeError" }),
     ]);
+  });
+});
+
+describe("ce que le développeur lit en local", () => {
+  it("enLocal : le texte tel quel (console.log), pas une ligne du journal", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    enLocal("[dev] code de connexion pour lea@blush.test : 123456");
+    expect(log).toHaveBeenCalledWith("[dev] code de connexion pour lea@blush.test : 123456");
   });
 });
 

@@ -125,6 +125,27 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     }
   });
 
+  it("pas de console dans src : le serveur écrit au journal, le navigateur par tracer ; les aperçus, scripts/ et tests/ restent libres", async () => {
+    for (const chemin of ["src/server/stats.ts", "src/server/ia/voix.ts", "src/app/api/rapport/route.ts", "src/app/rapport/Essai.tsx", "src/components/ui/Essai.tsx", "src/lib/essai.ts", "src/proxy.ts"]) {
+      expect(await regles(chemin, `export const f = () => console.log("x");\n`), chemin).toEqual(["no-console"]);
+      expect(await regles(chemin, `export const f = () => console.error("x");\n`), chemin).toEqual(["no-console"]);
+    }
+    /* Le journal du serveur et la trace du navigateur sont les deux seuls à écrire dans la console */
+    for (const chemin of ["src/server/journal.ts", "src/lib/tracer.ts", "src/app/apercu/page.tsx", "scripts/essai.mjs", "tests/essai.test.ts"]) {
+      expect(await regles(chemin, `export const f = () => console.warn("x");\n`), chemin).toEqual([]);
+    }
+  });
+
+  it("une valeur levée n’est jamais supposée Error : ni `as Error`, ni `.catch((e: Error) =>` ; nomErreur et journalErreur, si", async () => {
+    for (const chemin of ["src/server/stats.ts", "src/server/env.ts", "src/app/api/rapport/route.ts", "src/app/rapport/Essai.tsx", "src/components/ui/Essai.tsx"]) {
+      expect(await regles(chemin, `export const f = (e: unknown) => (e as Error).name;\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `export const f = (p: Promise<void>) => p.catch((e: Error) => e.name);\n`), chemin).toEqual(["no-restricted-syntax"]);
+      expect(await regles(chemin, `import { nomErreur } from "@/lib/tracer";\nexport const f = (p: Promise<void>) => p.catch((e: unknown) => nomErreur(e));\n`), chemin).toEqual([]);
+    }
+    /* Une Error construite ici, ou une sous-classe nommée, passe */
+    expect(await regles("src/server/stats.ts", `export const e: Error = new Error("x");\nexport const t = e as TypeError;\n`)).toEqual([]);
+  });
+
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {
     expect(await regles("src/components/ui/Essai.tsx", `import type { CSSProperties } from "react";\nexport const s = { color: "red" } as CSSProperties;\n`)).toEqual(["no-restricted-syntax"]);
     expect(await regles("prompts/lib/essai.ts", `import { NBSP } from "@/lib/format";\nexport const x = NBSP;\n`)).toEqual(["no-restricted-imports"]);

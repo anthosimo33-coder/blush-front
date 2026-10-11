@@ -4,7 +4,7 @@ import { cleDeLimiteDuCompte } from "../email-canonique";
 import { delaiAppel } from "../echeance";
 import { env } from "../env";
 import { ErreurTache } from "../erreurs";
-import { auMieux, journal } from "../journal";
+import { auMieux, journal, journalErreur } from "../journal";
 import { compter, LIMITES, rendre } from "../limites";
 import { DUREE_VOCAL_MAX_S, lireAudio, TAILLE_VOCAL_MAX } from "./duree-audio";
 import { iaFactice } from "./factice";
@@ -83,11 +83,17 @@ export async function transcrire(
   const fd = new FormData();
   const debut = Date.now();
   let r: Response | null;
+  /* L’appel qui n’a pas abouti (le réseau, le délai) : son nom et son code iront au journal */
+  let panne: unknown;
+  const enPanne = (err: unknown) => {
+    panne = err;
+    return null;
+  };
   if (prestataire === "mistral") {
     fd.append("model", modele);
     fd.append("language", "fr");
     fd.append("file", fichier);
-    r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(() => null);
+    r = await fetch(URL_MISTRAL, { method: "POST", headers: { authorization: `Bearer ${e.MISTRAL_API_KEY}` }, body: fd, signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)) }).catch(enPanne);
   } else {
     fd.append("model_id", modele);
     fd.append("language_code", "fr");
@@ -100,12 +106,13 @@ export async function transcrire(
       headers: { "xi-api-key": e.ELEVENLABS_API_KEY! },
       body: fd,
       signal: AbortSignal.timeout(delaiAppel(DELAI_TRANSCRIPTION_MS)),
-    }).catch(() => null);
+    }).catch(enPanne);
   }
-  /* Jamais de contenu dans les logs : le statut seulement */
+  /* Jamais de contenu dans les logs : le statut, ou le nom et le code de la panne */
   if (!r?.ok) {
     if (compte) await auMieux(rendre(cleDesSecondes(compte), reservees), "secondes du vocal non rendues");
-    console.error(`transcription : échec ${r?.status ?? "réseau"}`);
+    if (r) journal("transcription en échec", { prestataire, statut: r.status }, "erreur");
+    else journalErreur("transcription en échec", panne, { prestataire, statut: "réseau" });
     throw new ErreurTache("transcription");
   }
   const corps = (await r.json()) as { text?: string; transcription_id?: string; usage?: { prompt_audio_seconds?: number }; words?: { end?: number }[] };

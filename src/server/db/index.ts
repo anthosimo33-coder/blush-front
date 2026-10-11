@@ -2,6 +2,7 @@ import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { env } from "../env";
+import { journalErreur } from "../journal";
 import * as schema from "./schema";
 
 /*
@@ -17,7 +18,7 @@ const globale = globalThis as unknown as { blushDb?: ReturnType<typeof creer> };
 function creer() {
   const pool = new Pool({ connectionString: env().DATABASE_URL, max: 5, idleTimeoutMillis: 120_000, connectionTimeoutMillis: 30_000, maxLifetimeSeconds: 1800 });
   /* Une connexion au repos que la base coupe (Neon qui se met en veille, le pooler qui redémarre) : le pool l’écarte. Sans écouteur, l’erreur ferait tomber l’instance */
-  pool.on("error", (e) => console.error("connexion à la base perdue :", e.message));
+  pool.on("error", (e) => journalErreur("connexion à la base perdue", e));
   return drizzle({ client: pool, schema });
 }
 
