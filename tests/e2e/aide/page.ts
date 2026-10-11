@@ -62,6 +62,20 @@ function suivreLesChargements(page: Page): void {
   };
 }
 
+/*
+ * Les tests se jouent sans le son de BLUSH : WebKit joue vraiment les sons de l’interface sur la machine qui lance les
+ * tests. Le réglage « Sons et vibrations » part coupé (la clé de src/lib/sound.ts), sauf s’il est déjà posé.
+ */
+export async function couperLesSons(contexte: BrowserContext): Promise<void> {
+  await contexte.addInitScript(() => {
+    try {
+      if (localStorage.getItem("blush.sons.v1") === null) localStorage.setItem("blush.sons.v1", "0");
+    } catch {
+      /* stockage indisponible : l’appli joue alors comme sur un navigateur neuf */
+    }
+  });
+}
+
 /** Toutes les pages de ce navigateur, celles d’aujourd’hui et celles qu’il ouvrira (un second onglet). */
 export function suivreLeNavigateur(contexte: BrowserContext): void {
   contexte.on("page", suivreLesChargements);
@@ -76,6 +90,7 @@ export function suivreLeNavigateur(contexte: BrowserContext): void {
 export async function nouvelAppareil(browser: Browser): Promise<Page> {
   const contexte = await browser.newContext();
   suivreLeNavigateur(contexte);
+  await couperLesSons(contexte);
   return contexte.newPage();
 }
 

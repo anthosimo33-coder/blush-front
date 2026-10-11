@@ -140,22 +140,27 @@ test("BLUSH+ : la pause seulement, sans « Arrêter BLUSH+ » tant que le paieme
   await expect(page.getByText(/Arrêter BLUSH\+|effectif lundi/)).toHaveCount(0);
 });
 
-test("Sons et vibrations : coupés d’un toucher, et toujours coupés au retour sur la page", async ({ page }, testInfo) => {
-  const email = emailLibre(testInfo, "sons");
-  await connecterParApi(page, testInfo, email);
-  await ouvrir(page, "/compte");
-  const sons = page.getByRole("main").getByRole("region", { name: "L’app" }).getByRole("switch", { name: "Sons et vibrations" });
+test.describe("Sons et vibrations", () => {
+  /* Ce test parle du réglage lui-même : il part de celui d’un navigateur neuf, sons allumés */
+  test.use({ sonsAuDepart: true });
 
-  await expect(sons).toBeChecked();
-  await sons.click();
-  await expect(sons).not.toBeChecked();
-  /* Le réglage est gardé sur cet appareil : la page rechargée le relit */
-  await ouvrir(page);
-  await expect(sons).not.toBeChecked();
-  await sons.click();
-  await expect(sons).toBeChecked();
-  await ouvrir(page);
-  await expect(sons).toBeChecked();
+  test("Sons et vibrations : coupés d’un toucher, et toujours coupés au retour sur la page", async ({ page }, testInfo) => {
+    const email = emailLibre(testInfo, "sons");
+    await connecterParApi(page, testInfo, email);
+    await ouvrir(page, "/compte");
+    const sons = page.getByRole("main").getByRole("region", { name: "L’app" }).getByRole("switch", { name: "Sons et vibrations" });
+
+    await expect(sons).toBeChecked();
+    await sons.click();
+    await expect(sons).not.toBeChecked();
+    /* Le réglage est gardé sur cet appareil : la page rechargée le relit */
+    await ouvrir(page);
+    await expect(sons).not.toBeChecked();
+    await sons.click();
+    await expect(sons).toBeChecked();
+    await ouvrir(page);
+    await expect(sons).toBeChecked();
+  });
 });
 
 test("supprimer l’histoire ouverte : Annuler n’efface rien ; confirmé, l’histoire part avec son lien public, et le compte reste", async ({ page }, testInfo) => {

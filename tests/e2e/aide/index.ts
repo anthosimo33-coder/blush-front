@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { test as base, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
-import { nouvelAppareil, suivreLeNavigateur } from "./page";
+import { couperLesSons, nouvelAppareil, suivreLeNavigateur } from "./page";
 
 /*
  * Tout ce que les tests de bout en bout importent, d’ici seulement : `test` et `expect` de Playwright (avec l’IP propre à
@@ -19,7 +19,9 @@ function ipDuTest(testInfo: TestInfo): string {
 }
 
 /* Le second argument d’une fixture s’appelle `fournir` ici : nommé `use`, la règle des hooks React le prend pour un hook */
-export const test = base.extend<{ autreAppareil: () => Promise<Page> }>({
+export const test = base.extend<{ autreAppareil: () => Promise<Page>; sonsAuDepart: boolean }>({
+  /* Sans le son de BLUSH par défaut (aide/page.ts, couperLesSons) ; un test sur le réglage lui-même : test.use({ sonsAuDepart: true }) */
+  sonsAuDepart: [false, { option: true }],
   /*
    * Chaque requête du test (la page, ses fetch, `request`, et les navigateurs ouverts par browser.newContext) porte son IP
    * dans x-forwarded-for, que le serveur lit (ipDe)
@@ -28,8 +30,9 @@ export const test = base.extend<{ autreAppareil: () => Promise<Page> }>({
     await fournir({ ...extraHTTPHeaders, "x-forwarded-for": ipDuTest(testInfo) });
   },
   /* Chaque page du navigateur du test attend d’être vivante après un chargement (aide/page.ts) */
-  context: async ({ context }, fournir) => {
+  context: async ({ context, sonsAuDepart }, fournir) => {
     suivreLeNavigateur(context);
+    if (!sonsAuDepart) await couperLesSons(context);
     await fournir(context);
   },
   /*
