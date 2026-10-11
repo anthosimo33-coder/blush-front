@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CONV_MAX, detecterFormat, estLigneMessage, idDeLigne, lire, MESSAGE_MAX, participantsDe, rendre, type Histoire } from "@prompts/lib/conv";
+import { CONV_MAX, detecterFormat, lire, MESSAGE_MAX, participantsDe, rendre, type Histoire } from "@prompts/lib/conv";
+import { estLigneMessage, idDeLigne } from "@prompts/lib/ligne";
 
 /* Deux prénoms inventés, et l’heure de chaque message : le 13 octobre 2023 à 9 h, puis toutes les 47 minutes */
 const debut = Date.UTC(2023, 9, 13, 9, 0, 0);

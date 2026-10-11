@@ -102,6 +102,13 @@ describe("les lignes de la conv, à l’octet", () => {
     expect(suivant.n).toBe(10001);
   });
 
+  it("la mémoire : un message ajouté sur plusieurs lignes reste une ligne (« ⏎ », comme dans la conv)", () => {
+    const lignes = new Map<string, string>();
+    const nouveau = rendreNouveau({ date: "2024-02-21", messages: [{ qui: "autre", quand: "2024-02-21 10:09", texte: "a\nb" }] }, h, lignes, { n: 12 });
+    expect(nouveau).toBe('<nouveau date="2024-02-21 mer.">\nmessages ajoutés à la conv, par capture :\nm0012 2024-02-21 mer. 10:09 Inès : a ⏎ b\n</nouveau>');
+    expect(lignes.get("m0012")).toBe("m0012 2024-02-21 mer. 10:09 Inès : a ⏎ b");
+  });
+
   it("les preuves affichées et les sources de sa fiche", () => {
     const r = rendre(h, lire(texte, h, { autresEnTexte: true }));
     const lignes = new Map([...r.lignes, ["m0401", "m0401 2024-02-20 mar. --:-- profil de Inès : 24 ans ⏎ étudiante"]]);
@@ -155,6 +162,25 @@ describe("lib/ligne.ts : écrire une ligne, la relire", () => {
     expect(estLigneProfil(ligneProfil("m0900", "2026-03-15", "Sophie", "24 ans"))).toBe(true);
     expect(estLigneProfil("m0901 2026-03-15 dim. 10:00 Hugo : regarde sa bio --:-- profil de Sophie : 24 ans")).toBe(false);
     expect(estLigneProfil("m0902 2026-03-15 dim. --:-- Sophie : on se voit ?")).toBe(false);
+    /* Une seule règle : un profil n’a pas d’heure, une ligne qui en a une est un message, quel que soit son nom */
+    expect(lireLigne("m0903 2026-03-15 dim. 10:00 profil de Sophie : salut")?.profil).toBe(false);
+    expect(estLigneProfil("m0903 2026-03-15 dim. 10:00 profil de Sophie : salut")).toBe(false);
+  });
+
+  it("un profil dont le texte a un « \\r » seul ou un U+2028 (une bio lue sur une capture) reste un profil, relu tel quel", () => {
+    for (const bio of ["bio\u2028deux", "bio\rdeux", "bio\u2029deux"]) {
+      const l = ligneProfil("m0900", "2026-03-15", "Sophie", bio);
+      expect(estLigneProfil(l)).toBe(true);
+      expect(lireLigne(l)).toMatchObject({ nom: "profil de Sophie", texte: bio, profil: true });
+    }
+  });
+
+  it("une ligne forgée (« : » des milliers de fois, puis un U+2028) se relit, en temps linéaire", () => {
+    const l = ligneMessage({ id: "m0001", jour: "2026-01-01", heure: "10:00", nom: "Léa", texte: `${"a : ".repeat(10_000)}\u2028` });
+    const t0 = performance.now();
+    for (let i = 0; i < 20; i++) expect(lireLigne(l)?.nom).toBe("Léa");
+    /* En temps quadratique, ces 20 lectures prenaient des secondes */
+    expect(performance.now() - t0).toBeLessThan(500);
   });
 
   it("idDeLigne et parIdentifiant : la banque des preuves", () => {

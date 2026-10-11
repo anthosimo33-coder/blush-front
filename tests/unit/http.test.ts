@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ErreurAjout } from "@/server/ajouts";
 import { ErreurCaptures, LectureRefusee } from "@/server/captures";
 import { ErreurPublique, ErreurTache } from "@/server/erreurs";
-import { ErreurImport } from "@/server/histoires";
+import { ErreurImport } from "@/server/import";
 import { codeDErreur, memeOrigine, reponseAudio, reponseErreur } from "@/server/http";
 import { groupeIp, ipDe } from "@/server/limites";
 import { ErreurPartage } from "@/server/partages";

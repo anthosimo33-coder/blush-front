@@ -1,10 +1,11 @@
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
+import { messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import type { ExportLu } from "@prompts/lib/export";
+import { lireLigne } from "@prompts/lib/ligne";
 import type { Echange } from "@prompts/lib/memoire";
 import { Sortie01 } from "@prompts/lib/schemas";
 import type { Fiche, FicheUpdate } from "@/types";
@@ -97,7 +98,10 @@ export function resumeAjout(a: Ajout, source: "captures" | "export", n: number):
 }
 
 /** Ce qu’on a lu sur son profil, tel quel : la fin des lignes « profil de … » de l’ajout. */
-const profilLu = (a: Ajout) => a.lignes.filter(estLigneProfil).map((l) => l.replace(/^.*? --:-- profil de [^:]+ : /, "").replaceAll(" ⏎ ", " "));
+const profilLu = (a: Ajout) => a.lignes.flatMap((l) => {
+  const lue = lireLigne(l);
+  return lue?.profil ? [lue.texte.replaceAll(" ⏎ ", " ")] : [];
+});
 
 /**
  * Pour sa fiche : on répond tout de suite avec ce qui a été lu (son profil, le nombre de nouveaux messages), et la

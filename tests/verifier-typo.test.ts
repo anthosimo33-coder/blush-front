@@ -80,6 +80,7 @@ describe("la vérification de la typographie", () => {
     expect(regleDesInsecables("src/server/alertes.ts")).toBe(false);
     expect(regleDesInsecables("src/server/ia/factice.ts")).toBe(false);
     expect(regleDesInsecables("tests/e2e/aide/exports.ts")).toBe(false);
+    expect(regleDesInsecables("prompts/lib/conv.ts")).toBe(false);
     expect(problemesDe("tests/essai.test.ts", `const a = "une question ?";`, { insecables: false })).toEqual([]);
   });
 });

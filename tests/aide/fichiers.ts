@@ -16,7 +16,7 @@ export const texteDeConv = (nom: string) => readFileSync(`${CONVS}/${nom}`, "utf
 /** Une conv des évals en fichier, octet pour octet, comme l’envoie le navigateur (un export WhatsApp en .txt). */
 export const convDeTest = (nom: string) => new File([readFileSync(`${CONVS}/${nom}`)], nom, { type: "text/plain" });
 
-/* Le paquet de src/services/preparer-export.ts, vérifié comme le relit le serveur (Paquet, src/server/histoires.ts) */
+/* Le paquet de src/services/preparer-export.ts, vérifié comme le relit le serveur (Paquet, src/server/import.ts) */
 const Paquet = z.object({ nom: z.string(), parties: z.array(z.object({ nom: z.string(), contenu: z.string() })), coupe: z.boolean().optional() });
 
 /** Le paquet préparé par le navigateur (du JSON compressé), relu et vérifié : ses fichiers, et s’il a été coupé. */

@@ -215,6 +215,26 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
   });
 });
 
+describe("S-12 · un enregistrement d’écran : des lots de 300 messages au plus", () => {
+  /* Un lot d’un seul bloc de `n` messages, alternés */
+  const lot = (n: number) => {
+    const l = lotVideo("Léa");
+    const [autre, moi] = l.blocs[0].messages;
+    return { ...l, blocs: [{ ...l.blocs[0], messages: Array.from({ length: n }, (_, k) => ({ ...(k % 2 ? moi : autre), texte: `message ${k}` })) }] };
+  };
+  const envoyer = (n: number) => postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot(n)] }) }));
+
+  it("301 messages dans un lot : refusé ; 300 : la conv est lue", async () => {
+    etat.fermee = false;
+    etat.cookies.set(SESSION, secretSession);
+    expect((await envoyer(301)).status).toBe(422);
+    const bon = await envoyer(300);
+    expect(bon.status).toBe(200);
+    const { story } = (await bon.json()) as { story: { id: string } };
+    await db().delete(schema.stories).where(eq(schema.stories.id, story.id));
+  });
+});
+
 describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées ne grossit plus sans fin", () => {
   /* Une mémoire dont la fiche a une info, celle que la correction retire */
   const etatMemoire = memoire({

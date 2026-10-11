@@ -24,10 +24,12 @@ const norm = (t: string) =>
  * à leur début ; un bout coupé en haut de l’écran qu’on n’y retrouve pas est sauté en tête de lot (recouvrement).
  */
 const COMPARES = 300;
+/* Le texte brut lu pour en tirer COMPARES caractères normalisés : la normalisation retire la ponctuation, les espaces et les accents, un texte brut quatre fois plus long suffit à en garder 300 */
+const BRUTS_LUS = COMPARES * 4;
 const CLES = new WeakMap<Msg, string>();
 function cle(m: Msg): string {
   let c = CLES.get(m);
-  if (c === undefined) CLES.set(m, (c = norm(m.texte.slice(0, COMPARES * 4)).slice(0, COMPARES)));
+  if (c === undefined) CLES.set(m, (c = norm(m.texte.slice(0, BRUTS_LUS)).slice(0, COMPARES)));
   return c;
 }
 

@@ -6,14 +6,14 @@
  * - dans ces mêmes fichiers, l’insécable s’écrit d’une seule façon : `{NBSP}` (src/lib/format.ts) entre deux morceaux
  *   du JSX, ` ` dans une chaîne ou un gabarit. Ni `&nbsp;` ou `{" "}` dans le JSX, ni `${NBSP}` dans un
  *   gabarit, ni une constante d’espace à soi : celles d’AdminScreen et de Partage contenaient une espace normale ;
- * - dans src et tests, les caractères invisibles écrits en clair : l’insécable U+00A0 (à l’œil, une espace normale),
+ * - dans src, tests et prompts/lib, les caractères invisibles écrits en clair : l’insécable U+00A0 (à l’œil, une espace normale),
  *   U+200E, U+200D et U+FEFF. Une chaîne ou une regex semble vide ou juste, et un éditeur peut les effacer ou les
  *   changer sans que personne le voie. On les écrit en échappement (‎…). Le U+200D qui lie deux emojis en un seul
  *   (😮‍💨) se voit : il reste permis.
  * Seuls les textes comptent pour les deux premières règles (chaînes, gabarits, texte du JSX, lus avec le compilateur
  * TypeScript), jamais les commentaires ; dans le JSX, les morceaux d’une même phrase sont recollés comme à l’écran,
- * éléments imbriqués compris (`{" "}:` et `Une question <b>?</b>` comptent). Les prompts (prompts/lib, sous-module) ne
- * sont pas vérifiés ici : la session des prompts s’en charge.
+ * éléments imbriqués compris (`{" "}:` et `Une question <b>?</b>` comptent). Le code des prompts (prompts/lib,
+ * sous-module) n’est vérifié que pour la troisième : ses regex (style.ts, conv.ts) en ont perdu en silence.
  * `node scripts/verifier-typo.mjs [fichiers…]` : ces fichiers seulement (les tests du script).
  */
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
@@ -170,8 +170,8 @@ function* sources(dossier) {
   for (const f of readdirSync(join(RACINE, dossier), { recursive: true })) if (EXTENSIONS.test(f)) yield join(dossier, f).split(sep).join("/");
 }
 
-/** Vérifie des fichiers (par défaut : src et tests) ; renvoie leurs problèmes, et combien ont été lus. */
-export function verifier(fichiers = [...sources("src"), ...sources("tests")]) {
+/** Vérifie des fichiers (par défaut : src, tests et prompts/lib) ; renvoie leurs problèmes, et combien ont été lus. */
+export function verifier(fichiers = [...sources("src"), ...sources("tests"), ...sources("prompts/lib")]) {
   const lus = fichiers.map((f) => relative(RACINE, resolve(RACINE, f)).split(sep).join("/")).filter((f) => !GENERES.has(f));
   const problemes = lus.flatMap((f) => problemesDe(f, readFileSync(resolve(RACINE, f), "utf8"), { insecables: regleDesInsecables(f) }));
   return { problemes, lus: lus.length };

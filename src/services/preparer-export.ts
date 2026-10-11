@@ -5,7 +5,7 @@ import "client-only";
  * et l’envoi reste petit (Vercel refuse plus de 4,5 Mo).
  */
 import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
-import { choisirParties, convsInstagram, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
+import { choisirParties, convsInstagram, debutDeMessage, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
 import { ENVOI_EXPORT_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 
@@ -124,11 +124,8 @@ async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
 export function garderLaFin(parties: Partie[], part: number): Partie[] {
   if (parties.length === 1 && /\.txt$/i.test(parties[0].nom)) {
     const c = parties[0].contenu;
-    /* Le premier début de message (une ligne qui commence par une date) après la coupe */
-    const debut = /\n(?=\[?\d{1,4}[./-]\d{1,2}[./-]\d{2,4})/g;
-    debut.lastIndex = Math.floor(c.length * (1 - part));
-    const m = debut.exec(c);
-    return [{ ...parties[0], contenu: c.slice(m ? m.index + 1 : debut.lastIndex) }];
+    /* Le premier début de message (une ligne qui commence par une date) après la coupe ; sans, la conv reste entière */
+    return [{ ...parties[0], contenu: c.slice(Math.max(0, debutDeMessage(c, Math.floor(c.length * (1 - part))))) }];
   }
   let reste = parties.reduce((n, p) => n + p.contenu.length, 0) * part;
   const gardees: Partie[] = [];

@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { BLOC_HTML } from "@prompts/lib/instagram";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { depuisPaquet, importer, storyAffichee } from "@/server/histoires";
+import { importer, storyAffichee } from "@/server/histoires";
+import { depuisPaquet, LIGNES_MAX } from "@/server/import";
 import { purger } from "@/server/purge";
 import { analyserExport, garderLaFin } from "@/services/preparer-export";
 import { lirePaquet } from "./aide/fichiers";
@@ -40,6 +41,35 @@ describe("une conv trop longue pour partir", () => {
     const imp = await importer(lu);
     const source = storyAffichee(imp.id, imp.meta).sources[0];
     expect(source.moisLus).toBeGreaterThan(0);
+    await db().delete(schema.stories).where(eq(schema.stories.id, imp.id));
+  });
+
+  it("une longue conv qui se compresse bien (21 mois, 180 000 messages) part en entier, et le serveur la lit en entier", async () => {
+    const debut = Date.UTC(2023, 0, 1, 9, 0);
+    const mots = ["ok", "tu fais quoi", "mdr", "je suis crevé", "on se voit demain ?", "trop bien", "bonne nuit", "t’es où"];
+    const texte = Array.from({ length: 180_000 }, (_, k) => {
+      const d = new Date(debut + k * 5 * 60e3);
+      return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00] ${k % 2 ? "Léa" : "Tom"}: ${mots[k % mots.length]} ${k}`;
+    }).join("\n");
+    const pret = await analyserExport(new File([texte], "WhatsApp Chat - Léa.txt", { type: "text/plain" }));
+    if (pret.type !== "un") throw new Error("un seul fichier attendu");
+    expect((await lirePaquet(pret.paquet)).coupe).toBeUndefined();
+    const lu = await depuisPaquet(new File([await pret.paquet.arrayBuffer()], "export.json.gz"));
+    expect(lu.coupe).toBeUndefined();
+    expect(lu.texte).toBe(texte);
+  });
+
+  it("une conv coupée par le serveur (borner, dans importer) le dit aussi : meta.coupe, et les mois lus", async () => {
+    const debut = Date.UTC(2024, 0, 1, 9, 0);
+    /* Des lignes illisibles par centaines de milliers, puis 120 messages, un par jour : seuls ces derniers restent */
+    const messages = Array.from({ length: 120 }, (_, k) => {
+      const d = new Date(debut + k * 86400e3);
+      return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} 10:00:00] ${k % 2 ? "Léa" : "Tom"}: message ${k}`;
+    }).join("\n");
+    const imp = await importer({ appli: "whatsapp", texte: `${"x\n".repeat(LIGNES_MAX + 5)}${messages}`, nom: "chat.txt" });
+    expect(imp.meta.coupe).toBe(true);
+    expect(imp.meta.resume.total).toBe(120);
+    expect(storyAffichee(imp.id, imp.meta).sources[0].moisLus).toBe(4);
     await db().delete(schema.stories).where(eq(schema.stories.id, imp.id));
   });
 

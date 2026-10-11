@@ -2,7 +2,7 @@ import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, extensionAudio, TEXTE_CONV_MAX } from "@/lib/limites";
 import { imagesDe } from "@/server/captures";
-import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/histoires";
+import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { mailCode } from "@/server/mail-code";
 import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
 

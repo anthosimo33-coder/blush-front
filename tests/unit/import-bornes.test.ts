@@ -1,9 +1,9 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { lire, PROBLEMES_MAX, type Histoire } from "@prompts/lib/conv";
+import { detecterFormat, lire, participantsDe, PROBLEMES_MAX, type Histoire } from "@prompts/lib/conv";
 import { depuisInstagramHtml, depuisInstagramJson } from "@prompts/lib/instagram";
 import { imagesDe } from "@/server/captures";
-import { borner, depuisFichier, depuisPaquet, ErreurImport, LIGNE_MAX, LIGNES_MAX, TEXTE_LU_MAX } from "@/server/import";
+import { borner, depuisFichier, depuisPaquet, ErreurImport, LIGNE_MAX, LIGNES_MAX, TEXTE_LU_MAX_CARACTERES } from "@/server/import";
 
 /*
  * L’import anonyme (S-11) : ce que lit le serveur est borné avant la lecture, et la lecture reste linéaire, même sur un
@@ -44,19 +44,19 @@ describe("borner : ce que lit le serveur d’un export", () => {
     expect(borner(lu)).toBe(lu);
   });
 
-  it("au-delà de TEXTE_LU_MAX, garde sa partie la plus récente, coupée au début d’un message, et le dit", () => {
-    const texte = exporter(130_000, (k) => `message ${k} ${"x".repeat(40)}`);
-    expect(texte.length).toBeGreaterThan(TEXTE_LU_MAX);
+  it("au-delà de TEXTE_LU_MAX_CARACTERES, garde sa partie la plus récente, coupée au début d’un message, et le dit", () => {
+    const texte = exporter(Math.ceil(TEXTE_LU_MAX_CARACTERES / 100_000) + 20, (k) => `${k} ${"x".repeat(100_000)}`);
+    expect(texte.length).toBeGreaterThan(TEXTE_LU_MAX_CARACTERES);
     const b = borner({ appli: "whatsapp", texte, nom: "chat.txt" });
     expect(b.coupe).toBe(true);
-    expect(b.texte.length).toBeLessThanOrEqual(TEXTE_LU_MAX);
+    expect(b.texte.length).toBeLessThanOrEqual(TEXTE_LU_MAX_CARACTERES);
     expect(b.texte).toMatch(/^\[\d{2}\/\d{2}\/\d{4} /);
     expect(texte.endsWith(b.texte)).toBe(true);
   });
 
   it("au-delà de LIGNES_MAX, garde les plus récentes, sans couper un message en deux", () => {
     const texte = exporter(LIGNES_MAX / 2 + 10, undefined, true);
-    expect(texte.length).toBeLessThan(TEXTE_LU_MAX);
+    expect(texte.length).toBeLessThan(TEXTE_LU_MAX_CARACTERES);
     const b = borner({ appli: "whatsapp", texte, nom: "chat.txt" });
     expect(b.coupe).toBe(true);
     expect(b.texte.split("\n").length).toBeLessThanOrEqual(LIGNES_MAX);
@@ -66,10 +66,35 @@ describe("borner : ce que lit le serveur d’un export", () => {
     expect(borner({ appli: "whatsapp", texte: exporter(10), nom: "x", coupe: true }).coupe).toBe(true);
   });
 
-  it("une ligne de plus de LIGNE_MAX : refusé", () => {
+  it("une ligne de plus de LIGNE_MAX : tronquée, sans couper un emoji, et l’import continue", () => {
     const texte = exporter(100, (k) => (k === 50 ? "a".repeat(LIGNE_MAX + 1) : `message ${k}`));
-    expect(() => borner({ appli: "whatsapp", texte, nom: "chat.txt" })).toThrow(ErreurImport);
+    const b = borner({ appli: "whatsapp", texte, nom: "chat.txt" });
+    expect(b.coupe).toBeUndefined();
+    const lignes = b.texte.split("\n");
+    expect(lignes).toHaveLength(100);
+    expect(lignes[50]).toHaveLength(LIGNE_MAX);
+    expect(lignes.filter((_, k) => k !== 50)).toEqual(texte.split("\n").filter((_, k) => k !== 50));
+    /* Des emojis (deux unités chacun) : la coupe ne laisse pas une moitié d’emoji */
+    const emojis = borner({ appli: "whatsapp", texte: exporter(3, (k) => (k === 1 ? "😀".repeat(LIGNE_MAX) : "ok")), nom: "chat.txt" }).texte.split("\n")[1];
+    expect(emojis.length).toBeLessThanOrEqual(LIGNE_MAX);
+    expect(emojis.endsWith("😀")).toBe(true);
     expect(borner({ appli: "whatsapp", texte: exporter(100, (k) => (k === 50 ? "a".repeat(LIGNE_MAX - 100) : `${k}`)), nom: "chat.txt" }).coupe).toBeUndefined();
+  });
+
+  it("un message de 65 536 caractères (le plus long que WhatsApp permet) passe tel quel, et se lit", async () => {
+    const long = "x".repeat(65_536);
+    const texte = exporter(200, (k) => (k === 100 ? long : `message ${k}`));
+    const lu = await depuisFichier(new File([texte], "chat.txt"));
+    expect(lu.texte).toBe(texte);
+    expect(lu.coupe).toBeUndefined();
+    expect(lire(lu.texte, h).messages).toHaveLength(200);
+  });
+
+  it("une conv que le navigateur envoie entière (des Mo, des centaines de milliers de messages) n’est pas coupée", () => {
+    const texte = exporter(400_000, (k) => `message numéro ${k}, on se voit quand ?`);
+    expect(texte.length).toBeGreaterThan(20_000_000);
+    const lu = { appli: "whatsapp" as const, texte, nom: "chat.txt" };
+    expect(borner(lu)).toBe(lu);
   });
 
   it("le fichier et le paquet passent par là", async () => {
@@ -80,11 +105,29 @@ describe("borner : ce que lit le serveur d’un export", () => {
     expect(lu.texte).toBe(exporter(10));
     /* Que des lignes illisibles, sans un début de message après la coupe : ce n’est pas un export */
     await expect(depuisPaquet(paquet("x\n".repeat(LIGNES_MAX + 5)))).rejects.toBeInstanceOf(ErreurImport);
-    await expect(depuisFichier(new File([exporter(20, (k) => (k === 3 ? "b".repeat(LIGNE_MAX + 1) : "ok"))], "chat.txt"))).rejects.toMatchObject({ code: "fichier" });
+    expect((await depuisFichier(new File([exporter(20, (k) => (k === 3 ? "b".repeat(LIGNE_MAX + 1) : "ok"))], "chat.txt"))).texte.split("\n")[3]).toHaveLength(LIGNE_MAX);
   });
 });
 
 describe("des exports piégés, lus en temps borné", () => {
+  it("des en-têtes suivis de « a: » des milliers de fois, finis par un « \\r » seul, un U+2028 ou un U+2029", async () => {
+    for (const fin of ["\r", "\u2028", "\u2029"]) {
+      const piege = Array.from({ length: 100 }, (_, k) => `${entete(k)}${k % 2 ? "Léa" : "Tom"}: ${"a: ".repeat(21_000)}${fin}`).join("\n");
+      expect(piege.length).toBeGreaterThan(6_000_000);
+      /* Le paquet, puis les étapes de l’import (src/server/histoires.ts, importer) : chacune relit chaque en-tête */
+      const [lu, ms] = await (async () => {
+        const t0 = performance.now();
+        const r = await depuisPaquet(paquet(piege));
+        detecterFormat(r.texte);
+        participantsDe(r.texte);
+        return [lire(r.texte, h, { autresEnTexte: true }), performance.now() - t0] as const;
+      })();
+      expect(ms).toBeLessThan(VITE_MS);
+      /* Le texte va jusqu’au bout de la ligne, quoi qu’il contienne : chaque en-tête est un message */
+      expect(lu.messages).toHaveLength(100);
+    }
+  });
+
   it("des centaines de milliers de lignes illisibles : 100 problèmes notés, pas un de plus", () => {
     const texte = `${entete(0)}Tom: audio omitted\n${"?\n".repeat(400_000)}`;
     const [lu, ms] = chrono(() => lire(texte, h));
@@ -126,6 +169,13 @@ describe("des exports piégés, lus en temps borné", () => {
       expect(ms).toBeLessThan(VITE_MS);
       expect(r.texte).toContain("on se voit ?");
     }
+  });
+
+  it("Instagram HTML : une entité au-delà d’Unicode (« &#x110000; ») reste telle quelle, le fichier se lit", async () => {
+    const html = `<html><body><div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">Léa</h2><div class="_3-95 _a6-p"><div>salut &#x110000; &#99999999999; &#x1F600;</div></div><div class="_3-94 _a6-o">sep 18, 2026 8:29 am</div></div></body></html>`;
+    expect(depuisInstagramHtml(html).texte).toContain("salut &#x110000; &#99999999999; 😀");
+    const lu = await depuisFichier(new File([html], "message_1.html"));
+    expect(lu.texte).toContain("&#x110000;");
   });
 
   it("Instagram JSON : un message forgé pour la reconnaissance des lignes système", () => {

@@ -1,9 +1,10 @@
 import "server-only";
 import type { Requete } from "@prompts/lib/contextes";
+import { estLigneMessage, idDeLigne, lireLigne } from "@prompts/lib/ligne";
 
 /* Un modèle factice (BLUSH_IA_FACTICE=1, pour les tests et le dev sans coût) : des sorties valides, qui citent de vrais identifiants de la conv. */
 const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
-const ids = (req: Requete) => [...new Set(textes(req).join("\n").match(/^m\d{4,}(?= )/gm) ?? [])];
+const ids = (req: Requete) => [...new Set(textes(req).join("\n").split("\n").filter(estLigneMessage).map(idDeLigne))];
 
 /** Ce qu’une sortie factice rend pour simuler un refus du modèle (src/server/ia/claude.ts le traite comme un vrai refus). */
 export const REFUS_FACTICE = "@@refus@@";
@@ -142,7 +143,10 @@ export function fournisseurFactice(req: Requete): unknown {
       faits_ajoutes: [
         { section: "notes", texte: "Adore les soirées improvisées", preuves: [] },
         /* Une ligne de son profil arrivée avec des captures : elle rejoint sa fiche, avec sa preuve */
-        ...[...demande.matchAll(/^(m\d{4,}) \S+ \S+ --:-- profil de [^:]+ : (.*)$/gm)].map((m) => ({ section: "infos", texte: m[2], preuves: [m[1]] })),
+        ...demande.split("\n").flatMap((l) => {
+          const lue = lireLigne(l);
+          return lue?.profil ? [{ section: "infos" as const, texte: lue.texte, preuves: [lue.id] }] : [];
+        }),
       ],
       faits_retires: [],
       portrait: null,

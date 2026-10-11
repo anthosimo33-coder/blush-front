@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { blocAjout, estLigneProfil, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
+import { blocAjout, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import type { Requete } from "@prompts/lib/contextes";
 import { faitsAffiches, messagesAffiches } from "@prompts/lib/front";
+import { estLigneProfil } from "@prompts/lib/ligne";
 
 /* after() de Next ne vit que dans une requête : ici, on garde ce qui devait partir après la réponse, pour le lancer soi-même */
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
