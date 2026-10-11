@@ -1,4 +1,3 @@
-import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
@@ -297,7 +296,7 @@ function Beta({ b }: { b: StatsAdmin["beta"] }) {
 }
 
 /** `base` : l’adresse de la page, à laquelle s’ajoute `?p=` pour changer de période. */
-export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: string }) {
+export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: "/admin" | "/apercu/admin" }) {
   const heure = new Date(s.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
   const avant = contre(s.jours);
   return (
@@ -312,7 +311,7 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: stri
             {PERIODES.map(([j, nom]) => (
               <Link
                 key={j}
-                href={`${base}?p=${j}` as Route}
+                href={`${base}?p=${j}`}
                 aria-current={j === s.jours ? "page" : undefined}
                 className={cn(
                   "flex h-8 items-center rounded-full px-3.5 text-legende font-black no-underline",

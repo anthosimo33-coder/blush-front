@@ -22,7 +22,7 @@
       "@/*": ["./src/*"],
       "@prompts/*": ["./prompts/*"]
     },
-    "allowJs": true
+    "allowJs": false
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts", "**/*.mts"],
   "exclude": ["node_modules", "prompts/evals", "prompts/node_modules"]

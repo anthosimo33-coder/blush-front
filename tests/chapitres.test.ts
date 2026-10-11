@@ -29,6 +29,11 @@ describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
     ]);
   });
 
+  it("un numéro hors des chapitres : une erreur, jamais un titre vide", () => {
+    expect(() => titreDAttente(0, "Maëlys")).toThrow(RangeError);
+    expect(() => titreDAttente(NB_CHAPITRES + 1, "Maëlys")).toThrow(RangeError);
+  });
+
   /* Le sommaire du mail, lu dans son HTML : la pastille du numéro, puis le titre */
   const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => [Number(m[1]), m[2]]);
 

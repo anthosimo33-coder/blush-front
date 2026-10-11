@@ -17,7 +17,7 @@ import { pagePrecedente } from "@/lib/navigation";
  * Pas de couleur de sens, pas de 3D, pas de score, pas de logo en volume. Encre et papier seulement.
  */
 /* « Quitter vite » et « OK, merci » mènent à l’écran 01, comme dans la maquette */
-const QUIT_HREF = "/commencer";
+const QUIT_HREF: Route = "/commencer";
 
 /* TODO(produit): ressources d’aide absentes des maquettes, à valider. */
 const HELP = [
@@ -25,10 +25,10 @@ const HELP = [
   { name: "SOS Amitié", detail: "À l’écoute 24 h sur 24", tel: "0972394050", label: "09 72 39 40 50" },
 ];
 
-function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: string }) {
+function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: Route }) {
   const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-accent font-extrabold text-white no-underline";
   return href ? (
-    <Link href={href as Route} className={cls}>
+    <Link href={href} className={cls}>
       {children}
     </Link>
   ) : (

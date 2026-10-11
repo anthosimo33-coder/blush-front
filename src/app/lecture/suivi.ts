@@ -78,7 +78,7 @@ export function useSuiviLecture() {
   const enCours = useRef<number | null>(null);
 
   /* Le routeur n’est lu qu’au moment de partir : le lancement ne se rejoue pas pour lui */
-  const remplacer = useEffectEvent((url: string) => router.replace(url as Route));
+  const remplacer = useEffectEvent((url: Route) => router.replace(url));
 
   const relancer = () => {
     setEchec(false);

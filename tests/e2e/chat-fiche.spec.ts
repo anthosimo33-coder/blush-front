@@ -384,7 +384,7 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
   /* « question n° 7 » : un texte à lui par échange, de quoi suivre l’ordre ; exact, pour ne pas confondre 1 et 12 */
   const question = (n: number) => fil.getByText(`question n° ${n}`, { exact: true });
   await lectureBlushPlus(page, testInfo);
-  /* 22 échanges : le serveur en rend 20 à l’ouverture (src/server/chat.ts, historique) */
+  /* 22 échanges : le serveur en rend 20 à l’ouverture (src/server/historique.ts) */
   for (let n = 1; n <= 22; n++) await ecrireParApi(page, testInfo, `question n° ${n}`);
 
   await test.step("à l’ouverture : les vingt derniers échanges, pas les deux premiers", async () => {
