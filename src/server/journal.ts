@@ -1,12 +1,15 @@
 import "server-only";
 import { champsDErreur, ligneDuJournal, type Champs } from "@/lib/tracer";
+import { surVercel } from "./drapeaux";
 
 /*
  * Le journal du serveur : une ligne JSON par événement, dans les logs de Vercel (la sortie de la fonction). Un nom
  * d’événement, puis des champs courts : des codes, des identifiants, des nombres. Jamais de contenu : ni la conv, ni un
  * email, ni le message d’une erreur (champsDErreur, src/lib/tracer.ts, n’en garde que le nom et le code).
- * Tout le serveur écrit par ici : la règle no-console (eslint.config.mjs) n’y laisse la console qu’à ce fichier et à
- * src/lib/tracer.ts (le navigateur). Pour le nom d’une erreur dans un code : nomErreur (src/lib/tracer.ts).
+ * Le code du serveur écrit par ici : la règle no-console (eslint.config.mjs) ne laisse la console qu’à ce fichier, à
+ * src/lib/tracer.ts (le navigateur) et aux aperçus locaux (src/app/apercu, jamais en ligne). Pour le nom d’une erreur
+ * dans un code : nomErreur (src/lib/tracer.ts). Ce qui échappe encore au journal : une erreur qu’une route /api ne
+ * rattrape pas (Next l’écrit entière ; l’enveloppe `route` de src/server/http.ts n’est pas encore posée, lot 8a).
  */
 
 /** info : ce qui s’est passé ; alerte : ce qui mérite un coup d’œil (un repli, un refus du modèle) ; erreur : ce qui a échoué. */
@@ -44,9 +47,11 @@ export async function auMieux(travail: Promise<unknown> | (() => Promise<unknown
 /**
  * En local seulement, ce que le développeur lit en clair dans le terminal du serveur, à la place d’un mail que rien
  * n’envoie (sans clé de Resend ni boîte des tests) : le code de connexion, le sujet d’un mail, une alerte à l’équipe.
- * Pas une ligne du journal : un texte libre, que les tests lisent tel quel (console.log). Jamais en ligne : env() y
- * exige RESEND_API_KEY (seuls le dev et les tests s’en passent).
+ * Pas une ligne du journal : un texte libre, que les tests lisent tel quel (console.log). Jamais en ligne : sur Vercel,
+ * le texte est tu et une ligne du journal le dit (env() y exige déjà RESEND_API_KEY ; ceci ne compte pas sur lui). Ne
+ * s’importe que dans email.ts et alertes.ts (eslint.config.mjs).
  */
 export function enLocal(texte: string): void {
+  if (surVercel()) return journal("sortie locale ignorée en ligne", {}, "alerte");
   console.log(texte);
 }

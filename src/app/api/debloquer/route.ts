@@ -1,8 +1,7 @@
-import { after } from "next/server";
 import { passerEnBlushPlus } from "@/server/comptes";
 import { accesLibre } from "@/server/env";
 import { erreur, lireCorps, repondre } from "@/server/http";
-import { executerChaine, reparerLaChaine } from "@/server/pipeline";
+import { relancerApres, reparerLaChaine } from "@/server/pipeline";
 import { garde } from "@/server/requete";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
 import { peut } from "@/lib/acces";
@@ -27,7 +26,7 @@ export async function POST(req: Request) {
   /* Le rapport s’il n’a jamais été lancé, ou la mémoire d’un rapport sobre déjà offert : ce qui manque part, une seule fois */
   if (story) {
     await reparerLaChaine(story);
-    after(() => executerChaine(story.id));
+    relancerApres(story.id);
   }
   return repondre("POST /api/debloquer", SUBSCRIPTIONS.blushplus);
 }

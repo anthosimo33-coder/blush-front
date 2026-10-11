@@ -10,7 +10,7 @@ import type { Requete } from "@prompts/lib/contextes";
  * Le dépôt est public : un échec n’affiche ni les prompts (le garde-fou lit un faux texte) ni les messages de la conv
  * (on compare leurs longueurs, pas leur texte).
  */
-const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), apres: [] as (() => unknown)[], alertes: [] as string[][] }));
+const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), apres: [] as (() => unknown)[], alertes: [] as string[][], chaineEnPanne: null as Error | null }));
 const FAUX_PROMPT = vi.hoisted(() => "Tu es un phare. Des marins de toutes les mers t’envoient leur carnet de bord avec la côte qui les attire.");
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -23,6 +23,11 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
 vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]) }));
+/* La base qui tombe quand la chaîne des tâches repart (executerChaine lit d’abord si une autre la tient) */
+vi.mock("@/server/taches", async (original) => {
+  const o = await original<typeof import("@/server/taches")>();
+  return { ...o, occupee: (storyId: string) => (etat.chaineEnPanne ? Promise.reject(etat.chaineEnPanne) : o.occupee(storyId)) };
+});
 vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof import("@/server/ia/claude")>()), textesSysteme: () => [FAUX_PROMPT] }));
 
 import { POST } from "@/app/api/chat/route";
@@ -276,6 +281,28 @@ describe("POST /api/chat en flux", () => {
     expect(reponse.vocalEnCours).toBeUndefined();
     expect(reponse.echange).toBe((await historique(id)).echanges.at(-1)?.id);
     await lancerApres();
+  });
+
+  it("la mise à jour de la mémoire qui ne repart pas (la base tombe) : la réponse est partie, une ligne au journal, sans le message de l’erreur", async () => {
+    /* Une suite : la mémoire se met à jour après la réponse */
+    chat = (req) => reponseChat(req, (r) => ({ ...r, type: "suite" }));
+    for (const flux of [true, false]) {
+      etat.chaineEnPanne = Object.assign(new Error(`Failed query: select … params: ${compte.email}`), { name: "DrizzleQueryError" });
+      const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const r = await envoyer("elle m’a répondu, la suite", flux);
+        if (flux) expect((await lectures(r)).flat().at(-1)).toHaveProperty("reponse");
+        else expect(r.status).toBe(200);
+        /* after ne voit jamais d’erreur : Next l’écrirait entière dans les logs */
+        await expect(lancerApres()).resolves.toBeUndefined();
+        const lignes = erreur.mock.calls.map((c) => String(c[0]));
+        expect(lignes.map((l) => JSON.parse(l) as unknown), flux ? "en flux" : "d’un bloc").toEqual([{ evenement: "chaîne non relancée", niveau: "erreur", histoire: id, erreur: "DrizzleQueryError" }]);
+        expect(lignes.join("\n")).not.toContain(compte.email);
+      } finally {
+        etat.chaineEnPanne = null;
+        erreur.mockRestore();
+      }
+    }
   });
 
   it("la page quittée en route : la réponse s’écrit et s’enregistre quand même", async () => {

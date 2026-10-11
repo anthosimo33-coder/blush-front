@@ -155,9 +155,14 @@ function suiviDesChapitres(story: Ligne, t: Tache, messages: Map<string, Message
   let enregistrement = Promise.resolve();
   const garderPrets = () => {
     const affiches = chapitresAffiches([...prets.values()].sort((x, y) => x.numero - y.numero), messages, lignesScores);
-    enregistrement = enregistrement
-      .then(() => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)))
-      .then(() => undefined, () => undefined);
+    /* Des chapitres qui ne s’écrivent pas n’arrêtent pas le rapport : le journal le dit, et la chaîne ne rejette jamais */
+    enregistrement = enregistrement.then(() =>
+      auMieux(
+        () => db().update(schema.reports).set({ partiel: coffre.ecrire("reports.partiel", affiches), updatedAt: new Date() }).where(eq(schema.reports.storyId, story.id)),
+        "chapitres prêts non gardés",
+        { tache: t.id, histoire: story.id },
+      ),
+    );
   };
   const surAvance = (premier: Moitie, signal: AbortSignal) => (av: Avance) => {
     if (signal.aborted) return;
@@ -202,7 +207,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
    */
   const enParallele = auMieux(
     vocal(story, { verdict: v.sortie, rapport: { plan }, lignes: choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), sobre: false }),
-    "vocal pendant l’écriture",
+    "vocal en échec pendant l’écriture",
     { histoire: story.id },
   );
   /*

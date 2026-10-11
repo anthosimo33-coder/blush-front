@@ -108,14 +108,14 @@ export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?
   const lu = etat ?? (await lireEtat(story.id));
   const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && (estBudget(t.error) || estBudgetVoix(t.error)));
   if (arretee && (await reprendreApresMinuit(story.id))) {
-    after(() => executerChaine(story.id));
+    relancerApres(story.id);
     return true;
   }
   const [sans, avec] = [suite(lu, false), suite(lu, true)];
   const genres = sans.join() === avec.join() ? sans : (await aAcces(story)) ? avec : sans;
   if (!genres.length) return false;
   for (const g of genres) await planifier(story.id, g);
-  after(() => executerChaine(story.id));
+  relancerApres(story.id);
   return true;
 }
 
@@ -293,6 +293,23 @@ export async function executerChaine(storyId: string): Promise<void> {
       if (issue === "echec") await pause(PAUSE_APRES_ECHEC_MS * pris.attempts);
     }
   });
+}
+
+/**
+ * La chaîne relancée sans que l’appelant en attende l’issue : un échec (la base qui tombe pendant cloreLesAbandons ou
+ * aRelancer) laisse une ligne au journal, son nom et son code, jamais son message (une erreur SQL cite ses paramètres).
+ * Ne rejette jamais. executerChaine, elle, rejette : les tests et la tâche de nuit voient ses erreurs.
+ */
+export function relancerChaine(storyId: string): Promise<void> {
+  return auMieux(() => executerChaine(storyId), "chaîne non relancée", { histoire: storyId });
+}
+
+/**
+ * La chaîne relancée après la réponse (after) : la seule façon de le faire depuis une route. Sans relancerChaine, Next
+ * écrirait l’erreur entière dans les logs, message compris.
+ */
+export function relancerApres(storyId: string): void {
+  after(() => relancerChaine(storyId));
 }
 
 /**

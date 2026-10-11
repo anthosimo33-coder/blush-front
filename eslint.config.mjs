@@ -67,14 +67,43 @@ const CONTRAT_MESSAGE = "Hors du serveur (src/server, les routes /api), le contr
 const CONTRAT = { regex: `${versSrc("types/api")}$`, allowTypeImports: true, message: CONTRAT_MESSAGE };
 const CONTRAT_DYNAMIQUE = dynamique(CONTRAT.regex, CONTRAT_MESSAGE);
 /*
- * Une valeur levée peut être n’importe quoi (une chaîne, null) : `(e as Error).name` le cache, et `.catch((e: Error) =>`
- * aussi. Son nom se lit par nomErreur (src/lib/tracer.ts), une erreur s’écrit au journal par journalErreur ou auMieux
+ * Une valeur levée peut être n’importe quoi (une chaîne, null) : `(e as Error).name` le cache, comme `<Error>e`,
+ * `.catch((e: Error) =>` ou le rejet de `.then(…, (e: Error) =>)`. Le type supposé : Error, une sous-classe (TypeError),
+ * un type de Node (NodeJS.ErrnoException), seul ou dans une union ou une intersection (`Error & { code?: string }`).
+ * Son nom se lit par nomErreur (src/lib/tracer.ts), une erreur s’écrit au journal par journalErreur ou auMieux
  * (src/server/journal.ts), qui n’en gardent que le nom et le code.
  */
 const ERREUR_SUPPOSEE_MESSAGE = "Une valeur levée n’est pas forcément une Error : nomErreur(e) (src/lib/tracer.ts), ou journalErreur / auMieux (src/server/journal.ts).";
+const NOM_D_ERREUR = "/(Error|Exception)$/";
+const typesDErreur = (avant) =>
+  [`${avant} >`, `${avant} > :matches(TSUnionType, TSIntersectionType) >`].flatMap((chemin) => [
+    `${chemin} TSTypeReference > Identifier.typeName[name=${NOM_D_ERREUR}]`,
+    `${chemin} TSTypeReference > TSQualifiedName.typeName[right.name=${NOM_D_ERREUR}]`,
+  ]);
 const PAS_D_ERREUR_SUPPOSEE = [
-  { selector: "TSAsExpression > TSTypeReference.typeAnnotation > Identifier[name='Error']", message: ERREUR_SUPPOSEE_MESSAGE },
-  { selector: "CallExpression[callee.property.name='catch'] > :function > Identifier.params > TSTypeAnnotation > TSTypeReference > Identifier[name='Error']", message: ERREUR_SUPPOSEE_MESSAGE },
+  "TSAsExpression",
+  "TSTypeAssertion",
+  "CallExpression[callee.property.name='catch'] > :function > Identifier.params > TSTypeAnnotation",
+  /* Le second argument de `.then` : son gestionnaire de rejet */
+  "CallExpression[callee.property.name='then'] > :function:nth-child(2) > Identifier.params > TSTypeAnnotation",
+]
+  .flatMap(typesDErreur)
+  .map((selector) => ({ selector, message: ERREUR_SUPPOSEE_MESSAGE }));
+/*
+ * enLocal (src/server/journal.ts) écrit un texte libre en clair, l’email et le code de connexion compris : elle remplace
+ * un mail en local, et ne sert qu’à email.ts et alertes.ts. Ailleurs, on écrit au journal.
+ */
+const EN_LOCAL = {
+  regex: "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/journal$",
+  importNames: ["enLocal"],
+  message: "enLocal écrit en clair, à la place d’un mail en local : seuls email.ts et alertes.ts s’en servent. Ailleurs : journal, journalErreur ou auMieux.",
+};
+
+/* Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts */
+const SERVEUR_SANS_NAVIGATEUR = [
+  { regex: `${versSrc("services/api")}$`, allowTypeImports: true, message: "src/services/api.ts appelle les routes /api depuis le navigateur : le serveur lit ses propres modules (src/server)." },
+  { regex: `${versSrc("lib/query")}$`, allowTypeImports: true, message: "Le cache des requêtes vit dans le navigateur : le serveur n’en a pas." },
+  { regex: `${versSrc("state")}(/|$)`, allowTypeImports: true, message: "L’état du parcours vit dans le navigateur : le serveur lit la base." },
 ];
 
 const eslintConfig = defineConfig([
@@ -122,7 +151,7 @@ const eslintConfig = defineConfig([
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/server/**", "src/app/api/**", "src/types/api.ts"],
-    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [CONTRAT] }] },
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [CONTRAT, EN_LOCAL] }] },
   },
   // Les frontières entre couches. Un `import type` passe toujours : il disparaît à la compilation.
   // Le navigateur ne touche pas au serveur : tout src, sauf ce qui tourne sur le serveur (src/server, les routes /api, les
@@ -144,21 +173,15 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...PAS_DE_CAST_CSS, ...PAS_DE_PROCESS_ENV, ...PAS_D_ERREUR_SUPPOSEE, CHIFFREMENT_DYNAMIQUE, CONTRAT_DYNAMIQUE, DRIZZLE_DYNAMIQUE, dynamique(versSrc("server"), NAVIGATEUR_SANS_SERVEUR)],
     },
   },
-  // Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts.
+  // Le serveur ne passe pas par la couche du navigateur : il lit les types du réseau dans src/types/api.ts. Ni enLocal
+  // hors de email.ts et alertes.ts (EN_LOCAL) : le bloc suivant reprend la liste sans elle.
   {
     files: ["src/server/**", "src/app/api/**"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            { regex: `${versSrc("services/api")}$`, allowTypeImports: true, message: "src/services/api.ts appelle les routes /api depuis le navigateur : le serveur lit ses propres modules (src/server)." },
-            { regex: `${versSrc("lib/query")}$`, allowTypeImports: true, message: "Le cache des requêtes vit dans le navigateur : le serveur n’en a pas." },
-            { regex: `${versSrc("state")}(/|$)`, allowTypeImports: true, message: "L’état du parcours vit dans le navigateur : le serveur lit la base." },
-          ],
-        },
-      ],
-    },
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: [...SERVEUR_SANS_NAVIGATEUR, EN_LOCAL] }] },
+  },
+  {
+    files: ["src/server/email.ts", "src/server/alertes.ts"],
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns: SERVEUR_SANS_NAVIGATEUR }] },
   },
   // Le sous-module des prompts ne dépend pas de l’appli (seulement vérifié ici : il ne change pas avec elle).
   {

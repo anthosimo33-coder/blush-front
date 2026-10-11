@@ -26,11 +26,17 @@ async function deposer(boite: string, destinataires: string[], mail: Mail & { co
   }
 }
 
-/** Resend a refusé le mail : son statut HTTP, rien d’autre (ni l’adresse, ni le contenu), qu’une alerte peut montrer. */
+/**
+ * Resend a refusé le mail : son statut HTTP, rien d’autre (ni l’adresse, ni le contenu), qu’une alerte peut montrer. Le
+ * journal le lit dans `code` (« resend_422 », champsDErreur) : une clé révoquée (401, 403), un quota (429) ou une adresse
+ * refusée (422) s’y distinguent.
+ */
 export class ErreurResend extends Error {
+  readonly code: `resend_${number}`;
   constructor(readonly statut: number) {
     super(`Resend a répondu ${statut}`);
     this.name = "ErreurResend";
+    this.code = `resend_${statut}`;
   }
 }
 

@@ -200,14 +200,14 @@ function parametres(req: Requete, schema: z.ZodType) {
  * zéro, la jauge aussi. Le suivi ne doit jamais faire échouer la réponse : une erreur de `surAvance` est passée, et
  * dite au journal une fois par appel (elle reviendrait à chaque morceau).
  */
-function suivreFlux(surAvance: (a: Avance) => void): Ecoute {
+function suivreFlux(surAvance: (a: Avance) => void, tache: string): Ecoute {
   let a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
   let dite = false;
   const suivre = () => {
     try {
       surAvance({ ...a });
     } catch (e) {
-      if (!dite) journalErreur("suivi de l’avance en erreur", e);
+      if (!dite) journalErreur("suivi de l’avance en erreur", e, { tache });
       dite = true;
     }
   };
@@ -300,7 +300,7 @@ export async function appeler<S extends z.ZodType>(req: Requete, schema: S, { st
   /* Le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste (600 s et 2 tentatives sans échéance) */
   const reste = tempsRestant();
   const options: OptionsEnvoi = { timeout: delaiAppel(600_000), maxRetries: reste === Infinity ? 2 : reste > 150_000 ? 1 : 0, ...(signal ? { signal } : {}) };
-  const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance) : null });
+  const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance, req.tache) : null });
   const { usage, model } = message;
   const ms = Date.now() - debut;
   if (!prestataire.gratuit) await ensuite(() => noterUsage(usage, Math.round(cout(usage) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));

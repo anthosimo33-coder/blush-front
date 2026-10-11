@@ -121,7 +121,7 @@ export function env(): Env {
   }
   if (surVercel() && lu.data.BLUSH_IA_FACTICE) {
     /* Ignorée, mais dite : elle n’a rien à faire sur Vercel */
-    journal("BLUSH_IA_FACTICE=1 sur Vercel : ignorée (le vrai modèle répond), à retirer des variables du projet", {}, "alerte");
+    journal("variable ignorée sur Vercel, à retirer des variables du projet", { variable: "BLUSH_IA_FACTICE" }, "alerte");
     lu.data.BLUSH_IA_FACTICE = false;
   }
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");

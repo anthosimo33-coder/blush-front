@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import type { Ajout } from "@prompts/lib/ajouts";
 import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
-import { executerChaine } from "@/server/pipeline";
+import { relancerApres, relancerChaine } from "@/server/pipeline";
 import { imagesDe } from "@/server/captures";
 import { controlerBudget } from "@/server/budget";
 import { historique, repondre as blushRepond } from "@/server/chat";
@@ -89,13 +89,16 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
     }
     sortie = null;
   };
-  /* Une erreur après la réponse (la mise à jour de la mémoire, son signalement) laisse une ligne au journal : `fin` ne rejette jamais */
+  /*
+   * Une erreur après la réponse laisse une ligne au journal : `fin` ne rejette jamais. La mise à jour de la mémoire a la
+   * sienne (relancerChaine, « chaîne non relancée », comme partout où la chaîne repart) ; celle-ci couvre le reste
+   */
   const fin = auMieux(
     travail(emettre).then(
       async (r) => {
         ouvrir(true);
         fermer();
-        if (r.majMemoire) await executerChaine(storyId);
+        if (r.majMemoire) await relancerChaine(storyId);
       },
       async (e: unknown) => {
         /* Rien n’est parti : la route répond l’erreur elle-même (voir traiter) */
@@ -168,7 +171,7 @@ async function traiter(req: Request) {
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
       const r = await blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal });
-      if (r.majMemoire) after(() => auMieux(() => executerChaine(story.id), "chat : la mise à jour de la mémoire a échoué", { histoire: story.id }));
+      if (r.majMemoire) relancerApres(story.id);
       return repondre("POST /api/chat", r.reponse);
     }
     /* Le suivi des coûts attend la fin de la réponse */

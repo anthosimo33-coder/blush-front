@@ -89,9 +89,18 @@ const MARQUE = /typo\s*:\s*du code/;
 
 /*
  * Les appels qui n’écrivent qu’à l’équipe : une alerte, le journal du serveur (src/server/journal.ts : journal,
- * journalErreur, auMieux, et enLocal, ce que le développeur lit en local) et la trace du navigateur (tracer).
+ * journalErreur, auMieux, et enLocal, ce que le développeur lit en local) et la trace du navigateur (tracer). Pour
+ * chacun, le premier argument qui va à l’équipe : ceux d’avant restent lus, comme le travail passé à auMieux (une
+ * closure ou une promesse, qui peut envoyer un mail).
  */
-const A_L_EQUIPE = new Set(["alerter", "journal", "journalErreur", "auMieux", "enLocal", "tracer"]);
+const A_L_EQUIPE = new Map([
+  ["alerter", 0],
+  ["journal", 0],
+  ["journalErreur", 0],
+  ["auMieux", 1],
+  ["enLocal", 0],
+  ["tracer", 0],
+]);
 
 /**
  * Une chaîne qui n’est jamais affichée : un message de console.*, du journal, d’une erreur (`new …Error(…)`) ou d’une
@@ -99,9 +108,10 @@ const A_L_EQUIPE = new Set(["alerter", "journal", "journalErreur", "auMieux", "e
  * commentaire qui la précède.
  */
 function horsDesTextes(n, source) {
-  for (let p = n.parent; p; p = p.parent) {
+  /* `enfant` : le nœud du chemin juste sous `p` (l’argument d’un appel qui contient la chaîne) */
+  for (let enfant = n, p = n.parent; p; enfant = p, p = p.parent) {
     if (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ts.isIdentifier(p.expression.expression) && p.expression.expression.text === "console") return true;
-    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text)) return true;
+    if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && A_L_EQUIPE.has(p.expression.text) && p.arguments.indexOf(enfant) >= A_L_EQUIPE.get(p.expression.text)) return true;
     if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && p.expression.text.endsWith("Error")) return true;
     /* L’instruction qui contient la chaîne : le commentaire juste au-dessus d’elle peut la dispenser */
     if (p.parent && (ts.isSourceFile(p.parent) || ts.isBlock(p.parent))) return (ts.getLeadingCommentRanges(source, p.pos) ?? []).some((c) => MARQUE.test(source.slice(c.pos, c.end)));

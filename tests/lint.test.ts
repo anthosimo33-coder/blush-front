@@ -136,14 +136,44 @@ describe("les règles du lint", { timeout: 60_000 }, () => {
     }
   });
 
-  it("une valeur levée n’est jamais supposée Error : ni `as Error`, ni `.catch((e: Error) =>` ; nomErreur et journalErreur, si", async () => {
+  it("une valeur levée n’est jamais supposée Error : ni `as Error`, ni `<Error>e`, ni `.catch((e: Error) =>`, ni le rejet de `.then` ; nomErreur et journalErreur, si", async () => {
     for (const chemin of ["src/server/stats.ts", "src/server/env.ts", "src/app/api/rapport/route.ts", "src/app/rapport/Essai.tsx", "src/components/ui/Essai.tsx"]) {
       expect(await regles(chemin, `export const f = (e: unknown) => (e as Error).name;\n`), chemin).toEqual(["no-restricted-syntax"]);
       expect(await regles(chemin, `export const f = (p: Promise<void>) => p.catch((e: Error) => e.name);\n`), chemin).toEqual(["no-restricted-syntax"]);
       expect(await regles(chemin, `import { nomErreur } from "@/lib/tracer";\nexport const f = (p: Promise<void>) => p.catch((e: unknown) => nomErreur(e));\n`), chemin).toEqual([]);
     }
-    /* Une Error construite ici, ou une sous-classe nommée, passe */
-    expect(await regles("src/server/stats.ts", `export const e: Error = new Error("x");\nexport const t = e as TypeError;\n`)).toEqual([]);
+    /* Les autres façons de le supposer : une sous-classe, un type de Node, une union, une intersection, `<Error>e`, le rejet de `.then` */
+    for (const source of [
+      "export const f = (e: unknown) => (e as TypeError).name;",
+      "export const f = (e: unknown) => (e as NodeJS.ErrnoException).code;",
+      "export const f = (e: unknown) => (e as Error | undefined)?.name;",
+      "export const f = (e: unknown) => (e as Error & { code?: string }).code;",
+      "export const f = (e: unknown) => (<Error>e).name;",
+      "export const f = (p: Promise<void>) => p.then(() => 1, (e: Error) => e.name);",
+      "export const f = (p: Promise<void>) => p.then(undefined, (e: Error) => e.name);",
+    ]) {
+      expect(await regles("src/server/stats.ts", `${source}\n`), source).toEqual(["no-restricted-syntax"]);
+    }
+    /* Une Error construite ici passe, comme une valeur résolue nommée ainsi (le premier argument de `.then`) */
+    expect(await regles("src/server/stats.ts", `export const e: Error = new Error("x");\n`)).toEqual([]);
+    expect(await regles("src/server/stats.ts", `export const f = (p: Promise<Error>) => p.then((e: Error) => e.name);\n`)).toEqual([]);
+  });
+
+  it("enLocal (le texte en clair, en local) ne s’importe que dans email.ts et alertes.ts ; le reste du journal, partout côté serveur", async () => {
+    for (const [chemin, source] of [
+      ["src/server/stats.ts", `import { enLocal } from "./journal";\nexport const f = (email: string) => enLocal(email);\n`],
+      ["src/server/ia/voix.ts", `import { enLocal } from "../journal";\nexport const f = (email: string) => enLocal(email);\n`],
+      ["src/app/api/rapport/route.ts", `import { enLocal } from "@/server/journal";\nexport const f = (email: string) => enLocal(email);\n`],
+      ["src/app/rapport/page.tsx", `import { enLocal } from "@/server/journal";\nexport const f = (email: string) => enLocal(email);\n`],
+    ]) {
+      expect(await regles(chemin, source), chemin).toEqual(["@typescript-eslint/no-restricted-imports"]);
+    }
+    for (const chemin of ["src/server/email.ts", "src/server/alertes.ts"]) {
+      expect(await regles(chemin, `import { enLocal } from "./journal";\nexport const f = (sujet: string) => enLocal(sujet);\n`), chemin).toEqual([]);
+    }
+    expect(await regles("src/server/stats.ts", `import { journal } from "./journal";\nexport const f = () => journal("x");\n`)).toEqual([]);
+    /* La liste du serveur reste en place dans email.ts et alertes.ts */
+    expect(await regles("src/server/email.ts", `import { useJourney } from "@/state/journey";\nexport const x = useJourney;\n`)).toEqual(["@typescript-eslint/no-restricted-imports"]);
   });
 
   it("ni `as CSSProperties`, ni l’appli dans le sous-module des prompts", async () => {

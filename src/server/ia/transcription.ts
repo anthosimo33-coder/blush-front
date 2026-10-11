@@ -112,7 +112,7 @@ export async function transcrire(
   if (!r?.ok) {
     if (compte) await auMieux(rendre(cleDesSecondes(compte), reservees), "secondes du vocal non rendues");
     if (r) journal("transcription en échec", { prestataire, statut: r.status }, "erreur");
-    else journalErreur("transcription en échec", panne, { prestataire, statut: "réseau" });
+    else journalErreur("transcription en échec", panne, { prestataire, statut: 0, panne: "reseau" });
     throw new ErreurTache("transcription");
   }
   const corps = (await r.json()) as { text?: string; transcription_id?: string; usage?: { prompt_audio_seconds?: number }; words?: { end?: number }[] };

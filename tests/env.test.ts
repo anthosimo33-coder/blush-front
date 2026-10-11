@@ -159,6 +159,6 @@ describe("les garde-fous de la production", () => {
     const avertir = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { env } = await charger();
     expect(env().BLUSH_IA_FACTICE).toBe(false);
-    expect(avertir).toHaveBeenCalledWith(expect.stringContaining("BLUSH_IA_FACTICE=1 sur Vercel"));
+    expect(avertir).toHaveBeenCalledWith(expect.stringContaining(`"variable":"BLUSH_IA_FACTICE"`));
   });
 });

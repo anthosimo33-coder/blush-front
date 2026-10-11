@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { champsDErreur, ligneDuJournal, nomErreur, tracer } from "@/lib/tracer";
+import { ErreurResend } from "@/server/email";
 import { ErreurTache } from "@/server/erreurs";
 import { auMieux, enLocal, journal, journalErreur } from "@/server/journal";
 
@@ -31,6 +32,8 @@ describe("ce qu’on garde d’une erreur", () => {
     expect(champsDErreur(Object.assign(new Error("x"), { code: "un texte avec des espaces" })).code).toBeUndefined();
     expect(champsDErreur("une chaîne")).toEqual({ erreur: "string", code: undefined, digest: undefined });
     expect(champsDErreur(null).erreur).toBe("null");
+    /* Le refus de Resend : son statut dans le code, ni l’adresse ni le message */
+    expect(champsDErreur(new ErreurResend(422))).toMatchObject({ erreur: "ErreurResend", code: "resend_422" });
   });
 
   it("nomErreur : le nom d’une erreur, le type de ce qui n’en est pas une (là où `(e as Error).name` donnait undefined)", () => {
@@ -80,6 +83,19 @@ describe("ce que le développeur lit en local", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     enLocal("[dev] code de connexion pour lea@blush.test : 123456");
     expect(log).toHaveBeenCalledWith("[dev] code de connexion pour lea@blush.test : 123456");
+  });
+
+  it("enLocal sur Vercel : rien en clair, une ligne du journal le dit", () => {
+    vi.stubEnv("VERCEL", "1");
+    try {
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      enLocal("[dev] code de connexion pour lea@blush.test : 123456");
+      expect(log).not.toHaveBeenCalled();
+      expect(warn.mock.calls.map((c) => JSON.parse(c[0] as string) as unknown)).toEqual([{ evenement: "sortie locale ignorée en ligne", niveau: "alerte" }]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

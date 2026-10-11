@@ -62,6 +62,10 @@ describe("la vérification de la typographie", () => {
     expect(ecran(`after(() => auMieux(() => inscrire(email), "liste d’attente : non inscrit"));\nenLocal(\`[dev] mail « \${sujet} » pour \${pour}\`);\ntracer("son : non joué", e);`)).toEqual([]);
     /* Le même texte hors de ces appels reste lu */
     expect(ecran(`const t = "liste d’attente : non inscrit";`)).toEqual([expect.stringContaining("espace normale avant « : »")]);
+    /* Le travail passé à auMieux (une closure ou une promesse) peut envoyer un mail : il reste lu, seul l’événement est dispensé */
+    const mail = `envoyerMail(u, { sujet: "Ton rapport : prêt" })`;
+    expect(ecran(`void auMieux(() => ${mail}, "mail : non parti");`)).toEqual([expect.stringContaining("espace normale avant « : »")]);
+    expect(ecran(`void auMieux(${mail}, "mail : non parti", { cle: "a : b" });`)).toEqual([expect.stringContaining("espace normale avant « : »")]);
     expect(ecran("/* typo: du code */\nconst CODE = `const x = a ? b : c;`;")).toEqual([]);
   });
 

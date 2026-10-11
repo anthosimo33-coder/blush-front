@@ -1,5 +1,4 @@
-import { after } from "next/server";
-import { executerChaine } from "@/server/pipeline";
+import { relancerApres } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
 import { erreur, lireCorps, repondre } from "@/server/http";
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
     if (qui) await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
     await planifier(story.id, "verdict");
   }
-  after(() => executerChaine(story.id));
+  relancerApres(story.id);
   return repondre("POST /api/analyse", { ok: true });
 }
 

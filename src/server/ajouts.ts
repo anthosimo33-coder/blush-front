@@ -1,6 +1,5 @@
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { after } from "next/server";
 import { messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
@@ -16,7 +15,7 @@ import { ErreurPublique } from "./erreurs";
 import { planifier } from "./taches";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
-import { executerChaine } from "./pipeline";
+import { relancerApres } from "./pipeline";
 import type { DonneesMemoire } from "./stockage/types";
 import { exigerSortie } from "./ia/appel-verifie";
 import { appeler } from "./ia/claude";
@@ -115,7 +114,7 @@ const profilLu = (a: Ajout) => a.lignes.flatMap((l) => {
 export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<FicheUpdate & { confirmed: [] }> {
   const echange: Echange = { date: aujourdhuiParis().iso, lignes: ajout.lignes, dit: "(il ajoute ça à sa fiche)" };
   const [, fiche] = await Promise.all([planifier(story.id, "memoire_maj", echange), ficheDe(story)]);
-  after(() => executerChaine(story.id));
+  relancerApres(story.id);
   /*
    * `confirmed` (toujours vide, le front ne le lit plus) reste dans la réponse le temps d’une mise en production : un
    * onglet ouvert avant elle garde l’ancien code, qui le lit sans vérifier (sa fiche planterait). À retirer au lot suivant.
@@ -143,6 +142,6 @@ export async function majEnCours(storyId: string): Promise<boolean> {
 export async function ficheEtMaj(story: Ligne): Promise<Fiche> {
   const [fiche, enCours] = await Promise.all([ficheDe(story), majEnCours(story.id)]);
   if (!enCours) return fiche;
-  after(() => executerChaine(story.id));
+  relancerApres(story.id);
   return { ...fiche, updating: true };
 }

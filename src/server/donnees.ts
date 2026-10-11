@@ -1,6 +1,5 @@
 import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
-import { after } from "next/server";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { SUBSCRIPTIONS } from "@/contenu/offres";
@@ -20,7 +19,7 @@ import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
 import { aSaConv, contexteDe, histoireOuverte, histoiresDuCompte, initialeDe, metaDe, personnesDe, type Ligne, type LigneComplete, type LigneEcran } from "./histoires";
-import { cloreLesAbandons, etatDepuis, executerChaine, reparerLaChaine } from "./pipeline";
+import { cloreLesAbandons, etatDepuis, reparerLaChaine, relancerApres } from "./pipeline";
 import type { EtatChaine } from "./chaine";
 import { assemblerRapport, enTete, ouvertureDu, type EnTete, type RapportLu } from "./presentation/rapport";
 import { aRelancer, etatDesTaches } from "./taches";
@@ -110,7 +109,7 @@ export const finDeLecture = cache(async (storyId: string): Promise<number | null
 /** Relance, après la réponse, les tâches en attente ou abandonnées de l’histoire. Celles coupées à leur dernier essai passent en échec. */
 export async function relancer(storyId: string): Promise<void> {
   await cloreLesAbandons(storyId);
-  if ((await aRelancer(storyId)).length) after(() => executerChaine(storyId));
+  if ((await aRelancer(storyId)).length) relancerApres(storyId);
 }
 
 /**

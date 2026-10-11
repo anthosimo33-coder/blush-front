@@ -124,14 +124,18 @@ describe("appeler : l’envoi", () => {
     const vues: Avance[] = [];
     const surAvance = (a: Avance) => {
       vues.push(a);
-      throw new Error("le suivi plante");
+      throw new Error("le suivi plante pour lea@exemple.test");
     };
+    const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await appeler(VERDICT, Format, { surAvance })).sortie).toEqual({ ok: true });
     expect(vues).toEqual([
       { reflexion: 3, texte: 0, ecrit: "" },
       { reflexion: 3, texte: 6, ecrit: '{"ok":' },
       { reflexion: 0, texte: 11, ecrit: '{"ok":true}' },
     ]);
+    /* Le suivi plante à chaque morceau : une seule ligne au journal, avec la tâche, sans le message */
+    expect(erreur.mock.calls.map((c) => JSON.parse(String(c[0])) as unknown)).toEqual([{ evenement: "suivi de l’avance en erreur", niveau: "erreur", tache: "04-verdict", erreur: "Error" }]);
+    erreur.mockRestore();
   });
 
   it("le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste", async () => {
