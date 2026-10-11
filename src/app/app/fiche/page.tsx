@@ -14,7 +14,7 @@ export default async function Page() {
   const [storyId, fiche] = await Promise.all([convChoisie(), getFicheEtMaj()]);
   if (!fiche) redirect(await sansHistoire("/app/fiche"));
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <ViewTransition enter={{ "nav-forward": "push-in", default: "none" }} exit={{ "nav-back": "pop-out", default: "none" }} default="none">
         <div className="[background:var(--paper-light)]">
           {/* L’heure du rendu : préchargée, la page peut dater de plusieurs minutes (voir FicheScreen) */}

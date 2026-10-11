@@ -20,7 +20,7 @@ export default async function Page() {
   /* Mode sobre (une alerte de danger) : pas de scène, le rapport tout de suite (l’effet de VerdictReveal reste en secours) */
   if (initial.sober) redirect("/rapport");
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <VerdictReveal initial={initial} story={story} rendu={rendu} />
     </PageDeConv>
   );

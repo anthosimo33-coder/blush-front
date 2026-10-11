@@ -20,6 +20,8 @@ const listeners = new Map<string, Set<Listener>>();
 const ecritLe = new Map<string, number>();
 /* L’heure de la dernière mise à jour optimiste : une lecture partie avant elle rapporte une donnée déjà dépassée */
 const modifieLe = new Map<string, number>();
+/* L’heure de la dernière invalidation : un rendu serveur pris avant elle n’est plus frais (renduFrais), il faut relire */
+const invalideLe = new Map<string, number>();
 /*
  * Les lectures en route, par clé : deux écrans montés ensemble (« Mon compte » et sa coque lisent le compte) n’en font
  * qu’une. Une invalidation l’oublie : la lecture d’après repart du serveur.
@@ -52,6 +54,7 @@ export function invalidate(...keys: Cle[]) {
   keys.forEach((k) => {
     cache.delete(k);
     ecritLe.delete(k);
+    invalideLe.set(k, Date.now());
     lectures.delete(k);
     listeners.get(k)?.forEach((l) => l());
   });
@@ -92,10 +95,12 @@ export function depart<T>(key: string, initial: T | undefined, rendu?: number): 
  * La donnée rendue par le serveur dispense de la relire au montage : rendue il y a moins de `frais` ms, et montée pour la
  * première fois (une page revue par l’historique repasse le même rendu : elle est relue), ou par le même `montage` de
  * page (MontageDeLaPage : ses écrans montés ensemble). L’écart compare l’horloge du serveur à celle du téléphone : un
- * rendu « dans le futur » de plus de 2 s (horloges décalées) ne compte pas comme frais.
+ * rendu « dans le futur » de plus de 2 s (horloges décalées) ne compte pas comme frais. Une clé invalidée depuis `rendu`
+ * ne l’est plus, même pour le même montage : « une invalidation l’oublie, la lecture d’après repart du serveur ».
  */
 export function renduFrais(key: string, rendu: number | undefined, frais: number, montage?: object): boolean {
   if (rendu === undefined) return false;
+  if ((invalideLe.get(key) ?? -Infinity) > rendu) return false;
   const vu = `${key}@${rendu}`;
   if (rendusVus.has(vu) && (montage === undefined || rendusVus.get(vu) !== montage)) return false;
   rendusVus.set(vu, montage);

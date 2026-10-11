@@ -137,8 +137,8 @@ export async function getRetour(): Promise<{ destination: string } | null> {
  * Sans requête de plus : le contexte de la requête est déjà lu pour la page (contexte, mémorisé le temps du rendu).
  */
 export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null }> {
-  const { utilisateur, story } = await contexte();
-  return { id: story?.id ?? null, compte: utilisateur ? compteDe(utilisateur, story) : null };
+  const { story } = await contexte();
+  return { id: story?.id ?? null, compte: await getCompte() };
 }
 
 /** Le compte, pour « Mon compte » : son email et son abonnement, dès le rendu serveur. null : pas connecté. */

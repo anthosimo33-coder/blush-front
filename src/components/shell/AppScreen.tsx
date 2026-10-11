@@ -7,7 +7,7 @@ import { offreAProposer, peut, type Besoin } from "@/lib/acces";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
-import { useCompteDeLaPage } from "./PoseConv";
+import { useCompteDeLaPage } from "./compte-de-la-page";
 import { AccountPill, Screen } from "./Screen";
 
 /* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */

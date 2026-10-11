@@ -12,7 +12,7 @@ export default async function Page() {
   const rendu = heureDuRendu();
   const [noms, convs, compte] = await Promise.all([getNomsDuCompte(), getConvs(), getCompte()]);
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <CompteScreen noms={noms} convs={convs} compte={compte} rendu={rendu} />
     </PageDeConv>
   );

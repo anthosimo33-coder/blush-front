@@ -48,16 +48,26 @@ describe("les pages d’une conv passent par PageDeConv", () => {
     const source = readFileSync(join(RACINE, page), "utf8");
     expect(source).toContain(`import { PageDeConv } from "@/components/shell/PageDeConv";`);
     /* Le retour de la page est enveloppé : <PageDeConv> ouvre le JSX rendu, et le ferme */
-    expect(source).toMatch(/return \(\n\s*<PageDeConv>\n[\s\S]*\n\s*<\/PageDeConv>\n\s*\);\n\}\n?$/);
+    expect(source).toMatch(/return \(\n\s*<PageDeConv rendu=\{rendu\}>\n[\s\S]*\n\s*<\/PageDeConv>\n\s*\);\n\}\n?$/);
+    /* Et c’est son seul JSX rendu : pas de `return <X />` plus tôt qui sauterait PageDeConv (redirect() n’en rend pas) */
+    expect(source.match(/return\s*\(?\s*</g)).toHaveLength(1);
+  });
+
+  it.each(PAGES)("%s prend l’heure du rendu en tête, avant ses lectures", (page) => {
+    const corps = readFileSync(join(RACINE, page), "utf8").split("export default async function Page")[1] ?? "";
+    const heure = corps.indexOf("const rendu = heureDuRendu();");
+    expect(heure).toBeGreaterThan(-1);
+    /* Prise après une lecture, elle daterait le compte (et la donnée de l’écran) trop tard : sa fraîcheur partirait de là */
+    expect(heure).toBeLessThan(corps.indexOf("await "));
   });
 
   it("personne d’autre ne pose la conv de la page à la main", () => {
     const fichiers = readdirSync(join(RACINE, "src"), { recursive: true, encoding: "utf8" })
       .filter((f) => /\.tsx?$/.test(f))
       .map((f) => join("src", f).split(sep).join("/"));
-    const poseurs = fichiers.filter((f) => /poserConvDeLaPage|from "\.\/PoseConv"|shell\/PoseConv"/.test(readFileSync(join(RACINE, f), "utf8")));
-    /* La session (qui la garde), PoseConv (qui la pose), et ceux qui lisent PoseConv : PageDeConv, la coque des écrans */
-    expect(poseurs.sort()).toEqual(["src/components/shell/AppScreen.tsx", "src/components/shell/PageDeConv.tsx", "src/components/shell/PoseConv.tsx", "src/services/session.ts"]);
+    const poseurs = fichiers.filter((f) => /poserConvDeLaPage|<PoseConv\b/.test(readFileSync(join(RACINE, f), "utf8")));
+    /* La session (qui la garde), PoseConv (qui la pose), PageDeConv (qui le rend). Lire le compte de la page n’en est pas */
+    expect(poseurs.sort()).toEqual(["src/components/shell/PageDeConv.tsx", "src/components/shell/PoseConv.tsx", "src/services/session.ts"]);
   });
 });
 
@@ -65,18 +75,16 @@ describe("PageDeConv", () => {
   it("pose la conv de la requête et le compte rendu, l’heure du rendu, puis rend son écran", async () => {
     const compte: Account = { email: "lea@blush.test", subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false }, storyDeleted: false };
     Object.assign(page, { id: "conv-a", compte });
-    const avant = Date.now();
-    const rendu = (await PageDeConv({ children: "l’écran" })) as ReactElement<{ id: string | null; compte: Account | null; rendu: number; children: string }>;
+    /* L’heure du rendu vient de la page (prise avant ses lectures) : PageDeConv la passe telle quelle */
+    const rendu = (await PageDeConv({ rendu: 1234, children: "l’écran" })) as ReactElement<{ id: string | null; compte: Account | null; rendu: number; children: string }>;
     expect(isValidElement(rendu)).toBe(true);
     expect(rendu.type).toBe(PoseConv);
-    expect(rendu.props).toMatchObject({ id: "conv-a", compte, children: "l’écran" });
-    expect(rendu.props.rendu).toBeGreaterThanOrEqual(avant);
-    expect(rendu.props.rendu).toBeLessThanOrEqual(Date.now());
+    expect(rendu.props).toMatchObject({ id: "conv-a", compte, rendu: 1234, children: "l’écran" });
   });
 
   it("sans conv ni compte : rien à poser, l’écran est rendu quand même", async () => {
     Object.assign(page, { id: null, compte: null });
-    const rendu = (await PageDeConv({ children: "l’écran" })) as ReactElement<{ id: string | null; compte: Account | null }>;
+    const rendu = (await PageDeConv({ rendu: 1234, children: "l’écran" })) as ReactElement<{ id: string | null; compte: Account | null }>;
     expect(rendu.props).toMatchObject({ id: null, compte: null, children: "l’écran" });
   });
 });

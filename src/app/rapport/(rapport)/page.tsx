@@ -8,8 +8,8 @@ import { PageDeConv } from "@/components/shell/PageDeConv";
 export const metadata: Metadata = { title: "Ton rapport" };
 
 export default async function Page({ searchParams }: PageProps<"/rapport">) {
-  const { paiement } = await searchParams;
   const rendu = heureDuRendu();
+  const { paiement } = await searchParams;
   const [initial, story] = await Promise.all([getReport(), getStory()]);
   /*
    * Les gardes sont dans layout.tsx (une vraie 307, avant le squelette) : celles-ci ne servent qu’au type, et à une
@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
   if (!story) redirect(await sansHistoire("/rapport"));
   if (!initial) redirect("/lecture");
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <ReportScreen initial={initial} story={story} openPaywall={paiement === "1"} rendu={rendu} />
     </PageDeConv>
   );

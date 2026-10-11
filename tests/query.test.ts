@@ -78,6 +78,19 @@ describe("renduFrais", () => {
     expect(renduFrais("compte-h", Date.now() - 20_000, 10_000, page)).toBe(false);
   });
 
+  it("une invalidation après le rendu le rend périmé, même pour un écran du même montage", () => {
+    const fiche: Fiche = { person: { id: "p1", name: "Inès", initial: "I" }, portrait: "", updatedLabel: "", facts: [], summary: "rendue", summaryShort: "" };
+    const rendu = Date.now() - 500;
+    const page = {};
+    expect(renduFrais("fiche:i", rendu, 10_000, page)).toBe(true);
+    /* Un geste a invalidé la donnée : un écran monté ensuite dans la même page la relit */
+    invalidate("fiche:i");
+    expect(depart("fiche:i", fiche, rendu)).toEqual({ valeur: fiche, duServeur: true });
+    expect(renduFrais("fiche:i", rendu, 10_000, page)).toBe(false);
+    /* Un rendu pris après l’invalidation, lui, est frais */
+    expect(renduFrais("fiche:i", Date.now() + 1, 10_000, {})).toBe(true);
+  });
+
   it("un rendu « dans le futur » (horloges décalées) n’est pas frais", () => {
     expect(renduFrais("rapport-e", Date.now() + 60_000, 10_000)).toBe(false);
     expect(renduFrais("rapport-f", Date.now() + 1000, 10_000)).toBe(true);

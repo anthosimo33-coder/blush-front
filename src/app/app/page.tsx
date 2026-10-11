@@ -16,9 +16,9 @@ export const metadata: Metadata = { title: "Accueil" };
  * L’arrivée ne se joue qu’une fois par jour : un cookie (posé par l’accueil, jusqu’à minuit) la saute ensuite, dès le rendu serveur.
  */
 export default async function Page({ searchParams }: PageProps<"/app">) {
-  const { depuis } = await searchParams;
-  /* L’historique du chat rendu ici n’est pas relu à l’ouverture (HomeScreen, `rendu`) */
+  /* L’historique du chat rendu ici n’est pas relu à l’ouverture (HomeScreen, `rendu`), ni le compte (PageDeConv) */
   const rendu = heureDuRendu();
+  const { depuis } = await searchParams;
   const [storyId, jar] = await Promise.all([convChoisie(), cookies()]);
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
@@ -42,7 +42,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
    * capturé sur toute la hauteur de la conv, et le départ attendrait cette image (HomeScreen, « 10 · »).
    */
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <div className="[background:var(--paper-light)]">
         <HomeScreen
           quick={quick}

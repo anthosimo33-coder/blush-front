@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { heureDuRendu } from "@/lib/rendu";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES, PREMIER_PAYANT } from "@/contenu/chapitres";
 import { moiEtAutre } from "@/lib/participants";
 import { suiteSure } from "@/lib/suite";
@@ -9,6 +10,8 @@ import { PageDeConv } from "@/components/shell/PageDeConv";
 export const metadata: Metadata = { title: "C’est débloqué" };
 
 export default async function Page({ searchParams }: PageProps<"/rapport/debloque">) {
+  /* L’heure du rendu, avant les lectures : le compte posé par PageDeConv en part */
+  const rendu = heureDuRendu();
   const sp = await searchParams;
   const offer = sp.offre === "rapport" ? "rapport" : "blushplus";
   /* Où reprendre après : seulement une adresse interne */
@@ -23,7 +26,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
   const autre = story ? moiEtAutre(story).autre.pronoun : undefined;
   return (
-    <PageDeConv>
+    <PageDeConv rendu={rendu}>
       <UnlockedScreen offer={offer} next={next} restants={restants} reprise={PREMIER_PAYANT} autre={autre} />
     </PageDeConv>
   );
