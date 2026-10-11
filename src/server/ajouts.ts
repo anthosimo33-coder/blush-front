@@ -10,14 +10,15 @@ import type { Echange } from "@prompts/lib/memoire";
 import { Sortie01 } from "@prompts/lib/schemas";
 import type { Fiche, FicheUpdate } from "@/types";
 import type { CodeErreur } from "@/types/erreurs-api";
-import { executerChaine } from "./analyse";
 import * as coffre from "./coffre";
-import type { DonneesMemoire } from "./coffre";
 import { ficheDe } from "./donnees";
 import { ErreurPublique } from "./erreurs";
 import { planifier } from "./taches";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
+import { executerChaine } from "./pipeline";
+import type { DonneesMemoire } from "./stockage/types";
+import { exigerSortie } from "./ia/appel-verifie";
 import { appeler } from "./ia/claude";
 import { aujourdhuiParis } from "./temps";
 
@@ -76,17 +77,20 @@ export async function depuisExport(story: Ligne, memoire: DonneesMemoire, lu: Ex
   return garder(story, memoire, messages, []);
 }
 
-/** Des captures, lues par le prompt 01 : les nouveaux messages de leur conv, et ce qu’on lit sur son profil. */
+/**
+ * Des captures, lues par le prompt 01 : les nouveaux messages de leur conv, et ce qu’on lit sur son profil. Rien de
+ * lisible : « capture » ; un refus du modèle : « refus » (exigerSortie), que le chat et la fiche savent dire.
+ */
 export async function depuisCaptures(story: Ligne, memoire: DonneesMemoire, images: Image[]): Promise<Ajout> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
   const j = aujourdhuiParis();
   const a = await appeler(requeteCaptures({ prenom: h.utilisateur.prenom, autre: h.autre.prenom, appli: meta.appli, aujourdhui: j.t, images }), Sortie01, { storyId: story.id, etiquette: "captures" });
-  if (!a.sortie) throw new ErreurAjout("capture");
-  const profil = a.sortie.profil.map((p) => p.trim()).filter(Boolean);
-  const lus = a.sortie.blocs.some((b) => b.messages.length);
+  const lues = exigerSortie(a, new ErreurAjout("capture"));
+  const profil = lues.profil.map((p) => p.trim()).filter(Boolean);
+  const lus = lues.blocs.some((b) => b.messages.length);
   if (!lus && !profil.length) throw new ErreurAjout("capture");
-  const messages = lus ? messagesDesCaptures(a.sortie, h, { aujourdhui: j.iso, apres: curseurDe(story) }) : [];
+  const messages = lus ? messagesDesCaptures(lues, h, { aujourdhui: j.iso, apres: curseurDe(story) }) : [];
   return garder(story, memoire, messages, profil);
 }
 

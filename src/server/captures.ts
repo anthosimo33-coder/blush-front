@@ -12,6 +12,7 @@ import { env } from "./env";
 import { ErreurPublique } from "./erreurs";
 import { brouillonDe, metaDe, type Meta } from "./histoires";
 import { ErreurImport } from "./import";
+import { exigerSortie } from "./ia/appel-verifie";
 import { appeler } from "./ia/claude";
 import { LIMITES, sousLaLimite } from "./limites";
 import { sousLaLimiteDuCompte } from "./requete";
@@ -81,14 +82,14 @@ export async function lireCaptures(images: Image[], appli: string): Promise<Text
 /**
  * La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). Les lots d’un
  * enregistrement sont notés à part dans ai_usage (« captures_video ») : la durée d’un import de captures (un seul appel,
- * de 1 à 20 images) se mesure alors sans eux, pour décider s’il faut le lire en lots.
+ * de 1 à 20 images) se mesure alors sans eux, pour décider s’il faut le lire en lots. Une sortie illisible : « fichier » ;
+ * un refus du modèle : « refus » (exigerSortie).
  */
 export async function lireLot(images: Image[], appli: string, etiquette: "captures" | "captures_video" = "captures"): Promise<Captures> {
   /* Le budget de l’IA du jour (src/server/budget.ts) : la lecture est payée par le compte connecté, sinon par la part sans compte */
   const compte = await utilisateurDeSession(await lireSession());
   const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette, compte });
-  if (!a.sortie) throw new ErreurImport("fichier");
-  return a.sortie;
+  return exigerSortie(a, new ErreurImport("fichier"));
 }
 
 /** Une lecture au format « captures » que la lecture de la conv connaît. Rien de lisible : l’erreur « capture ». */

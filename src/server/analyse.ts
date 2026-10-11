@@ -1,11 +1,10 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
-import type { z } from "zod";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
-import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal, type Requete } from "@prompts/lib/contextes";
+import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { chapitresAffiches, messagesAffiches, scores, sobreAffiche, tempsDeLecture, type ChapitreAffiche, type LigneScore } from "@prompts/lib/front";
 import { appliquerMaj, citees, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
-import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
+import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { trouvailles } from "@prompts/lib/trouvailles";
@@ -18,8 +17,8 @@ import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from ".
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
-import { appeler, type Avance } from "./ia/claude";
-import { tempsRestant } from "./echeance";
+import type { Avance } from "./ia/claude";
+import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
@@ -38,8 +37,7 @@ import { enregistrerVocal, vocalAJour } from "./vocal";
 /*
  * Repris ici pour les modules qui les lisent encore à cette adresse : le moteur est dans pipeline.ts, les formes
  * gardées dans stockage/types.ts. Ces reprises partent au lot 9a (retrait des ré-exportations), ou avant, au fil des
- * lots qui tiennent leurs importeurs : 5b (le chat, les ajouts), 7c (scripts/essai-vrai-modele.mts), et les tests de
- * leurs zones.
+ * lots qui tiennent leurs importeurs : 7c (scripts/essai-vrai-modele.mts), et les tests de leurs zones.
  */
 export { executerChaine } from "./pipeline";
 export { editionsBornees, type DonneesMemoire, type DonneesRapport, type DonneesVerdict } from "./stockage/types";
@@ -60,38 +58,6 @@ function relire(story: LigneComplete) {
   const lu = lire(conv, h, { autresEnTexte: true });
   return { meta, h, lu, rendu: rendre(h, lu) };
 }
-
-/**
- * Un appel dont chaque preuve doit exister. Une sortie illisible, une preuve introuvable, ou une sortie incomplète
- * (`complet` : ce que l’étape attend, comme des chapitres) : on rejoue une fois. Au second essai, les preuves
- * introuvables sont simplement ignorées à l’affichage, et une sortie incomplète est rendue telle quelle.
- */
-async function appelVerifie<S extends z.ZodType>(
-  req: Requete,
-  format: S,
-  ids: (s: z.infer<S>) => string[],
-  lignes: Map<string, string>,
-  storyId: string,
-  etiquette: string,
-  surAvance?: (a: Avance) => void,
-  signal?: AbortSignal,
-  complet?: (s: z.infer<S>) => boolean,
-): Promise<z.infer<S>> {
-  for (let essai = 0; essai < 2; essai++) {
-    const a = await appeler(req, format, { storyId, etiquette, surAvance, signal });
-    /* Un refus qui tient malgré le repli : sa catégorie va dans le code d’erreur (et dans l’alerte) */
-    if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
-    if (!a.sortie) continue;
-    /* Il manque ce que l’étape attend : on rejoue cet appel seul (pas toute l’étape), si le temps le permet */
-    if (complet && !complet(a.sortie) && essai === 0 && tempsRestant() >= TEMPS_RELANCE) continue;
-    /* Des preuves introuvables : on rejoue, si le temps le permet (sinon, elles sont ignorées à l’affichage, comme au second essai) */
-    if (!introuvables(ids(a.sortie), lignes).length || essai === 1 || tempsRestant() < TEMPS_RELANCE) return a.sortie;
-  }
-  throw new ErreurTache("sortie_illisible");
-}
-
-/** Le temps qu’il faut encore pour rejouer un appel dont des preuves sont introuvables. */
-const TEMPS_RELANCE = 90_000;
 
 /* ———— Les étapes ———— */
 
@@ -123,7 +89,7 @@ async function verdict(story: LigneComplete, t: Tache) {
   /* Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, preuvesVerdict, rendu.lignes, story.id, "verdict", suivreAvance(t.id, avanceVerdict));
+  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, { preuves: preuvesVerdict, lignes: rendu.lignes, storyId: story.id, etiquette: "verdict", surAvance: suivreAvance(t.id, avanceVerdict) });
   /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
   const sortie: Verdict = { ...brute, mode_sobre: !!brute.alerte };
   const data = coffre.ecrire("verdicts.data", { sortie, scores: scores(chiffres) });
@@ -144,23 +110,21 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
   const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (v.sortie.mode_sobre) {
-    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, preuvesRapport, rendu.lignes, story.id, "rapport", undefined, undefined, (x) => !!x.sobre);
+    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, { preuves: preuvesRapport, lignes: rendu.lignes, storyId: story.id, etiquette: "rapport", complet: (x) => !!x.sobre });
     /* Le rapport sobre sans sa partie sobre : un écran vide. On le refait plutôt que de le garder */
     if (!r.sobre) throw new ErreurTache("sobre_vide");
     await garderRapport(story, { ...r, chapitres: null }, rendu.lignes, v.scores);
     return;
   }
-  const etape = await appelVerifie(
-    requeteRapport(rendu, v.sortie, DEMANDE_PLAN),
-    Etape05,
-    (e) => (e.plan ? preuvesPlan(e.plan) : []),
-    rendu.lignes,
-    story.id,
-    "rapport_plan",
-    suivreAvance(t.id, avancePlan),
-    undefined,
-    (e) => !!e.plan,
-  );
+  const etape = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN), Etape05, {
+    preuves: (e) => (e.plan ? preuvesPlan(e.plan) : []),
+    lignes: rendu.lignes,
+    storyId: story.id,
+    etiquette: "rapport_plan",
+    etape: "plan",
+    surAvance: suivreAvance(t.id, avancePlan),
+    complet: (e) => !!e.plan,
+  });
   if (!etape.plan) throw new ErreurTache("plan_vide");
   const plan = coffre.ecrire("reports.plan", etape.plan);
   await db()
@@ -219,17 +183,16 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
-    appelVerifie(
-      requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)),
-      Etape05,
-      (e) => preuvesChapitres(e.chapitres),
-      rendu.lignes,
-      story.id,
-      "rapport_chapitres",
-      suivi.surAvance(quels === "1 à 4" ? 1 : 5, abandon.signal),
-      abandon.signal,
-      (e) => !!e.chapitres?.length,
-    ).catch((e: unknown) => {
+    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, {
+      preuves: (e) => preuvesChapitres(e.chapitres),
+      lignes: rendu.lignes,
+      storyId: story.id,
+      etiquette: "rapport_chapitres",
+      etape: `chapitres ${quels}`,
+      surAvance: suivi.surAvance(quels === "1 à 4" ? 1 : 5, abandon.signal),
+      signal: abandon.signal,
+      complet: (e) => !!e.chapitres?.length,
+    }).catch((e: unknown) => {
       abandon.abort();
       throw e;
     });
@@ -237,7 +200,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
    * Le vocal s’écrit en même temps, sur le plan : il est prêt avant les chapitres. Son échec n’arrête pas le rapport
    * (la tâche « vocal », planifiée après, le refera).
    */
-  const enParallele = vocal(story, v.sortie, { plan }, choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), false).catch((e) =>
+  const enParallele = vocal(story, { verdict: v.sortie, rapport: { plan }, lignes: choisir(rendu.lignes, [...preuvesPlan(plan), ...preuvesVerdict(v.sortie)]), sobre: false }).catch((e) =>
     console.error(`vocal pendant l’écriture : ${e instanceof ErreurTache ? e.message : (e as Error).name}`),
   );
   /*
@@ -317,11 +280,11 @@ const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flat
  * s’arrête sur « voix_budget » (elle repart après minuit, src/server/pipeline.ts). Une autre erreur de la voix garde
  * son code (« voix_429 »…).
  */
-async function vocal(story: Ligne, verdict: Verdict, rapport: { plan: Plan } | { court: string }, lignes: Map<string, string>, sobre: boolean) {
+async function vocal(story: Ligne, { verdict, rapport, lignes, sobre }: { verdict: Verdict; rapport: { plan: Plan } | { court: string }; lignes: Map<string, string>; sobre: boolean }) {
   if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
   if (await voixBloquee(story.id, "rapport")) throw new ErreurTache("voix_budget");
   const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
-  const script = await appelVerifie(req, Sortie06, preuvesVocal, lignes, story.id, "vocal");
+  const script = await appelVerifie(req, Sortie06, { preuves: preuvesVocal, lignes, storyId: story.id, etiquette: "vocal" });
   if (script.alerte) return;
   try {
     await enregistrerVocal(story, script, lignes, sobre);
@@ -358,7 +321,7 @@ async function vocalTache(story: LigneComplete) {
    * distingue : rien à migrer en SQL. À retirer quand plus aucun verdict d’avant le 9 octobre n’a mode_sobre sans alerte.
    */
   const sobre = r.sobre ? `\nmode sobre : ${r.sobre.intro} ${r.sobre.titre} ${r.sobre.faits} ${r.sobre.reassurance}` : "";
-  await vocal(story, v.sortie, { court: rapportCourt(r) + sobre }, lignes, r.mode_sobre || v.sortie.mode_sobre);
+  await vocal(story, { verdict: v.sortie, rapport: { court: rapportCourt(r) + sobre }, lignes, sobre: r.mode_sobre || v.sortie.mode_sobre });
 }
 
 /** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
@@ -368,7 +331,7 @@ async function memoire(story: LigneComplete) {
   const ligne = await ligneRapport(story.id);
   if (!v || !ligne?.data) throw new ErreurTache("rapport_absent");
   const r = coffre.lire("reports.data", ligne.data).sortie;
-  const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, preuvesMemoire, rendu.lignes, story.id, "memoire");
+  const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, { preuves: preuvesMemoire, lignes: rendu.lignes, storyId: story.id, etiquette: "memoire" });
   if (!etat.memoire || !etat.fiche) throw new ErreurTache("memoire_vide");
   const gardees = [...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!] as [string, string]);
   const data = coffre.ecrire("memories.data", { etat, lignes: gardees, suivant: lu.messages.length + 1 });
@@ -398,7 +361,7 @@ async function memoireMaj(story: Ligne, t: Tache) {
       const nouveau = rendreNouveau(ech, h, lignes, suivant);
       const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau, editionsBornees(avant.editions));
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-      const maj = await appelVerifie(req, Maj07, (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, story.id, "memoire_maj");
+      const maj = await appelVerifie(req, Maj07, { preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)), lignes, storyId: story.id, etiquette: "memoire_maj", etape: "mise à jour" });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
       const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);

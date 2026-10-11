@@ -10,14 +10,14 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours, resumeAjout } from "@/server/ajouts";
-import { executerChaine } from "@/server/analyse";
 import { historique, repondre } from "@/server/chat";
 import { ficheDe, memoireDe } from "@/server/donnees";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { transcrire } from "@/server/ia/transcription";
+import { executerChaine } from "@/server/pipeline";
 import { captures, memoire, msg } from "./aide/fabriques";
 import { texteDeConv } from "./aide/fichiers";
-import { compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const texte01 = texteDeConv("01-a-deux-doigts.txt");
 const h = { utilisateur: { prenom: "Hugo", pronom: "il" as const, nomExport: "Hugo" }, autre: { prenom: "Sophie", pronom: "elle" as const, nomExport: "Sophie" } };
@@ -150,6 +150,13 @@ describe("après l’import : le chat et sa fiche", () => {
       expect(ajout.profil).toBe(1);
       expect(numero(ajout.lignes[0])).toBe(numero(exporte.lignes.at(-1)!) + 1);
       expect(derniere("01-captures")).toContain("autre personne : Sophie");
+    });
+
+    it("des captures que le modèle refuse de lire : le refus (que le chat et la fiche savent dire), jamais « capture »", async () => {
+      const lire = async () => depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
+      await expect(avecFactice(() => refusFactice("cyber"), lire)).rejects.toMatchObject({ code: "refus:cyber" });
+      /* Illisible : « capture » */
+      await expect(avecFactice(() => ({ rien: "de lisible" }), lire)).rejects.toMatchObject({ code: "capture" });
     });
   });
 

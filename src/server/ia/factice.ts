@@ -1,27 +1,54 @@
 import "server-only";
+import type { z } from "zod";
 import type { Requete } from "@prompts/lib/contextes";
 import { estLigneMessage, idDeLigne, lireLigne } from "@prompts/lib/ligne";
+import type { Captures, Chapitre, Etape05, Maj, Memoire, Rapport, ReponseChat, Verdict, Vocal } from "@prompts/lib/schemas";
+import { env } from "../env";
 
-/* Un modèle factice (BLUSH_IA_FACTICE=1, pour les tests et le dev sans coût) : des sorties valides, qui citent de vrais identifiants de la conv. */
+/*
+ * Un modèle factice (BLUSH_IA_FACTICE=1, pour les tests et le dev sans coût) : des sorties valides, qui citent de vrais
+ * identifiants de la conv. Chacune est écrite au type de son schéma (`satisfies`), et tests/unit/factice.test.ts les
+ * passe toutes par leur schéma : une sortie factice qui ne le passerait plus serait rejouée en silence (appeler).
+ */
+
+/**
+ * Le mode factice : le modèle, la voix et la transcription ne partent jamais chez un prestataire, ils rendent des
+ * réponses fixes (src/server/ia/claude.ts, voix.ts, transcription.ts). La seule question à poser pour le savoir : jamais
+ * sur Vercel (src/server/env.ts l’éteint), et jamais « une clé manque ».
+ */
+export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
+
+/**
+ * L’étape d’une tâche qui en a plusieurs : le plan ou une moitié des chapitres du rapport (05), la mise à jour de la
+ * mémoire (07, sa création sinon). Le vrai modèle la lit dans la demande ; appeler (src/server/ia/claude.ts) la passe
+ * au modèle factice avec la requête, au lieu qu’il la devine au libellé de la demande.
+ */
+export type EtapeDuModele = "plan" | "chapitres 1 à 4" | "chapitres 5 à 8" | "mise à jour";
+
+/** La requête telle que la reçoit le modèle factice : avec son étape (appeler l’ajoute). */
+export type RequeteFactice = Requete & { etape?: EtapeDuModele };
+
 const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
 const ids = (req: Requete) => [...new Set(textes(req).join("\n").split("\n").filter(estLigneMessage).map(idDeLigne))];
 
 /** Ce qu’une sortie factice rend pour simuler un refus du modèle (src/server/ia/claude.ts le traite comme un vrai refus). */
 export const REFUS_FACTICE = "@@refus@@";
 /** Un refus avec sa catégorie, comme les filtres du prestataire (« cyber ») : le code d’erreur la porte (« refus:cyber »). */
-export const refusFactice = (categorie: string) => `${REFUS_FACTICE}:${categorie}`;
+export const refusFactice = (categorie: string) => `${REFUS_FACTICE}:${categorie}` as const;
 
-/*
- * Les déclencheurs, pour les tests de bout en bout (tests/e2e/aide/exports.ts les écrit dans une conv) : des marqueurs
- * inventés, qui font prendre au modèle factice un chemin qu’il ne prend jamais sinon. Le modèle factice n’existe pas
- * sur Vercel (src/server/env.ts) : la production ne les lit jamais.
+/**
+ * Les déclencheurs, pour les tests (tests/e2e/aide/exports.ts les écrit dans une conv, avec les mêmes textes, que
+ * tests/unit/factice.test.ts compare) : des marqueurs inventés, qui font prendre au modèle factice un chemin qu’il ne
+ * prend jamais sinon. Le modèle factice n’existe pas sur Vercel (src/server/env.ts) : la production ne les lit jamais.
+ * `alerte` : dans la conv, le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts).
+ * `refus` : dans la conv, le modèle refuse de la lire (le verdict) ; dans un message au chat, il refuse d’y répondre.
  */
-/** Dans la conv : le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts). */
-const ALERTE_FACTICE = "#factice-alerte";
-/** Dans la conv : le modèle refuse de la lire (le verdict). Dans un message au chat : il refuse d’y répondre. */
-const REFUS_DANS_LE_TEXTE = "#factice-refus";
+export const FACTICE = { alerte: "#factice-alerte", refus: "#factice-refus" } as const;
 
-const chapitre = (numero: number, p: string[]) => ({
+/** Ce que rend le modèle factice : la sortie d’une tâche, au type de son schéma, ou un refus (REFUS_FACTICE, refusFactice). */
+export type SortieFactice = Captures | Verdict | Rapport | z.infer<typeof Etape05> | Vocal | Memoire | Maj | ReponseChat | typeof REFUS_FACTICE | ReturnType<typeof refusFactice>;
+
+const chapitre = (numero: number, p: string[]): Chapitre => ({
   numero,
   titre: `Chapitre ${numero}`,
   titre_court: `Ch. ${numero}`,
@@ -33,7 +60,7 @@ const chapitre = (numero: number, p: string[]) => ({
   ],
 });
 
-export function fournisseurFactice(req: Requete): unknown {
+export function fournisseurFactice(req: RequeteFactice): SortieFactice {
   /* Lire des captures : une transcription fixe de 24 messages, l’avant-veille et la veille du jour de la requête, et une ligne de son profil */
   if (req.tache === "01-captures") {
     const auj = Date.parse(`${textes(req)[0].match(/aujourd’hui : \S+ (\d{4}-\d{2}-\d{2})/)?.[1] ?? "2026-09-09"}T00:00:00Z`);
@@ -48,14 +75,14 @@ export function fournisseurFactice(req: Requete): unknown {
       ],
       profil: ["Étudiante en droit à Lyon"],
       doutes: [],
-    };
+    } satisfies Captures;
   }
   const p = ids(req);
   const demande = textes(req).at(-1)!;
   const tout = textes(req).join("\n");
-  if (req.tache === "04-verdict" && tout.includes(REFUS_DANS_LE_TEXTE)) return REFUS_FACTICE;
+  if (req.tache === "04-verdict" && tout.includes(FACTICE.refus)) return REFUS_FACTICE;
   /* Une alerte : pas d’emoji, pas de niveau, un pas pour soi (prompts/04-verdict.md, « La sécurité d’abord ») */
-  if (req.tache === "04-verdict" && tout.includes(ALERTE_FACTICE))
+  if (req.tache === "04-verdict" && tout.includes(FACTICE.alerte))
     return {
       alerte: "danger",
       mode_sobre: true,
@@ -71,9 +98,9 @@ export function fournisseurFactice(req: Requete): unknown {
       tendance: null,
       prochain_pas: "Cette semaine, parles-en à quelqu’un de confiance.",
       devinette: null,
-    };
+    } satisfies Verdict;
   /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec une alerte ») */
-  if (req.tache === "05-rapport" && tout.includes(ALERTE_FACTICE))
+  if (req.tache === "05-rapport" && tout.includes(FACTICE.alerte))
     return {
       alerte: "danger",
       mode_sobre: true,
@@ -89,7 +116,7 @@ export function fournisseurFactice(req: Requete): unknown {
         gestes: ["Parles-en à quelqu’un de confiance.", "Garde une trace de ce qui t’inquiète.", "Appelle une ligne d’écoute si ça pèse trop."],
         brouillon: "J’ai besoin de temps pour moi.",
       },
-    };
+    } satisfies Rapport;
   if (req.tache === "04-verdict")
     return {
       alerte: null,
@@ -106,8 +133,8 @@ export function fournisseurFactice(req: Requete): unknown {
       tendance: null,
       prochain_pas: "Samedi, tu lui réponds en face.",
       devinette: "C’est flou parce que t’as esquivé.",
-    };
-  if (req.tache === "05-rapport" && demande.startsWith("Étape : le plan"))
+    } satisfies Verdict;
+  if (req.tache === "05-rapport" && req.etape === "plan")
     return {
       plan: {
         alerte: null,
@@ -117,7 +144,7 @@ export function fournisseurFactice(req: Requete): unknown {
         chapitres: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ numero: n, titre: `Chapitre ${n}`, titre_court: `Ch. ${n}`, surtitre: null, periode: "hors du fil", scenes: [{ quand: "12/09", quoi: "une scène", preuves: [p[n]] }], epice: "une vanne" })),
       },
       chapitres: null,
-    };
+    } satisfies z.infer<typeof Etape05>;
   if (req.tache === "06-vocal")
     return {
       alerte: null,
@@ -128,9 +155,9 @@ export function fournisseurFactice(req: Requete): unknown {
         { jeu: "serious, slower", texte: "Samedi, tu lui poses LA question.", punch: true, preuve: null },
         { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
       ],
-    };
-  if (req.tache === "05-rapport") return { plan: null, chapitres: (demande.includes("1 à 4") ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) };
-  if (req.tache === "07-memoire" && demande.includes("Moment : la mise à jour."))
+    } satisfies Vocal;
+  if (req.tache === "05-rapport") return { plan: null, chapitres: (req.etape === "chapitres 1 à 4" ? [1, 2, 3, 4] : [5, 6, 7, 8]).map((n) => chapitre(n, p)) } satisfies z.infer<typeof Etape05>;
+  if (req.tache === "07-memoire" && req.etape === "mise à jour")
     return {
       alerte: null,
       rien_de_neuf: false,
@@ -154,11 +181,11 @@ export function fournisseurFactice(req: Requete): unknown {
       phrase_courte: null,
       niveau: null,
       questions: null,
-    };
+    } satisfies Maj;
   if (req.tache === "10-chat") {
     /* Le vocal : « parle-moi en vocal » l’active, « écris-moi » l’arrête ; <vocal> dit que la réponse part en vocal */
     const dernier = demande.split("\n").filter((l) => l.includes("(à toi) :")).at(-1) ?? "";
-    if (dernier.includes(REFUS_DANS_LE_TEXTE)) return REFUS_FACTICE;
+    if (dernier.includes(FACTICE.refus)) return REFUS_FACTICE;
     const modeVocal = dernier.includes("parle-moi en vocal") ? "activer" : dernier.includes("écris-moi") ? "arreter" : null;
     const enVocal = modeVocal === "activer" || (modeVocal !== "arreter" && demande.includes("<vocal>"));
     /* « je lui envoie quoi » : la phrase à lui envoyer ; « on est ensemble » : un niveau de franchi */
@@ -185,7 +212,7 @@ export function fournisseurFactice(req: Requete): unknown {
             { jeu: "laughing", texte: "Et toi, tu fais le mec occupé. Tu lui as répondu quoi ?" },
           ]
         : null,
-    };
+    } satisfies ReponseChat;
   }
   if (req.tache === "07-memoire")
     return {
@@ -202,6 +229,6 @@ export function fournisseurFactice(req: Requete): unknown {
       fiche: { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [{ section: "aime", texte: "Le libanais", preuves: [p[4]], statut: "nouveau" }] },
       niveau: { niveau: "dit", tendance: null, pourquoi: "vus quatre fois", preuves: [p[2]] },
       questions: ["pourquoi elle vanne ?", "je relance trop ?", "samedi je fais quoi ?", "qui craque en premier ?"],
-    };
+    } satisfies Memoire;
   throw new Error(`tâche factice inconnue : ${req.tache}`);
 }

@@ -1,12 +1,17 @@
 import { and, desc, eq } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+/* after() de Next ne vit que dans une requête : ici, ce qui devait partir après la réponse est gardé (reparerLaChaine) */
+const apres = vi.hoisted(() => [] as (() => unknown)[]);
+vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
+
 import type { Utilisateur } from "@/server/auth";
 import { historique, repondre } from "@/server/chat";
 import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
 import { depuisFichier, ErreurImport, importer, metaDe, storyAffichee, type LigneComplete } from "@/server/histoires";
-import { executerChaine } from "@/server/pipeline";
+import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import type { DonneesRapport, DonneesVocal } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
 import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalLu } from "@/server/vocal";
@@ -183,5 +188,25 @@ describe("purge", () => {
     const r = await purger();
     expect(r.brouillons).toBeGreaterThanOrEqual(1);
     expect(await db().select().from(schema.stories).where(eq(schema.stories.id, id))).toHaveLength(0);
+  });
+});
+
+describe("hors de la chaîne (reparerLaChaine)", () => {
+  /** Les plans du rapport planifiés pour cette histoire. */
+  const plans = (id: string) => db().select({ status: schema.tasks.status }).from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
+
+  it("l’accès est celui du compte de l’histoire, lu en base : sans lui, le rapport ne part pas ; avec, il part", async () => {
+    const u = await compteDeTest("reparer");
+    const { id } = await histoireLue(u, "06-elle-hesite.txt");
+    /* Un compte gratuit : rien ne part, quoi que croie l’appelant */
+    expect(await reparerLaChaine(await ligneEnBase(id))).toBe(false);
+    expect(await plans(id)).toEqual([]);
+    /* L’accès arrive (le déblocage) : le plan du rapport part, puis la chaîne après la réponse */
+    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
+    const lances = apres.length;
+    expect(await reparerLaChaine(await ligneEnBase(id))).toBe(true);
+    expect(await plans(id)).toEqual([{ status: "attente" }]);
+    expect(apres).toHaveLength(lances + 1);
+    apres.length = 0;
   });
 });

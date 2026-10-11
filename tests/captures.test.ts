@@ -6,8 +6,12 @@ import { versTexteCaptures } from "@prompts/lib/captures";
 import { lireCaptures } from "@/server/captures";
 import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
+import { ErreurTache } from "@/server/erreurs";
 import { definirQui, histoireDe, importerCaptures, metaDe } from "@/server/histoires";
+import { ErreurImport } from "@/server/import";
+import { refusFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { captures, msg } from "./aide/fabriques";
+import { avecFactice } from "./aide/fixtures";
 
 describe("des captures à l’histoire", () => {
   it("transcrit, crée le brouillon, et prend le prénom de l’utilisateur", async () => {
@@ -35,5 +39,18 @@ describe("des captures à l’histoire", () => {
       ],
     });
     expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe("# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis");
+  });
+});
+
+describe("des captures que le modèle ne lit pas", () => {
+  const IMAGES = [{ media: "image/png" as const, base64: "AA==" }];
+
+  it("un refus du modèle : « refus » (sa catégorie dans le code interne), jamais pris pour un fichier illisible", async () => {
+    await expect(avecFactice(() => refusFactice("cyber"), () => lireCaptures(IMAGES, "instagram"))).rejects.toMatchObject({ code: "refus:cyber" } satisfies Partial<ErreurTache>);
+    await expect(avecFactice(() => REFUS_FACTICE, () => lireCaptures(IMAGES, "instagram"))).rejects.toBeInstanceOf(ErreurTache);
+  });
+
+  it("une sortie illisible : « fichier »", async () => {
+    await expect(avecFactice(() => ({ rien: "de lisible" }), () => lireCaptures(IMAGES, "instagram"))).rejects.toMatchObject({ code: "fichier" } satisfies Partial<ErreurImport>);
   });
 });

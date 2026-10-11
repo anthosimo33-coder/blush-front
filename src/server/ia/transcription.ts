@@ -7,6 +7,7 @@ import { ErreurTache } from "../erreurs";
 import { auMieux, journal } from "../journal";
 import { compter, LIMITES, rendre } from "../limites";
 import { DUREE_VOCAL_MAX_S, lireAudio, TAILLE_VOCAL_MAX } from "./duree-audio";
+import { iaFactice } from "./factice";
 import { noterCout } from "./usage";
 import { effacerChezLePrestataire, ELEVENLABS, sansConservation, signalerSansIdentifiant } from "./voix";
 
@@ -70,14 +71,14 @@ export async function transcrire(
 ): Promise<string | null | "trop"> {
   const e = env();
   const prestataire = e.MISTRAL_API_KEY ? "mistral" : e.ELEVENLABS_API_KEY ? "elevenlabs" : null;
-  if (!prestataire && !e.BLUSH_IA_FACTICE) return null;
+  if (!prestataire && !iaFactice()) return null;
   /* Les secondes du jour, comptées aussi par le modèle factice (les tests, le développement) : elles bornent pareil */
   const reservees = Math.ceil(duree);
   if (compte && (await compter(cleDesSecondes(compte), LIMITES.secondesVocalParCompte, reservees)) > LIMITES.secondesVocalParCompte.max) {
     await rendre(cleDesSecondes(compte), reservees);
     return "trop";
   }
-  if (e.BLUSH_IA_FACTICE || !prestataire) return "bon elle m’a répondu ok pour samedi, mais elle a mis trois heures, je lui dis quoi";
+  if (iaFactice() || !prestataire) return "bon elle m’a répondu ok pour samedi, mais elle a mis trois heures, je lui dis quoi";
   const { modele, prixMinute } = PRESTATAIRES[prestataire];
   const fd = new FormData();
   const debut = Date.now();

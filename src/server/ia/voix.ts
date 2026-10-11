@@ -11,6 +11,7 @@ import { delaiAppel, tempsRestant } from "../echeance";
 import { auMieux, journal } from "../journal";
 import { compteDe, compter, LIMITES, rendre, sousLaLimite } from "../limites";
 import { aujourdhuiParis, pause } from "../temps";
+import { iaFactice } from "./factice";
 import { noterCout } from "./usage";
 
 /*
@@ -83,7 +84,7 @@ export function voixPour(cle: string): Voix {
 /** Le vocal est-il possible ? Il faut la clé et la voix A ; en mode factice (tests, dev), une voix muette suffit. */
 export function voixDisponible(): boolean {
   const e = env();
-  return !!(e.ELEVENLABS_API_KEY && e.BLUSH_VOIX_A) || e.BLUSH_IA_FACTICE;
+  return iaFactice() || !!(e.ELEVENLABS_API_KEY && e.BLUSH_VOIX_A);
 }
 
 /**
@@ -226,14 +227,16 @@ export function scriptQuiTient<L extends LigneScript>(lignes: L[], max: number):
  * Fait dire le texte par la voix, coupé pour son usage (couper ; par défaut, une réponse du chat). Le mode sobre est
  * joué plus posé. Au-delà du budget de la voix, rien ne part (ErreurVoix « voix_budget_… »). Une erreur passagère (trop
  * de requêtes en même temps, une panne) est réessayée deux fois. Ce que le prestataire en garde est effacé ensuite.
+ * En mode factice (iaFactice), une voix muette ; sans lui et sans clé, rien ne part (ErreurVoix « voix_absente » :
+ * voixDisponible le dit avant).
  */
 export async function dire(texte: string, voix: Voix, { sobre, storyId, pour = "chat" }: { sobre: boolean; storyId?: string; pour?: UsageVoix }): Promise<{ audio: Buffer; alignement: Alignement }> {
-  const e = env();
   const dit = couper(texte, COUPE_VOIX[pour]);
   if (!dit) throw new ErreurVoix("voix_vide");
+  if (!iaFactice() && !env().ELEVENLABS_API_KEY) throw new ErreurVoix("voix_absente");
   const payeur = await payeurDe(storyId);
   const reserve = await reserver(dit.length, payeur, pour);
-  if (!e.ELEVENLABS_API_KEY) {
+  if (iaFactice()) {
     await reserve.mois();
     return muette(dit);
   }

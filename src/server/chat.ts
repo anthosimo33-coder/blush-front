@@ -10,12 +10,13 @@ import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, LevelId } from "@/types";
-import { editionsBornees } from "./analyse";
 import { ErreurTache } from "./erreurs";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
-import { appeler, textesSysteme, type Avance } from "./ia/claude";
+import { editionsBornees, type DonneesMemoire } from "./stockage/types";
+import { appelVerifie } from "./ia/appel-verifie";
+import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
 import { dire, ErreurVoix, voixDisponible, voixPour } from "./ia/voix";
 import { planifier } from "./taches";
@@ -116,7 +117,7 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, MessageA
  */
 export async function repondre(
   story: Ligne,
-  memoire: coffre.DonneesMemoire,
+  memoire: DonneesMemoire,
   ditBrut: string,
   ajout?: { ajout: Ajout; affiche: string },
   {
@@ -150,19 +151,25 @@ export async function repondre(
   });
   const messages = messagesAffiches(lignes, h.utilisateur.prenom);
 
-  let sortie: ReponseChat | null = null;
-  /* Les bulles déjà montrées : un nouvel essai réécrirait autre chose, il n’y en a plus */
-  let montrees = 0;
-  for (let essai = 0; essai < 2 && !sortie; essai++) {
-    const auFil = surEvenement ? bullesAuFil(lignes, messages, vocalAttendu, surEvenement) : null;
-    const a = await appeler(req, Sortie10, { storyId: story.id, etiquette: "chat", ...(auFil ? { surAvance: auFil.surAvance } : {}), ...(differer ? { differer } : {}) });
-    montrees += auFil?.montrees() ?? 0;
-    if (a.refus) throw new ErreurTache(a.categorie ? `refus:${a.categorie}` : "refus");
-    /* Une preuve introuvable : on rejoue, sauf au second essai ou après une bulle montrée (la citation n’est alors pas affichée : bullesAffichees l’ignore) */
-    if (a.sortie && (!introuvables(preuvesChat(a.sortie), lignes).length || essai === 1 || montrees > 0)) sortie = a.sortie;
-    else if (montrees > 0) break;
-  }
-  if (!sortie) throw new ErreurTache("sortie_illisible");
+  /*
+   * Une preuve introuvable : on rejoue (appelVerifie), sauf après une bulle montrée, qu’un nouvel essai réécrirait autrement
+   * (la citation n’est alors pas affichée : bullesAffichees l’ignore). Chaque essai suit ses propres bulles.
+   */
+  const sortie: ReponseChat = await appelVerifie(req, Sortie10, {
+    preuves: preuvesChat,
+    lignes,
+    storyId: story.id,
+    etiquette: "chat",
+    ...(differer ? { differer } : {}),
+    ...(surEvenement
+      ? {
+          parEssai: () => {
+            const auFil = bullesAuFil(lignes, messages, vocalAttendu, surEvenement);
+            return { surAvance: auFil.surAvance, rejouable: () => auFil.montrees() === 0 };
+          },
+        }
+      : {}),
+  });
 
   /* Le garde-fou : une réponse qui recopie les prompts est remplacée */
   const fuite = recopieLesPrompts(texteDe(sortie), textesSysteme);

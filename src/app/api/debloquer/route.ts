@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   }
   /* Le rapport s’il n’a jamais été lancé, ou la mémoire d’un rapport sobre déjà offert : ce qui manque part, une seule fois */
   if (story) {
-    await reparerLaChaine(story, true);
+    await reparerLaChaine(story);
     after(() => executerChaine(story.id));
   }
   return repondre("POST /api/debloquer", SUBSCRIPTIONS.blushplus);

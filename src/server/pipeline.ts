@@ -75,7 +75,7 @@ async function lireEtat(storyId: string): Promise<EtatChaine> {
 }
 
 /** Le compte de l’histoire a-t-il l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */
-async function aAcces(story: Ligne): Promise<boolean> {
+async function aAcces(story: Pick<Ligne, "userId">): Promise<boolean> {
   if (!story.userId) return false;
   const [u] = await db().select({ plan: schema.users.plan }).from(schema.users).where(eq(schema.users.id, story.userId));
   return !!u && peut(u.plan, "rapport");
@@ -93,15 +93,17 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  * Hors de la chaîne (à l’ouverture du rapport, au déblocage) : planifie ce qui devait partir et n’a jamais été
  * lancé, puis la chaîne repart après la réponse. Le rapport et la mémoire d’un accès donné après coup, la mémoire
  * d’un rapport sobre offert puis débloqué, le vocal d’un rapport écrit avant lui ou d’une ancienne version du script.
- * `etat` : celui déjà lu par l’appelant (le rapport le lit une fois pour tout). Vrai si une tâche vient d’être lancée.
+ * L’accès est celui du compte de l’histoire, lu en base comme à la fin de chaque étape (aAcces) : jamais celui que
+ * croit l’appelant. `etat` : celui déjà lu par l’appelant (le rapport le lit une fois pour tout). Vrai si une tâche
+ * vient d’être lancée.
  */
-export async function reparerLaChaine(story: Pick<Ligne, "id">, acces: boolean, etat?: EtatChaine): Promise<boolean> {
+export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?: EtatChaine): Promise<boolean> {
   /*
    * Ce que le budget de l’IA a arrêté avant minuit repart d’abord : la chaîne le reprend, comme une étape planifiée.
    * Tenté seulement si l’état déjà lu montre une étape arrêtée par lui : sinon, l’ouverture du rapport ne paie pas une
    * requête de plus. Les mises à jour de la mémoire arrêtées (hors de la chaîne) repartent au suivi (cloreLesAbandons)
    */
-  const lu = etat ?? (await lireEtat(story.id));
+  const [lu, acces] = await Promise.all([etat ?? lireEtat(story.id), aAcces(story)]);
   const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && (estBudget(t.error) || estBudgetVoix(t.error)));
   if (arretee && (await reprendreApresMinuit(story.id))) {
     after(() => executerChaine(story.id));
