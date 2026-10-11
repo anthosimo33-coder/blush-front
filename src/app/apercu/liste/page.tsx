@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { NBSP } from "@/lib/format";
+import { lireTous } from "@/server/apercu";
 import { cheminDesApercus } from "@/server/drapeaux";
-import { lireTous } from "../lire";
 
 export const metadata: Metadata = { title: "Aperçu des convs de test" };
 export const dynamic = "force-dynamic";

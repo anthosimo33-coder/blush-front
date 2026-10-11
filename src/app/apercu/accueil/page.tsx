@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { lireApercu } from "@/server/apercu";
 import { cheminDesApercus, configDuChatLocal } from "@/server/drapeaux";
 import { ApercuNav } from "../ApercuNav";
-import { lireApercu } from "../lire";
 import { ApercuAccueil } from "./ApercuAccueil";
 
 export const metadata: Metadata = { title: "Aperçu de l’accueil" };

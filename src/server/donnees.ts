@@ -14,7 +14,7 @@ import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_R
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { echecDe } from "./erreurs";
-import { faitsAffiches } from "./ecrans/fiche";
+import { ficheAffichee } from "./ecrans/fiche";
 import { verdictAffiche } from "./ecrans/rapport";
 import { lireBrouillon, lireChoisie, lireSession } from "./cookies";
 import { db, schema } from "./db";
@@ -237,9 +237,7 @@ export async function ficheDe(story: Ligne): Promise<Fiche> {
   const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomOppose(meta.pronom) };
   const m = await memoireDe(story.id);
   if (!m) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
-  const { fiche } = m.etat;
-  const portrait = fiche.portrait.replace(/^\p{Ll}/u, (l) => l.toUpperCase());
-  return { person, portrait, updatedLabel: "mise à jour aujourd’hui", facts: faitsAffiches(m.etat, new Map(m.lignes)), summary: fiche.phrase, summaryShort: fiche.phrase_courte };
+  return ficheAffichee(person, m.etat, new Map(m.lignes));
 }
 
 /** Les 4 idées de questions de la mémoire. */

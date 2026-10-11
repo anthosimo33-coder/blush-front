@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { lireApercu } from "@/server/apercu";
 import { cheminDesApercus } from "@/server/drapeaux";
 import { FicheScreen } from "../../app/fiche/FicheScreen";
 import { ApercuNav } from "../ApercuNav";
-import { lireApercu } from "../lire";
 
 export const metadata: Metadata = { title: "Aperçu de sa fiche" };
 export const dynamic = "force-dynamic";

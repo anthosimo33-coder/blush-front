@@ -3,14 +3,17 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { ReponseDemandee } from "@prompts/lib/apercu";
 import { hoteLocal } from "@/lib/hote-local";
 import { configDuChatLocal } from "@/server/drapeaux";
+import { bullesAffichees } from "@/server/ecrans/chat";
+import { messagesAffiches } from "@/server/ecrans/messages";
 import { lireCorps, memeOrigine } from "@/server/http";
 import { FIL_MAX, PAS_DE_REPONSE, TEXTE_MAX } from "./bornes";
 
 export const dynamic = "force-dynamic";
 
-/* `memoires` : le dossier des mémoires des convs de test (une par conv, `01.json`…) */
+/* `lanceur` : prompts/evals/lancer.mts ; `memoires` : le dossier des mémoires des convs de test (une par conv, `01.json`…) */
 type Config = { lanceur: string; cas: string; memoire: string; memoires?: string; cle: string; workspace?: string };
 
 const Demande = z.object({
@@ -23,8 +26,10 @@ const Demande = z.object({
 
 /**
  * Hors de Vercel seulement (src/proxy.ts), et avec BLUSH_DEMANDER : pose une question au vrai chat (prompt 10), à partir
- * de la mémoire (prompt 07), via le lanceur des prompts. La config (des chemins, jamais la clé elle-même) est dans le
- * fichier BLUSH_DEMANDER. Ce poste seulement (le proxy le vérifie déjà pour tout /apercu : src/proxy.ts ; la route le
+ * de la mémoire (prompt 07), via le lanceur des prompts (lancé par tsx). La config (des chemins, jamais la clé elle-même)
+ * est dans le fichier BLUSH_DEMANDER. Le lanceur rend la sortie brute du chat et les lignes qu’elle peut citer
+ * (ReponseDemandee, prompts/lib/apercu.ts) : la réponse est mise en bulles ici, comme celles de l’appli
+ * (src/server/ecrans). Ce poste seulement (le proxy le vérifie déjà pour tout /apercu : src/proxy.ts ; la route le
  * revérifie, elle ne dépend pas du matcher), une question et un fil bornés (Demande, ./bornes.ts) : 400 sinon.
  */
 export async function POST(req: Request) {
@@ -48,7 +53,7 @@ export async function POST(req: Request) {
     ...(conf.workspace ? { ANTHROPIC_WORKSPACE_ID: (await readFile(conf.workspace, "utf8")).trim() } : {}),
   };
   const sortie = await new Promise<string>((ok, ko) => {
-    const p = spawn(process.execPath, [conf.lanceur, "10", ...quelle, "--demande", text, "--historique", JSON.stringify(history)], { env });
+    const p = spawn(process.execPath, ["--import", "tsx", conf.lanceur, "10", ...quelle, "--demande", text, "--historique", JSON.stringify(history)], { env });
     let s = "";
     p.stdout.on("data", (d) => (s += d));
     p.stderr.on("data", (d) => (s += d));
@@ -56,9 +61,20 @@ export async function POST(req: Request) {
     p.on("error", ko);
   });
   const ligne = sortie.split("\n").find((l) => l.startsWith("@@BLUSH@@"));
-  if (!ligne) {
+  const lu = ligne ? reponseLue(ligne.slice("@@BLUSH@@".length)) : null;
+  if (!lu?.sortie) {
     console.error(sortie.slice(-1500));
     return Response.json(PAS_DE_REPONSE);
   }
-  return new Response(ligne.slice("@@BLUSH@@".length), { headers: { "content-type": "application/json" } });
+  return Response.json(bullesAffichees(lu.sortie, messagesAffiches(new Map(lu.lignes), lu.prenom)));
+}
+
+/** La réponse du lanceur, lue par son schéma ; null si elle est illisible. */
+function reponseLue(texte: string): ReponseDemandee | null {
+  try {
+    const ok = ReponseDemandee.safeParse(JSON.parse(texte));
+    return ok.success ? ok.data : null;
+  } catch {
+    return null;
+  }
 }
