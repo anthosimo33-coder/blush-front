@@ -73,7 +73,7 @@ type Ok = { ok: true };
 /* ———— Ce que les routes reçoivent ———— */
 
 /** « Qui es-tu ? » : qui tu es dans la conv (l’un de ses deux participants, p0 ou p1), ton pronom, ta devinette, ce que tu veux. */
-export const Qui = z.object({
+const Qui = z.object({
   me: z.enum(["p0", "p1"]),
   pronom: z.enum(PRONOMS),
   guess: z.enum(GUESSES),
@@ -222,3 +222,9 @@ export type CleRoute = keyof Routes;
 
 /** Les routes qui répondent du JSON. Les autres répondent un audio ou une image (Blob), hors de repondre et d’appel. */
 export type CleJson = { [K in CleRoute]: Routes[K]["reponse"] extends Blob ? never : K }[CleRoute];
+
+/**
+ * Les routes dont l’adresse est celle de leur clé, telle quelle : pas de segment à remplir (« [id] »). Le navigateur
+ * n’appelle qu’elles par leur clé (requete, src/services/api.ts) : « /api/vocal/chat/[id] » n’est pas une adresse.
+ */
+export type CleFixe = Exclude<CleRoute, `${string}[${string}`>;

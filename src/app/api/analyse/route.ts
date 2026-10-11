@@ -6,7 +6,7 @@ import { erreur, lireCorps, memeOrigine, repondre } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES, sousLaLimite } from "@/server/limites";
 import { etatDesTaches, planifier } from "@/server/taches";
-import { Qui } from "@/types/api";
+import { ROUTES } from "@/types/api";
 
 /* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
 export const maxDuration = 300;
@@ -19,8 +19,13 @@ export const maxDuration = 300;
  */
 export async function POST(req: Request) {
   if (!memeOrigine(req)) return erreur("origine");
-  /* « Qui es-tu ? », ou rien : un corps qui ne le suit pas (`{}`, l’écran de lecture) est une relance */
-  const qui = await lireCorps(req, Qui);
+  /*
+   * Le corps de sa ligne : « Qui es-tu ? » rempli (il a `me`), ou `{}`, une relance depuis l’écran de lecture. Un corps
+   * qui n’est ni l’un ni l’autre (null) est pris pour une relance aussi, comme avant : y répondre « qui » serait une
+   * autre décision
+   */
+  const lu = await lireCorps(req, ROUTES["POST /api/analyse"].corps);
+  const qui = lu && "me" in lu ? lu : null;
   const { utilisateur, story } = await contexteRequete(!!qui);
   if (!utilisateur) return erreur("connexion");
   if (!story) return erreur("aucune");

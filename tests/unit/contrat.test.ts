@@ -2,13 +2,14 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 import { sensDeTendance } from "@/lib/tendance";
-import { ROUTES, type CleJson, type CleRoute, type Moi, type Routes } from "@/types/api";
+import { ROUTES, type CleFixe, type CleJson, type CleRoute, type Moi, type Routes } from "@/types/api";
 
 /*
  * Le contrat HTTP (src/types/api.ts) : chaque route de src/app/api y a sa ligne, et chaque ligne sa route ; chaque route
- * répond sous sa propre ligne (repondre) et lit son corps par son schéma (lireCorps). Le navigateur n’en importe que des
- * types : zod reste au serveur. Ce que le compilateur vérifie (les deux bouts sous le même type) est écrit plus bas, en
- * @ts-expect-error : `npm run check` (tsc) le relit.
+ * répond sous sa propre ligne (repondre) et lit son corps par le schéma de cette ligne (lireCorps). Le navigateur n’en
+ * importe que des types (zod reste au serveur), et appelle les routes par la couche de service, pas par un fetch à
+ * lui. Ce que le compilateur vérifie (les deux bouts sous le même type) est écrit plus bas, en @ts-expect-error :
+ * `npm run check` (tsc) le relit. La couche de service elle-même : tests/unit/api-client.test.ts.
  */
 
 const RACINE = process.cwd();
@@ -80,6 +81,24 @@ describe("la table des routes", () => {
     }
   });
 
+  it("une route lit le corps de sa ligne par le schéma de cette ligne, ou par une constante qui l’étend (.extend), jamais par un autre", () => {
+    for (const r of routes) {
+      /* Les schémas tirés d’une ligne dans le fichier : `const Corps = ROUTES["…"].corps.extend(…)` */
+      const etendus = new Map([...r.source.matchAll(/const\s+(\w+)\s*=\s*ROUTES\["([^"]+)"\]\.corps\s*\.extend\(/g)].map(([, nom, cle]) => [nom, cle]));
+      /* La ligne de chaque schéma passé à lireCorps ; un schéma d’ailleurs garde son texte, entre parenthèses */
+      const lues = [...r.source.matchAll(/lireCorps\(\s*\w+\s*,\s*([^)]*?)\s*\)/g)].map(([, schema]) => /^ROUTES\["([^"]+)"\]\.corps$/.exec(schema)?.[1] ?? etendus.get(schema) ?? `(${schema})`);
+      const attendues = r.methodes.map((m) => `${m} ${r.chemin}`).filter((cle) => (ROUTES[cle as CleRoute] as { corps?: unknown }).corps);
+      expect({ fichier: r.fichier, lues: [...new Set(lues)].sort() }).toEqual({ fichier: r.fichier, lues: attendues.sort() });
+    }
+  });
+
+  it("le navigateur n’appelle par sa clé qu’une route sans segment à remplir : « /api/vocal/chat/[id] » n’est pas une adresse", () => {
+    expectTypeOf<Exclude<CleRoute, CleFixe>>().toEqualTypeOf<"GET /api/vocal/chat/[id]">();
+    // @ts-expect-error : une clé à segment dynamique
+    const dynamique: CleFixe = "GET /api/vocal/chat/[id]";
+    expect(dynamique).toBeDefined();
+  });
+
   it("le corps de chaque ligne est un schéma qui refuse ce qui n’est pas un objet", () => {
     for (const cle of lignes) {
       const { corps } = ROUTES[cle] as { corps?: { safeParse: (v: unknown) => { success: boolean } } };
@@ -141,6 +160,24 @@ describe("le navigateur n’importe du contrat que des types", () => {
       }
     }
     expect(fautifs).toEqual([]);
+  });
+});
+
+describe("le navigateur appelle les routes par le contrat", () => {
+  /*
+   * Les appels qui passent encore à côté, par un fetch direct : la liste d’attente et son retrait (à reprendre dans
+   * src/services/api.ts avec les formulaires email), et le réveil de la base, une balise dont la réponse n’est pas lue
+   */
+  const A_COTE = ["src/app/attente/AttenteScreen.tsx", "src/app/attente/retirer/RetirerScreen.tsx", "src/components/shell/Reveil.tsx"];
+
+  it("hors du serveur, seule la couche de service (src/services/api.ts) passe une adresse /api/ à fetch", async () => {
+    const appelants: string[] = [];
+    for (const f of (await fichiers(join(RACINE, "src"))).filter((f) => /\.tsx?$/.test(f))) {
+      const chemin = relative(RACINE, f).split(sep).join("/");
+      if (chemin.startsWith("src/server/") || chemin.startsWith("src/app/api/") || chemin === "src/services/api.ts") continue;
+      if (/\b(?:fetch|sendBeacon)\(\s*["'`]\/api\//.test(await readFile(f, "utf8"))) appelants.push(chemin);
+    }
+    expect(appelants.sort()).toEqual([...A_COTE].sort());
   });
 });
 

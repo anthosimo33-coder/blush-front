@@ -1,11 +1,13 @@
 /*
- * Couche de service BLUSH, dans le navigateur : le seul point de contact avec les données, par les routes /api du
- * back-end, sous les types de leur contrat (src/types/api.ts). Les cookies de session sont httpOnly : le navigateur les
- * envoie, il ne les lit pas. Les pages serveur passent par serveur.ts.
+ * Couche de service BLUSH, dans le navigateur : le point de contact avec les données, par les routes /api du back-end,
+ * sous les types de leur contrat (src/types/api.ts). Les cookies de session sont httpOnly : le navigateur les envoie, il
+ * ne les lit pas. Les pages serveur passent par serveur.ts. Trois appels passent encore à côté, par un fetch direct :
+ * la liste d’attente et son retrait (src/app/attente, à reprendre ici avec ses formulaires email), et le réveil de la
+ * base (src/components/shell/Reveil.tsx, une balise dont la réponse n’est pas lue).
  */
 import type { AnalysisProgress, AppKind, BlushAnswer, BulleChat, EvenementChat, EvenementEcoute, Fiche, FicheFact, FicheUpdate, Goal, Guess, Plan, Pronom, QuestionAnswer, Source, Subscription } from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
-import type { Account, AvanceVideo, CibleImage, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
+import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
@@ -54,8 +56,11 @@ type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal }
 /** Ce qu’un appel à la route K prend : son corps, quand sa ligne du contrat en reçoit un (un objet JSON, ou un formulaire). */
 type ArgumentsDe<K extends CleRoute> = [Routes[K]["corps"]] extends [never] ? [options?: Options & { corps?: never }] : [options: Options & { corps: Routes[K]["corps"] }];
 
-/** La requête d’une route du contrat : sa clé dit la méthode et l’adresse. Un corps JSON part en JSON, un formulaire tel quel. */
-function requete<K extends CleRoute>(cle: K, options: Options & { corps?: Routes[K]["corps"] } = {}, entetes?: HeadersInit): Promise<Response> {
+/**
+ * La requête d’une route du contrat : sa clé dit la méthode et l’adresse (une adresse sans segment à remplir, CleFixe).
+ * Un corps JSON part en JSON, un formulaire tel quel (le navigateur pose son content-type, avec sa frontière).
+ */
+function requete<K extends CleFixe>(cle: K, options: Options & { corps?: Routes[K]["corps"] } = {}, entetes?: HeadersInit): Promise<Response> {
   const [method, chemin] = cle.split(" ");
   const { corps, recherche, keepalive, signal } = options;
   const h = avecConv(entetes);
@@ -73,13 +78,14 @@ function requete<K extends CleRoute>(cle: K, options: Options & { corps?: Routes
 
 /**
  * Le corps JSON d’une réponse de la route K : ce que dit sa ligne du contrat, ou `{ erreur }` ; `{}` sans JSON (un
- * serveur qui tombe, une page d’erreur). Le seul endroit où le navigateur croit le serveur sur parole, sans le revérifier
- * (zod n’entre pas dans ses pages) : le serveur répond sous le même type (repondre, src/server/http.ts).
+ * serveur qui tombe, une page d’erreur). L’un des deux endroits où le navigateur croit le serveur sur parole, sans le
+ * revérifier (zod n’entre pas dans ses pages) : le serveur répond sous le même type (repondre, src/server/http.ts).
+ * L’autre : les lignes du flux du chat, lues comme des EvenementChat (src/types), le type sous lequel la route les émet.
  */
 const corpsDe = <K extends CleRoute>(r: Response): Promise<Routes[K]["reponse"] & Partial<ReponseErreur>> => r.json().catch(() => ({}));
 
 /** Un appel à une route du contrat qui répond du JSON : sa réponse, ou une ErreurApi avec son code. Un audio, une image : requete. */
-async function appel<K extends CleJson>(cle: K, ...[options]: ArgumentsDe<K>): Promise<Routes[K]["reponse"]> {
+async function appel<K extends CleJson & CleFixe>(cle: K, ...[options]: ArgumentsDe<K>): Promise<Routes[K]["reponse"]> {
   const r = await requete(cle, options);
   const corps = await corpsDe<K>(r);
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
@@ -132,6 +138,7 @@ async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat =
           reste += decodeur.decode(value, { stream: !done });
           const lignes = reste.split("\n");
           reste = lignes.pop() ?? "";
+          /* Chaque ligne est crue sur parole, comme dans corpsDe : la route les émet sous ce type (enFlux, src/app/api/chat/route.ts) */
           for (const l of lignes) if (l.trim()) traiter(JSON.parse(l) as EvenementChat);
           if (done) break;
         }
@@ -519,7 +526,7 @@ export async function creerLienPartage(): Promise<{ url: string; verdict: Verdic
   const { id, verdict, v } = await appel("POST /api/partage");
   const url = `${window.location.origin}/v/${id}`;
   /* `story` : l’image story à sa version (`v`, donnée par le serveur), que le CDN garde : la feuille l’a tout de suite */
-  return { url, verdict, story: `${url}/image?format=story${v ? `&v=${encodeURIComponent(v)}` : ""}` };
+  return { url, verdict, story: `${url}/image?format=story&v=${encodeURIComponent(v)}` };
 }
 
 /** L’image « Partager en image » (story), dessinée par le serveur d’après le contenu du compte. */

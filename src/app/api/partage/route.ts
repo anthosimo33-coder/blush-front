@@ -27,8 +27,11 @@ export async function POST(req: Request) {
     const { id, verdict } = await partager(story);
     /* Compté après la réponse : la feuille attend ce lien pour demander l’image story */
     after(() => compter(CLES.partageOuvert));
-    /* `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`) */
-    return repondre("POST /api/partage", { id, verdict, v: versionImage(id, verdict) });
+    /*
+     * `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`). Du
+     * verdict, ce que la feuille montre et reprend dans le texte partagé (VerdictMontre), pas son sous-titre
+     */
+    return repondre("POST /api/partage", { id, verdict: { emoji: verdict.emoji, title: verdict.title }, v: versionImage(id, verdict) });
   } catch (e) {
     if (e instanceof ErreurPartage) return erreur(e.code);
     throw e;

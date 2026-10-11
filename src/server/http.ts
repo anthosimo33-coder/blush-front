@@ -12,7 +12,9 @@ const json = (corps: unknown, status: number, entetes: Record<string, string>) =
 /**
  * La réponse d’une route, sous le type de sa ligne du contrat (Routes, src/types/api.ts) : le compilateur vérifie
  * qu’elle le suit, et le navigateur la lit sous ce même type (appel, src/services/api.ts). La clé nomme la route qui
- * répond : tests/unit/contrat.test.ts vérifie que c’est bien la sienne.
+ * répond : tests/unit/contrat.test.ts vérifie que c’est bien la sienne. Le type ne retire rien : un objet qui a des
+ * champs en plus (une variable, pas un littéral) passe, et ses champs partent avec lui. Une route n’envoie que ce que
+ * dit sa ligne en l’écrivant champ par champ.
  */
 export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse"], status = 200, entetes: Record<string, string> = {}) => json(corps, status, entetes);
 
