@@ -49,7 +49,26 @@ import { useHydrated } from "@/state/journey";
 import type { BulleChat, ConvSummary, Fiche, LevelId, Pronom, Report } from "@/types";
 import { RecordingBar, useVoiceRecorder, VocalBlush, VoiceNote, type VoiceClip, type VoiceError } from "./voice";
 import { IDEES_MASQUEES } from "./idees";
-import { fusion, idHistorique, memesMessages, remonter, type Conv } from "./garde";
+import { fusion, memesMessages, remonter, type Conv } from "./garde";
+import {
+  CLE_INTRO,
+  CLE_JOUR_INTRO,
+  cleBulle,
+  clock,
+  dayLabel,
+  depli,
+  echangesEnMsgs,
+  introDe,
+  maintenantDe,
+  rowsOf,
+  tapeEncore,
+  typeInconnu,
+  type EchangeScript,
+  type Msg,
+  type MsgABulles,
+  type NewMsg,
+  type Row,
+} from "./accueil/conv/modele";
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/app/rapport/Partage.tsx) arrive à part, après l’affichage */
 const PartageImageSheet = dynamic(() => import("../rapport/Partage").then((m) => m.PartageImageSheet), { ssr: false });
@@ -147,63 +166,6 @@ function useDesktop() {
 
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
-
-/**
- * `at` : l’heure du message. `seed` : pour l’intro, un moment fixé par rapport à l’ouverture (hier soir). `answered` : la
- * réponse qui remplace « BLUSH écrit ». `vagues` : une réponse arrivée au fil de l’eau, où commence chaque arrivée de
- * bulles (chacune se déplie à son tour, ce qui est déjà posé ne bouge plus).
- */
-type Stamp = { at?: number; seed?: { day: number; h: number; m: number }; answered?: boolean; vagues?: number[] };
-
-/**
- * `about` : le point d’une réponse de BLUSH que tu creuses (glissé vers la droite). `event` : un repère dans la conv (un niveau franchi).
- * `reading` : BLUSH écrit encore ; `recues`, ses bulles déjà arrivées ; `coupee`, le réseau a coupé avant la fin (« Réessayer »).
- */
-type Msg = (
-  | { id: number; from: "blush"; intro: "next" | "hint" }
-  | { id: number; from: "blush"; reading: string; vocal?: boolean; recues?: BulleChat[]; coupee?: boolean }
-  | { id: number; from: "blush"; result: BlushAnswer }
-  | { id: number; from: "toi"; text: string; about?: string }
-  | { id: number; from: "toi"; images: string[] }
-  | { id: number; from: "toi"; file: { name: string; size: number } }
-  | { id: number; from: "toi"; voice: Pick<VoiceClip, "url" | "seconds" | "peaks"> }
-  | { id: number; from: "blush"; notice: string }
-  | { id: number; from: "event"; level: LevelId }
-) &
-  Stamp;
-
-/** Un échange de l’historique (back-end : avec son id et sa vraie heure ; aperçu : sans). */
-type EchangeScript = { id?: number; mine?: string; answer: BlushAnswer; at?: number };
-
-/**
- * Les échanges de l’historique, en messages de la conv. Avec un id (back-end), leurs identifiants en dérivent :
- * stables d’un chargement à l’autre, et les morceaux plus anciens se posent devant sans doublon.
- */
-function echangesEnMsgs(script: EchangeScript[]): Msg[] {
-  return script.flatMap((ex, k): Msg[] => {
-    const id = ex.id ? idHistorique(ex.id, false) : -100 - 2 * k;
-    return [
-      /* L’historique du back-end a ses vraies heures ; l’aperçu, des heures posées hier soir */
-      ...(ex.mine ? [{ id, from: "toi" as const, text: ex.mine, ...(ex.at ? { at: ex.at } : { seed: { day: -1, h: 22, m: 2 * k } }) }] : []),
-      { id: id - 1, from: "blush" as const, result: ex.id ? { ...ex.answer, echange: ex.id } : ex.answer, ...(ex.at ? { at: ex.at + 1000 } : { seed: { day: -1, h: 22, m: 2 * k + 1 } }) },
-    ];
-  });
-}
-
-/** Un message sans son identifiant (il est attribué au moment de l’ajouter à la conv). */
-type NewMsg = Msg extends infer T ? (T extends Msg ? Omit<T, "id"> : never) : never;
-
-/**
- * L’intro de BLUSH (ton prochain pas, puis « elle vient de répondre ? ») : à l’heure où ta lecture s’est finie (`at`),
- * avant tout l’historique. Sans cette heure (l’aperçu) : hier soir, comme dans les maquettes.
- */
-const introDe = (at?: number): Msg[] => [
-  { id: -2, from: "blush", intro: "next", ...(at ? { at } : { seed: { day: -1, h: 21, m: 40 } }) },
-  { id: -1, from: "blush", intro: "hint", ...(at ? { at: at + 60_000 } : { seed: { day: -1, h: 21, m: 41 } }) },
-];
-/** Le groupe de l’intro (les clés des lignes viennent de rowsOf) : c’est lui que l’arrivée du jour écrit. */
-const INTRO_GROUP = "-2-0";
-const INTRO_DAY = "jour--2";
 
 /*
  * 3 · 4 · Une bulle qui vole jusqu’à sa place : depuis la pastille touchée, ou depuis le champ.
@@ -369,7 +331,7 @@ export function HomeScreen({
   /* Les questions toutes prêtes déjà posées pendant la visite disparaissent de la rangée */
   const [asked, setAsked] = useState<string[]>(() => reprise?.asked ?? []);
   /* BLUSH « écrit » (ses bulles arrivent encore) : sa bulle s’anime en haut de la conv. Une réponse coupée attend « Réessayer » */
-  const busy = msgs.some((m) => "reading" in m && !m.coupee);
+  const busy = msgs.some((m) => m.type === "ecrit" && !m.coupee);
   const opened = useOpenedAt();
   const desktop = useDesktop();
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
@@ -652,8 +614,8 @@ export function HomeScreen({
       if (nouveaux.length)
         setMsgs((prev) => {
           const deja = new Set(prev.map((m) => m.id));
-          const intro = prev.filter((m) => "intro" in m);
-          return [...intro, ...nouveaux.filter((m) => !deja.has(m.id)), ...prev.filter((m) => !("intro" in m))];
+          const intro = prev.filter((m) => m.type === "intro");
+          return [...intro, ...nouveaux.filter((m) => !deja.has(m.id)), ...prev.filter((m) => m.type !== "intro")];
         });
     };
     if (nouveaux.length) {
@@ -737,7 +699,7 @@ export function HomeScreen({
     levelNow.current = to;
     setLevel(to);
     play("niveau", next.temperature);
-    update((m) => [...m, { id: id(), from: "event", level: to, at: Date.now() }]);
+    update((m) => [...m, { type: "niveau", id: id(), from: "event", level: to, at: Date.now() }]);
     setCheer((c) => c + 1);
   };
 
@@ -755,7 +717,7 @@ export function HomeScreen({
     const sent = Date.now();
     /* Les questions toutes prêtes s’effacent le temps de la réponse : à leur retour, elles refont leur entrée */
     setEntreeIdees(true);
-    const ecrit: Msg = { id: readingId, from: "blush", reading: label, vocal, at: sent };
+    const ecrit: Msg = { type: "ecrit", id: readingId, from: "blush", reading: label, vocal, at: sent };
     if (mine) update((m) => [...m, { ...mine, at: sent }, ecrit]);
     else update((m) => m.map((x) => (x.id === readingId ? ecrit : x)));
     /* Ce qui est déjà à l’écran : l’heure de la réponse (à sa première bulle), ses bulles, où commence chaque arrivée */
@@ -774,8 +736,8 @@ export function HomeScreen({
       at = Date.now();
       if (!prefersReducedMotion()) {
         /* 5 · La bulle qui écrit se pose en avatar, et la réponse se déplie depuis elle, sans temps mort */
-        const typing = thread.current?.querySelector(`[data-reading="${readingId}-ecrit"] svg`);
-        if (typing) flight.current = { kind: "logo", bubble: `${readingId}-0`, from: typing.getBoundingClientRect() };
+        const typing = thread.current?.querySelector(`[data-reading="${cleBulle(readingId, "ecrit")}"] svg`);
+        if (typing) flight.current = { kind: "logo", bubble: cleBulle(readingId, 0), from: typing.getBoundingClientRect() };
       }
       return true;
     };
@@ -791,14 +753,14 @@ export function HomeScreen({
       poses = noeudsDe(recues);
       if (coupee) vagues = [...vagues, poses];
       const v = vagues;
-      update((m) => m.map((x) => (x.id === readingId ? { id: readingId, from: "blush", reading: label, vocal, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v } : x)));
+      update((m) => m.map((x) => (x.id === readingId ? { type: "ecrit", id: readingId, from: "blush", reading: label, vocal, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v } : x)));
       if (premiere && recues.length) pop();
     };
     const suivi: SuiviChat = {
       bulles: (recues) => void (file = file.then(poser(recues))),
       vocal: (v) => {
         if (!posee) return void (vocalTot = v);
-        update((m) => m.map((x) => (x.id === readingId && "result" in x ? { ...x, result: avecVocal(x.result, v) } : x)));
+        update((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v) } : x)));
       },
     };
     let next: NewMsg;
@@ -816,13 +778,13 @@ export function HomeScreen({
     await file;
     finie = true;
     const premiere = await remplacer();
-    const r = "result" in next && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
+    const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
     posee = true;
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
     update((m) => m.map((x) => (x.id === readingId ? ({ ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } as Msg) : x)));
     if (premiere) pop();
-    if ("result" in next && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
-    const up = "result" in next ? next.result.levelUp : undefined;
+    if (next.type === "reponse" && next.result.modeVocal !== undefined) setModeVocal(next.result.modeVocal);
+    const up = next.type === "reponse" ? next.result.levelUp : undefined;
     if (up) window.setTimeout(() => levelUp(up), 700);
   };
 
@@ -844,7 +806,7 @@ export function HomeScreen({
         : liveUrl && payload.text && !payload.files
           ? await askLive(liveUrl, payload.text, historyOf(msgs))
           : await sendToBlush(payload, suivi);
-      return { from: "blush", result };
+      return { type: "reponse", from: "blush", result };
     }, modeVocal);
   };
 
@@ -852,8 +814,8 @@ export function HomeScreen({
   const sendQuick = (q: string, chip?: HTMLElement) => {
     setAsked((a) => [...a, q]);
     const mine = id();
-    if (chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: `${mine}-0`, text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
-    ask({ id: mine, from: "toi", text: q }, { text: q });
+    if (chip && !prefersReducedMotion()) flight.current = { kind: "text", bubble: cleBulle(mine, 0), text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
+    ask({ type: "texte", id: mine, from: "toi", text: q }, { text: q });
   };
 
   /* Ton message, depuis la barre de saisie : le champ montre encore ton texte, il s’envole de là */
@@ -864,26 +826,27 @@ export function HomeScreen({
     if (field && !about && !prefersReducedMotion()) {
       const r = field.getBoundingClientRect();
       const w = textWidth(t, field);
-      if (w <= r.width) flight.current = { kind: "text", bubble: `${mine}-0`, text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
+      if (w <= r.width) flight.current = { kind: "text", bubble: cleBulle(mine, 0), text: t, from: { left: r.left - 16, top: r.top + r.height / 2 - 21, width: w + 32, height: 42 }, start: FIELD_LOOK };
     }
     const point = about ?? undefined;
     setAbout(null);
-    ask({ id: mine, from: "toi", text: t, about: point }, { text: t, about: point });
+    ask({ type: "texte", id: mine, from: "toi", text: t, about: point }, { text: t, about: point });
   };
 
   const sendImages = (files: File[]) => {
     const list = files.map((f) => URL.createObjectURL(f));
     urls.current.push(...list);
-    ask({ id: id(), from: "toi", images: list }, { files });
+    ask({ type: "images", id: id(), from: "toi", images: list }, { files });
   };
 
-  const sendExport = ([file]: File[]) => ask({ id: id(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
+  const sendExport = ([file]: File[]) => ask({ type: "fichier", id: id(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
 
   /* Le vocal : le micro est demandé au premier toucher ; sans micro, BLUSH le dit dans la conv */
   const micRefused = (e: VoiceError) =>
     update((m) => [
       ...m,
       {
+        type: "mot",
         id: id(),
         from: "blush",
         at: Date.now(),
@@ -898,16 +861,16 @@ export function HomeScreen({
   /* Ton vocal, depuis la barre de saisie (ou rien d’entendu : BLUSH le dit) */
   const sendVoice = (clip: VoiceClip | "empty") => {
     if (clip === "empty") {
-      update((m) => [...m, { id: id(), from: "blush", at: Date.now(), notice: "Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi." }]);
+      update((m) => [...m, { type: "mot", id: id(), from: "blush", at: Date.now(), notice: "Je n’ai rien entendu. Vérifie ton micro et réessaie, ou écris-moi." }]);
       return;
     }
     play("vocalEnvoye");
     urls.current.push(clip.url);
     /* Tu lui parles en vocal : elle te répond en vocal */
     exchange(
-      { id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
+      { type: "vocal", id: id(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
       "BLUSH enregistre un vocal",
-      async (suivi) => ({ from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
+      async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
       true,
     );
   };
@@ -1832,29 +1795,11 @@ type Pos = "single" | "first" | "middle" | "last";
  */
 type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean; d: number; neuf: boolean };
 
-/** Une ligne de la conv : la date d’un nouveau jour, un niveau franchi, ou un groupe de bulles d’un même expéditeur (l’heure dessous). */
-type Row =
-  | { kind: "day"; key: string; at: number | null }
-  | { kind: "event"; key: string; level: LevelId; neuf: boolean }
-  | { kind: "group"; key: string; from: Msg["from"]; at: number | null; items: Item[]; echange?: number };
+/** Un groupe de la conv (accueil/conv/modele.ts, rowsOf), habillé : les bulles de chacun de ses messages. */
+type GroupeAffiche = Omit<Extract<Row, { kind: "group" }>, "msgs"> & { items: Item[] };
 
 /** Ce que les bulles lisent autour d’elles : ton prochain pas, l’arrivée du jour (il s’écrit mot par mot). */
 type BubbleEnv = { nextStep: string; arriving: boolean; autre?: Pronom };
-
-/**
- * L’heure d’un message, seulement dans le navigateur (`opened` est vide au rendu serveur) : le serveur est à l’heure
- * UTC, le téléphone à la sienne, et des heures différentes feraient refaire tout l’écran à l’hydratation.
- * Sans l’heure du verdict, l’intro se cale sur l’ouverture de l’écran.
- */
-function timeOf(m: Msg, opened: number | null) {
-  if (opened === null) return null;
-  if (m.at) return m.at;
-  if (!m.seed) return null;
-  const d = new Date(opened);
-  d.setDate(d.getDate() + m.seed.day);
-  d.setHours(m.seed.h, m.seed.m, 0, 0);
-  return d.getTime();
-}
 
 /*
  * Les bulles de chaque message, gardées : un nouveau message ne refait pas celles de toute la conv, et un groupe dont
@@ -1863,8 +1808,8 @@ function timeOf(m: Msg, opened: number | null) {
  */
 const bullesGardees = new WeakMap<Msg, { cle: string; nodes: BubbleNode[] }>();
 
-function bullesDe(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv) {
-  const cle = `${env.nextStep}|${env.autre ?? ""}|${"intro" in m && env.arriving}`;
+function bullesDe(m: MsgABulles, env: BubbleEnv) {
+  const cle = `${env.nextStep}|${env.autre ?? ""}|${m.type === "intro" && env.arriving}`;
   const gardees = bullesGardees.get(m);
   if (gardees?.cle === cle) return gardees.nodes;
   const nodes = bubblesOf(m, env);
@@ -1872,66 +1817,18 @@ function bullesDe(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv) {
   return nodes;
 }
 
-/** `depuis` : le premier identifiant de cette visite (les messages d’avant sont déjà lus). */
-function rowsOf(msgs: Msg[], opened: number | null, env: BubbleEnv, depuis: number) {
-  const rows: Row[] = [];
-  let prev: number | null | undefined;
-  for (const m of msgs) {
-    if (m.from === "event") {
-      rows.push({ kind: "event", key: `niveau-${m.id}`, level: m.level, neuf: m.id >= depuis });
-      continue;
-    }
-    const at = timeOf(m, opened);
-    /* Chaque nouveau jour s’annonce par sa date, comme dans Messages */
-    if (prev === undefined || (at !== null && prev !== null && dayStart(at) !== dayStart(prev))) rows.push({ kind: "day", key: `jour-${m.id}`, at });
-    prev = at;
-    /* « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent */
-    const neuf = m.id >= depuis;
-    const nodes = bullesDe(m, env);
-    /* 5 · Chaque arrivée de bulles se déplie depuis l’avatar, de sa dernière bulle à sa première (au fil de l’eau, plusieurs arrivées) */
-    const vagues = m.vagues ?? [0];
-    const items = nodes.map((node, k) => ({
-      key: node.tone === "typing" ? `${m.id}-ecrit` : `${m.id}-${k}`,
-      node,
-      at,
-      fresh: !!m.answered && neuf,
-      d: (Math.min(nodes.length, ...vagues.filter((v) => v > k)) - 1 - k) * 0.12,
-      neuf,
-    }));
-    /* La réponse de BLUSH garde son échange : de quoi la partager en image */
-    const echange = "result" in m ? m.result.echange : undefined;
-    const last = rows[rows.length - 1];
-    if (last?.kind === "group" && last.from === m.from) {
-      last.items.push(...items);
-      last.at = at;
-      if (echange) last.echange = echange;
-    } else rows.push({ kind: "group", key: items[0].key, from: m.from, at, items, echange });
-  }
-  return rows;
-}
-
-function dayStart(at: number) {
-  const d = new Date(at);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-/* Des formateurs gardés : Safari recrée un formateur à chaque toLocaleTimeString, deux fois par bulle à chaque rendu de la conv */
-const HEURE = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
-const JOUR = new Intl.DateTimeFormat("fr-FR", { weekday: "long" });
-const DATE = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-
-const clock = (at: number) => HEURE.format(at);
-
-/** « Aujourd’hui », « Hier », le jour de la semaine, puis la date. */
-function dayLabel(at: number, now: number) {
-  const days = Math.round((dayStart(now) - dayStart(at)) / 86_400_000);
-  if (days <= 0) return "Aujourd’hui";
-  if (days === 1) return "Hier";
-  if (days < 7) {
-    const w = JOUR.format(at);
-    return w.charAt(0).toUpperCase() + w.slice(1);
-  }
-  return DATE.format(at);
+/**
+ * Un groupe de la conv, en bulles : celles de chaque message (gardées, voir bullesDe), chacune avec sa clé et son délai.
+ * « BLUSH écrit » a sa propre clé : à la réponse, le groupe repart de zéro et ses bulles montent.
+ */
+function groupeAffiche({ msgs, ...groupe }: Extract<Row, { kind: "group" }>, env: BubbleEnv): GroupeAffiche {
+  return {
+    ...groupe,
+    items: msgs.flatMap(({ m, at, neuf, fresh }) => {
+      const nodes = bullesDe(m, env);
+      return nodes.map((node, k) => ({ key: cleBulle(m.id, node.tone === "typing" ? "ecrit" : k), node, at, fresh, d: depli(k, nodes.length, m.vagues), neuf }));
+    }),
+  };
 }
 
 /*
@@ -1941,15 +1838,15 @@ function dayLabel(at: number, now: number) {
 const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; opened: number | null; depuis: number }) {
   const { report, fiche } = useContact();
   const { arriving } = useHomeMotion();
-  const rows = rowsOf(msgs, opened, { nextStep: report.nextStep, arriving, autre: fiche.person.pronoun }, depuis);
-  /* « Aujourd’hui » se compte depuis le message le plus récent (une conv ouverte avant minuit reste juste) */
-  const now = Math.max(opened ?? 0, ...rows.map((r) => (r.kind === "event" ? 0 : (r.at ?? 0))));
+  const env: BubbleEnv = { nextStep: report.nextStep, arriving, autre: fiche.person.pronoun };
+  const rows = rowsOf(msgs, opened, depuis);
+  const now = maintenantDe(rows, opened);
   return (
     /* mt-auto pose les messages en bas sans justify-end, qui rend le haut d’une conv longue inaccessible au défilement */
     <div data-thread="" className="mt-auto flex flex-col gap-4">
       {rows.map((r) =>
         r.kind === "day" ? (
-          <p key={r.key} data-row={r.key} data-a={arriving && r.key === INTRO_DAY ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
+          <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
             {r.at === null ? (
               NBSP
             ) : (
@@ -1961,7 +1858,7 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
         ) : r.kind === "event" ? (
           <LevelEvent key={r.key} row={r.key} level={r.level} neuf={r.neuf} />
         ) : (
-          <Group key={r.key} row={r} intro={arriving && r.key === INTRO_GROUP} />
+          <Group key={r.key} row={groupeAffiche(r, env)} intro={arriving && r.key === CLE_INTRO} />
         ),
       )}
       <LogoDuFilDefini />
@@ -2012,7 +1909,7 @@ function LogoDuFilDefini() {
 /** « Partager en image » une réponse de BLUSH (son échange). */
 const PartagerContext = createContext<(echange: number) => void>(() => {});
 
-type GroupProps = { row: Extract<Row, { kind: "group" }>; intro: boolean };
+type GroupProps = { row: GroupeAffiche; intro: boolean };
 
 /**
  * Les bulles d’un même expéditeur : l’avatar de BLUSH sous la dernière, l’heure dessous (ou « BLUSH écrit » à la place).
@@ -2202,92 +2099,102 @@ function Coupure({ reponse }: { reponse: number }) {
   );
 }
 
-function bubblesOf(m: Exclude<Msg, { from: "event" }>, env: BubbleEnv): BubbleNode[] {
-  if ("intro" in m)
-    return m.intro === "next"
-      ? [
-          {
-            tone: "accent",
-            quote: env.nextStep,
-            body: (
-              <span className="flex items-start gap-2.5">
-                <Icon name="bolt" size={18} color="#3D8BFF" className="mt-0.5 shrink-0" />
-                <span className="flex flex-col gap-[3px]">
-                  <span className="text-[12px] font-black text-toi-ink">À toi de jouer</span>
-                  <span className="text-[16px] font-black leading-[1.35]">{env.arriving ? <Words text={env.nextStep} /> : env.nextStep}</span>
+/** Les bulles d’un message, d’après son `type`. */
+function bubblesOf(m: MsgABulles, env: BubbleEnv): BubbleNode[] {
+  switch (m.type) {
+    case "intro":
+      return m.intro === "next"
+        ? [
+            {
+              tone: "accent",
+              quote: env.nextStep,
+              body: (
+                <span className="flex items-start gap-2.5">
+                  <Icon name="bolt" size={18} color="#3D8BFF" className="mt-0.5 shrink-0" />
+                  <span className="flex flex-col gap-[3px]">
+                    <span className="text-[12px] font-black text-toi-ink">À toi de jouer</span>
+                    <span className="text-[16px] font-black leading-[1.35]">{env.arriving ? <Words text={env.nextStep} /> : env.nextStep}</span>
+                  </span>
                 </span>
-              </span>
-            ),
-          },
-        ]
-      : [
-          {
-            body: (
-              <span className="flex flex-col gap-1">
-                <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
-                <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
-              </span>
-            ),
-          },
-        ];
-  if ("reading" in m) {
-    /* Ses bulles déjà arrivées pendant qu’il écrit, et « Réessayer » si le réseau a coupé avant la fin */
-    if (m.recues?.length || m.coupee) return [...(m.recues ?? []).flatMap(bulleEcrite), ...(m.coupee ? [{ body: <Coupure reponse={m.id} /> }] : [])];
-    return [{ tone: "typing", body: <BlushTyping label={m.reading} vocal={m.vocal} /> }];
-  }
-  if ("notice" in m) return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
-  if ("voice" in m) return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
-  if ("text" in m)
-    return [
-      {
-        body: (
-          <span className="flex min-w-0 flex-col">
-            {/* 7 · Le point creusé, rappelé au-dessus de ta question */}
-            {m.about && <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-[13px] font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">{m.about}</span>}
-            <span className="whitespace-pre-wrap text-[16px] font-bold leading-[1.4]">{m.text}</span>
-          </span>
-        ),
-      },
-    ];
-  if ("images" in m)
-    return [
-      {
-        tone: "bare",
-        body: (
-          <span className={cn("grid gap-0.5", m.images.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
-            {m.images.slice(0, 4).map((u, i) => (
-              <span key={u} className="relative block">
-                {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local d’un fichier choisi */}
-                <img src={u} alt={`Capture ${i + 1}`} decoding="async" className={cn("block object-cover object-top", m.images.length > 1 ? "h-[150px] w-[112px]" : "h-[230px] w-[172px]")} />
-                {i === 3 && m.images.length > 4 && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-[rgba(17,17,20,0.55)] text-[20px] font-black text-white">+{m.images.length - 4}</span>
-                )}
-              </span>
-            ))}
-          </span>
-        ),
-      },
-    ];
-  if ("file" in m)
-    return [
-      {
-        className: "py-3 pl-3",
-        body: (
-          <span className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.18)]">
-              <Icon name="file" size={20} color="#FFFFFF" stroke={2.2} />
-            </span>
+              ),
+            },
+          ]
+        : [
+            {
+              body: (
+                <span className="flex flex-col gap-1">
+                  <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
+                  <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
+                </span>
+              ),
+            },
+          ];
+    case "ecrit":
+      if (tapeEncore(m)) return [{ tone: "typing", body: <BlushTyping label={m.reading} vocal={m.vocal} /> }];
+      /* Ses bulles déjà arrivées pendant qu’il écrit, et « Réessayer » si le réseau a coupé avant la fin */
+      return [...(m.recues ?? []).flatMap(bulleEcrite), ...(m.coupee ? [{ body: <Coupure reponse={m.id} /> }] : [])];
+    case "mot":
+      return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
+    case "vocal":
+      return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
+    case "texte":
+      return [
+        {
+          body: (
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-[15px] font-black">{m.file.name}</span>
-              <span className="text-[12px] font-extrabold text-[rgba(255,255,255,0.75)]">{formatSize(m.file.size)}</span>
+              {/* 7 · Le point creusé, rappelé au-dessus de ta question */}
+              {m.about && <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-[13px] font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">{m.about}</span>}
+              <span className="whitespace-pre-wrap text-[16px] font-bold leading-[1.4]">{m.text}</span>
             </span>
-          </span>
-        ),
-      },
-    ];
-  const r = m.result;
-  /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
-  const shine = !!m.answered;
+          ),
+        },
+      ];
+    case "images":
+      return [
+        {
+          tone: "bare",
+          body: (
+            <span className={cn("grid gap-0.5", m.images.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
+              {m.images.slice(0, 4).map((u, i) => (
+                <span key={u} className="relative block">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local d’un fichier choisi */}
+                  <img src={u} alt={`Capture ${i + 1}`} decoding="async" className={cn("block object-cover object-top", m.images.length > 1 ? "h-[150px] w-[112px]" : "h-[230px] w-[172px]")} />
+                  {i === 3 && m.images.length > 4 && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-[rgba(17,17,20,0.55)] text-[20px] font-black text-white">+{m.images.length - 4}</span>
+                  )}
+                </span>
+              ))}
+            </span>
+          ),
+        },
+      ];
+    case "fichier":
+      return [
+        {
+          className: "py-3 pl-3",
+          body: (
+            <span className="flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.18)]">
+                <Icon name="file" size={20} color="#FFFFFF" stroke={2.2} />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[15px] font-black">{m.file.name}</span>
+                <span className="text-[12px] font-extrabold text-[rgba(255,255,255,0.75)]">{formatSize(m.file.size)}</span>
+              </span>
+            </span>
+          ),
+        },
+      ];
+    case "reponse":
+      /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
+      return bullesDeLaReponse(m.result, !!m.answered);
+    default:
+      return typeInconnu(m);
+  }
+}
+
+/** Les bulles d’une réponse de BLUSH. `shine` : elle vient d’arriver, sa meilleure réponse brille une fois. */
+function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BubbleNode[] {
   /*
    * Une réponse dite en vocal : la bulle vocale à la place des bulles écrites ; les messages qu’elle cite et la réponse à
    * envoyer restent. Le vocal se fait encore : sa bulle attend, la réponse est déjà là
@@ -2360,8 +2267,8 @@ async function askLive(url: string, text: string, history: { from: "toi" | "blus
 function historyOf(msgs: Msg[]): { from: "toi" | "blush"; text: string }[] {
   return msgs
     .flatMap((m): { from: "toi" | "blush"; text: string }[] => {
-      if (m.from === "toi" && "text" in m) return [{ from: "toi", text: m.text }];
-      if (m.from === "blush" && "result" in m) return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
+      if (m.type === "texte") return [{ from: "toi", text: m.text }];
+      if (m.type === "reponse") return [{ from: "blush", text: [...m.result.bubbles.map((b) => b.text), ...(m.result.send ?? []), m.result.ask ?? ""].filter(Boolean).join(" / ") }];
       return [];
     })
     .slice(-6);
