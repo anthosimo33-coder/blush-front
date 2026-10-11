@@ -5,4 +5,4 @@
  */
 
 /** Le fond de la carte (le papier de la landing), le temps que l’image arrive. */
-export const PAPIER = "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), #F4F2ED";
+export const PAPIER = "radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), var(--paper)";

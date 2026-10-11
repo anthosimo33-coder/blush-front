@@ -7,7 +7,7 @@ import { Container, CtaButton } from "./parts";
 
 /* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
 
-const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[1100px] -translate-x-1/2 bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]";
+const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[1100px] -translate-x-1/2 bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]";
 
 /** `children` : ce qui suit dans le héros (les convs qui défilent). `retour` : qui revient (cta.ts). */
 export function Hero({ retour, children }: { retour: Retour; children?: ReactNode }) {
@@ -24,11 +24,11 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
             <Said me>que tu crois</Said>.
           </span>
         </h1>
-        <p className="m-0 mt-6 max-w-[600px] text-[18px] font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
+        <p className="m-0 mt-6 max-w-[600px] text-carte font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
           Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
         </p>
         <CtaButton retour={retour} className="mt-8 lg:mt-10" />
-        <span className="mt-3.5 text-[14px] font-extrabold text-grey">{cta.note}</span>
+        <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>
       </Container>
       {children}
     </section>

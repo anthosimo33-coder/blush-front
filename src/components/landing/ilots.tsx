@@ -143,12 +143,11 @@ function HandIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 64 64" aria-hidden="true" className={cn("block h-auto w-full overflow-visible drop-shadow-[0_10px_14px_rgba(0,0,0,0.4)]", className)}>
       <path
         d="M22 11 A5 5 0 0 1 32 11 V28.5 A4.5 4.5 0 0 1 41 28.5 V31.5 A4.5 4.5 0 0 1 50 31.5 V35 A4 4 0 0 1 58 35 V44 C58 52 52 58 44 58 H32 C27 58 24 56 21 52 L11 41 A4 4 0 0 1 16.5 35.5 L22 40 Z"
-        fill="#FFFFFF"
-        stroke="#121214"
+        className="fill-white stroke-ink"
         strokeWidth="3.4"
         strokeLinejoin="round"
       />
-      <path d="M32 32 V40.5 M41 35 V42.5 M50 38.5 V44.5" fill="none" stroke="#121214" strokeWidth="3" strokeLinecap="round" />
+      <path d="M32 32 V40.5 M41 35 V42.5 M50 38.5 V44.5" fill="none" className="stroke-ink" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }
@@ -275,11 +274,11 @@ export function AvisDefilants({ items }: { items: Testimonial[] }) {
                 {t.name.charAt(0)}
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[18px] font-black">{t.name}</span>
-                <span className="text-[14px] font-extrabold text-grey">{t.label}</span>
+                <span className="text-carte font-black">{t.name}</span>
+                <span className="text-note font-extrabold text-grey">{t.label}</span>
               </div>
             </div>
-            <p className="m-0 text-[17px] font-extrabold leading-[1.6] text-ink">{t.text}</p>
+            <p className="m-0 text-accent font-extrabold leading-[1.6] text-ink">{t.text}</p>
           </li>
         ))}
       </ul>

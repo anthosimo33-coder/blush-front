@@ -7,14 +7,14 @@
   --font-figtree: var(--font-figtree-latin-ext), var(--font-figtree-latin);
 }
 
-/* BLUSH · Design system « Le jeu » — tokens repris de maquettes/design-tokens.css */
+/* BLUSH · les tokens du design system (repris de maquettes/design-tokens.css). La planche de l’équipe, /styleguide, les
+   montre tels qu’ils sont ici : ses nuanciers lisent ces variables. */
 :root {
   /* Les polices (src/app/polices.ts) : les alphabets rares d’abord, le latin et sa police de repli en dernier */
   --font-nunito: var(--font-nunito-cyrillique-ext), var(--font-nunito-cyrillique), var(--font-nunito-vietnamien), var(--font-nunito-latin-ext), var(--font-nunito-latin);
 
   --paper: #f4f2ed;
   --paper-light: radial-gradient(120% 55% at 50% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 62%), #f4f2ed;
-  --white: #ffffff;
   --plaque: #f1efea;
   --line: #e6e3dc;
 
@@ -27,9 +27,10 @@
   --vrai: #12c08a;
   --flou: #9b7bff;
   --attente: #ffaa2c;
+  /* Le rouge des soucis (Q59, le plus utilisé) : un message d’erreur, un champ refusé, une action qui efface */
+  --danger: #d93036;
 
   --rose-blush: linear-gradient(160deg, #ff9bcb, #e8358a);
-  --opale: radial-gradient(circle at 32% 28%, #ffffff 0%, #cffff0 18%, #8fc8ff 50%, #e6a8ff 78%, #ffd3a1 100%);
   --gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 55%);
 
   --shadow-card: 0 0 0 1px rgba(17, 17, 20, 0.05), 0 1px 2px rgba(17, 17, 20, 0.04), 0 14px 32px -14px rgba(17, 17, 20, 0.16);
@@ -46,11 +47,6 @@
      la perle des trois points de BLUSH (TypingDots, la pastille de l’avatar) */
   --degrade-lecture: linear-gradient(90deg, #3d8bff, #ff4f9a 60%, #12c08a);
   --degrade-perle: linear-gradient(120deg, #a8ffe4 0%, #8fc8ff 35%, #e6a8ff 68%, #ffd3a1 100%);
-
-  --t-pop: 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
-  --t-rise: 0.45s ease-out;
-  --t-fill: 0.7s ease-out;
-  --t-float: 4s ease-in-out infinite;
 
   /* Survol : reliefs doux (jamais de socle décalé dur) */
   --ease-pop: cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -75,23 +71,30 @@
   --color-toi-ink: #1a66db;
   --color-elle-ink: #c81d6b;
   --color-vrai-ink: #087a56;
+  /* Les fonds des étiquettes « probable » et « à vérifier » (Tag), sous leur texte blanc (au moins 5:1) */
+  --color-attente-ink: #a85800;
+  --color-flou-ink: #6d4bd8;
   --color-flou: var(--flou);
   --color-attente: var(--attente);
   /* teintes secondaires relevées dans les maquettes */
   --color-bubble-her: #efeeea;
   --color-bubble-me: #1a66db;
+  /* Le gris doux (l’ancien gris, 3,2:1 sur le papier) : des icônes, des points, des chevrons ; un texte prend grey */
   --color-muted: #8a8780;
+  /* Le gris pâle d’un glyphe en retrait : le chevron d’une ligne, le cadenas d’un niveau à venir */
+  --color-pale: #b4b1a9;
   --color-track: #e1ded7;
   --color-sep: #efede8;
   --color-skeleton: #e7e4dd;
   --color-segment: #e9e6df;
   --color-disabled: #d9d6cf;
-  /* L’erreur et la réussite (Q59), aux valeurs d’aujourd’hui : le rouge des soucis (le plus utilisé), le même plus foncé
-     sur un fond rouge pâle, le rouge vif des pastilles et des icônes ; le vert de « c’est fait », celui de la vérité.
-     Les autres rouges écrits en dur rejoignent danger par le codemod des couleurs (8b, 8c). */
-  --color-danger: #d93036;
+  /* L’erreur et la réussite (Q59). Un seul rouge pour les soucis (décidé) : les quatre qu’on écrivait en dur (#D93036,
+     #E5484D, #C2363B, #C2373C) l’ont rejoint. danger-ink, le même plus foncé, ne sert qu’au texte posé sur le voile rouge
+     pâle (Alert variant="voile") : le rouge des soucis y tomberait à 4,2:1, sous les 4,5:1 d’un petit texte.
+     TODO(produit): garder ce rouge foncé pour ce seul cas (proposé), ou passer le voile au rouge des soucis malgré le contraste.
+     Le vert de « c’est fait », celui de la vérité. */
+  --color-danger: var(--danger);
   --color-danger-ink: #c2363b;
-  --color-danger-vif: #e5484d;
   --color-ok: var(--vrai);
 
   /* L’échelle du texte (les classes text-micro… text-affiche), aux tailles d’aujourd’hui : celles du styleguide (TYPE_SCALE)

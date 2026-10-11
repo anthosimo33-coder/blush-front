@@ -74,17 +74,17 @@ function LienRetour({ target, className, children, label }: { target: Exclude<Ba
 export function BoutonRetour({ target }: { target: BackTarget }) {
   return (
     <Retour target={target} label="Retour" className="flex size-11 items-center justify-center">
-      <Icon name="back" size={24} color="#121214" stroke={2.6} />
+      <Icon name="back" size={24} stroke={2.6} className="text-ink" />
     </Retour>
   );
 }
 
 /** Le lien « Retour » au-dessus du titre (desktop), sa zone tactile de 44 px sans changer la mise en page. */
 export function LienRetourDesktop({ target, label = "Retour" }: { target: BackTarget; label?: string }) {
-  const cls = "back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
+  const cls = "back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
   return (
     <Retour target={target} className={cls}>
-      <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
+      <Icon name="back" size={18} stroke={2.6} className="text-soft" />
       {label}
     </Retour>
   );

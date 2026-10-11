@@ -208,7 +208,7 @@ describe("InsetRow", () => {
     const ligne = screen.getByRole("button");
     expect(ligne.className).toContain("min-h-[58px]");
     const titre = screen.getByText("Tout effacer");
-    expect(titre.className).toContain("text-[16px]");
+    expect(titre.className).toContain("text-corps"); /* 16 px, le token --text-corps */
     expect(titre.className).toContain("text-danger");
     expect(ligne.querySelector("svg")?.getAttribute("width")).toBe("17");
   });
@@ -220,7 +220,7 @@ describe("InsetRow", () => {
     expect(lien.className).not.toContain("min-h-[58px]");
     expect(lien.className).toContain("py-3.5");
     expect(lien.dataset.ligne).toBe("rapport");
-    expect(screen.getByText("Le rapport").className).toContain("text-[15px]");
+    expect(screen.getByText("Le rapport").className).toContain("text-detail"); /* 15 px, le token --text-detail */
     expect(screen.getByText("Depuis mars").className).toContain("truncate");
     expect(lien.querySelector("svg")?.getAttribute("width")).toBe("16");
   });

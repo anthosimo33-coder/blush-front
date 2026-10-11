@@ -13,11 +13,11 @@ const base = "inline-flex select-none items-center justify-center no-underline d
 const variants: Record<Variant, string> = {
   /* Le bouton principal : encre en relief, un seul par écran. Il s’enfonce d’1 px et son ombre se resserre. */
   primary:
-    "lift lift-ink lift-sm w-full font-black text-white [background:var(--btn-ink-bg)] shadow-ink aria-disabled:pointer-events-none aria-disabled:![background:#D9D6CF] aria-disabled:!text-grey aria-disabled:!shadow-none disabled:![background:#D9D6CF] disabled:!text-grey disabled:!shadow-none",
+    "lift lift-ink lift-sm w-full font-black text-white [background:var(--btn-ink-bg)] shadow-ink aria-disabled:pointer-events-none aria-disabled:![background:var(--color-disabled)] aria-disabled:!text-grey aria-disabled:!shadow-none disabled:![background:var(--color-disabled)] disabled:!text-grey disabled:!shadow-none",
   /* Secondaire : blanc, bordé, il s’efface devant le principal. */
   secondary: "lift lift-sm w-full bg-white font-black text-ink shadow-soft",
   /* Lien : texte doux, zone tactile de 44 px. */
-  link: "min-h-11 px-1 text-[15px] font-black text-soft transition-colors hover:text-ink",
+  link: "min-h-11 px-1 text-detail font-black text-soft transition-colors hover:text-ink",
 };
 
 /**
@@ -27,8 +27,8 @@ const variants: Record<Variant, string> = {
 export type TailleBouton = "lg" | "md";
 
 const tailles: Record<TailleBouton, string> = {
-  lg: "h-[60px] gap-2.5 rounded-[30px] px-[22px] text-[18px]",
-  md: "h-[52px] gap-2 rounded-[26px] px-5 text-[16px]",
+  lg: "h-[60px] gap-2.5 rounded-[30px] px-[22px] text-carte",
+  md: "h-[52px] gap-2 rounded-[26px] px-5 text-corps",
 };
 
 /* Les classes d’un bouton : sa variante, et sa taille s’il est plein */
@@ -45,13 +45,14 @@ type CommonProps = {
 
 /** `lien` : dans un lien, la flèche (ou l’icône) laisse place aux trois points tant que la page n’arrive pas. */
 function Content({ arrow, icon, variant, children, lien = false }: Pick<CommonProps, "arrow" | "icon" | "variant" | "children"> & { lien?: boolean }) {
-  const color = variant === "primary" ? "#FFFFFF" : "currentColor";
-  const enRoute = (glyph: ReactNode) => (lien ? <EnRoute color={variant === "primary" ? "#FFFFFF" : undefined}>{glyph}</EnRoute> : glyph);
+  /* Le bouton principal garde ses glyphes blancs, même grisé ; les autres suivent la couleur de leur texte */
+  const blanc = variant === "primary";
+  const enRoute = (glyph: ReactNode) => (lien ? <EnRoute color={blanc ? "#FFFFFF" : undefined}>{glyph}</EnRoute> : glyph);
   return (
     <>
-      {icon && enRoute(<Icon name={icon} size={18} color={color} stroke={2.4} />)}
+      {icon && enRoute(<Icon name={icon} size={18} stroke={2.4} className={blanc ? "text-white" : undefined} />)}
       {children}
-      {arrow && enRoute(<Icon name="arrow" size={18} color={color} stroke={1.9} />)}
+      {arrow && enRoute(<Icon name="arrow" size={18} stroke={1.9} className={blanc ? "text-white" : undefined} />)}
     </>
   );
 }
@@ -157,7 +158,7 @@ export function IconButton({
   className?: string;
 } & AttributsLibres) {
   const cls = cn("inline-flex shrink-0 items-center justify-center rounded-full", size === "sm" ? "size-10" : "size-11", FONDS_ICONE[variant], className);
-  const glyph = <Icon name={icon} size={iconSize} color="#121214" stroke={icon === "user" ? 2.2 : 2.6} />;
+  const glyph = <Icon name={icon} size={iconSize} stroke={icon === "user" ? 2.2 : 2.6} className="text-ink" />;
   if (href)
     return (
       <Link

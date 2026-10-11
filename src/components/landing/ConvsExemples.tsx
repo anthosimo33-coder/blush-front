@@ -15,12 +15,16 @@ import { APPLIS, type LandingConv } from "@/types";
 import { ctaDe, type Retour } from "./cta";
 
 /* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
-const ROWS = [0, 1, 2].map((i) => ({
+/* Même vitesse qu’à cinq convs par rangée : la durée suit la longueur */
+const ROWS = [
+  { seconds: 77, offset: 0 },
+  { seconds: 91, offset: 150 },
+  { seconds: 84, offset: 70 },
+].map(({ seconds, offset }, i) => ({
   convs: LANDING_CONVS.slice(i * 6, i * 6 + 6),
   reverse: i === 1,
-  /* Même vitesse qu’à cinq convs par rangée : la durée suit la longueur */
-  seconds: [77, 91, 84][i],
-  offset: [0, 150, 70][i],
+  seconds,
+  offset,
 }));
 
 /** Les convs qui défilent : on en choisit une, BLUSH montre son verdict. `retour` : qui revient (cta.ts). */
@@ -37,7 +41,7 @@ export function ConvsExemples({ retour }: { retour: Retour }) {
       </div>
       <div className="mt-8 flex flex-col items-center gap-3 text-center lg:mt-10">
         <BubbleLogo size={52} animated />
-        <p className="m-0 inline-flex items-center gap-1.5 text-[15px] font-black text-grey">
+        <p className="m-0 inline-flex items-center gap-1.5 text-detail font-black text-grey">
           <Icon name="arrow" size={15} stroke={2.6} className="-rotate-90" />
           Choisis une conv, je te donne mon verdict.
         </p>
@@ -82,8 +86,8 @@ function ConvList({ convs, onPick, copy = false }: { convs: LandingConv[]; onPic
           >
             <ConvAvatar conv={c} size={44} />
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-[16px] font-black leading-tight">{c.name}</span>
-              <span className="truncate text-[13px] font-extrabold leading-tight text-grey">{c.label}</span>
+              <span className="truncate text-corps font-black leading-tight">{c.name}</span>
+              <span className="truncate text-legende font-extrabold leading-tight text-grey">{c.label}</span>
             </span>
             <span className="sr-only">{NBSP}: voir le verdict de BLUSH</span>
           </button>
@@ -122,35 +126,35 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
       <div className="flex items-center gap-3">
         <ConvAvatar conv={conv} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id={titreId} className="m-0 truncate text-[17px] font-black leading-tight lg:text-[19px]">
+          <h2 id={titreId} className="m-0 truncate text-accent font-black leading-tight lg:text-[19px]">
             {conv.name}
           </h2>
-          <span className="truncate text-[13px] font-extrabold text-grey">
+          <span className="truncate text-legende font-extrabold text-grey">
             {conv.label} · {APPLIS[conv.app]}
           </span>
         </div>
         <IconButton icon="close" label="Fermer" onClick={onClose} iconSize={18} />
       </div>
-      <span className="text-[13px] font-black text-grey lg:hidden">Le verdict de BLUSH · exemple fictif</span>
+      <span className="text-legende font-black text-grey lg:hidden">Le verdict de BLUSH · exemple fictif</span>
       <div className="hidden items-center justify-between gap-3 lg:flex">
         <span className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="flex size-[38px] items-center justify-center rounded-full bg-ink text-[16px] font-black text-white shadow-ink">
+          <span aria-hidden="true" className="flex size-[38px] items-center justify-center rounded-full bg-ink text-corps font-black text-white shadow-ink">
             1
           </span>
-          <span className="text-[24px] font-black tracking-[-0.01em]">Le verdict</span>
+          <span className="text-titre-3 font-black tracking-[-0.01em]">Le verdict</span>
         </span>
-        <span className="shrink-0 rounded-full bg-plaque px-2.5 py-1 text-[12px] font-black text-soft">Exemple</span>
+        <span className="shrink-0 rounded-full bg-plaque px-2.5 py-1 text-micro font-black text-soft">Exemple</span>
       </div>
       <div className="-mt-1 flex items-start gap-2 lg:mt-0 lg:gap-2.5">
         <span className="text-[28px] leading-none lg:text-[40px]" aria-hidden="true">
           {conv.verdict.emoji}
         </span>
-        <span className="text-[22px] font-black leading-[1.1] tracking-[-0.02em] min-[380px]:text-[24px] lg:text-[32px] lg:leading-[1.05]">{conv.verdict.title}</span>
+        <span className="text-[22px] font-black leading-[1.1] tracking-[-0.02em] min-[380px]:text-titre-3 lg:text-[32px] lg:leading-[1.05]">{conv.verdict.title}</span>
       </div>
-      <p className="m-0 text-[15px] font-extrabold leading-[1.4] text-soft lg:text-[17px] lg:leading-[1.45] [@media(max-height:600px)]:text-[14px] [@media(max-height:600px)]:leading-[1.3]">{conv.verdict.subtitle}</p>
+      <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-accent lg:leading-[1.45] [@media(max-height:600px)]:text-note [@media(max-height:600px)]:leading-[1.3]">{conv.verdict.subtitle}</p>
       <div className="flex flex-col gap-2 rounded-card bg-white p-3 shadow-card lg:p-3.5 [@media(max-height:600px)]:p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[13px] font-black text-grey">La preuve</span>
+          <span className="text-legende font-black text-grey">La preuve</span>
           <ConfidenceLine level={conv.confidence}>{conv.proofs} preuves</ConfidenceLine>
         </div>
         <Bubble from="elle" caption={conv.proof.caption}>
@@ -163,7 +167,7 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
       <ButtonLink href={cta.href} scroll={cta.scroll} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
         {cta.label}
       </ButtonLink>
-      <p className="m-0 hidden text-center text-[13px] font-extrabold text-grey lg:block">Exemple fictif. Ton rapport, lui, part de vos vrais messages.</p>
+      <p className="m-0 hidden text-center text-legende font-extrabold text-grey lg:block">Exemple fictif. Ton rapport, lui, part de vos vrais messages.</p>
     </div>
   );
 }

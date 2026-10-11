@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { nomErreur, tracer } from "@/lib/tracer";
 import { compterImagePartagee, imagePartage, type CibleImage } from "@/services/api";
-import { TypingDots } from "@/components/ui/feedback";
+import { Alert, TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import { PAPIER } from "./feuille";
@@ -36,7 +37,10 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
           return { cle, fichier: new File([b], "blush.png", { type: "image/png" }), url: URL.createObjectURL(b) };
         });
       })
-      .catch(() => !fini && setProbleme("L’image n’a pas pu être préparée. Réessaie dans un instant."));
+      .catch((e: unknown) => {
+        tracer("partage:image", e);
+        if (!fini) setProbleme("L’image n’a pas pu être préparée. Réessaie dans un instant.");
+      });
     return () => {
       fini = true;
     };
@@ -72,8 +76,9 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
     try {
       await navigator.share({ files: [image.fichier] });
       compterImagePartagee();
-    } catch {
-      /* Fenêtre de partage fermée : rien à faire, rien à compter */
+    } catch (e) {
+      /* Fenêtre de partage fermée (AbortError) : rien à faire, rien à compter. Un autre refus laisse sa trace */
+      if (nomErreur(e) !== "AbortError") tracer("partage:image:partager", e);
     }
   };
   const enregistrer = () => {
@@ -101,14 +106,12 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
         )}
       </div>
       {probleme ? (
-        <p role="alert" className="m-0 rounded-[18px] bg-[rgba(229,72,77,0.08)] px-4 py-3 text-[14px] font-extrabold text-[#C2363B]">
-          {probleme}
-        </p>
+        <Alert variant="voile">{probleme}</Alert>
       ) : (
         <div className="flex gap-2.5">
           {peutPartager && (
-            <button type="button" onClick={partager} className="lift lift-ink lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] text-[16px] font-black text-white shadow-ink [background:var(--btn-ink-bg)]">
-              <Icon name="share" size={17} color="#FFFFFF" stroke={2.4} />
+            <button type="button" onClick={() => void partager()} className="lift lift-ink lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] text-corps font-black text-white shadow-ink [background:var(--btn-ink-bg)]">
+              <Icon name="share" size={17} stroke={2.4} className="text-white" />
               Partager
             </button>
           )}
@@ -116,15 +119,15 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
             type="button"
             onClick={enregistrer}
             disabled={!pret}
-            className={cn("lift lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] bg-white text-[16px] font-black text-ink shadow-soft disabled:opacity-50", !peutPartager && "lift-ink")}
+            className={cn("lift lift-sm flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[26px] bg-white text-corps font-black text-ink shadow-soft disabled:opacity-50", !peutPartager && "lift-ink")}
           >
-            <Icon name="download" size={17} color="#121214" stroke={2.4} />
+            <Icon name="download" size={17} stroke={2.4} className="text-ink" />
             {fait ?? (peutPartager ? "Enregistrer" : "Enregistrer l’image")}
           </button>
         </div>
       )}
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="shield" size={16} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
+      <p className="m-0 flex items-start gap-2 text-legende font-extrabold leading-[1.45] text-grey">
+        <Icon name="shield" size={16} stroke={2.2} style={{ marginTop: 1 }} className="text-grey" />
         Son prénom devient une initiale, le tien reste. Parfait pour ta story.
       </p>
     </Sheet>

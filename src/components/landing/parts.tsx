@@ -30,12 +30,12 @@ export function CtaButton({ retour, className }: { retour: Retour; className?: s
       prefetch={cta.prefetch}
       scroll={cta.scroll}
       className={cn(
-        "arrow-nudge lift lift-ink lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-[18px] font-black text-white no-underline shadow-ink [background:var(--btn-ink-bg)]",
+        "arrow-nudge lift lift-ink lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-carte font-black text-white no-underline shadow-ink [background:var(--btn-ink-bg)]",
         className,
       )}
     >
       {cta.label}
-      <Icon name="arrow" size={19} color="#FFFFFF" stroke={2.6} className="arrow" />
+      <Icon name="arrow" size={19} stroke={2.6} className="arrow text-white" />
     </Link>
   );
 }
@@ -44,11 +44,11 @@ function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string;
   /* Aligné à gauche = section à deux colonnes : le titre descend d’un cran pour tenir sur deux lignes */
   return (
     <div data-reveal="" className={cn("flex flex-col items-center gap-3 text-center", align === "start" && "lg:items-start lg:text-left")}>
-      {kicker && <span className="text-[13px] font-black text-grey">{kicker}</span>}
-      <h2 id={id} className={cn("m-0 max-w-[720px] text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]", align === "start" ? "lg:text-[44px]" : "lg:text-[52px]")}>
+      {kicker && <span className="text-legende font-black text-grey">{kicker}</span>}
+      <h2 id={id} className={cn("m-0 max-w-[720px] text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]", align === "start" ? "lg:text-[44px]" : "lg:text-chiffre")}>
         {title}
       </h2>
-      {sub && <p className="m-0 max-w-[540px] text-[17px] font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:text-[19px]">{sub}</p>}
+      {sub && <p className="m-0 max-w-[540px] text-accent font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:text-[19px]">{sub}</p>}
     </div>
   );
 }
@@ -64,14 +64,14 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Déjà un compte, sur un autre appareil : on retrouve ses convs avec son email */}
             {!retour && (
-              <Link href="/connexion" className="relative inline-flex h-10 items-center px-2.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink">
+              <Link href="/connexion" className="relative inline-flex h-10 items-center px-2.5 text-note font-black text-soft no-underline transition-colors hover:text-ink">
                 Se connecter
               </Link>
             )}
             {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}
-            <Link href={cta.href} prefetch={cta.prefetch} scroll={cta.scroll} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-[14px] font-black text-ink no-underline shadow-soft">
+            <Link href={cta.href} prefetch={cta.prefetch} scroll={cta.scroll} className="arrow-nudge lift lift-sm inline-flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3.5 text-note font-black text-ink no-underline shadow-soft">
               {cta.header}
-              <Icon name="arrow" size={15} color="#121214" stroke={2.6} className="arrow" />
+              <Icon name="arrow" size={15} stroke={2.6} className="arrow text-ink" />
             </Link>
           </div>
         </Container>
@@ -81,9 +81,9 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
         <Container className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <LogoIlot size={26} fontSize={19} href="/" />
-            <span className="text-[13px] font-extrabold text-grey">© 2026</span>
+            <span className="text-legende font-extrabold text-grey">© 2026</span>
           </div>
-          <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-extrabold">
+          <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-note font-extrabold">
             <Link href={cta.href} scroll={cta.scroll} className="text-soft no-underline hover:text-ink">
               {cta.label}
             </Link>
@@ -116,10 +116,10 @@ const DEMANDES: Demande[] = [
     q: "ça veut dire quoi\u00a0?",
     reponse: (
       <>
-        <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-[15px] font-bold text-white">je suis crevée cette semaine, on verra</span>
+        <span className="max-w-[86%] self-end rounded-[20px] rounded-br-[6px] bg-toi-ink px-4 py-2.5 font-message text-detail font-bold text-white">je suis crevée cette semaine, on verra</span>
         <FromBlush>
-          <span className="text-[12px] font-black text-grey">Ce que ça veut dire</span>
-          <span className="text-[17px] font-black leading-[1.3]">Elle est partante, mais fatiguée.</span>
+          <span className="text-micro font-black text-grey">Ce que ça veut dire</span>
+          <span className="text-accent font-black leading-[1.3]">Elle est partante, mais fatiguée.</span>
         </FromBlush>
       </>
     ),
@@ -129,12 +129,12 @@ const DEMANDES: Demande[] = [
     reponse: (
       <FromBlush>
         <span className="flex items-center justify-between gap-2">
-          <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
+          <span className="text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
           <Tag tone="recommandee" />
         </span>
-        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold text-white">Courage pour jeudi. Samedi pour fêter ça{NBSP}?</span>
-        <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-full bg-white px-3 text-[12px] font-black shadow-soft">
-          <Icon name="copy" size={13} color="#121214" stroke={2.6} />
+        <span className="self-start rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold text-white">Courage pour jeudi. Samedi pour fêter ça{NBSP}?</span>
+        <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-full bg-white px-3 text-micro font-black shadow-soft">
+          <Icon name="copy" size={13} stroke={2.6} className="text-ink" />
           Copier
         </span>
       </FromBlush>
@@ -144,8 +144,8 @@ const DEMANDES: Demande[] = [
     q: "elle voit quelqu’un d’autre\u00a0?",
     reponse: (
       <FromBlush>
-        <span className="text-[17px] font-black leading-[1.3]">{REPONSE_EXEMPLE.title}</span>
-        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{REPONSE_EXEMPLE.evidence}</span>
+        <span className="text-accent font-black leading-[1.3]">{REPONSE_EXEMPLE.title}</span>
+        <span className="text-note font-extrabold leading-[1.45] text-soft">{REPONSE_EXEMPLE.evidence}</span>
         <ConfidenceLine level={REPONSE_EXEMPLE.confidence} className="mt-1">
           {REPONSE_EXEMPLE.limits}
         </ConfidenceLine>
@@ -156,10 +156,10 @@ const DEMANDES: Demande[] = [
     q: "on en est où\u00a0?",
     reponse: (
       <FromBlush>
-        <span className="text-[17px] font-black leading-[1.3]">
+        <span className="text-accent font-black leading-[1.3]">
           {VERDICT_EXEMPLE.emoji} {VERDICT_EXEMPLE.short} · <span className="text-vrai-ink">{VERDICT_EXEMPLE.trend}</span>
         </span>
-        <span className="text-[14px] font-extrabold leading-[1.45] text-soft">{VERDICT_EXEMPLE.nextStep}</span>
+        <span className="text-note font-extrabold leading-[1.45] text-soft">{VERDICT_EXEMPLE.nextStep}</span>
       </FromBlush>
     ),
   },
@@ -188,7 +188,7 @@ export function BlushPlus() {
                 aria-hidden="true"
                 data-float=""
                 className={cn(
-                  "pointer-events-none absolute hidden whitespace-nowrap rounded-[22px] bg-white px-4 py-2.5 font-message text-[17px] font-bold text-ink shadow-[0_18px_40px_-18px_rgba(0,0,0,0.7)] lg:block",
+                  "pointer-events-none absolute hidden whitespace-nowrap rounded-[22px] bg-white px-4 py-2.5 font-message text-accent font-bold text-ink shadow-[0_18px_40px_-18px_rgba(0,0,0,0.7)] lg:block",
                   b.r < 0 ? "rounded-bl-[6px]" : "rounded-br-[6px]",
                   b.at,
                 )}
@@ -197,7 +197,7 @@ export function BlushPlus() {
                 {b.text}
               </span>
             ))}
-            <span data-reveal="" className="text-[13px] font-black text-white/60">
+            <span data-reveal="" className="text-legende font-black text-white/60">
               Ensuite, avec BLUSH+
             </span>
             {/* Mobile : les messages qui font cogiter, en autocollants au-dessus du titre */}
@@ -205,7 +205,7 @@ export function BlushPlus() {
               {OVERTHINK.slice(0, 3).map((b) => (
                 <span
                   key={b.text}
-                  className={cn("whitespace-nowrap rounded-[18px] bg-white px-3 py-1.5 font-message text-[14px] font-bold text-ink", b.r < 0 ? "rounded-bl-[5px]" : "rounded-br-[5px]")}
+                  className={cn("whitespace-nowrap rounded-[18px] bg-white px-3 py-1.5 font-message text-note font-bold text-ink", b.r < 0 ? "rounded-bl-[5px]" : "rounded-br-[5px]")}
                   style={{ transform: `rotate(${b.r}deg)` }}
                 >
                   {b.text}
@@ -217,7 +217,7 @@ export function BlushPlus() {
               <br />
               message{NBSP}?
             </h2>
-            <p data-reveal="" className="m-0 mt-6 max-w-[440px] text-[17px] font-extrabold leading-[1.5] text-white/70 [text-wrap:balance] lg:mt-7 lg:text-[19px]">
+            <p data-reveal="" className="m-0 mt-6 max-w-[440px] text-accent font-extrabold leading-[1.5] text-white/70 [text-wrap:balance] lg:mt-7 lg:text-[19px]">
               Colle-le dans BLUSH, envoie une capture ou un nouvel export. Puis demande-lui{NBSP}:
             </p>
           </div>
@@ -234,7 +234,7 @@ function FromBlush({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-end gap-2">
       <LogoBulle size={28} className="mb-0.5 shrink-0" />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[20px] rounded-bl-[6px] bg-[#F4F2ED] px-4 py-3">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[20px] rounded-bl-[6px] bg-paper px-4 py-3">{children}</div>
     </div>
   );
 }
@@ -271,7 +271,7 @@ export function Facts() {
           {facts.map((f, i) => (
             <FactTile key={f.label} index={i}>
               <span className="text-[46px] font-black leading-none tracking-[-0.03em] lg:text-[60px]">{f.value}</span>
-              <span className="max-w-[170px] text-[14px] font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-[16px]">{f.label}</span>
+              <span className="max-w-[170px] text-note font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-corps">{f.label}</span>
             </FactTile>
           ))}
           <FactTile index={3}>
@@ -280,7 +280,7 @@ export function Facts() {
                 <AppBadge key={a} app={a} size={30} radius={9} className="lg:!size-10 lg:!rounded-[12px] lg:[&_svg]:!size-5" />
               ))}
             </span>
-            <span className="max-w-[170px] text-[14px] font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-[16px]">Toutes tes applis, même par captures</span>
+            <span className="max-w-[170px] text-note font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-corps">Toutes tes applis, même par captures</span>
           </FactTile>
         </ul>
       </Container>
@@ -308,9 +308,9 @@ export function FinalCta({ retour }: { retour: Retour }) {
       <Container>
         <div data-reveal="" className="flex flex-col items-center text-center">
           <LogoBulle size={68} animated />
-          <h2 className="m-0 mt-6 max-w-[640px] text-[36px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-[56px]">Ta conv a déjà la réponse.</h2>
+          <h2 className="m-0 mt-6 max-w-[640px] text-titre-1 font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-affiche">Ta conv a déjà la réponse.</h2>
           <CtaButton retour={retour} className="mt-8" />
-          <span className="mt-3.5 text-[14px] font-extrabold text-grey">{cta.note}</span>
+          <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>
         </div>
       </Container>
     </section>

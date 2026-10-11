@@ -22,7 +22,7 @@ export function PageErreur({ error, retry, trace }: { error: Error & { digest?: 
         <div className="flex w-full flex-col gap-2">
           <Button onClick={() => retry()}>Réessayer</Button>
           {error.digest && (
-            <p className="m-0 text-center text-[12px] font-bold text-grey">
+            <p className="m-0 text-center text-micro font-bold text-grey">
               Code de référence{NBSP}: <span className="select-all tabular-nums">{error.digest}</span>
             </p>
           )}

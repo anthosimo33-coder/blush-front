@@ -213,7 +213,7 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   /* Un seul critère, « jamais sur Vercel » : src/proxy.ts y sert la page introuvable (tests/proxy.test.ts). Ce serveur de test n’y est pas */
   const styleguide = await request.get("/styleguide");
   expect(styleguide.status()).toBe(200);
-  expect(await styleguide.text()).toContain("Le jeu");
+  expect(await styleguide.text()).toContain("Les briques de BLUSH");
   /* Des données fictives seulement */
   for (const chemin of ["/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/mail"]) {
     expect((await request.get(chemin)).status(), chemin).toBe(200);

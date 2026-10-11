@@ -14,14 +14,14 @@ export function ChapterHeader({ number, kicker, title, id }: { number: number; k
   return (
     /* La pastille se centre sur le titre et déborde de 6 px (compensés par les marges) : le surtitre reste à 2 px du titre, sur une ligne comme sur deux */
     <div className="mb-1.5 mt-3.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5">
-      {kicker && <div className="col-start-2 row-start-1 text-[13px] font-black text-grey">{kicker}</div>}
+      {kicker && <div className="col-start-2 row-start-1 text-legende font-black text-grey">{kicker}</div>}
       <span
-        className={cn("col-start-1 -my-1.5 flex h-[38px] min-w-[38px] items-center justify-center rounded-[19px] bg-ink px-2.5 text-[16px] font-black text-white shadow-ink", kicker && "row-start-2")}
+        className={cn("col-start-1 -my-1.5 flex h-[38px] min-w-[38px] items-center justify-center rounded-[19px] bg-ink px-2.5 text-corps font-black text-white shadow-ink", kicker && "row-start-2")}
         aria-hidden="true"
       >
         {number}
       </span>
-      <h2 id={id} className={cn("col-start-2 m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]", kicker && "row-start-2")}>
+      <h2 id={id} className={cn("col-start-2 m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]", kicker && "row-start-2")}>
         <span className="sr-only">Chapitre {number}{NBSP}: </span>
         {title}
       </h2>
@@ -35,14 +35,14 @@ export function ChapterRule() {
 }
 
 /* ———— Les blocs d’un chapitre ———— */
-export function Essential({ children }: { children: ReactNode }) {
+function Essential({ children }: { children: ReactNode }) {
   return <p className="m-0 text-[21px] font-black leading-[1.2] tracking-[-0.01em]">{children}</p>;
 }
 
-export function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }: Extract<ChapterBlock, { kind: "seen" }>) {
+function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }: Extract<ChapterBlock, { kind: "seen" }>) {
   return (
     <div className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
-      <div className="text-[13px] font-black text-grey">{title}</div>
+      <div className="text-legende font-black text-grey">{title}</div>
       {facts?.map((f) => <Fact key={f}>{f}</Fact>)}
       {messages && messages.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -56,11 +56,11 @@ export function Seen({ title = "Ce qu’on voit", facts, messages, factsAfter }:
   );
 }
 
-export function Meaning({ children, label = "Ce que ça veut dire" }: { children: ReactNode; label?: string }) {
+function Meaning({ children, label = "Ce que ça veut dire" }: { children: ReactNode; label?: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[13px] font-black text-grey">{label}</div>
-      <p className="m-0 text-[16px] font-extrabold leading-[1.45]">{children}</p>
+      <div className="text-legende font-black text-grey">{label}</div>
+      <p className="m-0 text-corps font-extrabold leading-[1.45]">{children}</p>
     </div>
   );
 }
@@ -71,8 +71,8 @@ function Timeline({ items }: Extract<ChapterBlock, { kind: "timeline" }>) {
       {/* La place dans la liste fait partie de la clé : le modèle peut écrire deux fois le même titre */}
       {items.map((it, i) => (
         <div key={`${i}-${it.title}`} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
-          <div className="text-[13px] font-black text-grey">{it.title}</div>
-          <div className="text-[14px] font-extrabold leading-[1.45]">{it.text}</div>
+          <div className="text-legende font-black text-grey">{it.title}</div>
+          <div className="text-note font-extrabold leading-[1.45]">{it.text}</div>
           {it.message && <ClampedBubble from={it.message.from} caption="" text={it.message.text} />}
         </div>
       ))}
@@ -88,7 +88,7 @@ function Duo({ title, text, trophies }: Extract<ChapterBlock, { kind: "duo" }>) 
           <BubbleLogo size={44} />
           <span className="text-[22px] font-black">{title}</span>
         </div>
-        <div className="text-[14px] font-extrabold leading-[1.45]">{text}</div>
+        <div className="text-note font-extrabold leading-[1.45]">{text}</div>
       </div>
       {trophies.map((t) => (
         <div key={t.title} data-pop="" className="flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-card">
@@ -100,8 +100,8 @@ function Duo({ title, text, trophies }: Extract<ChapterBlock, { kind: "duo" }>) 
             🏆
           </span>
           <div className="flex-1">
-            <div className="text-[15px] font-black">{t.title}</div>
-            <div className="text-[12px] font-extrabold text-grey">{t.text}</div>
+            <div className="text-detail font-black">{t.title}</div>
+            <div className="text-micro font-extrabold text-grey">{t.text}</div>
           </div>
         </div>
       ))}
@@ -115,10 +115,10 @@ function Scenarios({ items }: Extract<ChapterBlock, { kind: "scenarios" }>) {
       {items.map((s, i) => (
         <div key={`${i}-${s.title}`} className="flex flex-col gap-1.5 rounded-card bg-white p-3.5 shadow-card">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[15px] font-black">{s.title}</span>
+            <span className="text-detail font-black">{s.title}</span>
             <Tag tone={s.tag} />
           </div>
-          <div className="text-[14px] font-bold leading-[1.45] text-soft">{s.text}</div>
+          <div className="text-note font-bold leading-[1.45] text-soft">{s.text}</div>
         </div>
       ))}
     </>
@@ -130,10 +130,10 @@ function Plan({ items }: Extract<ChapterBlock, { kind: "plan" }>) {
     <ol className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
       {items.map((p, i) => (
         <li key={`${i}-${p.when}`} className="flex gap-3 border-b border-[rgba(17,17,20,0.07)] py-2.5">
-          <span className="w-[78px] shrink-0 text-[13px] font-black text-toi-ink">{p.when}</span>
+          <span className="w-[78px] shrink-0 text-legende font-black text-toi-ink">{p.when}</span>
           <div>
-            <div className="text-[15px] font-black">{p.title}</div>
-            <div className="text-[12px] font-extrabold text-grey">{p.text}</div>
+            <div className="text-detail font-black">{p.title}</div>
+            <div className="text-micro font-extrabold text-grey">{p.text}</div>
           </div>
         </li>
       ))}
@@ -158,7 +158,7 @@ function Paragraphs({ text, className }: { text: string; className: string }) {
 function Lead({ text }: { text: string }) {
   return (
     <div className="flex flex-col gap-3">
-      <Paragraphs text={text} className="text-[18px] font-extrabold leading-[1.5] tracking-[-0.005em]" />
+      <Paragraphs text={text} className="text-carte font-extrabold leading-[1.5] tracking-[-0.005em]" />
     </div>
   );
 }
@@ -166,7 +166,7 @@ function Lead({ text }: { text: string }) {
 function Story({ text, messages }: Extract<ChapterBlock, { kind: "story" }>) {
   return (
     <div className="flex flex-col gap-3">
-      <Paragraphs text={text} className="text-[16px] font-bold leading-[1.6] text-ink" />
+      <Paragraphs text={text} className="text-corps font-bold leading-[1.6] text-ink" />
       {messages && messages.length > 0 && (
         <div className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
           {messages.map((m, i) => (
@@ -181,7 +181,7 @@ function Story({ text, messages }: Extract<ChapterBlock, { kind: "story" }>) {
 function Punchline({ text, onShare }: { text: string; onShare?: () => void }) {
   return (
     <div className="relative rounded-card bg-ink px-4 py-3.5 text-white shadow-ink">
-      <p className={cn("m-0 text-[18px] font-black leading-[1.3] tracking-[-0.01em]", onShare && "pr-10")}>{text}</p>
+      <p className={cn("m-0 text-carte font-black leading-[1.3] tracking-[-0.01em]", onShare && "pr-10")}>{text}</p>
       {/* La chute se partage en image (story), le prénom de l’autre masqué */}
       {onShare && (
         <button
@@ -190,7 +190,7 @@ function Punchline({ text, onShare }: { text: string; onShare?: () => void }) {
           aria-label="Partager cette phrase en image"
           className="absolute right-2 top-2 flex size-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 after:absolute after:-inset-1 after:content-['']"
         >
-          <Icon name="share" size={16} color="#FFFFFF" stroke={2.4} />
+          <Icon name="share" size={16} stroke={2.4} className="text-white" />
         </button>
       )}
     </div>
@@ -203,12 +203,12 @@ function Stop({ items }: Extract<ChapterBlock, { kind: "stop" }>) {
       {items.map((s) => (
         <div key={s.title} className="flex flex-col gap-2 rounded-card bg-white p-3.5 shadow-card">
           <div className="flex items-center gap-2.5">
-            <span aria-hidden="true" className="flex size-[34px] shrink-0 items-center justify-center rounded-[17px] bg-[rgba(255,79,154,0.14)] text-[16px]">
+            <span aria-hidden="true" className="flex size-[34px] shrink-0 items-center justify-center rounded-[17px] bg-[rgba(255,79,154,0.14)] text-corps">
               ✋
             </span>
-            <span className="text-[15px] font-black">{s.title}</span>
+            <span className="text-detail font-black">{s.title}</span>
           </div>
-          <div className="text-[14px] font-bold leading-[1.45] text-soft">{s.text}</div>
+          <div className="text-note font-bold leading-[1.45] text-soft">{s.text}</div>
           {s.messages?.map((m, i) => (
             <ClampedBubble key={i} from={m.from} caption={m.caption} text={m.text} />
           ))}
@@ -223,9 +223,9 @@ function Ending({ text }: { text: string }) {
     <div className="flex flex-col gap-3 rounded-card bg-white p-4 shadow-selected">
       <div className="flex items-center gap-2.5">
         <BubbleLogo size={36} />
-        <span className="text-[13px] font-black text-grey">Le mot de la fin</span>
+        <span className="text-legende font-black text-grey">Le mot de la fin</span>
       </div>
-      <Paragraphs text={text} className="text-[16px] font-extrabold leading-[1.55]" />
+      <Paragraphs text={text} className="text-corps font-extrabold leading-[1.55]" />
     </div>
   );
 }

@@ -147,8 +147,10 @@ export function Sheet({
     }
     const { temps, panneau, voile: eteint } = sortieDeFeuille(estDesktop(), dureeSortie !== undefined && courbeSortie !== undefined ? { duration: dureeSortie, easing: courbeSortie } : undefined);
     p.style.pointerEvents = "none";
-    const anims = [p.animate(panneau, temps), ...(voile.current ? [voile.current.animate(eteint, temps)] : [])];
-    anims[0].finished.then(fermer, () => {});
+    const sortiePanneau = p.animate(panneau, temps);
+    const anims = [sortiePanneau, ...(voile.current ? [voile.current.animate(eteint, temps)] : [])];
+    /* Annulée (la feuille rouverte pendant sa sortie) : elle reste ouverte, rien à fermer */
+    sortiePanneau.finished.then(fermer, () => {});
     /* Rouverte pendant sa sortie : elle reprend sa place */
     return () => {
       anims.forEach((a) => a.cancel());
@@ -234,7 +236,7 @@ export function TitreFeuille({ id, children, taille = 24, fermer, className }: {
     <div className="flex items-center justify-between gap-3">
       {h2}
       <button type="button" aria-label="Fermer" onClick={fermer} className="lift lift-sm flex size-10 shrink-0 items-center justify-center rounded-full bg-white shadow-soft">
-        <Icon name="close" size={16} color="#121214" stroke={2.8} />
+        <Icon name="close" size={16} stroke={2.8} className="text-ink" />
       </button>
     </div>
   );
@@ -263,12 +265,12 @@ export function Toast({
       )}
     >
       <DoneCheck size={26} />
-      <span className="flex-1 text-[14px] font-extrabold">{children}</span>
+      <span className="flex-1 text-note font-extrabold">{children}</span>
       {action && (
         <button
           type="button"
           onClick={onAction}
-          className="relative inline-flex h-8 items-center rounded-2xl bg-white px-3 text-[13px] font-black text-ink after:absolute after:-inset-1.5 after:content-['']"
+          className="relative inline-flex h-8 items-center rounded-2xl bg-white px-3 text-legende font-black text-ink after:absolute after:-inset-1.5 after:content-['']"
         >
           {action}
         </button>

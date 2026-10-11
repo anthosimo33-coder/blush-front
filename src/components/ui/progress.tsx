@@ -11,7 +11,7 @@ import { Dot } from "./messages";
 export { scaleOf } from "@/contenu/niveaux";
 
 /* Couleur du nom du gagnant : les teintes foncées, lisibles en petit (au moins 4,5:1) */
-const SIDE_COLOR = { toi: "#1A66DB", elle: "#C81D6B", pareil: "#087A56" } as const;
+const SIDE_CLASS = { toi: "text-toi-ink", elle: "text-elle-ink", pareil: "text-vrai-ink" } as const;
 
 /* ———— Barre de score toi / elle ———— */
 /* La couleur du gagnant sur le fond sombre de la révélation : les teintes vives, lisibles sur le noir */
@@ -31,8 +31,8 @@ export function ScoreBar({ row, delay = 0, autre, sombre = false }: { row: Score
     return (
       <>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[16px] font-black leading-tight">{row.label}</span>
-          <span className={cn("shrink-0 text-[14px] font-black", SIDE_CLASS_SOMBRE[row.winner])}>{gagnant}</span>
+          <span className="text-corps font-black leading-tight">{row.label}</span>
+          <span className={cn("shrink-0 text-note font-black", SIDE_CLASS_SOMBRE[row.winner])}>{gagnant}</span>
         </div>
         <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle" role="img" aria-label={dite}>
           <span data-bar="" style={{ "--w": `${row.toiPercent}%`, ...delai(delay) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
@@ -47,15 +47,15 @@ export function ScoreBar({ row, delay = 0, autre, sombre = false }: { row: Score
     );
   return (
     <div className="flex flex-col gap-2 py-2.5 lg:gap-1.5 lg:py-2">
-      <div className="flex justify-between gap-3 text-[15px] font-black">
+      <div className="flex justify-between gap-3 text-detail font-black">
         <span>{row.label}</span>
-        <span style={{ color: SIDE_COLOR[row.winner] }}>{gagnant}</span>
+        <span className={SIDE_CLASS[row.winner]}>{gagnant}</span>
       </div>
       <div className="flex h-3.5 overflow-hidden rounded-[7px] bg-[rgba(255,79,154,0.35)]" role="img" aria-label={dite}>
         <span data-grow="" className="bg-toi" style={{ width: `${row.toiPercent}%`, ...delai(delay) }} />
       </div>
       {(row.captionLeft || row.captionRight) && (
-        <div className="flex justify-between text-[12px] font-extrabold text-grey">
+        <div className="flex justify-between text-micro font-extrabold text-grey">
           <span>{row.captionLeft}</span>
           <span>{row.captionRight}</span>
         </div>
@@ -68,14 +68,14 @@ export function ScoreBar({ row, delay = 0, autre, sombre = false }: { row: Score
 export function ScoreCard({ rows, className, autre }: { rows: ScoreRow[]; className?: string; autre?: Pronom }) {
   return (
     <div className={cn("flex flex-col rounded-card bg-white px-4 py-3.5 shadow-card", className)}>
-      <div className="flex justify-between text-[12px] font-black">
+      <div className="flex justify-between text-micro font-black">
         <span className="inline-flex items-center gap-1 text-toi-ink">
-          <Dot color="#3D8BFF" size={8} />
+          <Dot size={8} className="bg-toi" />
           Toi
         </span>
         <span className="inline-flex items-center gap-1 text-elle-ink">
           {IlOuElle(autre)}
-          <Dot color="#FF4F9A" size={8} />
+          <Dot size={8} className="bg-elle" />
         </span>
       </div>
       {rows.map((r, i) => (
@@ -101,8 +101,8 @@ export function LevelPath({ current, variant = "normal", className }: { current:
         className="absolute inset-x-[38px] top-6 h-1 rounded-sm"
         style={{
           background: temperature
-            ? "#E6E3DC"
-            : `linear-gradient(90deg, #12C08A 0%, #12C08A ${pct(idx - 1)}, #3D8BFF ${pct(idx - 1)}, #3D8BFF ${pct(idx)}, #E6E3DC ${pct(idx)})`,
+            ? "var(--line)"
+            : `linear-gradient(90deg, var(--vrai) 0%, var(--vrai) ${pct(idx - 1)}, var(--toi) ${pct(idx - 1)}, var(--toi) ${pct(idx)}, var(--line) ${pct(idx)})`,
         }}
       />
       <ol className="contents">
@@ -120,11 +120,11 @@ export function LevelPath({ current, variant = "normal", className }: { current:
                 data-beat={now ? "doux" : undefined}
                 className={cn("flex size-[50px] items-center justify-center rounded-[25px]", done && "bg-vrai-ink", now && "bg-toi-ink", !done && !now && "bg-white shadow-thin")}
               >
-                {done && <Icon name="check" size={20} color="#FFFFFF" stroke={3.2} />}
-                {now && (temperature ? <span className="size-3 rounded-full bg-white" /> : <span className="text-[18px] font-black text-white">{i + 1}</span>)}
-                {!done && !now && !temperature && <Icon name="lock" size={18} color="#B4B1A9" />}
+                {done && <Icon name="check" size={20} stroke={3.2} className="text-white" />}
+                {now && (temperature ? <span className="size-3 rounded-full bg-white" /> : <span className="text-carte font-black text-white">{i + 1}</span>)}
+                {!done && !now && !temperature && <Icon name="lock" size={18} className="text-pale" />}
               </span>
-              <span className={cn("text-[13px] font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
+              <span className={cn("text-legende font-black leading-[1.2]", !done && !now ? "text-muted" : "text-ink")}>
                 {l.label}
                 <span className="sr-only">{etatDuNiveau(i, idx, temperature)}</span>
               </span>
@@ -143,14 +143,14 @@ function LevelPathCompact({ current, className }: { current: LevelId; className?
   const doneShare = idx > 0 ? ((idx - 1) / idx) * 100 : 0;
   return (
     <ol className={cn("relative m-0 grid list-none grid-cols-4 p-0", className)}>
-      <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full bg-[#E6E3DC]" />
+      <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full bg-line" />
       {!temperature && idx > 0 && (
         <span
           aria-hidden="true"
           className="absolute left-[12.5%] top-2 h-0.5 -translate-y-1/2 rounded-full"
           style={{
             width: `${(idx / last) * 75}%`,
-            background: `linear-gradient(90deg, #12C08A 0%, #12C08A ${doneShare}%, #3D8BFF ${doneShare}%, #3D8BFF 100%)`,
+            background: `linear-gradient(90deg, var(--vrai) 0%, var(--vrai) ${doneShare}%, var(--toi) ${doneShare}%, var(--toi) 100%)`,
           }}
         />
       )}
@@ -165,10 +165,10 @@ function LevelPathCompact({ current, className }: { current: LevelId; className?
                 "flex size-4 items-center justify-center rounded-full",
                 done && "bg-vrai-ink",
                 now && "bg-toi-ink",
-                !done && !now && "bg-white shadow-[inset_0_0_0_1.5px_#D9D6CF]",
+                !done && !now && "bg-white shadow-[inset_0_0_0_1.5px_var(--color-disabled)]",
               )}
             >
-              {done && <Icon name="check" size={9} color="#FFFFFF" stroke={4} />}
+              {done && <Icon name="check" size={9} stroke={4} className="text-white" />}
               {now && <span className="size-1.5 rounded-full bg-white" />}
             </span>
             <span className={cn("px-0.5 text-[11.5px] font-black leading-[1.2]", !done && !now ? "text-grey" : "text-ink")}>
@@ -201,15 +201,15 @@ export function ProgressDots({ total = 3, current }: { total?: number; current: 
 export function LockRow({ number, title, last = false, onClick }: { number: number; title: string; last?: boolean; onClick?: () => void }) {
   const inner = (
     <>
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-[14px] bg-plaque text-[12px] font-black text-soft">{number}</span>
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-[14px] bg-plaque text-micro font-black text-soft">{number}</span>
       <span className="flex-1 text-left">
-        <span className="block text-[16px] font-black">{title}</span>
+        <span className="block text-corps font-black">{title}</span>
         <span aria-hidden="true" className="mt-1.5 flex flex-col gap-1 blur-[2px]">
           <span className="h-[7px] w-[88%] rounded bg-skeleton" />
           <span className="h-[7px] w-[64%] rounded bg-skeleton" />
         </span>
       </span>
-      <Icon name="lock" size={18} color="#8A8780" />
+      <Icon name="lock" size={18} className="text-muted" />
       <span className="sr-only">(verrouillé)</span>
     </>
   );
@@ -233,7 +233,7 @@ const FLOW = [
 export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {
   return (
     <div className="flex flex-col gap-1 rounded-card bg-white p-5 shadow-card">
-      <div className="text-[13px] font-black text-grey">Trois étapes, puis ton verdict</div>
+      <div className="text-legende font-black text-grey">Trois étapes, puis ton verdict</div>
       <ol className="m-0 flex list-none flex-col gap-1 p-0">
         {FLOW.map((s, i) => {
           const n = i + 1;
@@ -244,11 +244,11 @@ export function FlowSteps({ step }: { step: 1 | 2 | 3 }) {
               {done ? (
                 <DoneCheck size={30} />
               ) : (
-                <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-[14px] font-black", on ? "bg-ink text-white" : "bg-white text-grey shadow-thin")}>{n}</span>
+                <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black", on ? "bg-ink text-white" : "bg-white text-grey shadow-thin")}>{n}</span>
               )}
               <div>
-                <div className={cn("text-[16px] font-black", on || done ? "text-ink" : "text-grey")}>{s.title}</div>
-                <div className="text-[13px] font-extrabold text-grey">{s.sub}</div>
+                <div className={cn("text-corps font-black", on || done ? "text-ink" : "text-grey")}>{s.title}</div>
+                <div className="text-legende font-extrabold text-grey">{s.sub}</div>
               </div>
             </li>
           );

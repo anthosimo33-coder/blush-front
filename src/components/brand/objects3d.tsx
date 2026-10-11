@@ -221,56 +221,6 @@ function LayeredBubbleLogo({ size, animated, detail, className, style }: ObjProp
   );
 }
 
-export function Lock3D({ size, className, style }: ObjProps) {
-  const u = useSvgId("lk");
-  return (
-    <svg aria-hidden="true" width={size} height={Math.round(size * 1.08)} viewBox="0 0 120 130" className={className} style={{ overflow: "visible", ...style }}>
-      <defs>
-        <linearGradient id={`${u}c`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#7E8596" />
-          <stop offset="0.22" stopColor="#F5F7FB" />
-          <stop offset="0.45" stopColor="#AEB4C2" />
-          <stop offset="0.68" stopColor="#FFFFFF" />
-          <stop offset="1" stopColor="#6F7688" />
-        </linearGradient>
-        <radialGradient id={`${u}g`} cx="0.28" cy="0.18" r="1">
-          <stop offset="0" stopColor="#FFF4C4" />
-          <stop offset="0.3" stopColor="#FFD866" />
-          <stop offset="0.7" stopColor="#F2A21C" />
-          <stop offset="1" stopColor="#B86A06" />
-        </radialGradient>
-        <linearGradient id={`${u}b`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.75" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id={`${u}o`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0.5" stopColor="#7A4300" stopOpacity="0" />
-          <stop offset="1" stopColor="#7A4300" stopOpacity="0.35" />
-        </linearGradient>
-        <linearGradient id={`${u}k`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#5A3405" />
-          <stop offset="1" stopColor="#2E1A02" />
-        </linearGradient>
-        <filter id={`${u}f`} x="-50%" y="-300%" width="200%" height="700%">
-          <feGaussianBlur stdDeviation="4" />
-        </filter>
-      </defs>
-      <ellipse cx="60" cy="126" rx="44" ry="5" fill="rgba(120,70,0,0.28)" filter={`url(#${u}f)`} />
-      <path d="M34 60 V40 a26 26 0 0 1 52 0 V60" fill="none" stroke="#5E6474" strokeWidth="15" strokeLinecap="round" transform="translate(0 2)" />
-      <path d="M34 60 V40 a26 26 0 0 1 52 0 V60" fill="none" stroke={`url(#${u}c)`} strokeWidth="13" strokeLinecap="round" />
-      <path d="M40 38 a20 20 0 0 1 14 -18" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
-      <rect x="10" y="52" width="100" height="70" rx="24" fill={`url(#${u}g)`} />
-      <rect x="10" y="52" width="100" height="70" rx="24" fill={`url(#${u}o)`} />
-      <rect x="18" y="57" width="84" height="18" rx="9" fill={`url(#${u}b)`} />
-      <path d="M24 114 Q60 121 96 114" fill="none" stroke="#FFE6A3" strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
-      <circle cx="60" cy="84" r="9.5" fill={`url(#${u}k)`} />
-      <path d="M56 88 h8 l2 16 a2 2 0 0 1 -2 2 h-8 a2 2 0 0 1 -2 -2 z" fill={`url(#${u}k)`} />
-      <path d="M53.5 90 a9 9 0 0 0 13 0" fill="none" stroke="#FFE2A0" strokeWidth="1.6" opacity="0.6" />
-      <circle cx="26" cy="62" r="3" fill="#FFFFFF" opacity="0.9" />
-    </svg>
-  );
-}
-
 export function Bell3D({ size, className, style }: ObjProps) {
   const u = useSvgId("bl");
   return (
@@ -342,26 +292,6 @@ function CheckBadge({ size, className, style }: ObjProps) {
       <path d="M30 53 L44 66 L71 37" fill="none" stroke="#065E44" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" transform="translate(0 3)" filter={`url(#${u}t)`} />
       <path d="M30 53 L44 66 L71 37" fill="none" stroke="#FFFFFF" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-/** Les billes : composition nacre et opale de la planche « Objets 3D ». */
-export function Marbles({ className }: { className?: string }) {
-  const items: { kind: SphereKind; left: number; top: number; size: number }[] = [
-    { kind: "opale", left: 0, top: 34, size: 46 },
-    { kind: "nacre", left: 62, top: 0, size: 30 },
-    { kind: "opale", left: 96, top: 54, size: 62 },
-    { kind: "nacre", left: 44, top: 98, size: 22 },
-    { kind: "nacre", left: 150, top: 20, size: 16 },
-  ];
-  return (
-    <div className={className} style={{ position: "relative", width: 180, height: 140 }}>
-      {items.map((it, i) => (
-        <span key={i} aria-hidden="true" data-float="" style={{ position: "absolute", left: it.left, top: it.top, width: it.size, height: it.size }}>
-          <Sphere size={it.size} kind={it.kind} shadow={false} />
-        </span>
-      ))}
-    </div>
   );
 }
 

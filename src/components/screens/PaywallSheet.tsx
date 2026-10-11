@@ -8,7 +8,7 @@ import { unlock } from "@/services/api";
 import { OFFERS, PAYWALL, prixDe } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
-import { TypingDots } from "@/components/ui/FileInput";
+import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import type { Offer, Plan } from "@/types";
@@ -83,7 +83,7 @@ export function PaywallSheet({
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
         {only ? "BLUSH+" : PAYWALL.title(otherName)}
       </h2>
-      {!only && <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">{PAYWALL.subtitle(chapitres)}</p>}
+      {!only && <p className="m-0 text-note font-bold leading-[1.45] text-soft lg:text-detail">{PAYWALL.subtitle(chapitres)}</p>}
       {/* Les offres, comme un choix d’abonnement sur iPhone : un rond à cocher, le prix aligné à droite */}
       <RadioGroup label="Ton offre" className="flex flex-col gap-2.5">
         {offers.map((o) => {
@@ -103,20 +103,20 @@ export function PaywallSheet({
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-[16px] font-black leading-[1.25]">
+                  <span className="text-corps font-black leading-[1.25]">
                     <span className="lg:hidden">{o.title}</span>
                     <span className="hidden lg:inline">{o.titleDesktop}</span>
                   </span>
                   {o.recommended && <Tag tone="conseille" />}
                 </span>
-                <span className="text-[13px] font-extrabold leading-[1.4] text-grey">
+                <span className="text-legende font-extrabold leading-[1.4] text-grey">
                   <span className="lg:hidden">{o.note}</span>
                   <span className="hidden lg:inline">{o.noteDesktop}</span>
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end">
                 <span className="text-[21px] font-black leading-none tracking-[-0.01em] lg:text-[23px]">{montant}</span>
-                {periode && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {periode}</span>}
+                {periode && <span className="mt-1 text-micro font-extrabold text-grey">/ {periode}</span>}
               </span>
             </button>
           );
@@ -124,19 +124,17 @@ export function PaywallSheet({
       </RadioGroup>
       <div className="flex flex-col gap-3 lg:w-[360px] lg:gap-4 lg:self-center">
         {later && (
-          <p role="status" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-soft">
+          <p role="status" className="m-0 text-center text-note font-extrabold leading-[1.45] text-soft">
             Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.
           </p>
         )}
         {souci && (
-          <p role="alert" className="m-0 text-center text-[14px] font-extrabold leading-[1.45] text-[#D93036]">
-            Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.
-          </p>
+          <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>
         )}
-        <Button arrow={!occupe} onClick={occupe ? undefined : pay} aria-busy={occupe}>
-          {occupe ? <TypingDots color="#FFFFFF" label="Paiement en cours" /> : "Débloquer"}
+        <Button arrow loading={occupe} loadingLabel="Paiement en cours" onClick={() => void pay()}>
+          Débloquer
         </Button>
-        <span className="text-center text-[12px] font-extrabold text-grey">{PAYWALL.payments}</span>
+        <span className="text-center text-micro font-extrabold text-grey">{PAYWALL.payments}</span>
       </div>
     </Sheet>
   );

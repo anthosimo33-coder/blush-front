@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/Button";
 import { EmailField } from "@/components/ui/EmailField";
-import { TypingDots } from "@/components/ui/FileInput";
 import type { SaisieEmail } from "@/lib/email";
 import type { EnvoiCode } from "@/lib/useEnvoiCode";
 
@@ -30,8 +29,8 @@ export function FormulaireEmail({ envoi }: { envoi: SaisieEmail }) {
 /** « Recevoir mon code » : grisé tant que l’email n’a pas sa forme, des points pendant l’envoi. */
 export function BoutonRecevoirCode({ envoi }: { envoi: EnvoiCode }) {
   return (
-    <Button arrow={!envoi.occupe} disabled={!envoi.valide || envoi.occupe} aria-busy={envoi.occupe} onClick={() => void envoi.envoyer()}>
-      {envoi.occupe ? <TypingDots color="#FFFFFF" label="Envoi du code" /> : "Recevoir mon code"}
+    <Button arrow loading={envoi.occupe} loadingLabel="Envoi du code" disabled={!envoi.valide || envoi.occupe} onClick={() => void envoi.envoyer()}>
+      Recevoir mon code
     </Button>
   );
 }

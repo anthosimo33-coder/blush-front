@@ -208,7 +208,7 @@ export function ReorderGrid<T extends { id: string }>({
                 onClick={() => onRemove(s.id)}
                 className={cn("absolute left-1.5 top-1.5 z-[1] flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.72)] transition-opacity", lifted && "opacity-0")}
               >
-                <Icon name="close" size={12} color="#FFFFFF" stroke={3} />
+                <Icon name="close" size={12} stroke={3} className="text-white" />
               </button>
             </li>
           );
@@ -223,7 +223,7 @@ export function ReorderGrid<T extends { id: string }>({
       </ol>
       {sous}
       {avecAide && (
-        <p id={aideId} className="m-0 text-[13px] font-extrabold leading-[1.45] text-grey">
+        <p id={aideId} className="m-0 text-legende font-extrabold leading-[1.45] text-grey">
           {aide}
         </p>
       )}

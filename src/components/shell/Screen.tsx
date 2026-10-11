@@ -31,7 +31,7 @@ export function MobileTopBar({
   return (
     <header className={cn("flex h-[60px] shrink-0 items-center gap-2 px-4 lg:hidden", className)}>
       {back ? <BoutonRetour target={back} /> : <span className="size-11" />}
-      <span className="flex-1 text-center text-[14px] font-black text-grey">{title}</span>
+      <span className="flex-1 text-center text-note font-black text-grey">{title}</span>
       <span className="flex w-11 justify-end">{right ?? (progress !== undefined && <ProgressDots current={progress} />)}</span>
     </header>
   );
@@ -56,7 +56,7 @@ function DesktopBack({ target, label, trailing }: { target: BackTarget; label?: 
     /* Toujours 14 px entre « Retour » et le titre, quel que soit l’espacement du contenu */
     <div className="hidden items-center gap-4 lg:flex" style={{ marginBottom: "calc(14px - var(--gap))" }}>
       <LienRetourDesktop target={target} label={label} />
-      {trailing && <span className="text-[14px] font-black text-grey">{trailing}</span>}
+      {trailing && <span className="text-note font-black text-grey">{trailing}</span>}
     </div>
   );
 }
@@ -66,14 +66,14 @@ export function AccountPill({ initial }: { initial?: string }) {
   return (
     <Link
       href="/compte"
-      className="lift lift-sm inline-flex h-11 items-center gap-2.5 rounded-[22px] bg-white pl-1.5 pr-3.5 text-[15px] font-black text-ink no-underline shadow-soft"
+      className="lift lift-sm inline-flex h-11 items-center gap-2.5 rounded-[22px] bg-white pl-1.5 pr-3.5 text-detail font-black text-ink no-underline shadow-soft"
     >
       <span
         aria-hidden="true"
-        className="flex size-8 items-center justify-center rounded-full text-[14px] font-black text-white"
-        style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), #3D8BFF" }}
+        className="flex size-8 items-center justify-center rounded-full text-note font-black text-white"
+        style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), var(--toi)" }}
       >
-        {initial ?? <Icon name="user" size={16} color="#FFFFFF" stroke={2.4} />}
+        {initial ?? <Icon name="user" size={16} stroke={2.4} className="text-white" />}
       </span>
       Mon compte
     </Link>
@@ -173,7 +173,7 @@ export function Screen({
       {srTitle && <h1 className="sr-only">{srTitle}</h1>}
       {desktopBack && <DesktopBack {...desktopBack} />}
       {desktopLabel && !desktopBack && (
-        <div className="hidden text-[14px] font-black text-grey lg:block" style={{ marginBottom: "calc(14px - var(--gap))" }}>
+        <div className="hidden text-note font-black text-grey lg:block" style={{ marginBottom: "calc(14px - var(--gap))" }}>
           {desktopLabel}
         </div>
       )}
