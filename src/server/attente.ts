@@ -5,7 +5,7 @@ import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { SourceAttente } from "./db/enums";
 import { envoyerMail } from "./email";
-import { env, peutEntrer } from "./env";
+import { boiteAMails, env, peutEntrer } from "./env";
 import { LIMITES, sousLaLimite } from "./limites";
 import { mailAttente } from "./mail-attente";
 
@@ -36,7 +36,8 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
     .onConflictDoNothing({ target: schema.waitlist.emailHash });
   /* Pas de rafale chez une même personne, et un plafond pour tous (le quota des mails sert d’abord aux codes, aux rapports et aux alertes) : au-delà, on inscrit sans écrire */
   if (!(await sousLaLimite(`attente:mail:${emailHash}`, LIMITES.mailAttenteParEmail))) return;
-  if (!(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
+  /* Le plafond pour tous ne compte que les mails qui partent : pas ceux de la boîte des tests de bout en bout (comme les codes) */
+  if (!boiteAMails() && !(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
   await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }));
 }
 

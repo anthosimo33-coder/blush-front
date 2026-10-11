@@ -94,7 +94,8 @@ export const LIMITES = {
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
   /**
    * Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent épuiser ni le quota
-   * des codes, ni la réserve des rapports et des alertes (QUOTA_MAILS). Au-delà, on inscrit sans écrire. TODO(produit): 20.
+   * des codes, ni la réserve des rapports et des alertes (QUOTA_MAILS). Au-delà, on inscrit sans écrire. Sans la boîte
+   * des tests de bout en bout, dont les mails ne partent pas (comme mailsCodeParJour). TODO(produit): 20.
    */
   mailsAttenteParJour: { max: 20, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
