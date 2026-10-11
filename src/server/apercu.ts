@@ -13,7 +13,7 @@ import { bullesAffichees } from "./ecrans/chat";
 import { ficheAffichee } from "./ecrans/fiche";
 import { messagesAffiches, resoudre } from "./ecrans/messages";
 import { chapitresAffiches, scores, sobreAffiche, tempsDeLecture } from "./ecrans/rapport";
-import { resumeDe, type Meta } from "./histoires";
+import { resumeDe, type Meta, type Participant } from "./histoires";
 import { enTete } from "./presentation/rapport";
 
 /*
@@ -52,11 +52,12 @@ export function apercuDe(b: SortiesDuBanc): Apercu {
     access: "blushplus",
   };
   const { messages: tous } = lu;
+  const participant = (p: { nomExport: string; prenom: string }): Participant => ({ nom: p.nomExport, prenom: p.prenom, messages: tous.filter((m) => m.nom === p.nomExport).length });
   const meta: Meta = {
     appli: estAppli(h.appli) ? h.appli : "autre",
     format: h.format,
     fichier: "conv de test",
-    participants: [h.utilisateur, h.autre].map((p) => ({ nom: p.nomExport, prenom: p.prenom, messages: tous.filter((m) => m.nom === p.nomExport).length })),
+    participants: [participant(h.utilisateur), participant(h.autre)],
     resume: resumeDe(tous),
     ...(h.format === "captures" ? { captures: lu.captures ?? 0 } : {}),
     moi: 0,

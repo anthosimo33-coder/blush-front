@@ -13,7 +13,7 @@ export const maxDuration = 300;
  * Débloquer le rapport. v1, sans paiement : seulement pour les emails de la bêta (BLUSH_ACCES_LIBRE).
  * Le rapport, puis la mémoire, s’écrivent après la réponse.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/debloquer", async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;

@@ -67,7 +67,7 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
         .insert(schema.chatVocals)
         .values({ storyId: story.id, voix, audio: coffre.ecrireAudio(audio), dureeMs: Math.round(duree * 1000) })
         .returning({ id: schema.chatVocals.id }),
-      "chat_vocals (vocal créé)",
+      "chat_vocals:vocal_cree",
     );
     return { audio: `/api/vocal/chat/${v.id}`, duree: Math.round(duree * 10) / 10, peaks: ondeDe(alignement) };
   } catch (e) {

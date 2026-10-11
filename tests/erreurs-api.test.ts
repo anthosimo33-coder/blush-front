@@ -80,22 +80,24 @@ describe("l’enveloppe des routes", () => {
   it("une erreur que la route ne rattrape pas répond « panne », et le journal n’en garde que le nom (S-44)", async () => {
     const lignes = vi.spyOn(console, "error").mockImplementation(() => {});
     const sql = Object.assign(new Error("Failed query: select * from users where email = $1\nparams: ines@exemple.test"), { name: "DrizzleQueryError" });
-    const r = await route(async (req: Request) => {
+    const r = await route("POST /api/auth/verifier", async (req: Request) => {
       throw Object.assign(sql, { route: new URL(req.url).pathname });
     })(new Request("http://localhost/api/auth/verifier"));
     expect(r.status).toBe(502);
     expect(await r.json()).toEqual({ erreur: "panne" });
     expect(lignes.mock.calls.flat().join("\n")).toContain("DrizzleQueryError");
+    /* La ligne nomme la route par sa clé du contrat : on sait laquelle a lâché */
+    expect(lignes.mock.calls.flat().join("\n")).toContain('"route":"POST /api/auth/verifier"');
     expect(lignes.mock.calls.flat().join("\n")).not.toContain("exemple.test");
   });
 
   it("une erreur attendue garde son code ; une réponse passe telle quelle", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const budget = await route(async () => {
+    const budget = await route("POST /api/chat", async () => {
       throw new ErreurTache("budget");
     })();
     expect([budget.status, await budget.json()]).toEqual([503, { erreur: "souffle" }]);
-    const ok = await route(async () => Response.json({ ok: true }))();
+    const ok = await route("GET /api/compte", async () => Response.json({ ok: true }))();
     expect(await ok.json()).toEqual({ ok: true });
   });
 });

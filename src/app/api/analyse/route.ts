@@ -17,7 +17,7 @@ export const maxDuration = 300;
  * déjà connecté, elle rejoint ici le compte, et devient la conv ouverte. Sans (l’écran de lecture), c’est la conv qu’on
  * suit : un brouillon laissé en plan ne prend pas sa place.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/analyse", async (req: Request) => {
   /* L’origine d’abord, comme partout : une requête venue d’un autre site n’est même pas lue */
   const origine = await garde(req, { session: "aucune" });
   if (origine instanceof Response) return origine;
@@ -60,7 +60,7 @@ export const POST = route(async (req: Request) => {
 });
 
 /** La progression de la lecture. Relance au passage une tâche abandonnée. */
-export const GET = route(async () => {
+export const GET = route("GET /api/analyse", async () => {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
   await relancer(g.story.id);

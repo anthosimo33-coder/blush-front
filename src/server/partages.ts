@@ -7,7 +7,6 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
-import { lesDeux } from "./conv-affichee";
 import { db, schema, uneLigne } from "./db";
 import { chapitresEcrits, donneesVerdict } from "./depot";
 import { echangeDuChat } from "./historique";
@@ -57,8 +56,7 @@ export function masquerPrenoms(texte: string, masquer: string[], garder: string[
  */
 export function masqueDe(story: Ligne): (texte: string) => string {
   const meta = metaDe(story);
-  const { moi } = meta;
-  const participants = lesDeux(meta);
+  const { moi, participants } = meta;
   const unNom = (n: string) => n !== "Moi";
   const autres = participants.filter((_, k) => k !== moi).flatMap((p) => [p.prenom, p.nom].filter(unNom));
   const toi = moi == null ? [] : [participants[moi].prenom].filter(unNom);
@@ -91,7 +89,7 @@ export async function partager(story: Ligne): Promise<{ id: string; verdict: Ver
       /* Deux ouvertures en même temps : un seul lien */
       .onConflictDoUpdate({ target: schema.shares.storyId, set: { data } })
       .returning({ id: schema.shares.id }),
-    "shares (lien créé)",
+    "shares:lien_cree",
   );
   await compter(CLES.lienCree);
   return { id: cree.id, verdict };

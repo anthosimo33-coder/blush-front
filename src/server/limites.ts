@@ -185,7 +185,7 @@ export async function compter(cle: string, { fenetreS }: Pick<Limite, "fenetreS"
         },
       })
       .returning({ count: schema.rateLimits.count }),
-    "rate_limits (passage compté)",
+    "rate_limits:passage",
   );
   return ligne.count;
 }

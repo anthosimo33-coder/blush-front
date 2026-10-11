@@ -8,8 +8,10 @@ import { surVercel } from "./drapeaux";
  * email, ni le message d’une erreur (champsDErreur, src/lib/tracer.ts, n’en garde que le nom et le code).
  * Le code du serveur écrit par ici : la règle no-console (eslint.config.mjs) ne laisse la console qu’à ce fichier, à
  * src/lib/tracer.ts (le navigateur) et aux aperçus locaux (src/app/apercu, jamais en ligne). Pour le nom d’une erreur
- * dans un code : nomErreur (src/lib/tracer.ts). Ce qui échappe encore au journal : une erreur qu’une route /api ne
- * rattrape pas (Next l’écrit entière ; l’enveloppe `route` de src/server/http.ts n’est pas encore posée, lot 8a).
+ * dans un code : nomErreur (src/lib/tracer.ts). Chaque route /api passe par l’enveloppe `route` (src/server/http.ts) :
+ * une erreur qu’elle ne rattrape pas n’y laisse que la route, son nom et son code. Ce qui peut encore remonter jusqu’à
+ * Next (qui l’écrit entière) : une erreur d’une page ou des gestionnaires hors de /api (/ouvrir/[id], /v/[id]/essayer,
+ * /v/[id]/image), dont les requêtes ne prennent jamais d’email (l’empreinte d’une session, l’id d’un partage, un uuid).
  */
 
 /** info : ce qui s’est passé ; alerte : ce qui mérite un coup d’œil (un repli, un refus du modèle) ; erreur : ce qui a échoué. */

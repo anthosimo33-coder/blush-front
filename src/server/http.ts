@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_rethrow } from "next/navigation";
 import { after } from "next/server";
 import type { z } from "zod";
-import type { CleJson, ReponseErreur, Routes } from "@/types/api";
+import type { CleJson, CleRoute, ReponseErreur, Routes } from "@/types/api";
 import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 import { alerter } from "./alertes";
 import { ErreurPublique, ErreurTache, estBudget } from "./erreurs";
@@ -39,49 +39,58 @@ export function codeDErreur(e: unknown): CodeErreur {
 }
 
 /** L’alerte à l’équipe quand une étape échoue pendant une route : son sujet et ses lignes, sans contenu ; le code interne s’y ajoute. */
-export type AlerteDErreur = { sujet: string; lignes: string[] };
+type AlerteDErreur = { sujet: string; lignes: string[] };
+
+/**
+ * Ce qui situe une erreur levée pendant une route. `route` : sa clé du contrat (« POST /api/chat »), écrite au journal
+ * (jamais l’adresse demandée ni ses paramètres) ; `alerte` : une erreur d’étape part aussi à l’équipe.
+ */
+export type ContexteDErreur = { route?: CleRoute; alerte?: AlerteDErreur };
 
 /**
  * Ce que l’équipe apprend d’une erreur levée pendant une route, jamais son message ni ses détails : le message d’une
  * erreur SQL cite ses paramètres (un email), celui d’un JSON illisible un morceau du contenu. Une ErreurPublique est
  * attendue : rien. Une erreur d’étape : son code interne (« refus:cyber », « delai »), au journal, et à l’équipe avec
  * `alerte` ; sauf le budget de l’IA atteint, dont l’équipe est déjà prévenue (src/server/budget.ts). Le reste : son nom
- * et son code seulement (« DrizzleQueryError », journalErreur, src/server/journal.ts).
+ * et son code seulement (« DrizzleQueryError », « ErreurInvariant » et « stories:curseur:aucune_ligne », journalErreur,
+ * src/server/journal.ts). Chaque ligne nomme la route (`route`, sa clé du contrat).
  */
-export async function signalerErreur(e: unknown, alerte?: AlerteDErreur): Promise<void> {
+export async function signalerErreur(e: unknown, { route, alerte }: ContexteDErreur = {}): Promise<void> {
   if (e instanceof ErreurPublique) return;
   if (e instanceof ErreurTache) {
-    journal("route /api en échec", { code: e.code }, estBudget(e) ? "alerte" : "erreur");
+    journal("route /api en échec", { route, code: e.code }, estBudget(e) ? "alerte" : "erreur");
     if (alerte && !estBudget(e)) await alerter(alerte.sujet, [...alerte.lignes, `Erreur : ${e.code}`]);
     return;
   }
-  journalErreur("route /api en panne", e);
+  journalErreur("route /api en panne", e, { route });
 }
 
 /**
  * La réponse d’une erreur levée pendant une route, la même partout : son code (codeDErreur), sans rien d’interne. Elle
- * est signalée (signalerErreur) ; `alerte` : une erreur d’étape part aussi à l’équipe, une fois la réponse envoyée. Les
- * erreurs de Next lui-même (redirect, notFound, le rendu dynamique) repartent telles quelles.
+ * est signalée (signalerErreur, avec la clé de la route) ; `alerte` : une erreur d’étape part aussi à l’équipe, une fois
+ * la réponse envoyée. Les erreurs de Next lui-même (redirect, notFound, le rendu dynamique) repartent telles quelles.
  */
-export function reponseErreur(e: unknown, { alerte }: { alerte?: AlerteDErreur } = {}): Response {
+export function reponseErreur(e: unknown, { route, alerte }: ContexteDErreur = {}): Response {
   unstable_rethrow(e);
-  if (alerte && e instanceof ErreurTache) after(() => signalerErreur(e, alerte));
-  else void signalerErreur(e);
+  if (alerte && e instanceof ErreurTache) after(() => signalerErreur(e, { route, alerte }));
+  else void signalerErreur(e, { route });
   return erreur(codeDErreur(e));
 }
 
 /**
  * L’enveloppe commune d’une route /api (S-44) : une erreur que la route ne rattrape pas (une base qui tombe pendant
- * compteDe, un bug) répond comme les autres (reponseErreur : « panne », signalée sans son message), au lieu de remonter
- * jusqu’à Next. Next, lui, écrit l’erreur entière dans les logs (console.error, avant même src/instrumentation.ts) : le
- * message d’une erreur SQL cite ses paramètres, un email. `export const POST = route(async (req) => …)`.
+ * compteDe, un bug) répond comme les autres (reponseErreur : « panne », signalée sans son message, sous la clé de la
+ * route), au lieu de remonter jusqu’à Next. Next, lui, écrit l’erreur entière dans les logs (console.error, avant même
+ * src/instrumentation.ts) : le message d’une erreur SQL cite ses paramètres, un email. Chaque gestionnaire de
+ * src/app/api s’écrit donc `export const POST = route("POST /api/…", async (req) => …)`, jamais `export async function`
+ * (tests/unit/enveloppe-routes.test.ts le vérifie, et que la clé est bien la sienne).
  */
-export function route<A extends unknown[]>(traiter: (...args: A) => Promise<Response>): (...args: A) => Promise<Response> {
+export function route<A extends unknown[]>(cle: CleRoute, traiter: (...args: A) => Promise<Response>): (...args: A) => Promise<Response> {
   return async (...args) => {
     try {
       return await traiter(...args);
     } catch (e) {
-      return reponseErreur(e);
+      return reponseErreur(e, { route: cle });
     }
   };
 }

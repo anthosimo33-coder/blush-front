@@ -2,6 +2,7 @@ import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { env } from "../env";
+import { ErreurInvariant } from "../erreurs";
 import { journalErreur } from "../journal";
 import * as schema from "./schema";
 
@@ -31,11 +32,12 @@ export { schema };
 /**
  * La ligne qu’une requête rend forcément : celle d’un `insert … returning`, d’un `update … returning` sur une ligne
  * qu’on vient de lire, d’un agrégat (`count(*)`). Sans elle (une ligne effacée entre deux requêtes, une erreur du code),
- * l’erreur dit ce qu’on cherchait, ici, plutôt qu’un « cannot read properties of undefined » plus loin. `quoi` ne cite
- * que la table ou l’étape : jamais une valeur (journalErreur n’écrit de toute façon que le nom de l’erreur).
+ * l’erreur dit ce qu’on cherchait, ici, plutôt qu’un « cannot read properties of undefined » plus loin. `quoi` nomme la
+ * table et l’étape (« stories:curseur »), jamais une valeur : il fait le code de l’erreur (ErreurInvariant), que le
+ * journal garde.
  */
 export function uneLigne<T>(lignes: readonly T[], quoi: string): T {
   const [ligne] = lignes;
-  if (ligne === undefined) throw new Error(`${quoi} : aucune ligne`);
+  if (ligne === undefined) throw new ErreurInvariant(`${quoi}:aucune_ligne`);
   return ligne;
 }

@@ -13,7 +13,7 @@ import { ROUTES } from "@/types/api";
 export const maxDuration = 300;
 
 /** Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). */
-export const GET = route(async () => {
+export const GET = route("GET /api/fiche", async () => {
   const g = await lecture({ session: "requise", histoire: true });
   return g instanceof Response ? g : repondre("GET /api/fiche", await ficheEtMaj(g.story));
 });
@@ -24,7 +24,7 @@ export const GET = route(async () => {
  * lue : si une mise à jour l’a changée entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à
  * jour a appris n’est effacé).
  */
-export const PUT = route(async (req: Request) => {
+export const PUT = route("PUT /api/fiche", async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -59,11 +59,11 @@ async function traiter(req: Request) {
     return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));
   } catch (e) {
     /* Le code interne part à l’équipe ; le navigateur n’apprend que le refus ou la panne */
-    return reponseErreur(e, { alerte: { sujet: "ajout à la fiche en échec", lignes: [`Histoire ${story.id}`] } });
+    return reponseErreur(e, { route: "POST /api/fiche", alerte: { sujet: "ajout à la fiche en échec", lignes: [`Histoire ${story.id}`] } });
   }
 }
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/fiche", async (req: Request) => {
   return avecEcheance(echeancePour(maxDuration), () => traiter(req));
 });

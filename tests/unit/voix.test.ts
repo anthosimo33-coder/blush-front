@@ -224,6 +224,10 @@ describe("Ogg piégé (S-15) : illisible", () => {
     signer(ouvert, { debut: derniere.debut, fin: ouvert.length });
     expect(dureeAudio(ouvert)).toBeNull();
     expect(dureeAudio(o.subarray(0, o.length - 10))).toBeNull();
+    /* Coupée dans sa table des segments (une page qui en a plusieurs), juste après le premier octet */
+    const tableLongue = pagesOgg(o).find((p) => (o[p.debut + 26] ?? 0) > 1);
+    if (!tableLongue) throw new Error("court.ogg : une page à plusieurs segments attendue");
+    expect(dureeAudio(o.subarray(0, tableLongue.debut + 27 + 1))).toBeNull();
   });
 });
 

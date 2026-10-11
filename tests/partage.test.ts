@@ -48,14 +48,14 @@ describe("les prénoms dans ce qui se partage", () => {
       const t = new Date();
       return { id: randomUUID(), userId: null, draftToken: null, messageCount: 19, nextMessage: null, meta: chiffrer(meta), context: null, convPurgedAt: null, chatVocal: false, createdAt: t, updatedAt: t };
     };
-    const deux = [
+    const deux: Meta["participants"] = [
       { nom: "Hugo Lemaire", prenom: "Hugo", messages: 10 },
       { nom: "Sophie B", prenom: "Sophie", messages: 9 },
     ];
     expect(masqueDe(histoire({ participants: deux, moi: 0 }))("Sophie B attend Hugo Lemaire.")).toBe("S. attend Hugo Lemaire.");
     expect(masqueDe(histoire({ participants: deux }))("Sophie attend Hugo.")).toBe("S. attend H.");
     /* Des captures : tu es « Moi », ton prénom vient de « Qui es-tu ? » */
-    const captures = [
+    const captures: Meta["participants"] = [
       { nom: "Moi", prenom: "Karim", messages: 10 },
       { nom: "Inès", prenom: "Inès", messages: 9 },
     ];

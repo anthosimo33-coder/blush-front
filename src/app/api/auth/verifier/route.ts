@@ -17,7 +17,7 @@ const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
  * (src/types/erreurs-api.ts) : voulu, la même réponse pour tous. Trop d’essais ratés aujourd’hui pour cet email, depuis ce
  * navigateur ou cette adresse IP (prendreCode) : 429 `essais`, pour tous aussi.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/auth/verifier", async (req: Request) => {
   const g = await garde(req, { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
   if (g instanceof Response) return g;
   const b = await lireCorps(req, Corps);

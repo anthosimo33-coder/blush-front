@@ -4,8 +4,8 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http";
-import { convImportee } from "@/server/conv-affichee";
+import { erreur, lireCorps, repondre, route } from "@/server/http";
+import { storyEtSource } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
@@ -53,7 +53,7 @@ const Envoi = ROUTES["POST /api/captures/video"].corps
  * Un enregistrement d’écran, lu lot par lot (/api/captures/lot) : les lectures sont rassemblées (sans les messages
  * vus deux fois au bord de deux lots), puis la conv devient une histoire brouillon, comme des captures.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/captures/video", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   /* Les lots viennent de /api/captures/lot : la même règle (bêta fermée, un compte), sans plafond de modèle ici */
@@ -64,18 +64,14 @@ export const POST = route(async (req: Request) => {
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const { app, lots, cle } = envoi;
-  try {
-    const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
-      const t = enTexte(fusionnerLots(lots, app));
-      const { id, meta } = await importerCaptures({ appli: app, t, secret });
-      /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
-      await compterImportVenuDuPartage();
-      return { id, meta, secret, messages: t.messages };
-    });
-    await poserBrouillon(lu.secret);
-    const { story, source } = convImportee(lu.id, lu.meta);
-    return repondre("POST /api/captures/video", { source, messagesRead: lu.messages, story });
-  } catch (e) {
-    return reponseErreur(e);
-  }
+  const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
+    const t = enTexte(fusionnerLots(lots, app));
+    const { id, meta } = await importerCaptures({ appli: app, t, secret });
+    /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
+    await compterImportVenuDuPartage();
+    return { id, meta, secret, messages: t.messages };
+  });
+  await poserBrouillon(lu.secret);
+  const { story, source } = storyEtSource(lu.id, lu.meta);
+  return repondre("POST /api/captures/video", { source, messagesRead: lu.messages, story });
 });

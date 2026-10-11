@@ -4,6 +4,7 @@ import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire"
 import type { Memoire, Plan, Rapport } from "@prompts/lib/schemas";
 import type { BlushAnswer, Chapter, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
+import { ErreurInvariant } from "./erreurs";
 import type { Meta } from "./histoires";
 import type { VerdictPartage } from "./partages";
 import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesVocal } from "./stockage/types";
@@ -75,9 +76,11 @@ const objet = <T>() => z.custom<T>((v) => typeof v === "object" && v !== null &&
  * es-tu ? »), et ses unions élargies (l’appli, le format). On vérifie les participants, que tout le code lit, et les
  * champs ajoutés quand ils sont là ; leurs valeurs sont vérifiées à l’écriture (les routes).
  */
+const participantGarde = z.looseObject({ nom: z.string(), prenom: z.string() });
 const MetaGardee = z
   .looseObject({
-    participants: z.array(z.looseObject({ nom: z.string(), prenom: z.string() })),
+    /* Toujours deux (l’import n’en écrit jamais d’autre nombre) : les lecteurs prennent l’un et l’autre sans vérifier */
+    participants: z.tuple([participantGarde, participantGarde]),
     captures: z.number().optional(),
     coupe: z.boolean().optional(),
     moi: z.literal([0, 1]).optional(),
@@ -175,7 +178,8 @@ export function lire<C extends Colonne>(colonne: C, octets: Buffer | Uint8Array)
   if (!relecture) return valeur;
   const lue = relecture.safeParse(valeur);
   if (lue.success) return lue.data;
-  throw new Error(`${colonne} : forme inattendue (${lue.error.issues.map((i) => i.path.join(".") || "racine").join(", ")})`);
+  /* typo: du code, le message d’une erreur (jamais affiché ; scripts/verifier-typo.mjs ne reconnaît que les classes en …Error) */
+  throw new ErreurInvariant(`${colonne}:forme_inattendue`, `${colonne} : forme inattendue (${lue.error.issues.map((i) => i.path.join(".") || "racine").join(", ")})`);
 }
 
 /** Un audio (vocals.audio, chat_vocals.audio), chiffré. */

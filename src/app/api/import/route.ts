@@ -1,7 +1,7 @@
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
-import { erreur, repondre, reponseErreur, route } from "@/server/http";
-import { convImportee } from "@/server/conv-affichee";
+import { erreur, repondre, route } from "@/server/http";
+import { storyEtSource } from "@/server/conv-affichee";
 import { importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
 import { LIMITES } from "@/server/limites";
@@ -15,7 +15,7 @@ export const maxDuration = 60;
  * (« fichier ») est aussi accepté, sous la limite de taille de Vercel. Le texte est borné avant d’être lu
  * (src/server/import.ts) : un export forgé est refusé, ou coupé, vite.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/import", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   const fd = await req.formData().catch(() => null);
@@ -27,14 +27,10 @@ export const POST = route(async (req: Request) => {
    * lire : décompresser et lire un export coûte, un fichier illisible compte aussi
    */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
-  try {
-    const lu = paquet instanceof File ? await depuisPaquet(paquet) : await depuisFichier(fichier as File);
-    const { id, meta, secret } = await importer(lu);
-    await poserBrouillon(secret);
-    await compterImportVenuDuPartage();
-    const { story, source } = convImportee(id, meta);
-    return repondre("POST /api/import", { source, story });
-  } catch (e) {
-    return reponseErreur(e);
-  }
+  const lu = paquet instanceof File ? await depuisPaquet(paquet) : await depuisFichier(fichier as File);
+  const { id, meta, secret } = await importer(lu);
+  await poserBrouillon(secret);
+  await compterImportVenuDuPartage();
+  const { story, source } = storyEtSource(id, meta);
+  return repondre("POST /api/import", { source, story });
 });

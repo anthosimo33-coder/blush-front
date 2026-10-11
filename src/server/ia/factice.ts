@@ -78,8 +78,12 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
     } satisfies Captures;
   }
   const p = ids(req);
-  /* Le k-ième identifiant de la conv (à partir de 0) : une conv trop courte pour le citer le dit (lu), au lieu d’une preuve vide */
-  const preuve = (k: number) => lu(p[k], `l’identifiant ${k} de la conv`, req);
+  /* Le k-ième identifiant de la conv (à partir de 0) : une conv trop courte pour le citer le dit, au lieu d’une preuve vide */
+  const preuve = (k: number) => {
+    const id = p[k];
+    if (id === undefined) throw new Error(`modèle factice : la conv n’a que ${p.length} messages, il en faut ${k + 1} (${req.tache})`);
+    return id;
+  };
   const demande = textes(req).at(-1)!;
   const tout = textes(req).join("\n");
   if (req.tache === "04-verdict" && tout.includes(FACTICE.refus)) return REFUS_FACTICE;
@@ -158,7 +162,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         { jeu: null, texte: "Allez. Lis la suite.", punch: false, preuve: null },
       ],
     } satisfies Vocal;
-  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(n % p.length))) } satisfies z.infer<typeof Etape05>;
+  if (req.tache === "05-rapport") return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(p.length ? n % p.length : 0))) } satisfies z.infer<typeof Etape05>;
   if (req.tache === "07-memoire" && req.partie === "mise à jour")
     return {
       alerte: null,

@@ -3,6 +3,7 @@ import type { Chapitre, Rapport, Verdict } from "@prompts/lib/schemas";
 import { CHAPITRE_DU_VERDICT, estOffert, TITRE_DU_VERDICT, titreDAttente } from "@/contenu/chapitres";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
 import type { Chapter, ChapterBlock, Message, ScoreRow, SoberReport, Verdict as VerdictAffiche } from "@/types";
+import { ErreurInvariant } from "../erreurs";
 import { resoudre } from "./messages";
 
 /* Le verdict, les scores du chapitre 1 et le rapport, tels que les montrent ses écrans (src/server/ecrans/messages.ts). */
@@ -10,10 +11,14 @@ import { resoudre } from "./messages";
 /**
  * Le titre d’un chapitre avant que le plan donne le sien (titreDAttente, src/contenu/chapitres.ts) : chacun des
  * NB_CHAPITRES en a un. Un autre numéro est une erreur du code, levée ici plutôt qu’un titre vide à l’écran ou dans le mail.
+ * TODO(9a) : un pansement du lot 8 (src/contenu est à 8c) ; titreDAttente doit rendre une chaîne (TITRES typé sur les
+ * numéros des chapitres, ou une erreur levée chez lui), puis cette fonction disparaît et ses appelants
+ * (presentation/rapport.ts, mail-rapport.ts) reprennent titreDAttente de @/contenu/chapitres.
  */
 export function titreAttendu(numero: number, autre: string): string {
   const titre = titreDAttente(numero, autre);
-  if (titre === undefined) throw new Error(`chapitre ${numero} : pas de titre d’attente`);
+  /* typo: du code, le message d’une erreur (jamais affiché ; scripts/verifier-typo.mjs ne reconnaît que les classes en …Error) */
+  if (titre === undefined) throw new ErreurInvariant("chapitre:sans_titre_d_attente", `chapitre ${numero} : pas de titre d’attente`);
   return titre;
 }
 

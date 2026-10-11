@@ -4,7 +4,7 @@ import { noterEcoute } from "@/server/vocal";
 import { ROUTES } from "@/types/api";
 
 /** Un moment de l’écoute du vocal (début, fin, réécoute, fermé avant la fin), pour comparer les deux voix. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/vocal/ecoute", async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;

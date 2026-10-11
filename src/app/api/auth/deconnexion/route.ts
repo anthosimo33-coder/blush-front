@@ -9,7 +9,7 @@ import { ROUTES } from "@/types/api";
  * une conv ou un code sur cet appareil (oublierCetAppareil). La réponse fait aussi oublier au navigateur ce qu’il garde
  * de BLUSH (OUBLIER_LE_NAVIGATEUR) : sur un appareil partagé, la personne suivante ne retrouve rien.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/auth/deconnexion", async (req: Request) => {
   /* La session se lit sans la garde : celle d’un compte retiré de la bêta se ferme aussi */
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;

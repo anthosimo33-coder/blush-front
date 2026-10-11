@@ -112,7 +112,7 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
          */
         emettre({ erreur: codePublic(codeDErreur(e)) });
         fermer();
-        await signalerErreur(e, alerteDuChat(storyId));
+        await signalerErreur(e, { route: "POST /api/chat", alerte: alerteDuChat(storyId) });
       },
     ),
     "chat : la suite de la réponse a échoué",
@@ -178,12 +178,12 @@ async function traiter(req: Request) {
     return await enFlux(story.id, (surEvenement) => blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
   } catch (e) {
     /* Le code interne (« refus:cyber ») part à l’équipe ; le navigateur n’apprend que le refus, le vocal ou la panne */
-    return reponseErreur(e, { alerte: alerteDuChat(story.id) });
+    return reponseErreur(e, { route: "POST /api/chat", alerte: alerteDuChat(story.id) });
   }
 }
 
 /** L’historique, pour réafficher la conv avec BLUSH : les derniers échanges, ou ceux d’avant `?avant=` (un id d’échange). */
-export const GET = route(async (req: Request) => {
+export const GET = route("GET /api/chat", async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const { story } = g;
@@ -192,6 +192,6 @@ export const GET = route(async (req: Request) => {
 });
 
 /** Tout le traitement tient avant que Vercel coupe la fonction (src/server/echeance.ts) : un appel trop long s’arrête et le dit. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/chat", async (req: Request) => {
   return avecEcheance(echeancePour(maxDuration), () => traiter(req));
 });

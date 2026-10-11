@@ -8,30 +8,21 @@ import type { Meta } from "./histoires";
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
 
-type Participant = Meta["participants"][number];
-
 /**
- * Les deux participants d’une conv, dans l’ordre de l’export. L’import n’en écrit jamais d’autre nombre (histoires.ts :
- * importer refuse un groupe et une conv à une voix, importerCaptures écrit « Moi » et l’autre) : une meta qui n’en a pas
- * deux est une erreur, levée ici.
+ * L’histoire telle que l’affiche le front, pour toute conv (GET /api/histoire, un import, l’aperçu). Les participants
+ * sont p0 et p1 (dans l’ordre de l’export). Une conv a toujours exactement une source : l’export ou les captures d’où
+ * elle vient (storyEtSource la rend aussi à part).
  */
-export function lesDeux(meta: Pick<Meta, "participants">): [Participant, Participant] {
-  const [a, b] = meta.participants;
-  if (!a || !b) throw new Error("stories.meta : deux participants attendus");
-  return [a, b];
-}
-
-/** L’histoire telle que l’affiche le front. Les participants sont p0 et p1 (dans l’ordre de l’export). */
 export function storyAffichee(id: string, meta: Meta): Story {
-  return convImportee(id, meta).story;
+  return storyEtSource(id, meta).story;
 }
 
-/** Une conv qui vient d’être importée : l’histoire telle que l’affiche le front, et sa source (sa seule, à l’import). */
-export function convImportee(id: string, meta: Meta): { story: Story; source: Source } {
+/** L’histoire telle que l’affiche le front (storyAffichee), et sa source, la seule de `story.sources` : ce que répond un import. */
+export function storyEtSource(id: string, meta: Meta): { story: Story; source: Source } {
   const { debut, fin, total, vocaux } = meta.resume;
   const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
   const jours = Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / 86400e3));
-  const [a, b] = lesDeux(meta);
+  const [a, b] = meta.participants;
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
   const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });
   const source: Source = meta.captures

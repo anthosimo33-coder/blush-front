@@ -10,7 +10,7 @@ import { repondre, route } from "@/server/http";
  * dit rien d’autre que « ok ». Seul effet : une visite prolonge la session (un mois, une fois par jour au plus), et son
  * cookie avec elle.
  */
-export const GET = route(async () => {
+export const GET = route("GET /api/reveil", async () => {
   try {
     await reveillerLaBase();
     const secret = await lireSession();

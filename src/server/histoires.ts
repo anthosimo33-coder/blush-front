@@ -10,7 +10,7 @@ import * as coffre from "./coffre";
 import { db, schema, uneLigne } from "./db";
 import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
-import { lesDeux } from "./conv-affichee";
+import { ErreurInvariant } from "./erreurs";
 import { borner, ErreurImport } from "./import";
 
 /*
@@ -24,14 +24,21 @@ export { initialeDe, storyAffichee } from "./conv-affichee";
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
 const NOM_MAX = 100;
 
+/** L’un des deux participants d’une conv : son prénom, son nom dans l’export, combien de messages il y a écrits. */
+export type Participant = { nom: string; prenom: string; messages: number };
+
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
   /** L’appli d’où vient la conv : un export (WhatsApp, Instagram), ou des captures (Instagram, Hinge, iMessage, autre). */
   appli: Appli | "hinge" | "imessage" | "autre";
   format: Format;
   fichier: string;
-  /** Les deux participants, du plus bavard au moins bavard, avec leur nom dans l’export. */
-  participants: { nom: string; prenom: string; messages: number }[];
+  /**
+   * Les deux participants, du plus bavard au moins bavard, avec leur nom dans l’export. Toujours deux : l’import refuse
+   * un groupe et une conv à une voix (importer), des captures en ont deux (« Moi » et l’autre), et le coffre vérifie
+   * qu’une meta lue en a bien deux (src/server/coffre.ts).
+   */
+  participants: [Participant, Participant];
   resume: { debut: string; fin: string; total: number; vocaux: number };
   /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
   captures?: number;
@@ -59,7 +66,7 @@ export function resumeDe(messages: Message[]): Meta["resume"] {
   const [premier] = messages;
   const dernier = messages.at(-1);
   /* erreurImport refuse une conv sans message avant d’arriver ici */
-  if (!premier || !dernier) throw new Error("une conv lue a au moins un message");
+  if (!premier || !dernier) throw new ErreurInvariant("conv:sans_message", "une conv lue a au moins un message");
   return {
     debut: new Date(premier.t).toISOString().slice(0, 10),
     fin: new Date(dernier.t).toISOString().slice(0, 10),
@@ -78,7 +85,7 @@ async function creerBrouillon(meta: Meta, texte: string, secret: string): Promis
       .insert(schema.stories)
       .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", texte) })
       .returning({ id: schema.stories.id }),
-    "stories (brouillon créé)",
+    "stories:brouillon_cree",
   );
   return { id: ligne.id, meta, secret };
 }
@@ -99,6 +106,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
   /* Un nom de contact est court : un nom démesuré (ou fait de caractères de contrôle) gonflerait ce qu’on garde de la conv */
   if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
   const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
+  const participant = ({ nom, messages }: { nom: string; messages: number }): Participant => ({ nom, prenom: prenomDe(nom), messages });
   const lu = lire(texte, { utilisateur: personne(premier), autre: personne(second), format }, { autresEnTexte: true });
   const err = erreurImport(lu);
   if (err) throw new ErreurImport(err);
@@ -106,7 +114,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     appli,
     format,
     fichier: nom.slice(0, 200),
-    participants: noms.map((n) => ({ nom: n.nom, prenom: prenomDe(n.nom), messages: n.messages })),
+    participants: [participant(premier), participant(second)],
     resume: resumeDe(lu.messages),
     ...(coupe ? { coupe: true } : {}),
   };
@@ -245,8 +253,8 @@ export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" 
  * Toi et l’autre, parmi les participants. La règle des écrans (moiEtAutre, src/lib/participants.ts) : toi connu
  * (« Qui es-tu ? » rempli), l’autre est l’autre participant ; toi inconnu, l’autre est le second (`participants[1]`).
  */
-export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Meta["participants"][number]; autre: Meta["participants"][number] } {
-  const [a, b] = lesDeux(meta);
+export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Participant; autre: Participant } {
+  const [a, b] = meta.participants;
   return meta.moi === 1 ? { moi: b, autre: a } : { moi: a, autre: b };
 }
 
@@ -265,9 +273,10 @@ export function histoireDe(meta: Meta): Histoire {
 }
 
 export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
-  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories (qui est qui)"));
+  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories:qui_est_qui"));
   /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
-  const participants = prenom ? avant.participants.map((p, k) => (k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p)) : avant.participants;
+  const renomme = (p: Participant, k: 0 | 1): Participant => (prenom && k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p);
+  const participants: Meta["participants"] = [renomme(avant.participants[0], 0), renomme(avant.participants[1], 1)];
   const meta = { ...avant, ...qui, participants };
   await db().update(schema.stories).set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() }).where(eq(schema.stories.id, id));
   return meta;

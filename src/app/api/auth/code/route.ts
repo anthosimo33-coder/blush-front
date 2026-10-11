@@ -15,7 +15,7 @@ import { ROUTES } from "@/types/api";
 const Corps = ROUTES["POST /api/auth/code"].corps.extend({ email: Email });
 
 /** Le code de connexion, envoyé par email. Il ne vaudra que dans ce navigateur (son cookie, posé ici). */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/auth/code", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   const lu = await lireCorps(req, Corps);

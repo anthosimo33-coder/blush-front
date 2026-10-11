@@ -206,7 +206,7 @@ export async function compteDe(email: string): Promise<Utilisateur> {
         .insert(schema.users)
         .values({ email, plan: accesLibre(email) ? "blushplus" : "gratuit" })
         .returning(),
-      "users (compte créé)",
+      "users:compte_cree",
     );
   /* La bêta sans paiement : un email ajouté à la liste après coup a son accès à la connexion suivante */
   if (existant && existant.plan === "gratuit" && accesLibre(email)) {

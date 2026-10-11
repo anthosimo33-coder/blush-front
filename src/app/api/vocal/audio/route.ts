@@ -9,7 +9,7 @@ import { audioDuCompte } from "@/server/vocal";
  * octets, puis le reste) : chaque requête lit le compte, puis sa conv et son vocal en une seule requête, sans relire
  * l’histoire ni sa conv brute.
  */
-export const GET = route(async (req: Request) => {
+export const GET = route("GET /api/vocal/audio", async (req: Request) => {
   const conv = new URL(req.url).searchParams.get("conv");
   const utilisateur = await utilisateurCourant();
   if (!utilisateur) return erreur("connexion");

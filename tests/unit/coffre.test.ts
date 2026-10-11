@@ -146,7 +146,12 @@ describe("le coffre", () => {
     const lire = () => coffre.lire("memories.data", chiffrer({ etat: MEMOIRE, lignes: "m0002 Léa : on se voit jeudi ?", suivant: 221 }));
     expect(lire).toThrow("memories.data : forme inattendue (lignes)");
     expect(lire).not.toThrow(/Léa/);
-    expect(() => coffre.lire("stories.meta", chiffrer({ ...META, participants: [{ prenom: "Léa" }] }))).toThrow("stories.meta : forme inattendue (participants.0.nom)");
+    const [, tom] = META.participants;
+    expect(() => coffre.lire("stories.meta", chiffrer({ ...META, participants: [{ prenom: "Léa" }, tom] }))).toThrow("stories.meta : forme inattendue (participants.0.nom)");
+    /* Toujours deux participants : ni un, ni trois (les lecteurs prennent l’un et l’autre sans vérifier) */
+    for (const participants of [[tom], [...META.participants, tom]]) {
+      expect(() => coffre.lire("stories.meta", chiffrer({ ...META, participants }))).toThrow(/^stories\.meta : forme inattendue \(participants\)$/);
+    }
     expect(() => coffre.lire("reports.data", chiffrer({ test: true }))).toThrow(/^reports\.data : forme inattendue \(sortie, chapitres, sobre, lecture\)$/);
     /* Une mémoire gardée est faite : sans sa fiche (ou sans sa mémoire), aucun lecteur ne la reçoit */
     for (const vide of [{ fiche: null }, { memoire: null }]) {

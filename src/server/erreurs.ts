@@ -75,3 +75,19 @@ export const estBudgetVoix = (e: ErreurTache | string | null | undefined): boole
  * jour atteint (« souffle » : ça repart demain), ou une panne.
  */
 export const echecDe = (code: string | null | undefined): Echec => (estRefus(code) ? "refus" : estBudget(code) ? "souffle" : "panne");
+
+/**
+ * Ce qui ne devrait jamais arriver : une ligne attendue absente, une valeur gardée qui n’a pas sa forme, une erreur du
+ * code. Son code, court et sans valeur (« stories:curseur:aucune_ligne »), est ce que le journal en garde avec son nom
+ * (champsDErreur, src/lib/tracer.ts : lettres, chiffres, « : », « . », « - », « _ », 60 au plus) : sans lui, la ligne
+ * ne dirait que « Error ». Le message peut en dire un peu plus (les champs en cause) ; il ne sort jamais du serveur.
+ */
+export class ErreurInvariant extends Error {
+  constructor(
+    readonly code: string,
+    message: string = code,
+  ) {
+    super(message);
+    this.name = "ErreurInvariant";
+  }
+}

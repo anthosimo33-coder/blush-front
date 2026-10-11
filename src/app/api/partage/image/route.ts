@@ -9,7 +9,7 @@ import { ROUTES } from "@/types/api";
  * de l’autre masqué (le tien reste). Ce qui se dessine, et ce qui ne se dessine pas (le mode sobre, un chapitre sans
  * l’accès) : momentAPartager, src/server/partages.ts.
  */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/partage/image", async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;

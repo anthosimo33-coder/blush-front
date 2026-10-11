@@ -11,7 +11,7 @@ export const maxDuration = 300;
  * Ouvert (ouvrirLeRapport) : ce qui devait partir et ne l’a jamais été part maintenant (reparerLaChaine), comme à
  * l’ouverture de la page.
  */
-export const GET = route(async () => {
+export const GET = route("GET /api/rapport", async () => {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
@@ -21,7 +21,7 @@ export const GET = route(async () => {
 });
 
 /** « Relancer l’écriture » : l’écriture a échoué (une panne, pas un refus du modèle). Chaque essai coûte : quelques-uns par jour. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/rapport", async (req: Request) => {
   const g = await garde(req, { session: "requise", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;

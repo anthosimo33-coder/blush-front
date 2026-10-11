@@ -11,7 +11,7 @@ import { ROUTES } from "@/types/api";
 const Corps = ROUTES["POST /api/attente"].corps.extend({ email: Email });
 
 /** La liste d’attente de la bêta fermée : on garde l’email (chiffré) pour prévenir quand une place se libère. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/attente", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
   if (g instanceof Response) return g;
   const lu = await lireCorps(req, Corps);

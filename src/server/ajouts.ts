@@ -47,7 +47,7 @@ async function reserver(storyId: string, n: number, depart: number): Promise<num
       .set({ nextMessage: sql`greatest(coalesce(${schema.stories.nextMessage}, 0), ${depart}) + ${n}` })
       .where(eq(schema.stories.id, storyId))
       .returning({ suivant: schema.stories.nextMessage }),
-    "stories (numéros réservés)",
+    "stories:numeros_reserves",
   );
   return r.suivant! - n;
 }
@@ -55,7 +55,7 @@ async function reserver(storyId: string, n: number, depart: number): Promise<num
 /** Le curseur avance jusqu’au dernier message lu : le prochain export repart de là. */
 async function avancer(storyId: string, dernier: number | null) {
   if (dernier == null) return;
-  const story = uneLigne(await db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), "stories (curseur)");
+  const story = uneLigne(await db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), "stories:curseur");
   const c = contexteDe(story);
   if (!c || c.dernier >= dernier) return;
   await db().update(schema.stories).set({ context: coffre.ecrire("stories.context", { ...c, dernier }), updatedAt: new Date() }).where(eq(schema.stories.id, storyId));

@@ -6,13 +6,13 @@ import { garde, lecture } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 import { ERREURS_API } from "@/types/erreurs-api";
 
-export const GET = route(async () => {
+export const GET = route("GET /api/compte", async () => {
   const g = await lecture({ session: "requise" });
   return g instanceof Response ? g : repondre("GET /api/compte", compteDe(g.utilisateur, g.story));
 });
 
 /** Mettre BLUSH en pause (ou le reprendre). Un corps mal formé le reprend. */
-export const POST = route(async (req: Request) => {
+export const POST = route("POST /api/compte", async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const paused = (await lireCorps(req, ROUTES["POST /api/compte"].corps))?.paused === true;
@@ -28,7 +28,7 @@ export const POST = route(async (req: Request) => {
  * déconnecté de partout depuis un autre appareil), rien à effacer sur le serveur : 401, jamais un « c’est fait » qui ne
  * l’est pas ; mais cet appareil oublie quand même ce qu’il gardait, comme avant.
  */
-export const DELETE = route(async (req: Request) => {
+export const DELETE = route("DELETE /api/compte", async (req: Request) => {
   const g = await garde(req, { session: "sansBeta" });
   if (g instanceof Response) {
     /* Une requête venue d’ailleurs (403) ne fait rien oublier */
