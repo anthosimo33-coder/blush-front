@@ -66,6 +66,9 @@ describe("le reste", () => {
     const m = mailCode("159714", "https://www.askblush.com");
     expect(m.texte).toContain(`Il marche ${CODE_MINUTES} minutes.`);
     expect(m.html).toContain(`Il marche ${CODE_MINUTES} minutes.`);
+    /* S-08 : le code ne vaut que là où on l’a demandé, et le mail le dit */
+    expect(m.texte).toContain("Tape-le dans BLUSH, sur l’appareil où tu l’as demandé.");
+    expect(m.html).toContain("Tape-le dans BLUSH, sur l’appareil où tu l’as demandé.");
   });
 
   it.each([
