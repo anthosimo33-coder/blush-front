@@ -1,4 +1,4 @@
-import { creerRepere } from "@/lib/hooks";
+import { creerRepere } from "@/lib/repere";
 
 /*
  * Les ancres du rapport, écrites en un seul endroit. Chaque chapitre est une section `chapitre-N` : le sommaire et la
@@ -23,7 +23,7 @@ export function chapitreDeLAncre(hash: string): number | null {
 export const sectionDuChapitre = (n: number) => document.getElementById(ancreDuChapitre(n));
 
 /*
- * Les pastilles flottantes et ce qu’elles surveillent, par repère (src/lib/hooks.ts) plutôt que par un id cherché dans
+ * Les pastilles flottantes et ce qu’elles surveillent, par repère (src/lib/repere.ts) plutôt que par un id cherché dans
  * la page : celui qui montre l’élément lui passe son repère en `ref`, la pastille le suit.
  */
 

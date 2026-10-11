@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { Repere } from "@/lib/repere";
 import { play } from "@/lib/sound";
 
 const RM = "(prefers-reduced-motion: reduce)";
@@ -70,41 +71,6 @@ async function writeClipboard(text: string) {
   }
 }
 
-/**
- * Un élément de la page que d’autres écrans suivent, sans le chercher dans le DOM : celui qui le montre lui passe le
- * repère en `ref` (il rend de quoi l’oublier quand React l’enlève), ceux qui le suivent le lisent (useEnVue,
- * useHauteur) et sont prévenus quand il arrive ou s’en va.
- */
-export type Repere = ((el: HTMLElement | null) => () => void) & {
-  lire: () => HTMLElement | null;
-  abonner: (f: () => void) => () => void;
-};
-
-/** Un repère (voir Repere), créé une fois pour toute la page (au niveau du module). */
-export function creerRepere(): Repere {
-  let el: HTMLElement | null = null;
-  const abonnes = new Set<() => void>();
-  const poser = (nouveau: HTMLElement | null) => {
-    if (nouveau === el) return;
-    el = nouveau;
-    abonnes.forEach((f) => f());
-  };
-  /* Un élément qui s’en va n’efface pas celui qui l’a déjà remplacé */
-  const attacher = (nouveau: HTMLElement | null) => {
-    poser(nouveau);
-    return () => {
-      if (el === nouveau) poser(null);
-    };
-  };
-  return Object.assign(attacher, {
-    lire: () => el,
-    abonner: (f: () => void) => {
-      abonnes.add(f);
-      return () => void abonnes.delete(f);
-    },
-  });
-}
-
 /** L’élément d’un repère, et l’écran se re-rend quand il arrive ou s’en va (null côté serveur). */
 const useElement = (repere: Repere) => useSyncExternalStore(repere.abonner, repere.lire, () => null);
 
@@ -127,12 +93,17 @@ export function useEnVue(repere: Repere): boolean {
   return !!el && vu;
 }
 
-/** La hauteur de l’élément du repère, en px (suivie quand elle change) ; 0 tant qu’il n’existe pas. */
+/**
+ * La hauteur de l’élément du repère, en px (suivie quand elle change) ; 0 tant qu’il n’existe pas. Mesurée avant que
+ * l’écran se peigne : ce qui se pose au-dessus de lui y est dès sa première image, sans sauter à la suivante.
+ */
 export function useHauteur(repere: Repere): number {
   const el = useElement(repere);
   const [hauteur, setHauteur] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!el) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- une mesure du DOM, avant que l’écran se peigne
+    setHauteur(el.getBoundingClientRect().height);
     const obs = new ResizeObserver(([e]) => setHauteur(e.borderBoxSize[0]?.blockSize ?? el.offsetHeight));
     obs.observe(el);
     return () => {

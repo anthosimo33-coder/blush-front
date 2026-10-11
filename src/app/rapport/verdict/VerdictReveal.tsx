@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
-import { prendreSonForce } from "@/lib/audio";
+import { useSonForce } from "@/lib/audio";
 import { play, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
 import { useRapport } from "@/lib/requetes";
@@ -126,22 +126,21 @@ export function VerdictReveal({ initial, story }: { initial: ReportPayload; stor
     if (onVerdict && !payload.sober) play("verdict", verdict.emoji);
   }, [onVerdict, payload.sober, verdict.emoji]);
   /* Le son forcé que tient le bouton son touché : lâché quand on le retouche, ou qu’on quitte le verdict */
-  const sonForce = useRef<(() => void) | null>(null);
-  useEffect(() => () => sonForce.current?.(), []);
+  const sonForce = useSonForce();
   const toggleLoud = () => {
     const on = !loud;
     setLoud(on);
-    if (on) sonForce.current ??= prendreSonForce();
-    else {
-      sonForce.current?.();
-      sonForce.current = null;
-    }
+    sonForce(on);
     if (on && onVerdict) play("verdict", verdict.emoji);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      /* La fenêtre de partage ouverte garde ses touches (Échap la ferme, sans quitter le verdict) */
+      /*
+       * La fenêtre de partage ouverte garde ses touches (Échap la ferme, sans quitter le verdict). Lue sur la page, pas sur
+       * `partage` : la feuille reste ouverte pendant sa sortie animée (Sheet ne la ferme qu’au bout), quand `partage` est
+       * déjà faux. Le même sélecteur que globals.css (les animations en pause sous une fenêtre).
+       */
       if (document.querySelector("dialog[open]")) return;
       if (e.key === "ArrowRight") setAt((i) => Math.min(last, i + 1));
       else if (e.key === "ArrowLeft") setAt((i) => Math.max(0, i - 1));

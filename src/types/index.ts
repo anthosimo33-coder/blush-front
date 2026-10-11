@@ -16,7 +16,8 @@ export type AppKind = keyof typeof APPLIS;
 /** « autre », là où on choisit son appli (« Vous vous parlez où ? ») : des captures d’une appli qu’on ne nomme pas. */
 export const NOM_AUTRE_APPLI = "Autre appli";
 /** Les applis qui s’exportent (écran 02). iMessage ne s’exporte pas : on filme son écran (/importer/captures). */
-export type ExportApp = Extract<AppKind, "whatsapp" | "instagram">;
+export const EXPORTS = ["whatsapp", "instagram"] as const satisfies readonly AppKind[];
+export type ExportApp = (typeof EXPORTS)[number];
 type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 type Side = "toi" | "elle" | "pareil";

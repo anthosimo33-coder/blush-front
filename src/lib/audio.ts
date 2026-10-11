@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /*
  * L’audio du navigateur, écrit une fois : la session audio de Safari (le mode silencieux, le micro), le contexte Web
@@ -13,12 +13,15 @@ declare global {
     /** Le contexte audio des anciens Safari (avant la 14.1), sous son ancien nom. */
     webkitAudioContext?: typeof AudioContext;
   }
+  interface Navigator {
+    /** La session audio de Safari (16.4 et après) : absente ailleurs. */
+    audioSession?: { type: string };
+  }
 }
 
 /* ———— La session audio de Safari ———— */
 
 type TypeDeSession = "auto" | "ambient" | "playback";
-type NavigateurAvecSession = Navigator & { audioSession?: { type: string } };
 
 /* Ceux qui demandent que le son s’entende même en silencieux (prendreSonForce), et l’enregistrement d’un vocal */
 let forces = 0;
@@ -31,7 +34,7 @@ let enregistrement = false;
  */
 export function appliquerSession() {
   if (typeof navigator === "undefined") return;
-  const s = (navigator as NavigateurAvecSession).audioSession;
+  const s = navigator.audioSession;
   if (!s) return;
   const type: TypeDeSession = enregistrement ? "auto" : forces > 0 ? "playback" : "ambient";
   try {
@@ -56,6 +59,23 @@ export function prendreSonForce(): () => void {
     forces--;
     appliquerSession();
   };
+}
+
+/**
+ * Le son forcé tenu par un écran (le bouton son du verdict, un vocal qui joue) : `tenir(true)` le prend (une fois, même
+ * appelé deux fois), `tenir(false)` le lâche, et l’écran qui s’en va le lâche.
+ */
+export function useSonForce(): (tenir: boolean) => void {
+  const lacher = useRef<(() => void) | null>(null);
+  const tenir = useCallback((on: boolean) => {
+    if (on) lacher.current ??= prendreSonForce();
+    else {
+      lacher.current?.();
+      lacher.current = null;
+    }
+  }, []);
+  useEffect(() => () => tenir(false), [tenir]);
+  return tenir;
 }
 
 /** Pendant un vocal, Safari doit pouvoir ouvrir le micro : on lui rend la main, puis on revient en « ambient ». */
@@ -151,6 +171,15 @@ export type LecteurAudio = {
 };
 
 /**
+ * L’élément en erreur qu’on remplace : il reste « en lecture » (paused faux, dans Chromium comme dans WebKit). Il n’est
+ * plus le vocal en cours (le suivant ne le met pas en pause), et ses événements ne parlent plus.
+ */
+function oublier(a: HTMLAudioElement) {
+  a.onplay = a.onpause = a.onwaiting = a.onstalled = a.onplaying = a.ontimeupdate = a.onerror = a.onended = null;
+  if (enCours === a) enCours = null;
+}
+
+/**
  * Un vocal à écouter : l’élément audio naît au premier toucher, un seul vocal joue à la fois dans la page, et le son
  * forcé (`forcerSon`) n’est tenu que pendant qu’il joue. Il s’arrête quand l’écran qui le montre s’en va.
  */
@@ -166,40 +195,52 @@ export function useLecteurAudio({ source, forcerSon = false, suivreTemps = false
   useLayoutEffect(() => {
     options.current = { source, forcerSon, suivreTemps, surFin };
   });
-  /* Le son forcé que ce lecteur tient, s’il en tient un */
-  const sonForce = useRef<(() => void) | null>(null);
-  const lacherLeSon = () => {
-    sonForce.current?.();
-    sonForce.current = null;
-  };
+  /* Le son forcé que ce lecteur tient pendant qu’il joue (lâché aussi quand l’écran s’en va) */
+  const sonForce = useSonForce();
+  const lacherLeSon = () => sonForce(false);
 
   const lecteur = () => {
     const avant = element.current;
     /* Un élément en erreur ne repart pas : on en refait un */
     if (avant && !avant.error) return avant;
+    if (avant) oublier(avant);
     const a = new Audio(options.current.source(!!avant));
     a.preload = "auto";
-    a.onplay = () => setJoue(true);
+    /*
+     * Les événements arrivent après coup (le navigateur les met en file) : celui d’un élément déjà remplacé, ou d’une
+     * pause suivie d’une lecture dans le même toucher, ne doit plus toucher à rien (ni lâcher le son forcé repris depuis).
+     */
+    const actuel = () => element.current === a;
+    a.onplay = () => {
+      if (actuel() && !a.paused) setJoue(true);
+    };
     /* En pause (à la main, par un autre vocal, à la fin) : le temps se recale, et le mode silencieux reprend la main */
     a.onpause = () => {
+      if (!actuel() || !a.paused) return;
       setJoue(false);
       setTemps(a.currentTime);
       lacherLeSon();
     };
-    a.onwaiting = a.onstalled = () => setAttente(true);
-    a.onplaying = () => setAttente(false);
+    a.onwaiting = a.onstalled = () => {
+      if (actuel()) setAttente(true);
+    };
+    a.onplaying = () => {
+      if (actuel()) setAttente(false);
+    };
     a.ontimeupdate = () => {
-      if (!options.current.suivreTemps) return;
+      if (!actuel() || !options.current.suivreTemps) return;
       setTemps(a.currentTime);
       setDuree(Number.isFinite(a.duration) && a.duration > 0 ? a.duration : null);
     };
     a.onerror = () => {
+      if (!actuel()) return;
       setJoue(false);
       setAttente(false);
       setCoupe(true);
       lacherLeSon();
     };
     a.onended = () => {
+      if (!actuel()) return;
       setJoue(false);
       lacherLeSon();
       options.current.surFin?.(a);
@@ -217,7 +258,7 @@ export function useLecteurAudio({ source, forcerSon = false, suivreTemps = false
     }
     if (enCours && enCours !== a) enCours.pause();
     enCours = a;
-    if (options.current.forcerSon) sonForce.current ??= prendreSonForce();
+    if (options.current.forcerSon) sonForce(true);
     a.play().catch(() => {
       /* Refusé, ou arrêté avant de partir : rien ne joue (un nouvel essai, parti depuis, garde sa lecture) */
       if (!a.paused) return;
@@ -238,17 +279,15 @@ export function useLecteurAudio({ source, forcerSon = false, suivreTemps = false
     setTemps(a.currentTime);
   };
 
-  /* L’écran s’en va : son vocal s’arrête, et le son forcé est lâché */
-  const quitter = useRef(() => {});
-  useLayoutEffect(() => {
-    quitter.current = () => {
+  /* L’écran s’en va : son vocal s’arrête (et useSonForce lâche le son forcé) */
+  useEffect(
+    () => () => {
       const a = element.current;
       a?.pause();
       if (enCours === a) enCours = null;
-      lacherLeSon();
-    };
-  });
-  useEffect(() => () => quitter.current(), []);
+    },
+    [],
+  );
 
   return { element, joue, attente, coupe, temps, duree, jouer, basculer, pause: () => element.current?.pause(), aller, poserTemps: setTemps };
 }

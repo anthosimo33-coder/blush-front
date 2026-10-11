@@ -6,7 +6,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { ecrireJson, lireJson } from "@/lib/stockage";
-import { APPLIS, GOALS, GUESSES, PRONOMS, type AppKind, type ExportApp, type Goal, type Guess, type Pronom } from "@/types";
+import { APPLIS, EXPORTS, GOALS, GUESSES, PRONOMS, type AppKind, type ExportApp, type Goal, type Guess, type Pronom } from "@/types";
 import { CLE_PARCOURS } from "./cles";
 
 export type JourneyState = {
@@ -38,8 +38,6 @@ const JOURNEY_DEFAULTS: JourneyState = {
   goal: null,
   email: "",
 };
-
-const EXPORTS: readonly ExportApp[] = ["whatsapp", "instagram"];
 
 const dans =
   <T extends string>(liste: readonly T[]) =>

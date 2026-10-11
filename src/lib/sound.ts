@@ -379,7 +379,7 @@ export function play<K extends SoundName>(name: K, ...args: Parameters<(typeof S
   if (score.haptic) haptic(score.haptic, score.hapticAt);
   const c = chain;
   if (!c) return;
-  const inGesture = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive ?? false;
+  const inGesture = navigator.userActivation?.isActive ?? false;
   if (c.ac.state !== "running") {
     if (!inGesture) return;
     c.ac.resume().catch(() => {});
