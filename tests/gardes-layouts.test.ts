@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { inArray } from "drizzle-orm";
 import type { ReactNode } from "react";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
  * Les gardes des pages qui ont un écran de chargement (loading.tsx) sont dans leur layout : une page sous un squelette
@@ -28,10 +26,7 @@ vi.mock("next/navigation", () => ({
 import { executerChaine } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
-import { db, schema } from "@/server/db";
-import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { definirQui } from "@/server/histoires";
 import { planifier } from "@/server/taches";
 import { getConvs, getReport, nombreDeConvs, verdictEcrit } from "@/services/serveur";
 import Compte from "@/app/compte/layout";
@@ -42,6 +37,7 @@ import Question from "@/app/rapport/question/layout";
 import Ok from "@/app/importer/ok/layout";
 import Histoire from "@/app/importer/histoire/layout";
 import Convs from "@/app/app/convs/layout";
+import { compteDeTest, convRattachee, histoireLue } from "./aide/fixtures";
 
 type Layout = (props: { children: ReactNode; params: Promise<object> }) => Promise<ReactNode>;
 
@@ -67,17 +63,9 @@ const toutes = async () => ({
   convs: await garde(Convs),
 });
 
-const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
-const email = `gardes-${Date.now()}@blush.test`;
 let u: Utilisateur;
-
 beforeAll(async () => {
-  definirFactice(fournisseurFactice);
-  [u] = await db().insert(schema.users).values({ email }).returning();
-});
-afterAll(async () => {
-  await db().delete(schema.users).where(inArray(schema.users.email, [email]));
-  definirFactice(null);
+  u = await compteDeTest("gardes");
 });
 
 /** Les gardes légères des layouts disent la même chose que les lectures complètes des pages. */
@@ -103,8 +91,7 @@ describe("les gardes des pages à squelette, dans leur layout", () => {
 
   it("suit la conv : « Qui es-tu ? » d’abord, puis la lecture, puis le rapport", async () => {
     etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
-    const imp = await importer(await depuisFichier(conv("01-a-deux-doigts.txt")));
-    const histoire = (await rattacherBrouillon(u, imp.secret))!;
+    const histoire = (await convRattachee(u, "01-a-deux-doigts.txt")).id;
 
     /* Importée, « Qui es-tu ? » pas rempli : pas de lecture sans */
     const avantQui = await toutes();
@@ -126,11 +113,7 @@ describe("les gardes des pages à squelette, dans leur layout", () => {
   });
 
   it("deux convs lues : la liste s’ouvre", async () => {
-    const imp = await importer(await depuisFichier(conv("02-reciproque.txt")));
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" });
-    await planifier(imp.id, "verdict");
-    await executerChaine(imp.id);
+    await histoireLue(u, "02-reciproque.txt");
     expect(await nombreDeConvs()).toBe(2);
     expect(await garde(Convs)).toBeNull();
     await memesReponses();

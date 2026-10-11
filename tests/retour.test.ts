@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
-import { inArray } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
  * Les pages serveur de la navigation (src/services/serveur.ts) : où mène « Retrouver ma conv » selon l’état de la conv
@@ -19,28 +17,19 @@ vi.mock("next/headers", () => ({
 }));
 
 import { executerChaine } from "@/server/analyse";
-import { ouvrirSession } from "@/server/auth";
-import { db, schema } from "@/server/db";
-import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { ouvrirSession, type Utilisateur } from "@/server/auth";
+import { definirQui } from "@/server/histoires";
 import { planifier } from "@/server/taches";
 import { getCompte, getRetour } from "@/services/serveur";
+import { compteDeTest, convRattachee } from "./aide/fixtures";
 
-const email = `retour-${Date.now()}@blush.test`;
+let u: Utilisateur;
 let histoire = "";
 
 beforeAll(async () => {
-  definirFactice(fournisseurFactice);
-  const [u] = await db().insert(schema.users).values({ email }).returning();
+  u = await compteDeTest("retour");
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
-  const f = "01-a-deux-doigts.txt";
-  const imp = await importer(await depuisFichier(new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" })));
-  histoire = (await rattacherBrouillon(u, imp.secret))!;
-});
-afterAll(async () => {
-  await db().delete(schema.users).where(inArray(schema.users.email, [email]));
-  definirFactice(null);
+  histoire = (await convRattachee(u, "01-a-deux-doigts.txt")).id;
 });
 
 describe("« Retrouver ma conv » sur la landing", () => {
@@ -68,7 +57,7 @@ describe("« Retrouver ma conv » sur la landing", () => {
 describe("« Mon compte », dès le rendu serveur", () => {
   it("le compte connecté, avec son abonnement", async () => {
     const compte = await getCompte();
-    expect(compte?.email).toBe(email);
+    expect(compte?.email).toBe(u.email);
     expect(compte?.subscription.plan).toBe("gratuit");
   });
 });

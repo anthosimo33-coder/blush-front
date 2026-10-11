@@ -1,10 +1,9 @@
-import { readFileSync } from "node:fs";
-import { eq, inArray, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { inArray, sql } from "drizzle-orm";
+import { beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "@/server/db";
-import { depuisFichier, importer } from "@/server/histoires";
 import { statsAdmin } from "@/server/stats";
 import { PERIME_S, planifier } from "@/server/taches";
+import { convImportee } from "./aide/fixtures";
 
 /*
  * Le tableau de bord (/admin) compte « bloquée » une tâche en cours sans battement depuis PERIME_S : le seuil où la
@@ -15,13 +14,10 @@ describe("une tâche « bloquée » au tableau de bord", () => {
   let taches: string[];
 
   beforeAll(async () => {
-    id = (await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })))).id;
+    id = (await convImportee("01-a-deux-doigts.txt")).id;
     /* Des mises à jour de la mémoire : elles s’empilent, une même histoire peut en avoir plusieurs */
     taches = [await planifier(id, "memoire_maj", { a: 1 }), await planifier(id, "memoire_maj", { a: 2 }), await planifier(id, "memoire_maj", { a: 3 })];
     await db().update(schema.tasks).set({ status: "en_cours" }).where(inArray(schema.tasks.id, taches));
-  });
-  afterAll(async () => {
-    await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });
 
   it("sans battement depuis PERIME_S (90 s), pas avant", async () => {
@@ -31,7 +27,7 @@ describe("une tâche « bloquée » au tableau de bord", () => {
     };
     const a60s = await sansBattementDepuis(PERIME_S - 30);
     const a100s = await sansBattementDepuis(PERIME_S + 10);
-    /* Les autres fichiers de tests, sur la même base, abandonnent et reprennent des tâches au même moment : à une près */
-    expect(Math.abs(a100s - a60s - taches.length)).toBeLessThanOrEqual(1);
+    /* Les fichiers de tests passent l’un après l’autre (vitest.config.mts) : aucun autre ne prend ni ne lâche de tâche entre-temps */
+    expect(a100s - a60s).toBe(taches.length);
   });
 });

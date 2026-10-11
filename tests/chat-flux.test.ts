@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
@@ -27,20 +26,17 @@ vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof imp
 vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof import("@/server/ia/claude")>()), textesSysteme: () => [FAUX_PROMPT] }));
 
 import { POST } from "@/app/api/chat/route";
-import { executerChaine } from "@/server/analyse";
 import { ouvrirSession } from "@/server/auth";
 import { historique } from "@/server/chat";
 import { db, schema } from "@/server/db";
-import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
+import { REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { REFUS_FUITE } from "@/server/ia/garde";
-import { planifier } from "@/server/taches";
 import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
 import type { ErreurApi } from "@/types/erreurs-api";
 import type { BulleChat, EvenementChat } from "@/types";
+import { compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
 
-const email = `chat-flux-${Date.now()}@blush.test`;
 let id = "";
 /* Les appels au chat, et ce que le modèle factice rend pour lui (par défaut, sa réponse habituelle) */
 let appels = 0;
@@ -72,19 +68,14 @@ const reponseChat = (req: Requete, modif: (r: Record<string, unknown>, ids: stri
   return modif(fournisseurFactice(req) as Record<string, unknown>, ids);
 };
 
+facticePourChaqueTest((req) => {
+  if (req.tache !== "10-chat") return fournisseurFactice(req);
+  appels++;
+  return chat ? chat(req) : fournisseurFactice(req);
+});
 beforeAll(async () => {
-  definirFactice((req) => {
-    if (req.tache !== "10-chat") return fournisseurFactice(req);
-    appels++;
-    return chat ? chat(req) : fournisseurFactice(req);
-  });
-  const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-  id = imp.id;
-  const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
-  await rattacherBrouillon(u, imp.secret);
-  await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
-  await planifier(id, "verdict");
-  await executerChaine(id);
+  const u = await compteDeTest("chat-flux", "blushplus");
+  id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
 });
@@ -94,11 +85,7 @@ beforeEach(async () => {
   etat.alertes.length = 0;
   await vocalEnBase(false);
 });
-afterAll(async () => {
-  vi.unstubAllGlobals();
-  await db().delete(schema.users).where(eq(schema.users.email, email));
-  definirFactice(null);
-});
+afterAll(() => vi.unstubAllGlobals());
 
 describe("POST /api/chat en flux", () => {
   it("les bulles arrivent une à une, avant la réponse validée, qui porte son échange", async () => {
@@ -126,7 +113,8 @@ describe("POST /api/chat en flux", () => {
     await vocalEnBase(true);
     const evenements = (await lectures(await envoyer("et là je lui dis quoi ?"))).flat();
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse", "vocal"]);
-    const [fin, voix] = evenements as unknown as [{ reponse: { vocalEnCours?: boolean; vocal?: unknown; echange?: number } }, { vocal: { audio: string; peaks: number[] } }];
+    const [fin, voix] = evenements;
+    if (!("reponse" in fin) || !("vocal" in voix) || !voix.vocal) throw new Error("une réponse, puis son vocal");
     expect(fin.reponse.vocalEnCours).toBe(true);
     expect(fin.reponse.vocal).toBeUndefined();
     expect(voix.vocal.audio).toMatch(/^\/api\/vocal\/chat\/\d+$/);

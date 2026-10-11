@@ -1,14 +1,14 @@
-import { readFileSync } from "node:fs";
 import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { avanceMoitie, avancePlan, chapitresCommences, chapitresFinis, executerChaine } from "@/server/analyse";
+import { beforeAll, describe, expect, it } from "vitest";
+import type { Requete } from "@prompts/lib/contextes";
+import { avanceMoitie, avancePlan, chapitresCommences, chapitresFinis } from "@/server/analyse";
+import type { Utilisateur } from "@/server/auth";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { rapportDe } from "@/server/donnees";
-import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
+import { progression, rapportDe } from "@/server/donnees";
+import { REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { planifier } from "@/server/taches";
+import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const avance = (ecrit: string, reflexion = 0) => ({ reflexion, texte: ecrit.length, ecrit });
 
@@ -35,33 +35,24 @@ describe("l’avancée du rapport, lue sur ce que le modèle écrit", () => {
 });
 
 describe("le rapport pendant son écriture", () => {
-  const email = `ecriture-${Date.now()}@blush.test`;
+  let u: Utilisateur;
   let id = "";
   beforeAll(async () => {
-    definirFactice(fournisseurFactice);
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-    id = imp.id;
-    const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
-    await planifier(id, "verdict");
-    await executerChaine(id);
+    u = await compteDeTest("ecriture", "blushplus");
+    id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   });
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
-    definirFactice(null);
-  });
-
-  it("donne les vrais titres du plan, l’état de chaque chapitre et l’avancée", async () => {
-    /* On remet l’histoire au milieu de l’écriture : le plan fait, les deux moitiés en cours */
+  /** L’histoire remise au milieu de l’écriture : le plan fait, les deux moitiés en cours, le rapport pas encore écrit. */
+  async function auMilieuDeLEcriture() {
     await db().update(schema.reports).set({ data: null }).where(eq(schema.reports.storyId, id));
     await db()
       .update(schema.tasks)
       .set({ status: "en_cours", progress: 60, detail: { a: { progres: 0.7, ecrits: [1, 2], enCours: 3 }, b: { progres: 0.5, ecrits: [5], enCours: 6 } } })
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_chapitres")));
-    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
-    const [u] = await db().select().from(schema.users).where(eq(schema.users.email, email));
-    const r = (await rapportDe(story, { ...u, plan: "blushplus" } as never))!;
+  }
+
+  it("donne les vrais titres du plan, l’état de chaque chapitre et l’avancée", async () => {
+    await auMilieuDeLEcriture();
+    const r = (await rapportDe(await ligneEnBase(id), u))!;
     expect(r.generating).toBe(true);
     expect(r.ecriture?.etape).toBe("chapitres");
     expect(r.ecriture?.progres).toBeCloseTo(0.35 + 0.65 * 0.6, 2);
@@ -80,11 +71,10 @@ describe("le rapport pendant son écriture", () => {
   });
 
   it("donne à lire les chapitres finis, dans l’ordre : un chapitre prêt en avance attend ceux d’avant", async () => {
+    await auMilieuDeLEcriture();
     const pret = (n: number) => ({ number: n, title: `Prêt ${n}`, tocTitle: `Prêt ${n}`, free: false, blocks: [{ kind: "punchline", text: `fin ${n}` }] });
     await db().update(schema.reports).set({ partiel: chiffrer([pret(2), pret(3), pret(6)]) }).where(eq(schema.reports.storyId, id));
-    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
-    const [u] = await db().select().from(schema.users).where(eq(schema.users.email, email));
-    const r = (await rapportDe(story, { ...u, plan: "blushplus" } as never))!;
+    const r = (await rapportDe(await ligneEnBase(id), u))!;
     expect(r.report.chapters.map((c) => [c.number, !c.locked])).toEqual([
       [1, true],
       [2, true],
@@ -102,25 +92,12 @@ describe("le rapport pendant son écriture", () => {
 });
 
 describe("un refus du modèle", () => {
-  const email = `refus-${Date.now()}@blush.test`;
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
-    definirFactice(null);
-  });
-
   it("n’est essayé qu’une fois, et la lecture dit pourquoi", async () => {
-    const { REFUS_FACTICE } = await import("@/server/ia/claude");
-    const { progression } = await import("@/server/donnees");
-    definirFactice((req) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req)));
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/02-reciproque.txt")], "02.txt", { type: "text/plain" })));
-    const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "parle", objectif: "comprendre" });
-    await planifier(imp.id, "verdict");
-    await executerChaine(imp.id);
+    const u = await compteDeTest("refus", "blushplus");
+    const refus = (req: Requete) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req));
+    const imp = await avecFactice(refus, () => histoireLue(u, "02-reciproque.txt", { qui: { devinette: "parle", objectif: "comprendre" } }));
     const [t] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict")));
     expect([t.status, t.attempts, t.error]).toEqual(["echec", 1, "refus"]);
-    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, imp.id));
-    expect(await progression(story)).toMatchObject({ failed: true, failReason: "refus", done: false });
+    expect(await progression(await ligneEnBase(imp.id))).toMatchObject({ failed: true, failReason: "refus", done: false });
   });
 });

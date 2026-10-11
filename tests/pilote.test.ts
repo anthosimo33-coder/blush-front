@@ -25,9 +25,9 @@ describe("le pilote de la base", () => {
     expect(s.createdAt).toBeInstanceOf(Date);
     expect(s.createdAt.getTime()).toBe(quand.getTime());
 
-    const detail = { ecrits: [1, 2], enCours: 3, note: "« déjà » 💀", vide: null };
-    /* Le pilote rend tout JSON tel qu’écrit : le type de la colonne (DetailEcriture) n’y est pour rien */
-    const [t] = await db().insert(schema.tasks).values({ storyId: s.id, kind: "memoire_maj", detail: detail as never }).returning();
+    /* Le pilote rend tout JSON tel qu’écrit : un détail d’écriture (DetailEcriture), et ce que son type ne connaît pas */
+    const detail = { a: { progres: 0.5, ecrits: [1, 2], enCours: 3 }, b: { progres: 0, ecrits: [], enCours: null }, note: "« déjà » 💀", vide: null };
+    const [t] = await db().insert(schema.tasks).values({ storyId: s.id, kind: "memoire_maj", detail }).returning();
     expect((await db().select({ detail: schema.tasks.detail }).from(schema.tasks).where(eq(schema.tasks.id, t.id)))[0].detail).toEqual(detail);
 
     const [m1] = await db().insert(schema.chatMessages).values({ storyId: s.id, role: "toi", data: octets }).returning({ id: schema.chatMessages.id });

@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { and, eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
 
 /*
@@ -24,21 +23,18 @@ vi.mock("next/server", async (original) => ({ ...(await original<typeof import("
 vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]) }));
 
 import { GET, POST, PUT } from "@/app/api/fiche/route";
-import { executerChaine } from "@/server/analyse";
 import { ouvrirSession } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { ErreurTache } from "@/server/erreurs";
-import { definirQui, depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier } from "@/server/taches";
 import type { Fiche, FicheUpdate } from "@/types";
+import { texteDeConv } from "./aide/fichiers";
+import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
 
-const email = `fiche-async-${Date.now()}@blush.test`;
+/* Les étapes demandées au modèle (factice) pendant les tests */
 const taches: string[] = [];
 let id = "";
-/* Ce que rend la lecture des captures (par défaut, celle du modèle factice) */
-let captures: ((req: Requete) => unknown) | null = null;
 
 const requete = (init: RequestInit = {}) => new Request("http://localhost/api/fiche", { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...init.headers } });
 const lire = async () => (await (await GET()).json()) as Fiche;
@@ -48,28 +44,19 @@ const lancerApres = async () => {
 /** Une mise à jour de la mémoire planifiée par le chat (un échange qui apporte du neuf). */
 const majDuChat = () => planifier(id, "memoire_maj", { date: "2026-03-15", dit: "on s’est vus hier, c’était trop bien", reponse: ["Enfin."] });
 
+facticePourChaqueTest((req: Requete) => (taches.push(req.tache), fournisseurFactice(req)));
 beforeAll(async () => {
-  definirFactice((req: Requete) => (taches.push(req.tache), req.tache === "01-captures" && captures ? captures(req) : fournisseurFactice(req)));
-  const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-  id = imp.id;
-  const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
-  await rattacherBrouillon(u, imp.secret);
-  await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
-  await planifier(id, "verdict");
-  await executerChaine(id);
+  const u = await compteDeTest("fiche-async", "blushplus");
+  id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
-});
-afterAll(async () => {
-  await db().delete(schema.users).where(eq(schema.users.email, email));
-  definirFactice(null);
 });
 
 describe("ajouter des captures à sa fiche", () => {
   it("un nouvel export : la réponse part avec le nombre de nouveaux messages, sans profil", async () => {
     const suite = ["[14/03/2026 10:02:11] Hugo: alors cette semaine ?", "[14/03/2026 18:40:00] Sophie: ça va mieux"].join("\n");
     /* Le paquet que prépare le navigateur (src/services/preparer-export.ts) : du JSON compressé */
-    const paquet = gzipSync(JSON.stringify({ nom: "conv.txt", parties: [{ nom: "conv.txt", contenu: `${readFileSync("prompts/evals/convs/01-a-deux-doigts.txt", "utf8")}\n${suite}` }] }));
+    const paquet = gzipSync(JSON.stringify({ nom: "conv.txt", parties: [{ nom: "conv.txt", contenu: `${texteDeConv("01-a-deux-doigts.txt")}\n${suite}` }] }));
     const fd = new FormData();
     fd.append("export", new File([paquet], "paquet.json.gz", { type: "application/gzip" }));
     taches.length = 0;
@@ -141,17 +128,16 @@ describe("ajouter des captures à sa fiche", () => {
 });
 
 describe("un ajout à sa fiche qui échoue", () => {
-  afterAll(() => void (captures = null));
-
   it("une erreur d’étape à la lecture des captures (le temps écoulé) : un 502 « panne », le code interne dans l’alerte", async () => {
     /* Ce que lève appeler() quand l’échéance est trop proche pour lancer l’appel */
-    captures = () => {
-      throw new ErreurTache("delai");
+    const enRetard = (req: Requete) => {
+      if (req.tache === "01-captures") throw new ErreurTache("delai");
+      return fournisseurFactice(req);
     };
     etat.alertes.length = 0;
     const fd = new FormData();
     fd.append("captures", new File([new Uint8Array(64)], "profil.jpg", { type: "image/jpeg" }));
-    const r = await POST(requete({ method: "POST", body: fd }));
+    const r = await avecFactice(enRetard, () => POST(requete({ method: "POST", body: fd })));
     expect(r.status).toBe(502);
     expect(await r.json()).toEqual({ erreur: "panne" });
     expect(etat.alertes).toEqual([["ajout à la fiche en échec", `Histoire ${id}`, "Erreur : delai"]]);

@@ -7,12 +7,13 @@ import type { TestProject } from "vitest/node";
 
 /*
  * Avant les tests (globalSetup de vitest.config.mts) : la base des tests (DATABASE_URL de la config) est créée si elle
- * manque, puis mise à jour avec les migrations de drizzle/. Elle n’est jamais effacée : les tests écrivent avec des
- * emails et des identifiants à eux. Un Postgres injoignable arrête tout de suite, avec de quoi le relancer, plutôt que
- * cent tests en échec.
+ * manque, puis mise à jour avec les migrations de drizzle/, ses limites et ses compteurs du jour remis à zéro. Ses
+ * autres tables ne sont jamais effacées : les tests écrivent avec des emails et des identifiants à eux. Un Postgres
+ * injoignable arrête tout de suite, avec de quoi le relancer, plutôt que cent tests en échec.
  * blush_test, la base par défaut (sans DATABASE_URL_TEST), sert à tous les dossiers du projet sur la machine (les
- * worktrees, chacun sur sa branche) : elle n’est migrée que si elle vient d’être créée. Une migration qui lui manque
- * arrête les tests (la migrer changerait la base des autres dossiers) : DATABASE_URL_TEST donne à ce dossier sa propre base.
+ * worktrees, chacun sur sa branche) : elle n’est migrée, et remise à zéro, que si elle vient d’être créée. Une migration
+ * qui lui manque arrête les tests (la migrer changerait la base des autres dossiers) : DATABASE_URL_TEST donne à ce
+ * dossier sa propre base.
  */
 
 const DRIZZLE = join(__dirname, "../drizzle");
@@ -76,6 +77,13 @@ export default async function preparerLaBase(projet: TestProject): Promise<void>
     }
     await client`select pg_advisory_lock(hashtext('blush:migrations-des-tests'))`;
     await migrate(drizzle(client), { migrationsFolder: DRIZZLE });
+    /*
+     * Les limites (rate_limits) et les compteurs du jour (counters) s’ajoutent d’un lancement à l’autre : sans remise à
+     * zéro, un plafond du jour (les alertes, les mails de code) se remplit au fil des lancements, et un test échoue sans
+     * que rien n’ait changé. La base commune, elle, n’est pas remise à zéro (un autre dossier peut être en train de s’en
+     * servir) : les tests qui posent un plafond le retirent eux-mêmes.
+     */
+    await client`truncate rate_limits, counters`;
   } finally {
     await client.end();
   }

@@ -1,6 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Captures } from "@prompts/lib/schemas";
 
 /*
  * Un envoi de captures coupé par le réseau (Safari en arrière-plan, le Wi-Fi qui passe en 4G) : le navigateur réessaie
@@ -21,35 +20,29 @@ import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { ouvrirSession } from "@/server/auth";
 import { db, schema } from "@/server/db";
-import { definirFactice } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
+import { lotVideo } from "./aide/fabriques";
+import { compteDeTest, facticePourChaqueTest } from "./aide/fixtures";
 
 const n = Date.now();
-const emails = [`reprise-a-${n}@blush.test`, `reprise-b-${n}@blush.test`];
 let ip = 0;
 const requete = (chemin: string, init: RequestInit) =>
   new Request(`http://localhost${chemin}`, {
     ...init,
     headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": `11.${n % 250}.${(n >> 8) % 250}.${++ip}`, ...init.headers },
   });
+/* Les appels au modèle (factice) pendant les tests : une lecture reprise n’en refait pas */
 const appelsAuModele: unknown[] = [];
+facticePourChaqueTest((req) => (appelsAuModele.push(req), fournisseurFactice(req)));
 const sessions: string[] = [];
 const histoires: string[] = [];
 
 beforeAll(async () => {
-  definirFactice((req) => {
-    appelsAuModele.push(req);
-    return fournisseurFactice(req);
-  });
-  for (const email of emails) {
-    const [u] = await db().insert(schema.users).values({ email }).returning();
-    sessions.push((await ouvrirSession(u.id)).secret);
-  }
+  for (const prefixe of ["reprise-a", "reprise-b"]) sessions.push((await ouvrirSession((await compteDeTest(prefixe)).id)).secret);
 });
+/* Les brouillons de ces envois, restés sans compte (leurs comptes partent à la fin du fichier, avec ce qui leur est rattaché) */
 afterAll(async () => {
   if (histoires.length) await db().delete(schema.stories).where(inArray(schema.stories.id, histoires));
-  await db().delete(schema.users).where(inArray(schema.users.email, emails));
-  definirFactice(null);
 });
 
 const captures = (cle?: string) => {
@@ -111,14 +104,7 @@ describe("un envoi de captures repris après une coupure", () => {
 
   it("l’enregistrement d’écran : le dernier envoi renvoyé retrouve la même histoire", async () => {
     etat.cookies.set("blush-session", sessions[0]);
-    const lot = (k0: number): Captures => ({
-      appli: "instagram",
-      autre: "Léa",
-      captures: [{ numero: 1, place: 1, hors_sujet: false }],
-      blocs: [{ repere: { date: "2026-09-08", heure: "21:40" }, messages: Array.from({ length: 15 }, (_, k) => ({ de: k % 2 ? ("moi" as const) : ("autre" as const), texte: `message ${k0 + k}`, media: null, coupe: false, reaction: null })) }],
-      profil: [],
-      doutes: [],
-    });
+    const lot = (k0: number) => lotVideo("Léa", k0);
     const corps = JSON.stringify({ app: "imessage", lots: [lot(0), lot(100)], cle: crypto.randomUUID() });
     const envoi = () => postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: corps }));
     const a = await lue(await envoi());

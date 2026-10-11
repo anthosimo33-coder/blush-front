@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
-import { eq, inArray } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { describe, expect, it, vi } from "vitest";
 
 /* after() de Next ne vit que dans une requête : ici, ce qui devait partir après la réponse est gardé, et lancé à la main */
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
@@ -11,35 +10,18 @@ vi.mock("@/server/taches", async (original) => {
   return { ...m, etatDesTaches: vi.fn(m.etatDesTaches) };
 });
 
-import { executerChaine } from "@/server/analyse";
-import type { Utilisateur } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { rapportDe } from "@/server/donnees";
-import { definirQui, depuisFichier, histoireOuverte, importer, rattacherBrouillon } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
-import { etatDesTaches, planifier } from "@/server/taches";
+import { histoireOuverte } from "@/server/histoires";
+import { etatDesTaches } from "@/server/taches";
+import { compteDeTest, histoireLue } from "./aide/fixtures";
 
-const email = `rapport-taches-${Date.now()}@blush.test`;
 const lues = vi.mocked(etatDesTaches);
-let u: Utilisateur;
-
-beforeAll(async () => {
-  definirFactice(fournisseurFactice);
-  [u] = await db().insert(schema.users).values({ email }).returning();
-});
-afterAll(async () => {
-  await db().delete(schema.users).where(inArray(schema.users.email, [email]));
-  definirFactice(null);
-});
 
 describe("le rapport pendant son écriture", () => {
   it("lit l’état des tâches une fois par appel, et montre l’écriture dès qu’elle est lancée", async () => {
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/06-elle-hesite.txt")], "06-elle-hesite.txt", { type: "text/plain" })));
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" });
-    await planifier(imp.id, "verdict");
-    await executerChaine(imp.id);
+    const u = await compteDeTest("rapport-taches");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
 
     /* Sans l’accès : ni l’écriture ni le vocal ne sont regardés */
     lues.mockClear();

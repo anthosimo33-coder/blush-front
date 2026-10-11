@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Captures, Memoire } from "@prompts/lib/schemas";
+import type { Memoire } from "@prompts/lib/schemas";
 
 /*
  * Les correctifs de l’audit de sécurité du 9 octobre (S-01, S-02, S-03, S-05, S-06, et pour la connexion S-07, S-08,
@@ -71,10 +70,12 @@ import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
 import { emailCanonique } from "@/server/email-canonique";
 import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
-import { convDe, depuisFichier, importer, type LigneComplete, type Meta } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
+import { convDe, depuisFichier, importer, type Meta } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { suiteSure } from "@/lib/suite";
+import { lotVideo } from "./aide/fabriques";
+import { convDeTest } from "./aide/fichiers";
+import { facticePourChaqueTest } from "./aide/fixtures";
 
 /* Le cookie de session des tests, servis en http : sans le préfixe __Host- (src/lib/noms-cookies.ts) */
 const SESSION = nomDuCookie("session", false);
@@ -88,16 +89,14 @@ const requete = (chemin: string, init: RequestInit) =>
     headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": `10.${n % 250}.${(n >> 8) % 250}.${++ip}`, ...init.headers },
   });
 const cles = ["capturesAnonymesParJour", "lotsAnonymesParJour"].map((c) => empreinte(`limite:${c}`));
+/* Les appels au modèle (factice) pendant les tests : une route refusée n’en fait aucun */
 const appelsAuModele: unknown[] = [];
+facticePourChaqueTest((req) => (appelsAuModele.push(req), fournisseurFactice(req)));
 
 let userId = "";
 let secretSession = "";
 
 beforeAll(async () => {
-  definirFactice((req) => {
-    appelsAuModele.push(req);
-    return fournisseurFactice(req);
-  });
   await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, cles));
   const [u] = await db().insert(schema.users).values({ email: emails[0], plan: "blushplus" }).returning();
   userId = u.id;
@@ -106,7 +105,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await db().delete(schema.users).where(inArray(schema.users.email, emails));
   await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, cles));
-  definirFactice(null);
 });
 
 describe("S-06 · « suite » après la connexion ne mène jamais hors du site", () => {
@@ -135,41 +133,24 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
   });
 
   it("un export importé est gardé compressé, et relu tel quel", async () => {
-    const f = "01-a-deux-doigts.txt";
-    const lu = await depuisFichier(new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" }));
+    const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
     const { id } = await importer(lu);
     const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
     expect(ligne.conv![0]).toBe(2);
     expect(ligne.conv!.length).toBeLessThan(Buffer.byteLength(lu.texte) / 2);
-    expect(convDe(ligne as LigneComplete)).toBe(lu.texte);
+    expect(convDe(ligne)).toBe(lu.texte);
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });
 });
 
 describe("S-02 · un nom de participant démesuré n’entre pas dans ce qu’on garde", () => {
   it("un export dont un nom fait 150 caractères (ou contient un caractère de contrôle) est refusé", async () => {
-    const f = "01-a-deux-doigts.txt";
-    const lu = await depuisFichier(new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" }));
+    const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
     const { id, meta } = await importer(lu);
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
     const nom = meta.participants[0].nom;
     for (const autre of ["N".repeat(150), "Nom\u0001"]) await expect(importer({ ...lu, texte: lu.texte.split(`${nom}:`).join(`${autre}:`) })).rejects.toMatchObject({ code: "fichier" });
   });
-});
-
-/** Un lot d’enregistrement d’écran, tel que /api/captures/lot le renvoie. */
-const lot = (autre: string, k0 = 0): Captures => ({
-  appli: "instagram",
-  autre,
-  captures: [{ numero: 1, place: 1, hors_sujet: false }],
-  blocs: [
-    {
-      repere: { date: "2026-09-08", heure: "21:40" },
-      messages: Array.from({ length: 15 }, (_, k) => ({ de: k % 2 ? ("moi" as const) : ("autre" as const), texte: `message ${k0 + k}`, media: null, coupe: false, reaction: null })),
-    },
-  ],
-  profil: [],
-  doutes: [],
 });
 
 describe("S-01 · lire des captures (le modèle payant) avant l’email", () => {
@@ -209,18 +190,18 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
   it("bêta fermée, sans compte : refusé", async () => {
     etat.fermee = true;
     etat.cookies.clear();
-    const r = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot("Léa")] }) }));
+    const r = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa")] }) }));
     expect(r.status).toBe(401);
   });
 
   it("un nom de l’autre démesuré est refusé ; un vrai enregistrement passe", async () => {
     etat.fermee = false;
     etat.cookies.set(SESSION, secretSession);
-    const enorme = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot("L".repeat(170_000))] }) }));
+    const enorme = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lotVideo("L".repeat(170_000))] }) }));
     expect(enorme.status).toBe(422);
-    const trop = { ...lot("Léa"), profil: Array.from({ length: 51 }, () => "x") };
+    const trop = { ...lotVideo("Léa"), profil: Array.from({ length: 51 }, () => "x") };
     expect((await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [trop] }) }))).status).toBe(422);
-    const bon = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot("Léa"), lot("Léa", 100)] }) }));
+    const bon = await postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa"), lotVideo("Léa", 100)] }) }));
     expect(bon.status).toBe(200);
     const { story } = (await bon.json()) as { story: { id: string } };
     await db().delete(schema.stories).where(eq(schema.stories.id, story.id));
@@ -337,17 +318,15 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   /* Une adresse IP fixe, propre à ce lancement : d’autres lancements dans l’heure ne la partagent pas */
   const ipFixe = (k: number) => `10.${n % 250}.${(n >> 8) % 250}.${240 + k}`;
 
-  beforeAll(() => {
-    vi.spyOn(console, "log").mockImplementation((...l: unknown[]) => void logs.push(l.join(" ")));
-  });
   beforeEach(async () => {
+    /* Les codes écrits dans les logs, relevés ; l’espion est rendu avant chaque test (restoreMocks, vitest.config.mts) */
+    vi.spyOn(console, "log").mockImplementation((...l: unknown[]) => void logs.push(l.join(" ")));
     etat.fermee = false;
     autreNavigateur();
     /* Le plafond des mails de code, pour tous : la base des tests le garde d’un lancement à l’autre */
     await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte("limite:code:mails")));
   });
   afterAll(async () => {
-    vi.mocked(console.log).mockRestore();
     await db().delete(schema.loginCodes).where(inArray(schema.loginCodes.email, emails));
     await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte("limite:code:mails")));
   });

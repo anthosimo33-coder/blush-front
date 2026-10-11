@@ -59,9 +59,18 @@ export default defineConfig({
           exclude: [...configDefaults.exclude, ...UNITAIRES],
           /*
            * La base des tests : DATABASE_URL_TEST (en CI, celle du service Postgres), ou blush_test en local. Un clone neuf
-           * ou la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, puis la migre (drizzle/).
+           * ou la CI n’ont rien à préparer à la main : tests/preparer-la-base.ts la crée si elle manque, la migre (drizzle/)
+           * et remet ses limites et ses compteurs à zéro.
            */
           globalSetup: ["tests/preparer-la-base.ts"],
+          /*
+           * Un fichier après l’autre : tous écrivent dans la même base, et certains la parcourent en entier (la purge des
+           * brouillons, les tâches bloquées du tableau de bord, les limites communes). Les espions (vi.spyOn) sont rendus
+           * avant chaque test, et ce que les fixtures créent est effacé à la fin du fichier (tests/aide/isolation.ts).
+           */
+          fileParallelism: false,
+          restoreMocks: true,
+          setupFiles: ["tests/aide/isolation.ts"],
         },
       },
     ],

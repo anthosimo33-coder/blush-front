@@ -48,7 +48,6 @@ describe("la bêta fermée, sans dire qui est invité", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     for (let k = 0; k < 4; k++) await inscrire(email, "accueil");
     expect(log.mock.calls.flat().filter((l) => String(l).includes(`pour ${email}`))).toHaveLength(3);
-    log.mockRestore();
     const lien = new URL(lienRetrait(hash));
     expect(await retirer(lien.searchParams.get("id")!, "pas-la-bonne-cle")).toBe(false);
     expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, hash))).toHaveLength(1);

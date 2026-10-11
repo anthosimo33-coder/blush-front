@@ -1,15 +1,11 @@
-import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { DonneesVerdict } from "@/server/analyse";
-import { executerChaine } from "@/server/analyse";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { definirQui, depuisFichier, importer, rattacherBrouillon, type Ligne } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import type { Ligne } from "@/server/histoires";
 import { arreterPartage, ErreurPartage, lienDe, masqueDe, masquerPrenoms, partager, verdictPartage } from "@/server/partages";
-import { planifier } from "@/server/taches";
+import { compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 describe("les prénoms dans ce qui se partage", () => {
   it("deviennent des initiales, sans toucher aux mots qui les contiennent", () => {
@@ -43,7 +39,6 @@ describe("les prénoms dans ce qui se partage", () => {
 });
 
 describe("le lien de partage du verdict", () => {
-  const email = `partage-${Date.now()}@blush.test`;
   let story: Ligne;
   const verdictDe = async () => dechiffrer<DonneesVerdict>((await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, story.id)))[0].data);
   const changerVerdict = async (f: (v: DonneesVerdict) => void) => {
@@ -53,19 +48,9 @@ describe("le lien de partage du verdict", () => {
   };
 
   beforeAll(async () => {
-    definirFactice(fournisseurFactice);
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-    const [u] = await db().insert(schema.users).values({ email }).returning();
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(imp.id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
-    await planifier(imp.id, "verdict");
-    await executerChaine(imp.id);
-    [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, imp.id));
+    const imp = await histoireLue(await compteDeTest("partage"), "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } });
+    story = await ligneEnBase(imp.id);
     await changerVerdict((v) => (v.sortie.sous_titre = "Sophie attend que tu parles, Hugo."));
-  });
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
-    definirFactice(null);
   });
 
   it("montre le verdict seul, le prénom de l’autre masqué (le tien en clair), et reste le même lien", async () => {

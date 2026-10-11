@@ -1,34 +1,18 @@
-import { readFileSync } from "node:fs";
 import { eq, inArray } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { executerChaine } from "@/server/analyse";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { Utilisateur } from "@/server/auth";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { convsDe } from "@/server/donnees";
-import { brouillonALaConnexion, definirQui, depuisFichier, histoireOuverte, histoiresDuCompte, importer as importerLu, metaDe, quiRempli, rattacherBrouillon, type Ligne } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { brouillonALaConnexion, definirQui, histoireOuverte, histoiresDuCompte, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { purger } from "@/server/purge";
-import { planifier } from "@/server/taches";
 import { jourRelatif } from "@/server/temps";
+import { compteDeTest, convImportee, convRattachee, histoireLue, ligneEnBase } from "./aide/fixtures";
 
-const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
-const importer = async (f: string) => importerLu(await depuisFichier(conv(f)));
-const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as Ligne;
 const jours = (n: number) => new Date(Date.now() - n * 86400e3);
 
-const emails = [`convs-${Date.now()}@blush.test`, `convs-autre-${Date.now()}@blush.test`];
-
-/** Une conv importée, rattachée au compte, puis lue (le verdict seul : le compte est gratuit). */
-async function lue(u: Utilisateur, f: string): Promise<string> {
-  const imp = await importer(f);
-  await rattacherBrouillon(u, imp.secret);
-  await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" });
-  await planifier(imp.id, "verdict");
-  await executerChaine(imp.id);
-  return imp.id;
-}
+/** Une conv importée, rattachée au compte, puis lue (le verdict seul : les comptes sont gratuits). */
+const lue = async (u: Utilisateur, f: string) => (await histoireLue(u, f)).id;
 
 describe("plusieurs convs par compte", () => {
   let u: Utilisateur;
@@ -40,21 +24,11 @@ describe("plusieurs convs par compte", () => {
   let ailleurs: string;
 
   beforeAll(async () => {
-    definirFactice(fournisseurFactice);
-    const [a, b] = await db()
-      .insert(schema.users)
-      .values(emails.map((email) => ({ email })))
-      .returning();
-    u = a;
+    u = await compteDeTest("convs");
     premiere = await lue(u, "01-a-deux-doigts.txt");
     seconde = await lue(u, "02-reciproque.txt");
-    const imp = await importer("03-elle-s-eloigne.txt");
-    jamaisLue = (await rattacherBrouillon(u, imp.secret))!;
-    ailleurs = await lue(b, "04-ghosting.txt");
-  });
-  afterAll(async () => {
-    await db().delete(schema.users).where(inArray(schema.users.email, emails));
-    definirFactice(null);
+    jamaisLue = (await convRattachee(u, "03-elle-s-eloigne.txt")).id;
+    ailleurs = await lue(await compteDeTest("convs-autre"), "04-ghosting.txt");
   });
 
   it("ouvre celle choisie dans la liste si elle est au compte, sinon la plus récente déjà lue", async () => {
@@ -67,7 +41,7 @@ describe("plusieurs convs par compte", () => {
   });
 
   it("le parcours d’import suit d’abord la conv en train d’être importée, le reste garde celle qu’on suit", async () => {
-    const imp = await importer("05-insiste-apres-un-non.txt");
+    const imp = await convImportee("05-insiste-apres-un-non.txt");
     expect((await histoireOuverte(u, { brouillon: imp.secret, choisie: premiere }, { parcours: true }))!.id).toBe(imp.id);
     expect((await histoireOuverte(u, { brouillon: imp.secret, choisie: premiere }))!.id).toBe(premiere);
     /* Sans compte : le brouillon, partout */
@@ -82,7 +56,7 @@ describe("plusieurs convs par compte", () => {
     expect((await histoiresDuCompte(u.id)).map((l) => l.id)).toEqual([seconde, premiere]);
     /* BLUSH a parlé de la première après l’arrivée de la seconde : elle remonte */
     await db().insert(schema.chatMessages).values({ storyId: premiere, role: "blush", data: chiffrer({ texte: "…" }) });
-    const convs = await convsDe(u, await ligne(premiere));
+    const convs = await convsDe(u, await ligneEnBase(premiere));
     expect(convs.map((c) => c.storyId)).toEqual([premiere, seconde]);
     expect(convs.map((c) => c.current)).toEqual([true, false]);
     for (const c of convs) {
@@ -105,7 +79,6 @@ describe("plusieurs convs par compte", () => {
 
 /* Le 8 octobre en prod : une conv importée puis laissée avant « Qui es-tu ? », une connexion, et une lecture qui échouait en boucle */
 describe("se connecter avec une conv laissée avant « Qui es-tu ? »", () => {
-  const comptes = [`connexion-suivi-${Date.now()}@blush.test`, `connexion-neuf-${Date.now()}@blush.test`];
   /** Suit déjà une conv lue. */
   let suivi: Utilisateur;
   /** N’en a encore lu aucune. */
@@ -113,22 +86,14 @@ describe("se connecter avec une conv laissée avant « Qui es-tu ? »", () => {
   let suivie: string;
 
   beforeAll(async () => {
-    definirFactice(fournisseurFactice);
-    [suivi, neuf] = await db()
-      .insert(schema.users)
-      .values(comptes.map((email) => ({ email })))
-      .returning();
+    [suivi, neuf] = [await compteDeTest("connexion-suivi"), await compteDeTest("connexion-neuf")];
     suivie = await lue(suivi, "01-a-deux-doigts.txt");
-  });
-  afterAll(async () => {
-    await db().delete(schema.users).where(inArray(schema.users.email, comptes));
-    definirFactice(null);
   });
 
   it("un compte qui suit déjà une conv la garde : le brouillon reste un brouillon, que l’import retrouve", async () => {
-    const imp = await importer("03-elle-s-eloigne.txt");
+    const imp = await convImportee("03-elle-s-eloigne.txt");
     expect(await brouillonALaConnexion(suivi, imp.secret)).toBeNull();
-    expect((await ligne(imp.id)).userId).toBeNull();
+    expect((await ligneEnBase(imp.id)).userId).toBeNull();
     /* L’accueil, le rapport, l’écran de lecture : la conv lue, déjà passée par « Qui es-tu ? » */
     const ouverte = (await histoireOuverte(suivi, { brouillon: imp.secret }))!;
     expect(ouverte.id).toBe(suivie);
@@ -139,17 +104,17 @@ describe("se connecter avec une conv laissée avant « Qui es-tu ? »", () => {
   });
 
   it("un compte sans conv lue reçoit le brouillon, qui s’ouvre en attendant « Qui es-tu ? » (la lecture renvoie à /qui)", async () => {
-    const imp = await importer("02-reciproque.txt");
+    const imp = await convImportee("02-reciproque.txt");
     const rattachee = await brouillonALaConnexion(neuf, imp.secret);
     expect(rattachee).toBe(imp.id);
-    expect((await ligne(imp.id)).userId).toBe(neuf.id);
+    expect((await ligneEnBase(imp.id)).userId).toBe(neuf.id);
     const ouverte = (await histoireOuverte(neuf, { choisie: rattachee! }))!;
     expect(ouverte.id).toBe(imp.id);
     expect(quiRempli(metaDe(ouverte))).toBe(false);
     /* Des captures : l’utilisateur est « Moi », mais le reste de « Qui es-tu ? » manque encore */
     expect(quiRempli({ ...metaDe(ouverte), moi: 0 })).toBe(false);
     await definirQui(imp.id, { moi: 1, pronom: "elle", devinette: "parle", objectif: "reciproque" });
-    expect(quiRempli(metaDe(await ligne(imp.id)))).toBe(true);
+    expect(quiRempli(metaDe(await ligneEnBase(imp.id)))).toBe(true);
   });
 
   it("sans brouillon, la connexion ne change rien", async () => {

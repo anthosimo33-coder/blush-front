@@ -1,18 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { gunzipSync } from "node:zlib";
-import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BLOC_HTML } from "@prompts/lib/instagram";
-import { executerChaine } from "@/server/analyse";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { definirQui, depuisFichier, depuisPaquet, importer, rattacherBrouillon, storyAffichee } from "@/server/histoires";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { depuisPaquet, importer, storyAffichee } from "@/server/histoires";
 import { purger } from "@/server/purge";
-import { planifier } from "@/server/taches";
 import { analyserExport, garderLaFin } from "@/services/preparer-export";
+import { lirePaquet } from "./aide/fichiers";
+import { compteDeTest, histoireLue } from "./aide/fixtures";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** Une très longue conv WhatsApp : des messages qui ne se compressent pas (du hasard), une ligne par message. */
@@ -30,7 +26,7 @@ describe("une conv trop longue pour partir", () => {
     const pret = await analyserExport(new File([texte], "WhatsApp Chat - Léa.txt", { type: "text/plain" }));
     if (pret.type !== "un") throw new Error("un seul fichier attendu");
     expect(pret.paquet.size).toBeLessThanOrEqual(4.2 * 1024 * 1024);
-    const p = JSON.parse(gunzipSync(Buffer.from(await pret.paquet.arrayBuffer())).toString("utf8")) as { coupe?: boolean; parties: { contenu: string }[] };
+    const p = await lirePaquet(pret.paquet);
     expect(p.coupe).toBe(true);
     const garde = p.parties[0].contenu;
     /* Coupée au début d’un message, et jusqu’au dernier */
@@ -50,8 +46,7 @@ describe("une conv trop longue pour partir", () => {
   it("une conv qui tient part en entier, sans rien dire", async () => {
     const pret = await analyserExport(new File([tresLongue(200)], "chat.txt", { type: "text/plain" }));
     if (pret.type !== "un") throw new Error("un seul fichier attendu");
-    const p = JSON.parse(gunzipSync(Buffer.from(await pret.paquet.arrayBuffer())).toString("utf8")) as { coupe?: boolean };
-    expect(p.coupe).toBeUndefined();
+    expect((await lirePaquet(pret.paquet)).coupe).toBeUndefined();
   });
 
   it("Instagram : les fichiers les plus anciens partent d’abord, puis les plus anciens messages du dernier gardé", () => {
@@ -78,25 +73,10 @@ describe("une conv trop longue pour partir", () => {
 });
 
 describe("la conv brute d’une histoire sans rapport", () => {
-  const email = `longue-${Date.now()}@blush.test`;
-  beforeAll(() => definirFactice(fournisseurFactice));
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
-    definirFactice(null);
-  });
-
   it("reste gardée jusqu’au déblocage ; celle d’un rapport écrit sans mémoire part au bout de 30 jours", async () => {
-    const [u] = await db().insert(schema.users).values({ email }).returning();
-    const lue = async (f: string) => {
-      const imp = await importer(await depuisFichier(new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" })));
-      await rattacherBrouillon(u, imp.secret);
-      await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" });
-      await planifier(imp.id, "verdict");
-      await executerChaine(imp.id);
-      return imp.id;
-    };
-    const sansRapport = await lue("02-reciproque.txt");
-    const rapportSansMemoire = await lue("03-elle-s-eloigne.txt");
+    const u = await compteDeTest("longue");
+    const sansRapport = (await histoireLue(u, "02-reciproque.txt")).id;
+    const rapportSansMemoire = (await histoireLue(u, "03-elle-s-eloigne.txt")).id;
     await db().insert(schema.reports).values({ storyId: rapportSansMemoire, data: chiffrer({ test: true }) });
     const vieux = new Date(Date.now() - 40 * 86400e3);
     await db().update(schema.stories).set({ createdAt: vieux }).where(eq(schema.stories.userId, u.id));

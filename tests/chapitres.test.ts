@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { cardsOf } from "@/app/rapport/verdict/cartes";
 import { chapitresAffiches, tempsDeLecture } from "@prompts/lib/front";
-import type { Rapport } from "@prompts/lib/schemas";
 import { CHAPITRES_OFFERTS, CHAPITRES_PAYANTS, estOffert, NB_CHAPITRES, PREMIER_PAYANT, titreDAttente } from "@/contenu/chapitres";
 import { lectureDe } from "@/server/analyse";
 import { mailRapport } from "@/server/mail-rapport";
 import type { ReportPayload } from "@/services/api";
 import type { Chapter } from "@/types";
+import { chapitre, rapport } from "./aide/fabriques";
 
 describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
   it("huit chapitres, le verdict offert, la lecture reprend au 2", () => {
@@ -47,8 +47,8 @@ describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
   });
 
   it("le sous-module des prompts ne marque « free » que les chapitres offerts", () => {
-    const rapport = { chapitres: Array.from({ length: NB_CHAPITRES }, (_, k) => ({ numero: k + 1, titre: "t", titre_court: "t", surtitre: null, blocs: [] })) } as unknown as Rapport;
-    expect(chapitresAffiches(rapport, new Map(), []).map((c) => c.free)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map(estOffert));
+    const huit = rapport(Array.from({ length: NB_CHAPITRES }, (_, k) => chapitre(k + 1)));
+    expect(chapitresAffiches(huit, new Map(), []).map((c) => c.free)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map(estOffert));
   });
 
   it("le temps de lecture offert ne compte que le chapitre 1, même quand un chapitre 2 est marqué « free »", () => {

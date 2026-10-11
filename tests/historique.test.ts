@@ -1,19 +1,13 @@
-import { readFileSync } from "node:fs";
-import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { historique } from "@/server/chat";
 import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { depuisFichier, importer, rattacherBrouillon } from "@/server/histoires";
+import { compteDeTest, convRattachee } from "./aide/fixtures";
 
 describe("l’historique du chat avec BLUSH", () => {
-  const email = `historique-${Date.now()}@blush.test`;
   let id = "";
   beforeAll(async () => {
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-    id = imp.id;
-    const [u] = await db().insert(schema.users).values({ email }).returning();
-    await rattacherBrouillon(u, imp.secret);
+    id = (await convRattachee(await compteDeTest("historique"), "01-a-deux-doigts.txt")).id;
     /* 50 échanges, gardés comme le fait le chat : ton message, puis la réponse de BLUSH */
     for (let k = 1; k <= 50; k++)
       await db()
@@ -22,9 +16,6 @@ describe("l’historique du chat avec BLUSH", () => {
           { storyId: id, role: "toi", data: chiffrer({ texte: `question ${k}` }) },
           { storyId: id, role: "blush", data: chiffrer({ reponse: { kind: "bubbles", bubbles: [{ text: `réponse ${k}` }] }, resume: `réponse ${k}` }) },
         ]);
-  });
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
   });
 
   it("donne les derniers échanges, et dit qu’il en reste de plus anciens", async () => {

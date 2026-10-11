@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { deflateSync, strToU8, zipSync } from "fflate";
 import { analyserExport, ExportIllisible, lireFichiers, preparerExport } from "@/services/preparer-export";
+import { lirePaquet } from "./aide/fichiers";
 
 const chat = "[12/09/2026 18:58:00] Léa: t’es dispo jeudi ?\n[12/09/2026 19:00:00] Malik: à demain alors 😊\n".repeat(2000);
 const fichier = (octets: Uint8Array, nom: string) => new File([octets as BlobPart], nom);
@@ -62,7 +62,10 @@ function zipVirtuel(entrees: Entree[]) {
     }
     return new Blob([sortie]);
   };
-  return { fichier: { name: "WhatsApp Chat - Léa.zip", size: pos, slice } as unknown as File, lu };
+  /* Un vrai fichier, vide, auquel on prête la taille du zip et ses octets à la demande */
+  const fichier = new File([], "WhatsApp Chat - Léa.zip");
+  Object.defineProperties(fichier, { size: { value: pos }, slice: { value: slice } });
+  return { fichier, lu };
 }
 
 describe("lire un export zippé dans le navigateur", () => {
@@ -79,7 +82,7 @@ describe("lire un export zippé dans le navigateur", () => {
   });
 
   /* Le chemin que prend vraiment l’import (uploadExport, src/services/api.ts) : analyserExport, puis le paquet envoyé */
-  const contenuDe = async (paquet: Blob) => (JSON.parse(gunzipSync(Buffer.from(await paquet.arrayBuffer())).toString("utf8")) as { parties: { nom: string; contenu: string }[] }).parties;
+  const contenuDe = async (paquet: Blob) => (await lirePaquet(paquet)).parties;
 
   it("à l’import, un export WhatsApp avec médias : seul _chat.txt part, le zip n’est jamais lu en entier", async () => {
     const { fichier: zip, lu } = zipVirtuel([
@@ -130,7 +133,7 @@ describe("lire un export zippé dans le navigateur", () => {
     const pret = await analyserExport(fichier(strToU8(texte), "WhatsApp Chat - Léa.txt"));
     if (pret.type !== "un") throw new Error("une conv attendue");
     expect(pret.paquet.size).toBeLessThanOrEqual(4.2 * 1024 * 1024);
-    const p = JSON.parse(gunzipSync(Buffer.from(await pret.paquet.arrayBuffer())).toString("utf8")) as { coupe?: boolean; parties: { contenu: string }[] };
+    const p = await lirePaquet(pret.paquet);
     expect(p.coupe).toBe(true);
     const garde = p.parties[0].contenu;
     expect(texte.endsWith(garde)).toBe(true);

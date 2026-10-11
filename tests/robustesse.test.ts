@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
@@ -9,54 +8,47 @@ import type { Requete } from "@prompts/lib/contextes";
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
-import { executerChaine, type DonneesVerdict } from "@/server/analyse";
+import type { DonneesVerdict } from "@/server/analyse";
 import { compteDe, preparerCode, prendreCode, type Utilisateur } from "@/server/auth";
 import { dechiffrer, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { rapportDe } from "@/server/donnees";
-import { definirQui, depuisFichier, depuisPaquet, ErreurImport, importer, rattacherBrouillon, type LigneComplete } from "@/server/histoires";
-import { definirFactice, REFUS_FACTICE } from "@/server/ia/claude";
+import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/histoires";
+import { REFUS_FACTICE } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier, prendre } from "@/server/taches";
+import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
-const emails = [`robuste-${Date.now()}@blush.test`, `robuste-code-${Date.now()}@blush.test`];
-const ligne = async (id: string) => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0] as LigneComplete;
-const conv = (f: string) => new File([readFileSync(`prompts/evals/convs/${f}`)], f, { type: "text/plain" });
 const lancerApres = async () => {
   while (apres.length) await apres.shift()!();
 };
 
-/* Le verdict factice, modifiable test par test (l’alerte, le mode sobre). Le modèle factice n’écrit pas de rapport sobre : on le fait refuser */
-let verdict: Record<string, unknown> = {};
-let refuserRapport = false;
-let u: Utilisateur;
-
-beforeAll(async () => {
-  definirFactice((req: Requete) => {
+/**
+ * Le modèle factice, avec un verdict changé (l’alerte, le mode sobre) ; le modèle factice n’écrit pas de rapport
+ * sobre : `refuserRapport` le fait refuser.
+ */
+const facticeAvec =
+  ({ verdict, refuserRapport = false }: { verdict: Record<string, unknown>; refuserRapport?: boolean }) =>
+  (req: Requete) => {
     if (refuserRapport && req.tache === "05-rapport") return REFUS_FACTICE;
-    const s = fournisseurFactice(req) as Record<string, unknown>;
-    return req.tache === "04-verdict" ? { ...s, ...verdict } : s;
-  });
-  [u] = await db().insert(schema.users).values({ email: emails[0] }).returning();
-});
-afterAll(async () => {
-  await db().delete(schema.users).where(inArray(schema.users.email, emails));
-  await db().delete(schema.loginCodes).where(eq(schema.loginCodes.email, emails[1]));
-  definirFactice(null);
+    const s = fournisseurFactice(req);
+    return req.tache === "04-verdict" && s && typeof s === "object" ? { ...s, ...verdict } : s;
+  };
+
+let u: Utilisateur;
+beforeAll(async () => {
+  u = await compteDeTest("robuste");
 });
 
-/** Une conv importée, rattachée au compte, « Qui es-tu ? » rempli, son verdict lu. */
-async function lue(f: string): Promise<string> {
-  const imp = await importer(await depuisFichier(conv(f)));
-  await rattacherBrouillon(u, imp.secret);
-  await definirQui(imp.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" });
-  await planifier(imp.id, "verdict");
-  await executerChaine(imp.id);
-  return imp.id;
-}
+/** Une conv importée, rattachée au compte gratuit du fichier (ou à `compte`), « Qui es-tu ? » rempli, son verdict lu. */
+const lue = async (f: string, compte = u) => (await histoireLue(compte, f)).id;
 
 describe("le code de connexion", () => {
-  const email = emails[1];
+  const email = `robuste-code-${Date.now()}@blush.test`;
+  afterAll(async () => {
+    await db().delete(schema.loginCodes).where(eq(schema.loginCodes.email, email));
+    await db().delete(schema.users).where(eq(schema.users.email, email));
+  });
   /* Un code neuf, dans un navigateur à lui (le jeton de son cookie) */
   const nouveauCode = async () => {
     const navigateur = jeton();
@@ -83,7 +75,6 @@ describe("le code de connexion", () => {
 
 describe("les tâches d’une histoire", () => {
   it("une étape planifiée deux fois en même temps n’existe qu’une fois", async () => {
-    verdict = {};
     const id = await lue("02-reciproque.txt");
     const [a, b] = await Promise.all([planifier(id, "rapport_plan"), planifier(id, "rapport_plan")]);
     expect(a).toBe(b);
@@ -114,18 +105,14 @@ describe("le mode sobre", () => {
   const plans = async (id: string) => db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
 
   it("n’existe pas sans alerte, même si le modèle le demande (un rejet : le rapport complet, payant)", async () => {
-    verdict = { mode_sobre: true, alerte: null };
-    const id = await lue("04-ghosting.txt");
+    const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: true, alerte: null } }), () => lue("04-ghosting.txt"));
     expect((await sortie(id)).mode_sobre).toBe(false);
     /* Compte gratuit : pas de rapport offert */
     expect(await plans(id)).toHaveLength(0);
   });
 
   it("suit toujours une alerte, même si le modèle l’oublie (le rapport doux, offert)", async () => {
-    verdict = { mode_sobre: false, alerte: "danger" };
-    refuserRapport = true;
-    const id = await lue("05-insiste-apres-un-non.txt");
-    refuserRapport = false;
+    const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: false, alerte: "danger" }, refuserRapport: true }), () => lue("05-insiste-apres-un-non.txt"));
     expect((await sortie(id)).mode_sobre).toBe(true);
     expect(await plans(id)).toHaveLength(1);
   });
@@ -133,18 +120,18 @@ describe("le mode sobre", () => {
 
 describe("l’accès donné après le verdict", () => {
   it("lance le rapport à l’ouverture, puis la mémoire, sans passer par « Débloquer »", async () => {
-    verdict = {};
-    const id = await lue("06-elle-hesite.txt");
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
-    const plus = { ...u, plan: "blushplus" as const };
-    const avant = await rapportDe(await ligne(id), plus);
+    /* Un compte à lui : son plan change pendant le test */
+    const gratuit = await compteDeTest("robuste-acces");
+    const id = await lue("06-elle-hesite.txt", gratuit);
+    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, gratuit.id));
+    const plus = { ...gratuit, plan: "blushplus" as const };
+    const avant = await rapportDe(await ligneEnBase(id), plus);
     expect(avant?.generating).toBe(true);
     await lancerApres();
     const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, id));
     expect(r?.data).not.toBeNull();
     const taches = await db().select({ kind: schema.tasks.kind, status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.storyId, id));
     expect(taches.find((t) => t.kind === "memoire")?.status).toBe("fini");
-    await db().update(schema.users).set({ plan: "gratuit" }).where(eq(schema.users.id, u.id));
   });
 });
 
