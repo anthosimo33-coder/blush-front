@@ -8,9 +8,6 @@ import { useEnVue, useHauteur } from "@/lib/hooks";
 import { marquerChatOuvert, useChatOuvert } from "@/components/chat/ouvert";
 import { PARLER_A_BLUSH, PASTILLE_REPRISE } from "./ancres";
 
-/* Le rapport le prend encore ici (ReportScreen.tsx) : il vit avec l’accueil qui le pose, dans src/components/chat/ouvert.ts */
-export { marquerChatOuvert };
-
 /** L’écart entre la bulle et la pastille « Reprendre ta lecture » qu’elle surmonte, sur mobile. */
 const ECART_PASTILLE = 20;
 

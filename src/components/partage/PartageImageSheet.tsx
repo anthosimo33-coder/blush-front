@@ -6,7 +6,7 @@ import { compterImagePartagee, imagePartage, type CibleImage } from "@/services/
 import { TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
-import { EnTete, PAPIER } from "./feuille";
+import { PAPIER } from "./feuille";
 
 /*
  * « Partager en image », depuis l’accueil (une réponse de BLUSH) comme depuis le rapport (la chute d’un chapitre) :
@@ -87,8 +87,7 @@ export function PartageImageSheet({ cible, onClose }: { cible: CibleImage | null
   };
 
   return (
-    <Sheet open={!!cible} onClose={fermer} labelledBy="image-titre">
-      <EnTete id="image-titre" titre="Partager en image" onClose={fermer} />
+    <Sheet open={!!cible} onClose={fermer} title="Partager en image" titleClose>
       <div className="relative mx-auto aspect-[1080/1920] h-[min(52dvh,460px)] overflow-hidden rounded-[22px] shadow-card" style={{ background: PAPIER }}>
         {pret ? (
           // eslint-disable-next-line @next/next/no-img-element -- l’image dessinée par le serveur, telle qu’elle partira

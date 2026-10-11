@@ -3,18 +3,15 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { hoteLocal } from "@/lib/hote-local";
 import { configDuChatLocal } from "@/server/drapeaux";
 import { lireCorps, memeOrigine } from "@/server/http";
+import { FIL_MAX, PAS_DE_REPONSE, TEXTE_MAX } from "./bornes";
 
 export const dynamic = "force-dynamic";
 
 /* `memoires` : le dossier des mémoires des convs de test (une par conv, `01.json`…) */
 type Config = { lanceur: string; cas: string; memoire: string; memoires?: string; cle: string; workspace?: string };
-
-/** Une question, et chaque message du fil, au plus : la limite d’un message du vrai chat (src/app/api/chat/route.ts). */
-const TEXTE_MAX = 4000;
-/** Le fil déjà échangé, au plus (celui qu’envoie l’aperçu : src/app/apercu/accueil/ApercuAccueil.tsx). */
-const FIL_MAX = 6;
 
 const Demande = z.object({
   text: z.string().trim().min(1).max(TEXTE_MAX),
@@ -24,36 +21,17 @@ const Demande = z.object({
     .default([]),
 });
 
-/** Les noms de ce poste : l’aperçu ne répond qu’à eux (next dev écoute sur 127.0.0.1, scripts/developper.mjs). */
-const HOTES_LOCAUX = new Set(["localhost", "127.0.0.1", "[::1]"]);
-
-/**
- * La requête vise-t-elle ce poste ? L’hôte qu’elle demande (Host, et X-Forwarded-Host s’il y en a un) doit en être un nom :
- * un appareil du Wi-Fi qui joint un next dev lancé sur toutes les interfaces (-H 0.0.0.0) demande l’adresse du poste
- * sur le réseau, et un site qui ferait pointer son domaine sur 127.0.0.1 (DNS rebinding) demande le sien.
- */
-function hoteLocal(req: Request): boolean {
-  const hotes = [req.headers.get("host"), req.headers.get("x-forwarded-host")].filter((h) => h !== null);
-  if (!hotes.length) return false;
-  return hotes.every((h) => {
-    try {
-      return HOTES_LOCAUX.has(new URL(`http://${h}`).hostname);
-    } catch {
-      return false;
-    }
-  });
-}
-
 /**
  * Hors de Vercel seulement (src/proxy.ts), et avec BLUSH_DEMANDER : pose une question au vrai chat (prompt 10), à partir
  * de la mémoire (prompt 07), via le lanceur des prompts. La config (des chemins, jamais la clé elle-même) est dans le
- * fichier BLUSH_DEMANDER. Ce poste seulement (hoteLocal), une question et un fil bornés (Demande) : 400 sinon.
+ * fichier BLUSH_DEMANDER. Ce poste seulement (le proxy le vérifie déjà pour tout /apercu : src/proxy.ts ; la route le
+ * revérifie, elle ne dépend pas du matcher), une question et un fil bornés (Demande, ./bornes.ts) : 400 sinon.
  */
 export async function POST(req: Request) {
   const chemin = configDuChatLocal();
   if (!chemin) return new Response(null, { status: 404 });
   /* Elle appelle le vrai modèle avec ta clé : une page d’un autre site ne doit pas pouvoir la déclencher */
-  if (!memeOrigine(req) || !hoteLocal(req)) return new Response(null, { status: 403 });
+  if (!memeOrigine(req) || !hoteLocal(req.headers)) return new Response(null, { status: 403 });
   const conf = JSON.parse(await readFile(chemin, "utf8")) as Config;
   /* Ta conv (?cas=perso, ou sans cas) : sa mémoire et son cas, gardés hors du projet. Une conv de test : sa mémoire, à la date de la conv. */
   const id = new URL(req.url).searchParams.get("cas");
@@ -80,7 +58,7 @@ export async function POST(req: Request) {
   const ligne = sortie.split("\n").find((l) => l.startsWith("@@BLUSH@@"));
   if (!ligne) {
     console.error(sortie.slice(-1500));
-    return Response.json({ kind: "bubbles", bubbles: [{ text: "j’ai pas réussi à te répondre, réessaie" }] });
+    return Response.json(PAS_DE_REPONSE);
   }
   return new Response(ligne.slice("@@BLUSH@@".length), { headers: { "content-type": "application/json" } });
 }

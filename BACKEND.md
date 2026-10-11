@@ -47,7 +47,7 @@ La garde commune (`garde`, `lecture`, `src/server/requete.ts`) vérifie ces poin
 | `/api/reveil` | GET | Le réveil : démarre une instance et réveille la base (`select 1`). Le navigateur l’appelle sans attendre, à chaque visite (`src/components/shell/Reveil.tsx`) : avec une session, elle la prolonge d’un mois, une fois par jour au plus (`prolongerSession`), et son cookie avec | aucune | `src/server/depot.ts`, `src/server/auth.ts` |
 | `/api/cron/purge` | GET | La purge de nuit (Vercel Cron, `vercel.json`) : les brouillons et les convs brutes qui ne servent plus, les sessions, les codes et les compteurs périmés, les inscriptions à la liste d’attente de plus d’un an ; puis le résumé de la veille à l’équipe | l’en-tête `Authorization: Bearer <CRON_SECRET>`, sinon 401 | `src/server/purge.ts`, `src/server/alertes.ts` |
 
-Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’à l’équipe : jamais sur Vercel, où `src/proxy.ts` sert à leur place la page introuvable, en 404 (comme pour `/styleguide`).
+Hors de `/api`, trois routes répondent sans page : `/ouvrir/[id]` (le lien du mail « ton rapport est prêt »), `/v/[id]/image` (l’image d’un verdict partagé) et `/v/[id]/essayer` (« Analyser ma conv » depuis un verdict partagé). Celles de `/apercu` ne servent qu’à l’équipe : jamais sur Vercel, où `src/proxy.ts` sert à leur place la page introuvable, en 404 (comme pour `/styleguide`), et ailleurs à ce poste seulement : une requête qui demande un autre hôte que `localhost`, `127.0.0.1`, `[::1]` ou un nom en `.localhost` reçoit la même page (`src/lib/hote-local.ts`, contre le DNS rebinding).
 
 ## Les tâches
 
@@ -170,7 +170,7 @@ cp .env.example .env.development.local   # une fois : la configuration de dev, f
 npm run dev
 ```
 
-`npm run dev` (`scripts/developper.mjs`) lit les fichiers `.env` comme `next dev`, crée la base `blush_dev` si elle manque (sans jamais l’effacer), y applique les migrations, puis lance `next dev`. Ce qu’on lui donne dans le shell l’emporte (`DATABASE_URL=postgres://localhost:5432/blush_dev_<nom> npm run dev`). Avec le modèle factice (`BLUSH_IA_FACTICE=1`), il refuse les clés d’API : une vraie clé ferait partir de vrais appels. Seul `next dev` lit `.env.development.local` : ni `npm run build`, ni les tests de bout en bout ne le voient.
+`npm run dev` (`scripts/developper.mjs`) lit les fichiers `.env` comme `next dev`, crée la base `blush_dev` si elle manque (sans jamais l’effacer), y applique les migrations, puis lance `next dev`, sur ce poste seulement (`127.0.0.1`). Pour un téléphone du réseau : `npm run dev -- -H 0.0.0.0`, sans `BLUSH_APERCU` ni `BLUSH_DEMANDER` (il refuse sinon : `/apercu` lit ta conv et appelle le vrai modèle, et l’hôte qu’une requête demande se falsifie). Ce qu’on lui donne dans le shell l’emporte (`DATABASE_URL=postgres://localhost:5432/blush_dev_<nom> npm run dev`). Avec le modèle factice (`BLUSH_IA_FACTICE=1`), il refuse les clés d’API : une vraie clé ferait partir de vrais appels. Seul `next dev` lit `.env.development.local` : ni `npm run build`, ni les tests de bout en bout ne le voient.
 
 En dev, le code de connexion s’affiche dans les logs du serveur.
 

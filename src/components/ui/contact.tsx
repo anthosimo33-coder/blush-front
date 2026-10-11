@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode, SVGProps } from "react";
+import type { ComponentPropsWithoutRef, ReactNode, Ref, SVGProps } from "react";
 import { scaleOf } from "@/contenu/niveaux";
 import { cn } from "@/lib/cn";
 import type { LevelId, Verdict } from "@/types";
@@ -11,8 +11,8 @@ import { Avatar } from "./Avatar";
  *
  * Pour un anneau qui s’anime (l’en-tête de l’accueil) : `ringProps` et `badgeProps` vont sur l’arc du niveau et sur le
  * badge (leurs data-*, les ancres d’animation), `enveloppe` entoure l’avatar (une ViewTransition, une ancre), `children`
- * ajoute un calque sous l’anneau (le halo), et le reste (className, data-*) va sur l’anneau entier. `fontSize` : celle de
- * l’initiale, sinon celle de l’Avatar.
+ * ajoute un calque sous l’anneau (le halo), `ref` et le reste (className, data-*) vont sur l’anneau entier. `fontSize` :
+ * celle de l’initiale, sinon celle de l’Avatar.
  */
 export function ContactRing({
   initial,
@@ -25,6 +25,7 @@ export function ContactRing({
   enveloppe = (avatar) => avatar,
   children,
   className,
+  ref,
   ...rest
 }: {
   initial: string;
@@ -37,11 +38,12 @@ export function ContactRing({
   enveloppe?: (avatar: ReactNode) => ReactNode;
   children?: ReactNode;
   className?: string;
+  ref?: Ref<HTMLSpanElement>;
 } & AttributsLibres) {
   const { levels, index } = level ? scaleOf(level) : { levels: [], index: -1 };
   const ring = 2 * Math.PI * 21;
   return (
-    <span aria-hidden="true" className={cn("relative flex shrink-0 items-center justify-center", className)} style={{ width: size, height: size }} {...rest}>
+    <span ref={ref} aria-hidden="true" className={cn("relative flex shrink-0 items-center justify-center", className)} style={{ width: size, height: size }} {...rest}>
       {children}
       <svg viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
         <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />

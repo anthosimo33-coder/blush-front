@@ -12,6 +12,7 @@ import { useRapport } from "@/lib/requetes";
 import { useSondage } from "@/lib/useSondage";
 import type { CibleImage, ReportPayload } from "@/types/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
+import { marquerChatOuvert } from "@/components/chat/ouvert";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
@@ -24,7 +25,7 @@ import type { Chapter, ChapterBlock, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
 import { ancreDuChapitre, chapitreDeLAncre, PARLER_A_BLUSH, PASTILLE_REPRISE, sectionDuChapitre, titreDuChapitre } from "./ancres";
-import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
+import { ChatBubble } from "./ChatBubble";
 import { EnTeteRapport } from "./EnTeteRapport";
 import { PartageEtConfidentialite } from "./PartageVerdict";
 import { ecritureInachevee, phaseDuRapport, type PhaseDuRapport } from "./phase";
@@ -36,7 +37,7 @@ import { VocalDuRapport } from "./Vocal";
 /* Ce qui ne sert pas à chaque lecture (le mode sobre, l’écriture en cours, « Partager en image ») est chargé à part, quand il sert */
 const SoberReport = dynamic(() => import("./SoberReport").then((m) => m.SoberReport));
 const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
-const PartageImageSheet = dynamic(() => import("./Partage").then((m) => m.PartageImageSheet), { ssr: false });
+const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImageSheet").then((m) => m.PartageImageSheet), { ssr: false });
 
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).

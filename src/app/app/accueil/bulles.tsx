@@ -7,7 +7,7 @@
  * envoyer : SendReply), « BLUSH écrit », une réponse coupée (Coupure) et un niveau franchi (LevelEvent). Le modèle
  * des lignes (jours, groupes, clés) est dans ./conv/modele.ts ; HomeScreen pose le fil et lui donne la conv.
  */
-import { createContext, memo, use, type ReactNode, type RefObject } from "react";
+import { createContext, memo, use, type RefObject } from "react";
 import { IlOuElle } from "@/lib/pronom";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
@@ -16,7 +16,7 @@ import { BubbleLogo } from "@/components/brand/objects3d";
 import { CopyPill } from "@/components/ui/controls";
 import { TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
-import { Bubble as MessageBubble, BlushTyping, Tag } from "@/components/ui/messages";
+import { BlushTyping, BULLE_DE_BLUSH, citation, coinsDeBulle, placeDansLeGroupe, Tag, type BulleDeBlush, type PlaceBulle } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/contenu/niveaux";
 import type { BlushAnswer, BulleChat, LevelId, Pronom } from "@/types";
@@ -94,14 +94,13 @@ export function FilDeLaConv({
 }
 
 /* ———— La conv ———— */
-type Pos = "single" | "first" | "middle" | "last";
 
 /**
  * Une bulle de la conv : `at` son heure (6 · glisse pour l’heure), `fresh` une réponse qui vient d’arriver (5 · elle se
  * déplie, `d` secondes après le début de son arrivée), `neuf` un message de cette visite (il fait son entrée ;
  * l’historique et la conv gardée sont déjà lus). `tape` : la bulle de « BLUSH écrit » qui tape encore (tapeEncore).
  */
-type Item = { key: string; node: BubbleNode; at: number | null; fresh: boolean; d: number; neuf: boolean; tape: boolean };
+type Item = { key: string; node: BulleDeBlush; at: number | null; fresh: boolean; d: number; neuf: boolean; tape: boolean };
 
 /** Un groupe de la conv (accueil/conv/modele.ts, rowsOf), habillé : les bulles de chacun de ses messages. */
 type GroupeAffiche = Omit<Extract<Row, { kind: "group" }>, "msgs"> & { items: Item[] };
@@ -114,7 +113,7 @@ type BubbleEnv = { nextStep: string; arriving: boolean; autre?: Pronom };
  * rien n’a changé n’est pas refait (Group). Un message n’est jamais modifié en place (la réponse remplace « BLUSH
  * écrit ») : il garde ses bulles tant que ce que bubblesOf lit autour de lui ne change pas (la clé).
  */
-const bullesGardees = new WeakMap<Msg, { cle: string; nodes: BubbleNode[] }>();
+const bullesGardees = new WeakMap<Msg, { cle: string; nodes: BulleDeBlush[] }>();
 
 function bullesDe(m: MsgABulles, env: BubbleEnv) {
   const cle = `${env.nextStep}|${env.autre ?? ""}|${m.type === "intro" && env.arriving}`;
@@ -213,7 +212,7 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
   return (
     <div data-row={row.key} data-group="" className="relative flex flex-col gap-[3px]">
       {bubbles.map((it, i) => {
-        const pos: Pos = n === 1 ? "single" : i === 0 ? "first" : i === n - 1 ? "last" : "middle";
+        const pos = placeDansLeGroupe(i, n);
         /* 5 · Une réponse qui vient d’arriver se déplie depuis l’avatar (son délai reste le même quand la suite arrive : rien ne rejoue) */
         const unfold = it.fresh ? it.d : null;
         /* 6 · L’heure de chaque bulle attend hors champ, à droite */
@@ -297,16 +296,13 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
   });
 }
 
-/** Une bulle : sa forme vient de sa place dans le groupe, son style de son contenu. `quote` : 7 · ce qu’on creuse en la glissant. */
-type BubbleNode = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string; quote?: string };
-
-function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "toi"; pos: Pos; node: BubbleNode; id: string; unfold?: number | null }) {
+/**
+ * Une bulle de la conv (src/components/ui/messages.tsx, BulleDeBlush) : ses coins viennent de sa place dans le groupe,
+ * son style de son contenu (`plain`, la bulle blanche de BLUSH). `quote` : 7 · ce qu’on creuse en la glissant.
+ */
+function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "toi"; pos: PlaceBulle; node: BulleDeBlush; id: string; unfold?: number | null }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
   const quote = side === "blush" ? node.quote : undefined;
-  const corners =
-    side === "blush"
-      ? { single: "", first: "rounded-bl-[6px]", middle: "rounded-l-[6px]", last: "rounded-tl-[6px]" }[pos]
-      : { single: "", first: "rounded-br-[6px]", middle: "rounded-r-[6px]", last: "rounded-tr-[6px]" }[pos];
   return (
     <div
       data-bubble={id}
@@ -314,9 +310,9 @@ function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "
       data-unfold={unfold !== null ? "" : undefined}
       style={unfold !== null ? delai(unfold) : undefined}
       className={cn(
-        "relative z-[1] flex max-w-[318px] flex-col rounded-[20px] text-left",
-        corners,
-        tone === "plain" && "bg-white px-4 py-3 text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]",
+        "relative z-[1]",
+        tone === "plain" ? BULLE_DE_BLUSH : "flex max-w-[318px] flex-col rounded-[20px] text-left",
+        coinsDeBulle(side, pos),
         tone === "accent" && "bg-[linear-gradient(180deg,#F3F8FF,#FFFFFF)] px-4 py-3.5 text-ink shadow-play",
         tone === "toi" && "max-w-[80%] bg-toi-ink px-4 py-2.5 text-white",
         tone === "bare" && "overflow-hidden",
@@ -341,16 +337,12 @@ function Words({ text }: { text: string }) {
 }
 
 /** Une bulle écrite de BLUSH, puis les messages qu’elle cite, comme dans un vrai fil. */
-function bulleEcrite(b: BulleChat): BubbleNode[] {
-  return [
-    { quote: b.text, body: <span className="text-[16px] font-bold leading-[1.4]">{b.text}</span> },
-    ...(b.messages ?? []).map((msg) => ({
-      className: "pb-2.5 pt-3",
-      quote: msg.text,
-      body: <ClampedBubble from={msg.from} caption={msg.caption} text={msg.text} limit={25} />,
-    })),
-  ];
+function bulleEcrite(b: BulleChat): BulleDeBlush[] {
+  return [{ quote: b.text, body: <span className="text-[16px] font-bold leading-[1.4]">{b.text}</span> }, ...citesPar(b)];
 }
+
+/** Les messages qu’une bulle de BLUSH cite : chacun dans sa bulle, repliée s’il est long (ClampedBubble). */
+const citesPar = (b: BulleChat) => (b.messages ?? []).map((msg) => citation(msg, <ClampedBubble from={msg.from} caption={msg.caption} text={msg.text} limit={25} />));
 
 /** Le vocal de la réponse se fait encore : sa bulle attend, à la taille du lecteur qui la remplacera. */
 function VocalEnCours() {
@@ -383,7 +375,7 @@ function Coupure({ reponse }: { reponse: number }) {
 }
 
 /** Les bulles d’un message, d’après son `type`. */
-function bubblesOf(m: MsgABulles, env: BubbleEnv): BubbleNode[] {
+function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
   switch (m.type) {
     case "intro":
       return m.intro === "next"
@@ -478,46 +470,26 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BubbleNode[] {
 }
 
 /** Les bulles d’une réponse de BLUSH. `shine` : elle vient d’arriver, sa meilleure réponse brille une fois. */
-function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BubbleNode[] {
+function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BulleDeBlush[] {
+  /* Le message qu’il a reçu, montré d’abord, et la réponse à lui envoyer : en vocal comme en bulles */
+  const recu = (r.incoming ?? []).map((msg) => citation(msg));
+  const aEnvoyer: BulleDeBlush[] = r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : [];
   /*
    * Une réponse dite en vocal : la bulle vocale à la place des bulles écrites ; les messages qu’elle cite et la réponse à
    * envoyer restent. Le vocal se fait encore : sa bulle attend, la réponse est déjà là
    */
   if (r.vocal || r.vocalEnCours)
     return [
-      ...(r.incoming ?? []).map(
-        (msg): BubbleNode => ({
-          className: "pb-2.5 pt-3",
-          quote: msg.text,
-          body: (
-            <MessageBubble from={msg.from} caption={msg.caption}>
-              {msg.text}
-            </MessageBubble>
-          ),
-        }),
-      ),
+      ...recu,
       { className: "py-2.5 pl-2.5 pr-3.5", quote: r.bubbles.map((b) => b.text).join(" "), body: r.vocal ? <VocalBlush vocal={r.vocal} /> : <VocalEnCours /> },
-      ...r.bubbles.flatMap((b) =>
-        (b.messages ?? []).map((msg) => ({ className: "pb-2.5 pt-3", quote: msg.text, body: <ClampedBubble from={msg.from} caption={msg.caption} text={msg.text} limit={25} /> })),
-      ),
-      ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
+      ...r.bubbles.flatMap(citesPar),
+      ...aEnvoyer,
     ];
   /* La réponse en bulles : chaque bulle, puis les messages qu’elle cite, comme dans un vrai fil */
   return [
-    /* Le message qu’il a reçu, montré d’abord */
-    ...(r.incoming ?? []).map(
-      (msg): BubbleNode => ({
-        className: "pb-2.5 pt-3",
-        quote: msg.text,
-        body: (
-          <MessageBubble from={msg.from} caption={msg.caption}>
-            {msg.text}
-          </MessageBubble>
-        ),
-      }),
-    ),
+    ...recu,
     ...r.bubbles.flatMap(bulleEcrite),
-    ...(r.send ? [{ quote: r.send.join("\n"), body: <SendReply lines={r.send} why={r.why} shine={shine} /> }] : []),
+    ...aEnvoyer,
     ...(r.ask ? [{ quote: r.ask, body: <span className="text-[16px] font-bold leading-[1.4]">{r.ask}</span> }] : []),
     ...(r.react ? [{ quote: r.react, body: <span className="text-[16px] font-bold leading-[1.4]">{r.react}</span> }] : []),
   ];

@@ -75,14 +75,15 @@ const COINS = {
 /** Les coins d’une bulle, d’après son côté et sa place dans le groupe. */
 export const coinsDeBulle = (cote: keyof typeof COINS, place: PlaceBulle) => COINS[cote][place];
 
-/** La bulle blanche de BLUSH : sa forme (318 px au plus), son fond et son filet. */
-const BULLE_DE_BLUSH = "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]";
+/** La bulle blanche de BLUSH : sa forme (318 px au plus), son fond et son filet. Aussi celle du fil de l’accueil (src/app/app/accueil/bulles.tsx). */
+export const BULLE_DE_BLUSH = "flex max-w-[318px] flex-col rounded-[20px] bg-white px-4 py-3 text-left text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.045),0_1px_2px_rgba(17,17,20,0.06)]";
 
 /**
  * Une bulle du fil de BLUSH, avant d’être posée : son contenu, son ton (`plain` la bulle blanche, `accent` le pas suivant,
- * `toi` ton message, `bare` une image), ses classes, et `quote`, le texte qu’on creuse en la glissant.
+ * `toi` ton message, `bare` une image), ses classes, et `quote`, le texte qu’on creuse en la glissant. Le fil de
+ * l’accueil les pose (src/app/app/accueil/bulles.tsx, BubbleShape).
  */
-type BulleDeBlush = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string; quote?: string };
+export type BulleDeBlush = { body: ReactNode; tone?: "plain" | "accent" | "toi" | "bare"; className?: string; quote?: string };
 
 /** Un vrai message de votre conv, cité par BLUSH. */
 type MessageCite = { from: "elle" | "toi"; caption?: string; text: string };

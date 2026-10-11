@@ -10,7 +10,9 @@
  * 4. puis `next dev`, avec les arguments donnés (npm run dev -- -p 3001), sur ce poste seulement (127.0.0.1) : next dev
  *    écoute sinon sur toutes les interfaces (0.0.0.0), et le Wi-Fi joindrait l’appli et les outils de l’équipe (/apercu,
  *    dont /apercu/demander, qui appelle le vrai modèle avec ta clé). Pour un téléphone du réseau, le dire soi-même :
- *    npm run dev -- -H 0.0.0.0.
+ *    npm run dev -- -H 0.0.0.0, et sans BLUSH_APERCU ni BLUSH_DEMANDER : le proxy ne sert /apercu qu’à une requête qui
+ *    demande ce poste (src/lib/hote-local.ts), mais l’hôte demandé se falsifie (curl -H 'Host: localhost'), donc ces
+ *    outils, qui lisent ta conv et appellent le vrai modèle, refusent d’écouter le réseau.
  */
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -45,6 +47,14 @@ const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "RESEND_API_KEY_CODES
 const trouvees = process.env.BLUSH_IA_FACTICE === "1" ? INTERDITES.filter((cle) => process.env[cle]) : [];
 if (trouvees.length) arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${trouvees.join(", ")} : de vrais appels partiraient. Retire-les, ou lance le vrai modèle avec BLUSH_IA_FACTICE=0`);
 
+/* Les outils de l’équipe ne s’ouvrent pas au réseau (voir l’en-tête, 4.) : refusé avant de toucher à la base. L’hôte donné : -H, --hostname ou --hostname= */
+const args = process.argv.slice(2);
+const hoteDonne = args.flatMap((a, i) => (a === "-H" || a === "--hostname" ? [args[i + 1] ?? ""] : a.startsWith("--hostname=") ? [a.slice("--hostname=".length)] : []));
+const LOCAUX = ["127.0.0.1", "localhost", "::1", "[::1]"];
+const outils = ["BLUSH_APERCU", "BLUSH_DEMANDER"].filter((v) => process.env[v]);
+if (outils.length && hoteDonne.some((h) => !LOCAUX.includes(h)))
+  arreter(`le réseau joindrait /apercu (${outils.join(", ")}), et l’hôte qu’une requête demande se falsifie : retire ${outils.join(" et ")} pour tester sur un téléphone`);
+
 /* 3. La base : créée si elle manque, jamais effacée, puis migrée. Seulement sur ce poste : une base distante reste telle quelle */
 const url = new URL(process.env.DATABASE_URL);
 const nom = decodeURIComponent(url.pathname.slice(1));
@@ -75,8 +85,7 @@ if (estLocale(url.href)) {
 } else console.log(`base ${nom} sur ${url.host} : ni créée ni migrée ici (npm run db:migrer)`);
 
 /* 4. next dev, avec l’environnement du shell et les valeurs par défaut (les fichiers .env, il les lit lui-même), sur 127.0.0.1 sauf -H donné */
-const args = process.argv.slice(2);
-const hote = args.some((a) => a === "-H" || a === "--hostname" || a.startsWith("--hostname=")) ? [] : ["-H", "127.0.0.1"];
+const hote = hoteDonne.length ? [] : ["-H", "127.0.0.1"];
 const next = spawn(process.execPath, [join(RACINE, "node_modules/next/dist/bin/next"), "dev", ...hote, ...args], {
   cwd: RACINE,
   env: { ...shell, ...parDefaut },

@@ -64,7 +64,7 @@ export function useIdees(cle: string | undefined, toutes: string[]) {
 
 /**
  * Les envois de la barre de saisie, aux noms de ses props (accueil/Composer.tsx) : `about`, le point creusé, et `dig`
- * pour en creuser un. `conv` : la conv de l’accueil ; `flightRef`, le vol de ta bulle (accueil/mouvement/vol.ts) ;
+ * pour en creuser un. `conv` : la conv de l’accueil (ce qu’en lisent les envois) ; `flightRef`, le vol de ta bulle (accueil/mouvement/vol.ts) ;
  * `input`, le champ (ton texte s’envole de là).
  */
 export function useEnvois({
@@ -74,8 +74,8 @@ export function useEnvois({
   flightRef,
   input,
 }: {
-  conv: ReturnType<typeof useConversation>;
-  idees: ReturnType<typeof useIdees>;
+  conv: Pick<ReturnType<typeof useConversation>, "msgs" | "modeVocal" | "envoyer" | "direMot">;
+  idees: Pick<ReturnType<typeof useIdees>, "poser">;
   envoyer?: Envoyer;
   flightRef: RefObject<Flight | null>;
   input: RefObject<HTMLInputElement | null>;

@@ -12,6 +12,7 @@ import { createContext, use, useId, ViewTransition, type ReactNode, type Ref } f
 import { cn } from "@/lib/cn";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
+import { ContactRing } from "@/components/ui/contact";
 import { Icon } from "@/components/ui/icons";
 import { scaleOf } from "@/components/ui/progress";
 import type { ConvSummary } from "@/types";
@@ -115,16 +116,7 @@ export function SophieButton({
 }) {
   const { report, fiche, ficheHref = "/app/fiche" } = contact;
   const { levels, index: idx, temperature } = scaleOf(report.level);
-  const share = (idx + 1) / levels.length;
-  const ring = 2 * Math.PI * 21;
   const where = temperature ? levels[idx].label : `niveau ${idx + 1} sur ${levels.length}`;
-  const avatar = (
-    <span ref={avatarRef} data-a="av" className="block rounded-full">
-      <Avatar tone="elle" size={36} fontSize={15}>
-        {fiche.person.initial}
-      </Avatar>
-    </span>
-  );
   return (
     <Link
       href={ficheHref}
@@ -133,29 +125,36 @@ export function SophieButton({
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
       className="group pointer-events-auto flex flex-col items-center gap-1 text-ink no-underline"
     >
-      <span ref={anneauRef} data-c="so" className="relative flex size-12 items-center justify-center transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95">
+      {/* L’anneau d’un contact (src/components/ui/contact.tsx), avec les ancres de ses animations */}
+      <ContactRing
+        ref={anneauRef}
+        initial={fiche.person.initial}
+        level={report.level}
+        emoji={report.verdict.emoji}
+        size={48}
+        fontSize={15}
+        data-c="so"
+        className="transition-[scale] duration-300 [transition-timing-function:var(--ease-pop)] group-active:scale-95"
+        ringProps={{ "data-a": "ring", "data-ring-fill": "" }}
+        badgeProps={{ "data-badge": "", "data-a": "badge" }}
+        enveloppe={(avatar) => {
+          const vu = (
+            <span ref={avatarRef} data-a="av" className="block rounded-full">
+              {avatar}
+            </span>
+          );
+          return shared ? (
+            <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
+              {vu}
+            </ViewTransition>
+          ) : (
+            vu
+          );
+        }}
+      >
         {/* 11 · Le halo vert quand un niveau tombe (un calque à part : il s’anime sur le compositeur) */}
         <span aria-hidden="true" data-glow-ring="" className="pointer-events-none absolute -inset-1 rounded-full opacity-0 shadow-[0_0_14px_3px_rgba(18,192,138,0.7)]" />
-        <svg aria-hidden="true" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90">
-          <circle cx="24" cy="24" r="21" fill="none" stroke="#E6E3DC" strokeWidth="3.5" />
-          <circle data-a="ring" data-ring-fill="" cx="24" cy="24" r="21" fill="none" stroke="#12C08A" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${ring * share} ${ring}`} />
-        </svg>
-        {shared ? (
-          <ViewTransition name="sophie-avatar" share={{ "nav-forward": "avatar-morph", default: "none" }} default="none">
-            {avatar}
-          </ViewTransition>
-        ) : (
-          avatar
-        )}
-        <span
-          aria-hidden="true"
-          data-badge=""
-          data-a="badge"
-          className="absolute -bottom-1 -right-1.5 flex size-[22px] items-center justify-center rounded-full bg-white text-[12px] leading-none shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_3px_8px_-3px_rgba(17,17,20,0.35)]"
-        >
-          {report.verdict.emoji}
-        </span>
-      </span>
+      </ContactRing>
       <span data-c="nm" data-a="nm" className="text-[12px] font-black leading-none">
         {fiche.person.name}
       </span>

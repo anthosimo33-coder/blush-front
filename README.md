@@ -8,10 +8,10 @@ nvm use                                   # Node 24, celui de Vercel (.nvmrc)
 git submodule update --init               # les prompts (dépôt privé blush-prompts) : sans eux, npm run dev s’arrête
 npm install
 cp .env.example .env.development.local   # une fois : la configuration de dev, fictive
-npm run dev                               # http://localhost:3000 (crée et migre la base blush_dev au besoin)
+npm run dev                               # http://localhost:3000, ce poste seulement (crée et migre la base blush_dev au besoin)
 ```
 
-Le code de connexion s’affiche dans le terminal (pas de Resend en local). Avec `BLUSH_ACCES_LIBRE=*` (le réglage de `.env.example`), chaque compte a BLUSH+ : pour voir l’appli d’un compte gratuit, enlever la ligne ou la limiter à quelques emails.
+Le code de connexion s’affiche dans le terminal (pas de Resend en local). Pour un téléphone du réseau : `npm run dev -- -H 0.0.0.0`, sans `BLUSH_APERCU` ni `BLUSH_DEMANDER` (BACKEND.md, « En local »). Avec `BLUSH_ACCES_LIBRE=*` (le réglage de `.env.example`), chaque compte a BLUSH+ : pour voir l’appli d’un compte gratuit, enlever la ligne ou la limiter à quelques emails.
 
 ## Développer, vérifier, mettre en ligne
 

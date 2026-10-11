@@ -74,7 +74,7 @@ export function HomeScreen(p: {
   /** Back-end : l’heure du rendu serveur de la page (heureDuRendu). L’historique qu’elle vient de rendre n’est pas relu à l’ouverture. */
   rendu?: number;
 }) {
-  const { contact, storyId: cle, others = [] } = p;
+  const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
   const page = useRef<HTMLDivElement>(null);
   const thread = useRef<HTMLDivElement>(null);
@@ -98,14 +98,14 @@ export function HomeScreen(p: {
   /* La conv à l’écran : où elle se pose, ce qu’elle garde entre deux changements, le vol d’une bulle (accueil/mouvement/defilement.ts) */
   const defilement = useDefilement(thread);
   const { flightRef } = defilement;
-  const idees = useIdees(cle, p.quick ?? []);
+  const idees = useIdees(cle, quick);
 
   /* La conv elle-même (accueil/conv/useConversation.ts). L’accueil l’habille : ce que fait l’écran pendant qu’elle change, c’est sa scène */
   const conv = useConversation({
     cle,
     introAt: p.introAt,
-    script: p.script ?? [],
-    plusAnciens: p.plusAnciens ?? false,
+    script,
+    plusAnciens,
     modeVocalInitial: p.modeVocalInitial,
     rendu: p.rendu,
     scene: {
@@ -128,10 +128,10 @@ export function HomeScreen(p: {
       },
     },
   });
-  const { dig, ...envois } = useEnvois({ conv, idees, envoyer: p.envoyer, flightRef, input });
+  const { dig, ...envois } = useEnvois({ conv, idees, envoyer, flightRef, input });
   const opened = useSyncExternalStore(noSubscription, readOpenedAt, () => null);
   /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie), et une seule fois depuis l’ouverture de l’appli */
-  const arriving = useArrivee(p.arrive ?? false, page);
+  const arriving = useArrivee(arrive, page);
   const live = useMemo(() => ({ ...contact, report: { ...contact.report, level } }), [contact, level]);
   const moving = useMemo(() => ({ arriving }), [arriving]);
 
@@ -174,7 +174,7 @@ export function HomeScreen(p: {
           desktopTopPad={0}
           ref={page}
           className={cn(figtree.variable, arriving && "home-arrive")}
-          mobileTop={<EnTeteMobile headRef={head} fromReport={p.fromReport ?? false} {...barre} />}
+          mobileTop={<EnTeteMobile headRef={head} fromReport={fromReport} {...barre} />}
         >
           <h1 className="sr-only">Ta conv avec BLUSH</h1>
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
@@ -198,7 +198,7 @@ export function HomeScreen(p: {
               inputRef={input}
               quick={idees.quick}
               entree={idees.entree}
-              ideesMasquees={p.ideesMasquees ?? false}
+              ideesMasquees={ideesMasquees}
               modeVocal={conv.modeVocal}
               onEcrit={() => void conv.repasserAEcrit()}
               busy={conv.occupe}

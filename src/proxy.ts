@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { hoteLocal } from "@/lib/hote-local";
 import { NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
@@ -28,7 +29,9 @@ const connecte = (request: NextRequest) => NOMS_DE_SESSION.some((nom) => request
 /**
  * Les outils de l’équipe : les aperçus (/apercu, des données fictives ou des rapports locaux) et le design system. Ils
  * n’existent pas sur Vercel (src/server/drapeaux.ts, outilsDeLEquipe) : ce proxy y sert à leur place une adresse sans
- * page, donc la page introuvable de BLUSH (src/app/not-found.tsx), en 404.
+ * page, donc la page introuvable de BLUSH (src/app/not-found.tsx), en 404. Ailleurs, de même pour une requête qui ne
+ * demande pas ce poste (src/lib/hote-local.ts) : un site qui fait pointer son domaine sur 127.0.0.1 ne lit pas tes
+ * aperçus depuis ton navigateur, et ne lance pas /apercu/demander.
  */
 const estUnOutil = (chemin: string) => /^\/(apercu|styleguide)(\/|$)/.test(chemin);
 /** Aucune page à cette adresse, hors du matcher (tests/proxy.test.ts le vérifie) : Next y répond par sa page introuvable. */
@@ -36,7 +39,7 @@ const INTROUVABLE = "/introuvable";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (estUnOutil(pathname)) return outilsDeLEquipe() ? NextResponse.next() : NextResponse.rewrite(new URL(INTROUVABLE, request.url));
+  if (estUnOutil(pathname)) return outilsDeLEquipe() && hoteLocal(request.headers) ? NextResponse.next() : NextResponse.rewrite(new URL(INTROUVABLE, request.url));
   const variante = VARIANTES[pathname];
   if (!variante || !betaFermee()) return NextResponse.next();
   /* Déjà connecté (une autre conv) : /commencer sans la liste d’attente (next.config.ts sert alors /commencer/connecte) */

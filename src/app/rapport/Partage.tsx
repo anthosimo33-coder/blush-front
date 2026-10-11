@@ -11,16 +11,13 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { LienDiscret } from "@/components/ui/NotePrivee";
 import { Sheet } from "@/components/ui/surfaces";
 import { FEUILLE_CONFIDENTIALITE as F } from "@/contenu/confidentialite";
-import { EnTete, PAPIER } from "@/components/partage/feuille";
+import { PAPIER } from "@/components/partage/feuille";
 
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
  * le prénom de l’autre masqué (le tien reste) : jamais un message, jamais un chapitre. Textes relus le 8 octobre (voix de BLUSH).
  * Les feuilles seulement : le bouton du rapport (PartageVerdict.tsx) les charge à sa première ouverture.
  */
-
-/* « Partager en image » sert aussi à l’accueil : il vit dans src/components/partage, le rapport le charge encore d’ici (ReportScreen.tsx) */
-export { PartageImageSheet } from "@/components/partage/PartageImageSheet";
 
 /* Les logos de WhatsApp et de Messages, reconnaissables d’un coup d’œil (les icônes au trait se ressemblent trop) */
 function GlypheWhatsApp() {
@@ -157,8 +154,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
   };
 
   return (
-    <Sheet open={open} onClose={onClose} labelledBy="partage-titre">
-      <EnTete id="partage-titre" titre="Partager ton verdict" onClose={onClose} />
+    <Sheet open={open} onClose={onClose} title="Partager ton verdict" titleClose>
 
       {/* L’aperçu du lien, comme dans une conv : la carte, puis le titre et le site */}
       <figure className="m-0 overflow-hidden rounded-[22px] bg-white shadow-card">
@@ -243,8 +239,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
 export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ligne = "items-start [&>span:first-child]:mt-0.5";
   return (
-    <Sheet open={open} onClose={onClose} labelledBy="confidentialite-titre">
-      <EnTete id="confidentialite-titre" titre={F.titre} onClose={onClose} />
+    <Sheet open={open} onClose={onClose} title={F.titre} titleClose>
       <InsetGroup>
         <InsetRow leading={<RowIcon icon="lock" tone="vrai" />} title={F.chiffree.titre} sub={F.chiffree.detail} className={ligne} />
         <InsetRow leading={<RowIcon icon="trash" />} title={F.effacee.titre} sub={F.effacee.detail} className={ligne} />
