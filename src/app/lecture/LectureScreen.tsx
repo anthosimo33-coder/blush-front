@@ -10,8 +10,8 @@ import { play } from "@/lib/sound";
 import { READING_STEPS } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { DoneCheck } from "@/components/ui/feedback";
 import { TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import { useSuiviLecture } from "./suivi";
 
@@ -91,17 +91,15 @@ export function LectureScreen({ total }: { total: number }) {
                   );
                 }}
               >
-                {enRoute ? <TypingDots color="#FFFFFF" label="Ton verdict arrive" /> : "Voir mon rapport"}
+                {enRoute ? <TypingDots color="currentColor" label="Ton verdict arrive" /> : "Voir mon rapport"}
               </ButtonLink>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="flex items-center gap-2 text-[15px] font-black">
+              <div className="flex items-center gap-2 text-detail font-black">
                 <span className="flex size-5 shrink-0 items-center justify-center" aria-hidden="true">
                   {p.done ? (
-                    <span data-popin="" className="flex size-5 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
-                      <Icon name="check" size={11} color="#FFFFFF" stroke={3.4} />
-                    </span>
+                    <DoneCheck size={20} data-popin="" />
                   ) : (
                     <TypingDots size={5} />
                   )}
@@ -111,7 +109,7 @@ export function LectureScreen({ total }: { total: number }) {
                   <span className="sr-only">{p.done ? "\u00a0: fait" : "\u00a0: en cours"}</span>
                 </span>
               </div>
-              <p className={cn("m-0 text-[13px] font-extrabold text-grey", p.done && "invisible")}>Ça prend environ 40 secondes</p>
+              <p className={cn("m-0 text-legende font-extrabold text-grey", p.done && "invisible")}>Ça prend environ 40 secondes</p>
             </div>
           )}
         </div>
@@ -127,7 +125,7 @@ export function LectureScreen({ total }: { total: number }) {
         <div className="relative flex h-[150px] w-[300px] items-center justify-center">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]"
+            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
           />
           {done ? (
             <div data-float="">
@@ -141,30 +139,30 @@ export function LectureScreen({ total }: { total: number }) {
         {failed && raison === "refus" ? (
           /* Texte relu le 8 octobre */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
-            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
-            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+            <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
+            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">
               L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu{NBSP}: tu peux en essayer une autre.
             </p>
           </div>
         ) : failed && raison === "souffle" ? (
           /* Le budget de l’IA du jour : rien à relancer, la lecture repart quand on revient après minuit */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
-            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">{SOUFFLE}</h1>
+            <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">{SOUFFLE}</h1>
             {/* TODO(produit): phrase à valider */}
-            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Ta conv est bien là{NBSP}: la lecture reprendra quand tu reviendras.</p>
+            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">Ta conv est bien là{NBSP}: la lecture reprendra quand tu reviendras.</p>
           </div>
         ) : failed ? (
           /* Texte relu le 8 octobre */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
-            <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
+            <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
               Ça a coincé de notre côté.
               <br />
               Ta conv est bien là.
             </h1>
-            {trop && <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain{NBSP}: ta conv t’attend.</p>}
+            {trop && <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain{NBSP}: ta conv t’attend.</p>}
           </div>
         ) : (
-          <h1 className="m-0 mt-5 text-[30px] font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
+          <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">
             {/* Trois lignes sur mobile, deux sur desktop : les coupures ne tombent jamais au milieu d’une idée */}
             BLUSH analyse tes
             <br className="lg:hidden" /> <span className="tabular-nums">{done ? total : <Compteur cible={p.messagesRead} reduced={reduced} />}</span> messages,
@@ -195,12 +193,12 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
       <svg aria-hidden="true" viewBox="0 0 150 150" className="absolute inset-0 size-full">
         <defs>
           <linearGradient id="lecture-ring-a" gradientUnits="userSpaceOnUse" x1="75" y1="3" x2="75" y2="147">
-            <stop offset="0" stopColor="#3D8BFF" />
-            <stop offset="1" stopColor="#FF4F9A" />
+            <stop offset="0" style={{ stopColor: "var(--toi)" }} />
+            <stop offset="1" style={{ stopColor: "var(--elle)" }} />
           </linearGradient>
           <linearGradient id="lecture-ring-b" gradientUnits="userSpaceOnUse" x1="75" y1="147" x2="75" y2="3">
-            <stop offset="0" stopColor="#FF4F9A" />
-            <stop offset="1" stopColor="#12C08A" />
+            <stop offset="0" style={{ stopColor: "var(--elle)" }} />
+            <stop offset="1" style={{ stopColor: "var(--vrai)" }} />
           </linearGradient>
         </defs>
         <circle cx="75" cy="75" r="72" fill="none" stroke="rgba(17,17,20,0.07)" strokeWidth="4" />
@@ -230,11 +228,13 @@ function ReadingDial({ progress, leaving }: { progress: number; leaving: boolean
   );
 }
 
+type Sticker = { color: string; rotate: number };
+
 /* Les autocollants, dans l’ordre des découvertes : elle (rose), un mot à vous (bleu), le moment (vert). */
-const STICKERS = [
-  { color: "#FF4F9A", rotate: -2 },
-  { color: "#3D8BFF", rotate: 1.5 },
-  { color: "#12C08A", rotate: -1 },
+const STICKERS: [Sticker, ...Sticker[]] = [
+  { color: "var(--elle)", rotate: -2 },
+  { color: "var(--toi)", rotate: 1.5 },
+  { color: "var(--vrai)", rotate: -1 },
 ];
 
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
@@ -243,13 +243,13 @@ function Discoveries({ items, className }: { items: string[]; className?: string
     /* La place de deux lignes, réservée d’avance : le bloc centré ne remonte pas quand les découvertes passent à la ligne */
     <ul className={cn("m-0 flex min-h-[78px] list-none flex-wrap content-start justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">
       {items.map((text, i) => {
-        const d = STICKERS[i % STICKERS.length];
+        const d = STICKERS[i % STICKERS.length] ?? STICKERS[0];
         return (
           <li
             key={text}
             data-popin=""
             /* Une trouvaille longue passe sur deux lignes plutôt que de déborder sur un petit écran */
-            className="inline-flex min-h-[34px] max-w-full items-center gap-[7px] rounded-[17px] bg-white px-3 py-[7px] text-left text-[13px] font-black leading-[1.25] shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
+            className="inline-flex min-h-[34px] max-w-full items-center gap-[7px] rounded-[17px] bg-white px-3 py-[7px] text-left text-legende font-black leading-[1.25] shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_8px_18px_-8px_rgba(17,17,20,0.22)]"
             style={{ "--r": `${d.rotate}deg`, ...delai(i * 0.08), transform: `rotate(${d.rotate}deg)` }}
           >
             <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: d.color }} />

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { heureDuRendu } from "@/lib/rendu";
 import { redirect } from "next/navigation";
 import { getStory, sansHistoire } from "@/services/serveur";
@@ -15,7 +15,7 @@ export default async function Page() {
    * Les gardes sont dans layout.tsx (une vraie 307) : celle-ci ne sert qu’au type, et à une navigation qui ne rejoue pas
    * le layout (la même page, d’autres paramètres)
    */
-  if (!story) redirect(await sansHistoire("/lecture"));
+  if (!story) redirect((await sansHistoire("/lecture")) as Route);
   return (
     <PageDeConv rendu={rendu}>
       <LectureScreen total={story.totalMessages} />

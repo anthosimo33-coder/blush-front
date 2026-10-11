@@ -9,8 +9,8 @@ import { messageErreur } from "@/lib/messages-erreur";
 import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
-import { TypingDots } from "@/components/ui/FileInput";
 import { ChoiceTile, RadioGroup, SelectedCheck, type TileTone } from "@/components/ui/controls";
+import { Alert } from "@/components/ui/feedback";
 import type { IconName } from "@/components/ui/icons";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
@@ -99,12 +99,12 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       footer={
         <>
           {problem && (
-            <p role="alert" className="m-0 mb-3 rounded-[16px] bg-white px-4 py-3 text-center text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
+            <Alert variant="carte" className="mb-3 text-center">
               {problem}
-            </p>
+            </Alert>
           )}
-          <Button arrow={!busy} disabled={!ready || busy} aria-busy={busy} onClick={next}>
-            {busy ? <TypingDots color="#FFFFFF" label="BLUSH commence la lecture" /> : connecte ? "Lancer la lecture" : "Continuer"}
+          <Button arrow disabled={!ready || busy} loading={busy} loadingLabel="BLUSH commence la lecture" onClick={() => void next()}>
+            {connecte ? "Lancer la lecture" : "Continuer"}
           </Button>
         </>
       }
@@ -113,14 +113,14 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       {captures ? (
         /* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
         <label className="flex flex-col gap-2">
-          <span className="text-[13px] font-black text-grey">Ton prénom (sur tes captures avec {people[1].name}, tu es à droite)</span>
+          <span className="text-legende font-black text-grey">Ton prénom (sur tes captures avec {people[1].name}, tu es à droite)</span>
           <input
             value={j.prenom}
             onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}
             autoComplete="given-name"
             maxLength={PRENOM_MAX}
             placeholder="Ton prénom"
-            className="h-[60px] rounded-field bg-white px-[18px] text-[17px] font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_#121214]"
+            className="h-[60px] rounded-field bg-white px-[18px] text-accent font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_var(--ink)]"
           />
         </label>
       ) : (
@@ -150,8 +150,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
               <Avatar tone={tone} size={58} fontSize={24} className="lift-pop">
                 {p.initial}
               </Avatar>
-              <span className="text-[18px] font-black">{p.name}</span>
-              {me && <span className="absolute inset-x-0 bottom-3.5 text-center text-[12px] font-extrabold text-grey">c’est moi</span>}
+              <span className="text-carte font-black">{p.name}</span>
+              {me && <span className="absolute inset-x-0 bottom-3.5 text-center text-micro font-extrabold text-grey">c’est moi</span>}
             </button>
           );
         })}
@@ -159,7 +159,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       )}
 
       {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. Absent des maquettes, relu le 8 octobre */}
-      <div id={titres.pronom} className="text-[13px] font-black text-grey">
+      <div id={titres.pronom} className="text-legende font-black text-grey">
         Tu es
       </div>
       <RadioGroup labelledBy={titres.pronom} className="flex gap-2.5">
@@ -167,7 +167,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
         <ChoiceTile icon="user" tone="elle" label="Une fille" selected={j.pronom === "elle"} onClick={() => set({ pronom: "elle" })} />
       </RadioGroup>
 
-      <div id={titres.guess} className="text-[13px] font-black text-grey">
+      <div id={titres.guess} className="text-legende font-black text-grey">
         Où vous en êtes, selon toi
       </div>
       <RadioGroup labelledBy={titres.guess} className="flex gap-2.5">
@@ -176,7 +176,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
         ))}
       </RadioGroup>
 
-      <div id={titres.goal} className="text-[13px] font-black text-grey">
+      <div id={titres.goal} className="text-legende font-black text-grey">
         Ce que tu veux
       </div>
       <RadioGroup labelledBy={titres.goal} className="flex gap-2.5">

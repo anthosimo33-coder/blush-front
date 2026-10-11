@@ -13,6 +13,7 @@ import { EXPORT_STEPS } from "@/contenu/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/controls";
+import { Alert } from "@/components/ui/feedback";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
@@ -55,6 +56,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   };
 
   const onFiles = async ([file]: File[]) => {
+    if (!file) return;
     setBusy(true);
     setSouci(null);
     setAvance(null);
@@ -93,26 +95,25 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         <>
           {/* Une carte opaque : le haut du pied d’écran est un dégradé, le texte de la page passerait derrière */}
           {souci && (
-            <p role="alert" className="m-0 mb-3 rounded-[16px] bg-white px-4 py-3 text-center text-[14px] font-extrabold leading-[1.4] text-[#D93036] shadow-card">
+            <Alert variant="carte" className="mb-3 text-center">
               {souci}
-            </p>
+            </Alert>
           )}
-          <Button onClick={choisirFichier} disabled={busy} aria-busy={busy}>
+          <Button onClick={() => void choisirFichier()} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
+            {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
             {busy && avance != null ? (
               <span className="flex min-w-0 items-center gap-2.5">
-                <TypingDots color="#FFFFFF" label={`Je lis ton export · ${Math.round(avance * 100)}\u00a0%`} />
-                <span className="text-[16px] leading-[1.2] tabular-nums">
+                <TypingDots color="white" label={`Je lis ton export · ${Math.round(avance * 100)}\u00a0%`} />
+                <span className="text-corps leading-[1.2] tabular-nums">
                   Je lis ton export · {Math.round(avance * 100)}
                   {NBSP}%
                 </span>
               </span>
-            ) : busy ? (
-              <TypingDots color="#FFFFFF" label="Analyse du fichier" />
             ) : (
               "Choisir le fichier enregistré"
             )}
           </Button>
-          <FileInput inputRef={picker.ref} accept={ACCEPT_EXPORT} onFiles={onFiles} label="Fichier de la conversation exportée" />
+          <FileInput inputRef={picker.ref} accept={ACCEPT_EXPORT} onFiles={(f) => void onFiles(f)} label="Fichier de la conversation exportée" />
         </>
       }
     >
@@ -135,16 +136,16 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         <div className="relative flex w-full shrink-0 justify-center pb-[22px] lg:w-[260px]">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-[45%] -z-10 size-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]"
+            className="pointer-events-none absolute left-1/2 top-[45%] -z-10 size-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
           />
           <PhoneScreen menu={data.menu} />
           <button
             type="button"
             onClick={() => setVideo(true)}
-            className="lift lift-sm absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-[14px] font-black text-ink shadow-soft"
+            className="lift lift-sm absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-note font-black text-ink shadow-soft"
           >
             <span className="lift-pop flex size-8 items-center justify-center rounded-full bg-ink">
-              <Icon name="play" size={14} color="#FFFFFF" fill="#FFFFFF" stroke={0} />
+              <Icon name="play" size={14} fill="currentColor" stroke={0} className="text-white" />
             </span>
             Voir la vidéo
             <span className="font-extrabold text-grey">30 s</span>
@@ -183,10 +184,10 @@ function PhoneScreen({ menu }: { menu: Menu }) {
         <Avatar tone="elle" size={52} fontSize={21} className="mt-2.5">
           {menu.contact.charAt(0)}
         </Avatar>
-        <span className="mt-2 text-[16px] font-black">{menu.contact}</span>
+        <span className="mt-2 text-corps font-black">{menu.contact}</span>
         <div className="mt-3.5 w-[calc(100%_-_24px)] overflow-hidden rounded-[14px] bg-white">
           {menu.items.map((it, i) => (
-            <MenuRow key={it} first={i === 0} on={i === menu.highlight} className={cn("h-[42px] px-3.5 text-[13.5px]", i === menu.items.length - 1 ? "text-[#D93036]" : "text-[#0F7A3C]")}>
+            <MenuRow key={it} first={i === 0} on={i === menu.highlight} className={cn("h-[42px] px-3.5 text-[13.5px]", i === menu.items.length - 1 ? "text-danger" : "text-[#0F7A3C]")}>
               {it}
             </MenuRow>
           ))}
@@ -213,10 +214,10 @@ function StepTimeline({ steps, className }: { steps: ReactNode[]; className?: st
       {steps.map((s, i) => (
         <li key={i} className="relative flex gap-3.5 pb-[18px] last:pb-0">
           {i < steps.length - 1 && <span aria-hidden="true" className="absolute bottom-0 left-[14px] top-[34px] w-0.5 rounded-full bg-[rgba(17,17,20,0.08)]" />}
-          <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-white text-[13px] font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_4px_10px_-4px_rgba(17,17,20,0.25)]">
+          <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-white text-legende font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.06),0_4px_10px_-4px_rgba(17,17,20,0.25)]">
             {i + 1}
           </span>
-          <span className="pt-[4px] text-[16px] font-extrabold leading-[1.4] lg:text-[15px]">{s}</span>
+          <span className="pt-[4px] text-corps font-extrabold leading-[1.4] lg:text-detail">{s}</span>
         </li>
       ))}
     </ol>

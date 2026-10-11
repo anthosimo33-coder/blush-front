@@ -101,9 +101,9 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   };
 
   const composer = (
-    <form onSubmit={submit} className="flex flex-col gap-2">
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
       {souci && <Alert variant="carte">{souci}</Alert>}
-      <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214,0_10px_26px_-16px_rgba(17,17,20,0.35)]">
+      <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink),0_10px_26px_-16px_rgba(17,17,20,0.35)]">
         <span className="sr-only">Ta question à BLUSH</span>
         <textarea
           rows={1}
@@ -122,7 +122,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           }}
           placeholder="Écris ta question"
           enterKeyHint="send"
-          className="max-h-[132px] min-h-10 flex-1 resize-none bg-transparent py-[9px] text-[16px] font-extrabold leading-[22px] text-ink outline-none [field-sizing:content] placeholder:text-grey"
+          className="max-h-[132px] min-h-10 flex-1 resize-none bg-transparent py-[9px] text-corps font-extrabold leading-[22px] text-ink outline-none [field-sizing:content] placeholder:text-grey"
         />
         <button
           type="submit"
@@ -130,7 +130,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           disabled={!typed}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:bg-[#D9D6CF] disabled:shadow-none"
         >
-          <Icon name="arrow" size={18} color="#FFFFFF" stroke={2.8} className="-rotate-90" />
+          <Icon name="arrow" size={18} stroke={2.8} className="-rotate-90 text-white" />
         </button>
       </label>
     </form>
@@ -143,7 +143,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         Retour au rapport
       </ButtonLink>
       {/* Sans remise en haut : l’accueil s’ouvre sur le dernier échange */}
-      <Link href="/app" scroll={false} className="relative inline-flex min-h-11 items-center px-1 text-[15px] font-black text-soft no-underline transition-colors hover:text-ink">
+      <Link href="/app" scroll={false} className="relative inline-flex min-h-11 items-center px-1 text-detail font-black text-soft no-underline transition-colors hover:text-ink">
         {peut(plan, "chat") ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
       </Link>
     </div>
@@ -172,7 +172,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           </span>
         </span>
         {plan === "rapport" && (
-          <span className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_6px_14px_-8px_rgba(17,17,20,0.3)]">
+          <span className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-legende font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_6px_14px_-8px_rgba(17,17,20,0.3)]">
             <Icon name="bolt" size={13} color="#2F7BFF" stroke={2.6} />1 question incluse
           </span>
         )}
@@ -183,17 +183,17 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         <div ref={conv} role="log" aria-label="Ta conversation avec BLUSH" aria-live="polite" className="flex flex-col gap-4">
           <GroupeBulles
             bulles={[
-              <span key="a" className="text-[17px] font-black leading-[1.3]">
+              <span key="a" className="text-accent font-black leading-[1.3]">
                 une question sur vous deux{NBSP}? balance
               </span>,
-              <span key="b" className="text-[14px] font-extrabold leading-[1.45] text-soft">
+              <span key="b" className="text-note font-extrabold leading-[1.45] text-soft">
                 je te réponds avec vos {formatCount(story.totalMessages)} messages, preuves à l’appui
               </span>,
             ]}
           />
           {question && (
             <div data-rise="" className="flex justify-end">
-              <span className="max-w-[80%] whitespace-pre-wrap rounded-[20px] bg-toi-ink px-4 py-2.5 text-[16px] font-bold leading-[1.4] text-white">{question}</span>
+              <span className="max-w-[80%] whitespace-pre-wrap rounded-[20px] bg-toi-ink px-4 py-2.5 text-corps font-bold leading-[1.4] text-white">{question}</span>
             </div>
           )}
           {asking && (
@@ -208,13 +208,13 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
                   {answer.title}
                 </span>,
                 <span key="preuve" className="flex flex-col gap-2.5">
-                  <span className="text-[12px] font-black text-grey">{answer.evidenceLabel}</span>
+                  <span className="text-micro font-black text-grey">{answer.evidenceLabel}</span>
                   {answer.message && (
                     <MessageBubble from={answer.message.from} caption={answer.message.caption} className="!max-w-full">
                       {answer.message.text}
                     </MessageBubble>
                   )}
-                  <span className="text-[15px] font-extrabold leading-[1.45]">{answer.evidence}</span>
+                  <span className="text-detail font-extrabold leading-[1.45]">{answer.evidence}</span>
                   <ConfidenceLine level={answer.confidence}>{answer.limits}</ConfidenceLine>
                 </span>,
               ]}
@@ -239,10 +239,10 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
                   data-rise=""
                   style={delai(0.2 + i * 0.07)}
                   className={cn(
-                    "max-w-[88%] rounded-[20px] rounded-br-[6px] px-4 py-2.5 text-left text-[15px] font-extrabold leading-[1.35] transition-[background-color,color,box-shadow] duration-200",
+                    "max-w-[88%] rounded-[20px] rounded-br-[6px] px-4 py-2.5 text-left text-detail font-extrabold leading-[1.35] transition-[background-color,color,box-shadow] duration-200",
                     on
                       ? "bg-toi-ink text-white shadow-[0_10px_22px_-12px_rgba(26,102,219,0.8)]"
-                      : "bg-white text-toi-ink shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.3)] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_#1A66DB]",
+                      : "bg-white text-toi-ink shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.3)] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_var(--color-toi-ink)]",
                   )}
                 >
                   {q}

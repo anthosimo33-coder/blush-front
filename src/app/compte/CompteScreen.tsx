@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { FRAIS_DU_RENDU, invalidate, setQueryData } from "@/lib/query";
 import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
+import { tracer } from "@/lib/tracer";
 import { deleteAccount, deleteStory, seDeconnecter, setPaused, type Account } from "@/services/api";
 import { OFFRE_PAR_PLAN, prixDe, type PrixAffiche } from "@/contenu/offres";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
@@ -12,6 +13,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Switch } from "@/components/ui/controls";
+import { Alert } from "@/components/ui/feedback";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { Tag } from "@/components/ui/messages";
@@ -68,7 +70,8 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
     setSouci(null);
     try {
       await fn();
-    } catch {
+    } catch (e) {
+      tracer("compte:geste", e);
       setBusy(false);
       setSouci("Ça n’a pas marché. Vérifie ta connexion et réessaie.");
       return;
@@ -76,6 +79,18 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
     setBusy(false);
     setConfirm(null);
     after();
+  };
+  /* L’interrupteur bouge tout de suite ; si le serveur n’a rien enregistré, il revient où il était */
+  const mettreEnPause = async (v: boolean) => {
+    patch({ paused: v });
+    setSouciPause(false);
+    try {
+      await setPaused(v);
+    } catch (e) {
+      tracer("compte:pause", e);
+      patch({ paused: !v });
+      setSouciPause(true);
+    }
   };
 
   return (
@@ -91,13 +106,13 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       <div className="flex flex-col items-center pt-2 text-center">
         <span
           aria-hidden="true"
-          className="flex size-[76px] items-center justify-center rounded-full text-[30px] font-black text-white"
-          style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), #3D8BFF" }}
+          className="flex size-[76px] items-center justify-center rounded-full text-titre-2 font-black text-white"
+          style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), var(--toi)" }}
         >
           {noms?.me.initial ?? account?.email?.[0]?.toUpperCase()}
         </span>
-        {noms && <div className="mt-3 text-[24px] font-black leading-none tracking-[-0.01em]">{noms.me.name}</div>}
-        {account?.email && <div className="mt-1.5 text-[14px] font-extrabold text-grey">{account.email}</div>}
+        {noms && <div className="mt-3 text-titre-3 font-black leading-none tracking-[-0.01em]">{noms.me.name}</div>}
+        {account?.email && <div className="mt-1.5 text-note font-extrabold text-grey">{account.email}</div>}
       </div>
 
       {/* Tes histoires : celle en cours (ou toutes, s’il y en a plusieurs), et de quoi en commencer une autre */}
@@ -147,11 +162,11 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
             <>
               <RowIcon icon="bolt" tone={plus ? "ink" : "grey"} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="flex items-center gap-2 text-[16px] font-black">
+                <span className="flex items-center gap-2 text-corps font-black">
                   {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.title : "Ton rapport"}
                   {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
                 </span>
-                <span className="text-[13px] font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.note : null}</span>
+                <span className="text-legende font-extrabold leading-[1.4] text-grey">{plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.note : null}</span>
               </span>
               <Prix {...prixDe(sub.plan)} />
             </>
@@ -165,17 +180,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               <Switch
                 checked={sub.paused}
                 label="Mettre en pause"
-                onChange={async (v) => {
-                  patch({ paused: v });
-                  setSouciPause(false);
-                  try {
-                    await setPaused(v);
-                  } catch {
-                    /* Le serveur n’a rien enregistré : l’interrupteur revient où il était */
-                    patch({ paused: !v });
-                    setSouciPause(true);
-                  }
-                }}
+                onChange={(v) => void mettreEnPause(v)}
               />
             }
           />
@@ -221,13 +226,13 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">
         {confirm === "keep" && (
           <>
-            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+            <h2 id="confirm-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
               Ce que BLUSH garde
             </h2>
-            <p className="m-0 text-[15px] font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
+            <p className="m-0 text-detail font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
             <NotePrivee>{PROMESSE_CONV}</NotePrivee>
             {/* « Hébergement en Europe » taisait les États-Unis (l’IA et la voix de BLUSH) : la page Confidentialité le dit, ceci aussi */}
-            <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">{`${PROMESSE_DONNEES} ${PROMESSE_LIEU} ${PROMESSE_EFFACEMENT}`}</p>
+            <p className="m-0 text-legende font-bold leading-[1.45] text-grey">{`${PROMESSE_DONNEES} ${PROMESSE_LIEU} ${PROMESSE_EFFACEMENT}`}</p>
             <Button variant="secondary" onClick={fermer}>
               Fermer
             </Button>
@@ -235,30 +240,25 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         )}
         {(confirm === "story" || confirm === "all") && (
           <>
-            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+            <h2 id="confirm-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
               {confirm === "story" ? `Supprimer l’histoire avec ${noms?.other.name ?? "elle"}\u00a0?` : "Tout effacer\u00a0?"}
             </h2>
-            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">
               {confirm === "story" ? "Le rapport, la fiche et les captures." : "Ton compte et toutes tes histoires."}
             </p>
-            {souci && (
-              <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
-                {souci}
-              </p>
-            )}
+            {souci && <Alert>{souci}</Alert>}
             <Button
               aria-busy={busy}
-              onClick={() =>
-                busy
-                  ? undefined
-                  : run(confirm === "story" ? deleteStory : deleteAccount, () => {
-                      resetJourney();
-                      invalidate("account", "report");
-                      /* Une autre conv reste : elle s’ouvre à la place */
-                      if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
-                      else router.push("/commencer");
-                    })
-              }
+              onClick={() => {
+                if (busy) return;
+                void run(confirm === "story" ? deleteStory : deleteAccount, () => {
+                  resetJourney();
+                  invalidate("account", "report");
+                  /* Une autre conv reste : elle s’ouvre à la place */
+                  if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
+                  else router.push("/commencer");
+                });
+              }}
             >
               {confirm === "story" ? "Supprimer l’histoire" : "Tout effacer"}
             </Button>
@@ -269,28 +269,23 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         )}
         {(confirm === "sortie" || confirm === "partout") && (
           <>
-            <h2 id="confirm-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+            <h2 id="confirm-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
               {confirm === "sortie" ? "Se déconnecter\u00a0?" : "Se déconnecter de tous les appareils\u00a0?"}
             </h2>
-            <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">
+            <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">
               {confirm === "sortie" ? RIEN_N_EST_EFFACE : `Celui-ci compris. ${RIEN_N_EST_EFFACE}`}
             </p>
-            {souci && (
-              <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
-                {souci}
-              </p>
-            )}
+            {souci && <Alert>{souci}</Alert>}
             <Button
               aria-busy={busy}
-              onClick={() =>
-                busy
-                  ? undefined
-                  : run(
-                      () => seDeconnecter({ partout: confirm === "partout" }),
-                      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un chargement neuf, rien du compte ne reste en mémoire (le cache des requêtes, le parcours)
-                      () => window.location.assign("/"),
-                    )
-              }
+              onClick={() => {
+                if (busy) return;
+                void run(
+                  () => seDeconnecter({ partout: confirm === "partout" }),
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- voulu : un chargement neuf, rien du compte ne reste en mémoire (le cache des requêtes, le parcours)
+                  () => window.location.assign("/"),
+                );
+              }}
             >
               {confirm === "sortie" ? "Se déconnecter" : "Se déconnecter de partout"}
             </Button>
@@ -308,8 +303,8 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
 function Prix({ montant, periode }: PrixAffiche) {
   return (
     <span className="flex shrink-0 flex-col items-end">
-      <span className="text-[18px] font-black leading-none tracking-[-0.01em]">{montant}</span>
-      {periode && <span className="mt-1 text-[12px] font-extrabold text-grey">/ {periode}</span>}
+      <span className="text-carte font-black leading-none tracking-[-0.01em]">{montant}</span>
+      {periode && <span className="mt-1 text-micro font-extrabold text-grey">/ {periode}</span>}
     </span>
   );
 }

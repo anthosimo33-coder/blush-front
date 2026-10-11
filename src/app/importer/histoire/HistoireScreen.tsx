@@ -21,11 +21,11 @@ export function HistoireScreen({ story }: { story: Story }) {
       contentGap={22}
       head={
         <>
-          <div className="text-[13px] font-black text-vrai-ink">BLUSH a tout remis dans l’ordre</div>
+          <div className="text-legende font-black text-vrai-ink">BLUSH a tout remis dans l’ordre</div>
           <ScreenTitle size={30}>Votre histoire, d’un bout à l’autre.</ScreenTitle>
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[52px] font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(story.totalMessages)}</span>
-            <span className="text-[16px] font-black text-soft">
+            <span className="text-chiffre font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(story.totalMessages)}</span>
+            <span className="text-corps font-black text-soft">
               messages · {story.durationLabel} · {story.sources.length} applis
             </span>
           </div>
@@ -50,13 +50,13 @@ export function HistoireScreen({ story }: { story: Story }) {
             title={
               <span className="flex items-center gap-2">
                 {APP_NAME[s.app]}
-                <span className="rounded-full bg-[#F1EFEA] px-2 py-0.5 text-[11px] font-black text-grey">{s.mode === "export" ? "export" : "captures"}</span>
+                <span className="rounded-full bg-plaque px-2 py-0.5 text-[11px] font-black text-grey">{s.mode === "export" ? "export" : "captures"}</span>
               </span>
             }
             sub={`${s.label} · ${s.period}`}
             trailing={
               <span className="flex shrink-0 flex-col items-end">
-                <span className="text-[16px] font-black tabular-nums">{formatCount(s.messageCount)}</span>
+                <span className="text-corps font-black tabular-nums">{formatCount(s.messageCount)}</span>
                 <span className="text-[11.5px] font-extrabold text-grey">messages</span>
               </span>
             }

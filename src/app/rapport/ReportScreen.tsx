@@ -129,16 +129,14 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
   /* Les mêmes à chaque rendu (comme le partage d’un moment) : un chapitre qui n’a pas changé ne se refait pas */
   const renderQuestion = useCallback((b: Extract<ChapterBlock, { kind: "question" }>) => (
     <Card className="flex flex-col gap-2 p-3.5">
-      <div className="text-[13px] font-black text-grey">{b.label}</div>
-      <div className="text-[17px] font-black leading-[1.35]">{b.text}</div>
+      <div className="text-legende font-black text-grey">{b.label}</div>
+      <div className="text-accent font-black leading-[1.35]">{b.text}</div>
       <button
         type="button"
-        onClick={async () => {
-          if (await copyText(b.text.replace(/^«\s*|\s*»$/g, ""))) setToast("Copié.");
-        }}
-        className="lift lift-sm lift-ink relative inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-[13px] font-black text-white after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
+        onClick={() => void copyText(b.text.replace(/^«\s*|\s*»$/g, "")).then((copie) => copie && setToast("Copié."))}
+        className="lift lift-sm lift-ink relative inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
       >
-        <Icon name="copy" size={14} color="#FFFFFF" />
+        <Icon name="copy" size={14} className="text-white" />
         Copier
       </button>
     </Card>
@@ -154,7 +152,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
           </span>
           <span className="text-[32px] font-black leading-[1.05] tracking-[-0.02em]">{report.verdict.title}</span>
         </div>
-        <p className="m-0 text-[17px] font-extrabold leading-[1.45] text-soft">{report.verdict.subtitle}</p>
+        <p className="m-0 text-accent font-extrabold leading-[1.45] text-soft">{report.verdict.subtitle}</p>
       </>
     ),
     [report.verdict],
@@ -169,7 +167,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         <header className="sticky top-0 z-30 shrink-0 bg-[rgba(244,242,237,0.88)] backdrop-blur-xl lg:hidden">
           <div className="grid h-[58px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 px-2">
             <button type="button" aria-label="Retour" onClick={() => (pagePrecedente() ? router.back() : router.push("/app", { scroll: false }))} className="flex size-11 items-center justify-center">
-              <Icon name="back" size={24} color="#121214" stroke={2.6} />
+              <Icon name="back" size={24} stroke={2.6} className="text-ink" />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">
               {/* L’adresse du site : la barre reste en haut, elle est sur chaque capture du rapport */}
@@ -178,18 +176,18 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
                 askblush.com
               </span>
               {currentChapter ? (
-                <span key={currentChapter.number} data-rise="" className="max-w-full truncate text-[14px] font-black leading-tight text-ink">
+                <span key={currentChapter.number} data-rise="" className="max-w-full truncate text-note font-black leading-tight text-ink">
                   <span className="font-extrabold text-grey">
                     {currentChapter.number}/{chapters.length} ·{" "}
                   </span>
                   {currentChapter.tocTitle}
                 </span>
               ) : (
-                <span className="text-[14px] font-black leading-tight text-ink">{label}</span>
+                <span className="text-note font-black leading-tight text-ink">{label}</span>
               )}
             </button>
             <button type="button" aria-label="Sommaire du rapport" aria-haspopup="dialog" onClick={() => setMenu(true)} className="flex size-11 items-center justify-center">
-              <Icon name="list" size={22} color="#121214" stroke={2.4} />
+              <Icon name="list" size={22} stroke={2.4} className="text-ink" />
             </button>
           </div>
           <ReadingBar className="h-[3px] bg-[rgba(17,17,20,0.06)]" />
@@ -252,17 +250,17 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
           <div ref={PASTILLE_REPRISE} data-popin="" className="pointer-events-auto flex max-w-[420px] items-center gap-1 rounded-full bg-ink py-1.5 pl-1.5 pr-1 text-white shadow-[0_18px_40px_-14px_rgba(17,17,20,0.6)]">
             <button type="button" onClick={() => goTo(resume)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-1 pr-2 text-left">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.14)]">
-                <Icon name="arrow" size={15} color="#FFFFFF" stroke={2.6} className="rotate-90" />
+                <Icon name="arrow" size={15} stroke={2.6} className="rotate-90 text-white" />
               </span>
               <span className="flex min-w-0 flex-col">
-                <span className="text-[14px] font-black leading-tight">Reprendre ta lecture</span>
-                <span className="truncate text-[12px] font-extrabold leading-tight text-[rgba(255,255,255,0.72)]">
+                <span className="text-note font-black leading-tight">Reprendre ta lecture</span>
+                <span className="truncate text-micro font-extrabold leading-tight text-[rgba(255,255,255,0.72)]">
                   Chapitre {resume} · {chapters.find((c) => c.number === resume)?.tocTitle}
                 </span>
               </span>
             </button>
             <button type="button" aria-label="Ne pas reprendre" onClick={oublierReprise} className="flex size-9 shrink-0 items-center justify-center rounded-full">
-              <Icon name="close" size={15} color="#FFFFFF" stroke={2.8} />
+              <Icon name="close" size={15} stroke={2.8} className="text-white" />
             </button>
           </div>
         </div>

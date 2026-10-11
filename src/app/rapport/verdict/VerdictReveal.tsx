@@ -18,10 +18,9 @@ import { IlOuElle } from "@/lib/pronom";
 import { bloquerDefilement } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
+import { tracer } from "@/lib/tracer";
 import dynamic from "next/dynamic";
 import { cardsOf, type Card } from "./cartes";
-
-const INK = "#121214";
 
 /* La feuille du partage (src/app/rapport/Partage.tsx) ne s’ouvre qu’au toucher : elle arrive à part, sans alourdir la scène */
 const PartageSheet = dynamic(() => import("../Partage").then((m) => m.PartageSheet), { ssr: false });
@@ -67,7 +66,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
   const press = useRef<{ x: number; y: number } | null>(null);
   /* Un glissé vient d’avancer : le « clic » qui le suit ne compte pas */
   const swiped = useRef(false);
-  const card = cards[Math.min(at, last)];
+  const card = cards[Math.min(at, last)] ?? cards[0];
   const { verdict } = payload.report;
   /* L’autre personne : « Il » ou « Elle » dans le duel (d’après son pronom, une fois « Qui es-tu ? » rempli) */
   const autre = IlOuElle(moiEtAutre(story).autre.pronoun);
@@ -111,7 +110,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
   useEffect(() => {
     if (at !== last || chauffe.current) return;
     chauffe.current = true;
-    fetch("/rapport", { credentials: "same-origin", priority: "low" }).catch(() => {});
+    fetch("/rapport", { credentials: "same-origin", priority: "low" }).catch((e) => tracer("verdict:prechargement", e));
   }, [at, last]);
 
   /* Chaque nouvelle carte est annoncée : le focus va sur son titre */
@@ -190,7 +189,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
       className={cn("fixed inset-0 z-[60] flex cursor-pointer touch-manipulation select-none flex-col overflow-hidden bg-ink text-white", figtree.variable)}
     >
       {/* Sombre jusque sous les barres du navigateur, dès le premier affichage (Safari les teinte d’après la page) */}
-      <style>{`html,body{background:${INK}!important}`}</style>
+      <style>{"html,body{background:var(--ink)!important}"}</style>
       <h1 className="sr-only">Ton verdict</h1>
 
       {/* Les lueurs du fond */}
@@ -210,7 +209,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
         </div>
         <div className="mt-3 flex items-center justify-between">
           {/* L’adresse du site, toujours dans le cadre : elle est sur chaque capture des cartes */}
-          <span className="flex items-center gap-2 text-[14px] font-black tracking-[-0.01em]">
+          <span className="flex items-center gap-2 text-note font-black tracking-[-0.01em]">
             <BubbleLogo size={26} />
             askblush.com
           </span>
@@ -229,8 +228,8 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 <Icon name="sound" size={18} stroke={2.4} />
               </button>
             )}
-            <a href="/rapport" onClick={partir} aria-busy={enRoute} className="relative rounded-full px-1 text-[14px] font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
-              {enRoute ? <TypingDots size={5} color="#FFFFFF" label="Ton rapport arrive" /> : "Passer"}
+            <a href="/rapport" onClick={partir} aria-busy={enRoute} className="relative rounded-full px-1 text-note font-black text-white/70 no-underline transition-colors hover:text-white after:absolute after:-inset-x-3 after:-inset-y-3 after:content-['']">
+              {enRoute ? <TypingDots size={5} color="white" label="Ton rapport arrive" /> : "Passer"}
             </a>
           </span>
         </div>
@@ -240,7 +239,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
           {card.id === "chiffres" && <Numbers story={story} heading={heading} step={step} />}
           {card.id === "verdict" && (
             <div className="flex flex-col items-center text-center">
-              <p data-rise="" style={delai(0.05)} className="m-0 text-[15px] font-black text-elle">
+              <p data-rise="" style={delai(0.05)} className="m-0 text-detail font-black text-elle">
                 Le verdict
               </p>
               <div className="relative mt-4 flex size-[150px] items-center justify-center lg:size-[190px] [@media(max-height:600px)]:size-[110px]">
@@ -258,8 +257,8 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 {verdict.subtitle}
               </p>
               {card.confidence && (
-                <p data-rise="" style={delai(1.75)} className="m-0 mt-6 flex items-center gap-2 text-[14px] font-extrabold text-white/70 [@media(max-height:600px)]:mt-4">
-                  <span className="rounded-full bg-vrai px-2.5 py-1 text-[12px] font-black leading-none text-ink">{CONFIDENCE[card.confidence.level]}</span>
+                <p data-rise="" style={delai(1.75)} className="m-0 mt-6 flex items-center gap-2 text-note font-extrabold text-white/70 [@media(max-height:600px)]:mt-4">
+                  <span className="rounded-full bg-vrai px-2.5 py-1 text-micro font-black leading-none text-ink">{CONFIDENCE[card.confidence.level]}</span>
                   {card.confidence.text}
                 </p>
               )}
@@ -267,11 +266,11 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
           )}
           {card.id === "duel" && (
             <div className="flex flex-col">
-              <h2 ref={heading} tabIndex={-1} data-rise="" className="m-0 text-[15px] font-black text-white/70 outline-none">
+              <h2 ref={heading} tabIndex={-1} data-rise="" className="m-0 text-detail font-black text-white/70 outline-none">
                 {step}
                 Entre vous deux
               </h2>
-              <div data-rise="" style={delai(0.1)} className="mt-4 flex justify-between text-[13px] font-black">
+              <div data-rise="" style={delai(0.1)} className="mt-4 flex justify-between text-legende font-black">
                 <span className="flex items-center gap-1.5 text-toi">
                   <span className="size-2 rounded-full bg-toi" />
                   Toi
@@ -285,8 +284,8 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 {card.rows.map((r, i) => (
                   <li key={r.label} data-rise="" style={delai(0.25 + i * 0.14)}>
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[16px] font-black leading-tight">{r.label}</span>
-                      <span className={cn("shrink-0 text-[14px] font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
+                      <span className="text-corps font-black leading-tight">{r.label}</span>
+                      <span className={cn("shrink-0 text-note font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>{r.winner === "elle" ? autre.toLowerCase() : r.winner}</span>
                     </div>
                     <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
                       <span data-bar="" style={{ "--w": `${r.toiPercent}%`, ...delai(0.45 + i * 0.14) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
@@ -301,7 +300,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 ))}
               </ul>
               {card.meaning && (
-                <p data-rise="" style={delai(0.95)} className="m-0 mt-7 text-[24px] font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
+                <p data-rise="" style={delai(0.95)} className="m-0 mt-7 text-titre-3 font-black leading-[1.2] tracking-[-0.02em] [text-wrap:balance] lg:text-[28px] [@media(max-height:600px)]:mt-4 [@media(max-height:600px)]:text-[20px]">
                   {card.meaning}
                 </p>
               )}
@@ -310,7 +309,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
           {card.id === "moment" && (
             <div className="flex flex-col">
               {card.kicker && (
-                <p data-rise="" className="m-0 text-[15px] font-black text-elle">
+                <p data-rise="" className="m-0 text-detail font-black text-elle">
                   {card.kicker}
                 </p>
               )}
@@ -330,7 +329,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
                 </p>
               )}
               {card.fact && (
-                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-[14px] font-extrabold leading-[1.4] text-white/70">
+                <p data-rise="" style={delai(0.55 + card.messages.length * 1.05 + 0.45)} className="m-0 mt-3 flex items-start gap-2 text-note font-extrabold leading-[1.4] text-white/70">
                   <span aria-hidden="true" className="mt-[5px] size-2 shrink-0 rounded-full bg-vrai" />
                   {card.fact}
                 </p>
@@ -339,11 +338,11 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
           )}
           {card.id === "jouer" && (
             <div className="flex flex-col">
-              <p data-rise="" className="m-0 flex items-center gap-1.5 text-[15px] font-black text-toi">
-                <Icon name="bolt" size={16} color="#3D8BFF" stroke={2.4} />À toi de jouer
+              <p data-rise="" className="m-0 flex items-center gap-1.5 text-detail font-black text-toi">
+                <Icon name="bolt" size={16} stroke={2.4} className="text-toi" />À toi de jouer
               </p>
               {card.quote && (
-                <span data-rise="" style={delai(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-[16px] font-bold leading-[1.3] text-white/85">
+                <span data-rise="" style={delai(0.15)} className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-corps font-bold leading-[1.3] text-white/85">
                   {card.quote}
                 </span>
               )}
@@ -360,39 +359,39 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
           <div className="flex items-center justify-between gap-3">
             {at > 0 ? (
               <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
-                <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
+                <Icon name="back" size={20} stroke={2.6} className="text-white" />
               </button>
             ) : (
               <span aria-hidden="true" className="size-11" />
             )}
             {at === 0 && (
-              <span aria-hidden="true" className="text-[14px] font-extrabold text-white/70">
+              <span aria-hidden="true" className="text-note font-extrabold text-white/70">
                 <span className="lg:hidden">Touche pour voir le verdict</span>
                 <span className="hidden lg:inline">Clique pour voir le verdict</span>
               </span>
             )}
             <button type="button" onClick={() => go(at + 1)} aria-label="Suivant" className="lift lift-sm flex size-14 items-center justify-center rounded-full bg-white shadow-[0_10px_30px_-10px_rgba(255,79,154,0.6)]">
-              <Icon name="arrow" size={22} color={INK} stroke={2.8} className="arrow-nudge" />
+              <Icon name="arrow" size={22} stroke={2.8} className="arrow-nudge text-ink" />
             </button>
           </div>
         ) : (
           <div data-rise="" style={delai(0.7)} className="flex flex-col gap-1.5">
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => go(at - 1)} aria-label="Précédent" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/15">
-                <Icon name="back" size={20} color="#FFFFFF" stroke={2.6} />
+                <Icon name="back" size={20} stroke={2.6} className="text-white" />
               </button>
-              <a href="/rapport" onClick={partir} aria-busy={enRoute} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-[18px] font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
+              <a href="/rapport" onClick={partir} aria-busy={enRoute} className="lift lift-sm flex h-[60px] flex-1 items-center justify-center gap-2.5 rounded-[30px] bg-white text-carte font-black text-ink no-underline shadow-[0_14px_36px_-12px_rgba(255,79,154,0.55)]">
                 {enRoute ? (
-                  <TypingDots color={INK} label="Ton rapport arrive" />
+                  <TypingDots color="currentColor" label="Ton rapport arrive" />
                 ) : (
                   <>
                     Voir mon rapport
-                    <Icon name="arrow" size={20} color={INK} stroke={2.8} />
+                    <Icon name="arrow" size={20} stroke={2.8} />
                   </>
                 )}
               </a>
             </div>
-            <button type="button" onClick={() => setPartage(true)} aria-haspopup="dialog" className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-[15px] font-black text-white/80 transition-colors hover:text-white">
+            <button type="button" onClick={() => setPartage(true)} aria-haspopup="dialog" className="mx-auto inline-flex h-11 items-center gap-2 px-3 text-detail font-black text-white/80 transition-colors hover:text-white">
               <Icon name="share" size={16} color="currentColor" stroke={2.4} />
               Partager mon verdict
             </button>
@@ -415,7 +414,7 @@ function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HT
   const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(Boolean) as string[];
   return (
     <div className="flex flex-col items-center text-center">
-      <p data-rise="" className="m-0 text-[15px] font-black text-white/70">
+      <p data-rise="" className="m-0 text-detail font-black text-white/70">
         BLUSH a analysé
       </p>
       <h2 ref={heading} tabIndex={-1} className="m-0 mt-1 outline-none">
@@ -430,7 +429,7 @@ function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HT
       </h2>
       <ul className="m-0 mt-7 flex list-none flex-wrap justify-center gap-2 p-0">
         {facts.map((f, i) => (
-          <li key={f} data-rise="" style={delai(1.35 + i * 0.12)} className="rounded-full bg-white/10 px-3.5 py-2 text-[14px] font-black">
+          <li key={f} data-rise="" style={delai(1.35 + i * 0.12)} className="rounded-full bg-white/10 px-3.5 py-2 text-note font-black">
             {f}
           </li>
         ))}
@@ -492,7 +491,7 @@ function Replay({ message, at }: { message: Message; at: number }) {
       <span aria-hidden="true" data-once="" style={delai(at)} className={cn("absolute top-0 flex h-[44px] items-center rounded-[22px] px-4", elle ? "left-0 bg-white" : "right-0 bg-toi-ink")}>
         <span data-dots="" className="flex items-center gap-1">
           {[0, 1, 2].map((d) => (
-            <span key={d} className={cn("size-[7px] rounded-full", elle ? "bg-[#8A8780]" : "bg-white")} />
+            <span key={d} className={cn("size-[7px] rounded-full", elle ? "bg-muted" : "bg-white")} />
           ))}
         </span>
       </span>
@@ -500,14 +499,14 @@ function Replay({ message, at }: { message: Message; at: number }) {
         data-msg=""
         style={delai(at + 0.7)}
         className={cn(
-          "max-w-[84%] rounded-[22px] px-4 py-2.5 font-message text-[17px] font-bold leading-[1.3]",
+          "max-w-[84%] rounded-[22px] px-4 py-2.5 font-message text-accent font-bold leading-[1.3]",
           elle ? "origin-bottom-left rounded-bl-[6px] bg-white text-ink" : "origin-bottom-right rounded-br-[6px] bg-toi-ink text-white",
         )}
       >
         {message.text}
       </span>
       {message.caption && (
-        <span data-rise="" style={delai(at + 0.85)} className="mt-1 px-1 text-[12px] font-extrabold text-white/60">
+        <span data-rise="" style={delai(at + 0.85)} className="mt-1 px-1 text-micro font-extrabold text-white/60">
           {message.caption}
         </span>
       )}

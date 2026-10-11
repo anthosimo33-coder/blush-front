@@ -3,6 +3,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { prefersReducedMotion, spring } from "@/lib/motion";
 import { play } from "@/lib/sound";
+import { tracer } from "@/lib/tracer";
 
 /** Passé sa butée, le glissé résiste : il n’avance plus qu’au cinquième. */
 const rubber = (d: number, max: number) => (d <= max ? d : max + (d - max) * 0.2);
@@ -53,8 +54,9 @@ export function useThreadGestures(ref: RefObject<HTMLElement | null>, onDig: (qu
         g.x += Math.sign(dx) * 10;
         try {
           root.setPointerCapture(e.pointerId);
-        } catch {
+        } catch (e) {
           /* Pas de capture : le geste suit quand même tant que le doigt reste sur la conv */
+          tracer("geste:capture", e);
         }
       }
       const d = e.clientX - g.x;

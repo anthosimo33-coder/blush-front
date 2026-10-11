@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
@@ -31,9 +31,9 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
    * rapport et la lecture, un aller-retour chacun. Le reste est lu en même temps : l’accueil ne l’attend pas plus.
    */
   const retour = await getRetour();
-  if (retour && retour.destination !== "/app") redirect(retour.destination);
+  if (retour && retour.destination !== "/app") redirect(retour.destination as Route);
   const [quick, report, fiche, story, chat, all] = await lectures;
-  if (!story) redirect(await sansHistoire("/app"));
+  if (!story) redirect((await sansHistoire("/app")) as Route);
   if (!report || !fiche) redirect("/rapport");
   /*
    * Vers sa fiche, l’accueil recule à gauche ; au retour, il revient de la gauche (globals.css, « Sophie, en glissé »).

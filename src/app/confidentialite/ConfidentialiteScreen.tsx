@@ -22,7 +22,7 @@ export function ConfidentialiteScreen() {
       <HeroHeader
         visual={
           <span className="flex size-16 items-center justify-center rounded-full bg-ink shadow-[0_14px_30px_-14px_rgba(17,17,20,0.6)]">
-            <Icon name="lock" size={28} color="#FFFFFF" stroke={2.2} />
+            <Icon name="lock" size={28} stroke={2.2} className="text-white" />
           </span>
         }
         title="Ta conv, en sécurité."

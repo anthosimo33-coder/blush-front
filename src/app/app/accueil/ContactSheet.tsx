@@ -168,7 +168,7 @@ export function ContactSheet({
     <Sheet open={open} onClose={close} onClosed={remettre} sortie={SHEET_OUT} labelledBy="contact-titre" dialogRef={dialogRef} panelRef={panelRef}>
       <div className="relative flex flex-col items-center gap-2 pt-1 text-center">
         <IconButton icon="close" label="Fermer" onClick={close} className="!absolute right-0 top-0" />
-        <span className="flex items-center gap-1.5 text-[13px] font-black text-grey">
+        <span className="flex items-center gap-1.5 text-legende font-black text-grey">
           <span ref={logoRef} className="-my-2 block">
             <BubbleLogo size={36} />
           </span>
@@ -183,7 +183,7 @@ export function ContactSheet({
           {fiche.person.name} et toi
         </h2>
         <span className="flex items-center gap-2">
-          <span className="text-[15px] font-black">
+          <span className="text-detail font-black">
             {report.verdict.emoji} {report.verdict.short}
           </span>
           <Tag tone="verite">{report.trend}</Tag>

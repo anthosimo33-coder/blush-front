@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
 import { compteRetireDeLaBeta } from "@/server/auth";
@@ -16,6 +16,6 @@ export const metadata: Metadata = { title: "Tes données" };
 export default async function Page() {
   if (await estConnecte()) redirect("/compte");
   const compte = await compteRetireDeLaBeta(await lireSession());
-  if (!compte) redirect(connexionPuis("/compte"));
+  if (!compte) redirect(connexionPuis("/compte") as Route);
   return <EffacerScreen email={compte.email} />;
 }

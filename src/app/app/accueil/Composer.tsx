@@ -147,14 +147,14 @@ export function Composer({
       {about && (
         <div data-quote-strip="" className="mb-2.5">
           <div className="min-h-0 overflow-hidden">
-            <div className="flex items-center gap-2.5 rounded-2xl bg-white py-2 pl-3 pr-2 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.08)] lg:bg-[#F4F2ED] lg:shadow-none">
+            <div className="flex items-center gap-2.5 rounded-2xl bg-white py-2 pl-3 pr-2 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.08)] lg:bg-paper lg:shadow-none">
               <span aria-hidden="true" className="w-[3px] self-stretch rounded-full bg-[#E8358A]" />
               <span className="flex min-w-0 flex-1 flex-col gap-px">
-                <span className="text-[12px] font-black text-elle-ink">Tu creuses</span>
-                <span className="truncate text-[14px] font-extrabold">{about}</span>
+                <span className="text-micro font-black text-elle-ink">Tu creuses</span>
+                <span className="truncate text-note font-extrabold">{about}</span>
               </span>
-              <button type="button" aria-label="Ne plus creuser ce point" onClick={onAboutClear} className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA]">
-                <Icon name="close" size={13} color="#6B6862" stroke={2.8} />
+              <button type="button" aria-label="Ne plus creuser ce point" onClick={onAboutClear} className="flex size-7 shrink-0 items-center justify-center rounded-full bg-plaque">
+                <Icon name="close" size={13} stroke={2.8} className="text-grey" />
               </button>
             </div>
           </div>
@@ -164,12 +164,12 @@ export function Composer({
       {modeVocal && (
         <div className="mb-2.5 flex">
           <span role="status" className="inline-flex h-[34px] items-center gap-2 rounded-full bg-[#FFE6F2] pl-3 pr-1.5 shadow-[inset_0_0_0_1px_rgba(232,53,138,0.22)]">
-            <Icon name="sound" size={16} color="#C81D6B" />
-            <span className="text-[13px] font-black text-[#A3135A]">BLUSH te répond en vocal</span>
+            <Icon name="sound" size={16} className="text-elle-ink" />
+            <span className="text-legende font-black text-[#A3135A]">BLUSH te répond en vocal</span>
             <button
               type="button"
               onClick={onEcrit}
-              className="h-[26px] rounded-full bg-white px-2.5 text-[12px] font-black text-ink shadow-[0_1px_2px_rgba(17,17,20,0.1)]"
+              className="h-[26px] rounded-full bg-white px-2.5 text-micro font-black text-ink shadow-[0_1px_2px_rgba(17,17,20,0.1)]"
             >
               Repasser à l’écrit
             </button>
@@ -185,7 +185,7 @@ export function Composer({
           inert={typed || undefined}
           aria-hidden={typed || undefined}
           className={cn(
-            "mb-2.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-extrabold text-toi-ink shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[opacity,visibility] duration-150 lg:bg-[#F3F7FF]",
+            "mb-2.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-legende font-extrabold text-toi-ink shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[opacity,visibility] duration-150 lg:bg-[#F3F7FF]",
             typed && "pointer-events-none invisible opacity-0",
           )}
         >
@@ -213,7 +213,7 @@ export function Composer({
               data-popin={entree ? "" : undefined}
               data-a={arriving ? "chip" : undefined}
               style={{ ...delai(i * 0.05), "--i": i }}
-              className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-toi-ink lg:px-3 shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[box-shadow,background-color,color] duration-200 active:bg-toi-ink active:text-white lg:bg-[#F3F7FF] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_#1A66DB]"
+              className="h-9 shrink-0 rounded-full bg-white px-3.5 text-note font-extrabold text-toi-ink lg:px-3 shadow-[inset_0_0_0_1.5px_rgba(26,102,219,0.28)] transition-[box-shadow,background-color,color] duration-200 active:bg-toi-ink active:text-white lg:bg-[#F3F7FF] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1.5px_var(--color-toi-ink)]"
             >
               {q}
             </button>
@@ -239,9 +239,9 @@ export function Composer({
               void voice.stop(false);
             }}
             data-popin=""
-            className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-[#F4F2ED] lg:shadow-none"
+            className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-paper lg:shadow-none"
           >
-            <Icon name="trash" size={19} color="#D93036" stroke={2.4} />
+            <Icon name="trash" size={19} stroke={2.4} className="text-danger" />
           </button>
         ) : (
           <div className="relative">
@@ -251,9 +251,9 @@ export function Composer({
               aria-haspopup="menu"
               aria-expanded={menu}
               onClick={() => setMenu((v) => !v)}
-              className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-[#F4F2ED] lg:shadow-none"
+              className="lift lift-sm flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft lg:bg-paper lg:shadow-none"
             >
-              <Icon name="plus" size={21} color="#121214" stroke={2.8} className={cn("transition-transform duration-300 [transition-timing-function:var(--ease-pop)]", menu && "rotate-45")} />
+              <Icon name="plus" size={21} stroke={2.8} className={cn("text-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)]", menu && "rotate-45")} />
             </button>
             {menu && (
               <AddMenu
@@ -269,11 +269,11 @@ export function Composer({
           </div>
         )}
         {recording ? (
-          <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-white pl-4 pr-1 shadow-[inset_0_0_0_1.5px_#121214] lg:bg-[#F4F2ED]">
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-white pl-4 pr-1 shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper">
             <RecordingBar ecoute={voice.ecoute} onSend={() => void sendVoice()} />
           </div>
         ) : (
-          <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#121214] lg:bg-[#F4F2ED] lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_#121214]">
+          <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
             <span className="sr-only">{about ? "Ta question sur ce point" : "Écris à BLUSH, ou colle sa réponse"}</span>
             <input
               ref={inputRef}
@@ -283,12 +283,12 @@ export function Composer({
               onFocus={() => reveiller()}
               placeholder={about ? "Ta question sur ce point" : modeVocal ? "Écris ou parle à BLUSH" : "Écris à BLUSH"}
               enterKeyHint="send"
-              className="min-w-0 flex-1 bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-grey"
+              className="min-w-0 flex-1 bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey"
             />
             {/* Texte tapé : la flèche pour envoyer. Champ vide : le vocal, comme dans Messages */}
             {typed ? (
               <button type="submit" aria-label="Envoyer" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">
-                <Icon name="arrow" size={17} color="#FFFFFF" stroke={2.8} className="-rotate-90" />
+                <Icon name="arrow" size={17} stroke={2.8} className="-rotate-90 text-white" />
               </button>
             ) : (
               <button
@@ -302,7 +302,7 @@ export function Composer({
                 aria-busy={voice.phase === "starting" || undefined}
                 className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform active:scale-95 disabled:animate-pulse"
               >
-                <Icon name="wave" size={18} color="#FFFFFF" stroke={2.6} />
+                <Icon name="wave" size={18} stroke={2.6} className="text-white" />
               </button>
             )}
           </label>
@@ -400,12 +400,12 @@ function AddMenu({ onClose, onPick }: { onClose: () => void; onPick: (what: "sho
             onClick={() => onPick(it.what)}
             className="row-hover flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-ink"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F2ED]">
-              <Icon name={it.icon} size={20} color="#121214" stroke={2.2} />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-paper">
+              <Icon name={it.icon} size={20} stroke={2.2} className="text-ink" />
             </span>
             <span className="flex flex-col gap-0.5">
-              <span className="text-[15px] font-black">{it.title}</span>
-              <span className="text-[12px] font-extrabold leading-[1.35] text-grey">{it.sub}</span>
+              <span className="text-detail font-black">{it.title}</span>
+              <span className="text-micro font-extrabold leading-[1.35] text-grey">{it.sub}</span>
             </span>
           </button>
         ))}

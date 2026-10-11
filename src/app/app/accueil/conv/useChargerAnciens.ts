@@ -11,6 +11,7 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { getChatHistory } from "@/services/api";
 import { ecritDepuis, FRAIS_DU_RENDU, renduFrais } from "@/lib/query";
+import { tracer } from "@/lib/tracer";
 import type { HistoriqueChat } from "@/types/api";
 import { fusion, memesMessages, type Conv } from "../../garde";
 import { echangesEnMsgs, type Msg } from "./modele";
@@ -116,7 +117,8 @@ export function useChargerAnciens({
           setPlus(r.plus);
           actions.current.fondre(r.msgs);
         })
-        .catch(() => {});
+        /* Pas de réseau : la conv affichée reste telle quelle, le prochain retour sur la page relira */
+        .catch((e) => tracer("conv:historique", e));
     };
     const premier = montage.current;
     montage.current = false;
@@ -124,10 +126,10 @@ export function useChargerAnciens({
     if (premier && renduAJour(page.rendu)) {
       /* Ce que la relecture aurait rapporté : la conv de départ a déjà l’historique de la page, reste le mode vocal en base */
       if (page.modeVocalDuRendu !== undefined) actions.current.suivreModeVocal()(page.modeVocalDuRendu);
-    } else recharger();
+    } else void recharger();
     /* Revenu sur la page par le bouton retour du navigateur (la page gardée en mémoire) */
     const auRetour = (e: PageTransitionEvent) => {
-      if (e.persisted) recharger();
+      if (e.persisted) void recharger();
     };
     window.addEventListener("pageshow", auRetour);
     return () => {
@@ -143,7 +145,8 @@ export function useChargerAnciens({
     const reponse = getChatHistory(avant);
     suivant.current = { avant, reponse };
     /* Raté (réseau coupé) : il sera redemandé */
-    reponse.catch(() => {
+    reponse.catch((e) => {
+      tracer("conv:prechargement", e);
       if (suivant.current?.reponse === reponse) suivant.current = null;
     });
   }, []);
@@ -166,8 +169,9 @@ export function useChargerAnciens({
       suivant.current = null;
       h = await (deja ?? getChatHistory(avant));
       await auRepos();
-    } catch {
+    } catch (e) {
       /* Réseau coupé : le bouton reste là, on réessaiera */
+      tracer("conv:anciens", e);
       chargement.current = false;
       setAnciens(false);
       return;
@@ -186,11 +190,12 @@ export function useChargerAnciens({
       setPlus(encore);
       if (nouveaux.length) actions.current.poserDevant(nouveaux);
     };
-    if (nouveaux.length) {
-      plusAncien.current = h.echanges[0].id;
+    const premier = nouveaux[0];
+    if (premier) {
+      plusAncien.current = h.echanges[0]?.id ?? null;
       /* Le rendu qui les pose recale la conv (voir Devant), puis prévient : alors seulement, le suivant peut partir */
       await new Promise<void>((pose) => {
-        devant.current = { ...mesurer(nouveaux[0].id), pose };
+        devant.current = { ...mesurer(premier.id), pose };
         startTransition(afficher);
       });
     } else startTransition(afficher);

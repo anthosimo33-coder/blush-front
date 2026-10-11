@@ -47,7 +47,7 @@ export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
       <FormulaireEmail envoi={envoi} />
       <NotePrivee className="leading-[1.45]">{NOTE_CONNEXION}</NotePrivee>
       {!depuisImport && (
-        <p className="m-0 text-[14px] font-extrabold text-grey">
+        <p className="m-0 text-note font-extrabold text-grey">
           Pas encore de compte{NBSP}?{" "}
           <LienDiscret href="/commencer">Analyser ma conv</LienDiscret>
         </p>

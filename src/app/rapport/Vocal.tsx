@@ -63,7 +63,7 @@ export function VocalDuRapport({ vocal, titre, fin, ecrit, sobre = false }: { vo
 
 /* ———— La tuile ———— */
 
-const FOND_TUILE = "radial-gradient(70% 120% at 18% 110%, rgba(232,53,138,0.55) 0%, rgba(232,53,138,0) 60%), linear-gradient(160deg, #2A2A30, #121214)";
+const FOND_TUILE = "radial-gradient(70% 120% at 18% 110%, rgba(232,53,138,0.55) 0%, rgba(232,53,138,0) 60%), linear-gradient(160deg, #2A2A30, var(--ink))";
 const OMBRE_TUILE = "inset 0 1px 0 rgba(255,255,255,0.14), 0 18px 34px -16px rgba(17,17,20,0.6)";
 
 /** Pendant que BLUSH l’enregistre : le point rouge et une onde qui bouge. */
@@ -72,11 +72,11 @@ function TuileEnregistre({ ecrit, sobre }: { ecrit: boolean; sobre: boolean }) {
     <div role="status" className="flex items-center gap-3.5 rounded-card p-4 pl-3.5 text-white" style={{ background: sobre ? "#1B1B1F" : FOND_TUILE, boxShadow: OMBRE_TUILE }}>
       {!sobre && <BubbleLogo size={58} />}
       <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-        <span className="text-[18px] font-black leading-tight">
+        <span className="text-carte font-black leading-tight">
           <span aria-hidden="true" data-vocal-rec="" className="mb-0.5 mr-2 inline-block size-[9px] rounded-full bg-[#FF5A60] align-middle" />
           BLUSH enregistre <span className="whitespace-nowrap">ton vocal</span>
         </span>
-        <span className="text-[14px] font-extrabold text-white/75">{ecrit ? "Prêt avant ton rapport" : "Prêt dans quelques secondes"}</span>
+        <span className="text-note font-extrabold text-white/75">{ecrit ? "Prêt avant ton rapport" : "Prêt dans quelques secondes"}</span>
         <span aria-hidden="true" className="mt-1 flex h-[22px] items-center gap-[3px]">
           {Array.from({ length: 26 }, (_, i) => (
             <span
@@ -178,7 +178,7 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
         });
       }, 300);
     };
-    const obs = new IntersectionObserver(([e]) => e.isIntersecting && precharger());
+    const obs = new IntersectionObserver(([e]) => e?.isIntersecting && precharger());
     if (!dejaEcoute(vocal.audio)) precharger();
     else obs.observe(el);
     return () => {
@@ -250,18 +250,18 @@ function Lecteur({ vocal, titre, fin, sobre }: { vocal: Pret; titre: string; fin
         data-vocal-nouveau={nouveau ? "" : undefined}
         aria-label={`Écouter le vocal de BLUSH, ${duree} secondes`}
         className="lift relative flex w-full items-center gap-3.5 overflow-hidden rounded-card p-4 pl-3.5 text-left text-white"
-        style={{ background: sobre ? "linear-gradient(160deg, #2A2A30, #121214)" : FOND_TUILE, boxShadow: OMBRE_TUILE }}
+        style={{ background: sobre ? "linear-gradient(160deg, #2A2A30, var(--ink))" : FOND_TUILE, boxShadow: OMBRE_TUILE }}
       >
         {!sobre && <BubbleLogo size={58} />}
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           {/* Sur un téléphone étroit, la coupure tombe avant « un vocal » */}
-          <span className={cn("font-black leading-tight", sobre ? "text-[17px]" : "text-[19px] [@media(max-width:380px)]:text-[18px]")}>
+          <span className={cn("font-black leading-tight", sobre ? "text-accent" : "text-[19px] [@media(max-width:380px)]:text-carte")}>
             BLUSH t’a laissé <span className="whitespace-nowrap">un vocal</span>
           </span>
-          <span className="text-[14px] font-extrabold text-white/75">{sobre ? "Écoute-le quand tu veux" : `Ton rapport en ${duree}\u00a0s`}</span>
+          <span className="text-note font-extrabold text-white/75">{sobre ? "Écoute-le quand tu veux" : `Ton rapport en ${duree}\u00a0s`}</span>
         </span>
         <span className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-white">
-          <Icon name="play" size={17} color="#121214" fill="#121214" stroke={0} className="translate-x-px" />
+          <Icon name="play" size={17} fill="currentColor" stroke={0} className="translate-x-px text-ink" />
         </span>
       </button>
     ),
@@ -374,10 +374,10 @@ function Story({
           </div>
           <div className="flex h-11 items-center gap-2">
             {!sobre && <BubbleLogo size={24} />}
-            <span className="text-[15px] font-black">BLUSH</span>
-            <span className="min-w-0 flex-1 truncate text-[14px] font-extrabold text-white/60">{titre}</span>
+            <span className="text-detail font-black">BLUSH</span>
+            <span className="min-w-0 flex-1 truncate text-note font-extrabold text-white/60">{titre}</span>
             <button type="button" onClick={onFermer} aria-label="Fermer et revenir au rapport" className="-mr-2.5 flex size-11 items-center justify-center">
-              <Icon name="close" size={22} color="#FFFFFF" stroke={2.6} />
+              <Icon name="close" size={22} stroke={2.6} className="text-white" />
             </button>
           </div>
         </div>
@@ -388,17 +388,17 @@ function Story({
               {sobre ? <PerlesSobres /> : <BubbleLogo size={96} />}
             </div>
             {fin.emoji && (
-              <span aria-hidden="true" className="text-[56px] leading-none">
+              <span aria-hidden="true" className="text-affiche leading-none">
                 {fin.emoji}
               </span>
             )}
-            <h2 className="m-0 text-[38px] font-black leading-[1.04] tracking-[-0.02em] [text-wrap:balance] [@media(max-height:620px)]:text-[30px]">{fin.titre}</h2>
-            <p className="m-0 text-[18px] font-extrabold leading-[1.4] text-white/70">{fin.sousTitre}</p>
+            <h2 className="m-0 text-[38px] font-black leading-[1.04] tracking-[-0.02em] [text-wrap:balance] [@media(max-height:620px)]:text-titre-2">{fin.titre}</h2>
+            <p className="m-0 text-carte font-extrabold leading-[1.4] text-white/70">{fin.sousTitre}</p>
             <div className="mt-4 flex flex-col gap-2.5">
-              <button ref={principal} type="button" onClick={onFermer} className="h-14 rounded-[28px] bg-white text-[17px] font-black text-ink">
+              <button ref={principal} type="button" onClick={onFermer} className="h-14 rounded-[28px] bg-white text-accent font-black text-ink">
                 {fin.action}
               </button>
-              <button type="button" onClick={onReecouter} className="flex h-[52px] items-center justify-center gap-2 rounded-[26px] bg-white/10 text-[16px] font-black">
+              <button type="button" onClick={onReecouter} className="flex h-[52px] items-center justify-center gap-2 rounded-[26px] bg-white/10 text-corps font-black">
                 <IconeReecoute />
                 Réécouter
               </button>
@@ -425,17 +425,17 @@ function Story({
                   <div key={cleRecu} data-vocal-pop="" className={cn("flex flex-col gap-1", recu.from === "toi" ? "items-end" : "items-start")}>
                     <span
                       className={cn(
-                        "max-w-[260px] rounded-[19px] px-3.5 py-[9px] font-message text-[17px] font-medium leading-[1.3] [@media(max-height:700px)]:py-[7px] [@media(max-height:700px)]:text-[15px]",
+                        "max-w-[260px] rounded-[19px] px-3.5 py-[9px] font-message text-accent font-medium leading-[1.3] [@media(max-height:700px)]:py-[7px] [@media(max-height:700px)]:text-detail",
                         recu.from === "toi" ? "bg-bubble-me" : "bg-[#2A2A30]",
                       )}
                     >
                       {recu.text}
                     </span>
-                    {recu.caption && <span className="text-[12px] font-extrabold text-white/60">{recu.caption}</span>}
+                    {recu.caption && <span className="text-micro font-extrabold text-white/60">{recu.caption}</span>}
                   </div>
                 )}
               </div>
-              <p role={coupe ? "alert" : undefined} className={cn("m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-[16px] font-extrabold leading-[1.35] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[14px]", coupe ? "text-white" : "text-white/45")}>
+              <p role={coupe ? "alert" : undefined} className={cn("m-0 mt-[22px] min-h-[22px] shrink-0 truncate text-corps font-extrabold leading-[1.35] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-note", coupe ? "text-white" : "text-white/45")}>
                 {coupe ? "Le vocal ne charge pas. Vérifie ta connexion, puis relance-le." : avant?.texte}
               </p>
               {ligne && (
@@ -443,7 +443,7 @@ function Story({
                   key={k}
                   className={cn(
                     "m-0 mt-2 shrink-0 font-black tracking-[-0.02em] [@media(max-height:700px)]:text-[27px] [@media(max-height:620px)]:text-[23px] [@media(max-width:340px)]:text-[26px]",
-                    sobre ? "text-[30px] leading-[1.18]" : "text-[34px] leading-[1.1]",
+                    sobre ? "text-titre-2 leading-[1.18]" : "text-[34px] leading-[1.1]",
                   )}
                 >
                   <span className="sr-only" aria-live="polite">
@@ -451,7 +451,7 @@ function Story({
                   </span>
                   <span aria-hidden="true">
                     {ligne.mots.map((m, i) => (
-                      <span key={i} className="transition-colors duration-100" style={{ color: t >= m.debut ? (ligne.punch && !sobre ? "#FF7DBA" : "#FFFFFF") : "rgba(255,255,255,0.26)" }}>
+                      <span key={i} className="transition-colors duration-100" style={{ color: t >= m.debut ? (ligne.punch && !sobre ? "#FF7DBA" : "white") : "rgba(255,255,255,0.26)" }}>
                         {m.t}{" "}
                       </span>
                     ))}
@@ -471,11 +471,11 @@ function Story({
                 className="flex size-[68px] items-center justify-center rounded-full bg-white [@media(max-height:620px)]:size-[60px]"
                 style={{ boxShadow: sobre ? undefined : "0 12px 30px -10px rgba(255,125,186,0.6)" }}
               >
-                {joue ? <Icon name="pause" size={22} color="#121214" stroke={3.2} /> : <Icon name="play" size={22} color="#121214" fill="#121214" stroke={0} className="translate-x-0.5" />}
+                {joue ? <Icon name="pause" size={22} stroke={3.2} className="text-ink" /> : <Icon name="play" size={22} fill="currentColor" stroke={0} className="translate-x-0.5 text-ink" />}
               </button>
               <button type="button" onClick={onFermer} aria-label="Passer et lire le rapport" className="flex size-12 items-center justify-center rounded-full bg-white/10">
                 <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 5l8 7-8 7M18 5v14" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6 5l8 7-8 7M18 5v14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
@@ -489,7 +489,7 @@ function Story({
 function IconeReecoute({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

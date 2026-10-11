@@ -1,10 +1,12 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setPaused } from "@/services/api";
 import { invalidate } from "@/lib/query";
+import { tracer } from "@/lib/tracer";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
@@ -24,9 +26,9 @@ const HELP = [
 ];
 
 function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: string }) {
-  const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-[17px] font-extrabold text-white no-underline";
+  const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-accent font-extrabold text-white no-underline";
   return href ? (
-    <Link href={href} className={cls}>
+    <Link href={href as Route} className={cls}>
       {children}
     </Link>
   ) : (
@@ -38,7 +40,7 @@ function SoberButton({ children, onClick, href }: { children: string; onClick?: 
 
 function SoberLink({ children, onClick }: { children: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex min-h-11 items-center justify-center text-[15px] font-black text-soft">
+    <button type="button" onClick={onClick} className="flex min-h-11 items-center justify-center text-detail font-black text-soft">
       {children}
     </button>
   );
@@ -55,6 +57,18 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
     titleRef.current?.focus();
   }, [step]);
 
+  /* La pause enregistrée, Mon compte la montre ; ratée (réseau), on reste ici : le geste se refait */
+  const mettreEnPause = async () => {
+    try {
+      await setPaused(true);
+    } catch (e) {
+      tracer("sobre:pause", e);
+      return;
+    }
+    invalidate("account");
+    router.push("/compte");
+  };
+
   /* Ouvert directement (le lien du mail) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
   const back = () => (step === 2 ? setStep(1) : pagePrecedente() ? router.back() : router.push("/app", { scroll: false }));
 
@@ -64,12 +78,12 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
         {/* Retour à gauche, « Quitter vite » toujours visible à droite */}
         <header className="flex h-[60px] shrink-0 items-center justify-between px-4">
           <button type="button" aria-label="Retour" onClick={back} className="-ml-2.5 flex size-11 items-center justify-center">
-            <Icon name="back" size={24} color="#4B4A47" stroke={2.4} />
+            <Icon name="back" size={24} stroke={2.4} className="text-soft" />
           </button>
           <Link
             href={QUIT_HREF}
             replace
-            className="relative flex h-[38px] items-center rounded-[19px] px-3.5 text-[14px] font-extrabold text-soft no-underline shadow-[inset_0_0_0_1.5px_#D6D2C8] after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']"
+            className="relative flex h-[38px] items-center rounded-[19px] px-3.5 text-note font-extrabold text-soft no-underline shadow-[inset_0_0_0_1.5px_#D6D2C8] after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']"
           >
             Quitter vite
           </Link>
@@ -82,11 +96,11 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               <div className="flex-1 lg:flex-none" />
               {vocal && <div className="mb-3">{vocal}</div>}
               <p className="m-0 text-[20px] font-extrabold leading-[1.45] text-soft">{data.intro}</p>
-              <h1 ref={titleRef} tabIndex={-1} className="m-0 text-[36px] font-black leading-[1.08] tracking-[-0.02em] outline-none">
+              <h1 ref={titleRef} tabIndex={-1} className="m-0 text-titre-1 font-black leading-[1.08] tracking-[-0.02em] outline-none">
                 {data.title}
               </h1>
-              <p className="m-0 text-[17px] font-bold leading-[1.45] text-soft">{data.facts}</p>
-              <p className="m-0 text-[17px] font-extrabold leading-[1.45] text-ink">{data.reassurance}</p>
+              <p className="m-0 text-accent font-bold leading-[1.45] text-soft">{data.facts}</p>
+              <p className="m-0 text-accent font-extrabold leading-[1.45] text-ink">{data.reassurance}</p>
               <div className="flex-1 lg:flex-none" />
             </div>
             <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
@@ -103,25 +117,19 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               <ol className="m-0 flex list-none flex-col gap-[18px] p-0">
                 {data.steps.map((s, i) => (
                   <li key={s} className="flex items-start gap-3.5">
-                    <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-[14px] font-black text-soft shadow-[inset_0_0_0_2px_#D6D2C8]">{i + 1}</span>
-                    <span className="text-[16px] font-bold leading-[1.45]">{s}</span>
+                    <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[15px] text-note font-black text-soft shadow-[inset_0_0_0_2px_#D6D2C8]">{i + 1}</span>
+                    <span className="text-corps font-bold leading-[1.45]">{s}</span>
                   </li>
                 ))}
               </ol>
-              <div className="rounded-[20px] bg-white p-4 shadow-[inset_0_0_0_1.5px_#E1DED7]">
-                <span className="text-[13px] font-extrabold text-grey">{data.draftLabel}</span>
-                <p className="m-0 mt-1.5 text-[16px] font-bold leading-[1.45]">{data.draft}</p>
+              <div className="rounded-[20px] bg-white p-4 shadow-[inset_0_0_0_1.5px_var(--color-track)]">
+                <span className="text-legende font-extrabold text-grey">{data.draftLabel}</span>
+                <p className="m-0 mt-1.5 text-corps font-bold leading-[1.45]">{data.draft}</p>
               </div>
             </div>
             <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
               <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
-              <SoberLink
-                onClick={async () => {
-                  await setPaused(true);
-                  invalidate("account");
-                  router.push("/compte");
-                }}
-              >
+              <SoberLink onClick={() => void mettreEnPause()}>
                 Mettre mon abonnement en pause
               </SoberLink>
             </div>
@@ -131,17 +139,17 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
       </div>
 
       <Sheet open={help} onClose={() => setHelp(false)} labelledBy="help-title" belowHeader={false}>
-        <h2 id="help-title" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+        <h2 id="help-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
           {data.helpLabel}
         </h2>
         <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
           {HELP.map((h) => (
             <li key={h.name}>
-              <a href={`tel:${h.tel}`} className="flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_#E1DED7]">
-                <span className="text-[16px] font-black">
+              <a href={`tel:${h.tel}`} className="flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]">
+                <span className="text-corps font-black">
                   {h.name} · {h.label}
                 </span>
-                <span className="text-[13px] font-extrabold text-grey">{h.detail}</span>
+                <span className="text-legende font-extrabold text-grey">{h.detail}</span>
               </a>
             </li>
           ))}

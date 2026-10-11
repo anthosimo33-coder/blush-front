@@ -284,7 +284,7 @@ export function useAnciensEnRemontant({
     let avant = pos();
     const obs = new IntersectionObserver(
       ([e]) => {
-        proche = e.isIntersecting;
+        proche = !!e?.isIntersecting;
         if (proche && monte && el.isConnected) void chargerAnciens();
       },
       { root: desk ? box : null, rootMargin: "1200px 0px 0px 0px" },

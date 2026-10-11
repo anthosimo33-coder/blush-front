@@ -94,8 +94,8 @@ export function BarreDeLaFenetre({ contact, others, busy, ouvrirDetails, entete 
         {others.length > 0 ? (
           <ConvsButton others={others} flat />
         ) : (
-          <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
-            <Icon name="back" size={16} color="#121214" stroke={2.6} />
+          <Link href="/rapport" className="back-nudge flex items-center gap-1.5 rounded-full px-3 py-2 text-note font-black text-ink no-underline transition-colors hover:bg-[rgba(17,17,20,0.05)]">
+            <Icon name="back" size={16} stroke={2.6} className="text-ink" />
             Ton rapport
           </Link>
         )}

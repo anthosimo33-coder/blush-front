@@ -37,21 +37,21 @@ export function EnTeteRapport({ story, report, entier, moi, autre }: { story: St
   return (
     <Card className="flex flex-col gap-2.5 p-[18px]">
       <div className="flex items-center justify-between">
-        <div className="text-[13px] font-black text-grey">Le rapport de votre histoire</div>
+        <div className="text-legende font-black text-grey">Le rapport de votre histoire</div>
         {entier ? <Tag tone="ink" size="md">Complet</Tag> : <Tag tone="apercu" size="md" />}
       </div>
       <div className="flex items-center gap-2.5">
         <AvatarPair me={moi} other={autre} />
-        <h1 className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">{titreDuo(story)}</h1>
+        <h1 className="m-0 text-titre-2 font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">{titreDuo(story)}</h1>
       </div>
-      <div className="text-[13px] font-bold leading-[1.45] text-grey">
+      <div className="text-legende font-bold leading-[1.45] text-grey">
         {story.period} · {story.updatedLabel}
       </div>
       {/* Mobile : les chiffres rangés en grille ; desktop : les pastilles de la maquette */}
       <dl className="m-0 mt-1 grid grid-cols-4 gap-2 border-t-2 border-sep pt-3.5 lg:hidden">
         {chiffres.map((c) => (
           <div key={c.nom} className="flex min-w-0 flex-col-reverse gap-0.5">
-            <dt className="text-[12px] font-extrabold text-grey">{c.nom}</dt>
+            <dt className="text-micro font-extrabold text-grey">{c.nom}</dt>
             <dd className="m-0 whitespace-nowrap text-[19px] font-black leading-tight tabular-nums">{c.valeur}</dd>
           </div>
         ))}

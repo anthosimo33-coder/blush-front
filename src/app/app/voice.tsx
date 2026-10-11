@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { arreterLeVocal, chargerEnMemoire, creerAudioContext, setRecording, useLecteurAudio } from "@/lib/audio";
 import { cn } from "@/lib/cn";
 import { auRepos } from "@/lib/repos";
+import { tracer } from "@/lib/tracer";
 import { Icon } from "@/components/ui/icons";
 
 /*
@@ -84,7 +85,8 @@ function creerEcoute() {
 function enregistreur(stream: MediaStream) {
   try {
     return new MediaRecorder(stream, { audioBitsPerSecond: DEBIT_VOCAL });
-  } catch {
+  } catch (e) {
+    tracer("vocal:debit", e);
     return new MediaRecorder(stream);
   }
 }
@@ -140,8 +142,10 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      ctx?.close().catch(() => {});
+    } catch (e) {
+      /* Refusé, ou pas de micro (NotAllowedError, NotFoundError) : la conv le dit, la console garde lequel */
+      tracer("vocal:micro", e);
+      fermerAudio(ctx);
       setRecording(false);
       setPhase("idle");
       handlers.current.onError("denied");
@@ -150,16 +154,17 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     /* L’écran a été quitté pendant que le micro s’ouvrait : on le referme tout de suite, rien ne s’enregistre */
     if (!monte.current) {
       stream.getTracks().forEach((t) => t.stop());
-      ctx?.close().catch(() => {});
+      fermerAudio(ctx);
       setRecording(false);
       return;
     }
     let recorder: MediaRecorder;
     try {
       recorder = enregistreur(stream);
-    } catch {
+    } catch (e) {
+      tracer("vocal:enregistreur", e);
       stream.getTracks().forEach((t) => t.stop());
-      ctx?.close().catch(() => {});
+      fermerAudio(ctx);
       setRecording(false);
       setPhase("idle");
       handlers.current.onError("unsupported");
@@ -172,7 +177,7 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
     /* L’onde : le volume du micro, relevé environ 14 fois par seconde */
     if (ctx) {
       try {
-        ctx.resume().catch(() => {});
+        ctx.resume().catch((e) => tracer("vocal:reprise", e));
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
         ctx.createMediaStreamSource(stream).connect(analyser);
@@ -192,8 +197,9 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
           s.raf = requestAnimationFrame(tick);
         };
         s.raf = requestAnimationFrame(tick);
-      } catch {
+      } catch (e) {
         /* Pas de niveaux : l’onde reste calme, l’enregistrement continue */
+        tracer("vocal:niveaux", e);
       }
     }
     /* Le temps affiché ne change qu’une fois par seconde : entre deux, rien à refaire */
@@ -231,8 +237,9 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       s.recorder.onstop = done;
       try {
         s.recorder.requestData();
-      } catch {
+      } catch (e) {
         /* Rien à demander : l’arrêt livrera le reste */
+        tracer("vocal:donnees", e);
       }
       s.recorder.stop();
     });
@@ -242,11 +249,16 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
   return { phase, ecoute: direct, start, stop };
 }
 
+/** Le contexte audio de l’onde, refermé ; un refus (déjà fermé) se trace sans gêner la suite. */
+function fermerAudio(ctx: AudioContext | null | undefined) {
+  ctx?.close().catch((e) => tracer("vocal:fermeture", e));
+}
+
 function release(s: Session) {
   cancelAnimationFrame(s.raf);
   clearInterval(s.timer);
   s.stream.getTracks().forEach((t) => t.stop());
-  s.ctx?.close().catch(() => {});
+  fermerAudio(s.ctx);
   setRecording(false);
 }
 
@@ -273,8 +285,8 @@ export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSen
         Enregistrement du vocal en cours
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-[#E5484D]" />
-        <span className="w-[38px] text-[15px] font-black tabular-nums text-ink">{formatClock(seconds)}</span>
+        <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-danger-vif" />
+        <span className="w-[38px] text-detail font-black tabular-nums text-ink">{formatClock(seconds)}</span>
       </span>
       <span aria-hidden="true" data-onde="" className="flex h-7 min-w-0 flex-1 items-center justify-end gap-[2px] overflow-hidden">
         {bars.map((l, i) => (
@@ -283,7 +295,7 @@ export function RecordingBar({ ecoute, onSend }: { ecoute: EcouteEnDirect; onSen
         ))}
       </span>
       <button type="button" onClick={onSend} aria-label="Envoyer le vocal" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">
-        <Icon name="arrow" size={17} color="#FFFFFF" stroke={2.8} className="-rotate-90" />
+        <Icon name="arrow" size={17} stroke={2.8} className="-rotate-90 text-white" />
       </button>
     </>
   );
@@ -303,14 +315,14 @@ export function VoiceNote({ clip }: { clip: Pick<VoiceClip, "url" | "seconds" | 
         aria-label={playing ? "Mettre ton vocal en pause" : `Écouter ton vocal (${formatClock(clip.seconds)})`}
         className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white"
       >
-        {playing ? <Icon name="pause" size={15} color="#1A66DB" stroke={3.2} /> : <Icon name="play" size={15} color="#1A66DB" fill="#1A66DB" stroke={0} className="translate-x-px" />}
+        {playing ? <Icon name="pause" size={15} stroke={3.2} className="text-toi-ink" /> : <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-toi-ink" />}
       </button>
       <span aria-hidden="true" className="flex h-7 items-center gap-[2px]">
         {clip.peaks.map((p, i) => (
           <span key={i} className={cn("w-[3px] rounded-full", (i + 0.5) / clip.peaks.length <= progress ? "bg-white" : "bg-white/50")} style={{ height: 4 + p * 22 }} />
         ))}
       </span>
-      <span className="text-[13px] font-black tabular-nums text-white/90">{formatClock(clip.seconds)}</span>
+      <span className="text-legende font-black tabular-nums text-white/90">{formatClock(clip.seconds)}</span>
     </span>
   );
 }
@@ -372,7 +384,7 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
     };
     const obs = new IntersectionObserver(
       ([e]) => {
-        if (!e.isIntersecting) return;
+        if (!e?.isIntersecting) return;
         vue = true;
         revoir();
       },
@@ -398,14 +410,14 @@ export function VocalBlush({ vocal }: { vocal: { audio: string; duree: number; p
         className="flex size-[42px] shrink-0 items-center justify-center rounded-full shadow-[0_6px_14px_-6px_rgba(200,29,107,0.7)]"
         style={{ background: "linear-gradient(160deg, #FF94C8 0%, #E8358A 60%, #C81D6B 100%)" }}
       >
-        {playing ? <Icon name="pause" size={15} color="#FFFFFF" stroke={3.2} /> : <Icon name="play" size={15} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />}
+        {playing ? <Icon name="pause" size={15} stroke={3.2} className="text-white" /> : <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-white" />}
       </button>
       <span aria-hidden="true" className="flex h-7 flex-1 items-center justify-between gap-[2px]">
         {vocal.peaks.map((p, i) => (
           <span key={i} className={cn("w-[3px] rounded-full", (i + 0.5) / vocal.peaks.length <= t / duree ? "bg-[#E8358A]" : "bg-[#D9D6CF]")} style={{ height: 5 + p * 22 }} />
         ))}
       </span>
-      <span className="shrink-0 text-[13px] font-black tabular-nums text-grey">{formatClock(playing || t > 0 ? t : Math.round(duree))}</span>
+      <span className="shrink-0 text-legende font-black tabular-nums text-grey">{formatClock(playing || t > 0 ? t : Math.round(duree))}</span>
     </span>
   );
 }

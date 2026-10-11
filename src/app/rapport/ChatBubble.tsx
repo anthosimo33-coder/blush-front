@@ -45,7 +45,7 @@ export function ChatBubble({ sobre = false }: { sobre?: boolean }) {
       <span
         aria-hidden="true"
         className={cn(
-          "hidden rounded-full bg-ink px-3.5 py-2 text-[14px] font-black text-white shadow-[0_12px_28px_-12px_rgba(17,17,20,0.55)] transition-opacity duration-200 lg:block",
+          "hidden rounded-full bg-ink px-3.5 py-2 text-note font-black text-white shadow-[0_12px_28px_-12px_rgba(17,17,20,0.55)] transition-opacity duration-200 lg:block",
           vu && !sobre && "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
         )}
       >
@@ -59,7 +59,7 @@ export function ChatBubble({ sobre = false }: { sobre?: boolean }) {
         )}
       >
         {/* Une fois le chat ouvert, la bulle se calme : ses perles ne tournent plus en fond pendant toute la lecture */}
-        {sobre ? <Icon name="imessage" size={26} color="#FFFFFF" stroke={2.2} /> : <BubbleLogo size={40} animated={!ouvert} />}
+        {sobre ? <Icon name="imessage" size={26} stroke={2.2} className="text-white" /> : <BubbleLogo size={40} animated={!ouvert} />}
         {!ouvert && <span aria-hidden="true" className="absolute right-1 top-1 size-3.5 rounded-full border-[2.5px] border-white bg-elle" />}
       </span>
     </Link>

@@ -2,6 +2,7 @@
 
 import { AppBadge } from "@/components/ui/Avatar";
 import { ButtonLink } from "@/components/ui/Button";
+import { DoneCheck } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
@@ -39,17 +40,14 @@ export function ConvOkScreen({ source }: { source: Source }) {
         <div className="flex items-center gap-3 px-5 pb-4 pt-5">
           <AppBadge app={j.exportApp} size={46} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate text-[16px] font-black">{fileName}</span>
-            <span className="text-[13px] font-extrabold text-grey">{source.period}</span>
+            <span className="truncate text-corps font-black">{fileName}</span>
+            <span className="text-legende font-extrabold text-grey">{source.period}</span>
           </span>
-          <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
-            <Icon name="check" size={14} color="#FFFFFF" stroke={3.4} />
-            <span className="sr-only">Fichier ajouté</span>
-          </span>
+          <DoneCheck size={26} label="Fichier ajouté" />
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 border-t border-[rgba(17,17,20,0.06)] px-5 pb-5 pt-4">
-          <span className="text-[56px] font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(source.messageCount)}</span>
-          <span className="text-[16px] font-black text-soft">
+          <span className="text-affiche font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(source.messageCount)}</span>
+          <span className="text-corps font-black text-soft">
             messages · {source.voiceCount} vocaux
           </span>
         </div>
@@ -57,8 +55,8 @@ export function ConvOkScreen({ source }: { source: Source }) {
 
       {/* Une conv trop longue pour partir en entier : le navigateur n’en a gardé que la partie la plus récente, on le dit */}
       {source.moisLus && (
-        <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-[14px] font-extrabold leading-[1.45] text-soft">
-          <Icon name="clock" size={17} color="#4B4A47" style={{ marginTop: 1 }} />
+        <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-note font-extrabold leading-[1.45] text-soft">
+          <Icon name="clock" size={17} style={{ marginTop: 1 }} className="text-soft" />
           <span>
             Votre conv est très longue{NBSP}: BLUSH lit {source.moisLus > 1 ? `vos ${source.moisLus} derniers mois` : "votre dernier mois"}, ce qui compte le plus pour savoir où vous en êtes.
           </span>

@@ -45,7 +45,7 @@ export function CaseAjout() {
   return (
     <Thumb>
       <span className="absolute inset-0 flex items-center justify-center">
-        <Icon name="plus" size={26} color="#8A8780" stroke={2.6} />
+        <Icon name="plus" size={26} stroke={2.6} className="text-muted" />
       </span>
     </Thumb>
   );
@@ -82,7 +82,7 @@ function Thumb({ children, selected, number, image, video }: { children?: ReactN
         <video src={`${image}#t=0.6`} muted playsInline preload="metadata" className="absolute inset-0 size-full object-cover object-top" />
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="flex size-9 items-center justify-center rounded-full bg-[rgba(17,17,20,0.6)]">
-            <Icon name="play" size={15} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />
+            <Icon name="play" size={15} fill="currentColor" stroke={0} className="translate-x-px text-white" />
           </span>
         </span>
       </div>
@@ -96,7 +96,7 @@ function Thumb({ children, selected, number, image, video }: { children?: ReactN
       style={image ? { backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center top" } : undefined}
     >
       {number !== undefined && (
-        <span className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-xl bg-ink text-[12px] font-black text-white">{number}</span>
+        <span className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-xl bg-ink text-micro font-black text-white">{number}</span>
       )}
       {children}
     </div>
@@ -128,17 +128,17 @@ export function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?:
         )}
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="flex size-7 items-center justify-center rounded-full bg-[rgba(17,17,20,0.6)]">
-            <Icon name="play" size={12} color="#FFFFFF" fill="#FFFFFF" stroke={0} className="translate-x-px" />
+            <Icon name="play" size={12} fill="currentColor" stroke={0} className="translate-x-px text-white" />
           </span>
         </span>
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[16px] font-black">Ton enregistrement</span>
-        <span className="text-[13px] font-extrabold text-grey">
+        <span className="text-corps font-black">Ton enregistrement</span>
+        <span className="text-legende font-extrabold text-grey">
           {duree && Number.isFinite(duree) ? `${duree >= 60 ? `${Math.floor(duree / 60)}\u00a0min ` : ""}${Math.round(duree % 60)}\u00a0s · ` : ""}prêt
         </span>
       </span>
-      <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-[13px] font-black text-ink disabled:opacity-50">
+      <button type="button" onClick={onChange} disabled={!onChange} className="lift lift-sm h-9 shrink-0 rounded-full bg-plaque px-3.5 text-legende font-black text-ink disabled:opacity-50">
         Changer
       </button>
     </div>
@@ -163,15 +163,15 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
             <span className="size-4 rounded-full bg-[#FF5A60] shadow-[0_0_0_4px_rgba(255,90,96,0.22)]" />
           </span>
           <span className="flex flex-col">
-            <span className="text-[17px] font-black">Enregistre ton écran</span>
-            <span className="text-[13px] font-extrabold text-grey">Toute votre conv, en une minute</span>
+            <span className="text-accent font-black">Enregistre ton écran</span>
+            <span className="text-legende font-extrabold text-grey">Toute votre conv, en une minute</span>
           </span>
         </span>
         <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
           {etapes.map((e, k) => (
             <li key={k} className="flex items-start gap-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-black text-white">{k + 1}</span>
-              <span className="pt-0.5 text-[14px] font-extrabold leading-[1.4]">{e}</span>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink text-micro font-black text-white">{k + 1}</span>
+              <span className="pt-0.5 text-note font-extrabold leading-[1.4]">{e}</span>
             </li>
           ))}
         </ol>
@@ -208,8 +208,8 @@ export function Dropzone({ onPick, onFiles }: { onPick: () => void; onFiles: (fi
     >
       <ScreensArt />
       <span className="flex flex-col gap-1">
-        <span className="text-[17px] font-black">Ajoute tes captures</span>
-        <span className="text-[13px] font-extrabold text-grey">Dans l’ordre, de la plus ancienne à la plus récente</span>
+        <span className="text-accent font-black">Ajoute tes captures</span>
+        <span className="text-legende font-extrabold text-grey">Dans l’ordre, de la plus ancienne à la plus récente</span>
       </span>
     </button>
   );
@@ -236,7 +236,7 @@ function ScreensArt() {
           ))}
           {i === 2 && (
             <span className="absolute -bottom-2 -right-2 flex size-6 items-center justify-center rounded-full bg-ink shadow-[0_4px_10px_-4px_rgba(17,17,20,0.5)]">
-              <Icon name="plus" size={14} color="#FFFFFF" stroke={3} />
+              <Icon name="plus" size={14} stroke={3} className="text-white" />
             </span>
           )}
         </span>

@@ -1,9 +1,11 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { codeDe } from "@/lib/messages-erreur";
 import { connexionPuis } from "@/lib/suite";
+import { tracer } from "@/lib/tracer";
 import { useSondage, type SuiteDuSondage } from "@/lib/useSondage";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { lectureLancee } from "@/state/lecture";
@@ -76,7 +78,7 @@ export function useSuiviLecture() {
   const enCours = useRef<number | null>(null);
 
   /* Le routeur n’est lu qu’au moment de partir : le lancement ne se rejoue pas pour lui */
-  const remplacer = useEffectEvent((url: string) => router.replace(url));
+  const remplacer = useEffectEvent((url: string) => router.replace(url as Route));
 
   const relancer = () => {
     setEchec(false);
@@ -88,7 +90,7 @@ export function useSuiviLecture() {
 
   useEffect(() => {
     let vivant = true;
-    (async () => {
+    void (async () => {
       /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) : pas de second POST, on suit tout de suite */
       const deja = lancement === 0 && lectureLancee();
       /*
@@ -97,7 +99,14 @@ export function useSuiviLecture() {
        * aussitôt ; ce suivi suffit à la reprendre après minuit (GET /api/analyse). Sinon, le POST la lance ou la relance,
        * comme avant
        */
-      const avant = lancement === 0 && !deja ? await getAnalysisProgress().catch(() => null) : null;
+      const avant =
+        lancement === 0 && !deja
+          ? await getAnalysisProgress().catch((e) => {
+              /* Rien lu : le POST lance ou relance la lecture, comme avant */
+              tracer("lecture:avancee", e);
+              return null;
+            })
+          : null;
       if (!vivant) return;
       const rienARelancer = !!avant?.failed && avant.failReason === "souffle";
       /* Un refus du serveur : l’écran d’échec, avec « Relancer », plutôt qu’un anneau qui ne bouge plus */
@@ -157,7 +166,7 @@ export function useSuiviLecture() {
       if (enCours.current !== pour) return false;
       rates.current += 1;
       const apres = apresUnRate(codeDe(e), rates.current);
-      if (apres.faire === "connexion") router.replace(connexionPuis("/lecture"));
+      if (apres.faire === "connexion") router.replace(connexionPuis("/lecture") as Route);
       if (apres.faire === "echec") setEchec(true);
       return apres.faire === "relire" ? apres.dans : false;
     }

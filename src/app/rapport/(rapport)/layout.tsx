@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getStory, sansHistoire, verdictEcrit } from "@/services/serveur";
 
@@ -8,7 +9,7 @@ import { getStory, sansHistoire, verdictEcrit } from "@/services/serveur";
  */
 export default async function Layout({ children }: LayoutProps<"/rapport">) {
   const [story, ecrit] = await Promise.all([getStory(), verdictEcrit()]);
-  if (!story) redirect(await sansHistoire("/rapport"));
+  if (!story) redirect((await sansHistoire("/rapport")) as Route);
   if (!ecrit) redirect("/lecture");
   return children;
 }

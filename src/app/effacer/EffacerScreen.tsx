@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
+import { Alert, NoteIcone } from "@/components/ui/feedback";
 import { Sheet } from "@/components/ui/surfaces";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { NBSP } from "@/lib/format";
+import { tracer } from "@/lib/tracer";
 import { deleteAccount, seDeconnecter } from "@/services/api";
 import { ErreurApi } from "@/types/erreurs-api";
 
@@ -40,6 +40,7 @@ export function EffacerScreen({ email }: { email: string }) {
     } catch (e) {
       /* 401 : la session a expiré entre-temps, il n’y a plus rien à effacer sur le serveur, et cet appareil a déjà tout oublié */
       if (!(e instanceof ErreurApi && e.status === 401)) {
+        tracer("effacer:compte", e);
         setEnCours(null);
         setSouci("Ça n’a pas marché. Vérifie ta connexion et réessaie.");
         return;
@@ -54,7 +55,8 @@ export function EffacerScreen({ email }: { email: string }) {
     setSouci(null);
     try {
       await seDeconnecter();
-    } catch {
+    } catch (e) {
+      tracer("effacer:sortie", e);
       setEnCours(null);
       setSouci("Ça n’a pas marché. Vérifie ta connexion et réessaie.");
       return;
@@ -79,40 +81,31 @@ export function EffacerScreen({ email }: { email: string }) {
           <Button onClick={() => setConfirmer(true)} disabled={!!enCours}>
             Tout effacer
           </Button>
-          <Button variant="link" aria-busy={enCours === "sortir"} onClick={autreEmail}>
-            {enCours === "sortir" ? <TypingDots label="Déconnexion" /> : "Me connecter avec un autre email"}
+          <Button variant="link" loading={enCours === "sortir"} loadingLabel="Déconnexion" onClick={() => void autreEmail()}>
+            Me connecter avec un autre email
           </Button>
         </>
       }
     >
       {souci && !confirmer && (
-        <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
-          {souci}
-        </p>
+        <Alert>{souci}</Alert>
       )}
-      <p className="m-0 flex items-start gap-2 text-[13px] font-extrabold text-grey">
-        <Icon name="lock" size={16} color="#8A8780" style={{ marginTop: 1 }} />
-        <span>
-          Une question{NBSP}? Écris-nous à{" "}
-          <a href="mailto:bonjour@askblush.com" className="underline">
-            bonjour@askblush.com
-          </a>
-          .
-        </span>
-      </p>
+      <NoteIcone icone="lock" ton="muted" className="text-legende">
+        Une question{NBSP}? Écris-nous à{" "}
+        <a href="mailto:bonjour@askblush.com" className="underline">
+          bonjour@askblush.com
+        </a>
+        .
+      </NoteIcone>
 
       <Sheet open={confirmer} onClose={fermer} labelledBy="effacer-titre">
-        <h2 id="effacer-titre" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+        <h2 id="effacer-titre" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
           Tout effacer{NBSP}?
         </h2>
-        <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">Ton compte et toutes tes histoires, sur tous tes appareils. On ne pourra rien récupérer.</p>
-        {souci && (
-          <p role="alert" className="m-0 text-[14px] font-extrabold text-[#D93036]">
-            {souci}
-          </p>
-        )}
-        <Button aria-busy={enCours === "effacer"} onClick={effacer}>
-          {enCours === "effacer" ? <TypingDots color="#FFFFFF" label="Effacement" /> : "Tout effacer"}
+        <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">Ton compte et toutes tes histoires, sur tous tes appareils. On ne pourra rien récupérer.</p>
+        {souci && <Alert>{souci}</Alert>}
+        <Button loading={enCours === "effacer"} loadingLabel="Effacement" onClick={() => void effacer()}>
+          Tout effacer
         </Button>
         <Button variant="link" onClick={fermer}>
           Annuler

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
 import { betaFermee } from "@/server/drapeaux";
@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: PageProps<"/importer/captur
   const { appli, ajout } = adresseDesCaptures(app, mode);
   if (betaFermee() && !(await estConnecte())) {
     const ici = new URLSearchParams({ ...(appli ? { app: appli } : {}), ...(ajout ? { mode: "ajout" } : {}) }).toString();
-    redirect(connexionPuis(`/importer/captures${ici ? `?${ici}` : ""}`));
+    redirect(connexionPuis(`/importer/captures${ici ? `?${ici}` : ""}`) as Route);
   }
   return <CapturesScreen app={appli} addMode={ajout} />;
 }

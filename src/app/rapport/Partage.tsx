@@ -4,7 +4,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { copyText } from "@/lib/hooks";
+import { nomErreur, tracer } from "@/lib/tracer";
 import { creerLienPartage, desactiverLienPartage, type VerdictMontre } from "@/services/api";
+import { Alert } from "@/components/ui/feedback";
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
@@ -22,11 +24,11 @@ import { PAPIER } from "@/components/partage/feuille";
 /* Les logos de WhatsApp et de Messages, reconnaissables d’un coup d’œil (les icônes au trait se ressemblent trop) */
 function GlypheWhatsApp() {
   return (
-    <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3.2a8.8 8.8 0 0 0-7.6 13.2L3.3 20.7l4.4-1.1A8.8 8.8 0 1 0 12 3.2z" fill="none" stroke="#FFFFFF" strokeWidth={1.9} strokeLinejoin="round" />
+    <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true" className="text-white">
+      <path d="M12 3.2a8.8 8.8 0 0 0-7.6 13.2L3.3 20.7l4.4-1.1A8.8 8.8 0 1 0 12 3.2z" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinejoin="round" />
       <path
         d="M9.1 7.9c.2-.4.4-.4.6-.4h.5c.2 0 .4 0 .5.4l.7 1.7c.1.2 0 .4-.1.5l-.5.6c-.1.2-.2.3 0 .6.5.9 1.3 1.7 2.3 2.2.3.1.4.1.6-.1l.6-.7c.2-.2.3-.2.5-.1l1.6.8c.2.1.4.2.4.4 0 .5-.2 1.2-.6 1.5-.6.5-1.4.7-2.3.4-1.5-.5-2.9-1.4-4-2.6-.9-1-1.5-2-1.6-3 0-.9.3-1.6.8-2.2z"
-        fill="#FFFFFF"
+        fill="currentColor"
       />
     </svg>
   );
@@ -34,8 +36,8 @@ function GlypheWhatsApp() {
 
 function GlypheMessages() {
   return (
-    <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 4.5c-4.7 0-8.5 3.1-8.5 7 0 2.2 1.2 4.2 3.2 5.5-.2 1-.8 2-1.7 2.8 1.6 0 3.2-.6 4.3-1.5.9.2 1.8.3 2.7.3 4.7 0 8.5-3.1 8.5-7s-3.8-7.1-8.5-7.1z" fill="#FFFFFF" />
+    <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden="true" className="text-white">
+      <path d="M12 4.5c-4.7 0-8.5 3.1-8.5 7 0 2.2 1.2 4.2 3.2 5.5-.2 1-.8 2-1.7 2.8 1.6 0 3.2-.6 4.3-1.5.9.2 1.8.3 2.7.3 4.7 0 8.5-3.1 8.5-7s-3.8-7.1-8.5-7.1z" fill="currentColor" />
     </svg>
   );
 }
@@ -48,9 +50,9 @@ function Action({ icone, nom, fond, href, onClick, pret, children }: { icone: Ic
         className="flex size-14 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07),0_10px_20px_-10px_rgba(17,17,20,0.5)] transition-[translate,box-shadow] duration-300 [transition-timing-function:var(--ease-pop)] group-hover:-translate-y-0.5 group-hover:shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07),0_16px_26px_-12px_rgba(17,17,20,0.55)] group-active:translate-y-px group-active:duration-75 motion-reduce:translate-none"
         style={{ background: fond }}
       >
-        {children ?? <Icon name={icone} size={22} color="#FFFFFF" stroke={2.3} />}
+        {children ?? <Icon name={icone} size={22} stroke={2.3} className="text-white" />}
       </span>
-      <span className="text-[13px] font-black text-ink">{nom}</span>
+      <span className="text-legende font-black text-ink">{nom}</span>
     </>
   );
   /* Le survol soulève le rond, pas toute la case (sinon un carré blanc apparaît autour) */
@@ -89,7 +91,10 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
     let fini = false;
     creerLienPartage()
       .then((l) => !fini && setLien(l))
-      .catch(() => !fini && setProbleme(true));
+      .catch((e) => {
+        tracer("partage:lien", e);
+        if (!fini) setProbleme(true);
+      });
     return () => {
       fini = true;
     };
@@ -103,7 +108,10 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
     fetch(adresseStory)
       .then((r) => (r.ok ? r.blob() : Promise.reject()))
       .then((b) => !fini && setStory(new File([b], "verdict-blush.png", { type: "image/png" })))
-      .catch(() => !fini && setStoryRatee(true));
+      .catch((e) => {
+        tracer("partage:image-story", e);
+        if (!fini) setStoryRatee(true);
+      });
     return () => {
       fini = true;
     };
@@ -129,7 +137,9 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
         await navigator.share({ files: [story] });
         return;
       }
-    } catch {
+    } catch (e) {
+      /* La feuille de partage refermée sans choisir (AbortError) n’est pas un souci ; le reste se trace */
+      if (nomErreur(e) !== "AbortError") tracer("partage:story", e);
       return;
     }
     /* Sur ordinateur : l’image s’enregistre, prête pour une story depuis le téléphone */
@@ -148,9 +158,14 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
       setStory(null);
       setImage(false);
       onClose();
-    } catch {
+    } catch (e) {
+      tracer("partage:desactiver", e);
       setFait("Pas réussi. Réessaie.");
     }
+  };
+
+  const copier = async () => {
+    if (url) setCopie(await copyText(url));
   };
 
   return (
@@ -173,7 +188,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
             <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center">
               {montre ? (
                 <>
-                  <span aria-hidden="true" className="text-[52px] leading-none">
+                  <span aria-hidden="true" className="text-chiffre leading-none">
                     {montre.emoji}
                   </span>
                   <span aria-hidden="true" className="line-clamp-2 text-[20px] font-black leading-[1.15] tracking-[-0.01em] text-ink [text-wrap:balance]">
@@ -187,13 +202,13 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
           )}
         </div>
         <figcaption className="flex flex-col gap-0.5 px-4 py-3">
-          <span className="line-clamp-2 min-h-[20px] text-[15px] font-black leading-[1.3] text-ink">{montre && `${montre.emoji} ${montre.title}`}</span>
-          <span className="text-[13px] font-extrabold text-grey">askblush.com</span>
+          <span className="line-clamp-2 min-h-[20px] text-detail font-black leading-[1.3] text-ink">{montre && `${montre.emoji} ${montre.title}`}</span>
+          <span className="text-legende font-extrabold text-grey">askblush.com</span>
         </figcaption>
       </figure>
 
       {probleme ? (
-        <p role="alert" className="m-0 flex items-center justify-between gap-3 rounded-[18px] bg-[rgba(229,72,77,0.08)] px-4 py-3 text-[14px] font-extrabold text-[#C2363B]">
+        <Alert variant="voile" className="flex items-center justify-between gap-3">
           Le lien n’a pas pu être créé.
           <button
             type="button"
@@ -202,11 +217,11 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
           >
             Réessayer
           </button>
-        </p>
+        </Alert>
       ) : (
         <div className="grid grid-cols-4 gap-2 px-1 pt-1">
-          <Action icone="link" nom={copie ? "Copié" : "Copier"} fond="var(--gloss), #FFFFFF" pret={pret} onClick={async () => url && setCopie(await copyText(url))}>
-            {copie ? <Icon name="check" size={22} color="#087A56" stroke={3} /> : <Icon name="link" size={22} color="#121214" stroke={2.3} />}
+          <Action icone="link" nom={copie ? "Copié" : "Copier"} fond="var(--gloss), white" pret={pret} onClick={() => void copier()}>
+            {copie ? <Icon name="check" size={22} stroke={3} className="text-vrai-ink" /> : <Icon name="link" size={22} stroke={2.3} className="text-ink" />}
           </Action>
           <Action icone="whatsapp" nom="WhatsApp" fond="var(--gloss), #25D366" pret={pret} href={`https://wa.me/?text=${encodeURIComponent(avecLien)}`}>
             <GlypheWhatsApp />
@@ -214,18 +229,18 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
           <Action icone="imessage" nom="Messages" fond="var(--gloss), #34C759" pret={pret} href={`sms:?&body=${encodeURIComponent(avecLien)}`}>
             <GlypheMessages />
           </Action>
-          <Action icone="instagram" nom="Story" fond="var(--gloss), linear-gradient(45deg, #FFAA2C, #FF4F9A 55%, #9B7BFF)" pret={pret && (!!story || storyRatee)} onClick={story ? enStory : () => setFait("L’image story n’a pas pu se préparer. Réessaie dans un instant.")} />
+          <Action icone="instagram" nom="Story" fond="var(--gloss), linear-gradient(45deg, var(--attente), var(--elle) 55%, var(--flou))" pret={pret && (!!story || storyRatee)} onClick={story ? () => void enStory() : () => setFait("L’image story n’a pas pu se préparer. Réessaie dans un instant.")} />
         </div>
       )}
 
       <div className="flex items-start gap-2.5 rounded-[18px] bg-plaque px-3.5 py-3">
-        <Icon name="shield" size={17} color="#4B4A47" stroke={2.2} style={{ marginTop: 1 }} />
-        <p className="m-0 flex-1 text-[13px] font-extrabold leading-[1.45] text-soft">
+        <Icon name="shield" size={17} stroke={2.2} style={{ marginTop: 1 }} className="text-soft" />
+        <p className="m-0 flex-1 text-legende font-extrabold leading-[1.45] text-soft">
           {fait ?? (
             <>
               Le lien montre ce verdict, rien d’autre{NBSP}: ni vos messages, ni son prénom.{" "}
               {url && (
-<LienDiscret onClick={desactiver}>Désactiver le lien</LienDiscret>
+                <LienDiscret onClick={() => void desactiver()}>Désactiver le lien</LienDiscret>
               )}
             </>
           )}

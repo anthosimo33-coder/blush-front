@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -13,8 +14,8 @@ import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/
 import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
+import { DoneCheck } from "@/components/ui/feedback";
 import { FileInput, TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { ReorderGrid } from "@/components/ui/ReorderGrid";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
@@ -134,6 +135,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (from < 0 || to < 0 || to >= list.length || from === to) return list;
       const next = [...list];
       const [it] = next.splice(from, 1);
+      if (!it) return list;
       next.splice(to, 0, it);
       return next;
     });
@@ -145,9 +147,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     setSouci(null);
     setAvance(null);
     const video = !!result?.video;
+    const enregistre = video ? items[0] : undefined;
     try {
-      const r = video
-        ? await uploadRecording(items[0].file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", setAvance)
+      const r = enregistre
+        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", setAvance)
         : await uploadScreenshots(
             items.map((s) => s.file),
             { app: captureApp, mode: addMode ? "add" : "first", onAvance: setAvance },
@@ -160,7 +163,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     } catch (e) {
       if (!monte.current) return;
       /* Bêta fermée : BLUSH ne lit des captures que pour un compte (la session a pu expirer sur cet écran). La connexion, puis retour ici */
-      if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
+      if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`) as Route);
       setBusy(false);
       setAvance(null);
       /* La limite du jour, ou le budget de l’IA du jour atteint (« souffle ») : les captures ne sont pas en cause */
@@ -181,6 +184,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   };
   /* Pendant la lecture, ce qui se dit dans le bouton (et aux lecteurs d’écran) */
   const enCours = avance ? texteAvance(avance) : texteLecture(items.length);
+  /* La première capture, ou l’enregistrement (seul de sa liste) */
+  const premier = items[0];
 
   return (
     <ParcoursScreen
@@ -200,10 +205,11 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         items.length ? (
           <>
             <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
+              {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
               {busy ? (
                 <span className="flex min-w-0 items-center gap-2.5">
-                  <TypingDots color="#FFFFFF" label={enCours} />
-                  <span className="text-[16px] leading-[1.2] tabular-nums">{enCours}</span>
+                  <TypingDots color="white" label={enCours} />
+                  <span className="text-corps leading-[1.2] tabular-nums">{enCours}</span>
                 </span>
               ) : (
                 "Continuer"
@@ -220,14 +226,14 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         )
       }
     >
-      {items.length === 0 ? (
+      {!premier ? (
         enregistrement ? (
           <CommentFilmer onPick={rec.open} />
         ) : (
           <Dropzone onPick={shots.open} onFiles={(f) => handle(f, false)} />
         )
       ) : result?.video ? (
-        <CarteEnregistrement shot={items[0]} onChange={busy ? undefined : choisirEnregistrement} />
+        <CarteEnregistrement shot={premier} onChange={busy ? undefined : choisirEnregistrement} />
       ) : (
         <div className="flex flex-col gap-2.5">
           {/* Pendant la lecture, l’ordre et la sélection sont figés : ce qui part est déjà parti */}
@@ -242,7 +248,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
             textes={TEXTES_GRILLE}
             sous={
               trop && (
-                <p role="status" className="m-0 text-[14px] font-extrabold leading-[1.45] text-ink">
+                <p role="status" className="m-0 text-note font-extrabold leading-[1.45] text-ink">
                   {CAPTURES_MAX} captures au plus{NBSP}: on a gardé les {CAPTURES_MAX} premières. Retires-en pour en ajouter d’autres.
                 </p>
               )
@@ -285,12 +291,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       <div aria-live="polite" className="min-h-6">
         {/* L’avancée s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
         {busy && <span className="sr-only">{enCours}</span>}
-        {!busy && souci && <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">{souci}</p>}
+        {!busy && souci && <p className="m-0 mb-2.5 text-note font-extrabold leading-[1.45] text-ink">{souci}</p>}
         {!busy && result && !result.video && (
-          <div data-rise="" className="flex items-center gap-2 text-[14px] font-black">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>
-              <Icon name="check" size={13} color="#FFFFFF" stroke={3.4} />
-            </span>
+          <div data-rise="" className="flex items-center gap-2 text-note font-black">
+            <DoneCheck size={24} />
             {result.video ? "1 enregistrement" : `${result.count} capture${result.count > 1 ? "s" : ""}`}
             {result.messages >= 0 ? ` · ${result.messages} messages analysés` : result.video ? " prêt" : result.count > 1 ? " prêtes" : " prête"}
           </div>

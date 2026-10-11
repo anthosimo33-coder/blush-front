@@ -56,10 +56,10 @@ export function PartageEtConfidentialite() {
         }}
         aria-haspopup="dialog"
         data-dring={sonne ? "" : undefined}
-        className="lift lift-sm inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[26px] bg-white px-5 text-[16px] font-black text-ink shadow-soft"
+        className="lift lift-sm inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[26px] bg-white px-5 text-corps font-black text-ink shadow-soft"
       >
         <span data-dring-icone={sonne ? "" : undefined} className="flex">
-          <Icon name="share" size={17} color="#121214" stroke={2.4} />
+          <Icon name="share" size={17} stroke={2.4} className="text-ink" />
         </span>
         Partager mon verdict
       </button>

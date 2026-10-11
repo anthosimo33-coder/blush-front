@@ -7,6 +7,7 @@
  * et la fête d’un niveau le prennent là, sans le chercher dans la page. Et l’avatar de BLUSH sous chaque réponse de la
  * conv (LogoDuFil), dessiné une fois par conv.
  */
+import type { Route } from "next";
 import Link from "next/link";
 import { createContext, use, useId, ViewTransition, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/cn";
@@ -51,12 +52,12 @@ export function BlushTitle({ busy, onClick, big = false, logoRef }: { busy: bool
           data-a="pill"
           className={cn(
             "inline-flex items-center gap-1 rounded-full bg-white font-black leading-none tracking-[-0.02em] shadow-[0_0_0_1px_rgba(17,17,20,0.08),0_6px_14px_-6px_rgba(17,17,20,0.3)]",
-            big ? "h-[30px] pl-3.5 pr-2 text-[15px]" : "h-[26px] pl-2.5 pr-1.5 text-[14px]",
+            big ? "h-[30px] pl-3.5 pr-2 text-detail" : "h-[26px] pl-2.5 pr-1.5 text-note",
           )}
         >
           {/* L’adresse du site : toujours en haut de la conv, elle est sur chaque capture du chat */}
           askblush.com
-          <Icon name="chevron" size={big ? 13 : 12} color="#8A8780" stroke={3} />
+          <Icon name="chevron" size={big ? 13 : 12} stroke={3} className="text-muted" />
         </span>
       </span>
     </button>
@@ -82,16 +83,16 @@ export function ConvsButton({ others, flat = false }: { others: ConvSummary[]; f
         flat ? "transition-colors hover:bg-[rgba(17,17,20,0.05)]" : "lift lift-sm lift-card bg-white shadow-soft",
       )}
     >
-      <Icon name="back" size={17} color="#121214" stroke={2.6} />
+      <Icon name="back" size={17} stroke={2.6} className="text-ink" />
       <span aria-hidden="true" className="flex">
         {shown.map((o, i) => (
-          <span key={o.storyId} className={cn("rounded-full shadow-[0_0_0_2px_#FFFFFF]", i > 0 && "-ml-2")}>
+          <span key={o.storyId} className={cn("rounded-full shadow-[0_0_0_2px_white]", i > 0 && "-ml-2")}>
             <Avatar tone="elle" size={26} fontSize={11}>
               {o.person.initial}
             </Avatar>
           </span>
         ))}
-        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-[#F1EFEA] text-[11px] font-black text-soft shadow-[0_0_0_2px_#FFFFFF]">+{more}</span>}
+        {more > 0 && <span className="-ml-2 flex size-[26px] items-center justify-center rounded-full bg-plaque text-[11px] font-black text-soft shadow-[0_0_0_2px_white]">+{more}</span>}
       </span>
     </Link>
   );
@@ -116,10 +117,10 @@ export function SophieButton({
 }) {
   const { report, fiche, ficheHref = "/app/fiche" } = contact;
   const { levels, index: idx, temperature } = scaleOf(report.level);
-  const where = temperature ? levels[idx].label : `niveau ${idx + 1} sur ${levels.length}`;
+  const where = temperature ? (levels[idx]?.label ?? "") : `niveau ${idx + 1} sur ${levels.length}`;
   return (
     <Link
-      href={ficheHref}
+      href={ficheHref as Route}
       prefetch
       transitionTypes={["nav-forward", "accueil-vers-fiche"]}
       aria-label={`${fiche.person.name}, voir sa fiche (${report.verdict.short}, ${where})`}
@@ -155,7 +156,7 @@ export function SophieButton({
         {/* 11 · Le halo vert quand un niveau tombe (un calque à part : il s’anime sur le compositeur) */}
         <span aria-hidden="true" data-glow-ring="" className="pointer-events-none absolute -inset-1 rounded-full opacity-0 shadow-[0_0_14px_3px_rgba(18,192,138,0.7)]" />
       </ContactRing>
-      <span data-c="nm" data-a="nm" className="text-[12px] font-black leading-none">
+      <span data-c="nm" data-a="nm" className="text-micro font-black leading-none">
         {fiche.person.name}
       </span>
     </Link>

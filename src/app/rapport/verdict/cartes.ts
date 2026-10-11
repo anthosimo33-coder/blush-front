@@ -24,11 +24,11 @@ function blockOf<K extends ChapterBlock["kind"]>(c: Chapter | undefined, kind: K
  * Les cartes : sans accès, les chiffres, le verdict, le duel et « Ton rapport est prêt. » ; avec le chapitre 2 ouvert,
  * en plus « le moment », et « à toi de jouer » prend son texte. Une carte sans contenu est simplement sautée.
  */
-export function cardsOf({ report }: ReportPayload): Card[] {
+export function cardsOf({ report }: ReportPayload): [Card, ...Card[]] {
   const [c1, c2] = [CHAPITRE_DU_VERDICT, CHAPITRE_DE_LA_BASCULE].map((n) => report.chapters.find((c) => c.number === n && !c.locked));
   const scores = blockOf(c1, "scores");
   const seen = blockOf(c2, "seen");
-  const cards: Card[] = [{ id: "chiffres" }, { id: "verdict", confidence: blockOf(c1, "confidence") }];
+  const cards: [Card, ...Card[]] = [{ id: "chiffres" }, { id: "verdict", confidence: blockOf(c1, "confidence") }];
   if (scores) cards.push({ id: "duel", rows: scores.rows, meaning: blockOf(c1, "meaning")?.text });
   if (c2 && seen?.messages?.length)
     cards.push({ id: "moment", kicker: c2.kicker, title: c2.title, essential: blockOf(c2, "essential")?.text, messages: seen.messages, fact: seen.factsAfter?.[0] });

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { OFFERS } from "@/contenu/offres";
+import { OFFRE_PAR_PLAN } from "@/contenu/offres";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
 import { apresDeblocage } from "@/lib/requetes";
@@ -45,7 +45,7 @@ export function UnlockedScreen({
   reprise: number;
   autre?: Pronom;
 }) {
-  const o = OFFERS.find((x) => x.id === offer) ?? OFFERS[0];
+  const o = OFFRE_PAR_PLAN[offer];
   const plus = offer === "blushplus";
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
   useSoundOnce("debloque");
@@ -70,7 +70,7 @@ export function UnlockedScreen({
         <div className="relative flex h-[150px] w-[300px] items-center justify-center">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,#FFFFFF,rgba(255,255,255,0))]"
+            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
           />
           <div data-float="">
             <CheckBurst size={96} pop />
@@ -79,7 +79,7 @@ export function UnlockedScreen({
         <h1 data-rise="" style={delai(0.2)} className="m-0 mt-5 text-[32px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[40px]">
           {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
         </h1>
-        <p data-rise="" style={delai(0.3)} className="m-0 mt-3 max-w-[380px] text-[16px] font-extrabold leading-[1.45] text-soft">
+        <p data-rise="" style={delai(0.3)} className="m-0 mt-3 max-w-[380px] text-corps font-extrabold leading-[1.45] text-soft">
           {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${NB_CHAPITRES} chapitres sont à toi, pour toujours.`}
         </p>
 
@@ -90,7 +90,7 @@ export function UnlockedScreen({
             ))}
           </InsetGroup>
         </div>
-        <p data-rise="" style={delai(0.55)} className="m-0 mt-4 text-[13px] font-extrabold text-grey">
+        <p data-rise="" style={delai(0.55)} className="m-0 mt-4 text-legende font-extrabold text-grey">
           {o.price} · {o.noteDesktop}
         </p>
       </div>

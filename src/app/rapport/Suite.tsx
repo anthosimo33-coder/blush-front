@@ -50,12 +50,12 @@ function EchecEcriture({ raison }: { raison: Echec }) {
   };
   return (
     <Card className="flex flex-col gap-2 p-[18px]">
-      <div role="alert" className="text-[17px] font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
-      <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
-      {souci && <p className="m-0 text-[14px] font-extrabold leading-[1.4] text-ink">{souci}</p>}
+      <div role="alert" className="text-accent font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
+      <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
+      {souci && <p className="m-0 text-note font-extrabold leading-[1.4] text-ink">{souci}</p>}
       {raison === "panne" && (
-        <Button className="mt-1" onClick={relancer} disabled={busy} aria-busy={busy}>
-          {busy ? <TypingDots color="#FFFFFF" label="Relance de l’écriture" /> : "Relancer l’écriture"}
+        <Button className="mt-1" onClick={() => void relancer()} disabled={busy} loading={busy} loadingLabel="Relance de l’écriture">
+          Relancer l’écriture
         </Button>
       )}
     </Card>
@@ -66,8 +66,8 @@ function EchecEcriture({ raison }: { raison: Echec }) {
 export function Writing() {
   return (
     <div role="status" className="fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
-      <span className="flex items-center gap-2.5 rounded-full bg-ink px-4 py-2.5 text-[14px] font-extrabold text-white shadow-card">
-        <TypingDots color="#FFFFFF" label="BLUSH écrit ton rapport" />
+      <span className="flex items-center gap-2.5 rounded-full bg-ink px-4 py-2.5 text-note font-extrabold text-white shadow-card">
+        <TypingDots color="currentColor" label="BLUSH écrit ton rapport" />
         BLUSH écrit ton rapport, 2 à 3 minutes
       </span>
     </div>
@@ -86,7 +86,7 @@ export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseD
       {fermes.length > 0 && phase.nom === "ecriture" && (
         <>
           <ChapterRule />
-          <div className="text-[13px] font-black text-grey">La suite de ton rapport s’écrit · {fermes.length} chapitres</div>
+          <div className="text-legende font-black text-grey">La suite de ton rapport s’écrit · {fermes.length} chapitres</div>
           <div ref={SUITE_ECRITURE} className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
             {fermes.map((c, k) => (
               <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === fermes.length - 1} />
@@ -105,7 +105,7 @@ export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseD
       {fermes.length > 0 && (phase.nom === "lecture" || phase.nom === "complet") && (
         <>
           <ChapterRule />
-          <div className="text-[13px] font-black text-grey">La suite de ton rapport · {fermes.length} chapitres</div>
+          <div className="text-legende font-black text-grey">La suite de ton rapport · {fermes.length} chapitres</div>
           <div className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
             {fermes.map((c) => (
               <LockRow key={c.number} number={c.number} title={c.tocTitle} onClick={ouvrirPaiement} />

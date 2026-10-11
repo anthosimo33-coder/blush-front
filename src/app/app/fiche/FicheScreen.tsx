@@ -12,11 +12,13 @@ import { pagePrecedente } from "@/lib/navigation";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { ecritDepuis, FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
+import { tracer } from "@/lib/tracer";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
 import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
 import { FICHE_SECTIONS } from "@/contenu/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
+import { Alert } from "@/components/ui/feedback";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { AppScreen } from "@/components/shell/AppScreen";
@@ -159,6 +161,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     const n = ++dernier.current;
     enVol.current += 1;
     const envoi = file.current.then(() => updateFiche(facts)).finally(() => (enVol.current -= 1));
+    /* La file ne s’arrête pas sur un échec : il est dit plus bas (souci, la fiche relue), pas une seconde fois ici */
     file.current = envoi.catch(() => {});
     return envoi.then(
       (f) => {
@@ -183,7 +186,10 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     setEditing(false);
     setJob({ step: "reading", what, thumbs, file: files.some((f) => !estImage(f)) });
     /* Sans réseau, même la fiche ne se relit pas : on garde celle qu’on a, et l’écran dit que ça n’a pas marché */
-    const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], problem: "bug" }));
+    const update = await addToFiche(files).catch((e): FicheUpdate => {
+      tracer("fiche:ajout", e);
+      return { fiche, added: [], problem: "bug" };
+    });
     setQueryData(key, update.fiche);
     if (update.pending) {
       /*
@@ -225,7 +231,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       onClick={toggleEditing}
       aria-pressed={editing}
       disabled={job.step === "reading" || job.step === "adding"}
-      className={cn("relative h-10 rounded-full px-3 text-[15px] text-toi-ink transition-[color,opacity] after:absolute after:-inset-1 after:content-[''] disabled:opacity-40", editing ? "font-black" : "font-extrabold")}
+      className={cn("relative h-10 rounded-full px-3 text-detail text-toi-ink transition-[color,opacity] after:absolute after:-inset-1 after:content-[''] disabled:opacity-40", editing ? "font-black" : "font-extrabold")}
     >
       {editing ? "OK" : "Modifier"}
     </button>
@@ -243,17 +249,17 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       mobileTop={
         <header className="grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3 lg:hidden">
           <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} aria-label="Retour" className="flex size-11 items-center justify-center">
-            <Icon name="back" size={24} color="#121214" stroke={2.6} />
+            <Icon name="back" size={24} stroke={2.6} className="text-ink" />
           </Link>
-          <span className="text-[14px] font-black text-grey">Sa fiche</span>
+          <span className="text-note font-black text-grey">Sa fiche</span>
           <span className="flex justify-end">{editButton}</span>
         </header>
       }
     >
       {/* Desktop : retour à gauche, « Modifier » à droite */}
       <div className="mb-2 hidden items-center justify-between lg:flex">
-        <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-[14px] font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
-          <Icon name="back" size={18} color="#4B4A47" stroke={2.6} />
+        <Link href="/app" prefetch={prechargerAccueil} scroll={false} transitionTypes={["nav-back"]} onNavigate={retour} className="back-nudge relative inline-flex items-center gap-1.5 text-note font-black text-soft no-underline transition-colors hover:text-ink after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']">
+          <Icon name="back" size={18} stroke={2.6} className="text-soft" />
           Retour
         </Link>
         {editButton}
@@ -267,8 +273,8 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
             {fiche.person.initial}
           </Avatar>
         </ViewTransition>
-        <h1 className="m-0 mt-3.5 text-[30px] font-black leading-none tracking-[-0.02em]">{fiche.person.name}</h1>
-        <p className="m-0 mt-2 text-[14px] font-extrabold text-grey">
+        <h1 className="m-0 mt-3.5 text-titre-2 font-black leading-none tracking-[-0.02em]">{fiche.person.name}</h1>
+        <p className="m-0 mt-2 text-note font-extrabold text-grey">
           {fiche.portrait} · {fiche.updatedLabel}
         </p>
       </div>
@@ -289,12 +295,8 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
             dimmed={editing}
           />
         )}
-        {job.step === "done" && <Found what={job.what} update={job.update} onUndo={undo} onClose={() => setJob({ step: "idle" })} />}
-        {souci && (
-          <p role="alert" className="m-0 px-1 text-[14px] font-extrabold text-[#D93036]">
-            {souci}
-          </p>
-        )}
+        {job.step === "done" && <Found what={job.what} update={job.update} onUndo={() => void undo()} onClose={() => setJob({ step: "idle" })} />}
+        {souci && <Alert className="px-1">{souci}</Alert>}
       </div>
       <FileInput inputRef={picker.ref} accept={ACCEPT} multiple onFiles={(f) => void add(f)} label="Captures ou export à ajouter à sa fiche" />
 
@@ -305,7 +307,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
           if (items.length === 0 && !editing) return null;
           return (
             <section key={sec.id} aria-labelledby={`sec-${sec.id}`} className="flex flex-col gap-2">
-              <h2 id={`sec-${sec.id}`} className="m-0 pl-4 text-[13px] font-black text-grey">
+              <h2 id={`sec-${sec.id}`} className="m-0 pl-4 text-legende font-black text-grey">
                 {sectionTitle(sec.id, fiche.person.pronoun)}
               </h2>
               <ul className="m-0 flex list-none flex-col overflow-hidden rounded-[20px] bg-white p-0 shadow-card">
@@ -316,13 +318,13 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                       {editing ? (
                         <button
                           type="button"
-                          onClick={() => save(fiche.facts.filter((x) => x.id !== f.id))}
+                          onClick={() => void save(fiche.facts.filter((x) => x.id !== f.id))}
                           aria-label={`Retirer «\u00a0${f.text}\u00a0»`}
                           data-popin=""
                           className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center"
                         >
-                          <span className="flex size-[22px] items-center justify-center rounded-full bg-[#E5484D]">
-                            <Icon name="minus" size={14} color="#FFFFFF" stroke={3} />
+                          <span className="flex size-[22px] items-center justify-center rounded-full bg-danger-vif">
+                            <Icon name="minus" size={14} stroke={3} className="text-white" />
                           </span>
                         </button>
                       ) : (
@@ -332,19 +334,19 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                           </span>
                         )
                       )}
-                      <span className="min-w-0 flex-1 text-[16px] font-extrabold leading-[1.35]">{f.text}</span>
+                      <span className="min-w-0 flex-1 text-corps font-extrabold leading-[1.35]">{f.text}</span>
                       <span className="shrink-0 text-right text-[12.5px] font-extrabold text-grey">{f.sourceLabel}</span>
                     </li>
                   );
                 })}
-                {editing && <AddRow first={items.length === 0} label={sec.title} onAdd={(text) => save([...fiche.facts, { id: `f${Date.now()}`, section: sec.id, text, sourceLabel: "ajouté par toi", sources: ["note"] }])} />}
+                {editing && <AddRow first={items.length === 0} label={sec.title} onAdd={(text) => void save([...fiche.facts, { id: `f${Date.now()}`, section: sec.id, text, sourceLabel: "ajouté par toi", sources: ["note"] }])} />}
               </ul>
             </section>
           );
         })}
       </div>
 
-      <p className="m-0 mt-6 pb-2 text-center text-[13px] font-extrabold text-grey">Rien n’est cherché sur Internet</p>
+      <p className="m-0 mt-6 pb-2 text-center text-legende font-extrabold text-grey">Rien n’est cherché sur Internet</p>
 
       {/* Glisser-déposer : toute la page accueille les fichiers */}
       {over && (
@@ -363,8 +365,8 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
             className="pointer-events-none flex size-full max-h-[560px] max-w-[640px] flex-col items-center justify-center gap-3 rounded-[32px] border-[2.5px] border-dashed border-[rgba(232,53,138,0.5)] bg-[rgba(255,79,154,0.05)] px-6 text-center"
           >
             <BubbleLogo size={92} animated />
-            <p className="m-0 mt-3 text-[24px] font-black leading-[1.15] tracking-[-0.02em]">Dépose tes captures ou ton export</p>
-            <p className="m-0 text-[15px] font-extrabold text-grey">BLUSH trouve les infos et les range dans sa fiche.</p>
+            <p className="m-0 mt-3 text-titre-3 font-black leading-[1.15] tracking-[-0.02em]">Dépose tes captures ou ton export</p>
+            <p className="m-0 text-detail font-extrabold text-grey">BLUSH trouve les infos et les range dans sa fiche.</p>
           </div>
         </div>
       )}
@@ -383,13 +385,13 @@ function AddButton({ onClick, dimmed }: { onClick: () => void; dimmed: boolean }
     >
       <BubbleLogo size={50} className="lift-pop" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[16px] font-black leading-[1.25]">Complète sa fiche</span>
-        <span className="text-[13px] font-extrabold leading-[1.35] text-grey">
+        <span className="text-corps font-black leading-[1.25]">Complète sa fiche</span>
+        <span className="text-legende font-extrabold leading-[1.35] text-grey">
           Ajoute des captures ou un export, BLUSH range tout.<span className="hidden lg:inline"> Tu peux aussi les glisser ici.</span>
         </span>
       </span>
       <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-transform duration-300 [transition-timing-function:var(--ease-pop)] group-hover:rotate-90">
-        <Icon name="plus" size={18} color="#FFFFFF" stroke={2.8} />
+        <Icon name="plus" size={18} stroke={2.8} className="text-white" />
       </span>
     </button>
   );
@@ -401,20 +403,20 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
     <div role="status" className="relative flex items-center gap-3.5 overflow-hidden rounded-[22px] bg-white py-3.5 pl-3 pr-4 shadow-card">
       <BubbleLogo size={50} animated />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[16px] font-black leading-[1.25]">BLUSH analyse {what}</span>
-        <span className="text-[13px] font-extrabold leading-[1.35] text-grey">Il range ce qu’il trouve.</span>
+        <span className="text-corps font-black leading-[1.25]">BLUSH analyse {what}</span>
+        <span className="text-legende font-extrabold leading-[1.35] text-grey">Il range ce qu’il trouve.</span>
       </span>
       <span aria-hidden="true" className="relative flex shrink-0 items-center py-1 pl-3 pr-1">
         {thumbs.map((u, i) => (
           <span
             key={u}
-            className="-ml-3.5 block h-[46px] w-[32px] rounded-[8px] bg-white bg-cover bg-top shadow-[0_0_0_2px_#FFFFFF,0_8px_16px_-8px_rgba(17,17,20,0.45)] first:ml-0"
+            className="-ml-3.5 block h-[46px] w-[32px] rounded-[8px] bg-white bg-cover bg-top shadow-[0_0_0_2px_white,0_8px_16px_-8px_rgba(17,17,20,0.45)] first:ml-0"
             style={{ backgroundImage: `url(${u})`, rotate: `${(i - (thumbs.length - 1) / 2) * 9}deg` }}
           />
         ))}
         {file && (
-          <span className="-ml-3.5 flex h-[46px] w-[36px] items-center justify-center rounded-[8px] bg-[#F4F2ED] shadow-[0_0_0_2px_#FFFFFF,0_8px_16px_-8px_rgba(17,17,20,0.35)] first:ml-0">
-            <Icon name="file" size={18} color="#4B4A47" stroke={2.2} />
+          <span className="-ml-3.5 flex h-[46px] w-[36px] items-center justify-center rounded-[8px] bg-paper shadow-[0_0_0_2px_white,0_8px_16px_-8px_rgba(17,17,20,0.35)] first:ml-0">
+            <Icon name="file" size={18} stroke={2.2} className="text-soft" />
           </span>
         )}
         {/* Le trait est le haut d’un calque qui glisse (transform) : il balaie même quand la préparation des fichiers occupe le téléphone */}
@@ -439,10 +441,10 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
       <div className="flex items-center gap-3.5 py-3.5 pl-3 pr-4">
         <BubbleLogo size={50} animated />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id="ajout-titre" className="m-0 text-[16px] font-black leading-[1.25]">
+          <h2 id="ajout-titre" className="m-0 text-corps font-black leading-[1.25]">
             BLUSH a lu {what}
           </h2>
-          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">Il range tout ça dans sa fiche, même si tu pars.</span>
+          <span className="text-legende font-extrabold leading-[1.35] text-grey">Il range tout ça dans sa fiche, même si tu pars.</span>
         </span>
       </div>
       {rows.length > 0 && (
@@ -450,7 +452,7 @@ function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpd
           {rows.map((t, i) => (
             <li key={`${i}-${t}`} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
               <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-[#D9D6CF] motion-safe:animate-pulse" />
-              <span className="min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35] text-soft">{t}</span>
+              <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35] text-soft">{t}</span>
               <span className="shrink-0 text-[12.5px] font-extrabold text-grey">en cours d’ajout</span>
             </li>
           ))}
@@ -468,17 +470,17 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
   return (
     <section data-rise="" aria-labelledby="trouve-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">
       <div className="flex items-start gap-3 px-4 pb-3 pt-3.5">
-        <span aria-hidden="true" className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", n > 0 ? "bg-vrai-ink" : "bg-[#F1EFEA]")}>
-          <Icon name={problem ? "alert" : "check"} size={16} color={n > 0 ? "#FFFFFF" : "#4B4A47"} stroke={problem ? 2.6 : 3.2} />
+        <span aria-hidden="true" className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", n > 0 ? "bg-vrai-ink" : "bg-plaque")}>
+          <Icon name={problem ? "alert" : "check"} size={16} stroke={problem ? 2.6 : 3.2} className={n > 0 ? "text-white" : "text-soft"} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id="trouve-titre" className="m-0 text-[16px] font-black leading-[1.25]">
+          <h2 id="trouve-titre" className="m-0 text-corps font-black leading-[1.25]">
             {title}
           </h2>
-          <span className="text-[13px] font-extrabold leading-[1.35] text-grey">{problem?.detail ?? (n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`)}</span>
+          <span className="text-legende font-extrabold leading-[1.35] text-grey">{problem?.detail ?? (n > 0 ? `Trouvées dans ${what}.` : `BLUSH savait déjà tout ce qu’il y a dans ${what}.`)}</span>
         </span>
         <button type="button" onClick={onClose} aria-label="Fermer le résumé" className="-mr-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full">
-          <Icon name="close" size={16} color="#8A8780" stroke={2.6} />
+          <Icon name="close" size={16} stroke={2.6} className="text-muted" />
         </button>
       </div>
       {n > 0 && (
@@ -486,15 +488,15 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
           {update.added.map((f) => (
             <li key={f.id} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
               <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-elle" />
-              <span className="min-w-0 flex-1 text-[15px] font-extrabold leading-[1.35]">{f.text}</span>
-              <span className="shrink-0 rounded-full bg-[#F4F2ED] px-2.5 py-1 text-[12px] font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
+              <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35]">{f.text}</span>
+              <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-micro font-black leading-none text-soft">{sectionTitle(f.section, update.fiche.person.pronoun)}</span>
             </li>
           ))}
         </ul>
       )}
       {n > 0 && (
         <div className="border-t border-[rgba(17,17,20,0.06)] px-4 py-1.5">
-          <button type="button" onClick={onUndo} className="relative h-9 text-[14px] font-black text-toi-ink after:absolute after:-inset-x-2 after:-inset-y-1 after:content-['']">
+          <button type="button" onClick={onUndo} className="relative h-9 text-note font-black text-toi-ink after:absolute after:-inset-x-2 after:-inset-y-1 after:content-['']">
             Annuler
           </button>
         </div>
@@ -519,7 +521,7 @@ function AddRow({ first, label, onAdd }: { first: boolean; label: string; onAdd:
       >
         <button type="submit" aria-label={`Ajouter dans «\u00a0${label}\u00a0»`} className="-my-2 -ml-1 flex size-9 shrink-0 items-center justify-center">
           <span className="flex size-[22px] items-center justify-center rounded-full bg-vrai-ink">
-            <Icon name="plus" size={14} color="#FFFFFF" stroke={3} />
+            <Icon name="plus" size={14} stroke={3} className="text-white" />
           </span>
         </button>
         <input
@@ -527,7 +529,7 @@ function AddRow({ first, label, onAdd }: { first: boolean; label: string; onAdd:
           onChange={(e) => setValue(e.target.value)}
           aria-label={`Ajouter dans «\u00a0${label}\u00a0»`}
           placeholder="Ajouter"
-          className="min-w-0 flex-1 border-none bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-muted focus-visible:outline-none"
+          className="min-w-0 flex-1 border-none bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-muted focus-visible:outline-none"
         />
       </form>
     </li>

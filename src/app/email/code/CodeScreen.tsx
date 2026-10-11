@@ -1,18 +1,19 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { play } from "@/lib/sound";
+import { tracer } from "@/lib/tracer";
 import { messageErreur } from "@/lib/messages-erreur";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
 import { CODE_RENVOI_S } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
-import { TypingDots } from "@/components/ui/FileInput";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
@@ -93,7 +94,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
     router.refresh();
     if (connexion) {
       /* L’accueil se pose lui-même sur le dernier échange : Next ne doit pas le remettre en haut */
-      router.push(suite, { scroll: cheminDe(suite) !== "/app" });
+      router.push(suite as Route, { scroll: cheminDe(suite) !== "/app" });
       return;
     }
     /*
@@ -114,7 +115,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       await startAnalysis(reponsesQui(j, { captures }));
       retenirLecture();
       router.push("/lecture");
-    } catch {
+    } catch (e) {
+      tracer("code:lancement", e);
       /* Le code est bon (déjà utilisé), la session ouverte : « Qui es-tu ? » relance la lecture d’ici, et dit pourquoi elle bloque */
       router.push("/qui");
     }
@@ -148,10 +150,14 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         </>
       }
       footer={
-        <Button arrow={!busy} disabled={code.length !== LENGTH || busy} aria-busy={busy} onClick={() => verify(code)}>
-          {busy ? (
-            <TypingDots color="#FFFFFF" label={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"} />
-          ) : !connexion ? (
+        <Button
+          arrow
+          disabled={code.length !== LENGTH || busy}
+          loading={busy}
+          loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
+          onClick={() => void verify(code)}
+        >
+          {!connexion ? (
             "Créer mon rapport"
           ) : suite.startsWith("/importer/") ? (
             /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv (texte à valider) */
@@ -175,7 +181,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
             const v = e.target.value.replace(/\D/g, "").slice(0, LENGTH);
             setCode(v);
             setWrong(false);
-            if (v.length === LENGTH) verify(v);
+            if (v.length === LENGTH) void verify(v);
           }}
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -195,7 +201,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
                 key={i}
                 className={cn(
                   "flex h-[60px] items-center justify-center rounded-[16px] bg-white text-[26px] font-black tabular-nums text-ink transition-shadow",
-                  wrong ? "shadow-[inset_0_0_0_2px_#D93036]" : active ? "shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]" : "shadow-soft",
+                  wrong ? "shadow-[inset_0_0_0_2px_var(--color-danger)]" : active ? "shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]" : "shadow-soft",
                 )}
               >
                 {digit ?? (active ? <span className="h-7 w-0.5 rounded-full bg-ink motion-safe:animate-pulse" /> : null)}
@@ -207,26 +213,26 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
 
       <div aria-live="polite" className="-mt-1 min-h-5">
         {wrong && (
-          <p id="code-erreur" className="m-0 text-[14px] font-extrabold text-[#D93036]">
+          <p id="code-erreur" className="m-0 text-note font-extrabold text-danger">
             Ce code ne marche pas. Vérifie-le, ou demande-en un nouveau.
           </p>
         )}
-        {!wrong && souci && <p className="m-0 text-[14px] font-extrabold text-[#D93036]">{souci}</p>}
-        {!wrong && !souci && resent && <p className="m-0 text-[14px] font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
+        {!wrong && souci && <p className="m-0 text-note font-extrabold text-danger">{souci}</p>}
+        {!wrong && !souci && resent && <p className="m-0 text-note font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-        <button type="button" onClick={resend} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-toi-ink disabled:text-grey">
+        <button type="button" onClick={() => void resend()} disabled={wait > 0} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey">
           {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
         </button>
-        <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-[14px] font-black text-ink no-underline">
+        <Link href={retour as Route} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
           Changer d’email
         </Link>
       </div>
 
       {/* La phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
       <NotePrivee>{NOTE_CODE}</NotePrivee>
-      {fermee && <p className="m-0 -mt-2 pl-6 text-[13px] font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
+      {fermee && <p className="m-0 -mt-2 pl-6 text-legende font-extrabold text-grey">Pas de code dans le mail{NBSP}? BLUSH est en bêta privée{NBSP}: ton email est sur la liste d’attente, le mail t’explique tout.</p>}
     </ParcoursScreen>
   );
 }

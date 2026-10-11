@@ -12,27 +12,27 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
   const { etat = "chapitres" } = await searchParams;
   /* Le chapitre offert se lit déjà ; les payants s’écrivent, sous leurs titres d’attente tant que le plan n’est pas fait */
   const suite = report.chapters.filter((c) => CHAPITRES_PAYANTS.includes(c.number));
-  const etats: Record<string, { etape: EcritureRapport["etape"]; progres: number; restant: string | null; e: EtatChapitre[] }> = {
+  const etats = {
     plan: { etape: "plan", progres: 0.14, restant: "2 min", e: ["attente", "attente", "attente", "attente", "attente", "attente", "attente"] },
     chapitres: { etape: "chapitres", progres: 0.58, restant: "1 min", e: ["ecrit", "en_cours", "attente", "ecrit", "en_cours", "attente", "attente"] },
     presque: { etape: "chapitres", progres: 0.93, restant: "10 s", e: ["ecrit", "ecrit", "ecrit", "ecrit", "ecrit", "ecrit", "en_cours"] },
     /* Les chapitres 2 et 3 déjà finis se lisent ; le 5, prêt en avance, attend que le 4 le soit */
     lecture: { etape: "chapitres", progres: 0.64, restant: "50 s", e: ["ecrit", "ecrit", "en_cours", "ecrit", "en_cours", "attente", "attente"] },
-  };
+  } satisfies Record<string, { etape: EcritureRapport["etape"]; progres: number; restant: string | null; e: EtatChapitre[] }>;
   const lisibles = etat === "lecture" ? [2, 3] : [];
-  const s = etats[typeof etat === "string" && etat in etats ? etat : "chapitres"];
+  const s = etats[typeof etat === "string" && etat in etats ? (etat as keyof typeof etats) : "chapitres"];
   const ecriture: EcritureRapport = {
     etape: s.etape,
     progres: s.progres,
     restant: s.restant,
-    chapitres: suite.map((c, k) => ({ number: c.number, title: s.etape === "plan" ? titreDAttente(c.number, AUTRE) : c.tocTitle, etat: s.e[k] ?? "attente" })),
+    chapitres: suite.map((c, k) => ({ number: c.number, title: (s.etape === "plan" ? titreDAttente(c.number, AUTRE) : undefined) ?? c.tocTitle, etat: s.e[k] ?? "attente" })),
   };
   const payload: ReportPayload = {
     report: {
       ...report,
       chapters: [
         ...report.chapters.filter((c) => estOffert(c.number)).map((c) => ({ ...c, locked: false })),
-        ...suite.map((c, k) => (lisibles.includes(c.number) ? { ...c, locked: false } : { ...c, tocTitle: ecriture.chapitres[k].title, locked: true, blocks: [] })),
+        ...suite.map((c, k) => (lisibles.includes(c.number) ? { ...c, locked: false } : { ...c, tocTitle: ecriture.chapitres[k]?.title ?? c.tocTitle, locked: true, blocks: [] })),
       ],
     },
     sober: null,

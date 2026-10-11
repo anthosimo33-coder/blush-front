@@ -63,10 +63,10 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-[17px] font-black leading-tight">{conv.person.name}</span>
-          <span className="shrink-0 text-[13px] font-extrabold text-grey">{conv.lastLabel}</span>
+          <span className="min-w-0 flex-1 truncate text-accent font-black leading-tight">{conv.person.name}</span>
+          <span className="shrink-0 text-legende font-extrabold text-grey">{conv.lastLabel}</span>
         </span>
-        <span className="mt-0.5 truncate text-[14px] font-extrabold leading-[1.35] text-soft">{where}</span>
+        <span className="mt-0.5 truncate text-note font-extrabold leading-[1.35] text-soft">{where}</span>
         {conv.trend && <span className={cn("mt-1 text-[12.5px] font-black leading-none", up ? "text-vrai-ink" : "text-grey")}>{conv.trend}</span>}
       </span>
       {/* Sans préchargement, l’accueil se rend au toucher : le chevron laisse place aux trois points pendant ce temps */}

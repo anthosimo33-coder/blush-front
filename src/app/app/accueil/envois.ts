@@ -108,7 +108,7 @@ export function useEnvois({
     }
     const point = about ?? undefined;
     setAbout(null);
-    ask({ type: "texte", id: mine, from: "toi", text: t, about: point }, { text: t, about: point });
+    void ask({ type: "texte", id: mine, from: "toi", text: t, about: point }, { text: t, about: point });
   };
 
   /* Une question toute prête part tout de suite, comme si tu l’avais écrite. 3 · La pastille elle-même devient ta bulle */
@@ -116,16 +116,18 @@ export function useEnvois({
     idees.poser(q);
     const mine = nouvelId();
     if (chip && !prefersReducedMotion()) flightRef.current = { kind: "text", bubble: cleBulle(mine, 0), text: q, from: chip.getBoundingClientRect(), start: CHIP_LOOK };
-    ask({ type: "texte", id: mine, from: "toi", text: q }, { text: q });
+    void ask({ type: "texte", id: mine, from: "toi", text: q }, { text: q });
   };
 
   const onImages = (files: File[]) => {
     const list = files.map((f) => URL.createObjectURL(f));
     urls.current.push(...list);
-    ask({ type: "images", id: nouvelId(), from: "toi", images: list }, { files });
+    void ask({ type: "images", id: nouvelId(), from: "toi", images: list }, { files });
   };
 
-  const onExport = ([file]: File[]) => ask({ type: "fichier", id: nouvelId(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
+  const onExport = ([file]: File[]) => {
+    if (file) void ask({ type: "fichier", id: nouvelId(), from: "toi", file: { name: file.name, size: file.size } }, { files: [file] });
+  };
 
   /* Le vocal : le micro est demandé au premier toucher ; sans micro, BLUSH le dit dans la conv */
   const onMicError = (e: VoiceError) =>

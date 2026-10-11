@@ -3,14 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { TypingDots } from "@/components/ui/FileInput";
-import { Icon } from "@/components/ui/icons";
+import { DoneCheck } from "@/components/ui/feedback";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { FormulaireEmail } from "@/components/formulaires/FormulaireEmail";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { NOTE_ATTENTE } from "@/contenu/confidentialite";
 import { useSaisieEmail } from "@/lib/email";
 import { NBSP } from "@/lib/format";
+import { tracer } from "@/lib/tracer";
 import { rejoindreAttente } from "@/services/api";
 
 /*
@@ -32,7 +32,8 @@ export function AttenteScreen() {
       try {
         await rejoindreAttente(propre);
         setEtat("fait");
-      } catch {
+      } catch (e) {
+        tracer("attente:inscription", e);
         setEtat("erreur");
       }
     },
@@ -45,9 +46,7 @@ export function AttenteScreen() {
         desktopBack={{ target: "/" }}
         head={
           <>
-            <span className="flex size-12 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 8px 18px -8px rgba(18,192,138,0.6)" }}>
-              <Icon name="check" size={22} color="#FFFFFF" stroke={3.2} />
-            </span>
+            <DoneCheck size={48} glyphe={22} trait={3.2} />
             <ScreenTitle>Tu es sur la liste.</ScreenTitle>
             <Lead size={15} weight={800}>
               On vient de t’écrire pour te le confirmer. On te réécrit dès que ta place est prête.
@@ -77,8 +76,8 @@ export function AttenteScreen() {
         </>
       }
       footer={
-        <Button arrow={etat !== "envoi"} disabled={!saisie.valide || etat === "envoi"} aria-busy={etat === "envoi"} onClick={() => void saisie.envoyer()}>
-          {etat === "envoi" ? <TypingDots color="#FFFFFF" label="Inscription" /> : "Rejoindre la liste"}
+        <Button arrow disabled={!saisie.valide || etat === "envoi"} loading={etat === "envoi"} loadingLabel="Inscription" onClick={() => void saisie.envoyer()}>
+          Rejoindre la liste
         </Button>
       }
     >

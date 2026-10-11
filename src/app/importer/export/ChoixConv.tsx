@@ -27,20 +27,20 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
   const visibles = cherche.trim() ? triees.filter((c) => sansAccents(c.nom).includes(sansAccents(cherche.trim()))) : triees.slice(0, 12);
   return (
     <Sheet open={open} onClose={onClose} labelledBy="choix-conv-titre">
-      <h2 id="choix-conv-titre" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] lg:text-[30px]">
+      <h2 id="choix-conv-titre" className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] lg:text-titre-2">
         Quelle conv{NBSP}?
       </h2>
-      <p className="m-0 text-[14px] font-bold leading-[1.45] text-soft lg:text-[15px]">
+      <p className="m-0 text-note font-bold leading-[1.45] text-soft lg:text-detail">
         Ton export contient {convs.length}{NBSP}convs. Choisis celle avec la personne{NBSP}: seule celle-là part chez BLUSH, les autres ne quittent pas ton appareil.
       </p>
       <label className="flex h-[52px] items-center gap-3 rounded-field bg-white pl-4 pr-2 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] focus-within:shadow-[inset_0_0_0_2px_var(--elle),0_0_0_4px_rgb(255_79_154/0.16)]">
-        <Icon name="people" size={19} color="#8A8780" stroke={2} />
+        <Icon name="people" size={19} stroke={2} className="text-muted" />
         <input
           value={cherche}
           onChange={(e) => setCherche(e.target.value)}
           placeholder="Chercher un prénom ou un pseudo"
           aria-label="Chercher une conv"
-          className="h-full min-w-0 flex-1 border-none bg-transparent text-[16px] font-extrabold text-ink outline-none placeholder:text-grey"
+          className="h-full min-w-0 flex-1 border-none bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey"
         />
       </label>
       {/*
@@ -58,7 +58,7 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
             key={c.id}
             leading={
               <Avatar tone={c.groupe ? "toi" : "elle"} size={40} fontSize={16}>
-                {c.groupe ? <Icon name="people" size={18} color="#FFFFFF" stroke={2.2} /> : (c.nom.match(/\p{L}/u)?.[0]?.toUpperCase() ?? "?")}
+                {c.groupe ? <Icon name="people" size={18} stroke={2.2} className="text-white" /> : (c.nom.match(/\p{L}/u)?.[0]?.toUpperCase() ?? "?")}
               </Avatar>
             }
             title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
@@ -67,7 +67,7 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
             onClick={c.groupe ? undefined : () => onChoisir(c.id)}
           />
         ))}
-        {!visibles.length && <p className="m-0 px-4 py-4 text-[14px] font-extrabold text-grey">Aucune conv à ce nom.</p>}
+        {!visibles.length && <p className="m-0 px-4 py-4 text-note font-extrabold text-grey">Aucune conv à ce nom.</p>}
       </InsetGroup>
     </Sheet>
   );

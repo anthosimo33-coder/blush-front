@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import { ViewTransition } from "react";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Sa fiche" };
 export default async function Page() {
   const rendu = heureDuRendu();
   const [storyId, fiche] = await Promise.all([convChoisie(), getFicheEtMaj()]);
-  if (!fiche) redirect(await sansHistoire("/app/fiche"));
+  if (!fiche) redirect((await sansHistoire("/app/fiche")) as Route);
   return (
     <PageDeConv rendu={rendu}>
       <ViewTransition enter={{ "nav-forward": "push-in", default: "none" }} exit={{ "nav-back": "pop-out", default: "none" }} default="none">

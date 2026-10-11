@@ -78,7 +78,7 @@ export function FilDeLaConv({
           {anciens ? (
             <TypingDots label="Chargement des messages plus anciens" />
           ) : (
-            <button type="button" onClick={() => void chargerAnciens()} className="rounded-full px-3 text-[13px] font-black text-grey transition-colors hover:text-ink">
+            <button type="button" onClick={() => void chargerAnciens()} className="rounded-full px-3 text-legende font-black text-grey transition-colors hover:text-ink">
               Voir les messages plus anciens
             </button>
           )}
@@ -159,7 +159,7 @@ const Thread = memo(function Thread({ msgs, opened, depuis }: { msgs: Msg[]; ope
       <AvecLogoDuFil>
         {rows.map((r) =>
           r.kind === "day" ? (
-            <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-[12px] font-bold leading-4 text-grey first:-mt-2">
+            <p key={r.key} data-row={r.key} data-a={arriving && r.key === CLE_JOUR_INTRO ? "day" : undefined} className="m-0 h-4 text-center text-micro font-bold leading-4 text-grey first:-mt-2">
               {r.at === null ? (
                 NBSP
               ) : (
@@ -184,9 +184,9 @@ function LevelEvent({ row, level, neuf }: { row: string; level: LevelId; neuf: b
   const { levels, index, temperature } = scaleOf(level);
   return (
     <p data-row={row} className="m-0 flex justify-center">
-      <span data-popin={neuf ? "" : undefined} className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-[#E3F6EE] px-3 text-[13px] font-extrabold text-vrai-ink">
-        <Icon name="sparkle" size={14} color="#087A56" stroke={2.6} />
-        {temperature ? "Nouvelle température" : "Nouveau niveau"} · <b className="font-black">{levels[index].label}</b>
+      <span data-popin={neuf ? "" : undefined} className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-[#E3F6EE] px-3 text-legende font-extrabold text-vrai-ink">
+        <Icon name="sparkle" size={14} stroke={2.6} className="text-vrai-ink" />
+        {temperature ? "Nouvelle température" : "Nouveau niveau"} · <b className="font-black">{levels[index]?.label}</b>
       </span>
     </p>
   );
@@ -292,7 +292,7 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
   if (x.key !== y.key || x.at !== y.at || x.echange !== y.echange || x.from !== y.from || x.items.length !== y.items.length) return false;
   return x.items.every((it, i) => {
     const o = y.items[i];
-    return it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf && it.tape === o.tape;
+    return !!o && it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf && it.tape === o.tape;
   });
 }
 
@@ -313,7 +313,7 @@ function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "
         "relative z-[1]",
         tone === "plain" ? BULLE_DE_BLUSH : "flex max-w-[318px] flex-col rounded-[20px] text-left",
         coinsDeBulle(side, pos),
-        tone === "accent" && "bg-[linear-gradient(180deg,#F3F8FF,#FFFFFF)] px-4 py-3.5 text-ink shadow-play",
+        tone === "accent" && "bg-[linear-gradient(180deg,#F3F8FF,white)] px-4 py-3.5 text-ink shadow-play",
         tone === "toi" && "max-w-[80%] bg-toi-ink px-4 py-2.5 text-white",
         tone === "bare" && "overflow-hidden",
         node.className,
@@ -338,7 +338,7 @@ function Words({ text }: { text: string }) {
 
 /** Une bulle écrite de BLUSH, puis les messages qu’elle cite, comme dans un vrai fil. */
 function bulleEcrite(b: BulleChat): BulleDeBlush[] {
-  return [{ quote: b.text, body: <span className="text-[16px] font-bold leading-[1.4]">{b.text}</span> }, ...citesPar(b)];
+  return [{ quote: b.text, body: <span className="text-corps font-bold leading-[1.4]">{b.text}</span> }, ...citesPar(b)];
 }
 
 /** Les messages qu’une bulle de BLUSH cite : chacun dans sa bulle, repliée s’il est long (ClampedBubble). */
@@ -349,8 +349,8 @@ function VocalEnCours() {
   return (
     <span role="status" className="flex h-[42px] min-w-[220px] items-center gap-2 pl-1.5">
       <span className="sr-only">BLUSH</span>
-      <span data-vocal-rec="" className="size-[9px] rounded-full bg-[#E5484D]" />
-      <span className="text-[14px] font-black text-ink">enregistre un vocal…</span>
+      <span data-vocal-rec="" className="size-[9px] rounded-full bg-danger-vif" />
+      <span className="text-note font-black text-ink">enregistre un vocal…</span>
     </span>
   );
 }
@@ -366,8 +366,8 @@ function Coupure({ reponse }: { reponse: number }) {
   const relancer = use(RelanceContext);
   return (
     <span className="flex flex-col items-start gap-2.5">
-      <span className="text-[16px] font-bold leading-[1.4]">j’ai eu un bug, renvoie-moi ça</span>
-      <button type="button" onClick={() => relancer(reponse)} className="lift lift-sm inline-flex h-9 items-center rounded-full bg-white px-3.5 text-[13px] font-black text-ink shadow-soft">
+      <span className="text-corps font-bold leading-[1.4]">j’ai eu un bug, renvoie-moi ça</span>
+      <button type="button" onClick={() => relancer(reponse)} className="lift lift-sm inline-flex h-9 items-center rounded-full bg-white px-3.5 text-legende font-black text-ink shadow-soft">
         Réessayer
       </button>
     </span>
@@ -385,10 +385,10 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
               quote: env.nextStep,
               body: (
                 <span className="flex items-start gap-2.5">
-                  <Icon name="bolt" size={18} color="#3D8BFF" className="mt-0.5 shrink-0" />
+                  <Icon name="bolt" size={18} className="mt-0.5 shrink-0 text-toi" />
                   <span className="flex flex-col gap-[3px]">
-                    <span className="text-[12px] font-black text-toi-ink">À toi de jouer</span>
-                    <span className="text-[16px] font-black leading-[1.35]">{env.arriving ? <Words text={env.nextStep} /> : env.nextStep}</span>
+                    <span className="text-micro font-black text-toi-ink">À toi de jouer</span>
+                    <span className="text-corps font-black leading-[1.35]">{env.arriving ? <Words text={env.nextStep} /> : env.nextStep}</span>
                   </span>
                 </span>
               ),
@@ -398,8 +398,8 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
             {
               body: (
                 <span className="flex flex-col gap-1">
-                  <span className="text-[16px] font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
-                  <span className="text-[14px] font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
+                  <span className="text-corps font-black leading-[1.3]">{IlOuElle(env.autre)} vient de répondre{NBSP}?</span>
+                  <span className="text-note font-extrabold leading-[1.45] text-soft">Ajoute sa réponse{NBSP}: capture, export ou texte. BLUSH reconnaît tout seul.</span>
                 </span>
               ),
             },
@@ -410,7 +410,7 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
       /* Ses bulles déjà arrivées pendant qu’il écrit, et « Réessayer » si le réseau a coupé avant la fin */
       return [...(m.recues ?? []).flatMap(bulleEcrite), ...(m.coupee ? [{ body: <Coupure reponse={m.id} /> }] : [])];
     case "mot":
-      return [{ body: <span className="text-[15px] font-extrabold leading-[1.45]">{m.notice}</span> }];
+      return [{ body: <span className="text-detail font-extrabold leading-[1.45]">{m.notice}</span> }];
     case "vocal":
       return [{ className: "py-2 pl-2 pr-3.5", body: <VoiceNote clip={m.voice} /> }];
     case "texte":
@@ -419,8 +419,8 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
           body: (
             <span className="flex min-w-0 flex-col">
               {/* 7 · Le point creusé, rappelé au-dessus de ta question */}
-              {m.about && <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-[13px] font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">{m.about}</span>}
-              <span className="whitespace-pre-wrap text-[16px] font-bold leading-[1.4]">{m.text}</span>
+              {m.about && <span className="mb-1 truncate border-l-2 border-[rgba(255,255,255,0.55)] pl-2 text-legende font-extrabold leading-[1.35] text-[rgba(255,255,255,0.82)]">{m.about}</span>}
+              <span className="whitespace-pre-wrap text-corps font-bold leading-[1.4]">{m.text}</span>
             </span>
           ),
         },
@@ -451,11 +451,11 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
           body: (
             <span className="flex items-center gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.18)]">
-                <Icon name="file" size={20} color="#FFFFFF" stroke={2.2} />
+                <Icon name="file" size={20} stroke={2.2} className="text-white" />
               </span>
               <span className="flex min-w-0 flex-col">
-                <span className="truncate text-[15px] font-black">{m.file.name}</span>
-                <span className="text-[12px] font-extrabold text-[rgba(255,255,255,0.75)]">{formatSize(m.file.size)}</span>
+                <span className="truncate text-detail font-black">{m.file.name}</span>
+                <span className="text-micro font-extrabold text-[rgba(255,255,255,0.75)]">{formatSize(m.file.size)}</span>
               </span>
             </span>
           ),
@@ -490,8 +490,8 @@ function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BulleDeBlush[] {
     ...recu,
     ...r.bubbles.flatMap(bulleEcrite),
     ...aEnvoyer,
-    ...(r.ask ? [{ quote: r.ask, body: <span className="text-[16px] font-bold leading-[1.4]">{r.ask}</span> }] : []),
-    ...(r.react ? [{ quote: r.react, body: <span className="text-[16px] font-bold leading-[1.4]">{r.react}</span> }] : []),
+    ...(r.ask ? [{ quote: r.ask, body: <span className="text-corps font-bold leading-[1.4]">{r.ask}</span> }] : []),
+    ...(r.react ? [{ quote: r.react, body: <span className="text-corps font-bold leading-[1.4]">{r.react}</span> }] : []),
   ];
 }
 
@@ -500,17 +500,17 @@ function SendReply({ lines, why, shine = false }: { lines: string[]; why?: strin
   return (
     <span className="flex flex-col gap-2">
       <span className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-black text-vrai-ink">Ta meilleure réponse</span>
+        <span className="text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
         <Tag tone="recommandee" />
       </span>
       <span className="flex flex-col items-start gap-[3px]">
         {lines.map((l, i) => (
-          <span key={i} data-shine={shine && i === 0 ? "" : undefined} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-[15px] font-bold leading-[1.35] text-white">
+          <span key={i} data-shine={shine && i === 0 ? "" : undefined} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white">
             {l}
           </span>
         ))}
       </span>
-      {why && <span className="text-[13px] font-extrabold leading-[1.45] text-grey">{why}</span>}
+      {why && <span className="text-legende font-extrabold leading-[1.45] text-grey">{why}</span>}
       <span className="mt-1 flex">
         <CopyPill text={lines.join("\n")} label="Copier" />
       </span>

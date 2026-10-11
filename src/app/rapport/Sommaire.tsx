@@ -35,7 +35,7 @@ export function ReadingBar({ className }: { className?: string }) {
     <div ref={brancherBarre} role="progressbar" aria-label="Progression de la lecture" aria-valuemin={0} aria-valuemax={100} className={cn("overflow-hidden", className)}>
       <div
         className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]"
-        style={{ background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" }}
+        style={{ background: "var(--degrade-lecture)" }}
       />
     </div>
   );
@@ -56,14 +56,14 @@ function ChapterBadge({ number, state, large }: { number: number; state: EtatDuB
       aria-hidden="true"
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full font-black",
-        large ? "size-9 text-[14px]" : "h-[26px] min-w-[26px] text-[12px]",
+        large ? "size-9 text-note" : "h-[26px] min-w-[26px] text-micro",
         state === "current" && "bg-ink text-white",
         state === "read" && "bg-vrai-ink text-white",
         state === "open" && "bg-white text-ink shadow-[inset_0_0_0_1.5px_rgba(17,17,20,0.16)]",
         state === "locked" && "bg-plaque text-grey",
       )}
     >
-      {state === "read" ? <Icon name="check" size={large ? 15 : 12} color="#FFFFFF" stroke={3.2} /> : number}
+      {state === "read" ? <Icon name="check" size={large ? 15 : 12} stroke={3.2} className="text-white" /> : number}
     </span>
   );
 }
@@ -84,7 +84,7 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
   const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   return (
     <nav aria-label="Sommaire" className="flex flex-col gap-0.5 rounded-card bg-white p-[18px] shadow-card">
-      <div className="text-[13px] font-black text-grey">Sommaire</div>
+      <div className="text-legende font-black text-grey">Sommaire</div>
       {ecriture ? <BarreEcriture ecriture={ecriture} /> : <ReadingBar className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />}
       <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
         {chapters.map((c) => (
@@ -92,14 +92,14 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
             {etatDeLaLigne(c, phase) === "ecriture" ? (
               <div className="flex w-full items-center gap-2.5 py-[7px] text-left">
                 <ChapterBadge number={c.number} state="locked" />
-                <span className={cn("flex-1 text-[14px] font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
+                <span className={cn("flex-1 text-note font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
                 {phase.nom === "ecriture" && <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />}
               </div>
             ) : etatDeLaLigne(c, phase) === "paiement" ? (
               <button type="button" onClick={ouvrirPaiement} className="row-hover flex w-full items-center gap-2.5 py-[7px] text-left">
                 <ChapterBadge number={c.number} state="locked" />
-                <span className="flex-1 text-[14px] font-black text-grey">{c.tocTitle}</span>
-                <Icon name="lock" size={16} color="#8A8780" />
+                <span className="flex-1 text-note font-black text-grey">{c.tocTitle}</span>
+                <Icon name="lock" size={16} className="text-muted" />
                 <span className="sr-only">(verrouillé)</span>
               </button>
             ) : (
@@ -110,10 +110,10 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
                   allerAuChapitre(c.number);
                 }}
                 aria-current={c.number === current ? "location" : undefined}
-                className={cn("row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline", c.number === current && "before:!bg-[#F1EFEA] before:!opacity-100")}
+                className={cn("row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline", c.number === current && "before:!bg-plaque before:!opacity-100")}
               >
                 <ChapterBadge number={c.number} state={etatDuBadge(c.number, current)} />
-                <span className={cn("flex-1 text-[14px]", c.number === current ? "font-black" : "font-extrabold")}>{c.tocTitle}</span>
+                <span className={cn("flex-1 text-note", c.number === current ? "font-black" : "font-extrabold")}>{c.tocTitle}</span>
               </a>
             )}
           </li>
@@ -126,13 +126,13 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
             <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
               <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
             </span>
-            <span className="flex-1 text-[14px] font-black">Ta question</span>
+            <span className="flex-1 text-note font-black">Ta question</span>
             <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
           </Link>
         </div>
       )}
       {/* Le sommaire suit la lecture : l’adresse du site est sur chaque capture du rapport (ordinateur) */}
-      <span className="mt-3 flex items-center gap-1.5 border-t border-[rgba(17,17,20,0.06)] pt-3 text-[12px] font-black text-grey">
+      <span className="mt-3 flex items-center gap-1.5 border-t border-[rgba(17,17,20,0.06)] pt-3 text-micro font-black text-grey">
         <BubbleLogo size={15} />
         askblush.com
       </span>
@@ -150,16 +150,16 @@ export function FeuilleSommaire({ open, onClose, chapters, current, allerAuChapi
     <Sheet open={open} onClose={onClose} labelledBy={idTitre}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 id={idTitre} className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
+          <h2 id={idTitre} className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
             Sommaire
           </h2>
-          <span className="text-[13px] font-extrabold text-grey">{current ? `Chapitre ${current} sur ${chapters.length}` : `${chapters.length} chapitres`}</span>
+          <span className="text-legende font-extrabold text-grey">{current ? `Chapitre ${current} sur ${chapters.length}` : `${chapters.length} chapitres`}</span>
         </div>
         <button type="button" aria-label="Fermer" onClick={onClose} className="lift lift-sm flex size-10 shrink-0 items-center justify-center rounded-full bg-white shadow-soft">
-          <Icon name="close" size={16} color="#121214" stroke={2.8} />
+          <Icon name="close" size={16} stroke={2.8} className="text-ink" />
         </button>
       </div>
-      <ReadingBar className="h-1 rounded-full bg-[#E6E3DC]" />
+      <ReadingBar className="h-1 rounded-full bg-line" />
       <InsetGroup>
         {chapters.map((c) =>
           c.locked ? (
@@ -172,7 +172,7 @@ export function FeuilleSommaire({ open, onClose, chapters, current, allerAuChapi
                   <span className="sr-only"> (verrouillé)</span>
                 </span>
               }
-              trailing={<Icon name="lock" size={16} color="#8A8780" />}
+              trailing={<Icon name="lock" size={16} className="text-muted" />}
               /* Fermé pendant l’écriture (ou après un échec, ou le budget du jour atteint) : l’accès est là, pas de paiement */
               onClick={
                 etatDeLaLigne(c, phase) === "paiement"

@@ -50,7 +50,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
           <AppTile key={t.app} {...t} onClick={() => nouvelleConv(t.app)} />
         ))}
       </nav>
-      <p className="m-0 text-[13px] font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale, tu ajouteras le reste juste après.</p>
+      <p className="m-0 text-legende font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale, tu ajouteras le reste juste après.</p>
       <NotePrivee className="leading-[1.45]">
         {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>
       </NotePrivee>
@@ -58,11 +58,11 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
         /* Texte relu le 8 octobre */
         <Link href="/attente" className="row-hover flex items-center gap-3 rounded-[18px] bg-white px-4 py-3.5 text-ink no-underline shadow-soft">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[rgba(255,79,154,0.12)]">
-            <Icon name="lock" size={17} color="#C81D6B" stroke={2.4} />
+            <Icon name="lock" size={17} stroke={2.4} className="text-elle-ink" />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[15px] font-black">Bêta privée, sur invitation</span>
-            <span className="text-[13px] font-extrabold text-grey">Pas encore d’invitation{NBSP}? Rejoins la liste d’attente.</span>
+            <span className="text-detail font-black">Bêta privée, sur invitation</span>
+            <span className="text-legende font-extrabold text-grey">Pas encore d’invitation{NBSP}? Rejoins la liste d’attente.</span>
           </span>
           <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
         </Link>

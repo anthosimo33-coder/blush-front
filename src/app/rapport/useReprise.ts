@@ -80,8 +80,10 @@ function useLecture(openKey: string, depart: number | null, retour: boolean) {
       }
       /* Une valeur identique ne re-rend pas : le rapport ne se re-rend qu’au changement de chapitre */
       setCurrent(now);
-      const first = sectionDuChapitre(numbers[0]);
-      const last = sectionDuChapitre(numbers[numbers.length - 1]);
+      const premier = numbers[0];
+      const dernier = numbers.at(-1);
+      const first = premier === undefined ? null : sectionDuChapitre(premier);
+      const last = dernier === undefined ? null : sectionDuChapitre(dernier);
       if (first && last) {
         const start = first.getBoundingClientRect().top + window.scrollY - line;
         const end = last.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
