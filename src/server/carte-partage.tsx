@@ -1,7 +1,8 @@
 import "server-only";
 import { ImageResponse } from "next/og";
 import type { ReactNode } from "react";
-import { Bulle, DOUX, ENCRE, PAPIER, ressources } from "./carte-verdict";
+import { Bulle, cadreStory, dessiner, imageBulle } from "./carte-verdict";
+import { BLEU, DOUX, ENCRE } from "./marque";
 
 /*
  * « Partager en image » : un moment de BLUSH en story (1080 × 1920), dans l’habit de la carte du verdict.
@@ -10,46 +11,15 @@ import { Bulle, DOUX, ENCRE, PAPIER, ressources } from "./carte-verdict";
  * Le prénom de l’autre est masqué avant d’arriver ici (le tien reste). Textes relus le 8 octobre (voix de BLUSH).
  */
 
-const TAILLE_STORY = { width: 1080, height: 1920 } as const;
-
 /** Un texte trop long, coupé proprement (au mot), pour tenir dans la story. */
 const couper = (t: string, max: number) => (t.length <= max ? t : `${t.slice(0, max).replace(/\s+\S*$/, "")}…`);
 
-async function story(contenu: ReactNode): Promise<ImageResponse> {
-  const { noir, extra, bulle } = await ressources;
-  return new ImageResponse(
-    (
-      /* Rien d’important dans les 250 px du haut et du bas, où Instagram pose ses boutons */
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", width: "100%", height: "100%", padding: "270px 72px 280px", background: PAPIER, fontFamily: "Nunito" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- dessin de l’image, pas une page */}
-          <img src={bulle} width={100} height={100} alt="" />
-          <span style={{ fontSize: 60, fontWeight: 900, color: ENCRE, letterSpacing: "-0.035em" }}>askblush.com</span>
-        </div>
-        {contenu}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
-          <Bulle moi taille={42} angle={1.5}>
-            {"et la mienne, elle dit quoi\u00a0?"}
-          </Bulle>
-          <span style={{ fontSize: 32, fontWeight: 800, color: "#6B6862" }}>Ta conv en dit plus que tu crois.</span>
-        </div>
-      </div>
-    ),
-    {
-      ...TAILLE_STORY,
-      fonts: [
-        { name: "Nunito", data: noir, weight: 900, style: "normal" },
-        { name: "Nunito", data: extra, weight: 800, style: "normal" },
-      ],
-      emoji: "fluent",
-      headers: { "cache-control": "private, no-store" },
-    },
-  );
-}
+/* Une story dans le cadre d’un texte (src/server/carte-verdict.tsx, cadreStory) : jamais en cache, c’est un moment à soi */
+const story = async (contenu: ReactNode): Promise<ImageResponse> => dessiner(await cadreStory("texte", contenu), "story", "private, no-store");
 
 /** Une réponse de BLUSH dans le chat : ta question (bulle bleue, à droite), puis ses bulles (blanches, à gauche). */
 export async function carteReponse({ question, bulles }: { question: string | null; bulles: string[] }): Promise<ImageResponse> {
-  const { bulle } = await ressources;
+  const bulle = await imageBulle();
   /* Les premières bulles, tant qu’elles tiennent (environ 420 caractères) */
   const gardees: string[] = [];
   let place = 420;
@@ -62,7 +32,7 @@ export async function carteReponse({ question, bulles }: { question: string | nu
     <div style={{ display: "flex", flexDirection: "column", width: "100%", gap: 34 }}>
       {question && (
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ display: "flex", maxWidth: 760, padding: "22px 32px 26px", borderRadius: "44px 44px 12px 44px", background: "#1A66DB", color: "#FFFFFF", fontSize: 40, fontWeight: 800, lineHeight: 1.3 }}>
+          <div style={{ display: "flex", maxWidth: 760, padding: "22px 32px 26px", borderRadius: "44px 44px 12px 44px", background: BLEU, color: "#FFFFFF", fontSize: 40, fontWeight: 800, lineHeight: 1.3 }}>
             {couper(question, 140)}
           </div>
         </div>
