@@ -1,106 +1,42 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { pagePrecedente } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
-import { formatCount } from "@/lib/format";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { peut } from "@/lib/acces";
-import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
+import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
-import { messageErreur, SOUFFLE } from "@/lib/messages-erreur";
-import { relancerRapport } from "@/services/api";
+import { useSondage } from "@/lib/useSondage";
 import type { CibleImage, ReportPayload } from "@/types/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
-import { AvatarPair } from "@/components/ui/Avatar";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/cards";
-import { Chip } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
-import { Tag } from "@/components/ui/messages";
-import { TypingDots } from "@/components/ui/FileInput";
-import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
-import { LockRow } from "@/components/ui/progress";
 import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
-import { Sheet, Toast } from "@/components/ui/surfaces";
+import { Toast } from "@/components/ui/surfaces";
 import { Screen } from "@/components/shell/Screen";
 import { PaywallSheet } from "@/components/screens/PaywallSheet";
-import { CLE_REPRISE } from "@/state/cles";
 import { useHydrated, useJourneyMe } from "@/state/journey";
-import type { Chapter, ChapterBlock, Echec, Pronom, Story } from "@/types";
+import type { Chapter, ChapterBlock, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
 import { auRepos } from "@/lib/repos";
+import { ancreDuChapitre, chapitreDeLAncre, ID_PARLER_A_BLUSH, sectionDuChapitre, titreDuChapitre } from "./ancres";
 import { ChatBubble, marquerChatOuvert } from "./ChatBubble";
+import { EnTeteRapport } from "./EnTeteRapport";
 import { PartageEtConfidentialite } from "./PartageVerdict";
+import { ecritureInachevee, phaseDuRapport, type PhaseDuRapport } from "./phase";
+import { FeuilleSommaire, ReadingBar, Sommaire } from "./Sommaire";
+import { Suite, Writing } from "./Suite";
+import { useReprise } from "./useReprise";
 import { VocalDuRapport } from "./Vocal";
 
 /* Ce qui ne sert pas à chaque lecture (le mode sobre, l’écriture en cours, « Partager en image ») est chargé à part, quand il sert */
 const SoberReport = dynamic(() => import("./SoberReport").then((m) => m.SoberReport));
-const BarreEcriture = dynamic(() => import("./Ecriture").then((m) => m.BarreEcriture));
-const LigneEcriture = dynamic(() => import("./Ecriture").then((m) => m.LigneEcriture));
-const MarqueChapitre = dynamic(() => import("./Ecriture").then((m) => m.MarqueChapitre));
 const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
 const PartageImageSheet = dynamic(() => import("./Partage").then((m) => m.PartageImageSheet), { ssr: false });
-
-/** Où tu t’étais arrêté, conv par conv (ce navigateur seulement, sous CLE_REPRISE). */
-type Reprises = Record<string, number>;
-const lireReprises = (): Reprises => {
-  const brut = JSON.parse(localStorage.getItem(CLE_REPRISE) ?? "{}") as unknown;
-  return brut && typeof brut === "object" ? (brut as Reprises) : {};
-};
-
-/*
- * Un retour par l’historique (bouton, geste) : Next rend la position de défilement quelques images après l’affichage.
- * Retenu ici pour ne pas lire le haut de la page entre-temps (l’en-tête « Ton rapport complet », la reprise qui clignote).
- * React rend ce retour tout de suite, dans l’écouteur popstate de Next : seul l’événement navigate (API Navigation)
- * l’annonce avant. Sans elle (ancien Safari), popstate arrive après le premier rendu : la reprise, décidée un instant
- * plus tard, ne clignote plus, mais l’en-tête part encore du haut.
- */
-type Navigation = EventTarget & { addEventListener(type: "navigate", f: (e: Event & { navigationType: string; destination: { url: string } }) => void): void };
-let traversee: { adresse: string; t: number } | null = null;
-const noterTraversee = (adresse: string) => (traversee = { adresse, t: Date.now() });
-if (typeof window !== "undefined") {
-  (window as unknown as { navigation?: Navigation }).navigation?.addEventListener("navigate", (e) => e.navigationType === "traverse" && noterTraversee(e.destination.url));
-  window.addEventListener("popstate", () => noterTraversee(window.location.href));
-}
-const parTraversee = () => !!traversee && traversee.adresse === window.location.href && Date.now() - traversee.t < 3000;
-
-/* Le chapitre où l’on était (gardé à chaque chapitre lu), pour l’en-tête d’un retour par l’historique */
-const chapitreGarde = (storyId: string, openKey: string): number | null => {
-  try {
-    const n = Number(lireReprises()[storyId]);
-    return openKey.split(",").map(Number).includes(n) ? n : null;
-  } catch {
-    return null;
-  }
-};
-
-/*
- * La progression de lecture ne passe pas par React : à chaque image de défilement, seules les barres (en-tête, sommaire,
- * feuille) changent d’échelle, sans re-rendre tout le rapport. Le pourcentage annoncé ne change que quand l’entier change.
- */
-const barres = new Set<HTMLElement>();
-let lu = 0;
-const poserLu = (barre: HTMLElement) => {
-  (barre.firstElementChild as HTMLElement | null)?.style.setProperty("transform", `scaleX(${lu})`);
-  const pct = String(Math.round(lu * 100));
-  if (barre.getAttribute("aria-valuenow") !== pct) barre.setAttribute("aria-valuenow", pct);
-};
-const suivreLu = (p: number) => {
-  lu = p;
-  barres.forEach(poserLu);
-};
-/* Une barre qui apparaît (la feuille du sommaire) prend tout de suite la valeur du moment */
-const brancherBarre = (el: HTMLDivElement | null) => {
-  if (!el) return;
-  barres.add(el);
-  poserLu(el);
-  return () => void barres.delete(el);
-};
 
 /*
  * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
@@ -110,134 +46,39 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
   const { data, refresh } = useRapport(initial, { fetch: !fixed, rendu, frais: FRAIS_DU_RENDU });
   /* `fixed` : l’aperçu d’un vrai rapport (page /apercu, en local) ne se laisse pas remplacer par celui du compte connecté */
   const payload = fixed ? initial : (data ?? initial);
+  const phase = phaseDuRapport(payload);
   /* Le rapport s’écrit encore, ou son vocal s’enregistre : on repasse toutes les 2 secondes jusqu’à ce qu’ils soient là */
-  const attendre = !!payload.generating || payload.vocal?.etat === "en_cours";
-  useEffect(() => {
-    if (!attendre || fixed) return;
-    const t = setInterval(refresh, 2000);
-    return () => clearInterval(t);
-  }, [attendre, fixed, refresh]);
+  useSondage(refresh, { actif: !fixed && (phase.nom === "ecriture" || payload.vocal?.etat === "en_cours"), intervalle: 2000 });
   /* Mode sobre : le chat reste à portée aussi (c’est là qu’on a le plus besoin de parler), dans une bulle sobre */
   if (payload.sober)
     return (
       <>
         <SoberReport
           data={payload.sober}
-          vocal={payload.vocal ? <VocalDuRapport vocal={payload.vocal} sobre ecrit={!!payload.generating} titre={titreDuo(story)} fin={{ titre: payload.sober.title, sousTitre: payload.sober.reassurance, action: "Lire la suite" }} /> : undefined}
+          vocal={
+            payload.vocal ? (
+              <VocalDuRapport
+                vocal={payload.vocal}
+                sobre
+                ecrit={phase.nom === "ecriture"}
+                titre={titreDuo(story)}
+                fin={{ titre: payload.sober.title, sousTitre: payload.sober.reassurance, action: "Lire la suite" }}
+              />
+            ) : undefined
+          }
         />
-        {peut(payload.access, "chat") && !payload.generating && <ChatBubble sobre />}
+        {peut(payload.access, "chat") && phase.nom !== "ecriture" && <ChatBubble sobre />}
       </>
     );
   return (
     <>
-      <ReportBody payload={payload} story={story} openPaywall={openPaywall} />
-      {payload.generating && (payload.ecriture ? <PastilleEcriture ecriture={payload.ecriture} /> : <Writing />)}
+      <ReportBody payload={payload} phase={phase} story={story} openPaywall={openPaywall} />
+      {phase.nom === "ecriture" && (phase.ecriture ? <PastilleEcriture ecriture={phase.ecriture} /> : <Writing />)}
     </>
   );
 }
 
-/** Ce que dit l’écriture en échec, selon pourquoi. TODO(produit): la seconde phrase de « souffle », à valider. */
-const TEXTES_ECHEC: Record<Echec, string> = {
-  refus: "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste.",
-  souffle: `${SOUFFLE} Ta conv est toujours là\u00a0: l’écriture reprendra quand tu reviendras.`,
-  panne: "BLUSH a buté en l’écrivant. Ta conv est toujours là\u00a0: relance, et tout repart de zéro.",
-};
-
-/**
- * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
- * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer ; le budget de l’IA du jour
- * atteint (« souffle ») non plus : l’écriture repart d’elle-même après minuit, quand on rouvre le rapport.
- */
-function EchecEcriture({ raison }: { raison: Echec }) {
-  const [busy, setBusy] = useState(false);
-  const [souci, setSouci] = useState<string | null>(null);
-  const relancer = async () => {
-    setBusy(true);
-    setSouci(null);
-    try {
-      setQueryData("report", await relancerRapport());
-    } catch (e) {
-      setSouci(messageErreur("relance", e));
-    }
-    setBusy(false);
-  };
-  return (
-    <Card className="flex flex-col gap-2 p-[18px]">
-      <div role="alert" className="text-[17px] font-black leading-[1.3]">La suite de ton rapport n’a pas pu s’écrire.</div>
-      <p className="m-0 text-[15px] font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
-      {souci && <p className="m-0 text-[14px] font-extrabold leading-[1.4] text-ink">{souci}</p>}
-      {raison === "panne" && (
-        <Button className="mt-1" onClick={relancer} disabled={busy} aria-busy={busy}>
-          {busy ? <TypingDots color="#FFFFFF" label="Relance de l’écriture" /> : "Relancer l’écriture"}
-        </Button>
-      )}
-    </Card>
-  );
-}
-
-/** Pendant que BLUSH écrit le rapport (2 à 3 minutes) : une pastille en bas de l’écran. Texte relu le 8 octobre */
-function Writing() {
-  return (
-    <div role="status" className="fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
-      <span className="flex items-center gap-2.5 rounded-full bg-ink px-4 py-2.5 text-[14px] font-extrabold text-white shadow-card">
-        <TypingDots color="#FFFFFF" label="BLUSH écrit ton rapport" />
-        BLUSH écrit ton rapport, 2 à 3 minutes
-      </span>
-    </div>
-  );
-}
-
-/**
- * Suit la lecture : le chapitre à l’écran (celui dont le haut a passé le tiers de l’écran)
- * et la progression, du début du chapitre 1 à la fin du dernier chapitre ouvert (posée sur les barres, hors de React).
- * `retour` : arrivé par l’historique, on part du chapitre gardé et on attend que la position soit rendue pour mesurer.
- */
-function useReading(openKey: string, depart: number | null, retour: boolean) {
-  const [current, setCurrent] = useState<number | null>(depart);
-  const attendre = useRef(retour);
-  useEffect(() => {
-    const numbers = openKey.split(",").map(Number);
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
-      const line = window.innerHeight * 0.33;
-      let now: number | null = null;
-      for (const n of numbers) {
-        const el = document.getElementById(`chapitre-${n}`);
-        if (el && el.getBoundingClientRect().top <= line) now = n;
-      }
-      /* Une valeur identique ne re-rend pas : le rapport ne se re-rend qu’au changement de chapitre */
-      setCurrent(now);
-      const first = document.getElementById(`chapitre-${numbers[0]}`);
-      const last = document.getElementById(`chapitre-${numbers[numbers.length - 1]}`);
-      if (first && last) {
-        const start = first.getBoundingClientRect().top + window.scrollY - line;
-        const end = last.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
-        suivreLu(Math.min(1, Math.max(0, (window.scrollY - start) / Math.max(1, end - start))));
-      }
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(measure);
-    };
-    /* Un retour par l’historique : le défilement qui rend la position déclenche la mesure ; au plus tard dans un instant */
-    let plusTard = 0;
-    if (attendre.current) {
-      attendre.current = false;
-      plusTard = window.setTimeout(measure, 700);
-    } else measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(plusTard);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [openKey]);
-  return current;
-}
-
-function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; story: Story; openPaywall: boolean }) {
+function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPayload; phase: PhaseDuRapport; story: Story; openPaywall: boolean }) {
   const router = useRouter();
   /* Du parcours, seul « qui est toi » sert ici : le reste ne re-rend pas tout le rapport */
   const journeyMe = useJourneyMe();
@@ -248,13 +89,10 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const [image, setImage] = useState<CibleImage | null>(null);
   const [imageVue, setImageVue] = useState(false);
   if (image && !imageVue) setImageVue(true);
-  const [resume, setResume] = useState<number | null>(null);
 
   const { report, access } = payload;
+  /* Avec l’accès au rapport : « Ton rapport complet », son temps de lecture, « Ta question » ; sans lui, le paiement */
   const full = peut(access, "rapport");
-  /* Le rapport s’écrit : les chapitres à venir ne mènent pas au paiement, ils montrent où en est l’écriture */
-  const ecriture = payload.generating ? payload.ecriture : undefined;
-  const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
   const { moi: me, autre: other } = moiEtAutre(story, journeyMe);
   const chapters = report.chapters;
@@ -262,12 +100,10 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   const locked = chapters.filter((c) => c.locked);
   /* Les chapitres ouverts, en clé stable : la mesure de lecture ne se relance que s’ils changent */
   const openKey = free.map((c) => c.number).join(",");
-  /* Arrivé par l’historique (retour de « Ta question ») : la position revient seule, sans proposer de reprise */
-  const [retour] = useState(() => typeof window !== "undefined" && parTraversee());
-  const [depart] = useState(() => (retour ? chapitreGarde(report.storyId, openKey) : null));
-  const current = useReading(openKey, depart, retour);
+  const { retour, current, resume, allerAuChapitre, oublierReprise } = useReprise(report.storyId, openKey);
   const label = full ? "Ton rapport complet" : "Ton rapport";
   const currentChapter = chapters.find((c) => c.number === current);
+  const ouvrirPaiement = useCallback(() => setPaywall(true), []);
 
   useEffect(() => {
     if (!toast) return;
@@ -275,48 +111,19 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* À l’arrivée : si tu t’étais arrêté plus loin, on propose d’y reprendre (sans sauter tout seul). Décidé un instant
-     plus tard : un retour par l’historique (popstate, sans API Navigation) se sait alors, et ne propose rien */
-  useEffect(() => {
-    if (retour) return;
-    const t = setTimeout(() => {
-      if (parTraversee() || window.location.hash || window.scrollY > 200) return;
-      try {
-        const saved = Number(lireReprises()[report.storyId]);
-        if (saved >= 2 && openKey.split(",").map(Number).includes(saved)) setResume(saved);
-      } catch {
-        /* stockage indisponible : pas de reprise */
-      }
-    }, 0);
-    return () => clearTimeout(t);
-  }, [openKey, report.storyId, retour]);
-
   /*
    * « Partager en image » : chargée une fois la page posée, et montée fermée. Au premier toucher, elle n’a plus qu’à
    * s’ouvrir (montée au toucher, React gardait 0,3 s son écran d’attente avant de la montrer)
    */
   useEffect(() => auRepos(() => void import("./Partage").then(() => setImageVue(true))), []);
 
-  /* On garde le chapitre en cours ; la proposition de reprise s’efface dès qu’on lit plus loin */
-  useEffect(() => {
-    if (!current) return;
-    try {
-      localStorage.setItem(CLE_REPRISE, JSON.stringify({ ...lireReprises(), [report.storyId]: current }));
-    } catch {
-      /* rien */
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- la reprise devient inutile une fois la lecture repartie
-    if (current >= 2) setResume(null);
-  }, [current, report.storyId]);
-
-  const goTo = useCallback((n: number) => {
-    setMenu(false);
-    setResume(null);
-    requestAnimationFrame(() => {
-      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      document.getElementById(`chapitre-${n}`)?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
-    });
-  }, []);
+  const goTo = useCallback(
+    (n: number) => {
+      setMenu(false);
+      allerAuChapitre(n);
+    },
+    [allerAuChapitre],
+  );
 
   /* Les mêmes à chaque rendu (comme le partage d’un moment) : un chapitre qui n’a pas changé ne se refait pas */
   const renderQuestion = useCallback((b: Extract<ChapterBlock, { kind: "question" }>) => (
@@ -350,64 +157,6 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       </>
     ),
     [report.verdict],
-  );
-
-  /* Desktop : le sommaire suit la lecture (chapitre en cours surligné, progression sous le titre) */
-  const toc = (
-    <nav aria-label="Sommaire" className="flex flex-col gap-0.5 rounded-card bg-white p-[18px] shadow-card">
-      <div className="text-[13px] font-black text-grey">Sommaire</div>
-      {ecriture ? <BarreEcriture ecriture={ecriture} /> : <ReadingBar className="mb-2 mt-2.5 h-[3px] rounded-full bg-[#ECE9E2]" />}
-      <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
-        {chapters.map((c) => (
-          <li key={c.number}>
-            {c.locked && (payload.generating || payload.echec) ? (
-              <div className="flex w-full items-center gap-2.5 py-[7px] text-left">
-                <ChapterBadge number={c.number} state="locked" />
-                <span className={cn("flex-1 text-[14px] font-black", enEcriture(c.number)?.etat === "attente" || !ecriture ? "text-grey" : "text-ink")}>{enEcriture(c.number)?.title ?? c.tocTitle}</span>
-                {!payload.echec && <MarqueChapitre etat={enEcriture(c.number)?.etat ?? "attente"} />}
-              </div>
-            ) : c.locked ? (
-              <button type="button" onClick={() => setPaywall(true)} className="row-hover flex w-full items-center gap-2.5 py-[7px] text-left">
-                <ChapterBadge number={c.number} state="locked" />
-                <span className="flex-1 text-[14px] font-black text-grey">{c.tocTitle}</span>
-                <Icon name="lock" size={16} color="#8A8780" />
-                <span className="sr-only">(verrouillé)</span>
-              </button>
-            ) : (
-              <a
-                href={`#chapitre-${c.number}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  goTo(c.number);
-                }}
-                aria-current={c.number === current ? "location" : undefined}
-                className={cn("row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline", c.number === current && "before:!bg-[#F1EFEA] before:!opacity-100")}
-              >
-                <ChapterBadge number={c.number} state={c.number === current ? "current" : current && c.number < current ? "read" : "open"} />
-                <span className={cn("flex-1 text-[14px]", c.number === current ? "font-black" : "font-extrabold")}>{c.tocTitle}</span>
-              </a>
-            )}
-          </li>
-        ))}
-      </ol>
-      {full && !payload.generating && !payload.echec && (
-        /* Le trait est hors de la ligne cliquable : le voile du survol reste centré sur elle, comme pour les chapitres */
-        <div className="mt-2 border-t border-[rgba(17,17,20,0.06)] pt-1.5">
-          <Link href="/rapport/question" className="row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline">
-            <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
-              <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
-            </span>
-            <span className="flex-1 text-[14px] font-black">Ta question</span>
-            <Icon name="chevron" size={15} color="#B4B1A9" stroke={2.6} />
-          </Link>
-        </div>
-      )}
-      {/* Le sommaire suit la lecture : l’adresse du site est sur chaque capture du rapport (ordinateur) */}
-      <span className="mt-3 flex items-center gap-1.5 border-t border-[rgba(17,17,20,0.06)] pt-3 text-[12px] font-black text-grey">
-        <BubbleLogo size={15} />
-        askblush.com
-      </span>
-    </nav>
   );
 
   return (
@@ -446,7 +195,7 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </header>
       }
       desktopLabel={label}
-      aside={toc}
+      aside={<Sommaire chapters={chapters} phase={phase} current={current} allerAuChapitre={goTo} ouvrirPaiement={ouvrirPaiement} />}
       asideSide="left"
       asideWidth={300}
       mainWidth={720}
@@ -455,15 +204,13 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       stickyFooter={false}
       footer={
         /* Le rapport écrit : on continue avec BLUSH, dans le chat. Pendant l’écriture, le chat n’est pas encore prêt */
-        full ? (
-          payload.generating || payload.echec ? undefined : (
-            /* scroll={false} : l’accueil se pose lui-même en bas de la conv, Next ne doit pas le remettre en haut. Préchargé en entier (voir ChatBubble) */
-            <ButtonLink id="cta-chat" href="/app?depuis=rapport" scroll={false} prefetch onClick={marquerChatOuvert} arrow>
-              Parler à BLUSH
-            </ButtonLink>
-          )
-        ) : (
-          <Button arrow onClick={() => setPaywall(true)}>
+        phase.nom === "complet" ? (
+          /* scroll={false} : l’accueil se pose lui-même en bas de la conv, Next ne doit pas le remettre en haut. Préchargé en entier (voir ChatBubble) */
+          <ButtonLink id={ID_PARLER_A_BLUSH} href="/app?depuis=rapport" scroll={false} prefetch onClick={marquerChatOuvert} arrow>
+            Parler à BLUSH
+          </ButtonLink>
+        ) : full ? undefined : (
+          <Button arrow onClick={ouvrirPaiement}>
             Lire la suite
           </Button>
         )
@@ -473,52 +220,13 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
       {payload.vocal && (
         <VocalDuRapport
           vocal={payload.vocal}
-          ecrit={!!payload.generating}
+          ecrit={phase.nom === "ecriture"}
           titre={titreDuo(story)}
           fin={{ emoji: report.verdict.emoji, titre: report.verdict.title, sousTitre: report.verdict.subtitle, action: "Lire mon rapport" }}
         />
       )}
 
-      {/* En-tête du rapport */}
-      <Card className="flex flex-col gap-2.5 p-[18px]">
-        <div className="flex items-center justify-between">
-          <div className="text-[13px] font-black text-grey">Le rapport de votre histoire</div>
-          {full ? <Tag tone="ink" size="md">Complet</Tag> : <Tag tone="apercu" size="md" />}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <AvatarPair me={me.initial} other={other.initial} />
-          <h1 className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">
-            {titreDuo(story)}
-          </h1>
-        </div>
-        <div className="text-[13px] font-bold leading-[1.45] text-grey">
-          {story.period} · {story.updatedLabel}
-        </div>
-        {/* Mobile : les chiffres rangés en grille ; desktop : les pastilles de la maquette */}
-        <dl className="m-0 mt-1 grid grid-cols-4 gap-2 border-t-2 border-sep pt-3.5 lg:hidden">
-          {[
-            [formatCount(story.totalMessages), "messages"],
-            [String(story.sources.length), story.sources.length === 1 ? "appli" : "applis"],
-            [String(story.voiceCount), story.voiceCount === 1 ? "vocal" : "vocaux"],
-            [full ? report.readingTime.full : report.readingTime.free, "de lecture"],
-          ].map(([value, label]) => (
-            <div key={label} className="flex min-w-0 flex-col-reverse gap-0.5">
-              <dt className="text-[12px] font-extrabold text-grey">{label}</dt>
-              <dd className="m-0 whitespace-nowrap text-[19px] font-black leading-tight tabular-nums">{value}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="hidden flex-wrap gap-2 lg:flex">
-          <Chip>{formatCount(story.totalMessages)} messages</Chip>
-          <Chip>
-            {story.sources.length} {story.sources.length === 1 ? "appli" : "applis"}
-          </Chip>
-          <Chip>
-            {story.voiceCount} {story.voiceCount === 1 ? "vocal" : "vocaux"}
-          </Chip>
-          <Chip>{full ? report.readingTime.full : report.readingTime.free}</Chip>
-        </div>
-      </Card>
+      <EnTeteRapport story={story} report={report} entier={full} moi={me.initial} autre={other.initial} />
 
       {/* Partager son verdict (le verdict seul, le prénom de l’autre masqué), et ce que BLUSH fait de ta conv */}
       <PartageEtConfidentialite />
@@ -532,56 +240,10 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
         </Fragment>
       ))}
 
-      {locked.length > 0 && payload.generating && (
-        <>
-          <ChapterRule />
-          <div className="text-[13px] font-black text-grey">La suite de ton rapport s’écrit · {locked.length} chapitres</div>
-          <div id="suite-ecriture" className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
-            {locked.map((c, k) => (
-              <LigneEcriture key={c.number} number={c.number} title={enEcriture(c.number)?.title ?? c.tocTitle} etat={enEcriture(c.number)?.etat ?? "attente"} last={k === locked.length - 1} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {locked.length > 0 && payload.echec && (
-        <>
-          <ChapterRule />
-          <EchecEcriture raison={payload.echec} />
-        </>
-      )}
-
-      {locked.length > 0 && !payload.generating && !payload.echec && (
-        <>
-          <ChapterRule />
-          <div className="text-[13px] font-black text-grey">La suite de ton rapport · {locked.length} chapitres</div>
-          <div className="flex flex-col rounded-card bg-white px-4 py-1 shadow-card">
-            {locked.map((c) => (
-              <LockRow key={c.number} number={c.number} title={c.tocTitle} onClick={() => setPaywall(true)} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Après la lecture : ta question passe par le chat, prêt une fois le rapport écrit (pas pendant l’écriture, ni après un échec) */}
-      {full && !payload.generating && !payload.echec && (
-        <>
-          <ChapterRule />
-          {/* Après la lecture : ta question, bien visible */}
-          <InsetGroup>
-            <InsetRow
-              leading={<RowIcon icon="bolt" tone="toi" />}
-              title="Poser ma question à BLUSH"
-              sub={access === "rapport" ? "Une question incluse avec ton rapport" : undefined}
-              href="/rapport/question"
-              chevron
-            />
-          </InsetGroup>
-        </>
-      )}
+      <Suite phase={phase} fermes={locked} access={access} ouvrirPaiement={ouvrirPaiement} />
 
       {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
-      {peut(payload.access, "chat") && !payload.generating && !payload.echec && <ChatBubble raised={!!resume} />}
+      {peut(access, "chat") && !ecritureInachevee(phase) && <ChatBubble raised={!!resume} />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (
@@ -598,57 +260,14 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
                 </span>
               </span>
             </button>
-            <button type="button" aria-label="Ne pas reprendre" onClick={() => setResume(null)} className="flex size-9 shrink-0 items-center justify-center rounded-full">
+            <button type="button" aria-label="Ne pas reprendre" onClick={oublierReprise} className="flex size-9 shrink-0 items-center justify-center rounded-full">
               <Icon name="close" size={15} color="#FFFFFF" stroke={2.8} />
             </button>
           </div>
         </div>
       )}
 
-      {/* Le sommaire (mobile) : chaque chapitre à un toucher, les chapitres fermés ouvrent le paiement */}
-      <Sheet open={menu} onClose={() => setMenu(false)} labelledBy="sommaire-titre">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 id="sommaire-titre" className="m-0 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">
-              Sommaire
-            </h2>
-            <span className="text-[13px] font-extrabold text-grey">{current ? `Chapitre ${current} sur ${chapters.length}` : `${chapters.length} chapitres`}</span>
-          </div>
-          <button type="button" aria-label="Fermer" onClick={() => setMenu(false)} className="lift lift-sm flex size-10 shrink-0 items-center justify-center rounded-full bg-white shadow-soft">
-            <Icon name="close" size={16} color="#121214" stroke={2.8} />
-          </button>
-        </div>
-        <ReadingBar className="h-1 rounded-full bg-[#E6E3DC]" />
-        <InsetGroup>
-          {chapters.map((c) =>
-            c.locked ? (
-              <InsetRow
-                key={c.number}
-                leading={<ChapterBadge number={c.number} state="locked" large />}
-                title={<span className="text-grey">{c.tocTitle}</span>}
-                trailing={<Icon name="lock" size={16} color="#8A8780" />}
-                onClick={() => {
-                  setMenu(false);
-                  setPaywall(true);
-                }}
-              />
-            ) : (
-              <InsetRow
-                key={c.number}
-                leading={<ChapterBadge number={c.number} state={c.number === current ? "current" : current && c.number < current ? "read" : "open"} large />}
-                title={c.tocTitle}
-                sub={c.number === current ? "En cours" : undefined}
-                onClick={() => goTo(c.number)}
-              />
-            ),
-          )}
-        </InsetGroup>
-        {full && (
-          <InsetGroup>
-            <InsetRow leading={<RowIcon icon="bolt" tone="toi" />} title="Poser ma question à BLUSH" href="/rapport/question" chevron />
-          </InsetGroup>
-        )}
-      </Sheet>
+      <FeuilleSommaire open={menu} onClose={() => setMenu(false)} chapters={chapters} current={current} allerAuChapitre={goTo} ouvrirPaiement={ouvrirPaiement} question={full} />
 
       {toast && <Toast className="fixed inset-x-4 top-3 lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{toast}</Toast>}
 
@@ -668,37 +287,6 @@ function ReportBody({ payload, story, openPaywall }: { payload: ReportPayload; s
   );
 }
 
-/** La barre de progression de lecture : bleu toi → rose elle → vert vérité. Sa valeur est posée par suivreLu, hors de React. */
-function ReadingBar({ className }: { className?: string }) {
-  return (
-    <div ref={brancherBarre} role="progressbar" aria-label="Progression de la lecture" aria-valuemin={0} aria-valuemax={100} className={cn("overflow-hidden", className)}>
-      <div
-        className="h-full origin-left rounded-full transition-transform duration-150 ease-out [transform:scaleX(0)]"
-        style={{ background: "linear-gradient(90deg, #3D8BFF, #FF4F9A 60%, #12C08A)" }}
-      />
-    </div>
-  );
-}
-
-/** Le numéro d’un chapitre : lu (coche), en cours (encre), ouvert, ou fermé (cadenas à côté). */
-function ChapterBadge({ number, state, large }: { number: number; state: "read" | "current" | "open" | "locked"; large?: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-black",
-        large ? "size-9 text-[14px]" : "h-[26px] min-w-[26px] text-[12px]",
-        state === "current" && "bg-ink text-white",
-        state === "read" && "bg-vrai-ink text-white",
-        state === "open" && "bg-white text-ink shadow-[inset_0_0_0_1.5px_rgba(17,17,20,0.16)]",
-        state === "locked" && "bg-plaque text-grey",
-      )}
-    >
-      {state === "read" ? <Icon name="check" size={large ? 15 : 12} color="#FFFFFF" stroke={3.2} /> : number}
-    </span>
-  );
-}
-
 /**
  * Arrivé sur un chapitre (/rapport#chapitre-N, « Lire la suite » de « C’est débloqué ») par une navigation dans l’appli :
  * l’écran d’attente du rapport passe avant lui, et Next, qui n’y trouve pas encore le chapitre, oublie l’ancre. On y va
@@ -711,9 +299,9 @@ function SuivreAncre({ retour }: { retour: boolean }) {
   const [premierChargement] = useState(pageDuServeur);
   useEffect(() => {
     if (premierChargement || retour) return;
-    const ancre = /^#(chapitre-\d+)$/.exec(window.location.hash)?.[1];
-    if (!ancre) return;
-    const raf = requestAnimationFrame(() => document.getElementById(ancre)?.scrollIntoView({ block: "start" }));
+    const n = chapitreDeLAncre(window.location.hash);
+    if (n === null) return;
+    const raf = requestAnimationFrame(() => sectionDuChapitre(n)?.scrollIntoView({ block: "start" }));
     return () => cancelAnimationFrame(raf);
   }, [premierChargement, retour]);
   return null;
@@ -737,8 +325,8 @@ const ChapterSection = memo(function ChapterSection({
   autre?: Pronom;
 }) {
   return (
-    <section id={`chapitre-${chapter.number}`} aria-labelledby={`chapitre-${chapter.number}-titre`} className={cn("flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5")}>
-      <ChapterHeader number={chapter.number} kicker={chapter.kicker} title={chapter.title} id={`chapitre-${chapter.number}-titre`} />
+    <section id={ancreDuChapitre(chapter.number)} aria-labelledby={titreDuChapitre(chapter.number)} className="flex scroll-mt-[76px] flex-col gap-[18px] lg:scroll-mt-6 lg:gap-3.5">
+      <ChapterHeader number={chapter.number} kicker={chapter.kicker} title={chapter.title} id={titreDuChapitre(chapter.number)} />
       {children}
       <Blocks blocks={chapter.blocks} renderQuestion={renderQuestion} onShare={onShare && ((bloc) => onShare(chapter.number, bloc))} autre={autre} />
     </section>

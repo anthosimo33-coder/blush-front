@@ -14,7 +14,8 @@ import { pagePrecedente } from "@/lib/navigation";
  * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH sort du jeu.
  * Pas de couleur de sens, pas de 3D, pas de score, pas de logo en volume. Encre et papier seulement.
  */
-const QUIT_HREF = "/commencer"; /* « Quitter vite » mène à l’écran 01, comme dans la maquette */
+/* « Quitter vite » et « OK, merci » mènent à l’écran 01, comme dans la maquette */
+const QUIT_HREF = "/commencer";
 
 /* TODO(produit): ressources d’aide absentes des maquettes, à valider. */
 const HELP = [
@@ -113,7 +114,7 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               </div>
             </div>
             <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
-              <SoberButton href="/commencer">OK, merci</SoberButton>
+              <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
               <SoberLink
                 onClick={async () => {
                   await setPaused(true);
