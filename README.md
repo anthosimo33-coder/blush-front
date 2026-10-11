@@ -21,11 +21,20 @@ GitHub (`blush-front`) est la seule source : on travaille sur une branche, on po
 nvm use                                 # Node 24, celui de Vercel (.nvmrc, et `engines` de package.json, que Vercel lit aussi)
 git submodule update --init             # les prompts (dépôt privé blush-prompts)
 npm ci
-npm run check                           # types, lint, migrations, typographie, code mort (knip), tests (Postgres local : blush_test, créée au besoin)
+npm run check                           # types, lint (sans un avertissement), mise en forme, migrations, typographie, code mort (knip), tests et leur couverture (Postgres local : blush_test, créée au besoin)
+npm run forme:ecrire                    # met tout le dépôt en forme (Prettier) ; `npm run forme` vérifie seulement, comme check
+npm run couverture                      # les tests et leur couverture, seule (le rapport HTML dans coverage/)
 npm run test:unit                       # seulement les tests sans base (les projets vitest « unit » et « client ») : une boucle rapide, sans Postgres
 npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (voir BACKEND.md)
 npm run todo                            # les décisions produit en attente (les TODO(produit) du code), sans rien faire échouer
 ```
+
+Les garde-fous de `npm run check` :
+
+- **TypeScript** strict, avec `noUncheckedIndexedAccess` (un `liste[0]` peut manquer : le code le vérifie, ou l’affirme d’un `!` là où il le sait) et sans JavaScript (`allowJs` retiré). Les scripts restent en `.mjs`, lancés par node ; ceux que le TypeScript importe ont leurs types à côté, dans un `.d.mts` du même nom (`scripts/**/*.d.mts`, écrits à la main d’après le code : `tests/unit/declarations-scripts.test.ts` vérifie qu’ils déclarent exactement ce que le `.mjs` exporte). Les routes sont typées (`typedRoutes`, `next.config.ts`) : un lien ou une redirection vers une page qui n’existe pas ne compile pas.
+- **ESLint** (`eslint.config.mjs`, ses règles essayées par `tests/lint.test.ts`) : les frontières entre couches, les promesses tenues dans tout `src` (`no-floating-promises`, `no-misused-promises`), une couleur qui a son token jamais écrite en hex (`blush/couleur-en-jeton`), et aucun avertissement laissé (`--max-warnings 0`).
+- **Prettier** (`.prettierrc`, largeur 180) : tout le dépôt, sauf ce que `.prettierignore` laisse (le sous-module des prompts, les migrations, les fichiers servis). Le commit qui l’a passé sur tout le dépôt est dans `.git-blame-ignore-revs` : `git config blame.ignoreRevsFile .git-blame-ignore-revs` une fois, et `git blame` le saute.
+- **La couverture** (`vitest.config.mts`, `coverage`) : le code de `src`, sans les textes générés ni les outils de l’équipe ; ses seuils font échouer la commande quand elle baisse.
 
 `blush_test` sert à tous les dossiers du projet sur la machine : les tests ne la migrent que s’ils viennent de la créer. Un dossier qui ajoute une migration prend sa propre base : `DATABASE_URL_TEST=postgres://localhost:5432/blush_test_<nom> npm run check`. Une base à soi est migrée et remise à zéro à chaque lancement : ses limites et ses compteurs du jour (`rate_limits`, `counters`). Ses autres tables gardent ce que les tests y laissent : les comptes et les brouillons des fixtures (`tests/aide/fixtures.ts`) sont effacés à la fin de chaque fichier, un test qui écrit autrement efface lui-même ce qu’il crée. Les fichiers de tests avec la base passent un par un (`fileParallelism: false`).
 

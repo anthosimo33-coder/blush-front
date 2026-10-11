@@ -18,7 +18,7 @@
     "pretest": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs",
     "test": "vitest run",
     "test:unit": "node scripts/prompts.mjs && vitest run --project unit --project client",
-    "check": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && next typegen && tsc --noEmit && eslint . --max-warnings 0 && node scripts/verifier-typo.mjs && npm run mort && vitest run --coverage",
+    "check": "node scripts/prompts.mjs && node scripts/verifier-migrations.mjs && next typegen && tsc --noEmit && eslint . --max-warnings 0 && prettier --check . && node scripts/verifier-typo.mjs && npm run mort && vitest run --coverage",
     "mort": "knip --no-progress",
     "couverture": "node scripts/prompts.mjs && vitest run --coverage",
     "forme": "prettier --check .",

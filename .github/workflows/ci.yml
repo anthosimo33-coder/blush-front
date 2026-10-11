@@ -1,6 +1,6 @@
-# La CI de BLUSH. Chaque pull request et chaque push sur main passent les vérifications (types, lint, tests,
-# migrations, build du back-end et sa vérification des prompts), puis les tests de bout en bout dans Chromium et
-# WebKit. On ne déploie plus depuis un dossier local.
+# La CI de BLUSH. Chaque pull request et chaque push sur main passent les vérifications (types, lint, mise en forme,
+# tests et leur seuil de couverture, migrations, build du back-end et sa vérification des prompts), puis les tests de
+# bout en bout dans Chromium et WebKit. On ne déploie plus depuis un dossier local.
 #
 # La mise en production est un geste, jamais l’effet d’un push : « Run workflow » sur main (onglet Actions), ou
 # `gh workflow run CI --ref main`. Ce lancement refait toutes les vérifications sur la tête de main, puis déploie. Le
@@ -66,7 +66,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Types, lint, migrations, typographie, code mort et tests (npm run check)
+      - name: Types, lint, mise en forme, migrations, typographie, code mort, tests et leur couverture (npm run check)
         run: npm run check
 
       - name: Build du back-end (prebuild, next build, puis la vérification des prompts)

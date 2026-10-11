@@ -1,0 +1,6 @@
+# Les commits que `git blame` saute : des changements mécaniques, sans changement de code. Une fois par clone :
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub lit ce fichier de lui-même.) Un commit ajouté ici ne change que la forme, et son message le dit.
+
+# Prettier sur tout le dépôt (9a, Q13)
+d622b9e8f12d741e0eec732dea16b5c132cc4d4a

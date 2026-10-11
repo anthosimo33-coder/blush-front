@@ -56,14 +56,18 @@ export default defineConfig({
       BLUSH_ALERTES: "equipe@blush.test",
     },
     /*
-     * La couverture (`npm run couverture`, et la CI) : le code de src, ts et tsx, fichiers jamais chargés compris, sans les
-     * textes générés des prompts ni les outils de l’équipe (/apercu, /styleguide, jamais en ligne).
+     * La couverture (`npm run check` et `npm run couverture`, donc la CI) : le code de src, ts et tsx, fichiers jamais
+     * chargés compris, sans les textes générés des prompts ni les outils de l’équipe (/apercu, /styleguide, jamais en
+     * ligne). Les seuils sont ceux mesurés au lot 9a (66,6 % des instructions, 59,7 % des branches, 59,9 % des fonctions,
+     * 68,0 % des lignes), arrondis à l’unité en dessous : une baisse fait échouer la commande. Ils se relèvent quand la
+     * couverture monte, et ne se baissent jamais pour faire passer un changement.
      */
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/server/ia/textes.generated.ts", "src/app/apercu/**", "src/app/styleguide/**"],
       reporter: ["text-summary", "html"],
+      thresholds: { statements: 66, branches: 59, functions: 59, lines: 67 },
     },
     projects: [
       { extends: true, test: { name: "unit", include: UNITAIRES } },

@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Ne jamais lancer `vercel deploy` (ni `vercel --prod`) depuis un dossier local. GitHub est la seule source : on pousse une branche, la CI (`.github/workflows/ci.yml`) la vérifie.
 - Un push sur `main` ne déploie rien. La mise en production se lance à la main, avec l’accord de l’utilisateur : « Run workflow » sur `main`, ou `gh workflow run CI --ref main`. La CI refait alors toutes les vérifications sur la tête de `main`, puis déploie.
-- Avant de pousser : `npm run check` (types, lint, migrations, typographie, code mort, tests), puis `npm run e2e:build && npm run e2e` si l’appli a changé.
+- Avant de pousser : `npm run check` (types, lint, mise en forme, migrations, typographie, code mort, tests et leur couverture), puis `npm run e2e:build && npm run e2e` si l’appli a changé. Un code mal mis en forme : `npm run forme:ecrire`.
 
 # En local : le vrai back-end, le modèle factice
 
