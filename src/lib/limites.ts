@@ -2,13 +2,34 @@
  * Les limites que le navigateur et le serveur partagent, écrites une fois : ce module est pur (ni server-only, ni
  * client-only) et s’importe des deux côtés. Seules y vont les bornes qui mesurent la même chose des deux côtés ; celles
  * du serveur seul (la taille d’une image reçue, d’un vocal, d’un message du chat) restent près de leur code. Les seuils
- * de messages d’une conv sont ceux de sa lecture (MIN_MESSAGES, prompts/lib/conv.ts).
+ * de messages d’une conv sont ceux de sa lecture (MIN_MESSAGES, prompts/lib/conv.ts). Les filtres des sélecteurs de
+ * fichiers (ce qu’un écran propose de choisir) y sont aussi : chaque écran qui importe les reprend, sans les recopier.
  */
 
 const MO = 1024 * 1024;
 
 /** Au plus 20 captures dans un envoi : l’écran garde les 20 premières, le serveur refuse au-delà (src/server/captures.ts). */
 export const CAPTURES_MAX = 20;
+
+/** Ce que propose le sélecteur de captures (l’import, le chat, la fiche) : des images, que le navigateur réduit avant l’envoi. */
+export const ACCEPT_IMAGES = "image/*";
+/** Une image choisie ou déposée : une capture. */
+export const estImage = (f: Blob) => f.type.startsWith("image/");
+
+/* Un export de conv : WhatsApp .zip ou .txt, Instagram .html ou .json ; par extension, et par type pour un navigateur qui ne lit que lui */
+const EXTENSIONS_EXPORT = ["zip", "txt", "json", "html"];
+const TYPES_EXPORT = ["application/zip", "text/plain", "application/json", "text/html"];
+/** Ce que propose le sélecteur d’un export de conv (l’import, le chat, la fiche). */
+export const ACCEPT_EXPORT = [...EXTENSIONS_EXPORT.map((e) => `.${e}`), ...TYPES_EXPORT].join(",");
+/** Un fichier déposé qui peut être un export (son extension ou son type) : ce que la fiche garde d’un glisser-déposer. */
+export const estExport = (f: File) => EXTENSIONS_EXPORT.some((e) => f.name.toLowerCase().endsWith(`.${e}`)) || TYPES_EXPORT.includes(f.type);
+
+/**
+ * Les fichiers d’une conv dans le paquet d’un export (les message_N d’Instagram, un seul .txt pour WhatsApp) : le
+ * serveur refuse un paquet qui en compte plus (src/server/import.ts), le navigateur garde les plus récents
+ * (src/services/preparer-export.ts), comme pour une conv trop longue.
+ */
+export const PARTIES_MAX = 50;
 
 /** Le grand côté d’une image lue par le modèle, en pixels (il ne lit pas plus fin) : captures et images d’une vidéo y sont réduites. */
 export const COTE_IMAGE_MAX = 1568;

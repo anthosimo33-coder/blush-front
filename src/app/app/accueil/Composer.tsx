@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { useFilePicker } from "@/lib/hooks";
+import { ACCEPT_EXPORT, ACCEPT_IMAGES } from "@/lib/limites";
 import { bumpPearl, delai, pearlsOf, prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { drapeauLocal } from "@/lib/stockage";
@@ -307,9 +308,9 @@ export function Composer({
           </label>
         )}
       </div>
-      <FileInput inputRef={shots.ref} accept="image/*" multiple onFiles={onImages} label="Captures d’écran de sa réponse" />
+      <FileInput inputRef={shots.ref} accept={ACCEPT_IMAGES} multiple onFiles={onImages} label="Captures d’écran de sa réponse" />
       {children}
-      <FileInput inputRef={exp.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={onExport} label="Export de votre conv" />
+      <FileInput inputRef={exp.ref} accept={ACCEPT_EXPORT} onFiles={onExport} label="Export de votre conv" />
     </form>
   );
 }

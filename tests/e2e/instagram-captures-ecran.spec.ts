@@ -250,8 +250,8 @@ test("captures : une capture illisible, l’écran d’erreur le dit, et « Choi
  * retire la capture du pointeur (lostpointercapture, dans Chromium comme dans WebKit). Lâchée ailleurs que sur une vignette
  * (au-dessus de la grille, entre deux vignettes, sur une vignette encore en mouvement), le pointerup n’arrive à aucune
  * vignette : la capture reste soulevée (sa croix cachée), rien n’est annoncé, et le simple survol d’une autre vignette,
- * bouton relâché, la déplace encore. src/app/importer/captures/CapturesScreen.tsx:387 (setPointerCapture sur la vignette)
- * et :473-474 (la fin du glisser n’écoute que les vignettes).
+ * bouton relâché, la déplace encore. src/components/ui/ReorderGrid.tsx:68 (setPointerCapture sur la vignette)
+ * et :142-143 (la fin du glisser n’écoute que les vignettes).
  */
 test.fixme("captures : au pointeur, lâcher la capture hors de la grille la pose, et survoler ensuite ne déplace plus rien", async ({ page }, testInfo) => {
   await page.goto("/importer/captures?app=autre");
@@ -279,7 +279,7 @@ test.fixme("captures : au pointeur, lâcher la capture hors de la grille la pose
 /*
  * Un bug : retirer une capture au clavier (Suppr, ou Entrée sur sa croix) fait perdre le focus, qui retombe sur la page.
  * Il faut tout reparcourir à la tabulation pour revenir à la grille, alors qu’un déplacement aux flèches garde le focus
- * sur la capture. src/app/importer/captures/CapturesScreen.tsx:446-448 (Suppr) et :498 (la croix) appellent onRemove
+ * sur la capture. src/components/ui/ReorderGrid.tsx:127-129 (Suppr) et :205 (la croix) appellent onRemove
  * sans redonner le focus à la grille.
  */
 test.fixme("captures : après Suppr ou la croix au clavier, le focus reste dans la grille", async ({ page }, testInfo) => {

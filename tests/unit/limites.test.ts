@@ -1,6 +1,7 @@
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
+import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, extensionAudio, TEXTE_CONV_MAX } from "@/lib/limites";
+import { ACCEPT_EXPORT, ACCEPT_IMAGES, CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, estExport, estImage, extensionAudio, PARTIES_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 import { imagesDe } from "@/server/captures";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { CODE_ESSAIS } from "@/server/auth";
@@ -52,6 +53,31 @@ describe("le texte d’une conv : 40 Mo au plus, des deux côtés", () => {
     expect((JSON.parse(octets.toString("utf8")) as { coupe?: boolean }).coupe).toBe(true);
     await expect(depuisPaquet(new File([await pret.paquet.arrayBuffer()], "export.json.gz"))).resolves.toMatchObject({ coupe: true });
   }, 60_000);
+});
+
+describe("les fichiers d’une conv dans un paquet : 50 au plus, des deux côtés", () => {
+  /* Une conv d’Instagram en `n` fichiers : message_1 est le plus récent, chacun du plus récent au plus ancien */
+  const DEBUT = Date.UTC(2026, 8, 1);
+  const message = (k: number) => ({ sender_name: k % 2 ? "Moi" : "Léa", timestamp_ms: DEBUT - k * 60e3, content: `message ${k}` });
+  const fichierInsta = (n: number) => JSON.stringify({ participants: [{ name: "Léa" }, { name: "Moi" }], messages: [0, 1, 2, 3].map((k) => message(n * 4 + k)) });
+  const nomInsta = (n: number) => `your_instagram_activity/messages/inbox/lea_1/message_${n}.json`;
+  const parties = (n: number) => Array.from({ length: n }, (_, k) => ({ nom: nomInsta(k + 1), contenu: fichierInsta(k + 1) }));
+  const paquetDe = (contenu: unknown) => new File([gzipSync(JSON.stringify(contenu))], "export.json.gz");
+
+  it("le serveur lit un paquet de 50 fichiers, pas un de plus", async () => {
+    await expect(depuisPaquet(paquetDe({ nom: "instagram.zip", parties: parties(PARTIES_MAX) }))).resolves.toMatchObject({ appli: "instagram" });
+    await expect(depuisPaquet(paquetDe({ nom: "instagram.zip", parties: parties(PARTIES_MAX + 1) }))).rejects.toBeInstanceOf(ErreurImport);
+  });
+
+  it("le navigateur garde les 50 plus récents d’une conv plus longue, coupée comme une conv trop grosse : le serveur relit le paquet", async () => {
+    const zip = zipSync(Object.fromEntries(parties(PARTIES_MAX + 3).map((p) => [p.nom, strToU8(p.contenu)])));
+    const pret = await analyserExport(new File([zip as BlobPart], "instagram.zip", { type: "application/zip" }));
+    if (pret.type !== "un") throw new Error("une seule conv attendue");
+    const paquet = JSON.parse(gunzipSync(Buffer.from(await pret.paquet.arrayBuffer())).toString("utf8")) as { parties: { nom: string }[]; coupe?: boolean };
+    expect(paquet.parties.map((p) => p.nom)).toEqual(parties(PARTIES_MAX).map((p) => p.nom));
+    expect(paquet.coupe).toBe(true);
+    await expect(depuisPaquet(new File([await pret.paquet.arrayBuffer()], "export.json.gz"))).resolves.toMatchObject({ coupe: true });
+  });
 });
 
 describe("les captures : 20 au plus", () => {
@@ -111,6 +137,16 @@ describe("le reste", () => {
     expect(codeReserveParEmail.max / codeReserveParEmailEtIp.max).toBeGreaterThanOrEqual(5);
     /* Tous emails confondus, les mails de code du jour bornent ce qui se devine : moins d’une chance sur mille */
     expect((mailsCodeParJour.max * CODE_ESSAIS) / 1e6).toBeLessThan(1e-3);
+  });
+
+  it("les sélecteurs de fichiers : des images, ou un export WhatsApp (.zip, .txt) ou Instagram (.html, .json), par extension comme par type", () => {
+    expect(ACCEPT_IMAGES).toBe("image/*");
+    expect(ACCEPT_EXPORT).toBe(".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html");
+    const f = (nom: string, type = "") => new File([], nom, { type });
+    expect([f("a.png", "image/png"), f("b.HEIC", "image/heic")].map(estImage)).toEqual([true, true]);
+    expect([f("Conv.ZIP"), f("_chat.txt"), f("message_1.json"), f("message_1.html"), f("sans-extension", "application/zip")].map(estExport)).toEqual([true, true, true, true, true]);
+    expect([f("photo.jpg", "image/jpeg"), f("video.mp4", "video/mp4"), f("conv.zip.pdf", "application/pdf")].map(estExport)).toEqual([false, false, false]);
+    expect(estImage(f("video.mp4", "video/mp4"))).toBe(false);
   });
 
   it.each([

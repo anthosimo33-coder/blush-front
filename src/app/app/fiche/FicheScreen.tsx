@@ -7,7 +7,9 @@ import { useEffect, useRef, useState, ViewTransition } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
+import { ACCEPT_EXPORT, ACCEPT_IMAGES, estExport, estImage } from "@/lib/limites";
 import { pagePrecedente } from "@/lib/navigation";
+import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { ecritDepuis, FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
@@ -24,13 +26,12 @@ import type { Fiche, FicheFact, FicheUpdate, Pronom } from "@/types";
 const CARD_W = 600;
 
 /** Ce que la fiche accepte : des captures (images) ou un export de votre conv (WhatsApp .zip ou .txt, Instagram .html ou .json). */
-const ACCEPT = "image/*,.zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html";
-const isImage = (f: File) => f.type.startsWith("image/");
-const accepted = (f: File) => isImage(f) || /\.(zip|txt|json|html)$/i.test(f.name) || ["application/zip", "text/plain", "application/json", "text/html"].includes(f.type);
+const ACCEPT = `${ACCEPT_IMAGES},${ACCEPT_EXPORT}`;
+const accepted = (f: File) => estImage(f) || estExport(f);
 
 /** Ce que BLUSH analyse, dit simplement : « ta capture », « tes 3 captures », « votre conv », ou les deux. */
 function whatOf(files: File[]) {
-  const images = files.filter(isImage).length;
+  const images = files.filter(estImage).length;
   return [images === 1 ? "ta capture" : images > 1 ? `tes ${images} captures` : null, images < files.length ? "votre conv" : null].filter(Boolean).join(" et ");
 }
 
@@ -71,7 +72,8 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   const [fresh, setFresh] = useState<string[]>([]);
   const [over, setOver] = useState(false);
   const picker = useFilePicker();
-  const urls = useRef<string[]>([]);
+  /* Les vignettes des captures en cours de lecture, libérées au départ de la fiche */
+  const apercus = useApercusFichiers();
   const router = useRouter();
   /*
    * « Retour » : venu de l’accueil, on y revient par l’historique, comme le geste retour (sinon le retour suivant
@@ -92,8 +94,6 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     const t = setTimeout(() => setPrechargerAccueil(pagePrecedente() !== "/app" ? true : undefined));
     return () => clearTimeout(t);
   }, []);
-
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   /* Des fichiers glissés au-dessus de la page : toute la fiche devient la zone de dépôt */
   useEffect(() => {
@@ -175,11 +175,10 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     const files = picked.filter(accepted);
     if (!files.length || job.step === "reading" || job.step === "adding") return;
     const before = fiche.facts;
-    const thumbs = files.filter(isImage).slice(0, 3).map((f) => URL.createObjectURL(f));
-    urls.current.push(...thumbs);
+    const thumbs = files.filter(estImage).slice(0, 3).map(apercus.creer);
     const what = whatOf(files);
     setEditing(false);
-    setJob({ step: "reading", what, thumbs, file: files.some((f) => !isImage(f)) });
+    setJob({ step: "reading", what, thumbs, file: files.some((f) => !estImage(f)) });
     /* Sans réseau, même la fiche ne se relit pas : on garde celle qu’on a, et l’écran dit que ça n’a pas marché */
     const update = await addToFiche(files).catch((): FicheUpdate => ({ fiche, added: [], problem: "bug" }));
     setQueryData(key, update.fiche);

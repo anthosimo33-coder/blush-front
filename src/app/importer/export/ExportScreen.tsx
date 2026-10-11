@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useDevice, useFilePicker } from "@/lib/hooks";
+import { ACCEPT_EXPORT } from "@/lib/limites";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/contenu/parcours";
@@ -116,7 +117,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               "Choisir le fichier enregistré"
             )}
           </Button>
-          <FileInput inputRef={picker.ref} accept=".zip,.txt,.json,.html,application/zip,text/plain,application/json,text/html" onFiles={onFiles} label="Fichier de la conversation exportée" />
+          <FileInput inputRef={picker.ref} accept={ACCEPT_EXPORT} onFiles={onFiles} label="Fichier de la conversation exportée" />
         </>
       }
     >

@@ -7,7 +7,7 @@ import "client-only";
 import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, debutDeMessage, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
-import { ENVOI_EXPORT_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
+import { ENVOI_EXPORT_MAX, PARTIES_MAX, TEXTE_CONV_MAX } from "@/lib/limites";
 
 export class ExportIllisible extends Error {
   constructor(readonly code: "fichier" | "plusieurs") {
@@ -87,11 +87,13 @@ const ECHANTILLON = 1024 * 1024;
  * d’une conv réunis, ses échappements), même très compressible, garde aussi sa fin, ici plutôt qu’un refus après l’envoi.
  * Pour une très grosse conv, le taux mesuré sur sa fin (les messages gardés) dit d’avance où couper : on ne la
  * compresse plus en entier jusqu’à six fois. La boucle reste en garde-fou, si l’estimation était trop juste.
+ * Une conv d’Instagram en plus de PARTIES_MAX fichiers (le serveur refuserait le paquet) garde les plus récents, les
+ * premiers (message_1 est le plus récent).
  */
 async function paquet(nom: string, parties: Partie[]): Promise<Blob> {
-  let garde = parties;
-  let coupe = false;
-  let brut = await enOctets(nom, garde, false);
+  let coupe = parties.length > PARTIES_MAX;
+  let garde = coupe ? parties.slice(0, PARTIES_MAX) : parties;
+  let brut = await enOctets(nom, garde, coupe);
   for (let essai = 0; brut.length > TEXTE_CONV_MAX && essai < 3; essai++) {
     garde = garderLaFin(garde, (TEXTE_CONV_MAX * 0.9) / brut.length);
     coupe = true;

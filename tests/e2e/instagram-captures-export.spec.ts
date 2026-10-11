@@ -207,7 +207,7 @@ test("Instagram : une conv trop courte choisie dans l’export complet, l’écr
  * Un bug de texte : Instagram s’importe par son export (la tuile, l’écran d’erreur « trop courte » qui envoie vers les
  * captures en disant « Un export doit avoir au moins 50 messages »). Puis l’écran des captures affirme « Instagram et
  * Hinge ne permettent pas d’exporter », juste après un export Instagram.
- * src/app/importer/captures/CapturesScreen.tsx:199 (le texte d’avant le back-end, quand Instagram passait par les captures).
+ * src/app/importer/captures/CapturesScreen.tsx:200 (le texte d’avant le back-end, quand Instagram passait par les captures).
  */
 test.fixme("Instagram : l’écran des captures ne dit pas qu’Instagram ne s’exporte pas", async ({ page }) => {
   await page.goto("/importer/captures?app=instagram");
