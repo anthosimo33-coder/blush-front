@@ -26,8 +26,8 @@ export type EtatChaine = {
   rapport: boolean;
   /** Le vocal du rapport, s’il est fait : à la version du script, et quand. */
   vocal: { aJour: boolean; fait: Date } | null;
-  /** La dernière tâche de chaque genre de la chaîne. */
-  taches: Partial<Record<Genre, Pick<Tache, "status" | "createdAt">>>;
+  /** La dernière tâche de chaque genre de la chaîne (son code d’erreur, s’il est lu : une étape arrêtée par le budget de l’IA repart après minuit). */
+  taches: Partial<Record<Genre, Pick<Tache, "status" | "createdAt"> & Partial<Pick<Tache, "error">>>>;
 };
 
 /** Une tâche qui attend ou tourne : elle n’est pas encore faite, mais rien ne sert de la planifier à nouveau. */

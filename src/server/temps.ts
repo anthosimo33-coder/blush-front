@@ -1,10 +1,17 @@
 import "server-only";
+import { sql } from "drizzle-orm";
 
 /** Le jour à Paris (AAAA-MM-JJ), et le même jour à minuit UTC : la date du jour que reçoit le modèle. */
 export function aujourdhuiParis(maintenant = new Date()): { iso: string; t: number } {
   const iso = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(maintenant);
   return { iso, t: Date.parse(`${iso}T00:00:00Z`) };
 }
+
+/**
+ * Minuit à Paris, aujourd’hui, en SQL : le début du jour du budget de l’IA (src/server/budget.ts), et l’heure avant
+ * laquelle une tâche arrêtée par lui peut repartir (src/server/pipeline.ts).
+ */
+export const DEBUT_DU_JOUR = sql`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`;
 
 /** Un moment dit comme dans Messages, à l’heure de Paris : « aujourd’hui », « hier », « lun. » dans la semaine, puis « 12 mars ». */
 export function jourRelatif(quand: Date, maintenant = new Date()): string {

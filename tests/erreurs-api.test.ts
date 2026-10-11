@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout } from "@/lib/messages-erreur";
+import { describe, expect, it, vi } from "vitest";
+import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SOUFFLE } from "@/lib/messages-erreur";
 import { ErreurTache, estRefus } from "@/server/erreurs";
-import { erreur } from "@/server/http";
+import { erreur, route } from "@/server/http";
 import { codePublic, ERREURS_API, ErreurApi, type CodeErreur } from "@/types/erreurs-api";
 
 /* Les codes d’erreur de l’API, du serveur (src/types/erreurs-api.ts) jusqu’aux textes des écrans (src/lib/messages-erreur.ts) */
@@ -19,7 +19,6 @@ describe("le serveur", () => {
       trop: 429,
       codes: 429,
       essais: 429,
-      reseau: 429,
       aucune: 404,
       introuvable: 404,
       lien: 404,
@@ -64,6 +63,8 @@ describe("le serveur", () => {
     expect(codePublic("refus:cyber")).toBe("refus");
     expect(codePublic("transcription")).toBe("transcription");
     expect(codePublic("budget")).toBe("souffle");
+    /* Un code déjà public le reste : la route du chat applique codePublic au code de codeDErreur */
+    for (const publique of ["refus", "transcription", "souffle", "panne"] as const) expect(codePublic(publique)).toBe(publique);
     for (const interne of ["sortie_illisible", "contexte_absent", "delai", "annule"]) expect(codePublic(interne)).toBe("panne");
   });
 
@@ -72,6 +73,30 @@ describe("le serveur", () => {
     expect(estRefus(new ErreurTache("sortie_illisible"))).toBe(false);
     expect(estRefus("refus")).toBe(true);
     expect([estRefus("coupee"), estRefus("erreur:TypeError"), estRefus(null), estRefus(undefined)]).toEqual([false, false, false, false]);
+  });
+});
+
+describe("l’enveloppe des routes", () => {
+  it("une erreur que la route ne rattrape pas répond « panne », et le journal n’en garde que le nom (S-44)", async () => {
+    const lignes = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sql = Object.assign(new Error("Failed query: select * from users where email = $1\nparams: ines@exemple.test"), { name: "DrizzleQueryError" });
+    const r = await route(async (req: Request) => {
+      throw Object.assign(sql, { route: new URL(req.url).pathname });
+    })(new Request("http://localhost/api/auth/verifier"));
+    expect(r.status).toBe(502);
+    expect(await r.json()).toEqual({ erreur: "panne" });
+    expect(lignes.mock.calls.flat().join("\n")).toContain("DrizzleQueryError");
+    expect(lignes.mock.calls.flat().join("\n")).not.toContain("exemple.test");
+  });
+
+  it("une erreur attendue garde son code ; une réponse passe telle quelle", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const budget = await route(async () => {
+      throw new ErreurTache("budget");
+    })();
+    expect([budget.status, await budget.json()]).toEqual([503, { erreur: "souffle" }]);
+    const ok = await route(async () => Response.json({ ok: true }))();
+    expect(await ok.json()).toEqual({ ok: true });
   });
 });
 
@@ -97,16 +122,18 @@ describe("les écrans", () => {
   });
 
   it("le budget de l’IA du jour atteint : « BLUSH souffle un peu, réessaie demain », dit par BLUSH au chat", () => {
-    for (const action of ["lecture", "relance", "fiche"] as const) expect(messageErreur(action, api("souffle"))).toBe("BLUSH souffle un peu, réessaie demain.");
+    expect(SOUFFLE).toBe("BLUSH souffle un peu, réessaie demain.");
     expect(messageErreur("chat", api("souffle"))).toBe("je souffle un peu, réessaie demain");
     expect(messageErreur("question", api("souffle"))).toBe("je souffle un peu, réessaie demain");
     expect(problemeAjout(api("souffle"))).toBe("souffle");
     expect(messageAjoutFiche("souffle", "ta capture", "Inès")).toEqual({ title: "BLUSH souffle un peu", detail: "Réessaie demain." });
   });
 
-  it("une lecture refusée par la limite de son réseau ne se dit pas comme celle du compte", () => {
-    expect(messageErreur("lecture", api("reseau"))).toBe("Beaucoup de lectures sont parties de ce réseau aujourd’hui. Réessaie demain.");
-    expect(messageErreur("lecture", api("reseau"))).not.toBe(messageErreur("lecture", api("trop")));
+  it("l’import de captures arrêté par le budget du jour le dit, sans prendre les captures pour illisibles", () => {
+    expect(messageErreur("captures", api("souffle"))).toBe("BLUSH souffle un peu, réessaie demain. Tes captures restent là.");
+    expect(erreurDeParcours("captures", api("souffle"))).toBeNull();
+    expect(messageErreur("captures", api("trop"))).toBe("BLUSH a lu beaucoup de captures d’un coup\u00a0: réessaie un peu plus tard. Tes captures restent là.");
+    expect(messageErreur("captures", new TypeError("Failed to fetch"))).toBe("Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.");
   });
 
   it("le fichier ou la conv elle-même ouvrent l’écran d’erreur de l’import ; le reste se dit sur l’écran", () => {

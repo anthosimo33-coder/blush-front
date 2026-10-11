@@ -6,10 +6,10 @@ import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contex
 import { db, schema } from "../db";
 import { env } from "../env";
 import { alerter } from "../alertes";
-import { controlerBudget, noterDepense } from "../budget";
+import { controlerBudget, noterDepense, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
-import { journal, journalErreur } from "../journal";
+import { auMieux, journal, journalErreur } from "../journal";
 import { fournisseurFactice, REFUS_FACTICE } from "./factice";
 import { TEXTES } from "./textes.generated";
 
@@ -110,8 +110,9 @@ async function ecrireFactice(texte: string, surAvance: (a: Avance) => void) {
 
 /**
  * Appelle le modèle pour une tâche, avec son format de sortie. `storyId` sert au suivi des coûts et au budget du jour :
- * au-delà de celui de tous ou de celui du compte de la conv (sans conv, la part sans compte), l’appel ne part pas
- * (ErreurTache « budget », src/server/budget.ts), en mode factice aussi.
+ * au-delà de celui de tous ou de celui du compte de la conv (sans conv, celui de `compte`, le compte connecté qui
+ * envoie des captures avant l’import ; sans compte, la part sans compte), l’appel ne part pas (ErreurTache « budget »,
+ * src/server/budget.ts), en mode factice aussi.
  * `surAvance` : la réponse passe en flux, et on suit ce qui s’écrit (pour une jauge qui avance vraiment, les bulles du chat).
  * `signal` : l’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué).
  * `differer` : le suivi des coûts et l’alerte d’un repli passent après la réponse (le chat en flux), au lieu de la retarder.
@@ -125,10 +126,18 @@ export async function appeler<S extends z.ZodType>(
     etiquette,
     surAvance,
     signal,
+    compte,
     differer,
-  }: { storyId?: string; etiquette?: string; surAvance?: (a: Avance) => void; signal?: AbortSignal; differer?: (tache: () => Promise<unknown>) => void } = {},
+  }: {
+    storyId?: string;
+    etiquette?: string;
+    surAvance?: (a: Avance) => void;
+    signal?: AbortSignal;
+    compte?: { email: string } | null;
+    differer?: (tache: () => Promise<unknown>) => void;
+  } = {},
 ): Promise<Appel<z.infer<S>>> {
-  const payeur = await controlerBudget(storyId);
+  const payeur = await controlerBudget({ storyId, compte });
   if (env().BLUSH_IA_FACTICE) {
     if (signal?.aborted) throw new ErreurTache("annule");
     const brut = factice(req);
@@ -210,8 +219,8 @@ export async function appeler<S extends z.ZodType>(
   }
   const { usage, model } = message;
   const ms = Date.now() - debut;
-  noterDepense(payeur, Math.round(cout(usage) * 1e6));
-  await ensuite(() => noterUsage(usage, { storyId, tache: etiquette ?? req.tache, ms, modele: model }));
+  const micros = Math.round(cout(usage) * 1e6);
+  await ensuite(() => noterUsage(usage, micros, { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));
   /*
    * Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le
    * contenu). L’équipe n’en est prévenue que pour une conv : un repli sans conv (des captures lues avant l’import, que
@@ -235,7 +244,9 @@ export async function appeler<S extends z.ZodType>(
   return { sortie: lireSortie(message.content as { type: string; text?: string }[], schema), refus: false, stop: message.stop_reason, cout: cout(message.usage) };
 }
 
-async function noterUsage(u: Usage, { storyId, tache, ms, modele }: { storyId?: string; tache: string; ms: number; modele: string }) {
+/** Le suivi des coûts (ai_usage) et la dépense du jour de qui paie (le budget de l’IA, src/server/budget.ts). */
+async function noterUsage(u: Usage, micros: number, { storyId, payeur, tache, ms, modele }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string }) {
+  await auMieux(noterDepense(payeur, micros), "dépense non notée", { tache });
   try {
     await db()
       .insert(schema.aiUsage)
@@ -247,7 +258,7 @@ async function noterUsage(u: Usage, { storyId, tache, ms, modele }: { storyId?: 
         outputTokens: u.output_tokens ?? 0,
         cacheReadTokens: u.cache_read_input_tokens ?? 0,
         cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
-        costMicros: Math.round(cout(u) * 1e6),
+        costMicros: micros,
         ms,
       });
   } catch (e) {

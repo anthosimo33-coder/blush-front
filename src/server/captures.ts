@@ -69,7 +69,9 @@ export async function lireCaptures(images: Image[], appli: string): Promise<Text
  * de 1 à 20 images) se mesure alors sans eux, pour décider s’il faut le lire en lots.
  */
 export async function lireLot(images: Image[], appli: string, etiquette: "captures" | "captures_video" = "captures"): Promise<Captures> {
-  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette });
+  /* Le budget de l’IA du jour (src/server/budget.ts) : la lecture est payée par le compte connecté, sinon par la part sans compte */
+  const compte = await utilisateurDeSession(await lireSession());
+  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette, compte });
   if (!a.sortie) throw new ErreurImport("fichier");
   return a.sortie;
 }

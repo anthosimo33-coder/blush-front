@@ -34,25 +34,23 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
 /*
  * Le budget des alertes (S-19). Une seule clé pour toutes (30 par jour) s’épuisait sur un seul sujet : une rafale de
  * replis du modèle, et l’échec d’un rapport ou le budget de l’IA atteint ne partaient plus. Chaque sujet a donc sa part
- * du jour, et les dernières alertes du jour sont gardées pour les importantes.
+ * du jour (LIMITES.alertesParSujet), et les dernières alertes du jour sont gardées pour les importantes
+ * (LIMITES.alertesParJour.reserveImportantes).
  */
-/** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour. TODO(produit): 5, à revoir à l’usage. */
-const ALERTES_PAR_SUJET = { max: 5, fenetreS: 86400 };
-/** Sur les alertes du jour (LIMITES.alertesParJour), celles gardées pour les importantes : une alerte ordinaire s’arrête avant. TODO(produit): 10. */
-const RESERVE_IMPORTANTES = 10;
 
 /** Une alerte de plus pour ce sujet, aujourd’hui, peut-elle partir ? Compte son passage si oui. */
 async function dansLeBudget(sujet: string, importante: boolean): Promise<boolean> {
-  const jour = LIMITES.alertesParJour;
+  const { reserveImportantes, ...jour } = LIMITES.alertesParJour;
   /* Une alerte ordinaire ne touche pas à la réserve : elle regarde sans compter, puis compte */
-  if (!importante && (await limiteAtteinte("alertes", { ...jour, max: jour.max - RESERVE_IMPORTANTES }))) return false;
-  if (!(await sousLaLimite(`alertes:sujet:${sujet}`, ALERTES_PAR_SUJET))) return false;
+  if (!importante && (await limiteAtteinte("alertes", { ...jour, max: jour.max - reserveImportantes }))) return false;
+  if (!(await sousLaLimite(`alertes:sujet:${sujet}`, LIMITES.alertesParSujet))) return false;
   return sousLaLimite("alertes", jour);
 }
 
 /**
  * Quelque chose a échoué pour de bon. Une alerte ne fait jamais échouer ce qui l’appelle. Pas plus de 5 par sujet et 30
- * en tout par jour, dont les 10 dernières pour les `importante` (le budget de l’IA, ce qui touche tout le monde).
+ * en tout par jour, dont les 10 dernières pour les `importante` : ce qui touche tout le monde (le budget de l’IA) ou ce
+ * qu’on a promis (une lecture, un rapport, la mémoire du chat en échec, src/server/pipeline.ts).
  */
 export async function alerter(sujet: string, lignes: string[], { importante = false }: { importante?: boolean } = {}): Promise<void> {
   try {
@@ -76,13 +74,22 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
     const nb = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
     const taches = (genre: Genre, statut: StatutTache) =>
       nb(db().select({ n: count() }).from(schema.tasks).where(and(eq(schema.tasks.kind, genre), eq(schema.tasks.status, statut), gte(schema.tasks.updatedAt, depuis))));
-    const [histoires, verdicts, rapports, memoires, messages, echecs, attente] = await Promise.all([
+    /* Une étape arrêtée par le budget de l’IA (tasks.error « budget ») n’a pas échoué pour de bon : elle repart après minuit */
+    const echecsDe = (budget: boolean) =>
+      nb(
+        db()
+          .select({ n: count() })
+          .from(schema.tasks)
+          .where(and(eq(schema.tasks.status, "echec"), gte(schema.tasks.updatedAt, depuis), budget ? eq(schema.tasks.error, "budget") : sql`${schema.tasks.error} is distinct from 'budget'`)),
+      );
+    const [histoires, verdicts, rapports, memoires, messages, echecs, arretees, attente] = await Promise.all([
       nb(db().select({ n: count() }).from(schema.stories).where(gte(schema.stories.createdAt, depuis))),
       taches("verdict", "fini"),
       taches("rapport_chapitres", "fini"),
       taches("memoire", "fini"),
       nb(db().select({ n: count() }).from(schema.chatMessages).where(and(eq(schema.chatMessages.role, "toi"), gte(schema.chatMessages.createdAt, depuis)))),
-      nb(db().select({ n: count() }).from(schema.tasks).where(and(eq(schema.tasks.status, "echec"), gte(schema.tasks.updatedAt, depuis)))),
+      echecsDe(false),
+      echecsDe(true),
       nb(db().select({ n: count() }).from(schema.waitlist).where(gte(schema.waitlist.createdAt, depuis))),
     ]);
     const couts = await db()
@@ -92,12 +99,13 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
       .groupBy(schema.aiUsage.task);
     const total = couts.reduce((s, c) => s + (c.micros ?? 0), 0);
     const voix = await statsVocal();
-    if (!histoires && !messages && !couts.length && !attente && !echecs) return;
+    if (!histoires && !messages && !couts.length && !attente && !echecs && !arretees) return;
     await envoyer(`BLUSH · la veille : ${histoires} import${histoires > 1 ? "s" : ""}, ${dollars(total)}`, [
       `Imports : ${histoires}`,
       `Verdicts : ${verdicts} · rapports : ${rapports} · mémoires : ${memoires}`,
       `Messages au chat : ${messages}`,
       `Échecs définitifs : ${echecs}`,
+      ...(arretees ? [`Arrêtées par le budget de l’IA (elles repartent après minuit) : ${arretees}`] : []),
       `Nouveaux sur la liste d’attente : ${attente}`,
       "",
       `Coût de l’IA : ${dollars(total)}`,

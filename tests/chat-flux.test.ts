@@ -27,6 +27,9 @@ vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof i
 
 import { POST } from "@/app/api/chat/route";
 import { ouvrirSession } from "@/server/auth";
+import { cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/server/budget";
+import { empreinte } from "@/server/chiffrement";
+import { aujourdhuiParis } from "@/server/temps";
 import { historique } from "@/server/chat";
 import { db, schema } from "@/server/db";
 import { REFUS_FACTICE } from "@/server/ia/claude";
@@ -38,6 +41,8 @@ import type { BulleChat, EvenementChat } from "@/types";
 import { compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
 
 let id = "";
+/* Son compte : le budget de l’IA du jour se compte sur lui */
+let compte: { email: string } = { email: "" };
 /* Les appels au chat, et ce que le modèle factice rend pour lui (par défaut, sa réponse habituelle) */
 let appels = 0;
 let chat: ((req: Requete) => unknown) | null = null;
@@ -75,6 +80,7 @@ facticePourChaqueTest((req) => {
 });
 beforeAll(async () => {
   const u = await compteDeTest("chat-flux", "blushplus");
+  compte = u;
   id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
@@ -175,6 +181,25 @@ describe("POST /api/chat en flux", () => {
       expect(await r.json()).toEqual({ erreur: "refus" });
       await lancerApres();
       expect(etat.alertes).toEqual([["chat en échec", `Histoire ${id}`, "Erreur : refus:cyber"]]);
+    }
+  });
+
+  it("le budget de l’IA du compte atteint avant toute bulle : « souffle » (503), sans appeler le modèle ni alerter l’équipe", async () => {
+    const cle = empreinte(`limite:${cleDeDepense(payeurDuCompte(compte), aujourdhuiParis().iso)}`);
+    await noterDepense(payeurDuCompte(compte), 3e6);
+    oublierLeBudget();
+    try {
+      for (const flux of [true, false]) {
+        const r = await envoyer("tu me conseilles quoi ?", flux);
+        expect(r.status).toBe(503);
+        expect(await r.json()).toEqual({ erreur: "souffle" });
+        await lancerApres();
+      }
+      expect(appels).toBe(0);
+      expect(etat.alertes).toEqual([]);
+    } finally {
+      await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, cle));
+      oublierLeBudget();
     }
   });
 

@@ -25,6 +25,9 @@ describe("ce qu’on garde d’une erreur", () => {
   it("le code d’une erreur d’étape, l’empreinte d’une erreur de Next ; un code qui n’en a pas la forme est tu", () => {
     expect(champsDErreur(new ErreurTache("refus:cyber"))).toMatchObject({ erreur: "Error", code: "refus:cyber" });
     expect(champsDErreur(Object.assign(new Error("Ines a écrit…"), { digest: "2401781541" }))).toMatchObject({ digest: "2401781541" });
+    /* Une erreur de Next qui a son code (__NEXT_ERROR_CODE) : son empreinte le porte après un « @ » */
+    expect(champsDErreur(Object.assign(new Error("x"), { digest: "123@E394" })).digest).toBe("123@E394");
+    expect(champsDErreur(Object.assign(new Error("x"), { code: "ines@exemple.test" })).code).toBeUndefined();
     expect(champsDErreur(Object.assign(new Error("x"), { code: "un texte avec des espaces" })).code).toBeUndefined();
     expect(champsDErreur("une chaîne")).toEqual({ erreur: "string", code: undefined, digest: undefined });
     expect(champsDErreur(null).erreur).toBe("null");

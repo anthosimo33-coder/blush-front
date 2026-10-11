@@ -71,6 +71,22 @@ export function reponseErreur(e: unknown, { alerte }: { alerte?: AlerteDErreur }
 }
 
 /**
+ * L’enveloppe commune d’une route /api (S-44) : une erreur que la route ne rattrape pas (une base qui tombe pendant
+ * compteDe, un bug) répond comme les autres (reponseErreur : « panne », signalée sans son message), au lieu de remonter
+ * jusqu’à Next. Next, lui, écrit l’erreur entière dans les logs (console.error, avant même src/instrumentation.ts) : le
+ * message d’une erreur SQL cite ses paramètres, un email. `export const POST = route(async (req) => …)`.
+ */
+export function route<A extends unknown[]>(traiter: (...args: A) => Promise<Response>): (...args: A) => Promise<Response> {
+  return async (...args) => {
+    try {
+      return await traiter(...args);
+    } catch (e) {
+      return reponseErreur(e);
+    }
+  };
+}
+
+/**
  * Fait oublier au navigateur ce qu’il garde de BLUSH : son cache, et son stockage (où tu t’étais arrêté dans le rapport,
  * le parcours de l’onglet, les clés de src/state/cles.ts…), à la déconnexion et quand on efface tout. Pas les cookies :
  * l’en-tête les effacerait aussi sur les autres sous-domaines ; ceux de BLUSH s’effacent un par un.

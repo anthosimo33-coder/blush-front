@@ -7,7 +7,7 @@ import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
-import { codeDe, erreurDeParcours, type ErreurParcours } from "@/lib/messages-erreur";
+import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots, type AvanceVideo } from "@/services/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
@@ -62,7 +62,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   /* Plus de 20 captures choisies : on garde les 20 premières, et on le dit */
   const [trop, setTrop] = useState(false);
   /* Une limite atteinte (« trop »), ou le réseau qui a lâché deux fois : les captures restent là, le message le dit */
-  const [souci, setSouci] = useState<"trop" | "reseau" | null>(null);
+  /* Ce qui a empêché l’envoi et ne vient pas des captures (la limite du jour, le budget de l’IA, le réseau) : dit sous elles, qui restent là */
+  const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useRef(true);
   useEffect(() => {
@@ -171,9 +172,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
-      if (codeDe(e) === "trop") return setSouci("trop");
+      /* La limite du jour, ou le budget de l’IA du jour atteint (« souffle ») : les captures ne sont pas en cause */
+      if (codeDe(e) === "trop" || codeDe(e) === "souffle") return setSouci(messageErreur("captures", e));
       /* Le réseau, encore après la reprise : les captures ne sont pas en cause, elles restent là */
-      if (!(e instanceof ErreurApi)) return setSouci("reseau");
+      if (!(e instanceof ErreurApi)) return setSouci(messageErreur("captures", e));
       /* La conv elle-même (trop courte, de groupe), ou la vidéo : son écran d’erreur. Toute autre réponse : illisibles */
       echec(erreurDeParcours("captures", e) ?? "capture");
     }
@@ -285,14 +287,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       <div aria-live="polite" className="min-h-6">
         {/* L’avancée s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
         {busy && <span className="sr-only">{enCours}</span>}
-        {!busy && souci === "reseau" && (
-          <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.</p>
-        )}
-        {!busy && souci === "trop" && (
-          <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">
-            BLUSH a lu beaucoup de captures d’un coup{NBSP}: réessaie un peu plus tard. Tes captures restent là.
-          </p>
-        )}
+        {!busy && souci && <p className="m-0 mb-2.5 text-[14px] font-extrabold leading-[1.45] text-ink">{souci}</p>}
         {!busy && result && !result.video && (
           <div data-rise="" className="flex items-center gap-2 text-[14px] font-black">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--gloss), #12C08A", boxShadow: "0 3px 8px -3px rgba(18,192,138,0.6)" }}>

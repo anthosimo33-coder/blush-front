@@ -1,9 +1,8 @@
 import "server-only";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { peut } from "@/lib/acces";
 import { alerter } from "./alertes";
-import { DEBUT_DU_JOUR } from "./budget";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import { DUREES_MS } from "./avancement";
@@ -16,7 +15,7 @@ import { auMieux, journal, journalErreur } from "./journal";
 import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, planifier, prendre, type Tache } from "./taches";
 import type { DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
-import { pause } from "./temps";
+import { DEBUT_DU_JOUR, pause } from "./temps";
 import { vocalLu } from "./vocal";
 
 /*
@@ -98,15 +97,17 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  */
 export async function reparerLaChaine(story: Pick<Ligne, "id">, acces: boolean, etat?: EtatChaine): Promise<boolean> {
   /*
-   * Ce que le budget de l’IA a arrêté avant minuit repart d’abord : la chaîne le reprend, comme une étape planifiée. Lu
-   * seulement s’il y a une étape en échec (l’état déjà lu le dit) : l’ouverture du rapport ne paie pas une requête de plus
+   * Ce que le budget de l’IA a arrêté avant minuit repart d’abord : la chaîne le reprend, comme une étape planifiée.
+   * Tenté seulement si l’état déjà lu montre une étape arrêtée par lui : sinon, l’ouverture du rapport ne paie pas une
+   * requête de plus. Les mises à jour de la mémoire arrêtées (hors de la chaîne) repartent au suivi (cloreLesAbandons)
    */
-  const enEchec = !etat || Object.values(etat.taches).some((t) => t?.status === "echec");
-  if (enEchec && (await reprendreApresMinuit(story.id))) {
+  const lu = etat ?? (await lireEtat(story.id));
+  const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && estBudget(t.error));
+  if (arretee && (await reprendreApresMinuit(story.id))) {
     after(() => executerChaine(story.id));
     return true;
   }
-  const genres = suite(etat ?? (await lireEtat(story.id)), acces);
+  const genres = suite(lu, acces);
   if (!genres.length) return false;
   for (const g of genres) await planifier(story.id, g);
   after(() => executerChaine(story.id));
@@ -157,11 +158,16 @@ async function suspendre(t: Tache): Promise<void> {
 }
 
 /*
- * Seule la dernière tâche de son genre repart, et seulement si aucune autre du même genre n’attend ou ne tourne : une
- * lecture relancée le jour même (POST /api/analyse) a pu laisser deux verdicts arrêtés par le budget, et l’index unique
- * des tâches en cours refuserait d’en remettre deux en attente.
+ * Une étape de la chaîne ne repart que si elle est la dernière de son genre, et qu’aucune autre du même genre n’attend
+ * ni ne tourne : une lecture relancée le jour même (POST /api/analyse) a pu laisser deux verdicts arrêtés par le budget,
+ * et l’index unique des étapes en cours (tasks_une_par_etape) refuserait d’en remettre deux en attente. Les mises à jour
+ * de la mémoire (memoire_maj), elles, repartent toutes : chacune porte son échange, et l’index ne les compte pas. La
+ * chaîne les reprend dans l’ordre où elles sont arrivées (aRelancer), une nouvelle planifiée depuis après elles.
  */
-const derniereDeSonGenre = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."kind" = ${schema.tasks.kind} and "autre"."id" <> ${schema.tasks.id} and ("autre"."status" in ('attente', 'en_cours') or "autre"."created_at" > ${schema.tasks.createdAt}))`;
+const repartPourDeBon = or(
+  notInArray(schema.tasks.kind, [...GENRES_CHAINE]),
+  sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."kind" = ${schema.tasks.kind} and "autre"."id" <> ${schema.tasks.id} and ("autre"."status" in ('attente', 'en_cours') or "autre"."created_at" > ${schema.tasks.createdAt}))`,
+);
 
 /**
  * Les étapes de l’histoire arrêtées par le budget d’un jour passé (avant minuit, heure de Paris) repartent en attente,
@@ -173,7 +179,7 @@ async function reprendreApresMinuit(storyId: string): Promise<number> {
     .update(schema.tasks)
     .set({ status: "attente", error: null, updatedAt: new Date() })
     .where(
-      and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "echec"), eq(schema.tasks.error, "budget"), lt(schema.tasks.updatedAt, DEBUT_DU_JOUR), derniereDeSonGenre),
+      and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "echec"), eq(schema.tasks.error, "budget"), lt(schema.tasks.updatedAt, DEBUT_DU_JOUR), repartPourDeBon),
     )
     .returning({ id: schema.tasks.id });
   return reprises.length;
@@ -184,9 +190,27 @@ async function reprendreApresMinuit(storyId: string): Promise<number> {
 /** Ce que devient une tâche exécutée : finie, en échec (elle repartira, sauf au dernier essai), ou arrêtée par le budget du jour. */
 type Issue = "finie" | "echec" | "budget";
 
+/** Les échecs de ces étapes touchent ce qu’on a promis (la lecture, le rapport, le chat) : leur alerte est importante (S-19). */
+const ALERTE_IMPORTANTE: ReadonlySet<Genre> = new Set(["verdict", "rapport_plan", "rapport_chapitres", "memoire"]);
+
+/** L’alerte à l’équipe d’une étape en échec pour de bon : son genre, la tâche, le code, jamais de contenu. */
+const alerterEchec = (t: Tache, erreur: string) =>
+  alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${erreur}`, `Essais : ${t.attempts}`], { importante: ALERTE_IMPORTANTE.has(t.kind) });
+
 /** Exécute une tâche, puis planifie la suite. */
 async function executer(t: Tache): Promise<Issue> {
-  const coeur = setInterval(() => void auMieux(battre(t.id), "battement de cœur perdu", { tache: t.id }), BATTEMENT_MS);
+  /* Un battement raté se rattrape au suivant : le journal ne le dit qu’à partir du deuxième d’affilée */
+  let rates = 0;
+  const coeur = setInterval(
+    () =>
+      void battre(t.id).then(
+        () => void (rates = 0),
+        (e: unknown) => {
+          if (++rates >= 2) journalErreur("battement de cœur perdu", e, { tache: t.id, rates });
+        },
+      ),
+    BATTEMENT_MS,
+  );
   try {
     const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, t.storyId));
     /* tasks.kind est un text que la base ne contrôle pas (src/server/db/enums.ts) : un genre sans étape est une tâche inconnue */
@@ -220,7 +244,7 @@ async function executer(t: Tache): Promise<Issue> {
     const definitif = estRefus(code);
     await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
-    if (definitif || t.attempts >= ESSAIS_MAX) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${code}`, `Essais : ${t.attempts}`]);
+    if (definitif || t.attempts >= ESSAIS_MAX) await alerterEchec(t, code);
     return "echec";
   } finally {
     clearInterval(coeur);
@@ -252,8 +276,10 @@ export async function executerChaine(storyId: string): Promise<void> {
 /**
  * Les tâches coupées à leur dernier essai passent en échec (voir `clore`), et l’équipe est prévenue comme pour un autre
  * échec. Celles que le budget de l’IA a arrêtées avant minuit repartent (reprendreApresMinuit) : la chaîne les relance.
+ * Les deux requêtes partent ensemble (elles ne touchent pas les mêmes tâches : en cours, ou en échec) : le suivi de la
+ * lecture, chaque seconde, n’attend pas l’une après l’autre.
  */
 export async function cloreLesAbandons(storyId: string): Promise<void> {
-  await reprendreApresMinuit(storyId);
-  for (const t of await clore(storyId)) await alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, "Erreur : coupée à chaque essai (délai dépassé)", `Essais : ${t.attempts}`]);
+  const [, coupees] = await Promise.all([reprendreApresMinuit(storyId), clore(storyId)]);
+  for (const t of coupees) await alerterEchec(t, "coupée à chaque essai (délai dépassé)");
 }

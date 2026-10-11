@@ -12,6 +12,8 @@ export type Champs = Record<string, Champ>;
 
 /** Un code qu’on peut écrire tel quel : court, sans espace (« refus:cyber », « 23505 », « ECONNRESET »). Le reste est tu. */
 const CODE_SUR = /^[\w:.-]{1,60}$/;
+/** Une empreinte de Next : des chiffres, suivis du code de l’erreur de Next quand elle en a un (« 2345678901@E394 »). */
+const DIGEST_SUR = /^[\w@:.-]{1,60}$/;
 
 /** Le nom d’une erreur (« TypeError », « DrizzleQueryError ») ; pour ce qui n’en est pas une, son type. */
 const nomDe = (e: unknown): string => (e instanceof Error ? e.name : e === null ? "null" : typeof e);
@@ -21,7 +23,7 @@ function codeSur(e: unknown, cle: "code" | "digest"): string | undefined {
   if (typeof e !== "object" || e === null || !(cle in e)) return undefined;
   const v = (e as Record<string, unknown>)[cle];
   const s = typeof v === "number" ? String(v) : v;
-  return typeof s === "string" && CODE_SUR.test(s) ? s : undefined;
+  return typeof s === "string" && (cle === "digest" ? DIGEST_SUR : CODE_SUR).test(s) ? s : undefined;
 }
 
 /**

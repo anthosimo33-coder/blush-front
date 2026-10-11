@@ -67,6 +67,12 @@ export default async function preparerLaBase(projet: TestProject): Promise<void>
   const client = postgres(url.href, { max: 1, onnotice: () => {} });
   try {
     if (!creee && !choisie) {
+      /*
+       * Les dépenses de tests/budget.test.ts qu’un lancement interrompu a laissées (jusqu’à 30 $ aujourd’hui : tout appel au
+       * modèle, même factice, serait refusé jusqu’à minuit). Celles de plus de 10 minutes seulement : un autre dossier
+       * peut être en train de s’en servir
+       */
+      await client`delete from ai_usage where task = 'test-budget' and created_at < now() - interval '10 minutes'`;
       const manquantes = await migrationsManquantes(client);
       if (manquantes.length)
         throw new Error(
@@ -84,6 +90,8 @@ export default async function preparerLaBase(projet: TestProject): Promise<void>
      * servir) : les tests qui posent un plafond le retirent eux-mêmes.
      */
     await client`truncate rate_limits, counters`;
+    /* Les dépenses de tests/budget.test.ts qu’un lancement interrompu a laissées : jusqu’à minuit, tout appel au modèle serait refusé */
+    await client`delete from ai_usage where task = 'test-budget'`;
   } finally {
     await client.end();
   }

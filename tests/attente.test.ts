@@ -28,8 +28,10 @@ describe("la liste d’attente", () => {
 
 describe("les alertes", () => {
   it("préviennent l’équipe d’un échec, et résument la veille (sans aucun contenu)", async () => {
-    /* Le plafond de 30 alertes par jour se compte aussi dans la base de test : on le remet à zéro */
-    await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, empreinte("limite:alertes")));
+    /* Le plafond de 30 alertes par jour, et celui de 5 par sujet, se comptent aussi dans la base de test : on les remet à zéro */
+    await db()
+      .delete(schema.rateLimits)
+      .where(inArray(schema.rateLimits.key, ["limite:alertes", "limite:alertes:sujet:verdict en échec"].map((c) => empreinte(c))));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await alerter("verdict en échec", ["Tâche verdict (t1)", "Erreur : refus"]);
     expect(log.mock.calls.flat().join("\n")).toContain("BLUSH · verdict en échec");

@@ -9,8 +9,10 @@ import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
 /** Une phrase, ou quelques bulles dans le chat (une idée par bulle). */
 type Texte = string | readonly string[];
 
-/** Le budget de l’IA du jour est atteint (« souffle ») : le texte décidé, partout où l’écran parle de BLUSH. */
-const SOUFFLE = "BLUSH souffle un peu, réessaie demain.";
+/* Le budget de l’IA du jour est atteint (« souffle ») : le texte décidé, le seul (la lecture, le rapport, l’ajout à sa fiche, l’import de captures) */
+const SOUFFLE_TITRE = "BLUSH souffle un peu";
+/** « BLUSH souffle un peu, réessaie demain. » : le budget de l’IA du jour est atteint (src/server/budget.ts). */
+export const SOUFFLE = `${SOUFFLE_TITRE}, réessaie demain.`;
 
 /* Ce que BLUSH répond au chat comme à la question du rapport */
 const CHAT_ET_QUESTION = {
@@ -46,24 +48,26 @@ const MESSAGES = {
     trop: "Beaucoup d’imports d’un coup. Réessaie dans une heure.",
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
+  /* L’import de captures ou d’un enregistrement d’écran (la conv elle-même a son écran : erreurDeParcours) */
+  captures: {
+    trop: "BLUSH a lu beaucoup de captures d’un coup\u00a0: réessaie un peu plus tard. Tes captures restent là.",
+    /* La lecture des captures est payée par le compte connecté, ou par la part sans compte (src/server/budget.ts) */
+    souffle: `${SOUFFLE} Tes captures restent là.`,
+    defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
+  },
   /* « Lancer la lecture », sur « Qui es-tu ? » */
   lecture: {
     trop: "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain.",
-    /* TODO(produit): texte à valider */
-    reseau: "Beaucoup de lectures sont parties de ce réseau aujourd’hui. Réessaie demain.",
-    souffle: SOUFFLE,
     defaut: "La lecture n’a pas pu partir. Réessaie dans un instant.",
   },
   /* « Relancer l’écriture » du rapport */
   relance: {
     trop: "Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain.",
-    souffle: SOUFFLE,
     defaut: "Ça n’a pas pu repartir. Vérifie ta connexion et réessaie.",
   },
   /* Une modification de sa fiche (PUT /api/fiche) : la limite du jour, réessayer tout de suite n’y changerait rien */
   fiche: {
     trop: "Tu as beaucoup modifié sa fiche aujourd’hui\u00a0: ta dernière modification n’a pas été enregistrée. Réessaie demain.",
-    souffle: SOUFFLE,
     defaut: "Ta modification n’a pas été enregistrée. Vérifie ta connexion et réessaie.",
   },
   /* Le chat (un message, des captures, un export, un vocal), dans la voix de BLUSH : une idée par bulle */
@@ -140,7 +144,7 @@ const AJOUT_FICHE = {
   fichier: () => ({ title: "BLUSH n’arrive pas à ouvrir ce fichier", detail: "Envoie l’export de votre conv\u00a0: le .zip WhatsApp, ou le message_1.html d’Instagram." }),
   autre_conv: (_, prenom) => ({ title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${prenom}.` }),
   trop: () => ({ title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." }),
-  souffle: () => ({ title: "BLUSH souffle un peu", detail: "Réessaie demain." }),
+  souffle: () => ({ title: SOUFFLE_TITRE, detail: "Réessaie demain." }),
   bug: () => ({ title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." }),
 } satisfies Record<NonNullable<FicheUpdate["problem"]>, (quoi: string, prenom: string) => { title: string; detail: string }>;
 

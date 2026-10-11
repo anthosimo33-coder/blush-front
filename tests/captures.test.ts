@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+/* Lire des captures lit la session (le compte qui paie la lecture, src/server/budget.ts) : ici, sans compte */
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, has: () => false }), headers: async () => new Headers() }));
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lireCaptures } from "@/server/captures";
 import { db, schema } from "@/server/db";

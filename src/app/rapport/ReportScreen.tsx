@@ -12,7 +12,7 @@ import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { peut } from "@/lib/acces";
 import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
-import { messageErreur } from "@/lib/messages-erreur";
+import { messageErreur, SOUFFLE } from "@/lib/messages-erreur";
 import { relancerRapport } from "@/services/api";
 import type { CibleImage, ReportPayload } from "@/types/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -139,7 +139,7 @@ export function ReportScreen({ initial, story, openPaywall, fixed = false, rendu
 /** Ce que dit l’écriture en échec, selon pourquoi. TODO(produit): la seconde phrase de « souffle », à valider. */
 const TEXTES_ECHEC: Record<Echec, string> = {
   refus: "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste.",
-  souffle: "BLUSH souffle un peu, réessaie demain. Ta conv est toujours là\u00a0: l’écriture reprendra quand tu reviendras.",
+  souffle: `${SOUFFLE} Ta conv est toujours là\u00a0: l’écriture reprendra quand tu reviendras.`,
   panne: "BLUSH a buté en l’écrivant. Ta conv est toujours là\u00a0: relance, et tout repart de zéro.",
 };
 

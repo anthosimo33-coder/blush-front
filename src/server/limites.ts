@@ -41,8 +41,14 @@ export const LIMITES = {
   ecouteParCompte: { max: 200, fenetreS: 86400 },
   /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
   relanceParCompte: { max: 3, fenetreS: 86400 },
-  /** Les alertes par mail à l’équipe. */
-  alertesParJour: { max: 30, fenetreS: 86400 },
+  /**
+   * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
+   * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant.
+   * TODO(produit): 10, à revoir à l’usage.
+   */
+  alertesParJour: { max: 30, fenetreS: 86400, reserveImportantes: 10 },
+  /** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour. TODO(produit): 5, à revoir à l’usage. */
+  alertesParSujet: { max: 5, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */
   attenteParIp: { max: 10, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
@@ -79,15 +85,18 @@ const cleDe = (cle: string) => empreinte(`limite:${cle}`);
 /* La fenêtre de cette limite a expiré : le compte repart de zéro */
 const expiree = (fenetreS: number) => sql`${schema.rateLimits.windowStart} < now() - make_interval(secs => ${fenetreS})`;
 
-/** Compte un passage pour `cle`, et renvoie le compte de la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré. */
-export async function compter(cle: string, { fenetreS }: Limite): Promise<number> {
+/**
+ * Compte un passage pour `cle` (ou `n` : la dépense d’un appel au modèle, src/server/budget.ts), et renvoie le compte de
+ * la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré.
+ */
+export async function compter(cle: string, { fenetreS }: Pick<Limite, "fenetreS">, n = 1): Promise<number> {
   const [ligne] = await db()
     .insert(schema.rateLimits)
-    .values({ key: cleDe(cle), windowStart: new Date(), count: 1 })
+    .values({ key: cleDe(cle), windowStart: new Date(), count: n })
     .onConflictDoUpdate({
       target: schema.rateLimits.key,
       set: {
-        count: sql`case when ${expiree(fenetreS)} then 1 else ${schema.rateLimits.count} + 1 end`,
+        count: sql`case when ${expiree(fenetreS)} then ${n}::int else ${schema.rateLimits.count} + ${n}::int end`,
         windowStart: sql`case when ${expiree(fenetreS)} then now() else ${schema.rateLimits.windowStart} end`,
       },
     })
@@ -97,6 +106,15 @@ export async function compter(cle: string, { fenetreS }: Limite): Promise<number
 
 /** Compte un passage pour `cle` et dit s’il reste sous la limite. */
 export const sousLaLimite = async (cle: string, limite: Limite): Promise<boolean> => (await compter(cle, limite)) <= limite.max;
+
+/** Le compte de la fenêtre en cours pour `cle` (0 si elle a expiré), sans compter de passage. */
+export async function compteDe(cle: string, { fenetreS }: Pick<Limite, "fenetreS">): Promise<number> {
+  const [ligne] = await db()
+    .select({ n: sql<number>`case when ${expiree(fenetreS)} then 0 else ${schema.rateLimits.count} end`.mapWith(Number) })
+    .from(schema.rateLimits)
+    .where(eq(schema.rateLimits.key, cleDe(cle)));
+  return ligne?.n ?? 0;
+}
 
 /** La limite est-elle déjà atteinte pour `cle` ? Sans compter de passage. */
 export async function limiteAtteinte(cle: string, { max, fenetreS }: Limite): Promise<boolean> {

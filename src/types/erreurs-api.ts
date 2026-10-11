@@ -22,11 +22,6 @@ export const ERREURS_API = {
   codes: 429,
   /** Trop d’essais de code ratés aujourd’hui pour cet email (src/server/auth.ts, prendreCode) : à la vérification, et à la demande d’un nouveau code. */
   essais: 429,
-  /**
-   * Les lectures du jour lancées depuis ce réseau (son adresse IP, tous comptes confondus) : à part de « trop », la limite
-   * du compte, pour que l’écran ne dise pas « tu as lancé beaucoup de lectures » à quelqu’un qui n’en a lancé aucune.
-   */
-  reseau: 429,
 
   /* Ce qu’elle désigne */
   /** Pas de conv ouverte (ou plus). */
@@ -80,7 +75,7 @@ export const ERREURS_API = {
   /** La transcription des vocaux n’est pas configurée. */
   vocal_bientot: 503,
 
-  /* Le modèle, au chat, à la fiche et aux lectures : seulement codePublic */
+  /* Le modèle, au chat, à la fiche et à l’import de captures : seulement codePublic */
   /** Le modèle refuse de répondre (ses règles, ou les filtres de son prestataire), malgré le repli sur un autre. */
   refus: 502,
   /** Le vocal n’a pas pu être transcrit. */
@@ -123,6 +118,7 @@ export type CodePublic = Extract<CodeErreur, "refus" | "transcription" | "souffl
  */
 export function codePublic(interne: string): CodePublic {
   if (interne === "refus" || interne.startsWith("refus:")) return "refus";
-  if (interne === "budget") return "souffle";
+  /* « souffle » est déjà public : codePublic(codeDErreur(e)) le garde tel quel */
+  if (interne === "budget" || interne === "souffle") return "souffle";
   return interne === "transcription" ? "transcription" : "panne";
 }
