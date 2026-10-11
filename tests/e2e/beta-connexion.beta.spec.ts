@@ -169,21 +169,21 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
   });
 });
 
-test("les limites des codes sont les mêmes pour tous : sept codes par jour pour un email depuis une même adresse, puis « Trop de codes demandés aujourd’hui », invité ou pas", async ({ page, request }, testInfo) => {
+test("les limites des codes sont les mêmes pour tous : sept codes par jour pour un email, un de réserve depuis une même adresse, puis « Trop de codes demandés aujourd’hui », invité ou pas", async ({ page, request }, testInfo) => {
   const invite = await nouvelInvite(testInfo);
   const debut = Date.now();
   const dehors = emailLibre(testInfo, "dehors");
 
-  await test.step("sept codes demandés coup sur coup passent, pour l’un comme pour l’autre", async () => {
+  await test.step("sept codes demandés coup sur coup passent, puis celui de la réserve de l’adresse, pour l’un comme pour l’autre", async () => {
     for (const email of [dehors, invite])
-      for (let k = 0; k < 7; k++) {
+      for (let k = 0; k < 8; k++) {
         const r = await request.post("/api/auth/code", { headers: { origin: URL_BETA }, data: { email } });
         expect(r.status()).toBe(200);
       }
   });
 
   const ecrans: string[] = [];
-  await test.step("le huitième : le même refus à l’écran, et la même réponse, invité ou pas", async () => {
+  await test.step("le neuvième : le même refus à l’écran, et la même réponse, invité ou pas", async () => {
     for (const email of [dehors, invite]) {
       await page.goto("/connexion");
       expect(await reponseDuCode(page, email)).toEqual({ statut: 429, corps: { erreur: "codes" }, cookie: null });

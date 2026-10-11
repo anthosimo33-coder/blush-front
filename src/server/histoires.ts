@@ -179,12 +179,12 @@ export async function histoireOuverte(utilisateur: Utilisateur | null, { brouill
   return ligne ?? null;
 }
 
+/** La ligne du brouillon d’un cookie (`secret` : sa valeur), tant qu’il n’a pas de compte : la condition d’une requête. */
+export const duBrouillon = (secret: string) => and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId));
+
 /** Le brouillon d’un cookie, tant qu’il n’a pas de compte. */
 export async function brouillonDe(secret: string): Promise<LigneEcran | null> {
-  const [ligne] = await db()
-    .select(ECRAN)
-    .from(schema.stories)
-    .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)));
+  const [ligne] = await db().select(ECRAN).from(schema.stories).where(duBrouillon(secret));
   return ligne ?? null;
 }
 
@@ -217,7 +217,7 @@ export async function rattacherBrouillon(utilisateur: Utilisateur, secret: strin
   const [ligne] = await db()
     .update(schema.stories)
     .set({ userId: utilisateur.id, draftToken: null, updatedAt: new Date() })
-    .where(and(eq(schema.stories.draftToken, empreinte(secret)), isNull(schema.stories.userId)))
+    .where(duBrouillon(secret))
     .returning({ id: schema.stories.id });
   return ligne?.id ?? null;
 }

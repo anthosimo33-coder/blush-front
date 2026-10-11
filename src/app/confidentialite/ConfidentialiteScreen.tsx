@@ -77,15 +77,19 @@ export function ConfidentialiteScreen() {
         <Ligne icone="list" titre="Ce qui reste, tant que tu le gardes">
           Ton rapport, son vocal, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{NBSP}: tout part, vraiment.
         </Ligne>
+        {/* TODO(produit): texte à valider avec les autres textes de confidentialité (S-30 : ATTENTE_GARDEE_JOURS, src/server/attente.ts) */}
+        <Ligne icone="mail" titre="Ton email sur la liste d’attente">
+          Chiffré, et gardé un an au plus. Tu t’en retires avec le lien de son mail, et «{NBSP}Tout effacer{NBSP}» l’efface aussi.
+        </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 9 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 11 octobre 2026.`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Un prestataire d’IA" sub="L’IA qui lit ta conv, aux États-Unis" />
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
-        <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt)" />
+        <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, la liste d’attente)" />
         <InsetRow leading={<RowIcon icon="mail" tone="toi" />} title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>} sub="bonjour@askblush.com" href="mailto:bonjour@askblush.com" chevron />
       </InsetGroup>
     </Screen>

@@ -9,6 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * ignorée (et le modèle factice aussi, sur Vercel). env() garde ses variables au premier appel : chaque cas recharge les
  * modules après avoir posé les siennes.
  */
+/* Le quota des mails se compte dans la base (src/server/limites.ts) : ces tests sans base disent ce qu’il répond */
+const quota = vi.hoisted(() => ({ libre: true, rendus: [] as number[] }));
+vi.mock("@/server/limites", async (original) => ({
+  ...(await original<typeof import("@/server/limites")>()),
+  dansLeQuotaDesMails: async () => quota.libre,
+  rendreAuQuotaDesMails: async (n: number) => void quota.rendus.push(n),
+}));
+
 let boite: string;
 const charger = async () => {
   vi.resetModules();
@@ -17,11 +25,14 @@ const charger = async () => {
 const mailsDeLaBoite = () => readdirSync(boite).map((f) => JSON.parse(readFileSync(join(boite, f), "utf8")) as Record<string, string>);
 
 beforeEach(() => {
+  quota.libre = true;
+  quota.rendus = [];
   boite = mkdtempSync(join(tmpdir(), "blush-boite-"));
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("BLUSH_BOITE_MAILS", boite);
   vi.stubEnv("RESEND_API_KEY", undefined);
   vi.stubEnv("RESEND_API_KEY_CODES", undefined);
+  vi.stubEnv("BLUSH_EMAIL_FROM_CODES", undefined);
   vi.stubEnv("VERCEL", undefined);
   vi.stubEnv("BLUSH_IA_FACTICE", "1");
   vi.stubEnv("ANTHROPIC_API_KEY", undefined);
@@ -91,9 +102,42 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(appels[1]).toMatchObject({ cle: "Bearer re_cle_fictive", corps: { to: ["equipe@blush.test", "nuit@blush.test"], text: "Tâche t1" } });
     /* Une alerte n’a que sa version texte */
     expect(appels[1].corps).not.toHaveProperty("html");
-    /* Un refus du prestataire rejette, avec son statut seul */
+    /* Un refus du prestataire rejette, avec son statut seul, et rend sa place au quota */
     envoi.mockResolvedValueOnce(new Response("{}", { status: 429 }));
     await expect(envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" })).rejects.toEqual(new ErreurResend(429));
+    expect(quota.rendus).toEqual([1]);
+    /* Les codes partent de l’expéditeur de tous les mails, faute du leur */
+    expect(appels[0].corps.from).toBe("BLUSH <bonjour@askblush.com>");
+  });
+
+  it("S-09 · les codes partent de leur propre expéditeur (BLUSH_EMAIL_FROM_CODES), vérifié sur le compte de leur clé", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
+    vi.stubEnv("RESEND_API_KEY", "re_cle_fictive");
+    vi.stubEnv("RESEND_API_KEY_CODES", "re_cle_des_codes");
+    vi.stubEnv("BLUSH_EMAIL_FROM_CODES", "BLUSH <code@codes.askblush.com>");
+    const envoi = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }));
+    const { envoyerCodeParEmail, envoyerMail } = await charger();
+    await envoyerCodeParEmail("noe@e2e.blush.test", "042917");
+    await envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" });
+    const de = envoi.mock.calls.map(([, init]) => (JSON.parse(String(init?.body)) as { from: string }).from);
+    expect(de).toEqual(["BLUSH <code@codes.askblush.com>", "BLUSH <bonjour@askblush.com>"]);
+  });
+
+  it("S-09 · au-delà de sa part du quota, un mail ne part pas : la réponse le dit, et le journal aussi", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
+    vi.stubEnv("RESEND_API_KEY", "re_cle_fictive");
+    const envoi = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }));
+    const journal = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { envoyerMail } = await charger();
+    expect(await envoyerMail(["equipe@blush.test", "nuit@blush.test"], { sujet: "BLUSH · une alerte", texte: "Tâche t1" }, { sorte: "alerte" })).toBe(true);
+    quota.libre = false;
+    expect(await envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" }, { sorte: "attente" })).toBe(false);
+    expect(envoi).toHaveBeenCalledOnce();
+    /* Les lignes du journal (du JSON), pas les avertissements de env() sur les variables des tests */
+    const lignes = journal.mock.calls.map(([l]) => String(l)).filter((l) => l.startsWith("{"));
+    expect(lignes.map((l) => JSON.parse(l) as Record<string, unknown>)).toEqual([expect.objectContaining({ evenement: "mail retenu", sorte: "attente", destinataires: 1 })]);
   });
 });
 

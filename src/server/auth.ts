@@ -9,12 +9,13 @@ import { db, schema } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { accesLibre, boiteAMails, peutEntrer } from "./env";
-import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, rendre } from "./limites";
+import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, rendre, sousLaLimite } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
 /** Une session dure un mois, et chaque visite la prolonge d’autant (prolongerSession) : un mois sans visite la ferme. */
 const SESSION_JOURS = 30;
-const CODE_ESSAIS = 5;
+/** Les essais d’un code : au-delà, il ne vaut plus rien (prendreCode). */
+export const CODE_ESSAIS = 5;
 
 export const Email = z
   .string()
@@ -96,13 +97,27 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
   }
 }
 
+/**
+ * Les codes demandés pour cet email (canonique : ses alias avec lui) depuis l’adresse `ip` : sous ses plafonds du jour
+ * (LIMITES.codeParEmailEtIp, puis codeParEmail), ou, au-delà, dans la réserve des codes (S-08) : un code de plus par
+ * adresse, cinq pour l’email (LIMITES.codeReserveParEmailEtIp, codeReserveParEmail). Un tiers qui demande les codes d’une
+ * personne ne l’en prive donc qu’en écrivant depuis cinq adresses. Compte la demande.
+ */
+export async function codeAccorde(email: string, ip: string): Promise<boolean> {
+  const canonique = emailCanonique(email);
+  if ((await sousLaLimite(`code:email-ip:${canonique}:${ip}`, LIMITES.codeParEmailEtIp)) && (await sousLaLimite(`code:email:${canonique}`, LIMITES.codeParEmail)))
+    return true;
+  return (await sousLaLimite(`code:reserve-ip:${canonique}:${ip}`, LIMITES.codeReserveParEmailEtIp)) && (await sousLaLimite(`code:reserve:${canonique}`, LIMITES.codeReserveParEmail));
+}
+
 /*
  * Les essais ratés de la journée (S-07, S-08), comptés pour l’email (canonique : ses alias avec lui), pour son adresse IP
- * et pour le navigateur qui tape. Un tiers qui rate exprès les codes d’une personne n’épuise que les essais de son
- * navigateur, puis de son adresse : elle, d’ailleurs, garde les siens. Sur la même adresse que lui (le même Wi-Fi), elle
- * garde la réserve de son navigateur (LIMITES.echecsCodeParEmailEtIp.reserveNavigateur). Seule la borne de l’email,
- * celle de tout ce qui se devine en un jour, arrête tout le monde : il faut changer d’adresse et de navigateur pour la
- * remplir.
+ * et pour le navigateur qui tape. Un tiers qui rate exprès les codes d’une personne épuise les essais de son navigateur :
+ * elle, dans le sien, garde les siens. Quand les essais ratés d’une adresse sont pleins, un navigateur de cette adresse
+ * qui en a déjà raté cinq s’arrête là (LIMITES.echecsCodeParEmailEtIp.reserveNavigateur) ; celui de la personne sur le
+ * même Wi-Fi garde ses cinq. Ce compteur ne freine pas un tiers qui change de navigateur : ses codes le bornent
+ * (codeAccorde). Seule la borne de l’email, celle de tout ce qui se devine en un jour, arrête tout le monde, et un tiers
+ * ne l’atteint qu’avec tous les codes du jour, réserve comprise.
  */
 const clesDesEchecs = (email: string, ip: string) => {
   const canonique = emailCanonique(email);

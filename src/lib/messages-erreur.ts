@@ -23,8 +23,11 @@ const CHAT_ET_QUESTION = {
   acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
 
-/* TODO(produit): texte à valider */
-/** Vingt essais de code ratés aujourd’hui pour cet email : ni un code tapé, ni un nouveau code n’y font plus rien. */
+/*
+ * TODO(produit): texte à valider. Il dit « avec cet email », mais la porte se ferme aussi pour ce navigateur seul (dix
+ * essais ratés), ou depuis cette adresse (vingt, sauf la réserve d’un navigateur), avant celle de l’email (soixante).
+ */
+/** Trop d’essais de code ratés aujourd’hui (src/server/auth.ts) : ni un code tapé, ni un nouveau code n’y font plus rien. */
 const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.";
 
 const MESSAGES = {

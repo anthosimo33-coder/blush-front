@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { CAPTURES_MAX, CODE_MINUTES, CORPS_VERCEL_MAX, ENVOI_EXPORT_MAX, ENVOI_IMAGES_MAX, extensionAudio, TEXTE_CONV_MAX } from "@/lib/limites";
 import { imagesDe } from "@/server/captures";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
-import { LIMITES, QUOTA_MAILS } from "@/server/limites";
+import { CODE_ESSAIS } from "@/server/auth";
+import { LIMITES, partDesAutresMails, QUOTA_MAILS } from "@/server/limites";
 import { mailCode } from "@/server/mail-code";
 import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
 
@@ -80,20 +81,36 @@ describe("le reste", () => {
     expect(m.html).not.toContain(`Il marche ${CODE_MINUTES} minutes.`);
   });
 
-  it("S-09 · les codes et la liste d’attente restent sous le quota des mails, en laissant sa réserve aux rapports et aux alertes", () => {
-    expect(LIMITES.mailsCodeParJour.max + LIMITES.mailsAttenteParJour.max + QUOTA_MAILS.reserve).toBeLessThanOrEqual(QUOTA_MAILS.parJour);
-    expect([LIMITES.mailsCodeParJour.max, LIMITES.mailsAttenteParJour.max]).toEqual([60, 20]);
+  it("S-09 · tous les mails tiennent dans le quota du prestataire : les codes ont leur part, les autres se partagent le reste, les moins nécessaires s’arrêtent les premiers", () => {
+    const { parJour, laisse } = QUOTA_MAILS;
+    expect([LIMITES.mailsCodeParJour.max, LIMITES.mailsAttenteParJour.max, parJour]).toEqual([60, 20, 100]);
+    /* Les codes et les autres mails, ensemble, ne dépassent jamais le quota ; avec la clé des codes, les autres ont tout */
+    expect(LIMITES.mailsCodeParJour.max + partDesAutresMails(false)).toBe(parJour);
+    expect(partDesAutresMails(true)).toBe(parJour);
+    /* La liste d’attente s’arrête avant les alertes, les alertes avant les rapports, qui vont jusqu’au bout */
+    expect(laisse.attente).toBeGreaterThan(laisse.alerte);
+    expect(laisse.alerte).toBeGreaterThan(laisse.rapport);
+    expect(laisse.rapport).toBe(0);
+    /* Son propre plafond tient dans sa part : rien ne l’arrête plus tôt en temps normal */
+    expect(LIMITES.mailsAttenteParJour.max).toBeLessThanOrEqual(partDesAutresMails(false) - laisse.attente);
+    /* Les alertes en ont encore quand la liste a pris toute la sienne */
+    expect(partDesAutresMails(false) - laisse.alerte - LIMITES.mailsAttenteParJour.max).toBeGreaterThanOrEqual(10);
   });
 
-  it("S-08 · les essais ratés : la réserve d’un navigateur tient sous ses plafonds, et l’email borne tout ce qui se devine", () => {
-    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail } = LIMITES;
+  it("S-07, S-08 · les essais ratés et la réserve des codes : ce qui se devine reste borné, et un tiers ne ferme la porte qu’en écrivant de cinq adresses", () => {
+    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail, codeParEmailEtIp, codeReserveParEmail, codeReserveParEmailEtIp, mailsCodeParJour } = LIMITES;
     expect(echecsCodeParEmailEtIp.reserveNavigateur).toBeLessThan(echecsCodeParNavigateur.max);
     expect(echecsCodeParNavigateur.max).toBeLessThan(echecsCodeParEmailEtIp.max);
     expect(echecsCodeParEmailEtIp.max).toBeLessThan(echecsCodeParEmail.max);
     /* Une chance sur plus de 10 000 de deviner un code (un sur un million) dans la journée */
     expect(echecsCodeParEmail.max / 1e6).toBeLessThan(1e-4);
-    /* En temps normal, les codes demandés (cinq essais chacun) arrêtent avant la borne de l’email */
-    expect(codeParEmail.max * 5).toBeLessThan(echecsCodeParEmail.max);
+    /* Tous les codes du jour d’un email, réserve comprise, ne donnent pas plus d’essais que sa borne : elle ne grandit pas avec la réserve, et un tiers n’y arrive qu’avec tous ces codes */
+    expect((codeParEmail.max + codeReserveParEmail.max) * CODE_ESSAIS).toBeLessThanOrEqual(echecsCodeParEmail.max);
+    /* Une seule adresse ne prend pas plus que les codes de l’email ; la réserve, elle, en demande au moins cinq */
+    expect(codeParEmailEtIp.max).toBeLessThanOrEqual(codeParEmail.max);
+    expect(codeReserveParEmail.max / codeReserveParEmailEtIp.max).toBeGreaterThanOrEqual(5);
+    /* Tous emails confondus, les mails de code du jour bornent ce qui se devine : moins d’une chance sur mille */
+    expect((mailsCodeParJour.max * CODE_ESSAIS) / 1e6).toBeLessThan(1e-3);
   });
 
   it.each([

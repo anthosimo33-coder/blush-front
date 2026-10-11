@@ -45,6 +45,12 @@ export const Env = z.object({
   RESEND_API_KEY_CODES: z.string().min(1).optional(),
   /** L’expéditeur des mails, sur le domaine vérifié chez Resend. */
   BLUSH_EMAIL_FROM: z.string().default("BLUSH <bonjour@askblush.com>"),
+  /**
+   * Facultatif : l’expéditeur des codes de connexion, sur un domaine vérifié sur le compte de RESEND_API_KEY_CODES (un
+   * sous-domaine, par exemple). Sans lui, les codes partent de BLUSH_EMAIL_FROM : son domaine doit alors être vérifié sur
+   * ce compte aussi, sinon le prestataire refuse chaque code.
+   */
+  BLUSH_EMAIL_FROM_CODES: z.string().min(1).optional(),
   /** L’adresse du site : les images des mails viennent de là. */
   BLUSH_URL: z.string().url().default(SITE_EN_LIGNE),
   /** Bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde (refusé en production). */

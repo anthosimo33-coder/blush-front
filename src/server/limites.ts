@@ -12,43 +12,63 @@ export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
   codeParIp: { max: 20, fenetreS: 3600 },
   /**
-   * Les codes demandés pour un email (canonique : src/server/email-canonique.ts) depuis une même adresse IP, par jour. En
-   * dessous du plafond de l’email : quelqu’un qui en demande pour l’email d’un autre, d’une seule adresse, lui en laisse.
+   * Les codes demandés pour un email (canonique : src/server/email-canonique.ts) depuis une même adresse IP, par jour. Égal
+   * au plafond de l’email depuis la réserve des codes (plus bas) : il garde une adresse sous ce plafond si on le relève.
    */
   codeParEmailEtIp: { max: 7, fenetreS: 86400 },
-  /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. */
-  codeParEmail: { max: 10, fenetreS: 86400 },
+  /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. TODO(produit): 7 (10 avant la réserve). */
+  codeParEmail: { max: 7, fenetreS: 86400 },
+  /*
+   * La réserve des codes (S-08). N’importe qui peut demander les codes d’un email : un tiers qui remplit codeParEmail
+   * ne doit pas priver la personne de code. Au-delà des deux plafonds du dessus, chaque adresse IP a encore `max` code de
+   * réserve pour l’email (codeReserveParEmailEtIp), jusqu’à `max` pour l’email en tout (codeReserveParEmail). Rien ne
+   * distingue le navigateur d’un tiers de celui de la personne (un cookie s’efface) : la réserve se compte par adresse.
+   * Pour priver la personne de code partout, un tiers doit donc écrire depuis au moins cinq adresses (des /64 en IPv6) au
+   * lieu d’une : plus cher, pas impossible, d’où le CAPTCHA prévu avant l’ouverture publique. Les codes du jour, réserve
+   * comprise, donnent au plus echecsCodeParEmail essais (cinq chacun) : ce qui se devine ne grandit pas, et les essais
+   * ratés d’un tiers ne ferment pas la porte avant ses codes (tests/unit/limites.test.ts). TODO(produit): 1 par adresse,
+   * 5 par email.
+   */
+  codeReserveParEmailEtIp: { max: 1, fenetreS: 86400 },
+  codeReserveParEmail: { max: 5, fenetreS: 86400 },
   /**
-   * Les mails de code, pour tous et par jour (S-09). Sous le quota du prestataire de mails (QUOTA_MAILS), en laissant sa
-   * réserve aux rapports et aux alertes : les codes ne doivent pas les empêcher de partir, ni l’inverse. L’équipe est
+   * Les mails de code, pour tous et par jour (S-09) : leur part du quota du prestataire de mails (QUOTA_MAILS), les
+   * autres mails se comptant sur le reste : les codes n’empêchent pas un rapport de partir, ni l’inverse. L’équipe est
    * prévenue à `alerteA` du plafond (80 %), puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans
-   * la boîte des tests de bout en bout, dont les mails ne partent pas. TODO(produit): 60 par jour (le plan gratuit du
-   * prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes (RESEND_API_KEY_CODES).
+   * la boîte des tests de bout en bout, dont les mails ne partent pas. Une seule adresse IP peut l’épuiser en trois heures
+   * (codeParIp, sur des emails jetables) : le CAPTCHA prévu avant l’ouverture publique y répond. TODO(produit): 60 par
+   * jour (le plan gratuit du prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes
+   * (RESEND_API_KEY_CODES). Le relever, c’est aussi relever ce qui se devine en un jour sur tous les emails (cinq essais
+   * par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
    */
   mailsCodeParJour: { max: 60, fenetreS: 86400, alerteA: 0.8 },
   verificationParIp: { max: 30, fenetreS: 3600 },
   /*
    * Les essais de code ratés (S-07, S-08), par jour : un nouveau code ne remet aucun de ces comptes à zéro, un bon code
-   * rend son essai à chacun. Ils se comptent à trois endroits, pour qu’un tiers qui rate exprès les codes d’une personne ne
-   * bloque que lui : le navigateur qui tape (echecsCodeParNavigateur), son adresse IP (echecsCodeParEmailEtIp) et l’email
-   * (echecsCodeParEmail), la borne de tout ce qui se devine en un jour.
+   * rend son essai à chacun. Ils se comptent à trois endroits : le navigateur qui tape (echecsCodeParNavigateur), son
+   * adresse IP (echecsCodeParEmailEtIp) et l’email (echecsCodeParEmail), la borne de tout ce qui se devine en un jour.
+   * Un tiers qui rate exprès les codes d’une personne n’épuise que les essais de son navigateur : il lui faudrait les
+   * soixante de l’email, soit tous les codes du jour, réserve comprise, pour l’arrêter elle aussi.
    */
   /**
    * Les essais ratés d’un navigateur pour un email (canonique) : deux codes entiers (cinq essais chacun). Au-delà, ce
-   * navigateur n’a plus d’essai aujourd’hui pour cet email ; les autres gardent les leurs.
+   * navigateur n’a plus d’essai aujourd’hui pour cet email ; les autres gardent les leurs. TODO(produit): 10 par
+   * navigateur (deux codes entiers).
    */
   echecsCodeParNavigateur: { max: 10, fenetreS: 86400 },
   /**
-   * Les essais ratés pour un email depuis une même adresse IP. Au-delà, cette adresse n’a plus d’essai pour l’email, sauf
-   * la réserve d’un navigateur qui a demandé son code et n’en a pas encore raté `reserveNavigateur` : la personne qui
-   * partage le Wi-Fi de celui qui rate exprès ses codes garde un code entier. TODO(produit): 20, et une réserve de 5.
+   * Les essais ratés pour un email depuis une même adresse IP. Au-delà, un navigateur de cette adresse qui en a déjà raté
+   * `reserveNavigateur` n’essaie plus (cinq au lieu de dix) ; un autre garde sa réserve, celle de la personne sur le même
+   * Wi-Fi que le tiers. Elle ne ralentit pas un tiers qui change de navigateur (un cookie s’efface) : ce sont
+   * codeParEmailEtIp et les plafonds de l’email qui le bornent. TODO(produit): 20, et une réserve de 5.
    */
   echecsCodeParEmailEtIp: { max: 20, fenetreS: 86400, reserveNavigateur: 5 },
   /**
    * Les essais ratés pour un email (canonique), d’où qu’ils viennent : au-delà, plus personne n’essaie pour lui
    * aujourd’hui. Un code sur un million par essai : 60 essais, c’est une chance sur plus de 16 000 de deviner un code dans
-   * la journée. Les codes demandés (codeParEmail, cinq essais chacun) la bornent déjà en temps normal : elle ne se
-   * remplit qu’en changeant d’adresse et de navigateur. TODO(produit): 60 par jour (20 avant).
+   * la journée. Les codes du jour, réserve comprise (douze, cinq essais chacun), n’en donnent pas plus dans une fenêtre :
+   * seule une fenêtre des essais à cheval sur deux fenêtres des codes (elles ne commencent pas à la même heure) peut aller
+   * au-delà, et c’est elle qui l’arrête. Une défense en profondeur. TODO(produit): 60 par jour (20 avant).
    */
   echecsCodeParEmail: { max: 60, fenetreS: 86400 },
   importParIp: { max: 20, fenetreS: 3600 },
@@ -82,7 +102,8 @@ export const LIMITES = {
   relanceParCompte: { max: 3, fenetreS: 86400 },
   /**
    * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
-   * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant.
+   * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant. Elles
+   * partent aussi dans le quota des mails (QUOTA_MAILS : chaque destinataire compte), qui les arrête avant les rapports.
    * TODO(produit): 10, à revoir à l’usage.
    */
   alertesParJour: { max: 30, fenetreS: 86400, reserveImportantes: 10 },
@@ -94,8 +115,9 @@ export const LIMITES = {
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
   /**
    * Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent épuiser ni le quota
-   * des codes, ni la réserve des rapports et des alertes (QUOTA_MAILS). Au-delà, on inscrit sans écrire. Sans la boîte
-   * des tests de bout en bout, dont les mails ne partent pas (comme mailsCodeParJour). TODO(produit): 20.
+   * des codes, ni la part des rapports et des alertes (QUOTA_MAILS, qui les arrête aussi les premiers). Au-delà, on
+   * inscrit sans écrire. Sans la boîte des tests de bout en bout, dont les mails ne partent pas (comme mailsCodeParJour).
+   * TODO(produit): 20.
    */
   mailsAttenteParJour: { max: 20, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
@@ -122,13 +144,22 @@ export const LIMITES = {
 } as const;
 
 /**
- * Le quota du prestataire de mails (S-09), par jour : 100 sur son plan gratuit, pour tous les mails qui partent avec
- * RESEND_API_KEY. Les codes (mailsCodeParJour) et la liste d’attente (mailsAttenteParJour) ont chacun leur plafond, et
- * leur somme laisse au moins `reserve` mails aux rapports (« ton rapport est prêt ») et aux alertes de l’équipe
- * (tests/unit/limites.test.ts y veille). TODO(produit): 100 et une réserve de 20 ; les alertes peuvent à elles seules en
- * demander 30 par jour (alertesParJour) : un plan payant, ou une clé réservée aux codes, desserre tout.
+ * Le quota du prestataire de mails (S-09), par jour : 100 sur son plan gratuit, chaque destinataire compté. Les codes ont
+ * leur part (mailsCodeParJour). Tous les autres mails qui partent avec RESEND_API_KEY (« ton rapport est prêt », les
+ * alertes de l’équipe, la liste d’attente) se comptent ensemble sur ce qui reste (partDesAutresMails : 40, ou les 100
+ * quand les codes ont leur clé, RESEND_API_KEY_CODES), et les moins nécessaires s’arrêtent les premiers : chaque sorte de
+ * mail laisse `laisse[sorte]` mails de cette part aux suivantes. La liste d’attente en laisse 20, les alertes 10 (les
+ * rapports les ont toujours), les rapports aucun : au pire, « ton rapport est prêt » ne part pas, et le rapport attend
+ * dans l’appli (src/server/email.ts, envoyerMail). tests/unit/limites.test.ts y veille. Les fenêtres des compteurs ne
+ * commencent pas à minuit comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
+ * TODO(produit): 100, et ces parts.
  */
-export const QUOTA_MAILS = { parJour: 100, reserve: 20 } as const;
+export const QUOTA_MAILS = { parJour: 100, laisse: { attente: 20, alerte: 10, rapport: 0 } } as const;
+/** Ce qu’est un mail pour le quota : du plus nécessaire (le rapport) au moins nécessaire (la liste d’attente). */
+export type SorteDeMail = keyof typeof QUOTA_MAILS.laisse;
+
+/** La part du quota des mails autres que les codes : tout, quand les codes ont leur clé ; sinon, ce que les codes laissent. */
+export const partDesAutresMails = (codesAPart: boolean) => QUOTA_MAILS.parJour - (codesAPart ? 0 : LIMITES.mailsCodeParJour.max);
 
 /** Une limite : combien de passages au plus, sur quelle fenêtre (en secondes). */
 export type Limite = { max: number; fenetreS: number };
@@ -187,6 +218,25 @@ export async function rendre(cle: string, n = 1): Promise<void> {
     .set({ count: sql`greatest(${schema.rateLimits.count} - ${n}::int, 0)` })
     .where(eq(schema.rateLimits.key, cleDe(cle)));
 }
+
+/* Le compteur du jour des mails autres que les codes */
+const MAILS_DU_JOUR = "mails:autres";
+
+/**
+ * `n` mails de cette sorte (un par destinataire) tiennent-ils encore dans leur part du quota (QUOTA_MAILS) ? Comptés si
+ * oui. On regarde d’abord sans compter : un mail retenu ne prend rien à ceux qui passent après lui.
+ */
+export async function dansLeQuotaDesMails(sorte: SorteDeMail, n: number, { codesAPart }: { codesAPart: boolean }): Promise<boolean> {
+  const limite = { max: partDesAutresMails(codesAPart) - QUOTA_MAILS.laisse[sorte], fenetreS: 86400 };
+  if ((await compteDe(MAILS_DU_JOUR, limite)) + n > limite.max) return false;
+  if ((await compter(MAILS_DU_JOUR, limite, n)) <= limite.max) return true;
+  /* D’autres mails sont passés entre la question et le compte : celui-ci ne part pas, et rend sa place */
+  await rendre(MAILS_DU_JOUR, n);
+  return false;
+}
+
+/** Rend au quota des mails `n` mails comptés qui ne sont pas partis (le prestataire les a refusés). */
+export const rendreAuQuotaDesMails = (n: number) => rendre(MAILS_DU_JOUR, n);
 
 /**
  * L’adresse IP de la requête (derrière le proxy de Vercel, qui réécrit x-forwarded-for), telle que les limites la

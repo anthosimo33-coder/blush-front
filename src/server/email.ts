@@ -4,6 +4,8 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { boiteAMails, env } from "./env";
 import { delaiAppel } from "./echeance";
+import { auMieux, journal } from "./journal";
+import { dansLeQuotaDesMails, rendreAuQuotaDesMails, type SorteDeMail } from "./limites";
 import { mailCode } from "./mail-code";
 import type { Mail } from "./marque";
 
@@ -32,32 +34,51 @@ export class ErreurResend extends Error {
   }
 }
 
-/**
- * Envoie un mail, sa version texte et sa version HTML s’il en a une (une alerte de l’équipe n’en a pas), à un ou
- * plusieurs destinataires. `cle` : la clé du prestataire qui l’envoie, RESEND_API_KEY par défaut (les codes ont la
- * leur s’il y en a une : envoyerCodeParEmail). Sans clé (dev), seul son sujet s’affiche dans les logs. Rejette avec
- * ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
- */
-export async function envoyerMail(destinataires: string | string[], { sujet, texte, html }: Mail, { cle = env().RESEND_API_KEY }: { cle?: string } = {}): Promise<void> {
-  const pour = typeof destinataires === "string" ? [destinataires] : destinataires;
-  if (!pour.length) return;
-  const boite = boiteAMails();
-  if (boite) return deposer(boite, pour, { sujet, texte, ...(html !== undefined && { html }) });
-  if (!cle) {
-    console.log(`[dev] mail « ${sujet} » pour ${pour.join(", ")}`);
-    return;
-  }
+/* Poste un mail chez le prestataire, avec la clé `cle` et l’expéditeur `de` : rejette avec ErreurResend s’il le refuse */
+async function poster(pour: string[], { sujet, texte, html }: Mail, { cle, de }: { cle: string; de: string }): Promise<void> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${cle}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: env().BLUSH_EMAIL_FROM, to: pour, subject: sujet, text: texte, ...(html !== undefined && { html }) }),
+    body: JSON.stringify({ from: de, to: pour, subject: sujet, text: texte, ...(html !== undefined && { html }) }),
     signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
   if (!r.ok) throw new ErreurResend(r.status);
 }
 
-/** La clé qui envoie les codes : la leur (RESEND_API_KEY_CODES, un quota à part), sinon celle de tous les mails. */
-const cleDesCodes = () => env().RESEND_API_KEY_CODES ?? env().RESEND_API_KEY;
+/**
+ * Envoie un mail qui n’est pas un code, sa version texte et sa version HTML s’il en a une (une alerte de l’équipe n’en a
+ * pas), à un ou plusieurs destinataires, avec RESEND_API_KEY. `sorte` : ce qu’il est pour le quota du prestataire
+ * (QUOTA_MAILS, src/server/limites.ts : « rapport » par défaut, « alerte », « attente ») ; au-delà de sa part, il ne part
+ * pas, le journal le dit, et la réponse est false. Sans clé (dev), seul son sujet s’affiche dans les logs. Rejette avec
+ * ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
+ */
+export async function envoyerMail(destinataires: string | string[], mail: Mail, { sorte = "rapport" }: { sorte?: SorteDeMail } = {}): Promise<boolean> {
+  const pour = typeof destinataires === "string" ? [destinataires] : destinataires;
+  if (!pour.length) return true;
+  const boite = boiteAMails();
+  if (boite) {
+    await deposer(boite, pour, { sujet: mail.sujet, texte: mail.texte, ...(mail.html !== undefined && { html: mail.html }) });
+    return true;
+  }
+  const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM } = env();
+  if (!RESEND_API_KEY) {
+    console.log(`[dev] mail « ${mail.sujet} » pour ${pour.join(", ")}`);
+    return true;
+  }
+  /* Chaque destinataire compte pour le prestataire */
+  if (!(await dansLeQuotaDesMails(sorte, pour.length, { codesAPart: !!RESEND_API_KEY_CODES }))) {
+    journal("mail retenu", { sorte, destinataires: pour.length }, "alerte");
+    return false;
+  }
+  try {
+    await poster(pour, mail, { cle: RESEND_API_KEY, de: BLUSH_EMAIL_FROM });
+  } catch (e) {
+    /* Refusé, il n’a rien pris au prestataire : il rend sa place. Perdu en route, il a pu partir : il la garde */
+    if (e instanceof ErreurResend) await auMieux(rendreAuQuotaDesMails(pour.length), "quota des mails non rendu");
+    throw e;
+  }
+  return true;
+}
 
 /** Envoie le code de connexion. Sans clé (dev), il s’affiche dans les logs du serveur. */
 export async function envoyerCodeParEmail(email: string, code: string): Promise<void> {
@@ -65,10 +86,13 @@ export async function envoyerCodeParEmail(email: string, code: string): Promise<
   const boite = boiteAMails();
   /* La boîte des tests garde aussi le code seul : le test le lit sans fouiller le HTML */
   if (boite) return deposer(boite, [email], { ...mailCode(code, BLUSH_URL), code });
-  const cle = cleDesCodes();
+  /* La clé des codes (RESEND_API_KEY_CODES, un quota à part) et son expéditeur, sinon ceux de tous les mails */
+  const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM, BLUSH_EMAIL_FROM_CODES } = env();
+  const cle = RESEND_API_KEY_CODES ?? RESEND_API_KEY;
   if (!cle) {
     console.log(`[dev] code de connexion pour ${email} : ${code}`);
     return;
   }
-  await envoyerMail(email, mailCode(code, BLUSH_URL), { cle });
+  /* Leur part du quota se compte avant (LIMITES.mailsCodeParJour, src/server/auth.ts : envoyerCode) */
+  await poster([email], mailCode(code, BLUSH_URL), { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM });
 }

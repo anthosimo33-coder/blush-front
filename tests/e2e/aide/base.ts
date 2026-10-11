@@ -138,15 +138,20 @@ export async function remplirLaLimite(email: string, nom: LimiteDuCompte, max: n
 }
 
 /*
- * Les compteurs des codes de connexion d’un email (src/server/limites.ts) : ses codes du jour et ses essais ratés, rangés
- * par email canonique. Ceux d’un email et d’une adresse IP n’y sont pas : chaque test a son adresse (aide/index.ts).
+ * Les compteurs des codes de connexion d’un email (src/server/limites.ts) : ses codes du jour, ceux de sa réserve et ses
+ * essais ratés, rangés par email canonique. Ceux d’un email et d’une adresse IP (ses codes, sa réserve, ses essais ratés)
+ * n’y sont pas : chaque test a son adresse (aide/index.ts). Ni ceux d’un navigateur : chaque contexte du navigateur a son
+ * propre jeton (un cookie neuf), qu’aucun autre test ne reprend.
  */
-function limitesDesCodes(email: string): [string, string] {
+function limitesDesCodes(email: string): string[] {
   const canonique = emailCanonique(email);
-  return [empreinte(`limite:code:email:${canonique}`), empreinte(`limite:code:echecs:${canonique}`)];
+  return [`code:email:${canonique}`, `code:reserve:${canonique}`, `code:echecs:${canonique}`].map((cle) => empreinte(`limite:${cle}`));
 }
 
-/** Remet à zéro les compteurs des codes de connexion de cet email (dix codes et vingt essais ratés par jour), sans toucher au compte. */
+/**
+ * Remet à zéro les compteurs des codes de connexion de cet email (sept codes et cinq de réserve, soixante essais ratés par
+ * jour), sans toucher au compte.
+ */
 export async function oublierLimiteDesCodes(email: string): Promise<void> {
   await sql()`delete from rate_limits where key in ${sql()(limitesDesCodes(email))}`;
 }

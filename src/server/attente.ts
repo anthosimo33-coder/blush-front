@@ -38,7 +38,8 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
   if (!(await sousLaLimite(`attente:mail:${emailHash}`, LIMITES.mailAttenteParEmail))) return;
   /* Le plafond pour tous ne compte que les mails qui partent : pas ceux de la boîte des tests de bout en bout (comme les codes) */
   if (!boiteAMails() && !(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
-  await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }));
+  /* Le moins nécessaire des mails : le premier retenu quand le quota du prestataire se remplit (QUOTA_MAILS) */
+  await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }), { sorte: "attente" });
 }
 
 /** Retire un email de la liste, depuis le lien de son mail. Faux si le lien n’est pas le bon. */
@@ -48,8 +49,8 @@ export async function retirer(id: string, cle: string): Promise<boolean> {
   return true;
 }
 
-/** Efface les inscriptions de plus de ATTENTE_GARDEE_JOURS (la purge de nuit, src/server/purge.ts). Renvoie leur nombre. */
-export async function purgerLaListe(maintenant = new Date()): Promise<number> {
+/** Efface les inscriptions de plus de ATTENTE_GARDEE_JOURS (la purge de nuit, src/server/purge.ts). */
+export async function purgerLaListe(maintenant = new Date()): Promise<void> {
   const limite = new Date(maintenant.getTime() - ATTENTE_GARDEE_JOURS * 86400e3);
-  return (await db().delete(schema.waitlist).where(lt(schema.waitlist.createdAt, limite)).returning({ id: schema.waitlist.id })).length;
+  await db().delete(schema.waitlist).where(lt(schema.waitlist.createdAt, limite));
 }

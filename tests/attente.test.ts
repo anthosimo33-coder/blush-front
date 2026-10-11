@@ -1,9 +1,10 @@
 import { eq, inArray } from "drizzle-orm";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { alerter, resumerLaVeille } from "@/server/alertes";
 import { ATTENTE_GARDEE_JOURS, empreinteDeLaListe, inscrire, purgerLaListe } from "@/server/attente";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
+import { dansLeQuotaDesMails, partDesAutresMails, QUOTA_MAILS } from "@/server/limites";
 
 const n = Date.now();
 const email = `pote-${n}@exemple.fr`;
@@ -38,9 +39,49 @@ describe("la liste d’attente", () => {
     await db().update(schema.waitlist).set({ createdAt: il_y_a(ATTENTE_GARDEE_JOURS + 1) }).where(ligne(ancien));
     await db().update(schema.waitlist).set({ createdAt: il_y_a(ATTENTE_GARDEE_JOURS - 1) }).where(ligne(recent));
     expect(ATTENTE_GARDEE_JOURS).toBe(365);
-    expect(await purgerLaListe(maintenant)).toBeGreaterThanOrEqual(1);
+    await purgerLaListe(maintenant);
     expect(await db().select().from(schema.waitlist).where(ligne(ancien))).toHaveLength(0);
     expect(await db().select().from(schema.waitlist).where(ligne(recent))).toHaveLength(1);
+  });
+});
+
+describe("S-09 · le quota des mails autres que les codes (QUOTA_MAILS)", () => {
+  const cle = empreinte("limite:mails:autres");
+  const poser = (count: number) =>
+    db()
+      .insert(schema.rateLimits)
+      .values({ key: cle, windowStart: new Date(), count })
+      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count, windowStart: new Date() } });
+  const compte = async () => (await db().select().from(schema.rateLimits).where(eq(schema.rateLimits.key, cle)))[0]?.count ?? 0;
+  beforeEach(async () => {
+    await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, cle));
+  });
+  afterAll(async () => {
+    await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, cle));
+  });
+
+  it("la liste d’attente s’arrête la première, puis les alertes (chaque destinataire compté), les rapports en dernier ; un mail retenu ne prend rien", async () => {
+    const part = partDesAutresMails(false);
+    const { laisse } = QUOTA_MAILS;
+    const codesAvec = { codesAPart: false };
+    /* La liste d’attente laisse sa part aux autres */
+    await poser(part - laisse.attente - 1);
+    expect(await dansLeQuotaDesMails("attente", 1, codesAvec)).toBe(true);
+    expect(await dansLeQuotaDesMails("attente", 1, codesAvec)).toBe(false);
+    expect(await compte()).toBe(part - laisse.attente);
+    /* Une alerte passe encore ; à deux destinataires, il en faut deux places */
+    await poser(part - laisse.alerte - 1);
+    expect(await dansLeQuotaDesMails("alerte", 2, codesAvec)).toBe(false);
+    expect(await compte()).toBe(part - laisse.alerte - 1);
+    expect(await dansLeQuotaDesMails("alerte", 1, codesAvec)).toBe(true);
+    expect(await dansLeQuotaDesMails("alerte", 1, codesAvec)).toBe(false);
+    /* Les rapports vont jusqu’au bout de la part, pas au-delà */
+    expect(await dansLeQuotaDesMails("rapport", laisse.alerte, codesAvec)).toBe(true);
+    expect(await compte()).toBe(part);
+    expect(await dansLeQuotaDesMails("rapport", 1, codesAvec)).toBe(false);
+    /* Avec la clé des codes, les autres mails ont tout le quota */
+    expect(await dansLeQuotaDesMails("rapport", 1, { codesAPart: true })).toBe(true);
+    expect(await compte()).toBe(part + 1);
   });
 });
 

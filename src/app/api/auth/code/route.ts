@@ -1,9 +1,8 @@
 import { after } from "next/server";
 import { alerter } from "@/server/alertes";
 import { inscrire } from "@/server/attente";
-import { Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
+import { codeAccorde, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
 import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies";
-import { emailCanonique } from "@/server/email-canonique";
 import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
 import { erreur, lireCorps, repondre } from "@/server/http";
@@ -25,16 +24,15 @@ export async function POST(req: Request) {
    * Les mêmes limites pour tous : un « trop » ne dit pas si l’email est invité. Par adresse IP ; puis par email canonique
    * (ses alias comptent avec lui) : ses essais ratés du jour, pour l’email, ce navigateur et cette adresse (un code de
    * plus n’y pourrait rien, et ne ferait que consommer un mail ; la limite existe aussi pour un email hors de la liste :
-   * essaisEpuises), ses codes d’une même adresse IP (qui en demande pour l’email d’un autre lui en laisse), puis de
-   * partout ; enfin le plafond des mails du jour, pour tous.
+   * essaisEpuises) ; le plafond des mails du jour, pour tous (avant de compter quoi que ce soit à l’email) ; enfin ses
+   * codes du jour, de cette adresse puis de partout, et au-delà la réserve qu’un tiers ne prend pas d’une seule adresse
+   * (codeAccorde).
    */
   const ip = ipDe(req);
-  const canonique = emailCanonique(email);
   if (!(await sousLaLimite(`code:ip:${ip}`, LIMITES.codeParIp))) return erreur("trop");
   if (await essaisEpuises(email, await lireNavigateur(), ip)) return erreur("essais");
-  if (!(await sousLaLimite(`code:email-ip:${canonique}:${ip}`, LIMITES.codeParEmailEtIp))) return erreur("codes");
-  if (!(await sousLaLimite(`code:email:${canonique}`, LIMITES.codeParEmail))) return erreur("codes");
   if (await mailsDeCodeEpuises()) return erreur("codes");
+  if (!(await codeAccorde(email, ip))) return erreur("codes");
   const navigateur = await poserNavigateur();
   const brouillon = await lireBrouillon();
   const invite = peutEntrer(email);

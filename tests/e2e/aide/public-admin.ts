@@ -22,7 +22,7 @@ export const MUTATIONS: [string, string][] = (Object.keys(ROUTES) as CleRoute[])
  * Se connecter avec l’email de l’équipe (ADMIN, dans BLUSH_ADMINS), par l’interface. Il n’y en a qu’un pour tous les
  * workers : deux connexions en même temps liraient l’une le code de l’autre dans la boîte à mails (le dernier arrivé),
  * qui ne vaut que dans le navigateur qui l’a demandé. Un verrou Postgres les fait passer l’une après l’autre ; et ses
- * compteurs de codes (dix par jour) repartent de zéro, pour --repeat-each.
+ * compteurs de codes (sept par jour, et leur réserve) repartent de zéro, pour --repeat-each.
  */
 export async function seConnecterAdmin(page: Page, { timeout = RESEAU }: { timeout?: number } = {}): Promise<void> {
   const verrou = await sql().reserve();

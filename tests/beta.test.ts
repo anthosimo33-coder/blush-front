@@ -1,9 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { inscrire, lienRetrait, retirer } from "@/server/attente";
 import { preparerCode, prendreCode } from "@/server/auth";
 import { empreinte, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
+import { LIMITES } from "@/server/limites";
 import { mailAttente } from "@/server/mail-attente";
 
 const email = `curieux-${Date.now()}@exemple.fr`;
@@ -55,21 +56,29 @@ describe("la bêta fermée, sans dire qui est invité", () => {
     expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, hash))).toHaveLength(0);
   });
 
-  it("au-delà de cinquante mails de la liste dans la journée, pour tous : on inscrit encore, sans écrire", async () => {
-    const autre = `curieux-plafond-${Date.now()}@exemple.fr`;
-    await db()
-      .insert(schema.rateLimits)
-      .values({ key: mailsDuJour, windowStart: new Date(), count: 50 })
-      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 50, windowStart: new Date() } });
+  it("le plafond des mails de la liste, pour tous et par jour (mailsAttenteParJour) : le dernier part encore ; au-delà, on inscrit sans écrire", async () => {
+    const { max } = LIMITES.mailsAttenteParJour;
+    const [avant, apres] = [`curieux-dernier-${Date.now()}@exemple.fr`, `curieux-plafond-${Date.now()}@exemple.fr`];
+    const poser = (count: number) =>
+      db()
+        .insert(schema.rateLimits)
+        .values({ key: mailsDuJour, windowStart: new Date(), count })
+        .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count, windowStart: new Date() } });
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const ecritsA = (e: string) => log.mock.calls.flat().filter((l) => String(l).includes(`pour ${e}`)).length;
     try {
-      await inscrire(autre, "accueil");
-      expect(log.mock.calls.flat().filter((l) => String(l).includes(`pour ${autre}`))).toHaveLength(0);
-      expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${autre}`)))).toHaveLength(1);
+      await poser(max - 1);
+      await inscrire(avant, "accueil");
+      expect(ecritsA(avant)).toBe(1);
+      await inscrire(apres, "accueil");
+      expect(ecritsA(apres)).toBe(0);
+      expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${apres}`)))).toHaveLength(1);
     } finally {
       log.mockRestore();
       await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, mailsDuJour));
-      await db().delete(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${autre}`)));
+      await db()
+        .delete(schema.waitlist)
+        .where(inArray(schema.waitlist.emailHash, [avant, apres].map((e) => empreinte(`attente:${e}`))));
     }
   });
 });

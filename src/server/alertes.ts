@@ -23,7 +23,8 @@ async function envoyer(sujet: string, lignes: string[]): Promise<void> {
     console.log(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
   }
-  await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") });
+  /* Dans le quota du prestataire, une alerte passe avant la liste d’attente, après les rapports (QUOTA_MAILS) */
+  await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") }, { sorte: "alerte" });
 }
 
 /*
