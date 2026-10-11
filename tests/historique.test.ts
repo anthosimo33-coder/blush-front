@@ -29,11 +29,11 @@ describe("l’historique du chat avec BLUSH", () => {
     for (const limite of [40, 7]) {
       const vus: string[] = [];
       let h = await historique(id, { limite });
-      let curseur = h.echanges[0].id;
+      let curseur = h.echanges[0]!.id;
       vus.unshift(...h.echanges.map((e) => e.mine));
       while (h.plus) {
         h = await historique(id, { avant: curseur, limite });
-        if (h.echanges.length) curseur = h.echanges[0].id;
+        if (h.echanges.length) curseur = h.echanges[0]!.id;
         vus.unshift(...h.echanges.map((e) => e.mine));
       }
       expect(vus).toEqual(Array.from({ length: 50 }, (_, k) => `question ${k + 1}`));

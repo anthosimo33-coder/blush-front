@@ -128,10 +128,10 @@ export default defineConfig({
           testMatch: /[\\/]galerie\.spec\.ts$/,
           /* Chaque état a son propre compte : les états du fichier se capturent en parallèle */
           fullyParallel: true,
-          use: { ...navigateurs[0].use, viewport, deviceScaleFactor, baseURL: URL_APPLI },
+          use: { ...navigateurs[0]!.use, viewport, deviceScaleFactor, baseURL: URL_APPLI },
         }))
       : []),
-    ...(GALERIE ? [{ name: "galerie-fluidite", testDir: "scripts/galerie", testMatch: /[\\/]fluidite\.spec\.ts$/, use: { ...navigateurs[0].use, baseURL: URL_APPLI } }] : []),
+    ...(GALERIE ? [{ name: "galerie-fluidite", testDir: "scripts/galerie", testMatch: /[\\/]fluidite\.spec\.ts$/, use: { ...navigateurs[0]!.use, baseURL: URL_APPLI } }] : []),
   ],
   webServer: [serveur(PORT, false), serveur(PORT_BETA, true)],
 });

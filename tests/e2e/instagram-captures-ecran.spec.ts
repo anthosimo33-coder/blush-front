@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { auMoins } from "../aide/listes";
 import {
   attendreLaScene,
   attendreLecture,
@@ -31,7 +32,7 @@ import {
 test("captures : choisir, en ajouter, en retirer ; la grille les numérote et en garde 20 au plus", async ({ page }, testInfo) => {
   /* Toutes écrites d’avance : réécrire un fichier déjà choisi le rend illisible au navigateur (Chromium compare sa date) */
   const fichiers = capturesPng(testInfo, 22);
-  const [c1, c2, c3, c4, c5] = fichiers;
+  const [c1, c2, c3, c4, c5] = auMoins(fichiers, 5);
 
   await test.step("la tuile Hinge mène aux captures", async () => {
     await page.goto("/commencer");
@@ -148,7 +149,7 @@ test("captures : au pointeur, on attrape une capture et on la pose sur une autre
 
 test("captures : des fichiers glissés sur la zone d’ajout, seules les images entrent", async ({ page }, testInfo) => {
   test.skip(!surOrdinateur(page), "glisser des fichiers depuis le bureau sur la page : un geste d’ordinateur");
-  const [c1] = capturesPng(testInfo, 1);
+  const c1 = capturesPng(testInfo, 1)[0]!;
   await page.goto("/importer/captures?app=hinge");
   /* Une capture et une note .txt, glissées ensemble depuis le bureau */
   const fichiers = await page.evaluateHandle(
@@ -226,7 +227,7 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
 });
 
 test("captures : une capture illisible, l’écran d’erreur le dit, et « Choisir d’autres captures » ramène aux captures", async ({ page }, testInfo) => {
-  const [c1] = capturesPng(testInfo, 1);
+  const c1 = capturesPng(testInfo, 1)[0]!;
   await page.goto("/importer/captures?app=hinge");
   await choisirFichier(page, [c1, captureIllisible(testInfo)], "Choisir mes captures");
   await expect(capture(page, 2, 2)).toBeVisible();

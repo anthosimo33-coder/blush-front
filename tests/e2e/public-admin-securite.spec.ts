@@ -109,7 +109,7 @@ test("les vocaux d’une conv ne s’écoutent que depuis son compte : ni un aut
   const email = await lectureBlushPlus(page, testInfo);
   await ouvrir(page, "/app");
   expect(await ecrireABlush(page, "parle-moi en vocal")).toBe(200);
-  const [histoire] = await histoiresDe(email);
+  const histoire = (await histoiresDe(email))[0]!;
   const vocal = await dernierVocalDuChat(email);
   expect(vocal).not.toBeNull();
   const adresses = [`/api/vocal/audio?conv=${histoire.id}`, `/api/vocal/chat/${vocal}`];

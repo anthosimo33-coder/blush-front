@@ -45,7 +45,7 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
   });
 
   it("échoue quand une phrase d’un prompt est dans un fichier envoyé au navigateur", () => {
-    const [phrase] = phrasesDesPrompts();
+    const phrase = phrasesDesPrompts()[0]!;
     ecrire("static/chunks/app/page.js", `const consigne = ${JSON.stringify(phrase)};`);
     const { code, sortie } = verifier();
     expect(code).toBe(1);
@@ -102,7 +102,7 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     const { code, sortie } = verifier();
     expect(code).toBe(1);
     expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
-    expect(sortie.includes(passage![0])).toBe(false);
+    expect(sortie.includes(passage![0]!)).toBe(false);
   });
 
   it("échoue aussi quand la phrase est au milieu d’un JavaScript minifié qui contient un « < » (ce n’est pas une balise)", () => {

@@ -174,7 +174,7 @@ test("Instagram : l’export complet fait choisir la conv, cherche sans accents,
     /* Ce qui est parti : les deux fichiers de la conv avec Maëlys (65 lignes, son « a aimé » compris), rien des treize autres ni des infos du compte */
     const envois = await envoisVers("/api/import");
     expect(envois).toHaveLength(1);
-    const paquet = paquetDe(envois[0]);
+    const paquet = paquetDe(envois[0]!);
     expect(paquet.parties.map((p) => p.nom)).toEqual([
       "your_instagram_activity/messages/inbox/maelys_1234567890/message_1.json",
       "your_instagram_activity/messages/inbox/maelys_1234567890/message_2.json",

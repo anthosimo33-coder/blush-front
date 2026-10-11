@@ -107,7 +107,7 @@ let secretSession = "";
 
 beforeAll(async () => {
   await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, cles));
-  const [u] = await db().insert(schema.users).values({ email: emails[0], plan: "blushplus" }).returning();
+  const u = (await db().insert(schema.users).values({ email: emails[0]!, plan: "blushplus" }).returning())[0]!;
   userId = u.id;
   secretSession = (await ouvrirSession(u.id)).secret;
 });
@@ -144,7 +144,7 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
   it("un export importé est gardé compressé, et relu tel quel", async () => {
     const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
     const { id } = await importer(lu);
-    const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+    const ligne = (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
     expect(ligne.conv![0]).toBe(2);
     expect(ligne.conv!.length).toBeLessThan(Buffer.byteLength(lu.texte) / 2);
     expect(convDe(ligne)).toBe(lu.texte);
@@ -157,7 +157,7 @@ describe("S-02 · un nom de participant démesuré n’entre pas dans ce qu’on
     const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
     const { id, meta } = await importer(lu);
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
-    const nom = meta.participants[0].nom;
+    const nom = meta.participants[0]!.nom;
     for (const autre of ["N".repeat(150), "Nom\u0001"]) await expect(importer({ ...lu, texte: lu.texte.split(`${nom}:`).join(`${autre}:`) })).rejects.toMatchObject({ code: "fichier" });
   });
 });
@@ -186,7 +186,7 @@ describe("S-01 · lire des captures (le modèle payant) avant l’email", () => 
     etat.cookies.clear();
     await db()
       .insert(schema.rateLimits)
-      .values({ key: cles[0], windowStart: new Date(), count: 49 })
+      .values({ key: cles[0]!, windowStart: new Date(), count: 49 })
       .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 49, windowStart: new Date() } });
     expect(await lecturePermise("captures")).toBe("ok");
     expect(await lecturePermise("captures")).toBe("trop");
@@ -221,7 +221,7 @@ describe("S-12 · un enregistrement d’écran : des lots de 300 messages au plu
   /* Un lot d’un seul bloc de `n` messages, alternés */
   const lot = (n: number) => {
     const l = lotVideo("Léa");
-    const [autre, moi] = l.blocs[0].messages;
+    const [autre, moi] = l.blocs[0]!.messages;
     return { ...l, blocs: [{ ...l.blocs[0], messages: Array.from({ length: n }, (_, k) => ({ ...(k % 2 ? moi : autre), texte: `message ${k}` })) }] };
   };
   const envoyer = (n: number) => postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot(n)] }) }));
@@ -259,7 +259,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
       moi: 0,
       pronom: "il",
     };
-    const [s] = await db().insert(schema.stories).values({ userId, messageCount: 20, meta: chiffrer(meta) }).returning();
+    const s = (await db().insert(schema.stories).values({ userId, messageCount: 20, meta: chiffrer(meta) }).returning())[0]!;
     storyId = s.id;
     const donnees: DonneesMemoire = { etat: etatMemoire, lignes: [], suivant: 21, editions: { parToi: [], supprimees: Array.from({ length: 150 }, (_, k) => `ancien ${k}`) } };
     await db().insert(schema.memories).values({ storyId, data: chiffrer(donnees) });
@@ -276,7 +276,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
   it("les infos retirées gardent les 100 plus récentes", async () => {
     const r = await corriger();
     expect(r.status).toBe(200);
-    const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId));
+    const ligne = (await db().select().from(schema.memories).where(eq(schema.memories.storyId, storyId)))[0]!;
     const supprimees = dechiffrer<DonneesMemoire>(ligne.data).editions!.supprimees;
     expect(supprimees).toHaveLength(100);
     expect(supprimees.at(-1)).toBe("Fait 0");
@@ -292,7 +292,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
   });
 
   it("au-delà de la limite du jour : « trop »", async () => {
-    const cle = empreinte(`limite:${cleDeLimiteDuCompte("fiche", emails[0])}`);
+    const cle = empreinte(`limite:${cleDeLimiteDuCompte("fiche", emails[0]!)}`);
     await db().insert(schema.rateLimits).values({ key: cle, windowStart: new Date(), count: 60 }).onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 60, windowStart: new Date() } });
     /* Le plafond est retiré même si le test échoue : les autres corrigent la fiche du même compte */
     try {
@@ -369,7 +369,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   it("S-08 · un code ne vaut que dans le navigateur qui l’a demandé, et la demande d’un autre ne le remplace pas", async () => {
     const e = email("navigateur");
     expect((await demander(e)).status).toBe(200);
-    const [codeA] = codesEcrits(e);
+    const codeA = codesEcrits(e)[0]!;
     const navigateurA = autreNavigateur();
     expect((await demander(e)).status).toBe(200);
     const [, codeB] = codesEcrits(e);
@@ -378,7 +378,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     if (codeA !== codeB) expect(await verifier(e, codeA)).toEqual({ statut: 200, corps: { ok: false } });
     /* Sans aucun cookie de code : rien non plus */
     autreNavigateur();
-    expect(await verifier(e, codeB)).toEqual({ statut: 200, corps: { ok: false } });
+    expect(await verifier(e, codeB!)).toEqual({ statut: 200, corps: { ok: false } });
     /* A garde le sien, et entre */
     etat.cookies = navigateurA;
     expect(await verifier(e, codeA)).toEqual({ statut: 200, corps: { ok: true, email: e } });
@@ -391,7 +391,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     /* Le même code, toujours bon */
-    expect((await verifier(e, codesEcrits(e)[0])).corps).toMatchObject({ ok: true });
+    expect((await verifier(e, codesEcrits(e)[0]!)).corps).toMatchObject({ ok: true });
   });
 
   it("S-07 · soixante essais ratés par jour pour un email, alias compris : un nouveau code n’y change rien (il n’est plus envoyé), un bon code ne compte pas", async () => {
@@ -404,14 +404,14 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     /* Un bon code rend son essai */
     await poserLimite(echecs, 5);
     await demander(e);
-    expect((await verifier(e, codesEcrits(e)[0])).corps).toMatchObject({ ok: true });
+    expect((await verifier(e, codesEcrits(e)[0]!)).corps).toMatchObject({ ok: true });
     expect(await compteDeLimite(echecs)).toBe(5);
 
     /* Tous les essais ratés du jour moins un : le dernier, raté aussi, passe encore ; le suivant, même bon, est refusé */
     autreNavigateur();
     await poserLimite(echecs, LIMITES.echecsCodeParEmail.max - 1);
     await demander(alias);
-    const [code] = codesEcrits(alias);
+    const code = codesEcrits(alias)[0]!;
     expect(await verifier(alias, autreCode(code))).toEqual({ statut: 200, corps: { ok: false } });
     expect(await verifier(alias, code)).toEqual({ statut: 429, corps: { erreur: "essais" } });
     /* Un nouveau code, d’un autre navigateur : refusé d’emblée, sans mail (il n’y pourrait rien), pour l’alias aussi */
@@ -563,7 +563,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : 80 % du plafond du jour"]);
     /* Elle touche tout le monde : elle passe dans la réserve des importantes (S-19) */
-    expect(alertes[0].importante).toBe(true);
+    expect(alertes[0]!.importante).toBe(true);
     await poserLimite("code:mails", LIMITES.mailsCodeParJour.max);
     const r = await demander(email("plafond-apres"));
     expect([r.status, await r.json()]).toEqual([429, { erreur: "codes" }]);
@@ -576,7 +576,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : plafond du jour atteint"]);
-    expect(alertes[0].importante).toBe(true);
+    expect(alertes[0]!.importante).toBe(true);
     /* Des demandes en même temps : celle-ci a vu le plafond libre, mais il est atteint quand son mail va partir */
     await envoyerCode(e, "123456");
     expect(codesEcrits(e)).toHaveLength(1);
@@ -612,7 +612,7 @@ describe("S-16 · la session : glissante, et fermée partout d’un geste", () =
   beforeAll(async () => {
     const e = `session-${n}@blush.test`;
     emails.push(e);
-    [{ id: compte }] = await db().insert(schema.users).values({ email: e }).returning();
+    compte = (await db().insert(schema.users).values({ email: e }).returning())[0]!.id;
   });
 
   it("se déconnecter ferme la session de cet appareil ; « partout », toutes celles du compte. La réponse fait oublier le navigateur", async () => {
@@ -633,7 +633,7 @@ describe("S-16 · la session : glissante, et fermée partout d’un geste", () =
   it("« Tout effacer » : le compte et ses sessions, les cookies de cet appareil, et la réponse fait oublier le navigateur", async () => {
     const e = `tout-effacer-${n}@blush.test`;
     emails.push(e);
-    const [{ id }] = await db().insert(schema.users).values({ email: e }).returning();
+    const { id } = (await db().insert(schema.users).values({ email: e }).returning())[0]!;
     const { secret } = await ouvrirSession(id);
     etat.cookies = new Map([
       [SESSION, secret],
@@ -656,7 +656,7 @@ describe("S-16 · la session : glissante, et fermée partout d’un geste", () =
     etat.cookies = new Map([[SESSION, secret]]);
     etat.attributs.clear();
     expect((await getReveil()).status).toBe(200);
-    const [prolongee] = await db().select().from(schema.sessions).where(ici);
+    const prolongee = (await db().select().from(schema.sessions).where(ici))[0]!;
     expect(prolongee.expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 86400e3);
     expect(etat.attributs.get(SESSION)?.expires?.getTime()).toBe(prolongee.expiresAt.getTime());
     /* Le même jour : rien de plus */
@@ -666,7 +666,7 @@ describe("S-16 · la session : glissante, et fermée partout d’un geste", () =
     /* Expirée : la visite ne la rouvre pas */
     await db().update(schema.sessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(ici);
     await getReveil();
-    expect((await db().select().from(schema.sessions).where(ici))[0].expiresAt.getTime()).toBeLessThan(Date.now());
+    expect((await db().select().from(schema.sessions).where(ici))[0]!.expiresAt.getTime()).toBeLessThan(Date.now());
     await db().delete(schema.sessions).where(eq(schema.sessions.userId, compte));
   });
 });
@@ -839,7 +839,7 @@ describe("S-04 · S-28 · les lectures du jour se comptent par boîte mail et pa
     const boite = `lectures-${n}@blush.test`;
     const alias = boite.replace("@", "+bis@");
     emails.push(alias);
-    const [u] = await db().insert(schema.users).values({ email: alias }).returning();
+    const u = (await db().insert(schema.users).values({ email: alias }).returning())[0]!;
     const conv = await convRattachee(u, "01-a-deux-doigts.txt");
     etat.cookies = new Map([[SESSION, (await ouvrirSession(u.id)).secret]]);
     await poserChoisie(conv.id);

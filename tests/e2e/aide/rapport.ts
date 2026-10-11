@@ -173,7 +173,7 @@ export async function rapportCommeLeVraiModele(email: string, { chapitre1 = fals
       ];
     const [accroche, ...suite] = bascule.blocks;
     bascule.blocks = [
-      accroche,
+      accroche!,
       { kind: "essential", text: "Elle t’a tendu la perche, et t’as parlé du métro." },
       { kind: "seen", messages: [elle, toi], factsAfter: ["Trois minutes plus tard, t’as changé de sujet."] },
       ...suite.slice(0, -1),

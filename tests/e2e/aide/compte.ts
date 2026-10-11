@@ -87,8 +87,8 @@ export async function deconnecterParApi(page: Page, testInfo: TestInfo, { autreS
 
 /** Les sessions ouvertes du compte (0 : plus aucune, ou plus de compte). */
 export async function sessionsDe(email: string): Promise<number> {
-  const [{ n }] = await sql()<{ n: number }[]>`
-    select count(*)::int as n from sessions s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()}`;
+  const { n } = (await sql()<{ n: number }[]>`
+    select count(*)::int as n from sessions s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()}`)[0]!;
   return n;
 }
 
@@ -99,12 +99,12 @@ export async function fermerLesSessions(email: string): Promise<void> {
 
 /** BLUSH est-il en pause pour ce compte (« Mettre en pause », dans Mon compte) ? */
 export async function enPause(email: string): Promise<boolean> {
-  const [u] = await sql()<{ paused: boolean }[]>`select paused from users where email = ${email.toLowerCase()}`;
+  const u = (await sql()<{ paused: boolean }[]>`select paused from users where email = ${email.toLowerCase()}`)[0]!;
   return u.paused;
 }
 
 /** Combien de messages (les tiens et ceux de BLUSH) le chat de cette histoire garde. */
 export async function messagesDeLHistoire(storyId: string): Promise<number> {
-  const [{ n }] = await sql()<{ n: number }[]>`select count(*)::int as n from chat_messages where story_id = ${storyId}`;
+  const { n } = (await sql()<{ n: number }[]>`select count(*)::int as n from chat_messages where story_id = ${storyId}`)[0]!;
   return n;
 }

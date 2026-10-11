@@ -32,7 +32,7 @@ function convNoeEtMaelys(testInfo: TestInfo): ConvJson {
 /* ———— L’export HTML ———— */
 
 const HTML: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
-const echapper = (s: string) => s.replace(/[&<>"']/g, (c) => HTML[c]).replace(/\n/g, "<br />");
+const echapper = (s: string) => s.replace(/[&<>"']/g, (c) => HTML[c]!).replace(/\n/g, "<br />");
 const pad = (n: number) => String(n).padStart(2, "0");
 const MOIS_EN = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 /** L’heure du Pacifique en septembre (heure d’été : UTC-7), celle qu’affichent les exports HTML. */
@@ -90,7 +90,7 @@ function convInventee(titre: string, noms: string[], n: number, dossier: string)
   return {
     participants: noms.map((nom) => ({ name: commeInstagram(nom) })),
     /* Du plus récent au plus ancien, comme Instagram */
-    messages: Array.from({ length: n }, (_, k) => ({ sender_name: commeInstagram(noms[k % noms.length]), timestamp_ms: fin - k * 7 * 60e3, content: commeInstagram(PHRASES[k % PHRASES.length]) })),
+    messages: Array.from({ length: n }, (_, k) => ({ sender_name: commeInstagram(noms[k % noms.length]!), timestamp_ms: fin - k * 7 * 60e3, content: commeInstagram(PHRASES[k % PHRASES.length]!) })),
     title: commeInstagram(titre),
     thread_path: dossier.slice(dossier.indexOf("inbox/")),
   };
@@ -271,7 +271,7 @@ async function numeroDeLImage(vignette: Locator): Promise<number> {
     const toile = Object.assign(document.createElement("canvas"), { width: 1, height: 1 });
     const ctx = toile.getContext("2d")!;
     ctx.drawImage(image, 20, 60, 1, 1, 0, 0, 1, 1);
-    return ctx.getImageData(0, 0, 1, 1).data[0];
+    return ctx.getImageData(0, 0, 1, 1).data[0]!;
   }, IMAGE_DE_LA_VIGNETTE);
   return rouge < 0 ? -1 : Math.round((240 - rouge) / 10) + 1;
 }

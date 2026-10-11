@@ -29,7 +29,7 @@ export async function seConnecterAdmin(page: Page, { timeout = RESEAU }: { timeo
   try {
     const fin = Date.now() + timeout;
     for (;;) {
-      const [{ pris }] = await verrou<{ pris: boolean }[]>`select pg_try_advisory_lock(hashtext('blush-e2e:admin')) as pris`;
+      const { pris } = (await verrou<{ pris: boolean }[]>`select pg_try_advisory_lock(hashtext('blush-e2e:admin')) as pris`)[0]!;
       if (pris) break;
       if (Date.now() > fin) throw new Error(`la connexion de ${ADMIN} attend son tour depuis ${timeout} ms`);
       await new Promise((r) => setTimeout(r, 200));
@@ -54,7 +54,7 @@ export async function partageIllisible(): Promise<{ id: string; effacer: () => P
   /* Les octets d’un chiffré de BLUSH (la version 1, puis du bruit) : la version passe, l’authentification échoue */
   const illisible = () => Buffer.concat([Buffer.from([1]), randomBytes(48)]);
   const id = randomBytes(9).toString("base64").replace(/[^a-zA-Z0-9]/g, "x").slice(0, 12);
-  const [story] = await sql()<{ id: string }[]>`insert into stories (message_count, meta) values (64, ${illisible()}) returning id`;
+  const story = (await sql()<{ id: string }[]>`insert into stories (message_count, meta) values (64, ${illisible()}) returning id`)[0]!;
   await sql()`insert into shares (id, story_id, data) values (${id}, ${story.id}, ${illisible()})`;
   return { id, effacer: async () => void (await sql()`delete from stories where id = ${story.id}`) };
 }

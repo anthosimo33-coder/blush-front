@@ -29,7 +29,7 @@ describe("une conv trop longue pour partir", () => {
     expect(pret.paquet.size).toBeLessThanOrEqual(4.2 * 1024 * 1024);
     const p = await lirePaquet(pret.paquet);
     expect(p.coupe).toBe(true);
-    const garde = p.parties[0].contenu;
+    const garde = p.parties[0]!.contenu;
     /* Coupée au début d’un message, et jusqu’au dernier */
     expect(garde).toMatch(/^\[\d{2}\/\d{2}\/\d{4} /);
     expect(texte.endsWith(garde)).toBe(true);
@@ -39,7 +39,7 @@ describe("une conv trop longue pour partir", () => {
     const lu = await depuisPaquet(new File([await pret.paquet.arrayBuffer()], "export.json.gz"));
     expect(lu.coupe).toBe(true);
     const imp = await importer(lu);
-    const source = storyAffichee(imp.id, imp.meta).sources[0];
+    const source = storyAffichee(imp.id, imp.meta).sources[0]!;
     expect(source.moisLus).toBeGreaterThan(0);
     await db().delete(schema.stories).where(eq(schema.stories.id, imp.id));
   });
@@ -69,7 +69,7 @@ describe("une conv trop longue pour partir", () => {
     const imp = await importer({ appli: "whatsapp", texte: `${"x\n".repeat(LIGNES_MAX + 5)}${messages}`, nom: "chat.txt" });
     expect(imp.meta.coupe).toBe(true);
     expect(imp.meta.resume.total).toBe(120);
-    expect(storyAffichee(imp.id, imp.meta).sources[0].moisLus).toBe(4);
+    expect(storyAffichee(imp.id, imp.meta).sources[0]!.moisLus).toBe(4);
     await db().delete(schema.stories).where(eq(schema.stories.id, imp.id));
   });
 
@@ -88,14 +88,14 @@ describe("une conv trop longue pour partir", () => {
     const garde = garderLaFin(parties, 0.75);
     expect(garde).toHaveLength(2);
     expect(garde[0]).toBe(parties[0]);
-    const messages = (JSON.parse(garde[1].contenu) as { messages: { timestamp_ms: number }[] }).messages;
+    const messages = (JSON.parse(garde[1]!.contenu) as { messages: { timestamp_ms: number }[] }).messages;
     /* Les plus récents du second fichier : son début */
     expect(messages.length).toBeGreaterThan(30);
     expect(messages.length).toBeLessThan(70);
-    expect(messages[0].timestamp_ms).toBe(1_800_000_000_000 - 100 * 60e3);
+    expect(messages[0]!.timestamp_ms).toBe(1_800_000_000_000 - 100 * 60e3);
 
     const html = `<html><header>en-tête</header>${Array.from({ length: 10 }, (_, k) => `${BLOC_HTML}message ${k}</div>`).join("")}`;
-    const h = garderLaFin([{ nom: "message_1.html", contenu: html }], 0.5)[0].contenu;
+    const h = garderLaFin([{ nom: "message_1.html", contenu: html }], 0.5)[0]!.contenu;
     expect(h.startsWith("<html><header>en-tête</header>")).toBe(true);
     expect(h).toContain("message 0");
     expect(h).not.toContain("message 9");
@@ -111,7 +111,7 @@ describe("la conv brute d’une histoire sans rapport", () => {
     const vieux = new Date(Date.now() - 40 * 86400e3);
     await db().update(schema.stories).set({ createdAt: vieux }).where(eq(schema.stories.userId, u.id));
     await purger();
-    const conv = async (id: string) => (await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, id)))[0].conv;
+    const conv = async (id: string) => (await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, id)))[0]!.conv;
     expect(await conv(sansRapport)).not.toBeNull();
     expect(await conv(rapportSansMemoire)).toBeNull();
   });

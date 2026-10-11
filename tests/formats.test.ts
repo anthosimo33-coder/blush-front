@@ -54,7 +54,7 @@ describe("les formats d’export WhatsApp", () => {
 describe("une conv très longue", () => {
   it("le modèle en lit le début et la fin, sous le plafond, avec les identifiants de la conv entière", () => {
     const n = 30000;
-    const lu = lire(exporter(FORMATS["iOS français"], n), histoire("whatsapp-ios"));
+    const lu = lire(exporter(FORMATS["iOS français"]!, n), histoire("whatsapp-ios"));
     const r = rendre(histoire("whatsapp-ios"), lu);
     expect(r.conversation.length).toBeLessThan(CONV_MAX + 1000);
     const lignes = r.conversation.split("\n");
@@ -71,7 +71,7 @@ describe("une conv très longue", () => {
 
   it("une conv normale n’est pas coupée, un message géant l’est", () => {
     const lu = lire(
-      exporter(FORMATS["Android français"], 300, (k) => (k === 7 ? "bla ".repeat(5000) : PHRASES[k % PHRASES.length])),
+      exporter(FORMATS["Android français"]!, 300, (k) => (k === 7 ? "bla ".repeat(5000) : PHRASES[k % PHRASES.length])),
       histoire("whatsapp-android"),
     );
     const r = rendre(histoire("whatsapp-android"), lu);

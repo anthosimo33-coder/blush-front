@@ -47,6 +47,7 @@ import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
 import type { ErreurApi } from "@/types/erreurs-api";
 import type { BulleChat, EvenementChat } from "@/types";
 import { compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
+import { auMoins } from "./aide/listes";
 
 let id = "";
 /* Son compte : le budget de l’IA du jour se compte sur lui */
@@ -107,11 +108,11 @@ describe("POST /api/chat en flux", () => {
     const lus = await lectures(r);
     /* Chaque bulle part seule, dès qu’elle est finie : la réponse vient après, dans une autre lecture */
     expect(lus.slice(0, 2).map((l) => l.map((e) => Object.keys(e)[0]))).toEqual([["bulle"], ["bulle"]]);
-    const [premiere, seconde] = lus.slice(0, 2).map((l) => (l[0] as { bulle: BulleChat }).bulle);
+    const [premiere, seconde] = auMoins(lus.slice(0, 2).map((l) => (l[0] as { bulle: BulleChat }).bulle), 2);
     expect([premiere.text, seconde.text]).toEqual(["elle te cherche 👀", "et toi tu fais le mec occupé"]);
     /* La citation vient de la conv : sa forme, pas son texte */
     expect([premiere.messages?.length, seconde.messages?.length]).toEqual([1, 0]);
-    expect(typeof premiere.messages?.[0].from === "string" && typeof premiere.messages[0].caption === "string", "citation sans auteur ou sans légende").toBe(true);
+    expect(typeof premiere.messages?.[0]!.from === "string" && typeof premiere.messages[0].caption === "string", "citation sans auteur ou sans légende").toBe(true);
     const fin = lus.flat().at(-1) as { reponse: Extract<EvenementChat, { reponse: unknown }>["reponse"] };
     expect([fin.reponse.kind, fin.reponse.kind === "bubbles" && fin.reponse.ask, fin.reponse.modeVocal]).toEqual(["bubbles", "tu lui as répondu quoi ?", false]);
     expect(fin.reponse.kind === "bubbles" && fin.reponse.bubbles.map((b) => b.text)).toEqual(["elle te cherche 👀", "et toi tu fais le mec occupé"]);
@@ -126,7 +127,7 @@ describe("POST /api/chat en flux", () => {
     await vocalEnBase(true);
     const evenements = (await lectures(await envoyer("et là je lui dis quoi ?"))).flat();
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse", "vocal"]);
-    const [fin, voix] = evenements;
+    const [fin, voix] = auMoins(evenements, 2);
     if (!("reponse" in fin) || !("vocal" in voix) || !voix.vocal) throw new Error("une réponse, puis son vocal");
     expect(fin.reponse.vocalEnCours).toBe(true);
     expect(fin.reponse.vocal).toBeUndefined();
@@ -255,7 +256,7 @@ describe("POST /api/chat en flux", () => {
   });
 
   it("une mémoire gardée sans sa fiche (la création n’en écrit jamais) : refusée à la lecture par le coffre, sans appeler le modèle", async () => {
-    const [ligne] = await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, id));
+    const ligne = (await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, id)))[0]!;
     const gardee = coffre.lire("memories.data", ligne.data);
     await db().update(schema.memories).set({ data: chiffrer({ ...gardee, etat: { ...gardee.etat, fiche: null } }) }).where(eq(schema.memories.storyId, id));
     const erreur = vi.spyOn(console, "error").mockImplementation(() => {});

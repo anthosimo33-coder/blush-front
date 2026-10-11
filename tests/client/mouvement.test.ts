@@ -13,6 +13,7 @@ import { creerRegistreEntete, departs, useRegistreEntete } from "@/app/app/accue
 import { launch } from "@/app/app/accueil/mouvement/vol";
 import { flyBox, flyText } from "@/lib/motion";
 import type { Msg } from "@/app/app/accueil/conv/modele";
+import { auMoins } from "../aide/listes";
 
 /*
  * Le mouvement de l’accueil (src/app/app/accueil/mouvement/) et ses en-têtes (accueil/Entetes.tsx), dans le DOM simulé :
@@ -166,7 +167,7 @@ describe("le logo du fil : un dessin par conv, repris par ses copies", () => {
   it("chaque copie reprend le dessin de sa conv, et deux convs de la même page ont chacune le leur", () => {
     const conv = () => createElement(AvecLogoDuFil, null, createElement(LogoDuFil), createElement(LogoDuFil));
     const { container } = render(createElement("div", null, createElement("section", null, conv()), createElement("section", null, conv())));
-    const [a, b] = [...container.querySelectorAll("section")];
+    const [a, b] = auMoins([...container.querySelectorAll("section")], 2);
     const dessinDe = (s: Element) => s.querySelector("defs g")!.id;
     expect(dessinDe(a)).not.toBe(dessinDe(b));
     for (const s of [a, b]) {
@@ -258,15 +259,15 @@ describe("11 · la fête d’un niveau", () => {
     entete.inscrire.avatar(avatar);
     celebrate(entete);
     const de = (el: Element) => animees.filter((a) => a.el === el);
-    expect(de(logo)[0].images).toEqual([{ translate: "0 0" }, { translate: "0 -9px", offset: 0.35 }, { translate: "0 0" }]);
+    expect(de(logo)[0]!.images).toEqual([{ translate: "0 0" }, { translate: "0 -9px", offset: 0.35 }, { translate: "0 0" }]);
     expect(de(halo)).toHaveLength(1);
-    expect(de(avatar)[0].images).toEqual([{ scale: 1 }, { scale: 1.16, offset: 0.35 }, { scale: 1 }]);
+    expect(de(avatar)[0]!.images).toEqual([{ scale: 1 }, { scale: 1.16, offset: 0.35 }, { scale: 1 }]);
     expect(de(badge)).toHaveLength(1);
     const eclats = [...document.querySelectorAll<HTMLElement>(".level-spark")];
     expect(eclats).toHaveLength(14);
     /* Ils partent du centre de l’anneau */
     for (const e of eclats) expect(parseFloat(e.style.left) + parseFloat(e.style.width) / 2).toBeCloseTo(324);
-    for (const e of eclats) de(e)[0].animation.onfinish?.();
+    for (const e of eclats) de(e)[0]!.animation.onfinish?.();
     expect(document.querySelectorAll(".level-spark")).toHaveLength(0);
   });
 
@@ -311,7 +312,7 @@ describe("3 · 4 · 5 · les vols jusqu’à la conv", () => {
     const { box, avatar } = conv(42);
     launch(box, { kind: "logo", bubble: "b1", from: { left: 0, top: 0, width: 30, height: 30 } });
     expect(avatar.style.visibility).toBe("hidden");
-    expect(vi.mocked(flyBox).mock.calls[0][0].tagName.toLowerCase()).toBe("svg");
+    expect(vi.mocked(flyBox).mock.calls[0]![0].tagName.toLowerCase()).toBe("svg");
     await act(async () => {});
     expect(avatar.style.visibility).toBe("");
   });
@@ -748,7 +749,7 @@ describe("1 · l’arrivée du jour", () => {
     const finie = { effect: { getComputedTiming: () => ({ endTime: 900 }) }, finish: vi.fn() };
     const boucle = { effect: { getComputedTiming: () => ({ endTime: Infinity }) }, finish: vi.fn() };
     const horsArrivee = { effect: { getComputedTiming: () => ({ endTime: 300 }) }, finish: vi.fn() };
-    const [logo, pilule, autre] = [...accueil.children];
+    const [logo, pilule, autre] = auMoins([...accueil.children], 3);
     logo.getAnimations = () => [finie, boucle] as unknown as Animation[];
     pilule.getAnimations = () => [finie] as unknown as Animation[];
     autre.getAnimations = () => [horsArrivee] as unknown as Animation[];

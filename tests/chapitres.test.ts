@@ -84,7 +84,7 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
       { kind: "play", text: "Pose-lui la question, en face." },
     ],
   };
-  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({ number: n, title: titreDAttente(n, "Maëlys"), tocTitle: titreDAttente(n, "Maëlys"), free: false, locked: true, blocks: [] }));
+  const fermes = CHAPITRES_PAYANTS.map((n): Chapter => ({ number: n, title: titreDAttente(n, "Maëlys")!, tocTitle: titreDAttente(n, "Maëlys")!, free: false, locked: true, blocks: [] }));
   const payload = (chapters: Chapter[], access: ReportPayload["access"]): ReportPayload => ({
     report: {
       storyId: "s",

@@ -101,7 +101,7 @@ describe("appelVerifie : un suivi par essai (le chat)", () => {
     expect((await verifie({ parEssai })).texte).toBe("second");
     expect(vus).toHaveLength(2);
     expect(appels.mock.calls.map((c) => c[2]?.surAvance)).toHaveLength(2);
-    expect(appels.mock.calls[0][2]?.surAvance).not.toBe(appels.mock.calls[1][2]?.surAvance);
+    expect(appels.mock.calls[0]![2]?.surAvance).not.toBe(appels.mock.calls[1]![2]?.surAvance);
   });
 
   it("une bulle déjà montrée : pas de second essai, la sortie telle quelle ; illisible, l’étape échoue", async () => {

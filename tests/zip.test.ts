@@ -135,7 +135,7 @@ describe("lire un export zippé dans le navigateur", () => {
     expect(pret.paquet.size).toBeLessThanOrEqual(4.2 * 1024 * 1024);
     const p = await lirePaquet(pret.paquet);
     expect(p.coupe).toBe(true);
-    const garde = p.parties[0].contenu;
+    const garde = p.parties[0]!.contenu;
     expect(texte.endsWith(garde)).toBe(true);
     expect(garde).toMatch(/^\[12\/09\/2026 /);
     /* L’estimation ne coupe pas beaucoup trop : la plus grande part de ce qui tient est gardée */

@@ -24,7 +24,7 @@ try {
   const f = new File([readFileSync(join(EVALS, "convs/11-conv-courte.txt"))], "11.txt", { type: "text/plain" });
   const imp = await importer(await depuisFichier(f));
   id = imp.id;
-  const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
+  const u = (await db().insert(schema.users).values({ email, plan: "blushplus" }).returning())[0]!;
   await rattacherBrouillon(u, imp.secret);
   await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Julie") as 0 | 1, pronom: "elle", devinette: "parle", objectif: "comprendre" });
   await planifier(id, "verdict");
@@ -42,7 +42,7 @@ try {
   const m = await donneesMemoire(id);
   if (m) {
     console.log("mémoire :", m.etat.fiche?.portrait, "· questions :", m.etat.questions?.join(" | "));
-    const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+    const story = (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
     console.log("conv effacée :", story.conv === null);
     const { reponse } = await repondre(story, m, m.etat.questions?.[0] ?? "il me calcule ou pas ?");
     console.log("chat :", JSON.stringify(reponse).slice(0, 500));

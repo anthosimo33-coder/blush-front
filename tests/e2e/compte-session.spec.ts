@@ -192,14 +192,14 @@ test("Mon compte propose de se déconnecter : la session se ferme, le navigateur
   await ouvrir(page, "/compte");
   await reveil;
   /* Ce que le navigateur garde de BLUSH (src/state/cles.ts) : où tu t’étais arrêté dans le rapport, le parcours de l’onglet */
-  await page.evaluate(([reprise, parcours]) => {
+  await page.evaluate(({ reprise, parcours }) => {
     localStorage.setItem(reprise, "{}");
     sessionStorage.setItem(parcours, "{}");
-  }, [CLE_REPRISE, CLE_PARCOURS]);
+  }, { reprise: CLE_REPRISE, parcours: CLE_PARCOURS });
 
   await seDeconnecterDansMonCompte(page);
   await expect.poll(() => sessionsDe(email)).toBe(0);
-  expect(await page.evaluate(([reprise, parcours]) => [localStorage.getItem(reprise), sessionStorage.getItem(parcours)], [CLE_REPRISE, CLE_PARCOURS])).toEqual([null, null]);
+  expect(await page.evaluate(({ reprise, parcours }) => [localStorage.getItem(reprise), sessionStorage.getItem(parcours)], { reprise: CLE_REPRISE, parcours: CLE_PARCOURS })).toEqual([null, null]);
   await page.goto("/compte");
   await expect(page).toHaveURL(urlDeConnexion("/compte"));
 });

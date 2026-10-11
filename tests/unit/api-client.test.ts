@@ -45,15 +45,15 @@ describe("une requête du contrat (requete, appel)", () => {
       ["GET", "/api/chat?avant=12"],
       ["GET", "/api/chat"],
     ]);
-    expect(envois[0].init).toMatchObject({ credentials: "same-origin", cache: "no-store" });
-    expect(envois[0].init.body).toBeUndefined();
+    expect(envois[0]!.init).toMatchObject({ credentials: "same-origin", cache: "no-store" });
+    expect(envois[0]!.init.body).toBeUndefined();
   });
 
   it("envoie un corps JSON en JSON, avec son content-type", async () => {
     repondre = () => Response.json(FICHE);
     const facts: FicheFact[] = [{ id: "f1", section: "aime", text: "Le ski de fond.", sourceLabel: "ajouté par toi", sources: [] }];
     expect(await updateFiche(facts)).toEqual(FICHE);
-    const [{ url, init }] = envois;
+    const { url, init } = envois[0]!;
     expect({ url, method: init.method, type: init.headers.get("content-type"), corps: JSON.parse(String(init.body)) }).toEqual({
       url: "/api/fiche",
       method: "PUT",
@@ -65,7 +65,7 @@ describe("une requête du contrat (requete, appel)", () => {
   it("laisse un formulaire tel quel : pas de content-type posé à la main (le navigateur met le sien, avec sa frontière)", async () => {
     repondre = () => Response.json({ fiche: FICHE, added: [] });
     await addToFiche([new File(["x"], "capture.png", { type: "image/png" })]);
-    const [{ url, init }] = envois;
+    const { url, init } = envois[0]!;
     expect({ url, method: init.method, formulaire: init.body instanceof FormData, type: init.headers.get("content-type") }).toEqual({
       url: "/api/fiche",
       method: "POST",
@@ -121,7 +121,7 @@ describe("le chat en vocal (modeVocalChat)", () => {
   it("part en keepalive (« Repasser à l’écrit » part même si la page se ferme), avec le mode voulu", async () => {
     repondre = () => Response.json({ modeVocal: false });
     await modeVocalChat(false);
-    const [{ url, init }] = envois;
+    const { url, init } = envois[0]!;
     expect({ url, method: init.method, keepalive: init.keepalive, corps: JSON.parse(String(init.body)) }).toEqual({ url: "/api/chat/vocal", method: "POST", keepalive: true, corps: { actif: false } });
   });
 
@@ -143,7 +143,7 @@ describe("la liste d’attente (rejoindreAttente, retirerDeLaListe)", () => {
   it("s’inscrire : l’email part en JSON par la route du contrat ; un refus est une erreur", async () => {
     repondre = () => Response.json({ ok: true });
     await rejoindreAttente("sam@exemple.fr");
-    const [{ url, init }] = envois;
+    const { url, init } = envois[0]!;
     expect({ url, method: init.method, corps: JSON.parse(String(init.body)) }).toEqual({ url: "/api/attente", method: "POST", corps: { email: "sam@exemple.fr" } });
     repondre = () => Response.json({ erreur: "email" }, { status: 422 });
     await expect(rejoindreAttente("sam")).rejects.toBeInstanceOf(ErreurApi);

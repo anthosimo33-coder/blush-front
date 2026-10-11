@@ -31,7 +31,7 @@ const maxDurationDe = (texte: string) => {
   return m ? Number(m[1]) : null;
 };
 /** Le premier argument de chaque appel à avecEcheance. */
-const echeancesPosees = (texte: string) => [...texte.matchAll(/\bavecEcheance\(([^,]+),/g)].map((m) => m[1].trim());
+const echeancesPosees = (texte: string) => [...texte.matchAll(/\bavecEcheance\(([^,]+),/g)].map((m) => m[1]!.trim());
 
 describe("l’échéance d’une fonction", () => {
   it("echeancePour : 15 s avant que Vercel coupe la fonction, par défaut", () => {
@@ -53,8 +53,8 @@ describe("l’échéance d’une fonction", () => {
   it("hors des routes, seule la chaîne des tâches pose une échéance : celle d’une fonction qui vit DUREE_FONCTION_S", () => {
     const ailleurs = sources("src").filter((f) => !f.chemin.startsWith("src/app/") && f.chemin !== "src/server/echeance.ts" && echeancesPosees(f.texte).length);
     expect(ailleurs.map((f) => f.chemin)).toEqual(["src/server/pipeline.ts"]);
-    expect(echeancesPosees(ailleurs[0].texte)).toEqual(["ECHEANCE_CHAINE_MS"]);
-    expect(ailleurs[0].texte).toContain("export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);");
+    expect(echeancesPosees(ailleurs[0]!.texte)).toEqual(["ECHEANCE_CHAINE_MS"]);
+    expect(ailleurs[0]!.texte).toContain("export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);");
   });
 
   it("une route qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj qui la relance) vit DUREE_FONCTION_S", () => {

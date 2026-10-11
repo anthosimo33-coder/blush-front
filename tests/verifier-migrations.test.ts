@@ -40,7 +40,7 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
   });
 
   it("refuse des idx qui ne se suivent pas", () => {
-    reecrire((e) => (e[3].idx = 7));
+    reecrire((e) => (e[3]!.idx = 7));
     const { code, sortie } = verifier();
     expect(code).toBe(1);
     expect(sortie).toContain("a l’idx 7 : les idx doivent se suivre depuis 0");
@@ -54,11 +54,11 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
   });
 
   it("refuse une migration sans son .sql, ou sans son instantané", () => {
-    rmSync(join(dossier, `${journal().entries[5].tag}.sql`));
+    rmSync(join(dossier, `${journal().entries[5]!.tag}.sql`));
     rmSync(join(dossier, "meta/0008_snapshot.json"));
     const { code, sortie } = verifier();
     expect(code).toBe(1);
-    expect(sortie).toContain(`${journal().entries[5].tag}.sql manque`);
+    expect(sortie).toContain(`${journal().entries[5]!.tag}.sql manque`);
     expect(sortie).toContain("meta/0008_snapshot.json manque");
   });
 
@@ -91,7 +91,7 @@ describe("la vérification des migrations", { timeout: 30_000 }, () => {
     /* Le dernier instantané garde l’index d’avant une étape de plus dans GENRES_CHAINE : schema.ts en demande un autre */
     const chemin = join(dossier, `meta/${journal().entries.at(-1)!.tag.slice(0, 4)}_snapshot.json`);
     const dernier = JSON.parse(readFileSync(chemin, "utf8")) as { tables: Record<string, { indexes: Record<string, { where: string }> }> };
-    const index = dernier.tables["public.tasks"].indexes.tasks_une_par_etape;
+    const index = dernier.tables["public.tasks"]!.indexes.tasks_une_par_etape!;
     index.where = index.where.replace(", 'memoire')", ")");
     writeFileSync(chemin, JSON.stringify(dernier));
     const { code, sortie } = verifier();

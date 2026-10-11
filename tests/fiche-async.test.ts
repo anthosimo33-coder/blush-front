@@ -132,7 +132,7 @@ describe("ajouter des captures à sa fiche", () => {
     expect((await lire()).updating).toBe(true);
     expect(etat.apres).toHaveLength(1);
     await lancerApres();
-    const [tache] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.id, t), eq(schema.tasks.storyId, id)));
+    const tache = (await db().select().from(schema.tasks).where(and(eq(schema.tasks.id, t), eq(schema.tasks.storyId, id))))[0]!;
     expect(tache.status).toBe("fini");
     expect((await lire()).updating).toBeUndefined();
     /* Plus rien en attente : la relecture ne relance rien */
@@ -152,7 +152,7 @@ describe("ajouter des captures à sa fiche", () => {
     await db().update(schema.tasks).set({ status: "en_cours", attempts: 1, heartbeatAt: sql`now() - interval '10 minutes'` }).where(eq(schema.tasks.id, t));
     expect((await getFicheEtMaj())?.updating).toBe(true);
     await lancerApres();
-    const [tache] = await db().select().from(schema.tasks).where(eq(schema.tasks.id, t));
+    const tache = (await db().select().from(schema.tasks).where(eq(schema.tasks.id, t)))[0]!;
     expect(tache.status).toBe("fini");
     expect((await getFicheEtMaj())?.updating).toBeUndefined();
     expect(etat.apres).toHaveLength(0);

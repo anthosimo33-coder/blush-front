@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { texteDit, type LigneScript } from "@/lib/vocal";
 import { dureeAudio, dureeOpus, lireAudio } from "@/server/ia/duree-audio";
 import { couper, scriptQuiTient } from "@/server/ia/voix";
+import { auMoins } from "../aide/listes";
 
 /*
  * Ce que la voix dit (S-13 : la coupe d’un vocal) et ce que le chat entend (S-15 : la durée d’un vocal reçu, comptée
@@ -78,7 +79,7 @@ describe("scriptQuiTient : le vocal du rapport coupé ligne à ligne", () => {
   });
 
   it("une première ligne trop longue à elle seule est coupée, son jeu compris dans la coupe", () => {
-    const [seule] = scriptQuiTient([ligne("Écoute. Elle t’a répondu en trois heures, et toi tu cours.", "sighs")], 20);
+    const seule = scriptQuiTient([ligne("Écoute. Elle t’a répondu en trois heures, et toi tu cours.", "sighs")], 20)[0]!;
     expect(seule.jeu).toBe("sighs");
     expect(texteDit([seule]).texte.length).toBeLessThanOrEqual(20);
     expect(seule.texte).toBe("Écoute.");
@@ -160,9 +161,9 @@ describe("lireAudio : ce qui part à la transcription est ce qui a été compté
 function pagesOgg(o: Uint8Array): { debut: number; fin: number }[] {
   const pages = [];
   for (let a = 0; a < o.length; ) {
-    const n = o[a + 26];
+    const n = o[a + 26]!;
     let fin = a + 27 + n;
-    for (let i = 0; i < n; i++) fin += o[a + 27 + i];
+    for (let i = 0; i < n; i++) fin += o[a + 27 + i]!;
     pages.push({ debut: a, fin });
     a = fin;
   }
@@ -172,7 +173,7 @@ function pagesOgg(o: Uint8Array): { debut: number; fin: number }[] {
 function signer(o: Uint8Array, { debut, fin }: { debut: number; fin: number }): void {
   let crc = 0;
   for (let i = debut; i < fin; i++) {
-    crc ^= (i >= debut + 22 && i < debut + 26 ? 0 : o[i]) << 24;
+    crc ^= (i >= debut + 22 && i < debut + 26 ? 0 : o[i]!) << 24;
     for (let k = 0; k < 8; k++) crc = crc & 0x80000000 ? (crc << 1) ^ 0x04c11db7 : crc << 1;
   }
   new DataView(o.buffer, o.byteOffset).setUint32(debut + 22, crc >>> 0, true);
@@ -189,14 +190,14 @@ describe("Ogg piégé (S-15) : illisible", () => {
   it("une page au CRC faux (un démultiplexeur la saute et se recale sur ce qu’elle cache)", () => {
     const o = vocal("court.ogg");
     const [, , p] = pagesOgg(o);
-    o[p.fin - 1] ^= 0xff;
+    o[p!.fin - 1]! ^= 0xff;
     expect(dureeAudio(o)).toBeNull();
   });
 
   it("les vraies pages cachées dans une page au CRC faux, qui commence par un paquet Opus valable", () => {
     const o = vocal("court.ogg");
     const pages = pagesOgg(o);
-    const [tete, tags, premiere] = pages;
+    const [tete, tags, premiere] = auMoins(pages, 3);
     const cachees = o.subarray(premiere.debut);
     /* Une page de 255 segments de 255 octets, dont le corps commence par un octet TOC (20 ms) : les vraies pages dedans */
     const corps = concat(Uint8Array.of(0x08), cachees, new Uint8Array(Math.max(0, 255 * 254 + 254 - cachees.length)));
@@ -210,16 +211,16 @@ describe("Ogg piégé (S-15) : illisible", () => {
     const o = vocal("court.ogg");
     const pages = pagesOgg(o);
     expect(pages.length).toBeGreaterThan(3);
-    expect(dureeAudio(concat(o.subarray(0, pages[2].debut), o.subarray(pages[3].debut)))).toBeNull();
+    expect(dureeAudio(concat(o.subarray(0, pages[2]!.debut), o.subarray(pages[3]!.debut)))).toBeNull();
   });
 
   it("un paquet resté ouvert à la fin, ou une page coupée", () => {
     const o = vocal("court.ogg");
     const derniere = pagesOgg(o).at(-1)!;
-    const n = o[derniere.debut + 26];
+    const n = o[derniere.debut + 26]!;
     expect(o[derniere.debut + 27 + n - 1]).toBeLessThan(255);
     /* Le dernier segment devient 255 octets (le paquet continue), la page grandit d’autant, signée comme il faut */
-    const ouvert = concat(o.subarray(0, derniere.fin), new Uint8Array(255 - o[derniere.debut + 27 + n - 1]));
+    const ouvert = concat(o.subarray(0, derniere.fin), new Uint8Array(255 - o[derniere.debut + 27 + n - 1]!));
     ouvert[derniere.debut + 27 + n - 1] = 255;
     signer(ouvert, { debut: derniere.debut, fin: ouvert.length });
     expect(dureeAudio(ouvert)).toBeNull();
@@ -238,8 +239,8 @@ describe("WebM piégé (S-15)", () => {
     const o = vocal("court.webm");
     const cluster = chercher(o, [0x1f, 0x43, 0xb6, 0x75]);
     /* La taille du cluster, sur 2 octets (0x40 | les 14 bits) : il s’arrête 40 octets plus tôt, son dernier bloc déborde */
-    expect(o[cluster + 4] & 0xc0).toBe(0x40);
-    const taille = (((o[cluster + 4] & 0x3f) << 8) | o[cluster + 5]) - 40;
+    expect(o[cluster + 4]! & 0xc0).toBe(0x40);
+    const taille = (((o[cluster + 4]! & 0x3f) << 8) | o[cluster + 5]!) - 40;
     o.set([0x40 | (taille >> 8), taille & 0xff], cluster + 4);
     expect(dureeAudio(o)).toBeNull();
   });

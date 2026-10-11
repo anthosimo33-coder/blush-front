@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { auMoins } from "../aide/listes";
 import {
   attendreLecture,
   attendreMail,
@@ -96,7 +97,7 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
 
   await test.step("les mails : le code pour l’invité, « Tu es sur la liste » avec de quoi se retirer pour l’autre", async () => {
     expect(mailsDepuis(invite, debut).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
-    const [mail, ...autres] = mailsPour(dehors);
+    const [mail, ...autres] = auMoins(mailsPour(dehors), 1);
     expect(autres).toEqual([]);
     expect(mail.sujet).toBe("Tu es sur la liste de BLUSH");
     expect(mail.code).toBeUndefined();

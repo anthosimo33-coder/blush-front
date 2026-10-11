@@ -62,7 +62,7 @@ const lue = async (r: Response) => {
 describe("un envoi de captures repris après une coupure", () => {
   it("le même envoi, renvoyé : la lecture déjà faite revient, et le cookie du brouillon est reposé", async () => {
     etat.cookies.clear();
-    etat.cookies.set("blush-session", sessions[0]);
+    etat.cookies.set("blush-session", sessions[0]!);
     const cle = crypto.randomUUID();
     const avant = appelsAuModele.length;
     const premier = await lue(await postCaptures(captures(cle)));
@@ -79,7 +79,7 @@ describe("un envoi de captures repris après une coupure", () => {
   });
 
   it("deux essais en même temps : une seule lecture", async () => {
-    etat.cookies.set("blush-session", sessions[0]);
+    etat.cookies.set("blush-session", sessions[0]!);
     const cle = crypto.randomUUID();
     const avant = appelsAuModele.length;
     const [a, b] = await Promise.all([postCaptures(captures(cle)), postCaptures(captures(cle))]);
@@ -90,9 +90,9 @@ describe("un envoi de captures repris après une coupure", () => {
 
   it("la clé d’un autre compte ne rend pas sa lecture ; sans clé, chaque envoi est lu", async () => {
     const cle = crypto.randomUUID();
-    etat.cookies.set("blush-session", sessions[0]);
+    etat.cookies.set("blush-session", sessions[0]!);
     const a = await lue(await postCaptures(captures(cle)));
-    etat.cookies.set("blush-session", sessions[1]);
+    etat.cookies.set("blush-session", sessions[1]!);
     const b = await lue(await postCaptures(captures(cle)));
     expect(b.story.id).not.toBe(a.story.id);
     const avant = appelsAuModele.length;
@@ -103,7 +103,7 @@ describe("un envoi de captures repris après une coupure", () => {
   });
 
   it("l’enregistrement d’écran : le dernier envoi renvoyé retrouve la même histoire", async () => {
-    etat.cookies.set("blush-session", sessions[0]);
+    etat.cookies.set("blush-session", sessions[0]!);
     const lot = (k0: number) => lotVideo("Léa", k0);
     const corps = JSON.stringify({ app: "imessage", lots: [lot(0), lot(100)], cle: crypto.randomUUID() });
     const envoi = () => postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: corps }));

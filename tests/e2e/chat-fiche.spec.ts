@@ -76,7 +76,7 @@ test("le chat au quotidien : l’intro de BLUSH, un message écrit, ses bulles, 
     await expect(fil.getByText(QUESTION_DE_BLUSH)).toBeVisible();
     const texte = await fil.innerText();
     const ordre = ["À toi de jouer", message, "elle te cherche 👀", "et toi tu fais le mec occupé", QUESTION_DE_BLUSH].map((t) => texte.indexOf(t));
-    expect(ordre.every((k, i) => k >= 0 && (i === 0 || k > ordre[i - 1])), `ordre dans la conv : ${ordre.join(", ")}`).toBe(true);
+    expect(ordre.every((k, i) => k >= 0 && (i === 0 || k > ordre[i - 1]!)), `ordre dans la conv : ${ordre.join(", ")}`).toBe(true);
     expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
   });
 
@@ -242,7 +242,7 @@ test("un compte gratuit : le chat et sa fiche sont réservés à BLUSH+ (le paie
     const chat = await page.request.post("/api/chat", { headers: { origin }, data: { texte: "elle m’a répondu, je lui dis quoi ?" } });
     expect(chat.status()).toBe(402);
     expect(await chat.json()).toEqual({ erreur: "acces" });
-    const [capture] = capturesPng(testInfo);
+    const capture = capturesPng(testInfo)[0]!;
     const fiche = await page.request.post("/api/fiche", {
       headers: { origin },
       multipart: { captures: { name: "capture-1.png", mimeType: "image/png", buffer: readFileSync(capture) } },
@@ -418,7 +418,7 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
   await test.step("les vingt-deux échanges sont là, dans l’ordre, chacun une fois ; plus rien à charger", async () => {
     const texte = await fil.innerText();
     const places = Array.from({ length: 22 }, (_, k) => texte.search(new RegExp(`question n° ${k + 1}(?!\\d)`)));
-    expect(places.every((p, k) => p >= 0 && (k === 0 || p > places[k - 1])), `l’ordre dans la conv : ${places.join(", ")}`).toBe(true);
+    expect(places.every((p, k) => p >= 0 && (k === 0 || p > places[k - 1]!)), `l’ordre dans la conv : ${places.join(", ")}`).toBe(true);
     for (const n of [1, 2, 3, 22]) await expect(question(n)).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Voir les messages plus anciens" })).toHaveCount(0);
   });

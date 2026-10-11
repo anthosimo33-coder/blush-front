@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sheet, sortieDeFeuille, TitreFeuille } from "@/components/ui/surfaces";
+import { auMoins } from "../aide/listes";
 
 /*
  * La feuille (src/components/ui/surfaces.tsx) : son titre (posé par l’écran, ou par elle avec useId), les refs qu’elle
@@ -74,7 +75,7 @@ describe("Sheet : le titre", () => {
         </Sheet>
       </>,
     );
-    const [a, b] = Array.from(document.querySelectorAll("dialog"));
+    const [a, b] = auMoins(Array.from(document.querySelectorAll("dialog")), 2);
     const titreA = screen.getByRole("heading", { name: "Première" });
     const titreB = screen.getByRole("heading", { name: "Seconde" });
     expect(a.getAttribute("aria-labelledby")).toBe(titreA.id);
@@ -147,11 +148,11 @@ describe("Sheet : la sortie animée", () => {
     /* Le panneau et le voile s’animent ensemble, au rythme du téléphone par défaut */
     expect(animees).toHaveLength(2);
     expect(animees.map((a) => a.temps.duration)).toEqual([280, 280]);
-    expect(animees[0].images).toEqual(sortieDeFeuille(false).panneau);
+    expect(animees[0]!.images).toEqual(sortieDeFeuille(false).panneau);
     expect(dialogue().open).toBe(true);
     expect(screen.getByText("Le contenu")).toBeTruthy();
     expect(onClosed).not.toHaveBeenCalled();
-    await act(async () => animees[0].finir());
+    await act(async () => animees[0]!.finir());
     expect(dialogue().open).toBe(false);
     expect(screen.queryByText("Le contenu")).toBeNull();
     /* Le dialogue fermé annonce sa fermeture : onClosed, une fois */
@@ -178,7 +179,7 @@ describe("Sheet : la sortie animée", () => {
     expect(animees).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Supprimer ton compte ?" })).toBe(titre);
     expect(dialogue().getAttribute("aria-labelledby")).toBe(titre.id);
-    await act(async () => animees[0].finir());
+    await act(async () => animees[0]!.finir());
     expect(dialogue().open).toBe(false);
   });
 

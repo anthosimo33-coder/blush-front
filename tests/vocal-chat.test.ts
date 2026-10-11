@@ -219,14 +219,14 @@ describe("la voix (S-13) : un texte coupé, dans le budget du compte et du mois"
       .map((l) => JSON.parse(l) as EvenementChat);
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse", "vocal"]);
     const [fin, voix] = evenements;
-    if (!("reponse" in fin) || fin.reponse.kind !== "bubbles") throw new Error("une réponse en bulles");
+    if (!("reponse" in fin!) || fin.reponse.kind !== "bubbles") throw new Error("une réponse en bulles");
     expect(fin.reponse.bubbles.length).toBeGreaterThan(0);
     expect(voix).toEqual({ vocal: null });
   });
 
   it("le vocal du rapport, le budget de la voix du compte épuisé : son script n’est pas écrit, il attend sans user d’essai ni alerter, puis repart le lendemain", async () => {
     /* Un vocal d’une ancienne version du script : il est à refaire */
-    const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, id));
+    const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, id)))[0]!;
     await db()
       .update(schema.vocals)
       .set({ data: chiffrer({ ...dechiffrer<DonneesVocal>(brut.data), version: 1 }) })
@@ -290,7 +290,7 @@ describe("chez le prestataire (S-17) : rien de gardé, tout noté", () => {
   it("un vocal dit : le texte coupé part avec les réglages nommés, son élément d’historique est effacé après, son coût est noté", async () => {
     const appels = simuler();
     await dire("Elle t’a répondu ok. Mais trois heures après, franchement. ".repeat(20), "A", { sobre: true, storyId: id });
-    const [voix] = appels;
+    const voix = appels[0]!;
     expect(voix.url).toBe("https://api.elevenlabs.io/v1/text-to-speech/voix-fictive/with-timestamps?output_format=mp3_44100_96");
     const corps = JSON.parse(voix.corps!) as { text: string; voice_settings: unknown };
     expect(corps.text.length).toBeLessThanOrEqual(COUPE_VOIX.chat);

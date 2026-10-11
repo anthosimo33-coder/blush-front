@@ -41,7 +41,7 @@ describe("les scores du chapitre 1", () => {
 
   it("le gagnant a sa légende, en fois sur 10 ; à égalité, les deux comptes", () => {
     expect(ouvre(7, 3)).toMatchObject({ captionLeft: "toi, 7 fois sur 10" });
-    expect(ouvre(7, 3).captionRight).toBeUndefined();
+    expect(ouvre(7, 3)!.captionRight).toBeUndefined();
     expect(ouvre(3, 7)).toMatchObject({ captionRight: "léa, 7 fois sur 10" });
     /* L’insécable avant « : » : le compte ne part pas seul à la ligne */
     expect(ouvre(5, 5)).toMatchObject({ captionLeft: "toi\u00a0: 5", captionRight: "léa\u00a0: 5" });

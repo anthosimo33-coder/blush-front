@@ -42,7 +42,7 @@ test("« Partager en image » une réponse du chat : la story dessinée par le s
     await test.step("« Partager » : la feuille du système reçoit l’image, blush.png, et l’image est comptée", async () => {
       await mesurerCompteurs(() => feuille.getByRole("button", { name: "Partager", exact: true }).click(), { image_partagee: 1 });
       expect(await partages()).toEqual([{ nom: "blush.png", type: "image/png", octets: expect.any(Number) }]);
-      expect((await partages())[0].octets).toBeGreaterThan(0);
+      expect((await partages())[0]!.octets).toBeGreaterThan(0);
     });
 
   await test.step("enregistrée : le fichier blush.png, et l’image comptée", async () => {

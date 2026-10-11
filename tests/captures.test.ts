@@ -25,7 +25,7 @@ describe("des captures à l’histoire", () => {
     expect(storyAffichee(id, meta).sources[0]).toMatchObject({ mode: "captures", screenshotCount: 2, label: "Instagram · 2 captures" });
     const apres = await definirQui(id, { moi: 0, pronom: "elle", devinette: "parle", objectif: "comprendre", prenom: "Sarah" });
     expect(histoireDe(apres).utilisateur).toEqual({ prenom: "Sarah", pronom: "elle", nomExport: "Moi" });
-    const [ligne] = await db().select().from(schema.stories).where(eq(schema.stories.id, id));
+    const ligne = (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
     expect(metaDe(ligne).format).toBe("captures");
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });

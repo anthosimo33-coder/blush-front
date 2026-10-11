@@ -104,7 +104,7 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
     const H = 240;
     /* Une « conv » : des lignes de texte (bandes sombres) à des hauteurs irrégulières, sur un fond clair */
     const page = Array.from({ length: H * 3 }, (_, y) => (Math.sin(y * 0.37) + Math.sin(y * 0.11) > 0.6 ? 40 : 235));
-    const ecran = (depuis: number) => Float32Array.from({ length: L * H }, (_, i) => page[depuis + Math.floor(i / L)] + (i % L > 12 ? 10 : 0));
+    const ecran = (depuis: number) => Float32Array.from({ length: L * H }, (_, i) => page[depuis + Math.floor(i / L)]! + (i % L > 12 ? 10 : 0));
     /* Le contenu remonte de 30 lignes (on descend vers les messages récents) */
     expect(decalage(ecran(100), ecran(130))).toEqual({ d: -30, saut: false });
     /* Il descend de 45 lignes (on remonte vers les vieux messages) */
@@ -128,6 +128,6 @@ describe("une conv iMessage lue sur un enregistrement", () => {
     expect(t.messages).toBe(30);
     const { id, meta } = await importerCaptures({ appli: "imessage", t });
     ids.push(id);
-    expect(storyAffichee(id, meta).sources[0].label).toBe("iMessage · 17 captures");
+    expect(storyAffichee(id, meta).sources[0]!.label).toBe("iMessage · 17 captures");
   });
 });

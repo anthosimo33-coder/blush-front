@@ -56,8 +56,8 @@ describe("le journal du serveur", () => {
     const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     journal("lecture lancée", { tache: "t1" });
     journalErreur("route /api en panne", erreurSql(), { route: "/api/fiche" });
-    expect(JSON.parse(info.mock.calls[0][0] as string)).toEqual({ evenement: "lecture lancée", niveau: "info", tache: "t1" });
-    const ligne = erreur.mock.calls[0][0] as string;
+    expect(JSON.parse(info.mock.calls[0]![0] as string)).toEqual({ evenement: "lecture lancée", niveau: "info", tache: "t1" });
+    const ligne = erreur.mock.calls[0]![0] as string;
     expect(JSON.parse(ligne)).toMatchObject({ evenement: "route /api en panne", niveau: "erreur", route: "/api/fiche", erreur: "DrizzleQueryError", codeCause: "23505" });
     expect(ligne).not.toContain("exemple.test");
   });
@@ -104,8 +104,8 @@ describe("la trace du navigateur", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const envoi = vi.spyOn(globalThis, "fetch");
     tracer("son non joué", Object.assign(new Error("play() refusé pour ines@exemple.test"), { name: "NotAllowedError" }), { son: "envoi" });
-    expect(JSON.parse(warn.mock.calls[0][0] as string)).toEqual({ evenement: "son non joué", son: "envoi", erreur: "NotAllowedError" });
-    expect(warn.mock.calls[0][0]).not.toContain("exemple.test");
+    expect(JSON.parse(warn.mock.calls[0]![0] as string)).toEqual({ evenement: "son non joué", son: "envoi", erreur: "NotAllowedError" });
+    expect(warn.mock.calls[0]![0]).not.toContain("exemple.test");
     expect(envoi).not.toHaveBeenCalled();
   });
 });

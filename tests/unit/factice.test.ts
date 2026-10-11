@@ -96,7 +96,7 @@ describe("appeler en mode factice", () => {
   it("passe la partie au modèle factice : le plan, puis une moitié ; sans rien noter au suivi des coûts", async () => {
     const req = requete("05-rapport");
     expect((await appeler(req, Etape05, { partie: "plan", storyId: "histoire" })).sortie?.plan).not.toBeNull();
-    expect((await appeler(req, Etape05, { partie: "chapitres 1 à 4", storyId: "histoire" })).sortie?.chapitres?.[0].numero).toBe(1);
+    expect((await appeler(req, Etape05, { partie: "chapitres 1 à 4", storyId: "histoire" })).sortie?.chapitres?.[0]!.numero).toBe(1);
     expect(noterCout).not.toHaveBeenCalled();
   });
 

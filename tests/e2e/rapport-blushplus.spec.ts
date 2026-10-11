@@ -67,7 +67,7 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
     await expect(rapport.getByRole("heading", { level: 1, name: "Noé & Maëlys" })).toBeVisible();
   });
 
-  const [histoire] = await histoiresDe(email);
+  const histoire = (await histoiresDe(email))[0]!;
   const lien = `${URL_APPLI}/ouvrir/${histoire.id}`;
 
   await test.step("le rapport et la mémoire faits, la conv brute n’est plus gardée (« effacée après ton rapport »)", async () => {
@@ -109,7 +109,7 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
 test("BLUSH+ : le vocal de BLUSH s’écoute en grand, avec ses sous-titres ; l’écoute est notée, et un son qui ne vient pas est dit", async ({ page }, testInfo) => {
   const email = await lectureBlushPlus(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
-  const [histoire] = await histoiresDe(email);
+  const histoire = (await histoiresDe(email))[0]!;
   const audio = `/api/vocal/audio?conv=${histoire.id}`;
   const tuile = rapport.getByRole("button", { name: /^Écouter le vocal de BLUSH, \d+ secondes$/ });
   const story = page.getByRole("dialog", { name: "Le vocal de BLUSH" });

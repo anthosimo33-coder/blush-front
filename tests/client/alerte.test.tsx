@@ -4,6 +4,7 @@ import { Alert, DoneCheck, NoteIcone, TypingDots } from "@/components/ui/feedbac
 import { TypingDots as TypingDotsDeFileInput } from "@/components/ui/FileInput";
 import { citation, coinsDeBulle, GroupeBulles, placeDansLeGroupe } from "@/components/ui/messages";
 import { NotePrivee } from "@/components/ui/NotePrivee";
+import { auMoins } from "../aide/listes";
 
 /*
  * Ce que l’écran répond (src/components/ui/feedback.tsx) : le souci annoncé, la pastille « c’est fait », la note avec son
@@ -24,7 +25,7 @@ describe("Alert", () => {
         </Alert>
       </>,
     );
-    const [texte, carte, voile] = screen.getAllByRole("alert");
+    const [texte, carte, voile] = auMoins(screen.getAllByRole("alert"), 3);
     expect(texte.tagName).toBe("P");
     expect(texte.className).toContain("text-danger");
     expect(texte.className).not.toContain("shadow-card");
@@ -51,12 +52,12 @@ describe("DoneCheck", () => {
     const pastilles = Array.from(container.children) as HTMLElement[];
     expect(pastilles.map((p) => p.querySelector("svg")!.getAttribute("width"))).toEqual(["11", "14", "22", "16", "22"]);
     expect(pastilles.map((p) => p.querySelector("svg")!.getAttribute("stroke-width"))).toEqual(["3.4", "3.4", "3.2", "3.2", "3.4"]);
-    expect(pastilles[0].style.boxShadow).toContain("3px 8px -3px");
-    expect(pastilles[2].style.boxShadow).toContain("8px 18px -8px");
+    expect(pastilles[0]!.style.boxShadow).toContain("3px 8px -3px");
+    expect(pastilles[2]!.style.boxShadow).toContain("8px 18px -8px");
     /* La coche du tableau de bord (32 px, coche de 16, trait de 3,2, sans ombre) */
-    expect(pastilles[3].style.boxShadow).toBe("");
+    expect(pastilles[3]!.style.boxShadow).toBe("");
     /* 40 px : encore la petite ombre, la grande commence au-delà */
-    expect(pastilles[4].style.boxShadow).toContain("3px 8px -3px");
+    expect(pastilles[4]!.style.boxShadow).toContain("3px 8px -3px");
     for (const p of pastilles) {
       expect(p.className).toContain("bg-ok");
       expect(p.getAttribute("aria-hidden")).toBe("true");
@@ -102,7 +103,7 @@ describe("NoteIcone et NotePrivee", () => {
     ]);
     const notes = Array.from(container.children) as HTMLElement[];
     expect(notes.map((n) => n.className.includes("text-[12.5px]"))).toEqual([false, true, false]);
-    expect(notes[0].className).toContain("text-legende");
+    expect(notes[0]!.className).toContain("text-legende");
   });
 });
 
@@ -115,7 +116,7 @@ describe("TypingDots", () => {
         <TypingDots color="currentColor" size={4} />
       </>,
     );
-    const [doux, blanc, courant] = Array.from(container.querySelectorAll<HTMLElement>("[data-dots]"));
+    const [doux, blanc, courant] = auMoins(Array.from(container.querySelectorAll<HTMLElement>("[data-dots]")), 3);
     expect(doux.className).toContain("text-muted");
     expect(doux.getAttribute("aria-hidden")).toBe("true");
     expect(blanc.style.color).toBe("#FFFFFF");
@@ -125,7 +126,7 @@ describe("TypingDots", () => {
     const points = Array.from(courant.children) as HTMLElement[];
     expect(points.map((p) => p.style.width)).toEqual(["4px", "4px", "4px"]);
     expect(points.slice(0, 2).every((p) => p.className.includes("bg-current"))).toBe(true);
-    expect(points[2].style.background).toContain("--degrade-perle");
+    expect(points[2]!.style.background).toContain("--degrade-perle");
   });
 
   it("reste importable depuis FileInput, le temps que 9a bascule ses importeurs", () => {
@@ -147,13 +148,13 @@ describe("Les bulles de BLUSH", () => {
     const rangs = Array.from(container.firstElementChild!.children) as HTMLElement[];
     expect(rangs).toHaveLength(3);
     expect(rangs.map((r) => r.firstElementChild!.querySelector("svg") !== null || r.firstElementChild!.tagName === "svg")).toEqual([false, false, true]);
-    expect(rangs[0].firstElementChild!.className).toContain("w-[34px]");
-    expect(rangs[2].firstElementChild!.className).not.toContain("w-[34px]");
+    expect(rangs[0]!.firstElementChild!.className).toContain("w-[34px]");
+    expect(rangs[2]!.firstElementChild!.className).not.toContain("w-[34px]");
     const bulles = rangs.map((r) => r.lastElementChild as HTMLElement);
     expect(bulles.map((b) => b.textContent)).toEqual(["une", "deux", "trois"]);
-    expect(bulles[0].className).toContain("rounded-bl-[6px]");
-    expect(bulles[1].className).toContain("rounded-l-[6px]");
-    expect(bulles[2].className).toContain("rounded-tl-[6px]");
+    expect(bulles[0]!.className).toContain("rounded-bl-[6px]");
+    expect(bulles[1]!.className).toContain("rounded-l-[6px]");
+    expect(bulles[2]!.className).toContain("rounded-tl-[6px]");
     expect(rangs.map((r) => r.style.getPropertyValue("--d"))).toEqual(["0s", "0.08s", "0.16s"]);
   });
 

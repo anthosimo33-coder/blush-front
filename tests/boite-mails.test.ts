@@ -84,7 +84,7 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(env().BLUSH_IA_FACTICE).toBe(false);
     await envoyerCodeParEmail("noe@e2e.blush.test", "042917");
     expect(envoi).toHaveBeenCalledOnce();
-    expect(envoi.mock.calls[0][0]).toBe("https://api.resend.com/emails");
+    expect(envoi.mock.calls[0]![0]).toBe("https://api.resend.com/emails");
     expect(readdirSync(boite)).toHaveLength(0);
   });
 
@@ -101,13 +101,13 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(appels[0]).toMatchObject({ cle: "Bearer re_cle_des_codes", corps: { to: ["noe@e2e.blush.test"], subject: "042917\u00a0: ton code BLUSH" } });
     expect(appels[1]).toMatchObject({ cle: "Bearer re_cle_fictive", corps: { to: ["equipe@blush.test", "nuit@blush.test"], text: "Tâche t1" } });
     /* Une alerte n’a que sa version texte */
-    expect(appels[1].corps).not.toHaveProperty("html");
+    expect(appels[1]!.corps).not.toHaveProperty("html");
     /* Un refus du prestataire rejette, avec son statut seul, et rend sa place au quota */
     envoi.mockResolvedValueOnce(new Response("{}", { status: 429 }));
     await expect(envoyerMail("noe@e2e.blush.test", { sujet: "Un sujet", texte: "Un texte" })).rejects.toEqual(new ErreurResend(429));
     expect(quota.rendus).toEqual([1]);
     /* Les codes partent de l’expéditeur de tous les mails, faute du leur */
-    expect(appels[0].corps.from).toBe("BLUSH <bonjour@askblush.com>");
+    expect(appels[0]!.corps.from).toBe("BLUSH <bonjour@askblush.com>");
   });
 
   it("S-09 · les codes partent de leur propre expéditeur (BLUSH_EMAIL_FROM_CODES), vérifié sur le compte de leur clé", async () => {

@@ -85,7 +85,7 @@ export type Ajout = { de: "toi" | "autre"; texte: string };
 function messages(n: number, ajout?: Ajout): (Message & { t: number })[] {
   const debut = Date.UTC(2026, 8, 4, 19, 2, 11);
   const quand = (k: number) => debut + Math.floor(k / 20) * 86400e3 + (k % 20) * 6 * 60e3 + ((k * 13) % 50) * 1e3;
-  const ms = Array.from({ length: n }, (_, k) => ({ ...CONV[k % CONV.length], t: quand(k) }));
+  const ms = Array.from({ length: n }, (_, k) => ({ ...CONV[k % CONV.length]!, t: quand(k) }));
   return ajout ? [...ms, { de: ajout.de, texte: ajout.texte, t: quand(n - 1) + 60e3 }] : ms;
 }
 
@@ -104,7 +104,7 @@ const MEDIA_IOS = { photo: "\u200eimage omitted", vocal: "\u200eaudio omitted" }
  */
 export function texteWhatsApp(personnes: Personnes = NOE_ET_MAELYS, n = 64, ajout?: Ajout): string {
   const ms = messages(n, ajout);
-  const systeme = `${enteteIos(ms[0].t - 90e3)} ${personnes.autre}: \u200eLes messages et les appels sont chiffrés de bout en bout.`;
+  const systeme = `${enteteIos(ms[0]!.t - 90e3)} ${personnes.autre}: \u200eLes messages et les appels sont chiffrés de bout en bout.`;
   return [systeme, ...ms.map((m) => `${m.media ? "\u200e" : ""}${enteteIos(m.t)} ${personnes[m.de]}: ${m.media ? MEDIA_IOS[m.media] : m.texte}`)].join("\n");
 }
 
@@ -120,7 +120,7 @@ const enteteAndroid = (t: number) => {
  */
 function texteWhatsAppAndroid(personnes: Personnes = NOE_ET_MAELYS, n = 64): string {
   const ms = messages(n);
-  const systeme = `${enteteAndroid(ms[0].t - 90e3)} Les messages et les appels sont chiffrés de bout en bout. Personne en dehors de cette discussion ne peut les lire ni les écouter.`;
+  const systeme = `${enteteAndroid(ms[0]!.t - 90e3)} Les messages et les appels sont chiffrés de bout en bout. Personne en dehors de cette discussion ne peut les lire ni les écouter.`;
   return [systeme, ...ms.map((m) => `${enteteAndroid(m.t)} ${personnes[m.de]}: ${m.media ? "<Médias omis>" : m.texte}`)].join("\n");
 }
 
@@ -195,7 +195,7 @@ const CRC = Array.from({ length: 256 }, (_, n) => {
 });
 const crc32 = (octets: Buffer) => {
   let c = 0xffffffff;
-  for (const o of octets) c = CRC[(c ^ o) & 0xff] ^ (c >>> 8);
+  for (const o of octets) c = CRC[(c ^ o) & 0xff]! ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 };
 function morceau(type: string, donnees: Buffer): Buffer {

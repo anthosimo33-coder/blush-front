@@ -9,7 +9,7 @@ test("le lien du mail « ton rapport est prêt », ouvert dans un autre navigate
   /* Un invité : BLUSH+ d’office, son rapport complet s’écrit, et le mail part quand il est prêt */
   const email = await nouvelInvite(testInfo);
   await lectureFaite(page, testInfo, email);
-  const [{ id }] = await histoiresDe(email);
+  const { id } = (await histoiresDe(email))[0]!;
 
   const lien = await test.step("le mail porte le lien de cette conv", async () => {
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });

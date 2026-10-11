@@ -27,7 +27,7 @@ describe("la bêta fermée, sans dire qui est invité", () => {
     const code = await preparerCode(email, navigateur, { envoye: false });
     expect(code).toMatch(/^\d{6}$/);
     expect(await prendreCode(email, code!, { navigateur, ip: "198.51.100.8" })).toBe("faux");
-    const [ligne] = await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email));
+    const ligne = (await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email)))[0]!;
     expect(ligne.attempts).toBe(1);
     expect(await db().select().from(schema.users).where(eq(schema.users.email, email))).toHaveLength(0);
   });

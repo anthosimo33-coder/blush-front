@@ -8,7 +8,7 @@ const ligne = (k: number, nom: string, texte: string) => {
   const d = new Date(Date.UTC(2026, 8, 12, 10, 0) + k * 10 * 60e3);
   return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00] ${nom}: ${texte}`;
 };
-const conv = (n: number, noms = ["Léa", "Tom"]) => Array.from({ length: n }, (_, k) => ligne(k, noms[k % 2], `message ${k}`));
+const conv = (n: number, noms = ["Léa", "Tom"]) => Array.from({ length: n }, (_, k) => ligne(k, noms[k % 2]!, `message ${k}`));
 const qui = (moi: string, autre: string) => ({ utilisateur: { prenom: moi, pronom: "il" as const, nomExport: moi }, autre: { prenom: autre, pronom: "elle" as const, nomExport: autre }, format: "whatsapp-ios" as const });
 
 describe("lire un export WhatsApp", () => {
@@ -38,7 +38,7 @@ describe("lire un export WhatsApp", () => {
   });
 
   it("refuse toujours une vraie conv de groupe (un troisième qui parle vraiment)", () => {
-    const texte = Array.from({ length: 90 }, (_, k) => ligne(k, ["Léa", "Tom", "Sarah"][k % 3], `message ${k}`)).join("\n");
+    const texte = Array.from({ length: 90 }, (_, k) => ligne(k, ["Léa", "Tom", "Sarah"][k % 3]!, `message ${k}`)).join("\n");
     expect(principaux(participantsDe(texte))).toHaveLength(3);
   });
 

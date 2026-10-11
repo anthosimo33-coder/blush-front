@@ -75,7 +75,7 @@ describe("borner : ce que lit le serveur d’un export", () => {
     expect(lignes[50]).toHaveLength(LIGNE_MAX);
     expect(lignes.filter((_, k) => k !== 50)).toEqual(texte.split("\n").filter((_, k) => k !== 50));
     /* Des emojis (deux unités chacun) : la coupe ne laisse pas une moitié d’emoji */
-    const emojis = borner({ appli: "whatsapp", texte: exporter(3, (k) => (k === 1 ? "😀".repeat(LIGNE_MAX) : "ok")), nom: "chat.txt" }).texte.split("\n")[1];
+    const emojis = borner({ appli: "whatsapp", texte: exporter(3, (k) => (k === 1 ? "😀".repeat(LIGNE_MAX) : "ok")), nom: "chat.txt" }).texte.split("\n")[1]!;
     expect(emojis.length).toBeLessThanOrEqual(LIGNE_MAX);
     expect(emojis.endsWith("😀")).toBe(true);
     expect(borner({ appli: "whatsapp", texte: exporter(100, (k) => (k === 50 ? "a".repeat(LIGNE_MAX - 100) : `${k}`)), nom: "chat.txt" }).coupe).toBeUndefined();
@@ -142,7 +142,7 @@ describe("des exports piégés, lus en temps borné", () => {
     expect(ms).toBeLessThan(VITE_MS);
     expect(lu.messages).toHaveLength(4);
     /* La marque d’un message modifié, et les espaces qui l’entourent, partent toujours */
-    expect(lu.messages[3].texte).toBe("ok");
+    expect(lu.messages[3]!.texte).toBe("ok");
   });
 
   it("un nom de fichier joint forgé (« -AUDIO- » des milliers de fois)", () => {

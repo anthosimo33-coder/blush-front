@@ -126,7 +126,7 @@ describe("ReorderGrid", () => {
     fireEvent.pointerMove(a, { pointerId: 1, pointerType: "mouse", clientX: 30, clientY: 10 });
     expect(a.className).toContain("cursor-grabbing");
     /* Au-dessus de la troisième case */
-    const c = screen.getAllByRole("listitem")[2];
+    const c = screen.getAllByRole("listitem")[2]!;
     const sous = vi.spyOn(document, "elementFromPoint").mockReturnValue(c);
     fireEvent.pointerMove(a, { pointerId: 1, pointerType: "mouse", clientX: 200, clientY: 10 });
     expect(sous).toHaveBeenCalledWith(200, 10);

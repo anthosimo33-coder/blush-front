@@ -171,7 +171,7 @@ describe("le vocal de la barre de saisie", () => {
     expect(onde().slice(-12)).toEqual(Array(12).fill("scaleY(0.868)"));
     expect(screen.getByText("0:01")).toBeTruthy();
     /* Les perles suivent la voix, hors de React */
-    const [premiere] = perles.querySelectorAll<HTMLElement>("[data-pearl]");
+    const premiere = perles.querySelectorAll<HTMLElement>("[data-pearl]")[0]!;
     expect(premiere.style.transform).toBe("translateY(-26.0%) scale(1.280)");
     /* La barre de saisie (et l’accueil qui la porte) ne s’est pas refaite une seule fois */
     expect(rendus.saisie).toBe(saisie);

@@ -13,8 +13,7 @@ async function partagerUnVerdict(page: Page, testInfo: TestInfo, email: string, 
   await avant?.();
   await page.goto("/rapport");
   await mesurerCompteurs(() => ouvrirLePartage(page), { partage_ouvert: 1, lien_cree: 1 });
-  const [id] = await liensDe(email);
-  return id;
+  return (await liensDe(email))[0]!;
 }
 
 test("la page publique, sans compte : le verdict seul, le prénom de l’autre en initiale, le tien en clair", async ({ page, autreAppareil }, testInfo) => {

@@ -50,11 +50,11 @@ describe("le mail « ton rapport est prêt »", () => {
     const pauses: number[] = [];
     definirPause(async (ms) => void pauses.push(ms));
     const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-    const [u] = await db().insert(schema.users).values({ email, plan: "blushplus" }).returning();
+    const u = (await db().insert(schema.users).values({ email, plan: "blushplus" }).returning())[0]!;
     await rattacherBrouillon(u, imp.secret);
     await definirQui(imp.id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
     /* La conv brute telle qu’en base : la mémoire l’efface en fin de chaîne, et une relance de l’écriture la relit */
-    const [{ conv }] = await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, imp.id));
+    const { conv } = (await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, imp.id)))[0]!;
     await planifier(imp.id, "verdict");
     await executerChaine(imp.id);
     const mails = () => log.mock.calls.filter(([l]) => String(l).startsWith("[dev] mail") && String(l).includes(email));

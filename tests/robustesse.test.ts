@@ -60,7 +60,7 @@ describe("le code de connexion", () => {
   it("ne laisse pas passer plus de 5 essais, même envoyés en même temps", async () => {
     const { navigateur, code } = await nouveauCode();
     await Promise.all(Array.from({ length: 20 }, (_, k) => entrer(navigateur, String(200000 + k))));
-    const [c] = await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email));
+    const c = (await db().select().from(schema.loginCodes).where(eq(schema.loginCodes.email, email)))[0]!;
     expect(c.attempts).toBe(5);
     /* Le bon code ne marche plus : les essais sont épuisés */
     expect(await entrer(navigateur, code)).toBeNull();
@@ -101,7 +101,7 @@ describe("les tâches d’une histoire", () => {
 });
 
 describe("le mode sobre", () => {
-  const sortie = async (id: string) => dechiffrer<DonneesVerdict>((await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, id)))[0].data).sortie;
+  const sortie = async (id: string) => dechiffrer<DonneesVerdict>((await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, id)))[0]!.data).sortie;
   const plans = async (id: string) => db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
 
   it("n’existe pas sans alerte, même si le modèle le demande (un rejet : le rapport complet, payant)", async () => {

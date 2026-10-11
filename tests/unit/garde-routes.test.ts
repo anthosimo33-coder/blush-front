@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { estMutation, ROUTES, type CleRoute } from "@/types/api";
+import { auMoins } from "../aide/listes";
 
 /*
  * La garde commune des routes /api (src/server/requete.ts). D’abord en table, sur chaque route de la table du contrat
@@ -66,14 +67,14 @@ const SANS_COMPTE = new Set<CleRoute>([
 const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
-const mutations = cles.filter((c) => estMutation(c.split(" ")[0]));
+const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
 
 /** Appelle la route de cette clé comme Next le ferait : son fichier, sa méthode, une requête vide (ou un formulaire vide). */
 async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Promise<Response> {
-  const [methode, chemin] = cle.split(" ");
+  const [methode, chemin] = auMoins(cle.split(" "), 2);
   const route = (await import(join(process.cwd(), "src/app", chemin, "route.ts"))) as Record<string, (req: Request, ctx: unknown) => Promise<Response>>;
   const req = new Request(`${APPLI}${chemin.replace("[id]", "1")}`, { method: methode, headers: { "x-forwarded-for": "10.9.8.7", ...entetes } });
-  return route[methode](req, { params: Promise.resolve({ id: "1" }) });
+  return route[methode]!(req, { params: Promise.resolve({ id: "1" }) });
 }
 
 describe("chaque route de la table", () => {

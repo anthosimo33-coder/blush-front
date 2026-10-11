@@ -114,8 +114,8 @@ export async function etapeEnEchec(email: string, genre: string, erreur: string)
   const [s] = await sql()<{ id: string }[]>`
     select s.id from stories s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()} order by s.created_at desc limit 1`;
   if (!s) throw new Error(`aucune histoire pour ${email}`);
-  const [t] = await sql()<{ id: string }[]>`
-    insert into tasks (story_id, kind, status, attempts, error) values (${s.id}, ${genre}, 'echec', 3, ${erreur}) returning id`;
+  const t = (await sql()<{ id: string }[]>`
+    insert into tasks (story_id, kind, status, attempts, error) values (${s.id}, ${genre}, 'echec', 3, ${erreur}) returning id`)[0]!;
   return t.id;
 }
 

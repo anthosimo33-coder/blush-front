@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { attendreMail, compteDe, ecranLu, emailLibre, expect, lienDeRetrait, mailsPour, nouvelInvite, placeSurLaListe, reponseAuGeste, test, URL_BETA } from "./aide";
+import { auMoins } from "../aide/listes";
 
 /*
  * La liste d’attente de la bêta fermée : la page /attente (on y laisse son email), le mail qui le confirme, et le lien
@@ -115,7 +116,7 @@ test("/attente/retirer : un lien incomplet, abîmé ou pris dans le mail d’un 
     expect(await rejoindreLaListe(page, email)).toBe(200);
     liens.push(lienDeRetrait(await attendreMail(email, { depuis })));
   }
-  const [lienAlice, lienBruno] = liens.map((l) => new URL(l));
+  const [lienAlice, lienBruno] = auMoins(liens.map((l) => new URL(l)), 2);
 
   /** Ouvre un lien de retrait et appuie sur le bouton : le serveur le refuse (404), l’écran dit que le lien ne marche pas. */
   const refuse = async (lien: string) => {

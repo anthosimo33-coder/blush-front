@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { arreterLeVocal, chargerEnMemoire, creerAudioContext, prendreSonForce, useLecteurAudio, useSonForce } from "@/lib/audio";
+import { auMoins } from "../aide/listes";
 
 /*
  * L’audio du navigateur (src/lib/audio.ts) : le contexte Web Audio, et le lecteur des vocaux (un seul à la fois, le son
@@ -99,8 +100,8 @@ describe("useLecteurAudio", () => {
     expect(source).not.toHaveBeenCalled();
     await faire(() => result.current.jouer());
     expect(FauxAudio.tous).toHaveLength(1);
-    expect(FauxAudio.tous[0].src).toBe("/son.mp3");
-    expect(FauxAudio.tous[0].preload).toBe("auto");
+    expect(FauxAudio.tous[0]!.src).toBe("/son.mp3");
+    expect(FauxAudio.tous[0]!.preload).toBe("auto");
     expect(result.current.joue).toBe(true);
   });
 
@@ -136,7 +137,7 @@ describe("useLecteurAudio", () => {
     const surFin = vi.fn();
     const { result } = lecteur({ source: () => "/a.mp3", forcerSon: true, suivreTemps: true, surFin });
     await faire(() => result.current.jouer());
-    const a = FauxAudio.tous[0];
+    const a = FauxAudio.tous[0]!;
     await faire(() => a.avancer(3, 12));
     expect(result.current.temps).toBe(3);
     expect(result.current.duree).toBe(12);
@@ -151,7 +152,7 @@ describe("useLecteurAudio", () => {
     const { result } = lecteur({ source: () => "/a.mp3" });
     await faire(() => result.current.jouer(4));
     expect(result.current.temps).toBe(4);
-    const a = FauxAudio.tous[0];
+    const a = FauxAudio.tous[0]!;
     await faire(() => a.avancer(6, 12));
     expect(result.current.temps).toBe(4);
     await faire(() => result.current.poserTemps(5));
@@ -167,7 +168,7 @@ describe("useLecteurAudio", () => {
     const source = vi.fn((refait: boolean) => (refait ? "/reseau.mp3" : "blob:memoire"));
     const { result } = lecteur({ source, forcerSon: true });
     await faire(() => result.current.jouer());
-    await faire(() => FauxAudio.tous[0].echouer());
+    await faire(() => FauxAudio.tous[0]!.echouer());
     expect(result.current.coupe).toBe(true);
     expect(result.current.joue).toBe(false);
     expect(session.type).toBe("ambient");
@@ -182,10 +183,10 @@ describe("useLecteurAudio", () => {
   it("rejouer après une erreur : playback tenu une fois les événements passés", async () => {
     const { result } = lecteur({ source: (refait) => (refait ? "/reseau.mp3" : "blob:memoire"), forcerSon: true });
     await faire(() => result.current.jouer());
-    await faire(() => FauxAudio.tous[0].echouer());
+    await faire(() => FauxAudio.tous[0]!.echouer());
     /* L’élément en erreur reste « en lecture » : rejouer (par basculer, puis par jouer) ne le met pas en pause */
     await faire(() => result.current.basculer());
-    const [enErreur, refait] = FauxAudio.tous;
+    const [enErreur, refait] = auMoins(FauxAudio.tous, 2);
     expect(enErreur.paused).toBe(false);
     expect(refait.paused).toBe(false);
     expect(result.current.joue).toBe(true);
@@ -233,7 +234,7 @@ describe("useLecteurAudio", () => {
   it("l’écran s’en va : le son s’arrête, et le son forcé est lâché", async () => {
     const { result, unmount } = lecteur({ source: () => "/a.mp3", forcerSon: true });
     await faire(() => result.current.jouer());
-    const a = FauxAudio.tous[0];
+    const a = FauxAudio.tous[0]!;
     unmount();
     expect(a.paused).toBe(true);
     expect(session.type).toBe("ambient");

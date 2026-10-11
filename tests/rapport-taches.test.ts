@@ -88,7 +88,7 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
     const u = await compteDeTest("sobre-gratuit");
     const imp = await avecFactice(sobreAvecChapitres, () => histoireLue(u, "06-elle-hesite.txt"));
 
-    const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id));
+    const r = (await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id)))[0]!;
     const donnees = coffre.lire("reports.data", r.data!);
     expect(donnees.sortie.chapitres).toBeNull();
     expect(donnees.chapitres).toEqual([]);

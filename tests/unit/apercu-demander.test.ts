@@ -30,7 +30,7 @@ const reponse = (texte: string) => `{
 const LANCEUR = `console.log("du bruit avant");
 console.log("@@BLUSH@@" + JSON.stringify(${reponse("JSON.stringify({ args: process.argv.slice(2), cle: process.env.ANTHROPIC_API_KEY })")}));`;
 /** Ce que le faux lanceur a reçu, relu dans la bulle de la réponse. */
-const recu = async (r: Response) => JSON.parse(((await r.json()) as BlushAnswer).bubbles[0].text) as { args: string[]; cle: string };
+const recu = async (r: Response) => JSON.parse(((await r.json()) as BlushAnswer).bubbles[0]!.text) as { args: string[]; cle: string };
 
 /** La configuration de l’aperçu, son lanceur `lanceur` (un fichier du dossier temporaire). */
 function configurer(lanceur: string) {
@@ -99,16 +99,16 @@ describe("/apercu/demander : ce poste seulement", () => {
     expect(r.status).toBe(200);
     const { args, cle } = await recu(r.clone());
     /* Le message cité, comme l’appli le montre : de l’autre, daté */
-    expect(((await r.json()) as BlushAnswer).bubbles[0].messages).toEqual([{ from: "elle", text: "on se voit samedi ?", caption: "Léa · 02/03 23:41" }]);
+    expect(((await r.json()) as BlushAnswer).bubbles[0]!.messages).toEqual([{ from: "elle", text: "on se voit samedi ?", caption: "Léa · 02/03 23:41" }]);
     expect(args.slice(0, 5)).toEqual(["10", "--cas-perso", "cas.json", "--memoire", "memoire.json"]);
     expect(args[args.indexOf("--demande") + 1]).toBe("et là ?");
-    expect(JSON.parse(args[args.indexOf("--historique") + 1])).toEqual(history);
+    expect(JSON.parse(args[args.indexOf("--historique") + 1]!)).toEqual(history);
     expect(cle).toBe("une-cle-de-test");
   });
 
   it("sans fil, il part vide ; un lanceur qui ne répond pas, ou sans réponse lisible : BLUSH le dit, en 200", async () => {
     const { args } = await recu(await POST(demande({ text: "salut" })));
-    expect(JSON.parse(args[args.indexOf("--historique") + 1])).toEqual([]);
+    expect(JSON.parse(args[args.indexOf("--historique") + 1]!)).toEqual([]);
     writeFileSync(join(dossier, "muet.mjs"), `console.log("@@BLUSH@@" + JSON.stringify(${reponse("null")}));`);
     writeFileSync(join(dossier, "illisible.mjs"), `console.log("@@BLUSH@@{ pas du json");`);
     /* Un ancien lanceur (lancer.mjs), qui rendait la réponse déjà en bulles */

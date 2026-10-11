@@ -89,9 +89,9 @@ describe("useSondage", () => {
     expect(tour).toHaveBeenCalledTimes(3);
     expect(avertir).toHaveBeenCalledTimes(3);
     /* Le nom de l’erreur, jamais son message (tracer) */
-    expect(avertir.mock.calls[0][0]).toContain("sondage");
-    expect(avertir.mock.calls[0][0]).toContain("TypeError");
-    expect(avertir.mock.calls[0][0]).not.toContain("réseau");
+    expect(avertir.mock.calls[0]![0]).toContain("sondage");
+    expect(avertir.mock.calls[0]![0]).toContain("TypeError");
+    expect(avertir.mock.calls[0]![0]).not.toContain("réseau");
     avertir.mockRestore();
   });
 

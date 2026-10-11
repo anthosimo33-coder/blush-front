@@ -97,7 +97,7 @@ describe("le rapport assemblé", () => {
       }),
     );
     expect(r.generating).toBe(true);
-    expect(r.report.chapters[1].title).toBe("Le verre");
+    expect(r.report.chapters[1]!.title).toBe("Le verre");
     expect(r.ecriture?.etape).toBe("plan");
     expect(r.ecriture?.progres).toBeCloseTo(0.35 * 0.4, 5);
     expect(r.vocal).toEqual({ etat: "en_cours" });
@@ -116,7 +116,7 @@ describe("le mode sobre (S-25)", () => {
   it("sans l’accès : sa partie sobre seulement, jamais des chapitres que le modèle aurait écrits", () => {
     const r = assemblerRapport(lu({ verdict: { sortie: ALERTE, scores: [] }, donnees }));
     expect(r.sober).toBe(SOBRE);
-    expect(r.report.chapters.flatMap((c) => c.blocks)).not.toContainEqual(chapitres[1].blocks[0]);
+    expect(r.report.chapters.flatMap((c) => c.blocks)).not.toContainEqual(chapitres[1]!.blocks[0]);
     expect(r.report.chapters.slice(1).every((c) => c.locked && !c.blocks.length)).toBe(true);
     /* Une alerte : jamais de vocal */
     expect(r.vocal).toBeUndefined();

@@ -115,7 +115,7 @@ describe("après l’import : le chat et sa fiche", () => {
     const memoire = (await memoireDe(id))!;
     const ajout = await depuisExport(await ligneEnBase(id), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
     expect(ajout.messages).toBe(3);
-    expect(numero(ajout.lignes[0])).toBe(memoire.suivant);
+    expect(numero(ajout.lignes[0]!)).toBe(memoire.suivant);
 
     const { reponse, majMemoire } = await repondre(await ligneEnBase(id), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
     expect(reponse.kind).toBe("bubbles");
@@ -153,7 +153,7 @@ describe("après l’import : le chat et sa fiche", () => {
       const ajout = await depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]);
       expect(ajout.messages).toBe(FACTICE.messagesCaptures);
       expect(ajout.profil).toBe(1);
-      expect(numero(ajout.lignes[0])).toBe(numero(exporte.lignes.at(-1)!) + 1);
+      expect(numero(ajout.lignes[0]!)).toBe(numero(exporte.lignes.at(-1)!) + 1);
       expect(derniere("01-captures")).toContain("autre personne : Sophie");
     });
 

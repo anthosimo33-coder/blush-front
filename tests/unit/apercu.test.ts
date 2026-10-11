@@ -9,6 +9,7 @@ import { apercuDe, lireApercu, lireTous } from "@/server/apercu";
 import { sobreAffiche } from "@/server/ecrans/rapport";
 import { enTete } from "@/server/presentation/rapport";
 import { chapitre, memoire } from "../aide/fabriques";
+import { auMoins } from "../aide/listes";
 
 /*
  * Les aperçus de l’équipe (src/server/apercu.ts) : les sorties brutes du banc d’évals (prompts/lib/apercu.ts), mises en
@@ -100,7 +101,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
     const { payload } = apercuDe(sorties());
     expect(payload.report).toMatchObject({ storyId: "apercu", ...enTete(VERDICT) });
     expect(payload.report.nextStep).toBe("Ton prochain pas\u00a0: Propose un verre jeudi.");
-    const [ch1, ch2] = payload.report.chapters;
+    const [ch1, ch2] = auMoins(payload.report.chapters, 2);
     expect(ch1).toMatchObject({ number: 1, title: TITRE_DU_VERDICT, free: true });
     expect(ch1.blocks.map((b) => b.kind)).toEqual(["lead", "scores"]);
     expect(ch2).toMatchObject({ number: 2, title: "Chapitre 2", free: false });
@@ -128,7 +129,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
     const [quotidien, ouverture] = home?.script ?? [];
     expect(quotidien).toMatchObject({ mine: "je lui réponds quoi ?", answer: { incoming: [SAMEDI], bubbles: [{ text: "elle te tend la perche", messages: [] }] } });
     expect(ouverture).not.toHaveProperty("mine");
-    expect(ouverture.answer).not.toHaveProperty("incoming");
+    expect(ouverture!.answer).not.toHaveProperty("incoming");
   });
 
   it("le mode sobre : le rapport doux de l’appli (ses libellés), sans chapitres", () => {

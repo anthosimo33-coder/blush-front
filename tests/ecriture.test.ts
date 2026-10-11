@@ -41,8 +41,8 @@ describe("le rapport pendant son écriture", () => {
       [8, "attente"],
     ]);
     /* Les titres viennent du plan (le modèle factice les appelle « Ch. N »), dans le sommaire aussi */
-    expect(r.ecriture?.chapitres[0].title).toBe("Ch. 2");
-    expect(r.report.chapters[1].tocTitle).toBe("Ch. 2");
+    expect(r.ecriture?.chapitres[0]!.title).toBe("Ch. 2");
+    expect(r.report.chapters[1]!.tocTitle).toBe("Ch. 2");
   });
 
   it("donne à lire les chapitres finis, dans l’ordre : un chapitre prêt en avance attend ceux d’avant", async () => {
@@ -60,7 +60,7 @@ describe("le rapport pendant son écriture", () => {
       [7, false],
       [8, false],
     ]);
-    expect(r.report.chapters[2].title).toBe("Prêt 3");
+    expect(r.report.chapters[2]!.title).toBe("Prêt 3");
     /* Le 6 est prêt mais attend : la liste le marque « écrit » */
     expect(r.ecriture?.chapitres.find((c) => c.number === 6)?.etat).toBe("ecrit");
   });
@@ -71,7 +71,7 @@ describe("un refus du modèle", () => {
     const u = await compteDeTest("refus", "blushplus");
     const refus = (req: Requete) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req));
     const imp = await avecFactice(refus, () => histoireLue(u, "02-reciproque.txt", { qui: { devinette: "parle", objectif: "comprendre" } }));
-    const [t] = await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict")));
+    const t = (await db().select().from(schema.tasks).where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "verdict"))))[0]!;
     expect([t.status, t.attempts, t.error]).toEqual(["echec", 1, "refus"]);
     expect(await progression(await ligneEnBase(imp.id))).toMatchObject({ failed: true, failReason: "refus", done: false });
   });

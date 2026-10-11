@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "@/app/app/accueil/Composer";
+import { auMoins } from "../aide/listes";
 
 /*
  * La barre de saisie de l’accueil (src/app/app/accueil/Composer.tsx), seule : ce qu’on y écrit ou touche part vers
@@ -104,11 +105,11 @@ describe("la barre de saisie de l’accueil", () => {
     vi.useFakeTimers();
     try {
       /* Un autre logo dans la page, qui porte le même attribut : il n’est pas pris (Q62, rien n’est cherché dans la page) */
-      const [donne, autre] = [0, 1].map(() => {
+      const [donne, autre] = auMoins([0, 1].map(() => {
         const el = document.body.appendChild(document.createElement("span"));
         el.setAttribute("data-blush-logo", "");
         return el;
-      });
+      }), 2);
       const { champ } = monter({ logo: () => donne });
       fireEvent.change(champ, { target: { value: "s" } });
       expect(donne.hasAttribute("data-lean")).toBe(true);

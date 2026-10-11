@@ -99,7 +99,7 @@ export async function mesurerCompteurs<T>(geste: () => Promise<T>, attendus: Par
   const voulu = Object.fromEntries(compares.map((k) => [k, attendus[k] ?? 0]));
   return (await sql().begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${VERROU_COMPTEURS})`;
-    const [{ jour }] = await tx<{ jour: string }[]>`select ((now() at time zone 'Europe/Paris')::date)::text as jour`;
+    const { jour } = (await tx<{ jour: string }[]>`select ((now() at time zone 'Europe/Paris')::date)::text as jour`)[0]!;
     const avant = await compteursDepuis(tx, jour);
     const resultat = await geste();
     const ecart = async () => {

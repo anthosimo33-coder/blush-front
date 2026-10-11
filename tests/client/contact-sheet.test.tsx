@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContactSheet } from "@/app/app/accueil/ContactSheet";
 import { creerRegistreEntete, type Departs, type RegistreEntete } from "@/app/app/accueil/mouvement/registre";
 import { sortieDeFeuille } from "@/components/ui/surfaces";
+import { auMoins } from "../aide/listes";
 
 /*
  * Les détails du contact de l’accueil (src/app/app/accueil/ContactSheet.tsx) : ce qu’ils montrent, et leur fermeture
@@ -82,7 +83,7 @@ const CONTACT: ComponentProps<typeof ContactSheet>["contact"] = {
 
 /** L’en-tête de l’accueil, tel que departs() le relève au toucher : la bulle de BLUSH et l’avatar de l’autre. */
 function enTete(): Departs {
-  const [logo, av] = [0, 1].map(() => document.body.appendChild(document.createElement("span")));
+  const [logo, av] = auMoins([0, 1].map(() => document.body.appendChild(document.createElement("span"))), 2);
   enTetes.push(logo, av);
   return { logo: { src: logo, from: { left: 150, top: 10, width: 88, height: 88 } }, av: { src: av, from: { left: 330, top: 20, width: 40, height: 40 } } };
 }
@@ -282,11 +283,11 @@ describe("ContactSheet : l’ouverture et la fermeture animées", () => {
 
   it("9 · sans départ relevé au toucher : la bulle et l’avatar sont pris au registre de l’en-tête à l’ouverture, ceux qu’on voit, et volent", () => {
     const entete = creerRegistreEntete();
-    const [cache, logo, av] = [0, 1, 2].map(() => {
+    const [cache, logo, av] = auMoins([0, 1, 2].map(() => {
       const el = document.body.appendChild(document.createElement("span"));
       enTetes.push(el);
       return el;
-    });
+    }), 3);
     /* L’en-tête existe deux fois : celui qui est masqué (sans rectangles) ne part pas */
     cache.getClientRects = () => [] as unknown as DOMRectList;
     [logo, av].forEach((el) => (el.getClientRects = () => [{}] as unknown as DOMRectList));

@@ -134,7 +134,7 @@ test("« Story » sur iPhone : la feuille de partage du système reçoit l’ima
   await expect(story).toBeEnabled({ timeout: DESSIN });
   await story.click();
   await expect.poll(partages).toEqual([{ nom: "verdict-blush.png", type: "image/png", octets: expect.any(Number) }]);
-  expect((await partages())[0].octets).toBeGreaterThan(0);
+  expect((await partages())[0]!.octets).toBeGreaterThan(0);
   /* Partagé, rien ne s’enregistre en plus */
   await expect(feuille.getByText("Image enregistrée.")).toHaveCount(0);
 });

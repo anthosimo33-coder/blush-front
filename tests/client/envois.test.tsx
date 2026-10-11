@@ -161,7 +161,7 @@ describe("le répondeur de l’aperçu", () => {
     ];
     expect(await repondeurDeLApercu({}, "/apercu/demander")({ text: "et là ?" }, { msgs: fil, suivi })).toEqual(reponse("du chat local"));
     expect(appels).toHaveLength(1);
-    const [{ url, corps }] = appels;
+    const { url, corps } = appels[0]!;
     expect(url).toBe("/apercu/demander");
     expect(corps.text).toBe("et là ?");
     /* Les FIL_MAX derniers messages (un mot de BLUSH n’en est pas un) : la réponse de BLUSH, ses bulles jointes, coupée */

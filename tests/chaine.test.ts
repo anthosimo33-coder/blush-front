@@ -56,7 +56,7 @@ describe("de l’import à la mémoire", () => {
   it("l’import : deux participants, plus de 50 messages, et la conv chiffrée en base", () => {
     expect(imp.meta.participants).toHaveLength(2);
     expect(storyAffichee(imp.id, imp.meta).totalMessages).toBeGreaterThan(50);
-    expect(importee.conv!.toString("utf8")).not.toContain(imp.meta.participants[0].nom);
+    expect(importee.conv!.toString("utf8")).not.toContain(imp.meta.participants[0]!.nom);
   });
 
   it("enchaîne verdict, plan, chapitres, vocal et mémoire", () => {
@@ -72,9 +72,9 @@ describe("de l’import à la mémoire", () => {
   it("le rapport : ses chapitres (ceux du modèle factice), le verdict d’abord avec ses scores, et des preuves devenues des messages datés", async () => {
     const rapport = (await rapportEnBase(imp.id))!;
     expect(rapport.chapitres).toHaveLength(FACTICE.chapitres);
-    expect(rapport.chapitres[0].title).toBe("Le verdict");
-    expect(rapport.chapitres[0].blocks.some((b) => b.kind === "scores")).toBe(true);
-    const recit = rapport.chapitres[1].blocks.find((b) => b.kind === "story");
+    expect(rapport.chapitres[0]!.title).toBe("Le verdict");
+    expect(rapport.chapitres[0]!.blocks.some((b) => b.kind === "scores")).toBe(true);
+    const recit = rapport.chapitres[1]!.blocks.find((b) => b.kind === "story");
     expect(recit && "messages" in recit && recit.messages?.[0]?.caption).toMatch(/· \d{2}\/\d{2}/);
   });
 
@@ -84,15 +84,15 @@ describe("de l’import à la mémoire", () => {
     expect(vocal?.lignes.length).toBeGreaterThan(2);
     expect(vocal?.lignes.some((l) => l.punch)).toBe(true);
     expect(vocal?.lignes.some((l) => l.recu?.caption)).toBe(true);
-    expect(vocal?.lignes.every((l, k, ls) => l.debut <= l.fin && (k === 0 || ls[k - 1].debut <= l.debut))).toBe(true);
+    expect(vocal?.lignes.every((l, k, ls) => l.debut <= l.fin && (k === 0 || ls[k - 1]!.debut <= l.debut))).toBe(true);
     const audio = (await audioDuCompte(u.id, imp.id))?.audio;
     expect(audio?.subarray(0, 2).toString("hex")).toBe("fffb");
-    const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id));
+    const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id)))[0]!;
     expect(brut.data.toString("utf8")).not.toContain("Lis la suite");
   });
 
   it("l’A/B test du vocal : l’écoute est notée sans contenu, et les chiffres sortent par voix", async () => {
-    const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id));
+    const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id)))[0]!;
     await noterEcoute(imp.id, "debut", 0);
     await noterEcoute(imp.id, "fin", brut.dureeMs);
     const stats = (await statsVocal()).find((s) => s.voix === "A");
@@ -112,7 +112,7 @@ describe("de l’import à la mémoire", () => {
 
   it("une nouvelle version du script : le vocal se refait (la conv effacée, sur le rapport et la mémoire), à une nouvelle adresse", async () => {
     const avant = await vocalPret(imp.id);
-    const [brut] = await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id));
+    const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id)))[0]!;
     const ancien = dechiffrer<DonneesVocal>(brut.data);
     await db().update(schema.vocals).set({ data: chiffrer({ ...ancien, version: 1 }) }).where(eq(schema.vocals.storyId, imp.id));
     expect(await vocalAJour(imp.id)).toBe(false);
@@ -126,19 +126,19 @@ describe("de l’import à la mémoire", () => {
     const echanges = (await historique(imp.id)).echanges.length;
     const { reponse, majMemoire } = await repondre(await relire(), await memoire(), "on s’est vus hier, c’était trop bien");
     expect(reponse.kind).toBe("bubbles");
-    expect(reponse.kind === "bubbles" && reponse.bubbles[0].messages?.length).toBe(1);
+    expect(reponse.kind === "bubbles" && reponse.bubbles[0]!.messages?.length).toBe(1);
     expect(majMemoire).toBe(true);
     const apres = (await historique(imp.id)).echanges;
     expect(apres).toHaveLength(echanges + 1);
     /* La réponse porte son échange (pour la partager en image), le même que dans l’historique */
     expect(reponse.echange).toBe(apres.at(-1)!.id);
     await executerChaine(imp.id);
-    const [maj] = await db()
+    const maj = (await db()
       .select()
       .from(schema.tasks)
       .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")))
       .orderBy(desc(schema.tasks.createdAt))
-      .limit(1);
+      .limit(1))[0]!;
     expect(maj.status).toBe("fini");
   });
 
@@ -148,7 +148,7 @@ describe("de l’import à la mémoire", () => {
     expect(parVocal.reponse.vocal?.peaks).toHaveLength(28);
     expect(parVocal.reponse.modeVocal).toBe(false);
     const id = Number(parVocal.reponse.vocal!.audio.split("/").at(-1));
-    const [audioChat] = await db().select().from(schema.chatVocals).where(eq(schema.chatVocals.id, id));
+    const audioChat = (await db().select().from(schema.chatVocals).where(eq(schema.chatVocals.id, id)))[0]!;
     expect(audioChat.storyId).toBe(imp.id);
     expect(dechiffrerOctets(audioChat.audio).subarray(0, 2).toString("hex")).toBe("fffb");
     expect((await historique(imp.id)).echanges.find((e) => e.id === parVocal.reponse.echange)?.answer.vocal).toBeDefined();

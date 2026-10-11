@@ -24,8 +24,8 @@ describe("la liste d’attente", () => {
     await inscrire(email, "connexion");
     const lignes = await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinte(`attente:${email}`)));
     expect(lignes).toHaveLength(1);
-    expect(lignes[0].source).toBe("accueil");
-    expect(Buffer.from(lignes[0].email).toString("utf8")).not.toContain("exemple");
+    expect(lignes[0]!.source).toBe("accueil");
+    expect(Buffer.from(lignes[0]!.email).toString("utf8")).not.toContain("exemple");
     expect(empreinteDeLaListe(` ${email.toUpperCase()} `)).toBe(empreinte(`attente:${email}`));
   });
 

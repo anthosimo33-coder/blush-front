@@ -65,7 +65,7 @@ describe("les prénoms dans ce qui se partage", () => {
 
 /** Change le verdict gardé de la conv (par le coffre, comme la chaîne l’écrit). */
 async function changerVerdict(storyId: string, f: (v: DonneesVerdict) => void) {
-  const [{ data }] = await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId));
+  const { data } = (await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, storyId)))[0]!;
   const v = coffre.lire("verdicts.data", data);
   f(v);
   await db().update(schema.verdicts).set({ data: coffre.ecrire("verdicts.data", v) }).where(eq(schema.verdicts.storyId, storyId));
@@ -97,7 +97,7 @@ describe("le lien de partage du verdict", () => {
     /* La feuille de partage reçoit ce que montre le lien, sans le relire */
     expect(await partager(story)).toEqual({ id, verdict: v });
     /* Rien en clair dans la base */
-    const [ligne] = await db().select().from(schema.shares).where(eq(schema.shares.id, id));
+    const ligne = (await db().select().from(schema.shares).where(eq(schema.shares.id, id)))[0]!;
     expect(ligne.data.toString("utf8")).not.toContain("attend");
   });
 
@@ -159,10 +159,10 @@ describe("partager un moment en image", () => {
       .insert(schema.reports)
       .values({ storyId: story.id, partiel: chiffrer([chute(1), chute(2)]) })
       .onConflictDoUpdate({ target: schema.reports.storyId, set: { partiel: chiffrer([chute(1), chute(2)]) } });
-    const [toi] = await db()
+    const toi = (await db()
       .insert(schema.chatMessages)
       .values({ storyId: story.id, role: "toi", data: coffre.ecrire("chat_messages.data:toi", { texte: "Elle m’attend ?" }) })
-      .returning({ id: schema.chatMessages.id });
+      .returning({ id: schema.chatMessages.id }))[0]!;
     await db()
       .insert(schema.chatMessages)
       .values({ storyId: story.id, role: "blush", data: coffre.ecrire("chat_messages.data:blush", { reponse: { kind: "bubbles", bubbles: [{ text: "Oui." }] }, resume: "oui" }) });

@@ -28,7 +28,7 @@ describe("petits cas de lecture", () => {
       { nom: "liste-de-courses.txt", contenu: "pain\nlait" },
       { nom: "WhatsApp Chat avec Léa.txt", contenu: conv },
     ]);
-    expect(parties && parties !== "plusieurs" && parties[0].nom).toBe("WhatsApp Chat avec Léa.txt");
+    expect(parties && parties !== "plusieurs" && parties[0]!.nom).toBe("WhatsApp Chat avec Léa.txt");
   });
 
   it("un JSON d’Instagram déjà en bon UTF-8 n’est pas « réparé » (et abîmé)", () => {
@@ -39,7 +39,7 @@ describe("petits cas de lecture", () => {
   it("des heures AM/PM sans jour au-delà de 12 : le mois d’abord (un téléphone américain)", () => {
     const texte = ["[9/1/26, 9:05:00 AM] Léa: hi", "[9/1/26, 9:06:00 AM] Tom: hey", "[9/2/26, 10:00:00 PM] Léa: ok"].join("\n");
     const lu = lire(texte, { utilisateur: { prenom: "Tom", pronom: "il", nomExport: "Tom" }, autre: { prenom: "Léa", pronom: "elle", nomExport: "Léa" }, format: "whatsapp-ios" });
-    expect(new Date(lu.messages[0].t).toISOString().slice(0, 10)).toBe("2026-09-01");
+    expect(new Date(lu.messages[0]!.t).toISOString().slice(0, 10)).toBe("2026-09-01");
   });
 
   it("le repère d’une capture : l’heure complétée (« 9:05 »), un repère illisible ignoré", () => {
@@ -91,7 +91,7 @@ describe("un export Instagram complet", () => {
     const ines = pret.convs.find((c) => c.messages === 12)!;
     const paquet = await lirePaquet(await pret.paquetDe(ines.id));
     expect(paquet.parties.map((p) => p.nom)).toEqual(["your_instagram_activity/messages/inbox/ines_2/message_1.json"]);
-    expect(paquet.parties[0].contenu).toContain("Inès 0");
+    expect(paquet.parties[0]!.contenu).toContain("Inès 0");
   });
 });
 
@@ -99,14 +99,14 @@ describe("le serveur", () => {
   /** Le modèle factice qui double un chapitre du rapport, et en sort un de sa moitié. */
   const debordant = (req: Requete) => {
     const s = fournisseurFactice(req) as { chapitres?: { numero: number }[] | null };
-    if (req.tache === "05-rapport" && s.chapitres?.length) return { ...s, chapitres: [...s.chapitres, s.chapitres[0], { ...s.chapitres[0], numero: s.chapitres[0].numero + 20 }] };
+    if (req.tache === "05-rapport" && s.chapitres?.length) return { ...s, chapitres: [...s.chapitres, s.chapitres[0], { ...s.chapitres[0], numero: s.chapitres[0]!.numero + 20 }] };
     return s;
   };
 
   it("garde chaque chapitre une fois, dans sa moitié, même si le modèle en double un", async () => {
     const u = await compteDeTest("mineurs", "blushplus");
     const imp = await avecFactice(debordant, () => histoireLue(u, "02-reciproque.txt"));
-    const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id));
+    const r = (await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id)))[0]!;
     expect(dechiffrer<DonneesRapport>(r.data!).chapitres.map((c) => c.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 

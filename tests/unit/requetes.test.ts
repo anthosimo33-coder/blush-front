@@ -76,7 +76,7 @@ function structure(req: Requete) {
 function bienFermees(t: string): boolean {
   const pile: string[] = [];
   for (const [, fin, nom] of t.matchAll(/<(\/?)([a-z_]+)[ >]?/g)) {
-    if (!fin) pile.push(nom);
+    if (!fin) pile.push(nom!);
     else if (pile.pop() !== nom) return false;
   }
   return pile.length === 0;
@@ -201,7 +201,7 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     }
     /* La conv n’y est pas : seulement les messages que la mémoire garde, et les chiffres de la conv */
     expect(textes(premier)[0]).not.toContain("<conversation");
-    expect([...new Set(textes(premier)[0].match(/\bm\d{4,}\b/g))].sort()).toEqual([...lignes.keys()].sort());
+    expect([...new Set(textes(premier)[0]!.match(/\bm\d{4,}\b/g))].sort()).toEqual([...lignes.keys()].sort());
     for (const l of lignes.values()) expect(textes(premier)[0]).toContain(l);
     expect(textes(premier)[0]).toContain(rendu.chiffres);
   });
@@ -217,8 +217,8 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
       const l = t.split("\n");
       return l.slice(l.indexOf(ouvre), l.indexOf(ferme) + 1);
     };
-    const enChat = textes(chat())[0];
-    const maj = textes(requeteMemoireMaj(h, Date.UTC(2026, 9, 1), etat, lignes, "<nouveau>\n</nouveau>"))[0];
+    const enChat = textes(chat())[0]!;
+    const maj = textes(requeteMemoireMaj(h, Date.UTC(2026, 9, 1), etat, lignes, "<nouveau>\n</nouveau>"))[0]!;
     const histoire = { chat: bloc(enChat, "<histoire>", "</histoire>"), maj: bloc(maj, "<histoire>", "</histoire>") };
     const memoire = { chat: bloc(enChat, "<memoire>", "</fiche>"), maj: bloc(maj, "<memoire>", "</fiche>") };
     /* Le chat : une ligne de plus juste avant </histoire>, qui porte le niveau ; le reste est celui de la mise à jour */
@@ -229,7 +229,7 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     expect(memoire.chat.toSpliced(1, 1)).toEqual(memoire.maj);
     expect(memoire.maj.some((l) => l.includes(rendu.fin))).toBe(false);
     /* Sans niveau (une mémoire du mode sobre), la ligne reste, et le dit */
-    expect(bloc(textes(chat({ etat: { ...etat, niveau: null } }))[0], "<histoire>", "</histoire>").at(-2)).toMatch(/ : mode sobre$/);
+    expect(bloc(textes(chat({ etat: { ...etat, niveau: null } }))[0]!, "<histoire>", "</histoire>").at(-2)).toMatch(/ : mode sobre$/);
   });
 
   it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style et le nouveau (instantané)", () => {

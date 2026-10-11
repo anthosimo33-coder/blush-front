@@ -60,7 +60,7 @@ function routesDocumentees(): Map<string, string[]> {
 }
 
 /** Les variables du tableau « Variables d’environnement » : celles de la première cellule (« `A`, `B` »). */
-const variablesDocumentees = () => tableau(section("Variables d’environnement")).flatMap(([cellule]) => [...(cellule ?? "").matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]));
+const variablesDocumentees = () => tableau(section("Variables d’environnement")).flatMap(([cellule]) => [...(cellule ?? "").matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]!));
 
 describe("BACKEND.md", () => {
   const code = routesDuCode();

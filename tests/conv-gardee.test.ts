@@ -34,7 +34,7 @@ describe("remonter", () => {
       ]),
     );
     expect(ids(c)).toEqual([-2, -1, 2]);
-    expect(c.msgs[2].answered).toBe(false);
+    expect(c.msgs[2]!.answered).toBe(false);
   });
 
   it("back-end : un échange de la visite prend son identifiant de l’historique", () => {

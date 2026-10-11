@@ -74,7 +74,7 @@ describe("un export Instagram complet", () => {
       ["maxime.drn", 30, false],
       ["Les zinzins", 60, true],
     ]);
-    expect(resumes[0].derniere).toMatch(/^2026-09-2\d$/);
+    expect(resumes[0]!.derniere).toMatch(/^2026-09-2\d$/);
   });
 });
 

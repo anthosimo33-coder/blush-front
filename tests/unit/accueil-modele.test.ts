@@ -131,7 +131,7 @@ describe("l’historique et l’intro, en messages", () => {
       ["texte", -102, "apercu", { day: -1, h: 22, m: 2 }],
       ["reponse", -103, "apercu", { day: -1, h: 22, m: 3 }],
     ]);
-    expect(msgs[1].type === "reponse" && msgs[1].result).toBe(answer);
+    expect(msgs[1]!.type === "reponse" && msgs[1]!.result).toBe(answer);
   });
 
   it("l’intro : à la fin de la lecture (puis une minute après), ou hier soir sans cette heure", () => {
@@ -217,7 +217,7 @@ describe("les lignes de la conv (rowsOf)", () => {
     /* Deux réponses à la suite (l’aperçu sans tes messages) et un mot de BLUSH : un seul groupe, l’échange de la dernière réponse */
     const suite = rowsOf([...echangesEnMsgs([{ id: 7, answer: reponse("a"), at: le(10, 9) }, { id: 8, answer: reponse("b"), at: le(10, 10) }]), { type: "mot", id: 3, from: "blush", notice: "Je n’ai rien entendu.", at: le(10, 11) }], OUVERT, 1);
     expect(lu(suite)).toEqual([`jour jour-${idHistorique(7, true)}`, `blush ${idHistorique(7, true)}-0 [${idHistorique(7, true)}, ${idHistorique(8, true)}, 3]`]);
-    expect(suite[1].kind === "group" && [suite[1].at, suite[1].echange]).toEqual([le(10, 11), 8]);
+    expect(suite[1]!.kind === "group" && [suite[1]!.at, suite[1]!.echange]).toEqual([le(10, 11), 8]);
   });
 
   it("un niveau franchi coupe le groupe, sans date ni heure à lui ; il fait son entrée s’il est de la visite", () => {
@@ -264,7 +264,7 @@ describe("les lignes de la conv (rowsOf)", () => {
     const ecrit = { type: "ecrit", id: 2, from: "blush", reading: "BLUSH analyse sa réponse" } as const;
     expect([tapeEncore(ecrit), tapeEncore({ ...ecrit, recues: [] }), tapeEncore({ ...ecrit, recues: [{ text: "attends" }] }), tapeEncore({ ...ecrit, coupee: true })]).toEqual([true, true, false, false]);
     expect(tapeEncore({ type: "reponse", id: 2, from: "blush", result: reponse("ok") })).toBe(false);
-    expect(rowsOf([{ ...ecrit, recues: [{ text: "attends" }], at: le(11, 9) }], OUVERT, 1)[1].key).toBe("2-0");
+    expect(rowsOf([{ ...ecrit, recues: [{ text: "attends" }], at: le(11, 9) }], OUVERT, 1)[1]!.key).toBe("2-0");
   });
 });
 

@@ -25,7 +25,7 @@ const verite = (sansVerite ? { aujourdhui: new Date().toISOString().slice(0, 10)
 const fichiers = readdirSync(dossier).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).sort((a, b) => +(a.match(/\d+/)?.[0] ?? 0) - +(b.match(/\d+/)?.[0] ?? 0));
 const type = (f: string) => (/\.webp$/i.test(f) ? "image/webp" : /\.jpe?g$/i.test(f) ? "image/jpeg" : "image/png") as "image/png";
 const ordre = ordreArg ? ordreArg.split(",").map(Number) : fichiers.map((_, k) => k + 1);
-const images = ordre.map((k) => ({ media: type(fichiers[k - 1]), base64: readFileSync(join(dossier, fichiers[k - 1])).toString("base64") }));
+const images = ordre.map((k) => ({ media: type(fichiers[k - 1]!), base64: readFileSync(join(dossier, fichiers[k - 1]!)).toString("base64") }));
 
 const t0 = Date.now();
 const a = await appeler(requeteCaptures({ prenom: "Sarah", autre: null, appli: "instagram", aujourdhui: Date.parse(`${verite.aujourdhui}T00:00:00Z`), images }), Sortie01, { etiquette: "essai_captures" });
@@ -58,7 +58,7 @@ const lus = c.blocs.flatMap((b) => b.messages);
 const A = vrais.map(cle);
 const B = lus.map(cle);
 const L = Array.from({ length: A.length + 1 }, () => new Array(B.length + 1).fill(0));
-for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i]![j] = A[i] === B[j] ? L[i + 1]![j + 1] + 1 : Math.max(L[i + 1]![j], L[i]![j + 1]);
 const manques: string[] = [];
 const enTrop: string[] = [];
 for (let i = 0, j = 0; i < A.length || j < B.length; ) {
@@ -66,8 +66,8 @@ for (let i = 0, j = 0; i < A.length || j < B.length; ) {
     i++;
     j++;
   }
-  else if (j < B.length && (i === A.length || L[i][j + 1] >= L[i + 1][j])) enTrop.push(B[j++]);
-  else manques.push(A[i++]);
+  else if (j < B.length && (i === A.length || L[i]![j + 1] >= L[i + 1]![j])) enTrop.push(B[j++]!);
+  else manques.push(A[i++]!);
 }
 const reperes = c.blocs.filter((b) => b.repere).map((b) => `${b.repere!.date} ${b.repere!.heure ?? ""}`.trim());
 const reperesVrais = verite.blocs.map((b) => `${b.repere.date} ${b.repere.heure}`);
@@ -76,7 +76,7 @@ const texte = versTexteCaptures(c, { aujourdhui: verite.aujourdhui });
 const lu = lire(texte.texte, { utilisateur: { prenom: "Sarah", pronom: "elle", nomExport: "Moi" }, autre: { prenom: texte.autre, pronom: "il", nomExport: texte.autre }, format: "captures" });
 
 console.log(`ordre d’envoi ${ordre.join(",")} · ${Math.round((Date.now() - t0) / 1000)} s · ${a.cout.toFixed(3)} $`);
-console.log(`messages : ${L[0][0]} / ${A.length} retrouvés mot pour mot · ${lus.length} écrits · manquants ${manques.length} · en trop ${enTrop.length}`);
+console.log(`messages : ${L[0]![0]} / ${A.length} retrouvés mot pour mot · ${lus.length} écrits · manquants ${manques.length} · en trop ${enTrop.length}`);
 console.log(`repères : ${reperes.filter((r) => reperesVrais.includes(r)).length} / ${reperesVrais.length} justes (${reperes.join(" | ")})`);
 console.log(`réactions : ${reactions} / 2 · places : ${c.captures.map((x) => `${x.numero}→${x.place}`).join(" ")} · autre : ${c.autre} · doutes : ${c.doutes.join(" ; ") || "aucun"}`);
 console.log(`profil : ${c.profil.length ? c.profil.join(" | ") : "rien"} (attendu : rien)`);

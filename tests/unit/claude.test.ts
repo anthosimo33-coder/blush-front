@@ -40,7 +40,7 @@ type Envoi = Parameters<Fournisseur["envoyer"]>;
 /** Le faux prestataire : ce qu’il reçoit, et ce qu’il fait de chaque envoi (rendre un message, lever une erreur, écrire en flux). */
 function faux(...reponses: ((...envoi: Envoi) => Promise<MessageRecu>)[]) {
   const envois: Envoi[] = [];
-  definirFournisseur({ envoyer: async (...envoi) => (envois.push(envoi), reponses[envois.length - 1](...envoi)) });
+  definirFournisseur({ envoyer: async (...envoi) => (envois.push(envoi), reponses[envois.length - 1]!(...envoi)) });
   return envois;
 }
 const rend = (m: MessageRecu) => async () => m;
@@ -142,9 +142,9 @@ describe("appeler : l’envoi", () => {
     const envois = faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
     await appeler(VERDICT, Format);
     await avecEcheance(100_000, () => appeler(VERDICT, Format));
-    expect(envois[0][1]).toMatchObject({ timeout: 600_000, maxRetries: 2 });
-    expect(envois[1][1].maxRetries).toBe(0);
-    expect(envois[1][1].timeout).toBeLessThanOrEqual(95_000);
+    expect(envois[0]![1]).toMatchObject({ timeout: 600_000, maxRetries: 2 });
+    expect(envois[1]![1].maxRetries).toBe(0);
+    expect(envois[1]![1].timeout).toBeLessThanOrEqual(95_000);
   });
 
   it("plus le temps avant l’échéance : l’appel ne part pas (« delai »)", async () => {
@@ -163,7 +163,7 @@ describe("appeler : l’envoi", () => {
   it("passe au prestataire la requête et sa partie, avec les paramètres du SDK", async () => {
     const envois = faux(rend(message([texte('{"ok":true}')])));
     await appeler(VERDICT, Format, { partie: "plan" });
-    expect(envois[0][0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
+    expect(envois[0]![0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
   });
 });
 
@@ -187,7 +187,7 @@ function clientSDK(...reponses: (() => Response)[]) {
     maxRetries: 0,
     fetch: async (_url, init) => {
       recus.push({ corps: JSON.parse(String(init?.body)) as Record<string, unknown>, beta: new Headers(init?.headers).get("anthropic-beta") });
-      return reponses[recus.length - 1]();
+      return reponses[recus.length - 1]!();
     },
   });
   return { sdk: prestataireSDK(() => client), recus };
@@ -206,7 +206,7 @@ describe("prestataireSDK : le vrai client du SDK", () => {
     const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null });
     expect(m.content).toEqual([{ type: "text", text: '{"ok":true}', citations: null }]);
     expect(m._request_id).toBe("req_1");
-    expect(recus[0].corps.stream).toBeUndefined();
+    expect(recus[0]!.corps.stream).toBeUndefined();
   });
 
   it("en flux : chaque bloc qui commence, la réflexion et le texte arrivent au suivi, repli compris ; puis le message entier", async () => {
@@ -228,7 +228,7 @@ describe("prestataireSDK : le vrai client du SDK", () => {
     );
     const { ecoute, vu } = ecouteNotee();
     const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: true, ecoute });
-    expect(recus[0].corps.stream).toBe(true);
+    expect(recus[0]!.corps.stream).toBe(true);
     expect(vu).toEqual(["bloc thinking", "réflexion hmm", "bloc fallback", "bloc text", 'texte {"ok":', "texte true}"]);
     expect(m.content.map((b) => b.type)).toEqual(["thinking", "fallback", "text"]);
     expect(m.content.at(-1)).toMatchObject({ type: "text", text: '{"ok":true}' });

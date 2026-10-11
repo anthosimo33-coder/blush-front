@@ -56,5 +56,5 @@ export async function quiEnregistre(email: string): Promise<QuiEnregistre | null
     where u.email = ${email.toLowerCase()} order by s.created_at desc limit 1`;
   if (!s) return null;
   const meta = dechiffrer<{ participants: { prenom: string }[]; moi?: 0 | 1; pronom?: string; devinette?: string; objectif?: string }>(s.meta);
-  return { moi: meta.moi == null ? "" : meta.participants[meta.moi].prenom, pronom: meta.pronom, devinette: meta.devinette, objectif: meta.objectif };
+  return { moi: meta.moi == null ? "" : meta.participants[meta.moi]!.prenom, pronom: meta.pronom, devinette: meta.devinette, objectif: meta.objectif };
 }

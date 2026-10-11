@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ChoiceTile, RadioGroup, Segmented } from "@/components/ui/controls";
+import { auMoins } from "../aide/listes";
 
 /*
  * Les groupes de radios au clavier (RadioGroup, useRovingRadio : src/components/ui/controls.tsx), sous les quatre
@@ -33,14 +34,14 @@ describe("RadioGroup", () => {
     render(<Tuiles />);
     expect(screen.getByRole("radiogroup", { name: "Ce que tu veux" })).toBeTruthy();
     expect(arrets()).toEqual([0, -1, -1]);
-    fireEvent.click(radios()[2]);
+    fireEvent.click(radios()[2]!);
     expect(arrets()).toEqual([-1, -1, 0]);
   });
 
   it("les flèches passent à l’option voisine et la choisissent, en boucle dans les deux sens", () => {
     const onChange = vi.fn();
     render(<Tuiles depart="ensemble" onChange={onChange} />);
-    const [a, b, c] = radios();
+    const [a, b, c] = auMoins(radios(), 3);
     a.focus();
     fireEvent.keyDown(a, { key: "ArrowRight" });
     expect(document.activeElement).toBe(b);
@@ -60,7 +61,7 @@ describe("RadioGroup", () => {
   it("Début et Fin vont aux extrémités ; une autre touche, ou une flèche avec un modificateur, ne change rien", () => {
     const onChange = vi.fn();
     render(<Tuiles depart="reciproque" onChange={onChange} />);
-    const [a, b, c] = radios();
+    const [a, b, c] = auMoins(radios(), 3);
     fireEvent.keyDown(b, { key: "End" });
     expect(document.activeElement).toBe(c);
     fireEvent.keyDown(c, { key: "Home" });
@@ -84,7 +85,7 @@ describe("RadioGroup", () => {
         </button>
       </RadioGroup>,
     );
-    const [seule] = radios();
+    const seule = radios()[0]!;
     fireEvent.keyDown(seule, { key: "ArrowRight" });
     expect(document.activeElement).toBe(seule);
     expect(onChange).not.toHaveBeenCalled();
@@ -110,7 +111,7 @@ describe("Segmented", () => {
     render(<Choix />);
     expect(screen.getByRole("radiogroup", { name: "Ce que tu envoies" })).toBeTruthy();
     expect(arrets()).toEqual([0, -1]);
-    fireEvent.keyDown(radios()[0], { key: "ArrowRight" });
+    fireEvent.keyDown(radios()[0]!, { key: "ArrowRight" });
     expect(screen.getByRole("radio", { name: "Des captures" }).getAttribute("aria-checked")).toBe("true");
     expect(arrets()).toEqual([-1, 0]);
   });

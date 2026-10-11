@@ -28,10 +28,10 @@ const QUI: Qui = { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" 
 let comptes = 0;
 /** Un compte neuf (gratuit, sauf `plan`), à l’email unique `<prefixe>-…@blush.test`, effacé à la fin du fichier. */
 export async function compteDeTest(prefixe: string, plan: Utilisateur["plan"] = "gratuit"): Promise<Utilisateur> {
-  const [u] = await db()
+  const u = (await db()
     .insert(schema.users)
     .values({ email: `${prefixe}-${Date.now()}-${++comptes}@blush.test`, plan })
-    .returning();
+    .returning())[0]!;
   creees.comptes.push(u.id);
   return u;
 }
@@ -78,7 +78,7 @@ export async function histoireLue(u: Utilisateur, conv: string | Importee, { qui
 }
 
 /** La ligne d’une histoire telle qu’elle est en base, conv brute comprise. */
-export const ligneEnBase = async (id: string): Promise<LigneComplete> => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0];
+export const ligneEnBase = async (id: string): Promise<LigneComplete> => (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
 
 /** Un modèle factice : ce qu’il rend pour une requête (definirFactice, src/server/ia/claude.ts). */
 type Factice = (req: Requete) => unknown;

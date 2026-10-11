@@ -17,9 +17,13 @@ export const EVALS = join(import.meta.dirname, "../../prompts/evals");
 
 /**
  * Un chemin donné en argument d’un essai, lu depuis le dossier où la commande a été tapée : `npm run` se place à la
- * racine du dépôt, et garde ce dossier dans INIT_CWD.
+ * racine du dépôt, et garde ce dossier dans INIT_CWD. Un argument manquant (`process.argv[k]`, undefined) arrête l’essai
+ * en le disant : chaque script écrit son usage dans son en-tête.
  */
-export const cheminDonne = (chemin: string) => resolve(process.env.INIT_CWD ?? process.cwd(), chemin);
+export function cheminDonne(chemin: string | undefined): string {
+  if (chemin === undefined) throw new Error("un chemin manque parmi les arguments de l’essai (son usage : l’en-tête du script)");
+  return resolve(process.env.INIT_CWD ?? process.cwd(), chemin);
+}
 
 /**
  * Les tâches d’une histoire, dans l’ordre de leur création : sans tri, Postgres les rend dans l’ordre de leur dernière
@@ -35,9 +39,9 @@ export async function rapportEnBase(storyId: string): Promise<DonneesRapport | n
 
 /** Ce qu’ont coûté les appels au modèle d’une histoire (ai_usage), en dollars, et leur nombre. */
 export async function coutDe(storyId: string): Promise<{ dollars: number; appels: number }> {
-  const [c] = await db()
+  const c = (await db()
     .select({ micros: sql<string | null>`sum(${schema.aiUsage.costMicros})`, appels: sql<number>`count(*)::int` })
     .from(schema.aiUsage)
-    .where(eq(schema.aiUsage.storyId, storyId));
+    .where(eq(schema.aiUsage.storyId, storyId)))[0]!;
   return { dollars: Number(c.micros ?? 0) / 1e6, appels: c.appels };
 }

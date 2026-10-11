@@ -11,16 +11,16 @@ describe("chiffrement", () => {
 
   it("refuse un contenu modifié", () => {
     const b = chiffrer({ a: 1 });
-    b[b.length - 1] ^= 1;
+    b[b.length - 1]! ^= 1;
     expect(() => dechiffrer(b)).toThrow();
   });
 
   it("refuse un contenu modifié, compressé ou en octets bruts", () => {
     const compresse = chiffrerCompresse("Léa: coucou\n".repeat(100));
-    compresse[compresse.length - 1] ^= 1;
+    compresse[compresse.length - 1]! ^= 1;
     expect(() => dechiffrer(compresse)).toThrow();
     const octets = chiffrerOctets(Buffer.from("fffb9064", "hex"));
-    octets[20] ^= 1;
+    octets[20]! ^= 1;
     expect(() => dechiffrerOctets(octets)).toThrow();
   });
 
