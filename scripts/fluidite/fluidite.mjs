@@ -1,6 +1,6 @@
 /*
- * Banc de fluidité de l’accueil : Chrome en taille iPhone, processeur ralenti (CPU=4 par défaut, comme un téléphone),
- * chaque scénario joué pour de vrai. Deux mesures :
+ * Banc de fluidité de l’accueil (et du rapport) : Chrome en taille iPhone, processeur ralenti (CPU=4 par défaut, comme
+ * un téléphone), chaque scénario joué pour de vrai. Deux mesures :
  *   - « écran » : les images que le compositeur (viz) a vraiment dessinées, et pendant chaque geste (toucher, lettres,
  *     molette) le pire trou entre deux images, les trous de plus de 34 ms (deux images ratées d’affilée), et le délai
  *     entre le toucher et la première image qui suit ;
@@ -13,16 +13,12 @@
  *   npm run fluidite                                  (le serveur des tests et un compte BLUSH+ semé : scripts/galerie/fluidite.spec.ts)
  *   NORAF=1 RUNS=3 npm run fluidite                   (sans la boucle requestAnimationFrame du fil, trois passages)
  *   ONLY=pastille,feuille DEBUG=1 npm run fluidite    (le détail des longues images et de leurs scripts)
+ *   ONLY=vocal,rapport npm run fluidite               (le vocal en cours, au micro factice, et le défilement du rapport)
  * L’ancien compteur (PipelineReporter de Chrome) ne s’affiche plus que sous DEBUG : il marque « perdue » toute image
  * dont le seul changement est en bas de l’écran (la bulle du rapport, par exemple), même quand viz l’a bien dessinée.
  */
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const { chromium } = require("playwright-core");
+import { chromium } from "playwright-core";
 
 const BASE = process.env.BASE ?? "http://localhost:3300";
 const CPU = Number(process.env.CPU ?? 4);
@@ -32,15 +28,6 @@ const SESSION = process.env.SESSION;
 if (!SESSION) throw new Error("SESSION manque : la valeur du cookie blush-session d’un compte BLUSH+ (ou npm run fluidite, qui en sème un)");
 /* Un serveur local seulement : le banc écrit au chat du compte, et son cookie ne doit jamais être celui d’un compte réel */
 if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(BASE)) throw new Error(`BASE refusée : « ${BASE} » (le banc ne mesure qu’un serveur local, jamais la production)`);
-
-function chromePath() {
-  const cache = path.join(os.homedir(), "Library/Caches/ms-playwright");
-  for (const b of fs.readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse()) {
-    const full = path.join(cache, b, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
-    if (fs.existsSync(full)) return full;
-  }
-  throw new Error("Chromium introuvable");
-}
 
 const INIT = (noraf) => {
   window.__f = [];
@@ -228,6 +215,28 @@ const SCENARIOS = {
     });
     return r;
   },
+  async vocal(page) {
+    /* Champ vide : le bouton du vocal remplace la flèche. Le micro factice de Chromium (un bip) s’enregistre quelques
+       secondes, la barre d’enregistrement suit son niveau en direct, puis le vocal est jeté sans rien envoyer */
+    const input = page.locator("input[enterkeyhint]");
+    await input.fill("");
+    const annuler = page.getByRole("button", { name: "Annuler le vocal" });
+    let enregistre = false;
+    const r = await measure(page, "12 · vocal en cours", async () => {
+      await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
+      enregistre = await annuler.waitFor({ timeout: 5000 }).then(
+        () => true,
+        () => false,
+      );
+      if (!enregistre) return;
+      await sleep(3500);
+      await annuler.click();
+      await sleep(600);
+    });
+    /* Sans la barre d’enregistrement, la mesure n’est qu’un toucher : le scénario échoue */
+    if (!enregistre) throw new Error("l’enregistrement n’a pas démarré (le micro factice de Chromium ?) : la mesure n’est qu’un toucher");
+    return r;
+  },
   async fiche(page) {
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await sleep(300);
@@ -240,12 +249,45 @@ const SCENARIOS = {
       await sleep(900);
     });
   },
+  async rapport(page) {
+    /* Le rapport du compte, lu d’un bout à l’autre à la molette, puis remonté : la progression de lecture et la barre du
+       chapitre en cours suivent le défilement */
+    await page.goto(`${BASE}/rapport`);
+    await page.locator("#chapitre-2").waitFor();
+    await sleep(1200);
+    await page.mouse.move(200, 400);
+    const depart = await page.evaluate(() => scrollY);
+    let plusBas = depart;
+    const r = await measure(page, "13 · défilement du rapport", async () => {
+      for (let i = 0; i < 48; i++) {
+        await page.mouse.wheel(0, 120);
+        await sleep(16);
+      }
+      await sleep(400);
+      plusBas = await page.evaluate(() => scrollY);
+      for (let i = 0; i < 24; i++) {
+        await page.mouse.wheel(0, -120);
+        await sleep(16);
+      }
+      await sleep(400);
+    });
+    /* Une page qui n’a pas bougé ne mesure rien : le scénario échoue */
+    if (plusBas - depart < 2000) throw new Error(`le rapport n’a défilé que de ${Math.round(plusBas - depart)} px : la mesure ne vaut rien`);
+    return r;
+  },
 };
 
-const browser = await chromium.launch({ executablePath: chromePath(), args: ["--enable-features=LongAnimationFrameTiming"] });
+/*
+ * Le Chromium de Playwright (`npx playwright install chromium`), le navigateur complet (channel « chromium ») plutôt que
+ * la coquille sans écran, dont le compositeur ne se trace pas pareil ; et son micro factice (un bip), autorisé d’office.
+ */
+const browser = await chromium.launch({
+  channel: "chromium",
+  args: ["--enable-features=LongAnimationFrameTiming", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+});
 const rows = [];
 for (let run = 0; run < RUNS; run++) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-FR" });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-FR", permissions: ["microphone"] });
   /* Un contexte neuf à chaque passage : l’arrivée de l’accueil se joue */
   await ctx.addCookies([{ name: "blush-session", value: SESSION, url: BASE }]);
   await ctx.addInitScript(INIT, !!process.env.NORAF);
@@ -255,8 +297,8 @@ for (let run = 0; run < RUNS; run++) {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU });
   for (const [name, fn] of Object.entries(SCENARIOS)) {
     if (ONLY && !ONLY.includes(name)) continue;
-    /* Lancé seul, un scénario ouvre d’abord l’accueil (l’arrivée s’en charge sinon) */
-    if (name !== "arrivee" && !page.url().includes("/app")) {
+    /* Lancé seul, un scénario de l’accueil l’ouvre d’abord (l’arrivée s’en charge sinon) ; celui du rapport ouvre sa page */
+    if (name !== "arrivee" && name !== "rapport" && !page.url().includes("/app")) {
       await page.goto(`${BASE}/app`);
       await sleep(1500);
     }
