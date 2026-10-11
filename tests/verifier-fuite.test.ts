@@ -3,14 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { canari, decoder, ENCODAGES, MIN_PHRASES, mots, phrasesDesPrompts, TAILLE } from "../scripts/verifier-fuite.mjs";
+import { canari, decoder, ENCODAGES, indexDes, MIN_SUITES, mots, phrasesDesPrompts, TAILLE, textesDesPrompts } from "../scripts/verifier-fuite.mjs";
 
 /*
  * scripts/verifier-fuite.mjs, lancé après chaque build : sur un faux .next, une phrase d’un prompt glissée dans ce que
  * reçoit le navigateur fait échouer le build (code 1), quelle que soit sa forme (mise en forme, échappée, en entités
- * HTML), et une vérification qui ne vérifierait rien aussi (pas de build, aucun fichier). Un build propre passe, comme
- * un texte qui partage moins de TAILLE mots d’affilée avec les prompts. Les phrases sont lues dans le sous-module à
- * chaque lancement : aucune n’est recopiée ici (le dépôt est public).
+ * HTML, en lignes courtes), et une vérification qui ne vérifierait rien aussi (pas de build, aucun fichier). Un build
+ * propre passe, comme un texte qui partage moins de TAILLE mots d’affilée avec les prompts. Les phrases sont lues dans
+ * le sous-module à chaque lancement : aucune n’est recopiée ici (le dépôt est public).
  */
 const SCRIPT = join(__dirname, "../scripts/verifier-fuite.mjs");
 let racine: string;
@@ -32,8 +32,8 @@ beforeEach(() => {
 afterEach(() => rmSync(racine, { recursive: true, force: true }));
 
 describe("la vérification des prompts dans le build", { timeout: 30_000 }, () => {
-  it("lit assez de phrases dans les prompts pour que la vérification prouve quelque chose", () => {
-    expect(phrasesDesPrompts().length).toBeGreaterThanOrEqual(MIN_PHRASES);
+  it("lit assez de suites dans les prompts pour que la vérification prouve quelque chose", () => {
+    expect(indexDes(textesDesPrompts()).size).toBeGreaterThanOrEqual(MIN_SUITES);
   });
 
   it("passe sur un build sans prompt", () => {
@@ -49,7 +49,7 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     ecrire("static/chunks/app/page.js", `const consigne = ${JSON.stringify(phrase)};`);
     const { code, sortie } = verifier();
     expect(code).toBe(1);
-    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js (phrase n° 1 sur");
+    expect(sortie).toMatch(/fuite des prompts : static\/chunks\/app\/page\.js \(prompts\/[\w-]+\.md, mot n° \d+\)/);
     /* La sortie ne recopie pas la phrase (les logs de la CI sont publics) ; un booléen, pour qu’un échec ne l’affiche pas non plus */
     expect(sortie.includes(phrase)).toBe(false);
   });
@@ -84,6 +84,35 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
     expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
   });
 
+  it("échoue aussi sur un passage fait de lignes courtes (une liste de règles), chacune de moins de TAILLE mots", () => {
+    /* Des lignes qui se suivent dans un prompt, chacune trop courte pour une suite de TAILLE mots, mais pas leur suite */
+    const passage = textesDesPrompts()
+      .flatMap(({ texte }) => {
+        const blocs: string[][] = [[]];
+        for (const l of texte.split("\n")) {
+          const n = mots(l).length;
+          if (n > 0 && n < TAILLE) blocs.at(-1)!.push(l);
+          else blocs.push([]);
+        }
+        return blocs;
+      })
+      .find((b) => mots(b.join("\n")).length >= TAILLE + 2);
+    expect(passage, "aucune suite de lignes courtes dans les prompts").toBeDefined();
+    ecrire("static/chunks/app/page.js", `const regles = ${JSON.stringify(passage!.join("\n"))};`);
+    const { code, sortie } = verifier();
+    expect(code).toBe(1);
+    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
+    expect(sortie.includes(passage![0])).toBe(false);
+  });
+
+  it("échoue aussi quand la phrase est au milieu d’un JavaScript minifié qui contient un « < » (ce n’est pas une balise)", () => {
+    const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2 && !/[<>]/.test(ph))!;
+    ecrire("static/chunks/app/page.js", `x="u"<typeof window?${JSON.stringify(phrase)}:(a)=>a;`);
+    const { code, sortie } = verifier();
+    expect(code).toBe(1);
+    expect(sortie).toContain("fuite des prompts : static/chunks/app/page.js");
+  });
+
   it(`passe quand un texte ne partage que ${TAILLE - 1} mots d’affilée avec une phrase des prompts`, () => {
     const phrase = phrasesDesPrompts().find((ph) => mots(ph).length >= TAILLE + 2)!;
     ecrire("static/chunks/app/page.js", `const t = ${JSON.stringify(mots(phrase).slice(0, TAILLE - 1).join(" "))};`);
@@ -93,14 +122,18 @@ describe("la vérification des prompts dans le build", { timeout: 30_000 }, () =
   });
 
   it("le canari : une phrase des prompts écrite sous chaque forme est retrouvée, et une recherche aveugle le dit", () => {
-    const phrases = phrasesDesPrompts();
-    expect(canari(phrases)).toEqual([]);
+    const textes = textesDesPrompts();
+    expect(canari(textes)).toEqual([]);
     /* Sans index (une recherche qui ne trouverait rien), chaque forme est signalée */
-    expect(canari(phrases, new Map())).toEqual(Object.keys(ENCODAGES));
+    expect(canari(textes, new Map())).toEqual(Object.keys(ENCODAGES));
   });
 
   it("décode les échappements du JavaScript et les entités HTML, même deux fois", () => {
     expect(decoder("l\\u2019autre \\x27a\\x27 \\u{1F600}")).toBe("l’autre 'a' 😀");
+    /* Échappé deux fois : chaque passe enlève un niveau, l’antislash échappé n’entame pas l’échappement qui le suit */
+    expect(decoder("l\\\\u2019autre")).toBe("l’autre");
+    expect(mots(decoder("l\\\\u2019autre"))).toEqual(["l'autre"]);
+    expect(decoder("a\\\\nous")).toBe("a ous");
     expect(decoder("&lt;p&gt;l&#x27;autre &amp;amp; &#8217; &rsquo;&quot;")).toBe("<p>l'autre & ’ ’\"");
     expect(mots("<p>C’est <!-- -->l’<strong>AUTRE</strong>, 'vraiment'</p>")).toEqual(["c'est", "l", "autre", "vraiment"]);
   });

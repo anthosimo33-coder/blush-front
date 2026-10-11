@@ -5,6 +5,9 @@
  *     molette) le pire trou entre deux images, les trous de plus de 34 ms (deux images ratées d’affilée), et le délai
  *     entre le toucher et la première image qui suit ;
  *   - « fil » : les images du fil principal (requestAnimationFrame) et ses longues tâches (LoAF).
+ * Le compositeur ne dessine rien d’une page immobile : un scénario garde l’écran en mouvement pendant ses gestes (une
+ * pause, ou une page arrivée en bas, compterait pour un trou), et marque comme geste ce qui bouge sans toucher (le
+ * vocal en cours). Sous DEBUG, chaque geste dit où tombe son pire trou.
  * Une animation saine ne touche que transform et opacity : le compositeur la joue même quand le fil principal est occupé.
  * Chrome reste un substitut de l’iPhone : un écart se confirme sur Safari (WebKit) ou sur un vrai téléphone.
  * L’accueil d’un compte BLUSH+ semé dont la conv est lue, sur le serveur des tests : SESSION, la valeur de son cookie
@@ -85,14 +88,19 @@ async function traced(run) {
   for (const m of marks) {
     const g = gestes.at(-1);
     if (g && m.t - g.fin < GESTE) g.fin = m.t;
-    else gestes.push({ type: m.type, debut: m.t, fin: m.t });
+    else gestes.push({ type: m.type, debut: m.t, fin: m.t, marques: [] });
+    gestes.at(-1).marques.push(m.t);
   }
   const parGeste = gestes.map((g) => {
     const fin = g.fin + GESTE;
     const premiere = draws.find((t) => t > g.debut);
     const dans = [g.debut, ...draws.filter((t) => t > g.debut && t <= fin)];
     const ecarts = dans.slice(1).map((t, i) => t - dans[i]);
-    return { type: g.type, delai: premiere === undefined ? null : premiere - g.debut, pire: Math.max(0, ...ecarts), trous: ecarts.filter((x) => x > TROU).length };
+    const pire = Math.max(0, ...ecarts);
+    /* Pour DEBUG : où tombe le pire trou dans le geste, et le geste (marque) le plus proche avant lui */
+    const debutPire = dans[ecarts.indexOf(pire)] ?? g.debut;
+    const marqueAvant = g.marques.filter((t) => t <= debutPire).at(-1) ?? g.debut;
+    return { type: g.type, delai: premiere === undefined ? null : premiere - g.debut, pire, trous: ecarts.filter((x) => x > TROU).length, pireA: debutPire - g.debut, apresMarque: debutPire - marqueAvant, duree: fin - g.debut, marques: g.marques.length };
   });
   const states = {};
   for (const e of events) {
@@ -123,7 +131,7 @@ async function measure(page, label, run) {
     f.forEach((d) => { t += d; if (d > 25) big.push(`${Math.round(t)}:${Math.round(d)}`); });
     console.log(label, "images longues (t:durée)", big.join(" "));
     for (const e of loaf) console.log("   LoAF", Math.round(e.d), "ms, rendu", e.render, "style+layout", e.style, e.scripts.join(" | "));
-    console.log("   gestes", parGeste.map((g) => `${g.type} délai ${g.delai === null ? "?" : Math.round(g.delai)} pire ${Math.round(g.pire)} trous ${g.trous}`).join(" | "));
+    console.log("   gestes", parGeste.map((g) => `${g.type} délai ${g.delai === null ? "?" : Math.round(g.delai)} pire ${Math.round(g.pire)} (à ${Math.round(g.pireA)} ms sur ${Math.round(g.duree)}, ${Math.round(g.apresMarque)} ms après la marque d’avant, ${g.marques} marques) trous ${g.trous}`).join(" | "));
     /* L’ancien compteur, pour comparer : à ne pas croire seul (voir l’en-tête) */
     console.log("   PipelineReporter (indicatif, faux « perdues » en bas d’écran)", JSON.stringify(states));
   }
@@ -229,7 +237,12 @@ const SCENARIOS = {
         () => false,
       );
       if (!enregistre) return;
-      await sleep(3500);
+      /* Sans geste pendant l’enregistrement, les colonnes « écran » ne le verraient pas : une marque toutes les 400 ms
+         en fait un seul geste, du toucher sur Enregistrer jusqu’à Annuler */
+      for (let i = 0; i < 9; i++) {
+        await page.evaluate(() => performance.mark("geste:enregistrement"));
+        await sleep(400);
+      }
       await annuler.click();
       await sleep(600);
     });
@@ -250,22 +263,27 @@ const SCENARIOS = {
     });
   },
   async rapport(page) {
-    /* Le rapport du compte, lu d’un bout à l’autre à la molette, puis remonté : la progression de lecture et la barre du
+    /* Le rapport du compte, lu à la molette jusque près du bas, puis remonté : la progression de lecture et la barre du
        chapitre en cours suivent le défilement */
     await page.goto(`${BASE}/rapport`);
     await page.locator("#chapitre-2").waitFor();
     await sleep(1200);
     await page.mouse.move(200, 400);
-    const depart = await page.evaluate(() => scrollY);
+    const { depart, bas } = await page.evaluate(() => ({ depart: scrollY, bas: document.documentElement.scrollHeight - innerHeight }));
+    /* Des crans qui font tous bouger la page : arrivée en bas, la page ne bouge plus et le compositeur n’a plus rien à
+       dessiner, ce qui compterait pour un trou (mesuré en octobre 2026 : 115 à 200 ms, scrollY figé tout du long) */
+    const crans = Math.min(48, Math.floor((bas - depart - 240) / 120));
     let plusBas = depart;
     const r = await measure(page, "13 · défilement du rapport", async () => {
-      for (let i = 0; i < 48; i++) {
+      for (let i = 0; i < crans; i++) {
         await page.mouse.wheel(0, 120);
         await sleep(16);
       }
-      await sleep(400);
+      /* Plus de GESTE ms à l’arrêt avant de remonter : deux gestes. Dans un seul, la page immobile entre la descente et
+         la remontée compterait aussi pour un trou */
+      await sleep(GESTE + 300);
       plusBas = await page.evaluate(() => scrollY);
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < Math.min(24, crans); i++) {
         await page.mouse.wheel(0, -120);
         await sleep(16);
       }

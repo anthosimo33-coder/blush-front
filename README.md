@@ -31,7 +31,7 @@ npm run todo                            # les décisions produit en attente (les
 
 La CI (`.github/workflows/ci.yml`), à chaque pull request et à chaque push sur `main` :
 
-1. **Vérifications et build** : `npm run check` (dont la cohérence des migrations, `scripts/verifier-migrations.mjs`), puis le build du back-end et sa vérification qu’aucun prompt n’arrive au navigateur (`scripts/verifier-fuite.mjs` : aucune suite de 10 mots des prompts dans ce qu’il envoie, quelle que soit sa forme, échappée ou en entités HTML, et un canari qui prouve qu’elle la verrait).
+1. **Vérifications et build** : `npm run check` (dont la cohérence des migrations, `scripts/verifier-migrations.mjs`), puis le build du back-end et sa vérification qu’aucun prompt n’arrive au navigateur (`scripts/verifier-fuite.mjs` : aucune suite de 10 mots d’affilée des prompts, prise sur tout leur texte, à travers les phrases et les lignes, dans ce qu’il envoie, quelle que soit sa forme, échappée ou en entités HTML, et un canari qui prouve qu’elle la verrait).
 2. **E2E (chromium)** et **E2E (webkit)** : chacun refait le build, puis les tests de bout en bout avec un Postgres neuf. En cas d’échec, le rapport et les traces (données de test inventées, jamais les prompts) sont dans les artefacts du run.
 
 Les dépendances : chaque lundi, Dependabot (`.github/dependabot.yml`) ouvre une pull request pour les versions mineures et correctives des paquets npm, une par version majeure, et une pour les actions de la CI ; la CI les vérifie comme les autres. Elle lit le sous-module privé : `PROMPTS_TOKEN` doit aussi être un secret de Dependabot (Settings › Secrets and variables › Dependabot).

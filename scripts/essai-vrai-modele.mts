@@ -47,9 +47,12 @@ try {
     const { reponse } = await repondre(story, m, m.etat.questions?.[0] ?? "il me calcule ou pas ?");
     console.log("chat :", JSON.stringify(reponse).slice(0, 500));
   }
-  const cout = await coutDe(id);
-  console.log(`coût : ${cout.dollars.toFixed(3)} $ en ${cout.appels} appels`);
 } finally {
+  /* Le coût d’abord, même quand un pas a échoué après des appels payés : effacer l’histoire le détache de ses appels (ai_usage.story_id passe à null) */
+  if (id) {
+    const cout = await coutDe(id).catch(() => null);
+    if (cout) console.log(`coût : ${cout.dollars.toFixed(3)} $ en ${cout.appels} appels`);
+  }
   /* Le compte emporte son histoire (en cascade) ; une histoire restée brouillon (un pas raté avant le rattachement) s’efface à part */
   await db().delete(schema.users).where(eq(schema.users.email, email));
   if (id) await db().delete(schema.stories).where(eq(schema.stories.id, id));
