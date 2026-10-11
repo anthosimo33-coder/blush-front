@@ -1,13 +1,13 @@
 import { effacerBrouillon, effacerChoisie } from "@/server/cookies";
-import { storyCourante } from "@/server/donnees";
 import { erreur, repondre } from "@/server/http";
-import { supprimerHistoire } from "@/server/histoires";
-import { garde } from "@/server/requete";
+import { metaDe, storyAffichee, supprimerHistoire } from "@/server/histoires";
+import { garde, lecture } from "@/server/requete";
 
 /** L’histoire du parcours : la conv qu’on importe, sinon celle qui est ouverte. */
 export async function GET() {
-  const story = await storyCourante(true);
-  return story ? repondre("GET /api/histoire", story) : erreur("aucune");
+  const g = await lecture({ session: "facultative", parcours: true });
+  if (g instanceof Response) return g;
+  return g.story ? repondre("GET /api/histoire", storyAffichee(g.story.id, metaDe(g.story))) : erreur("aucune");
 }
 
 /** « Supprimer l’histoire » (celle qui est ouverte) : tout ce qui vient de la conv est effacé, en cascade. La suivante s’ouvre. */

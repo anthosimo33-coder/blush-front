@@ -60,6 +60,9 @@ import { POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postDeconnexion } from "@/app/api/auth/deconnexion/route";
 import { POST as postVerifier } from "@/app/api/auth/verifier/route";
 import { DELETE as deleteCompte, GET as getCompte } from "@/app/api/compte/route";
+import CompteLayout from "@/app/compte/layout";
+import Connecte from "@/app/connexion/connecte/page";
+import Effacer from "@/app/effacer/page";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
@@ -70,7 +73,7 @@ import { envoyerCode, ouvrirSession } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
 import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
-import { cleDuCompte, emailCanonique } from "@/server/email-canonique";
+import { cleDeLimiteDuCompte, emailCanonique } from "@/server/email-canonique";
 import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { convDe, depuisFichier, importer, type Meta } from "@/server/histoires";
@@ -267,7 +270,7 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
   });
 
   it("au-delà de la limite du jour : « trop »", async () => {
-    const cle = empreinte(`limite:fiche:${cleDuCompte(emails[0])}`);
+    const cle = empreinte(`limite:${cleDeLimiteDuCompte("fiche", emails[0])}`);
     await db().insert(schema.rateLimits).values({ key: cle, windowStart: new Date(), count: 60 }).onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 60, windowStart: new Date() } });
     /* Le plafond est retiré même si le test échoue : les autres corrigent la fiche du même compte */
     try {
@@ -563,7 +566,7 @@ describe("S-32 · en https, les cookies du serveur portent le préfixe __Host-",
   });
 });
 
-describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retiré de la bêta ; sans compte, 401", () => {
+describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retiré de la bêta ; sans compte, 401, et l’appareil oublie quand même", () => {
   it("retiré de la liste, il n’entre plus, mais son compte, ses sessions et ses convs s’effacent", async () => {
     const u = await compteDeTest("retire");
     const { secret } = await ouvrirSession(u.id);
@@ -582,7 +585,41 @@ describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retir
     }
   });
 
-  it("sans session (ou une session expirée) : 401 « connexion », jamais un « c’est fait » qui ne l’est pas", async () => {
+  it("les écrans : /compte et /connexion l’envoient à /effacer (« Tout effacer »), qui ne s’ouvre que pour lui", async () => {
+    const u = await compteDeTest("retire-ecrans");
+    const { secret } = await ouvrirSession(u.id);
+    etat.cookies = new Map([[SESSION, secret]]);
+    /* Où la page renvoie (redirect lève une erreur de Next, son adresse dans son digest), ou null si elle s’affiche */
+    const renvoi = async (rendu: () => Promise<unknown>) => {
+      try {
+        await rendu();
+        return null;
+      } catch (e) {
+        const digest = (e as { digest?: string }).digest;
+        if (digest?.startsWith("NEXT_REDIRECT;")) return digest.split(";")[2];
+        throw e;
+      }
+    };
+    const pages = () =>
+      Promise.all([
+        renvoi(() => CompteLayout({ children: "la page", params: Promise.resolve({}) } as never)),
+        renvoi(() => Connecte({ searchParams: Promise.resolve({}) } as never)),
+        renvoi(() => Effacer()),
+      ]);
+    /* Dans la bêta : son compte et son accueil, et /effacer renvoie à l’écran du compte */
+    expect(await pages()).toEqual([null, "/app", "/compte"]);
+    etat.retires.add(u.email);
+    try {
+      expect(await pages()).toEqual(["/effacer", "/effacer", null]);
+    } finally {
+      etat.retires.delete(u.email);
+    }
+    /* Sans session : la connexion, comme avant */
+    etat.cookies = new Map();
+    expect(await pages()).toEqual(["/connexion?suite=%2Fcompte", null, "/connexion?suite=%2Fcompte"]);
+  });
+
+  it("sans session (ou une session expirée) : 401 « connexion », jamais un « c’est fait » qui ne l’est pas ; cet appareil oublie quand même ce qu’il gardait", async () => {
     const u = await compteDeTest("expiree");
     const { secret } = await ouvrirSession(u.id);
     await db().update(schema.sessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.sessions.id, empreinte(secret)));
@@ -590,7 +627,16 @@ describe("S-29 · « Tout effacer » efface aussi le compte d’un testeur retir
       etat.cookies = cookies;
       const r = await deleteCompte(requete("/api/compte", { method: "DELETE" }));
       expect([r.status, await r.json()]).toEqual([401, { erreur: "connexion" }]);
+      /* Le cookie de la session (expirée) et le stockage du navigateur s’en vont, comme quand le compte existait */
+      expect(etat.cookies.has(SESSION)).toBe(false);
+      expect(r.headers.get("clear-site-data")).toBe('"cache", "storage"');
     }
+    /* Venue d’un autre site : rien n’est effacé, ni le compte, ni les cookies */
+    etat.cookies = new Map([[SESSION, secret]]);
+    const ailleurs = await deleteCompte(requete("/api/compte", { method: "DELETE", headers: { origin: "http://site-pirate.test" } }));
+    expect(ailleurs.status).toBe(403);
+    expect(ailleurs.headers.get("clear-site-data")).toBeNull();
+    expect(etat.cookies.get(SESSION)).toBe(secret);
     expect(await db().select().from(schema.users).where(eq(schema.users.id, u.id))).toHaveLength(1);
   });
 });
@@ -621,21 +667,28 @@ describe("S-04 · S-28 · les lectures du jour se comptent par boîte mail et pa
     const verdict = async () => (await etatDesTaches(conv.id, ["verdict"])).verdict;
 
     /* La boîte a lu ses cinq convs du jour (sous un autre compte, ou avant d’effacer le sien) */
-    await poser(`analyse:${cleDuCompte(boite)}`, 5);
+    await poser(cleDeLimiteDuCompte("analyse", boite), 5);
     expect(await (await lancer()).json()).toEqual({ erreur: "trop" });
     expect(await verdict()).toBeUndefined();
 
-    /* Un compte frais, mais une adresse IP qui en a déjà lancé vingt aujourd’hui */
-    await poser(`analyse:${cleDuCompte(boite)}`, 0);
-    await poser(`analyse:${ipLecture}`, 20);
-    const parIp = await lancer();
-    expect([parIp.status, await parIp.json()]).toEqual([429, { erreur: "trop" }]);
+    /*
+     * Un compte frais, mais une adresse IP qui en a déjà lancé vingt aujourd’hui. Refusée par l’adresse, la lecture ne
+     * coûte rien au compte : derrière un réseau saturé, réessayer n’use pas ses cinq lectures
+     */
+    await poser(cleDeLimiteDuCompte("analyse", boite), 2);
+    await poser(`analyse:ip:${ipLecture}`, 20);
+    for (let k = 0; k < 4; k++) {
+      const parIp = await lancer();
+      expect([parIp.status, await parIp.json()]).toEqual([429, { erreur: "trop" }]);
+    }
+    expect(await compteDeLimite(cleDeLimiteDuCompte("analyse", boite))).toBe(2);
     expect(await verdict()).toBeUndefined();
 
-    /* Sous les deux : la lecture part */
-    await poser(`analyse:${ipLecture}`, 0);
+    /* Sous les deux : la lecture part, et compte une fois de chaque côté */
+    await poser(`analyse:ip:${ipLecture}`, 0);
     expect((await lancer()).status).toBe(200);
     expect(await verdict()).toBeDefined();
+    expect([await compteDeLimite(cleDeLimiteDuCompte("analyse", boite)), await compteDeLimite(`analyse:ip:${ipLecture}`)]).toEqual([3, 1]);
     /* La chaîne laissée pour après la réponse ne tourne pas ici */
     etat.apres.length = 0;
   });
@@ -650,7 +703,7 @@ describe("S-10 · les limites par adresse IP", () => {
 
   it("un envoi invalide ne compte pas ; une IPv6 compte pour son /64 : changer d’adresse dans sa box ne remet pas le compteur à zéro", async () => {
     const reseau = `2001:db8:${(n % 65535).toString(16)}:${((n >> 16) % 65535).toString(16)}`;
-    const cle = `import:${reseau}::/64`;
+    const cle = `import:ip:${reseau}::/64`;
     await poserLimite(cle, 19);
     try {
       /* Sans fichier : refusé pour ça, sans toucher au compteur */

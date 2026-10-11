@@ -170,8 +170,8 @@ export async function prolongerSession(secret: string): Promise<Date | null> {
 
 /**
  * Le compte d’une session encore valide, ou null, que la bêta le laisse entrer ou non. Seul « Tout effacer » s’en sert
- * (DELETE /api/compte) : un testeur retiré de la bêta peut toujours effacer ce qu’il a laissé. Partout ailleurs,
- * utilisateurDeSession.
+ * (DELETE /api/compte, et l’écran /effacer par compteRetireDeLaBeta) : un testeur retiré de la bêta peut toujours effacer
+ * ce qu’il a laissé. Partout ailleurs, utilisateurDeSession.
  */
 export async function compteDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   if (!secret) return null;
@@ -190,6 +190,15 @@ export async function compteDeSession(secret: string | undefined): Promise<Utili
 export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   const utilisateur = await compteDeSession(secret);
   return utilisateur && peutEntrer(utilisateur.email) ? utilisateur : null;
+}
+
+/**
+ * Le compte d’une session encore valide que la bêta ne laisse plus entrer (un testeur retiré de la liste), ou null. Il
+ * n’ouvre plus rien, sauf l’écran /effacer : « Tout effacer », ou se connecter avec un autre email.
+ */
+export async function compteRetireDeLaBeta(secret: string | undefined): Promise<Utilisateur | null> {
+  const utilisateur = await compteDeSession(secret);
+  return utilisateur && !peutEntrer(utilisateur.email) ? utilisateur : null;
 }
 
 /**

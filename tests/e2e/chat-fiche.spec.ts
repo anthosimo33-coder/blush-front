@@ -296,7 +296,7 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
   });
 
   await test.step("150 messages dans la journée : « on reprend demain ? »", async () => {
-    await remplirLaLimite(email, (id) => `chat:${id}`, 150);
+    await remplirLaLimite(email, "chat", 150);
     expect(await ecrireABlush(page, "dernière question promis")).toBe(429);
     const bulle = fil.getByText("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
     await expect(bulle).toBeVisible();

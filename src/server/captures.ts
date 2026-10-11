@@ -7,18 +7,19 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import { utilisateurDeSession } from "./auth";
 import { empreinte, jeton } from "./chiffrement";
 import { lireSession } from "./cookies";
-import { cleDuCompte, type LimiteDuCompte } from "./email-canonique";
+import type { LimiteDuCompte } from "./email-canonique";
 import { env } from "./env";
 import { ErreurPublique } from "./erreurs";
 import { brouillonDe, ErreurImport, metaDe, type Meta } from "./histoires";
 import { appeler } from "./ia/claude";
 import { LIMITES, sousLaLimite } from "./limites";
+import { sousLaLimiteDuCompte } from "./requete";
 import { aujourdhuiParis } from "./temps";
 
 const PLAFONDS = {
   captures: { anonymes: "capturesAnonymesParJour", compte: "capturesParCompte" },
   lots: { anonymes: "lotsAnonymesParJour", compte: "lotsParCompte" },
-} as const satisfies Record<string, { anonymes: keyof typeof LIMITES; compte: LimiteDuCompte & keyof typeof LIMITES }>;
+} as const satisfies Record<string, { anonymes: keyof typeof LIMITES; compte: LimiteDuCompte }>;
 
 /**
  * Peut-on lire des captures (`quoi` : « captures », ou les « lots » d’un enregistrement d’écran) pour cette requête ? Le
@@ -35,7 +36,7 @@ export async function lecturePermise(quoi: keyof typeof PLAFONDS | null): Promis
   if (!utilisateur && env().BLUSH_BETA_FERMEE) return "connexion";
   if (!quoi) return "ok";
   const { anonymes, compte } = PLAFONDS[quoi];
-  const ok = utilisateur ? await sousLaLimite(`${compte}:${cleDuCompte(utilisateur.email)}`, LIMITES[compte]) : await sousLaLimite(anonymes, LIMITES[anonymes]);
+  const ok = utilisateur ? await sousLaLimiteDuCompte(utilisateur, compte) : await sousLaLimite(anonymes, LIMITES[anonymes]);
   return ok ? "ok" : "trop";
 }
 

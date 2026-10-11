@@ -152,7 +152,9 @@ describe("un ajout à sa fiche qui échoue", () => {
     const r = await avecFactice(enRetard, () => POST(requete({ method: "POST", body: fd })));
     expect(r.status).toBe(502);
     expect(await r.json()).toEqual({ erreur: "panne" });
-    expect(etat.alertes).toEqual([["ajout à la fiche en échec", `Histoire ${id}`, "Erreur : delai"]]);
+    /* L’alerte part une fois la réponse envoyée (reponseErreur, comme le chat) : elle ne la retarde pas */
+    expect(etat.alertes).toEqual([]);
     await lancerApres();
+    expect(etat.alertes).toEqual([["ajout à la fiche en échec", `Histoire ${id}`, "Erreur : delai"]]);
   });
 });

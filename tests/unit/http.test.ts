@@ -4,7 +4,7 @@ import { ErreurAjout } from "@/server/ajouts";
 import { ErreurCaptures, LectureRefusee } from "@/server/captures";
 import { ErreurPublique, ErreurTache } from "@/server/erreurs";
 import { ErreurImport } from "@/server/histoires";
-import { memeOrigine, reponseAudio, reponseErreur } from "@/server/http";
+import { codeDErreur, memeOrigine, reponseAudio, reponseErreur } from "@/server/http";
 import { groupeIp, ipDe } from "@/server/limites";
 import { ErreurPartage } from "@/server/partages";
 
@@ -135,17 +135,47 @@ describe("reponseErreur", () => {
     expect(await reponse(new ErreurTache("sortie_illisible"))).toEqual([502, { erreur: "panne" }]);
   });
 
-  it("le reste (un bug, la base) : « panne », sans rien en dire au navigateur ; l’erreur va aux logs", async () => {
+  it("le reste (un bug, la base) : « panne », sans rien en dire au navigateur ; seul son nom va aux logs, jamais son message", async () => {
     const logs = vi.spyOn(console, "error").mockImplementation(() => {});
-    const bug = new Error("la colonne secrète n’existe pas");
+    /* Une erreur SQL cite ses paramètres (un email), un JSON illisible un morceau du contenu */
+    const bug = Object.assign(new Error("insert into users values ($1) : noe@exemple.fr"), { name: "DrizzleQueryError", params: ["noe@exemple.fr"] });
     try {
       const [statut, corps] = await reponse(bug);
       expect([statut, corps]).toEqual([502, { erreur: "panne" }]);
-      expect(JSON.stringify(corps)).not.toContain("secrète");
-      expect(logs).toHaveBeenCalledWith(bug);
+      expect(JSON.stringify(corps)).not.toContain("exemple");
+      expect(logs).toHaveBeenCalledTimes(1);
+      /* Ni l’erreur elle-même (la console l’écrirait en entier, ses paramètres compris), ni son message */
+      expect(logs.mock.calls.flat().some((a) => a instanceof Error)).toBe(false);
+      const journal = logs.mock.calls.flat().join(" ");
+      expect(journal).toContain("DrizzleQueryError");
+      expect(journal).not.toContain("exemple");
     } finally {
       logs.mockRestore();
     }
+  });
+
+  it("une erreur d’étape va aux logs par son code interne (un délai n’est pas une panne muette) ; une erreur publique, attendue, n’y va pas", async () => {
+    const logs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await reponse(new ErreurTache("delai"))).toEqual([502, { erreur: "panne" }]);
+      expect(logs.mock.calls.flat().join(" ")).toContain("delai");
+      logs.mockClear();
+      await reponse(new ErreurImport("groupe"));
+      expect(logs).not.toHaveBeenCalled();
+    } finally {
+      logs.mockRestore();
+    }
+  });
+
+  it("codeDErreur : le même code pour la réponse d’un bloc et le dernier événement d’un flux", () => {
+    expect(codeDErreur(new ErreurImport("groupe"))).toBe("groupe");
+    expect(codeDErreur(new ErreurTache("refus:cyber"))).toBe("refus");
+    expect(codeDErreur(new Error("x"))).toBe("panne");
+    expect(codeDErreur("pas une erreur")).toBe("panne");
+  });
+
+  it("une erreur publique porte le nom de sa classe (les logs ne gardent que lui)", () => {
+    expect([new ErreurImport("groupe").name, new ErreurPartage("sobre").name, new ErreurCaptures().name]).toEqual(["ErreurImport", "ErreurPartage", "ErreurCaptures"]);
   });
 
   it("une erreur de Next lui-même (redirect) repart telle quelle", () => {

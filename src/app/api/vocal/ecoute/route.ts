@@ -1,5 +1,4 @@
 import { erreur, lireCorps, repondre } from "@/server/http";
-import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { noterEcoute } from "@/server/vocal";
 import { ROUTES } from "@/types/api";
@@ -12,7 +11,7 @@ export async function POST(req: Request) {
   const ecoute = await lireCorps(req, ROUTES["POST /api/vocal/ecoute"].corps);
   if (!ecoute) return erreur("invalide");
   /* Les chiffres de l’A/B test des voix : quelques dizaines d’écoutes par jour suffisent, pas des milliers */
-  if (!(await sousLaLimiteDuCompte(utilisateur, "ecoute", LIMITES.ecouteParCompte))) return repondre("POST /api/vocal/ecoute", { ok: true });
+  if (!(await sousLaLimiteDuCompte(utilisateur, "ecoute"))) return repondre("POST /api/vocal/ecoute", { ok: true });
   await noterEcoute(story.id, ecoute.evenement, ecoute.position * 1000);
   return repondre("POST /api/vocal/ecoute", { ok: true });
 }

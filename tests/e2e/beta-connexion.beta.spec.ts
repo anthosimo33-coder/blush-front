@@ -200,7 +200,7 @@ test("les limites des codes sont les mêmes pour tous : sept codes par jour pour
   });
 });
 
-test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en bêta fermée", async ({ page }, testInfo) => {
+test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en bêta fermée, sauf « Tout effacer »", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "ancien");
 
   await test.step("un compte gratuit se connecte sur le serveur ouvert", async () => {
@@ -212,16 +212,36 @@ test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en
     expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
   });
 
-  await test.step("sur le serveur en bêta fermée, même base, même cookie : l’accueil renvoie à la connexion, sans boucler", async () => {
+  const fermee = page.getByRole("heading", { level: 1, name: "Ta place dans la bêta est fermée." });
+  await test.step("sur le serveur en bêta fermée, même base, même cookie : l’accueil, la connexion et le compte mènent à l’écran où tout effacer, sans boucler", async () => {
     await page.goto("/app");
-    await expect(page).toHaveURL(`${URL_BETA}/connexion?suite=%2Fapp`);
-    await expect(page.getByRole("heading", { level: 1, name: "Retrouve tes convs." })).toBeVisible();
-    await expect(page.getByLabel("Ton email")).toBeVisible();
+    await expect(page).toHaveURL(`${URL_BETA}/effacer`);
+    await expect(fermee).toBeVisible();
+    await expect(page.getByText(`BLUSH n’est plus ouvert à ${email} pour l’instant.`, { exact: false })).toBeVisible();
+    for (const adresse of ["/connexion", "/compte"]) {
+      await page.goto(adresse);
+      await expect(page).toHaveURL(`${URL_BETA}/effacer`);
+      await expect(fermee).toBeVisible();
+    }
   });
 
   await test.step("la session reste valable sur le serveur ouvert : c’est la bêta qui la refuse", async () => {
     await page.goto(`${URL_APPLI}/app`);
     await expect(page).toHaveURL(`${URL_APPLI}/commencer`);
+  });
+
+  await test.step("« Tout effacer », confirmé : le compte disparaît, et l’appareil repart de zéro", async () => {
+    await page.goto("/effacer");
+    await page.getByRole("button", { name: "Tout effacer" }).click();
+    const feuille = page.getByRole("dialog", { name: "Tout effacer\u00a0?" });
+    await expect(feuille).toBeVisible();
+    await feuille.getByRole("button", { name: "Tout effacer" }).click();
+    await expect(page).toHaveURL(`${URL_BETA}/`);
+    await expect.poll(() => compteDe(email)).toBeNull();
+    /* Plus de session : /effacer mène à la connexion, comme une page de l’appli */
+    await page.goto("/effacer");
+    await expect(page).toHaveURL(`${URL_BETA}/connexion?suite=%2Fcompte`);
+    await expect(page.getByRole("heading", { level: 1, name: "Retrouve tes convs." })).toBeVisible();
   });
 });
 

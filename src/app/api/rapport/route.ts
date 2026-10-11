@@ -2,7 +2,6 @@ import { after } from "next/server";
 import { executerChaine } from "@/server/analyse";
 import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
 import { erreur, repondre } from "@/server/http";
-import { LIMITES } from "@/server/limites";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { reprendre } from "@/server/taches";
 
@@ -26,7 +25,7 @@ export async function POST(req: Request) {
   const avant = await rapportDe(story, utilisateur);
   if (!avant) return erreur("pas_pret");
   if (avant.echec !== "panne") return repondre("POST /api/rapport", avant);
-  if (!(await sousLaLimiteDuCompte(utilisateur, "relance", LIMITES.relanceParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "relance"))) return erreur("trop");
   await reprendre(story.id, [...ETAPES_DU_RAPPORT]);
   after(() => executerChaine(story.id));
   const rapport = await rapportDe(story, utilisateur);

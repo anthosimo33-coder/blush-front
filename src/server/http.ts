@@ -1,8 +1,10 @@
 import "server-only";
 import { unstable_rethrow } from "next/navigation";
+import { after } from "next/server";
 import type { z } from "zod";
 import type { CleJson, ReponseErreur, Routes } from "@/types/api";
 import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
+import { alerter } from "./alertes";
 import { ErreurPublique, ErreurTache } from "./erreurs";
 
 /*
@@ -21,21 +23,49 @@ const json = (corps: unknown, status: number, entetes: Record<string, string>) =
 export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse"], status = 200, entetes: Record<string, string> = {}) => json(corps, status, entetes);
 
 /** Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. */
-export const erreur = (code: CodeErreur) => json({ erreur: code } satisfies ReponseErreur, ERREURS_API[code], {});
+export const erreur = (code: CodeErreur, entetes: Record<string, string> = {}) => json({ erreur: code } satisfies ReponseErreur, ERREURS_API[code], entetes);
 
 /**
- * La réponse d’une erreur levée pendant une route, la même partout. Une ErreurPublique (un import refusé, un ajout sans
- * rien de neuf, un partage pas prêt…) répond son code. Une erreur d’étape (ErreurTache) son code public : le refus du
- * modèle, le vocal, ou la panne ; son code interne reste dans l’alerte que la route envoie à l’équipe. Le reste (un bug,
- * la base) répond « panne », sans rien en dire au navigateur : l’erreur va aux logs. Les erreurs de Next lui-même
- * (redirect, notFound, le rendu dynamique) repartent telles quelles.
+ * Ce que le navigateur apprend d’une erreur levée pendant une route : une ErreurPublique (un import refusé, un ajout sans
+ * rien de neuf, un partage pas prêt…) son code ; une erreur d’étape (ErreurTache) son code public, le refus du modèle,
+ * le vocal ou la panne ; le reste (un bug, la base) « panne ». La réponse d’un bloc (reponseErreur) comme le dernier
+ * événement d’une réponse en flux (le chat) le lisent ici.
  */
-export function reponseErreur(e: unknown): Response {
+export function codeDErreur(e: unknown): CodeErreur {
+  if (e instanceof ErreurPublique) return e.code;
+  if (e instanceof ErreurTache) return codePublic(e.code);
+  return "panne";
+}
+
+/** L’alerte à l’équipe quand une étape échoue pendant une route : son sujet et ses lignes, sans contenu ; le code interne s’y ajoute. */
+export type AlerteDErreur = { sujet: string; lignes: string[] };
+
+/**
+ * Ce que l’équipe apprend d’une erreur levée pendant une route, jamais son message ni ses détails : le message d’une
+ * erreur SQL cite ses paramètres (un email), celui d’un JSON illisible un morceau du contenu. Une ErreurPublique est
+ * attendue : rien. Une erreur d’étape : son code interne (« refus:cyber », « delai »), aux logs, et à l’équipe avec
+ * `alerte`. Le reste : son nom seulement (« DrizzleQueryError »). Le journal des erreurs (lot 3) reprendra ces lignes.
+ */
+export async function signalerErreur(e: unknown, alerte?: AlerteDErreur): Promise<void> {
+  if (e instanceof ErreurPublique) return;
+  if (e instanceof ErreurTache) {
+    console.error(`route /api en échec : ${e.code}`);
+    if (alerte) await alerter(alerte.sujet, [...alerte.lignes, `Erreur : ${e.code}`]);
+    return;
+  }
+  console.error("route /api en panne :", e instanceof Error ? e.name : typeof e);
+}
+
+/**
+ * La réponse d’une erreur levée pendant une route, la même partout : son code (codeDErreur), sans rien d’interne. Elle
+ * est signalée (signalerErreur) ; `alerte` : une erreur d’étape part aussi à l’équipe, une fois la réponse envoyée. Les
+ * erreurs de Next lui-même (redirect, notFound, le rendu dynamique) repartent telles quelles.
+ */
+export function reponseErreur(e: unknown, { alerte }: { alerte?: AlerteDErreur } = {}): Response {
   unstable_rethrow(e);
-  if (e instanceof ErreurPublique) return erreur(e.code);
-  if (e instanceof ErreurTache) return erreur(codePublic(e.code));
-  console.error(e);
-  return erreur("panne");
+  if (alerte && e instanceof ErreurTache) after(() => signalerErreur(e, alerte));
+  else void signalerErreur(e);
+  return erreur(codeDErreur(e));
 }
 
 /**

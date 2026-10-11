@@ -69,7 +69,7 @@ test("le modèle refuse la conv : « BLUSH ne peut pas lire cette conv. », une 
   });
 
   await test.step("après trois relances dans la journée, l’écran dit de revenir demain", async () => {
-    await remplirLaLimite(email, (id) => `relance:verdict:${id}`, 3);
+    await remplirLaLimite(email, "relance:verdict", 3);
     await page.goto("/lecture");
     await expect(ecran.getByRole("alert")).toContainText(COINCE);
     await expect(ecran.getByRole("alert")).toContainText("Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain : ta conv t’attend.");
@@ -102,7 +102,7 @@ test("trop de lectures en un jour : « Qui es-tu ? » le dit, et la lecture ne p
   const email = emailLibre(testInfo, "lecture-limite");
   await connecterParApi(page, testInfo, email);
   /* Cinq convs lues aujourd’hui (src/server/limites.ts, analyseParCompte) */
-  await remplirLaLimite(email, (id) => `analyse:${id}`, 5);
+  await remplirLaLimite(email, "analyse", 5);
   await importerWhatsApp(page, exportWhatsApp(testInfo));
   await page.getByRole("link", { name: "Continuer" }).click();
   await repondreQui(page, REPONSES_NOE);

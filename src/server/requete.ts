@@ -1,12 +1,13 @@
 import "server-only";
 import { peut, type Besoin } from "@/lib/acces";
+import { estMutation } from "@/types/api";
 import { compteDeSession, type Utilisateur } from "./auth";
 import { lireSession } from "./cookies";
 import { contexteRequete } from "./donnees";
-import { cleDuCompte, type LimiteDuCompte } from "./email-canonique";
+import { cleDeLimiteDuCompte, LIMITES_DU_COMPTE, type LimiteDuCompte } from "./email-canonique";
 import type { LigneEcran } from "./histoires";
 import { erreur, memeOrigine } from "./http";
-import { ipDe, sousLaLimite, type LIMITES } from "./limites";
+import { ipDe, LIMITES, rendre, sousLaLimite, type Limite } from "./limites";
 
 /*
  * La garde commune des routes /api : ce que chacune vérifie avant de faire quoi que ce soit, toujours dans le même ordre.
@@ -19,8 +20,6 @@ import { ipDe, sousLaLimite, type LIMITES } from "./limites";
  * tests/unit/garde-routes.test.ts vérifie le 403 et le 401 de chaque route de la table (src/types/api.ts).
  */
 
-type Limite = (typeof LIMITES)[keyof typeof LIMITES];
-
 /**
  * Qui fait la requête. « requise » : un compte connecté, que la bêta laisse entrer. « facultative » : le compte s’il y en
  * a un (et sa conv ouverte, ou le brouillon importé). « sansBeta » : un compte connecté, même retiré de la bêta, sans sa
@@ -29,8 +28,11 @@ type Limite = (typeof LIMITES)[keyof typeof LIMITES];
  */
 type Session = "requise" | "facultative" | "sansBeta" | "aucune";
 
-/** Une limite comptée à l’entrée de la route : sa clé (« image »), son plafond (LIMITES), et sur quoi elle se range. */
-type LimiteDeRoute = { cle: LimiteDuCompte; limite: Limite; par: "compte" } | { cle: string; limite: Limite; par: "ip" };
+/**
+ * Une limite comptée à l’entrée de la route, et sur quoi elle se range : par compte, son nom suffit (son plafond est dans
+ * LIMITES_DU_COMPTE) ; par adresse IP, son nom et son plafond (LIMITES).
+ */
+type LimiteDeRoute = { compte: LimiteDuCompte } | { ip: string; limite: Limite };
 
 type Options = {
   session: Session;
@@ -49,20 +51,28 @@ type Garde<O extends Options> = {
   story: O["histoire"] extends true ? LigneEcran : LigneEcran | null;
 };
 
-/** Les méthodes qui ne font que lire : tout le reste doit venir de l’appli. */
-const LECTURES = new Set(["GET", "HEAD"]);
-
 /**
  * Le compte de la requête et sa conv ouverte (contexteRequete, src/server/donnees.ts), en options nommées. `parcours` :
  * les écrans et routes de l’import, qui suivent d’abord la conv en train d’être importée.
  */
 export const contexte = ({ parcours = false }: { parcours?: boolean } = {}) => contexteRequete(parcours);
 
-/** Compte un passage de cette limite pour ce compte (rangée sur son email canonique : cleDuCompte), et dit s’il reste dessous. */
-export const sousLaLimiteDuCompte = (utilisateur: Pick<Utilisateur, "email">, cle: LimiteDuCompte, limite: Limite) => sousLaLimite(`${cle}:${cleDuCompte(utilisateur.email)}`, limite);
+/**
+ * Compte un passage de cette limite pour ce compte, et dit s’il reste dessous. Rangée sur son email canonique
+ * (cleDeLimiteDuCompte) : un alias, ou le même compte effacé puis recréé, ne repart pas de zéro. Son plafond vient de son
+ * nom (LIMITES_DU_COMPTE).
+ */
+export const sousLaLimiteDuCompte = (compte: { email: string }, nom: LimiteDuCompte) => sousLaLimite(cleDeLimiteDuCompte(nom, compte.email), LIMITES[LIMITES_DU_COMPTE[nom]]);
 
-/** Compte un passage de cette limite pour l’adresse IP de la requête (une IPv6 par son /64 : ipDe), et dit s’il reste dessous. */
-export const sousLaLimiteDeLIp = (req: Request, cle: string, limite: Limite) => sousLaLimite(`${cle}:${ipDe(req)}`, limite);
+/** Rend un passage compté pour ce compte (sousLaLimiteDuCompte) : ce qui l’a compté n’a finalement rien lancé. */
+export const rendreAuCompte = (compte: { email: string }, nom: LimiteDuCompte) => rendre(cleDeLimiteDuCompte(nom, compte.email));
+
+/**
+ * Compte un passage de cette limite pour l’adresse IP de la requête (une IPv6 par son /64 : ipDe), et dit s’il reste
+ * dessous. Sa clé, « <nom>:ip:<adresse> », ne peut pas tomber sur celle d’un compte (« <nom>:compte:<email> ») : une
+ * adresse lue dans x-forwarded-for qui n’en est pas une (« compte:quelquun@gmail.com ») reste dans la famille des IP.
+ */
+export const sousLaLimiteDeLIp = (req: Request, nom: string, limite: Limite) => sousLaLimite(`${nom}:ip:${ipDe(req)}`, limite);
 
 /**
  * Garde une route (voir l’en-tête) : `req` dit sa méthode, son origine et son adresse IP. Rend son contexte, ou la
@@ -71,12 +81,16 @@ export const sousLaLimiteDeLIp = (req: Request, cle: string, limite: Limite) => 
  *   if (g instanceof Response) return g;
  */
 export async function garde<const O extends Options>(req: Request, options: O): Promise<Garde<O> | Response> {
-  if (!LECTURES.has(req.method) && !memeOrigine(req)) return erreur("origine");
+  if (estMutation(req.method) && !memeOrigine(req)) return erreur("origine");
   return verifier(req, options);
 }
 
-/** La même garde pour une route qui ne lit rien de sa requête (un GET sans paramètre) : ni origine, ni adresse IP. */
-export function lecture<const O extends Options & { limite?: Extract<LimiteDeRoute, { par: "compte" }> }>(options: O): Promise<Garde<O> | Response> {
+/**
+ * La même garde sans la requête : ni origine, ni adresse IP. Pour un GET qui ne lit rien de sa requête, ou une mutation
+ * dont l’origine est déjà vérifiée (garde avec `session: "aucune"`) et qui lit son corps avant de savoir quelle conv
+ * suivre (POST /api/analyse).
+ */
+export function lecture<const O extends Options & { limite?: Extract<LimiteDeRoute, { compte: LimiteDuCompte }> }>(options: O): Promise<Garde<O> | Response> {
   return verifier(null, options);
 }
 
@@ -89,8 +103,7 @@ async function verifier<O extends Options>(req: Request | null, { session, parco
   if (plan && !(utilisateur && peut(utilisateur.plan, plan))) return erreur("acces");
   if (histoire && !story) return erreur("aucune");
   if (limite) {
-    const sous =
-      limite.par === "ip" ? !!req && (await sousLaLimiteDeLIp(req, limite.cle, limite.limite)) : !!utilisateur && (await sousLaLimiteDuCompte(utilisateur, limite.cle, limite.limite));
+    const sous = "ip" in limite ? !!req && (await sousLaLimiteDeLIp(req, limite.ip, limite.limite)) : !!utilisateur && (await sousLaLimiteDuCompte(utilisateur, limite.compte));
     if (!sous) return erreur("trop");
   }
   return { utilisateur, story } as Garde<O>;

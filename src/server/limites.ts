@@ -5,7 +5,8 @@ import { db, schema } from "./db";
 
 /**
  * Les limites anti-abus : combien de fois, sur quelle fenêtre. Celles « par compte » se rangent sur son email canonique
- * (cleDuCompte, src/server/email-canonique.ts), celles « par IP » sur son adresse, IPv6 regroupée par /64 (ipDe).
+ * (sousLaLimiteDuCompte, src/server/requete.ts), celles « par IP » sur son adresse, IPv6 regroupée par /64
+ * (sousLaLimiteDeLIp) : deux familles de clés qui ne se croisent jamais (« analyse:compte:… », « analyse:ip:… »).
  */
 export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
@@ -71,7 +72,8 @@ export const LIMITES = {
   ficheParCompte: { max: 60, fenetreS: 86400 },
 } as const;
 
-type Limite = { max: number; fenetreS: number };
+/** Une limite : combien de passages au plus, sur quelle fenêtre (en secondes). */
+export type Limite = { max: number; fenetreS: number };
 /* L’empreinte de la clé : une adresse IP ou un email n’est jamais gardé en clair */
 const cleDe = (cle: string) => empreinte(`limite:${cle}`);
 /* La fenêtre de cette limite a expiré : le compte repart de zéro */

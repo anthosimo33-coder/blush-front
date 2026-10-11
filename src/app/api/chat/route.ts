@@ -5,12 +5,9 @@ import { executerChaine } from "@/server/analyse";
 import { imagesDe } from "@/server/captures";
 import { historique, repondre as blushRepond } from "@/server/chat";
 import { memoireDe } from "@/server/donnees";
-import { alerter } from "@/server/alertes";
-import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet } from "@/server/histoires";
-import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
+import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, signalerErreur } from "@/server/http";
 import { TAILLE_VOCAL_MAX, transcrire } from "@/server/ia/transcription";
-import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
@@ -25,6 +22,9 @@ export const maxDuration = 300;
 const LONGUEUR_MAX = 4000;
 /* La réponse en flux, quand le navigateur la demande (Accept) */
 const NDJSON = "application/x-ndjson";
+
+/** L’alerte à l’équipe quand la réponse échoue, d’un bloc comme en flux : la conv, et le code interne (reponseErreur, signalerErreur). */
+const alerteDuChat = (storyId: string) => ({ sujet: "chat en échec", lignes: [`Histoire ${storyId}`] });
 
 type Envoi = { texte: string; captures: File[]; export: File | null; vocal: File | null };
 
@@ -99,10 +99,13 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
         echec = e;
         return ouvrir(false);
       }
-      emettre({ erreur: e instanceof ErreurTache ? codePublic(e.code) : "panne" });
+      /*
+       * La même traduction que la réponse d’un bloc (codeDErreur) ; le flux ne porte que les codes d’une étape
+       * (EvenementChat) : une erreur publique levée après la première bulle y devient une panne
+       */
+      emettre({ erreur: codePublic(codeDErreur(e)) });
       fermer();
-      if (e instanceof ErreurTache) await alerter(`chat en échec`, [`Histoire ${storyId}`, `Erreur : ${e.code}`]);
-      else console.error(e);
+      await signalerErreur(e, alerteDuChat(storyId));
     },
   );
   /*
@@ -132,9 +135,9 @@ async function traiter(req: Request) {
   if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");
   const fichiers = envoi.captures.length > 0 || !!envoi.export;
   if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte");
-  if (!(await sousLaLimiteDuCompte(utilisateur, "chat", LIMITES.chatParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "chat"))) return erreur("trop");
   /* Lire des captures coûte plus qu’un message : une limite à part */
-  if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout", LIMITES.ajoutParCompte))) return erreur("trop");
+  if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire) return erreur("pas_pret");
   let dit = envoi.texte;
@@ -163,8 +166,7 @@ async function traiter(req: Request) {
     return await enFlux(story.id, (surEvenement) => blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
   } catch (e) {
     /* Le code interne (« refus:cyber ») part à l’équipe ; le navigateur n’apprend que le refus, le vocal ou la panne */
-    if (e instanceof ErreurTache) after(() => alerter(`chat en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]));
-    return reponseErreur(e);
+    return reponseErreur(e, { alerte: alerteDuChat(story.id) });
   }
 }
 

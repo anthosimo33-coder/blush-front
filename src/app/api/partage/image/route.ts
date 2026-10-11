@@ -4,7 +4,6 @@ import { carteMoment, carteReponse } from "@/server/carte-partage";
 import { dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { erreur, lireCorps } from "@/server/http";
-import { LIMITES } from "@/server/limites";
 import { masqueDe } from "@/server/partages";
 import { garde } from "@/server/requete";
 import type { BlushAnswer, Chapter } from "@/types";
@@ -16,7 +15,7 @@ import { ROUTES } from "@/types/api";
  * et le prénom de l’autre est masqué (le tien reste).
  */
 export async function POST(req: Request) {
-  const g = await garde(req, { session: "requise", histoire: true, limite: { cle: "image", limite: LIMITES.imageParCompte, par: "compte" } });
+  const g = await garde(req, { session: "requise", histoire: true, limite: { compte: "image" } });
   if (g instanceof Response) return g;
   const { story } = g;
   /* Une réponse du chat (son échange) ou la chute d’un chapitre (sa place) : CibleImage, src/types/api.ts */

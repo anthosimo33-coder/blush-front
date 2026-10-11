@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
 import postgres from "postgres";
-import { cleDuCompte, emailCanonique, LIMITES_DU_COMPTE } from "../../../src/server/email-canonique";
+import { cleDeLimiteDuCompte, emailCanonique, LIMITES_DU_COMPTE, type LimiteDuCompte } from "../../../src/server/email-canonique";
 import { CLE, DATABASE_URL } from "../reglages";
 import { oublierMails } from "./boite";
 import { RESEAU } from "./page";
@@ -125,14 +125,15 @@ export async function changerErreur(tache: string, erreur: string): Promise<void
 }
 
 /**
- * Pose une limite anti-abus de ce compte à son maximum (src/server/limites.ts : la clé, sans « limite: », et son maximum),
- * comme après une journée bien remplie : la prochaine fois, le serveur refuse (« trop »). `max: 0` la remet à zéro. `cle`
- * reçoit ce qui range les limites du compte, son email canonique (cleDuCompte), et rend la clé : (compte) => `chat:${compte}`.
+ * Pose une limite anti-abus de ce compte (son nom, LIMITES_DU_COMPTE de src/server/email-canonique.ts) à `max`, comme
+ * après une journée bien remplie : à son plafond, la prochaine fois, le serveur refuse (« trop »). `max: 0` la remet à
+ * zéro. Rangée sur l’email canonique (cleDeLimiteDuCompte), la clé même que compte le serveur. Le compte doit exister :
+ * une faute dans l’email du test se voit tout de suite.
  */
-export async function remplirLaLimite(email: string, cle: (compte: string) => string, max: number): Promise<void> {
+export async function remplirLaLimite(email: string, nom: LimiteDuCompte, max: number): Promise<void> {
   const [u] = await sql()<{ id: string }[]>`select id from users where email = ${email.toLowerCase()}`;
   if (!u) throw new Error(`aucun compte pour ${email}`);
-  const k = empreinte(`limite:${cle(cleDuCompte(email))}`);
+  const k = empreinte(`limite:${cleDeLimiteDuCompte(nom, email)}`);
   await sql()`insert into rate_limits (key, window_start, count) values (${k}, now(), ${max}) on conflict (key) do update set window_start = now(), count = ${max}`;
 }
 
@@ -164,7 +165,7 @@ export async function oublierEmail(email: string): Promise<void> {
     await tx`delete from users where email = ${e}`;
     await tx`delete from login_codes where email = ${e}`;
     await tx`delete from waitlist where email_hash = ${attente}`;
-    const duCompte = LIMITES_DU_COMPTE.map((nom) => empreinte(`limite:${nom}:${cleDuCompte(e)}`));
+    const duCompte = (Object.keys(LIMITES_DU_COMPTE) as LimiteDuCompte[]).map((nom) => empreinte(`limite:${cleDeLimiteDuCompte(nom, e)}`));
     await tx`delete from rate_limits where key in ${tx([...limitesDesCodes(e), empreinte(`limite:attente:mail:${attente}`), ...duCompte])}`;
   });
   oublierMails(e);

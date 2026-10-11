@@ -18,7 +18,7 @@ const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
  * `essais`, pour tous aussi.
  */
 export async function POST(req: Request) {
-  const g = await garde(req, { session: "aucune", limite: { cle: "verif", limite: LIMITES.verificationParIp, par: "ip" } });
+  const g = await garde(req, { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
   if (g instanceof Response) return g;
   const b = await lireCorps(req, Corps);
   if (!b) return repondre("POST /api/auth/verifier", { ok: false });

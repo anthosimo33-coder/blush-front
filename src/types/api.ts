@@ -228,3 +228,10 @@ export type CleJson = { [K in CleRoute]: Routes[K]["reponse"] extends Blob ? nev
  * n’appelle qu’elles par leur clé (requete, src/services/api.ts) : « /api/vocal/chat/[id] » n’est pas une adresse.
  */
 export type CleFixe = Exclude<CleRoute, `${string}[${string}`>;
+
+/**
+ * Une requête de cette méthode modifie-t-elle quelque chose ? Tout sauf GET et HEAD : la garde commune des routes
+ * (src/server/requete.ts) exige alors qu’elle vienne de l’appli, et les tests (garde-routes, l’e2e de la sécurité) en
+ * tirent la liste des mutations de la table. Une seule définition pour les trois.
+ */
+export const estMutation = (methode: string) => !["GET", "HEAD"].includes(methode.toUpperCase());

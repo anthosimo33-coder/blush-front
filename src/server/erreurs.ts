@@ -16,6 +16,8 @@ import { codePublic, type CodeErreur } from "@/types/erreurs-api";
 export class ErreurPublique<C extends CodeErreur = CodeErreur> extends Error {
   constructor(readonly code: C) {
     super(code);
+    /* Son nom dans les logs, qui ne gardent que lui (« ErreurImport ») : celui de la classe qui l’a levée */
+    this.name = new.target.name;
   }
 }
 

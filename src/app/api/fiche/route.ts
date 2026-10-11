@@ -6,11 +6,8 @@ import { imagesDe } from "@/server/captures";
 import { chiffrer, dechiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { ficheDe, memoireDe } from "@/server/donnees";
-import { alerter } from "@/server/alertes";
-import { ErreurTache } from "@/server/erreurs";
 import { depuisPaquet, type Ligne } from "@/server/histoires";
 import { erreur, lireCorps, repondre, reponseErreur } from "@/server/http";
-import { LIMITES } from "@/server/limites";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { Fiche } from "@/types";
@@ -47,7 +44,7 @@ export async function PUT(req: Request) {
   const { utilisateur, story } = g;
   const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);
   if (!corrigee) return erreur("faits");
-  if (!(await sousLaLimiteDuCompte(utilisateur, "fiche", LIMITES.ficheParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "fiche"))) return erreur("trop");
   for (let essai = 0; essai < 3; essai++) {
     const [ligne] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id));
     const m = ligne ? dechiffrer<DonneesMemoire>(ligne.data) : null;
@@ -84,7 +81,7 @@ async function traiter(req: Request) {
   const captures = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const paquet = fd?.get("export");
   if (!captures.length && !(paquet instanceof File)) return erreur("fichier");
-  if (!(await sousLaLimiteDuCompte(utilisateur, "ajout", LIMITES.ajoutParCompte))) return erreur("trop");
+  if (!(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire?.etat.fiche) return erreur("pas_pret");
   try {
@@ -92,8 +89,7 @@ async function traiter(req: Request) {
     return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));
   } catch (e) {
     /* Le code interne part à l’équipe ; le navigateur n’apprend que le refus ou la panne */
-    if (e instanceof ErreurTache) await alerter(`ajout à la fiche en échec`, [`Histoire ${story.id}`, `Erreur : ${e.code}`]);
-    return reponseErreur(e);
+    return reponseErreur(e, { alerte: { sujet: "ajout à la fiche en échec", lignes: [`Histoire ${story.id}`] } });
   }
 }
 

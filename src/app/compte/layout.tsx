@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { connexionPuis } from "@/lib/suite";
+import { compteRetireDeLaBeta } from "@/server/auth";
+import { lireSession } from "@/server/cookies";
 import { estConnecte } from "@/services/serveur";
 
 /*
@@ -10,7 +12,10 @@ import { estConnecte } from "@/services/serveur";
  * lisent tous les deux n’est lu qu’une fois (contexteRequete est mémorisé le temps de la requête).
  */
 export default async function Layout({ children }: LayoutProps<"/compte">) {
-  /* Sans compte connecté (session expirée, autre appareil) : la connexion d’abord, puis retour ici */
-  if (!(await estConnecte())) redirect(connexionPuis("/compte"));
+  /*
+   * Sans compte connecté (session expirée, autre appareil) : la connexion d’abord, puis retour ici. Une session ouverte
+   * que la bêta refuse désormais (un testeur retiré de la liste) : l’écran où il peut tout effacer
+   */
+  if (!(await estConnecte())) redirect((await compteRetireDeLaBeta(await lireSession())) ? "/effacer" : connexionPuis("/compte"));
   return children;
 }

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ROUTES, type CleRoute } from "@/types/api";
+import { estMutation, ROUTES, type CleRoute } from "@/types/api";
 
 /*
  * La garde commune des routes /api (src/server/requete.ts). D’abord en table, sur chaque route de la table du contrat
@@ -45,7 +45,6 @@ beforeEach(() => {
 });
 
 const APPLI = "http://localhost";
-const LECTURES = new Set(["GET", "HEAD"]);
 
 /**
  * Les routes qui ne demandent pas de compte : l’import avant l’email (un brouillon), la connexion, la liste d’attente, et
@@ -68,7 +67,7 @@ const SANS_COMPTE = new Set<CleRoute>([
 const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
-const mutations = cles.filter((c) => !LECTURES.has(c.split(" ")[0]));
+const mutations = cles.filter((c) => estMutation(c.split(" ")[0]));
 
 /** Appelle la route de cette clé comme Next le ferait : son fichier, sa méthode, une requête vide (ou un formulaire vide). */
 async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Promise<Response> {
@@ -121,7 +120,7 @@ describe("la garde", () => {
       const g = await garde(post(), o);
       return g instanceof Response ? [g.status, ((await g.json()) as { erreur: string }).erreur] : "ok";
     };
-    const tout = { session: "requise", plan: "chat", histoire: true, limite: { cle: "image", limite: LIMITES.imageParCompte, par: "compte" } } as const;
+    const tout = { session: "requise", plan: "chat", histoire: true, limite: { compte: "image" } } as const;
     expect(await statut(tout)).toEqual([401, "connexion"]);
     etat.utilisateur = gratuit;
     expect(await statut(tout)).toEqual([402, "acces"]);
@@ -138,10 +137,28 @@ describe("la garde", () => {
 
   it("une limite par compte se range sur son email canonique ; par adresse IP, une IPv6 sur son /64", async () => {
     etat.utilisateur = gratuit;
-    await garde(post(), { session: "requise", limite: { cle: "image", limite: LIMITES.imageParCompte, par: "compte" } });
-    await garde(post(), { session: "aucune", limite: { cle: "verif", limite: LIMITES.verificationParIp, par: "ip" } });
-    await lecture({ session: "requise", limite: { cle: "image", limite: LIMITES.imageParCompte, par: "compte" } });
-    expect(etat.comptees).toEqual(["image:compte:noemartin@gmail.com", "verif:2001:db8:1:2::/64", "image:compte:noemartin@gmail.com"]);
+    await garde(post(), { session: "requise", limite: { compte: "image" } });
+    await garde(post(), { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
+    await lecture({ session: "requise", limite: { compte: "image" } });
+    expect(etat.comptees).toEqual(["image:compte:noemartin@gmail.com", "verif:ip:2001:db8:1:2::/64", "image:compte:noemartin@gmail.com"]);
+  });
+
+  it("une adresse forgée qui imite la clé d’un compte reste dans la famille des adresses IP : elle n’use pas les lectures d’un autre", async () => {
+    for (const forgee of ["compte:noemartin@gmail.com", "compte:noemartin@gmail.com, 10.0.0.1"]) {
+      etat.comptees = [];
+      await garde(post({ origin: APPLI, host: "localhost", "x-forwarded-for": forgee }), { session: "aucune", limite: { ip: "analyse", limite: LIMITES.analyseParIp } });
+      expect(etat.comptees).toEqual(["analyse:ip:compte:noemartin@gmail.com"]);
+      expect(etat.comptees).not.toContain("analyse:compte:noemartin@gmail.com");
+    }
+  });
+
+  it("POST /api/analyse : l’origine passe avant la lecture du corps (une requête venue d’ailleurs n’est même pas lue)", async () => {
+    const { POST } = await import("@/app/api/analyse/route");
+    const req = new Request(`${APPLI}/api/analyse`, { method: "POST", headers: { origin: "http://site-pirate.test", host: "localhost" }, body: JSON.stringify({ me: "p0" }) });
+    const lu = vi.spyOn(req, "json");
+    const r = await POST(req);
+    expect([r.status, await r.json()]).toEqual([403, { erreur: "origine" }]);
+    expect(lu).not.toHaveBeenCalled();
   });
 
   it("« sansBeta » : le compte de la session même retiré de la bêta, sans sa conv ; sans compte, 401", async () => {

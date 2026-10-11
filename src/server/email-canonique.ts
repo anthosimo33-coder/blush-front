@@ -6,6 +6,8 @@
  * en bout le lisent sans base.
  */
 
+import type { LIMITES } from "./limites";
+
 /** Les domaines de Gmail : une seule boîte pour les deux, où les points du nom ne comptent pas. */
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
@@ -26,15 +28,35 @@ export function emailCanonique(email: string): string {
 /**
  * Ce qui range les limites d’un compte (src/server/limites.ts) : son email canonique, pas son identifiant. Supprimer son
  * compte puis le recréer, ou en ouvrir un sous un alias, ne remet pas ses compteurs du jour à zéro (rate_limits survit au
- * compte). La clé d’une limite est `<nom>:<cleDuCompte>`, par exemple `analyse:compte:noe@gmail.com`.
+ * compte). La clé d’une limite : cleDeLimiteDuCompte.
  */
 export const cleDuCompte = (email: string) => `compte:${emailCanonique(email)}`;
 
 /**
- * Les limites rangées par compte (cleDuCompte), par le nom que leur clé porte : sousLaLimiteDuCompte (src/server/requete.ts)
- * n’en compte pas d’autre. Les tests de bout en bout les remettent à zéro quand ils reprennent un email (oublierEmail).
+ * Les limites rangées par compte (cleDuCompte) : le nom que porte leur clé, et le plafond qu’il suit (LIMITES,
+ * src/server/limites.ts). sousLaLimiteDuCompte n’en compte pas d’autre, et n’a besoin que du nom. Les tests de bout en
+ * bout les remettent à zéro quand ils reprennent un email (oublierEmail). Deux noms peuvent suivre le même plafond : la
+ * relance d’un verdict et celle d’un rapport se comptent à part.
  */
-export const LIMITES_DU_COMPTE = ["analyse", "relance:verdict", "relance", "chat", "ajout", "fiche", "image", "partage-compte", "ecoute", "capturesParCompte", "lotsParCompte"] as const;
+export const LIMITES_DU_COMPTE = {
+  analyse: "analyseParCompte",
+  "relance:verdict": "relanceParCompte",
+  relance: "relanceParCompte",
+  chat: "chatParCompte",
+  ajout: "ajoutParCompte",
+  fiche: "ficheParCompte",
+  image: "imageParCompte",
+  "partage-compte": "imageParCompte",
+  ecoute: "ecouteParCompte",
+  capturesParCompte: "capturesParCompte",
+  lotsParCompte: "lotsParCompte",
+} as const satisfies Record<string, keyof typeof LIMITES>;
 
 /** Le nom d’une limite rangée par compte. */
-export type LimiteDuCompte = (typeof LIMITES_DU_COMPTE)[number];
+export type LimiteDuCompte = keyof typeof LIMITES_DU_COMPTE;
+
+/**
+ * La clé d’une limite de ce compte, écrite ici seulement : `<nom>:<cleDuCompte>`, par exemple
+ * `analyse:compte:noe@gmail.com`. Le serveur la compte (sousLaLimiteDuCompte), les tests la posent ou l’effacent.
+ */
+export const cleDeLimiteDuCompte = (nom: LimiteDuCompte, email: string) => `${nom}:${cleDuCompte(email)}`;
