@@ -64,7 +64,7 @@ export function AppScreen({
   }, [peutManquer, bloqueVu]);
   return (
     <>
-      <Screen desktopHeaderRight={<AccountPill initial={access.initiale} />} mainWidth={600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
+      <Screen desktopHeaderRight={<AccountPill initial={access.initiale} />} mainWidth={props.mise ? undefined : 600} asideWidth={360} columnsGap={64} aside={aside ?? undefined} {...props}>
         {children}
       </Screen>
       {requires && bloqueVu && (

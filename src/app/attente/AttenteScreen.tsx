@@ -9,9 +9,8 @@ import { NotePrivee } from "@/components/ui/NotePrivee";
 import { FormulaireEmail } from "@/components/formulaires/FormulaireEmail";
 import { Lead, MobileTopBar, Screen, ScreenTitle } from "@/components/shell/Screen";
 import { NOTE_ATTENTE } from "@/contenu/confidentialite";
-import { emailValide } from "@/lib/email";
+import { useSaisieEmail } from "@/lib/email";
 import { NBSP } from "@/lib/format";
-import { champInvalide, type SaisieEmail } from "@/lib/useEnvoiCode";
 import { rejoindreAttente } from "@/services/api";
 
 /*
@@ -22,37 +21,22 @@ import { rejoindreAttente } from "@/services/api";
 export function AttenteScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [touched, setTouched] = useState(false);
   const [etat, setEtat] = useState<"saisie" | "envoi" | "fait" | "erreur">("saisie");
-  const valid = emailValide(email);
-
-  const envoyer = async () => {
-    if (!valid || etat === "envoi") {
-      setTouched(true);
-      return;
-    }
-    setEtat("envoi");
-    try {
-      await rejoindreAttente(email.trim());
-      setEtat("fait");
-    } catch {
-      setEtat("erreur");
-    }
-  };
   /* Le même champ que le parcours : son erreur de forme, ou l’inscription ratée */
-  const probleme = etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : null;
-  const saisie: SaisieEmail = {
-    email,
-    changer: (v) => {
-      setEmail(v);
-      if (etat === "erreur") setEtat("saisie");
+  const saisie = useSaisieEmail(email, setEmail, {
+    probleme: etat === "erreur" ? "Ça n’a pas marché. Réessaie dans un instant." : null,
+    oublierProbleme: () => setEtat((e) => (e === "erreur" ? "saisie" : e)),
+    occupe: etat === "envoi",
+    envoyer: async (propre) => {
+      setEtat("envoi");
+      try {
+        await rejoindreAttente(propre);
+        setEtat("fait");
+      } catch {
+        setEtat("erreur");
+      }
     },
-    quitter: () => setTouched(true),
-    valide: valid,
-    invalide: champInvalide({ email, valide: valid, probleme, touche: touched }),
-    probleme,
-    envoyer,
-  };
+  });
 
   if (etat === "fait")
     return (
@@ -93,7 +77,7 @@ export function AttenteScreen() {
         </>
       }
       footer={
-        <Button arrow={etat !== "envoi"} disabled={!valid || etat === "envoi"} aria-busy={etat === "envoi"} onClick={envoyer}>
+        <Button arrow={etat !== "envoi"} disabled={!saisie.valide || etat === "envoi"} aria-busy={etat === "envoi"} onClick={() => void saisie.envoyer()}>
           {etat === "envoi" ? <TypingDots color="#FFFFFF" label="Inscription" /> : "Rejoindre la liste"}
         </Button>
       }

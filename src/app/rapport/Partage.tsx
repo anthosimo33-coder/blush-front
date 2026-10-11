@@ -8,7 +8,9 @@ import { compterImagePartagee, creerLienPartage, desactiverLienPartage, imagePar
 import { TypingDots } from "@/components/ui/FileInput";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
+import { LienDiscret } from "@/components/ui/NotePrivee";
 import { Sheet } from "@/components/ui/surfaces";
+import { FEUILLE_CONFIDENTIALITE as F } from "@/contenu/confidentialite";
 
 /*
  * Partager son verdict, et ce que BLUSH fait de ta conv. Le lien public (/v/<id>) montre le verdict seul,
@@ -239,13 +241,7 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
             <>
               Le lien montre ce verdict, rien d’autre{NBSP}: ni vos messages, ni son prénom.{" "}
               {url && (
-                <button
-                  type="button"
-                  onClick={desactiver}
-                  className="relative font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2 after:absolute after:-inset-2 after:content-['']"
-                >
-                  Désactiver le lien
-                </button>
+<LienDiscret onClick={desactiver}>Désactiver le lien</LienDiscret>
               )}
             </>
           )}
@@ -255,31 +251,16 @@ export function PartageSheet({ open, onClose }: { open: boolean; onClose: () => 
   );
 }
 
-/** Ce que BLUSH fait de ta conv, en trois lignes, et la main sur tout (ton compte, la politique complète). */
+/** Ce que BLUSH fait de ta conv, en trois lignes (src/contenu/confidentialite.ts), et la main sur tout (ton compte, la politique complète). */
 export function ConfidentialiteSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ligne = "items-start [&>span:first-child]:mt-0.5";
   return (
     <Sheet open={open} onClose={onClose} labelledBy="confidentialite-titre">
-      <EnTete id="confidentialite-titre" titre="Ta conv reste à toi." onClose={onClose} />
+      <EnTete id="confidentialite-titre" titre={F.titre} onClose={onClose} />
       <InsetGroup>
-        <InsetRow
-          leading={<RowIcon icon="lock" tone="vrai" />}
-          title="Chiffrée, lue seulement par l’IA"
-          sub="Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit."
-          className={ligne}
-        />
-        <InsetRow
-          leading={<RowIcon icon="trash" />}
-          title="Effacée dès ton rapport écrit"
-          sub={`La conv brute part dès que ton rapport est prêt. Sans rapport, elle reste chiffrée jusqu’à ce que tu le débloques. Jamais lue, au bout de 24\u00a0h.`}
-          className={ligne}
-        />
-        <InsetRow
-          leading={<RowIcon icon="eye" tone="elle" />}
-          title="Rien ne sort sans toi"
-          sub="La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom."
-          className={ligne}
-        />
+        <InsetRow leading={<RowIcon icon="lock" tone="vrai" />} title={F.chiffree.titre} sub={F.chiffree.detail} className={ligne} />
+        <InsetRow leading={<RowIcon icon="trash" />} title={F.effacee.titre} sub={F.effacee.detail} className={ligne} />
+        <InsetRow leading={<RowIcon icon="eye" tone="elle" />} title={F.partage.titre} sub={F.partage.detail} className={ligne} />
       </InsetGroup>
       <InsetGroup title="Tu gardes la main">
         <InsetRow leading={<RowIcon icon="user" tone="toi" />} title="Gérer mon compte" sub="Supprime ton histoire ou ton compte quand tu veux" href="/compte" chevron />

@@ -181,7 +181,7 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
   await page.goto("/rapport");
   const rapport = page.getByRole("main");
   const enSavoirPlus = rapport.getByRole("button", { name: "En savoir plus" });
-  await expect(rapport.getByText("Ta conv reste privée, et c’est toi qui décides.")).toBeVisible();
+  await expect(rapport.getByText("Ta conv reste à toi, et c’est toi qui décides.")).toBeVisible();
 
   const feuille = page.getByRole("dialog", { name: "Ta conv reste à toi." });
   await test.step("la feuille dit ce que devient la conv, et que rien ne part sans toi", async () => {
@@ -189,7 +189,8 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
     await expect(feuille).toBeVisible();
     await expect(feuille.getByText("Chiffrée, lue seulement par l’IA")).toBeVisible();
     await expect(feuille.getByText("Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit.")).toBeVisible();
-    await expect(feuille.getByText("Effacée dès ton rapport écrit")).toBeVisible();
+    await expect(feuille.getByText("Effacée après ton rapport")).toBeVisible();
+    await expect(feuille.getByText("La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.")).toBeVisible();
     await expect(feuille.getByText("Rien ne sort sans toi")).toBeVisible();
     await expect(feuille.getByText("La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom.")).toBeVisible();
     /* Cette feuille ne crée aucun lien */

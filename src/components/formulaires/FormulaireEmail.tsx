@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/Button";
 import { EmailField } from "@/components/ui/EmailField";
 import { TypingDots } from "@/components/ui/FileInput";
-import type { EnvoiCode, SaisieEmail } from "@/lib/useEnvoiCode";
+import type { SaisieEmail } from "@/lib/email";
+import type { EnvoiCode } from "@/lib/useEnvoiCode";
 
 /*
  * Le formulaire « ton email, puis un code », commun au parcours (EmailScreen) et à la connexion (ConnexionScreen) : le

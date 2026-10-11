@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { auRepos } from "@/lib/repos";
 import { Icon } from "@/components/ui/icons";
+import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
+import { PROMESSE_PARTAGE } from "@/contenu/confidentialite";
 
 /*
  * Le bouton « Partager mon verdict » sous l’en-tête du rapport, et la promesse de confidentialité. Leurs feuilles
@@ -83,20 +85,12 @@ export function PartageEtConfidentialite() {
         </span>
         Partager mon verdict
       </button>
-      <p className="m-0 flex items-start gap-2 px-1 text-[13px] font-extrabold leading-[1.45] text-grey">
-        <Icon name="shield" size={16} color="#6B6862" stroke={2.2} style={{ marginTop: 1 }} />
-        <span>
-          Ta conv reste privée, et c’est toi qui décides.{" "}
-          <button
-            type="button"
-            onClick={() => setConfidentialite(true)}
-            aria-haspopup="dialog"
-            className="relative font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2 after:absolute after:-inset-2 after:content-['']"
-          >
-            En savoir plus
-          </button>
-        </span>
-      </p>
+      <NotePrivee icone="shield" className="px-1 leading-[1.45]">
+        {PROMESSE_PARTAGE}{" "}
+        <LienDiscret onClick={() => setConfidentialite(true)} ouvreFeuille>
+          En savoir plus
+        </LienDiscret>
+      </NotePrivee>
       {partageVu && <PartageSheet open={partage} onClose={() => setPartage(false)} />}
       {confidentialiteVu && <ConfidentialiteSheet open={confidentialite} onClose={() => setConfidentialite(false)} />}
     </div>

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailValide } from "@/lib/email";
-import { champInvalide } from "@/lib/useEnvoiCode";
+import { champInvalide, emailValide } from "@/lib/email";
 
 /* La forme d’un email dans le navigateur (src/lib/email.ts), et quand le champ le dit (champInvalide) */
 

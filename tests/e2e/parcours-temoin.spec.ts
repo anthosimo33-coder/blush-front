@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { attendreLecture, choisirFichier, compteDe, dernierCode, emailLibre, expect, exportWhatsApp, mailsPour, pagePrete, tachesDe, test } from "./aide";
 
 /*
@@ -5,6 +6,13 @@ import { attendreLecture, choisirFichier, compteDe, dernierCode, emailLibre, exp
  * comportement d’aujourd’hui (le back-end, la bêta ouverte, le modèle factice) : le verdict est offert, le chapitre 1 se
  * lit, les sept autres sont fermés, et rien de payant ne s’écrit.
  */
+/** L’étape se dit aux lecteurs d’écran (« Étape n sur 3 », sous les points du haut) : présente, et hors de tout aria-hidden. */
+async function etapeDite(page: Page, n: 1 | 2 | 3) {
+  const texte = `Étape ${n} sur 3`;
+  await expect(page.getByText(texte, { exact: true })).toBeAttached();
+  await expect(page.locator("[aria-hidden='true']").getByText(texte, { exact: true })).toHaveCount(0);
+}
+
 test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par email, lecture, verdict, chapitre 1 ouvert", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "temoin");
   /* 64 messages entre Noé (qui importe) et Maëlys, inventés */
@@ -14,6 +22,7 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
     await page.goto("/");
     await page.getByRole("link", { name: "Commencer", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+    await etapeDite(page, 1);
   });
 
   await test.step("l’export WhatsApp est importé", async () => {
@@ -39,6 +48,7 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
 
   await test.step("l’email reçoit un code, le bon code lance la lecture", async () => {
     await expect(page.getByRole("heading", { level: 1, name: "On t’envoie ton rapport où\u00a0?" })).toBeVisible();
+    await etapeDite(page, 3);
     await page.getByLabel("Ton email").fill(email);
     const depuis = Date.now();
     await page.getByRole("button", { name: "Recevoir mon code" }).click();

@@ -129,8 +129,9 @@ export function AccountPill({ initial }: { initial?: string }) {
 
 /*
  * Les mises en page nommées d’un écran, au lieu de largeurs recopiées : `etroit`, une colonne de 600 px sans colonne
- * d’appoint, le cadre à sa mesure (le compte, les convs, la question) ; `colonne`, 520 px centrés (les pages d’erreur,
- * le rapport débloqué). Une largeur donnée à côté passe avant ; sans colonne d’appoint, le cadre suit la colonne.
+ * d’appoint, le cadre à sa mesure (le compte, les convs, la question) ; `colonne`, 520 px centrés (les pages d’erreur),
+ * ou une largeur donnée à côté (le rapport débloqué, 560). Une largeur donnée à côté passe avant ; sans colonne
+ * d’appoint, le cadre suit la colonne. AppScreen ne pose sa largeur par défaut (600) que sans mise en page nommée.
  */
 const MISES = {
   etroit: { mainWidth: 600, centered: false },

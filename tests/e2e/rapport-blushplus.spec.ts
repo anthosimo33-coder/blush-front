@@ -70,7 +70,7 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
   const [histoire] = await histoiresDe(email);
   const lien = `${URL_APPLI}/ouvrir/${histoire.id}`;
 
-  await test.step("le rapport et la mémoire faits, la conv brute n’est plus gardée (« supprimée dès que ton rapport est prêt »)", async () => {
+  await test.step("le rapport et la mémoire faits, la conv brute n’est plus gardée (« effacée après ton rapport »)", async () => {
     expect(histoire.convGardee).toBe(false);
   });
 
