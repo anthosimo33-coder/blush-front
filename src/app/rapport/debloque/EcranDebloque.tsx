@@ -39,7 +39,7 @@ function OffrePremiumAjout({ bulles, enUnGeste, ici, lire }: { bulles: number; e
       aria-labelledby={titre}
       data-rise=""
       style={delai(0.45)}
-      className="mt-5 flex w-full flex-col gap-2.5 rounded-[24px] bg-white p-[18px] text-left shadow-[inset_0_0_0_2px_#E8358A,0_22px_40px_-20px_rgba(200,29,107,0.5)]"
+      className="mt-5 flex w-full flex-col gap-2.5 rounded-[24px] bg-white p-[18px] text-left [@media(max-height:700px)]:mt-4 [@media(max-height:700px)]:gap-2 shadow-[inset_0_0_0_2px_#E8358A,0_22px_40px_-20px_rgba(200,29,107,0.5)]"
     >
       <span className="self-start rounded-full bg-[#FFE6F2] px-3 py-1 text-micro font-black uppercase tracking-[0.08em] text-elle-ink">{OFFRE_PREMIUM_AJOUT.badge}</span>
       <h2 id={titre} className="m-0 text-[22px] font-black leading-[1.1] tracking-[-0.02em]">
@@ -60,7 +60,7 @@ function OffrePremiumAjout({ bulles, enUnGeste, ici, lire }: { bulles: number; e
           {OFFRE_PREMIUM_AJOUT.carte}
         </span>
       )}
-      <CaseRenonciation quoi="bulles" etat={paiement.renonciation} />
+      <CaseRenonciation quoi="bulles" etat={paiement.renonciation} className="[@media(max-height:700px)]:[&_label]:text-micro" />
       {paiement.refus && <Alert className="text-center leading-[1.45]">{OFFRE_PREMIUM_AJOUT.souci}</Alert>}
       <Button loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer("premium_ajout")}>
         {OFFRE_PREMIUM_AJOUT.prendre}
@@ -76,7 +76,8 @@ function OffrePremiumAjout({ bulles, enUnGeste, ici, lire }: { bulles: number; e
  * « C’est débloqué » (le prototype des bulles) : un moment, pas une facture. La gerbe, le titre, ce que l’achat vient
  * d’ouvrir (les chapitres qui restent, les bulles reçues, dans l’anneau rose de leur perle), puis un seul bouton pour
  * reprendre. Après le rapport seul (ou la suite), si le serveur la montre, l’offre ③ prend la place de la liste : elle
- * est alors le bouton principal, et « Non merci, je lis la suite » continue la lecture.
+ * est alors le bouton principal, et « Non merci, je lis la suite » continue la lecture. Sur un écran court (375 × 667),
+ * l’offre se resserre (sa case, que le prototype n’avait pas, s’écrit plus petit) pour tenir sans défiler.
  */
 export function EcranDebloque({
   achat,
@@ -146,7 +147,7 @@ export function EcranDebloque({
           vue ? "pt-2 lg:pt-[max(16px,calc(50dvh_-_420px))]" : "justify-center pb-4 pt-6 lg:pb-0 lg:pt-[max(16px,calc(50dvh_-_380px))]",
         )}
       >
-        <div className={cn("relative flex w-[300px] items-center justify-center", vue ? "h-[84px]" : "h-[120px]")}>
+        <div className={cn("relative flex w-[300px] items-center justify-center", vue ? "h-[84px] [@media(max-height:700px)]:h-[64px]" : "h-[120px]")}>
           <span
             aria-hidden="true"
             className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
