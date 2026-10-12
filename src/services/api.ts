@@ -73,7 +73,11 @@ export class CoupureChat extends Error {
 }
 
 /** Pendant la réponse du chat : ses bulles une à une (toutes celles reçues), puis son vocal, qui arrive après elle (null : elle reste écrite). */
-export type SuiviChat = { bulles?: (recues: BulleChat[]) => void; vocal?: (vocal: NonNullable<BlushAnswer["vocal"]> | null) => void };
+/**
+ * Ce que le chat suit d’une réponse à mesure : ses bulles, puis son vocal (null : la voix a échoué, elle reste écrite ;
+ * `bulles` : ce qu’elle a alors coûté en fin de compte, et ce qu’il reste).
+ */
+export type SuiviChat = { bulles?: (recues: BulleChat[]) => void; vocal?: (vocal: NonNullable<BlushAnswer["vocal"]> | null, bulles?: BlushAnswer["bulles"]) => void };
 
 /** Les en-têtes d’un appel, avec la conv de la page (voir ENTETE_CONV). */
 function avecConv(entetes?: HeadersInit): Headers {
@@ -166,7 +170,7 @@ async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat =
         if (!e.reponse.vocalEnCours || !suivi.vocal) void lecteur.cancel().catch((err: unknown) => tracer("chat:arret-du-flux", err));
       } else if ("vocal" in e) {
         vocal = true;
-        suivi.vocal?.(e.vocal);
+        suivi.vocal?.(e.vocal, e.bulles);
       } else if (!reponse) rejeter(recues.length ? new CoupureChat(recues) : new ErreurApi(e.erreur, 502));
     };
     void (async () => {
@@ -215,8 +219,11 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
 /* Les lots d’un enregistrement lus en même temps (chacun est un appel au modèle : lotParIp et lotsParCompte les bornent) */
 const LECTEURS = 5;
 
-/** La clé d’un envoi : le serveur reconnaît un nouvel essai du même envoi (src/server/captures.ts, reprise). */
-const cleEnvoi = () =>
+/**
+ * La clé d’un envoi : le serveur reconnaît un nouvel essai du même envoi (src/server/captures.ts, reprise ; le chat,
+ * « Réessayer » : le même message n’est jamais débité deux fois).
+ */
+export const cleEnvoi = () =>
   typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (o) => o.toString(16).padStart(2, "0")).join("");
 
 /**
@@ -555,29 +562,34 @@ export async function getChatHistory(avant?: number): Promise<HistoriqueChat> {
 /**
  * Le chat de l’accueil : un texte, ou des fichiers (des captures de leur conv ou de son profil, un nouvel export), avec
  * ou sans un mot. `about` : le point d’une réponse de BLUSH que tu creuses (tu l’as glissée vers la droite) ; ta question
- * porte dessus. `suivi` : les bulles à mesure qu’elles arrivent, puis le vocal (voir chat).
+ * porte dessus. `suivi` : les bulles à mesure qu’elles arrivent, puis le vocal (voir chat). `cle` : la clé du message
+ * (cleEnvoi), prise une fois par message et renvoyée telle quelle par « Réessayer » : le serveur ne le débite jamais deux
+ * fois, et rend la réponse déjà écrite.
  */
-export async function sendToBlush(input: { text?: string; files?: File[]; about?: string }, suivi?: SuiviChat): Promise<BlushAnswer> {
+export async function sendToBlush(input: { text?: string; files?: File[]; about?: string; cle?: string }, suivi?: SuiviChat): Promise<BlushAnswer> {
+  const { cle } = input;
   if (input.files?.length) {
     const files = input.files;
     const mot = input.text?.trim();
     return envoyerAuChat(async () => {
       const fd = await avecFichiers(new FormData(), files);
       if (mot) fd.append("texte", mot);
+      if (cle) fd.append("cle", cle);
       return chat(fd, suivi);
     });
   }
   const texte = input.text?.trim();
   if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
-  return envoyerAuChat(() => chat({ texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte }, suivi));
+  return envoyerAuChat(() => chat({ texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte, ...(cle ? { cle } : {}) }, suivi));
 }
 
-/** Un vocal pour BLUSH : transcrit côté serveur, puis lu par BLUSH comme un message. */
-export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, suivi?: SuiviChat): Promise<BlushAnswer> {
-  const audio = input.audio;
+/** Un vocal pour BLUSH : transcrit côté serveur, puis lu par BLUSH comme un message. `cle` : voir sendToBlush. */
+export async function sendVoiceToBlush(input: { audio: Blob; seconds: number; cle?: string }, suivi?: SuiviChat): Promise<BlushAnswer> {
+  const { audio, cle } = input;
   return envoyerAuChat(() => {
     const fd = new FormData();
     fd.append("vocal", audio, `vocal.${extensionAudio(audio.type)}`);
+    if (cle) fd.append("cle", cle);
     return chat(fd, suivi);
   });
 }

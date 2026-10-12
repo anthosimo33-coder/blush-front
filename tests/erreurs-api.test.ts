@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
 import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SOUFFLE } from "@/lib/messages-erreur";
 import { ErreurTache, estRefus } from "@/server/erreurs";
 import { erreur, route } from "@/server/http";
@@ -61,7 +62,8 @@ describe("le serveur", () => {
     for (const [code, status] of Object.entries(ERREURS_API) as [CodeErreur, number][]) {
       const r = erreur(code);
       expect(r.status).toBe(status);
-      expect(await r.json()).toEqual({ erreur: code });
+      /* « bulles » porte toujours les numéros d’aide (src/contenu/aide.ts) */
+      expect(await r.json()).toEqual({ erreur: code, ...(code === "bulles" ? { aide: AIDE_SANS_BULLES } : {}) });
     }
   });
 
@@ -131,9 +133,9 @@ describe("les écrans", () => {
     expect(messageErreur("question", api("panne"))).toBe("j’ai eu un bug, renvoie-moi ta question");
   });
 
-  it("plus de bulles : BLUSH le dit au chat en bulles, à la question en une phrase", () => {
-    expect(messageErreur("chat", api("bulles"))).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"]);
-    expect(messageErreur("question", api("bulles"))).toBe("plus de bulles pour l’instant, recharge et je te réponds");
+  it("plus de bulles : BLUSH le dit au chat en bulles, à la question en une phrase, et les numéros d’aide suivent toujours", () => {
+    expect(messageErreur("chat", api("bulles"))).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
+    expect(messageErreur("question", api("bulles"))).toBe(`plus de bulles pour l’instant, recharge et je te réponds. ${URGENCES}`);
   });
 
   it("un vocal illisible dit le texte de la transcription en panne (qu’il écrive), pas celui d’un vocal vide (qu’il renvoie)", () => {

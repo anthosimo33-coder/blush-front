@@ -1,3 +1,4 @@
+import { URGENCES } from "./aide";
 import { CASE_RENONCIATION } from "./consentements";
 
 /*
@@ -42,7 +43,7 @@ const UTILISATION: readonly Section[] = [
     titre: "Une lecture, pas un conseil",
     blocs: [
       "BLUSH t’aide à y voir plus clair, avec un peu d’humour. Ce n’est ni un service de conseil, ni une thérapie, ni un avis médical, psychologique ou juridique. Une IA peut se tromper\u00a0: ce que tu décides reste ta décision.",
-      "Si tu te sens en danger, appelle le 17 ou le 112. Si tu vas mal, le 3114 répond jour et nuit, gratuitement.",
+      URGENCES,
     ],
   },
   {

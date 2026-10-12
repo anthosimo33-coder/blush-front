@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/services/preparer-captures", () => ({ preparerCaptures: async (fichiers: File[]) => fichiers.map((f) => new Blob([f], { type: "image/jpeg" })) }));
 
+import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
 import { addToFiche, getAccount, getAchats, getChatHistory, modeVocalChat, rejoindreAttente, retirerDeLaListe, sendToBlush, startAnalysis, updateFiche } from "@/services/api";
 import { ENTETE_CONV, poserConvDeLaPage } from "@/services/session";
 import { ErreurApi } from "@/types/erreurs-api";
@@ -119,10 +120,11 @@ describe("« Qui es-tu ? » (startAnalysis)", () => {
 
 describe("les bulles (sendToBlush, getAchats)", () => {
   it("plus de bulles (402 « bulles ») : BLUSH le dit, et la réponse le marque, pour que l’accueil ouvre la recharge", async () => {
-    repondre = () => Response.json({ erreur: "bulles" }, { status: 402 });
+    repondre = () => Response.json({ erreur: "bulles", aide: AIDE_SANS_BULLES }, { status: 402 });
     const r = await sendToBlush({ text: "allô ?" });
     expect(r.plusDeBulles).toBe(true);
-    expect(r.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"]);
+    /* Les numéros d’aide, toujours : ce message n’est pas allé jusqu’au modèle (src/contenu/aide.ts) */
+    expect(r.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
   });
 
   it("une autre erreur : BLUSH la dit, sans recharge", async () => {

@@ -1,4 +1,5 @@
 import type { Page, TestInfo } from "@playwright/test";
+import { AIDE_SANS_BULLES } from "@/contenu/aide";
 import {
   attendreTaches,
   compteDe,
@@ -152,7 +153,7 @@ test("un rapport débloqué, 1 bulle : ta question reçoit sa réponse ; la suiv
   expect(await messagesDuChat(email)).toEqual(["toi", "blush", "toi", "blush"]);
   /* La troisième : une réponse verrouillée attend déjà, rien ne part */
   const troisieme = await question("et dimanche ?");
-  expect([troisieme.status(), await troisieme.json()]).toEqual([402, { erreur: "bulles" }]);
+  expect([troisieme.status(), await troisieme.json()]).toEqual([402, { erreur: "bulles", aide: AIDE_SANS_BULLES }]);
   expect(await messagesDuChat(email)).toHaveLength(4);
 });
 

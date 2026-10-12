@@ -90,12 +90,18 @@ export async function reserverEchange(): Promise<IdsDeLEchange> {
  * mais reste en base (ni ses bulles en flux, ni son texte, ni son vocal ne partent), au coût `cout`. `ecrit` : sans voix
  * (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce qu’elle coûte
  * vraiment (0 : offerte, une alerte de danger) ; il rend le trop-perçu et dit ce qu’il reste (rien pour l’équipe).
+ * `paye` : ce qui a été débité jusque-là. `ajouterVocal` : la réponse part en vocal alors qu’elle a été payée comme écrite
+ * (« parle-moi en vocal », dans ce message même) : la bulle de plus, faux si le solde ne la couvre pas (elle reste alors
+ * écrite). `liberer` : la place de la réponse verrouillée du compte, rendue une fois la réponse gardée.
  */
 export type Reglement = {
   ids: IdsDeLEchange;
   verrouillee: boolean;
   ecrit: boolean;
   cout: number;
+  paye: () => number;
+  ajouterVocal: () => Promise<boolean>;
+  liberer?: () => Promise<void>;
   regler: (cout: number) => Promise<BlushAnswer["bulles"]>;
 };
 
@@ -174,7 +180,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
  * `differer` : ce qui peut attendre la fin de la réponse (le suivi des coûts) passe après elle.
  * `reglement` : ce qu’elle coûte en bulles (Reglement). Une réponse verrouillée part masquée (reponseMasquee), sans
  * échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une alerte de danger ne se verrouille jamais
- * (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé.
+ * (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
+ * l’envoi, gardée avec ton message (« Réessayer » retrouve sa réponse : reponseDeLEnvoi, src/server/historique.ts).
  */
 export async function repondre(
   story: Ligne,
@@ -186,7 +193,8 @@ export async function repondre(
     surEvenement,
     differer,
     reglement,
-  }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void; reglement?: Reglement } = {},
+    cle,
+  }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void; reglement?: Reglement; cle?: string } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
@@ -247,15 +255,21 @@ export async function repondre(
   /* Une alerte de danger (ou la réponse remplacée par le garde-fou) est offerte : jamais verrouillée, ses bulles rendues */
   const offerte = fuite || !!sortie.alerte;
   const verrouillee = verrouAttendu && !offerte;
+  const voixVoulue = !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie);
+  /*
+   * Une voix que le débit n’a pas comptée (« parle-moi en vocal », dans ce message même : la réponse a été payée comme
+   * écrite) coûte comme tout vocal : la bulle de plus, avant qu’elle parte. Sans elle, la réponse reste écrite. Des
+   * captures jointes (3) la couvrent déjà
+   */
+  const voixPayee = voixVoulue && (!reglement || !!ajout || (await reglement.ajouterVocal()));
   /* La voix part tout de suite, pendant qu’on enregistre l’échange : la réponse écrite ne l’attend pas */
-  const voix = !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie) ? direReponse(story, sortie) : null;
+  const voix = voixPayee ? direReponse(story, sortie) : null;
   /*
    * Ce qu’elle coûte vraiment : sa voix est partie ou non, des captures jointes ; verrouillée, ce qu’elle coûtera à la
-   * lecture. Jamais plus que ce qui a été débité avant (une voix demandée dans ce message même, « parle-moi en vocal »,
-   * part sur une réponse payée comme écrite) : la colonne `cout` dit ce que le journal des bulles a pris
+   * lecture. Jamais plus que ce qui a été débité : la colonne `cout` dit ce que le journal des bulles a pris
    */
   const coutReel = offerte ? null : verrouillee ? (reglement?.cout ?? null) : coutDe({ ajout: !!ajout, vocal: !!voix });
-  const cout = coutReel !== null && reglement && !verrouillee ? Math.min(coutReel, reglement.cout) : coutReel;
+  const cout = coutReel !== null && reglement && !verrouillee ? Math.min(coutReel, reglement.paye()) : coutReel;
   const reponse: BlushAnswer = fuite
     ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })), modeVocal }
     : {
@@ -273,6 +287,7 @@ export async function repondre(
       data: coffre.ecrire("chat_messages.data:toi", {
         texte: dit,
         ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}),
+        ...(cle ? { cle } : {}),
       }),
     },
     {
@@ -292,6 +307,8 @@ export async function repondre(
     verrouillee && compte
       ? await garderVerrouillee(compte, (tx) => tx.insert(schema.chatMessages).values(lignesDeLEchange).returning(colonnes))
       : await db().insert(schema.chatMessages).values(lignesDeLEchange).returning(colonnes);
+  /* Gardée (ou refusée) : la place de la réponse verrouillée du compte se libère, la garde de garderVerrouillee prend le relais */
+  await reglement?.liberer?.();
   if (!gardes) throw new ErreurPublique("bulles");
   /* L’échange (l’id de ton message) part avec la réponse : de quoi la partager en image ensuite */
   const echangeId = gardes.find((g) => g.role === "toi")?.id;
@@ -329,18 +346,23 @@ export async function repondre(
       .update(schema.chatMessages)
       .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde }) })
       .where(eq(schema.chatMessages.id, blushId));
-  /* La voix a échoué : la réponse reste écrite, et coûte ce que coûte une réponse écrite (le reste est rendu) */
+  /*
+   * La voix a échoué : la réponse reste écrite, et coûte ce que coûte une réponse écrite (le reste est rendu). L’événement
+   * du vocal dit ce qu’elle a coûté en fin de compte et ce qu’il reste : le compteur de l’écran suit (2 → 1)
+   */
+  let corrige: BlushAnswer["bulles"];
   if (voix && !vocal && reglement) {
     const ecrite = coutDe({ ajout: !!ajout, vocal: false });
     await auMieux(
       async () => {
-        await reglement.regler(ecrite);
+        corrige = await reglement.regler(ecrite);
         await db().update(schema.chatMessages).set({ cout: ecrite }).where(eq(schema.chatMessages.id, blushId));
       },
       "chat : les bulles d’un vocal raté non rendues",
       { histoire: story.id },
     );
   }
-  if (voix) surEvenement?.({ vocal });
-  return { reponse: { ...montree, ...(vocal ? { vocal } : {}) }, majMemoire };
+  const avecCorrige = corrige ? { bulles: corrige } : {};
+  if (voix) surEvenement?.({ vocal, ...avecCorrige });
+  return { reponse: { ...montree, ...(vocal ? { vocal } : {}), ...avecCorrige }, majMemoire };
 }

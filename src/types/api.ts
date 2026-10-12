@@ -116,7 +116,8 @@ export type GesteDeLEquipe =
 export type PassageDesRelances = { dues: number; envoyees: number; ecartees: number; retenues: number; echecs: number };
 
 /** Une erreur d’une route : son code (src/types/erreurs-api.ts), jamais de détail interne. */
-export type ReponseErreur = { erreur: CodeErreur };
+/** Une erreur : son code ; « bulles » porte aussi les numéros d’aide de l’appli (src/contenu/aide.ts). */
+export type ReponseErreur = { erreur: CodeErreur; aide?: readonly string[] };
 
 /** Une conv importée (un export, des captures, un enregistrement d’écran) : sa source, et l’histoire brouillon qu’elle devient. */
 type ConvImportee = { source: Source; story: Story };
@@ -262,7 +263,8 @@ export const ROUTES = {
    * Un message en texte ; des captures, un export ou un vocal partent en formulaire. `question` : la question du rapport
    * (« Ta question »), en texte seulement : une réponse du chat comme une autre
    */
-  "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional() }), formulaire: true },
+  /* `cle` : la clé de l’envoi, prise une fois par message par le navigateur et renvoyée telle quelle par « Réessayer » */
+  "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional(), cle: z.string().uuid().optional() }), formulaire: true },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   /* La réponse verrouillée à lire : son message (BlushAnswer.verrouillee) */
   "POST /api/chat/debloquer": { corps: z.object({ message: z.number().int().positive() }) },

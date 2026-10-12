@@ -3,6 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LIGNES_D_ECOUTE } from "@/contenu/aide";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
@@ -16,11 +17,8 @@ import { useRetourSinon } from "@/lib/navigation";
 /* « Quitter vite » et « OK, merci » mènent à l’écran 01, comme dans la maquette */
 const QUIT_HREF: Route = "/commencer";
 
-/* Les lignes d’écoute, absentes des maquettes (validées) */
-const HELP = [
-  { name: "Fil Santé Jeunes", detail: "Anonyme et gratuit, tous les jours de 9 h à 23 h", tel: "0800235236", label: "0 800 235 236" },
-  { name: "SOS Amitié", detail: "À l’écoute 24 h sur 24", tel: "0972394050", label: "09 72 39 40 50" },
-];
+/* Les lignes d’écoute, absentes des maquettes (validées) : src/contenu/aide.ts, la même source que le chat sans bulles */
+const HELP = LIGNES_D_ECOUTE;
 
 function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: Route }) {
   const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-accent font-extrabold text-white no-underline";

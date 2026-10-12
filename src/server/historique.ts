@@ -51,6 +51,29 @@ export async function historique(
   return { echanges, plus: lignes.length === limite, modeVocal: !!s?.chatVocal };
 }
 
+/** Combien de messages récents on relit pour retrouver un envoi déjà fait (sa clé) : un « Réessayer » suit de près. */
+const RELUS_POUR_UNE_CLE = 20;
+
+/**
+ * La réponse de BLUSH à l’envoi de cette clé (POST /api/chat, `cle`), s’il est déjà fait dans cette conv : un
+ * « Réessayer » après une coupure, ou un double toucher. Elle telle qu’en base (masquée si elle est verrouillée),
+ * l’échange (l’id de ton message) et ce qu’elle a coûté ; null : pas d’envoi de cette clé parmi les derniers messages,
+ * ou pas encore de réponse gardée. Seuls les derniers messages sont relus (et déchiffrés).
+ */
+export async function reponseDeLEnvoi(storyId: string, cle: string): Promise<{ reponse: BlushAnswer; echange: number; cout: number | null; verrouillee: boolean } | null> {
+  const c = schema.chatMessages;
+  const lignes = await db().select().from(c).where(eq(c.storyId, storyId)).orderBy(desc(c.id)).limit(RELUS_POUR_UNE_CLE);
+  /* Un message de toi de cette clé, et la réponse qui le suit : l’id d’après (un échange prend ses deux ids d’un coup) */
+  for (const toi of lignes) {
+    if (toi.role !== "toi" || coffre.lire("chat_messages.data:toi", toi.data).cle !== cle) continue;
+    const blush = lignes.find((l) => l.id === toi.id + 1);
+    if (blush?.role !== "blush") return null;
+    const reponse = blush.verrouillee ? reponseMasquee(blush.id, blush.cout ?? 1) : coffre.lire("chat_messages.data:blush", blush.data).reponse;
+    return { reponse, echange: toi.id, cout: blush.cout, verrouillee: blush.verrouillee };
+  }
+  return null;
+}
+
 /** Un échange du chat, déchiffré : ton message et la réponse de BLUSH qui le suit. */
 type EchangeLu = { toi: coffre.Formes["chat_messages.data:toi"]; blush: coffre.Formes["chat_messages.data:blush"] };
 

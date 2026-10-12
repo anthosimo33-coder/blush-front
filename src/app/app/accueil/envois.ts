@@ -10,15 +10,18 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { prefersReducedMotion, textWidth } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { sendToBlush, sendVoiceToBlush, type SuiviChat } from "@/services/api";
+import { cleEnvoi, sendToBlush, sendVoiceToBlush, type SuiviChat } from "@/services/api";
 import type { BlushAnswer } from "@/types";
 import type { VoiceClip, VoiceError } from "../voice";
 import { cleBulle, type Msg } from "./conv/modele";
 import { nouvelId, type useConversation } from "./conv/useConversation";
 import { CHIP_LOOK, FIELD_LOOK, type Flight } from "./mouvement/vol";
 
-/** Ce que tu envoies d’écrit à BLUSH : ton texte (et le point creusé qu’il porte), ou des fichiers (captures, export). */
-export type DemandeAuChat = { text?: string; files?: File[]; about?: string };
+/**
+ * Ce que tu envoies d’écrit à BLUSH : ton texte (et le point creusé qu’il porte), ou des fichiers (captures, export).
+ * `cle` : la clé du message, la même pour « Réessayer » (sendToBlush).
+ */
+export type DemandeAuChat = { text?: string; files?: File[]; about?: string; cle?: string };
 
 /**
  * Qui répond à un envoi écrit, à la place du vrai chat : `msgs`, la conv au moment de l’envoi (sans ton message) ;
@@ -87,8 +90,10 @@ export function useEnvois({
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
-  const ask = (mine: Msg, payload: DemandeAuChat) => {
+  const ask = (mine: Msg, demande: DemandeAuChat) => {
     play("envoi");
+    /* Sa clé, prise une fois : « Réessayer » relance cette même demande, le serveur reconnaît le message (jamais débité deux fois) */
+    const payload = { ...demande, cle: cleEnvoi() };
     return conv.envoyer(mine, {
       label: modeVocal ? "BLUSH enregistre un vocal" : "BLUSH analyse sa réponse",
       demande: async (suivi) => ({ type: "reponse", from: "blush", result: envoyer ? await envoyer(payload, { msgs, suivi }) : await sendToBlush(payload, suivi) }),
@@ -152,12 +157,13 @@ export function useEnvois({
     }
     play("vocalEnvoye");
     urls.current.push(clip.url);
+    const cle = cleEnvoi();
     /* Tu lui parles en vocal : elle te répond en vocal */
     void conv.envoyer(
       { type: "vocal", id: nouvelId(), from: "toi", voice: { url: clip.url, seconds: clip.seconds, peaks: clip.peaks } },
       {
         label: "BLUSH enregistre un vocal",
-        demande: async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds }, suivi) }),
+        demande: async (suivi) => ({ type: "reponse", from: "blush", result: await sendVoiceToBlush({ audio: clip.blob, seconds: clip.seconds, cle }, suivi) }),
         vocal: true,
       },
     );

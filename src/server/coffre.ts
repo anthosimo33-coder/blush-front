@@ -31,7 +31,8 @@ import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesV
  * Ce qu’il a envoyé au chat : `texte`, ce que le modèle lit ; `lignes`, les messages de leur conv envoyés avec (un
  * export, des captures), gardés pour la suite du fil ; `affiche`, ce que l’historique réaffiche (« (3 captures) »).
  */
-type MessageToi = { texte: string; lignes?: string[]; affiche?: string };
+/** Ton message au chat : ce que BLUSH a lu, les lignes jointes, ce que l’historique réaffiche, et la clé de l’envoi (« Réessayer »). */
+type MessageToi = { texte: string; lignes?: string[]; affiche?: string; cle?: string };
 /** La réponse de BLUSH au chat, et son résumé (ce que le fil des échanges suivants en garde). */
 type MessageBlush = { reponse: BlushAnswer; resume: string };
 

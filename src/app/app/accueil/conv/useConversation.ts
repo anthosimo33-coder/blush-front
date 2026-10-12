@@ -67,8 +67,16 @@ export type Echange = { label: string; demande: Demande; vocal?: boolean };
 /** Combien de bulles de la conv font ces bulles de BLUSH (une bulle, et chacun de ses messages à copier : bulleEcrite, ../bulles.tsx). */
 const noeudsDe = (bulles: BulleChat[]) => bulles.reduce((n, b) => n + 1 + (b.messages?.length ?? 0), 0);
 
-/** La réponse avec son vocal arrivé, ou sans (la voix a échoué : elle reste écrite). Sa bulle n’attend plus. */
-const avecVocal = (r: BlushAnswer, vocal: NonNullable<BlushAnswer["vocal"]> | null): BlushAnswer => ({ ...r, vocalEnCours: undefined, ...(vocal ? { vocal } : {}) });
+/**
+ * La réponse avec son vocal arrivé, ou sans (la voix a échoué : elle reste écrite, et `bulles` dit ce qu’elle a coûté en
+ * fin de compte). Sa bulle n’attend plus.
+ */
+const avecVocal = (r: BlushAnswer, vocal: NonNullable<BlushAnswer["vocal"]> | null, bulles?: BlushAnswer["bulles"]): BlushAnswer => ({
+  ...r,
+  vocalEnCours: undefined,
+  ...(vocal ? { vocal } : {}),
+  ...(bulles ? { bulles } : {}),
+});
 
 /**
  * Le mode vocal du chat, son seul propriétaire : BLUSH répond en vocal tant qu’on ne repasse pas à l’écrit. Il part de
@@ -235,6 +243,9 @@ export function useConversation({
     let finie = false;
     /* Le vocal, s’il arrive avant que la réponse soit posée */
     let vocalTot: NonNullable<BlushAnswer["vocal"]> | null | undefined;
+    let bullesTot: BlushAnswer["bulles"];
+    /* La réponse posée : le vocal qui arrive après elle la complète (et corrige ses bulles, la voix ratée) */
+    let resultatPose: BlushAnswer | undefined;
     let posee = false;
     /* « BLUSH écrit » laisse sa place à ce qui arrive en premier : des bulles, ou la réponse entière. Vrai la première fois */
     const remplacer = () => {
@@ -260,9 +271,11 @@ export function useConversation({
       };
     const suivi: SuiviChat = {
       bulles: (recues) => void (file = file.then(poser(recues)).then(() => {})),
-      vocal: (v) => {
-        if (!posee) return void (vocalTot = v);
-        changer((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v) } : x)));
+      vocal: (v, bulles) => {
+        if (!posee) return void ((vocalTot = v), (bullesTot = bulles));
+        changer((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v, bulles) } : x)));
+        /* La voix ratée a coûté moins que dit : le compteur suit */
+        if (bulles && resultatPose) ecran.current.recue?.(avecVocal(resultatPose, v, bulles));
       },
     };
     /* Le mode vocal que rapportera la réponse : celui du serveur au départ de la demande */
@@ -288,14 +301,17 @@ export function useConversation({
     await file;
     finie = true;
     const premiere = remplacer();
-    const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
+    const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot, bullesTot) } : next;
     posee = true;
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
     const reponse: Msg = { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) };
     changer((m) => m.map((x) => (x.id === readingId ? reponse : x)));
     if (premiere) ecran.current.reponsePosee();
     ecran.current.annoncer(reponse);
-    if (next.type === "reponse") ecran.current.recue?.(next.result);
+    if (r.type === "reponse") {
+      resultatPose = r.result;
+      ecran.current.recue?.(r.result);
+    }
     if (next.type === "reponse" && next.result.modeVocal !== undefined) suivreModeVocal(next.result.modeVocal);
     const up = next.type === "reponse" ? next.result.levelUp : undefined;
     if (!up) return;

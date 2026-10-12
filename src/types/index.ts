@@ -314,7 +314,12 @@ export type BulleChat = BlushAnswer["bubbles"][number];
  * qu’il écrit ; la réponse validée (elle peut remplacer ces bulles) ; puis, si elle part en vocal, l’audio (null : elle
  * reste écrite). Une erreur en route remplace la suite.
  */
-export type EvenementChat = { bulle: BulleChat } | { reponse: BlushAnswer } | { vocal: NonNullable<BlushAnswer["vocal"]> | null } | { erreur: CodePublic };
+export type EvenementChat =
+  | { bulle: BulleChat }
+  | { reponse: BlushAnswer }
+  /* `bulles` : la voix a échoué, la réponse a coûté moins que dit (ce qu’elle a coûté en fin de compte, ce qu’il reste) */
+  | { vocal: NonNullable<BlushAnswer["vocal"]> | null; bulles?: BlushAnswer["bulles"] }
+  | { erreur: CodePublic };
 
 type FicheSource = "conv" | "capture" | "note";
 

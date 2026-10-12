@@ -4,9 +4,12 @@ import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
 import { relancerApres, relancerChaine } from "@/server/pipeline";
 import { imagesDe } from "@/server/captures";
 import { controlerBudget } from "@/server/budget";
-import { coutDe, debiter, refDuMessage, rendre, reponseVerrouillee, soldeDe, type Debit } from "@/server/bulles";
+import { coutDe, debiter, refDeLEnvoi, refDuMessage, rendre, rendues, reponseVerrouillee, soldeDe, type Debit } from "@/server/bulles";
 import { repondEnVocal, repondre as blushRepond, reserverEchange, type Reglement } from "@/server/chat";
-import { historique } from "@/server/historique";
+import { estEquipe } from "@/server/droits";
+import { historique, reponseDeLEnvoi } from "@/server/historique";
+import { UUID } from "@/server/histoires";
+import { rendre as rendreALaLimite, sousLaLimite } from "@/server/limites";
 import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/import";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, route, signalerErreur } from "@/server/http";
@@ -36,8 +39,11 @@ const alerteDuChat = (storyId: string) => ({ sujet: "chat en échec", lignes: [`
 /** Ce que la réponse de BLUSH reçoit en plus de ce qu’il a dit (src/server/chat.ts). */
 type OptionsDeReponse = NonNullable<Parameters<typeof blushRepond>[4]>;
 
-/** Ce qu’il envoie. `question` : la question du rapport (« Ta question »), toujours en texte (ROUTES). */
-type Envoi = { texte: string; question: boolean; captures: File[]; export: File | null; vocal: File | null };
+/**
+ * Ce qu’il envoie. `question` : la question du rapport (« Ta question »), toujours en texte (ROUTES). `cle` : la clé de
+ * l’envoi (un uuid pris par le navigateur une fois par message, la même pour « Réessayer »), ou null.
+ */
+type Envoi = { texte: string; question: boolean; captures: File[]; export: File | null; vocal: File | null; cle: string | null };
 
 /**
  * Un vocal que le serveur ne sait pas lire (lireVocal) : un navigateur qui enregistre dans un format qu’on ne connaît
@@ -60,7 +66,7 @@ async function signalerVocalIllisible(vocal: File): Promise<void> {
 async function lireEnvoi(req: Request): Promise<Envoi | null> {
   if (!req.headers.get("content-type")?.startsWith("multipart/form-data")) {
     const lu = await lireCorps(req, ROUTES["POST /api/chat"].corps);
-    return lu ? { texte: lu.texte.trim(), question: lu.question === true, captures: [], export: null, vocal: null } : null;
+    return lu ? { texte: lu.texte.trim(), question: lu.question === true, captures: [], export: null, vocal: null, cle: lu.cle?.toLowerCase() ?? null } : null;
   }
   const fd = await req.formData().catch(() => null);
   if (!fd) return null;
@@ -69,12 +75,14 @@ async function lireEnvoi(req: Request): Promise<Envoi | null> {
     return f instanceof File ? f : null;
   };
   const texte = fd.get("texte");
+  const cle = fd.get("cle");
   return {
     texte: typeof texte === "string" ? texte.trim() : "",
     question: false,
     captures: fd.getAll("captures").filter((f): f is File => f instanceof File),
     export: fichier("export"),
     vocal: fichier("vocal"),
+    cle: typeof cle === "string" && UUID.test(cle) ? cle.toLowerCase() : null,
   };
 }
 
@@ -159,25 +167,74 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
 /** Le paiement d’une réponse en bulles, décidé avant que BLUSH écrive (voir payer). */
 type Paiement = { reglement: Reglement; rendreSiPasReglee: () => Promise<void> };
 
+/** La réponse d’un envoi déjà fait (sa clé) : reponseDeLEnvoi, src/server/historique.ts. */
+type EnvoiDejaFait = NonNullable<Awaited<ReturnType<typeof reponseDeLEnvoi>>>;
+
+/**
+ * Ce que décide payer : la réponse payée (Paiement) ; « bulles » : le solde ne la couvre pas et une réponse verrouillée
+ * attend déjà (ou s’écrit en ce moment pour ce compte), rien ne part au modèle ; `deja` : cet envoi (sa clé) est déjà
+ * fait, sa réponse ; « occupe » : il s’écrit encore, trop longtemps pour l’attendre.
+ */
+type Decision = Paiement | { deja: EnvoiDejaFait } | "bulles" | "occupe";
+
+/**
+ * La place de la réponse verrouillée d’un compte, prise avant le modèle le temps de l’écrire (un compteur des limites,
+ * d’une seule place) : deux messages en même temps à 0 bulle n’appellent le modèle qu’une fois, l’autre répond
+ * « bulles ». Rendue une fois la réponse gardée (ou en échec) ; une fonction coupée la libère au bout de sa durée.
+ */
+const placeVerrouillee = (userId: string) => `chat:verrouillee:${userId}`;
+const PLACE_VERROUILLEE = { max: 1, fenetreS: maxDuration };
+
+/** Combien de temps un envoi attend celui de la même clé qui s’écrit encore (un double toucher, « Réessayer » trop tôt). */
+const ATTENTE_DE_L_ENVOI_MS = 90_000;
+
+/**
+ * Un envoi dont la clé est déjà payée : il s’écrit encore (un double toucher, « Réessayer » pendant que BLUSH écrit
+ * toujours), ou il a échoué (ses bulles rendues). Sa réponse dès qu’elle est gardée ; « rendu » : il a échoué, ce nouvel
+ * essai se paiera ; « occupe » : toujours rien au bout d’ATTENTE_DE_L_ENVOI_MS.
+ */
+async function attendreLEnvoi(storyId: string, cle: string, userId: string, ref: string): Promise<EnvoiDejaFait | "rendu" | "occupe"> {
+  const fin = Date.now() + ATTENTE_DE_L_ENVOI_MS;
+  for (;;) {
+    const faite = await reponseDeLEnvoi(storyId, cle);
+    if (faite) return faite;
+    if (await rendues(userId, ref)) return "rendu";
+    if (Date.now() > fin) return "occupe";
+    await new Promise((ok) => setTimeout(ok, 400));
+  }
+}
+
 /**
  * Le paiement de la réponse, avant tout appel au modèle (la transcription d’un vocal, la lecture de captures, la
  * réponse) : son coût (coutDe : des captures ou un export 3, une réponse en vocal 2, écrite 1) est débité d’un coup, sous
- * la référence de la réponse (refDuMessage, ses identifiants pris d’avance). Le solde ne couvre pas un vocal : une
- * réponse écrite, s’il la couvre. Il ne la couvre pas (0 bulle, ou moins après un remboursement) : la réponse s’écrira
- * verrouillée, sauf si une autre attend déjà d’être payée (une par compte) : null, la route répond « bulles » sans appel
- * au modèle. L’équipe n’est jamais débitée. `rendreSiPasReglee` : la réponse a échoué avant de partir, ses bulles
- * reviennent (une fois) ; partie, elle est réglée (Reglement.regler : le trop-perçu d’une alerte ou d’un vocal resté écrit
- * est rendu, et la réponse dit ce qu’il reste).
+ * la référence de l’envoi (refDeLEnvoi, sa clé : un message n’est jamais débité deux fois, « Réessayer » compris), ou
+ * de la réponse sans clé (refDuMessage, ses identifiants pris d’avance). La clé déjà payée : l’envoi se fait encore (on
+ * attend sa réponse) ou il a échoué (ce nouvel essai se paie, sous la référence de sa réponse). Le solde ne couvre pas un
+ * vocal : une réponse écrite, s’il la couvre. Il ne la couvre pas (0 bulle, ou moins après un remboursement) : la réponse
+ * s’écrira verrouillée, sauf si une autre attend déjà d’être payée (une par compte) ou s’écrit en ce moment
+ * (placeVerrouillee) : « bulles », la route répond sans appel au modèle. L’équipe n’est jamais débitée.
+ * `rendreSiPasReglee` : la réponse a échoué avant de partir, ses bulles reviennent (une fois) ; partie, elle est réglée
+ * (Reglement.regler : le trop-perçu d’une alerte ou d’un vocal resté écrit est rendu, et la réponse dit ce qu’il reste).
+ * Une voix que le débit n’a pas comptée (« parle-moi en vocal » dans ce message) se paie quand elle part
+ * (Reglement.ajouterVocal : la bulle de plus, sous sa propre référence).
  */
 async function payer(
   utilisateur: Utilisateur,
   story: Parameters<typeof repondEnVocal>[0] & { id: string },
-  { fichiers, vocal }: { fichiers: boolean; vocal: boolean },
-): Promise<Paiement | null> {
+  { fichiers, vocal, cle }: { fichiers: boolean; vocal: boolean; cle: string | null },
+): Promise<Decision> {
   const ids = await reserverEchange();
-  const ref = refDuMessage(ids.blush);
+  let ref = cle ? refDeLEnvoi(utilisateur.id, cle) : refDuMessage(ids.blush);
   let cout = coutDe({ ajout: fichiers, vocal: repondEnVocal(story, vocal) });
   let debit: Debit = await debiter(utilisateur, cout, ref);
+  if (debit === "deja" && cle) {
+    const attendu = await attendreLEnvoi(story.id, cle, utilisateur.id, ref);
+    if (attendu === "occupe") return "occupe";
+    if (attendu !== "rendu") return { deja: attendu };
+    /* Il a échoué, ses bulles rendues : ce nouvel essai se paie, sous la référence de sa propre réponse */
+    ref = refDuMessage(ids.blush);
+    debit = await debiter(utilisateur, cout, ref);
+  }
   let ecrit = false;
   /* Pas de quoi payer un vocal : la réponse s’écrit, si le solde couvre une réponse écrite */
   if (debit === "insuffisant" && cout === COUT_EN_BULLES.vocal) {
@@ -185,11 +242,27 @@ async function payer(
     if (ecrite !== "insuffisant") [debit, cout, ecrit] = [ecrite, COUT_EN_BULLES.reponse, true];
   }
   const verrouillee = debit === "insuffisant";
+  let liberer = async () => {};
   if (verrouillee) {
-    if (await reponseVerrouillee(utilisateur.id)) return null;
+    if (await reponseVerrouillee(utilisateur.id)) return "bulles";
+    const place = placeVerrouillee(utilisateur.id);
+    const prise = await sousLaLimite(place, PLACE_VERROUILLEE);
+    let libre = false;
+    liberer = async () => {
+      if (libre) return;
+      libre = true;
+      await auMieux(() => rendreALaLimite(place), "chat : la place de la réponse verrouillée non rendue", { histoire: story.id });
+    };
+    /* Une autre s’écrit en ce moment (la place est prise), ou vient d’être gardée : celle-ci n’appelle pas le modèle */
+    if (!prise || (await reponseVerrouillee(utilisateur.id))) {
+      await liberer();
+      return "bulles";
+    }
     /* Verrouillée, elle s’écrit sans voix : son coût à la lecture est celui d’une réponse écrite (ou de captures) */
     cout = coutDe({ ajout: fichiers, vocal: false });
   }
+  const refDeLaVoix = `${ref}:vocal`;
+  let supplement = 0;
   let reglee = false;
   return {
     reglement: {
@@ -197,21 +270,58 @@ async function payer(
       verrouillee,
       ecrit: ecrit || verrouillee,
       cout,
+      paye: () => cout + supplement,
+      liberer,
+      ajouterVocal: async () => {
+        if (debit === "equipe") return true;
+        if (debit !== "debite") return false;
+        const n = COUT_EN_BULLES.vocal - cout;
+        if (n <= 0) return true;
+        if ((await debiter(utilisateur, n, refDeLaVoix)) !== "debite") return false;
+        supplement = n;
+        return true;
+      },
       regler: async (reel) => {
         reglee = true;
         if (debit === "equipe") return undefined;
         /* Verrouillée d’avance mais sortie en alerte de danger (offerte, jamais verrouillée) : rien n’a été débité */
         if (debit !== "debite") return { depensees: 0, restantes: await soldeDe(utilisateur.id) };
-        if (reel < cout) await rendre(utilisateur, ref, cout - reel);
-        return { depensees: Math.min(reel, cout), restantes: await soldeDe(utilisateur.id) };
+        const paye = cout + supplement;
+        /* Le trop-perçu revient : la bulle de la voix d’abord (sa référence), puis le reste */
+        let trop = paye - reel;
+        if (trop > 0 && supplement > 0) {
+          const n = Math.min(trop, supplement);
+          await rendre(utilisateur, refDeLaVoix, n);
+          trop -= n;
+        }
+        if (trop > 0) await rendre(utilisateur, ref, trop);
+        return { depensees: Math.min(reel, paye), restantes: await soldeDe(utilisateur.id) };
       },
     },
     rendreSiPasReglee: async () => {
+      await liberer();
       if (debit !== "debite" || reglee) return;
       reglee = true;
-      await auMieux(() => rendre(utilisateur, ref), "chat : les bulles d’une réponse en échec non rendues", { histoire: story.id, ref });
+      await auMieux(
+        async () => {
+          await rendre(utilisateur, ref);
+          if (supplement) await rendre(utilisateur, refDeLaVoix);
+        },
+        "chat : les bulles d’une réponse en échec non rendues",
+        { histoire: story.id, ref },
+      );
     },
   };
+}
+
+/**
+ * La réponse d’un envoi déjà fait (sa clé : « Réessayer » après une coupure, un double toucher), telle qu’elle est
+ * gardée, d’un bloc : sans nouvel appel au modèle, sans nouveau débit. Ce qu’elle a coûté et ce qu’il reste, sauf pour
+ * l’équipe et une réponse verrouillée (masquée).
+ */
+async function dejaFait(utilisateur: Utilisateur, d: EnvoiDejaFait): Promise<Response> {
+  const bulles = d.verrouillee || estEquipe(utilisateur) ? {} : { bulles: { depensees: d.cout ?? 0, restantes: await soldeDe(utilisateur.id) } };
+  return repondre("POST /api/chat", { ...d.reponse, echange: d.echange, ...bulles });
 }
 
 /**
@@ -230,17 +340,21 @@ async function traiter(req: Request) {
   if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");
   const fichiers = envoi.captures.length > 0 || !!envoi.export;
   if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte");
+  /* Cet envoi (sa clé) est déjà fait : sa réponse, telle quelle, sans rien compter ni débiter de plus */
+  const fait = envoi.cle ? await reponseDeLEnvoi(story.id, envoi.cle) : null;
+  if (fait) return dejaFait(utilisateur, fait);
   if (!(await sousLaLimiteDuCompte(utilisateur, "chat"))) return erreur("trop");
   /* Lire des captures coûte plus qu’un message : une limite à part */
   if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire) return erreur("pas_pret");
-  const paiement = await payer(utilisateur, story, { fichiers, vocal: !!envoi.vocal });
-  if (!paiement) {
-    /* Une réponse verrouillée attend déjà : rien ne part, le message du jour est rendu */
+  const paiement = await payer(utilisateur, story, { fichiers, vocal: !!envoi.vocal, cle: envoi.cle });
+  if (typeof paiement === "string" || "deja" in paiement) {
+    /* Rien ne part au modèle (une réponse verrouillée attend déjà, ou cet envoi est déjà fait) : le message du jour est rendu */
     await rendreAuCompte(utilisateur, "chat");
     if (fichiers) await rendreAuCompte(utilisateur, "ajout");
-    return erreur("bulles");
+    /* « bulles » porte toujours les numéros d’aide (erreur, src/server/http.ts) : ce message, personne ne l’a lu */
+    return typeof paiement === "string" ? erreur(paiement) : dejaFait(utilisateur, paiement.deja);
   }
   try {
     const r = await repondreA(req, envoi, { utilisateur, story, memoire, paiement });
@@ -295,8 +409,8 @@ async function repondreA(
       ajout = { ajout: lu, affiche: resumeAjout(lu, "export", 1) };
     }
     /* La réponse de BLUSH, payée */
-    const reponseDeBlush = (suite: Omit<OptionsDeReponse, "parVocal" | "reglement"> = {}) =>
-      blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, reglement: paiement.reglement, ...suite });
+    const reponseDeBlush = (suite: Omit<OptionsDeReponse, "parVocal" | "reglement" | "cle"> = {}) =>
+      blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, reglement: paiement.reglement, ...(envoi.cle ? { cle: envoi.cle } : {}), ...suite });
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
       const r = await reponseDeBlush();

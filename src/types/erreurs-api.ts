@@ -36,7 +36,7 @@ export const ERREURS_API = {
   lien: 404,
   /** La conv n’en est pas là : le rapport, la mémoire ou le vocal ne sont pas encore faits. */
   pas_pret: 409,
-  /** La fiche a changé trois fois pendant qu’on l’enregistrait. */
+  /** La fiche a changé trois fois pendant qu’on l’enregistrait ; un message au chat (sa clé) déjà parti, qui s’écrit encore. */
   occupe: 409,
   /** Une alerte de danger (le mode sobre) : le verdict ne se partage pas. */
   sobre: 409,

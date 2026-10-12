@@ -129,6 +129,23 @@ export async function rendre(compte: Pick<Utilisateur, "id">, ref: string, n?: n
 export const refDuMessage = (messageId: number) => `message:${messageId}`;
 
 /**
+ * La référence du débit d’une réponse demandée par un envoi qui porte sa clé (POST /api/chat, `cle` : la même pour
+ * « Réessayer ») : un message n’est jamais débité deux fois. Avec le compte : la clé vient du navigateur.
+ */
+export const refDeLEnvoi = (userId: string, cle: string) => `envoi:${userId}:${cle}`;
+
+/** Les bulles de ce débit (`ref`) ont-elles été rendues (la réponse a échoué) ? */
+export async function rendues(userId: string, ref: string): Promise<boolean> {
+  const m = schema.mouvementsBulles;
+  const [l] = await db()
+    .select({ id: m.id })
+    .from(m)
+    .where(and(eq(m.raison, "rendu"), eq(m.ref, ref), eq(m.userId, userId)))
+    .limit(1);
+  return !!l;
+}
+
+/**
  * La réponse de BLUSH verrouillée qui attend d’être payée, pour ce compte (une au plus : la suivante demande la
  * recharge, sans appel au modèle), ou null. Son texte reste en base, chiffré, jamais envoyé avant d’être payé. `ex` :
  * la transaction qui la cherche (garderVerrouillee), sinon la base.

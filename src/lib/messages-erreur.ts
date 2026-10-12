@@ -3,6 +3,7 @@
  * action. Un code absent d’une action prend son texte par défaut (le réseau, un bug). Les textes des écrans d’erreur de
  * l’import, avec leur action, sont dans src/lib/copie-erreur.ts.
  */
+import { URGENCES } from "@/contenu/aide";
 import type { FicheUpdate } from "@/types";
 import { ErreurApi, type CodeApi, type CodeErreur } from "@/types/erreurs-api";
 
@@ -22,9 +23,13 @@ const CHAT_ET_QUESTION = {
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   /*
    * Plus de bulles : une réponse verrouillée attend déjà (src/server/bulles.ts), ou la lire en demande plus que le solde.
+   * Le message n’a pas atteint le modèle : s’il disait sa détresse, personne ne l’a lu. Les numéros d’urgence suivent
+   * donc toujours (URGENCES, la même source que les conditions et la réponse 402).
    * TODO(produit): texte nouveau, sans maquette (le prototype des bulles n’a pas ce cas) ; la recharge viendra avec lui
    */
-  bulles: ["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"],
+  bulles: ["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES],
+  /* Le même message, déjà parti, s’écrit encore (« Réessayer » trop tôt). TODO(produit): texte nouveau, sans maquette */
+  occupe: "je t’écris encore, deux secondes",
 } as const;
 
 /** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
@@ -114,7 +119,7 @@ const MESSAGES = {
   question: {
     ...CHAT_ET_QUESTION,
     /* TODO(produit): texte nouveau, sans maquette (voir CHAT_ET_QUESTION) */
-    bulles: "plus de bulles pour l’instant, recharge et je te réponds",
+    bulles: `plus de bulles pour l’instant, recharge et je te réponds. ${URGENCES}`,
     refus: "là-dessus je peux pas t’aider, reformule ta question",
     defaut: "j’ai eu un bug, renvoie-moi ta question",
   },

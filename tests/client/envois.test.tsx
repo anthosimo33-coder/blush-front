@@ -66,29 +66,29 @@ describe("les envois de la barre de saisie", () => {
     act(() => void result.current.onText("et là ?"));
     expect(echanges.at(-1)!.mine).toMatchObject({ type: "texte", from: "toi", text: "et là ?" });
     expect(await demander(suivi)).toEqual({ type: "reponse", from: "blush", result: reponse("de l’aperçu") });
-    expect(envoyer).toHaveBeenLastCalledWith({ text: "et là ?", about: undefined }, { msgs: FIL, suivi });
+    expect(envoyer).toHaveBeenLastCalledWith({ text: "et là ?", about: undefined, cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, { msgs: FIL, suivi });
 
     act(() => void result.current.onQuick("je lui dis quoi ?"));
     expect(idees.poser).toHaveBeenCalledWith("je lui dis quoi ?");
     await demander(suivi);
-    expect(envoyer).toHaveBeenLastCalledWith({ text: "je lui dis quoi ?" }, { msgs: FIL, suivi });
+    expect(envoyer).toHaveBeenLastCalledWith({ text: "je lui dis quoi ?", cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, { msgs: FIL, suivi });
 
     const capture = new File(["png"], "capture.png", { type: "image/png" });
     act(() => void result.current.onImages([capture]));
     await demander(suivi);
-    expect(envoyer).toHaveBeenLastCalledWith({ files: [capture] }, { msgs: FIL, suivi });
+    expect(envoyer).toHaveBeenLastCalledWith({ files: [capture], cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, { msgs: FIL, suivi });
 
     const paquet = new File(["zip"], "conv.zip", { type: "application/zip" });
     act(() => void result.current.onExport([paquet]));
     expect(echanges.at(-1)!.mine).toMatchObject({ type: "fichier", file: { name: "conv.zip", size: 3 } });
     await demander(suivi);
-    expect(envoyer).toHaveBeenLastCalledWith({ files: [paquet] }, { msgs: FIL, suivi });
+    expect(envoyer).toHaveBeenLastCalledWith({ files: [paquet], cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, { msgs: FIL, suivi });
 
     /* Le point creusé part avec ta question suivante, une seule fois */
     act(() => void result.current.dig("elle hésite"));
     act(() => void result.current.onText("pourquoi ?"));
     await demander(suivi);
-    expect(envoyer).toHaveBeenLastCalledWith({ text: "pourquoi ?", about: "elle hésite" }, { msgs: FIL, suivi });
+    expect(envoyer).toHaveBeenLastCalledWith({ text: "pourquoi ?", about: "elle hésite", cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, { msgs: FIL, suivi });
     expect(result.current.about).toBeNull();
 
     expect(envoyer).toHaveBeenCalledTimes(5);
@@ -100,7 +100,27 @@ describe("les envois de la barre de saisie", () => {
     const suivi: SuiviChat = { bulles: vi.fn() };
     act(() => void result.current.onText("et là ?"));
     expect(await demander(suivi)).toEqual({ type: "reponse", from: "blush", result: reponse("du vrai chat") });
-    expect(auVraiChat).toHaveBeenCalledWith({ text: "et là ?", about: undefined }, suivi);
+    expect(auVraiChat).toHaveBeenCalledWith({ text: "et là ?", about: undefined, cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, suivi);
+  });
+
+  it("« Réessayer » relance la même demande : la même clé (le serveur ne débite jamais deux fois le même message) ; un autre message, une autre clé", async () => {
+    const { result, demander } = monter();
+    act(() => void result.current.onText("et là ?"));
+    await demander();
+    await demander();
+    const [premier, reessai] = auVraiChat.mock.calls.map(([p]) => p.cle);
+    expect(premier).toMatch(/^[0-9a-f-]{36}$/);
+    expect(reessai).toBe(premier);
+    act(() => void result.current.onText("et après ?"));
+    await demander();
+    expect(auVraiChat.mock.calls.at(-1)![0].cle).not.toBe(premier);
+    const blob = new Blob(["son"], { type: "audio/webm" });
+    act(() => void result.current.onVoice({ url: "blob:vocal", blob, seconds: 4, peaks: [0.2] }));
+    await demander();
+    await demander();
+    const [vocal, vocalEncore] = auVraiChatEnVocal.mock.calls.map(([p]) => p.cle);
+    expect(vocal).toMatch(/^[0-9a-f-]{36}$/);
+    expect(vocalEncore).toBe(vocal);
   });
 
   it("ton vocal part toujours au vrai chat, même avec `envoyer`, et sa réponse est attendue en vocal", async () => {
@@ -111,7 +131,7 @@ describe("les envois de la barre de saisie", () => {
     expect(echanges.at(-1)!.echange.vocal).toBe(true);
     const suivi: SuiviChat = { vocal: vi.fn() };
     expect(await demander(suivi)).toEqual({ type: "reponse", from: "blush", result: reponse("du vrai chat, en vocal") });
-    expect(auVraiChatEnVocal).toHaveBeenCalledWith({ audio: blob, seconds: 4 }, suivi);
+    expect(auVraiChatEnVocal).toHaveBeenCalledWith({ audio: blob, seconds: 4, cle: expect.stringMatching(/^[0-9a-f-]{36}$/) }, suivi);
     expect(envoyer).not.toHaveBeenCalled();
   });
 

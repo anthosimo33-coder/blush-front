@@ -288,7 +288,8 @@ describe("la voix (S-13) : un texte coupé, dans le budget du compte et du mois"
     const [fin, voix] = evenements;
     if (!("reponse" in fin!) || fin.reponse.kind !== "bubbles") throw new Error("une réponse en bulles");
     expect(fin.reponse.bubbles.length).toBeGreaterThan(0);
-    expect(voix).toEqual({ vocal: null });
+    /* Le vocal raté dit aussi ce que la réponse a coûté en fin de compte (l’écrit) et ce qu’il reste */
+    expect(voix).toEqual({ vocal: null, bulles: { depensees: 1, restantes: expect.any(Number) } });
   });
 
   it("le vocal du rapport, le budget de la voix du compte épuisé : son script n’est pas écrit, il attend sans user d’essai ni alerter, puis repart le lendemain", async () => {

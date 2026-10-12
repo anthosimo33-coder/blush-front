@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, eq, ne } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
@@ -30,6 +31,7 @@ vi.mock("@/server/env", async (original) => {
 
 import { GET, POST } from "@/app/api/chat/route";
 import { POST as debloquer } from "@/app/api/chat/debloquer/route";
+import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
 import { COUT_EN_BULLES } from "@/contenu/offres";
 import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { coutDe, crediter, refDuMessage, reponseVerrouillee, soldeDe } from "@/server/bulles";
@@ -79,14 +81,20 @@ async function parleur(prefixe: string, bulles: number): Promise<{ u: Utilisateu
 
 const requete = (chemin: string, init: RequestInit = {}) =>
   new Request(`http://localhost${chemin}`, { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...init.headers } });
-const envoyer = (texte: string, { flux = true, question = false }: { flux?: boolean; question?: boolean } = {}) =>
+/* `cle` : la clé du message, la même pour « Réessayer » (le navigateur la prend une fois par message) */
+const envoyer = (texte: string, { flux = true, question = false, cle }: { flux?: boolean; question?: boolean; cle?: string } = {}) =>
   POST(
     requete("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json", ...(flux ? { accept: "application/x-ndjson" } : {}) },
-      body: JSON.stringify({ texte, ...(question ? { question: true } : {}) }),
+      body: JSON.stringify({ texte, ...(question ? { question: true } : {}), ...(cle ? { cle } : {}) }),
     }),
   );
+/** La réponse d’un envoi, en flux ou d’un bloc (une réponse déjà écrite revient d’un bloc). */
+const reponseDe = async (r: Response): Promise<BlushAnswer> =>
+  r.headers.get("content-type")?.includes("ndjson") ? reponseDu((await fluxDe(r)).evenements) : ((await r.json()) as BlushAnswer);
+/** Ce que porte une réponse 402 « bulles » : les numéros d’aide de l’appli (src/contenu/aide.ts), toujours. */
+const SANS_BULLES = { erreur: "bulles", aide: AIDE_SANS_BULLES };
 /* Une capture (de leur conv), comme l’envoie le « + » du chat */
 const envoyerCaptures = () => {
   const fd = new FormData();
@@ -229,7 +237,9 @@ describe("POST /api/chat, avec des bulles", () => {
     await compter(cleDeLimiteDuCompte("voix", u.email), LIMITES.voixParCompte, LIMITES.voixParCompte.max);
     const evenements = (await fluxDe(await envoyer("dis-moi tout"))).evenements;
     await lancerApres();
-    expect(evenements.at(-1)).toEqual({ vocal: null });
+    /* L’événement du vocal dit ce que la réponse a coûté en fin de compte (2 → 1) et ce qu’il reste : le compteur suit */
+    expect(reponseDu(evenements).bulles).toEqual({ depensees: 2, restantes: 1 });
+    expect(evenements.at(-1)).toEqual({ vocal: null, bulles: { depensees: 1, restantes: 2 } });
     expect(await soldeDe(u.id)).toBe(2);
     expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([
       ["reponse", -COUT_EN_BULLES.vocal],
@@ -238,14 +248,22 @@ describe("POST /api/chat, avec des bulles", () => {
     expect(await derniereReponse(id)).toMatchObject({ cout: COUT_EN_BULLES.reponse, verrouillee: false });
   });
 
-  it("« parle-moi en vocal » dans un chat écrit : la réponse part en vocal, payée comme écrite ; ce qu’elle garde de son coût est ce qui a été débité", async () => {
+  it("« parle-moi en vocal » dans un chat écrit : la réponse part en vocal et coûte 2 comme tout vocal (la bulle de plus débitée quand la voix part) ; sans elle, la réponse reste écrite pour 1", async () => {
     const { u, id } = await parleur("bulles-voix-demandee", 3);
+    chat = (req) => ({ ...(fournisseurFactice(req) as object), mode_vocal: "activer" });
     const evenements = (await fluxDe(await envoyer("parle-moi en vocal"))).evenements;
     await lancerApres();
     expect(evenements.some((e) => "vocal" in e && e.vocal)).toBe(true);
-    expect(reponseDu(evenements).bulles).toEqual({ depensees: 1, restantes: 2 });
-    expect((await journalDe(u.id)).map((m) => m.delta)).toEqual([-1]);
-    expect(await derniereReponse(id)).toMatchObject({ cout: 1 });
+    expect(reponseDu(evenements).bulles).toEqual({ depensees: 2, restantes: 1 });
+    expect((await journalDe(u.id)).map((m) => m.delta)).toEqual([-1, -1]);
+    expect(await derniereReponse(id)).toMatchObject({ cout: 2 });
+    /* Une seule bulle : pas de quoi payer la voix, la réponse reste écrite (1) */
+    const seule = await parleur("bulles-voix-demandee-une", 1);
+    const ecrite = (await fluxDe(await envoyer("parle-moi en vocal"))).evenements;
+    await lancerApres();
+    expect(ecrite.some((e) => "vocal" in e)).toBe(false);
+    expect(reponseDu(ecrite).bulles).toEqual({ depensees: 1, restantes: 0 });
+    expect(await soldeDe(seule.u.id)).toBe(0);
   });
 
   it("des captures : 3 bulles ; à 2, la réponse s’écrit verrouillée et se lira pour 3 ; la suivante répond « bulles » et rend l’ajout du jour", async () => {
@@ -260,7 +278,7 @@ describe("POST /api/chat, avec des bulles", () => {
     const ajouts = () => compteDe(cleDeLimiteDuCompte("ajout", u.email), LIMITES.ajoutParCompte);
     const avant = await ajouts();
     const refusee = await envoyerCaptures();
-    expect([refusee.status, await refusee.json()]).toEqual([402, { erreur: "bulles" }]);
+    expect([refusee.status, await refusee.json()]).toEqual([402, SANS_BULLES]);
     expect(await ajouts()).toBe(avant);
     expect((await lire(verrouillee.verrouillee!.message)).status).toBe(402);
     await donnerDesBulles(u, 1);
@@ -273,6 +291,47 @@ describe("POST /api/chat, avec des bulles", () => {
     await lancerApres();
     expect(r.bulles).toEqual({ depensees: 1, restantes: 0 });
     expect(await soldeDe(u.id)).toBe(0);
+  });
+
+  it("« Réessayer » après une coupure (la même clé) : jamais débité deux fois ; la réponse déjà écrite revient telle quelle, sans nouvel appel au modèle", async () => {
+    const { u, id } = await parleur("bulles-reessayer", 5);
+    const cle = randomUUID();
+    const premiere = await reponseDe(await envoyer("on s’est vus hier", { cle }));
+    await lancerApres();
+    const encore = await reponseDe(await envoyer("on s’est vus hier", { cle }));
+    await lancerApres();
+    expect(appels).toBe(1);
+    expect(textesDe(encore)).toEqual(textesDe(premiere));
+    expect(encore.echange).toBe(premiere.echange);
+    expect(encore.bulles).toEqual({ depensees: 1, restantes: 4 });
+    expect(await soldeDe(u.id)).toBe(4);
+    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([["reponse", -1]]);
+    expect((await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, id))).length).toBe(2);
+    /* Deux envois de la même clé en même temps (un double toucher) : un appel, un débit */
+    const autre = randomUUID();
+    const deux = await Promise.all([envoyer("et là ?", { cle: autre }), envoyer("et là ?", { cle: autre })]);
+    const [a, b] = await Promise.all(deux.map(reponseDe));
+    await lancerApres();
+    expect(appels).toBe(2);
+    expect(a!.echange).toBe(b!.echange);
+    expect(await soldeDe(u.id)).toBe(3);
+    /* Une autre clé, c’est un autre message : il se paie */
+    await reponseDe(await envoyer("on s’est vus hier", { cle: randomUUID() }));
+    await lancerApres();
+    expect(await soldeDe(u.id)).toBe(2);
+  });
+
+  it("« Réessayer » après un échec (ses bulles rendues) : le nouvel essai se paie une fois, le solde net n’a perdu qu’une bulle", async () => {
+    const { u } = await parleur("bulles-reessayer-echec", 3);
+    const cle = randomUUID();
+    chat = () => refusFactice("cyber");
+    expect((await envoyer("…", { cle })).status).toBe(502);
+    await lancerApres();
+    chat = null;
+    const r = await reponseDe(await envoyer("…", { cle }));
+    await lancerApres();
+    expect(r.bulles).toEqual({ depensees: 1, restantes: 2 });
+    expect(await soldeDe(u.id)).toBe(2);
   });
 
   it("l’équipe n’est jamais débitée, et ne voit pas de compteur", async () => {
@@ -340,7 +399,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
 
     /* Pas de quoi la lire : rien ne change */
     const sansBulles = await lire(v.id);
-    expect([sansBulles.status, await sansBulles.json()]).toEqual([402, { erreur: "bulles" }]);
+    expect([sansBulles.status, await sansBulles.json()]).toEqual([402, SANS_BULLES]);
     expect(await soldeDe(u.id)).toBe(0);
 
     /* Rechargé : elle se lit, son coût débité une fois ; un second toucher la rend sans nouveau débit */
@@ -375,7 +434,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     const avant = await comptes();
     for (const flux of [true, false]) {
       const r = await envoyer("second", { flux });
-      expect([r.status, await r.json()]).toEqual([402, { erreur: "bulles" }]);
+      expect([r.status, await r.json()]).toEqual([402, SANS_BULLES]);
     }
     expect(appels).toBe(1);
     expect(await comptes()).toBe(avant);
@@ -388,6 +447,8 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect(statuts).toEqual([200, 402]);
     await Promise.all(reponses.map((r) => r.text()));
     await lancerApres();
+    /* L’autre n’a pas appelé le modèle : la place de la réponse verrouillée est prise avant lui */
+    expect(appels).toBe(1);
     expect(await reponseVerrouillee(u.id)).not.toBeNull();
     const gardees = await db().select().from(schema.chatMessages).where(eq(schema.chatMessages.storyId, id));
     expect(gardees.filter((m) => m.verrouillee).length).toBe(1);
@@ -470,7 +531,8 @@ describe("le navigateur (api.ts), à 0 bulle", () => {
     expect(q).toMatchObject({ question: "il pense à moi ?", title: "Ta réponse est prête", verrouillee: true });
     expect(q.message).toBeUndefined();
     const chat = await sendToBlush({ text: "et maintenant ?" });
-    expect(chat.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"]);
+    /* Les numéros d’aide de l’appli, toujours : un message de détresse à 0 bulle n’a pas de réponse du modèle, il a l’aide */
+    expect(chat.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
     await expect(askQuestion("et là ?")).rejects.toMatchObject({ code: "bulles", status: 402 });
     const v = await derniereVerrouillee(u.id);
     await expect(lireLaReponse(v.id)).rejects.toMatchObject({ code: "bulles" });

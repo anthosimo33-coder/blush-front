@@ -3,6 +3,7 @@ import { unstable_rethrow } from "next/navigation";
 import { after } from "next/server";
 import type { z } from "zod";
 import type { CleJson, CleRoute, ReponseErreur, Routes } from "@/types/api";
+import { AIDE_SANS_BULLES } from "@/contenu/aide";
 import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 import { alerter } from "./alertes";
 import { ErreurPublique, ErreurTache, estBudget } from "./erreurs";
@@ -23,8 +24,13 @@ const json = (corps: unknown, status: number, entetes: Record<string, string>) =
  */
 export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse"], status = 200, entetes: Record<string, string> = {}) => json(corps, status, entetes);
 
-/** Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. */
-export const erreur = (code: CodeErreur, entetes: Record<string, string> = {}) => json({ erreur: code } satisfies ReponseErreur, ERREURS_API[code], entetes);
+/**
+ * Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. « bulles » porte
+ * toujours les numéros d’aide (AIDE_SANS_BULLES, src/contenu/aide.ts) : un message qui n’atteint pas le modèle faute de
+ * bulles peut être un message de détresse, et aucune détection ne tourne avant lui.
+ */
+export const erreur = (code: CodeErreur, entetes: Record<string, string> = {}) =>
+  json({ erreur: code, ...(code === "bulles" ? { aide: AIDE_SANS_BULLES } : {}) } satisfies ReponseErreur, ERREURS_API[code], entetes);
 
 /**
  * Ce que le navigateur apprend d’une erreur levée pendant une route : une ErreurPublique (un import refusé, un ajout sans

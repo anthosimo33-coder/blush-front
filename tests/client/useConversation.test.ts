@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { URGENCES } from "@/contenu/aide";
 import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CoupureChat, getChatHistory, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
@@ -378,7 +379,7 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
     await act(async () => void (lue = await result.current.lire(masquee.id, 41)));
     expect(lue).toBe(false);
     expect(result.current.msgs.at(-2)).toEqual(masquee);
-    expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: "plus de bulles pour l’instant 🫧 recharge, et je te réponds" });
+    expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: `plus de bulles pour l’instant 🫧 recharge, et je te réponds ${URGENCES}` });
     /* Et l’écran ouvre la recharge */
     expect(s.manqueDeBulles).toHaveBeenCalledOnce();
   });
