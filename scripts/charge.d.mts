@@ -14,6 +14,10 @@ export type Options = {
   sondage: number;
   lente: number;
   releve: number;
+  /** Un aller-retour de plus (ms) entre l’appli et la base, par un relais TCP (0 : en direct). */
+  latence: number;
+  /** Le webhook du paiement posté deux fois en même temps. */
+  rejeu: boolean;
   garder: boolean;
   sortie: string;
 };
@@ -32,6 +36,13 @@ export function routeDe(methode: string, chemin: string): string;
 
 /** Un bocal à cookies : ce que le serveur pose repart avec les requêtes suivantes. */
 export function nouveauBocal(): { recevoir(entetes: Headers): void; entete(): string; taille(): number };
+
+/**
+ * Un relais TCP vers `hote`:`port` qui retarde chaque morceau de `ms / 2` dans chaque sens (un aller-retour de `ms` de
+ * plus) : son port sur 127.0.0.1, les connexions prises (une requête envoyée, pas encore rendue libre par ReadyForQuery
+ * hors transaction) et ouvertes, et de quoi le fermer.
+ */
+export function relaisLent(hote: string, port: number, ms: number): Promise<{ port: number; prises(): number; ouvertes(): number; fermer(): Promise<void> }>;
 
 /** Le _chat.txt d’un export WhatsApp iPhone inventé, propre au parcours `k`. */
 export function convInventee(k: number): string;
@@ -53,9 +64,12 @@ export type Mesures = {
   etapes: Map<string, number[]>;
   /** Clé : l’étape et le code, séparés par U+0000. */
   erreurs: Map<string, number>;
-  base_releves: { t: number; total: number; actifs: number; idleTx: number; verrous: number; plusLongue: number }[];
+  /** `prisesAppli` : les connexions prises vues du relais (--latence), réseau compris. */
+  base_releves: { t: number; total: number; actifs: number; idleTx: number; verrous: number; plusLongue: number; prisesAppli?: number }[];
   lentes: Map<string, { vues: number; max: number }>;
   stats: Record<string, number> | null;
+  /** Les convs dont deux étapes ont tourné en même temps (0 attendu), ou null s’il n’a pas pu être lu. */
+  chevauchements: number | null;
   serveur_releves: { t: number; rssMo: number; cpu: number }[];
   /** Clé : l’événement et le niveau, séparés par U+0000. */
   journal: Map<string, number>;
