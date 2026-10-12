@@ -11,13 +11,15 @@ import { useSondage } from "@/lib/useSondage";
 import type { CibleImage, ReportPayload } from "@/types/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { marquerChatOuvert } from "@/components/chat/ouvert";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/cards";
 import { Icon } from "@/components/ui/icons";
 import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
 import { Toast } from "@/components/ui/surfaces";
 import { Screen } from "@/components/shell/Screen";
-import { PaywallSheet } from "@/components/screens/PaywallSheet";
+import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
+import { FeuilleFormule } from "@/components/paiement/FeuilleFormule";
+import { PiedGratuit } from "@/components/paiement/PiedGratuit";
 import { useHydrated, useJourneyMe } from "@/state/journey";
 import type { Chapter, ChapterBlock, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
@@ -39,7 +41,7 @@ const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.Pastil
 const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImageSheet").then((m) => m.PartageImageSheet), { ssr: false });
 
 /*
- * Écrans 09 (aperçu gratuit), 10 (paiement), 11 (rapport complet) et 18-19 (mode sobre).
+ * Écrans 09 (aperçu gratuit, et son pied : PiedGratuit), 10 (la feuille « Ta formule »), 11 (rapport complet) et 18-19 (mode sobre).
  */
 export function ReportScreen({
   initial,
@@ -104,6 +106,8 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
   /* Du parcours, seul « qui est toi » sert ici : le reste ne re-rend pas tout le rapport */
   const journeyMe = useJourneyMe();
   const [paywall, setPaywall] = useState(openPaywall);
+  /* « C’est quoi une bulle ? », du bas de l’aperçu gratuit */
+  const [bulle, setBulle] = useState(false);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /* « Partager en image » : la chute d’un chapitre en story */
@@ -232,9 +236,8 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
             Parler à BLUSH
           </ButtonLink>
         ) : full ? undefined : (
-          <Button arrow onClick={ouvrirPaiement}>
-            Lire la suite
-          </Button>
+          /* L’aperçu gratuit : « Lire la suite », son prix, et les bulles offertes avec le rapport */
+          <PiedGratuit ouvrirPaiement={ouvrirPaiement} expliquer={() => setBulle(true)} />
         )
       }
     >
@@ -302,7 +305,8 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
 
       <SuivreAncre retour={retour} />
 
-      <PaywallSheet open={paywall} onClose={() => setPaywall(false)} otherName={other.name} chapitres={locked.length || undefined} />
+      <FeuilleFormule open={paywall} onClose={() => setPaywall(false)} autre={other.name} chapitres={locked.length || undefined} />
+      {!full && <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />}
     </Screen>
   );
 }

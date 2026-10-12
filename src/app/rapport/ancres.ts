@@ -3,7 +3,7 @@ import { creerRepere } from "@/lib/repere";
 /*
  * Les ancres du rapport, écrites en un seul endroit. Chaque chapitre est une section `chapitre-N` : le sommaire et la
  * reprise y mènent, la lecture suivie les mesure, et on y arrive par l’adresse (/rapport#chapitre-N : « Lire la suite »
- * de « C’est débloqué », src/app/rapport/debloque/UnlockedScreen.tsx). Les tests de bout en bout et la galerie
+ * de « C’est débloqué », src/app/rapport/debloque/EcranDebloque.tsx). Les tests de bout en bout et la galerie
  * (scripts/galerie/screens.mjs) les visent aussi, sous la même forme.
  */
 

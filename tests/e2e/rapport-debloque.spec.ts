@@ -13,6 +13,7 @@ import {
   ouvrir,
   ouvrirLeRapport,
   PAIEMENT,
+  RENONCIATION,
   tachesDe,
   test,
   URL_APPLI,
@@ -123,7 +124,7 @@ test("un compte de l’équipe n’a rien à payer : son rapport est ouvert, et 
   const rapport = await ouvrirLeRapport(page);
   await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
   for (const offre of ["rapport", "pack30"] as const) {
-    const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: true } });
+    const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: RENONCIATION } });
     expect([r.status(), await r.json()]).toEqual([409, { erreur: "deja" }]);
   }
   expect(await compteDe(email)).toMatchObject({ bulles: 0 });

@@ -16,7 +16,8 @@ const STATUTS: Record<StatutAchat, string> = { en_attente: "en attente", paye: "
 /**
  * Le faux Whop, en local et dans les tests : l’achat, son prix, et « Payer » ou « Refuser ». Chaque bouton fait
  * fabriquer au serveur le webhook que Whop enverrait (POST /api/paiement/factice), le poste à /api/paiement/whop comme
- * Whop, puis revient sur la page du retour. Un outil de l’équipe : ses textes ne sont pas ceux du produit.
+ * Whop, puis revient sur la page du retour. « Annuler » y revient sans rien poster, comme l’acheteur qui quitte la page
+ * de Whop (status=canceled). Un outil de l’équipe : ses textes ne sont pas ceux du produit.
  */
 export function FauxWhopScreen({ achat, titre, centimes, statut }: { achat: string; titre: string; centimes: number; statut: StatutAchat }) {
   const router = useRouter();
@@ -46,6 +47,10 @@ export function FauxWhopScreen({ achat, titre, centimes, statut }: { achat: stri
         </Button>
         <Button variant="secondary" loading={occupe === "refuser"} disabled={!!occupe} onClick={() => void choisir("refuser")}>
           Refuser
+        </Button>
+        {/* Quitter la page sans payer, comme « Retour » chez Whop : rien n’est posté, le retour le dit (status=canceled) */}
+        <Button variant="link" disabled={!!occupe} onClick={() => router.push(`/paiement/retour?achat=${achat}&status=canceled` as Route)}>
+          Annuler
         </Button>
       </div>
     </Screen>

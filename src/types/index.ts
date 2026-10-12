@@ -343,17 +343,6 @@ export type FicheUpdate = {
   problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle" | "refus"> | "bug";
 };
 
-/** Une formule telle que la montre la feuille du paiement (src/contenu/offres.ts). */
-export type Offer = {
-  id: Formule;
-  title: string;
-  titleDesktop: string;
-  price: string;
-  note: string;
-  noteDesktop: string;
-  recommended: boolean;
-};
-
 export type AnalysisProgress = {
   progress: number;
   messagesRead: number;
