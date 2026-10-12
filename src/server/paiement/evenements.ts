@@ -103,20 +103,25 @@ const Enveloppe = z.looseObject({
   data: z.unknown(),
 });
 
-/** Un remboursement ou un litige : de quel paiement, et où il en est. */
+/** Un remboursement ou un litige : de quel paiement, où il en est, et ce qu’il rend (un remboursement). */
 const RepriseBrute = z.looseObject({
   id: z.string().nullish(),
   status: z.string().nullish(),
+  amount: Montant.nullish(),
   payment_id: z.string().nullish(),
-  payment: z.looseObject({ id: z.string() }).nullish(),
+  payment: z.looseObject({ id: z.string(), refunded_amount: Montant.nullish() }).nullish(),
 });
 
 /** Ce qu’un webhook demande de faire. */
 export type ActionWebhook =
   /* Un paiement réussi : livrer l’achat qu’il paie, s’il colle */
   | { faire: "livrer"; paiement: PaiementWhop }
-  /* Remboursé ou contesté : reprendre l’achat de ce paiement (l’achat, s’il est su ; sinon par le paiement) */
-  | { faire: "reprendre"; statut: "rembourse" | "conteste"; paiementId: string; achat: string | null }
+  /*
+   * Remboursé ou contesté : reprendre l’achat de ce paiement (l’achat, s’il est su ; sinon par le paiement). `montant` :
+   * ce qu’un remboursement a rendu en tout sur ce paiement, en centimes, quand Whop le dit ; moins que le prix, rien
+   * n’est repris (un geste commercial, webhook.ts)
+   */
+  | { faire: "reprendre"; statut: "rembourse" | "conteste"; paiementId: string; achat: string | null; montant?: number }
   /* Un paiement refusé : l’achat en attente passe « echoue » */
   | { faire: "echouer"; paiement: PaiementWhop }
   /* Rien à faire : un événement qu’on n’écoute pas, un paiement en attente, un remboursement pas encore fait… */
@@ -134,7 +139,7 @@ const paiementDe = (r: z.infer<typeof RepriseBrute>) => {
 /**
  * Lit un webhook (son corps, en JSON déjà parsé) : ce qu’il demande. payment.succeeded livre (sauf remboursé d’office :
  * repris), payment.failed fait échouer, refund.created et refund.updated reprennent quand le remboursement est fait
- * (« succeeded »), dispute.created reprend (contesté) tout de suite, dispute.updated quand le litige est perdu. Le reste
+ * (« succeeded » ; avec ce qu’il a rendu, s’il le dit : un remboursement partiel ne reprend rien), dispute.created reprend (contesté) tout de suite, dispute.updated quand le litige est perdu. Le reste
  * ne fait rien (dispute_alert.created, payment.pending, un litige gagné…).
  */
 export function lireWebhook(corps: unknown): WebhookLu | null {
@@ -161,9 +166,10 @@ export function lireWebhook(corps: unknown): WebhookLu | null {
       if (!r.success || !paiementId) return lu({ faire: "rien", pourquoi: "paiement introuvable dans l’événement" });
       const statut = (r.data.status ?? "").toLowerCase();
       if (type.startsWith("refund.")) {
-        return statut === "succeeded"
-          ? lu({ faire: "reprendre", statut: "rembourse", paiementId, achat: null })
-          : lu({ faire: "rien", pourquoi: `remboursement ${statut || "sans statut"}` });
+        if (statut !== "succeeded") return lu({ faire: "rien", pourquoi: `remboursement ${statut || "sans statut"}` });
+        /* Ce que le paiement a rendu en tout (plusieurs remboursements partiels), sinon ce que rend celui-ci */
+        const montant = enCentimes(r.data.payment?.refunded_amount) ?? enCentimes(r.data.amount);
+        return lu({ faire: "reprendre", statut: "rembourse", paiementId, achat: null, ...(montant !== null ? { montant } : {}) });
       }
       /* Un litige ouvert re-verrouille tout de suite ; mis à jour, seulement perdu (gagné : TODO(produit), voir BACKEND.md) */
       if (type === "dispute.created" || statut === "lost") return lu({ faire: "reprendre", statut: "conteste", paiementId, achat: null });

@@ -42,7 +42,13 @@ const paiementDe = (achat: Pick<Achat, "id" | "centimes" | "devise" | "checkoutI
 export function webhookDeLIssue(achat: Pick<Achat, "id" | "centimes" | "devise" | "checkoutId" | "paiementId">, issue: IssueDuFauxWhop): WebhookFactice | null {
   if (issue === "rembourser") {
     if (!achat.paiementId) return null;
-    return webhookFactice("refund.created", { id: `rfnd_faux_${randomUUID().replaceAll("-", "")}`, status: "succeeded", payment_id: achat.paiementId });
+    return webhookFactice("refund.created", {
+      id: `rfnd_faux_${randomUUID().replaceAll("-", "")}`,
+      status: "succeeded",
+      payment_id: achat.paiementId,
+      /* Le montant entier : le remboursement reprend l’achat */
+      amount: (achat.centimes / 100).toFixed(2),
+    });
   }
   return webhookFactice(issue === "payer" ? "payment.succeeded" : "payment.failed", paiementDe(achat, issue === "payer" ? "paid" : "failed"));
 }

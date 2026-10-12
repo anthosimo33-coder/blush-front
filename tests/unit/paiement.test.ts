@@ -161,6 +161,17 @@ describe("ce que demande chaque webhook", () => {
     expect(lireWebhook(webhook("refund.created", { id: "rfnd_1", status: "succeeded" }))?.action).toMatchObject({ faire: "rien" });
   });
 
+  it("un remboursement dit combien il rend (en centimes) : son montant, ou ce que le paiement a rendu en tout s’il le dit (plusieurs remboursements partiels)", () => {
+    const rendu = (data: Record<string, unknown>) =>
+      (lireWebhook(webhook("refund.created", { id: "rfnd_1", status: "succeeded", payment_id: "pay_abc", ...data }))?.action as { montant?: number })?.montant;
+    expect(rendu({ amount: 4.5 })).toBe(450);
+    expect(rendu({ amount: "9.90" })).toBe(990);
+    expect(rendu({ amount: { amount: "2.00", currency: "eur" } })).toBe(200);
+    expect(rendu({ amount: 2, payment: { id: "pay_abc", refunded_amount: 9.9 } })).toBe(990);
+    /* Sans montant : inconnu (le remboursement entier, comme avant) */
+    expect(rendu({})).toBeUndefined();
+  });
+
   it("le reste ne fait rien (une alerte de litige, un paiement en attente, un événement inconnu) ; une enveloppe illisible : null", () => {
     for (const type of ["dispute_alert.created", "payment.pending", "membership.activated"])
       expect(lireWebhook(webhook(type, paiement()))?.action, type).toMatchObject({ faire: "rien" });

@@ -136,6 +136,21 @@ async function appliquer(f: Fournisseur, action: ActionWebhook): Promise<string>
         );
         return "doublon";
       }
+      /*
+       * Un remboursement partiel (un geste commercial) ne reprend rien : le rapport reste ouvert, les bulles restent ;
+       * l’équipe le sait. Seul le montant entier (ou un montant que Whop ne dit pas : le remboursement entier, comme avant)
+       * reprend l’achat. Plusieurs remboursements partiels qui finissent par tout rendre le reprennent (refunded_amount)
+       */
+      if (action.statut === "rembourse" && action.montant !== undefined && action.montant < achat.centimes) {
+        const { montant } = action;
+        after(() =>
+          alerter("paiement : remboursement partiel", [
+            `Le paiement ${action.paiementId} de l’achat ${achat.id} (${achat.offre}, ${achat.centimes / 100} €) est remboursé en partie : ${montant / 100} € rendus en tout.`,
+            "Rien n’est repris (le rapport reste ouvert, les bulles restent) : seul un remboursement du montant entier reprend l’achat.",
+          ]),
+        );
+        return "partiel";
+      }
       return (await reprendre(achat.id, action.statut)).effet;
     }
     case "echouer": {

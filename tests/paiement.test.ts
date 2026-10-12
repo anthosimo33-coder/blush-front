@@ -323,6 +323,33 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
   });
 
+  it("un remboursement partiel (un geste commercial) ne reprend rien : l’équipe est prévenue ; seul le montant entier reprend l’achat", async () => {
+    const { u, conv } = await acheteur("hook-rembourse-partiel");
+    const achat = await rapportPaye();
+    const paiementId = (await achatEnBase(achat)).paiementId!;
+    etat.alertes.length = 0;
+    expect((await poster(webhookFactice("refund.created", { id: "rfnd_p1", status: "succeeded", payment_id: paiementId, amount: 3 }))).status).toBe(200);
+    await apresLaReponse();
+    expect(await achatEnBase(achat)).toMatchObject({ statut: "paye" });
+    expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
+    expect(await soldeDe(u.id)).toBe(10);
+    expect(etat.alertes).toEqual(["paiement : remboursement partiel"]);
+    /* Le reste rendu ensuite : le paiement a tout rendu (9,90 €), l’achat est repris */
+    etat.alertes.length = 0;
+    expect(
+      (
+        await poster(
+          webhookFactice("refund.created", { id: "rfnd_p2", status: "succeeded", payment_id: paiementId, amount: 6.9, payment: { id: paiementId, refunded_amount: 9.9 } }),
+        )
+      ).status,
+    ).toBe(200);
+    await apresLaReponse();
+    expect(await achatEnBase(achat)).toMatchObject({ statut: "rembourse" });
+    expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
+    expect(await soldeDe(u.id)).toBe(0);
+    expect(etat.alertes).toEqual(["paiement remboursé"]);
+  });
+
   it("un litige ouvert (Whop) : contesté, re-verrouillé ; le remboursement arrivé avant le paiement : rien ne sera livré", async () => {
     const { u, conv } = await acheteur("hook-litige");
     etat.mode = "whop";
