@@ -11,7 +11,7 @@ import { mailAttente } from "./mail-attente";
 
 /**
  * Combien de temps une inscription reste sur la liste (S-30) : au-delà, la purge de nuit l’efface (purgerLaListe), et
- * supprimer son compte l’efface tout de suite (src/server/comptes.ts). TODO(produit): 12 mois.
+ * supprimer son compte l’efface tout de suite (src/server/comptes.ts). Douze mois.
  */
 export const ATTENTE_GARDEE_JOURS = 365;
 

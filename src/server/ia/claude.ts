@@ -299,9 +299,14 @@ export async function appeler<S extends z.ZodType>(
   /* Les longues sorties (rapport, mémoire) passent en flux. Une sortie suivie aussi */
   const flux = REGLAGES[req.tache].flux || !!surAvance;
   const debut = Date.now();
-  /* Le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste (600 s et 2 tentatives sans échéance) */
+  /*
+   * Le délai et les nouvelles tentatives du SDK tiennent ensemble dans le temps qui reste : le SDK compte son délai à
+   * chaque tentative (jusqu’à la réponse d’un bloc, ou jusqu’au début du flux), le temps qui reste se partage donc entre
+   * elles. Une tentative de plus quand il reste plus de 150 s ; sans échéance (un script), deux, de 200 s chacune.
+   */
   const reste = tempsRestant();
-  const options: OptionsEnvoi = { timeout: delaiAppel(600_000), maxRetries: reste === Infinity ? 2 : reste > 150_000 ? 1 : 0, ...(signal ? { signal } : {}) };
+  const maxRetries = reste === Infinity ? 2 : reste > 150_000 ? 1 : 0;
+  const options: OptionsEnvoi = { timeout: Math.floor(delaiAppel(600_000) / (maxRetries + 1)), maxRetries, ...(signal ? { signal } : {}) };
   const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance, req.tache) : null });
   const { usage, model } = message;
   const ms = Date.now() - debut;

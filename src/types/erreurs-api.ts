@@ -68,10 +68,12 @@ export const ERREURS_API = {
   autre_conv: 422,
   /** Un ajout sans rien de nouveau. */
   rien_de_neuf: 422,
-  /** Un vocal vide, ou trop long. */
+  /** Un vocal trop lourd, ou trop long. */
   vocal: 422,
-  /** Un vocal où la transcription n’entend rien. */
+  /** Un vocal vide, qui ne dure rien, ou où la transcription n’entend rien. */
   vocal_vide: 422,
+  /** Un vocal dans un format que le serveur ne sait pas lire (pas celui d’un enregistreur de navigateur connu). */
+  vocal_illisible: 422,
   /** La transcription des vocaux n’est pas configurée. */
   vocal_bientot: 503,
 

@@ -32,7 +32,7 @@ export const BUDGET_IA = {
   jour: 30,
   /** Les appels pour un compte (décidé). */
   compte: 3,
-  /** Les appels sans compte, pris dans le budget du jour. TODO(produit): 5 $, à revoir avec les chiffres de l’ouverture. */
+  /** Les appels sans compte, pris dans le budget du jour ; à revoir avec les chiffres de l’ouverture. */
   anonyme: 5,
   /** L’équipe est prévenue à 50 % et 80 % (décidé), puis quand le budget du jour est atteint. */
   seuils: [0.5, 0.8, 1],

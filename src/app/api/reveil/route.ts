@@ -2,6 +2,7 @@ import { prolongerSession } from "@/server/auth";
 import { lireSession, poserSession } from "@/server/cookies";
 import { reveillerLaBase } from "@/server/depot";
 import { repondre, route } from "@/server/http";
+import { journalErreur } from "@/server/journal";
 
 /*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes
@@ -17,7 +18,9 @@ export const GET = route("GET /api/reveil", async () => {
     const fin = secret ? await prolongerSession(secret) : null;
     if (secret && fin) await poserSession(secret, fin);
     return repondre("GET /api/reveil", { ok: true });
-  } catch {
+  } catch (e) {
+    /* La base qui ne répond pas : le navigateur n’en saura rien de plus (503), le journal en garde le nom et le code */
+    journalErreur("réveil sans base", e);
     return repondre("GET /api/reveil", { ok: false }, 503);
   }
 });

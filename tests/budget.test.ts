@@ -32,6 +32,7 @@ import { fournisseurFactice } from "@/server/ia/factice";
 import { cloreLesAbandons, executerChaine } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
+import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, convPrete, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const ETIQUETTE = "test-budget";
@@ -218,7 +219,6 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
     const payeur = payeurDuCompte(u);
     const { id } = await histoireLue(u, "02-reciproque.txt");
     expect((await etatDesTaches(id, ["memoire"])).memoire?.status).toBe("fini");
-    const echange = (n: number) => ({ date: "2026-03-15", dit: `échange numéro ${n}`, reponse: ["Enfin."] });
     /* Le jour J : deux échanges du chat, chacun arrêté par le budget (la chaîne s’arrête au premier) */
     await depense(payeur, 3);
     await planifier(id, "memoire_maj", echange(1));
@@ -254,6 +254,12 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
       { status: "fini", error: null },
     ]);
     expect(lus).toEqual([1, 2, 3]);
+    /* Une fois finie, une mise à jour n’a plus à garder son échange (S-34) : la mémoire l’a retenu */
+    const entrees = await db()
+      .select({ input: schema.tasks.input })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "memoire_maj")));
+    expect(entrees).toEqual([{ input: null }, { input: null }, { input: null }]);
   });
 });
 

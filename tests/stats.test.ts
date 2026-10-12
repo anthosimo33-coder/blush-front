@@ -1,17 +1,14 @@
-import { readFileSync } from "node:fs";
 import { and, asc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { executerChaine } from "@/server/pipeline";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
 import { db, schema } from "@/server/db";
-import { definirQui, importer, rattacherBrouillon } from "@/server/histoires";
-import { depuisFichier } from "@/server/import";
-import { definirFactice } from "@/server/ia/claude";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { definirQui } from "@/server/histoires";
 import { mailRapport } from "@/server/mail-rapport";
 import { statsAdmin } from "@/server/stats";
 import { planifier } from "@/server/taches";
 import { definirPause } from "@/server/temps";
+import { compteDeTest, convRattachee, moiDans } from "./aide/fixtures";
 
 describe("les robots d’aperçu ne sont pas des visites", () => {
   it("reconnaît WhatsApp, iMessage et Slack, pas un iPhone", () => {
@@ -37,46 +34,40 @@ describe("le mail « ton rapport est prêt »", () => {
     expect(s.sujet).not.toContain("📖");
   });
 
-  const email = `mail-rapport-${Date.now()}@blush.test`;
-  beforeAll(() => definirFactice(fournisseurFactice));
-  afterAll(async () => {
-    await db().delete(schema.users).where(eq(schema.users.email, email));
-    definirFactice(null);
-    definirPause(null);
-  });
-
   it("part une seule fois, quand le rapport complet est écrit : une relance réussie de l’écriture ne le renvoie pas", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    /* Chaque essai raté de la chaîne fait une pause avant le suivant : on les compte */
+    const u = await compteDeTest("mail-rapport", "blushplus");
+    const imp = await convRattachee(u, "01-a-deux-doigts.txt");
+    await definirQui(imp.id, { moi: moiDans(imp.meta, "Hugo"), pronom: "il", devinette: "vus", objectif: "ensemble" });
+    /* Chaque essai raté de la chaîne fait une pause avant le suivant : on les compte, le temps du test */
     const pauses: number[] = [];
     definirPause(async (ms) => void pauses.push(ms));
-    const imp = await importer(await depuisFichier(new File([readFileSync("prompts/evals/convs/01-a-deux-doigts.txt")], "01.txt", { type: "text/plain" })));
-    const u = (await db().insert(schema.users).values({ email, plan: "blushplus" }).returning())[0]!;
-    await rattacherBrouillon(u, imp.secret);
-    await definirQui(imp.id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Hugo") as 0 | 1, pronom: "il", devinette: "vus", objectif: "ensemble" });
-    /* La conv brute telle qu’en base : la mémoire l’efface en fin de chaîne, et une relance de l’écriture la relit */
-    const { conv } = (await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, imp.id)))[0]!;
-    await planifier(imp.id, "verdict");
-    await executerChaine(imp.id);
-    const mails = () => log.mock.calls.filter(([l]) => String(l).startsWith("[dev] mail") && String(l).includes(email));
-    expect(mails().map(([l]) => l)).toEqual([`[dev] mail « 📖 Ton rapport BLUSH est prêt » pour ${email}`]);
+    try {
+      /* La conv brute telle qu’en base : la mémoire l’efface en fin de chaîne, et une relance de l’écriture la relit */
+      const { conv } = (await db().select({ conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, imp.id)))[0]!;
+      await planifier(imp.id, "verdict");
+      await executerChaine(imp.id);
+      const mails = () => log.mock.calls.filter(([l]) => String(l).startsWith("[dev] mail") && String(l).includes(u.email));
+      expect(mails().map(([l]) => l)).toEqual([`[dev] mail « 📖 Ton rapport BLUSH est prêt » pour ${u.email}`]);
 
-    /* L’écriture relancée, la conv encore là : elle réécrit le rapport (sans échec, sans pause), et le mail ne repart pas */
-    await db().update(schema.stories).set({ conv, convPurgedAt: null }).where(eq(schema.stories.id, imp.id));
-    await planifier(imp.id, "rapport_chapitres");
-    await executerChaine(imp.id);
-    const ecritures = await db()
-      .select({ status: schema.tasks.status, error: schema.tasks.error })
-      .from(schema.tasks)
-      .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "rapport_chapitres")))
-      .orderBy(asc(schema.tasks.createdAt));
-    expect(ecritures).toEqual([
-      { status: "fini", error: null },
-      { status: "fini", error: null },
-    ]);
-    expect(pauses).toEqual([]);
-    expect(mails()).toHaveLength(1);
-    log.mockRestore();
+      /* L’écriture relancée, la conv encore là : elle réécrit le rapport (sans échec, sans pause), et le mail ne repart pas */
+      await db().update(schema.stories).set({ conv, convPurgedAt: null }).where(eq(schema.stories.id, imp.id));
+      await planifier(imp.id, "rapport_chapitres");
+      await executerChaine(imp.id);
+      const ecritures = await db()
+        .select({ status: schema.tasks.status, error: schema.tasks.error })
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "rapport_chapitres")))
+        .orderBy(asc(schema.tasks.createdAt));
+      expect(ecritures).toEqual([
+        { status: "fini", error: null },
+        { status: "fini", error: null },
+      ]);
+      expect(pauses).toEqual([]);
+      expect(mails()).toHaveLength(1);
+    } finally {
+      definirPause(null);
+    }
   });
 });
 

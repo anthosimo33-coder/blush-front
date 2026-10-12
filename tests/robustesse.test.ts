@@ -16,6 +16,7 @@ import { ouvrirLeRapport } from "@/server/donnees";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { planifier, prendre } from "@/server/taches";
+import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const lancerApres = async () => {
@@ -83,14 +84,14 @@ describe("les tâches d’une histoire", () => {
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan"), inArray(schema.tasks.status, ["attente", "en_cours"])));
     expect(enAttente).toHaveLength(1);
     /* Les mises à jour de la mémoire, elles, s’empilent */
-    const [m1, m2] = [await planifier(id, "memoire_maj", { a: 1 }), await planifier(id, "memoire_maj", { a: 2 })];
+    const [m1, m2] = [await planifier(id, "memoire_maj", echange(1)), await planifier(id, "memoire_maj", echange(2))];
     expect(m1).not.toBe(m2);
   });
 
   it("jamais deux étapes d’une même histoire en même temps", async () => {
     const id = await lue("03-elle-s-eloigne.txt");
-    const t1 = await planifier(id, "memoire_maj", { a: 1 });
-    const t2 = await planifier(id, "memoire_maj", { a: 2 });
+    const t1 = await planifier(id, "memoire_maj", echange(1));
+    const t2 = await planifier(id, "memoire_maj", echange(2));
     expect(await prendre(t1)).not.toBeNull();
     expect(await prendre(t2)).toBeNull();
     /* La première abandonnée (battement périmé) : la seconde peut partir */

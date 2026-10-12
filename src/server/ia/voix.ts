@@ -103,7 +103,7 @@ export class ErreurVoix extends Error {
 
 /**
  * La coupe d’un vocal, en caractères envoyés à la voix : une réponse du chat (la coupe par défaut de dire), le vocal du
- * rapport (src/server/vocal.ts). TODO(produit): 400 et 700, environ 25 et 45 secondes de voix.
+ * rapport (src/server/vocal.ts) : environ 25 et 45 secondes de voix.
  */
 export const COUPE_VOIX = { chat: 400, rapport: 700 } as const;
 
@@ -111,21 +111,25 @@ export const COUPE_VOIX = { chat: 400, rapport: 700 } as const;
 type UsageVoix = keyof typeof COUPE_VOIX;
 
 /**
- * Les caractères que la voix dit pour tous, par mois (de Paris), comptés dans rate_limits (« voix:mois:AAAA-MM »).
- * TODO(produit): 100 000, sous les 121 000 de l’abonnement Creator du prestataire, à caler sur l’offre prise.
+ * Les caractères que la voix dit pour tous, par mois (de Paris), comptés dans rate_limits (« voix:mois:AAAA-MM ») : sous
+ * les 121 000 de l’abonnement Creator du prestataire, à caler sur l’offre prise.
  */
 export const VOIX_PAR_MOIS = 100_000;
 /** L’équipe est prévenue quand le mois passe 80 % de VOIX_PAR_MOIS, puis quand il est atteint : une fois chacun. */
 const SEUIL_DU_MOIS = 0.8;
-/* La clé du mois porte son nom : sa fenêtre ne sert qu’à faire place nette ensuite */
-const FENETRE_DU_MOIS = { fenetreS: 40 * 86400 };
+/**
+ * La fenêtre du compteur du mois. Sa clé porte le nom du mois : un nouveau mois, une nouvelle clé. La fenêtre, plus
+ * longue que le plus long des mois, la garde d’ici là : la purge n’efface une clé qu’après la fin de sa fenêtre
+ * (rate_limits.expires_at), puis fait place nette.
+ */
+export const FENETRE_DU_MOIS = { fenetreS: 40 * 86400 };
 
 /** La clé du compteur du mois en cours (de Paris), dans rate_limits. */
 export const cleDuMoisDeLaVoix = (mois = aujourdhuiParis().iso.slice(0, 7)) => `voix:mois:${mois}`;
 
 /**
  * Les caractères du jour d’un compte pour cet usage : le chat s’arrête avant, en laissant au vocal du rapport sa coupe
- * entière (COUPE_VOIX.rapport). TODO(produit): la réserve du rapport (700 caractères pris sur les 6 000 du jour).
+ * entière (COUPE_VOIX.rapport : 700 caractères pris sur les 6 000 du jour).
  */
 const plafondDuCompte = (pour: UsageVoix) => LIMITES.voixParCompte.max - (pour === "chat" ? COUPE_VOIX.rapport : 0);
 

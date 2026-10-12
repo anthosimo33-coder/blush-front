@@ -37,7 +37,7 @@ vi.mock("@/server/limites", async (original) => ({
   limiteAtteinte: async () => false,
 }));
 
-import { garde, lecture } from "@/server/requete";
+import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { LIMITES } from "@/server/limites";
 
 beforeEach(() => {
@@ -121,7 +121,7 @@ describe("la garde", () => {
       const g = await garde(post(), o);
       return g instanceof Response ? [g.status, ((await g.json()) as { erreur: string }).erreur] : "ok";
     };
-    const tout = { session: "requise", plan: "chat", histoire: true, limite: { compte: "image" } } as const;
+    const tout = { session: "requise", plan: "chat", histoire: true, limite: { ip: "verif", limite: LIMITES.verificationParIp } } as const;
     expect(await statut(tout)).toEqual([401, "connexion"]);
     etat.utilisateur = gratuit;
     expect(await statut(tout)).toEqual([402, "acces"]);
@@ -136,12 +136,19 @@ describe("la garde", () => {
     expect(await statut({ session: "facultative" })).toEqual("ok");
   });
 
-  it("une limite par compte se range sur son email canonique ; par adresse IP, une IPv6 sur son /64", async () => {
+  it("une limite par adresse IP se range sur l’adresse, une IPv6 sur son /64 ; celle d’un compte (comptée par la route), sur son email canonique", async () => {
     etat.utilisateur = gratuit;
-    await garde(post(), { session: "requise", limite: { compte: "image" } });
     await garde(post(), { session: "aucune", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
-    await lecture({ session: "requise", limite: { compte: "image" } });
-    expect(etat.comptees).toEqual(["image:compte:noemartin@gmail.com", "verif:ip:2001:db8:1:2::/64", "image:compte:noemartin@gmail.com"]);
+    await sousLaLimiteDuCompte(gratuit, "image");
+    expect(etat.comptees).toEqual(["verif:ip:2001:db8:1:2::/64", "image:compte:noemartin@gmail.com"]);
+  });
+
+  it("une limite à l’entrée attend la requête : lecture n’en prend pas (refusée à la compilation, et « trop » sinon)", async () => {
+    etat.utilisateur = gratuit;
+    // @ts-expect-error lecture n’a pas d’adresse IP à compter
+    const r = await lecture({ session: "requise", limite: { ip: "verif", limite: LIMITES.verificationParIp } });
+    expect(r instanceof Response && r.status).toBe(429);
+    expect(etat.comptees).toEqual([]);
   });
 
   it("une adresse forgée qui imite la clé d’un compte reste dans la famille des adresses IP : elle n’use pas les lectures d’un autre", async () => {

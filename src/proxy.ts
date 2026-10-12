@@ -21,8 +21,8 @@ const VARIANTES: Record<string, string> = {
 };
 
 /**
- * Le cookie de session (src/server/cookies.ts) : sa seule présence, sans le vérifier, comme aUneSession. Sous l’un ou
- * l’autre de ses noms (__Host- en https : src/lib/noms-cookies.ts).
+ * Le cookie de session (src/server/cookies.ts) : sa seule présence, sans le vérifier (le proxy ne fait qu’aiguiller).
+ * Sous l’un ou l’autre de ses noms (__Host- en https : src/lib/noms-cookies.ts).
  */
 const connecte = (request: NextRequest) => NOMS_DE_SESSION.some((nom) => request.cookies.has(nom));
 

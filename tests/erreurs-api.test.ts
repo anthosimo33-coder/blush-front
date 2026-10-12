@@ -42,6 +42,7 @@ describe("le serveur", () => {
       rien_de_neuf: 422,
       vocal: 422,
       vocal_vide: 422,
+      vocal_illisible: 422,
       vocal_bientot: 503,
       refus: 502,
       transcription: 502,
@@ -121,6 +122,12 @@ describe("les écrans", () => {
     expect(messageErreur("question", api("refus"))).toBe("là-dessus je peux pas t’aider, reformule ta question");
     expect(messageErreur("question", api("acces"))).toBe("le chat avec moi, c’est dans BLUSH+");
     expect(messageErreur("question", api("panne"))).toBe("j’ai eu un bug, renvoie-moi ta question");
+  });
+
+  it("un vocal illisible dit le texte de la transcription en panne (qu’il écrive), pas celui d’un vocal vide (qu’il renvoie)", () => {
+    expect(messageErreur("chat", api("vocal_illisible"))).toBe("j’arrive pas à écouter ton vocal là, écris-moi");
+    expect(messageErreur("chat", api("vocal_illisible"))).toBe(messageErreur("chat", api("transcription")));
+    expect(messageErreur("chat", api("vocal_vide"))).toBe("j’ai rien entendu dans ton vocal, tu me le renvoies\u00a0?");
   });
 
   it("le budget de l’IA du jour atteint : « BLUSH souffle un peu, réessaie demain », dit par BLUSH au chat", () => {

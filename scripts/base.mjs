@@ -1,6 +1,6 @@
 /*
- * Ce que les scripts qui touchent à la base partagent (scripts/migrer.mjs, scripts/acces.mts, drizzle.config.ts) :
- * comment s’y connecter, et ce que drizzle sauterait en migrant. Sans dépendance : tests/verifier-migrations.test.ts
+ * Ce que les scripts qui touchent à la base partagent (scripts/migrer.mjs, scripts/acces.mts, drizzle.config.ts), et le
+ * pool de l’appli (src/server/db/index.ts) : comment s’y connecter, et ce que drizzle sauterait en migrant. Sans dépendance : tests/verifier-migrations.test.ts
  * l’essaie sans base.
  */
 
@@ -21,7 +21,11 @@ export function estLocale(url) {
  */
 export const sslPour = (url) => (estLocale(url) ? false : "verify-full");
 
-/** La même règle écrite dans l’URL (`sslmode=verify-full`), pour les outils qui ne prennent qu’une URL (drizzle-kit). */
+/**
+ * La même règle écrite dans l’URL (`sslmode=verify-full`), pour ce qui ne prend qu’une URL : drizzle-kit, et le pool pg
+ * de l’appli. pg 8 lisait déjà `sslmode=require` comme `verify-full`, mais l’écrivait dans les logs à chaque démarrage
+ * (« SECURITY WARNING ») : dit en clair, il se tait (tests/unit/db-url.test.ts).
+ */
 export function urlVerifiee(url) {
   if (estLocale(url)) return url;
   const u = new URL(url);

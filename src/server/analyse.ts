@@ -2,7 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { appliquerMaj, citees, estFaite, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
+import { appliquerMaj, estFaite, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -25,7 +25,7 @@ import { auMieux, journalErreur } from "./journal";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
-import { editionsBornees, type Contexte, type DonneesRapport } from "./stockage/types";
+import { editionsBornees, lignesGardees, type Contexte, type DonneesRapport } from "./stockage/types";
 import { entreeDe, type Tache } from "./taches";
 import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
@@ -368,8 +368,7 @@ async function memoire(story: LigneComplete) {
   const r = coffre.lire("reports.data", ligne.data).sortie;
   const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, { preuves: preuvesMemoire, lignes: rendu.lignes, storyId: story.id, etiquette: "memoire" });
   if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
-  const gardees = [...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!] as [string, string]);
-  const data = coffre.ecrire("memories.data", { etat, lignes: gardees, suivant: lu.messages.length + 1 });
+  const data = coffre.ecrire("memories.data", { etat, lignes: lignesGardees(etat, rendu.lignes), suivant: lu.messages.length + 1 });
   await db()
     .insert(schema.memories)
     .values({ storyId: story.id, data })
@@ -404,8 +403,7 @@ async function memoireMaj(story: Ligne, t: Tache) {
       });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
-      const gardees = [...new Set(citees(etat))].filter((id) => lignes.has(id)).map((id) => [id, lignes.get(id)!] as [string, string]);
-      return { etat, lignes: gardees, suivant: nouveau.suivant, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
+      return { etat, lignes: lignesGardees(etat, lignes), suivant: nouveau.suivant, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
     },
     { essais: 2 },
   );

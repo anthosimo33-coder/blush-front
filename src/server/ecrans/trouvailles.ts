@@ -6,6 +6,7 @@
  */
 import type { Chiffres, Histoire, Message } from "@prompts/lib/conv";
 import { formatCount } from "@/lib/format";
+import { joursCouverts } from "../temps";
 
 const H = 3600e3;
 
@@ -89,7 +90,7 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
   const motAVous = mot ? `Votre mot à vous\u00a0: «\u00a0${mot[0]}\u00a0»\u00a0×\u00a0${mot[1]}` : null;
 
   /* Le volume, toujours disponible */
-  const etendue = c.debut && c.fin ? Math.round((Date.parse(c.fin) - Date.parse(c.debut)) / (24 * H)) + 1 : 0;
+  const etendue = c.debut && c.fin ? joursCouverts(c.debut, c.fin) : 0;
   const volume = etendue
     ? `${formatCount(total)}\u00a0messages en ${etendue >= 60 ? `${Math.round(etendue / 30)}\u00a0mois` : `${etendue}\u00a0jour${etendue > 1 ? "s" : ""}`}`
     : null;

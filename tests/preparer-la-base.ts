@@ -31,7 +31,17 @@ async function migrationsManquantes(client: postgres.Sql): Promise<string[]> {
   return journal.entries.filter((e) => e.when > derniere).map((e) => e.tag);
 }
 
+/*
+ * Les clés du prestataire de mails qui feraient partir de vrais mails pendant les tests (un shell qui a lu un .env de
+ * production) : le modèle, la voix et la transcription restent factices (BLUSH_IA_FACTICE), les mails, eux, partiraient
+ * par Resend vers les adresses @blush.test des tests (des rebonds, la réputation du domaine). Un test qui en veut une la
+ * pose lui-même, le temps du test (vi.stubEnv, comme tests/boite-mails.test.ts), sur un `fetch` simulé.
+ */
+const CLES_DE_MAILS = ["RESEND_API_KEY", "RESEND_API_KEY_CODES"];
+
 export default async function preparerLaBase(projet: TestProject): Promise<void> {
+  const cles = CLES_DE_MAILS.filter((cle) => process.env[cle]);
+  if (cles.length) throw new Error(`${cles.join(" et ")} dans l’environnement des tests : de vrais mails partiraient. Lance les tests sans (env -u ${cles.join(" -u ")} npm test)`);
   const url = new URL(String(projet.config.env.DATABASE_URL));
   /* Une base choisie (DATABASE_URL_TEST) est à ce dossier : on peut la migrer */
   const choisie = !!process.env.DATABASE_URL_TEST;

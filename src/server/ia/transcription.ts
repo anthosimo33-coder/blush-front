@@ -40,16 +40,30 @@ export type VocalLu = { duree: number; fichier: File };
 
 /**
  * Lit un vocal reçu par le chat, avant de le transcrire (src/server/ia/duree-audio.ts) : sa durée et ce qui part chez le
- * prestataire ; « vocal » s’il est trop lourd ou trop long, « vocal_vide » s’il est vide ou illisible (un format qui
- * n’est pas celui d’un enregistreur, un fichier piégé).
+ * prestataire ; « vocal » s’il est trop lourd ou trop long, « vocal_vide » s’il est vide ou ne dure rien,
+ * « vocal_illisible » s’il n’est pas dans un format d’enregistreur que le serveur sait lire (un navigateur qui
+ * enregistre autrement, un fichier piégé) : la route le dit à l’équipe (signatureDuVocal).
  */
-export async function lireVocal(vocal: File): Promise<VocalLu | "vocal" | "vocal_vide"> {
+export async function lireVocal(vocal: File): Promise<VocalLu | "vocal" | "vocal_vide" | "vocal_illisible"> {
   if (!vocal.size) return "vocal_vide";
   if (vocal.size > TAILLE_VOCAL_MAX) return "vocal";
   const lu = lireAudio(new Uint8Array(await vocal.arrayBuffer()));
-  if (!lu || lu.secondes <= 0) return "vocal_vide";
+  if (!lu) return "vocal_illisible";
+  if (lu.secondes <= 0) return "vocal_vide";
   if (lu.secondes > DUREE_VOCAL_MAX_S) return "vocal";
   return { duree: lu.secondes, fichier: new File([lu.octets as Uint8Array<ArrayBuffer>], `vocal.${lu.extension}`, { type: lu.type }) };
+}
+
+/**
+ * Ce qui dit le format d’un vocal illisible, pour le journal et l’alerte de l’équipe : le type annoncé par le navigateur,
+ * la taille, les 12 premiers octets en hexadécimal (l’en-tête du conteneur : jamais du son), et la marque d’un MP4
+ * (« ftyp », ses quatre lettres suivantes), le seul format qui en porte une.
+ */
+export async function signatureDuVocal(vocal: File): Promise<{ type: string; taille: number; signature: string; marque: string | null }> {
+  const debut = new Uint8Array(await vocal.slice(0, 12).arrayBuffer());
+  const ascii = (a: number, b: number) => String.fromCharCode(...debut.subarray(a, b));
+  const marque = debut.length >= 12 && ascii(4, 8) === "ftyp" ? ascii(8, 12).replace(/[^\x20-\x7e]/g, "?") : null;
+  return { type: vocal.type || "(aucun)", taille: vocal.size, signature: Buffer.from(debut).toString("hex"), marque };
 }
 
 /**

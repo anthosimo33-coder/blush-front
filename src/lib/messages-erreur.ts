@@ -4,7 +4,7 @@
  * l’import, avec leur action, sont dans src/lib/copie-erreur.ts.
  */
 import type { FicheUpdate } from "@/types";
-import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
+import { ErreurApi, type CodeApi, type CodeErreur } from "@/types/erreurs-api";
 
 /** Une phrase, ou quelques bulles dans le chat (une idée par bulle). */
 type Texte = string | readonly string[];
@@ -17,16 +17,19 @@ export const SOUFFLE = `${SOUFFLE_TITRE}, réessaie demain.`;
 /* Ce que BLUSH répond au chat comme à la question du rapport */
 const CHAT_ET_QUESTION = {
   trop: "tu m’as fait parler toute la journée 😮‍💨 on reprend demain\u00a0?",
-  /* TODO(produit): « BLUSH souffle un peu, réessaie demain », dit par BLUSH lui-même, à valider */
+  /* « BLUSH souffle un peu, réessaie demain », dit par BLUSH lui-même */
   souffle: "je souffle un peu, réessaie demain",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
 
 /*
- * TODO(produit): texte à valider. Il dit « avec cet email », mais la porte se ferme aussi pour ce navigateur seul (dix
- * essais ratés), ou depuis cette adresse (vingt, sauf la réserve d’un navigateur), avant celle de l’email (soixante).
+ * Il dit « avec cet email », mais la porte se ferme aussi pour ce navigateur seul (dix essais ratés), ou depuis cette
+ * adresse (vingt, sauf la réserve d’un navigateur), avant celle de l’email (soixante).
  */
+/** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
+const ECOUTE_IMPOSSIBLE = "j’arrive pas à écouter ton vocal là, écris-moi";
+
 /** Trop d’essais de code ratés aujourd’hui (src/server/auth.ts) : ni un code tapé, ni un nouveau code n’y font plus rien. */
 const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.";
 
@@ -34,7 +37,6 @@ const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
     trop: "Trop de codes demandés. Réessaie dans une heure.",
-    /* TODO(produit): texte à valider */
     codes: "Trop de codes demandés aujourd’hui. Réessaie demain.",
     essais: ESSAIS_DU_JOUR,
     defaut: "Le code n’est pas parti. Réessaie dans un instant.",
@@ -56,7 +58,7 @@ const MESSAGES = {
     trop: "BLUSH a lu beaucoup de captures d’un coup\u00a0: réessaie un peu plus tard. Tes captures restent là.",
     /* La lecture des captures est payée par le compte connecté, ou par la part sans compte (src/server/budget.ts) */
     souffle: `${SOUFFLE} Tes captures restent là.`,
-    /* Un refus de l’IA : réessayer n’y changerait rien. TODO(produit): texte à valider */
+    /* Un refus de l’IA : réessayer n’y changerait rien */
     refus: "BLUSH ne peut pas lire ces captures. Essaie avec d’autres.",
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
@@ -84,8 +86,10 @@ const MESSAGES = {
     rien_de_neuf: "ça, je l’ai déjà 😌 rien de nouveau depuis la dernière fois",
     vocal_bientot: ["les vocaux, ça arrive très vite", "écris-moi en attendant, je te réponds pareil"],
     vocal_vide: "j’ai rien entendu dans ton vocal, tu me le renvoies\u00a0?",
+    /* Un format que le serveur ne sait pas lire : renvoyer le même vocal n’y changerait rien, le texte de la transcription en panne */
+    vocal_illisible: ECOUTE_IMPOSSIBLE,
     vocal: "ton vocal est trop long, même pour moi 😭 fais-moi la version courte",
-    transcription: "j’arrive pas à écouter ton vocal là, écris-moi",
+    transcription: ECOUTE_IMPOSSIBLE,
     /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug */
     refus: ["là-dessus je peux pas t’aider", "reformule, ou envoie-moi autre chose"],
     defaut: "j’ai eu un bug, renvoie-moi ça",
@@ -140,6 +144,16 @@ export function erreurDeParcours<D extends keyof typeof PARCOURS>(depuis: D, e: 
 
 /* ———— Un ajout à sa fiche ———— */
 
+/* Les erreurs d’un ajout que l’écran de la fiche sait dire ; les autres sont un bug */
+const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop", "souffle", "refus"] as const satisfies readonly CodeErreur[];
+
+/**
+ * Pourquoi un ajout à sa fiche n’a rien rangé : une erreur de PROBLEMES_AJOUT, ou un bug. La liste en est la source ;
+ * FicheUpdate["problem"] (src/types) l’écrit aussi, et les deux se vérifient l’un l’autre : messageAjoutFiche lit
+ * AJOUT_FICHE avec le sien, et ce que rend problemeAjout va dans une FicheUpdate (src/services/api.ts).
+ */
+type ProblemeAjout = (typeof PROBLEMES_AJOUT)[number] | "bug";
+
 /*
  * Un ajout (des captures, un export) qui n’a rien rangé : un titre et une phrase. `quoi` : ce qu’il a envoyé (« ta
  * capture », « tes 3 captures », « votre conv ») ; `prenom` : le sien. « rien_de_neuf » n’est pas une erreur.
@@ -153,19 +167,16 @@ const AJOUT_FICHE = {
   autre_conv: (_, prenom) => ({ title: "Ce n’est pas votre conv", detail: `Envoie l’export de ta conv avec ${prenom}.` }),
   trop: () => ({ title: "Beaucoup d’ajouts aujourd’hui", detail: "Réessaie demain." }),
   souffle: () => ({ title: SOUFFLE_TITRE, detail: "Réessaie demain." }),
-  /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug ; réessayer n’y changerait rien. TODO(produit): texte à valider */
+  /* Un refus de l’IA (malgré le repli sur un autre modèle) : on le dit, sans parler de bug ; réessayer n’y changerait rien */
   refus: (quoi) => ({ title: `BLUSH ne peut pas lire ${quoi}`, detail: "Essaie avec d’autres captures." }),
   bug: () => ({ title: "Ça n’a pas marché", detail: "Un bug de notre côté. Réessaie dans un instant." }),
-} satisfies Record<NonNullable<FicheUpdate["problem"]>, (quoi: string, prenom: string) => { title: string; detail: string }>;
+} satisfies Record<ProblemeAjout, (quoi: string, prenom: string) => { title: string; detail: string }>;
 
 /** Ce que dit l’écran de la fiche d’un ajout qui n’a rien rangé. */
 export const messageAjoutFiche = (probleme: NonNullable<FicheUpdate["problem"]>, quoi: string, prenom: string) => AJOUT_FICHE[probleme](quoi, prenom);
 
-/* Les erreurs d’un ajout que l’écran de la fiche sait dire ; les autres sont un bug */
-const PROBLEMES_AJOUT = ["capture", "fichier", "autre_conv", "trop", "souffle", "refus"] as const satisfies readonly NonNullable<FicheUpdate["problem"]>[];
-
 /** Pourquoi un ajout à sa fiche n’a rien rangé : ce que l’écran sait dire, un bug pour le reste, rien si rien n’était neuf. */
-export function problemeAjout(e: unknown): FicheUpdate["problem"] {
+export function problemeAjout(e: unknown): ProblemeAjout | undefined {
   const code = codeDe(e);
   if (code === "rien_de_neuf") return undefined;
   return PROBLEMES_AJOUT.find((p) => p === code) ?? "bug";

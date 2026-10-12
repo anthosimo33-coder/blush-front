@@ -20,12 +20,10 @@ export const PERIME_S = 90;
  * Planifie une étape. Celles de la chaîne (verdict, rapport, vocal, mémoire) n’existent qu’une fois en attente ou en
  * cours par histoire (un index unique) : planifiée deux fois en même temps, c’est la même tâche qui revient.
  * `input` : l’échange d’une mise à jour de la mémoire (memoire_maj, la seule étape qui en a une), relu par entreeDe.
- * Encore `unknown` : des tests empilent des mises à jour aux entrées factices (`{ a: 1 }`), jamais exécutées ; elle
- * deviendra `Echange` quand ils passeront de vrais échanges (lot 5).
  */
-export async function planifier(storyId: string, kind: Genre, input?: unknown): Promise<string> {
+export async function planifier(storyId: string, kind: Genre, input?: Echange): Promise<string> {
   /* Chiffrée une fois pour les deux essais */
-  const entree = input === undefined ? undefined : coffre.ecrire("tasks.input", input as Echange);
+  const entree = input === undefined ? undefined : coffre.ecrire("tasks.input", input);
   for (let essai = 0; essai < 2; essai++) {
     const [t] = await db()
       .insert(schema.tasks)
@@ -70,8 +68,12 @@ export async function prendre(id: string): Promise<Tache | null> {
 
 export const battre = (id: string) => db().update(schema.tasks).set({ heartbeatAt: new Date() }).where(eq(schema.tasks.id, id));
 
+/**
+ * Une tâche finie. Son entrée (l’échange d’une mise à jour de la mémoire : ce qu’il a dit, ce qu’il a ajouté) est
+ * effacée avec : la mémoire l’a retenue, rien ne la relira (S-34). Une tâche en échec garde la sienne, pour repartir.
+ */
 export async function finir(id: string): Promise<void> {
-  await db().update(schema.tasks).set({ status: "fini", error: null, updatedAt: new Date() }).where(eq(schema.tasks.id, id));
+  await db().update(schema.tasks).set({ status: "fini", error: null, input: null, updatedAt: new Date() }).where(eq(schema.tasks.id, id));
 }
 
 /**

@@ -7,6 +7,10 @@ import { db, schema, uneLigne } from "./db";
  * Les limites anti-abus : combien de fois, sur quelle fenêtre. Celles « par compte » se rangent sur son email canonique
  * (sousLaLimiteDuCompte, src/server/requete.ts), celles « par IP » sur son adresse, IPv6 regroupée par /64
  * (sousLaLimiteDeLIp) : deux familles de clés qui ne se croisent jamais (« analyse:compte:… », « analyse:ip:… »).
+ * Ce qu’aucune ne borne : un script qui change d’adresse IP à volonté (des /64 en IPv6, un réseau de proxys) et
+ * d’email, pour ouvrir des comptes à la chaîne et leurs lectures offertes (S-04), demander les codes d’une personne (S-08)
+ * ou épuiser le plafond des mails de code pour tous (S-09).
+ * TODO(produit): un CAPTCHA (Turnstile ou équivalent) sur la demande de code, avant l’ouverture publique.
  */
 export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
@@ -16,7 +20,7 @@ export const LIMITES = {
    * au plafond de l’email depuis la réserve des codes (plus bas) : il garde une adresse sous ce plafond si on le relève.
    */
   codeParEmailEtIp: { max: 7, fenetreS: 86400 },
-  /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent. TODO(produit): 7 (10 avant la réserve). */
+  /** Les codes demandés pour un email (canonique), par jour, d’où qu’ils viennent (10 avant la réserve). */
   codeParEmail: { max: 7, fenetreS: 86400 },
   /*
    * La réserve des codes (S-08). N’importe qui peut demander les codes d’un email : un tiers qui remplit codeParEmail
@@ -26,8 +30,7 @@ export const LIMITES = {
    * Pour priver la personne de code partout, un tiers doit donc écrire depuis au moins cinq adresses (des /64 en IPv6) au
    * lieu d’une : plus cher, pas impossible, d’où le CAPTCHA prévu avant l’ouverture publique. Les codes du jour, réserve
    * comprise, donnent au plus echecsCodeParEmail essais (cinq chacun) : ce qui se devine ne grandit pas, et les essais
-   * ratés d’un tiers ne ferment pas la porte avant ses codes (tests/unit/limites.test.ts). TODO(produit): 1 par adresse,
-   * 5 par email.
+   * ratés d’un tiers ne ferment pas la porte avant ses codes (tests/unit/limites.test.ts).
    */
   codeReserveParEmailEtIp: { max: 1, fenetreS: 86400 },
   codeReserveParEmail: { max: 5, fenetreS: 86400 },
@@ -36,8 +39,8 @@ export const LIMITES = {
    * autres mails se comptant sur le reste : les codes n’empêchent pas un rapport de partir, ni l’inverse. L’équipe est
    * prévenue à `alerteA` du plafond (80 %), puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans
    * la boîte des tests de bout en bout, dont les mails ne partent pas. Une seule adresse IP peut l’épuiser en trois heures
-   * (codeParIp, sur des emails jetables) : le CAPTCHA prévu avant l’ouverture publique y répond. TODO(produit): 60 par
-   * jour (le plan gratuit du prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes
+   * (codeParIp, sur des emails jetables) : le CAPTCHA prévu avant l’ouverture publique y répond. 60 par jour (le plan
+   * gratuit du prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes
    * (RESEND_API_KEY_CODES). Le relever, c’est aussi relever ce qui se devine en un jour sur tous les emails (cinq essais
    * par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
    */
@@ -52,15 +55,14 @@ export const LIMITES = {
    */
   /**
    * Les essais ratés d’un navigateur pour un email (canonique) : deux codes entiers (cinq essais chacun). Au-delà, ce
-   * navigateur n’a plus d’essai aujourd’hui pour cet email ; les autres gardent les leurs. TODO(produit): 10 par
-   * navigateur (deux codes entiers).
+   * navigateur n’a plus d’essai aujourd’hui pour cet email ; les autres gardent les leurs.
    */
   echecsCodeParNavigateur: { max: 10, fenetreS: 86400 },
   /**
    * Les essais ratés pour un email depuis une même adresse IP. Au-delà, un navigateur de cette adresse qui en a déjà raté
    * `reserveNavigateur` n’essaie plus (cinq au lieu de dix) ; un autre garde sa réserve, celle de la personne sur le même
    * Wi-Fi que le tiers. Elle ne ralentit pas un tiers qui change de navigateur (un cookie s’efface) : ce sont
-   * codeParEmailEtIp et les plafonds de l’email qui le bornent. TODO(produit): 20, et une réserve de 5.
+   * codeParEmailEtIp et les plafonds de l’email qui le bornent.
    */
   echecsCodeParEmailEtIp: { max: 20, fenetreS: 86400, reserveNavigateur: 5 },
   /**
@@ -68,32 +70,43 @@ export const LIMITES = {
    * aujourd’hui. Un code sur un million par essai : 60 essais, c’est une chance sur plus de 16 000 de deviner un code dans
    * la journée. Les codes du jour, réserve comprise (douze, cinq essais chacun), n’en donnent pas plus dans une fenêtre :
    * seule une fenêtre des essais à cheval sur deux fenêtres des codes (elles ne commencent pas à la même heure) peut aller
-   * au-delà, et c’est elle qui l’arrête. Une défense en profondeur. TODO(produit): 60 par jour (20 avant).
+   * au-delà, et c’est elle qui l’arrête. Une défense en profondeur (20 par jour avant).
    */
   echecsCodeParEmail: { max: 60, fenetreS: 86400 },
   importParIp: { max: 20, fenetreS: 3600 },
+  /*
+   * Le budget d’octets des imports (S-02), en Ko (le compte de rate_limits est un entier de 32 bits) : la taille du
+   * fichier reçu, comptée avant de le lire (src/app/api/import, octetsDansLeBudget de src/server/requete.ts). Un brouillon
+   * vit 24 h dans la base avant la purge : sans ce budget, des imports à la chaîne (20 par heure et par adresse, de
+   * 4,5 Mo chacun) rempliraient la base de Neon sans rien payer. Par adresse IP, de quoi importer une dizaine des plus
+   * gros exports par jour ; pour tous, un plafond du jour, prévenu à `alerteA` (80 %) puis quand il est atteint : tout
+   * le monde voit alors « trop » à l’import. TODO(produit): 40 000 Ko par adresse et 150 000 Ko pour tous, par jour, à
+   * caler sur l’offre Neon.
+   */
+  koImportParIp: { max: 40_000, fenetreS: 86400 },
+  koBrouillonsParJour: { max: 150_000, fenetreS: 86400, alerteA: 0.8 },
   chatParCompte: { max: 150, fenetreS: 86400 },
   /**
    * Les vocaux envoyés au chat (S-15), par jour : chacun est transcrit, à la durée. Un message du chat les compte aussi
-   * (chatParCompte). TODO(produit): 40 par jour.
+   * (chatParCompte).
    */
   vocalParCompte: { max: 40, fenetreS: 86400 },
   /**
    * Les secondes de son transcrites pour un compte, par jour : la durée mesurée, ou celle que le prestataire dit avoir
-   * facturée si elle est plus longue (src/server/ia/transcription.ts). TODO(produit): 1 800, une demi-heure de vocaux.
+   * facturée si elle est plus longue (src/server/ia/transcription.ts) : une demi-heure de vocaux.
    */
   secondesVocalParCompte: { max: 1800, fenetreS: 86400 },
   /**
    * Les caractères que la voix dit pour un compte (S-13), par jour : ses réponses du chat en vocal et le vocal de son
-   * rapport. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts). TODO(produit): 6 000, environ 6 minutes de voix.
+   * rapport, environ 6 minutes de voix. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts).
    */
   voixParCompte: { max: 6000, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
   /**
    * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
-   * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur. TODO(produit): 20 par jour, à
-   * revoir avec les chiffres de l’ouverture.
+   * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur ; à revoir avec les chiffres de
+   * l’ouverture.
    */
   analyseParIp: { max: 20, fenetreS: 86400 },
   /** Les moments d’écoute du vocal notés pour l’A/B test des voix. */
@@ -104,10 +117,10 @@ export const LIMITES = {
    * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
    * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant. Elles
    * partent aussi dans le quota des mails (QUOTA_MAILS : chaque destinataire compte), qui les arrête avant les rapports.
-   * TODO(produit): 10, à revoir à l’usage.
+   * À revoir à l’usage.
    */
   alertesParJour: { max: 30, fenetreS: 86400, reserveImportantes: 10 },
-  /** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour. TODO(produit): 5, à revoir à l’usage. */
+  /** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour ; à revoir à l’usage. */
   alertesParSujet: { max: 5, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */
   attenteParIp: { max: 10, fenetreS: 3600 },
@@ -117,7 +130,6 @@ export const LIMITES = {
    * Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent épuiser ni le quota
    * des codes, ni la part des rapports et des alertes (QUOTA_MAILS, qui les arrête aussi les premiers). Au-delà, on
    * inscrit sans écrire. Sans la boîte des tests de bout en bout, dont les mails ne partent pas (comme mailsCodeParJour).
-   * TODO(produit): 20.
    */
   mailsAttenteParJour: { max: 20, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
@@ -152,7 +164,6 @@ export const LIMITES = {
  * rapports les ont toujours), les rapports aucun : au pire, « ton rapport est prêt » ne part pas, et le rapport attend
  * dans l’appli (src/server/email.ts, envoyerMail). tests/unit/limites.test.ts y veille. Les fenêtres des compteurs ne
  * commencent pas à minuit comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
- * TODO(produit): 100, et ces parts.
  */
 export const QUOTA_MAILS = { parJour: 100, laisse: { attente: 20, alerte: 10, rapport: 0 } } as const;
 /** Ce qu’est un mail pour le quota : du plus nécessaire (le rapport) au moins nécessaire (la liste d’attente). */
@@ -167,21 +178,27 @@ export type Limite = { max: number; fenetreS: number };
 const cleDe = (cle: string) => empreinte(`limite:${cle}`);
 /* La fenêtre de cette limite a expiré : le compte repart de zéro */
 const expiree = (fenetreS: number) => sql`${schema.rateLimits.windowStart} < now() - make_interval(secs => ${fenetreS})`;
+/* La durée d’une fenêtre, pour en écrire la fin (expires_at) */
+const duree = (fenetreS: number) => sql`make_interval(secs => ${fenetreS})`;
 
 /**
  * Compte un passage pour `cle` (ou `n` : la dépense d’un appel au modèle, src/server/budget.ts), et renvoie le compte de
- * la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré.
+ * la fenêtre. Une seule requête, atomique : la fenêtre repart à zéro quand elle a expiré. La fin de la fenêtre
+ * (expires_at) est écrite avec elle : la purge (src/server/purge.ts) n’efface la clé qu’après, même pour une fenêtre de
+ * 40 jours (S-13 : le compteur du mois de la voix ne repart plus à zéro chaque nuit). Une ligne d’avant la colonne la
+ * reçoit au passage suivant.
  */
 export async function compter(cle: string, { fenetreS }: Pick<Limite, "fenetreS">, n = 1): Promise<number> {
   const ligne = uneLigne(
     await db()
       .insert(schema.rateLimits)
-      .values({ key: cleDe(cle), windowStart: new Date(), count: n })
+      .values({ key: cleDe(cle), windowStart: sql`now()`, expiresAt: sql`now() + ${duree(fenetreS)}`, count: n })
       .onConflictDoUpdate({
         target: schema.rateLimits.key,
         set: {
           count: sql`case when ${expiree(fenetreS)} then ${n}::int else ${schema.rateLimits.count} + ${n}::int end`,
           windowStart: sql`case when ${expiree(fenetreS)} then now() else ${schema.rateLimits.windowStart} end`,
+          expiresAt: sql`case when ${expiree(fenetreS)} then now() + ${duree(fenetreS)} else ${schema.rateLimits.windowStart} + ${duree(fenetreS)} end`,
         },
       })
       .returning({ count: schema.rateLimits.count }),
@@ -190,8 +207,8 @@ export async function compter(cle: string, { fenetreS }: Pick<Limite, "fenetreS"
   return ligne.count;
 }
 
-/** Compte un passage pour `cle` et dit s’il reste sous la limite. */
-export const sousLaLimite = async (cle: string, limite: Limite): Promise<boolean> => (await compter(cle, limite)) <= limite.max;
+/** Compte un passage pour `cle` (ou `n` : des Ko d’import) et dit s’il reste sous la limite. */
+export const sousLaLimite = async (cle: string, limite: Limite, n = 1): Promise<boolean> => (await compter(cle, limite, n)) <= limite.max;
 
 /** Le compte de la fenêtre en cours pour `cle` (0 si elle a expiré), sans compter de passage. */
 export async function compteDe(cle: string, { fenetreS }: Pick<Limite, "fenetreS">): Promise<number> {

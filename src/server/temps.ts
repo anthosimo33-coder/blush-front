@@ -13,6 +13,17 @@ export function aujourdhuiParis(maintenant = new Date()): { iso: string; t: numb
  */
 export const DEBUT_DU_JOUR = sql`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`;
 
+/**
+ * Les jours qu’une conv couvre, du premier au dernier compris : du 4 au 7 septembre, 4 jours ; un seul jour, 1. `debut`
+ * et `fin` sont des jours AAAA-MM-JJ du calendrier de la conv, celui de l’heure écrite dans l’export (l’heure de Paris
+ * pour une conv française) : resume.debut de sa meta, Chiffres.debut de prompts/lib/conv.ts. La durée que montrent la
+ * lecture (src/server/ecrans/trouvailles.ts) et le verdict (src/server/conv-affichee.ts) : la même, une seule fois.
+ */
+export function joursCouverts(debut: string, fin: string): number {
+  const ecart = Math.round((Date.parse(fin.slice(0, 10)) - Date.parse(debut.slice(0, 10))) / 86400e3);
+  return Number.isFinite(ecart) ? Math.max(1, ecart + 1) : 1;
+}
+
 /** Un moment dit comme dans Messages, à l’heure de Paris : « aujourd’hui », « hier », « lun. » dans la semaine, puis « 12 mars ». */
 export function jourRelatif(quand: Date, maintenant = new Date()): string {
   const ecart = Math.round((aujourdhuiParis(maintenant).t - aujourdhuiParis(quand).t) / 86400e3);

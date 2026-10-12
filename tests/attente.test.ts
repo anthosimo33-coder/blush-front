@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { alerter, resumerLaVeille } from "@/server/alertes";
+import { alerter } from "@/server/alertes";
+import { resumerLaVeille } from "@/server/veille";
 import { ATTENTE_GARDEE_JOURS, empreinteDeLaListe, inscrire, purgerLaListe } from "@/server/attente";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";

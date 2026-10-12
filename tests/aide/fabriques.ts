@@ -1,4 +1,4 @@
-import { estFaite, type MemoireFaite } from "@prompts/lib/memoire";
+import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
 import { Maj07, Sortie01, Sortie07, type Captures, type Chapitre, type Maj, type Memoire } from "@prompts/lib/schemas";
 
 /*
@@ -8,6 +8,12 @@ import { Maj07, Sortie01, Sortie07, type Captures, type Chapitre, type Maj, type
  */
 
 type Msg = Captures["blocs"][number]["messages"][number];
+
+/**
+ * Un échange au chat, l’entrée d’une mise à jour de la mémoire (memoire_maj, planifier) : un message de lui et la
+ * réponse de BLUSH, le 15 mars, numéroté `n` pour qu’on les distingue (sauf ce que `e` change).
+ */
+export const echange = (n: number, e: Partial<Echange> = {}): Echange => ({ date: "2026-03-15", dit: `échange numéro ${n}`, reponse: ["Enfin."], ...e });
 
 /** Un message lu sur des captures : du texte, sans média, entier, sans réaction (sauf ce que `autres` change). */
 export const msg = (de: Msg["de"], texte: string, autres: Partial<Omit<Msg, "de" | "texte">> = {}): Msg => ({ de, texte, media: null, coupe: false, reaction: null, ...autres });

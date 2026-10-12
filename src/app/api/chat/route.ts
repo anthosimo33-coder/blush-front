@@ -9,9 +9,10 @@ import { historique } from "@/server/historique";
 import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/import";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, route, signalerErreur } from "@/server/http";
-import { lireVocal, transcrire } from "@/server/ia/transcription";
-import { auMieux } from "@/server/journal";
-import { garde, sousLaLimiteDuCompte } from "@/server/requete";
+import { lireVocal, signatureDuVocal, transcrire } from "@/server/ia/transcription";
+import { alerter } from "@/server/alertes";
+import { auMieux, journal } from "@/server/journal";
+import { garde, rendreAuCompte, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
 import { ROUTES } from "@/types/api";
@@ -30,6 +31,23 @@ const NDJSON = "application/x-ndjson";
 const alerteDuChat = (storyId: string) => ({ sujet: "chat en échec", lignes: [`Histoire ${storyId}`] });
 
 type Envoi = { texte: string; captures: File[]; export: File | null; vocal: File | null };
+
+/**
+ * Un vocal que le serveur ne sait pas lire (lireVocal) : un navigateur qui enregistre dans un format qu’on ne connaît
+ * pas, ou un fichier forgé. Une ligne au journal et une alerte à l’équipe (au plus LIMITES.alertesParSujet par jour),
+ * avec de quoi reconnaître le format (signatureDuVocal) : jamais le son. Ne fait jamais échouer la réponse.
+ */
+async function signalerVocalIllisible(vocal: File): Promise<void> {
+  await auMieux(async () => {
+    const { type, taille, signature, marque } = await signatureDuVocal(vocal);
+    journal("vocal illisible", { type, taille, signature, marque: marque ?? "" }, "alerte");
+    await alerter("vocal illisible", [
+      "Un vocal envoyé au chat n’est dans aucun format que le serveur sait lire (src/server/ia/duree-audio.ts).",
+      `Type annoncé : ${type} · taille : ${taille} octets`,
+      `Premiers octets : ${signature}${marque ? ` · marque MP4 : ${marque}` : ""}`,
+    ]);
+  }, "vocal illisible non signalé");
+}
 
 /** Ce qu’il envoie : du texte (JSON), ou un formulaire avec des captures, un export ou un vocal. */
 async function lireEnvoi(req: Request): Promise<Envoi | null> {
@@ -153,6 +171,9 @@ async function traiter(req: Request) {
     if (envoi.vocal) {
       /* Sa durée, mesurée ici (S-15) : un vocal trop long ou illisible ne part pas à la transcription, qui se paie à la durée */
       const lu = await lireVocal(envoi.vocal);
+      if (lu === "vocal_illisible") await signalerVocalIllisible(envoi.vocal);
+      /* Un vocal vide ou illisible n’a fait parler personne : le message du jour est rendu (un trop long reste compté) */
+      if (lu === "vocal_vide" || lu === "vocal_illisible") await rendreAuCompte(utilisateur, "chat");
       if (typeof lu === "string") return erreur(lu);
       /* Le budget de l’IA d’abord : quand BLUSH souffle, le vocal n’est pas transcrit pour rien (sa transcription y compte) */
       const payeur = await controlerBudget({ storyId: story.id });
@@ -160,7 +181,10 @@ async function traiter(req: Request) {
       const t = await transcrire(lu, { storyId: story.id, payeur, compte: utilisateur });
       if (t === "trop") return erreur("trop");
       if (t === null) return erreur("vocal_bientot");
-      if (!t) return erreur("vocal_vide");
+      if (!t) {
+        await rendreAuCompte(utilisateur, "chat");
+        return erreur("vocal_vide");
+      }
       dit = `(vocal) ${t}`.slice(0, LONGUEUR_MAX);
     } else if (envoi.captures.length) {
       const lu = await depuisCaptures(story, memoire, await imagesDe(envoi.captures));

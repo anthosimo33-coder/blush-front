@@ -149,13 +149,21 @@ describe("appeler : l’envoi", () => {
     erreur.mockRestore();
   });
 
-  it("le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste", async () => {
-    const envois = faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
+  it("le délai et les nouvelles tentatives du SDK tiennent ensemble dans le temps qui reste : chaque tentative a sa part", async () => {
+    const ok = rend(message([texte('{"ok":true}')]));
+    const envois = faux(ok, ok, ok);
     await appeler(VERDICT, Format);
+    await avecEcheance(200_000, () => appeler(VERDICT, Format));
     await avecEcheance(100_000, () => appeler(VERDICT, Format));
-    expect(envois[0]![1]).toMatchObject({ timeout: 600_000, maxRetries: 2 });
-    expect(envois[1]![1].maxRetries).toBe(0);
-    expect(envois[1]![1].timeout).toBeLessThanOrEqual(95_000);
+    /* Sans échéance (un script) : trois tentatives de 200 s */
+    expect(envois[0]![1]).toMatchObject({ timeout: 200_000, maxRetries: 2 });
+    /* 200 s : deux tentatives, qui tiennent ensemble avant l’échéance (moins la marge de delaiAppel) */
+    expect(envois[1]![1].maxRetries).toBe(1);
+    expect(envois[1]![1].timeout * 2).toBeLessThanOrEqual(195_000);
+    expect(envois[1]![1].timeout).toBeGreaterThan(90_000);
+    /* 100 s : une seule */
+    expect(envois[2]![1].maxRetries).toBe(0);
+    expect(envois[2]![1].timeout).toBeLessThanOrEqual(95_000);
   });
 
   it("plus le temps avant l’échéance : l’appel ne part pas (« delai »)", async () => {
@@ -222,6 +230,25 @@ function ecouteNotee() {
 }
 
 describe("prestataireSDK : le vrai client du SDK", () => {
+  it("compte son délai à chaque tentative : un prestataire muet est attendu `timeout` par tentative, puis abandonné", async () => {
+    const debuts: number[] = [];
+    const client = new Anthropic({
+      apiKey: "cle-fictive",
+      fetch: (_url, init) =>
+        new Promise<Response>((_, rejeter) => {
+          debuts.push(Date.now());
+          init?.signal?.addEventListener("abort", () => rejeter(init.signal?.reason ?? new Error("abort")));
+        }),
+    });
+    const sdk = prestataireSDK(() => client);
+    const debut = Date.now();
+    await expect(sdk.envoyer(DEMANDE, { timeout: 50, maxRetries: 1 }, { flux: false, ecoute: null })).rejects.toBeInstanceOf(Anthropic.APIConnectionTimeoutError);
+    expect(debuts).toHaveLength(2);
+    /* Deux attentes de 50 ms et la pause du SDK entre elles (moins d’une seconde) : le délai ne couvre pas tout l’appel */
+    expect(Date.now() - debut).toBeGreaterThanOrEqual(100);
+    expect(Date.now() - debut).toBeLessThan(3_000);
+  });
+
   it("d’un bloc : une seule requête, sans flux, et le message rendu tel quel", async () => {
     const { sdk, recus } = clientSDK(() => json({ ...MESSAGE_SDK, content: [{ type: "text", text: '{"ok":true}', citations: null }] }));
     const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: false, ecoute: null });

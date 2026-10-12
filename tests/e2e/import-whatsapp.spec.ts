@@ -111,7 +111,7 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
 
   await test.step("le verdict : les flèches du clavier avancent et reculent, sans dépasser la première carte", async () => {
     await attendreLaScene(page, conv.messages);
-    /* Les chiffres de la conv importée : une appli, 2 vocaux (sa durée : voir le test.fixme plus bas) */
+    /* Les chiffres de la conv importée : une appli, 2 vocaux (sa durée : voir le dernier test, plus bas) */
     for (const chiffre of ["1 appli", `${conv.vocaux} vocaux`]) await expect(page.getByText(chiffre, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Précédent" })).toHaveCount(0);
     await page.keyboard.press("ArrowLeft");
@@ -253,12 +253,11 @@ test.describe("sur un téléphone Android", () => {
 });
 
 /*
- * La durée de la conv se lit deux fois, à quelques secondes d’écart : « 64 messages en 4 jours » pendant la lecture
- * (src/server/ecrans/trouvailles.ts:91 compte du 4 au 7 septembre compris), puis « 3 jours » sur la première carte du verdict
- * (src/server/conv-affichee.ts, storyAffichee, ne compte pas le premier jour : deux jours de messages y font « 1 jour »). Le bon compte,
- * partout : 4 jours.
+ * La durée de la conv se lit deux fois, à quelques secondes d’écart : pendant la lecture (« 64 messages en 4 jours »,
+ * src/server/ecrans/trouvailles.ts), puis sur la première carte du verdict (src/server/conv-affichee.ts). Les deux la
+ * prennent à joursCouverts (src/server/temps.ts) : du 4 au 7 septembre compris, 4 jours, partout.
  */
-test.fixme("la durée de la conv est la même pendant la lecture et sur le verdict : 4 jours, du 4 au 7 septembre", async ({ page }, testInfo) => {
+test("la durée de la conv est la même pendant la lecture et sur le verdict : 4 jours, du 4 au 7 septembre", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "import-duree");
   const conv = exportWhatsApp(testInfo, { format: "txt" });
   await saisirLeCodeRecu(page, email, await jusquAuCode(page, conv, email));

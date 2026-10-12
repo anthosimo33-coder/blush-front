@@ -36,8 +36,6 @@ const effacer = async (cookie: CookieDuServeur) => {
 };
 
 export const lireSession = async () => (await cookies()).get(nom("session"))?.value;
-/** Une session dans la requête, sans la vérifier (ce qui ne fait qu’adapter l’affichage). */
-export const aUneSession = async () => (await cookies()).has(nom("session"));
 export const lireBrouillon = async () => (await cookies()).get(nom("brouillon"))?.value;
 export const poserSession = (secret: string, expires: Date) => poser("session", secret, expires);
 export const poserBrouillon = (secret: string) => poser("brouillon", secret, new Date(Date.now() + 86400e3));

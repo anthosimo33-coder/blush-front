@@ -4,6 +4,8 @@ import { alerter } from "@/server/alertes";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { LIMITES } from "@/server/limites";
+import { resumerLaVeille } from "@/server/veille";
+import { convImportee } from "./aide/fixtures";
 
 /*
  * Le budget des alertes à l’équipe (S-19, src/server/alertes.ts) : 5 par sujet et par jour, 30 en tout, dont les 10
@@ -42,5 +44,32 @@ describe("le budget des alertes", () => {
     expect(envoyees("ordinaire 4")).toBe(0);
     await alerter("rapport_chapitres en échec", ["Tâche t2"], { importante: true });
     expect(envoyees("rapport_chapitres en échec")).toBe(1);
+  });
+});
+
+describe("le résumé de la veille", () => {
+  /* Le chiffre d’une ligne du résumé (« Échecs définitifs : 3 »), 0 si elle manque */
+  const chiffre = (resume: string, ligne: string) => Number(resume.match(new RegExp(`${ligne} : (\\d+)`))?.[1] ?? 0);
+  const resume = async () => {
+    parties = [];
+    await resumerLaVeille();
+    return parties.join("\n");
+  };
+
+  it("compte une étape arrêtée par le budget de la voix avec celles du budget de l’IA, pas dans les échecs définitifs", async () => {
+    const avant = await resume();
+    const { id } = await convImportee("01-a-deux-doigts.txt");
+    await db()
+      .insert(schema.tasks)
+      .values([
+        { storyId: id, kind: "vocal", status: "echec", error: "voix_budget" },
+        { storyId: id, kind: "verdict", status: "echec", error: "budget" },
+        { storyId: id, kind: "rapport_plan", status: "echec", error: "sortie_illisible" },
+        { storyId: id, kind: "memoire", status: "echec", error: null },
+      ]);
+    const apres = await resume();
+    expect(chiffre(apres, "Échecs définitifs") - chiffre(avant, "Échecs définitifs")).toBe(2);
+    const arretees = "Arrêtées par le budget de l’IA ou de la voix \\(elles repartent après minuit\\)";
+    expect(chiffre(apres, arretees) - chiffre(avant, arretees)).toBe(2);
   });
 });

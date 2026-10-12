@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "@/server/db";
 import { statsAdmin } from "@/server/stats";
 import { PERIME_S, planifier } from "@/server/taches";
+import { echange } from "./aide/fabriques";
 import { convImportee } from "./aide/fixtures";
 
 /*
@@ -16,7 +17,7 @@ describe("une tâche « bloquée » au tableau de bord", () => {
   beforeAll(async () => {
     id = (await convImportee("01-a-deux-doigts.txt")).id;
     /* Des mises à jour de la mémoire : elles s’empilent, une même histoire peut en avoir plusieurs */
-    taches = [await planifier(id, "memoire_maj", { a: 1 }), await planifier(id, "memoire_maj", { a: 2 }), await planifier(id, "memoire_maj", { a: 3 })];
+    taches = [await planifier(id, "memoire_maj", echange(1)), await planifier(id, "memoire_maj", echange(2)), await planifier(id, "memoire_maj", echange(3))];
     await db().update(schema.tasks).set({ status: "en_cours" }).where(inArray(schema.tasks.id, taches));
   });
 

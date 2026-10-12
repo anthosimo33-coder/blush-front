@@ -2,6 +2,7 @@ import "server-only";
 import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Source, type Story } from "@/types";
 import type { Meta } from "./histoires";
+import { joursCouverts } from "./temps";
 
 /* La conv telle que l’affiche le front (le type Story) : tirée de sa meta seule, sans la base ni la conv brute. */
 
@@ -21,7 +22,7 @@ export function storyAffichee(id: string, meta: Meta): Story {
 export function storyEtSource(id: string, meta: Meta): { story: Story; source: Source } {
   const { debut, fin, total, vocaux } = meta.resume;
   const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
-  const jours = Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / 86400e3));
+  const jours = joursCouverts(debut, fin);
   const [a, b] = meta.participants;
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
   const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });

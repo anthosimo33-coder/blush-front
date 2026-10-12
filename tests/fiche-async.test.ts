@@ -34,6 +34,7 @@ import { fournisseurFactice } from "@/server/ia/factice";
 import { planifier } from "@/server/taches";
 import { getFiche, getFicheEtMaj } from "@/services/serveur";
 import type { Fiche, FicheUpdate } from "@/types";
+import { echange } from "./aide/fabriques";
 import { texteDeConv } from "./aide/fichiers";
 import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -59,7 +60,7 @@ async function apresLeDernierLu(minutes: number, qui: string, texte: string): Pr
   return `[${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}] ${qui}: ${texte}`;
 }
 /** Une mise à jour de la mémoire planifiée par le chat (un échange qui apporte du neuf). */
-const majDuChat = () => planifier(id, "memoire_maj", { date: "2026-03-15", dit: "on s’est vus hier, c’était trop bien", reponse: ["Enfin."] });
+const majDuChat = () => planifier(id, "memoire_maj", echange(1, { dit: "on s’est vus hier, c’était trop bien" }));
 
 facticePourChaqueTest((req: Requete) => (taches.push(req.tache), fournisseurFactice(req)));
 beforeAll(async () => {

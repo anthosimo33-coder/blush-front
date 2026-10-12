@@ -28,7 +28,7 @@
 
 /**
  * Le plus long vocal que le chat accepte, en secondes : le navigateur l’envoie tout seul à 120 s (src/app/app/voice.tsx),
- * 10 s de marge pour l’enveloppe et l’arrondi. TODO(produit): 130 s.
+ * 10 s de marge pour l’enveloppe et l’arrondi.
  */
 export const DUREE_VOCAL_MAX_S = 130;
 /**

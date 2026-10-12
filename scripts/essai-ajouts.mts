@@ -11,11 +11,12 @@ import { join } from "node:path";
 import { blocAjout, messagesDeLExport, numeroter } from "@prompts/lib/ajouts";
 import { requeteChat, requeteMemoireMaj } from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
-import { citees, estFaite, rendreNouveau } from "@prompts/lib/memoire";
+import { estFaite, rendreNouveau } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat, preuvesMaj } from "@prompts/lib/preuves";
 import { Maj07, Sortie10, type Memoire } from "@prompts/lib/schemas";
 import { profil as style } from "@prompts/lib/style";
 import { appeler } from "@/server/ia/claude";
+import { lignesGardees } from "@/server/stockage/types";
 import { cheminDonne, EVALS } from "../tests/aide/essai";
 
 const [fichier07, fichierSuite, ...profil] = process.argv.slice(2);
@@ -27,7 +28,7 @@ const h: Histoire = { ...cas, format: cas.format ?? "whatsapp-ios" };
 const texte = readFileSync(join(EVALS, cas.fichier), "utf8");
 const lu = lire(texte, h);
 const rendu = rendre(h, lu);
-const lignes = new Map([...new Set(citees(etat))].filter((id) => rendu.lignes.has(id)).map((id) => [id, rendu.lignes.get(id)!]));
+const lignes = new Map(lignesGardees(etat, rendu.lignes));
 
 /* La suite : les messages d’après le dernier lu, numérotés à la suite, et son profil */
 const nouveaux = messagesDeLExport(`${texte}\n${readFileSync(cheminDonne(fichierSuite), "utf8").trim()}`, h, lu.messages.at(-1)!.t);

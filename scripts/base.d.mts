@@ -1,6 +1,6 @@
 /*
  * Les types de scripts/base.mjs, pour le TypeScript qui l’importe (drizzle.config.ts, scripts/acces.mts,
- * tests/verifier-migrations.test.ts) : sans allowJs, tsc ne lit plus un .mjs. Le script reste en JavaScript (node le
+ * src/server/db/index.ts, tests/verifier-migrations.test.ts, tests/unit/db-url.test.ts) : sans allowJs, tsc ne lit plus un .mjs. Le script reste en JavaScript (node le
  * lance sans compiler, au build) ; ces déclarations se tiennent à la main, à côté de lui, et changent avec lui.
  * tests/unit/declarations-scripts.test.ts vérifie que les deux exportent les mêmes noms, les fonctions en
  * fonctions ; les signatures, elles, se relisent à la main.
@@ -12,7 +12,7 @@ export function estLocale(url: string): boolean;
 /** Le réglage TLS d’une connexion postgres.js (S-36) : rien en local, sinon un certificat vérifié (`verify-full`). */
 export function sslPour(url: string): false | "verify-full";
 
-/** La même règle écrite dans l’URL (`sslmode=verify-full`), pour les outils qui ne prennent qu’une URL (drizzle-kit). */
+/** La même règle écrite dans l’URL (`sslmode=verify-full`), pour ce qui ne prend qu’une URL : drizzle-kit, le pool pg de l’appli. */
 export function urlVerifiee(url: string): string;
 
 /**

@@ -9,10 +9,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
-import { appliquerMaj, citees, estFaite, rendreNouveau, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
+import { appliquerMaj, estFaite, rendreNouveau, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
 import { requeteMemoireMaj } from "@prompts/lib/contextes";
 import { Maj07, type Memoire } from "@prompts/lib/schemas";
 import { appeler } from "@/server/ia/claude";
+import { lignesGardees } from "@/server/stockage/types";
 import { cheminDonne, EVALS } from "../tests/aide/essai";
 
 const [fichier07, fichierEchanges, fichierCas] = process.argv.slice(2);
@@ -24,7 +25,7 @@ let etat: MemoireFaite = creation;
 const h: Histoire = { ...cas, format: cas.format ?? "whatsapp-ios" };
 const lu = lire(readFileSync(join(EVALS, cas.fichier), "utf8"), h);
 const tout = rendre(h, lu).lignes;
-const lignes = new Map([...new Set(citees(etat))].filter((id) => tout.has(id)).map((id) => [id, tout.get(id)!]));
+const lignes = new Map(lignesGardees(etat, tout));
 let suivant = lu.messages.length + 1;
 let total = 0;
 for (const ech of (JSON.parse(readFileSync(cheminDonne(fichierEchanges), "utf8")) as Record<string, (Echange & { attendu?: string })[]>)[cas.id] ?? []) {

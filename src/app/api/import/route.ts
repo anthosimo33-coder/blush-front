@@ -5,7 +5,7 @@ import { storyEtSource } from "@/server/conv-affichee";
 import { importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
 import { LIMITES } from "@/server/limites";
-import { garde, sousLaLimiteDeLIp } from "@/server/requete";
+import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
 
 export const maxDuration = 60;
 
@@ -21,13 +21,16 @@ export const POST = route("POST /api/import", async (req: Request) => {
   const fd = await req.formData().catch(() => null);
   const paquet = fd?.get("export");
   const fichier = fd?.get("fichier");
-  if (!(paquet instanceof File) && !(fichier instanceof File)) return erreur("fichier");
+  const recu = paquet instanceof File ? paquet : fichier instanceof File ? fichier : null;
+  if (!recu) return erreur("fichier");
   /*
    * La limite de l’adresse IP, une fois le formulaire vérifié (un envoi sans fichier ne compte pas), mais avant de le
    * lire : décompresser et lire un export coûte, un fichier illisible compte aussi
    */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
-  const lu = paquet instanceof File ? await depuisPaquet(paquet) : await depuisFichier(fichier as File);
+  /* Et ses octets (S-02) : la taille reçue, avant de la lire, dans le budget du jour de l’adresse et de tous */
+  if (!(await octetsDansLeBudget(req, recu.size))) return erreur("trop");
+  const lu = recu === paquet ? await depuisPaquet(recu) : await depuisFichier(recu);
   const { id, meta, secret } = await importer(lu);
   await poserBrouillon(secret);
   await compterImportVenuDuPartage();

@@ -264,6 +264,12 @@ export const rateLimits = pgTable("rate_limits", {
   key: text("key").primaryKey(),
   windowStart: quand("window_start").notNull(),
   count: integer("count").notNull().default(0),
+  /**
+   * La fin de la fenêtre en cours (window_start + sa durée), écrite par compter() : la purge efface une clé après elle,
+   * jamais avant (le compteur du mois de la voix vit 40 jours). Vide sur les lignes d’avant la colonne : la purge s’y
+   * règle alors sur window_start, comme avant.
+   */
+  expiresAt: quand("expires_at"),
 });
 
 /** Ce que coûte chaque appel au modèle. Aucun contenu. */
@@ -283,6 +289,9 @@ export const aiUsage = pgTable(
     ms: integer("ms").notNull().default(0),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
-  /* Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue */
-  (t) => [index("ai_usage_story_idx").on(t.storyId)],
+  /*
+   * Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue. La dépense du
+   * jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date.
+   */
+  (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt)],
 );
