@@ -10,6 +10,7 @@ import {
   dechiffrer,
   debloquerLaConv,
   dernierCode,
+  donnerDesBulles,
   derniereHistoire,
   DOMAINE,
   emailLibre,
@@ -143,6 +144,8 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
     case "rapport":
     case "equipe": {
       const email = await comptePayant(page, testInfo, etat.compte);
+      /* Ses bulles (l’outil de l’équipe), pour les états des bulles */
+      if (etat.bulles) await donnerDesBulles(email, etat.bulles);
       return { ...sans, histoire: (await histoiresDe(email)).at(-1)?.id ?? null };
     }
     case "sobre":

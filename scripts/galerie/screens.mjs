@@ -41,6 +41,7 @@
  * @property {number} [wait]                    l’attente avant les gestes, en ms (600 par défaut)
  * @property {"m" | "d"} [only]                 un seul écran
  * @property {Compte} [compte]
+ * @property {number} [bulles]                  les bulles données au compte préparé (un compte qui paie : « rapport »)
  * @property {Record<string, unknown>} [journey] l’état du parcours de l’onglet (sessionStorage), là où l’écran le lit
  * @property {number} [reprise]                 le chapitre où la lecture du rapport s’était arrêtée (dans le navigateur)
  * @property {string | { role: string, name: string | RegExp }} [hover]
@@ -653,6 +654,7 @@ export const STATES = [
     compte: "equipe",
     ref: "13-accueil",
     note: "L’accueil est le chat avec BLUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, BLUSH en grand comme un personnage\u00a0: un toucher ouvre «\u00a0Ce que BLUSH voit\u00a0». À droite, Maëlys comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. Au-dessus du champ, les questions toutes prêtes (celles de sa mémoire), en un toucher.",
+    changement: "Le compteur de bulles, à côté du bouton du compte\u00a0: «\u00a0illimitées\u00a0» pour l’équipe (un compte qui paie\u00a0: 13k à 13o).",
   },
   {
     id: "13b",
@@ -776,6 +778,73 @@ export const STATES = [
     note: "BLUSH lit la situation, puis propose la phrase à lui envoyer, à copier d’un geste, et pourquoi elle marche.",
     changement: "La vraie réponse du modèle factice à «\u00a0je lui envoie quoi\u00a0?\u00a0».",
   },
+  /* Les bulles dans le chat (le prototype validé des bulles) : un compte qui paie, son rapport débloqué */
+  {
+    id: "13k",
+    section: "quotidien",
+    title: "Accueil",
+    state: "Les bulles offertes",
+    route: "/app",
+    compte: "rapport",
+    bulles: 10,
+    sheet: true,
+    note: "Le compteur de bulles à côté du bouton du compte, et sa première apparition expliquée au-dessus du champ (fermée, ou à la première réponse). «\u00a0comment ça marche\u00a0» ouvre «\u00a0C’est quoi une bulle\u00a0?\u00a0». Le dessin et les textes du prototype des bulles.",
+  },
+  {
+    id: "13l",
+    section: "quotidien",
+    title: "Accueil",
+    state: "Plus que 5 bulles",
+    route: "/app",
+    compte: "rapport",
+    bulles: 6,
+    sheet: true,
+    steps: ecrire(SA_REPONSE),
+    note: "«\u00a01 bulle · il t’en reste 5\u00a0» sous la réponse (ce que le serveur a débité), le compteur rose, et la carte à 5 bulles ou moins, avec «\u00a0Recharger\u00a0».",
+  },
+  {
+    id: "13m",
+    section: "quotidien",
+    title: "Accueil",
+    state: "Ta réponse est prête (0 bulle)",
+    route: "/app",
+    compte: "rapport",
+    sheet: true,
+    steps: ecrire(QUOI_ENVOYER),
+    note: "À 0 bulle, BLUSH écrit quand même sa réponse, mais le serveur la garde\u00a0: floutée (des barres, jamais son texte), «\u00a0Recharger pour la lire\u00a0», et la carte «\u00a0Ta réponse à Maëlys est écrite\u00a0».",
+  },
+  {
+    id: "13n",
+    section: "quotidien",
+    title: "Accueil",
+    state: "La recharge (première fois)",
+    route: "/app",
+    compte: "rapport",
+    sheet: true,
+    steps: async (page) => {
+      await ecrire(QUOI_ENVOYER)(page);
+      await click("Recharger pour la lire", { wait: 1100 })(page);
+    },
+    note: "La recharge\u00a0: 30, 70 + 10 offertes (conseillé, choisi), 150 + 50 offertes. Le bonus de la première recharge (+40 sur le pack conseillé) quand le serveur le montre (une fois par compte, jamais le jour d’une autre offre unique). La case de renonciation avant de payer (absente du prototype, demandée par la loi). Payée, l’accueil lit la réponse prête et dit «\u00a0+120 bulles, ta réponse est là\u00a0».",
+  },
+  {
+    id: "13o",
+    section: "quotidien",
+    title: "Accueil",
+    state: "C’est quoi une bulle ? (le compteur)",
+    route: "/app",
+    compte: "rapport",
+    bulles: 4,
+    sheet: true,
+    steps: async (page) => {
+      await page
+        .getByRole("button", { name: /^Tes bulles/ })
+        .first()
+        .click();
+      await page.waitForTimeout(1100);
+    },
+    note: "Le compteur touché\u00a0: ce qu’est une bulle, ce que coûte chaque réponse, et «\u00a0Recharger · il t’en reste 4\u00a0».",
+  },
   {
     id: "16",
     section: "quotidien",
@@ -821,6 +890,28 @@ export const STATES = [
     changement: "Ce que le modèle factice lit dans toute capture\u00a0: «\u00a0Étudiante en droit à Lyon\u00a0» (son profil), puis «\u00a0Adore les soirées improvisées\u00a0».",
   },
   { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", compte: "equipe", ref: "20-mon-compte" },
+  {
+    id: "20e",
+    section: "quotidien",
+    title: "Mon compte",
+    state: "Tes bulles et Tes achats",
+    route: "/compte",
+    compte: "rapport",
+    bulles: 10,
+    full: true,
+    steps: async (page) => {
+      /* Une recharge de 30 bulles, payée au faux Whop depuis Mon compte, qui y revient */
+      await click("Recharger 30, 80 ou 200 bulles")(page);
+      const feuille = page.getByRole("dialog");
+      await feuille.getByRole("radio", { name: /^30 bulles/ }).click();
+      await feuille.getByRole("checkbox").check();
+      await feuille.getByRole("button", { name: /^Payer/ }).click();
+      await page.getByRole("button", { name: "Payer", exact: true }).click();
+      await page.waitForURL((u) => u.pathname === "/compte");
+      await page.waitForTimeout(1200);
+    },
+    note: "«\u00a0Tes bulles\u00a0»\u00a0: le solde, «\u00a0Recharger\u00a0» (la recharge revient ici une fois payée) et «\u00a0C’est quoi une bulle\u00a0?\u00a0». «\u00a0Tes achats\u00a0»\u00a0: le jour, l’offre, les bulles reçues, le montant et son état (payé, remboursé, contesté). Sans maquette\u00a0: textes à valider.",
+  },
   {
     id: "20b",
     section: "quotidien",
