@@ -9,7 +9,9 @@
  *   Whop → la livraison → le rapport débloqué et écrit → quelques messages au chat, qui débitent des bulles → le solde.
  * Il mesure chaque étape et chaque route (p50, p95, max), les erreurs par code, le débit, et surveille la base
  * (pg_stat_activity : connexions ouvertes, pool de l’appli plein, attentes de verrou, requêtes lentes ; pg_stat_database)
- * et le processus du serveur (mémoire, processeur). À la fin, il efface les comptes créés (DELETE /api/compte, la vraie
+ * et le processus du serveur (mémoire, processeur). --latence fait passer l’appli par un relais qui simule le réseau
+ * jusqu’à la base (relaisLent) ; --rejeu poste chaque webhook deux fois en même temps. La mesure d’avant l’ouverture :
+ * docs/charge.md. À la fin, il efface les comptes créés (DELETE /api/compte, la vraie
  * suppression), arrête le serveur et efface sa base ; le rapport s’écrit en markdown (test-results/charge, hors du dépôt).
  *   npm run e2e:build && npm run charge -- --parcours 20 --montee 10
  *   npm run charge -- --parcours 50 --duree 300      50 parcours à la fois pendant 5 minutes (un parcours fini en relance un)
@@ -22,6 +24,7 @@
 import { spawn, execFile } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { setMaxListeners } from "node:events";
+import { connect, createServer } from "node:net";
 import { cpus, loadavg, platform, release } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +35,7 @@ const RACINE = fileURLToPath(new URL("..", import.meta.url));
 /* ———— Les réglages ———— */
 
 /** Les réglages par défaut : une fumée (quelques parcours) plutôt qu’une vraie mesure. */
-const DEFAUTS = { parcours: 5, montee: 0, duree: 0, messages: 3, delai: 30, sondage: 1000, lente: 100, releve: 100, garder: false, sortie: "" };
+const DEFAUTS = { parcours: 5, montee: 0, duree: 0, messages: 3, delai: 30, sondage: 1000, lente: 100, releve: 100, latence: 0, rejeu: false, garder: false, sortie: "" };
 
 const AIDE = `usage : npm run charge -- [options]
   --parcours N    parcours en même temps (${DEFAUTS.parcours})
@@ -43,6 +46,8 @@ const AIDE = `usage : npm run charge -- [options]
   --sondage MS    l’écart entre deux relectures d’un état (le verdict, la livraison, le rapport), comme l’écran (${DEFAUTS.sondage})
   --lente MS      une requête active depuis plus de MS ms dans la base est notée lente (${DEFAUTS.lente})
   --releve MS     l’écart entre deux relevés de pg_stat_activity (${DEFAUTS.releve})
+  --latence MS    un aller-retour de MS ms de plus entre l’appli et la base, comme le réseau jusqu’à Neon (${DEFAUTS.latence})
+  --rejeu         le webhook du paiement arrive deux fois en même temps, comme Whop peut le rejouer
   --sortie F      le rapport markdown (test-results/charge/charge-<date>.md)
   --garder        garde la base à la fin (pour la lire)
 E2E_PORT (3460) et E2E_DB (blush_e2e_charge) : le port du serveur et sa base.`;
@@ -53,12 +58,22 @@ E2E_PORT (3460) et E2E_DB (blush_e2e_charge) : le port du serveur et sa base.`;
  */
 export function lireOptions(argv) {
   const o = { ...DEFAUTS };
-  const bornes = { parcours: [1, 2000], montee: [0, 3600], duree: [0, 86400], messages: [0, 10], delai: [1, 600], sondage: [100, 60000], lente: [1, 600000], releve: [50, 60000] };
+  const bornes = {
+    parcours: [1, 2000],
+    montee: [0, 3600],
+    duree: [0, 86400],
+    messages: [0, 10],
+    delai: [1, 600],
+    sondage: [100, 60000],
+    lente: [1, 600000],
+    releve: [50, 60000],
+    latence: [0, 500],
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--aide" || a === "-h" || a === "--help") return { aide: true };
-    if (a === "--garder") {
-      o.garder = true;
+    if (a === "--garder" || a === "--rejeu") {
+      o[a.slice(2)] = true;
       continue;
     }
     const nom = a.startsWith("--") ? a.slice(2) : "";
@@ -133,6 +148,79 @@ export function nouveauBocal() {
   };
 }
 
+/* ———— Le réseau jusqu’à la base ———— */
+
+/**
+ * La fin d’une réponse de Postgres qui rend la connexion libre : le message ReadyForQuery (« Z », longueur 5) avec
+ * l’état « I » (hors de toute transaction). Avec « T » ou « E », une transaction reste ouverte : le pool garde la
+ * connexion. `fin` : les 6 derniers octets reçus du serveur.
+ */
+const libre = (fin) => fin.length === 6 && fin[0] === 0x5a && fin[1] === 0 && fin[2] === 0 && fin[3] === 0 && fin[4] === 5 && fin[5] === 0x49;
+
+/**
+ * Un relais TCP vers Postgres (`hote`, `port`) qui retarde chaque morceau de `ms / 2` dans chaque sens : un aller-retour
+ * de `ms` de plus pour chaque requête de l’appli, comme le réseau entre une fonction Vercel et Neon (fra1 et Francfort,
+ * pooler compris : de l’ordre de la milliseconde). Les morceaux gardent leur ordre : des minuteries de même durée
+ * partent dans l’ordre où elles ont été posées.
+ * Il compte aussi les connexions prises, vues de l’appli : de l’envoi d’une requête jusqu’à la réponse qui la rend libre
+ * (ReadyForQuery hors transaction), réseau compris. pg_stat_activity ne voit pas ce temps-là : pendant que les octets
+ * voyagent, la base croit la connexion au repos, alors que le pool de l’appli ne peut pas la prêter.
+ * Rend son port (sur 127.0.0.1), `prises()` et `ouvertes()`, et de quoi le fermer.
+ */
+export function relaisLent(hote, port, ms) {
+  const sockets = new Set();
+  /** Les connexions de l’appli, et pour chacune : prise (une requête envoyée, pas encore rendue libre) ou non. */
+  const connexions = new Map();
+  /** Recopie `de` vers `vers`, chaque morceau `ms / 2` plus tard (`livre` : juste après l’avoir écrit) ; la fin aussi, après le dernier morceau. */
+  const retarder = (de, vers, livre) => {
+    de.on("data", (morceau) =>
+      setTimeout(() => {
+        if (vers.destroyed) return;
+        vers.write(morceau);
+        livre(morceau);
+      }, ms / 2),
+    );
+    de.on("end", () => setTimeout(() => vers.end(), ms / 2));
+    de.on("error", () => vers.destroy());
+    /* Fermé sans fin propre : l’autre côté se ferme après ses derniers morceaux (end attend qu’ils soient écrits) */
+    de.on("close", () => setTimeout(() => vers.end(), ms / 2));
+  };
+  const serveur = createServer((client) => {
+    const base = connect(port, hote);
+    const etat = { prise: false, fin: Buffer.alloc(0) };
+    connexions.set(client, etat);
+    for (const s of [client, base]) {
+      s.setNoDelay(true);
+      sockets.add(s);
+      s.on("close", () => sockets.delete(s));
+    }
+    client.on("close", () => connexions.delete(client));
+    /* L’appli écrit : la connexion est prise dès cet instant (avant le réseau) */
+    client.on("data", () => (etat.prise = true));
+    retarder(client, base, () => {});
+    /* La réponse arrive à l’appli : libre si elle finit par ReadyForQuery hors transaction (la fin peut tomber entre deux morceaux) */
+    retarder(base, client, (morceau) => {
+      etat.fin = Buffer.concat([etat.fin, morceau]).subarray(-6);
+      if (libre(etat.fin)) etat.prise = false;
+    });
+  });
+  return new Promise((ok, ko) => {
+    serveur.once("error", ko);
+    serveur.listen(0, "127.0.0.1", () =>
+      ok({
+        port: serveur.address().port,
+        prises: () => [...connexions.values()].filter((e) => e.prise).length,
+        ouvertes: () => connexions.size,
+        fermer: () =>
+          new Promise((fini) => {
+            for (const s of sockets) s.destroy();
+            serveur.close(() => fini());
+          }),
+      }),
+    );
+  });
+}
+
 /* ———— La conv inventée ———— */
 
 /* Des prénoms inventés pour des convs inventées : jamais une vraie conv (le dépôt est public) */
@@ -194,6 +282,8 @@ const ms = (v) => (v == null ? "—" : `${Math.round(v)}`);
 const pct = (a, b) => (b ? `${Math.round((100 * a) / b)} %` : "—");
 /* Une cellule de tableau markdown : sans barre verticale ni retour à la ligne */
 const cellule = (s) => String(s).replace(/\|/g, "\\|").replace(/\s+/g, " ");
+/* Le chat pas encore prêt (la mémoire s’écrit après le rapport) : une attente que l’écran relit, pas une erreur */
+const ATTENTE_DU_CHAT = "409 pas_pret";
 
 /**
  * Le rapport markdown d’un lancement : les réglages, le résultat, les étapes, les routes, les erreurs, la base et le
@@ -211,6 +301,9 @@ export function rapportMarkdown(m) {
     `- ${m.options.parcours} parcours en même temps, montée sur ${m.options.montee} s, ${m.options.duree ? `pendant ${m.options.duree} s (un parcours fini en relance un)` : "chacun une fois"}`,
   );
   l.push(`- ${m.options.messages} message(s) au chat par parcours ; délai d’une requête ${m.options.delai} s ; relecture d’un état toutes les ${m.options.sondage} ms`);
+  l.push(
+    `- Le réseau jusqu’à la base : ${m.options.latence ? `un aller-retour de ${m.options.latence} ms de plus par requête (un relais TCP retarde chaque sens de ${m.options.latence / 2} ms)` : "aucun (le Postgres de la machine, en direct)"}${m.options.rejeu ? " ; chaque webhook de paiement arrive deux fois en même temps" : ""}`,
+  );
   l.push(
     `- Machine : ${m.machine.systeme}, ${m.machine.coeurs} cœurs, Node ${m.machine.node} ; charge (1 min) ${m.machine.chargeAvant} au départ, ${m.machine.chargeApres} à la fin`,
   );
@@ -240,10 +333,12 @@ export function rapportMarkdown(m) {
   l.push("## Les routes", "", "Chaque requête (ms), réussie ou non.", "");
   l.push("| Route | n | p50 | p95 | max | Erreurs |", "|---|---|---|---|---|---|");
   const parRoute = new Map();
+  let attentes = 0;
   for (const r of m.requetes) {
     const e = parRoute.get(r.route) ?? { durees: [], erreurs: 0 };
     e.durees.push(r.ms);
-    if (r.erreur) e.erreurs++;
+    if (r.erreur === ATTENTE_DU_CHAT) attentes++;
+    else if (r.erreur) e.erreurs++;
     parRoute.set(r.route, e);
   }
   for (const [route, e] of [...parRoute].sort((a, b) => b[1].durees.length - a[1].durees.length)) {
@@ -251,6 +346,11 @@ export function rapportMarkdown(m) {
     l.push(`| \`${cellule(route)}\` | ${r.n} | ${ms(r.p50)} | ${ms(r.p95)} | ${ms(r.max)} | ${e.erreurs} |`);
   }
   l.push("");
+  if (attentes)
+    l.push(
+      `Réponses « ${ATTENTE_DU_CHAT} » du chat : ${attentes}. Le premier message attend la mémoire, écrite après le rapport, et repart ${m.options.sondage} ms plus tard, comme l’écran : ces réponses comptent dans ses requêtes, pas dans ses erreurs.`,
+      "",
+    );
 
   l.push("## Les erreurs", "");
   if (!m.erreurs.size) l.push("Aucune.", "");
@@ -264,6 +364,11 @@ export function rapportMarkdown(m) {
   }
   const anomalies = m.parcours.filter((p) => p.anomalie);
   if (anomalies.length) l.push(`Bulles incohérentes (le solde après le chat n’est pas 10 − les messages) : ${anomalies.length} parcours.`, "");
+  if (m.chevauchements)
+    l.push(
+      `Deux étapes d’une même conv ont tourné en même temps (prendre, src/server/taches.ts, ne le permet jamais : deux mises à jour de la mémoire en perdraient une, un vocal se ferait deux fois) : ${m.chevauchements} conv(s).`,
+      "",
+    );
 
   l.push("## La base", "");
   const b = m.base_releves;
@@ -272,13 +377,16 @@ export function rapportMarkdown(m) {
     const appli = b.map((r) => r.total);
     /* Une connexion prise : une requête en cours, ou une transaction ouverte entre deux requêtes (le pool ne la rend qu’au commit) */
     const prises = b.map((r) => r.actifs + r.idleTx);
-    const pleins = prises.filter((n) => m.pool && n >= m.pool).length;
+    /* Avec le réseau simulé (--latence), le relais voit ce que la base ne voit pas : le temps du voyage des octets */
+    const appliVues = b.every((r) => r.prisesAppli !== undefined) ? b.map((r) => r.prisesAppli) : null;
+    const pleins = (appliVues ?? prises).filter((n) => m.pool && n >= m.pool).length;
     const moyenne = (xs) => (xs.reduce((s, x) => s + x, 0) / xs.length).toFixed(1);
     const ligne = (nom, xs) => l.push(`| ${nom} | ${moyenne(xs)} | ${Math.max(...xs)} |`);
     l.push(`${b.length} relevés de pg_stat_activity (toutes les ${m.options.releve} ms), sans la connexion du relevé.`, "");
     l.push("| Mesure | Moyenne | Max |", "|---|---|---|");
     ligne("Connexions ouvertes (l’appli)", appli);
     ligne("Connexions prises (requête en cours ou transaction ouverte)", prises);
+    if (appliVues) ligne("Connexions prises vues de l’appli (de l’envoi à la réponse qui la libère, réseau compris : le relais)", appliVues);
     ligne(
       "Requêtes en cours (active)",
       b.map((r) => r.actifs),
@@ -291,9 +399,10 @@ export function rapportMarkdown(m) {
       "Requêtes qui attendent un verrou",
       b.map((r) => r.verrous),
     );
+
     l.push(`| La plus longue requête en cours (ms) | ${ms(b.reduce((s, r) => s + r.plusLongue, 0) / b.length)} | ${ms(Math.max(...b.map((r) => r.plusLongue)))} |`, "");
     l.push(
-      `Le pool de l’appli plein (ses ${m.pool ?? "?"} connexions prises à la fois) : ${pct(pleins, b.length)} des relevés. Une requête qui arrive alors attend qu’une connexion se libère (jusqu’à 30 s, connectionTimeoutMillis, puis une erreur) : cette attente ne se voit pas dans la base, elle s’ajoute au temps des routes. Une transaction ouverte pendant que Node calcule (chiffrer, déchiffrer, valider) garde sa connexion sans rien demander à la base.`,
+      `Le pool de l’appli plein (ses ${m.pool ?? "?"} connexions prises à la fois${appliVues ? ", vues de l’appli" : ""}) : ${pct(pleins, b.length)} des relevés. Une requête qui arrive alors attend qu’une connexion se libère (jusqu’à 30 s, connectionTimeoutMillis, puis une erreur) : cette attente ne se voit pas dans la base, elle s’ajoute au temps des routes. Une transaction ouverte pendant que Node calcule (chiffrer, déchiffrer, valider) garde sa connexion sans rien demander à la base.`,
       "",
     );
   }
@@ -420,6 +529,19 @@ async function main() {
     arret.abort();
   });
 
+  /*
+   * Le réseau jusqu’à la base (--latence) : l’appli passe par un relais qui retarde chaque sens ; la surveillance et le
+   * nettoyage gardent la connexion directe (leur relevé ne doit pas attendre le relais)
+   */
+  const relais = options.latence ? await relaisLent(new URL(DATABASE_URL).hostname, Number(new URL(DATABASE_URL).port || 5432), options.latence) : null;
+  const urlDeLAppli = (() => {
+    if (!relais) return DATABASE_URL;
+    const u = new URL(DATABASE_URL);
+    u.hostname = "127.0.0.1";
+    u.port = String(relais.port);
+    return u.href;
+  })();
+
   /* ———— Le serveur, comme celui des tests de bout en bout (playwright.config.ts) ———— */
   const dossier = join(RACINE, "test-results", "charge");
   mkdirSync(dossier, { recursive: true });
@@ -436,7 +558,7 @@ async function main() {
       ),
       E2E_PORT_SERVEUR: String(PORT),
       E2E_PREPARER: "1",
-      DATABASE_URL,
+      DATABASE_URL: urlDeLAppli,
       BLUSH_CLE: CLE,
       BLUSH_IA_FACTICE: "1",
       BLUSH_PAIEMENT_FACTICE: "1",
@@ -535,6 +657,7 @@ async function main() {
     base_releves: [],
     lentes: new Map(),
     stats: null,
+    chevauchements: null,
     serveur_releves: [],
     journal,
   };
@@ -544,6 +667,8 @@ async function main() {
   const releverLaBase = setInterval(async () => {
     if (releveEnCours) return;
     releveEnCours = true;
+    /* Vues de l’appli (le relais, avec --latence) : au même instant que le relevé part */
+    const prisesAppli = relais ? relais.prises() : undefined;
     try {
       const lignes = await sql`
         select state, wait_event_type, extract(epoch from (now() - query_start)) * 1000 as ms, left(regexp_replace(query, '\\s+', ' ', 'g'), 160) as q
@@ -556,6 +681,7 @@ async function main() {
         idleTx: lignes.filter((r) => r.state?.startsWith("idle in transaction")).length,
         verrous: lignes.filter((r) => r.wait_event_type === "Lock").length,
         plusLongue: Math.max(0, ...actives.map((r) => Number(r.ms))),
+        ...(prisesAppli === undefined ? {} : { prisesAppli }),
       });
       for (const r of actives) {
         if (Number(r.ms) < options.lente) continue;
@@ -732,11 +858,13 @@ async function main() {
       );
       await etape("webhook", async () => {
         const { webhook } = exiger("webhook", await c.requete("POST", "/api/paiement/factice", { json: { achat, issue: "payer" } }));
-        /* Posté comme Whop le poste : ses en-têtes signés, son corps tel quel, sans cookie ni origine de l’appli */
-        exiger(
-          "webhook",
-          await client(k).requete("POST", "/api/paiement/whop", { corps: webhook.corps, entetes: { ...webhook.entetes, "content-type": "application/json" }, commeWhop: true }),
-        );
+        /*
+         * Posté comme Whop le poste : ses en-têtes signés, son corps tel quel, sans cookie ni origine de l’appli. Avec
+         * --rejeu, deux fois en même temps (Whop livre « au moins une fois ») : les deux répondent 2xx, un seul livre
+         */
+        const poster = () =>
+          client(k).requete("POST", "/api/paiement/whop", { corps: webhook.corps, entetes: { ...webhook.entetes, "content-type": "application/json" }, commeWhop: true });
+        for (const r of await Promise.all(options.rejeu ? [poster(), poster()] : [poster()])) exiger("webhook", r);
       });
       await etape("livraison", () =>
         attendre(c, "livraison", `/api/paiement/${achat}`, (d) => (d?.statut === "paye" ? true : d?.statut && d.statut !== "en_attente" ? `achat ${d.statut}` : false), 60),
@@ -752,7 +880,7 @@ async function main() {
         for (;;) {
           const t1 = performance.now();
           r = await c.requete("POST", "/api/chat", { json: { texte } });
-          if (r.statut !== 409 || r.erreur !== "409 pas_pret") {
+          if (r.statut !== 409 || r.erreur !== ATTENTE_DU_CHAT) {
             noter("chat (une réponse)", performance.now() - t1);
             break;
           }
@@ -812,6 +940,21 @@ async function main() {
     mesures.stats = null;
   }
 
+  /*
+   * Jamais deux étapes d’une même conv en même temps : une tâche tourne de sa prise (heartbeat_at, posé par prendre ; le
+   * modèle factice répond avant le premier battement) à sa fin (updated_at, posé par finir). Deux tâches finies d’une même
+   * conv dont les deux intervalles se croisent ont tourné ensemble. Lu avant l’effacement des comptes (il efface les tâches).
+   */
+  try {
+    const [{ n }] = await sql`
+      select count(distinct a.story_id)::int as n from tasks a join tasks b on b.story_id = a.story_id and b.id <> a.id
+      where a.status = 'fini' and b.status = 'fini' and a.attempts = 1 and b.attempts = 1
+        and a.heartbeat_at < b.updated_at and b.heartbeat_at < a.updated_at`;
+    mesures.chevauchements = n;
+  } catch {
+    mesures.chevauchements = null;
+  }
+
   /* ———— Le rapport ———— */
   const sortie = options.sortie || join(dossier, `charge-${new Date(mesures.debut).toISOString().slice(0, 19).replace(/[:T]/g, "-")}-${options.parcours}.md`);
   writeFileSync(sortie, `${rapportMarkdown(mesures)}\n`);
@@ -834,6 +977,7 @@ async function main() {
   }
   await sql.end({ timeout: 5 });
   await arreterServeur();
+  await relais?.fermer();
   if (!options.garder) {
     const serveurPg = new URL(DATABASE_URL);
     serveurPg.pathname = "/postgres";
@@ -854,7 +998,8 @@ async function main() {
       (parcoursEntier ? ` (un parcours : p50 ${ms(parcoursEntier.p50)} ms, p95 ${ms(parcoursEntier.p95)} ms)` : ""),
   );
   console.log(`  rapport : ${relative(process.cwd(), sortie)}`);
-  process.exit(ok === mesures.parcours.length && !mesures.interrompu ? 0 : 1);
+  if (mesures.chevauchements) console.log(`✗ ${mesures.chevauchements} conv(s) avec deux étapes en même temps (le rapport, « Les erreurs »)`);
+  process.exit(ok === mesures.parcours.length && !mesures.interrompu && !mesures.chevauchements ? 0 : 1);
 }
 
 /* Lancé comme un script (pas importé par un test) */

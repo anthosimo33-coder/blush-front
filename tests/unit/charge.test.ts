@@ -1,5 +1,6 @@
+import { connect, createServer, type AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { centile, convInventee, lireOptions, nouveauBocal, rapportMarkdown, resume, routeDe, type Mesures, type Options } from "../../scripts/charge.mjs";
+import { centile, convInventee, lireOptions, nouveauBocal, rapportMarkdown, relaisLent, resume, routeDe, type Mesures, type Options } from "../../scripts/charge.mjs";
 import { depuisFichier } from "@/server/import";
 
 /*
@@ -19,6 +20,8 @@ describe("les options du test de charge", () => {
       sortie: "r.md",
     });
     expect(lireOptions(["--aide"])).toEqual({ aide: true });
+    expect(lireOptions([])).toMatchObject({ latence: 0, rejeu: false });
+    expect(lireOptions(["--latence", "5", "--rejeu"])).toMatchObject({ latence: 5, rejeu: true });
   });
 
   it("refusent une option inconnue, un nombre qui n’en est pas un, ou hors de ses bornes", () => {
@@ -28,6 +31,115 @@ describe("les options du test de charge", () => {
     expect(() => lireOptions(["--parcours", "0"])).toThrow(/entre 1 et 2000/);
     /* Le rapport donne 10 bulles : au-delà, le chat demanderait une recharge */
     expect(() => lireOptions(["--messages", "11"])).toThrow(/entre 0 et 10/);
+    expect(() => lireOptions(["--latence", "501"])).toThrow(/entre 0 et 500/);
+  });
+});
+
+describe("le relais lent vers la base", () => {
+  /** Un serveur d’écho local (127.0.0.1 : rien ne sort de la machine), le temps de `travail`. */
+  async function avecEcho(travail: (port: number) => Promise<void>) {
+    const echo = createServer((s) => s.pipe(s));
+    await new Promise<void>((ok) => echo.listen(0, "127.0.0.1", ok));
+    try {
+      await travail((echo.address() as AddressInfo).port);
+    } finally {
+      echo.close();
+    }
+  }
+  /** Envoie des morceaux par le relais et attend leur écho : ce qui revient, et le temps qu’il a mis. */
+  async function allerRetour(port: number, morceaux: string[]) {
+    const s = connect(port, "127.0.0.1");
+    await new Promise<void>((ok) => s.once("connect", ok));
+    const attendu = morceaux.join("");
+    const t0 = performance.now();
+    const recu = await new Promise<string>((ok) => {
+      let tout = "";
+      s.on("data", (d) => {
+        tout += d.toString("utf8");
+        if (tout.length >= attendu.length) ok(tout);
+      });
+      for (const m of morceaux) s.write(m);
+    });
+    s.destroy();
+    return { recu, ms: performance.now() - t0 };
+  }
+
+  it("rend chaque octet, dans l’ordre, un aller-retour plus tard", async () => {
+    await avecEcho(async (portEcho) => {
+      const relais = await relaisLent("127.0.0.1", portEcho, 60);
+      try {
+        const morceaux = Array.from({ length: 20 }, (_, i) => `morceau ${i};`);
+        const { recu, ms } = await allerRetour(relais.port, morceaux);
+        expect(recu).toBe(morceaux.join(""));
+        /* 30 ms à l’aller, 30 au retour (les minuteries ne partent jamais en avance) */
+        expect(ms).toBeGreaterThanOrEqual(58);
+      } finally {
+        await relais.fermer();
+      }
+    });
+  });
+
+  it("compte une connexion prise de l’envoi jusqu’au ReadyForQuery hors transaction, même coupé en deux morceaux", async () => {
+    /* Un faux Postgres : « BEGIN » rend ReadyForQuery « T » (en transaction), « COMMIT » rend « I » coupé en deux morceaux */
+    const pret = (etat: "I" | "T") => Buffer.from([0x5a, 0, 0, 0, 5, etat.charCodeAt(0)]);
+    const faux = createServer((s) =>
+      s.on("data", (d) => {
+        if (d.toString() === "BEGIN") s.write(Buffer.concat([Buffer.from("C"), pret("T")]));
+        else {
+          const r = Buffer.concat([Buffer.from("C"), pret("I")]);
+          s.write(r.subarray(0, 3));
+          setTimeout(() => s.write(r.subarray(3)), 150);
+        }
+      }),
+    );
+    await new Promise<void>((ok) => faux.listen(0, "127.0.0.1", ok));
+    const relais = await relaisLent("127.0.0.1", (faux.address() as AddressInfo).port, 10);
+    const s = connect(relais.port, "127.0.0.1");
+    try {
+      await new Promise<void>((ok) => s.once("connect", ok));
+      /** Les connexions prises vues du relais à chaque morceau reçu par l’appli. */
+      const vues: number[] = [];
+      const reponse = (envoi: string, octets: number) =>
+        new Promise<void>((ok) => {
+          let n = 0;
+          const lu = (d: Buffer) => {
+            n += d.length;
+            vues.push(relais.prises());
+            if (n >= octets) {
+              s.off("data", lu);
+              ok();
+            }
+          };
+          s.on("data", lu);
+          s.write(envoi);
+        });
+      expect(relais.prises()).toBe(0);
+      await reponse("BEGIN", 7);
+      /* En transaction : le pool garde la connexion */
+      expect(relais.prises()).toBe(1);
+      vues.length = 0;
+      await reponse("COMMIT", 7);
+      /* La première moitié de la réponse arrivée : pas encore libre ; la seconde la libère */
+      expect(vues).toEqual([1, 0]);
+      expect(relais.prises()).toBe(0);
+      expect(relais.ouvertes()).toBe(1);
+    } finally {
+      s.destroy();
+      await relais.fermer();
+      faux.close();
+    }
+  });
+
+  it("sans retard, n’en ajoute pas", async () => {
+    await avecEcho(async (portEcho) => {
+      const relais = await relaisLent("127.0.0.1", portEcho, 0);
+      try {
+        const { recu } = await allerRetour(relais.port, ["a", "b"]);
+        expect(recu).toBe("ab");
+      } finally {
+        await relais.fermer();
+      }
+    });
   });
 });
 
@@ -109,6 +221,7 @@ describe("le rapport", () => {
     ],
     lentes: new Map([["select | from stories", { vues: 1, max: 120 }]]),
     stats: { xact_commit: 100, xact_rollback: 0, tup_inserted: 10, tup_updated: 5, tup_deleted: 0, blks_read: 0, blks_hit: 50, deadlocks: 0, temp_files: 0 },
+    chevauchements: 0,
     serveur_releves: [{ t: 0, rssMo: 200, cpu: 50 }],
     journal: new Map([["route /api en panne\u0000erreur", 2]]),
     ...m,
@@ -125,7 +238,47 @@ describe("le rapport", () => {
     expect(md).toContain("`select \\| from stories`");
     expect(md).toContain("| route /api en panne | erreur | 2 |");
     expect(md).toContain("Ce que ce test ne mesure pas");
+    expect(md).toContain("Le réseau jusqu’à la base : aucun");
     expect(md).not.toContain("Interrompu");
+    expect(md).not.toContain("pas_pret");
+  });
+
+  it("ne compte pas le chat pas encore prêt (409 pas_pret) parmi les erreurs, et dit le réseau simulé", () => {
+    const md = rapportMarkdown(
+      mesures({
+        options: lireOptions(["--parcours", "2", "--latence", "4", "--rejeu"]) as Options,
+        requetes: [
+          { route: "POST /api/chat", ms: 5, statut: 409, erreur: "409 pas_pret" },
+          { route: "POST /api/chat", ms: 7, statut: 200, erreur: null },
+          { route: "POST /api/chat", ms: 9, statut: 500, erreur: "500 interne" },
+        ],
+      }),
+    );
+    expect(md).toContain("| `POST /api/chat` | 3 | 7 | 9 | 9 | 1 |");
+    expect(md).toContain("Réponses « 409 pas_pret » du chat : 1.");
+    expect(md).toContain("un aller-retour de 4 ms de plus par requête");
+    expect(md).toContain("chaque webhook de paiement arrive deux fois en même temps");
+    expect(md).not.toContain("vues de l’appli");
+    expect(md).not.toContain("en même temps (prendre");
+  });
+
+  it("dit les convs dont deux étapes ont tourné en même temps", () => {
+    expect(rapportMarkdown(mesures({ chevauchements: 3 }))).toContain(
+      "ne le permet jamais : deux mises à jour de la mémoire en perdraient une, un vocal se ferait deux fois) : 3 conv(s).",
+    );
+  });
+
+  it("avec le relais, juge le pool plein sur les connexions vues de l’appli", () => {
+    const md = rapportMarkdown(
+      mesures({
+        base_releves: [
+          { t: 0, total: 5, actifs: 0, idleTx: 0, verrous: 0, plusLongue: 0, prisesAppli: 5 },
+          { t: 1, total: 5, actifs: 1, idleTx: 0, verrous: 0, plusLongue: 0, prisesAppli: 5 },
+        ],
+      }),
+    );
+    expect(md).toContain("| Connexions prises vues de l’appli (de l’envoi à la réponse qui la libère, réseau compris : le relais) | 5.0 | 5 |");
+    expect(md).toContain("vues de l’appli) : 100 % des relevés");
   });
 
   it("dit qu’il a été interrompu, et tient sans aucun relevé", () => {
