@@ -79,7 +79,9 @@ describe("PageDeConv", () => {
   it("pose la conv de la requête et le compte rendu, l’heure du rendu, puis rend son écran", async () => {
     const compte: Account = {
       email: "lea@blush.test",
-      subscription: { plan: "rapport", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false },
+      bulles: 10,
+      client: true,
+      equipe: false,
       storyDeleted: false,
     };
     Object.assign(page, { id: "conv-a", compte });

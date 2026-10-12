@@ -16,7 +16,7 @@ import { versionImage } from "@/server/partages";
 import { executerChaine, tempsPourCommencer } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { audioDuCompte } from "@/server/vocal";
-import { compteDeTest, convPrete } from "./aide/fixtures";
+import { compteDeTest, convPrete, debloquerLaConv } from "./aide/fixtures";
 
 /* Côté serveur, ce qui garde les écrans rapides : ce que lisent les écrans, la chaîne, l’audio du vocal, l’image story */
 
@@ -37,8 +37,6 @@ async function importee(f: string, compte = u): Promise<string> {
   await planifier(id, "verdict");
   return id;
 }
-/** L’accès qui arrive : le compte passe à BLUSH+ (un compte du test seul, les autres tests gardent le leur). */
-const passerABlushPlus = (compte: Utilisateur) => db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, compte.id));
 
 describe("ce que lisent les écrans", () => {
   it("n’apporte jamais la conv brute, mais sait si elle est encore là", async () => {
@@ -57,9 +55,9 @@ describe("ce que lisent les écrans", () => {
     const id = await importee("06-elle-hesite.txt", compte);
     await executerChaine(id);
     expect(await contactDe(id)).toMatchObject({ level: expect.any(String), nextStep: expect.stringMatching(/^Ton prochain pas\u00a0: /) });
-    const plus = { ...compte, plan: "blushplus" as const };
-    await passerABlushPlus(compte);
-    const r = await ouvrirLeRapport((await histoireOuverte(plus, { affichee: id }))!, plus);
+    /* Le rapport se débloque (comme un achat livré) */
+    await debloquerLaConv(id);
+    const r = await ouvrirLeRapport((await histoireOuverte(compte, { affichee: id }))!, compte);
     expect(r?.generating).toBe(true);
     /* Le contact de l’accueil est celui de la tête du rapport */
     expect(await contactDe(id)).toEqual({ verdict: r!.report.verdict, level: r!.report.level, trend: r!.report.trend, nextStep: r!.report.nextStep });
@@ -89,7 +87,7 @@ describe("la chaîne", () => {
     await avecEcheance(tempsPourCommencer("verdict") - 5_000, () => executerChaine(id));
     expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("attente");
     /* Le temps qu’il faut : verdict, puis le plan et les chapitres s’enchaînent sans attendre un sondage */
-    await passerABlushPlus(compte);
+    await debloquerLaConv(id);
     await executerChaine(id);
     const { verdict, rapport_chapitres } = await etatDesTaches(id, ["verdict", "rapport_chapitres"]);
     expect([verdict?.status, rapport_chapitres?.status]).toEqual(["fini", "fini"]);
@@ -103,8 +101,8 @@ describe("la chaîne", () => {
 
 describe("l’audio du vocal", () => {
   it("n’est lu que par son compte, en une requête, et la seconde ne relit pas l’audio", async () => {
-    /* Un compte BLUSH+ à lui : sa lecture va jusqu’au vocal */
-    const plus = await compteDeTest("fluidite-vocal", "blushplus");
+    /* Un compte à lui, ses convs débloquées : sa lecture va jusqu’au vocal */
+    const plus = await compteDeTest("fluidite-vocal", "debloque");
     const id = await importee("02-reciproque.txt", plus);
     await executerChaine(id);
     const premier = await audioDuCompte(plus.id, id);

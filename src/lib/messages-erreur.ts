@@ -20,7 +20,6 @@ const CHAT_ET_QUESTION = {
   /* « BLUSH souffle un peu, réessaie demain », dit par BLUSH lui-même */
   souffle: "je souffle un peu, réessaie demain",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
-  acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
 
 /** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */

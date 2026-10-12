@@ -31,7 +31,7 @@ export async function ecrireABlush(page: Page, texte: string): Promise<number> {
 }
 
 /**
- * Écrit à BLUSH par la route du chat (POST /api/chat), sans l’écran : de quoi remplir l’historique d’un compte BLUSH+
+ * Écrit à BLUSH par la route du chat (POST /api/chat), sans l’écran : de quoi remplir l’historique d’un compte au rapport ouvert
  * dont la mémoire est faite. Le modèle factice répond toujours pareil (src/server/ia/factice.ts).
  */
 export async function ecrireParApi(page: Page, testInfo: TestInfo, texte: string): Promise<void> {

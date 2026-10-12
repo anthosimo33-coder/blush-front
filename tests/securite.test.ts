@@ -111,7 +111,7 @@ let secretSession = "";
 
 beforeAll(async () => {
   await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, cles));
-  const u = (await db().insert(schema.users).values({ email: emails[0]!, plan: "blushplus" }).returning())[0]!;
+  const u = (await db().insert(schema.users).values({ email: emails[0]! }).returning())[0]!;
   userId = u.id;
   secretSession = (await ouvrirSession(u.id)).secret;
 });

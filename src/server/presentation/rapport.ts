@@ -1,7 +1,6 @@
 import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres";
-import { peut } from "@/lib/acces";
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
-import type { Chapter, Echec, Plan, VocalRapport } from "@/types";
+import type { Chapter, Echec, VocalRapport } from "@/types";
 import type { Plan as PlanDuRapport, Verdict } from "@prompts/lib/schemas";
 import { avanceChapitres, CHAPITRES_PAR_MOITIE, DUREES_MS, ECRITURE_MAX, PART_DU_PLAN, RYTHME_FIABLE } from "../avancement";
 import { echecDe } from "../erreurs";
@@ -23,8 +22,8 @@ export type RapportLu = {
   storyId: string;
   /** Le prénom de l’autre : les titres d’attente des chapitres. */
   autre: string;
-  /** Le plan du compte. */
-  access: Plan;
+  /** Le rapport de cette conv est débloqué pour ce compte (rapportOuvert, src/server/droits.ts). */
+  debloque: boolean;
   verdict: DonneesVerdict;
   /** Le rapport gardé, ou null tant qu’il s’écrit (ou qu’il n’a pas commencé). */
   donnees: DonneesRapport | null;
@@ -42,13 +41,10 @@ export type RapportLu = {
 };
 
 /**
- * Ce que le compte voit du rapport : `entier`, tous ses chapitres (l’accès, src/lib/acces.ts) ; `ouvert`, son écriture,
- * son vocal et sa partie sobre, avec l’accès ou en mode sobre (une alerte : le rapport doux, offert).
+ * Ce que le compte voit du rapport : `entier`, tous ses chapitres (le rapport débloqué, src/server/droits.ts) ; `ouvert`,
+ * son écriture, son vocal et sa partie sobre, débloqué ou en mode sobre (une alerte : le rapport doux, offert).
  */
-export const ouvertureDu = (access: Plan, verdict: Pick<Verdict, "mode_sobre">) => {
-  const entier = peut(access, "rapport");
-  return { entier, ouvert: entier || verdict.mode_sobre };
-};
+export const ouvertureDu = (debloque: boolean, verdict: Pick<Verdict, "mode_sobre">) => ({ entier: debloque, ouvert: debloque || verdict.mode_sobre });
 
 /** Ce que le verdict dit en tête du rapport, et sur l’accueil : son verdict, où vous en êtes, ton prochain pas. */
 export type EnTete = Pick<ReportPayload["report"], "verdict" | "level" | "trend" | "nextStep">;
@@ -132,9 +128,9 @@ function vocalAffiche(v: VocalLu, verdict: Verdict, taches: EtatTaches, voix: bo
  * dès le verdict, avant que cette partie soit écrite.
  */
 export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: boolean; alerte: boolean } {
-  const { access, autre, donnees, taches } = lu;
+  const { debloque, autre, donnees, taches } = lu;
   const { sortie, scores } = lu.verdict;
-  const { entier, ouvert } = ouvertureDu(access, sortie);
+  const { entier, ouvert } = ouvertureDu(debloque, sortie);
   /* Le plan et les chapitres finis ne comptent qu’avec l’accès (S-25) */
   const plan = entier ? lu.plan : null;
   const lusPartiels = entier ? lu.partiels : [];
@@ -187,7 +183,7 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
     sober: ouvert ? (donnees?.sobre ?? null) : null,
     /* Su dès le verdict : la scène du verdict et le rapport joueur ne se montrent pas, même avant le rapport doux */
     alerte: sortie.mode_sobre,
-    access,
+    debloque,
     /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente, et où en est l’écriture */
     generating: ouvert && !donnees && !echec,
     ...(echec ? { echec } : {}),

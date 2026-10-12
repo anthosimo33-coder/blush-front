@@ -111,7 +111,7 @@ describe("le serveur", () => {
   };
 
   it("garde chaque chapitre une fois, dans sa moitié, même si le modèle en double un", async () => {
-    const u = await compteDeTest("mineurs", "blushplus");
+    const u = await compteDeTest("mineurs", "debloque");
     const imp = await avecFactice(debordant, () => histoireLue(u, "02-reciproque.txt"));
     const r = (await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id)))[0]!;
     expect(dechiffrer<DonneesRapport>(r.data!).chapitres.map((c) => c.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);

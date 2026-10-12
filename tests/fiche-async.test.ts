@@ -64,7 +64,7 @@ const majDuChat = () => planifier(id, "memoire_maj", echange(1, { dit: "on s’e
 
 facticePourChaqueTest((req: Requete) => (taches.push(req.tache), fournisseurFactice(req)));
 beforeAll(async () => {
-  const u = await compteDeTest("fiche-async", "blushplus");
+  const u = await compteDeTest("fiche-async", "debloque");
   id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);

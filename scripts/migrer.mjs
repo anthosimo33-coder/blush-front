@@ -10,6 +10,8 @@
  * la voir. Seulement en production (VERCEL_ENV=production, S-45) : une prévisualisation ne touche jamais la base, même si
  * elle en avait l’URL. Ailleurs, rien à faire : en local, c’est `npm run dev` qui migre la base (scripts/developper.mjs).
  *
+ * Puis les rattrapages de données (rattraper, scripts/base.mjs : les testeurs de la bêta), qui se rejouent sans effet.
+ *
  * `npm run db:migrer` (`--ici`) : la base de DATABASE_URL (par défaut blush_dev sur ce poste), à la main, avec la même
  * garde.
  */
@@ -18,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { migrationsSautees, sslPour } from "./base.mjs";
+import { migrationsSautees, rattraper, sslPour } from "./base.mjs";
 
 const ici = process.argv.includes("--ici");
 /* Neon : l’URL sans pooler pour les migrations (Vercel la nomme DATABASE_URL_UNPOOLED) */
@@ -41,6 +43,8 @@ try {
     process.exitCode = 1;
   } else {
     await migrate(drizzle(client), { migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)) });
+    /* Ce que les migrations générées ne font pas (les testeurs de la bêta) : une fois, rejouable sans effet */
+    await rattraper(client);
     console.log("migrations : base à jour");
   }
 } finally {

@@ -47,3 +47,39 @@ export function migrationsSautees(entrees, appliquees) {
   const passees = new Set(appliquees);
   return entrees.filter((e) => e.when <= derniere && !passees.has(e.when));
 }
+
+/*
+ * Les rattrapages de données, après les migrations (scripts/migrer.mjs, scripts/developper.mjs) : ce qu’une migration
+ * générée par drizzle (du schéma seulement, jamais écrite à la main) ne fait pas. Chacun tient en une requête, se rejoue
+ * sans effet, et ne touche qu’une fois chaque ligne : une base migrée deux fois, ou deux builds en même temps, ne donnent
+ * rien deux fois (BACKEND.md, « Les migrations »).
+ */
+
+/** Les bulles données aux testeurs de la bêta : BULLES_DE_LA_BETA (src/contenu/offres.ts), recopié ici (tests/rattrapages.test.ts les compare). */
+export const BULLES_DE_LA_BETA = 100;
+
+/**
+ * Les testeurs de la bêta (users.plan « rapport », ou l’ancien accès au chat) gardent leurs rapports et reçoivent leurs
+ * bulles, une fois : une ligne « beta » au journal des bulles (unique par compte : sa référence est l’id du compte), le
+ * solde, puis toutes les convs que le compte a à ce moment-là, débloquées. Ce qui n’a pas inscrit sa ligne (déjà fait)
+ * ne change rien : une conv importée après le rattrapage reste à payer. Rend le nombre de testeurs et de convs servis.
+ */
+export const RATTRAPAGE_BETA = `
+with testeurs as (
+  insert into mouvements_bulles (user_id, delta, raison, ref)
+  select id, ${BULLES_DE_LA_BETA}, 'beta', id::text from users where plan in ('rapport', 'blushplus')
+  on conflict (raison, ref) do nothing
+  returning user_id
+), soldes as (
+  update users set bulles = bulles + ${BULLES_DE_LA_BETA} where id in (select user_id from testeurs) returning id
+), convs as (
+  update stories set debloque_le = now() where user_id in (select user_id from testeurs) and debloque_le is null returning id
+)
+select (select count(*) from soldes)::int as testeurs, (select count(*) from convs)::int as convs`;
+
+/** Passe les rattrapages sur une base déjà migrée (`client` : postgres.js), et dit ce qu’ils ont fait. */
+export async function rattraper(client) {
+  const [{ testeurs, convs }] = await client.unsafe(RATTRAPAGE_BETA);
+  if (testeurs) console.log(`rattrapages : ${testeurs} testeur(s) de la bêta, ${convs} conv(s) débloquée(s)`);
+  return { testeurs, convs };
+}

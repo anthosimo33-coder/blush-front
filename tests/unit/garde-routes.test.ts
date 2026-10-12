@@ -6,16 +6,18 @@ import { auMoins } from "../aide/listes";
 /*
  * La garde commune des routes /api (src/server/requete.ts). D’abord en table, sur chaque route de la table du contrat
  * (src/types/api.ts) : une mutation venue d’ailleurs répond 403, une route qui demande un compte répond 401 sans session.
- * Une route ajoutée à la table y passe d’elle-même. Puis la garde seule : le plan, la conv, la limite, la session sans
- * le filtre de la bêta. Sans base : les cookies, le compte et sa conv, et les limites sont simulés.
+ * Une route ajoutée à la table y passe d’elle-même. Puis la garde seule : le client, la conv, la limite, la session sans
+ * le filtre de la bêta. Sans base : les cookies, le compte et sa conv, ses droits et les limites sont simulés.
  */
 
-type Compte = { id: string; email: string; plan: "gratuit" | "rapport" | "blushplus" };
+type Compte = { id: string; email: string };
 const etat = vi.hoisted(() => ({
   /** Ce que contexteRequete rend (le compte de la session, sa conv ouverte), et compteDeSession (sans le filtre de la bêta) */
   utilisateur: null as Compte | null,
   story: null as { id: string } | null,
   sansBeta: null as Compte | null,
+  /** Le compte est-il client (estClient, src/server/droits.ts) */
+  client: false,
   /** Les limites comptées (leur clé), et si elles sont atteintes */
   comptees: [] as string[],
   atteinte: false,
@@ -30,6 +32,7 @@ vi.mock("@/server/donnees", async (original) => ({
   contexteRequete: async () => ({ utilisateur: etat.utilisateur, story: etat.story }),
   utilisateurCourant: async () => etat.utilisateur,
 }));
+vi.mock("@/server/droits", async (original) => ({ ...(await original<typeof import("@/server/droits")>()), estClient: async () => etat.client }));
 vi.mock("@/server/auth", async (original) => ({ ...(await original<typeof import("@/server/auth")>()), compteDeSession: async () => etat.sansBeta }));
 vi.mock("@/server/limites", async (original) => ({
   ...(await original<typeof import("@/server/limites")>()),
@@ -41,7 +44,7 @@ import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { LIMITES } from "@/server/limites";
 
 beforeEach(() => {
-  Object.assign(etat, { utilisateur: null, story: null, sansBeta: null, comptees: [], atteinte: false });
+  Object.assign(etat, { utilisateur: null, story: null, sansBeta: null, client: false, comptees: [], atteinte: false });
 });
 
 const APPLI = "http://localhost";
@@ -63,8 +66,11 @@ const SANS_COMPTE = new Set<CleRoute>([
   "GET /api/histoire",
   "DELETE /api/histoire",
 ]);
-/** Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron, et le réveil qui ne dit rien. */
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil"]);
+/**
+ * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron, le réveil qui ne dit rien,
+ * et le webhook de Whop (sa signature : Whop n’est pas l’appli, sa requête n’a pas notre origine).
+ */
+const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil", "POST /api/paiement/whop"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
@@ -73,17 +79,17 @@ const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
 async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Promise<Response> {
   const [methode, chemin] = auMoins(cle.split(" "), 2);
   const route = (await import(join(process.cwd(), "src/app", chemin, "route.ts"))) as Record<string, (req: Request, ctx: unknown) => Promise<Response>>;
-  const req = new Request(`${APPLI}${chemin.replace("[id]", "1")}`, { method: methode, headers: { "x-forwarded-for": "10.9.8.7", ...entetes } });
-  return route[methode]!(req, { params: Promise.resolve({ id: "1" }) });
+  const req = new Request(`${APPLI}${chemin.replace(/\[\w+\]/, "1")}`, { method: methode, headers: { "x-forwarded-for": "10.9.8.7", ...entetes } });
+  return route[methode]!(req, { params: Promise.resolve({ id: "1", achat: "1" }) });
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 24 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(24);
+  it("la table compte 26 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(26);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 
-  it.each(mutations)("%s refuse (403) une requête venue d’un autre site, ou sans origine", async (cle) => {
+  it.each(mutations.filter((c) => !HORS_GARDE.has(c)))("%s refuse (403) une requête venue d’un autre site, ou sans origine", async (cle) => {
     for (const origine of [{ origin: "http://site-pirate.test", host: "localhost" }, { origin: "null", host: "localhost" }, { host: "localhost" }] as Record<string, string>[]) {
       const r = await appeler(cle, origine);
       expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([403, { erreur: "origine" }]);
@@ -98,6 +104,14 @@ describe("chaque route de la table", () => {
     expect(etat.comptees).toEqual([]);
   });
 
+  it("POST /api/paiement/whop, la seule mutation hors de la garde : d’où qu’elle vienne, sans signature, 401 « interdit » ; ni session lue, ni limite comptée", async () => {
+    for (const origine of [{ origin: "https://api.whop.com", host: "localhost" }, { host: "localhost" }, { origin: APPLI, host: "localhost" }] as Record<string, string>[]) {
+      const r = await appeler("POST /api/paiement/whop", origine);
+      expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([401, { erreur: "interdit" }]);
+    }
+    expect(etat.comptees).toEqual([]);
+  });
+
   it.each([...SANS_COMPTE])("%s, depuis l’appli et sans session : ni 401, ni 403 (sa réponse vient de ce qu’on lui envoie)", async (cle) => {
     const r = await appeler(cle, { origin: APPLI, host: "localhost" });
     expect([401, 403], `${cle} : ${r.status}`).not.toContain(r.status);
@@ -107,7 +121,7 @@ describe("chaque route de la table", () => {
 describe("la garde", () => {
   const post = (entetes: Record<string, string> = { origin: APPLI, host: "localhost", "x-forwarded-for": "2001:db8:1:2:3:4:5:6" }) =>
     new Request(`${APPLI}/api/x`, { method: "POST", headers: entetes });
-  const gratuit: Compte = { id: "c1", email: "Noe.Martin+test@gmail.com", plan: "gratuit" };
+  const gratuit: Compte = { id: "c1", email: "Noe.Martin+test@gmail.com" };
 
   it("une lecture (GET) ne regarde pas l’origine ; une mutation, si", async () => {
     etat.utilisateur = gratuit;
@@ -116,16 +130,16 @@ describe("la garde", () => {
     expect(refus instanceof Response && refus.status).toBe(403);
   });
 
-  it("dans l’ordre : la session (401), le plan (402), la conv (404), puis la limite (429)", async () => {
+  it("dans l’ordre : la session (401), le client (402), la conv (404), puis la limite (429)", async () => {
     const statut = async (o: Parameters<typeof garde>[1]) => {
       const g = await garde(post(), o);
       return g instanceof Response ? [g.status, ((await g.json()) as { erreur: string }).erreur] : "ok";
     };
-    const tout = { session: "requise", plan: "chat", histoire: true, limite: { ip: "verif", limite: LIMITES.verificationParIp } } as const;
+    const tout = { session: "requise", client: true, histoire: true, limite: { ip: "verif", limite: LIMITES.verificationParIp } } as const;
     expect(await statut(tout)).toEqual([401, "connexion"]);
     etat.utilisateur = gratuit;
     expect(await statut(tout)).toEqual([402, "acces"]);
-    etat.utilisateur = { ...gratuit, plan: "blushplus" };
+    etat.client = true;
     expect(await statut(tout)).toEqual([404, "aucune"]);
     etat.story = { id: "s1" };
     expect(await statut(tout)).toEqual("ok");

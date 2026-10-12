@@ -8,7 +8,7 @@ import {
   chiffrer,
   connecterParApi,
   dechiffrer,
-  definirPlan,
+  debloquerLaConv,
   dernierCode,
   derniereHistoire,
   DOMAINE,
@@ -16,7 +16,7 @@ import {
   expect,
   exportWhatsApp,
   histoiresDe,
-  lectureBlushPlus,
+  lectureComplete,
   lectureFaite,
   lireUneConvParApi,
   nouvelInvite,
@@ -83,14 +83,19 @@ async function temperatureDuVerdict(email: string, niveau: "eloigne" | "coince" 
   await sql()`update verdicts set data = ${chiffrer({ ...donnees, sortie: { ...donnees.sortie, niveau } })} where story_id = ${derniereHistoire(email)}`;
 }
 
-/** Un compte payant (`plan`), connecté dans ce navigateur, dont une conv est lue et toute la suite écrite. */
-async function comptePayant(page: Page, testInfo: TestInfo, plan: "rapport" | "blushplus"): Promise<string> {
-  const email = plan === "blushplus" ? await lectureBlushPlus(page, testInfo) : emailLibre(testInfo, "galerie-rapport");
-  if (plan === "rapport") {
-    /* Le plan avant la lecture : le rapport s’écrit d’un trait, comme pour BLUSH+ */
+/**
+ * Un compte dont une conv est lue et toute la suite écrite, connecté dans ce navigateur : « equipe » (un invité, tout
+ * ouvert), ou « rapport » (un compte qui paie, son rapport débloqué après le verdict comme un achat livré).
+ */
+async function comptePayant(page: Page, testInfo: TestInfo, compte: "rapport" | "equipe"): Promise<string> {
+  const email = compte === "equipe" ? await lectureComplete(page, testInfo) : emailLibre(testInfo, "galerie-rapport");
+  if (compte === "rapport") {
     await connecterParApi(page, testInfo, email);
-    await definirPlan(email, "rapport");
     await lireUneConvParApi(page, testInfo);
+    await attendreTaches(email);
+    /* Débloqué : ouvrir le rapport lance la suite, d’un trait */
+    await debloquerLaConv(email);
+    expect((await page.request.get("/api/rapport")).status()).toBe(200);
     await attendreTaches(email);
   }
   await commeLeVraiModele(email);
@@ -131,7 +136,7 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       return { ...sans, histoire };
     }
     case "rapport":
-    case "blushplus": {
+    case "equipe": {
       const email = await comptePayant(page, testInfo, etat.compte);
       return { ...sans, histoire: (await histoiresDe(email)).at(-1)?.id ?? null };
     }
@@ -149,8 +154,8 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       return { ...sans, histoire };
     }
     case "couple": {
-      /* « En couple » à « Qui es-tu ? », BLUSH+, puis le verdict à « Ça coince », comme le vrai modèle l’écrirait */
-      const email = await lectureBlushPlus(page, testInfo, { enCouple: true });
+      /* « En couple » à « Qui es-tu ? », de l’équipe, puis le verdict à « Ça coince », comme le vrai modèle l’écrirait */
+      const email = await lectureComplete(page, testInfo, { enCouple: true });
       await commeLeVraiModele(email);
       await temperatureDuVerdict(email, "coince");
       return { ...sans, histoire: (await histoiresDe(email)).at(-1)?.id ?? null };
@@ -184,8 +189,8 @@ for (const etat of STATES) {
   test(`${etat.id} · ${etat.title}${etat.state ? ` · ${etat.state}` : ""}`, async ({ browser, extraHTTPHeaders }, testInfo) => {
     const ecran = testInfo.project.metadata.ecran as "m" | "d";
     test.skip(!!etat.only && etat.only !== ecran, `seulement en ${etat.only === "m" ? "mobile" : "ordinateur"}`);
-    /* Un compte BLUSH+ et trois convs lues : de la marge sur une machine chargée */
-    if (etat.compte === "plusieurs" || etat.compte === "blushplus" || etat.compte === "rapport" || etat.compte === "couple") test.slow();
+    /* Un compte de l’équipe et trois convs lues : de la marge sur une machine chargée */
+    if (etat.compte === "plusieurs" || etat.compte === "equipe" || etat.compte === "rapport" || etat.compte === "couple") test.slow();
     const { viewport, deviceScaleFactor = 1 } = testInfo.project.use;
     if (!viewport) throw new Error(`le projet ${testInfo.project.name} n’a pas d’écran (playwright.config.ts)`);
     /* `touch` : le mobile est capturé comme un vrai écran tactile (pas de survol, pointeur grossier) */

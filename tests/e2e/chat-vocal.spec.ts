@@ -1,5 +1,5 @@
 import { DUREE_VOCAL_MAX_S, TAILLE_VOCAL_MAX } from "../../src/server/ia/duree-audio";
-import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureBlushPlus, litLeMp3, ouvrir, RESEAU, reponseAuGeste, tesMessagesAuChat, test } from "./aide";
+import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureComplete, litLeMp3, ouvrir, RESEAU, reponseAuGeste, tesMessagesAuChat, test } from "./aide";
 
 /*
  * Le chat en vocal (/app) : BLUSH répond en vocal quand on le lui demande (« parle-moi en vocal », que le modèle factice
@@ -12,7 +12,7 @@ import { chatEnVocal, ecrireABlush, expect, filDuChat, lectureBlushPlus, litLeMp
 const VOCAL_DE_BLUSH = /^Écouter le vocal de BLUSH \(\d+:\d{2}\)$/;
 
 test("« parle-moi en vocal » : BLUSH répond en vocal ; « Repasser à l’écrit » revient aux bulles, et ça tient après un rechargement", async ({ page }, testInfo) => {
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   const fil = filDuChat(page);
   const bandeau = page.getByRole("status").filter({ hasText: "BLUSH te répond en vocal" });
@@ -84,7 +84,7 @@ test("le micro refusé : BLUSH le dit dans la conv, et rien n’est enregistré"
     else Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: refus } });
     if (typeof MediaRecorder === "undefined") Object.assign(window, { MediaRecorder: class {} });
   });
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
   await expect(filDuChat(page).getByText("Je n’ai pas accès à ton micro. Autorise-le dans les réglages de ton navigateur, ou écris-moi.")).toBeVisible();
@@ -96,7 +96,7 @@ test("le micro refusé : BLUSH le dit dans la conv, et rien n’est enregistré"
 test("au micro : un vocal annulé ne part pas ; un vocal envoyé est écouté par BLUSH, qui répond en vocal", async ({ page, browserName }, testInfo) => {
   /* Un micro factice : Chromium seulement (--use-fake-device-for-media-stream, playwright.config.ts) */
   test.skip(browserName !== "chromium", "le micro factice est celui de Chromium");
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   const fil = filDuChat(page);
   const enregistrer = page.getByRole("button", { name: "Enregistrer un vocal" });
@@ -174,7 +174,7 @@ test("le poids d’un vocal : ce qui part au serveur, au débit réel du navigat
       return vrai(entree, init);
     };
   });
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   /* Le WebKit de Linux (la CI) n’a pas d’encodeur audio : un flux n’y donne aucun morceau, et l’enregistrement ne part pas */
   const enregistre = await page.evaluate(async () => {

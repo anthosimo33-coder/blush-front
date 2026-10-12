@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /*
  * La configuration (src/server/env.ts) : les listes d’emails lues une fois par le schéma, l’adresse du site et
  * l’expéditeur par défaut, et les garde-fous de la production (audit S-23) : une variable oubliée lors d’un ménage
- * refuse le service au lieu d’ouvrir la bêta, de donner BLUSH+ à tous ou d’arrêter la purge sans bruit. env() garde ses
+ * refuse le service au lieu d’ouvrir la bêta, de tout offrir à tous ou d’arrêter la purge sans bruit. env() garde ses
  * variables au premier appel : chaque cas recharge le module après avoir posé les siennes. Sans base.
  */
 const charger = async () => {
@@ -24,8 +24,29 @@ const production = () => {
   vi.stubEnv("BLUSH_ACCES_LIBRE", "invite@blush.test");
 };
 
+/** Les quatre variables de Whop : toutes, ou aucune. */
+const WHOP = ["WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID"] as const;
+/** Whop configuré, avec des valeurs fictives (sauf celles de `sauf`). */
+const whop = (...sauf: (typeof WHOP)[number][]) => {
+  const valeurs = { WHOP_API_KEY: "cle_fictive", WHOP_WEBHOOK_SECRET: "ws_fictif", WHOP_ACCOUNT_ID: "biz_fictif", WHOP_PRODUCT_ID: "prod_fictif" };
+  for (const v of WHOP) vi.stubEnv(v, sauf.includes(v) ? undefined : valeurs[v]);
+};
+
 beforeEach(() => {
-  for (const v of ["VERCEL", "VERCEL_ENV", "BLUSH_URL", "BLUSH_EMAIL_FROM", "BLUSH_ACCES_LIBRE", "BLUSH_ADMINS", "BLUSH_BETA_FERMEE", "CRON_SECRET", "BLUSH_BOITE_MAILS"])
+  for (const v of [
+    "VERCEL",
+    "VERCEL_ENV",
+    "BLUSH_URL",
+    "BLUSH_EMAIL_FROM",
+    "BLUSH_ACCES_LIBRE",
+    "BLUSH_ADMINS",
+    "BLUSH_BETA_FERMEE",
+    "CRON_SECRET",
+    "BLUSH_BOITE_MAILS",
+    "BLUSH_PAIEMENT_FACTICE",
+    ...WHOP,
+    "WHOP_BAC_A_SABLE",
+  ])
     vi.stubEnv(v, undefined);
 });
 afterEach(() => {
@@ -44,7 +65,7 @@ describe("les listes d’emails, lues une fois par le schéma", () => {
     expect(peutEntrer("noe@exemple.fr")).toBe(true);
   });
 
-  it("BLUSH_ACCES_LIBRE=* (en dev) : BLUSH+ d’office pour tout le monde, et en bêta fermée tout le monde entre", async () => {
+  it("BLUSH_ACCES_LIBRE=* (en dev) : tout le monde est de l’équipe, et en bêta fermée tout le monde entre", async () => {
     vi.stubEnv("BLUSH_ACCES_LIBRE", " * ");
     vi.stubEnv("BLUSH_BETA_FERMEE", "1");
     const { env, accesLibre, peutEntrer } = await charger();
@@ -123,7 +144,7 @@ describe("les garde-fous de la production", () => {
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/CRON_SECRET manque/);
   });
 
-  it("BLUSH_ACCES_LIBRE=* est refusée : BLUSH+ pour tout le monde, pour toujours", async () => {
+  it("BLUSH_ACCES_LIBRE=* est refusée : tout offert à tout le monde", async () => {
     production();
     vi.stubEnv("BLUSH_ACCES_LIBRE", "*");
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/BLUSH_ACCES_LIBRE=\* est refusée/);
@@ -161,5 +182,39 @@ describe("les garde-fous de la production", () => {
     const { env } = await charger();
     expect(env().BLUSH_IA_FACTICE).toBe(false);
     expect(avertir).toHaveBeenCalledWith(expect.stringContaining(`"variable":"BLUSH_IA_FACTICE"`));
+  });
+
+  it("Whop à moitié configuré : refusé (les quatre variables, ou aucune) ; le bac à sable aussi", async () => {
+    production();
+    whop("WHOP_WEBHOOK_SECRET", "WHOP_PRODUCT_ID");
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/Whop à moitié configuré : WHOP_WEBHOOK_SECRET, WHOP_PRODUCT_ID manque/);
+    whop();
+    expect((await charger()).paiementWhop()).toEqual({ cle: "cle_fictive", secret: "ws_fictif", compte: "biz_fictif", produit: "prod_fictif", bacASable: false });
+    vi.stubEnv("WHOP_BAC_A_SABLE", "1");
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/WHOP_BAC_A_SABLE=1 est refusée/);
+    /* Sans aucune : le paiement n’est pas branché (« bientot »), la production tourne */
+    vi.stubEnv("WHOP_BAC_A_SABLE", undefined);
+    whop(...WHOP);
+    expect((await charger()).paiementWhop()).toBeNull();
+  });
+
+  it("le faux Whop sur Vercel : refusé, en ligne comme en préversion", async () => {
+    production();
+    vi.stubEnv("BLUSH_PAIEMENT_FACTICE", "1");
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/BLUSH_PAIEMENT_FACTICE est refusée sur Vercel/);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/BLUSH_PAIEMENT_FACTICE est refusée sur Vercel/);
+  });
+
+  it("hors de la production : Whop à moitié configuré compte pour rien, le faux Whop s’allume ; les identifiants de Whop sont vérifiés", async () => {
+    whop("WHOP_API_KEY");
+    let m = await charger();
+    expect([m.paiementWhop(), m.paiementFactice()]).toEqual([null, false]);
+    vi.stubEnv("BLUSH_PAIEMENT_FACTICE", "1");
+    expect((await charger()).paiementFactice()).toBe(true);
+    whop();
+    vi.stubEnv("WHOP_ACCOUNT_ID", "pas_un_compte");
+    m = await charger();
+    expect(() => m.env()).toThrow("WHOP_ACCOUNT_ID");
   });
 });

@@ -13,7 +13,7 @@ import type { Story } from "@/types";
  */
 vi.mock("@/lib/sound", () => ({ play: vi.fn() }));
 vi.mock("@/components/shell/Reveil", () => ({ reveiller: vi.fn() }));
-vi.mock("@/lib/requetes", () => ({ useCompte: () => ({ data: { email: "test@example.com", subscription: { plan: "rapport" } } }) }));
+vi.mock("@/lib/requetes", () => ({ useCompte: () => ({ data: { email: "test@example.com", bulles: 10, client: true, equipe: false } }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }), usePathname: () => "/rapport/question" }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
 /* Les polices de Next ne se chargent pas hors de Next */

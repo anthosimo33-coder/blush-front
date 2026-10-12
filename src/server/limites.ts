@@ -156,6 +156,13 @@ export const LIMITES = {
   lotsParCompte: { max: 300, fenetreS: 86400 },
   /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
   ficheParCompte: { max: 60, fenetreS: 86400 },
+  /**
+   * Les paiements commencés par un compte (POST /api/paiement), par heure : chacun écrit un achat et crée une
+   * configuration de paiement chez Whop (600 appels par minute au plus, pour tout BLUSH).
+   */
+  commandeParCompte: { max: 20, fenetreS: 3600 },
+  /** Les vérifications d’un paiement chez Whop, par achat (la page du retour, quand le webhook tarde) : elle repasse chaque seconde. */
+  verificationParAchat: { max: 20, fenetreS: 600 },
 } as const;
 
 /**

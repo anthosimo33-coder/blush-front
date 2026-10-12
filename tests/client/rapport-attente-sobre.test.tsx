@@ -31,7 +31,7 @@ const SOBRE: SoberReport = {
 };
 
 /** Le rapport d’une alerte, le rapport doux pas encore écrit (sauf ce que `p` change). */
-const alerte = (p: Partial<ReportPayload> = {}): ReportPayload => ({ report, sober: null, alerte: true, access: "gratuit", generating: true, ...p });
+const alerte = (p: Partial<ReportPayload> = {}): ReportPayload => ({ report, sober: null, alerte: true, debloque: false, generating: true, ...p });
 const ecran = (initial: ReportPayload) => <ReportScreen initial={initial} story={story} openPaywall={false} fixed />;
 
 describe("ReportScreen : une alerte de danger", () => {

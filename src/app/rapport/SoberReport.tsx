@@ -2,14 +2,8 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { setPaused } from "@/services/api";
-import { invalidate } from "@/lib/query";
-import { tracer } from "@/lib/tracer";
-import { PAUSE_RATEE } from "@/contenu/offres";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
-import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
@@ -135,29 +129,13 @@ export function AttenteSobre({ echec }: { echec?: ReactNode }) {
 
 /** `vocal` : le vocal doux de BLUSH, au-dessus de la nouvelle (src/app/rapport/Vocal.tsx). */
 export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNode }) {
-  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [help, setHelp] = useState(false);
-  const [pauseRatee, setPauseRatee] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     titleRef.current?.focus();
   }, [step]);
-
-  /* La pause enregistrée, Mon compte la montre ; ratée (réseau), on reste ici et on le dit : le geste se refait */
-  const mettreEnPause = async () => {
-    setPauseRatee(false);
-    try {
-      await setPaused(true);
-    } catch (e) {
-      tracer("sobre:pause", e);
-      setPauseRatee(true);
-      return;
-    }
-    invalidate("account");
-    router.push("/compte");
-  };
 
   /* L’étape 2 revient à la 1 ; sinon la page d’avant, ou l’accueil quand on arrive d’ailleurs (le lien du mail) */
   const retourSinon = useRetourSinon("/app", { scroll: false });
@@ -209,8 +187,6 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               </div>
               <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
                 <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
-                <SoberLink onClick={() => void mettreEnPause()}>Mettre mon abonnement en pause</SoberLink>
-                {pauseRatee && <Alert className="text-center">{PAUSE_RATEE}</Alert>}
               </div>
             </>
           )}

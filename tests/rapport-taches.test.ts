@@ -17,7 +17,7 @@ import { ouvrirLeRapport, rapportDe } from "@/server/donnees";
 import { histoireOuverte } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { etatDesTaches } from "@/server/taches";
-import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const lues = vi.mocked(etatDesTaches);
 const { etatDesTaches: vraiEtatDesTaches } = await vi.importActual<typeof import("@/server/taches")>("@/server/taches");
@@ -39,9 +39,9 @@ describe("le rapport pendant son écriture", () => {
     expect((await rapportDe((await histoireOuverte(u, { affichee: imp.id }))!, u))?.generating).toBe(false);
     expect(lues).not.toHaveBeenCalled();
 
-    /* L’accès arrive. Lu seul (rapportDe), le rapport ne lance rien : une lecture ne planifie pas de tâche payante */
-    const plus = { ...u, plan: "blushplus" as const };
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
+    /* Le rapport se débloque. Lu seul (rapportDe), il ne lance rien : une lecture ne planifie pas de tâche payante */
+    const plus = u;
+    await debloquerLaConv(imp.id);
     const ligne = (await histoireOuverte(plus, { affichee: imp.id }))!;
     const lances = apres.length;
     expect(await rapportDe(ligne, plus)).not.toBeNull();
@@ -110,9 +110,9 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
     expect(lu.report.chapters.slice(1).every((c) => c.locked && !c.blocks.length)).toBe(true);
     expect(JSON.stringify(lu)).not.toContain("Caché");
 
-    /* L’accès arrive : ouvrir le rapport lance la mémoire (la réparation), toujours sans chapitre */
-    const plus = { ...u, plan: "blushplus" as const };
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
+    /* Le rapport se débloque : l’ouvrir lance la mémoire (la réparation), toujours sans chapitre */
+    const plus = u;
+    await debloquerLaConv(imp.id);
     const avecAcces = (await ouvrirLeRapport((await histoireOuverte(plus, { affichee: imp.id }))!, plus))!;
     expect(await tachesDe(imp.id, "memoire")).toEqual([{ status: "attente", error: null }]);
     expect(JSON.stringify(avecAcces)).not.toContain("Caché");
@@ -120,7 +120,7 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
   });
 
   it("avec l’accès : la mémoire suit le rapport doux, dans la chaîne", async () => {
-    const u = await compteDeTest("sobre-plus", "blushplus");
+    const u = await compteDeTest("sobre-plus", "debloque");
     const imp = await avecFactice(sobreAvecChapitres, () => histoireLue(u, "06-elle-hesite.txt"));
     expect(await tachesDe(imp.id, "rapport_plan")).toEqual([{ status: "fini", error: null }]);
     expect(await tachesDe(imp.id, "memoire")).toEqual([{ status: "fini", error: null }]);
@@ -130,7 +130,7 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
 
 describe("la mémoire, qui efface la conv", () => {
   it("est finie même si sa suite ne peut pas être planifiée : rejouée, elle ne trouverait plus la conv", async () => {
-    const u = await compteDeTest("memoire-suite", "blushplus");
+    const u = await compteDeTest("memoire-suite", "debloque");
     let memoireEcrite = false;
     let coupures = 0;
     /* Juste après l’appel de la mémoire, la première lecture de l’état (celle de la suite) tombe : une coupure passagère */

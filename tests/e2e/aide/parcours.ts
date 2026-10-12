@@ -10,7 +10,7 @@ import { choisirFichier, pagePrete, RESEAU, reponseAuGeste } from "./page";
 /*
  * Les gestes du parcours, par l’interface, comme quelqu’un qui découvre BLUSH : importer sa conv, répondre à « Qui
  * es-tu ? », recevoir son code. Le parcours lui-même est figé par parcours-temoin.spec.ts et les import*.spec.ts ;
- * ailleurs, un compte et sa conv lue se préparent par les routes /api (lectureFaite, lectureBlushPlus).
+ * ailleurs, un compte et sa conv lue se préparent par les routes /api (lectureFaite, lectureComplete).
  */
 
 /** Depuis /commencer : la tuile WhatsApp mène à l’écran de l’export. */
@@ -163,18 +163,19 @@ export async function jusquAuCode(page: Page, fichier: Fichier, email: string): 
 }
 
 /**
- * Un compte BLUSH+ (un invité, nouvelInvite) dont une conv est lue et toute la suite écrite, sans échec : le rapport,
+ * Un compte de l’équipe (un invité, nouvelInvite : tous ses rapports ouverts, bulles illimitées) dont une conv est lue
+ * et toute la suite écrite, sans échec : le rapport,
  * le vocal, puis la mémoire (sa fiche, les questions toutes prêtes) ; le chat répond dès qu’on lui écrit. Préparé par
  * les routes /api (lectureFaite) : connecté dans ce navigateur, la conv de Noé et Maëlys (par défaut) ouverte. À appeler
  * au début du test, avant tout autre geste avec cet invité. Renvoie l’email du compte.
  */
-export async function lectureBlushPlus(page: Page, testInfo: TestInfo, lecture: Lecture = {}): Promise<string> {
+export async function lectureComplete(page: Page, testInfo: TestInfo, lecture: Lecture = {}): Promise<string> {
   const email = await nouvelInvite(testInfo);
   await lectureFaite(page, testInfo, email, lecture);
   const taches = await attendreTaches(email);
   expect(
     taches.map((t) => t.genre),
-    "toute la chaîne de BLUSH+",
+    "toute la chaîne d’un rapport ouvert",
   ).toEqual(expect.arrayContaining(["verdict", "rapport_plan", "rapport_chapitres", "vocal", "memoire"]));
   return email;
 }

@@ -2,16 +2,15 @@ import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { cache } from "react";
-import { SUBSCRIPTIONS } from "@/contenu/offres";
-import { peut } from "@/lib/acces";
 import { pronomOppose } from "@/lib/pronom";
 import type { Account, ReportPayload } from "@/types/api";
-import type { AnalysisProgress, ConvSummary, Fiche, Plan } from "@/types";
+import type { AnalysisProgress, ConvSummary, Fiche } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
+import { compteAffiche, rapportOuvert } from "./droits";
 import { echecDe } from "./erreurs";
 import { ficheAffichee } from "./ecrans/fiche";
 import { verdictAffiche } from "./ecrans/rapport";
@@ -164,8 +163,7 @@ type RapportAffiche = ReportPayload & { generating: boolean };
  * lu une fois pour tout, et le vocal.
  */
 async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Utilisateur | null): Promise<{ lu: RapportLu; etat: EtatChaine | null } | null> {
-  const access: Plan = utilisateur?.plan ?? "gratuit";
-  const aLeRapport = peut(access, "rapport");
+  const aLeRapport = rapportOuvert(story, utilisateur);
   const [verdict, r, tachesLues, vocalLuAvant] = await Promise.all([
     donneesVerdict(story.id),
     ligneRapport(story.id),
@@ -174,7 +172,7 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
   ]);
   if (!verdict) return null;
   const donnees = r?.data ? coffre.lire("reports.data", r.data) : null;
-  const { ouvert } = ouvertureDu(access, verdict.sortie);
+  const { ouvert } = ouvertureDu(aLeRapport, verdict.sortie);
   /* Un rapport sobre offert, sans l’accès : ce qui n’a pas été lu d’avance */
   const [taches, vocal] = ouvert && !tachesLues ? await Promise.all([etatDesTaches(story.id, [...GENRES_CHAINE]), vocalLu(story.id)]) : [tachesLues ?? {}, vocalLuAvant];
   /* Le plan et les chapitres finis ne sont lus (et déchiffrés) qu’avec l’accès, pendant l’écriture ; assemblerRapport les ignore sans lui */
@@ -182,7 +180,7 @@ async function lireLeRapport(story: LigneEcran | LigneComplete, utilisateur: Uti
   const lu: RapportLu = {
     storyId: story.id,
     autre: personnesDe(metaDe(story)).autre.prenom,
-    access,
+    debloque: aLeRapport,
     verdict,
     donnees,
     plan: enEcriture && r?.plan ? coffre.lire("reports.plan", r.plan) : null,
@@ -220,9 +218,8 @@ export async function ouvrirLeRapport(story: LigneEcran | LigneComplete, utilisa
   return assemblerRapport({ ...lu, taches: await etatDesTaches(story.id, [...GENRES_CHAINE]), maintenant: Date.now() });
 }
 
-export function compteDe(utilisateur: Utilisateur, story: Ligne | null): Account {
-  return { email: utilisateur.email, subscription: { ...SUBSCRIPTIONS[utilisateur.plan], paused: utilisateur.paused }, storyDeleted: !story };
-}
+/** Le compte tel que l’écran le lit : son email, ses bulles, ses droits (compteAffiche, src/server/droits.ts). */
+export const compteDe = (utilisateur: Utilisateur, story: Ligne | null): Promise<Account> => compteAffiche(utilisateur, { storyDeleted: !story });
 
 /**
  * La mémoire de l’histoire (après le rapport), ou null. Mémorisée le temps d’un rendu : l’accueil la lit pour la fiche

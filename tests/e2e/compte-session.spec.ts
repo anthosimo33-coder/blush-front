@@ -64,12 +64,12 @@ test("sans session, Mon compte et les pages d’une conv mènent à la connexion
     await expect(page).toHaveURL(/\/compte$/);
     await expect(page.getByRole("main").getByText(email)).toBeVisible();
     /* Le compte est né au premier bon code */
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 });
 
 test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrouver ma conv », qui mènent à son accueil", async ({ page }, testInfo) => {
-  /* BLUSH+ (un invité) : l’accueil s’ouvre sans le paiement */
+  /* Un invité (de l’équipe) : l’accueil s’ouvre sans le paiement */
   const email = await nouvelInvite(testInfo);
   await connecterParApi(page, testInfo, email);
   const entete = page.getByRole("banner");
@@ -241,6 +241,6 @@ test("le code ne vaut que dans le navigateur qui l’a demandé : tapé sur un a
   await test.step("dans le navigateur qui l’a demandé : il ouvre la session", async () => {
     await saisirLeCodeRecu(page, email, depuis);
     await expect(page).toHaveURL(/\/commencer$/);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 });

@@ -1,14 +1,13 @@
 import type { Page, TestInfo } from "@playwright/test";
 import {
   attendreTaches,
-  definirPlan,
+  debloquerLaConv,
   emailLibre,
   expect,
-  lectureBlushPlus,
+  lectureComplete,
   lectureFaite,
   messagesDuChat,
   origine,
-  ouvrir,
   ouvrirLeRapport,
   PAIEMENT,
   RESEAU,
@@ -26,8 +25,8 @@ const IDEES = ["pourquoi elle vanne ?", "je relance trop ?", "samedi je fais quo
 /* Une question inventée, comme un utilisateur l’écrirait */
 const QUESTION = "elle m’a dit on verra pour dimanche, ça veut dire non ?";
 
-test("BLUSH+ : ta question, une idée tirée du rapport, puis la réponse de BLUSH, gardée dans le chat", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+test("un compte de l’équipe : ta question, une idée tirée du rapport, puis la réponse de BLUSH, gardée dans le chat", async ({ page }, testInfo) => {
+  await lectureComplete(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
   const conv = page.getByRole("log", { name: "Ta conversation avec BLUSH" });
   const champ = page.getByRole("textbox", { name: "Ta question à BLUSH" });
@@ -81,21 +80,21 @@ test("BLUSH+ : ta question, une idée tirée du rapport, puis la réponse de BLU
 });
 
 /**
- * Un compte « rapport » (le rapport complet acheté une fois, donné par `npm run acces -- <email> rapport`) dont la conv
- * est lue : l’accès arrive après le verdict, le rapport s’écrit à la première ouverture.
+ * Un compte qui paie (pas de l’équipe) dont la conv est lue, puis son rapport débloqué, comme un achat livré : le rapport
+ * s’écrit à la première ouverture.
  */
-async function compteRapport(page: Page, testInfo: TestInfo): Promise<string> {
-  const email = emailLibre(testInfo, "question-rapport");
+async function compteDebloque(page: Page, testInfo: TestInfo): Promise<string> {
+  const email = emailLibre(testInfo, "question-debloque");
   await lectureFaite(page, testInfo, email);
-  await definirPlan(email, "rapport");
-  /* Ouvrir le rapport lance son écriture (l’accès donné après le verdict) */
+  await debloquerLaConv(email);
+  /* Ouvrir le rapport lance son écriture (débloqué après le verdict) */
   await ouvrirLeRapport(page);
   await attendreTaches(email);
   return email;
 }
 
-test("compte « rapport » : le rapport complet, une question incluse, mais pas le chat (réservé à BLUSH+)", async ({ page }, testInfo) => {
-  await compteRapport(page, testInfo);
+test("un rapport débloqué (un achat) : le rapport complet, « Ta question » et le chat à portée", async ({ page }, testInfo) => {
+  await compteDebloque(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
 
   await test.step("les huit chapitres sont ouverts, et l’en-tête dit « Complet »", async () => {
@@ -106,67 +105,43 @@ test("compte « rapport » : le rapport complet, une question incluse, mais pas 
     await expect(rapport.getByRole("button", { name: "Lire la suite" })).toHaveCount(0);
   });
 
-  await test.step("une question incluse avec le rapport ; le bouton du chat, mais pas sa bulle", async () => {
-    await expect(rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ })).toContainText("Une question incluse avec ton rapport");
-    /* Le bouton du bas seulement : la bulle du chat (en bas à droite) est celle de BLUSH+ */
-    await expect(page.getByRole("link", { name: "Parler à BLUSH" })).toHaveCount(1);
+  await test.step("« Ta question », sans question incluse ; le chat, par son bouton et par sa bulle", async () => {
+    await expect(rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ })).toBeVisible();
+    await expect(page.getByText("Une question incluse avec ton rapport")).toHaveCount(0);
+    await expect(rapport.getByRole("link", { name: "Parler à BLUSH" }).first()).toHaveAttribute("href", "/app?depuis=rapport");
+    /* La bulle du chat (en bas à droite) : celle d’un rapport débloqué */
+    await expect(page.locator("a[aria-label='Parler à BLUSH']")).toHaveCount(1);
   });
 
-  await test.step("« Parler à BLUSH » ouvre le chat sous le paiement de BLUSH+, sa seule offre (le rapport est déjà à lui)", async () => {
-    await page.getByRole("link", { name: "Parler à BLUSH" }).click();
+  await test.step("« Parler à BLUSH » ouvre le chat, sans paiement", async () => {
+    await rapport.getByRole("link", { name: "Parler à BLUSH" }).first().click();
     await expect(page).toHaveURL(/\/app\?depuis=rapport$/);
-    const paiement = page.getByRole("dialog", { name: "BLUSH+", exact: true });
-    await expect(paiement).toBeVisible();
-    await expect(paiement.getByRole("radio")).toHaveCount(1);
-    await expect(paiement.getByRole("radio", { name: /^BLUSH\+ · / })).toBeChecked();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toHaveCount(0);
   });
 });
 
 /*
- * Le plan « rapport » a une question incluse par conv, sans le chat : l’écran la marque (`question`), le serveur la
- * laisse partir une fois (src/server/question-incluse.ts). Le modèle factice répond comme pour BLUSH+.
+ * « Ta question » est une réponse du chat comme une autre (plus de question incluse) : chacune reçoit sa réponse, et
+ * l’échange est gardé dans le chat. Le débit des bulles arrive avec le lot du chat.
  */
-test("compte « rapport » : la question incluse avec le rapport reçoit sa réponse", async ({ page }, testInfo) => {
-  const email = await compteRapport(page, testInfo);
+test("un rapport débloqué : ta question reçoit sa réponse, et la suivante aussi", async ({ page }, testInfo) => {
+  const email = await compteDebloque(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ }).click();
   await expect(page).toHaveURL(/\/rapport\/question$/);
-  await expect(page.getByText("1 question incluse")).toBeVisible();
+  await expect(page.getByText("1 question incluse")).toHaveCount(0);
   await page.getByRole("textbox", { name: "Ta question à BLUSH" }).fill(QUESTION);
   expect((await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Poser ma question" }).click())).status()).toBe(200);
   const conv = page.getByRole("log", { name: "Ta conversation avec BLUSH" });
   await expect(conv.getByText("elle te cherche 👀")).toBeVisible();
   await expect(conv.getByText("tu lui as répondu quoi ?")).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
-  /* La suite, c’est le chat de BLUSH+ ; l’échange y est gardé, à la suite */
-  await expect(page.getByRole("link", { name: "Toutes tes questions, avec BLUSH+" })).toBeVisible();
-  expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
-});
-
-test("compte « rapport » : la question incluse déjà posée, la suivante est refusée et ouvre le paiement de BLUSH+, sa seule offre", async ({ page }, testInfo) => {
-  const email = await compteRapport(page, testInfo);
-  /* La question incluse, posée par la route comme le fait l’écran : marquée `question` */
-  const premiere = await page.request.post("/api/chat", { headers: origine(testInfo), data: { texte: QUESTION, question: true }, timeout: RESEAU });
-  expect(premiere.status()).toBe(200);
-
-  await ouvrir(page, "/rapport/question");
-  await expect(page.getByText("1 question incluse")).toBeVisible();
-  await page.getByRole("textbox", { name: "Ta question à BLUSH" }).fill("et samedi, je fais quoi ?");
-  const refus = await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Poser ma question" }).click());
-  expect([refus.status(), await refus.json()]).toEqual([402, { erreur: "acces" }]);
-
-  const paiement = page.getByRole("dialog", { name: "BLUSH+", exact: true });
-  await expect(paiement).toBeVisible();
-  await expect(paiement.getByRole("radio")).toHaveCount(1);
-  await expect(paiement.getByRole("radio", { name: /^BLUSH\+ · / })).toBeChecked();
-  await expect(page.getByRole("dialog", { name: PAIEMENT })).toHaveCount(0);
-  await expect(page.getByText("1 question incluse")).toHaveCount(0);
-  /* Rien n’est parti au modèle : la conv avec BLUSH n’a que la question incluse */
+  /* La suite, c’est le chat ; l’échange y est gardé, à la suite */
+  await expect(page.getByRole("link", { name: "Continuer dans ton chat avec BLUSH" })).toBeVisible();
   expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
 
-  await test.step("fermer le paiement ramène au rapport", async () => {
-    await page.keyboard.press("Escape");
-    await expect(page).toHaveURL(/\/rapport$/);
-  });
+  /* Une deuxième question, posée par la route comme le fait l’écran (marquée `question`) : elle part aussi */
+  const seconde = await page.request.post("/api/chat", { headers: origine(testInfo), data: { texte: "et samedi, je fais quoi ?", question: true }, timeout: RESEAU });
+  expect(seconde.status()).toBe(200);
+  expect(await messagesDuChat(email)).toEqual(["toi", "blush", "toi", "blush"]);
 });

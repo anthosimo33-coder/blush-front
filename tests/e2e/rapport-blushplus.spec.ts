@@ -7,7 +7,7 @@ import {
   expect,
   filDuChat,
   histoiresDe,
-  lectureBlushPlus,
+  lectureComplete,
   litLeMp3,
   mailsPour,
   ouvrirLeRapport,
@@ -19,15 +19,15 @@ import {
 } from "./aide";
 
 /*
- * Le rapport d’un compte BLUSH+ (un invité de la bêta, BLUSH_ACCES_LIBRE) : les huit chapitres écrits par le modèle
+ * Le rapport d’un compte de l’équipe (un invité de la bêta, BLUSH_ACCES_LIBRE : tout ouvert) : les huit chapitres écrits par le modèle
  * factice (« Chapitre N », « Assieds-toi. », « Le soir où tout a basculé. », « Et voilà. »), le mail « ton rapport est
  * prêt », le vocal de BLUSH, et la reprise de la lecture.
  */
 
 const SUJET_PRET = "📖 Ton rapport BLUSH est prêt";
 
-test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à portée, et le mail « prêt » mène au rapport", async ({ page, autreAppareil }, testInfo) => {
-  const email = await lectureBlushPlus(page, testInfo);
+test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question sont à portée, et le mail « prêt » mène au rapport", async ({ page, autreAppareil }, testInfo) => {
+  const email = await lectureComplete(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
 
   await test.step("l’en-tête dit que le rapport est complet, et le vocal de BLUSH l’ouvre", async () => {
@@ -106,8 +106,8 @@ test("BLUSH+ : les huit chapitres se lisent, le chat et ta question sont à port
   });
 });
 
-test("BLUSH+ : le vocal de BLUSH s’écoute en grand, avec ses sous-titres ; l’écoute est notée, et un son qui ne vient pas est dit", async ({ page }, testInfo) => {
-  const email = await lectureBlushPlus(page, testInfo);
+test("un rapport ouvert : le vocal de BLUSH s’écoute en grand, avec ses sous-titres ; l’écoute est notée, et un son qui ne vient pas est dit", async ({ page }, testInfo) => {
+  const email = await lectureComplete(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
   const histoire = (await histoiresDe(email))[0]!;
   const audio = `/api/vocal/audio?conv=${histoire.id}`;
@@ -157,8 +157,8 @@ test("BLUSH+ : le vocal de BLUSH s’écoute en grand, avec ses sous-titres ; l�
   });
 });
 
-test("BLUSH+ : « Reprendre ta lecture » propose de revenir au chapitre où tu t’étais arrêté, sans y sauter tout seul", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+test("un rapport ouvert : « Reprendre ta lecture » propose de revenir au chapitre où tu t’étais arrêté, sans y sauter tout seul", async ({ page }, testInfo) => {
+  await lectureComplete(page, testInfo);
   /* Jusqu’où chaque page a défilé depuis son chargement : un saut tout seul se verrait, même parti puis revenu */
   const defilement = await suivreLeDefilement(page);
   const rapport = await ouvrirLeRapport(page);

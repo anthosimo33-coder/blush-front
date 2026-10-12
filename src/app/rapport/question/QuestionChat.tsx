@@ -9,8 +9,6 @@ import { gardeLeFocus } from "@/lib/hooks";
 import { formatCount, NBSP } from "@/lib/format";
 import { QUESTION_MAX } from "@/lib/limites";
 import { moiEtAutre } from "@/lib/participants";
-import { peut } from "@/lib/acces";
-import { codeDe } from "@/lib/messages-erreur";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { noterEcriture } from "@/lib/query";
 import { play } from "@/lib/sound";
@@ -21,33 +19,27 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, GroupeBulles } from "@/components/ui/messages";
-import { AppScreen, useAccess } from "@/components/shell/AppScreen";
+import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
 
 /*
  * Écran 12 — Ta question, en conversation avec BLUSH.
  * BLUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
- * la question incluse ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
+ * la question ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
-export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
+export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[]; story: Story; ferme?: boolean }) {
   /*
    * La réponse de la visite. Pas de question déjà posée à relire : elle passe par le chat (son historique est sur
    * l’accueil). Le champ et les idées sont là dès le premier affichage ; au retour sur l’écran, la question est à poser.
    */
   const [answer, setAnswer] = useState<QuestionAnswer | null>(null);
-  const { plan } = useAccess();
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
   /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
   const [souci, setSouci] = useState<string | null>(null);
-  /*
-   * Le serveur refuse la question (402 « acces ») : celle incluse avec le rapport est déjà posée. La suite, c’est le chat :
-   * l’écran le demande alors, et le paiement s’ouvre par-dessus, avec BLUSH+ seulement (AppScreen, offreAProposer)
-   */
-  const [dejaPosee, setDejaPosee] = useState(false);
   const first = useRef(true);
   const conv = useRef<HTMLDivElement>(null);
   const avant = useRef<Map<string, number> | null>(null);
@@ -92,7 +84,6 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       setAsking(null);
       setDraft(q);
       setSouci(souciQuestion(e));
-      if (codeDe(e) === "acces") setDejaPosee(true);
       play("non");
       return;
     } finally {
@@ -153,7 +144,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
     </form>
   );
 
-  /* Après la réponse : le rapport ; et pour aller plus loin, le chat (BLUSH+) */
+  /* Après la réponse : le rapport ; et pour aller plus loin, le chat */
   const after = (
     <div data-rise="" className="flex flex-col items-center gap-1">
       <ButtonLink href="/rapport" arrow>
@@ -161,14 +152,15 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       </ButtonLink>
       {/* Sans remise en haut : l’accueil s’ouvre sur le dernier échange */}
       <Link href="/app" scroll={false} className="relative inline-flex min-h-11 items-center px-1 text-detail font-black text-soft no-underline transition-colors hover:text-ink">
-        {peut(plan, "chat") ? "Continuer dans ton chat avec BLUSH" : "Toutes tes questions, avec BLUSH+"}
+        Continuer dans ton chat avec BLUSH
       </Link>
     </div>
   );
 
   return (
     <AppScreen
-      besoin={dejaPosee ? "chat" : "question"}
+      /* Le rapport de cette conv pas encore débloqué : « Ta question » vient avec lui, le paiement s’ouvre par-dessus */
+      ferme={ferme}
       autre={moiEtAutre(story).autre.name}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
@@ -188,11 +180,6 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
             <BubbleLogo size={72} animated={asking !== null} />
           </span>
         </span>
-        {plan === "rapport" && !dejaPosee && (
-          <span className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-legende font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_6px_14px_-8px_rgba(17,17,20,0.3)]">
-            <Icon name="bolt" size={13} color="#2F7BFF" stroke={2.6} />1 question incluse
-          </span>
-        )}
       </div>
 
       {/* La conv, posée en bas, près du champ */}

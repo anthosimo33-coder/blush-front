@@ -74,8 +74,8 @@ afterEach(effacerLesDepenses);
 
 let numero = 0;
 /** Un compte neuf et une conv à lui, prête à être lue. */
-async function compteEtConv(plan: Utilisateur["plan"] = "gratuit"): Promise<{ u: Utilisateur; id: string; payeur: string }> {
-  const u = await compteDeTest(`budget-${++numero}`, plan);
+async function compteEtConv(acces: "gratuit" | "debloque" = "gratuit"): Promise<{ u: Utilisateur; id: string; payeur: string }> {
+  const u = await compteDeTest(`budget-${++numero}`, acces);
   const { id } = await convPrete(u, "02-reciproque.txt");
   return { u, id, payeur: payeurDuCompte(u) };
 }
@@ -215,7 +215,7 @@ describe("deux lectures arrêtées le même jour", () => {
 
 describe("des mises à jour de la mémoire arrêtées par le budget", () => {
   it("repartent toutes le lendemain, dans l’ordre, même après une nouvelle planifiée avant la reprise", async () => {
-    const u = await compteDeTest(`budget-${++numero}`, "blushplus");
+    const u = await compteDeTest(`budget-${++numero}`, "debloque");
     const payeur = payeurDuCompte(u);
     const { id } = await histoireLue(u, "02-reciproque.txt");
     expect((await etatDesTaches(id, ["memoire"])).memoire?.status).toBe("fini");

@@ -12,7 +12,7 @@ describe("le rapport pendant son écriture", () => {
   let u: Utilisateur;
   let id = "";
   beforeAll(async () => {
-    u = await compteDeTest("ecriture", "blushplus");
+    u = await compteDeTest("ecriture", "debloque");
     id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   });
   /** L’histoire remise au milieu de l’écriture : le plan fait, les deux moitiés en cours, ni rapport écrit ni chapitre prêt en avance. */
@@ -70,7 +70,7 @@ describe("le rapport pendant son écriture", () => {
 
 describe("un refus du modèle", () => {
   it("n’est essayé qu’une fois, et la lecture dit pourquoi", async () => {
-    const u = await compteDeTest("refus", "blushplus");
+    const u = await compteDeTest("refus", "debloque");
     const refus = (req: Requete) => (req.tache === "04-verdict" ? REFUS_FACTICE : fournisseurFactice(req));
     const imp = await avecFactice(refus, () => histoireLue(u, "02-reciproque.txt", { qui: { devinette: "parle", objectif: "comprendre" } }));
     const t = (

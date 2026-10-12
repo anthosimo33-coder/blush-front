@@ -25,7 +25,7 @@ test("un mauvais code est refusé sans créer de compte, le bon lance la lecture
   await test.step("le bon code : le compte naît, la lecture se fait", async () => {
     expect(await saisirCode(page, code)).toBe(true);
     await attendreLecture(page);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
   await test.step("revenu sur l’écran du code, le même code ne marche plus", async () => {
@@ -58,7 +58,7 @@ test("un code expiré est refusé : « Changer d’email » en redemande un, qui
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     expect(await saisirCode(page, await dernierCode(email, { depuis: encore }))).toBe(true);
     await expect(page).toHaveURL(/\/lecture$/);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect(mailsPour(email)).toHaveLength(2);
   });
 });
@@ -82,6 +82,6 @@ test("cinq mauvais codes : même le bon est refusé ensuite, un nouveau code rep
     await expect(page.getByRole("heading", { level: 1, name: "Entre ton code." })).toBeVisible();
     expect(await saisirCode(page, await dernierCode(email, { depuis: encore }))).toBe(true);
     await expect(page).toHaveURL(/\/lecture$/);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 });

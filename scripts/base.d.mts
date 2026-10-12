@@ -21,3 +21,12 @@ export function urlVerifiee(url: string): string;
  * `created_at` de la table drizzle.__drizzle_migrations.
  */
 export function migrationsSautees<E extends { when: number }>(entrees: readonly E[], appliquees: readonly number[]): E[];
+
+/** Les bulles données aux testeurs de la bêta (BULLES_DE_LA_BETA de src/contenu/offres.ts, recopié). */
+export const BULLES_DE_LA_BETA: number;
+
+/** Le rattrapage des testeurs de la bêta, en une requête qui se rejoue sans effet : ce qu’il a servi (testeurs, convs). */
+export const RATTRAPAGE_BETA: string;
+
+/** Passe les rattrapages sur une base déjà migrée (`client` : postgres.js), et dit ce qu’ils ont fait. */
+export function rattraper(client: { unsafe: (requete: string) => PromiseLike<readonly unknown[]> }): Promise<{ testeurs: number; convs: number }>;

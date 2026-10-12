@@ -55,9 +55,8 @@ describe("« Retrouver ma conv » sur la landing", () => {
 });
 
 describe("« Mon compte », dès le rendu serveur", () => {
-  it("le compte connecté, avec son abonnement", async () => {
+  it("le compte connecté, avec ses bulles et ses droits", async () => {
     const compte = await getCompte();
-    expect(compte?.email).toBe(u.email);
-    expect(compte?.subscription.plan).toBe("gratuit");
+    expect(compte).toMatchObject({ email: u.email, bulles: 0, client: false, equipe: false });
   });
 });

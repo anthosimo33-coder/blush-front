@@ -21,9 +21,35 @@ export type ExportApp = (typeof EXPORTS)[number];
 type ImportMode = "export" | "captures";
 export type Confidence = "sur" | "probable" | "verifier";
 type Side = "toi" | "elle" | "pareil";
-/** Ce que le compte a (users.plan) : l’offre achetée en donne un (src/contenu/offres.ts). Du moins au plus : src/lib/acces.ts lit cet ordre. */
-export const PLANS = ["gratuit", "rapport", "blushplus"] as const;
-export type Plan = (typeof PLANS)[number];
+/**
+ * Les offres du catalogue (src/contenu/offres.ts) : ce qu’on achète, une fois (achats.offre). Le rapport d’une conv seul
+ * ou avec des bulles (les deux formules, et la suite de l’offre unique ①), des bulles en plus après le rapport (③), et
+ * les recharges.
+ */
+export const OFFRES = ["rapport", "premium", "suite", "premium_ajout", "pack30", "pack80", "pack200"] as const;
+export type OffreId = (typeof OFFRES)[number];
+/** Les deux formules de la feuille du paiement : le rapport seul, ou Premium (choisie d’avance). */
+export const FORMULES = ["rapport", "premium"] as const satisfies readonly OffreId[];
+export type Formule = (typeof FORMULES)[number];
+/**
+ * Les offres uniques, chacune une fois par compte au plus, décidée par le serveur (src/server/offres-uniques.ts) : ① la
+ * suite moins chère pendant 5 minutes, ② le mail de relance, ③ Premium pour 5 € de plus après le paiement, ④ le bonus
+ * de la première recharge.
+ */
+export const OFFRES_UNIQUES = ["suite", "relance_mail", "premium_ajout", "premiere_recharge"] as const;
+export type OffreUnique = (typeof OFFRES_UNIQUES)[number];
+/** Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ sur « C’est débloqué ». */
+export const OFFRES_PROPOSEES = ["suite", "premium_ajout"] as const satisfies readonly OffreUnique[];
+export type OffreProposee = (typeof OFFRES_PROPOSEES)[number];
+/** Ce que le faux Whop (BLUSH_PAIEMENT_FACTICE, jamais en ligne) fait d’un achat : le payer, le refuser, ou le rembourser (un moyen de test). */
+export const ISSUES_DU_FAUX_WHOP = ["payer", "refuser", "rembourser"] as const;
+export type IssueDuFauxWhop = (typeof ISSUES_DU_FAUX_WHOP)[number];
+/**
+ * achats.statut : commandé (en_attente : la configuration de paiement créée, pas encore payé), payé (livré), échoué,
+ * remboursé ou contesté (repris : la conv re-verrouillée, les bulles retirées). La page du retour du paiement le lit.
+ */
+export const STATUTS_ACHAT = ["en_attente", "paye", "echoue", "rembourse", "conteste"] as const;
+export type StatutAchat = (typeof STATUTS_ACHAT)[number];
 /** Les deux voix de l’A/B test (vocals, chat_vocals, vocal_ecoutes) : A, créée pour BLUSH, et B, de la bibliothèque du prestataire (leurs noms : NOMS_VOIX, src/server/ia/voix.ts). */
 export const VOIX = ["A", "B"] as const;
 export type Voix = (typeof VOIX)[number];
@@ -303,17 +329,9 @@ export type FicheUpdate = {
   problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle" | "refus"> | "bug";
 };
 
-export type Subscription = {
-  plan: Plan;
-  priceLabel: string;
-  renewLabel: string;
-  stopLabel: string;
-  active: boolean;
-  paused: boolean;
-};
-
+/** Une formule telle que la montre la feuille du paiement (src/contenu/offres.ts). */
 export type Offer = {
-  id: Exclude<Plan, "gratuit">;
+  id: Formule;
   title: string;
   titleDesktop: string;
   price: string;

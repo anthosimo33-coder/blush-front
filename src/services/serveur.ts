@@ -5,8 +5,10 @@ import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
+import { rapportOuvert } from "@/server/droits";
 import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
 import { storyAffichee } from "@/server/conv-affichee";
+import { achatDuFauxWhop, achatPaye } from "@/server/paiement/commande";
 import { contexte } from "@/server/requete";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
@@ -137,7 +139,7 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
 
 /**
  * Ce que pose toute page d’une conv (src/components/shell/PageDeConv.tsx) : la conv qu’elle montre (ses gestes la
- * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour son plan.
+ * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour ses droits.
  * Sans requête de plus : le contexte de la requête est déjà lu pour la page (contexte, mémorisé le temps du rendu).
  */
 export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null }> {
@@ -145,10 +147,19 @@ export async function pageDeConv(): Promise<{ id: string | null; compte: Account
   return { id: story?.id ?? null, compte: await getCompte() };
 }
 
-/** Le compte, pour « Mon compte » : son email et son abonnement, dès le rendu serveur. null : pas connecté. */
+/**
+ * Le rapport de la conv ouverte est-il débloqué (payé, offert, ou un compte de l’équipe) ? Sans requête de plus : la
+ * conv et le compte de la requête sont déjà lus (contexte, mémorisé le temps du rendu).
+ */
+export async function rapportDebloque(): Promise<boolean> {
+  const { utilisateur, story } = await contexte();
+  return !!story && rapportOuvert(story, utilisateur);
+}
+
+/** Le compte, pour « Mon compte » : son email, ses bulles et ses droits, dès le rendu serveur. null : pas connecté. */
 export async function getCompte(): Promise<Account | null> {
   const { utilisateur, story } = await contexte();
-  return utilisateur ? compteDe(utilisateur, story) : null;
+  return utilisateur ? await compteDe(utilisateur, story) : null;
 }
 
 /** Les convs du compte, pour la liste « Tes convs ». Une seule : pas de liste, l’accueil reste comme avant. */
@@ -164,4 +175,16 @@ export async function getConvs(): Promise<ConvSummary[]> {
 export async function nombreDeConvs(): Promise<number> {
   const { utilisateur } = await contexte();
   return utilisateur ? (await histoiresDuCompte(utilisateur.id)).length : 0;
+}
+
+/** L’achat payé du compte connecté, pour « C’est débloqué » (`?achat=`) : son offre et ses bulles ; null sinon. */
+export async function getAchatPaye(achat: string): Promise<Awaited<ReturnType<typeof achatPaye>>> {
+  const u = await utilisateurCourant();
+  return u ? achatPaye(u, achat) : null;
+}
+
+/** L’achat du compte connecté que montre la page du faux Whop (BLUSH_PAIEMENT_FACTICE seulement) ; null sinon. */
+export async function getAchatDuFauxWhop(achat: string): Promise<Awaited<ReturnType<typeof achatDuFauxWhop>>> {
+  const u = await utilisateurCourant();
+  return u ? achatDuFauxWhop(u, achat) : null;
 }

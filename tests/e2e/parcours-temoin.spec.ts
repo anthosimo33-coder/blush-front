@@ -93,7 +93,7 @@ test("de la landing au rapport gratuit : import WhatsApp, qui es-tu, code par em
   });
 
   await test.step("côté serveur : un compte gratuit, le verdict seul (rien de payant ne s’écrit), un seul mail", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
     expect(mailsPour(email).map((m) => m.sujet)).toEqual([expect.stringMatching(/^\d{6}\u00a0: ton code BLUSH$/)]);
   });

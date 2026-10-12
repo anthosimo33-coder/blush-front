@@ -17,7 +17,7 @@ import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { planifier, prendre } from "@/server/taches";
 import { echange } from "./aide/fabriques";
-import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const lancerApres = async () => {
   while (apres.length) await apres.shift()!();
@@ -127,12 +127,11 @@ describe("le mode sobre", () => {
 
 describe("l’accès donné après le verdict", () => {
   it("lance le rapport à l’ouverture, puis la mémoire, sans passer par « Débloquer »", async () => {
-    /* Un compte à lui : son plan change pendant le test */
-    const gratuit = await compteDeTest("robuste-acces");
-    const id = await lue("06-elle-hesite.txt", gratuit);
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, gratuit.id));
-    const plus = { ...gratuit, plan: "blushplus" as const };
-    const avant = await ouvrirLeRapport(await ligneEnBase(id), plus);
+    /* Un compte à lui : sa conv se débloque pendant le test */
+    const compte = await compteDeTest("robuste-acces");
+    const id = await lue("06-elle-hesite.txt", compte);
+    await debloquerLaConv(id);
+    const avant = await ouvrirLeRapport(await ligneEnBase(id), compte);
     expect(avant?.generating).toBe(true);
     await lancerApres();
     const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, id));

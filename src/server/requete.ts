@@ -1,10 +1,10 @@
 import "server-only";
-import { peut, type Besoin } from "@/lib/acces";
 import { estMutation } from "@/types/api";
 import { alerter } from "./alertes";
 import { compteDeSession, type Utilisateur } from "./auth";
 import { lireSession } from "./cookies";
 import { contexteRequete } from "./donnees";
+import { estClient } from "./droits";
 import { cleDeLimiteDuCompte, LIMITES_DU_COMPTE, type LimiteDuCompte } from "./email-canonique";
 import type { LigneEcran } from "./histoires";
 import { erreur, memeOrigine } from "./http";
@@ -17,7 +17,8 @@ import { aujourdhuiParis } from "./temps";
  * 1. D’où vient la requête : une requête qui modifie (tout sauf GET et HEAD) doit venir de l’appli (memeOrigine), 403
  *    « origine ». La méthode en décide, pas la route : une mutation ajoutée est gardée sans y penser.
  * 2. Qui la fait : sa session, requise (401 « connexion »), facultative, ou lue sans le filtre de la bêta (« Tout effacer »).
- * 3. Ce que son plan ouvre (402 « acces »), puis sa conv ouverte (404 « aucune »).
+ * 3. Ce que ses droits ouvrent (402 « acces » : un client, pour sa fiche, src/server/droits.ts), puis sa conv ouverte
+ *    (404 « aucune »).
  * 4. Une limite par adresse IP (429 « trop »), comptée en dernier : une requête refusée avant ne l’use pas. Une limite
  *    par compte, elle, se compte dans la route (sousLaLimiteDuCompte), une fois qu’elle sait ce qu’elle lance (un
  *    message au chat, un vocal, une lecture) : elle peut la rendre si rien ne part (rendreAuCompte).
@@ -42,8 +43,8 @@ type Options = {
   parcours?: boolean;
   /** Il faut une conv ouverte. */
   histoire?: boolean;
-  /** Ce que le plan du compte doit ouvrir (src/lib/acces.ts). */
-  plan?: Besoin;
+  /** Le compte doit être client : un rapport débloqué, un achat payé, ou l’équipe (estClient, src/server/droits.ts). */
+  client?: true;
   limite?: LimiteDeRoute;
 };
 
@@ -147,13 +148,13 @@ export function lecture<const O extends Omit<Options, "limite"> & { limite?: nev
   return verifier(null, options);
 }
 
-async function verifier<O extends Options>(req: Request | null, { session, parcours, histoire, plan, limite }: O): Promise<Garde<O> | Response> {
+async function verifier<O extends Options>(req: Request | null, { session, parcours, histoire, client, limite }: O): Promise<Garde<O> | Response> {
   let utilisateur: Utilisateur | null = null;
   let story: LigneEcran | null = null;
   if (session === "sansBeta") utilisateur = await compteDeSession(await lireSession());
   else if (session !== "aucune") ({ utilisateur, story } = await contexte({ parcours }));
   if (!utilisateur && (session === "requise" || session === "sansBeta")) return erreur("connexion");
-  if (plan && !(utilisateur && peut(utilisateur.plan, plan))) return erreur("acces");
+  if (client && !(utilisateur && (await estClient(utilisateur)))) return erreur("acces");
   if (histoire && !story) return erreur("aucune");
   /* Sans requête (lecture), pas d’adresse : lecture n’accepte pas de limite */
   if (limite && !(req && (await sousLaLimiteDeLIp(req, limite.ip, limite.limite)))) return erreur("trop");

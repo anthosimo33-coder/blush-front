@@ -2,7 +2,7 @@ import { NB_CHAPITRES } from "../../src/contenu/chapitres";
 import { desactiverPartage, expect, partageIllisible, test } from "./aide";
 
 /*
- * Les pages publiques, sans compte : la landing (la promesse, les convs d’exemple, BLUSH+, les boutons vers le
+ * Les pages publiques, sans compte : la landing (la promesse, les convs d’exemple, le quotidien, les boutons vers le
  * parcours), la confidentialité, le choix de l’appli, la page introuvable et celle d’une page qui plante. Elles figent
  * le comportement d’aujourd’hui (le back-end, la bêta ouverte).
  */
@@ -86,10 +86,10 @@ test("une conv d’exemple qui défile montre le verdict de BLUSH, qui se ferme 
   });
 });
 
-test("le bloc BLUSH+ : une question touchée ouvre sa réponse et referme la précédente", async ({ page }) => {
+test("le bloc du quotidien : une question touchée ouvre sa réponse et referme la précédente", async ({ page }) => {
   await page.goto("/");
   const bloc = page.getByRole("region", { name: /un nouveau\s*message/ });
-  await expect(bloc.getByText("Ensuite, avec BLUSH+")).toBeVisible();
+  await expect(bloc.getByText("Ensuite, avec tes bulles")).toBeVisible();
   const sens = bloc.getByRole("region", { name: `ça veut dire quoi${NB}?` });
   const repondre = bloc.getByRole("region", { name: `je lui réponds quoi${NB}?` });
 

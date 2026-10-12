@@ -1455,7 +1455,7 @@ html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) 
 .marquee:has(:focus-visible) [data-marquee] {
   animation: none;
 }
-/* Landing : la grosse main de la section BLUSH+ (souris seulement) et son « tape ici » sur écran tactile */
+/* Landing : la grosse main du bloc du quotidien (souris seulement) et son « tape ici » sur écran tactile */
 [data-hand="on"],
 [data-hand="on"] * {
   cursor: none !important;

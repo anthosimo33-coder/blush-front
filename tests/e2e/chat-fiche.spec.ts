@@ -12,7 +12,7 @@ import {
   exportWhatsApp,
   filDuChat,
   glisserAuDoigt,
-  lectureBlushPlus,
+  lectureComplete,
   lectureFaite,
   messagesDuChat,
   oublierLaMemoire,
@@ -29,8 +29,8 @@ import {
 
 /*
  * Le chat du quotidien (/app), après une lecture : l’intro de BLUSH, un message écrit et ses bulles, les questions
- * toutes prêtes, le « + » (des captures, un nouvel export), la conv gardée d’un chargement à l’autre. Réservé à BLUSH+ :
- * un compte gratuit tombe sur le paiement. Le modèle factice répond toujours pareil (src/server/ia/factice.ts) :
+ * toutes prêtes, le « + » (des captures, un nouvel export), la conv gardée d’un chargement à l’autre. Il vient avec le
+ * rapport débloqué (sa mémoire) : sans lui, le paiement par-dessus. Le modèle factice répond toujours pareil (src/server/ia/factice.ts) :
  * « elle te cherche 👀 », « et toi tu fais le mec occupé », puis « tu lui as répondu quoi ? ».
  */
 
@@ -41,7 +41,7 @@ test("le chat au quotidien : l’intro de BLUSH, un message écrit, ses bulles, 
   const fil = filDuChat(page);
   /* « on s’est vus » : une nouvelle, que BLUSH garde en mémoire (le modèle factice la reconnaît à ces mots) */
   const message = "on s’est vus hier soir, c’était trop bien";
-  const email = await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", () => lectureBlushPlus(page, testInfo));
+  const email = await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", () => lectureComplete(page, testInfo));
 
   await test.step("l’accueil s’ouvre sur l’intro de BLUSH : ton prochain pas, puis « Elle vient de répondre ? »", async () => {
     await ouvrir(page, "/app");
@@ -96,7 +96,7 @@ test("les questions toutes prêtes : une pastille devient ta question, BLUSH éc
   const pastilles = questions.getByRole("button", { name: /\?$/ });
   const ecrit = fil.getByRole("status").filter({ hasText: "BLUSH analyse sa réponse" });
 
-  await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", () => lectureBlushPlus(page, testInfo));
+  await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", () => lectureComplete(page, testInfo));
 
   await test.step("au-dessus du champ, les quatre questions de la mémoire", async () => {
     await ouvrir(page, "/app");
@@ -150,8 +150,8 @@ test("le « + » du chat : le menu, un nouvel export puis des captures, montrés
   const nouvel = exportWhatsApp(testInfo, { n: 84, format: "txt" });
   const deja = fil.getByText("ça, je l’ai déjà 😌 rien de nouveau depuis la dernière fois");
 
-  const email = await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", async () => {
-    const email = await lectureBlushPlus(page, testInfo);
+  const email = await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", async () => {
+    const email = await lectureComplete(page, testInfo);
     await ouvrir(page, "/app");
     await expect(fil).toBeVisible();
     return email;
@@ -207,7 +207,7 @@ test("le « + » du chat : le menu, un nouvel export puis des captures, montrés
   });
 });
 
-test("un compte gratuit : le chat et sa fiche sont réservés à BLUSH+ (le paiement s’ouvre, le serveur refuse)", async ({ page }, testInfo) => {
+test("le rapport pas débloqué : le chat et sa fiche s’ouvrent sous le paiement (le serveur : pas de mémoire, pas client)", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "gratuit");
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
 
@@ -215,19 +215,19 @@ test("un compte gratuit : le chat et sa fiche sont réservés à BLUSH+ (le paie
     await lectureFaite(page, testInfo, email);
   });
 
-  await test.step("le chat s’ouvre sous le paiement, BLUSH+ choisi d’avance", async () => {
+  await test.step("le chat s’ouvre sous le paiement, Premium choisi d’avance", async () => {
     await ouvrir(page, "/app");
     await expect(paiement).toBeVisible();
-    await expect(paiement.getByRole("radio", { name: /^BLUSH\+/ })).toBeChecked();
-    await expect(paiement.getByRole("radio", { name: /^Le rapport complet/ })).not.toBeChecked();
-    /* Sans BLUSH+, pas de mémoire : pas de questions toutes prêtes */
+    await expect(paiement.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toBeChecked();
+    await expect(paiement.getByRole("radio", { name: /^Le rapport/ })).not.toBeChecked();
+    /* Sans le rapport, pas de mémoire : pas de questions toutes prêtes */
     await expect(page.getByRole("group", { name: "Questions toutes prêtes" })).toHaveCount(0);
   });
 
-  await test.step("« Débloquer » : pas de paiement pendant la bêta, le compte reste gratuit", async () => {
+  await test.step("« Débloquer » sans la case de renonciation cochée : rien ne part, rien n’est débloqué", async () => {
     await paiement.getByRole("button", { name: "Débloquer" }).click();
-    await expect(paiement.getByRole("status")).toHaveText("Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.");
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    await expect(paiement.getByRole("alert")).toHaveText("Coche la case pour payer.");
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
   await test.step("fermer le paiement ramène au rapport", async () => {
@@ -240,11 +240,11 @@ test("un compte gratuit : le chat et sa fiche sont réservés à BLUSH+ (le paie
     await expect(paiement).toBeVisible();
   });
 
-  await test.step("le serveur refuse le chat et l’ajout à sa fiche d’un compte gratuit : rien ne s’écrit", async () => {
+  await test.step("le serveur : le chat, ouvert, attend la mémoire (qui vient avec le rapport) ; l’ajout à sa fiche, réservé aux clients ; rien ne s’écrit", async () => {
     const origin = new URL(page.url()).origin;
     const chat = await page.request.post("/api/chat", { headers: { origin }, data: { texte: "elle m’a répondu, je lui dis quoi ?" } });
-    expect(chat.status()).toBe(402);
-    expect(await chat.json()).toEqual({ erreur: "acces" });
+    expect(chat.status()).toBe(409);
+    expect(await chat.json()).toEqual({ erreur: "pas_pret" });
     const capture = capturesPng(testInfo)[0]!;
     const fiche = await page.request.post("/api/fiche", {
       headers: { origin },
@@ -262,7 +262,7 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
   const fil = filDuChat(page);
   const plus = page.getByRole("button", { name: "Ajouter des captures ou un export" });
   const unExport = page.getByRole("menu", { name: "Ajouter" }).getByRole("menuitem", { name: /^Exporte votre conv\./ });
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
 
   await test.step("l’export d’une autre conv (Noé et Inès) : « c’est pas votre conv ça 👀 »", async () => {
@@ -315,7 +315,7 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
 test("BLUSH propose la phrase à lui envoyer, à copier d’un geste, et marque un niveau franchi, une seule fois", async ({ page }, testInfo) => {
   const copie = await releverLePressePapiers(page);
   const fil = filDuChat(page);
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
 
   await test.step("« je lui envoie quoi ? » : ta meilleure réponse, pourquoi, et « Copier »", async () => {
@@ -351,7 +351,7 @@ test("« Glisse pour creuser », au doigt : la réponse glissée devient le poin
   test.skip(browserName !== "chromium", "un glissé au doigt se joue par le protocole de Chromium");
   const fil = filDuChat(page);
   const creuse = page.getByText("Tu creuses", { exact: true });
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   expect(await ecrireABlush(page, "elle répond vite mais court")).toBe(200);
   /* La réponse arrive en flux : le glissé attend qu’elle soit là en entier (sa question de la fin) */
@@ -383,7 +383,7 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
   const fil = filDuChat(page);
   /* « question n° 7 » : un texte à lui par échange, de quoi suivre l’ordre ; exact, pour ne pas confondre 1 et 12 */
   const question = (n: number) => fil.getByText(`question n° ${n}`, { exact: true });
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   /* 22 échanges : le serveur en rend 20 à l’ouverture (src/server/historique.ts) */
   for (let n = 1; n <= 22; n++) await ecrireParApi(page, testInfo, `question n° ${n}`);
 
@@ -435,7 +435,7 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
  * pastille (Composer, src/app/app/accueil/Composer.tsx). Son nom ne les lit plus (« … Enregistrer un vocal »).
  */
 test("le champ du chat porte son seul nom, sans celui du bouton à côté", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true }).fill("elle m’a vu");

@@ -1,10 +1,10 @@
 import type { Page } from "@playwright/test";
-import { capturesPng, choisirFichier, enregistrerLaFiche, expect, filDuChat, lectureBlushPlus, ouvrir, test } from "./aide";
+import { capturesPng, choisirFichier, enregistrerLaFiche, expect, filDuChat, lectureComplete, ouvrir, test } from "./aide";
 
 /*
  * Sa fiche (/app/fiche), à la manière d’une fiche Contacts, et le va-et-vient avec le chat : les détails du contact
  * (BLUSH en haut du chat), sa fiche lue par rubrique, « Modifier » (retirer, ajouter), « Complète sa fiche » et
- * « Annuler ». Après la lecture d’un compte BLUSH+, la mémoire du modèle factice range « Le libanais » dans « Elle aime »
+ * « Annuler ». Après la lecture d’un compte de l’équipe, la mémoire du modèle factice range « Le libanais » dans « Elle aime »
  * (src/server/ia/factice.ts) ; une capture y ajoute « Étudiante en droit à Lyon » et « Adore les soirées improvisées ».
  */
 
@@ -17,8 +17,8 @@ test("les détails du contact, et le va-et-vient entre le chat et sa fiche", asy
   const retour = page.getByRole("link", { name: "Retour" });
   const fiche = page.getByRole("heading", { level: 1, name: "Maëlys" });
 
-  await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", async () => {
-    await lectureBlushPlus(page, testInfo);
+  await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", async () => {
+    await lectureComplete(page, testInfo);
     await ouvrir(page, "/app");
     await expect(filDuChat(page)).toBeVisible();
   });
@@ -84,7 +84,7 @@ test("sa fiche : lue par rubrique, une info corrigée (retirée puis réécrite)
   const correction = "Le libanais, surtout les falafels";
   const ajout = "Sa sœur Jeanne, en Erasmus à Porto";
 
-  await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", () => lectureBlushPlus(page, testInfo));
+  await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", () => lectureComplete(page, testInfo));
 
   await test.step("sa fiche : son prénom, son portrait, ce que BLUSH sait d’elle, chaque info avec sa source", async () => {
     await ouvrir(page, "/app/fiche");
@@ -141,8 +141,8 @@ test("« Complète sa fiche » : une capture, les infos rangées dans leur rubri
   const aSavoir = page.getByRole("region", { name: "À savoir" });
   const notes = page.getByRole("region", { name: "Tes notes" });
 
-  await test.step("un compte BLUSH+ dont la lecture et la mémoire sont faites", async () => {
-    await lectureBlushPlus(page, testInfo);
+  await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", async () => {
+    await lectureComplete(page, testInfo);
     await ouvrir(page, "/app/fiche");
     await expect(rubriques(page)).toHaveText(["Elle aime"]);
   });
@@ -195,7 +195,7 @@ test("« Complète sa fiche » : une capture, les infos rangées dans leur rubri
  * le point « Nouveau » reste sur les bonnes infos.
  */
 test("après un retrait, les infos arrivées gardent leur point « Nouveau »", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   await ouvrir(page, "/app/fiche");
   await choisirFichier(page, capturesPng(testInfo, 1), page.getByRole("button", { name: /^Complète sa fiche/ }));
   await expect(page.getByRole("region", { name: "2 nouvelles infos rangées" })).toBeVisible();
@@ -212,7 +212,7 @@ test("après un retrait, les infos arrivées gardent leur point « Nouveau »", 
  * (titreDeRubrique, src/contenu/fiche.ts), et la fiche le lit tel quel.
  */
 test("quand elle parle de lui, la ligne d’ajout de « Il aime » porte ce nom", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo, { personnes: { toi: "Inès", autre: "Malo" }, jeSuis: "Une fille" });
+  await lectureComplete(page, testInfo, { personnes: { toi: "Inès", autre: "Malo" }, jeSuis: "Une fille" });
   await ouvrir(page, "/app/fiche");
   await page.getByRole("button", { name: "Modifier" }).click();
   const ilAime = page.getByRole("region", { name: "Il aime" });

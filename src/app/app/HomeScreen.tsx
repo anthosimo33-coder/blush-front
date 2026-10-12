@@ -77,6 +77,8 @@ export function HomeScreen(p: {
   storyId?: string;
   /** Back-end : l’heure du rendu serveur de la page (heureDuRendu). L’historique qu’elle vient de rendre n’est pas relu à l’ouverture. */
   rendu?: number;
+  /** Le rapport de cette conv pas encore débloqué : le chat vient avec lui (sa mémoire), le paiement s’ouvre par-dessus. */
+  ferme?: boolean;
 }) {
   const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
@@ -180,7 +182,7 @@ export function HomeScreen(p: {
     <ContactContext value={live}>
       <MotionContext value={moving}>
         <AppScreen
-          besoin="chat"
+          ferme={p.ferme}
           autre={contact.fiche.person.name}
           aside={null}
           mainWidth={WINDOW_W}

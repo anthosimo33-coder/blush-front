@@ -107,7 +107,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
     expect(ch2).toMatchObject({ number: 2, title: "Chapitre 2", free: false });
     /* Le vocal de Tom (m0006) n’a rien à montrer : seul le message de Léa est cité */
     expect(ch2.blocks).toEqual([{ kind: "story", text: "Elle propose, il esquive.", messages: [SAMEDI] }]);
-    expect(payload).toMatchObject({ sober: null, access: "blushplus" });
+    expect(payload).toMatchObject({ sober: null, debloque: true });
   });
 
   it("la conv : ses deux personnes, ses messages et son vocal, comme l’appli la décrit", () => {

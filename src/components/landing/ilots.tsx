@@ -10,7 +10,7 @@ import type { Testimonial } from "@/types";
 
 /*
  * Les îlots de la landing : les seules parties qui tournent dans le navigateur (l’apparition au défilement, les questions
- * de BLUSH+, la grosse main, les avis qui glissent). Le reste de la page est rendu sur le serveur (parts.tsx), et les
+ * du quotidien, la grosse main, les avis qui glissent). Le reste de la page est rendu sur le serveur (parts.tsx), et les
  * convs qui défilent ont leur îlot à elles (ConvsExemples.tsx).
  */
 
@@ -23,7 +23,7 @@ export function LogoBulle(props: ComponentProps<typeof BubbleLogo>) {
   return <BubbleLogo {...props} />;
 }
 
-/** La cloche d’un nouveau message (BLUSH+), en îlot pour la même raison : son code part déjà avec le logo. */
+/** La cloche d’un nouveau message (le bloc du quotidien), en îlot pour la même raison : son code part déjà avec le logo. */
 export function Cloche(props: ComponentProps<typeof Bell3D>) {
   return <Bell3D {...props} />;
 }

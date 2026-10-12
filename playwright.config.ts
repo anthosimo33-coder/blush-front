@@ -15,7 +15,7 @@ const CI = !!process.env.CI;
 
 /**
  * Un serveur des tests (tests/e2e/serveur.mjs vérifie le build, recrée la base, puis lance `next start`). Tout est
- * fictif, et il n’a aucune clé d’API : ni Anthropic, ni Resend, ni ElevenLabs, ni Mistral.
+ * fictif, et il n’a aucune clé d’API : ni Anthropic, ni Resend, ni ElevenLabs, ni Mistral, ni Whop (le faux Whop paie).
  */
 const serveur = (port: number, betaFermee: boolean) => ({
   name: betaFermee ? "bêta fermée" : "appli",
@@ -34,6 +34,8 @@ const serveur = (port: number, betaFermee: boolean) => ({
     DATABASE_URL,
     BLUSH_CLE: CLE,
     BLUSH_IA_FACTICE: "1",
+    /* Le faux Whop : sa page de paiement locale, et de vrais webhooks signés d’un secret de test (src/server/paiement/factice.ts) */
+    BLUSH_PAIEMENT_FACTICE: "1",
     BLUSH_URL: `http://localhost:${port}`,
     BLUSH_ACCES_LIBRE: INVITES.join(","),
     BLUSH_ALERTES: ADMIN,

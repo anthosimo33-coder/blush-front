@@ -3,7 +3,7 @@ import {
   attendreTaches,
   changerErreur,
   CHAPITRES_FERMES,
-  definirPlan,
+  debloquerLaConv,
   emailLibre,
   etapeEnEchec,
   expect,
@@ -16,16 +16,16 @@ import {
 } from "./aide";
 
 /*
- * Le rapport qui s’écrit. L’accès arrive après le verdict (donné à la main, comme `npm run acces`) : la suite part à la
- * prochaine ouverture du rapport, et l’écran montre l’écriture jusqu’à ce que les huit chapitres soient là.
+ * Le rapport qui s’écrit. Il se débloque après le verdict (comme un achat livré, ou `npm run acces`) : la suite part à
+ * la prochaine ouverture du rapport, et l’écran montre l’écriture jusqu’à ce que les huit chapitres soient là.
  * Le modèle factice écrit en quelques secondes : le suivi de l’écran (GET /api/rapport, toutes les 2 secondes) est
  * retenu le temps de regarder l’écriture, puis relâché. Une écriture en échec, elle, se dit, et se relance.
  */
 
-test("l’accès arrive après le verdict : le rapport s’écrit sous tes yeux, puis s’ouvre en entier sans recharger", async ({ page }, testInfo) => {
+test("le rapport débloqué après le verdict : le rapport s’écrit sous tes yeux, puis s’ouvre en entier sans recharger", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "rapport-ecriture");
   await lectureFaite(page, testInfo, email);
-  await definirPlan(email, "blushplus");
+  await debloquerLaConv(email);
 
   let relacher!: () => void;
   const retenu = new Promise<void>((r) => (relacher = r));
@@ -94,7 +94,7 @@ test("l’écriture a échoué : BLUSH le dit, un refus ne se relance pas, une p
   await lectureFaite(page, testInfo, email);
   /* Le plan a raté ses trois essais, puis l’accès est arrivé : ouvrir le rapport ne relance rien tout seul */
   const plan = await etapeEnEchec(email, "rapport_plan", "refus");
-  await definirPlan(email, "blushplus");
+  await debloquerLaConv(email);
   const echec = page.getByRole("main").getByRole("alert");
   const relancer = page.getByRole("button", { name: "Relancer l’écriture" });
 

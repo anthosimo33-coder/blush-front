@@ -7,15 +7,21 @@
  */
 import { z } from "zod";
 import { PRENOM_MAX } from "@/lib/limites";
-import { EVENEMENTS_ECOUTE, GOALS, GUESSES, PLANS, PRONOMS, SECTIONS_FICHE } from "@/types";
-import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, Plan, Report, SoberReport, Source, Story, Subscription, VocalRapport } from "@/types";
+import { EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
+import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, OffreId, OffreProposee, Report, SoberReport, Source, StatutAchat, Story, VocalRapport } from "@/types";
 import type { CodeErreur } from "./erreurs-api";
 
 /* ———— Ce qui passe sur le réseau ———— */
 
+/** Le compte, ses droits et ses bulles (src/server/droits.ts). */
 export type Account = {
   email: string | null;
-  subscription: Subscription;
+  /** Son solde de bulles (une réponse de BLUSH en coûte). Il peut être négatif après un remboursement. */
+  bulles: number;
+  /** Un client : au moins un rapport débloqué, ou un achat payé (sa fiche s’ouvre). */
+  client: boolean;
+  /** Un compte de l’équipe (BLUSH_ACCES_LIBRE) : tous ses rapports ouverts, bulles illimitées, rien à payer. */
+  equipe: boolean;
   storyDeleted: boolean;
 };
 
@@ -41,8 +47,9 @@ export type ReportPayload = {
    * serveur (assemblerRapport) ; absent des aperçus de l’équipe, qui n’en ont pas.
    */
   alerte?: boolean;
-  access: Plan;
-  /** Le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
+  /** Le rapport de cette conv est débloqué (payé, offert, ou un compte de l’équipe) : tous ses chapitres. Sinon, le chapitre 1. */
+  debloque: boolean;
+  /** Le rapport s’écrit encore (rapport débloqué, pas fini). Le front repasse dans quelques secondes. */
   generating?: boolean;
   /** Pendant l’écriture : où en est BLUSH, chapitre par chapitre. */
   ecriture?: EcritureRapport;
@@ -66,6 +73,25 @@ export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; fa
 
 /** Le verdict tel que le montre un lien partagé : le prénom de l’autre en initiale, le tien en clair (« C. t’attend, Hugo »). */
 export type VerdictMontre = { emoji: string; title: string };
+
+/**
+ * Un paiement commencé (POST /api/paiement) : son achat, sa configuration de paiement chez Whop (ch_…), et la page où
+ * payer (celle de Whop, ou du faux Whop), ou null : payé en un geste (l’offre ③), l’achat se suit par
+ * GET /api/paiement/[achat] jusqu’à sa livraison.
+ */
+export type PaiementCommence = { achat: string; checkout: string | null; url: string | null };
+
+/** Où en est un achat (GET /api/paiement/[achat]) : son offre, son statut, les bulles qu’il donne, la conv dont il débloque le rapport. */
+export type EtatAchat = { achat: string; offre: OffreId; statut: StatutAchat; bulles: number; conv: string | null };
+
+/**
+ * Une offre unique montrée (POST /api/paiement/offre) : laquelle, jusqu’à quand (une date ISO, l’heure de fin du compte
+ * à rebours de ①, ou null : sans fin), et si elle se paie en un geste (un moyen de paiement gardé) ; ou aucune.
+ */
+export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; enUnGeste: boolean } | { offre: null };
+
+/** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
+export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
 
 /** Une erreur d’une route : son code (src/types/erreurs-api.ts), jamais de détail interne. */
 export type ReponseErreur = { erreur: CodeErreur };
@@ -124,17 +150,21 @@ type Reponses = {
   "POST /api/chat": BlushAnswer;
   "POST /api/chat/vocal": { modeVocal: boolean };
   "GET /api/compte": Account;
-  "POST /api/compte": Ok;
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "POST /api/debloquer": Subscription;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
   "POST /api/fiche": FicheUpdate;
   "GET /api/histoire": Story;
   "DELETE /api/histoire": Ok;
   "POST /api/import": ConvImportee;
+  "POST /api/paiement": PaiementCommence;
+  "GET /api/paiement/[achat]": EtatAchat;
+  "POST /api/paiement/offre": OffreUniqueMontree;
+  "POST /api/paiement/factice": WebhookDuFauxWhop;
+  /** Le webhook de Whop, hors de la garde commune : sa signature (401 « interdit » sinon). */
+  "POST /api/paiement/whop": Ok;
   /** `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`). */
   "POST /api/partage": { id: string; verdict: VerdictMontre; v: string };
   "DELETE /api/partage": { id: null };
@@ -183,15 +213,13 @@ export const ROUTES = {
   "GET /api/chat": {},
   /*
    * Un message en texte ; des captures, un export ou un vocal partent en formulaire. `question` : la question du rapport
-   * (« Ta question »), en texte seulement : le plan « rapport » en a une par conv, sans le chat (src/server/question-incluse.ts)
+   * (« Ta question »), en texte seulement : une réponse du chat comme une autre
    */
   "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional() }), formulaire: true },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   "GET /api/compte": {},
-  "POST /api/compte": { corps: z.object({ paused: z.boolean() }) },
   "DELETE /api/compte": {},
   "GET /api/cron/purge": {},
-  "POST /api/debloquer": { corps: z.object({ offre: z.enum(PLANS).exclude(["gratuit"]) }) },
   "GET /api/fiche": {},
   /* Sa fiche corrigée : la liste entière de ses faits */
   "PUT /api/fiche": {
@@ -201,6 +229,17 @@ export const ROUTES = {
   "GET /api/histoire": {},
   "DELETE /api/histoire": {},
   "POST /api/import": { formulaire: true },
+  /*
+   * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la case « je renonce à mon droit
+   * de rétractation » cochée (sans elle, 422 « renonciation » : rien ne part)
+   */
+  "POST /api/paiement": { corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.boolean().optional() }) },
+  /* `?paiement=pay_…` : le paiement que Whop a donné au retour, vérifié chez lui si le webhook tarde */
+  "GET /api/paiement/[achat]": {},
+  "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES) }) },
+  "POST /api/paiement/factice": { corps: z.object({ achat: z.string().uuid(), issue: z.enum(ISSUES_DU_FAUX_WHOP) }) },
+  /* Le corps brut, tel quel : sa signature porte sur ses octets (src/server/paiement/signature.ts) */
+  "POST /api/paiement/whop": {},
   "POST /api/partage": {},
   "DELETE /api/partage": {},
   "POST /api/partage/compte": {},

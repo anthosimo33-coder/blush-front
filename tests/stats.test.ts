@@ -36,7 +36,7 @@ describe("le mail « ton rapport est prêt »", () => {
 
   it("part une seule fois, quand le rapport complet est écrit : une relance réussie de l’écriture ne le renvoie pas", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const u = await compteDeTest("mail-rapport", "blushplus");
+    const u = await compteDeTest("mail-rapport", "debloque");
     const imp = await convRattachee(u, "01-a-deux-doigts.txt");
     await definirQui(imp.id, { moi: moiDans(imp.meta, "Hugo"), pronom: "il", devinette: "vus", objectif: "ensemble" });
     /* Chaque essai raté de la chaîne fait une pause avant le suivant : on les compte, le temps du test */

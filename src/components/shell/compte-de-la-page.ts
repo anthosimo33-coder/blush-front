@@ -8,7 +8,7 @@ export type CompteDeLaPage = { compte: Account | null; rendu: number };
 export const CompteRendu = createContext<CompteDeLaPage | null>(null);
 
 /**
- * Le compte que la page d’une conv a rendu (PageDeConv), pour la coque des écrans (AppScreen, useAccess) : son plan est là
- * dès l’affichage, sans relire /api/compte au montage. null hors d’une page de conv (« Tes convs ») : la coque le lit.
+ * Le compte que la page d’une conv a rendu (PageDeConv), pour la coque des écrans (AppScreen, useAccess) : ses droits
+ * sont là dès l’affichage, sans relire /api/compte au montage. null hors d’une page de conv (« Tes convs ») : la coque le lit.
  */
 export const useCompteDeLaPage = () => useContext(CompteRendu);

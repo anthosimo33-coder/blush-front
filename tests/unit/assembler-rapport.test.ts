@@ -62,11 +62,11 @@ const tache = (status: Tache["status"], autres: Partial<Tache> = {}): Tache => (
   ...autres,
 });
 
-/** Ce que lit le rapport d’un compte gratuit, verdict écrit, rien d’autre (sauf ce que `lu` change). */
+/** Ce que lit le rapport pas débloqué, verdict écrit, rien d’autre (sauf ce que `lu` change). */
 const lu = (l: Partial<RapportLu> = {}): RapportLu => ({
   storyId: "00000000-0000-4000-8000-000000000001",
   autre: "Léa",
-  access: "gratuit",
+  debloque: false,
   verdict: { sortie: VERDICT, scores: [{ label: "Qui relance", winner: "elle", toiPercent: 35 }] },
   donnees: null,
   plan: null,
@@ -88,7 +88,7 @@ describe("le rapport assemblé", () => {
 
   it("avec l’accès, le rapport écrit : ses chapitres, et son temps de lecture", () => {
     const chapitres = [1, ...CHAPITRES_PAYANTS].map(chapitre);
-    const r = assemblerRapport(lu({ access: "blushplus", donnees: { sortie: SORTIE, chapitres, sobre: null, lecture: { free: "2 min", full: "11 min" } } }));
+    const r = assemblerRapport(lu({ debloque: true, donnees: { sortie: SORTIE, chapitres, sobre: null, lecture: { free: "2 min", full: "11 min" } } }));
     expect(r.report.chapters).toBe(chapitres);
     expect(r.report.readingTime).toEqual({ free: "2 min", full: "11 min" });
     expect(r.generating).toBe(false);
@@ -97,7 +97,7 @@ describe("le rapport assemblé", () => {
   it("avec l’accès, pendant l’écriture : les titres du plan, l’écriture, et le vocal qui s’enregistre", () => {
     const r = assemblerRapport(
       lu({
-        access: "blushplus",
+        debloque: true,
         plan: {
           alerte: null,
           mode_sobre: false,
@@ -116,7 +116,7 @@ describe("le rapport assemblé", () => {
   });
 
   it("l’écriture en échec : le rapport le dit, et n’attend plus", () => {
-    const r = assemblerRapport(lu({ access: "blushplus", taches: { rapport_plan: tache("echec", { error: "coupee" }) } }));
+    const r = assemblerRapport(lu({ debloque: true, taches: { rapport_plan: tache("echec", { error: "coupee" }) } }));
     expect([r.generating, r.echec, r.ecriture]).toEqual([false, "panne", undefined]);
   });
 });
@@ -153,7 +153,7 @@ describe("le mode sobre (S-25)", () => {
   });
 
   it("avec l’accès : ce que le rapport garde", () => {
-    const r = assemblerRapport(lu({ access: "blushplus", verdict: { sortie: ALERTE, scores: [] }, donnees }));
+    const r = assemblerRapport(lu({ debloque: true, verdict: { sortie: ALERTE, scores: [] }, donnees }));
     expect(r.sober).toBe(SOBRE);
     expect(r.report.chapters).toBe(chapitres);
   });
@@ -162,7 +162,7 @@ describe("le mode sobre (S-25)", () => {
 describe("le vocal du rapport", () => {
   const pret = { etat: "pret" as const, audio: "/api/vocal/audio?conv=x&v=1", duree: 25, voix: "A" as const, sobre: false, lignes: [] };
   const donnees = { sortie: SORTIE, chapitres: [], sobre: null, lecture: { free: "1 min", full: "9 min" } };
-  const avec = (l: Partial<RapportLu>) => assemblerRapport(lu({ access: "blushplus", donnees, ...l })).vocal;
+  const avec = (l: Partial<RapportLu>) => assemblerRapport(lu({ debloque: true, donnees, ...l })).vocal;
 
   it("prêt, s’enregistre, ou rien", () => {
     expect(avec({ vocal: { pret, aJour: true, fait: new Date(1) } })).toBe(pret);

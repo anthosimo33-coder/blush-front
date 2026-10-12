@@ -21,7 +21,7 @@ import nextEnv from "@next/env";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { estLocale } from "./base.mjs";
+import { estLocale, rattraper } from "./base.mjs";
 
 const RACINE = fileURLToPath(new URL("..", import.meta.url));
 
@@ -47,6 +47,9 @@ const INTERDITES = ["ANTHROPIC_API_KEY", "RESEND_API_KEY", "RESEND_API_KEY_CODES
 const trouvees = process.env.BLUSH_IA_FACTICE === "1" ? INTERDITES.filter((cle) => process.env[cle]) : [];
 if (trouvees.length)
   arreter(`le modèle factice (BLUSH_IA_FACTICE=1) avec ${trouvees.join(", ")} : de vrais appels partiraient. Retire-les, ou lance le vrai modèle avec BLUSH_IA_FACTICE=0`);
+/* Whop en dev : seulement son bac à sable (ses cartes de test), jamais la vraie API, qui encaisserait de vrais paiements */
+if (process.env.WHOP_API_KEY && process.env.WHOP_BAC_A_SABLE !== "1" && process.env.BLUSH_PAIEMENT_FACTICE !== "1")
+  arreter("WHOP_API_KEY sans WHOP_BAC_A_SABLE=1 : de vrais paiements partiraient. En dev, le faux Whop (BLUSH_PAIEMENT_FACTICE=1) ou le bac à sable de Whop");
 
 /* Les outils de l’équipe ne s’ouvrent pas au réseau (voir l’en-tête, 4.) : refusé avant de toucher à la base. L’hôte donné : -H, --hostname ou --hostname= */
 const args = process.argv.slice(2);
@@ -76,6 +79,7 @@ if (estLocale(url.href)) {
     const client = postgres(url.href, { max: 1, onnotice: () => {} });
     try {
       await migrate(drizzle(client), { migrationsFolder: join(RACINE, "drizzle") });
+      await rattraper(client);
     } finally {
       await client.end();
     }

@@ -15,7 +15,9 @@ import { renduNeuf } from "./temps";
 /* Un compte, que son email distingue d’une version à l’autre */
 const compte = (email: string): Account => ({
   email,
-  subscription: { plan: "blushplus", priceLabel: "", renewLabel: "", stopLabel: "", active: true, paused: false },
+  bulles: 10,
+  client: true,
+  equipe: false,
   storyDeleted: false,
 });
 

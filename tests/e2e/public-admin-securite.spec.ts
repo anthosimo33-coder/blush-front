@@ -8,7 +8,7 @@ import {
   expect,
   histoireExiste,
   histoiresDe,
-  lectureBlushPlus,
+  lectureComplete,
   MUTATIONS,
   ouvrir,
   reponseAuGeste,
@@ -36,6 +36,9 @@ const ENTETES = {
   "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
 };
 
+/** Le webhook de Whop, hors de la garde commune : Whop n’a pas notre origine, seule sa signature compte. */
+const WEBHOOK = "/api/paiement/whop";
+
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
 
@@ -47,15 +50,23 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 24 routes de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(24);
-    for (const [methode, chemin] of MUTATIONS) {
+  await test.step("les 25 routes gardées de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(26);
+    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK)) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
         const qui = `${methode} ${chemin} depuis ${origine ?? "nulle part"}`;
         expect.soft(r.status(), qui).toBe(403);
         expect.soft(await r.json(), qui).toEqual({ erreur: "origine" });
       }
+    }
+  });
+
+  await test.step("le webhook de Whop, d’où qu’il vienne : sans signature, 401 « interdit »", async () => {
+    for (const origine of [PIRATE, URL_APPLI, null]) {
+      const r = await request.post(WEBHOOK, { headers: origine ? { origin: origine } : {}, data: { type: "payment.succeeded", data: {} } });
+      expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
+      expect.soft(await r.json()).toEqual({ erreur: "interdit" });
     }
   });
 
@@ -106,7 +117,7 @@ test("connecté, une page d’un autre site ne peut ni le déconnecter, ni suppr
 
 test("les vocaux d’une conv ne s’écoutent que depuis son compte : ni un autre compte, ni sans session", async ({ page, request, autreAppareil }, testInfo) => {
   /* Le compte de Noé : le vocal de son rapport, et une réponse du chat dite en vocal (ils citent leur conv) */
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   expect(await ecrireABlush(page, "parle-moi en vocal")).toBe(200);
   const histoire = (await histoiresDe(email))[0]!;

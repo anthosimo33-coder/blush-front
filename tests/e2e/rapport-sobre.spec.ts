@@ -66,7 +66,7 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
   });
 
   await test.step("côté serveur : le rapport doux est offert (le compte reste gratuit), sans vocal ; le mail « prêt » est doux aussi", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([
       ["verdict", "fini"],
       ["rapport_plan", "fini"],

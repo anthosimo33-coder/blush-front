@@ -170,7 +170,7 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
   });
 
   await test.step("côté serveur : un compte gratuit, la conv lue avec les réponses de Qui es-tu ?", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect(await histoiresDe(email)).toEqual([expect.objectContaining({ messages: conv.messages })]);
     expect(await quiEnregistre(email)).toEqual({ moi: "Maëlys", pronom: "elle", devinette: "ensemble", objectif: "mieux" });
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
