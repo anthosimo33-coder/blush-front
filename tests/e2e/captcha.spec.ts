@@ -3,6 +3,7 @@ import { ENTETE_CAPTCHA, JETON_DE_TEST, SCRIPT_TURNSTILE } from "../../src/lib/c
 import {
   capturesPng,
   choisirFichier,
+  connecterParApi,
   emailLibre,
   ENTETE_DU_JETON,
   expect,
@@ -120,4 +121,30 @@ test("les captures sans compte : le laissez-passer, puis la lecture", async ({ p
   expect(reponse.status()).toBe(200);
   expect(appels).toEqual(["/api/captcha", "/api/captures"]);
   await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
+});
+
+test("le script de Cloudflare bloqué (une extension, un réseau d’entreprise) : sans compte, le message tout de suite ; connecté, l’import part sans attendre", async ({
+  page,
+}, testInfo) => {
+  /* Le script ne vient pas : la route de la page passe avant le faux script du contexte (aide/captcha.ts) */
+  await page.route(SCRIPT_TURNSTILE, (route) => route.abort());
+  const conv = exportWhatsApp(testInfo);
+  const imports: string[] = [];
+  page.on("request", (r) => void (new URL(r.url()).pathname === "/api/import" && imports.push(r.method())));
+  /* Attendre le jeton, ce serait 20 secondes (jetonCaptcha) : bien au-delà de ce que ces étapes s’accordent */
+  const vite = { timeout: 10_000 };
+
+  await test.step("sans compte : « captcha », dit à l’écran, et rien n’est importé", async () => {
+    await page.goto("/importer/export?app=whatsapp");
+    await choisirFichier(page, conv.chemin);
+    await expect(page.getByText("On n’a pas pu vérifier que tu n’es pas un robot.", { exact: false })).toBeVisible(vite);
+    expect(imports).toEqual([]);
+  });
+
+  await test.step("connecté : le serveur ne demande rien, l’import part", async () => {
+    await connecterParApi(page, testInfo, emailLibre(testInfo, "captcha-bloque"));
+    await page.goto("/importer/export?app=whatsapp");
+    const reponse = await reponseAuGeste(page, { chemin: "/api/import", timeout: vite.timeout }, () => choisirFichier(page, conv.chemin));
+    expect(reponse.status()).toBe(200);
+  });
 });

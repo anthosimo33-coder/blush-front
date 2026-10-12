@@ -35,6 +35,9 @@ vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof imp
 
 import { POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postCaptcha } from "@/app/api/captcha/route";
+import { POST as postCapturesRoute } from "@/app/api/captures/route";
+import { POST as postLot } from "@/app/api/captures/lot/route";
+import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postImport } from "@/app/api/import/route";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { nomDuCookie } from "@/lib/noms-cookies";
@@ -43,6 +46,7 @@ import { humainRefuse } from "@/server/captcha";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { compteDe as compteDeLimite } from "@/server/limites";
+import { lotVideo } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
 import { compteDeTest } from "./aide/fixtures";
 
@@ -101,7 +105,7 @@ afterEach(() => {
 });
 afterAll(async () => {
   if (histoires.length) await db().delete(schema.stories).where(inArray(schema.stories.id, histoires));
-  const cles = adresses.flatMap((a) => [`code:ip:${a}`, `import:ip:${a}`, `captcha:ip:${a}`, `import:ko:ip:${a}`]);
+  const cles = adresses.flatMap((a) => [`code:ip:${a}`, `import:ip:${a}`, `captcha:ip:${a}`, `import:ko:ip:${a}`, `lot:ip:${a}`]);
   await db()
     .delete(schema.rateLimits)
     .where(
@@ -233,5 +237,46 @@ describe("le laissez-passer des imports sans compte", () => {
     cloudflare(new TypeError("fetch failed"));
     expect((await laissezPasser()).status).toBe(200);
     expect(await humainRefuse("brouillon")).toBeNull();
+  });
+});
+
+describe("les captures et l’enregistrement d’écran sans compte : le laissez-passer, avant toute limite", () => {
+  /* Une capture (la signature d’un PNG suffit au serveur), un lot de six images, les lots lus rassemblés */
+  const png = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "c.png", { type: "image/png" });
+  const formulaire = () => {
+    const fd = new FormData();
+    fd.append("captures", png());
+    fd.append("app", "instagram");
+    return fd;
+  };
+  const envoyer = {
+    captures: (ip: string) => postCapturesRoute(requete("/api/captures", { method: "POST", body: formulaire(), ip })),
+    lot: (ip: string) => postLot(requete("/api/captures/lot", { method: "POST", body: formulaire(), ip })),
+    video: (ip: string) =>
+      postVideo(
+        requete("/api/captures/video", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa", 0), lotVideo("Léa", 100)], cle: crypto.randomUUID() }),
+          ip,
+        }),
+      ),
+  };
+  /* La limite d’adresse que chaque route compte après le CAPTCHA */
+  const limiteDe = { captures: "import", lot: "lot", video: "import" } as const;
+
+  it.each(["captures", "lot", "video"] as const)("%s : sans laissez-passer, 403 « captcha », et la limite de l’adresse n’a rien compté", async (route) => {
+    const ici = adresse();
+    expect(await corpsDe(await envoyer[route](ici))).toEqual([403, { erreur: "captcha" }]);
+    expect(await compteDeLimite(`${limiteDe[route]}:ip:${ici}`, { fenetreS: 3600 })).toBe(0);
+  });
+
+  it("avec un laissez-passer : les lots, puis leur rassemblement en une histoire", async () => {
+    cloudflare(true);
+    await laissezPasser();
+    expect((await envoyer.lot(adresse())).status).toBe(200);
+    const r = await envoyer.video(adresse());
+    expect(r.status).toBe(200);
+    histoires.push(((await r.json()) as { story: { id: string } }).story.id);
   });
 });
