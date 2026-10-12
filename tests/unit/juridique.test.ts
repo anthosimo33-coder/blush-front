@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { CONDITIONS, PARTIES_CONDITIONS } from "@/contenu/conditions";
 import { CASE_IMPORT, CASE_RENONCIATION, texteCaseImport } from "@/contenu/consentements";
 import { CHAMPS_EDITEUR, EDITEUR, HEBERGEUR, MENTIONS } from "@/contenu/mentions-legales";
-import { champsEditeurManquants, consentementImport, editeurComplet } from "@/server/juridique";
+import { champsEditeurManquants, consentementImport, editeurComplet, renonciationPaiement } from "@/server/juridique";
 
 /*
- * Le juridique, sans base : l’accord de l’import (sa version), l’identité de l’éditeur (complète ou non), et ce que les
+ * Le juridique, sans base : l’accord de l’import et la renonciation du paiement (leur version), l’identité de l’éditeur (complète ou non), et ce que les
  * conditions doivent dire (le modèle du lot « prêt à lancer » : Whop vendeur en titre, prix TTC, contenu livré tout de
  * suite et renonciation, bulles sans date de fin, remboursement, 18 ans, ni conseil ni thérapie).
  */
@@ -16,6 +16,12 @@ describe("l’accord de l’import", () => {
     const maintenant = new Date("2026-10-12T10:00:00Z");
     expect(consentementImport(CASE_IMPORT.version, maintenant)).toEqual({ version: CASE_IMPORT.version, le: maintenant });
     for (const autre of [null, undefined, "", "2020-01-01", "on", "true", CASE_IMPORT.version + " ", 1]) expect(consentementImport(autre)).toBeNull();
+  });
+
+  it("la renonciation au droit de rétractation : seule la version d’aujourd’hui de la case vaut, avec l’heure (l’achat la garde)", () => {
+    const maintenant = new Date("2026-10-12T10:00:00Z");
+    expect(renonciationPaiement(CASE_RENONCIATION.version, maintenant)).toEqual({ version: CASE_RENONCIATION.version, le: maintenant });
+    for (const autre of [null, undefined, "", true, false, "2020-01-01", CASE_RENONCIATION.version + " ", 1]) expect(renonciationPaiement(autre)).toBeNull();
   });
 
   it("un texte changé change sa version (le serveur refuse alors une case cochée sous l’ancien texte)", () => {

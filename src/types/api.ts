@@ -242,9 +242,13 @@ export const ROUTES = {
   "POST /api/import": { formulaire: true },
   /*
    * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la case « je renonce à mon droit
-   * de rétractation » cochée (sans elle, 422 « renonciation » : rien ne part)
+   * de rétractation » cochée : la version de son texte (CASE_RENONCIATION.version), gardée avec l’achat. Sans elle, ou
+   * une version qui n’est plus la bonne (dont l’ancien `true` d’un onglet ouvert avant la version) : 422 « renonciation »,
+   * rien ne part
    */
-  "POST /api/paiement": { corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.boolean().optional() }) },
+  "POST /api/paiement": {
+    corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.union([z.string().max(40), z.boolean()]).optional() }),
+  },
   /* `?paiement=pay_…` : le paiement que Whop a donné au retour, vérifié chez lui si le webhook tarde */
   "GET /api/paiement/[achat]": {},
   "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES) }) },

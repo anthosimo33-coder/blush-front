@@ -8,6 +8,7 @@ import { commander, marquerEchoue, type Achat, type RefusDeCommande } from "../a
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
+import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
 import { journalErreur } from "../journal";
 import { LIMITES, sousLaLimite } from "../limites";
@@ -101,15 +102,16 @@ async function pageDePaiement(f: Fournisseur, achat: Achat, retour: string): Pro
 export type RefusDePaiement = "bientot" | RefusDeCommande;
 
 /**
- * Commence le paiement d’une offre (la case de renonciation déjà vérifiée par la route) : l’achat écrit « en_attente »
- * au prix du catalogue (commander : le droit de l’acheter), puis la page où le payer, ou le paiement en un geste (③).
+ * Commence le paiement d’une offre (la case de renonciation déjà vérifiée par la route : `renonciation`, sa version et
+ * son heure, gardées avec l’achat) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
+ * l’acheter), puis la page où le payer, ou le paiement en un geste (③).
  * Une page que Whop refuse de créer laisse l’achat « echoue » (rien n’a été payé), et l’erreur remonte (« panne »).
  */
-export async function commencerPaiement(compte: Compte, offre: OffreId, storyId: string | null): Promise<PaiementCommence | RefusDePaiement> {
+export async function commencerPaiement(compte: Compte, offre: OffreId, storyId: string | null, renonciation: Consentement): Promise<PaiementCommence | RefusDePaiement> {
   const f = fournisseur();
   if (!f) return "bientot";
   if (estEquipe(compte)) return "deja";
-  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode });
+  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation });
   if (typeof achat === "string") return achat;
   const retour = adresseDuRetour(f, achat.id);
   try {

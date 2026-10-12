@@ -107,7 +107,7 @@ const TOUT_FAUX = JSON.stringify({
   actif: "oui",
   offre: "gratuit",
   conv: 3,
-  renonciation: "oui",
+  renonciation: 3,
   achat: 3,
   issue: "x",
   facts: "x",

@@ -1,4 +1,5 @@
 import { expect, type Page, type Request } from "@playwright/test";
+import { CASE_RENONCIATION } from "../../../src/contenu/consentements";
 import type { OffreId } from "../../../src/types";
 import { URL_APPLI } from "../reglages";
 import { RESEAU } from "./page";
@@ -9,9 +10,12 @@ import { RESEAU } from "./page";
  * de Whop. Les états d’un achat se lisent en base (aide/base.ts, compteDe).
  */
 
+/** Ce que l’écran envoie de la case de renonciation cochée : la version de son texte. */
+export const RENONCIATION = CASE_RENONCIATION.version;
+
 /** Le paiement commencé comme l’écran le fait (POST /api/paiement, la case de renonciation cochée) : l’achat, et la page où le payer. */
 export async function commencerPaiement(page: Page, offre: OffreId): Promise<{ achat: string; url: string }> {
-  const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: true }, timeout: RESEAU });
+  const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: RENONCIATION }, timeout: RESEAU });
   expect(r.status(), `le paiement de ${offre} commence`).toBe(200);
   return (await r.json()) as { achat: string; url: string };
 }
