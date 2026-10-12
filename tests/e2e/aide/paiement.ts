@@ -80,3 +80,25 @@ export async function raccourcirLaSuite(email: string, secondes: number): Promis
     from users u where u.id = o.user_id and u.email = ${email.toLowerCase()} and o.offre = 'suite' and o.prise_le is null`;
   if (fait.count !== 1) throw new Error(`pas d’offre ① montrée à ${email}`);
 }
+
+/**
+ * Ce qui est à l’écran tient en 375 × 667 (le plus petit iPhone encore courant) sans défiler, comme le prototype des
+ * bulles : la dernière feuille ouverte (son panneau, qui défile s’il dépasse), sinon la page. L’écran revient ensuite à
+ * sa taille. `quoi` : ce qu’on mesure, pour le message.
+ */
+export async function tientEnPetitEcran(page: Page, quoi: string): Promise<void> {
+  const avant = page.viewportSize();
+  await page.setViewportSize({ width: 375, height: 667 });
+  try {
+    /* La mise en page refaite, et le panneau d’une feuille monté jusqu’en haut (son entrée dure 0,35 s) */
+    await page.waitForTimeout(500);
+    const { haut, visible } = await page.evaluate(() => {
+      const feuille = [...document.querySelectorAll("dialog[open]")].at(-1)?.querySelector<HTMLElement>(":scope [tabindex='-1']");
+      const el = feuille ?? document.documentElement;
+      return { haut: el.scrollHeight, visible: feuille ? feuille.clientHeight : window.innerHeight };
+    });
+    expect(haut, `${quoi} : tient en 375 × 667 sans défiler (${visible} px visibles)`).toBeLessThanOrEqual(visible + 1);
+  } finally {
+    if (avant) await page.setViewportSize(avant);
+  }
+}

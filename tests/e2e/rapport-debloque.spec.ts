@@ -21,6 +21,7 @@ import {
   RENONCIATION,
   tachesDe,
   test,
+  tientEnPetitEcran,
   URL_APPLI,
 } from "./aide";
 
@@ -91,6 +92,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     /* L’offre prend la place de la liste et du bouton du bas : « Non merci » continue la lecture */
     await expect(ecran.getByText("Les 7 chapitres qui restent")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Lire la suite" })).toHaveCount(0);
+    await tientEnPetitEcran(page, "« C’est débloqué » et l’offre ③");
     await offre.getByRole("button", { name: "Non merci, je lis la suite" }).click();
   });
 
@@ -135,9 +137,11 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
   const rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
   await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
+  await tientEnPetitEcran(page, "« Ta formule », Premium ouverte");
   await fermerLaFeuille(page);
   const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
   await expect(offre).toBeVisible();
+  await tientEnPetitEcran(page, "l’offre ①");
   /*
    * La souris est restée où était « Lire la suite » : pile sur le bord bas de « Je la prends », qui se soulève au survol
    * (lift), en sort, retombe, et y revient, sans jamais tenir en place. On l’écarte, comme une main qui bouge
