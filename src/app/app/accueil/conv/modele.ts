@@ -264,12 +264,13 @@ type MsgDuGroupe = { m: MsgABulles; at: number | null; neuf: boolean; fresh: boo
 
 /**
  * Une ligne de la conv : la date d’un nouveau jour, un niveau franchi, ou un groupe de messages d’un même expéditeur
- * (l’heure dessous : celle du dernier). `echange` : la dernière réponse du groupe qui en a un, de quoi la partager en image.
+ * (l’heure dessous : celle du dernier). `echange` : la dernière réponse du groupe qui en a un, de quoi la partager en image ;
+ * `bulles` : ce que sa dernière réponse payée a coûté, et ce qu’il reste.
  */
 export type Row =
   | { kind: "day"; key: string; at: number | null }
   | { kind: "event"; key: string; level: LevelId; neuf: boolean }
-  | { kind: "group"; key: string; from: MsgABulles["from"]; at: number | null; msgs: MsgDuGroupe[]; echange?: number };
+  | { kind: "group"; key: string; from: MsgABulles["from"]; at: number | null; msgs: MsgDuGroupe[]; echange?: number; bulles?: BlushAnswer["bulles"] };
 
 /** Les lignes de la conv. `depuis` : le premier identifiant de cette visite (les messages d’avant sont déjà lus). */
 export function rowsOf(msgs: readonly Msg[], opened: number | null, depuis: number) {
@@ -288,12 +289,15 @@ export function rowsOf(msgs: readonly Msg[], opened: number | null, depuis: numb
     const ligne = { m, at, neuf, fresh: !!m.answered && neuf };
     /* La réponse de BLUSH garde son échange : de quoi la partager en image */
     const echange = m.type === "reponse" && !m.result.verrouillee ? m.result.echange : undefined;
+    /* Ce que la réponse a coûté en bulles, dit sous son groupe (le serveur ne le dit qu’à son arrivée, jamais dans l’historique) */
+    const bulles = m.type === "reponse" ? m.result.bulles : undefined;
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
       last.msgs.push(ligne);
       last.at = at;
       if (echange) last.echange = echange;
-    } else rows.push({ kind: "group", key: cleDeBulle(m, 0), from: m.from, at, msgs: [ligne], echange });
+      if (bulles) last.bulles = bulles;
+    } else rows.push({ kind: "group", key: cleDeBulle(m, 0), from: m.from, at, msgs: [ligne], echange, ...(bulles ? { bulles } : {}) });
   }
   return rows;
 }

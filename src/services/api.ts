@@ -27,6 +27,7 @@ import type {
 import type {
   Account,
   AvanceVideo,
+  AchatDuCompte,
   CibleImage,
   CleFixe,
   CleJson,
@@ -42,7 +43,7 @@ import type {
   VerdictMontre,
 } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
-import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
+import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
@@ -595,8 +596,8 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
   } catch (e) {
     /* Le réseau a coupé en route : l’accueil garde les bulles reçues et propose de réessayer */
     if (e instanceof CoupureChat) throw e;
-    /* Une erreur : BLUSH la dit dans sa voix (un refus de l’IA, sans parler de bug) */
-    return bulle(messageErreur("chat", e));
+    /* Une erreur : BLUSH la dit dans sa voix (un refus de l’IA, sans parler de bug) ; plus de bulles, l’accueil ouvre la recharge */
+    return { ...bulle(messageErreur("chat", e)), ...(codeDe(e) === "bulles" ? { plusDeBulles: true as const } : {}) };
   }
 }
 
@@ -662,6 +663,11 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
 
 export async function getAccount(): Promise<Account> {
   return appel("GET /api/compte");
+}
+
+/** « Tes achats » (Mon compte) : les achats payés du compte, même repris ensuite, du plus récent au plus ancien. */
+export async function getAchats(): Promise<AchatDuCompte[]> {
+  return (await appel("GET /api/achats")).achats;
 }
 
 /**

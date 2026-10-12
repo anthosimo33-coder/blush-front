@@ -18,7 +18,9 @@ export const metadata: Metadata = { title: "Accueil" };
 export default async function Page({ searchParams }: PageProps<"/app">) {
   /* L’historique du chat rendu ici n’est pas relu à l’ouverture (HomeScreen, `rendu`), ni le compte (PageDeConv) */
   const rendu = heureDuRendu();
-  const { depuis } = await searchParams;
+  const { depuis, recharge } = await searchParams;
+  /* Revenu d’une recharge payée : les bulles achetées (FeuilleRecharge, l’adresse donnée au paiement) */
+  const rechargees = typeof recharge === "string" && /^[1-9]\d{0,4}$/.test(recharge) ? Number(recharge) : undefined;
   const jar = await cookies();
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
@@ -62,6 +64,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
           storyId={story.id}
           rendu={rendu}
           ferme={!debloque}
+          recharge={rechargees}
         />
       </div>
     </PageDeConv>

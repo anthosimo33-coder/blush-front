@@ -6,12 +6,23 @@ import { cn } from "@/lib/cn";
 import { figtree } from "@/lib/fonts";
 import { prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
+import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
+import { useCompte } from "@/lib/requetes";
+import { drapeauLocal, useDrapeau } from "@/lib/stockage";
+import { CompteurBulles } from "@/components/bulles/CompteurBulles";
+import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
+import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { marquerChatOuvert } from "@/components/chat/ouvert";
 import { AppScreen } from "@/components/shell/AppScreen";
-import type { ConvSummary } from "@/types";
+import { useCompteDeLaPage } from "@/components/shell/compte-de-la-page";
+import { Toast } from "@/components/ui/surfaces";
+import { apresLaRecharge } from "@/contenu/bulles-du-chat";
+import type { BlushAnswer, ConvSummary } from "@/types";
+import type { Account } from "@/types/api";
 import { BarreDeLaFenetre, EnTeteMobile } from "./accueil/Barres";
 import { useAnnonce } from "./accueil/annonce";
-import { ContactContext, FilDeLaConv } from "./accueil/bulles";
+import { BandeauBulles, etatDuBandeau } from "./accueil/BandeauBulles";
+import { ContactContext, CreditContext, FilDeLaConv } from "./accueil/bulles";
 import { Composer } from "./accueil/Composer";
 import { ContactSheet } from "./accueil/ContactSheet";
 import type { HomeContact } from "./accueil/contact";
@@ -32,6 +43,18 @@ const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImag
 
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
+
+/*
+ * La première apparition du compteur de bulles est expliquée (la carte « Tes 10 bulles offertes sont là »), une fois sur
+ * cet appareil : fermée, ou une première réponse arrivée. Au rendu serveur, et sans stockage, elle ne se montre pas.
+ */
+const BULLES_EXPLIQUEES = drapeauLocal("blush.bulles.expliquees", { defaut: false, indisponible: true, serveur: true });
+
+/** Combien de temps reste le mot qui suit une recharge (« +120 bulles, ta réponse est là »). */
+const MOT_DE_LA_RECHARGE_MS = 2600;
+
+/** Le solde de bulles que montre le chat : null pour l’équipe (illimitées), ou tant que le compte n’est pas lu. */
+const soldeDe = (compte: Account | undefined) => (compte && !compte.equipe ? compte.bulles : null);
 
 /* L’heure d’ouverture de l’écran, lue dans le navigateur seulement : rien au rendu serveur, donc pas d’écart à l’hydratation */
 let openedAt: number | null = null;
@@ -79,6 +102,11 @@ export function HomeScreen(p: {
   rendu?: number;
   /** Le rapport de cette conv pas encore débloqué : le chat vient avec lui (sa mémoire), le paiement s’ouvre par-dessus. */
   ferme?: boolean;
+  /**
+   * Revenu d’une recharge payée (`/app?recharge=<bulles>`, l’adresse que la recharge a donnée au paiement) : les bulles
+   * achetées. La réponse prête se lit tout de suite, et un mot le dit.
+   */
+  recharge?: number;
 }) {
   const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
@@ -112,6 +140,29 @@ export function HomeScreen(p: {
    */
   const [annonce, annoncer] = useAnnonce();
 
+  /*
+   * Les bulles (le prototype validé des bulles) : le solde vient du compte que la page a rendu, puis de chaque réponse
+   * (ce qu’il en reste, dit par le serveur avec elle). Le compteur à côté du bouton du compte, une carte au-dessus du
+   * champ, « C’est quoi une bulle ? » et la recharge. L’équipe a des bulles illimitées : ni carte, ni recharge.
+   */
+  const comptePage = useCompteDeLaPage();
+  const { data: compte } = useCompte(comptePage?.compte ?? undefined, { rendu: comptePage?.rendu, frais: FRAIS_DU_RENDU });
+  const compteVu = useRef(compte);
+  useEffect(() => {
+    compteVu.current = compte;
+  });
+  const solde = soldeDe(compte);
+  const expliquees = useDrapeau(BULLES_EXPLIQUEES);
+  const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
+  const [mot, setMot] = useState<string | null>(null);
+  /** Ce qu’une réponse dit des bulles : ce qu’il en reste (le compteur, Mon compte), ou qu’il n’y en a plus (la recharge). */
+  const bullesDeLaReponse = (r: BlushAnswer) => {
+    const c = compteVu.current;
+    if (r.bulles && c) setQueryData("account", { ...c, bulles: r.bulles.restantes });
+    if (r.plusDeBulles) setFeuille("recharge");
+    else BULLES_EXPLIQUEES.poser(true);
+  };
+
   /* La conv elle-même (accueil/conv/useConversation.ts). L’accueil l’habille : ce que fait l’écran pendant qu’elle change, c’est sa scène */
   const conv = useConversation({
     cle,
@@ -143,8 +194,43 @@ export function HomeScreen(p: {
       niveau: (to) => {
         if (monter(to)) conv.marquerNiveau(to);
       },
+      recue: bullesDeLaReponse,
+      manqueDeBulles: () => setFeuille("recharge"),
     },
   });
+  /* La réponse écrite à 0 bulle qui attend la recharge (une au plus par compte), si elle est dans cette conv */
+  const prete = conv.msgs.find((m) => m.type === "reponse" && !!m.result.verrouillee);
+  const verrou = prete?.type === "reponse" ? prete.result.verrouillee : undefined;
+  const lirePrete = () => {
+    if (!prete || !verrou) return;
+    if (solde !== null && solde < verrou.cout) setFeuille("recharge");
+    else void conv.lire(prete.id, verrou.message);
+  };
+
+  /*
+   * Revenu d’une recharge payée : l’adresse perd son `?recharge=` (un rechargement ne le redit pas), la réponse prête se
+   * lit (son coût débité), et un mot dit les bulles reçues. Une fois par montage
+   */
+  const recharge = p.recharge;
+  const rechargeVue = useRef(false);
+  useEffect(() => {
+    if (!recharge || rechargeVue.current) return;
+    rechargeVue.current = true;
+    const ici = new URL(window.location.href);
+    ici.searchParams.delete("recharge");
+    window.history.replaceState(window.history.state, "", `${ici.pathname}${ici.search}${ici.hash}`);
+    const m = conv.msgs.find((x) => x.type === "reponse" && !!x.result.verrouillee);
+    const v = m?.type === "reponse" ? m.result.verrouillee : undefined;
+    void (async () => {
+      const lue = m && v ? await conv.lire(m.id, v.message) : false;
+      setMot(apresLaRecharge(recharge, lue));
+    })();
+  }, [recharge, conv]);
+  useEffect(() => {
+    if (!mot) return;
+    const t = setTimeout(() => setMot(null), MOT_DE_LA_RECHARGE_MS);
+    return () => clearTimeout(t);
+  }, [mot]);
   const { dig, ...envois } = useEnvois({ conv, idees, envoyer, flightRef, input });
   const opened = useSyncExternalStore(noSubscription, readOpenedAt, () => null);
   /* 1 · L’arrivée, une fois par jour (le serveur le sait par un cookie), et une seule fois depuis l’ouverture de l’appli */
@@ -177,7 +263,17 @@ export function HomeScreen(p: {
     if (conv.relancer(reponse)) play("envoi");
   };
 
-  const barre = { contact: live, others, busy: conv.occupe, ouvrirDetails, entete };
+  const credit = useMemo(() => ({ solde, recharger: () => setFeuille("recharge") }), [solde]);
+  const etatBandeau = etatDuBandeau({ solde, prete: !!verrou, expliquees });
+  const barre = {
+    contact: live,
+    others,
+    busy: conv.occupe,
+    ouvrirDetails,
+    entete,
+    /* Le compteur de bulles, dès que le compte est lu (l’aperçu de l’équipe, sans compte, n’en a pas) */
+    aGauche: compte ? <CompteurBulles bulles={solde} ouvrir={() => setFeuille("bulle")} /> : undefined,
+  };
   return (
     <ContactContext value={live}>
       <MotionContext value={moving}>
@@ -199,19 +295,21 @@ export function HomeScreen(p: {
           </p>
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             <BarreDeLaFenetre {...barre} />
-            <FilDeLaConv
-              threadRef={thread}
-              hautRef={haut}
-              msgs={conv.msgs}
-              opened={opened}
-              depuis={conv.depuis}
-              plus={conv.plus}
-              anciens={conv.anciens}
-              chargerAnciens={conv.chargerAnciens}
-              partager={setImage}
-              relancer={relancer}
-              lire={conv.lire}
-            />
+            <CreditContext value={credit}>
+              <FilDeLaConv
+                threadRef={thread}
+                hautRef={haut}
+                msgs={conv.msgs}
+                opened={opened}
+                depuis={conv.depuis}
+                plus={conv.plus}
+                anciens={conv.anciens}
+                chargerAnciens={conv.chargerAnciens}
+                partager={setImage}
+                relancer={relancer}
+                lire={conv.lire}
+              />
+            </CreditContext>
             {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
             <Composer
               {...envois}
@@ -225,6 +323,20 @@ export function HomeScreen(p: {
               busy={conv.occupe}
               arriving={arriving}
               logo={logoVu}
+              bandeau={
+                solde !== null && (
+                  <BandeauBulles
+                    etat={etatBandeau}
+                    bulles={Math.max(0, solde)}
+                    autre={contact.fiche.person.name}
+                    pronom={contact.fiche.person.pronoun}
+                    recharger={() => setFeuille("recharge")}
+                    lire={lirePrete}
+                    expliquer={() => setFeuille("bulle")}
+                    fermer={() => BULLES_EXPLIQUEES.poser(true)}
+                  />
+                )
+              }
             >
               {/* « Partager en image » : la réponse choisie, en story */}
               <PartageImageSheet cible={image ? { type: "reponse", echange: image } : null} onClose={() => setImage(null)} />
@@ -233,6 +345,23 @@ export function HomeScreen(p: {
           </div>
 
           <ContactSheet contact={live} open={details} onClose={() => setDetails(false)} departRef={departRef} entete={entete} pageRef={page} />
+          {/* « C’est quoi une bulle ? » (le compteur), d’où l’on recharge ; puis la recharge, qui revient ici une fois payée */}
+          {compte &&
+            (solde === null ? (
+              <FeuilleBulle open={feuille === "bulle"} onClose={() => setFeuille(null)} />
+            ) : (
+              <FeuilleBulle open={feuille === "bulle"} onClose={() => setFeuille(null)} solde={Math.max(0, solde)} recharger={() => setFeuille("recharge")} />
+            ))}
+          {solde !== null && (
+            <FeuilleRecharge
+              open={feuille === "recharge"}
+              onClose={() => setFeuille(null)}
+              reponsePrete={!!verrou}
+              autre={contact.fiche.person.name}
+              suite={(bulles) => `/app?recharge=${bulles}`}
+            />
+          )}
+          {mot && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{mot}</Toast>}
         </AppScreen>
       </MotionContext>
     </ContactContext>

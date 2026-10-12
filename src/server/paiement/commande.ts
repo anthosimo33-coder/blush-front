@@ -150,11 +150,16 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
   return { achat: achat.id, offre: achat.offre, statut: achat.statut, bulles: achat.bulles, conv: achat.storyId };
 }
 
+/** Les recharges : les packs de bulles du catalogue (ni rapport, ni offre unique). */
+const PACKS = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
+
 /**
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
- * 5 € de plus, après un rapport payé (le rapport seul, ou la suite). Jamais sans prestataire (rien ne s’achèterait), ni à
- * l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est enregistrée »).
+ * 5 € de plus, après un rapport payé (le rapport seul, ou la suite) ; ④ le bonus de la première recharge, tant qu’aucun
+ * pack n’a été payé (la recharge l’affiche, et la commande du pack conseillé le prend : commander). Jamais sans
+ * prestataire (rien ne s’achèterait), ni à l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est
+ * enregistrée »).
  */
 export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null): Promise<OffreUniqueMontree> {
   const f = fournisseur();
@@ -167,13 +172,21 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .from(schema.stories)
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s || s.debloqueLe) return rien;
-  } else {
+  } else if (offre === "premium_ajout") {
     const [rapport] = await db()
       .select({ id: a.id })
       .from(a)
       .where(and(eq(a.userId, compte.id), eq(a.statut, "paye"), inArray(a.offre, ["rapport", "suite"])))
       .limit(1);
     if (!rapport) return rien;
+  } else {
+    /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) */
+    const [recharge] = await db()
+      .select({ id: a.id })
+      .from(a)
+      .where(and(eq(a.userId, compte.id), isNotNull(a.payeLe), inArray(a.offre, PACKS)))
+      .limit(1);
+    if (recharge) return rien;
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;

@@ -1,7 +1,8 @@
 import "server-only";
 import type { Route } from "next";
 import type { ConvSummary, Fiche, Story } from "@/types";
-import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
+import type { Account, AchatDuCompte, HistoriqueChat, ReportPayload } from "@/types/api";
+import { achatsDuCompte } from "@/server/achats";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
@@ -160,6 +161,12 @@ export async function rapportDebloque(): Promise<boolean> {
 export async function getCompte(): Promise<Account | null> {
   const { utilisateur, story } = await contexte();
   return utilisateur ? await compteDe(utilisateur, story) : null;
+}
+
+/** « Tes achats », pour « Mon compte » : les achats payés du compte, dès le rendu serveur. Sans compte connecté, aucun. */
+export async function getAchats(): Promise<AchatDuCompte[]> {
+  const { utilisateur } = await contexte();
+  return utilisateur ? achatsDuCompte(utilisateur.id) : [];
 }
 
 /** Les convs du compte, pour la liste « Tes convs ». Une seule : pas de liste, l’accueil reste comme avant. */

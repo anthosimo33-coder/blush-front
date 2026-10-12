@@ -1,7 +1,8 @@
 import "server-only";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { bullesDe, CATALOGUE, PREMIERE_RECHARGE } from "@/contenu/offres";
 import type { OffreId } from "@/types";
+import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
 import { mouvementDans } from "./bulles";
@@ -224,4 +225,22 @@ export async function offrirLeRapport(story: { id: string; userId: string }): Pr
     .returning({ id: s.id });
   await reparerLaChaine(story);
   return ouvertes.length > 0;
+}
+
+/** Combien d’achats « Tes achats » montre au plus : les plus récents. */
+const ACHATS_MONTRES = 100;
+
+/**
+ * Les achats de ce compte pour « Tes achats » (Mon compte), du plus récent au plus ancien : ceux qui ont été payés, même
+ * repris ensuite (remboursés, contestés). Une commande jamais payée (la page de paiement quittée, une carte refusée)
+ * n’en est pas un. Rien de la conv : l’offre, le prix, les bulles, le statut et le jour du paiement.
+ */
+export async function achatsDuCompte(userId: string): Promise<AchatDuCompte[]> {
+  const lignes = await db()
+    .select({ id: a.id, offre: a.offre, centimes: a.centimes, bulles: a.bulles, statut: a.statut, payeLe: a.payeLe })
+    .from(a)
+    .where(and(eq(a.userId, userId), isNotNull(a.payeLe)))
+    .orderBy(desc(a.payeLe), desc(a.creeLe))
+    .limit(ACHATS_MONTRES);
+  return lignes.map(({ payeLe, ...l }) => ({ ...l, le: payeLe!.toISOString() }));
 }

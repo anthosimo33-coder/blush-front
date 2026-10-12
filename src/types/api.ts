@@ -81,6 +81,12 @@ export type VerdictMontre = { emoji: string; title: string };
  */
 export type PaiementCommence = { achat: string; checkout: string | null; url: string | null };
 
+/**
+ * Un achat du compte, pour « Tes achats » (GET /api/achats) : son offre, son prix TTC (en centimes), les bulles qu’il a
+ * données, son statut, et quand (son paiement, une date ISO).
+ */
+export type AchatDuCompte = { id: string; offre: OffreId; centimes: number; bulles: number; statut: StatutAchat; le: string };
+
 /** Où en est un achat (GET /api/paiement/[achat]) : son offre, son statut, les bulles qu’il donne, la conv dont il débloque le rapport. */
 export type EtatAchat = { achat: string; offre: OffreId; statut: StatutAchat; bulles: number; conv: string | null };
 
@@ -147,6 +153,7 @@ type Reponses = {
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
   "POST /api/captures/video": ConvImportee & { messagesRead: number };
+  "GET /api/achats": { achats: AchatDuCompte[] };
   "GET /api/chat": HistoriqueChat;
   /** D’un bloc ; en flux, quand le navigateur le demande (Accept), une ligne JSON par événement (EvenementChat, src/types). */
   "POST /api/chat": BlushAnswer;
@@ -219,6 +226,7 @@ export const ROUTES = {
   "POST /api/captures/video": {
     corps: z.object({ app: z.string(), lots: z.array(z.unknown()), cle: z.string().max(64).optional(), consentement: z.string().max(40).optional() }),
   },
+  "GET /api/achats": {},
   "GET /api/chat": {},
   /*
    * Un message en texte ; des captures, un export ou un vocal partent en formulaire. `question` : la question du rapport
