@@ -383,7 +383,7 @@ async function main() {
   process.env.E2E_DB ??= "blush_e2e_charge";
   const { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, TURNSTILE, URL_APPLI } = await import("../tests/e2e/reglages.ts");
   const { ENTETE_CAPTCHA, JETON_DE_TEST } = await import("../src/lib/captcha.ts");
-  const { CASE_IMPORT } = await import("../src/contenu/consentements.ts");
+  const { CASE_IMPORT, CASE_RENONCIATION } = await import("../src/contenu/consentements.ts");
   const nomBase = new URL(DATABASE_URL).pathname.slice(1);
 
   /* Le port doit être libre : le serveur de ce test, jamais un autre déjà lancé */
@@ -728,7 +728,7 @@ async function main() {
       );
       await etape("verdict", () => attendre(c, "verdict", "/api/analyse", (d) => (d?.failed ? `échec ${d.failReason ?? ""}`.trim() : d?.done === true), 120));
       const { achat } = await etape("commande", async () =>
-        exiger("commande", await c.requete("POST", "/api/paiement", { json: { offre: "rapport", conv: story.id, renonciation: true } })),
+        exiger("commande", await c.requete("POST", "/api/paiement", { json: { offre: "rapport", conv: story.id, renonciation: CASE_RENONCIATION.version } })),
       );
       await etape("webhook", async () => {
         const { webhook } = exiger("webhook", await c.requete("POST", "/api/paiement/factice", { json: { achat, issue: "payer" } }));
