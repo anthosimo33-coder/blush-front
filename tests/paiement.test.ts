@@ -237,7 +237,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect(await mouvements(u.id)).toEqual([["achat", 90]]);
   });
 
-  it("une signature fausse, ou sans signature : 401 « interdit », rien de livré, l’équipe prévenue", async () => {
+  it("une signature fausse, ou sans signature : 401 « interdit », rien de livré ; l’équipe prévenue d’une signature fausse", async () => {
     const { u } = await acheteur("hook-signature");
     const { corps } = await payer({ offre: "rapport", renonciation: true });
     const w = await issue(corps.achat, "payer");
@@ -249,7 +249,8 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     /* Signé du secret du vrai Whop alors que c’est le faux qui encaisse : refusé aussi */
     expect((await poster({ corps: w.corps, entetes: signerWebhook(WHOP.secret, "msg_autre", w.corps) })).status).toBe(401);
     await apresLaReponse();
-    expect(etat.alertes).toEqual(Array(4).fill("paiement : webhook refusé"));
+    /* Sans en-têtes de signature (un robot, pas Whop) : le journal seulement */
+    expect(etat.alertes).toEqual(Array(3).fill("paiement : webhook refusé"));
     expect((await achatEnBase(corps.achat)).statut).toBe("en_attente");
     expect(await soldeDe(u.id)).toBe(0);
   });

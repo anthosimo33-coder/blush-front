@@ -9,7 +9,7 @@ const CORPS_MAX = 256 * 1024;
 
 /**
  * Les webhooks de Whop (ou du faux Whop), hors de la garde commune : Whop n’est pas l’appli, sa requête n’a pas notre
- * origine. Seule sa signature compte (401 « interdit » sinon, et une alerte à l’équipe) : src/server/paiement/webhook.ts.
+ * origine. Seule sa signature compte (401 « interdit » sinon ; une signature fausse prévient l’équipe) : src/server/paiement/webhook.ts.
  * Le corps se lit brut, tel quel : la signature porte sur ses octets.
  */
 export const POST = route("POST /api/paiement/whop", async (req: Request) => {

@@ -125,12 +125,14 @@ export async function recevoirWebhook(corps: string, entetes: Headers): Promise<
   const v = verifierWebhook(f.secret, entetes, corps);
   if ("refus" in v) {
     journal("webhook de paiement refusé", { raison: v.refus }, "alerte");
-    after(() =>
-      alerter("paiement : webhook refusé", [
-        `Un webhook de paiement a été refusé (${v.refus === "heure" ? "trop vieux, ou rejoué" : v.refus === "entetes" ? "sans ses en-têtes de signature" : "signature fausse"}).`,
-        "Si ça se répète : le secret WHOP_WEBHOOK_SECRET a-t-il changé ?",
-      ]),
-    );
+    /* Sans ses en-têtes, ce n’est pas Whop (un robot qui passe) : le journal suffit. Signé, mais faux ou trop vieux : l’équipe le sait */
+    if (v.refus !== "entetes")
+      after(() =>
+        alerter("paiement : webhook refusé", [
+          `Un webhook de paiement a été refusé (${v.refus === "heure" ? "trop vieux, ou rejoué" : "signature fausse"}).`,
+          "Si ça se répète : le secret WHOP_WEBHOOK_SECRET a-t-il changé ?",
+        ]),
+      );
     return "refuse";
   }
   let json: unknown;
