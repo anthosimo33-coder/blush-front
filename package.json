@@ -31,6 +31,7 @@
     "db:generer": "drizzle-kit generate",
     "db:migrer": "node scripts/migrer.mjs --ici",
     "acces": "tsx scripts/acces.mts",
+    "charge": "tsx scripts/charge.mjs",
     "essai:vrai-modele": "tsx --conditions=react-server scripts/essai-vrai-modele.mts",
     "essai:memoire": "tsx --conditions=react-server scripts/essai-memoire.mts",
     "essai:ajouts": "tsx --conditions=react-server scripts/essai-ajouts.mts",
