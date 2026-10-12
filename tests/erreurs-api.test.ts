@@ -16,6 +16,7 @@ describe("le serveur", () => {
       connexion: 401,
       interdit: 401,
       beta: 403,
+      captcha: 403,
       trop: 429,
       trop_jour: 429,
       codes: 429,
