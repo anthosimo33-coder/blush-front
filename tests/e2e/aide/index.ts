@@ -55,7 +55,7 @@ export const test = base.extend<{ autreAppareil: () => Promise<Page>; sonsAuDepa
 export { devices, expect } from "@playwright/test";
 
 /* Les réglages des serveurs des tests (tests/e2e/reglages.ts) dont les tests ont besoin */
-export { CRON_SECRET, DOMAINE, INVITES, URL_APPLI, URL_BETA } from "../reglages";
+export { ADMIN, CRON_SECRET, DOMAINE, INVITES, URL_APPLI, URL_BETA } from "../reglages";
 
 export * from "./base";
 export * from "./beta";

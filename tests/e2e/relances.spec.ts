@@ -56,7 +56,21 @@ test("la relance : le mail « Ta suite t’attend », son lien vers la feuille d
   });
 });
 
-test("la désinscription sans un lien entier, ou avec un lien faux : « Ce lien ne marche pas. », rien n’est coupé", async ({ page }) => {
+test("la désinscription sans un lien entier, ou avec un lien faux : « Ce lien ne marche pas. », rien n’est coupé ; elle tient en 375 × 667 sans défiler", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  for (const adresse of ["/desinscription?id=00000000-0000-4000-8000-000000000000&cle=exemple", "/desinscription"]) {
+    await page.goto(adresse);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const { haut, ecran, large, ecranLarge } = await page.evaluate(() => ({
+      haut: document.documentElement.scrollHeight,
+      ecran: window.innerHeight,
+      large: document.documentElement.scrollWidth,
+      ecranLarge: window.innerWidth,
+    }));
+    expect(haut, `${adresse} : la hauteur de la page`).toBeLessThanOrEqual(ecran);
+    expect(large, `${adresse} : la largeur de la page`).toBeLessThanOrEqual(ecranLarge);
+    await expect(page.getByRole("button", { name: "Me désinscrire" }).or(page.getByRole("link", { name: "Revenir à l’accueil" }))).toBeInViewport();
+  }
   await page.goto("/desinscription");
   await expect(page.getByRole("heading", { level: 1, name: "Ce lien ne marche pas." })).toBeVisible();
   await page.goto("/desinscription?id=00000000-0000-4000-8000-000000000000&cle=pas-la-bonne");

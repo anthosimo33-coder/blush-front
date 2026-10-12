@@ -6,10 +6,12 @@ import {
   attendreTaches,
   autreCode,
   champDuCode,
+  chiffrer,
   compteDe,
   dernierCode,
   ecranLu,
   emailLibre,
+  empreinte,
   ENTETE_DU_JETON,
   envoyerEmail,
   expect,
@@ -24,13 +26,16 @@ import {
   placeSurLaListe,
   REPONSES_NOE,
   saisirLeCodeRecu,
+  seConnecter,
+  sql,
   test,
   URL_APPLI,
   URL_BETA,
 } from "./aide";
 
 /*
- * La bêta fermée (BLUSH_BETA_FERMEE=1) : seuls les invités (BLUSH_ACCES_LIBRE) entrent. La connexion répond pareil à
+ * La bêta fermée (BLUSH_BETA_FERMEE=1) : seuls les invités (BLUSH_ACCES_LIBRE, et la liste d’attente que l’équipe
+ * invite depuis /admin) entrent. La connexion répond pareil à
  * tous (même écran, même statut), pour que personne ne puisse savoir si un email est invité : l’invité reçoit son code,
  * les autres le mail de la liste d’attente, et la conv qu’ils venaient d’importer est effacée tout de suite.
  */
@@ -266,4 +271,22 @@ test("/email/code en bêta fermée : « On vient d’écrire à », et la liste 
   await expect(page).toHaveURL(/\/email\/code$/);
   await expect(page.getByText(`On vient d’écrire à ${dehors}.`)).toBeVisible();
   await expect(page.getByText("Pas de code dans le mail\u00a0? BLUSH est en bêta privée\u00a0: ton email est sur la liste d’attente, le mail t’explique tout.")).toBeVisible();
+});
+
+test("un email de la liste d’attente invité par l’équipe (/admin) : il entre, sans être de l’équipe", async ({ page }, testInfo) => {
+  const email = emailLibre(testInfo, "liste-invitee");
+  /* Inscrit, puis invité : ce que fait « Inviter la liste d’attente » de /admin, une fois le mail « Ta place est prête » parti */
+  await sql()`insert into waitlist (email_hash, email, source, invite_le) values (${empreinte(`attente:${email}`)}, ${chiffrer(email)}, 'accueil', now())`;
+  try {
+    await seConnecter(page, email);
+    /* Pas encore de conv : l’accueil mène au début du parcours */
+    await expect(page).toHaveURL(/\/commencer$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où\u00a0?" })).toBeVisible();
+    /* Sa session tient d’une requête à l’autre ; il n’est pas de l’équipe : il paie ses rapports et ses bulles */
+    const compte = await page.request.get("/api/compte");
+    expect(compte.status()).toBe(200);
+    expect(await compte.json()).toMatchObject({ email, equipe: false, client: false, bulles: 0 });
+  } finally {
+    await sql()`delete from waitlist where email_hash = ${empreinte(`attente:${email}`)}`;
+  }
 });

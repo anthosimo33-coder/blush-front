@@ -1,4 +1,4 @@
-import { compteDe, emailLibre, expect, INVITES, lectureFaite, seConnecter, seConnecterAdmin, test } from "./aide";
+import { ADMIN, compteDe, emailLibre, expect, INVITES, lectureFaite, seConnecter, seConnecterAdmin, sql, test } from "./aide";
 
 /*
  * Le tableau de bord (/admin) : réservé aux emails de BLUSH_ADMINS. Pour tous les autres, il n’existe pas (une 404,
@@ -118,9 +118,18 @@ test("les gestes de l’équipe : des bulles à un compte, puis le rapport de sa
   });
 
   await test.step("le tableau de bord se relit : les deux gestes en tête des derniers, sans dire pour qui", async () => {
+    /* Un autre test peut faire les mêmes gestes en même temps (un autre navigateur) : au moins les nôtres */
     const journal = admin.getByRole("list", { name: "Les derniers gestes" });
-    await expect(journal.getByText("1 conv débloquée", { exact: true })).toBeVisible();
-    await expect(journal.getByText("+25 bulles données", { exact: true })).toBeVisible();
+    await expect(journal.getByText("1 conv débloquée", { exact: true }).first()).toBeVisible();
+    await expect(journal.getByText("+25 bulles données", { exact: true }).first()).toBeVisible();
+    /* Au journal de l’équipe, en base : qui (le compte de l’équipe), pour qui, combien */
+    const notees = await sql()<{ action: string; nombre: number; parEquipe: boolean }[]>`
+      select a.action, a.nombre, p.email = ${ADMIN} as "parEquipe" from actions_equipe a join users u on u.id = a.compte_id left join users p on p.id = a.par_id
+      where u.email = ${email} order by a.id`;
+    expect(notees).toEqual([
+      { action: "bulles", nombre: 25, parEquipe: true },
+      { action: "debloquer", nombre: 1, parEquipe: true },
+    ]);
     await expect(journal).not.toContainText(email);
     await expect(admin.getByText(email)).toHaveCount(0);
   });
