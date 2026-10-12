@@ -203,6 +203,29 @@ describe("commander", () => {
   });
 });
 
+describe("une offre unique commandée deux fois", () => {
+  it("payées toutes les deux : la première profite de l’offre, la seconde ③ n’est pas livrée, la seconde recharge n’a pas son bonus", async () => {
+    const u = await compteDeTest("unique-double");
+    await montrer(u, "premiere_recharge");
+    const [une, deux] = [await commande(u, "pack80", { fournisseur: "factice" }), await commande(u, "pack80", { fournisseur: "factice" })];
+    expect([une.bulles, deux.bulles]).toEqual([80 + PREMIERE_RECHARGE.bonus, 80 + PREMIERE_RECHARGE.bonus]);
+    expect((await livrer(une.id)).effet).toBe("livre");
+    /* Le pack est payé au prix normal : il est livré, sans le bonus déjà pris */
+    expect(await livrer(deux.id)).toMatchObject({ effet: "livre", achat: { bulles: 80 } });
+    expect(await soldeDe(u.id)).toBe(80 + PREMIERE_RECHARGE.bonus + 80);
+
+    const v = await compteDeTest("unique-double-ajout");
+    await livrer((await commande(v, "rapport", { storyId: await conv(v), fournisseur: "factice" })).id);
+    await montrer(v, "premium_ajout");
+    const [a, b] = [await commande(v, "premium_ajout", { fournisseur: "factice" }), await commande(v, "premium_ajout", { fournisseur: "factice" })];
+    const effets = await Promise.all([livrer(a.id), livrer(b.id)]);
+    /* 80 bulles pour 5 € une seule fois : l’autre paiement reste en attente, à rembourser (l’alerte part de la route du webhook) */
+    expect(effets.map((l) => l.effet).sort()).toEqual(["livre", "offre"]);
+    expect(await soldeDe(v.id)).toBe(10 + 80);
+    expect([(await achatEnBase(a.id)).statut, (await achatEnBase(b.id)).statut].sort()).toEqual(["en_attente", "paye"]);
+  });
+});
+
 describe("livrer et reprendre", () => {
   beforeAll(() => {
     etat.apres.length = 0;

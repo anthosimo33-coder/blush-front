@@ -508,6 +508,20 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 422, corps: { erreur: "offre" } });
   });
 
+  it("③ commandée deux fois (deux onglets) puis payée deux fois : livrée une seule fois ; l’autre paiement n’est pas livré, l’équipe est prévenue de le rembourser", async () => {
+    const { u } = await acheteur("offre-ajout-double");
+    await rapportPaye();
+    expect((await montrer("premium_ajout")).offre).toBe("premium_ajout");
+    /* Deux commandes tant que l’offre vaut (deux onglets), chacune payée en un geste : deux webhooks payment.succeeded */
+    const une = (await payer({ offre: "premium_ajout", renonciation: true })).corps.achat;
+    const deux = (await payer({ offre: "premium_ajout", renonciation: true })).corps.achat;
+    etat.alertes.length = 0;
+    await apresLaReponse();
+    expect(await soldeDe(u.id)).toBe(10 + 80);
+    expect([(await achatEnBase(une)).statut, (await achatEnBase(deux)).statut].sort()).toEqual(["en_attente", "paye"]);
+    expect(etat.alertes).toEqual(["paiement : offre unique déjà prise"]);
+  });
+
   it("③ en un geste chez Whop, sans réponse ou illisible : aucune page de plus (pas de second débit), l’achat échoue, et son webhook le livre quand même", async () => {
     const { u } = await acheteur("offre-geste-whop");
     etat.mode = "whop";
