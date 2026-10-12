@@ -10,6 +10,7 @@ import type { LigneEcran } from "./histoires";
 import { erreur, memeOrigine } from "./http";
 import { auMieux } from "./journal";
 import { compter, ipDe, LIMITES, rendre, sousLaLimite, type Limite } from "./limites";
+import { aujourdhuiParis } from "./temps";
 
 /*
  * La garde commune des routes /api : ce que chacune vérifie avant de faire quoi que ce soit, toujours dans le même ordre.
@@ -75,39 +76,50 @@ export const rendreAuCompte = (compte: { email: string }, nom: LimiteDuCompte) =
  */
 export const sousLaLimiteDeLIp = (req: Request, nom: string, limite: Limite, n = 1) => sousLaLimite(`${nom}:ip:${ipDe(req)}`, limite, n);
 
-/* Le compteur du jour des Ko importés par tous (LIMITES.koBrouillonsParJour) */
-const KO_DES_BROUILLONS = "brouillons:ko";
+/* Le compteur des Ko importés par tous, rangé sur le jour de Paris : il repart à minuit, ses alertes avec lui */
+const koDesBrouillons = (jour: string) => `brouillons:ko:${jour}`;
+
+/** Un import dans le budget d’octets du jour (octetsDansLeBudget) : `rendre` lui retire sa place dans le plafond de tous. */
+export type PlaceDansLeBudget = { rendre: () => Promise<void> };
 
 /**
- * Les octets d’un import tiennent-ils dans le budget du jour (S-02) ? Comptés en Ko, arrondis au-dessus : d’abord pour
- * l’adresse IP de la requête (LIMITES.koImportParIp ; un fichier refusé compte aussi, comme tout passage), puis pour tous
- * (LIMITES.koBrouillonsParJour ; un fichier refusé là rend sa place, il ne garde personne dehors). L’équipe est prévenue
- * quand le jour passe 80 % du plafond de tous, puis quand il l’atteint : une fois chacun par jour.
+ * Les octets d’un import tiennent-ils dans le budget du jour (S-02) ? Comptés en Ko, arrondis au-dessus, avant de le
+ * lire : d’abord pour l’adresse IP de la requête (LIMITES.koImportParIp ; un fichier illisible compte aussi, contre le
+ * coût de sa lecture), puis pour tous (LIMITES.koBrouillonsParJour, le jour de Paris). Rend null au-delà : un refus pour
+ * tous rend les Ko comptés, à tous et à l’adresse (elle réessaiera demain sans avoir usé son budget). Sinon, la place
+ * prise dans le plafond de tous : la route la rend si l’import n’aboutit pas (un fichier illisible, un groupe, une conv
+ * courte n’entrent pas en base). L’équipe est prévenue quand le jour passe 80 % du plafond de tous, puis au premier
+ * refus : une fois chacun par jour.
  */
-export async function octetsDansLeBudget(req: Request, octets: number): Promise<boolean> {
+export async function octetsDansLeBudget(req: Request, octets: number): Promise<PlaceDansLeBudget | null> {
   const ko = Math.max(1, Math.ceil(octets / 1024));
-  if (!(await sousLaLimiteDeLIp(req, "import:ko", LIMITES.koImportParIp, ko))) return false;
-  const { alerteA, ...jour } = LIMITES.koBrouillonsParJour;
-  const total = await compter(KO_DES_BROUILLONS, jour, ko);
+  const deLIp = `import:ko:ip:${ipDe(req)}`;
+  if (!(await sousLaLimite(deLIp, LIMITES.koImportParIp, ko))) return null;
+  const { alerteA, ...plafond } = LIMITES.koBrouillonsParJour;
+  const jour = aujourdhuiParis().iso;
+  const deTous = koDesBrouillons(jour);
+  const total = await compter(deTous, plafond, ko);
   const avant = total - ko;
-  /* Le premier refusé (un import qui remplit pile le plafond passe : c’est le suivant qui le dit) */
-  if (avant <= jour.max && total > jour.max) await prevenirDesBrouillons(1, avant);
-  else if (avant < alerteA * jour.max && total >= alerteA * jour.max) await prevenirDesBrouillons(alerteA, total);
-  if (total <= jour.max) return true;
-  await rendre(KO_DES_BROUILLONS, ko);
-  return false;
+  /* Au-delà du plafond, chaque refus le dit : la clé de l’alerte n’en laisse partir qu’une par jour */
+  if (total > plafond.max) await prevenirDesBrouillons(jour, 1, avant);
+  else if (avant < alerteA * plafond.max && total >= alerteA * plafond.max) await prevenirDesBrouillons(jour, alerteA, total);
+  const rendreATous = () => auMieux(() => rendre(deTous, ko), "Ko d’un import non rendus", { ko });
+  if (total <= plafond.max) return { rendre: rendreATous };
+  await rendreATous();
+  await auMieux(() => rendre(deLIp, ko), "Ko d’un import non rendus à l’adresse", { ko });
+  return null;
 }
 
-/** Prévient l’équipe que les Ko importés du jour ont passé ce seuil du plafond (1 : atteint), une fois par seuil et par jour. */
-async function prevenirDesBrouillons(seuil: number, ko: number): Promise<void> {
+/** Prévient l’équipe que les Ko importés de ce jour ont passé ce seuil du plafond (1 : atteint), une fois par seuil et par jour. */
+async function prevenirDesBrouillons(jour: string, seuil: number, ko: number): Promise<void> {
   await auMieux(async () => {
-    if (!(await sousLaLimite(`${KO_DES_BROUILLONS}:alerte:${seuil}`, { max: 1, fenetreS: 86400 }))) return;
+    if (!(await sousLaLimite(`${koDesBrouillons(jour)}:alerte:${seuil}`, { max: 1, fenetreS: 2 * 86400 }))) return;
     const { max } = LIMITES.koBrouillonsParJour;
     await alerter(
       seuil >= 1 ? "imports : plafond du jour atteint" : `imports : ${Math.round(seuil * 100)} % du plafond du jour`,
       [
-        `${ko} Ko importés depuis le début de la fenêtre, pour un plafond de ${max} Ko par jour (LIMITES.koBrouillonsParJour).`,
-        "Au plafond, plus personne ne peut importer : chacun voit « trop » jusqu’à la fin de la fenêtre.",
+        `${ko} Ko importés le ${jour}, pour un plafond de ${max} Ko par jour (LIMITES.koBrouillonsParJour).`,
+        "Au plafond, plus personne ne peut importer : chacun voit « trop_jour » jusqu’à minuit.",
       ],
       /* Touche tout le monde : passe dans la réserve des alertes importantes (S-19) */
       { importante: true },

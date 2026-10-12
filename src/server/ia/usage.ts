@@ -6,9 +6,9 @@ import { db, schema } from "../db";
 /*
  * Le suivi des coûts (ai_usage) : une ligne par appel payant à un prestataire (le modèle, la voix, la transcription),
  * jamais de contenu. Le budget de l’IA du jour l’additionne (src/server/budget.ts), le résumé de la nuit aussi
- * (src/server/alertes.ts). Ce que mesure chaque colonne de quantité dépend du prestataire :
+ * (src/server/veille.ts). Ce que mesure chaque colonne de quantité dépend du prestataire :
  *   - le modèle : les jetons lus, écrits et en cache ;
- *   - la voix (« vocal_voix ») : les caractères dits, en `sortie` (le plafond du mois les additionne, src/server/ia/voix.ts) ;
+ *   - la voix (« vocal_voix ») : les caractères dits, en `sortie` (le plafond du mois, lui, les compte dans rate_limits : voix:mois, src/server/ia/voix.ts) ;
  *   - la transcription (« vocal_transcription ») : les secondes de son, en `entree`.
  */
 

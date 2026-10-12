@@ -3,7 +3,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
  * Le budget d’octets des imports (S-02, octetsDansLeBudget de src/server/requete.ts) : la taille du fichier reçu,
- * comptée en Ko avant de le lire, par adresse IP et pour tous, par jour. La route est appelée comme le ferait le
+ * comptée en Ko avant de le lire, par adresse IP (24 h) et pour tous (le jour de Paris, seulement les imports devenus
+ * brouillons). La route est appelée comme le ferait le
  * navigateur (ses cookies simulés), et les alertes de l’équipe relevées au lieu de partir. Les compteurs sont posés près
  * de leur plafond plutôt que remplis à coups d’imports, puis effacés : ceux de tous avant chaque test (les fichiers
  * déjà passés ont importé), et tous à la fin.
@@ -22,6 +23,7 @@ import { POST as postImport } from "@/app/api/import/route";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { compteDe, LIMITES } from "@/server/limites";
+import { aujourdhuiParis } from "@/server/temps";
 import { convDeTest } from "./aide/fichiers";
 import { creees } from "./aide/nettoyage";
 
@@ -33,8 +35,11 @@ const CONV = "01-a-deux-doigts.txt";
 /** Les Ko que compte l’import de CONV (arrondis au-dessus). */
 const KO = Math.ceil(convDeTest(CONV).size / 1024);
 
-const TOUS = "brouillons:ko";
-const cles = new Set([TOUS, `${TOUS}:alerte:0.8`, `${TOUS}:alerte:1`]);
+const JOUR = aujourdhuiParis().iso;
+const TOUS = `brouillons:ko:${JOUR}`;
+/* La veille : ses alertes ne retiennent pas celles du jour */
+const HIER = `brouillons:ko:${aujourdhuiParis(new Date(Date.now() - 86400e3)).iso}`;
+const cles = new Set([TOUS, `${TOUS}:alerte:0.8`, `${TOUS}:alerte:1`, `${HIER}:alerte:1`]);
 const empreintes = () => [...cles].map((c) => empreinte(`limite:${c}`));
 
 /** Le compte d’une limite, posé à `count` pour une fenêtre qui commence maintenant. */
@@ -47,11 +52,11 @@ async function poser(cle: string, count: number): Promise<void> {
     .onConflictDoUpdate({ target: schema.rateLimits.key, set: fenetre });
 }
 
-/** Un import de CONV depuis cette adresse : le code d’erreur, ou null s’il est passé (son brouillon est effacé à la fin). */
-async function importer(ip: string): Promise<string | null> {
+/** Un import de `fichier` (CONV) depuis cette adresse : le code d’erreur, ou null s’il est passé (son brouillon est effacé à la fin). */
+async function importer(ip: string, fichier = convDeTest(CONV)): Promise<string | null> {
   cles.add(`import:ip:${ip}`).add(`import:ko:ip:${ip}`);
   const fd = new FormData();
-  fd.append("fichier", convDeTest(CONV));
+  fd.append("fichier", fichier);
   const r = await postImport(
     new Request("http://localhost/api/import", { method: "POST", body: fd, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": ip } }),
   );
@@ -78,9 +83,17 @@ describe("le budget d’octets des imports (S-02)", () => {
     /* Juste de quoi passer une fois de plus : le compte arrive pile au plafond */
     await poser(`import:ko:ip:${ip}`, LIMITES.koImportParIp.max - KO);
     expect(await importer(ip)).toBeNull();
-    expect(await importer(ip)).toBe("trop");
+    expect(await importer(ip)).toBe("trop_jour");
     expect(await importer(nouvelleIp())).toBeNull();
     expect(alertes).toEqual([]);
+  });
+
+  it("un fichier illisible compte pour son adresse (sa lecture coûte), jamais pour tous : il n’entre pas en base", async () => {
+    const ip = nouvelleIp();
+    const illisible = new File([Uint8Array.from({ length: 3000 }, (_, i) => (i * 7919) % 251)], "conv.zip", { type: "application/zip" });
+    expect(await importer(ip, illisible)).toBe("fichier");
+    expect(await compteDe(`import:ko:ip:${ip}`, LIMITES.koImportParIp)).toBe(3);
+    expect(await compteDe(TOUS, LIMITES.koBrouillonsParJour)).toBe(0);
   });
 
   it("refuse tout le monde au plafond de tous, sans garder la place du refusé, et prévient l’équipe à 80 % puis au plafond, une fois chacun", async () => {
@@ -92,17 +105,20 @@ describe("le budget d’octets des imports (S-02)", () => {
     expect(await importer(nouvelleIp())).toBeNull();
     expect(alertes).toHaveLength(1);
 
-    /* À un Ko du plafond : le suivant le passerait, il est refusé, et le compte de tous ne bouge pas */
+    /* À un Ko du plafond : le suivant le passerait, il est refusé ; ni le compte de tous, ni celui de son adresse ne bougent */
     await poser(TOUS, max - 1);
-    expect(await importer(nouvelleIp())).toBe("trop");
+    const ip = nouvelleIp();
+    expect(await importer(ip)).toBe("trop_jour");
     expect(await compteDe(TOUS, LIMITES.koBrouillonsParJour)).toBe(max - 1);
-    expect(await importer(nouvelleIp())).toBe("trop");
+    expect(await compteDe(`import:ko:ip:${ip}`, LIMITES.koImportParIp)).toBe(0);
+    expect(await importer(nouvelleIp())).toBe("trop_jour");
     expect(alertes.slice(1)).toEqual([{ sujet: "imports : plafond du jour atteint", importante: true }]);
   });
 
-  it("un jour rempli pile au plafond : le premier refusé prévient l’équipe", async () => {
+  it("un jour rempli pile au plafond : le premier refusé prévient l’équipe, même si la veille l’a déjà été", async () => {
+    await poser(`${HIER}:alerte:1`, 1);
     await poser(TOUS, LIMITES.koBrouillonsParJour.max);
-    expect(await importer(nouvelleIp())).toBe("trop");
+    expect(await importer(nouvelleIp())).toBe("trop_jour");
     expect(alertes).toEqual([{ sujet: "imports : plafond du jour atteint", importante: true }]);
   });
 

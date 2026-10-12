@@ -300,13 +300,22 @@ export async function appeler<S extends z.ZodType>(
   const flux = REGLAGES[req.tache].flux || !!surAvance;
   const debut = Date.now();
   /*
-   * Le délai et les nouvelles tentatives du SDK tiennent ensemble dans le temps qui reste : le SDK compte son délai à
-   * chaque tentative (jusqu’à la réponse d’un bloc, ou jusqu’au début du flux), le temps qui reste se partage donc entre
-   * elles. Une tentative de plus quand il reste plus de 150 s ; sans échéance (un script), deux, de 200 s chacune.
+   * Le délai et les nouvelles tentatives du SDK tiennent ensemble dans le temps qui reste. Le SDK compte son délai à
+   * chaque tentative. En flux, il ne couvre que l’attente du début du flux : il se partage entre les tentatives (sans
+   * échéance, un script : trois de 200 s). D’un bloc, il couvre tout l’appel (un verdict écrit parfois plus de deux
+   * minutes) : chaque tentative garde le délai plein. Dans les deux cas, l’échéance arrête l’appel entier (le signal) :
+   * une nouvelle tentative ne part qu’après un échec rapide (une surcharge, une connexion coupée), dans le temps qui
+   * reste. Une tentative de plus quand il reste plus de 150 s.
    */
   const reste = tempsRestant();
   const maxRetries = reste === Infinity ? 2 : reste > 150_000 ? 1 : 0;
-  const options: OptionsEnvoi = { timeout: Math.floor(delaiAppel(600_000) / (maxRetries + 1)), maxRetries, ...(signal ? { signal } : {}) };
+  const delai = delaiAppel(600_000);
+  const signaux = [...(signal ? [signal] : []), ...(reste === Infinity ? [] : [AbortSignal.timeout(delai)])];
+  const options: OptionsEnvoi = {
+    timeout: flux ? Math.floor(delai / (maxRetries + 1)) : delai,
+    maxRetries,
+    ...(signaux.length ? { signal: AbortSignal.any(signaux) } : {}),
+  };
   const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance, req.tache) : null });
   const { usage, model } = message;
   const ms = Date.now() - debut;

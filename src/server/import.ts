@@ -33,9 +33,8 @@ export const TEXTE_LU_MAX_CARACTERES = TEXTE_CONV_MAX;
  * lecture (un objet par message) devant un export forgé de lignes minuscules. Une vraie conv au plus gros que le
  * navigateur envoie (TEXTE_CONV_MAX, ses lignes de plus de 40 caractères en moyenne) en reste en deçà ; au-delà, on
  * garde les plus récentes (`coupe`).
- * Mesuré : environ 2 s de lecture et 700 Mo de mémoire au pire. Le plafond de
- * 8 Mo de l’audit S-11 coupait une conv d’à peine 21 mois que le navigateur envoyait entière, il est levé : la lecture
- * est linéaire.
+ * Mesuré : environ 2 s de lecture et 700 Mo de mémoire au pire. Le plafond de 8 Mo de l’audit S-11 coupait une conv
+ * d’à peine 21 mois que le navigateur envoyait entière, il est levé : la lecture est linéaire.
  */
 export const LIGNES_MAX = 1_000_000;
 /**

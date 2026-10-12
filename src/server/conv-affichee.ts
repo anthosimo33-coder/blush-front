@@ -2,7 +2,7 @@ import "server-only";
 import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Source, type Story } from "@/types";
 import type { Meta } from "./histoires";
-import { joursCouverts } from "./temps";
+import { dureeLisible, joursCouverts } from "./temps";
 
 /* La conv telle que l’affiche le front (le type Story) : tirée de sa meta seule, sans la base ni la conv brute. */
 
@@ -59,7 +59,7 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
     totalMessages: total,
     voiceCount: vocaux,
     period: periode,
-    durationLabel: `${jours} jour${jours > 1 ? "s" : ""}`,
+    durationLabel: dureeLisible(jours),
     updatedLabel: "aujourd’hui",
     /* Qui est l’utilisateur : le rapport ouvert depuis le mail (un autre onglet, sans parcours) met les bons avatars */
     ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),

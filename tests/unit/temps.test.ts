@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { joursCouverts } from "@/server/temps";
+import { dureeLisible, joursCouverts } from "@/server/temps";
 
 /*
  * La durée d’une conv (joursCouverts, src/server/temps.ts) : les jours de son calendrier, du premier au dernier compris.
@@ -19,6 +19,10 @@ describe("les jours qu’une conv couvre", () => {
     expect(joursCouverts("2026-10-24", "2026-10-26")).toBe(3);
     expect(joursCouverts("2026-03-28", "2026-03-30")).toBe(3);
     expect(joursCouverts("2024-02-28", "2024-03-01")).toBe(3);
+  });
+
+  it("se dit pareil partout : en jours, puis en mois à partir de 60 jours", () => {
+    expect([1, 4, 59, 60, 450].map(dureeLisible)).toEqual(["1\u00a0jour", "4\u00a0jours", "59\u00a0jours", "2\u00a0mois", "15\u00a0mois"]);
   });
 
   it("lit un moment entier par son jour, et ne rend jamais moins d’un jour", () => {

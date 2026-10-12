@@ -65,7 +65,7 @@ const REGLAGES = {
   joueuse: { stability: 0, similarity_boost: 0.75, style: 0.6 },
 } as const;
 
-/** Le nom de chaque voix de l’A/B test dans la bibliothèque du prestataire, pour l’équipe (le résumé de la nuit, src/server/alertes.ts). */
+/** Le nom de chaque voix de l’A/B test dans la bibliothèque du prestataire, pour l’équipe (le résumé de la nuit, src/server/veille.ts). */
 export const NOMS_VOIX: Record<Voix, string> = { A: "E2", B: "L2, Harmonie" };
 
 /** L’identifiant chez le prestataire d’une des deux voix de l’A/B test (BLUSH_VOIX_A, BLUSH_VOIX_B) ; sans voix B, la A. */

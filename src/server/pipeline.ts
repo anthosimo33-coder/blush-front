@@ -9,7 +9,7 @@ import { db, schema } from "./db";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
-import { ErreurTache, estBudget, estBudgetVoix, estRefus } from "./erreurs";
+import { ARRETS_DU_BUDGET, ErreurTache, estBudget, estBudgetVoix, estRefus, type ArretDuBudget } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
@@ -155,7 +155,7 @@ const DETRUIT_SON_ENTREE: ReadonlySet<Genre> = new Set(["memoire"]);
  * (l’écran dit « BLUSH souffle un peu, réessaie demain »), sans user l’essai que `prendre` venait de compter. Pas
  * d’alerte : l’équipe est prévenue du budget lui-même. Elle repart après minuit (reprendreApresMinuit).
  */
-async function suspendre(t: Tache, code: "budget" | "voix_budget" = "budget"): Promise<void> {
+async function suspendre(t: Tache, code: ArretDuBudget = "budget"): Promise<void> {
   await db()
     .update(schema.tasks)
     .set({ status: "echec", error: code, attempts: sql`greatest(${schema.tasks.attempts} - 1, 0)`, updatedAt: new Date() })
@@ -188,7 +188,7 @@ async function reprendreApresMinuit(storyId: string): Promise<number> {
       and(
         eq(schema.tasks.storyId, storyId),
         eq(schema.tasks.status, "echec"),
-        inArray(schema.tasks.error, ["budget", "voix_budget"]),
+        inArray(schema.tasks.error, [...ARRETS_DU_BUDGET]),
         lt(schema.tasks.updatedAt, DEBUT_DU_JOUR),
         repartPourDeBon,
       ),

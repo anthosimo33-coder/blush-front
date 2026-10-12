@@ -18,6 +18,8 @@ export const ERREURS_API = {
   beta: 403,
   /** Une limite atteinte (src/server/limites.ts). */
   trop: 429,
+  /** Le budget d’octets des imports du jour (S-02) : celui de cette adresse, ou le plafond de tous (octetsDansLeBudget, src/server/requete.ts). */
+  trop_jour: 429,
   /** Les codes de connexion du jour : trop demandés pour cet email, ou le plafond des mails atteint pour tous. */
   codes: 429,
   /** Trop d’essais de code ratés aujourd’hui, pour ce navigateur, cette adresse ou l’email (src/server/auth.ts, prendreCode) : à la vérification, et à la demande d’un nouveau code. */

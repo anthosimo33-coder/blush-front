@@ -17,6 +17,7 @@ describe("le serveur", () => {
       interdit: 401,
       beta: 403,
       trop: 429,
+      trop_jour: 429,
       codes: 429,
       essais: 429,
       aucune: 404,
@@ -148,6 +149,9 @@ describe("les écrans", () => {
   it("le fichier ou la conv elle-même ouvrent l’écran d’erreur de l’import ; le reste se dit sur l’écran", () => {
     expect(erreurDeParcours("export", api("groupe"))).toBe("groupe");
     expect(erreurDeParcours("export", api("trop"))).toBeNull();
+    /* Le budget d’octets du jour (S-02) ne promet pas « dans une heure » : il dure jusqu’au lendemain */
+    expect(erreurDeParcours("export", api("trop_jour"))).toBeNull();
+    expect(messageErreur("export", api("trop_jour"))).toBe("Beaucoup de convs importées aujourd’hui. Réessaie demain.");
     expect(erreurDeParcours("captures", new ErreurApi("longue", 422))).toBe("longue");
     /* Des captures : un « fichier » n’a pas d’écran à lui, l’écran des captures dit qu’elles sont illisibles */
     expect(erreurDeParcours("captures", api("fichier"))).toBeNull();

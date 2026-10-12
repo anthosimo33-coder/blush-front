@@ -77,14 +77,17 @@ export const LIMITES = {
   /*
    * Le budget d’octets des imports (S-02), en Ko (le compte de rate_limits est un entier de 32 bits) : la taille du
    * fichier reçu, comptée avant de le lire (src/app/api/import, octetsDansLeBudget de src/server/requete.ts). Un brouillon
-   * vit 24 h dans la base avant la purge : sans ce budget, des imports à la chaîne (20 par heure et par adresse, de
-   * 4,5 Mo chacun) rempliraient la base de Neon sans rien payer. Par adresse IP, de quoi importer une dizaine des plus
-   * gros exports par jour ; pour tous, un plafond du jour, prévenu à `alerteA` (80 %) puis quand il est atteint : tout
-   * le monde voit alors « trop » à l’import. TODO(produit): 40 000 Ko par adresse et 150 000 Ko pour tous, par jour, à
-   * caler sur l’offre Neon.
+   * reste en base jusqu’à environ 48 h (la purge passe une fois par nuit, et efface ceux de plus d’un jour) : sans ce
+   * budget, des imports à la chaîne (20 par heure et par adresse, de 4,5 Mo chacun) rempliraient la base de Neon sans
+   * rien payer. Par adresse IP (24 h), de quoi importer trois des plus gros exports par jour, des dizaines d’ordinaires ;
+   * un fichier illisible y compte aussi. Pour tous, par jour de Paris (la clé porte le jour ; sa fenêtre ne fait que la
+   * garder jusqu’au lendemain), seuls les imports devenus brouillons : dix adresses au moins pour le remplir. Prévenu à
+   * `alerteA` (80 %), puis quand il refuse : tout le monde voit alors « trop_jour » à l’import, jusqu’à minuit.
+   * TODO(produit): 15 000 Ko par adresse et 150 000 Ko pour tous, par jour, à caler sur l’offre Neon : la base peut
+   * garder environ deux fois koBrouillonsParJour (deux nuits de brouillons).
    */
-  koImportParIp: { max: 40_000, fenetreS: 86400 },
-  koBrouillonsParJour: { max: 150_000, fenetreS: 86400, alerteA: 0.8 },
+  koImportParIp: { max: 15_000, fenetreS: 86400 },
+  koBrouillonsParJour: { max: 150_000, fenetreS: 2 * 86400, alerteA: 0.8 },
   chatParCompte: { max: 150, fenetreS: 86400 },
   /**
    * Les vocaux envoyés au chat (S-15), par jour : chacun est transcrit, à la durée. Un message du chat les compte aussi

@@ -24,6 +24,9 @@ export function joursCouverts(debut: string, fin: string): number {
   return Number.isFinite(ecart) ? Math.max(1, ecart + 1) : 1;
 }
 
+/** Une durée de conv à l’écran, la même pendant la lecture et sur le verdict : en jours (« 4 jours »), en mois à partir de 60 jours. */
+export const dureeLisible = (jours: number) => (jours >= 60 ? `${Math.round(jours / 30)}\u00a0mois` : `${jours}\u00a0jour${jours > 1 ? "s" : ""}`);
+
 /** Un moment dit comme dans Messages, à l’heure de Paris : « aujourd’hui », « hier », « lun. » dans la semaine, puis « 12 mars ». */
 export function jourRelatif(quand: Date, maintenant = new Date()): string {
   const ecart = Math.round((aujourdhuiParis(maintenant).t - aujourdhuiParis(quand).t) / 86400e3);

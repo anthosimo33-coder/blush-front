@@ -149,21 +149,31 @@ describe("appeler : l’envoi", () => {
     erreur.mockRestore();
   });
 
-  it("le délai et les nouvelles tentatives du SDK tiennent ensemble dans le temps qui reste : chaque tentative a sa part", async () => {
+  it("le délai et les nouvelles tentatives du SDK tiennent dans le temps qui reste : partagé en flux, plein d’un bloc, l’échéance arrête tout", async () => {
     const ok = rend(message([texte('{"ok":true}')]));
-    const envois = faux(ok, ok, ok);
+    const envois = faux(ok, ok, ok, ok, ok);
+    const enFlux = { surAvance: () => {} };
     await appeler(VERDICT, Format);
+    await appeler(VERDICT, Format, enFlux);
+    await avecEcheance(200_000, () => appeler(VERDICT, Format, enFlux));
     await avecEcheance(200_000, () => appeler(VERDICT, Format));
     await avecEcheance(100_000, () => appeler(VERDICT, Format));
-    /* Sans échéance (un script) : trois tentatives de 200 s */
-    expect(envois[0]![1]).toMatchObject({ timeout: 200_000, maxRetries: 2 });
-    /* 200 s : deux tentatives, qui tiennent ensemble avant l’échéance (moins la marge de delaiAppel) */
-    expect(envois[1]![1].maxRetries).toBe(1);
-    expect(envois[1]![1].timeout * 2).toBeLessThanOrEqual(195_000);
-    expect(envois[1]![1].timeout).toBeGreaterThan(90_000);
+    /* Sans échéance (un script) : trois tentatives, de 600 s d’un bloc, de 200 s jusqu’au début du flux ; rien d’autre ne les arrête */
+    expect(envois[0]![1]).toEqual({ timeout: 600_000, maxRetries: 2 });
+    expect(envois[1]![1]).toEqual({ timeout: 200_000, maxRetries: 2 });
+    /* 200 s, en flux : deux tentatives, qui attendent le début du flux chacune sa part du temps qui reste (moins la marge de delaiAppel) */
+    expect(envois[2]![1].maxRetries).toBe(1);
+    expect(envois[2]![1].timeout * 2).toBeLessThanOrEqual(195_000);
+    expect(envois[2]![1].timeout).toBeGreaterThan(90_000);
+    /* 200 s, d’un bloc : un verdict long garde tout le temps qui reste ; une deuxième tentative ne part qu’après un échec rapide */
+    expect(envois[3]![1].maxRetries).toBe(1);
+    expect(envois[3]![1].timeout).toBeGreaterThan(190_000);
+    expect(envois[3]![1].timeout).toBeLessThanOrEqual(195_000);
+    /* Avec une échéance, le signal arrête l’appel entier avant elle */
+    for (const e of envois.slice(2)) expect(e[1].signal).toBeInstanceOf(AbortSignal);
     /* 100 s : une seule */
-    expect(envois[2]![1].maxRetries).toBe(0);
-    expect(envois[2]![1].timeout).toBeLessThanOrEqual(95_000);
+    expect(envois[4]![1].maxRetries).toBe(0);
+    expect(envois[4]![1].timeout).toBeLessThanOrEqual(95_000);
   });
 
   it("plus le temps avant l’échéance : l’appel ne part pas (« delai »)", async () => {

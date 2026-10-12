@@ -23,13 +23,13 @@ const CHAT_ET_QUESTION = {
   acces: "le chat avec moi, c’est dans BLUSH+",
 } as const;
 
+/** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
+const ECOUTE_IMPOSSIBLE = "j’arrive pas à écouter ton vocal là, écris-moi";
+
 /*
  * Il dit « avec cet email », mais la porte se ferme aussi pour ce navigateur seul (dix essais ratés), ou depuis cette
  * adresse (vingt, sauf la réserve d’un navigateur), avant celle de l’email (soixante).
  */
-/** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
-const ECOUTE_IMPOSSIBLE = "j’arrive pas à écouter ton vocal là, écris-moi";
-
 /** Trop d’essais de code ratés aujourd’hui (src/server/auth.ts) : ni un code tapé, ni un nouveau code n’y font plus rien. */
 const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.";
 
@@ -51,6 +51,8 @@ const MESSAGES = {
   /* Un export qui n’a pas pu partir (le fichier lui-même a son écran : erreurDeParcours) */
   export: {
     trop: "Beaucoup d’imports d’un coup. Réessaie dans une heure.",
+    /* Le budget d’octets du jour, de son adresse ou de tous (S-02) : il repart à minuit, ou 24 h après le premier import de l’adresse. TODO(produit): texte nouveau */
+    trop_jour: "Beaucoup de convs importées aujourd’hui. Réessaie demain.",
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* L’import de captures ou d’un enregistrement d’écran (la conv elle-même a son écran : erreurDeParcours) */

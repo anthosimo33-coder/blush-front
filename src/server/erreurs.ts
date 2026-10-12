@@ -51,6 +51,14 @@ export type CodeTache =
   | "memoire_absente"
   | "memoire_changee";
 
+/**
+ * Les codes d’un arrêt par un budget, celui de l’IA ou celui de la voix (tasks.error) : l’étape repart après minuit, ce
+ * n’est pas un échec définitif. La seule liste : la suspension et la reprise (src/server/pipeline.ts), le résumé de la
+ * nuit (src/server/veille.ts).
+ */
+export const ARRETS_DU_BUDGET = ["budget", "voix_budget"] as const satisfies readonly CodeTache[];
+export type ArretDuBudget = (typeof ARRETS_DU_BUDGET)[number];
+
 /** Une erreur attendue d’une étape (son code part dans les logs et la tâche, jamais de contenu). */
 export class ErreurTache extends Error {
   constructor(readonly code: CodeTache) {

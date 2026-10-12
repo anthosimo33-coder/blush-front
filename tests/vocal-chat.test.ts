@@ -146,15 +146,19 @@ describe("un vocal reçu (S-15) : mesuré avant d’être transcrit", () => {
     expect(await compteDe(cle("vocal"), LIMITES.vocalParCompte)).toBe(0);
   });
 
-  it("un fichier qui n’est pas un vocal d’enregistreur : « vocal_illisible », dit à l’équipe avec sa signature, et le message du jour rendu", async () => {
+  it("un fichier qui n’est pas un vocal d’enregistreur : « vocal_illisible », dit à l’équipe avec sa signature après la réponse, et compté dans les messages du jour", async () => {
     const journal = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mails = vi.spyOn(console, "log").mockImplementation(() => {});
     const avant = await compteDe(cle("chat"), LIMITES.chatParCompte);
     const octets = Uint8Array.from({ length: 4096 }, (_, i) => (i * 7919) % 251);
     const r = await envoyerVocal(new File([octets], "vocal.webm", { type: "audio/webm" }));
     expect([r.status, await r.json()]).toEqual([422, { erreur: "vocal_illisible" }]);
-    expect(await compteDe(cle("chat"), LIMITES.chatParCompte)).toBe(avant);
+    /* Il borne ces lectures et ces alertes : un compte ne peut pas en envoyer sans fin */
+    expect(await compteDe(cle("chat"), LIMITES.chatParCompte)).toBe(avant + 1);
     expect(await compteDe(cle("vocal"), LIMITES.vocalParCompte)).toBe(0);
+    /* L’alerte part après la réponse */
+    expect(journal.mock.calls.flat().join("\n")).not.toContain("vocal illisible");
+    await lancerApres();
     /* Le journal : le type annoncé, la taille, les 12 premiers octets ; jamais le son */
     const ligne = journal.mock.calls
       .flat()
@@ -165,7 +169,7 @@ describe("un vocal reçu (S-15) : mesuré avant d’être transcrit", () => {
     expect(mails.mock.calls.flat().join("\n")).toContain("BLUSH · vocal illisible");
   });
 
-  it("un MP4 d’un format inconnu : sa marque (ftyp) dans le journal ; vide : « vocal_vide », le message rendu aussi ; trop lourd : « vocal », sans être lu", async () => {
+  it("un MP4 d’un format inconnu : sa marque (ftyp) dans le journal ; vide : « vocal_vide », le message rendu ; trop lourd : « vocal », sans être lu", async () => {
     const journal = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "log").mockImplementation(() => {});
     const avant = await compteDe(cle("chat"), LIMITES.chatParCompte);
@@ -173,12 +177,14 @@ describe("un vocal reçu (S-15) : mesuré avant d’être transcrit", () => {
     mp4.set([0, 0, 0, 24, ...Buffer.from("ftypqt  ")]);
     let r = await envoyerVocal(new File([mp4], "vocal.mov", { type: "video/quicktime" }));
     expect([r.status, await r.json()]).toEqual([422, { erreur: "vocal_illisible" }]);
+    await lancerApres();
     expect(journal.mock.calls.flat().map((l) => JSON.parse(String(l)) as Record<string, unknown>)).toContainEqual(
       expect.objectContaining({ evenement: "vocal illisible", marque: "qt  " }),
     );
     r = await envoyerVocal(new File([], "vocal.webm", { type: "audio/webm" }));
     expect([r.status, await r.json()]).toEqual([422, { erreur: "vocal_vide" }]);
-    expect(await compteDe(cle("chat"), LIMITES.chatParCompte)).toBe(avant);
+    /* L’illisible reste compté, le vide est rendu */
+    expect(await compteDe(cle("chat"), LIMITES.chatParCompte)).toBe(avant + 1);
     r = await envoyerVocal(new File([new Uint8Array(TAILLE_VOCAL_MAX + 1)], "vocal.webm", { type: "audio/webm" }));
     expect([r.status, await r.json()]).toEqual([422, { erreur: "vocal" }]);
   });

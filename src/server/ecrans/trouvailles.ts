@@ -6,7 +6,7 @@
  */
 import type { Chiffres, Histoire, Message } from "@prompts/lib/conv";
 import { formatCount } from "@/lib/format";
-import { joursCouverts } from "../temps";
+import { dureeLisible, joursCouverts } from "../temps";
 
 const H = 3600e3;
 
@@ -91,9 +91,7 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
 
   /* Le volume, toujours disponible */
   const etendue = c.debut && c.fin ? joursCouverts(c.debut, c.fin) : 0;
-  const volume = etendue
-    ? `${formatCount(total)}\u00a0messages en ${etendue >= 60 ? `${Math.round(etendue / 30)}\u00a0mois` : `${etendue}\u00a0jour${etendue > 1 ? "s" : ""}`}`
-    : null;
+  const volume = etendue ? `${formatCount(total)}\u00a0messages en ${dureeLisible(etendue)}` : null;
 
   /* Deux déséquilibres au plus, puis leur mot, puis de quoi compléter */
   const desequilibres = [ouvre, relance, delai, longueur, soir].filter((x): x is string => !!x);

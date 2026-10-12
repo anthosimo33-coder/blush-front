@@ -169,11 +169,13 @@ async function traiter(req: Request) {
   let ajout: { ajout: Ajout; affiche: string } | undefined;
   try {
     if (envoi.vocal) {
+      const vocal = envoi.vocal;
       /* Sa durée, mesurée ici (S-15) : un vocal trop long ou illisible ne part pas à la transcription, qui se paie à la durée */
-      const lu = await lireVocal(envoi.vocal);
-      if (lu === "vocal_illisible") await signalerVocalIllisible(envoi.vocal);
-      /* Un vocal vide ou illisible n’a fait parler personne : le message du jour est rendu (un trop long reste compté) */
-      if (lu === "vocal_vide" || lu === "vocal_illisible") await rendreAuCompte(utilisateur, "chat");
+      const lu = await lireVocal(vocal);
+      /* Dit à l’équipe après la réponse ; il reste compté dans les messages du jour, qui bornent ces lectures et ces alertes */
+      if (lu === "vocal_illisible") after(() => signalerVocalIllisible(vocal));
+      /* Un vocal vide n’a fait parler personne : le message du jour est rendu (un trop long ou un illisible reste compté) */
+      if (lu === "vocal_vide") await rendreAuCompte(utilisateur, "chat");
       if (typeof lu === "string") return erreur(lu);
       /* Le budget de l’IA d’abord : quand BLUSH souffle, le vocal n’est pas transcrit pour rien (sa transcription y compte) */
       const payeur = await controlerBudget({ storyId: story.id });

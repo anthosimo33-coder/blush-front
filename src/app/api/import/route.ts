@@ -29,9 +29,14 @@ export const POST = route("POST /api/import", async (req: Request) => {
    */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   /* Et ses octets (S-02) : la taille reçue, avant de la lire, dans le budget du jour de l’adresse et de tous */
-  if (!(await octetsDansLeBudget(req, recu.size))) return erreur("trop");
-  const lu = recu === paquet ? await depuisPaquet(recu) : await depuisFichier(recu);
-  const { id, meta, secret } = await importer(lu);
+  const place = await octetsDansLeBudget(req, recu.size);
+  if (!place) return erreur("trop_jour");
+  const lire = async () => importer(recu === paquet ? await depuisPaquet(recu) : await depuisFichier(recu));
+  /* Rien n’entre en base (un fichier illisible, un groupe, une conv courte) : sa place revient à tous, l’adresse garde son compte */
+  const { id, meta, secret } = await lire().catch(async (e: unknown) => {
+    await place.rendre();
+    throw e;
+  });
   await poserBrouillon(secret);
   await compterImportVenuDuPartage();
   const { story, source } = storyEtSource(id, meta);

@@ -2,6 +2,7 @@ import "server-only";
 import { and, count, eq, gte, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { envoyerALEquipe } from "./alertes";
 import { db, schema } from "./db";
+import { ARRETS_DU_BUDGET } from "./erreurs";
 import type { Genre, StatutTache } from "./db/enums";
 import { NOMS_VOIX } from "./ia/voix";
 import { journalErreur } from "./journal";
@@ -12,9 +13,6 @@ import { statsVocal } from "./vocal";
  * lectures, le chat, les échecs, le coût de l’IA et l’A/B test des voix. Hors de src/server/alertes.ts, qui n’a plus à
  * lire la voix ni les vocaux : la voix alerte (src/server/ia/voix.ts), et le budget aussi, sans boucler sur eux.
  */
-
-/* Ce qu’un budget arrête (tasks.error) : ça repart après minuit, ce n’est pas un échec définitif (src/server/pipeline.ts) */
-const ARRETS_DU_BUDGET = ["budget", "voix_budget"];
 
 const dollars = (micros: number) => `${(micros / 1e6).toFixed(2)} $`;
 const part = (n: number, sur: number) => (sur ? `${Math.round((n / sur) * 100)} %` : "–");
@@ -41,7 +39,7 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
             and(
               eq(schema.tasks.status, "echec"),
               gte(schema.tasks.updatedAt, depuis),
-              budget ? inArray(schema.tasks.error, ARRETS_DU_BUDGET) : or(isNull(schema.tasks.error), notInArray(schema.tasks.error, ARRETS_DU_BUDGET)),
+              budget ? inArray(schema.tasks.error, [...ARRETS_DU_BUDGET]) : or(isNull(schema.tasks.error), notInArray(schema.tasks.error, [...ARRETS_DU_BUDGET])),
             ),
           ),
       );
