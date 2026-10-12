@@ -80,6 +80,12 @@ export const stories = pgTable(
     convPurgedAt: quand("conv_purged_at"),
     /** Le chat en vocal : il a demandé à BLUSH de lui parler en vocal (jusqu’à ce qu’il repasse à l’écrit). */
     chatVocal: boolean("chat_vocal").notNull().default(false),
+    /**
+     * La question incluse avec le rapport (plan « rapport ») : l’heure où elle est partie au modèle. Un verrou, pris en
+     * une seule requête (prendreLaQuestion, src/server/question-incluse.ts) : elle ne part qu’une fois, même envoyée deux
+     * fois d’un coup. Rendu (null) si la réponse échoue ; posée pour de bon une fois son échange gardé dans le chat.
+     */
+    questionPrise: quand("question_prise"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },

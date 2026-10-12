@@ -13,6 +13,8 @@ import { lireVocal, signatureDuVocal, transcrire } from "@/server/ia/transcripti
 import { alerter } from "@/server/alertes";
 import { auMieux, journal } from "@/server/journal";
 import { garde, rendreAuCompte, sousLaLimiteDuCompte } from "@/server/requete";
+import { prendreLaQuestion, rendreLaQuestion } from "@/server/question-incluse";
+import { peut } from "@/lib/acces";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import type { EvenementChat } from "@/types";
 import { ROUTES } from "@/types/api";
@@ -30,7 +32,11 @@ const NDJSON = "application/x-ndjson";
 /** L’alerte à l’équipe quand la réponse échoue, d’un bloc comme en flux : la conv, et le code interne (reponseErreur, signalerErreur). */
 const alerteDuChat = (storyId: string) => ({ sujet: "chat en échec", lignes: [`Histoire ${storyId}`] });
 
-type Envoi = { texte: string; captures: File[]; export: File | null; vocal: File | null };
+/** Ce que la réponse de BLUSH reçoit en plus de ce qu’il a dit (src/server/chat.ts). */
+type OptionsDeReponse = NonNullable<Parameters<typeof blushRepond>[4]>;
+
+/** Ce qu’il envoie. `question` : la question du rapport (« Ta question »), toujours en texte (ROUTES). */
+type Envoi = { texte: string; question: boolean; captures: File[]; export: File | null; vocal: File | null };
 
 /**
  * Un vocal que le serveur ne sait pas lire (lireVocal) : un navigateur qui enregistre dans un format qu’on ne connaît
@@ -53,7 +59,7 @@ async function signalerVocalIllisible(vocal: File): Promise<void> {
 async function lireEnvoi(req: Request): Promise<Envoi | null> {
   if (!req.headers.get("content-type")?.startsWith("multipart/form-data")) {
     const lu = await lireCorps(req, ROUTES["POST /api/chat"].corps);
-    return lu ? { texte: lu.texte.trim(), captures: [], export: null, vocal: null } : null;
+    return lu ? { texte: lu.texte.trim(), question: lu.question === true, captures: [], export: null, vocal: null } : null;
   }
   const fd = await req.formData().catch(() => null);
   if (!fd) return null;
@@ -64,6 +70,7 @@ async function lireEnvoi(req: Request): Promise<Envoi | null> {
   const texte = fd.get("texte");
   return {
     texte: typeof texte === "string" ? texte.trim() : "",
+    question: false,
     captures: fd.getAll("captures").filter((f): f is File => f instanceof File),
     export: fichier("export"),
     vocal: fichier("vocal"),
@@ -148,16 +155,19 @@ async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => 
 
 /**
  * Ce qu’il envoie à BLUSH : un texte, des captures (de leur conv ou de son profil), un nouvel export, ou un vocal.
- * Réservé à BLUSH+, une fois la mémoire faite (après le rapport). Ce qui se lit avant que BLUSH écrive (le vocal
- * transcrit, les captures, l’export) répond encore d’un bloc en cas d’erreur, comme un refus du modèle avant sa
- * première bulle ; la réponse, elle, part en flux.
+ * Réservé à BLUSH+, une fois la mémoire faite (après le rapport) ; la question du rapport (`question`), au plan
+ * « rapport » aussi, une fois par conv. Ce qui se lit avant que BLUSH écrive (le vocal transcrit, les captures,
+ * l’export) répond encore d’un bloc en cas d’erreur, comme un refus du modèle avant sa première bulle ; la réponse,
+ * elle, part en flux.
  */
 async function traiter(req: Request) {
-  const g = await garde(req, { session: "requise", plan: "chat", histoire: true });
+  /* Un compte gratuit n’a ni le chat ni la question : 402 avant de lire l’envoi, qui dit ensuite lequel des deux il faut */
+  const g = await garde(req, { session: "requise", plan: "question", histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
   const envoi = await lireEnvoi(req);
   if (!envoi || envoi.texte.length > LONGUEUR_MAX) return erreur("texte");
+  if (!peut(utilisateur.plan, envoi.question ? "question" : "chat")) return erreur("acces");
   const fichiers = envoi.captures.length > 0 || !!envoi.export;
   if (!fichiers && !envoi.vocal && !envoi.texte) return erreur("texte");
   if (!(await sousLaLimiteDuCompte(utilisateur, "chat"))) return erreur("trop");
@@ -165,6 +175,16 @@ async function traiter(req: Request) {
   if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
   const memoire = await memoireDe(story.id);
   if (!memoire) return erreur("pas_pret");
+  /*
+   * La question incluse avec le rapport, sans le chat (plan « rapport ») : une par conv, prise juste avant de partir au
+   * modèle et rendue si la réponse échoue (src/server/question-incluse.ts). Déjà posée, ou en route : 402 comme le chat
+   * (l’écran ouvre le paiement de BLUSH+), et son message du jour est rendu
+   */
+  const incluse = envoi.question && !peut(utilisateur.plan, "chat");
+  if (incluse && !(await prendreLaQuestion(story.id))) {
+    await rendreAuCompte(utilisateur, "chat");
+    return erreur("acces");
+  }
   let dit = envoi.texte;
   let ajout: { ajout: Ajout; affiche: string } | undefined;
   try {
@@ -195,14 +215,20 @@ async function traiter(req: Request) {
       const lu = await depuisExport(story, memoire, await depuisPaquet(envoi.export));
       ajout = { ajout: lu, affiche: resumeAjout(lu, "export", 1) };
     }
+    /* La réponse de BLUSH. Une erreur, avant sa première bulle comme après, rend la question incluse : elle se repose */
+    const reponseDeBlush = (suite: Omit<OptionsDeReponse, "parVocal"> = {}) =>
+      blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, ...suite }).catch(async (e: unknown) => {
+        if (incluse) await rendreLaQuestion(story.id);
+        throw e;
+      });
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
-      const r = await blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal });
+      const r = await reponseDeBlush();
       if (r.majMemoire) relancerApres(story.id);
       return repondre("POST /api/chat", r.reponse);
     }
     /* Le suivi des coûts attend la fin de la réponse */
-    return await enFlux(story.id, (surEvenement) => blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, surEvenement, differer: after }));
+    return await enFlux(story.id, (surEvenement) => reponseDeBlush({ surEvenement, differer: after }));
   } catch (e) {
     /* Le code interne (« refus:cyber ») part à l’équipe ; le navigateur n’apprend que le refus, le vocal ou la panne */
     return reponseErreur(e, { route: "POST /api/chat", alerte: alerteDuChat(story.id) });

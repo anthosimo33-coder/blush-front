@@ -1,5 +1,20 @@
 import type { Page, TestInfo } from "@playwright/test";
-import { attendreTaches, definirPlan, emailLibre, expect, lectureBlushPlus, lectureFaite, ouvrirLeRapport, PAIEMENT, reponseAuGeste, test } from "./aide";
+import {
+  attendreTaches,
+  definirPlan,
+  emailLibre,
+  expect,
+  lectureBlushPlus,
+  lectureFaite,
+  messagesDuChat,
+  origine,
+  ouvrir,
+  ouvrirLeRapport,
+  PAIEMENT,
+  RESEAU,
+  reponseAuGeste,
+  test,
+} from "./aide";
 
 /*
  * « Ta question » (/rapport/question), depuis le rapport complet : BLUSH accueille, propose des idées tirées du rapport
@@ -109,20 +124,49 @@ test("compte « rapport » : le rapport complet, une question incluse, mais pas 
 });
 
 /*
- * Bug : un compte « rapport » voit « Une question incluse avec ton rapport » et « 1 question incluse », mais sa question
- * est refusée : elle passe par le chat, réservé à BLUSH+ (src/app/api/chat/route.ts, `peut(utilisateur.plan, "chat")`
- * → 402 « acces »), et l’écran répond « le chat avec moi, c’est dans BLUSH+ » (souciQuestion, le texte de « acces » dans src/lib/messages-erreur.ts).
- * TODO(produit): la question incluse avec le seul plan « rapport » (src/lib/acces.ts:15) ; sans effet en bêta, où
- * débloquer donne BLUSH+. Ce fixme reste admis tant que la décision n’est pas prise (tests/unit/fixme-admis.test.ts).
+ * Le plan « rapport » a une question incluse par conv, sans le chat : l’écran la marque (`question`), le serveur la
+ * laisse partir une fois (src/server/question-incluse.ts). Le modèle factice répond comme pour BLUSH+.
  */
-test.fixme("compte « rapport » : la question incluse avec le rapport reçoit sa réponse", async ({ page }, testInfo) => {
-  await compteRapport(page, testInfo);
+test("compte « rapport » : la question incluse avec le rapport reçoit sa réponse", async ({ page }, testInfo) => {
+  const email = await compteRapport(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ }).click();
+  await expect(page).toHaveURL(/\/rapport\/question$/);
   await expect(page.getByText("1 question incluse")).toBeVisible();
   await page.getByRole("textbox", { name: "Ta question à BLUSH" }).fill(QUESTION);
-  await page.getByRole("button", { name: "Poser ma question" }).click();
+  expect((await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Poser ma question" }).click())).status()).toBe(200);
   const conv = page.getByRole("log", { name: "Ta conversation avec BLUSH" });
   await expect(conv.getByText("elle te cherche 👀")).toBeVisible();
+  await expect(conv.getByText("tu lui as répondu quoi ?")).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  /* La suite, c’est le chat de BLUSH+ ; l’échange y est gardé, à la suite */
+  await expect(page.getByRole("link", { name: "Toutes tes questions, avec BLUSH+" })).toBeVisible();
+  expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
+});
+
+test("compte « rapport » : la question incluse déjà posée, la suivante est refusée et ouvre le paiement de BLUSH+, sa seule offre", async ({ page }, testInfo) => {
+  const email = await compteRapport(page, testInfo);
+  /* La question incluse, posée par la route comme le fait l’écran : marquée `question` */
+  const premiere = await page.request.post("/api/chat", { headers: origine(testInfo), data: { texte: QUESTION, question: true }, timeout: RESEAU });
+  expect(premiere.status()).toBe(200);
+
+  await ouvrir(page, "/rapport/question");
+  await expect(page.getByText("1 question incluse")).toBeVisible();
+  await page.getByRole("textbox", { name: "Ta question à BLUSH" }).fill("et samedi, je fais quoi ?");
+  const refus = await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Poser ma question" }).click());
+  expect([refus.status(), await refus.json()]).toEqual([402, { erreur: "acces" }]);
+
+  const paiement = page.getByRole("dialog", { name: "BLUSH+", exact: true });
+  await expect(paiement).toBeVisible();
+  await expect(paiement.getByRole("radio")).toHaveCount(1);
+  await expect(paiement.getByRole("radio", { name: /^BLUSH\+ · / })).toBeChecked();
+  await expect(page.getByRole("dialog", { name: PAIEMENT })).toHaveCount(0);
+  await expect(page.getByText("1 question incluse")).toHaveCount(0);
+  /* Rien n’est parti au modèle : la conv avec BLUSH n’a que la question incluse */
+  expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
+
+  await test.step("fermer le paiement ramène au rapport", async () => {
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(/\/rapport$/);
+  });
 });

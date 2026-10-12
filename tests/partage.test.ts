@@ -56,6 +56,7 @@ describe("les prénoms dans ce qui se partage", () => {
         context: null,
         convPurgedAt: null,
         chatVocal: false,
+        questionPrise: null,
         createdAt: t,
         updatedAt: t,
       };

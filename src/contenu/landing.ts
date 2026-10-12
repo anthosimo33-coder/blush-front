@@ -258,7 +258,7 @@ export const VERDICT_EXEMPLE = {
  * Ce que BLUSH promet en chiffres, dans « Rapide. Complet. Discret. ». Le nombre de chapitres vient de la règle
  * (NB_CHAPITRES) ; le dernier fait reprend PROMESSE_CONV et la page Confidentialité, qui fait foi (« La conv brute,
  * effacée après ton rapport ») : ce qui en vient (le rapport, sa fiche) reste, chiffré, ce n’est donc pas « 0 message ».
- * TODO(produit): « conv brute gardée après ton rapport », libellé proposé le 12 octobre (remplace « message gardé »), à valider avec le juriste.
+ * « conv brute gardée après ton rapport » : libellé validé le 12 octobre 2026 (il remplace « message gardé »).
  */
 export const FAITS_LANDING = [
   { valeur: "40\u00a0s", libelle: "pour analyser votre conv" },

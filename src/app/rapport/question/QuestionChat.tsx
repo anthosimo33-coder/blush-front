@@ -10,6 +10,7 @@ import { formatCount, NBSP } from "@/lib/format";
 import { QUESTION_MAX } from "@/lib/limites";
 import { moiEtAutre } from "@/lib/participants";
 import { peut } from "@/lib/acces";
+import { codeDe } from "@/lib/messages-erreur";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { noterEcriture } from "@/lib/query";
 import { play } from "@/lib/sound";
@@ -42,6 +43,11 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
   /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
   const [souci, setSouci] = useState<string | null>(null);
+  /*
+   * Le serveur refuse la question (402 « acces ») : celle incluse avec le rapport est déjà posée. La suite, c’est le chat :
+   * l’écran le demande alors, et le paiement s’ouvre par-dessus, avec BLUSH+ seulement (AppScreen, offreAProposer)
+   */
+  const [dejaPosee, setDejaPosee] = useState(false);
   const first = useRef(true);
   const conv = useRef<HTMLDivElement>(null);
   const avant = useRef<Map<string, number> | null>(null);
@@ -86,6 +92,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
       setAsking(null);
       setDraft(q);
       setSouci(souciQuestion(e));
+      if (codeDe(e) === "acces") setDejaPosee(true);
       play("non");
       return;
     } finally {
@@ -161,7 +168,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
   return (
     <AppScreen
-      besoin="question"
+      besoin={dejaPosee ? "chat" : "question"}
       autre={moiEtAutre(story).autre.name}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
@@ -181,7 +188,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
             <BubbleLogo size={72} animated={asking !== null} />
           </span>
         </span>
-        {plan === "rapport" && (
+        {plan === "rapport" && !dejaPosee && (
           <span className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-legende font-black text-ink shadow-[0_0_0_1px_rgba(17,17,20,0.07),0_6px_14px_-8px_rgba(17,17,20,0.3)]">
             <Icon name="bolt" size={13} color="#2F7BFF" stroke={2.6} />1 question incluse
           </span>

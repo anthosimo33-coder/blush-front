@@ -133,8 +133,10 @@ describe("« Qui es-tu ? » (POST /api/analyse)", () => {
     const vide: Routes["POST /api/chat"]["corps"] = {};
     // @ts-expect-error : une route sans corps n’en reçoit pas
     const rien: Routes["GET /api/analyse"]["corps"] = {};
-    expect([autre, inconnu, vide, rien]).toHaveLength(4);
-    expectTypeOf<Routes["POST /api/chat"]["corps"]>().toEqualTypeOf<{ texte: string } | FormData>();
+    // @ts-expect-error : la question du rapport se marque, elle ne se démarque pas
+    const demarquee: Routes["POST /api/chat"]["corps"] = { texte: "…", question: false };
+    expect([autre, inconnu, vide, rien, demarquee]).toHaveLength(5);
+    expectTypeOf<Routes["POST /api/chat"]["corps"]>().toEqualTypeOf<{ texte: string; question?: true | undefined } | FormData>();
     expectTypeOf<Routes["POST /api/chat/vocal"]["reponse"]>().toEqualTypeOf<{ modeVocal: boolean }>();
   });
 });

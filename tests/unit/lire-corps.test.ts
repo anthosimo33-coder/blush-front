@@ -102,6 +102,7 @@ const TOUT_FAUX = JSON.stringify({
   app: 3,
   lots: "x",
   texte: 3,
+  question: "oui",
   actif: "oui",
   paused: "oui",
   offre: "gratuit",

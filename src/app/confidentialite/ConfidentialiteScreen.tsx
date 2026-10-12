@@ -57,7 +57,7 @@ export function ConfidentialiteScreen() {
         </Ligne>
         {/*
          * Le lien ne montre que le verdict ; l’image, une réponse du chat (avec ta question) ou la chute d’un chapitre. Les deux
-         * sont masqués par le serveur (src/server/partages.ts). TODO(produit): ligne ajoutée le 12 octobre, à valider avec le juriste.
+         * sont masqués par le serveur (src/server/partages.ts). Ligne ajoutée et validée le 12 octobre 2026.
          */}
         <Ligne icone="share" ton="elle" titre="Rien ne sort sans toi">
           Tu choisis ce que tu partages{NBSP}: ton verdict, par un lien, ou en image une réponse de BLUSH (avec ta question) ou un passage de ton rapport. Son prénom y devient une

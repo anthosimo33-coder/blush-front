@@ -434,11 +434,13 @@ export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscript
 /* ———— Question incluse ———— */
 
 /**
- * La question du rapport. Elle passe par le chat ; une erreur (le rapport s’écrit encore, plus de réseau) remonte telle
- * quelle, pour que l’écran garde la question et le dise (voir souciQuestion), au lieu d’en faire une réponse.
+ * La question du rapport. Elle passe par le chat, marquée `question` : le plan « rapport » en a une par conv, sans le
+ * chat (src/server/question-incluse.ts). Une erreur (le rapport s’écrit encore, plus de réseau, la question déjà posée :
+ * « acces ») remonte telle quelle, pour que l’écran garde la question et le dise (voir souciQuestion), au lieu d’en faire
+ * une réponse.
  */
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  return enQuestion(question, await chat({ texte: question }));
+  return enQuestion(question, await chat({ texte: question, question: true }));
 }
 
 /* ———— Au quotidien ———— */

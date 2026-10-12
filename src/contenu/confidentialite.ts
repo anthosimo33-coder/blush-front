@@ -56,7 +56,7 @@ export const PROMESSE_PARTAGE = "Ta conv reste à toi, et c’est toi qui décid
  * de 24 h » ne disait pas ce qui arrivait). La ligne du partage dit les deux façons de partager : le lien, qui ne montre
  * que le verdict, et l’image (« Partager en image », src/server/partages.ts), une réponse de BLUSH avec ta question ou la
  * chute d’un chapitre. Dans les deux, son prénom devient une initiale et le tien reste.
- * TODO(produit): le détail de la ligne du partage, réécrit le 12 octobre (il disait « seul ton verdict part »), à valider avec le juriste.
+ * Le détail de la ligne du partage, réécrit et validé le 12 octobre 2026 (il disait « seul ton verdict part »).
  */
 export const FEUILLE_CONFIDENTIALITE = {
   titre: "Ta conv reste à toi.",

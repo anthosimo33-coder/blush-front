@@ -181,8 +181,11 @@ export const ROUTES = {
    */
   "POST /api/captures/video": { corps: z.object({ app: z.string(), lots: z.array(z.unknown()), cle: z.string().max(64).optional() }) },
   "GET /api/chat": {},
-  /* Un message en texte ; des captures, un export ou un vocal partent en formulaire */
-  "POST /api/chat": { corps: z.object({ texte: z.string() }), formulaire: true },
+  /*
+   * Un message en texte ; des captures, un export ou un vocal partent en formulaire. `question` : la question du rapport
+   * (« Ta question »), en texte seulement : le plan « rapport » en a une par conv, sans le chat (src/server/question-incluse.ts)
+   */
+  "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional() }), formulaire: true },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   "GET /api/compte": {},
   "POST /api/compte": { corps: z.object({ paused: z.boolean() }) },

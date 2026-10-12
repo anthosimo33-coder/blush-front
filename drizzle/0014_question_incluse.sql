@@ -1,0 +1,1 @@
+ALTER TABLE "stories" ADD COLUMN "question_prise" timestamp with time zone;

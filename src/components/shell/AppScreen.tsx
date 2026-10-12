@@ -14,9 +14,9 @@ import { AccountPill, Screen } from "./Screen";
 const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
 /**
- * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la table que l’écran et le serveur lisent ; « Ta question »
- * et la lecture de sa fiche ne sont encore refusées qu’ici, voir là-bas) : gratuit (le chapitre 1, le verdict), rapport
- * (tous les chapitres, « Ta question »), BLUSH+ (en plus : le chat, sa fiche).
+ * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la table que l’écran et le serveur lisent ; la lecture de
+ * sa fiche n’est encore refusée qu’ici, voir là-bas) : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres,
+ * « Ta question », une par conv), BLUSH+ (en plus : le chat, sa fiche).
  * Dans la page d’une conv, le compte part de celui qu’elle a rendu (PageDeConv) : tout juste rendu, il n’est pas relu au
  * montage, et le plan est là dès l’affichage.
  */

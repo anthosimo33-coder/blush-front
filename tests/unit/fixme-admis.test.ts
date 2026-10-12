@@ -6,24 +6,14 @@ import { describe, expect, it } from "vitest";
  * Un fixme (un test marqué `.fixme`) est un bug connu, que la CI ne joue pas : il ne doit pas s’oublier. Chaque fixme des tests de bout
  * en bout (tests/e2e/**\/*.spec.ts) est dans FIXME_ADMIS, avec la raison qui le garde, et `npm run todo` les liste avec
  * les marqueurs de produit. Un nouveau fixme fait échouer ce test : on corrige le bug, ou on l’ajoute ici en le disant. Ce
- * fichier n’écrit jamais en entier ni l’appel ni le marqueur de produit (PRODUIT), pour que `npm run todo` ne liste que
- * les vrais.
+ * fichier n’écrit jamais en entier l’appel, pour que `npm run todo` ne liste que les vrais.
  *
- * La liste ne fait que rétrécir : un fixme corrigé (repassé en test()) en sort. Il n’y reste que la question du plan
- * « rapport », qui attend une décision (son marqueur de produit, dans src/lib/acces.ts).
+ * La liste ne fait que rétrécir : un fixme corrigé (repassé en test()) en sort. Elle est vide depuis la question incluse
+ * avec le plan « rapport » (le 12 octobre 2026, tests/e2e/rapport-question.spec.ts).
  */
 
-/** Le marqueur d’une décision de produit en attente, formé ici seulement */
-const PRODUIT = ["TODO", "(produit)"].join("");
-
 /** Les fixme admis, par fichier (depuis tests/e2e) et par titre, avec ce qui les garde. */
-const FIXME_ADMIS: readonly { fichier: string; titre: string; raison: string }[] = [
-  {
-    fichier: "rapport-question.spec.ts",
-    titre: "compte « rapport » : la question incluse avec le rapport reçoit sa réponse",
-    raison: `${PRODUIT} : la question incluse avec le seul plan « rapport » (src/lib/acces.ts)`,
-  },
-];
+const FIXME_ADMIS: readonly { fichier: string; titre: string; raison: string }[] = [];
 
 const E2E = join(__dirname, "../e2e");
 const SPECS = readdirSync(E2E, { recursive: true, encoding: "utf8" })
@@ -53,9 +43,5 @@ describe("les fixme des tests de bout en bout", () => {
   it("sont encore là : un fixme corrigé sort de FIXME_ADMIS", () => {
     const absents = FIXME_ADMIS.filter((a) => !SPECS.includes(a.fichier) || !fixmeDe(readFileSync(join(E2E, a.fichier), "utf8")).includes(a.titre));
     expect(absents, "un fixme admis n’existe plus : le retirer de FIXME_ADMIS").toEqual([]);
-  });
-
-  it("la question du plan « rapport » est la seule admise pour une raison de produit", () => {
-    expect(FIXME_ADMIS.filter((a) => a.raison.startsWith(PRODUIT)).map((a) => a.fichier)).toEqual(["rapport-question.spec.ts"]);
   });
 });
