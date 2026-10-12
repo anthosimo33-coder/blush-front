@@ -21,8 +21,8 @@ const cleDeLaSuite = (achat: string) => `blush.paiement.suite.${achat}`;
 export const suiteDuPaiement = (achat: string) => suiteSure(lire(cleDeLaSuite(achat), "session"));
 
 /**
- * Commence le paiement de cette offre et part le payer ; `suite` : où reprendre ensuite. La promesse ne se résout que si
- * la page ne part pas (une erreur la rejette : ErreurApi « bientot », « renonciation »…).
+ * Commence le paiement de cette offre et part le payer (`aller` : la navigation de l’écran, pour une page de l’appli) ;
+ * `suite` : où reprendre ensuite. Une erreur la rejette (ErreurApi « bientot », « renonciation »…) : rien n’est parti.
  */
 export async function partirPayer(
   offre: OffreId,

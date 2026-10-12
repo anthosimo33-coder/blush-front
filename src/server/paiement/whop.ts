@@ -37,7 +37,7 @@ export class ErreurWhop extends Error {
   }
 }
 
-/** Un appel à l’API : son corps JSON lu, ou ErreurWhop. `introuvable` : un 404 rend null au lieu d’échouer. */
+/** Un appel à l’API : son corps JSON lu, ou ErreurWhop. Une lecture (GET) de ce qui n’existe pas (404) rend null. */
 async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string, { corps, idempotence }: { corps?: unknown; idempotence?: string } = {}): Promise<unknown> {
   let r: Response;
   try {
