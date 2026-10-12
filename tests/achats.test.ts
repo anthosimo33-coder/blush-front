@@ -281,6 +281,36 @@ describe("livrer et reprendre", () => {
     expect(await estClient(u)).toBe(false);
   });
 
+  it("deux achats payés du même rapport : l’un remboursé pendant que l’autre se livre, la conv reste ouverte (payée par l’autre)", async () => {
+    const u = await compteDeTest("reprendre-croise");
+    const id = await conv(u);
+    const [a, b] = [await commande(u, "rapport", { storyId: id, fournisseur: "factice" }), await commande(u, "rapport", { storyId: id, fournisseur: "factice" })];
+    await livrer(b.id);
+    /* Le compte tenu par une autre transaction : la livraison de A attend sur lui, au milieu de sa transaction */
+    let lacher!: () => void;
+    const tenu = new Promise<void>((r) => (lacher = r));
+    let pris!: () => void;
+    const verrouille = new Promise<void>((r) => (pris = r));
+    const bloqueur = db().transaction(async (tx) => {
+      await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, u.id)).for("update");
+      pris();
+      await tenu;
+    });
+    await verrouille;
+    const livraison = livrer(a.id);
+    await new Promise((r) => setTimeout(r, 150));
+    /* Pendant ce temps, B est remboursé : A n’est pas encore payé aux yeux de sa transaction */
+    const reprise = reprendre(b.id, "rembourse");
+    await new Promise((r) => setTimeout(r, 150));
+    lacher();
+    await bloqueur;
+    expect((await livraison).effet).toBe("livre");
+    expect((await reprise).effet).toBe("repris");
+    expect((await achatEnBase(a.id)).statut).toBe("paye");
+    expect(await rapportOuvertEnBase(id)).toBe(true);
+    expect(await soldeDe(u.id)).toBe(10);
+  });
+
   it("un achat jamais livré : repris sans rien reprendre ; un paiement refusé ne passe qu’un achat en attente", async () => {
     const u = await compteDeTest("reprendre-rien");
     const [a, b] = [await commande(u, "pack30", { fournisseur: "factice" }), await commande(u, "pack30", { fournisseur: "factice" })];

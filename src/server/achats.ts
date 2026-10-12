@@ -81,6 +81,14 @@ export async function commander(
   return achat!;
 }
 
+/**
+ * Verrouille la ligne de la conv dans la transaction d’une livraison ou d’une reprise : deux achats de la même conv,
+ * l’un livré pendant que l’autre est repris, passent l’un après l’autre. Sans lui, la reprise ne voit pas l’autre achat
+ * payé (sa transaction n’est pas finie) et re-verrouille un rapport bel et bien payé.
+ */
+const verrouillerLaConv = (tx: Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0], storyId: string) =>
+  tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
+
 /** Ce que le prestataire dit du paiement à la livraison : ses identifiants, à garder sur l’achat (le paiement en un geste). */
 export type Paiement = { paiementId?: string | null; checkoutId?: string | null; membreId?: string | null; moyenId?: string | null };
 
@@ -143,6 +151,7 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
     let debloquee = false;
     if (storyId) {
       const s = schema.stories;
+      await verrouillerLaConv(tx, storyId);
       const ouvertes = await tx
         .update(s)
         .set({ debloqueLe: sql`now()` })
@@ -189,6 +198,8 @@ export async function reprendre(achatId: string, statut: "rembourse" | "conteste
     const { userId, storyId } = achat;
     if (storyId) {
       const s = schema.stories;
+      /* Verrouillée d’abord : un autre achat de cette conv en train d’être livré a fini, et compte comme payé ci-dessous */
+      await verrouillerLaConv(tx, storyId);
       const autre = tx
         .select({ un: sql`1` })
         .from(a)
