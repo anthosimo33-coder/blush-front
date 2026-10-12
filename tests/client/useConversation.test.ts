@@ -67,6 +67,8 @@ function scene(): Scene {
     annoncer: vi.fn(),
     anciensPoses: vi.fn(),
     niveau: vi.fn(),
+    recue: vi.fn(),
+    manqueDeBulles: vi.fn(),
   };
 }
 
@@ -346,10 +348,24 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
     expect(result.current.msgs.at(-1)).toMatchObject({ id: masquee.id, type: "reponse", result: { bubbles: [{ text: "dis-lui oui" }], echange: 40 } });
     /* Annoncée « prête » quand elle est arrivée masquée, puis ce qu’elle dit une fois lue */
     expect(s.annoncer).toHaveBeenLastCalledWith(result.current.msgs.at(-1));
+    /* L’écran apprend ce qu’il reste de bulles : la masquée d’abord (sans), puis la lue */
+    expect(s.recue).toHaveBeenLastCalledWith(expect.objectContaining({ bulles: { depensees: 1, restantes: 4 } }));
   });
 
-  it("plus de bulles pour la lire : elle reste verrouillée, et BLUSH le dit d’un mot", async () => {
-    const { result } = monter();
+  it("chaque réponse arrivée dit à l’écran ce qu’elle a coûté (le compteur se met à jour)", async () => {
+    const { result, scene: s } = monter();
+    const payee = reponse(["ok"], { bulles: { depensees: 1, restantes: 8 } });
+    await act(() =>
+      result.current.envoyer(
+        texteDe("et là ?"),
+        analyse(async () => enMsg(payee)),
+      ),
+    );
+    expect(s.recue).toHaveBeenCalledExactlyOnceWith(payee);
+  });
+
+  it("plus de bulles pour la lire : elle reste verrouillée, BLUSH le dit d’un mot, et la recharge s’ouvre", async () => {
+    const { result, scene: s } = monter();
     await act(() =>
       result.current.envoyer(
         texteDe("je lui dis quoi ?"),
@@ -358,9 +374,26 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
     );
     const masquee = result.current.msgs.at(-1)!;
     lireReponse.mockRejectedValue(new ErreurApi("bulles", 402));
-    await act(() => result.current.lire(masquee.id, 41));
+    let lue: boolean | undefined;
+    await act(async () => void (lue = await result.current.lire(masquee.id, 41)));
+    expect(lue).toBe(false);
     expect(result.current.msgs.at(-2)).toEqual(masquee);
     expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: "plus de bulles pour l’instant 🫧 recharge, et je te réponds" });
+    /* Et l’écran ouvre la recharge */
+    expect(s.manqueDeBulles).toHaveBeenCalledOnce();
+  });
+
+  it("le réseau coupe la lecture : BLUSH le dit, sans ouvrir la recharge", async () => {
+    const { result, scene: s } = monter();
+    await act(() =>
+      result.current.envoyer(
+        texteDe("je lui dis quoi ?"),
+        analyse(async () => enMsg(verrouillee)),
+      ),
+    );
+    lireReponse.mockRejectedValue(new ErreurApi("connexion", 0));
+    await act(async () => void (await result.current.lire(result.current.msgs.at(-1)!.id, 41)));
+    expect(s.manqueDeBulles).not.toHaveBeenCalled();
   });
 });
 
