@@ -21,6 +21,12 @@ import { compteDeTest, convPrete, debloquerLaConv } from "./aide/fixtures";
 
 /* Côté serveur, ce qui garde les écrans rapides : ce que lisent les écrans, la chaîne, l’audio du vocal, l’image story */
 
+/** L’audio servi, ou null : pas de conv à ce compte, ou son rapport fermé (« acces »). */
+const servi = async (...a: Parameters<typeof audioDuCompte>) => {
+  const r = await audioDuCompte(...a);
+  return r === "acces" ? null : r;
+};
+
 const lancerApres = async () => {
   while (apres.length) await apres.shift()!();
 };
@@ -106,7 +112,7 @@ describe("l’audio du vocal", () => {
     const plus = await compteDeTest("fluidite-vocal", "debloque");
     const id = await importee("02-reciproque.txt", plus);
     await executerChaine(id);
-    const premier = await audioDuCompte(plus, id);
+    const premier = await servi(plus, id);
     expect(premier?.audio?.subarray(0, 2).toString("hex")).toBe("fffb");
     expect(await audioDuCompte(autre, id)).toBeNull();
     expect(await audioDuCompte(plus, "../../etc")).toBeNull();
@@ -115,13 +121,13 @@ describe("l’audio du vocal", () => {
       .update(schema.vocals)
       .set({ audio: chiffrerOctets(Buffer.from("autre")) })
       .where(eq(schema.vocals.storyId, id));
-    expect((await audioDuCompte(plus, id))?.audio?.equals(premier!.audio!)).toBe(true);
+    expect((await servi(plus, id))?.audio?.equals(premier!.audio!)).toBe(true);
     /* Une nouvelle version (le vocal refait) : le nouvel audio */
     await db()
       .update(schema.vocals)
       .set({ createdAt: new Date(Date.now() + 1000) })
       .where(eq(schema.vocals.storyId, id));
-    expect((await audioDuCompte(plus, id))?.audio?.toString()).toBe("autre");
+    expect((await servi(plus, id))?.audio?.toString()).toBe("autre");
   });
 
   it("dit « pas prêt » quand la conv n’a pas encore de vocal", async () => {

@@ -88,7 +88,8 @@ describe("de l’import à la mémoire", () => {
     expect(vocal?.lignes.some((l) => l.punch)).toBe(true);
     expect(vocal?.lignes.some((l) => l.recu?.caption)).toBe(true);
     expect(vocal?.lignes.every((l, k, ls) => l.debut <= l.fin && (k === 0 || ls[k - 1]!.debut <= l.debut))).toBe(true);
-    const audio = (await audioDuCompte(u, imp.id))?.audio;
+    const lu = await audioDuCompte(u, imp.id);
+    const audio = lu === "acces" ? null : lu?.audio;
     expect(audio?.subarray(0, 2).toString("hex")).toBe("fffb");
     const brut = (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, imp.id)))[0]!;
     expect(brut.data.toString("utf8")).not.toContain("Lis la suite");
