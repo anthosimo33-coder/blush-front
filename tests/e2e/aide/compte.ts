@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 import { attendreTaches, sql } from "./base";
+import { ENTETE_DU_JETON, prouverHumain } from "./captcha";
 import { dernierCode } from "./boite";
 import { exportWhatsApp, NOE_ET_MAELYS, type Ajout, type Personnes } from "./exports";
 import { RESEAU } from "./page";
@@ -21,7 +22,7 @@ export const origine = (testInfo: TestInfo) => ({ origin: String(testInfo.projec
  */
 export async function connecterParApi(page: Page, testInfo: TestInfo, email: string): Promise<void> {
   const depuis = Date.now();
-  const code = await page.request.post("/api/auth/code", { headers: origine(testInfo), data: { email }, timeout: RESEAU });
+  const code = await page.request.post("/api/auth/code", { headers: { ...origine(testInfo), ...ENTETE_DU_JETON }, data: { email }, timeout: RESEAU });
   expect(code.status(), "le code de connexion est demandé").toBe(200);
   const verif = await page.request.post("/api/auth/verifier", { headers: origine(testInfo), data: { email, code: await dernierCode(email, { depuis }) }, timeout: RESEAU });
   expect(await verif.json(), "le code ouvre la session").toMatchObject({ ok: true });
@@ -50,6 +51,7 @@ export async function lireUneConvParApi(
   { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false }: Lecture = {},
 ): Promise<string> {
   const conv = exportWhatsApp(testInfo, { personnes, ajout });
+  await prouverHumain(page.request, testInfo);
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
     multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) } },

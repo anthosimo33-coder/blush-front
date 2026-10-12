@@ -1,0 +1,70 @@
+# La veille de la production, toutes les 15 minutes : la page d’accueil et le réveil (/api/reveil, qui répond 503 quand
+# la base ne répond pas) doivent répondre. Sinon le lancement échoue, et GitHub l’écrit par mail (pour un workflow
+# planifié, à qui a modifié sa ligne `cron` en dernier). Elle appelle aussi les relances par mail (/api/cron/relances) :
+# Vercel Hobby n’autorise qu’un cron par jour (vercel.json : la purge de nuit).
+#
+# Ce qu’elle attend du dépôt (BACKEND.md, « Mise en ligne ») : le secret CRON_SECRET, le même que dans Vercel. Sans lui,
+# ou tant que la route des relances n’existe pas (404), l’étape des relances se saute et le dit ; la veille tourne.
+#
+# Rien ne se construit ni ne se déploie ici : pas de code (aucun checkout), pas de jeton GitHub (permissions vides), et
+# sa propre file, à part de celles de la CI (ci.yml) : une veille ne retarde ni n’annule jamais une vérification ou une
+# mise en production. GitHub suspend un workflow planifié après 60 jours sans activité sur le dépôt : un push le réveille.
+name: Veille
+
+on:
+  schedule:
+    # Toutes les 15 minutes (GitHub peut décaler un lancement planifié de quelques minutes quand il est chargé)
+    - cron: "*/15 * * * *"
+  # À la main, pour l’essayer : onglet Actions, « Veille », « Run workflow »
+  workflow_dispatch:
+
+# Une veille à la fois : une qui tarde n’en empile pas d’autres derrière elle
+concurrency:
+  group: veille
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  veille:
+    name: La production répond
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      # L’adresse de la production (BLUSH_URL, src/server/env.ts : son défaut)
+      SITE: https://www.askblush.com
+      # Le secret ne peut pas se lire dans un `if` : seulement s’il est posé (true ou false, jamais sa valeur)
+      AVEC_SECRET: ${{ secrets.CRON_SECRET != '' }}
+    steps:
+      # Deux nouveaux essais, 5 s d’écart : une instance qui démarre (une seconde ou deux) n’est pas une panne
+      - name: La page d’accueil répond
+        run: >-
+          curl --fail --silent --show-error --location --max-time 20 --retry 2 --retry-delay 5 --retry-all-errors
+          --output /dev/null --write-out "/ : %{http_code} en %{time_total} s\n" "$SITE/"
+
+      - name: Le réveil répond, la base avec
+        run: |
+          corps="$(curl --fail --silent --show-error --max-time 20 --retry 2 --retry-delay 5 --retry-all-errors "$SITE/api/reveil")"
+          echo "/api/reveil : $corps"
+          test "$(jq -r '.ok' <<< "$corps")" = "true" || { echo "::error::/api/reveil ne dit pas ok : $corps"; exit 1; }
+
+      - name: Les relances (sautées sans le secret CRON_SECRET)
+        if: env.AVEC_SECRET != 'true'
+        run: |
+          echo "::notice::Pas de secret CRON_SECRET dans le dépôt (Settings, Secrets and variables, Actions) : les relances attendent."
+
+      - name: Les relances
+        if: env.AVEC_SECRET == 'true'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          statut="$(curl --silent --show-error --max-time 60 --output reponse.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer $CRON_SECRET" "$SITE/api/cron/relances")"
+          # La route arrive avec les relances : avant elle, la page introuvable de l’appli
+          if [ "$statut" = "404" ]; then
+            echo "::notice::/api/cron/relances n’existe pas encore en production : étape sautée."
+            exit 0
+          fi
+          # Ce qu’elle a fait (des nombres, jamais un email), ou pourquoi elle refuse
+          head -c 500 reponse.json; echo
+          test "$statut" = "200" || { echo "::error::/api/cron/relances a répondu $statut"; exit 1; }

@@ -14,6 +14,7 @@ import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/
 import type { AvanceVideo } from "@/types/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
+import { Captcha } from "@/components/ui/Captcha";
 import { DoneCheck, TypingDots } from "@/components/ui/feedback";
 import { FileInput } from "@/components/ui/FileInput";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
@@ -225,27 +226,31 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         </>
       }
       footer={
-        items.length ? (
-          <>
-            <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
-              {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
-              {busy ? (
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <TypingDots color="white" label={enCours} />
-                  <span className="text-corps leading-[1.2] tabular-nums">{enCours}</span>
-                </span>
-              ) : (
-                "Continuer"
-              )}
-            </Button>
-            {/* Des captures : rien ne dit où en est la lecture, une barre avance d’après sa durée habituelle */}
-            {busy && !result?.video && <BarreLecture captures={items.length} />}
-          </>
-        ) : enregistrement ? (
-          <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>
-        ) : (
-          <Button onClick={shots.open}>Choisir mes captures</Button>
-        )
+        <>
+          {/* Le CAPTCHA de l’import sans compte, monté dès l’écran (il a son jeton prêt au « Continuer ») : invisible tant qu’il ne demande pas de geste */}
+          <Captcha action="import" />
+          {items.length ? (
+            <>
+              <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>
+                {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
+                {busy ? (
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <TypingDots color="white" label={enCours} />
+                    <span className="text-corps leading-[1.2] tabular-nums">{enCours}</span>
+                  </span>
+                ) : (
+                  "Continuer"
+                )}
+              </Button>
+              {/* Des captures : rien ne dit où en est la lecture, une barre avance d’après sa durée habituelle */}
+              {busy && !result?.video && <BarreLecture captures={items.length} />}
+            </>
+          ) : enregistrement ? (
+            <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>
+          ) : (
+            <Button onClick={shots.open}>Choisir mes captures</Button>
+          )}
+        </>
       }
     >
       {!premier ? (

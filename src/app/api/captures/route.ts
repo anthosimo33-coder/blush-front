@@ -1,4 +1,5 @@
 import { AppliCaptures } from "@/server/appli-captures";
+import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
@@ -29,6 +30,14 @@ async function traiter(req: Request) {
   if (fd?.get("mode") === "add") return erreur("capture");
   const app = appli.success ? appli.data : "autre";
   const images = await imagesDe(fichiers);
+  /*
+   * Une fois l’envoi vérifié, avant toute limite : la bêta (sans compte, « connexion »), puis le laissez-passer du CAPTCHA
+   * d’un visiteur sans compte (src/server/captcha.ts). Un nouvel essai du même envoi en use un second, le dernier
+   */
+  const beta = await lecturePermise(null);
+  if (beta !== "ok") return erreur(beta);
+  const captcha = await humainRefuse("brouillon");
+  if (captcha) return captcha;
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {

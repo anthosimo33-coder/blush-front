@@ -10,6 +10,7 @@ import {
   dernierCode,
   ecranLu,
   emailLibre,
+  ENTETE_DU_JETON,
   envoyerEmail,
   expect,
   exportWhatsApp,
@@ -185,7 +186,7 @@ test("les limites des codes sont les mêmes pour tous : sept codes par jour pour
   await test.step("sept codes demandés coup sur coup passent, puis celui de la réserve de l’adresse, pour l’un comme pour l’autre", async () => {
     for (const email of [dehors, invite])
       for (let k = 0; k < 8; k++) {
-        const r = await request.post("/api/auth/code", { headers: { origin: URL_BETA }, data: { email } });
+        const r = await request.post("/api/auth/code", { headers: { origin: URL_BETA, ...ENTETE_DU_JETON }, data: { email } });
         expect(r.status()).toBe(200);
       }
   });

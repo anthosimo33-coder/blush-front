@@ -23,7 +23,7 @@ export async function envoyerALEquipe(sujet: string, lignes: string[]): Promise<
     enLocal(`[dev] alerte : ${sujet}\n${lignes.join("\n")}`);
     return;
   }
-  /* Dans le quota du prestataire, une alerte passe avant la liste d’attente, après les rapports (QUOTA_MAILS) */
+  /* Dans le quota du prestataire, une alerte passe avant la liste d’attente, après les rapports (plafondsDesMails) */
   await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") }, { sorte: "alerte" });
 }
 

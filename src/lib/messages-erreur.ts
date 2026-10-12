@@ -37,12 +37,20 @@ const ECOUTE_IMPOSSIBLE = "j’arrive pas à écouter ton vocal là, écris-moi"
 /** Trop d’essais de code ratés aujourd’hui (src/server/auth.ts) : ni un code tapé, ni un nouveau code n’y font plus rien. */
 const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Réessaie demain.";
 
+/*
+ * Le CAPTCHA n’a pas laissé passer (src/server/captcha.ts) : le widget n’a pas rendu de jeton (bloqué par une extension,
+ * le réseau, un geste demandé et pas fait), ou Cloudflare l’a refusé. Le widget en tire un neuf : réessayer suffit
+ * souvent. TODO(produit): texte nouveau, à valider.
+ */
+const CAPTCHA = "On n’a pas pu vérifier que tu n’es pas un robot. Réessaie dans un instant (et coche la case si elle apparaît).";
+
 const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
     trop: "Trop de codes demandés. Réessaie dans une heure.",
     codes: "Trop de codes demandés aujourd’hui. Réessaie demain.",
     essais: ESSAIS_DU_JOUR,
+    captcha: CAPTCHA,
     defaut: "Le code n’est pas parti. Réessaie dans un instant.",
   },
   /* La vérification du code reçu (un mauvais code a son propre message, sur l’écran) */
@@ -57,6 +65,7 @@ const MESSAGES = {
     trop: "Beaucoup d’imports d’un coup. Réessaie dans une heure.",
     /* Le budget d’octets du jour, de son adresse ou de tous (S-02) : il repart à minuit, ou 24 h après le premier import de l’adresse. TODO(produit): texte nouveau */
     trop_jour: "Beaucoup de convs importées aujourd’hui. Réessaie demain.",
+    captcha: CAPTCHA,
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* L’import de captures ou d’un enregistrement d’écran (la conv elle-même a son écran : erreurDeParcours) */
@@ -66,6 +75,7 @@ const MESSAGES = {
     souffle: `${SOUFFLE} Tes captures restent là.`,
     /* Un refus de l’IA : réessayer n’y changerait rien */
     refus: "BLUSH ne peut pas lire ces captures. Essaie avec d’autres.",
+    captcha: `${CAPTCHA} Tes captures restent là.`,
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* « Lancer la lecture », sur « Qui es-tu ? » */

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CLES_DE_TEST_TURNSTILE } from "@/lib/captcha";
 
 /*
  * La configuration (src/server/env.ts) : les listes d’emails lues une fois par le schéma, l’adresse du site et
@@ -32,6 +33,12 @@ const whop = (...sauf: (typeof WHOP)[number][]) => {
   for (const v of WHOP) vi.stubEnv(v, sauf.includes(v) ? undefined : valeurs[v]);
 };
 
+/* Les clés du CAPTCHA de la production (fictives : pas celles de test, qu’elle refuse) */
+const captcha = () => {
+  vi.stubEnv("TURNSTILE_SECRET_KEY", "0x4AAAAAAAsecret-fictif");
+  vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "0x4AAAAAAAcle-publique-fictive");
+};
+
 beforeEach(() => {
   for (const v of [
     "VERCEL",
@@ -46,6 +53,9 @@ beforeEach(() => {
     "BLUSH_PAIEMENT_FACTICE",
     ...WHOP,
     "WHOP_BAC_A_SABLE",
+    "TURNSTILE_SECRET_KEY",
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    "BLUSH_MAILS_PAR_JOUR",
   ])
     vi.stubEnv(v, undefined);
 });
@@ -105,6 +115,32 @@ describe("les listes d’emails, lues une fois par le schéma", () => {
   });
 });
 
+describe("le CAPTCHA et le quota des mails", () => {
+  it("les deux clés du CAPTCHA vont ensemble, partout : l’une sans l’autre, env() refuse", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", CLES_DE_TEST_TURNSTILE.secretes[0]);
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/NEXT_PUBLIC_TURNSTILE_SITE_KEY manque/);
+    vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", CLES_DE_TEST_TURNSTILE.publiques[0]);
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/TURNSTILE_SECRET_KEY manque/);
+    /* Ensemble : les clés de test passent hors de la production (le dev, les tests de bout en bout) */
+    vi.stubEnv("TURNSTILE_SECRET_KEY", CLES_DE_TEST_TURNSTILE.secretes[0]);
+    expect((await charger()).env().TURNSTILE_SECRET_KEY).toBe(CLES_DE_TEST_TURNSTILE.secretes[0]);
+  });
+
+  it("BLUSH_MAILS_PAR_JOUR : 100 par défaut, un entier de 100 au moins", async () => {
+    expect((await charger()).env().BLUSH_MAILS_PAR_JOUR).toBe(100);
+    vi.stubEnv("BLUSH_MAILS_PAR_JOUR", "3000");
+    expect((await charger()).env().BLUSH_MAILS_PAR_JOUR).toBe(3000);
+    for (const mauvais of ["50", "120.5", "beaucoup"]) {
+      vi.stubEnv("BLUSH_MAILS_PAR_JOUR", mauvais);
+      await expect(
+        charger().then(({ env }) => env()),
+        mauvais,
+      ).rejects.toThrow("BLUSH_MAILS_PAR_JOUR");
+    }
+  });
+});
+
 describe("les défauts écrits une fois", () => {
   it("l’expéditeur des mails, sur le domaine vérifié", async () => {
     const { env } = await charger();
@@ -133,9 +169,33 @@ describe("les garde-fous de la production", () => {
     production();
     vi.stubEnv("BLUSH_BETA_FERMEE", undefined);
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/Configuration refusée en production : BLUSH_BETA_FERMEE manque/);
-    /* Écrite exprès à 0, la bêta ouverte est un choix */
+    /* Écrite exprès à 0, la bêta ouverte est un choix (avec le CAPTCHA, plus bas) */
     vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+    captcha();
     expect((await charger()).env().BLUSH_BETA_FERMEE).toBe(false);
+  });
+
+  it("la bêta ouverte exige le CAPTCHA : sans ses clés, la production refuse de tourner", async () => {
+    production();
+    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+    await expect(charger().then(({ env }) => env())).rejects.toThrow(/TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA/);
+    /* Fermée, il peut attendre (la production d’aujourd’hui) */
+    vi.stubEnv("BLUSH_BETA_FERMEE", "1");
+    expect((await charger()).env().TURNSTILE_SECRET_KEY).toBeUndefined();
+  });
+
+  it("les clés de test de Cloudflare y sont refusées, même bêta fermée : elles ne protègent rien", async () => {
+    production();
+    vi.stubEnv("TURNSTILE_SECRET_KEY", CLES_DE_TEST_TURNSTILE.secretes[0]);
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", CLES_DE_TEST_TURNSTILE.publiques[0]);
+    const message = await charger()
+      .then(({ env }) => env())
+      .then(
+        () => "",
+        (e: Error) => e.message,
+      );
+    expect(message).toContain("TURNSTILE_SECRET_KEY est une clé de test de Cloudflare");
+    expect(message).toContain("NEXT_PUBLIC_TURNSTILE_SITE_KEY est une clé de test de Cloudflare");
   });
 
   it("CRON_SECRET est exigé : sans lui, la purge de nuit ne tournerait jamais", async () => {

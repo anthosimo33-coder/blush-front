@@ -11,6 +11,7 @@ import {
   lectureComplete,
   MUTATIONS,
   ouvrir,
+  prouverHumain,
   reponseAuGeste,
   seConnecter,
   test,
@@ -50,8 +51,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 26 routes gardées de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(27);
+  await test.step("les 27 routes gardées de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(28);
     for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK)) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
@@ -144,7 +145,7 @@ test("les vocaux d’une conv ne s’écoutent que depuis son compte : ni un aut
   });
 });
 
-test("la purge de la nuit : refusée sans le bon secret, elle efface les brouillons de plus de 24 h et garde les récents", async ({ request }) => {
+test("la purge de la nuit : refusée sans le bon secret, elle efface les brouillons de plus de 24 h et garde les récents", async ({ request }, testInfo) => {
   await test.step("sans « Bearer CRON_SECRET » : 401", async () => {
     for (const authorization of [null, "Bearer un-secret-qui-n-est-pas-le-bon", CRON_SECRET, `bearer ${CRON_SECRET}`]) {
       const r = await request.get("/api/cron/purge", { headers: authorization ? { authorization } : {} });
@@ -155,6 +156,7 @@ test("la purge de la nuit : refusée sans le bon secret, elle efface les brouill
 
   /* Deux convs importées sans email (des brouillons) ; l’une fait comme si elle datait d’hier soir */
   const importer = async () => {
+    await prouverHumain(request, testInfo);
     const r = await request.post("/api/import", {
       headers: { origin: URL_APPLI },
       multipart: { fichier: { name: "_chat.txt", mimeType: "text/plain", buffer: Buffer.from(texteWhatsApp()) } },

@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Locator, Page, Response } from "@playwright/test";
+import { fauxCloudflare } from "./captcha";
 
 /*
  * Une page de l’appli chargée en entier (une adresse ouverte, un rechargement, un lien qui recharge tout) s’affiche avant
@@ -90,6 +91,7 @@ export function suivreLeNavigateur(contexte: BrowserContext): void {
 export async function nouvelAppareil(browser: Browser): Promise<Page> {
   const contexte = await browser.newContext();
   suivreLeNavigateur(contexte);
+  await fauxCloudflare(contexte);
   await couperLesSons(contexte);
   return contexte.newPage();
 }

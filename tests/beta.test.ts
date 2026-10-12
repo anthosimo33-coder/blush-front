@@ -4,7 +4,7 @@ import { inscrire, lienRetrait, retirer } from "@/server/attente";
 import { preparerCode, prendreCode } from "@/server/auth";
 import { empreinte, jeton } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { LIMITES } from "@/server/limites";
+import { plafondsDesMails } from "@/server/limites";
 import { mailAttente } from "@/server/mail-attente";
 
 const email = `curieux-${Date.now()}@exemple.fr`;
@@ -56,8 +56,8 @@ describe("la bêta fermée, sans dire qui est invité", () => {
     expect(await db().select().from(schema.waitlist).where(eq(schema.waitlist.emailHash, hash))).toHaveLength(0);
   });
 
-  it("le plafond des mails de la liste, pour tous et par jour (mailsAttenteParJour) : le dernier part encore ; au-delà, on inscrit sans écrire", async () => {
-    const { max } = LIMITES.mailsAttenteParJour;
+  it("le plafond des mails de la liste, pour tous et par jour (plafondsDesMails().attente) : le dernier part encore ; au-delà, on inscrit sans écrire", async () => {
+    const { max } = plafondsDesMails().attente;
     const [avant, apres] = [`curieux-dernier-${Date.now()}@exemple.fr`, `curieux-plafond-${Date.now()}@exemple.fr`];
     const poser = (count: number) =>
       db()

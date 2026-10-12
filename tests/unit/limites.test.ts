@@ -18,7 +18,7 @@ import {
 import { imagesDe } from "@/server/captures";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { CODE_ESSAIS } from "@/server/auth";
-import { LIMITES, partDesAutresMails, QUOTA_MAILS } from "@/server/limites";
+import { LIMITES, partDesAutresMails, plafondsDesMails } from "@/server/limites";
 import { mailCode } from "@/server/mail-code";
 import { analyserExport, ExportIllisible, lireFichiers } from "@/services/preparer-export";
 
@@ -121,25 +121,38 @@ describe("le reste", () => {
     expect(m.html).not.toContain(`Il marche ${CODE_MINUTES} minutes.`);
   });
 
-  it("S-09 · tous les mails tiennent dans le quota du prestataire : les codes ont leur part, les autres se partagent le reste, les moins nécessaires s’arrêtent les premiers", () => {
-    const { parJour, laisse } = QUOTA_MAILS;
-    expect([LIMITES.mailsCodeParJour.max, LIMITES.mailsAttenteParJour.max, parJour]).toEqual([60, 20, 100]);
-    /* Les codes et les autres mails, ensemble, ne dépassent jamais le quota ; avec la clé des codes, les autres ont tout */
-    expect(LIMITES.mailsCodeParJour.max + partDesAutresMails(false)).toBe(parJour);
-    expect(partDesAutresMails(true)).toBe(parJour);
-    /* La liste d’attente s’arrête avant les alertes, les alertes avant les rapports, qui vont jusqu’au bout */
-    expect(laisse.attente).toBeGreaterThan(laisse.alerte);
-    expect(laisse.alerte).toBeGreaterThan(laisse.rapport);
-    expect(laisse.rapport).toBe(0);
-    /* Son propre plafond tient dans sa part : rien ne l’arrête plus tôt en temps normal */
-    expect(LIMITES.mailsAttenteParJour.max).toBeLessThanOrEqual(partDesAutresMails(false) - laisse.attente);
-    /* Les alertes en ont encore quand la liste a pris toute la sienne */
-    expect(partDesAutresMails(false) - laisse.alerte - LIMITES.mailsAttenteParJour.max).toBeGreaterThanOrEqual(10);
+  it("S-09 · BLUSH_MAILS_PAR_JOUR : 100 par défaut (le plan gratuit du prestataire), 60 codes et 20 mails de la liste d’attente", () => {
+    const { parJour, codes, attente, laisse } = plafondsDesMails();
+    expect([codes.max, attente.max, parJour]).toEqual([60, 20, 100]);
+    expect(laisse).toEqual({ attente: 20, alerte: 10, rapport: 0 });
   });
 
+  it.each([100, 101, 250, 1000, 3000])(
+    "S-09 · à %i mails par jour, tous tiennent dans le quota : les codes ont leur part, les autres se partagent le reste, les moins nécessaires s’arrêtent les premiers",
+    (quota) => {
+      const plafonds = plafondsDesMails(quota);
+      const { parJour, codes, attente, laisse } = plafonds;
+      expect(parJour).toBe(quota);
+      /* Les plafonds suivent le quota, dans les mêmes proportions qu’à 100 */
+      expect(codes.max).toBe(Math.floor(quota * 0.6));
+      expect(attente.max).toBe(Math.floor(quota * 0.2));
+      /* Les codes et les autres mails, ensemble, ne dépassent jamais le quota ; avec la clé des codes, les autres ont tout */
+      expect(codes.max + partDesAutresMails(false, plafonds)).toBe(parJour);
+      expect(partDesAutresMails(true, plafonds)).toBe(parJour);
+      /* La liste d’attente s’arrête avant les alertes, les alertes avant les rapports, qui vont jusqu’au bout */
+      expect(laisse.attente).toBeGreaterThan(laisse.alerte);
+      expect(laisse.alerte).toBeGreaterThan(laisse.rapport);
+      expect(laisse.rapport).toBe(0);
+      /* Son propre plafond tient dans sa part : rien ne l’arrête plus tôt en temps normal */
+      expect(attente.max).toBeLessThanOrEqual(partDesAutresMails(false, plafonds) - laisse.attente);
+      /* Les alertes en ont encore quand la liste a pris toute la sienne */
+      expect(partDesAutresMails(false, plafonds) - laisse.alerte - attente.max).toBeGreaterThanOrEqual(10);
+    },
+  );
+
   it("S-07, S-08 · les essais ratés et la réserve des codes : ce qui se devine reste borné, et un tiers ne ferme la porte qu’en écrivant de cinq adresses", () => {
-    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail, codeParEmailEtIp, codeReserveParEmail, codeReserveParEmailEtIp, mailsCodeParJour } =
-      LIMITES;
+    const { echecsCodeParEmail, echecsCodeParEmailEtIp, echecsCodeParNavigateur, codeParEmail, codeParEmailEtIp, codeReserveParEmail, codeReserveParEmailEtIp } = LIMITES;
+    const mailsCodeParJour = plafondsDesMails().codes;
     expect(echecsCodeParEmailEtIp.reserveNavigateur).toBeLessThan(echecsCodeParNavigateur.max);
     expect(echecsCodeParNavigateur.max).toBeLessThan(echecsCodeParEmailEtIp.max);
     expect(echecsCodeParEmailEtIp.max).toBeLessThan(echecsCodeParEmail.max);

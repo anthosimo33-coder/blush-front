@@ -12,6 +12,7 @@ import { prechargerExport, uploadExport } from "@/services/api";
 import { EXPORT_STEPS } from "@/contenu/parcours";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { Captcha } from "@/components/ui/Captcha";
 import { Segmented } from "@/components/ui/controls";
 import { Alert, TypingDots } from "@/components/ui/feedback";
 import { FileInput } from "@/components/ui/FileInput";
@@ -100,6 +101,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </Alert>
           )}
+          {/* Le CAPTCHA de l’import sans compte : invisible tant qu’il ne demande pas de geste */}
+          <Captcha action="import" />
           {/* aria-busy pour la phase « Je lis ton export · N % » aussi, où loading est faux (Button ne le pose qu’avec loading) */}
           <Button onClick={choisirFichier} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
             {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}

@@ -64,6 +64,10 @@ export async function poserNavigateur(): Promise<string> {
 }
 export const effacerNavigateur = () => effacer("code");
 
+/** Le laissez-passer du CAPTCHA (src/server/captcha.ts) : signé, il ne dit rien de personne. */
+export const lireHumain = async () => (await cookies()).get(nom("humain"))?.value;
+export const poserHumain = (valeur: string, expires: Date) => poser("humain", valeur, expires);
+
 /*
  * La conv choisie dans « Tes convs » : son identifiant, rien d’autre. Pas httpOnly : un toucher dans la liste l’écrit
  * (src/services/api.ts, openConv), et le serveur vérifie qu’elle est bien au compte (histoireOuverte).

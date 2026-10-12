@@ -16,6 +16,8 @@ export const ERREURS_API = {
   interdit: 401,
   /** Bêta fermée : un email retiré de la liste après l’envoi de son code. */
   beta: 403,
+  /** Le CAPTCHA (src/server/captcha.ts) : sans compte, un jeton du widget absent ou refusé, ou pas de laissez-passer valable. */
+  captcha: 403,
   /** Une limite atteinte (src/server/limites.ts). */
   trop: 429,
   /** Le budget d’octets des imports du jour (S-02) : celui de cette adresse, ou le plafond de tous (octetsDansLeBudget, src/server/requete.ts). */

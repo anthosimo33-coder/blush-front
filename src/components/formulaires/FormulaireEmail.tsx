@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
+import { Captcha } from "@/components/ui/Captcha";
 import { EmailField } from "@/components/ui/EmailField";
 import type { SaisieEmail } from "@/lib/email";
 import type { EnvoiCode } from "@/lib/useEnvoiCode";
@@ -32,11 +33,17 @@ export function FormulaireEmail({ envoi }: { envoi: SaisieEmail }) {
   );
 }
 
-/** « Recevoir mon code » : grisé tant que l’email n’a pas sa forme, des points pendant l’envoi. */
+/**
+ * « Recevoir mon code » : grisé tant que l’email n’a pas sa forme, des points pendant l’envoi. Au-dessus, le widget du
+ * CAPTCHA, invisible tant qu’il ne demande pas de geste : son jeton part avec la demande (sendLoginCode).
+ */
 export function BoutonRecevoirCode({ envoi }: { envoi: EnvoiCode }) {
   return (
-    <Button arrow loading={envoi.occupe} loadingLabel="Envoi du code" disabled={!envoi.valide || envoi.occupe} onClick={() => void envoi.envoyer()}>
-      Recevoir mon code
-    </Button>
+    <>
+      <Captcha action="code" />
+      <Button arrow loading={envoi.occupe} loadingLabel="Envoi du code" disabled={!envoi.valide || envoi.occupe} onClick={() => void envoi.envoyer()}>
+        Recevoir mon code
+      </Button>
+    </>
   );
 }

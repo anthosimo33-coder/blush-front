@@ -14,6 +14,8 @@ const NOMS = {
   brouillon: "blush-brouillon",
   /** Le navigateur qui a demandé un code de connexion : le code ne vaut que là (src/server/auth.ts). */
   code: "blush-code",
+  /** Le laissez-passer du CAPTCHA : un import sans compte (src/server/captcha.ts). */
+  humain: "blush-humain",
 } as const;
 
 export type CookieDuServeur = keyof typeof NOMS;
