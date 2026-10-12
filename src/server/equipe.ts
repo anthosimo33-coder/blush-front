@@ -45,7 +45,7 @@ export async function donnerDesBulles(email: string, n: number, par: Par): Promi
 }
 
 /**
- * Ce que l’équipe débloque d’un compte : sa dernière conv (la plus récente), toutes ses convs d’aujourd’hui, ou une
+ * Ce que l’équipe débloque d’un compte : sa dernière conv (la plus récente), toutes ses convs, ou une
  * conv désignée par son id (stories.id, depuis le terminal).
  */
 export type CibleDuDeblocage = "derniere" | "toutes" | { conv: string };

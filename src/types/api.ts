@@ -95,11 +95,14 @@ export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<stri
 
 /**
  * Ce qu’un geste de l’équipe a fait (POST /api/admin), en nombres : le nouveau solde de bulles, les convs débloquées
- * (null : aucun compte pour cet email), ou un lot d’invitations (les mails partis, ceux qui restent à inviter, et si le
- * plafond des mails du jour l’a arrêté).
+ * (null : aucun compte pour cet email), ou un lot d’invitations (les mails partis, ceux qui restent à inviter, si le
+ * plafond des mails du jour l’a arrêté, les adresses refusées par le prestataire des mails, et s’il l’a arrêté : LotInvite,
+ * src/server/attente.ts).
  */
 export type GesteDeLEquipe =
-  { action: "bulles"; solde: number | null } | { action: "debloquer"; convs: number | null } | { action: "inviter"; invites: number; restent: number; plafond: boolean };
+  | { action: "bulles"; solde: number | null }
+  | { action: "debloquer"; convs: number | null }
+  | { action: "inviter"; invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
 
 /** Ce qu’un passage des relances a fait (GET /api/cron/relances) : des nombres seulement, jamais un email ni un identifiant. */
 export type PassageDesRelances = { dues: number; envoyees: number; ecartees: number; retenues: number; echecs: number };

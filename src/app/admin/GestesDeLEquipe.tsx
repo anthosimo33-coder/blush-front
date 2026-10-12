@@ -34,8 +34,13 @@ function issueDe(r: GesteDeLEquipe): Issue {
       : r.convs === 0
         ? { ok: false, texte: "Rien à débloquer\u00a0: pas de conv, ou déjà ouverte." }
         : { ok: true, texte: `C’est fait\u00a0: ${r.convs} conv${s(r.convs)} débloquée${s(r.convs)}. Le rapport s’écrit à sa prochaine ouverture.` };
-  const fin = r.plafond ? " Le plafond des mails du jour est atteint\u00a0: la suite demain." : "";
-  return { ok: r.invites > 0, texte: `${nombre(r.invites)} invitation${s(r.invites)} partie${s(r.invites)}, ${nombre(r.restent)} à inviter.${fin}` };
+  const refusees = r.refusees ? ` ${nombre(r.refusees)} adresse${s(r.refusees)} refusée${s(r.refusees)} par le prestataire des mails.` : "";
+  const fin = r.plafond
+    ? " Le plafond des mails du jour est atteint\u00a0: la suite demain."
+    : r.prestataire
+      ? " Le prestataire des mails a arrêté le lot\u00a0: réessaie dans quelques minutes."
+      : "";
+  return { ok: r.invites > 0, texte: `${nombre(r.invites)} invitation${s(r.invites)} partie${s(r.invites)}, ${nombre(r.restent)} à inviter.${refusees}${fin}` };
 }
 
 /** Un refus du serveur, dit en clair. */

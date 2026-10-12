@@ -37,6 +37,21 @@ vi.mock("@/server/donnees", async (original) => ({
   contexteRequete: async () => ({ utilisateur: etat.utilisateur, story: null }),
 }));
 
+/* Le prestataire des mails, en panne pour certaines adresses : un statut de Resend, ou pas de réponse (le réseau) */
+const pannes = vi.hoisted(() => new Map<string, number | "reseau">());
+vi.mock("@/server/email", async (original) => {
+  const m = await original<typeof import("@/server/email")>();
+  return {
+    ...m,
+    envoyerMail: async (...args: Parameters<typeof m.envoyerMail>) => {
+      const panne = typeof args[0] === "string" ? pannes.get(args[0]) : undefined;
+      if (panne === "reseau") throw new TypeError("fetch failed");
+      if (panne) throw new m.ErreurResend(panne);
+      return m.envoyerMail(...args);
+    },
+  };
+});
+
 import { POST as postAdmin } from "@/app/api/admin/route";
 import { etatDeLaListe, inviterLaListe, purgerLaListe, ATTENTE_GARDEE_JOURS } from "@/server/attente";
 import { actionsRecentes, debloquerDesConvs, donnerDesBulles } from "@/server/equipe";
@@ -44,6 +59,7 @@ import { entre, empreinteDeLaListe } from "@/server/invitations";
 import { statsAdmin } from "@/server/stats";
 
 afterEach(() => {
+  pannes.clear();
   Object.assign(etat, { utilisateur: null, fermee: false });
   etat.admins.clear();
   etat.equipe.clear();
@@ -112,7 +128,7 @@ describe("les chiffres de l’argent (/admin)", () => {
       ),
     );
 
-    /* L’entonnoir de la période : les commandes créées dans les 7 jours, et ce qu’elles sont devenues */
+    /* L’entonnoir de la période : les commandes d’un rapport créées dans les 7 jours (pas les recharges), et ce qu’elles sont devenues */
     const a = (s: typeof avant) => s.achats;
     expect({
       commandes: a(apres).commandes - a(avant).commandes,
@@ -120,7 +136,7 @@ describe("les chiffres de l’argent (/admin)", () => {
       enAttente: a(apres).enAttente - a(avant).enAttente,
       echouees: a(apres).echouees - a(avant).echouees,
       comptes: a(apres).comptes - a(avant).comptes,
-    }).toEqual({ commandes: 9, payees: 6, enAttente: 1, echouees: 1, comptes: 1 });
+    }).toEqual({ commandes: 7, payees: 4, enAttente: 1, echouees: 1, comptes: 1 });
   });
 
   it("les bulles : vendues, dépensées, offertes, rendues, d’après leur journal ; et les offres uniques montrées puis prises", async () => {
@@ -255,7 +271,14 @@ describe("POST /api/admin", () => {
       expect(await json(await appel(faux)), JSON.stringify(faux)).toEqual([422, { erreur: "invalide" }]);
     const inviter = await appel({ action: "inviter", n: 1 });
     expect(inviter.status).toBe(200);
-    expect(await inviter.json()).toEqual({ action: "inviter", invites: expect.any(Number), restent: expect.any(Number), plafond: expect.any(Boolean) });
+    expect(await inviter.json()).toEqual({
+      action: "inviter",
+      invites: expect.any(Number),
+      restent: expect.any(Number),
+      plafond: expect.any(Boolean),
+      refusees: expect.any(Number),
+      prestataire: expect.any(Boolean),
+    });
   });
 });
 
@@ -345,5 +368,64 @@ describe("inviter la liste d’attente", () => {
     expect(s.actions.length).toBeGreaterThan(0);
     const [derniere] = await db().select().from(schema.actionsEquipe).orderBy(desc(schema.actionsEquipe.id)).limit(1);
     expect(s.actions[0]).toMatchObject({ action: derniere!.action, nombre: derniere!.nombre });
+  });
+});
+
+describe("inviter la liste d’attente quand le prestataire des mails refuse", () => {
+  /* Plus anciens encore que ceux d’au-dessus (2000) : le lot les prend d’abord */
+  const inscrits = Array.from({ length: 3 }, (_, k) => `invite-panne-${Date.now()}-${k}@exemple.fr`);
+  const hashes = inscrits.map(empreinteDeLaListe);
+  beforeAll(async () => {
+    await poserLeCompteur(0);
+    await db()
+      .insert(schema.waitlist)
+      .values(
+        inscrits.map((email, k) => ({
+          emailHash: hashes[k]!,
+          email: coffre.ecrire("waitlist.email", email),
+          source: "accueil" as const,
+          createdAt: new Date(Date.UTC(2000, 0, 1 + k)),
+        })),
+      );
+  });
+  afterAll(async () => {
+    await db().delete(schema.waitlist).where(inArray(schema.waitlist.emailHash, hashes));
+    await poserLeCompteur(0);
+  });
+  const invite = async (k: number) =>
+    (
+      await db()
+        .select({ le: schema.waitlist.inviteLe })
+        .from(schema.waitlist)
+        .where(eq(schema.waitlist.emailHash, hashes[k]!))
+    )[0]?.le instanceof Date;
+  const compteur = async () =>
+    (await db().select({ count: schema.rateLimits.count }).from(schema.rateLimits).where(eq(schema.rateLimits.key, MAILS_DE_LA_LISTE)))[0]?.count ?? 0;
+
+  it("une adresse refusée (422) n’arrête pas le lot : elle reste à inviter, sans prendre de place du jour, et les suivants partent", async () => {
+    pannes.set(inscrits[0]!, 422);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const lot = await inviterLaListe(3);
+    vi.mocked(console.log).mockRestore();
+    expect(lot).toMatchObject({ invites: 2, refusees: 1, plafond: false, prestataire: false });
+    expect([await invite(0), await invite(1), await invite(2)]).toEqual([false, true, true]);
+    expect(await compteur()).toBe(2);
+  });
+
+  it("le prestataire qui freine (429), en panne ou sans la clé : le lot s’arrête, la personne reste à inviter, et ce n’est pas « le plafond »", async () => {
+    for (const statut of [429, 503, 403]) {
+      pannes.set(inscrits[0]!, statut);
+      const lot = await inviterLaListe(1);
+      expect(lot, String(statut)).toMatchObject({ invites: 0, refusees: 0, plafond: false, prestataire: true });
+      expect(await invite(0), String(statut)).toBe(false);
+    }
+    expect(await compteur()).toBe(2);
+  });
+
+  it("un mail perdu en route (pas de réponse) a pu partir : la personne reste invitée, sans second mail, et le lot s’arrête", async () => {
+    pannes.set(inscrits[0]!, "reseau");
+    const lot = await inviterLaListe(1);
+    expect(lot).toMatchObject({ invites: 1, prestataire: true });
+    expect(await invite(0)).toBe(true);
   });
 });

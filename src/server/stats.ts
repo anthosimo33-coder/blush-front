@@ -1,5 +1,6 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
+import { CATALOGUE } from "@/contenu/offres";
 import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { db, uneLigne } from "./db";
@@ -51,13 +52,20 @@ export type StatsAdmin = {
   /** Aujourd’hui et les 7 derniers jours (jours de Paris), quelle que soit la période choisie. */
   ventes: { jour: Ventes; semaine: Ventes };
   bulles: { jour: Bulles; semaine: Bulles };
-  /** Les commandes créées sur la période (achats.cree_le), et ce qu’elles sont devenues. */
+  /**
+   * Les commandes d’un rapport (le rapport, Premium, la suite : les offres d’une conv) créées sur la période
+   * (achats.cree_le), et ce qu’elles sont devenues. Les bulles seules (les recharges, ③) n’entrent pas dans l’entonnoir
+   * des verdicts lus.
+   */
   achats: { commandes: number; comptes: number; payees: number; echouees: number; enAttente: number };
   /** Les offres uniques montrées sur la période, et combien de celles-là ont été prises. */
   offresUniques: { offre: OffreUnique; montrees: number; prises: number }[];
   /** Les derniers gestes de l’équipe (/admin, le terminal). */
   actions: ActionRecente[];
 };
+
+/* Les offres qui débloquent le rapport d’une conv : l’entonnoir des achats part des verdicts lus */
+const OFFRES_DU_RAPPORT = OFFRES.filter((o) => CATALOGUE[o].conv);
 
 /* Le début du jour de Paris, et celui des 7 derniers jours (aujourd’hui compris) */
 const DEBUT_DU_JOUR = sql.raw(`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`);
@@ -140,7 +148,10 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ligne<{ commandes: string; comptes: string; payees: string; echouees: string; en_attente: string }>(
       sql`select count(*) as commandes, count(distinct user_id) as comptes, count(*) filter (where paye_le is not null) as payees,
             count(*) filter (where statut = 'echoue') as echouees, count(*) filter (where statut = 'en_attente') as en_attente
-          from achats where ${dans("cree_le")}`,
+          from achats where ${dans("cree_le")} and offre in (${sql.join(
+            OFFRES_DU_RAPPORT.map((o) => sql`${o}`),
+            sql`, `,
+          )})`,
     ),
     lignes<{ offre: OffreUnique; montrees: string; prises: string }>(
       sql`select offre, count(*) as montrees, count(*) filter (where prise_le is not null) as prises from offres_uniques where ${dans("montree_le")} group by offre`,

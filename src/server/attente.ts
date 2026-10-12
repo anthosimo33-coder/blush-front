@@ -4,7 +4,7 @@ import { empreinte, memeEmpreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { SourceAttente } from "./db/enums";
-import { envoyerMail } from "./email";
+import { envoyerMail, ErreurResend, refusDuPrestataire } from "./email";
 import { boiteAMails, env } from "./env";
 import { empreinteDeLaListe, entre } from "./invitations";
 import { compteDe, LIMITES, plafondsDesMails, rendre, sousLaLimite } from "./limites";
@@ -64,8 +64,12 @@ export async function purgerLaListe(maintenant = new Date()): Promise<void> {
 /* Le compteur du jour des mails de la liste (inscriptions et invitations ensemble) : plafondsDesMails().attente */
 const MAILS_DE_LA_LISTE = "attente:mails";
 
-/** Ce qu’un lot d’invitations a fait : les mails partis, ceux qui restent à inviter, et si le plafond des mails du jour l’a arrêté. */
-export type LotInvite = { invites: number; restent: number; plafond: boolean };
+/**
+ * Ce qu’un lot d’invitations a fait : les mails partis, ceux qui restent à inviter, si le plafond des mails du jour l’a
+ * arrêté, les adresses que le prestataire a refusées (elles restent à inviter), et s’il s’est arrêté sur un refus du
+ * prestataire sans rapport avec l’adresse (trop de mails à la fois, une panne, la clé, ou pas de réponse).
+ */
+export type LotInvite = { invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
 
 /**
  * Invite les `n` plus anciens de la liste d’attente pas encore invités (INVITATIONS_PAR_LOT au plus) : à chacun, le mail
@@ -73,8 +77,11 @@ export type LotInvite = { invites: number; restent: number; plafond: boolean };
  * src/server/invitations.ts), sans les droits de l’équipe. Un par un, dans le plafond des mails de la liste
  * (plafondsDesMails().attente, partagé avec les inscriptions) puis dans le quota du prestataire (sorte « attente », la
  * première retenue) : le premier mail retenu arrête le lot, et la personne reste à inviter. Un invité n’est noté qu’une
- * fois son mail parti : personne n’entre sans le savoir. Deux lots en même temps ne prennent jamais la même personne
- * (la ligne est prise avant le mail). L’équipe le voit dans /admin, et l’action va au journal de l’équipe (equipe.ts).
+ * fois son mail parti : personne n’entre sans le savoir. Une adresse que le prestataire refuse reste à inviter, et le lot
+ * passe à la suivante (une seule adresse invalide n’arrête pas la liste) ; un refus qui ne tient pas à l’adresse (trop
+ * vite, une panne, la clé : refusDuPrestataire) arrête le lot. Un mail perdu en route a pu partir : la personne reste
+ * invitée (pas de second mail), et le lot s’arrête. Deux lots en même temps ne prennent jamais la même personne (la
+ * ligne est prise avant le mail). L’équipe le voit dans /admin, et l’action va au journal de l’équipe (equipe.ts).
  */
 export async function inviterLaListe(n: number): Promise<LotInvite> {
   const w = schema.waitlist;
@@ -82,6 +89,8 @@ export async function inviterLaListe(n: number): Promise<LotInvite> {
   const boite = boiteAMails();
   let invites = 0;
   let plafond = false;
+  let refusees = 0;
+  let prestataire = false;
   const aInviter = await db()
     .select({ id: w.id })
     .from(w)
@@ -106,22 +115,41 @@ export async function inviterLaListe(n: number): Promise<LotInvite> {
       continue;
     }
     const email = coffre.lire("waitlist.email", prise.email);
-    let parti = false;
+    /* Ne pas l’avoir invitée : la ligne rendue, sa place du jour aussi */
+    const rendreLaPlace = async () => {
+      await db().update(w).set({ inviteLe: null }).where(eq(w.id, id));
+      if (!boite) await rendre(MAILS_DE_LA_LISTE);
+    };
+    let parti: boolean;
     try {
       parti = await envoyerMail(email, mailAttente({ base, place: "prete", retrait: lienRetrait(prise.emailHash) }), { sorte: "attente" });
     } catch (e) {
       journalErreur("invitation de la liste : mail refusé", e);
+      if (refusDuPrestataire(e)) {
+        await rendreLaPlace();
+        prestataire = true;
+        break;
+      }
+      if (e instanceof ErreurResend) {
+        /* L’adresse refusée : elle reste à inviter, on passe à la suivante */
+        await rendreLaPlace();
+        refusees++;
+        continue;
+      }
+      /* Perdu en route : il a pu partir, la personne reste invitée (entrer sans l’avoir lu ne lui coûte rien) */
+      invites++;
+      prestataire = true;
+      break;
     }
     if (!parti) {
-      await db().update(w).set({ inviteLe: null }).where(eq(w.id, id));
-      if (!boite) await rendre(MAILS_DE_LA_LISTE);
+      await rendreLaPlace();
       plafond = true;
       break;
     }
     invites++;
   }
   const [reste] = await db().select({ n: count() }).from(w).where(isNull(w.inviteLe));
-  return { invites, restent: reste?.n ?? 0, plafond };
+  return { invites, restent: reste?.n ?? 0, plafond, refusees, prestataire };
 }
 
 /** La liste d’attente, pour /admin : combien sont inscrits, combien invités, et combien de mails de la liste peuvent encore partir aujourd’hui. */

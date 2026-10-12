@@ -2,7 +2,7 @@
 /*
  * L’outil de l’équipe dans le terminal, sans paiement : débloquer le rapport d’un compte, ou lui donner des bulles. Les
  * mêmes gestes que /admin (src/server/equipe.ts), notés au journal de l’équipe comme venus du terminal.
- *   DATABASE_URL=… BLUSH_CLE=… npm run acces -- ami@exemple.fr debloquer            toutes ses convs d’aujourd’hui
+ *   DATABASE_URL=… BLUSH_CLE=… npm run acces -- ami@exemple.fr debloquer            toutes ses convs
  *   DATABASE_URL=… BLUSH_CLE=… npm run acces -- ami@exemple.fr debloquer <conv>     une conv (son id, stories.id)
  *   DATABASE_URL=… BLUSH_CLE=… npm run acces -- ami@exemple.fr bulles 50            50 bulles de plus (négatif : en retirer)
  * Les variables sont celles du serveur (src/server/env.ts) : le modèle n’est jamais appelé ici, et le modèle factice
