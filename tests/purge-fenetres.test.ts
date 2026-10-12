@@ -106,6 +106,33 @@ describe("la purge et la fin des fenêtres (S-13)", () => {
   });
 });
 
+describe("la purge des webhooks de paiement déjà traités", () => {
+  it("efface les lignes d’evenements_paiement de plus de 90 jours, garde les plus récentes", async () => {
+    const maintenant = new Date();
+    const il_y_a = (jours: number) => new Date(maintenant.getTime() - jours * 86400e3);
+    const ids = { vieux: `msg_test_vieux_${id}`, limite: `msg_test_limite_${id}`, recent: `msg_test_recent_${id}` };
+    await db()
+      .insert(schema.evenementsPaiement)
+      .values([
+        { id: ids.vieux, type: "payment.succeeded", recuLe: il_y_a(91) },
+        { id: ids.limite, type: "payment.succeeded", recuLe: il_y_a(89) },
+        { id: ids.recent, type: "refund.created", recuLe: il_y_a(1) },
+      ]);
+    try {
+      await purger(maintenant);
+      const restent = await db()
+        .select({ id: schema.evenementsPaiement.id })
+        .from(schema.evenementsPaiement)
+        .where(inArray(schema.evenementsPaiement.id, Object.values(ids)));
+      expect(restent.map((r) => r.id).sort()).toEqual([ids.limite, ids.recent].sort());
+    } finally {
+      await db()
+        .delete(schema.evenementsPaiement)
+        .where(inArray(schema.evenementsPaiement.id, Object.values(ids)));
+    }
+  });
+});
+
 describe("la purge de la nuit, étape par étape (S-35)", () => {
   afterEach(() => {
     etat.panne = false;

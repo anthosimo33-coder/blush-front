@@ -14,8 +14,13 @@ import { journalErreur } from "./journal";
  *   30 jours (sinon, elle part dès la mémoire faite). Sans rapport, elle reste, chiffrée, jusqu’au déblocage : c’est
  *   d’elle que le rapport s’écrira (choix du 9 octobre 2026). Supprimer l’histoire ou le compte l’efface ;
  * - les sessions expirées, les vieux codes de connexion, et les compteurs de limites dont la fenêtre est finie ;
- * - les inscriptions à la liste d’attente de plus d’un an (ATTENTE_GARDEE_JOURS, src/server/attente.ts).
+ * - les inscriptions à la liste d’attente de plus d’un an (ATTENTE_GARDEE_JOURS, src/server/attente.ts) ;
+ * - les webhooks de paiement déjà traités (evenements_paiement) de plus de 90 jours (EVENEMENTS_PAIEMENT_GARDES_JOURS) :
+ *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien.
  */
+
+/** Combien de jours on garde un webhook de paiement déjà traité (son `webhook-id`, pour l’ignorer s’il revient). */
+const EVENEMENTS_PAIEMENT_GARDES_JOURS = 90;
 export async function purger(maintenant = new Date()) {
   const il_y_a = (jours: number) => new Date(maintenant.getTime() - jours * 86400e3);
   /*
@@ -64,6 +69,11 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.rateLimits)
       .where(or(lt(schema.rateLimits.expiresAt, maintenant), and(isNull(schema.rateLimits.expiresAt), lt(schema.rateLimits.windowStart, il_y_a(2)))));
+  });
+  await etape("webhooks de paiement", async () => {
+    await db()
+      .delete(schema.evenementsPaiement)
+      .where(lt(schema.evenementsPaiement.recuLe, il_y_a(EVENEMENTS_PAIEMENT_GARDES_JOURS)));
   });
   await etape("liste d’attente", () => purgerLaListe(maintenant));
   if (echecs.length)
