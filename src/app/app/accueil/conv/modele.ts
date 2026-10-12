@@ -159,8 +159,16 @@ export function annonceDe(m: Msg): string | null {
         : `La réponse de BLUSH s’est coupée\u00a0: ${MOT_DE_LA_COUPURE}. «\u00a0Réessayer\u00a0» la relance.`;
     case "mot":
       return `BLUSH\u00a0: ${m.notice}`;
-    default:
+    /* Ce qui ne s’annonce pas : ton message (tu viens de l’envoyer), l’intro (rendue avec la page), un repère */
+    case "texte":
+    case "images":
+    case "fichier":
+    case "vocal":
+    case "intro":
+    case "niveau":
       return null;
+    default:
+      return typeInconnu(m);
   }
 }
 

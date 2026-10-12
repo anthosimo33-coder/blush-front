@@ -201,7 +201,7 @@ export function useConversation({
    * Ton message part (`mine`), BLUSH tape « … », puis sa réponse remplace les trois points. Back-end : elle arrive au
    * fil de l’eau, ses bulles une à une (chaque arrivée se déplie, ce qui est posé ne bouge plus), puis la réponse
    * validée, qui les complète (ou les remplace) ; un vocal se prépare encore après elle, sa bulle attend. Le réseau qui
-   * coupe : les bulles reçues restent, avec « Réessayer ». Toute autre erreur aussi (aucune bulle reçue) : « BLUSH
+   * coupe : les bulles reçues restent, avec « Réessayer ». Toute autre erreur aussi (celles déjà posées restent) : « BLUSH
    * écrit » ne reste jamais bloqué. `relance` : la réponse coupée qui repart, à sa place (sans ton message, déjà là).
    */
   const echanger = async ({ mine, relance, ...echange }: Echange & ({ mine: Msg; relance?: undefined } | { mine?: undefined; relance: number })) => {
@@ -216,6 +216,8 @@ export function useConversation({
     let at = 0;
     let poses = 0;
     let vagues: number[] = [];
+    /* Les bulles déjà posées : une erreur qui n’est pas une coupure (sans bulles à elle) les laisse à l’écran */
+    let posees: BulleChat[] = [];
     /* Les arrivées se posent dans l’ordre (« BLUSH écrit » peut d’abord se replier) */
     let file = Promise.resolve();
     let finie = false;
@@ -237,6 +239,7 @@ export function useConversation({
         const premiere = remplacer();
         vagues = [...vagues, poses];
         poses = noeudsDe(recues);
+        posees = recues;
         if (coupee) vagues = [...vagues, poses];
         const pose: Msg = { type: "ecrit", id: readingId, from: "blush", reading: label, vocal: vocalAttendu, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues };
         changer((m) => m.map((x) => (x.id === readingId ? pose : x)));
@@ -264,7 +267,7 @@ export function useConversation({
       finie = true;
       /* Le réseau a coupé : ce qui est arrivé reste, « Réessayer » relance la même demande, à la même place */
       relances.current.set(readingId, echange);
-      const coupee = await poser(e instanceof CoupureChat ? e.recues : [], true)();
+      const coupee = await poser(e instanceof CoupureChat ? e.recues : posees, true)();
       if (coupee) ecran.current.annoncer(coupee);
       return;
     } finally {

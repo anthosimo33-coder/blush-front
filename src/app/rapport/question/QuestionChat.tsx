@@ -103,9 +103,13 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const composer = (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
       {souci && <Alert variant="carte">{souci}</Alert>}
-      {/* La pastille du champ, avec son bouton à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom */}
-      <div className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink),0_10px_26px_-16px_rgba(17,17,20,0.35)]">
-        <label className="flex min-w-0 flex-1 self-stretch">
+      {/*
+       * La pastille du champ, avec son bouton à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom. Il
+       * couvre la pastille hors du bouton (son retrait de gauche, et le vertical par une marge négative) : un toucher au
+       * bord donne encore le focus au champ
+       */}
+      <div className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink),0_10px_26px_-16px_rgba(17,17,20,0.35)]">
+        <label className="-my-1.5 flex min-w-0 flex-1 self-stretch py-1.5 pl-[18px]">
           <span className="sr-only">Ta question à BLUSH</span>
           <textarea
             rows={1}

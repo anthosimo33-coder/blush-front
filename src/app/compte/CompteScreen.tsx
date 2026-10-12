@@ -131,7 +131,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
               sub={c.current ? "Ouverte sur l’accueil" : c.lastLabel}
               onClick={() => {
                 if (ouverture) return;
-                changerDeConv(c.storyId);
+                changerDeConv(c.storyId, router);
                 setOuverte(c.storyId);
                 versAccueil();
               }}

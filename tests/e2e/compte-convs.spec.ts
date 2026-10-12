@@ -205,4 +205,24 @@ test("connecté sans cookie de conv : l’accueil de l’une ne montre rien de l
     await expect(accueilDe(page, "Romane")).toBeVisible();
     await expect(filDuChat(page).getByText(question)).toBeVisible();
   });
+
+  /* L’autre entrée qui change de conv : sa fiche, préchargée par l’accueil de Romane, ne doit pas s’ouvrir sur elle */
+  await test.step("Maëlys, ouverte par « Mon compte » sans recharger la page : sa fiche est bien la sienne", async () => {
+    await page.getByRole("link", { name: "Tes convs (Maëlys)" }).click();
+    await expect(page).toHaveURL(/\/app\/convs$/);
+    await page.getByRole("link", { name: "Mon compte" }).click();
+    await expect(page).toHaveURL(/\/compte$/);
+    await page
+      .getByRole("main")
+      .getByRole("region", { name: "Tes histoires" })
+      .getByRole("button", { name: /^Maëlys et toi/ })
+      .click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(accueilDe(page, "Maëlys")).toBeVisible();
+    await expect(filDuChat(page).getByText(question)).toHaveCount(0);
+    await accueilDe(page, "Maëlys").click();
+    await expect(page).toHaveURL(/\/app\/fiche$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Maëlys" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Romane" })).toHaveCount(0);
+  });
 });

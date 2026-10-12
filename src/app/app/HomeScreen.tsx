@@ -10,6 +10,7 @@ import { marquerChatOuvert } from "@/components/chat/ouvert";
 import { AppScreen } from "@/components/shell/AppScreen";
 import type { ConvSummary } from "@/types";
 import { BarreDeLaFenetre, EnTeteMobile } from "./accueil/Barres";
+import { useAnnonce } from "./accueil/annonce";
 import { ContactContext, FilDeLaConv } from "./accueil/bulles";
 import { Composer } from "./accueil/Composer";
 import { ContactSheet } from "./accueil/ContactSheet";
@@ -104,9 +105,10 @@ export function HomeScreen(p: {
   const idees = useIdees(cle, quick);
   /*
    * Ce que les lecteurs d’écran entendent de la conv (la région role="status", plus bas) : le fil n’est pas une région
-   * live, seuls la dernière réponse de BLUSH (ou un mot de lui) et les messages plus anciens chargés sont dits
+   * live, seuls la dernière réponse de BLUSH (ou un mot de lui) et les messages plus anciens chargés sont dits, même deux
+   * fois de suite (accueil/annonce.ts)
    */
-  const [annonce, setAnnonce] = useState("");
+  const [annonce, annoncer] = useAnnonce();
 
   /* La conv elle-même (accueil/conv/useConversation.ts). L’accueil l’habille : ce que fait l’écran pendant qu’elle change, c’est sa scène */
   const conv = useConversation({
@@ -133,9 +135,9 @@ export function HomeScreen(p: {
       },
       annoncer: (m) => {
         const texte = annonceDe(m);
-        if (texte) setAnnonce(texte);
+        if (texte) annoncer(texte);
       },
-      anciensPoses: (n) => setAnnonce(annonceAnciens(n)),
+      anciensPoses: (n) => annoncer(annonceAnciens(n)),
       niveau: (to) => {
         if (monter(to)) conv.marquerNiveau(to);
       },

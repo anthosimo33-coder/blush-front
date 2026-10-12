@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { BlushAnswer } from "@/types";
 import {
+  annonceAnciens,
+  annonceDe,
   CLE_INTRO,
   CLE_JOUR_INTRO,
   cleBulle,
@@ -306,5 +308,45 @@ describe("le dépli d’une réponse (5)", () => {
     /* Deux bulles arrivées d’abord, puis deux autres : chaque arrivée finit sur sa dernière bulle */
     const d = [0, 1, 2, 3].map((k) => depli(k, 4, [0, 2]));
     expect(d.map((x) => Math.round(x * 100) / 100)).toEqual([0.12, 0, 0.12, 0]);
+  });
+});
+
+describe("ce que les lecteurs d’écran entendent de la conv (annonceDe, la région role=status de l’accueil)", () => {
+  const reponseDeBlush = (textes: string[], plus: Partial<Extract<Msg, { type: "reponse" }>["result"]> = {}): Msg => ({
+    type: "reponse",
+    id: 3,
+    from: "blush",
+    result: { kind: "bubbles", bubbles: textes.map((text) => ({ text })), ...plus },
+  });
+
+  it("la réponse de BLUSH, ses bulles à la suite", () => {
+    expect(annonceDe(reponseDeBlush(["oui, elle a vu", "et elle réfléchit"]))).toBe("BLUSH a répondu\u00a0: oui, elle a vu et elle réfléchit");
+  });
+
+  it("une longue réponse est coupée au dernier mot entier, avec des points de suspension", () => {
+    const long = Array.from({ length: 80 }, (_, i) => `mot${i}`).join(" ");
+    const annonce = annonceDe(reponseDeBlush([long]))!;
+    expect(annonce.length).toBeLessThan(320);
+    expect(annonce.endsWith("…")).toBe(true);
+    expect(annonce).toMatch(/ mot\d+…$/);
+  });
+
+  it("une réponse en vocal, sa coupure (avec ou sans bulles reçues), et un mot de BLUSH", () => {
+    expect(annonceDe(reponseDeBlush(["ok"], { vocalEnCours: true }))).toBe("BLUSH t’a répondu en vocal.");
+    expect(annonceDe({ type: "ecrit", id: 4, from: "blush", reading: "BLUSH écrit", coupee: true, recues: [] })).toBe(
+      "La réponse de BLUSH s’est coupée\u00a0: j’ai eu un bug, renvoie-moi ça. «\u00a0Réessayer\u00a0» la relance.",
+    );
+    expect(annonceDe({ type: "ecrit", id: 4, from: "blush", reading: "BLUSH écrit", coupee: true, recues: [{ text: "bon, écoute" }] })).toContain(
+      "BLUSH a répondu\u00a0: bon, écoute",
+    );
+    expect(annonceDe({ type: "mot", id: 5, from: "blush", notice: "Je n’ai rien entendu." })).toBe("BLUSH\u00a0: Je n’ai rien entendu.");
+  });
+
+  it("rien pour un message à toi, BLUSH qui écrit encore, ou un repère ; et les messages plus anciens chargés", () => {
+    expect(annonceDe({ type: "texte", id: 1, from: "toi", text: "allô" })).toBeNull();
+    expect(annonceDe({ type: "ecrit", id: 2, from: "blush", reading: "BLUSH écrit" })).toBeNull();
+    expect(annonceDe({ type: "niveau", id: 6, from: "event", level: "dit" })).toBeNull();
+    expect(annonceAnciens(1)).toBe("1 message plus ancien chargé");
+    expect(annonceAnciens(12)).toBe("12 messages plus anciens chargés");
   });
 });

@@ -57,9 +57,14 @@ describe("l’échéance d’une fonction", () => {
     expect(ailleurs[0]!.texte).toContain("export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);");
   });
 
-  it("une route qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj qui la relance) vit DUREE_FONCTION_S", () => {
-    const routes = sources("src/app").filter((f) => /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj)\(/.test(f.texte));
-    expect(routes.length).toBeGreaterThanOrEqual(5);
+  /*
+   * Une page la lance aussi, par le service qui la relance après le rendu : getFicheEtMaj (sa fiche). getReport (les
+   * pages du rapport, par ouvrirLeRapport) s’y ajoutera avec leur maxDuration (lot 6, PR2).
+   */
+  it("une route ou une page qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj et getFicheEtMaj qui la relancent) vit DUREE_FONCTION_S", () => {
+    const routes = sources("src/app").filter((f) => /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj|getFicheEtMaj)\(/.test(f.texte));
+    expect(routes.map((f) => f.chemin)).toContain("src/app/app/fiche/page.tsx");
+    expect(routes.length).toBeGreaterThanOrEqual(6);
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);
   });
 

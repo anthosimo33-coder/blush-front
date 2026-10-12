@@ -279,9 +279,12 @@ export function Composer({
             <RecordingBar ecoute={voice.ecoute} onSend={() => void sendVoice()} />
           </div>
         ) : (
-          /* La pastille du champ, avec ses boutons à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom */
-          <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
-            <label className="flex h-full min-w-0 flex-1 items-center">
+          /*
+           * La pastille du champ, avec ses boutons à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom.
+           * Il prend le retrait de gauche : un toucher au bord de la pastille donne encore le focus au champ
+           */
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
+            <label className="flex h-full min-w-0 flex-1 items-center pl-[18px]">
               <span className="sr-only">{about ? "Ta question sur ce point" : "Écris à BLUSH, ou colle sa réponse"}</span>
               <input
                 ref={inputRef}

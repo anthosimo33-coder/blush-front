@@ -61,15 +61,7 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       prefetch={false}
       scroll={false}
       transitionTypes={["nav-forward"]}
-      /*
-       * Les pages préchargées en entier gardent la conv d’avant (5 min) : sa fiche, préchargée par l’accueil, s’ouvrirait
-       * sur l’autre personne. refresh() oublie tout ce que le navigateur en garde ; la navigation vers l’accueil, partie
-       * juste après, passe devant lui
-       */
-      onClick={() => {
-        changerDeConv(conv.storyId);
-        router.refresh();
-      }}
+      onClick={() => changerDeConv(conv.storyId, router)}
       aria-label={`${conv.person.name}\u00a0: ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"
     >

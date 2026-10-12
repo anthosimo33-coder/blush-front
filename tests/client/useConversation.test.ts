@@ -235,6 +235,38 @@ describe("useConversation : un échange", () => {
     }
   });
 
+  it("une erreur qui n’est pas une coupure, après des bulles déjà posées : elles restent à l’écran, avec « Réessayer »", async () => {
+    const { result } = monter();
+    const avertir = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const r = retenue<NewMsg>();
+      let suivi!: SuiviChat;
+      let fini!: Promise<void>;
+      act(() => {
+        fini = result.current.envoyer(
+          texteDe("et là ?"),
+          analyse((sv) => {
+            suivi = sv;
+            return r.promesse;
+          }),
+        );
+      });
+      const posee: BulleChat = { text: "là, tu respires" };
+      await act(async () => {
+        suivi.bulles?.([posee]);
+        await Promise.resolve();
+      });
+      await act(async () => {
+        r.rompre(new Error("bug après le flux"));
+        await fini;
+      });
+      expect(types(result.current.msgs)).toEqual(["intro", "intro", "texte", "ecrit coupé"]);
+      expect(result.current.msgs.at(-1)).toMatchObject({ recues: [posee], coupee: true });
+    } finally {
+      avertir.mockRestore();
+    }
+  });
+
   it("la réponse posée en entier, et un mot de BLUSH, sont annoncés à l’écran (pour les lecteurs d’écran)", async () => {
     const { result, scene: s } = monter();
     await act(() =>
