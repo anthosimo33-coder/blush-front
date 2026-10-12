@@ -73,7 +73,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
   });
 
-  await test.step("l’offre ③ juste après : Premium pour 5 € de plus, la carte gardée ; « Non merci » montre ce qui vient de s’ouvrir", async () => {
+  await test.step("l’offre ③ juste après : Premium pour 5 € de plus, la carte gardée ; « Non merci, je lis la suite » ramène au rapport", async () => {
     const ecran = page.getByRole("main");
     const offre = ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" });
     await expect(offre).toBeVisible();
@@ -81,14 +81,9 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await expect(offre.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();
     await expect(offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" })).toBeVisible();
     await offre.getByRole("button", { name: "Non merci, je lis la suite" }).click();
-    await expect(offre).toHaveCount(0);
-    await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
-    await expect(ecran.getByText("Ta lecture reprend au chapitre 2")).toBeVisible();
-    await expect(ecran.getByText("10 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
   });
 
-  await test.step("« Lire la suite » ramène au rapport, complet : les huit chapitres arrivent", async () => {
-    await page.getByRole("link", { name: "Lire la suite" }).click();
+  await test.step("la suite de son rapport, complet : les huit chapitres arrivent", async () => {
     await expect(page).toHaveURL(/\/rapport#chapitre-2$/);
     await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
     await attendreTaches(email);
@@ -112,6 +107,8 @@ test("Premium, choisie d’avance : payée à l’écran, 90 bulles, et pas d’
   await payerALecran(page, /^Rapport \+ 60 bulles/);
   const ecran = page.getByRole("main");
   await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
+  await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
+  await expect(ecran.getByText("Ta lecture reprend au chapitre 2")).toBeVisible();
   await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
   await expect(ecran.getByText("14,90\u00a0€ · Paiement unique, pas d’abonnement")).toBeVisible();
   await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);

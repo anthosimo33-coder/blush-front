@@ -88,10 +88,12 @@ export function lirePaiementWhop(data: unknown): PaiementWhop | null {
 /**
  * Le montant d’un paiement colle-t-il à l’achat ? La devise (l’euro), et le total TTC, ou le sous-total si Whop a
  * ajouté la taxe par-dessus (des prix configurés hors taxe chez lui) : jamais moins que le prix du catalogue figé dans
- * l’achat. Un montant qui ne colle pas n’est pas livré, et l’équipe est prévenue.
+ * l’achat. Un sous-total au prix ne suffit donc pas si le total payé est plus bas (une remise, un code promo appliqué
+ * chez Whop : le sous-total est alors le prix d’avant la remise). Un montant qui ne colle pas n’est pas livré, et
+ * l’équipe est prévenue.
  */
 export const montantJuste = (p: Pick<PaiementWhop, "total" | "sousTotal" | "devise">, achat: { centimes: number; devise: string }) =>
-  p.devise === achat.devise && (p.total === achat.centimes || p.sousTotal === achat.centimes);
+  p.devise === achat.devise && (p.total === achat.centimes || (p.sousTotal === achat.centimes && p.total !== null && p.total >= achat.centimes));
 
 /** L’enveloppe d’un webhook de Whop. */
 const Enveloppe = z.looseObject({

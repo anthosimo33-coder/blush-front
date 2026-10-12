@@ -94,6 +94,7 @@ export function UnlockedScreen({
   reprise: number;
 }) {
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
+  const router = useRouter();
   useSoundOnce("debloque");
   /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
   useEffect(() => apresDeblocage(), []);
@@ -145,7 +146,8 @@ export function UnlockedScreen({
         </p>
 
         {ajout ? (
-          <OffrePremiumAjout enUnGeste={ajout.enUnGeste} ici={ici} fermer={() => setAjout(null)} />
+          /* « Non merci, je lis la suite » : la lecture reprend, comme le bouton du bas (le prototype des bulles) */
+          <OffrePremiumAjout enUnGeste={ajout.enUnGeste} ici={ici} fermer={() => router.push(suite as Route, { scroll: cheminDe(suite) !== "/app" })} />
         ) : (
           <div data-rise="" style={delai(0.45)} className="mt-8 w-full text-left">
             <InsetGroup>

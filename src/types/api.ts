@@ -93,7 +93,7 @@ export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; enU
 /** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
 
-/** Une erreur d’une route : son code/** Une erreur d’une route : son code (src/types/erreurs-api.ts), jamais de détail interne. */
+/** Une erreur d’une route : son code (src/types/erreurs-api.ts), jamais de détail interne. */
 export type ReponseErreur = { erreur: CodeErreur };
 
 /** Une conv importée (un export, des captures, un enregistrement d’écran) : sa source, et l’histoire brouillon qu’elle devient. */

@@ -128,6 +128,10 @@ describe("ce que dit un paiement de Whop", () => {
     expect(montantJuste({ total: 690, sousTotal: 575, devise: "eur" }, achat)).toBe(false);
     expect(montantJuste({ total: 990, sousTotal: null, devise: "usd" }, achat)).toBe(false);
     expect(montantJuste({ total: null, sousTotal: null, devise: "eur" }, achat)).toBe(false);
+    /* Le sous-total au prix, mais un total payé plus bas (une remise chez Whop) ou inconnu : non */
+    expect(montantJuste({ total: 0, sousTotal: 990, devise: "eur" }, achat)).toBe(false);
+    expect(montantJuste({ total: 495, sousTotal: 990, devise: "eur" }, achat)).toBe(false);
+    expect(montantJuste({ total: null, sousTotal: 990, devise: "eur" }, achat)).toBe(false);
   });
 });
 

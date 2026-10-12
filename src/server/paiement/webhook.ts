@@ -1,6 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
+import { CATALOGUE } from "@/contenu/offres";
 import { livrer, marquerEchoue, reprendre, uneFoisParEvenement, type Achat } from "../achats";
 import { alerter } from "../alertes";
 import { db, schema } from "../db";
@@ -76,6 +77,14 @@ export async function livrerLePaiement(mode: Fournisseur["mode"], p: PaiementWho
         importante: true,
       }),
     );
+  /* Le rapport d’une conv déjà ouverte par un autre achat (deux commandes payées, deux onglets) : ses bulles sont livrées, le rapport payé deux fois */
+  if (r.effet === "livre" && r.achat?.storyId && r.achat.userId && CATALOGUE[r.achat.offre].conv && !r.debloquee)
+    after(() =>
+      alerter("paiement : rapport déjà ouvert", [
+        `L’achat ${achat.id} (${achat.offre}, paiement ${p.id}) est livré, mais le rapport de sa conv était déjà ouvert : seules ses bulles comptent.`,
+        "Le rapport a peut-être été payé deux fois : à voir chez Whop, et à rembourser s’il le demande.",
+      ]),
+    );
   return r.effet;
 }
 
@@ -100,6 +109,20 @@ async function appliquer(f: Fournisseur, action: ActionWebhook): Promise<string>
       if (!achat || achat.fournisseur !== f.mode) {
         journal("reprise d’un paiement sans achat connu", { paiement: action.paiementId, statut: action.statut }, "alerte");
         return "inconnu";
+      }
+      /*
+       * Livré par un autre paiement : celui-ci l’a payé en double (« payé deux fois », livrerLePaiement), et c’est lui qu’on
+       * rembourse, ou qui est contesté. L’achat reste à lui : rien n’est repris (sinon, rembourser le doublon, comme
+       * l’alerte le demande, re-verrouillerait le rapport bel et bien payé)
+       */
+      if (achat.paiementId && achat.paiementId !== action.paiementId) {
+        const quoi = action.statut === "rembourse" ? "remboursé" : "contesté";
+        after(() =>
+          alerter(`paiement en double ${quoi}`, [
+            `Le paiement ${action.paiementId} (${quoi}) payait l’achat ${achat.id} (${achat.offre}), déjà livré par le paiement ${achat.paiementId} : rien n’est repris.`,
+          ]),
+        );
+        return "doublon";
       }
       return (await reprendre(achat.id, action.statut)).effet;
     }

@@ -56,6 +56,9 @@ async function moyenGarde(userId: string, mode: Fournisseur["mode"]): Promise<{ 
   return l?.membreId && l.moyenId ? { membreId: l.membreId, moyenId: l.moyenId } : null;
 }
 
+/** Whop a refusé l’appel, sans rien faire (un 4xx) : ni une panne, ni un délai, ni une réponse illisible, où le paiement a pu partir. */
+const refusNet = (e: ErreurWhop) => typeof e.statut === "number" && e.statut >= 400 && e.statut < 500;
+
 /**
  * L’offre ③ payée en un geste, avec le moyen de paiement gardé d’un achat payé : chez Whop (POST /payments ; l’adresse où
  * le confirmer si la banque le demande), ou par le faux Whop, qui envoie son webhook payment.succeeded juste après la
@@ -73,7 +76,12 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
     const p = await payerEnUnGeste(f.whop, { achat: achat.id, centimes: achat.centimes, membre: moyen.membreId, moyen: moyen.moyenId, retour });
     return { achat: achat.id, checkout: null, url: p.confirmer };
   } catch (e) {
-    if (!(e instanceof ErreurWhop)) throw e;
+    /*
+     * Seul un refus net de Whop (4xx : rien n’a été débité) passe à une page de paiement. Sans réponse, ou une réponse
+     * illisible, le paiement a pu partir : une page de plus le ferait payer deux fois. L’erreur remonte (l’achat échoue,
+     * « panne ») ; s’il a été débité, son webhook le livre quand même (livrer, depuis « echoue »).
+     */
+    if (!(e instanceof ErreurWhop) || !refusNet(e)) throw e;
     journalErreur("paiement en un geste refusé, page de paiement à la place", e, { achat: achat.id });
     return null;
   }

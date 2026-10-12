@@ -352,6 +352,79 @@ describe("le webhook (POST /api/paiement/whop)", () => {
   });
 });
 
+/** Un webhook de Whop (pas du faux), signé de son secret, de son compte. */
+const signeWhop = (type: string, data: unknown) => {
+  const corps = JSON.stringify({ id: `evt_${type}`, type, account_id: WHOP.compte, data });
+  return { corps, entetes: signerWebhook(WHOP.secret, `msg_${crypto.randomUUID()}`, corps) };
+};
+
+/** Un paiement de Whop de cet achat, à ce prix, avec le moyen de paiement gardé de l’acheteur. */
+const paiementDeWhop = (achat: string, id: string, montant = "9.90") => ({
+  id,
+  status: "paid",
+  metadata: { achat },
+  total: { amount: montant, currency: "eur" },
+  currency: "eur",
+  member_id: "mber_w",
+  payment_method_id: "payt_w",
+});
+
+describe("payé deux fois", () => {
+  it("le même achat payé par deux paiements : livré une fois, l’équipe prévenue ; rembourser (ou contester) le doublon ne reprend rien", async () => {
+    const { u, conv } = await acheteur("double-paiement");
+    etat.mode = "whop";
+    let achat = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => (url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_d" }) : Response.json(paiementDeWhop(achat, url.split("/").pop()!)))),
+    );
+    achat = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(achat, "pay_d1")))).status).toBe(200);
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(achat, "pay_d2")))).status).toBe(200);
+    expect(await mouvements(u.id)).toEqual([["achat", 10]]);
+    /* L’équipe rembourse le doublon, comme l’alerte le demande ; puis un litige sur lui : le rapport payé reste ouvert */
+    expect((await poster(signeWhop("refund.created", { id: "rfnd_d2", status: "succeeded", payment_id: "pay_d2" }))).status).toBe(200);
+    expect((await poster(signeWhop("dispute.created", { id: "dspt_d2", status: "needs_response", payment_id: "pay_d2" }))).status).toBe(200);
+    expect(await achatEnBase(achat)).toMatchObject({ statut: "paye", paiementId: "pay_d1" });
+    expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
+    expect(await soldeDe(u.id)).toBe(10);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : payé deux fois", "paiement en double remboursé", "paiement en double contesté"]);
+    /* Le paiement qui l’a livré, remboursé : là, l’achat est repris */
+    expect((await poster(signeWhop("refund.created", { id: "rfnd_d1", status: "succeeded", payment_id: "pay_d1" }))).status).toBe(200);
+    expect(await achatEnBase(achat)).toMatchObject({ statut: "rembourse" });
+    expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
+    expect(await soldeDe(u.id)).toBe(0);
+  });
+
+  it("deux commandes du même rapport, payées toutes les deux : les bulles de chacune, l’équipe prévenue de la seconde", async () => {
+    const { u, conv } = await acheteur("double-commande");
+    const [une, deux] = [(await payer({ offre: "rapport", renonciation: true })).corps, (await payer({ offre: "rapport", renonciation: true })).corps];
+    expect((await poster(await issue(une.achat, "payer"))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual([]);
+    expect((await poster(await issue(deux.achat, "payer"))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : rapport déjà ouvert"]);
+    expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
+    expect(await soldeDe(u.id)).toBe(20);
+    expect(etat.relancees).toEqual([conv]);
+  });
+
+  it("un sous-total au prix mais un total plus bas (une remise chez Whop) : rien de livré, l’équipe prévenue", async () => {
+    const { u, conv } = await acheteur("remise");
+    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
+    const remise = { ...data, total: { amount: "0.00", currency: "eur" }, subtotal: { amount: "9.90", currency: "eur" } };
+    expect((await poster(webhookFactice("payment.succeeded", remise))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : montant inattendu"]);
+    expect((await achatEnBase(corps.achat)).statut).toBe("en_attente");
+    expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
+    expect(await soldeDe(u.id)).toBe(0);
+  });
+});
+
 describe("le retour (GET /api/paiement/[achat])", () => {
   const etatDe = async (achat: string, paiement?: string) => {
     const r = await lireEtat(new Request(`${APPLI}/api/paiement/${achat}${paiement ? `?paiement=${paiement}` : ""}`), { params: Promise.resolve({ achat }) });
@@ -417,5 +490,61 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await soldeDe(u.id)).toBe(90);
     expect(await montrer("premium_ajout")).toEqual({ offre: null });
     expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 422, corps: { erreur: "offre" } });
+  });
+
+  it("③ en un geste chez Whop, sans réponse ou illisible : aucune page de plus (pas de second débit), l’achat échoue, et son webhook le livre quand même", async () => {
+    const { u } = await acheteur("offre-geste-whop");
+    etat.mode = "whop";
+    let reponseAuGeste: () => Response = () => new Response("{}", { status: 500 });
+    const appels: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const chemin = new URL(url).pathname.replace("/api/v1", "");
+        appels.push(chemin);
+        if (chemin === "/payments") return reponseAuGeste();
+        return Response.json({ id: "ch_g", purchase_url: "https://whop.com/checkout/ch_g/" });
+      }),
+    );
+    const rapport = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_g1")))).status).toBe(200);
+    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, enUnGeste: true });
+    appels.length = 0;
+
+    /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, l’achat échoue (son webhook le livrerait quand même) */
+    for (const reponse of [() => new Response("{}", { status: 500 }), () => new Response("pas du json", { status: 200 })]) {
+      reponseAuGeste = reponse;
+      expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 502, corps: { erreur: "panne" } });
+    }
+    expect(appels).toEqual(["/payments", "/payments"]);
+    const echoues = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).filter((a) => a.offre === "premium_ajout");
+    expect(echoues.map((a) => a.statut)).toEqual(["echoue", "echoue"]);
+    /* Débité malgré la panne : le webhook livre l’achat échoué */
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(echoues[1]!.id, "pay_g2", "5.00")))).status).toBe(200);
+    expect(await achatEnBase(echoues[1]!.id)).toMatchObject({ statut: "paye" });
+    expect(await soldeDe(u.id)).toBe(90);
+  });
+
+  it("③ en un geste chez Whop, refusé net : la page de paiement normale", async () => {
+    await acheteur("offre-geste-refus");
+    etat.mode = "whop";
+    const appels: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const chemin = new URL(url).pathname.replace("/api/v1", "");
+        appels.push(chemin);
+        if (chemin === "/payments") return new Response("{}", { status: 400 });
+        return Response.json({ id: "ch_r", purchase_url: "https://whop.com/checkout/ch_r/" });
+      }),
+    );
+    const rapport = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_r1")))).status).toBe(200);
+    expect((await montrer("premium_ajout")).offre).toBe("premium_ajout");
+    appels.length = 0;
+    const { status, corps } = await payer({ offre: "premium_ajout", renonciation: true });
+    expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_r/", "ch_r"]);
+    expect(appels).toEqual(["/payments", "/checkout_configurations"]);
+    expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", centimes: 500 });
   });
 });
