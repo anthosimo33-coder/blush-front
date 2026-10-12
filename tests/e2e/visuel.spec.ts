@@ -381,49 +381,49 @@ test("un compte de l’équipe : la landing, l’accueil, sa fiche, Mon compte, 
     await page.goto("/");
     await expect(page.getByRole("main").getByRole("link", { name: "Retrouver ma conv" }).first()).toBeVisible();
     await parcourirLaLanding(page);
-    await capturer(page, "blushplus-accueil-connecte");
+    await capturer(page, "equipe-accueil-connecte");
   });
 
   await test.step("l’accueil : l’intro de BLUSH", async () => {
     await ouvrir(page, "/app");
     await expect(filDuChat(page).getByText("Elle vient de répondre ?")).toBeVisible();
-    await capturer(page, "blushplus-app-intro");
+    await capturer(page, "equipe-app-intro");
   });
 
   await test.step("sa fiche", async () => {
     await ouvrir(page, "/app/fiche");
     await expect(page.getByRole("heading", { level: 1, name: "Maëlys" })).toBeVisible();
-    await capturer(page, "blushplus-fiche");
+    await capturer(page, "equipe-fiche");
   });
 
   await test.step("Mon compte", async () => {
     await ouvrir(page, "/compte");
     await expect(page.getByRole("main").getByRole("button", { name: /^Tout effacer/ })).toBeVisible();
-    await capturer(page, "blushplus-compte");
+    await capturer(page, "equipe-compte");
   });
 
   await test.step("la révélation du verdict, carte par carte : le moment et « à toi de jouer » viennent du chapitre 2", async () => {
     await page.goto("/rapport/verdict");
-    expect(await capturerLaRevelation(page, "blushplus-verdict"), "les cartes d’un rapport ouvert").toBe(5);
+    expect(await capturerLaRevelation(page, "equipe-verdict"), "les cartes d’un rapport ouvert").toBe(5);
   });
 
   const rapport = page.getByRole("main");
   await test.step("le rapport complet, en haut", async () => {
     await ouvrirLeRapport(page);
     await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
-    await capturer(page, "blushplus-rapport");
+    await capturer(page, "equipe-rapport");
   });
 
   await test.step("le rapport, au chapitre 3", async () => {
     await allerAuChapitre(page, 3, "Ch. 3");
-    await capturer(page, "blushplus-rapport-chapitre-3");
+    await capturer(page, "equipe-rapport-chapitre-3");
   });
 
   await test.step("la feuille de partage", async () => {
     await ouvrirLeRapport(page);
     const feuille = await ouvrirLePartage(page);
     await expect(feuille.getByRole("img").first()).toBeVisible();
-    await capturer(page, "blushplus-partage");
+    await capturer(page, "equipe-partage");
   });
 
   await test.step("le verdict partagé, vu par un pote", async () => {
@@ -437,7 +437,7 @@ test("un compte de l’équipe : la landing, l’accueil, sa fiche, Mon compte, 
   await test.step("ta question", async () => {
     await page.goto("/rapport/question");
     await expect(page.getByRole("log", { name: "Ta conversation avec BLUSH" }).getByText("une question sur vous deux ? balance")).toBeVisible();
-    await capturer(page, "blushplus-question");
+    await capturer(page, "equipe-question");
   });
 
   await test.step("l’accueil, après un message", async () => {
@@ -445,7 +445,7 @@ test("un compte de l’équipe : la landing, l’accueil, sa fiche, Mon compte, 
     expect(await ecrireABlush(page, "on s’est vus hier soir, c’était trop bien")).toBe(200);
     await expect(champDuChat(page)).toHaveValue("");
     await expect(filDuChat(page).getByText("tu lui as répondu quoi ?")).toBeVisible();
-    await capturer(page, "blushplus-app-message");
+    await capturer(page, "equipe-app-message");
   });
 });
 
@@ -458,7 +458,7 @@ test("un compte de l’équipe : « Tes convs », avec deux convs", async ({ pag
   await attendreTaches(email);
   await ouvrir(page, "/app/convs");
   await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Tes convs" })).toBeVisible();
-  await capturer(page, "blushplus-convs");
+  await capturer(page, "equipe-convs");
 });
 
 test("le tableau de bord de l’équipe", async ({ page }, testInfo) => {
