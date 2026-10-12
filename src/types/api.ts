@@ -86,9 +86,11 @@ export type EtatAchat = { achat: string; offre: OffreId; statut: StatutAchat; bu
 
 /**
  * Une offre unique montrée (POST /api/paiement/offre) : laquelle, jusqu’à quand (une date ISO, l’heure de fin du compte
- * à rebours de ①, ou null : sans fin), et si elle se paie en un geste (un moyen de paiement gardé) ; ou aucune.
+ * à rebours de ①, ou null : sans fin), le temps qu’il lui reste à l’heure du serveur (en millisecondes, ou null : sans
+ * fin), et si elle se paie en un geste (un moyen de paiement gardé) ; ou aucune. Le compte à rebours part de `reste`,
+ * pas de `fin` : l’horloge du téléphone peut avancer ou retarder sur celle du serveur.
  */
-export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; enUnGeste: boolean } | { offre: null };
+export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; reste: number | null; enUnGeste: boolean } | { offre: null };
 
 /** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
@@ -242,9 +244,13 @@ export const ROUTES = {
   "POST /api/import": { formulaire: true },
   /*
    * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la case « je renonce à mon droit
-   * de rétractation » cochée (sans elle, 422 « renonciation » : rien ne part)
+   * de rétractation » cochée : la version de son texte (CASE_RENONCIATION.version), gardée avec l’achat. Sans elle, ou
+   * une version qui n’est plus la bonne (dont l’ancien `true` d’un onglet ouvert avant la version) : 422 « renonciation »,
+   * rien ne part
    */
-  "POST /api/paiement": { corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.boolean().optional() }) },
+  "POST /api/paiement": {
+    corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.union([z.string().max(40), z.boolean()]).optional() }),
+  },
   /* `?paiement=pay_…` : le paiement que Whop a donné au retour, vérifié chez lui si le webhook tarde */
   "GET /api/paiement/[achat]": {},
   "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES) }) },

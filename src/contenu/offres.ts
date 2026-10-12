@@ -1,4 +1,4 @@
-import type { Formule, Offer, OffreId, OffreUnique } from "@/types";
+import type { Formule, OffreId, OffreUnique } from "@/types";
 
 /*
  * Le catalogue : ce qu’on achète, une fois, par Whop (vendeur en titre : les prix sont TTC). Le serveur fait payer ces
@@ -67,42 +67,10 @@ export const enEuros = (centimes: number) => `${Math.floor(centimes / 100)},${St
 /** Le prix d’une offre, à afficher : « 9,90 € ». */
 export const prixDe = (offre: OffreId) => enEuros(CATALOGUE[offre].centimes);
 
-/** Les deux formules de la feuille du paiement, chacune par son id : le rapport seul, ou Premium (le prototype des bulles). */
-const FORMULE: Record<Formule, Offer> = {
-  rapport: {
-    id: "rapport",
-    title: "Le rapport",
-    titleDesktop: "Le rapport",
-    price: prixDe("rapport"),
-    note: `+ ${CATALOGUE.rapport.bulles} bulles offertes`,
-    noteDesktop: `+ ${CATALOGUE.rapport.bulles} bulles offertes`,
-    recommended: false,
-  },
-  premium: {
-    id: "premium",
-    title: "Rapport + 60 bulles",
-    titleDesktop: "Rapport + 60 bulles",
-    price: prixDe("premium"),
-    note: `Soit ${CATALOGUE.premium.bulles} bulles en tout`,
-    noteDesktop: `Soit ${CATALOGUE.premium.bulles} bulles en tout`,
-    recommended: true,
-  },
-};
-
 /**
- * Les formules dans l’ordre de la feuille : le rapport seul, puis Premium, choisie d’avance (décidé le 12 octobre).
+ * La formule choisie d’avance quand la feuille « Ta formule » s’ouvre : Premium (décidé le 12 octobre). Ses textes sont
+ * dans src/contenu/paiement.ts (FEUILLE_FORMULE).
  * TODO(produit): le faire relire par un juriste (un paiement en plus choisi par défaut peut être remboursé, article 22
  * de la directive 2011/83/UE).
  */
-export const OFFERS: Offer[] = [FORMULE.rapport, FORMULE.premium];
-
-/** La formule choisie d’avance quand la feuille s’ouvre. */
 export const FORMULE_CHOISIE: Formule = "premium";
-
-export const PAYWALL = {
-  title: (other?: string) => (other ? `La suite parle de vous deux\u00a0: toi et ${other}.` : "La suite parle de vous deux."),
-  /** Le nombre de chapitres qui restent, quand on le sait (le rapport ouvert) ; sinon, la suite, sans compter. */
-  subtitle: (chapitres?: number) =>
-    chapitres ? `${chapitres} chapitres, ton plan et les phrases pour lui parler.` : "La suite de ton rapport, ton plan et les phrases pour lui parler.",
-  payments: "Paiement unique, pas d’abonnement · Apple Pay ou carte",
-};

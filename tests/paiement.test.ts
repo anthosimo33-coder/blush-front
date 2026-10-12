@@ -53,6 +53,7 @@ import { GET as lireEtat } from "@/app/api/paiement/[achat]/route";
 import { POST as fauxWhop } from "@/app/api/paiement/factice/route";
 import { POST as offre } from "@/app/api/paiement/offre/route";
 import { POST as webhookRecu } from "@/app/api/paiement/whop/route";
+import { CASE_RENONCIATION } from "@/contenu/consentements";
 import type { Utilisateur } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
@@ -122,7 +123,7 @@ async function acheteur(prefixe: string): Promise<{ u: Utilisateur; conv: string
 
 /** Commande le rapport de sa conv au faux Whop, puis le paie : l’id de l’achat. */
 async function rapportPaye(offreId: "rapport" | "premium" = "rapport"): Promise<string> {
-  const { corps } = await payer({ offre: offreId, renonciation: true });
+  const { corps } = await payer({ offre: offreId, renonciation: CASE_RENONCIATION.version });
   expect((await poster(await issue(corps.achat, "payer"))).status).toBe(200);
   return corps.achat;
 }
@@ -130,20 +131,38 @@ async function rapportPaye(offreId: "rapport" | "premium" = "rapport"): Promise<
 describe("commencer un paiement (POST /api/paiement)", () => {
   it("sans la case de renonciation cochée, rien ne part : 422 « renonciation », aucun achat", async () => {
     const { u } = await acheteur("paie-renonce");
-    for (const corps of [{ offre: "rapport" }, { offre: "rapport", renonciation: false }]) expect(await payer(corps)).toEqual({ status: 422, corps: { erreur: "renonciation" } });
+    /* Sans la case, décochée, l’ancien `true` (un onglet d’avant la version), ou une version qui n’est plus la bonne */
+    for (const corps of [
+      { offre: "rapport" },
+      { offre: "rapport", renonciation: false },
+      { offre: "rapport", renonciation: true },
+      { offre: "rapport", renonciation: "2020-01-01" },
+    ])
+      expect(await payer(corps), JSON.stringify(corps)).toEqual({ status: 422, corps: { erreur: "renonciation" } });
     expect(await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).toEqual([]);
+  });
+
+  it("la case cochée : l’achat garde sa version et l’heure où le serveur l’a reçue", async () => {
+    await acheteur("paie-renonce-garde");
+    const avant = Date.now();
+    const { status, corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
+    expect(status).toBe(200);
+    const achat = await achatEnBase(corps.achat);
+    expect(achat.renonciationVersion).toBe(CASE_RENONCIATION.version);
+    expect(achat.renonciationLe!.getTime()).toBeGreaterThanOrEqual(avant - 1000);
+    expect(achat.renonciationLe!.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
   it("sans paiement branché (ni Whop, ni le faux Whop) : 402 « bientot », aucun achat", async () => {
     const { u } = await acheteur("paie-bientot");
     etat.mode = null;
-    expect(await payer({ offre: "rapport", renonciation: true })).toEqual({ status: 402, corps: { erreur: "bientot" } });
+    expect(await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 402, corps: { erreur: "bientot" } });
     expect(await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).toEqual([]);
   });
 
   it("le faux Whop : l’achat en attente au prix du catalogue, pour la conv de la page, et sa page de paiement locale", async () => {
     const { u, conv } = await acheteur("paie-factice");
-    const { status, corps } = await payer({ offre: "premium", renonciation: true });
+    const { status, corps } = await payer({ offre: "premium", renonciation: CASE_RENONCIATION.version });
     expect(status).toBe(200);
     expect(corps.url).toBe(`/paiement/factice?achat=${corps.achat}`);
     expect(corps.checkout).toMatch(/^ch_faux_/);
@@ -162,13 +181,13 @@ describe("commencer un paiement (POST /api/paiement)", () => {
   it("refusé : l’équipe ou un rapport déjà ouvert (409 « deja »), la conv d’un autre (404 « aucune »), une offre unique pas montrée (422 « offre »)", async () => {
     const { conv } = await acheteur("paie-refus");
     await debloquerLaConv(conv);
-    expect(await payer({ offre: "rapport", renonciation: true })).toEqual({ status: 409, corps: { erreur: "deja" } });
+    expect(await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 409, corps: { erreur: "deja" } });
     const autre = await acheteur("paie-refus-autre");
-    expect(await payer({ offre: "rapport", conv, renonciation: true })).toEqual({ status: 404, corps: { erreur: "aucune" } });
-    expect(await payer({ offre: "suite", renonciation: true })).toEqual({ status: 422, corps: { erreur: "offre" } });
-    expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 422, corps: { erreur: "offre" } });
+    expect(await payer({ offre: "rapport", conv, renonciation: CASE_RENONCIATION.version })).toEqual({ status: 404, corps: { erreur: "aucune" } });
+    expect(await payer({ offre: "suite", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 422, corps: { erreur: "offre" } });
+    expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 422, corps: { erreur: "offre" } });
     connecter(await compteDeTest("equipe-paie"));
-    expect(await payer({ offre: "pack80", renonciation: true })).toEqual({ status: 409, corps: { erreur: "deja" } });
+    expect(await payer({ offre: "pack80", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 409, corps: { erreur: "deja" } });
     expect(autre.conv).not.toBe(conv);
   });
 
@@ -183,7 +202,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
         return Response.json({ id: "ch_whop_1", purchase_url: "https://whop.com/checkout/ch_whop_1/" });
       }),
     );
-    const { status, corps } = await payer({ offre: "rapport", renonciation: true });
+    const { status, corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_whop_1/", "ch_whop_1"]);
     expect(corpsEnvoyes).toEqual([expect.objectContaining({ metadata: { achat: corps.achat }, redirect_url: `https://www.askblush.com/paiement/retour?achat=${corps.achat}` })]);
     expect(await achatEnBase(corps.achat)).toMatchObject({ fournisseur: "whop", checkoutId: "ch_whop_1", centimes: 990 });
@@ -194,7 +213,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
       "fetch",
       vi.fn(async () => new Response("{}", { status: 500 })),
     );
-    expect(await payer({ offre: "rapport", renonciation: true })).toEqual({ status: 502, corps: { erreur: "panne" } });
+    expect(await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 502, corps: { erreur: "panne" } });
     const statuts = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).map((a) => a.statut).sort();
     expect(statuts).toEqual(["echoue", "en_attente"]);
   });
@@ -203,7 +222,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
 describe("le webhook (POST /api/paiement/whop)", () => {
   it("payé : la conv débloquée, les bulles créditées, la chaîne relancée, le paiement et son moyen gardés ; rejoué, rien de plus", async () => {
     const { u, conv } = await acheteur("hook-livre");
-    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const w = await issue(corps.achat, "payer");
     const r = await poster(w);
     expect([r.status, await r.json()]).toEqual([200, { ok: true }]);
@@ -228,7 +247,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
 
   it("deux webhooks en même temps (le même, et deux envois du même paiement) : livré une seule fois", async () => {
     const { u } = await acheteur("hook-course");
-    const { corps } = await payer({ offre: "premium", renonciation: true });
+    const { corps } = await payer({ offre: "premium", renonciation: CASE_RENONCIATION.version });
     const w = await issue(corps.achat, "payer");
     const data = (JSON.parse(w.corps) as { data: Record<string, unknown> }).data;
     const reponses = await Promise.all([poster(w), poster(w), poster(webhookFactice("payment.succeeded", data)), poster(webhookFactice("payment.succeeded", data))]);
@@ -239,7 +258,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
 
   it("une signature fausse, ou sans signature : 401 « interdit », rien de livré ; l’équipe prévenue d’une signature fausse", async () => {
     const { u } = await acheteur("hook-signature");
-    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const w = await issue(corps.achat, "payer");
     const touche = { corps: w.corps.replace('"9.90"', '"0.01"'), entetes: w.entetes };
     for (const faux of [touche, { corps: w.corps, entetes: { ...w.entetes, "webhook-signature": "v1,AAAA" } }, { corps: w.corps, entetes: {} }]) {
@@ -257,7 +276,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
 
   it("un montant faux (ou une autre devise) : rien de livré, l’équipe prévenue ; un autre compte Whop : ignoré", async () => {
     const { u, conv } = await acheteur("hook-montant");
-    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
     for (const faux of [
       { ...data, total: { amount: "0.99", currency: "eur" } },
@@ -278,7 +297,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
 
   it("refusé (payment.failed) : l’achat échoue ; remboursé : la conv re-verrouillée, les bulles reprises (sous zéro), l’équipe prévenue, une fois", async () => {
     const { u, conv } = await acheteur("hook-rembourse");
-    const { corps: refuse } = await payer({ offre: "rapport", renonciation: true });
+    const { corps: refuse } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     expect((await poster(await issue(refuse.achat, "refuser"))).status).toBe(200);
     expect((await achatEnBase(refuse.achat)).statut).toBe("echoue");
 
@@ -330,7 +349,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
       payment_method_id: null,
     });
 
-    const { corps: premier } = await payer({ offre: "rapport", renonciation: true });
+    const { corps: premier } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     expect((await poster(signe("payment.succeeded", paiementWhop(premier.achat, "pay_w1")))).status).toBe(200);
     expect(await soldeDe(u.id)).toBe(10);
     expect((await poster(signe("dispute.created", { id: "dspt_1", status: "needs_response", payment_id: "pay_w1" }))).status).toBe(200);
@@ -341,7 +360,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect(etat.alertes).toContain("paiement contesté");
 
     /* Le remboursement d’un paiement encore inconnu : Whop dit quel achat il payait, qui ne sera plus livré */
-    const { corps: second } = await payer({ offre: "rapport", renonciation: true });
+    const { corps: second } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     achatAttendu = second.achat;
     expect((await poster(signe("refund.created", { id: "rfnd_1", status: "succeeded", payment_id: "pay_w2" }))).status).toBe(200);
     expect(await achatEnBase(second.achat)).toMatchObject({ statut: "rembourse" });
@@ -378,7 +397,7 @@ describe("payé deux fois", () => {
       "fetch",
       vi.fn(async (url: string) => (url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_d" }) : Response.json(paiementDeWhop(achat, url.split("/").pop()!)))),
     );
-    achat = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    achat = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(achat, "pay_d1")))).status).toBe(200);
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(achat, "pay_d2")))).status).toBe(200);
     expect(await mouvements(u.id)).toEqual([["achat", 10]]);
@@ -399,7 +418,10 @@ describe("payé deux fois", () => {
 
   it("deux commandes du même rapport, payées toutes les deux : les bulles de chacune, l’équipe prévenue de la seconde", async () => {
     const { u, conv } = await acheteur("double-commande");
-    const [une, deux] = [(await payer({ offre: "rapport", renonciation: true })).corps, (await payer({ offre: "rapport", renonciation: true })).corps];
+    const [une, deux] = [
+      (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps,
+      (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps,
+    ];
     expect((await poster(await issue(une.achat, "payer"))).status).toBe(200);
     await apresLaReponse();
     expect(etat.alertes).toEqual([]);
@@ -413,7 +435,7 @@ describe("payé deux fois", () => {
 
   it("un sous-total au prix mais un total plus bas (une remise chez Whop) : rien de livré, l’équipe prévenue", async () => {
     const { u, conv } = await acheteur("remise");
-    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
     const remise = { ...data, total: { amount: "0.00", currency: "eur" }, subtotal: { amount: "9.90", currency: "eur" } };
     expect((await poster(webhookFactice("payment.succeeded", remise))).status).toBe(200);
@@ -447,7 +469,7 @@ describe("le retour (GET /api/paiement/[achat])", () => {
       "fetch",
       vi.fn(async (url: string) => (url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_r" }) : Response.json(paiementChezWhop))),
     );
-    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     /* Le paiement d’un autre achat, ou pas encore encaissé : rien */
     paiementChezWhop = { id: "pay_r", status: "paid", metadata: { achat: "0b7e3f4c-0000-4000-8000-000000000001" }, total: 9.9, currency: "eur" };
     expect((await etatDe(corps.achat, "pay_r")).corps.statut).toBe("en_attente");
@@ -466,7 +488,7 @@ describe("le retour (GET /api/paiement/[achat])", () => {
       "fetch",
       vi.fn(async (url: string) => (url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_s" }) : Response.json(paiementDeWhop(achat, "pay_s2")))),
     );
-    achat = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    achat = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.failed", { ...paiementDeWhop(achat, "pay_s1"), status: "failed" }))).status).toBe(200);
     expect((await etatDe(achat)).corps.statut).toBe("echoue");
     expect((await etatDe(achat, "pay_s2")).corps.statut).toBe("paye");
@@ -488,7 +510,12 @@ describe("les offres uniques et le paiement en un geste", () => {
     const reste = Date.parse((m as { fin: string }).fin) - Date.now();
     expect(reste).toBeGreaterThan(4 * 60_000);
     expect(reste).toBeLessThanOrEqual(5 * 60_000);
-    const { status, corps } = await payer({ offre: "suite", renonciation: true });
+    /* Le temps qu’il lui reste, à l’heure du serveur : le compte à rebours de l’écran en part (pas de l’horloge du téléphone) */
+    const dit = (m as { reste: number }).reste;
+    expect(dit).toBeGreaterThan(4 * 60_000);
+    expect(dit).toBeLessThanOrEqual(5 * 60_000);
+    expect(Math.abs(dit - reste)).toBeLessThan(5_000);
+    const { status, corps } = await payer({ offre: "suite", renonciation: CASE_RENONCIATION.version });
     expect(status).toBe(200);
     expect(await achatEnBase(corps.achat)).toMatchObject({ offre: "suite", centimes: 690, bulles: 10 });
   });
@@ -497,15 +524,15 @@ describe("les offres uniques et le paiement en un geste", () => {
     const { u } = await acheteur("offre-ajout");
     expect(await montrer("premium_ajout")).toEqual({ offre: null });
     await rapportPaye();
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, enUnGeste: true });
-    const { status, corps } = await payer({ offre: "premium_ajout", renonciation: true });
+    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+    const { status, corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, null, null]);
     expect((await achatEnBase(corps.achat)).statut).toBe("en_attente");
     await apresLaReponse();
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "paye", centimes: 500 });
     expect(await soldeDe(u.id)).toBe(90);
     expect(await montrer("premium_ajout")).toEqual({ offre: null });
-    expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 422, corps: { erreur: "offre" } });
+    expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 422, corps: { erreur: "offre" } });
   });
 
   it("③ en un geste chez Whop, sans réponse ou illisible : aucune page de plus (pas de second débit), l’achat échoue, et son webhook le livre quand même", async () => {
@@ -522,15 +549,15 @@ describe("les offres uniques et le paiement en un geste", () => {
         return Response.json({ id: "ch_g", purchase_url: "https://whop.com/checkout/ch_g/" });
       }),
     );
-    const rapport = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_g1")))).status).toBe(200);
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, enUnGeste: true });
+    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
     appels.length = 0;
 
     /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, l’achat échoue (son webhook le livrerait quand même) */
     for (const reponse of [() => new Response("{}", { status: 500 }), () => new Response("pas du json", { status: 200 })]) {
       reponseAuGeste = reponse;
-      expect(await payer({ offre: "premium_ajout", renonciation: true })).toEqual({ status: 502, corps: { erreur: "panne" } });
+      expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 502, corps: { erreur: "panne" } });
     }
     expect(appels).toEqual(["/payments", "/payments"]);
     const echoues = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).filter((a) => a.offre === "premium_ajout");
@@ -554,11 +581,11 @@ describe("les offres uniques et le paiement en un geste", () => {
         return Response.json({ id: "ch_r", purchase_url: "https://whop.com/checkout/ch_r/" });
       }),
     );
-    const rapport = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_r1")))).status).toBe(200);
     expect((await montrer("premium_ajout")).offre).toBe("premium_ajout");
     appels.length = 0;
-    const { status, corps } = await payer({ offre: "premium_ajout", renonciation: true });
+    const { status, corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_r/", "ch_r"]);
     expect(appels).toEqual(["/payments", "/checkout_configurations"]);
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", centimes: 500 });

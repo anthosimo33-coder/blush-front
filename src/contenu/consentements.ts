@@ -48,6 +48,9 @@ export const CASE_RENONCIATION = {
     bulles: "Je veux mes bulles tout de suite et je renonce à mon droit de rétractation",
   },
   manquante: "Coche la case pour payer.",
+  /** Le serveur a refusé la case (son texte a changé depuis l’ouverture de la page) : comme pour la case de l’import. */
+  perimee: CASE_IMPORT.perimee,
+  recharger: CASE_IMPORT.recharger,
 } as const;
 
 /** Ce qu’on achète, pour la case de la renonciation : le rapport (la feuille « Ta formule »), ou des bulles (la recharge). */

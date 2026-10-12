@@ -8,6 +8,7 @@ import { commander, marquerEchoue, type Achat, type RefusDeCommande } from "../a
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
+import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
 import { journalErreur } from "../journal";
 import { LIMITES, sousLaLimite } from "../limites";
@@ -101,15 +102,16 @@ async function pageDePaiement(f: Fournisseur, achat: Achat, retour: string): Pro
 export type RefusDePaiement = "bientot" | RefusDeCommande;
 
 /**
- * Commence le paiement d’une offre (la case de renonciation déjà vérifiée par la route) : l’achat écrit « en_attente »
- * au prix du catalogue (commander : le droit de l’acheter), puis la page où le payer, ou le paiement en un geste (③).
+ * Commence le paiement d’une offre (la case de renonciation déjà vérifiée par la route : `renonciation`, sa version et
+ * son heure, gardées avec l’achat) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
+ * l’acheter), puis la page où le payer, ou le paiement en un geste (③).
  * Une page que Whop refuse de créer laisse l’achat « echoue » (rien n’a été payé), et l’erreur remonte (« panne »).
  */
-export async function commencerPaiement(compte: Compte, offre: OffreId, storyId: string | null): Promise<PaiementCommence | RefusDePaiement> {
+export async function commencerPaiement(compte: Compte, offre: OffreId, storyId: string | null, renonciation: Consentement): Promise<PaiementCommence | RefusDePaiement> {
   const f = fournisseur();
   if (!f) return "bientot";
   if (estEquipe(compte)) return "deja";
-  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode });
+  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation });
   if (typeof achat === "string") return achat;
   const retour = adresseDuRetour(f, achat.id);
   try {
@@ -154,7 +156,8 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
  * 5 € de plus, après un rapport payé (le rapport seul, ou la suite). Jamais sans prestataire (rien ne s’achèterait), ni à
- * l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est enregistrée »).
+ * l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est enregistrée »). `reste` : le temps qu’il reste
+ * à ① à l’heure du serveur, d’où part le compte à rebours de l’écran (l’horloge du téléphone peut être fausse).
  */
 export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null): Promise<OffreUniqueMontree> {
   const f = fournisseur();
@@ -177,7 +180,9 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;
-  return { offre, fin: montree.expireLe?.toISOString() ?? null, enUnGeste: offre === "premium_ajout" && !!(await moyenGarde(compte.id, f.mode)) };
+  const enUnGesteGarde = offre === "premium_ajout" && !!(await moyenGarde(compte.id, f.mode));
+  const fin = montree.expireLe;
+  return { offre, fin: fin?.toISOString() ?? null, reste: fin ? Math.max(0, fin.getTime() - Date.now()) : null, enUnGeste: enUnGesteGarde };
 }
 
 /** Ce que le faux Whop fait d’un achat de ce compte : le webhook à poster, et l’adresse du retour (null pour un remboursement). */

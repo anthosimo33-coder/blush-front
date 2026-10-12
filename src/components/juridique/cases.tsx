@@ -63,13 +63,8 @@ export function CaseImport({ etat, className }: { etat: EtatCase; className?: st
       refus={!!etat.refus}
       message={
         etat.refus === "perimee" ? (
-          <>
-            {CASE_IMPORT.perimee}{" "}
-            {/* Le nouveau texte (et sa version) n’arrive qu’avec la page rechargée : un bouton, car l’appli posée sur l’écran d’accueil n’a pas celui du navigateur */}
-            <button type="button" onClick={() => window.location.reload()} className="font-black text-danger underline underline-offset-2">
-              {CASE_IMPORT.recharger}
-            </button>
-          </>
+          /* Le nouveau texte (et sa version) n’arrive qu’avec la page rechargée */
+          <Perimee texte={CASE_IMPORT.perimee} recharger={CASE_IMPORT.recharger} />
         ) : (
           CASE_IMPORT.manquante
         )
@@ -86,14 +81,34 @@ export function CaseImport({ etat, className }: { etat: EtatCase; className?: st
   );
 }
 
+/** Le message d’une case refusée par le serveur (`perimee`) : la page est à recharger, par un bouton (l’appli posée sur l’écran d’accueil n’a pas celui du navigateur). */
+function Perimee({ texte, recharger }: { texte: string; recharger: string }) {
+  return (
+    <>
+      {texte}{" "}
+      <button type="button" onClick={() => window.location.reload()} className="font-black text-danger underline underline-offset-2">
+        {recharger}
+      </button>
+    </>
+  );
+}
+
 /**
  * La case de la feuille du paiement : le contenu livré tout de suite, et la renonciation au droit de rétractation (Code
  * de la consommation, L221-28 13°). Sans elle, le bouton ne paie pas : `etat.exiger()` avant de payer. `quoi` : le
- * rapport (« Ta formule »), ou des bulles (la recharge). Le serveur du paiement peut garder sa version (CASE_RENONCIATION).
+ * rapport (« Ta formule »), ou des bulles (la recharge). Le serveur du paiement garde sa version avec l’achat
+ * (CASE_RENONCIATION) ; il refuse une version qui n’est plus la sienne (`etat.perimer()` : la page est à recharger).
  */
 export function CaseRenonciation({ etat, quoi, className }: { etat: EtatCase; quoi: AchatImmediat; className?: string }) {
   return (
-    <CaseACocher coche={etat.coche} onChange={etat.changer} refus={!!etat.refus} message={CASE_RENONCIATION.manquante} inputRef={etat.ref} className={className}>
+    <CaseACocher
+      coche={etat.coche}
+      onChange={etat.changer}
+      refus={!!etat.refus}
+      message={etat.refus === "perimee" ? <Perimee texte={CASE_RENONCIATION.perimee} recharger={CASE_RENONCIATION.recharger} /> : CASE_RENONCIATION.manquante}
+      inputRef={etat.ref}
+      className={className}
+    >
       {CASE_RENONCIATION.textes[quoi]}
     </CaseACocher>
   );

@@ -1,14 +1,15 @@
 import "server-only";
-import { CASE_IMPORT } from "@/contenu/consentements";
+import { CASE_IMPORT, CASE_RENONCIATION } from "@/contenu/consentements";
 import { CHAMPS_EDITEUR, EDITEUR } from "@/contenu/mentions-legales";
 
 /*
  * Ce que la loi demande au serveur : l’accord de l’import (la case « J’ai 18 ans ou plus… », données sensibles du
- * RGPD article 9), vérifié par chaque route qui reçoit une conv et gardé avec elle ; et l’identité de l’éditeur, sans
+ * RGPD article 9), vérifié par chaque route qui reçoit une conv et gardé avec elle ; la renonciation au droit de
+ * rétractation, vérifiée avant de commencer un paiement et gardée avec l’achat ; et l’identité de l’éditeur, sans
  * laquelle la production ne s’ouvre pas au public (les mentions légales l’affichent).
  */
 
-/** L’accord d’un import : la version du texte de la case cochée, et l’heure où le serveur l’a reçu. */
+/** Un accord donné par une case : la version du texte de la case cochée, et l’heure où le serveur l’a reçu (l’import, la renonciation). */
 export type Consentement = { version: string; le: Date };
 
 /**
@@ -18,6 +19,16 @@ export type Consentement = { version: string; le: Date };
  */
 export function consentementImport(valeur: unknown, maintenant = new Date()): Consentement | null {
   return valeur === CASE_IMPORT.version ? { version: CASE_IMPORT.version, le: maintenant } : null;
+}
+
+/**
+ * La renonciation au droit de rétractation que porte une commande (le champ `renonciation` de POST /api/paiement : la
+ * version de la case cochée), ou null : sans la case, ou avec une version qui n’est plus celle d’aujourd’hui. La route
+ * répond alors 422 `renonciation`, avant toute limite et avant toute commande ; sinon, l’achat la garde (sa version et
+ * son heure).
+ */
+export function renonciationPaiement(valeur: unknown, maintenant = new Date()): Consentement | null {
+  return valeur === CASE_RENONCIATION.version ? { version: CASE_RENONCIATION.version, le: maintenant } : null;
 }
 
 /** Les champs de l’identité de l’éditeur encore vides (src/contenu/mentions-legales.ts, EDITEUR), dans l’ordre de la page. */

@@ -126,6 +126,16 @@ const payerLaFormule = (nom) => async (page) => {
   await page.waitForURL(/\/rapport\/debloque\?achat=/);
   await page.waitForTimeout(1600);
 };
+/** Commence le paiement de la formule choisie d’avance, la case cochée, puis touche `bouton` (« Refuser », « Annuler ») chez le faux Whop : la page du retour. */
+const retourDuFauxWhop = (bouton) => async (page) => {
+  const feuille = page.getByRole("dialog");
+  await feuille.getByRole("checkbox").check();
+  await feuille.getByRole("button", { name: /^Débloquer/ }).click();
+  await page.getByRole("button", { name: bouton, exact: true }).click();
+  await page.waitForURL(/\/paiement\/retour\?/);
+  await page.getByRole("heading", { level: 1 }).waitFor();
+  await page.waitForTimeout(700);
+};
 /** La première idée de « Ta question » (une question de la mémoire), mise dans le champ. */
 const premiereIdee = async (page) => {
   await page.getByRole("group", { name: "Des idées, tirées de ton rapport" }).getByRole("button").first().click();
@@ -431,8 +441,69 @@ export const STATES = [
     note: "La dernière carte d’un compte gratuit\u00a0: «\u00a0Voir mon rapport\u00a0» (le rapport habituel) et «\u00a0Partager mon verdict\u00a0» (prénoms masqués).",
     changement: "La 4e carte d’un compte gratuit (la 5e est pour les comptes payants, en VP5).",
   },
-  { id: "09", section: "rapport", title: "Rapport, aperçu gratuit", state: "Page entière", route: "/rapport", compte: "gratuit", full: true, ref: "09-rapport-apercu-gratuit" },
-  { id: "10", section: "rapport", title: "Paiement", route: "/rapport?paiement=1", compte: "gratuit", sheet: true, wait: 900, ref: "10-paiement" },
+  {
+    id: "09",
+    section: "rapport",
+    title: "Rapport, aperçu gratuit",
+    state: "Page entière",
+    route: "/rapport",
+    compte: "gratuit",
+    full: true,
+    ref: "09-rapport-apercu-gratuit",
+    changement: "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 10 bulles offertes.",
+  },
+  {
+    id: "09q",
+    section: "rapport",
+    title: "Rapport, aperçu gratuit",
+    state: "C’est quoi une bulle\u00a0?",
+    route: "/rapport",
+    compte: "gratuit",
+    sheet: true,
+    steps: click(/^10 bulles offertes avec ton rapport/),
+    note: "Ouverte de la ligne rose du bas de l’aperçu\u00a0: «\u00a0Compris\u00a0» la ferme.",
+  },
+  {
+    id: "10",
+    section: "rapport",
+    title: "Paiement",
+    state: "Ta formule, Premium choisie d’avance",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    wait: 900,
+    ref: "10-paiement",
+    note: "La case de renonciation (que le prototype n’avait pas) sous «\u00a0C’est quoi une bulle\u00a0?\u00a0». Sur un écran court (375 × 667), les marges de Premium se resserrent pour que la feuille tienne sans défiler.",
+    changement: "La feuille «\u00a0Ta formule\u00a0» du prototype des bulles remplace l’ancien paiement, partout où il s’ouvre.",
+  },
+  {
+    id: "10r",
+    section: "rapport",
+    title: "Paiement",
+    state: "Ta formule, le rapport seul",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    wait: 900,
+    steps: click(/^Le rapport/, { role: "radio" }),
+  },
+  {
+    id: "10o",
+    section: "rapport",
+    title: "Paiement",
+    state: "L’offre ①, la feuille fermée sans payer",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.waitForTimeout(900);
+    },
+    note: "Le compte à rebours part de l’heure de fin donnée par le serveur (5 minutes)\u00a0; la case de renonciation, que le prototype n’avait pas, au-dessus de «\u00a0Je la prends\u00a0».",
+    changement: "Au dessin du prototype\u00a0: le logo, «\u00a0attends…\u00a0», la barre qui se vide.",
+  },
   {
     id: "10b",
     section: "rapport",
@@ -441,8 +512,8 @@ export const STATES = [
     route: "/rapport?paiement=1",
     compte: "gratuit",
     steps: payerLaFormule(/^Le rapport/),
-    note: "Payé au faux Whop. Animé (la gerbe). L’offre ③ en dessous, à son dessin de la vague 2.",
-    changement: "Le vrai paiement (le faux Whop) : l’offre ③ apparaît juste après le rapport seul.",
+    note: "Payé au faux Whop. Animé (la gerbe). L’offre ③ prend la place de la liste et du bouton du bas\u00a0; la case de renonciation, que le prototype n’avait pas, au-dessus de «\u00a0Ajouter 80 bulles\u00a0».",
+    changement: "Au dessin du prototype\u00a0: les bulles reçues, l’offre ③ et ses perles. Sans la ligne du prix, absente du prototype.",
   },
   {
     id: "10c",
@@ -452,7 +523,60 @@ export const STATES = [
     route: "/rapport?paiement=1",
     compte: "gratuit",
     steps: payerLaFormule(/^Rapport \+ 60 bulles/),
-    note: "Payé au faux Whop. Animé (la gerbe). Textes à valider.",
+    note: "Payé au faux Whop. Animé (la gerbe). Les bulles reçues dans l’anneau rose de leur perle.",
+  },
+  {
+    id: "10w",
+    section: "rapport",
+    title: "Retour du paiement",
+    state: "L’attente",
+    route: "/paiement/retour?achat=00000000-0000-4000-8000-000000000000",
+    compte: "gratuit",
+    sheet: true,
+    retenir: { chemin: "/api/paiement/*", methode: "GET" },
+    note: "Le webhook n’est pas encore là\u00a0: l’achat se relit chaque seconde (une minute, puis «\u00a0met du temps\u00a0»). Textes nouveaux, sans maquette.",
+  },
+  {
+    id: "10x",
+    section: "rapport",
+    title: "Retour du paiement",
+    state: "Refusé",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    steps: retourDuFauxWhop("Refuser"),
+    note: "«\u00a0Réessayer\u00a0» rouvre «\u00a0Ta formule\u00a0». Textes nouveaux, sans maquette.",
+  },
+  {
+    id: "10y",
+    section: "rapport",
+    title: "Retour du paiement",
+    state: "Annulé chez Whop",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    steps: retourDuFauxWhop("Annuler"),
+    note: "Revenu de la page de Whop sans payer (status=canceled). Textes nouveaux, sans maquette.",
+  },
+  {
+    id: "10z",
+    section: "rapport",
+    title: "Retour du paiement",
+    state: "Des bulles reçues",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    sheet: true,
+    steps: async (page) => {
+      /* Pas d’écran de recharge dans ce lot : la commande de la feuille, la case cochée, part en pack (sa version de la case est celle de l’écran) */
+      await page.route("**/api/paiement", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), offre: "pack80" }) }));
+      const feuille = page.getByRole("dialog");
+      await feuille.getByRole("checkbox").check();
+      await feuille.getByRole("button", { name: /^Débloquer/ }).click();
+      await page.getByRole("button", { name: "Payer", exact: true }).click();
+      await page.getByRole("heading", { level: 1, name: /bulles$/ }).waitFor();
+      await page.waitForTimeout(500);
+    },
+    note: "Un pack payé\u00a0: les bulles se disent un instant, puis on revient là où le paiement a commencé (le chat). Textes nouveaux, sans maquette.",
   },
   {
     id: "VP1",
@@ -1023,7 +1147,7 @@ export const STATES = [
     state: "Offre du paiement",
     route: "/rapport?paiement=1",
     compte: "gratuit",
-    hover: { role: "radio", name: /Le rapport complet/ },
+    hover: { role: "radio", name: /^Le rapport/ },
     sheet: true,
     wait: 900,
     only: "d",

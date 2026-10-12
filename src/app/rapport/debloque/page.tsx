@@ -5,7 +5,7 @@ import { CHAPITRES_OFFERTS, NB_CHAPITRES, PREMIER_PAYANT } from "@/contenu/chapi
 import { CATALOGUE } from "@/contenu/offres";
 import { suiteSure } from "@/lib/suite";
 import { getAchatPaye, getReport } from "@/services/serveur";
-import { UnlockedScreen } from "./UnlockedScreen";
+import { EcranDebloque } from "./EcranDebloque";
 import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
@@ -36,7 +36,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
   return (
     <PageDeConv rendu={rendu}>
-      <UnlockedScreen achat={achat.id} offre={achat.offre} bulles={achat.bulles} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} />
+      <EcranDebloque achat={achat.id} offre={achat.offre} bulles={achat.bulles} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} />
     </PageDeConv>
   );
 }

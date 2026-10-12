@@ -374,6 +374,13 @@ export const achats = pgTable(
     /** Le membre Whop (mber_…) et son moyen de paiement gardé (payt_…) : le paiement en un geste de l’offre ③. */
     membreId: text("membre_id"),
     moyenId: text("moyen_id"),
+    /**
+     * La case de renonciation au droit de rétractation (src/contenu/consentements.ts), cochée avant de payer : la version
+     * de son texte et l’heure où le serveur l’a reçue, avec la commande. Null pour un achat sans paiement (l’équipe, un
+     * achat d’avant la case).
+     */
+    renonciationVersion: text("renonciation_version"),
+    renonciationLe: quand("renonciation_le"),
     creeLe: quand("cree_le").notNull().defaultNow(),
     payeLe: quand("paye_le"),
     /** Remboursé, contesté ou échoué : l’heure. */

@@ -11,7 +11,7 @@ import { useCompteDeLaPage } from "./compte-de-la-page";
 import { AccountPill, Screen } from "./Screen";
 
 /* Le paiement ne s’ouvre que si les droits manquent : son code (offres comprises) arrive à part, seulement ce jour-là */
-const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
+const FeuilleFormule = dynamic(() => import("@/components/paiement/FeuilleFormule").then((m) => m.FeuilleFormule), { ssr: false });
 
 /**
  * Les droits du compte, par besoin (src/lib/acces.ts ; la lecture de sa fiche n’est encore refusée qu’ici, voir
@@ -31,7 +31,7 @@ function useAccess() {
 
 /**
  * Coque des écrans après le rapport (desktop : une colonne centrée, « Mon compte » en haut ; une colonne d’appoint seulement si l’écran en passe une).
- * `besoin` : ce que l’écran demande (sa fiche) ; le paiement s’affiche par-dessus si le compte ne l’ouvre pas.
+ * `besoin` : ce que l’écran demande (sa fiche) ; le paiement (la feuille « Ta formule ») s’affiche par-dessus si le compte ne l’ouvre pas.
  * `ferme` : ce que l’écran montre demande le rapport de sa conv, pas encore débloqué (« Ta question ») : le paiement
  * s’affiche par-dessus, quoi que le compte ait d’autre.
  */
@@ -65,7 +65,7 @@ export function AppScreen({
   useEffect(() => {
     if (!peutManquer || bloqueVu) return;
     let fini = false;
-    const annuler = auRepos(() => void import("@/components/screens/PaywallSheet").then(() => !fini && setBloqueVu(true)));
+    const annuler = auRepos(() => void import("@/components/paiement/FeuilleFormule").then(() => !fini && setBloqueVu(true)));
     return () => {
       fini = true;
       annuler();
@@ -83,7 +83,7 @@ export function AppScreen({
       >
         {children}
       </Screen>
-      {(besoin || ferme) && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} proposerLaSuite={false} />}
+      {(besoin || ferme) && bloqueVu && <FeuilleFormule open={blocked} onClose={() => router.push("/rapport")} suite={pathname} autre={autre} proposerLaSuite={false} />}
     </>
   );
 }
