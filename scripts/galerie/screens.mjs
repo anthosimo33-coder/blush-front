@@ -4,7 +4,6 @@
  * éventuels. Les prénoms sont ceux des exports fictifs des tests : Noé (qui importe) et Maëlys.
  * `ref` = nom de la maquette (maquettes/png/{mobile,desktop}/<ref>.png), montrée à côté quand elle est là.
  */
-import { CASE_RENONCIATION } from "../../src/contenu/consentements.ts";
 
 /**
  * Le compte préparé avant la capture (galerie.spec.ts, `preparer`). Sans : aucun compte, aucune conv.
@@ -564,13 +563,15 @@ export const STATES = [
     section: "rapport",
     title: "Retour du paiement",
     state: "Des bulles reçues",
-    route: "/compte",
+    route: "/rapport?paiement=1",
     compte: "gratuit",
     sheet: true,
     steps: async (page) => {
-      const r = await page.request.post("/api/paiement", { headers: { origin: new URL(page.url()).origin }, data: { offre: "pack80", renonciation: CASE_RENONCIATION.version } });
-      const { url } = await r.json();
-      await page.goto(url);
+      /* Pas d’écran de recharge dans ce lot : la commande de la feuille, la case cochée, part en pack (sa version de la case est celle de l’écran) */
+      await page.route("**/api/paiement", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), offre: "pack80" }) }));
+      const feuille = page.getByRole("dialog");
+      await feuille.getByRole("checkbox").check();
+      await feuille.getByRole("button", { name: /^Débloquer/ }).click();
       await page.getByRole("button", { name: "Payer", exact: true }).click();
       await page.getByRole("heading", { level: 1, name: /bulles$/ }).waitFor();
       await page.waitForTimeout(500);
