@@ -139,12 +139,7 @@ export function Suite({ phase, fermes, ouvrirPaiement }: { phase: PhaseDuRapport
           <ChapterRule />
           {/* Après la lecture : ta question, bien visible */}
           <InsetGroup>
-            <InsetRow
-              leading={<RowIcon icon="bolt" tone="toi" />}
-              title="Poser ma question à BLUSH"
-              href="/rapport/question"
-              chevron
-            />
+            <InsetRow leading={<RowIcon icon="bolt" tone="toi" />} title="Poser ma question à BLUSH" href="/rapport/question" chevron />
           </InsetGroup>
         </>
       )}

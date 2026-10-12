@@ -27,16 +27,32 @@ type QuiDeTest = Partial<Omit<Qui, "moi">> & { moi?: Qui["moi"] | string };
 const QUI: Qui = { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble" };
 
 let comptes = 0;
-/** Un compte neuf (gratuit, sauf `plan`), à l’email unique `<prefixe>-…@blush.test`, effacé à la fin du fichier. */
-export async function compteDeTest(prefixe: string, plan: Utilisateur["plan"] = "gratuit"): Promise<Utilisateur> {
+/* Les comptes dont chaque conv rattachée est débloquée d’office (compteDeTest, « debloque ») */
+const debloques = new Set<string>();
+
+/**
+ * Un compte neuf, à l’email unique `<prefixe>-…@blush.test`, effacé à la fin du fichier. `acces` : « gratuit » (par
+ * défaut, le chapitre 1 seul), ou « debloque » : chaque conv qu’on lui rattache (convRattachee) a son rapport débloqué,
+ * comme payé, et toute la chaîne s’écrit à la lecture.
+ */
+export async function compteDeTest(prefixe: string, acces: "gratuit" | "debloque" = "gratuit"): Promise<Utilisateur> {
   const u = (
     await db()
       .insert(schema.users)
-      .values({ email: `${prefixe}-${Date.now()}-${++comptes}@blush.test`, plan })
+      .values({ email: `${prefixe}-${Date.now()}-${++comptes}@blush.test` })
       .returning()
   )[0]!;
   creees.comptes.push(u.id);
+  if (acces === "debloque") debloques.add(u.id);
   return u;
+}
+
+/** Débloque (ou re-verrouille, `ouvert` faux) le rapport de cette conv, comme un achat livré (ou repris), sans relancer la chaîne. */
+export async function debloquerLaConv(storyId: string, ouvert = true): Promise<void> {
+  await db()
+    .update(schema.stories)
+    .set({ debloqueLe: ouvert ? new Date() : null })
+    .where(eq(schema.stories.id, storyId));
 }
 
 /** La place de quelqu’un dans la conv (0 ou 1), d’après son prénom : le `moi` de « Qui es-tu ? ». */
@@ -57,6 +73,7 @@ export async function convImportee(nom: string): Promise<Importee> {
 export async function convRattachee(u: Utilisateur, conv: string | Importee): Promise<Importee> {
   const imp = typeof conv === "string" ? await convImportee(conv) : conv;
   if ((await rattacherBrouillon(u, imp.secret)) !== imp.id) throw new Error(`la conv ${imp.id} ne s’est pas rattachée au compte`);
+  if (debloques.has(u.id)) await debloquerLaConv(imp.id);
   return imp;
 }
 
@@ -69,7 +86,7 @@ export async function convPrete(u: Utilisateur, conv: string | Importee, qui: Qu
 }
 
 /**
- * Une conv prête, puis lue : le verdict, et ce que le plan du compte ouvre ensuite (le rapport, le vocal, la mémoire).
+ * Une conv prête, puis lue : le verdict, et ce que son rapport débloqué ouvre ensuite (le rapport, le vocal, la mémoire).
  * `avant` : de quoi changer l’histoire juste avant la lecture.
  */
 export async function histoireLue(u: Utilisateur, conv: string | Importee, { qui, avant }: { qui?: QuiDeTest; avant?: (id: string) => Promise<unknown> } = {}): Promise<Importee> {

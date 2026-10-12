@@ -103,7 +103,7 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
     locked: true,
     blocks: [],
   }));
-  const payload = (chapters: Chapter[], access: ReportPayload["access"]): ReportPayload => ({
+  const payload = (chapters: Chapter[], debloque: boolean): ReportPayload => ({
     report: {
       storyId: "s",
       verdict: { emoji: "🤏", short: "À deux doigts", title: "Vous êtes à deux doigts.", subtitle: "" },
@@ -114,21 +114,21 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
       nextStep: "",
     },
     sober: null,
-    access,
+    debloque,
   });
 
-  it("un compte gratuit : quatre cartes, toutes tirées du verdict", () => {
-    const cartes = cardsOf(payload([verdict, ...fermes], "gratuit"));
+  it("un rapport pas débloqué : quatre cartes, toutes tirées du verdict", () => {
+    const cartes = cardsOf(payload([verdict, ...fermes], false));
     expect(cartes.map((c) => c.id)).toEqual(["chiffres", "verdict", "duel", "jouer"]);
     expect(cartes.at(-1)).toEqual({ id: "jouer", text: undefined, quote: undefined });
     /* Même un chapitre 2 fermé qui aurait du contenu n’est pas lu */
-    const fuite = cardsOf(payload([verdict, { ...bascule, locked: true }, ...fermes.slice(1)], "gratuit"));
+    const fuite = cardsOf(payload([verdict, { ...bascule, locked: true }, ...fermes.slice(1)], false));
     expect(fuite).toEqual(cartes);
   });
 
   it("un rapport BLUSH+ écrit : le moment, et « à toi de jouer » du chapitre 2", () => {
     const ecrits = [verdict, bascule, ...fermes.slice(1).map((c) => ({ ...c, locked: false, blocks: [{ kind: "punchline" as const, text: "fin" }] }))];
-    const cartes = cardsOf(payload(ecrits, "blushplus"));
+    const cartes = cardsOf(payload(ecrits, true));
     expect(cartes.map((c) => c.id)).toEqual(["chiffres", "verdict", "duel", "moment", "jouer"]);
     expect(cartes[3]).toMatchObject({ id: "moment", kicker: "2 mars, 23 h 41", title: "Le moment où tout a basculé", fact: "Ses messages raccourcissent." });
     expect(cartes[4]).toEqual({ id: "jouer", text: "Pose-lui la question, en face.", quote: "au fait on est quoi toi et moi" });

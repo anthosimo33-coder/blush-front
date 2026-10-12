@@ -76,7 +76,7 @@ describe("une requête du contrat (requete, appel)", () => {
   });
 
   it("désigne la conv de la page dans son en-tête, quand la page en montre une", async () => {
-    repondre = () => Response.json({ email: null, subscription: {}, storyDeleted: false });
+    repondre = () => Response.json({ email: null, bulles: 0, client: false, equipe: false, storyDeleted: false });
     await getAccount();
     poserConvDeLaPage("conv-a");
     await getAccount();

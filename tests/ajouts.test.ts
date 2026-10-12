@@ -106,7 +106,7 @@ describe("après l’import : le chat et sa fiche", () => {
       .join("\n");
   const image = { media: "image/jpeg" as const, base64: "AAAA" };
   /** Une conv lue par un compte BLUSH+ neuf (Hugo et Sophie, la conv 01) : son id. */
-  const convLue = async () => (await histoireLue(await compteDeTest("ajouts", "blushplus"), "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
+  const convLue = async () => (await histoireLue(await compteDeTest("ajouts", "debloque"), "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   /** Le numéro d’une ligne ajoutée (« m1074 … » : 1074). */
   const numero = (ligne: string) => Number(/^m(\d+) /.exec(ligne)?.[1]);
 

@@ -105,7 +105,7 @@ facticePourChaqueTest((req) => {
   return chat ? chat(req) : fournisseurFactice(req);
 });
 beforeAll(async () => {
-  const u = await compteDeTest("chat-flux", "blushplus");
+  const u = await compteDeTest("chat-flux", "debloque");
   compte = u;
   id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();

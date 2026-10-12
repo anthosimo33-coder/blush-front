@@ -157,7 +157,11 @@ export async function reprendre(achatId: string, statut: "rembourse" | "conteste
     const [achat] = await tx.select().from(a).where(eq(a.id, achatId)).for("update");
     if (!achat) return { effet: "inconnu", achat: null };
     if (achat.statut === "rembourse" || achat.statut === "conteste") return { effet: "deja", achat };
-    const [repris] = await tx.update(a).set({ statut, annuleLe: sql`now()` }).where(eq(a.id, achatId)).returning();
+    const [repris] = await tx
+      .update(a)
+      .set({ statut, annuleLe: sql`now()` })
+      .where(eq(a.id, achatId))
+      .returning();
     if (achat.statut !== "paye") return { effet: "rien", achat: repris! };
     const { userId, storyId } = achat;
     if (storyId) {

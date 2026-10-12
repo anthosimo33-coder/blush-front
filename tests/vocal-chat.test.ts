@@ -106,7 +106,7 @@ const oublierLeMois = () =>
     );
 
 beforeAll(async () => {
-  compte = await compteDeTest("vocal-chat", "blushplus");
+  compte = await compteDeTest("vocal-chat", "debloque");
   id = (await histoireLue(compte, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(compte.id)).secret);

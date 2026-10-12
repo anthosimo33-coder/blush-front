@@ -62,7 +62,7 @@ export const bullesDe = (offre: OffreId, { premiereRecharge = false }: { premier
   CATALOGUE[offre].bulles + (premiereRecharge && offre === PREMIERE_RECHARGE.offre ? PREMIERE_RECHARGE.bonus : 0);
 
 /** « 9,90 € » : des centimes en euros, la virgule française, l’espace insécable avant €. */
-export const enEuros = (centimes: number) => `${Math.floor(centimes / 100)},${String(centimes % 100).padStart(2, "0")} €`;
+export const enEuros = (centimes: number) => `${Math.floor(centimes / 100)},${String(centimes % 100).padStart(2, "0")}\u00a0€`;
 
 /** Le prix d’une offre, à afficher : « 9,90 € ». */
 export const prixDe = (offre: OffreId) => enEuros(CATALOGUE[offre].centimes);
@@ -100,7 +100,7 @@ export const OFFERS: Offer[] = [FORMULE.rapport, FORMULE.premium];
 export const FORMULE_CHOISIE: Formule = "premium";
 
 export const PAYWALL = {
-  title: (other?: string) => (other ? `La suite parle de vous deux : toi et ${other}.` : "La suite parle de vous deux."),
+  title: (other?: string) => (other ? `La suite parle de vous deux\u00a0: toi et ${other}.` : "La suite parle de vous deux."),
   /** Le nombre de chapitres qui restent, quand on le sait (le rapport ouvert) ; sinon, la suite, sans compter. */
   subtitle: (chapitres?: number) =>
     chapitres ? `${chapitres} chapitres, ton plan et les phrases pour lui parler.` : "La suite de ton rapport, ton plan et les phrases pour lui parler.",

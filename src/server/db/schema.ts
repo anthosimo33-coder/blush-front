@@ -22,7 +22,9 @@ export const users = pgTable("users", {
    * (BACKEND.md, « Les migrations »), comme `paused`. Ses valeurs ne s’écrivent qu’ici.
    * TODO(produit): choisir quand retirer users.plan et users.paused (une migration seule, après la mise en ligne de ce code).
    */
-  plan: text("plan", { enum: ["gratuit", "rapport", "blushplus"] }).notNull().default("gratuit"),
+  plan: text("plan", { enum: ["gratuit", "rapport", "blushplus"] })
+    .notNull()
+    .default("gratuit"),
   /** La pause de l’abonnement d’avant le paiement : plus rien ne la lit ni ne l’écrit (voir `plan`). */
   paused: boolean("paused").notNull().default(false),
   /**

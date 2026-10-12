@@ -37,7 +37,6 @@ export type SourceAttente = (typeof SOURCES_ATTENTE)[number];
  * remboursé ou contesté (repris : la conv re-verrouillée, les bulles retirées).
  */
 export const STATUTS_ACHAT = ["en_attente", "paye", "echoue", "rembourse", "conteste"] as const;
-export type StatutAchat = (typeof STATUTS_ACHAT)[number];
 
 /** achats.fournisseur : Whop, ou le faux Whop des tests et du dev (BLUSH_PAIEMENT_FACTICE). */
 export const FOURNISSEURS_PAIEMENT = ["whop", "factice"] as const;

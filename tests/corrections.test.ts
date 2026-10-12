@@ -8,7 +8,7 @@ import { histoireOuverte } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { executerChaine } from "@/server/pipeline";
 import { ESSAIS_MAX, planifier, reprendre } from "@/server/taches";
-import { compteDeTest, convImportee, convRattachee, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { compteDeTest, convImportee, convRattachee, debloquerLaConv, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 /* Les requêtes envoyées au modèle (factice) pendant les tests, pour lire ce qu’il reçoit */
 const requetes: Requete[] = [];
@@ -42,14 +42,13 @@ describe("le jour de la lecture", () => {
 
 describe("une écriture coupée à chaque essai", () => {
   /**
-   * Une conv lue par un compte à lui (le verdict seul, en gratuit), puis l’accès : le rapport est planifié, et sa
-   * première étape coupée trois fois. Chaque test part de la sienne : le plan du compte et la tâche changent en route.
+   * Une conv lue par un compte à lui (le verdict seul, pas débloqué), puis débloquée : le rapport est planifié, et sa
+   * première étape coupée trois fois. Chaque test part de la sienne : le déblocage et la tâche changent en route.
    */
   async function coupee(): Promise<{ id: string; plus: Utilisateur }> {
     const plus = await compteDeTest("corrections-acces");
     const id = await lue("01-a-deux-doigts.txt", { compte: plus });
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, plus.id));
-    plus.plan = "blushplus";
+    await debloquerLaConv(id);
     const tache = await planifier(id, "rapport_plan");
     await db()
       .update(schema.tasks)

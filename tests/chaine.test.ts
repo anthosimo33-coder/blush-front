@@ -21,7 +21,7 @@ import { planifier } from "@/server/taches";
 import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalLu } from "@/server/vocal";
 import { rapportEnBase, tachesDe } from "./aide/essai";
 import { convDeTest } from "./aide/fichiers";
-import { compteDeTest, convImportee, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
+import { compteDeTest, convImportee, debloquerLaConv, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
 
 /** Le vocal tel que l’affiche le front, s’il est fait (ce que le rapport en montre, par vocalLu). */
 const vocalPret = async (storyId: string) => (await vocalLu(storyId))?.pret ?? null;
@@ -49,7 +49,7 @@ describe("de l’import à la mémoire", () => {
   const memoire = async () => (await memoireDe(imp.id))!;
 
   beforeAll(async () => {
-    u = await compteDeTest("chaine", "blushplus");
+    u = await compteDeTest("chaine", "debloque");
     imp = await convImportee("01-a-deux-doigts.txt");
     importee = await ligneEnBase(imp.id);
     await histoireLue(u, imp, { qui: { moi: "Hugo" } });
@@ -211,14 +211,14 @@ describe("hors de la chaîne (reparerLaChaine)", () => {
       .from(schema.tasks)
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan")));
 
-  it("l’accès est celui du compte de l’histoire, lu en base : sans lui, le rapport ne part pas ; avec, il part", async () => {
+  it("le déblocage est celui de l’histoire, lu en base : sans lui, le rapport ne part pas ; avec, il part", async () => {
     const u = await compteDeTest("reparer");
     const { id } = await histoireLue(u, "06-elle-hesite.txt");
-    /* Un compte gratuit : rien ne part, quoi que croie l’appelant */
+    /* Pas débloqué : rien ne part, quoi que croie l’appelant */
     expect(await reparerLaChaine(await ligneEnBase(id))).toBe(false);
     expect(await plans(id)).toEqual([]);
-    /* L’accès arrive (le déblocage) : le plan du rapport part, puis la chaîne après la réponse */
-    await db().update(schema.users).set({ plan: "blushplus" }).where(eq(schema.users.id, u.id));
+    /* Le déblocage arrive (un achat livré) : le plan du rapport part, puis la chaîne après la réponse */
+    await debloquerLaConv(id);
     const lances = apres.length;
     expect(await reparerLaChaine(await ligneEnBase(id))).toBe(true);
     expect(await plans(id)).toEqual([{ status: "attente" }]);

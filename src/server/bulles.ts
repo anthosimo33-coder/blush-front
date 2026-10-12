@@ -69,11 +69,7 @@ async function debiterDans(tx: Executeur, compte: Compte, cout: number, ref: str
   if (!Number.isSafeInteger(cout) || cout <= 0) throw new ErreurInvariant("bulles:cout");
   if (estEquipe(compte)) return "equipe";
   const m = schema.mouvementsBulles;
-  const [ecrit] = await tx
-    .insert(m)
-    .values({ userId: compte.id, delta: -cout, raison: "reponse", ref })
-    .onConflictDoNothing()
-    .returning({ id: m.id });
+  const [ecrit] = await tx.insert(m).values({ userId: compte.id, delta: -cout, raison: "reponse", ref }).onConflictDoNothing().returning({ id: m.id });
   if (!ecrit) return "deja";
   const u = schema.users;
   const [paye] = await tx

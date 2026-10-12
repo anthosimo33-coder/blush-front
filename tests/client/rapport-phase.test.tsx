@@ -15,23 +15,22 @@ import type { EcritureRapport, ReportPayload } from "@/types/api";
  * montrent, la reprise de la lecture (useReprise.ts), et les ancres (ancres.ts).
  */
 
-type Entree = Pick<ReportPayload, "access" | "generating" | "ecriture" | "echec">;
+type Entree = Pick<ReportPayload, "debloque" | "generating" | "ecriture" | "echec">;
 const ecriture: EcritureRapport = { etape: "plan", progres: 0.1, chapitres: [], restant: null };
 
 describe("phaseDuRapport", () => {
   it.each<[string, Entree, PhaseDuRapport]>([
-    ["sans accès : l’aperçu", { access: "gratuit" }, { nom: "lecture" }],
-    ["avec le rapport, écrit", { access: "rapport" }, { nom: "complet" }],
-    ["avec BLUSH+, écrit", { access: "blushplus" }, { nom: "complet" }],
-    ["l’écriture lancée, sans avancée encore", { access: "rapport", generating: true }, { nom: "ecriture" }],
-    ["l’écriture et son avancée", { access: "blushplus", generating: true, ecriture }, { nom: "ecriture", ecriture }],
-    ["le mode sobre pas encore écrit, sans accès", { access: "gratuit", generating: true }, { nom: "ecriture" }],
-    ["une panne", { access: "rapport", echec: "panne" }, { nom: "echec", raison: "panne" }],
-    ["un refus du modèle", { access: "rapport", echec: "refus" }, { nom: "echec", raison: "refus" }],
-    ["le budget du jour atteint", { access: "rapport", echec: "souffle" }, { nom: "souffle" }],
-    ["generating: false explicite", { access: "rapport", generating: false }, { nom: "complet" }],
+    ["pas débloqué : l’aperçu", { debloque: false }, { nom: "lecture" }],
+    ["débloqué, écrit", { debloque: true }, { nom: "complet" }],
+    ["l’écriture lancée, sans avancée encore", { debloque: true, generating: true }, { nom: "ecriture" }],
+    ["l’écriture et son avancée", { debloque: true, generating: true, ecriture }, { nom: "ecriture", ecriture }],
+    ["le mode sobre pas encore écrit, pas débloqué", { debloque: false, generating: true }, { nom: "ecriture" }],
+    ["une panne", { debloque: true, echec: "panne" }, { nom: "echec", raison: "panne" }],
+    ["un refus du modèle", { debloque: true, echec: "refus" }, { nom: "echec", raison: "refus" }],
+    ["le budget du jour atteint", { debloque: true, echec: "souffle" }, { nom: "souffle" }],
+    ["generating: false explicite", { debloque: true, generating: false }, { nom: "complet" }],
     /* Le serveur ne les envoie jamais ensemble : l’échec, définitif, passerait avant */
-    ["un échec avec generating", { access: "rapport", generating: true, echec: "panne" }, { nom: "echec", raison: "panne" }],
+    ["un échec avec generating", { debloque: true, generating: true, echec: "panne" }, { nom: "echec", raison: "panne" }],
   ])("%s", (_, entree, phase) => {
     expect(phaseDuRapport(entree)).toEqual(phase);
   });
@@ -55,12 +54,11 @@ const chapitres: Chapter[] = [chapitre(1, false), ...fermes];
 const inachevees: PhaseDuRapport[] = [{ nom: "ecriture" }, { nom: "echec", raison: "panne" }, { nom: "souffle" }];
 
 describe("Suite : ce que la phase montre après les chapitres ouverts", () => {
-  const rendre = (phase: PhaseDuRapport, access: ReportPayload["access"] = "rapport", ouvrirPaiement = () => {}) =>
-    render(<Suite phase={phase} fermes={fermes} access={access} ouvrirPaiement={ouvrirPaiement} />);
+  const rendre = (phase: PhaseDuRapport, ouvrirPaiement = () => {}) => render(<Suite phase={phase} fermes={fermes} ouvrirPaiement={ouvrirPaiement} />);
 
   it("l’aperçu : les chapitres fermés mènent au paiement, sans « Ta question »", () => {
     const ouvrirPaiement = vi.fn();
-    rendre({ nom: "lecture" }, "gratuit", ouvrirPaiement);
+    rendre({ nom: "lecture" }, ouvrirPaiement);
     expect(screen.getByText("La suite de ton rapport · 2 chapitres")).toBeTruthy();
     screen.getByRole("button", { name: /Chapitre inventé 2/ }).click();
     expect(ouvrirPaiement).toHaveBeenCalledTimes(1);
@@ -69,7 +67,7 @@ describe("Suite : ce que la phase montre après les chapitres ouverts", () => {
 
   it("l’écriture : la liste de ce qui s’écrit (que la pastille surveille), sans paiement ni « Ta question »", async () => {
     const ouvrirPaiement = vi.fn();
-    const { container } = rendre({ nom: "ecriture" }, "rapport", ouvrirPaiement);
+    const { container } = rendre({ nom: "ecriture" }, ouvrirPaiement);
     expect(screen.getByText("La suite de ton rapport s’écrit · 2 chapitres")).toBeTruthy();
     /* La liste que la pastille suit, par son repère */
     const liste = SUITE_ECRITURE.lire()!;
@@ -82,10 +80,10 @@ describe("Suite : ce que la phase montre après les chapitres ouverts", () => {
     expect(ouvrirPaiement).not.toHaveBeenCalled();
   });
 
-  it("le rapport écrit : « Ta question », incluse avec le rapport seul", () => {
-    rendre({ nom: "complet" }, "rapport");
+  it("le rapport écrit : « Ta question », une réponse du chat comme une autre (plus de question incluse)", () => {
+    rendre({ nom: "complet" });
     expect(screen.getByText("Poser ma question à BLUSH")).toBeTruthy();
-    expect(screen.getByText("Une question incluse avec ton rapport")).toBeTruthy();
+    expect(screen.queryByText("Une question incluse avec ton rapport")).toBeNull();
   });
 
   it("une panne se relance ; un refus et le budget du jour, non", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
 import { assemblerRapport, type RapportLu } from "@/server/presentation/rapport";
-import type { Plan, SoberReport } from "@/types";
+import type { SoberReport } from "@/types";
 
 /*
  * `alerte` (src/server/presentation/rapport.ts) : le verdict a levé une alerte de danger (son mode_sobre). Le front le
@@ -42,7 +42,7 @@ const SORTIE_SOBRE: Rapport = { alerte: "danger", mode_sobre: true, decouvertes:
 const lu = (sortie: Verdict, l: Partial<RapportLu> = {}): RapportLu => ({
   storyId: "00000000-0000-4000-8000-000000000002",
   autre: "Inès",
-  access: "gratuit",
+  debloque: false,
   verdict: { sortie, scores: [{ label: "Qui relance", winner: "toi", toiPercent: 70 }] },
   donnees: null,
   plan: null,
@@ -55,8 +55,8 @@ const lu = (sortie: Verdict, l: Partial<RapportLu> = {}): RapportLu => ({
 });
 
 describe("alerte : le verdict dit le mode sobre avant le rapport doux", () => {
-  it.each<Plan>(["gratuit", "rapport", "blushplus"])("une alerte, rien d’écrit encore (%s) : alerte vraie, sober encore null, le rapport s’écrit", (access) => {
-    const r = assemblerRapport(lu(ALERTE, { access }));
+  it.each([false, true])("une alerte, rien d’écrit encore (débloqué : %s) : alerte vraie, sober encore null, le rapport s’écrit", (debloque) => {
+    const r = assemblerRapport(lu(ALERTE, { debloque }));
     expect(r.alerte).toBe(true);
     expect(r.sober).toBeNull();
     /* Le front relit le rapport (la phase `ecriture`) jusqu’au rapport doux */
@@ -70,8 +70,8 @@ describe("alerte : le verdict dit le mode sobre avant le rapport doux", () => {
     expect(r.generating).toBe(false);
   });
 
-  it.each<Plan>(["gratuit", "blushplus"])("sans alerte (%s) : alerte fausse, la scène du verdict se joue", (access) => {
-    const r = assemblerRapport(lu(VERDICT, { access }));
+  it.each([false, true])("sans alerte (débloqué : %s) : alerte fausse, la scène du verdict se joue", (debloque) => {
+    const r = assemblerRapport(lu(VERDICT, { debloque }));
     expect(r.alerte).toBe(false);
     expect(r.sober).toBeNull();
   });

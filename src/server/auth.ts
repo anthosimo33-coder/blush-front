@@ -194,15 +194,7 @@ export async function prendreCode(email: string, code: string, { navigateur, ip 
 /** Le compte de cet email, créé s’il n’existe pas. */
 export async function compteDe(email: string): Promise<Utilisateur> {
   const [existant] = await db().select().from(schema.users).where(eq(schema.users.email, email));
-  const utilisateur =
-    existant ??
-    uneLigne(
-      await db()
-        .insert(schema.users)
-        .values({ email })
-        .returning(),
-      "users:compte_cree",
-    );
+  const utilisateur = existant ?? uneLigne(await db().insert(schema.users).values({ email }).returning(), "users:compte_cree");
   return utilisateur;
 }
 

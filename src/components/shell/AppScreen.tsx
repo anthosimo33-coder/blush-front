@@ -19,7 +19,7 @@ const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").t
  * Dans la page d’une conv, le compte part de celui qu’elle a rendu (PageDeConv) : tout juste rendu, il n’est pas relu au
  * montage, et les droits sont là dès l’affichage.
  */
-export function useAccess() {
+function useAccess() {
   const page = useCompteDeLaPage();
   const { data } = useCompte(page?.compte ?? undefined, { rendu: page?.rendu, frais: FRAIS_DU_RENDU });
   return {
@@ -79,14 +79,7 @@ export function AppScreen({
       >
         {children}
       </Screen>
-      {besoin && bloqueVu && (
-        <PaywallSheet
-          open={blocked}
-          onClose={() => router.push("/rapport")}
-          next={pathname}
-          otherName={autre}
-        />
-      )}
+      {besoin && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} />}
     </>
   );
 }

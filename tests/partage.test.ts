@@ -25,7 +25,7 @@ import { compter, LIMITES } from "@/server/limites";
 import { arreterPartage, ErreurPartage, masqueDe, masquerPrenoms, partager, verdictPartage } from "@/server/partages";
 import type { DonneesVerdict } from "@/server/stockage/types";
 import type { Chapter } from "@/types";
-import { compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 describe("les prénoms dans ce qui se partage", () => {
   it("deviennent des initiales, sans toucher aux mots qui les contiennent", () => {
@@ -57,6 +57,7 @@ describe("les prénoms dans ce qui se partage", () => {
         convPurgedAt: null,
         chatVocal: false,
         questionPrise: null,
+        debloqueLe: null,
         createdAt: t,
         updatedAt: t,
       };
@@ -173,7 +174,7 @@ describe("partager un moment en image", () => {
         body: JSON.stringify(corps),
       }),
     );
-  const passerAuPlan = (plan: "gratuit" | "blushplus") => db().update(schema.users).set({ plan }).where(eq(schema.users.id, compte.id));
+  const debloque = (oui: boolean) => debloquerLaConv(story.id, oui);
   const sobre = (oui: boolean) => changerVerdict(story.id, (v) => (v.sortie.mode_sobre = oui));
   /** Les images comptées aujourd’hui pour ce compte (le passage compté pour les lire compris). */
   const imagesComptees = () => compter(cleDeLimiteDuCompte("image", compte.email), LIMITES.imageParCompte);
@@ -199,8 +200,8 @@ describe("partager un moment en image", () => {
     cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
   });
 
-  it("sans l’accès : aucune chute ne se dessine (402), ni celle du chapitre 1, ni un chapitre payant déjà écrit", async () => {
-    await passerAuPlan("gratuit");
+  it("le rapport pas débloqué : aucune chute ne se dessine (402), ni celle du chapitre 1, ni un chapitre payant déjà écrit", async () => {
+    await debloque(false);
     for (const chapitre of [1, 2]) {
       const r = await dessiner({ type: "moment", chapitre, bloc: 0 });
       expect(r.status, `chapitre ${chapitre}`).toBe(402);
@@ -208,8 +209,8 @@ describe("partager un moment en image", () => {
     }
   });
 
-  it("avec l’accès : les chutes se dessinent ; une chute qui n’existe pas reste introuvable", async () => {
-    await passerAuPlan("blushplus");
+  it("le rapport débloqué : les chutes se dessinent ; une chute qui n’existe pas reste introuvable", async () => {
+    await debloque(true);
     try {
       for (const chapitre of [1, 2]) {
         const r = await dessiner({ type: "moment", chapitre, bloc: 0 });
@@ -218,7 +219,7 @@ describe("partager un moment en image", () => {
       }
       expect((await dessiner({ type: "moment", chapitre: 3, bloc: 0 })).status).toBe(404);
     } finally {
-      await passerAuPlan("gratuit");
+      await debloque(false);
     }
   });
 
@@ -230,7 +231,7 @@ describe("partager un moment en image", () => {
   });
 
   it("en mode sobre : aucune chute ne se partage (409), même avec l’accès ; une réponse du chat, si, comme le fil la montre", async () => {
-    await passerAuPlan("blushplus");
+    await debloque(true);
     await sobre(true);
     try {
       const chapitre = await dessiner({ type: "moment", chapitre: 1, bloc: 0 });
@@ -241,7 +242,7 @@ describe("partager un moment en image", () => {
       expect(reponse.headers.get("content-type")).toBe("image/png");
     } finally {
       await sobre(false);
-      await passerAuPlan("gratuit");
+      await debloque(false);
     }
   });
 

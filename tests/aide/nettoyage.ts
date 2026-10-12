@@ -15,6 +15,8 @@ export async function effacerCeQuiAEteCree(): Promise<void> {
    * elle aurait gardé les vrais modules (src/server/env…) que ses vi.mock remplacent.
    */
   const [{ inArray }, { db, schema }] = await Promise.all([import("drizzle-orm"), import("@/server/db")]);
+  /* Un compte effacé laisse ses achats sans compte (les ventes) : ceux des tests partent avec lui */
+  if (comptes.length) await db().delete(schema.achats).where(inArray(schema.achats.userId, comptes));
   if (comptes.length) await db().delete(schema.users).where(inArray(schema.users.id, comptes));
   if (histoires.length) await db().delete(schema.stories).where(inArray(schema.stories.id, histoires));
 }

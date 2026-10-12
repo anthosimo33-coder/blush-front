@@ -16,8 +16,8 @@ const etat = vi.hoisted(() => ({
 
 vi.mock("@/server/donnees", async (original) => ({
   ...(await original<typeof import("@/server/donnees")>()),
-  /* Un compte BLUSH+ (le chat lui est ouvert), et sa conv, où « Qui es-tu ? » reste à remplir */
-  contexteRequete: async () => ({ utilisateur: { id: "compte", email: "toi@blush.test", plan: "blushplus" }, story: { id: "conv", chatVocal: false } }),
+  /* Un compte connecté (le chat lui est ouvert), et sa conv, où « Qui es-tu ? » reste à remplir */
+  contexteRequete: async () => ({ utilisateur: { id: "compte", email: "toi@blush.test", bulles: 10 }, story: { id: "conv", chatVocal: false } }),
 }));
 vi.mock("@/server/histoires", async (original) => ({ ...(await original<typeof import("@/server/histoires")>()), metaDe: () => ({}), quiRempli: () => false }));
 vi.mock("@/server/limites", async (original) => ({ ...(await original<typeof import("@/server/limites")>()), sousLaLimite: async () => true, limiteAtteinte: async () => false }));
@@ -46,7 +46,6 @@ import { POST as postVerifier } from "@/app/api/auth/verifier/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postChat } from "@/app/api/chat/route";
 import { POST as postVocal } from "@/app/api/chat/vocal/route";
-import { POST as postCompte } from "@/app/api/compte/route";
 import { POST as postDebloquer } from "@/app/api/debloquer/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
 import { POST as postImage } from "@/app/api/partage/image/route";
@@ -104,7 +103,6 @@ const TOUT_FAUX = JSON.stringify({
   texte: 3,
   question: "oui",
   actif: "oui",
-  paused: "oui",
   offre: "gratuit",
   facts: "x",
   type: "x",
@@ -160,16 +158,6 @@ describe("les routes qui font sans un corps mal formé", () => {
   it("POST /api/auth/deconnexion, partout : toutes les sessions du compte", async () => {
     await postDeconnexion(requete("POST", JSON.stringify({ partout: true })));
     expect(etat.fermees).toEqual([{ secret: "secret", partout: true }]);
-  });
-
-  it.each(MAL_FORMES)("POST /api/compte, %s : BLUSH reprend (pas de pause)", async (_, corps) => {
-    const r = await postCompte(requete("POST", corps));
-    expect({ status: r.status, corps: await r.json(), ecrit: etat.ecrit }).toEqual({ status: 200, corps: { ok: true }, ecrit: [{ paused: false }] });
-  });
-
-  it("POST /api/compte, en pause : la pause est écrite", async () => {
-    await postCompte(requete("POST", JSON.stringify({ paused: true })));
-    expect(etat.ecrit).toEqual([{ paused: true }]);
   });
 
   it("POST /api/chat/vocal, un corps bien formé : le mode est écrit et rendu", async () => {
