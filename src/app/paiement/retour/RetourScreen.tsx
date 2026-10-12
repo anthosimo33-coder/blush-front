@@ -79,7 +79,12 @@ export function RetourScreen({ achat, paiement }: { achat: string | null; paieme
       footer={enCours && etat === "attente" ? undefined : <ButtonLink href="/rapport">{RETOUR_PAIEMENT.revenir}</ButtonLink>}
     >
       <div className="flex flex-1 flex-col items-center justify-center gap-4 pb-6 pt-16 text-center">
-        {etat === "attente" && <TypingDots label={RETOUR_PAIEMENT.attente} />}
+        {/* Les trois points, pour l’œil : le texte dessous dit déjà ce qui se passe */}
+        {etat === "attente" && (
+          <span aria-hidden="true">
+            <TypingDots />
+          </span>
+        )}
         <p role="status" className="m-0 max-w-[340px] text-corps font-extrabold leading-[1.45] text-soft">
           {RETOUR_PAIEMENT[etat]}
         </p>

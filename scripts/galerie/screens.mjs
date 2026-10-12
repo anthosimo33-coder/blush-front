@@ -113,6 +113,19 @@ const ecrire = (texte, retenue) => async (page) => {
   await envoyer();
   await page.waitForTimeout(retenue);
 };
+/**
+ * Paie la formule `nom` de la feuille du paiement au faux Whop (BLUSH_PAIEMENT_FACTICE), comme à l’écran : la case de
+ * renonciation cochée, « Débloquer », puis « Payer » sur sa page ; on arrive sur « C’est débloqué ».
+ */
+const payerLaFormule = (nom) => async (page) => {
+  const feuille = page.getByRole("dialog");
+  await feuille.getByRole("radio", { name: nom }).click();
+  await feuille.getByRole("checkbox").check();
+  await feuille.getByRole("button", { name: "Débloquer" }).click();
+  await page.getByRole("button", { name: "Payer", exact: true }).click();
+  await page.waitForURL(/\/rapport\/debloque\?achat=/);
+  await page.waitForTimeout(1600);
+};
 /** La première idée de « Ta question » (une question de la mémoire), mise dans le champ. */
 const premiereIdee = async (page) => {
   await page.getByRole("group", { name: "Des idées, tirées de ton rapport" }).getByRole("button").first().click();
@@ -424,21 +437,22 @@ export const STATES = [
     id: "10b",
     section: "rapport",
     title: "Paiement réussi",
-    state: "Rapport complet",
-    route: "/rapport/debloque?offre=rapport",
-    compte: "rapport",
-    wait: 1600,
-    note: "Animé (la gerbe). Textes à valider.",
+    state: "Le rapport seul, et l’offre ③",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    steps: payerLaFormule(/^Le rapport/),
+    note: "Payé au faux Whop. Animé (la gerbe). L’offre ③ en dessous, à son dessin de la vague 2.",
+    changement: "Le vrai paiement (le faux Whop) : l’offre ③ apparaît juste après le rapport seul.",
   },
   {
     id: "10c",
     section: "rapport",
     title: "Paiement réussi",
     state: "Premium",
-    route: "/rapport/debloque?offre=premium",
-    compte: "equipe",
-    wait: 1600,
-    note: "Animé (la gerbe). Textes à valider.",
+    route: "/rapport?paiement=1",
+    compte: "gratuit",
+    steps: payerLaFormule(/^Rapport \+ 60 bulles/),
+    note: "Payé au faux Whop. Animé (la gerbe). Textes à valider.",
   },
   {
     id: "VP1",

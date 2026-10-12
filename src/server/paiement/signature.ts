@@ -18,7 +18,7 @@ export const TOLERANCE_WEBHOOK_S = 5 * 60;
 export type EntetesWebhook = { "webhook-id": string; "webhook-timestamp": string; "webhook-signature": string };
 
 /** La signature « v1,<base64> » d’un corps brut, pour cet envoi (`id`) à cette heure (`timestamp`, en secondes). */
-export function signature(secret: string, id: string, timestamp: number | string, corps: string): string {
+function signature(secret: string, id: string, timestamp: number | string, corps: string): string {
   const hmac = createHmac("sha256", Buffer.from(secret, "utf8")).update(`${id}.${timestamp}.${corps}`).digest("base64");
   return `v1,${hmac}`;
 }

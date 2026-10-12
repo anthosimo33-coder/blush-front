@@ -212,7 +212,7 @@ export async function uneFoisParEvenement<T>(id: string, type: string, travail: 
 }
 
 /**
- * Débloque le rapport d’une conv sans paiement (un compte de l’équipe, POST /api/debloquer ; l’outil de l’équipe,
+ * Débloque le rapport d’une conv sans paiement (l’outil de l’équipe,
  * scripts/acces.mts) : vrai si elle vient de s’ouvrir. Puis ce qui manque (le rapport, la mémoire) part après la réponse.
  */
 export async function offrirLeRapport(story: { id: string; userId: string }): Promise<boolean> {
