@@ -372,7 +372,11 @@ test("« Glisse pour creuser », au doigt : la réponse glissée devient le poin
     const champ = page.getByRole("textbox", { name: /^Ta question sur ce point/ });
     await champ.fill("c’est mauvais signe ?");
     const envoi = await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Envoyer" }).click());
-    expect(envoi.request().postDataJSON()).toEqual({ texte: "(à propos de «\u00a0et toi tu fais le mec occupé\u00a0») c’est mauvais signe ?" });
+    /* Avec sa clé : « Réessayer » la renverrait telle quelle (jamais deux débits pour le même message) */
+    expect(envoi.request().postDataJSON()).toEqual({
+      texte: "(à propos de «\u00a0et toi tu fais le mec occupé\u00a0») c’est mauvais signe ?",
+      cle: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
     expect(envoi.status()).toBe(200);
     await expect(creuse).toHaveCount(0);
     await expect(fil.getByText("tu lui as répondu quoi ?")).toHaveCount(2);
