@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/services/preparer-captures", () => ({ preparerCaptures: async (fichiers: File[]) => fichiers.map((f) => new Blob([f], { type: "image/jpeg" })) }));
 
-import { addToFiche, getAccount, getChatHistory, modeVocalChat, rejoindreAttente, retirerDeLaListe, startAnalysis, updateFiche } from "@/services/api";
+import { addToFiche, getAccount, getAchats, getChatHistory, modeVocalChat, rejoindreAttente, retirerDeLaListe, sendToBlush, startAnalysis, updateFiche } from "@/services/api";
 import { ENTETE_CONV, poserConvDeLaPage } from "@/services/session";
 import { ErreurApi } from "@/types/erreurs-api";
 import type { Fiche, FicheFact } from "@/types";
@@ -114,6 +114,27 @@ describe("« Qui es-tu ? » (startAnalysis)", () => {
       ["POST", "/api/analyse", { me: "p1", ...qui, pronom: "il" }],
       ["POST", "/api/analyse", { me: "p0", ...qui, pronom: "elle", prenom: "Léa" }],
     ]);
+  });
+});
+
+describe("les bulles (sendToBlush, getAchats)", () => {
+  it("plus de bulles (402 « bulles ») : BLUSH le dit, et la réponse le marque, pour que l’accueil ouvre la recharge", async () => {
+    repondre = () => Response.json({ erreur: "bulles" }, { status: 402 });
+    const r = await sendToBlush({ text: "allô ?" });
+    expect(r.plusDeBulles).toBe(true);
+    expect(r.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"]);
+  });
+
+  it("une autre erreur : BLUSH la dit, sans recharge", async () => {
+    repondre = () => Response.json({ erreur: "trop" }, { status: 429 });
+    expect((await sendToBlush({ text: "allô ?" })).plusDeBulles).toBeUndefined();
+  });
+
+  it("« Tes achats » : la liste que rend GET /api/achats", async () => {
+    const achat = { id: "a1", offre: "pack80", centimes: 990, bulles: 120, statut: "paye", le: "2026-10-12T10:00:00.000Z" } as const;
+    repondre = () => Response.json({ achats: [achat] });
+    expect(await getAchats()).toEqual([achat]);
+    expect(envois[0]!.url).toBe("/api/achats");
   });
 });
 

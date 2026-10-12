@@ -30,6 +30,7 @@ export type Etat = {
   wait?: number;
   only?: "m" | "d";
   compte?: Compte;
+  bulles?: number;
   journey?: Record<string, unknown>;
   reprise?: number;
   hover?: string | { role: string; name: string | RegExp };

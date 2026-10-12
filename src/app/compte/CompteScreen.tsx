@@ -3,12 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FRAIS_DU_RENDU } from "@/lib/query";
-import { changerDeConv, useCompte } from "@/lib/requetes";
+import { changerDeConv, useAchats, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { deleteAccount, deleteStory, seDeconnecter } from "@/services/api";
-import type { Account } from "@/types/api";
+import type { Account, AchatDuCompte } from "@/types/api";
+import { ETAT_ACHAT, TES_ACHATS, TES_BULLES } from "@/contenu/achats";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
+import { CATALOGUE, enEuros } from "@/contenu/offres";
+import { Perle } from "@/components/bulles/perles";
+import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
+import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/controls";
@@ -30,19 +35,39 @@ type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
 const RIEN_N_EST_EFFACE = "Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver.";
 
 /*
- * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, tes bulles, l’app, ta connexion (se
- * déconnecter), puis tes données (les gestes qui effacent en rouge).
+ * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, tes bulles (et la recharge), tes
+ * achats, l’app, ta connexion (se déconnecter), puis tes données (les gestes qui effacent en rouge).
  */
+
+/** Le jour d’un achat, à l’heure de Paris, au rendu serveur comme dans le navigateur (« 12 oct. 2026 »). */
+const JOUR_D_ACHAT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" });
+
+/** La feuille des bulles ouverte : « C’est quoi une bulle ? », ou la recharge. */
+type FeuilleDesBulles = "bulle" | "recharge" | null;
 export type NomsDuCompte = { me: Person; other: Person; period: string };
 
 /**
  * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).
- * `compte` : le compte lu par la page serveur à l’heure `rendu` : ses bulles sont là dès l’affichage, rien ne descend
- * ensuite, et il n’est pas relu tout de suite.
+ * `compte`, `achats` : le compte et ses achats lus par la page serveur à l’heure `rendu` : ses bulles et ses achats sont
+ * là dès l’affichage, rien ne descend ensuite, et ils ne sont pas relus tout de suite.
  */
-export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
+export function CompteScreen({
+  noms,
+  convs = [],
+  compte,
+  achats: achatsRendus,
+  rendu,
+}: {
+  noms: NomsDuCompte | null;
+  convs?: ConvSummary[];
+  compte?: Account | null;
+  achats?: AchatDuCompte[];
+  rendu?: number;
+}) {
   const router = useRouter();
   const { data: account } = useCompte(compte ?? undefined, { rendu, frais: FRAIS_DU_RENDU });
+  const { data: achats = [] } = useAchats(achatsRendus, { rendu, frais: FRAIS_DU_RENDU });
+  const [bulles, setBulles] = useState<FeuilleDesBulles>(null);
   /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
   const [ouverture, demarrer] = useTransition();
   const [ouverte, setOuverte] = useState<string | null>(null);
@@ -145,18 +170,53 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       </InsetGroup>
 
       {/*
-       * Tes bulles : le solde (illimitées pour l’équipe). La recharge, « C’est quoi une bulle ? » et la liste des achats
-       * viennent avec les écrans des bulles. TODO(produit): le texte de l’équipe (« illimitées »), pas encore décidé
+       * Tes bulles : le solde (illimitées pour l’équipe), la recharge (qui revient ici une fois payée) et « C’est quoi une
+       * bulle ? ». TODO(produit): le texte de l’équipe (« illimitées »), pas encore décidé
        */}
-      <InsetGroup title="Tes bulles" id="bulles" className="mt-6">
+      <InsetGroup title={TES_BULLES.titre} id="bulles" className="mt-6">
         <InsetRow
-          leading={<RowIcon icon="bolt" tone="elle" />}
-          title={account ? (account.equipe ? "Tes bulles\u00a0: illimitées" : `Tes bulles\u00a0: ${account.bulles}`) : "Tes bulles"}
-          sub="1 bulle = 1 réponse de BLUSH · elles n’expirent jamais"
+          leading={
+            <RowIcon tone="elle">
+              <Perle taille={20} />
+            </RowIcon>
+          }
+          title={account ? (account.equipe ? TES_BULLES.illimitees : TES_BULLES.solde(account.bulles)) : TES_BULLES.titre}
+          sub={TES_BULLES.regle}
         />
+        {account && !account.equipe && (
+          <InsetRow
+            leading={<RowIcon icon="plus" tone="elle" />}
+            title={TES_BULLES.recharger}
+            sub={TES_BULLES.rechargerNote}
+            onClick={() => setBulles("recharge")}
+            aria-haspopup="dialog"
+            chevron
+          />
+        )}
+        <InsetRow leading={<RowIcon icon="list" />} title={TES_BULLES.cestQuoi} sub={TES_BULLES.cestQuoiNote} onClick={() => setBulles("bulle")} aria-haspopup="dialog" chevron />
         {/* Aucun rapport débloqué : la suite du rapport ouvert, à payer */}
         {account && !account.client && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
       </InsetGroup>
+
+      {/* Tes achats : chaque achat payé (même repris ensuite), son jour, son offre, son montant et son état */}
+      {achats.length > 0 && (
+        <InsetGroup title={TES_ACHATS.titre} id="achats" className="mt-6" footer={TES_ACHATS.pied}>
+          {achats.map((a) => (
+            <InsetRow
+              key={a.id}
+              variant="compact"
+              title={CATALOGUE[a.offre].titre}
+              sub={`${JOUR_D_ACHAT.format(new Date(a.le))}${a.bulles > 0 ? ` · ${TES_ACHATS.bulles(a.bulles)}` : ""}`}
+              trailing={
+                <span className="flex flex-col items-end gap-0.5">
+                  <span className="text-detail font-black text-ink">{enEuros(a.centimes)}</span>
+                  <span className={a.statut === "paye" ? "text-micro font-extrabold text-vrai-ink" : "text-micro font-extrabold text-danger"}>{ETAT_ACHAT[a.statut]}</span>
+                </span>
+              }
+            />
+          ))}
+        </InsetGroup>
+      )}
 
       {/* Un seul réglage pour les sons et les vibrations (textes relus le 8 octobre) */}
       <InsetGroup title="L’app" id="app" className="mt-6" footer="En mode silencieux, BLUSH se tait de lui-même.">
@@ -204,6 +264,10 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
 
       {/* Les pages légales, au pied du compte */}
       <LiensJuridiques className="mt-6" />
+
+      {/* « C’est quoi une bulle ? », et la recharge, qui revient ici une fois payée */}
+      <FeuilleBulle open={bulles === "bulle"} onClose={() => setBulles(null)} />
+      {account && !account.equipe && <FeuilleRecharge open={bulles === "recharge"} onClose={() => setBulles(null)} suite={() => "/compte"} />}
 
       {/* Les panneaux de confirmation, absents des maquettes : leurs textes reprennent les libellés de l’écran (validés) */}
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">

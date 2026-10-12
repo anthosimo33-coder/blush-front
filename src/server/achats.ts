@@ -1,7 +1,8 @@
 import "server-only";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { bullesDe, CATALOGUE, PREMIERE_RECHARGE } from "@/contenu/offres";
 import type { OffreId } from "@/types";
+import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
 import { mouvementDans } from "./bulles";
@@ -28,13 +29,29 @@ const a = schema.achats;
 /** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
 export type RefusDeCommande = "aucune" | "deja" | "offre";
 
+/** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
+const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
+
+/**
+ * Ce compte a-t-il déjà payé une recharge (un pack, même repris ensuite) ? Alors le bonus de la première recharge (④) ne
+ * vaut plus : ni montré (proposerOffreUnique), ni donné à la commande, même montré avant.
+ */
+export async function rechargeDejaPayee(userId: string): Promise<boolean> {
+  const [l] = await db()
+    .select({ id: a.id })
+    .from(a)
+    .where(and(eq(a.userId, userId), isNotNull(a.payeLe), inArray(a.offre, PACKS_DE_BULLES)))
+    .limit(1);
+  return !!l;
+}
+
 /**
  * Le droit d’acheter cette offre, puis l’achat écrit « en_attente », au prix et avec les bulles du catalogue, figés
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
  * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable. `renonciation` : la case de renonciation au droit de rétractation cochée avec la commande (sa
- * version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
+ * montré et valable, et qu’aucune recharge n’a encore été payée. `renonciation` : la case de renonciation au droit de
+ * rétractation cochée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
@@ -63,7 +80,8 @@ export async function commander(
       .limit(1);
     if (!rapport) return "offre";
   }
-  const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge"));
+  /* ④ : montré et valable, et toujours la première recharge (un autre pack payé depuis l’a passée : la feuille ne le montre plus) */
+  const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge")) && !(await rechargeDejaPayee(compte.id));
   const [achat] = await db()
     .insert(a)
     .values({
@@ -228,4 +246,22 @@ export async function offrirLeRapport(story: { id: string; userId: string }): Pr
     .returning({ id: s.id });
   await reparerLaChaine(story);
   return ouvertes.length > 0;
+}
+
+/** Combien d’achats « Tes achats » montre au plus : les plus récents. */
+const ACHATS_MONTRES = 100;
+
+/**
+ * Les achats de ce compte pour « Tes achats » (Mon compte), du plus récent au plus ancien : ceux qui ont été payés, même
+ * repris ensuite (remboursés, contestés). Une commande jamais payée (la page de paiement quittée, une carte refusée)
+ * n’en est pas un. Rien de la conv : l’offre, le prix, les bulles, le statut et le jour du paiement.
+ */
+export async function achatsDuCompte(userId: string): Promise<AchatDuCompte[]> {
+  const lignes = await db()
+    .select({ id: a.id, offre: a.offre, centimes: a.centimes, bulles: a.bulles, statut: a.statut, payeLe: a.payeLe })
+    .from(a)
+    .where(and(eq(a.userId, userId), isNotNull(a.payeLe)))
+    .orderBy(desc(a.payeLe), desc(a.creeLe))
+    .limit(ACHATS_MONTRES);
+  return lignes.map(({ payeLe, ...l }) => ({ ...l, le: payeLe!.toISOString() }));
 }

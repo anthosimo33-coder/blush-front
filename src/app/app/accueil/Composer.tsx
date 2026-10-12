@@ -75,6 +75,7 @@ export function Composer({
   onMicError,
   arriving,
   logo,
+  bandeau,
   children,
 }: {
   formRef: RefObject<HTMLFormElement | null>;
@@ -100,6 +101,8 @@ export function Composer({
   arriving: boolean;
   /** Le logo de BLUSH qu’on voit (mobile ou desktop), ou null : ses perles t’écoutent, sa bulle se penche (accueil/mouvement/registre.ts). */
   logo: () => HTMLElement | null;
+  /** Ce qui se pose au-dessus du champ, avant le point creusé : la carte des bulles (./BandeauBulles.tsx). */
+  bandeau?: ReactNode;
   /** Ce qui vit dans la barre sans en faire partie (la feuille « Partager en image »). */
   children?: ReactNode;
 }) {
@@ -143,6 +146,7 @@ export function Composer({
       data-a="composer"
       className="sticky bottom-0 z-10 -mb-6 mt-auto border-t border-[rgba(17,17,20,0.06)] bg-[rgba(244,242,237,0.88)] px-[18px] pb-[max(14px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:static lg:mb-0 lg:bg-white lg:px-6 lg:py-4 lg:backdrop-blur-none"
     >
+      {bandeau && <div className="mb-2.5">{bandeau}</div>}
       {/* 7 · Le point creusé, au-dessus du champ : ta question porte dessus (textes relus le 8 octobre) */}
       {about && (
         <div data-quote-strip="" className="mb-2.5">

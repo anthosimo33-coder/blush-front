@@ -4,12 +4,12 @@
  * Les deux barres du haut de l’accueil : sur mobile, l’en-tête qui flotte au-dessus de la conv (EnTeteMobile) ; sur
  * desktop, la barre de la fenêtre de conv (BarreDeLaFenetre). Les deux posent BLUSH au centre (sa bulle s’anime quand il
  * répond, un toucher ouvre la feuille du contact), l’autre à droite comme un contact, et à gauche un retour (au rapport,
- * à la liste des convs, au compte). Leurs pièces (BlushTitle, SophieButton, ConvsButton) sont dans ./Entetes.tsx, et ce
+ * à la liste des convs, au compte), suivi du compteur de bulles. Leurs pièces (BlushTitle, SophieButton, ConvsButton) sont dans ./Entetes.tsx, et ce
  * qui en part ou s’y anime s’inscrit au registre de l’en-tête (./mouvement/registre.ts).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSyncExternalStore, type RefObject } from "react";
+import { useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { DESKTOP } from "@/lib/motion";
 import { revenirVers } from "@/lib/navigation";
 import { IconButton } from "@/components/ui/Button";
@@ -42,6 +42,8 @@ type Barre = {
   /** Un toucher sur BLUSH : la feuille du contact. */
   ouvrirDetails: () => void;
   entete: RegistreEntete;
+  /** Ce qui se pose à gauche, après le retour (le compteur de bulles). */
+  aGauche?: ReactNode;
 };
 
 /**
@@ -50,7 +52,16 @@ type Barre = {
  * range dans une barre fine (`headRef`, accueil/mouvement/entete.ts). `fromReport` : arrivé par la bulle du rapport, le
  * retour au rapport remplace le bouton du compte.
  */
-export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvrirDetails, entete }: Barre & { headRef: RefObject<HTMLElement | null>; fromReport: boolean }) {
+export function EnTeteMobile({
+  headRef,
+  fromReport,
+  contact,
+  others,
+  busy,
+  ouvrirDetails,
+  entete,
+  aGauche,
+}: Barre & { headRef: RefObject<HTMLElement | null>; fromReport: boolean }) {
   const router = useRouter();
   const desktop = useDesktop();
   return (
@@ -61,7 +72,7 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
         className="absolute inset-0 bg-[rgba(244,242,237,0.84)] backdrop-blur-xl [mask-image:linear-gradient(180deg,#000_calc(100%_-_22px),transparent)]"
       />
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-start px-4 pb-5 pt-[max(6px,env(safe-area-inset-top))]">
-        <div data-c="acc" className="pointer-events-auto mt-3 flex">
+        <div data-c="acc" className="pointer-events-auto mt-3 flex items-center gap-1.5">
           <span data-a="acc" className="flex">
             {fromReport ? (
               <IconButton
@@ -78,6 +89,7 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
               <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} size="sm" variant="doux" />
             )}
           </span>
+          {aGauche}
         </div>
         <BlushTitle big busy={busy} onClick={ouvrirDetails} logoRef={entete.inscrire.logo} />
         <div className="mt-2 flex justify-end">
@@ -90,12 +102,12 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
 }
 
 /** Desktop : la barre de la fenêtre, comme sur mobile (BLUSH au centre, l’autre à droite). */
-export function BarreDeLaFenetre({ contact, others, busy, ouvrirDetails, entete }: Barre) {
+export function BarreDeLaFenetre({ contact, others, busy, ouvrirDetails, entete, aGauche }: Barre) {
   const desktop = useDesktop();
   return (
     <div className="hidden h-[112px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[rgba(17,17,20,0.06)] px-5 lg:grid">
       {/* Le rapport, à un clic : la place à gauche de la barre était vide. Avec plusieurs convs, le retour à leur liste */}
-      <span className="flex">
+      <span className="flex items-center gap-1.5">
         {others.length > 0 ? (
           <ConvsButton others={others} flat />
         ) : (
@@ -107,6 +119,7 @@ export function BarreDeLaFenetre({ contact, others, busy, ouvrirDetails, entete 
             Ton rapport
           </Link>
         )}
+        {aGauche}
       </span>
       <BlushTitle busy={busy} onClick={ouvrirDetails} logoRef={entete.inscrire.logo} />
       <div className="flex justify-end">

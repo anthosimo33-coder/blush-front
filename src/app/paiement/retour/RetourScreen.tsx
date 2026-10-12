@@ -75,7 +75,8 @@ export function RetourScreen({ achat, paiement, statut }: { achat: string | null
       try {
         const e = await etatDuPaiement(achat, paiement);
         if (fini) return;
-        const suite = suiteDuPaiement(e.achat);
+        /* La suite d’une recharge dit les bulles que le serveur a livrées (`?recharge=`), pas celles que la feuille a comptées */
+        const suite = suiteDuPaiement(e.achat, e.bulles);
         setOffre(e.offre);
         setSuite(suite);
         if (e.statut === "paye") {

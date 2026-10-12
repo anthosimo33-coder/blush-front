@@ -295,10 +295,13 @@ export async function repondre(
   if (blushId === undefined) throw new ErreurInvariant("chat_messages:reponse_non_gardee");
   /* Ce qu’elle a coûté, et ce qu’il reste : réglé au moment où elle part (une verrouillée se paie à la lecture) */
   const bulles = verrouillee ? undefined : await reglement?.regler(cout ?? 0);
-  /* Ce qui part au navigateur : la réponse, ou rien d’elle si elle est verrouillée */
-  const montree: BlushAnswer = verrouillee
-    ? reponseMasquee(blushId, cout ?? 1, modeVocal)
-    : { ...reponse, ...(bulles ? { bulles } : {}), ...(echangeId === undefined ? {} : { echange: echangeId }) };
+  /*
+   * Ce qui part au navigateur : la réponse, ou rien d’elle si elle est verrouillée. L’échange part avec l’une comme avec
+   * l’autre : l’accueil y reconnaît la réponse de sa visite dans l’historique (src/app/app/garde.ts), sans la doubler ;
+   * une verrouillée ne se partage pas pour autant (momentAPartager la refuse)
+   */
+  const avecEchange = echangeId === undefined ? {} : { echange: echangeId };
+  const montree: BlushAnswer = verrouillee ? { ...reponseMasquee(blushId, cout ?? 1, modeVocal), ...avecEchange } : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange };
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
   /*

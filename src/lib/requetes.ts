@@ -5,8 +5,8 @@
  * écrans passent par ici, pour qu’un changement de conv ou un paiement n’oublie aucune donnée.
  */
 import type { useRouter } from "next/navigation";
-import { getAccount, getReport, openConv } from "@/services/api";
-import type { Account, ReportPayload } from "@/types/api";
+import { getAccount, getAchats, getReport, openConv } from "@/services/api";
+import type { Account, AchatDuCompte, ReportPayload } from "@/types/api";
 import { invalidate, useQuery, type Cle, type OptionsLecture } from "./query";
 
 /**
@@ -17,6 +17,9 @@ const CLES_DE_LA_CONV = ["report", "account"] as const satisfies readonly Cle[];
 
 /** Le compte (son email, son plan), lu une seule fois pour tous les écrans montés ; `initial` : celui que la page serveur a rendu. */
 export const useCompte = (initial?: Account, options?: OptionsLecture) => useQuery("account", getAccount, initial, options);
+
+/** « Tes achats » (Mon compte), à partir de ceux que la page serveur a rendus (`initial`) ; un paiement les fait relire. */
+export const useAchats = (initial?: AchatDuCompte[], options?: OptionsLecture) => useQuery("achats", getAchats, initial, options);
 
 /** Le rapport de la conv ouverte, à partir de celui que la page serveur a rendu (`initial`, voir useQuery). */
 export const useRapport = (initial: ReportPayload, options?: OptionsLecture) => useQuery("report", getReport, initial, options);
@@ -33,5 +36,5 @@ export function changerDeConv(storyId: string, router: Pick<ReturnType<typeof us
   router.refresh();
 }
 
-/** Après un paiement : le rapport (ses chapitres ouverts) et le compte (son plan) se relisent. */
-export const apresDeblocage = () => invalidate("report", "account");
+/** Après un paiement : le rapport (ses chapitres ouverts), le compte (ses bulles) et ses achats se relisent. */
+export const apresDeblocage = () => invalidate("report", "account", "achats");

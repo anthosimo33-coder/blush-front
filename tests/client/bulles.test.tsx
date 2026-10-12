@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContactContext, FilDeLaConv } from "@/app/app/accueil/bulles";
+import { ContactContext, CreditContext, FilDeLaConv } from "@/app/app/accueil/bulles";
 import type { HomeContact } from "@/app/app/accueil/contact";
 import type { Msg } from "@/app/app/accueil/conv/modele";
 import { MotionContext } from "@/app/app/accueil/mouvement/contexte";
@@ -37,7 +37,10 @@ const A = new Date(2026, 9, 10, 18, 0).getTime();
 
 type Props = ComponentProps<typeof FilDeLaConv>;
 
-function monter(msgs: Msg[], plus: Partial<Props> = {}) {
+/** Les bulles du compte que l’accueil donne au fil (CreditContext) : le solde, et la recharge. */
+type Credit = { solde: number | null; recharger: () => void };
+
+function monter(msgs: Msg[], plus: Partial<Props> = {}, credit: Credit = { solde: null, recharger: vi.fn() }) {
   const props: Props = {
     threadRef: createRef<HTMLElement>(),
     hautRef: createRef<HTMLDivElement>(),
@@ -55,7 +58,9 @@ function monter(msgs: Msg[], plus: Partial<Props> = {}) {
   render(
     <ContactContext value={CONTACT}>
       <MotionContext value={{ arriving: false }}>
-        <FilDeLaConv {...props} />
+        <CreditContext value={credit}>
+          <FilDeLaConv {...props} />
+        </CreditContext>
       </MotionContext>
     </ContactContext>,
   );
@@ -144,17 +149,54 @@ describe("les bulles de la conv de l’accueil", () => {
     expect(props.relancer).toHaveBeenCalledExactlyOnceWith(2);
   });
 
-  it("une réponse verrouillée (écrite à 0 bulle) : prête, sans rien d’elle, ni « Partager » ; « La lire » la demande", async () => {
-    const { props, fil } = monter([
-      { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
-      { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 1 }, echange: 1 }, at: A },
+  it("ce que coûte chaque réponse, sous elle : « 1 bulle · il t’en reste N » ; offerte (une alerte) ou de l’historique, rien", () => {
+    const { fil } = monter([
+      { type: "texte", id: 1, from: "toi", text: "et là ?", at: A },
+      { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "elle te cherche" }], bulles: { depensees: 1, restantes: 9 } }, at: A },
+      { type: "texte", id: 3, from: "toi", text: "voilà ses captures", at: A },
+      { type: "reponse", id: 4, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "je vois" }], bulles: { depensees: 3, restantes: 6 } }, at: A },
+      { type: "texte", id: 5, from: "toi", text: "ça va pas", at: A },
+      { type: "reponse", id: 6, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "je suis là" }], bulles: { depensees: 0, restantes: 6 } }, at: A },
+      { type: "texte", id: 7, from: "toi", text: "merci", at: A },
+      { type: "reponse", id: 8, from: "blush", result: { kind: "bubbles", bubbles: [{ text: "de rien" }] }, at: A },
     ]);
+    expect([...fil.querySelectorAll("[data-recu]")].map((r) => r.textContent)).toEqual(["1 bulle · il t’en reste 9", "3 bulles · il t’en reste 6"]);
+  });
+
+  it("une réponse verrouillée (écrite à 0 bulle) : prête et floutée, sans rien d’elle dans la page, ni « Partager » ; « Recharger pour la lire » ouvre la recharge", () => {
+    const recharger = vi.fn();
+    const { props, fil } = monter(
+      [
+        { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
+        { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 1 }, echange: 1 }, at: A },
+      ],
+      {},
+      { solde: 0, recharger },
+    );
+    const prete = fil.querySelector("[data-verrouillee]")!;
     expect(within(fil).getByText("Ta réponse est prête")).toBeTruthy();
-    expect(within(fil).getByText("Recharge tes bulles pour la lire.")).toBeTruthy();
+    /* Floutée : des barres, jamais de texte (le serveur garde la réponse) ; ce qui se lit, c’est « prête » et le bouton */
+    expect(prete.textContent).toBe("Ta réponse est prêteRecharger pour la lire");
+    expect(prete.querySelectorAll("[aria-hidden=true].blur-\\[5px\\]")).toHaveLength(3);
     expect(within(fil).queryByText("Ta meilleure réponse")).toBeNull();
     expect(within(fil).queryByRole("button", { name: "Partager" })).toBeNull();
+    const bouton = within(fil).getByRole("button", { name: "Recharger pour la lire" });
+    expect(bouton.getAttribute("aria-haspopup")).toBe("dialog");
+    fireEvent.click(bouton);
+    expect(recharger).toHaveBeenCalledOnce();
+    expect(props.lire).not.toHaveBeenCalled();
+  });
+
+  it("une réponse verrouillée que le solde couvre déjà (rechargé ailleurs) : « La lire » la demande", async () => {
+    const recharger = vi.fn();
+    const { props, fil } = monter(
+      [{ type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 3 } }, at: A }],
+      {},
+      { solde: 3, recharger },
+    );
     await act(async () => fireEvent.click(within(fil).getByRole("button", { name: "La lire" })));
     expect(props.lire).toHaveBeenCalledExactlyOnceWith(2, 77);
+    expect(recharger).not.toHaveBeenCalled();
   });
 
   it("l’intro : « il vient de répondre ? » d’après son pronom, et un niveau franchi pendant la visite", () => {

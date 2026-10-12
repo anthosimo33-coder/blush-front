@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { CoupureChat, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
-import { messageErreur } from "@/lib/messages-erreur";
+import { codeDe, messageErreur } from "@/lib/messages-erreur";
 import { noterEcriture } from "@/lib/query";
 import { tracer } from "@/lib/tracer";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
@@ -49,6 +49,10 @@ export type Scene = EcranDeLHistorique & {
   anciensPoses: (n: number) => void;
   /** Une réponse fait passer un cap (0,7 s après elle). */
   niveau: (level: LevelId) => void;
+  /** Une réponse de BLUSH vient d’arriver en entier, ou d’être lue (une réponse verrouillée) : ce qu’elle dit des bulles. */
+  recue?: (r: BlushAnswer) => void;
+  /** Plus assez de bulles pour lire une réponse verrouillée : la recharge. */
+  manqueDeBulles?: () => void;
 };
 
 /** Ce que demande un échange : la réponse de BLUSH, avec ses bulles et son vocal à mesure (`suivi`). */
@@ -291,6 +295,7 @@ export function useConversation({
     changer((m) => m.map((x) => (x.id === readingId ? reponse : x)));
     if (premiere) ecran.current.reponsePosee();
     ecran.current.annoncer(reponse);
+    if (next.type === "reponse") ecran.current.recue?.(next.result);
     if (next.type === "reponse" && next.result.modeVocal !== undefined) suivreModeVocal(next.result.modeVocal);
     const up = next.type === "reponse" ? next.result.levelUp : undefined;
     if (!up) return;
@@ -327,18 +332,22 @@ export function useConversation({
     /**
      * « La lire » : la réponse verrouillée `reponse` (son `message` en base), une fois rechargé. Elle remplace sa version
      * masquée, et les lecteurs d’écran l’entendent comme une réponse qui arrive ; sinon (plus de bulles, le réseau),
-     * BLUSH dit pourquoi d’un mot.
+     * BLUSH dit pourquoi d’un mot, et plus de bulles ouvre la recharge. Vrai si elle est lue.
      */
-    lire: async (reponse: number, message: number) => {
+    lire: async (reponse: number, message: number): Promise<boolean> => {
       noterEcriture("chat");
       try {
         const lue = await lireLaReponse(message);
         changer((m) => m.map((x) => (x.id === reponse && x.type === "reponse" ? { ...x, result: lue } : x)));
         const masquee = derniers.current.msgs.find((x) => x.id === reponse);
         if (masquee?.type === "reponse") ecran.current.annoncer({ ...masquee, result: lue });
+        ecran.current.recue?.(lue);
+        return true;
       } catch (e) {
         tracer("conv:lire", e);
         direMot([messageErreur("chat", e)].flat().join(" "));
+        if (codeDe(e) === "bulles") ecran.current.manqueDeBulles?.();
+        return false;
       } finally {
         noterEcriture("chat");
       }

@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useLibererAuRetour } from "@/lib/paiement";
+import { suiteDuPaiement, useLibererAuRetour } from "@/lib/paiement";
 
 /*
  * Revenir de chez Whop par « Retour » (src/lib/paiement.ts) : le navigateur rend la page gardée dans son cache des pages,
@@ -22,5 +22,20 @@ describe("le retour de chez Whop par « Retour »", () => {
     unmount();
     afficher(true);
     expect(liberer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("où reprendre une fois l’achat livré (suiteDuPaiement)", () => {
+  it("une recharge revient avec les bulles que le serveur a livrées, pas celles que la feuille avait comptées", () => {
+    /* La feuille a compté 80 (le bonus ④ pas encore su) ; l’achat livré en a donné 120 : le mot dira « +120 bulles » */
+    sessionStorage.setItem("blush.paiement.suite.a1", "/app?recharge=80");
+    expect(suiteDuPaiement("a1", 120)).toBe("/app?recharge=120");
+    expect(suiteDuPaiement("a1")).toBe("/app?recharge=80");
+    /* Une autre suite (Mon compte, le rapport) reste telle quelle ; rien de gardé, ou une adresse hors du site : rien */
+    sessionStorage.setItem("blush.paiement.suite.a2", "/compte");
+    expect(suiteDuPaiement("a2", 30)).toBe("/compte");
+    sessionStorage.setItem("blush.paiement.suite.a3", "//exemple.com/?recharge=1");
+    expect(suiteDuPaiement("a3", 30)).toBeNull();
+    expect(suiteDuPaiement("a4", 30)).toBeNull();
   });
 });

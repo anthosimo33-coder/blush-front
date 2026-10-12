@@ -38,8 +38,11 @@ export type Formule = (typeof FORMULES)[number];
  */
 export const OFFRES_UNIQUES = ["suite", "relance_mail", "premium_ajout", "premiere_recharge"] as const;
 export type OffreUnique = (typeof OFFRES_UNIQUES)[number];
-/** Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ sur « C’est débloqué ». */
-export const OFFRES_PROPOSEES = ["suite", "premium_ajout"] as const satisfies readonly OffreUnique[];
+/**
+ * Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ sur
+ * « C’est débloqué », ④ en ouvrant la recharge.
+ */
+export const OFFRES_PROPOSEES = ["suite", "premium_ajout", "premiere_recharge"] as const satisfies readonly OffreUnique[];
 export type OffreProposee = (typeof OFFRES_PROPOSEES)[number];
 /** Ce que le faux Whop (BLUSH_PAIEMENT_FACTICE, jamais en ligne) fait d’un achat : le payer, le refuser, ou le rembourser (un moyen de test). */
 export const ISSUES_DU_FAUX_WHOP = ["payer", "refuser", "rembourser"] as const;
@@ -296,6 +299,11 @@ export type BlushAnswer = {
    * /api/chat/debloquer, qui débite son `cout`).
    */
   verrouillee?: { message: number; cout: number };
+  /**
+   * Jamais du serveur : le mot de BLUSH que le navigateur pose à la place d’une réponse refusée faute de bulles (402
+   * « bulles », src/services/api.ts). L’accueil ouvre alors la recharge.
+   */
+  plusDeBulles?: true;
 };
 
 /** Une bulle de BLUSH dans le chat, et les messages qu’elle cite. */

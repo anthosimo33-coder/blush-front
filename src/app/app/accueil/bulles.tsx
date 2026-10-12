@@ -5,7 +5,7 @@
  * expéditeur (Group), la forme d’une bulle (BubbleShape) et ce que chaque message y montre (bubblesOf) : ta question,
  * tes captures, un export, un vocal, la réponse de BLUSH (ses bulles, les messages qu’elle cite, la réponse à lui
  * envoyer : SendReply), « BLUSH écrit », une réponse coupée (Coupure), une réponse verrouillée (ReponseVerrouillee) et un
- * niveau franchi (LevelEvent). Le modèle
+ * niveau franchi (LevelEvent), et sous chaque réponse ce qu’elle a coûté en bulles. Le modèle
  * des lignes (jours, groupes, clés) est dans ./conv/modele.ts ; HomeScreen pose le fil et lui donne la conv.
  */
 import { createContext, memo, use, useState, type RefObject } from "react";
@@ -19,6 +19,8 @@ import { TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { BlushTyping, BULLE_DE_BLUSH, citation, coinsDeBulle, placeDansLeGroupe, Tag, type BulleDeBlush, type PlaceBulle } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
+import { Perle } from "@/components/bulles/perles";
+import { recu, REPONSE_PRETE } from "@/contenu/bulles-du-chat";
 import { scaleOf } from "@/contenu/niveaux";
 import type { BlushAnswer, BulleChat, LevelId, Pronom } from "@/types";
 import { VocalBlush, VoiceNote } from "../voice";
@@ -295,6 +297,13 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
           className={cn("mt-0.5 flex h-3.5 items-center gap-2 text-[11px] font-bold leading-[14px] text-grey", row.from === "blush" ? "pl-[46px]" : "justify-end pr-1.5")}
         >
           {row.at === null ? NBSP : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
+          {/* Ce que la réponse a coûté, et ce qu’il reste (le serveur le dit avec elle ; offerte, une alerte, rien) */}
+          {row.from === "blush" && !!row.bulles?.depensees && (
+            <span data-recu="" className="inline-flex items-center gap-1">
+              <Perle taille={11} />
+              {recu(row.bulles.depensees, row.bulles.restantes)}
+            </span>
+          )}
           {/* La réponse se partage en image (story), le prénom de l’autre masqué */}
           {row.from === "blush" && row.echange && (
             <button
@@ -318,7 +327,8 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
   const x = a.row;
   const y = b.row;
   if (x === y) return true;
-  if (x.key !== y.key || x.at !== y.at || x.echange !== y.echange || x.from !== y.from || x.items.length !== y.items.length) return false;
+  if (x.key !== y.key || x.at !== y.at || x.echange !== y.echange || x.bulles?.restantes !== y.bulles?.restantes || x.from !== y.from || x.items.length !== y.items.length)
+    return false;
   return x.items.every((it, i) => {
     const o = y.items[i];
     return !!o && it.key === o.key && it.node === o.node && it.at === o.at && it.fresh === o.fresh && it.d === o.d && it.neuf === o.neuf && it.tape === o.tape;
@@ -411,31 +421,52 @@ function Coupure({ reponse }: { reponse: number }) {
 const LireContext = createContext<(reponse: number, message: number) => Promise<unknown>>(async () => {});
 
 /**
- * Une réponse écrite à 0 bulle : verrouillée, rien d’elle n’est arrivé (le serveur la garde). « La lire » la demande une
- * fois rechargé (son coût débité) ; sans bulles, BLUSH le redit. Juste ce qu’il faut : le dessin du prototype des bulles
- * (floutée, « Recharger pour la lire ») viendra avec la recharge.
- * TODO(produit): textes repris du prototype (« Ta réponse est prête », « La lire ») ; la ligne du dessous est nouvelle.
+ * Les bulles du compte, pour une réponse verrouillée : `solde` (null : on ne sait pas, ou l’équipe, aux bulles
+ * illimitées), et la recharge. HomeScreen le donne ; sans lui, une réponse verrouillée se lit d’un toucher.
  */
-function ReponseVerrouillee({ reponse, message }: { reponse: number; message: number }) {
+export const CreditContext = createContext<{ solde: number | null; recharger: () => void }>({ solde: null, recharger: () => {} });
+
+/* Les lignes floutées d’une réponse prête : de simples barres, jamais son texte (le serveur le garde), en largeurs de phrases */
+const LIGNES_FLOUTEES = [168, 214, 120];
+
+/**
+ * Une réponse écrite à 0 bulle (le prototype validé des bulles) : verrouillée, rien d’elle n’est arrivé (le serveur la
+ * garde), floutée sous « Ta réponse est prête ». « Recharger pour la lire » ouvre la recharge ; si le solde couvre déjà
+ * son coût (rechargé ailleurs), « La lire » la demande (son coût débité), et sans bulles, BLUSH le redit.
+ */
+function ReponseVerrouillee({ reponse, message, cout }: { reponse: number; message: number; cout: number }) {
   const lire = use(LireContext);
+  const credit = use(CreditContext);
   const [enCours, setEnCours] = useState(false);
+  const lisible = credit.solde === null || credit.solde >= cout;
   return (
-    <span data-verrouillee="" className="flex flex-col items-start gap-2">
-      <span className="inline-flex items-center gap-1.5 text-corps font-black leading-[1.35]">
-        <Icon name="lock" size={15} stroke={2.6} />
-        Ta réponse est prête
+    <span data-verrouillee="" className="flex flex-col gap-2">
+      <span className="relative flex flex-col items-start gap-[3px]">
+        {LIGNES_FLOUTEES.map((largeur, i) => (
+          <span key={i} aria-hidden="true" className="flex select-none rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-[13px] blur-[5px]">
+            <span className="block h-[9px] rounded-full bg-white/85" style={{ width: largeur }} />
+          </span>
+        ))}
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-legende font-black text-white shadow-card">
+            <Icon name="lock" size={13} stroke={2.6} className="text-white" />
+            {REPONSE_PRETE.titre}
+          </span>
+        </span>
       </span>
-      <span className="text-detail font-extrabold leading-[1.45] text-soft">Recharge tes bulles pour la lire.</span>
       <button
         type="button"
         disabled={enCours}
+        aria-haspopup={lisible ? undefined : "dialog"}
         onClick={() => {
+          if (!lisible) return credit.recharger();
           setEnCours(true);
           void lire(reponse, message).finally(() => setEnCours(false));
         }}
-        className="lift lift-sm lift-ink mt-0.5 inline-flex h-9 items-center rounded-full bg-ink px-3.5 text-legende font-black text-white disabled:opacity-60"
+        className="lift lift-sm lift-ink mt-1 inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white disabled:opacity-60"
       >
-        La lire
+        <Perle taille={14} />
+        {lisible ? REPONSE_PRETE.lire : REPONSE_PRETE.recharger}
       </button>
     </span>
   );
@@ -541,7 +572,7 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
       ];
     case "reponse":
       /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
-      if (m.result.verrouillee) return [{ body: <ReponseVerrouillee reponse={m.id} message={m.result.verrouillee.message} /> }];
+      if (m.result.verrouillee) return [{ body: <ReponseVerrouillee reponse={m.id} message={m.result.verrouillee.message} cout={m.result.verrouillee.cout} /> }];
       return bullesDeLaReponse(m.result, !!m.answered);
     default:
       return typeInconnu(m);

@@ -291,7 +291,13 @@ describe("POST /api/chat, avec des bulles", () => {
     await lancerApres();
     const [payee, verrouillee] = [reponses.find((r) => !r.verrouillee), reponses.find((r) => r.verrouillee)];
     expect(payee?.bulles).toEqual({ depensees: 1, restantes: 0 });
-    expect(verrouillee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: (await derniereVerrouillee(u.id)).id, cout: 1 }, modeVocal: false });
+    expect(verrouillee).toEqual({
+      kind: "bubbles",
+      bubbles: [],
+      verrouillee: { message: (await derniereVerrouillee(u.id)).id, cout: 1 },
+      modeVocal: false,
+      echange: expect.any(Number),
+    });
     expect(await soldeDe(u.id)).toBe(0);
     expect((await journalDe(u.id)).map((m) => m.raison)).toEqual(["reponse"]);
     /* L’historique les a toutes les deux, dans l’ordre, chacune avec son message */
@@ -316,14 +322,16 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     /* Rien en route : pas une bulle, seulement la réponse masquée */
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse"]);
     const v = await derniereVerrouillee(u.id);
-    expect(reponseDu(evenements)).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1 }, modeVocal: false });
+    const masquee = reponseDu(evenements);
+    expect(masquee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1 }, modeVocal: false, echange: expect.any(Number) });
     expect(await derniereReponse(id)).toMatchObject({ id: v.id, cout: 1, verrouillee: true });
     expect(await soldeDe(u.id)).toBe(0);
 
-    /* L’historique : l’échange est là, sa réponse masquée */
+    /* L’historique : l’échange est là, sa réponse masquée ; celui que la réponse a dit (l’accueil s’y reconnaît au retour) */
     const avant = await historique();
     const echange = avant.echanges.at(-1)!;
     expect(echange.answer).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1 } });
+    expect(masquee.echange).toBe(echange.id);
     /* L’image partagée de cet échange : refusée */
     expect(await momentAPartager(await ligneEnBase(id), true, { type: "reponse", echange: echange.id })).toBe("introuvable");
     /* La mise à jour de la mémoire n’apprend que ce qu’il a dit */

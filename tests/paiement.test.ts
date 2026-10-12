@@ -53,13 +53,14 @@ import { GET as lireEtat } from "@/app/api/paiement/[achat]/route";
 import { POST as fauxWhop } from "@/app/api/paiement/factice/route";
 import { POST as offre } from "@/app/api/paiement/offre/route";
 import { POST as webhookRecu } from "@/app/api/paiement/whop/route";
+import { GET as lireAchats } from "@/app/api/achats/route";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import type { Utilisateur } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
 import { webhookFactice, type WebhookFactice } from "@/server/paiement/factice";
 import { signerWebhook } from "@/server/paiement/signature";
-import type { EtatAchat, OffreUniqueMontree, PaiementCommence, WebhookDuFauxWhop } from "@/types/api";
+import type { AchatDuCompte, EtatAchat, OffreUniqueMontree, PaiementCommence, WebhookDuFauxWhop } from "@/types/api";
 import { compteDeTest, convRattachee, debloquerLaConv, ligneEnBase } from "./aide/fixtures";
 
 const APPLI = "http://localhost";
@@ -498,7 +499,50 @@ describe("le retour (GET /api/paiement/[achat])", () => {
 });
 
 describe("les offres uniques et le paiement en un geste", () => {
-  const montrer = async (o: "suite" | "premium_ajout") => (await (await offre(depuisLAppli("/api/paiement/offre", { offre: o }))).json()) as OffreUniqueMontree;
+  const montrer = async (o: "suite" | "premium_ajout" | "premiere_recharge") =>
+    (await (await offre(depuisLAppli("/api/paiement/offre", { offre: o }))).json()) as OffreUniqueMontree;
+
+  it("④ la première recharge : montrée tant qu’aucun pack n’a été payé, prise par le pack conseillé (+40), puis plus jamais", async () => {
+    const { u } = await acheteur("offre-recharge");
+    etat.mode = null;
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+    etat.mode = "factice";
+    expect(await montrer("premiere_recharge")).toEqual({ offre: "premiere_recharge", fin: null, reste: null, enUnGeste: false });
+    /* Montrée, elle reste valable : la recharge rouverte la retrouve */
+    expect((await montrer("premiere_recharge")).offre).toBe("premiere_recharge");
+    const { corps } = await payer({ offre: "pack80", renonciation: CASE_RENONCIATION.version });
+    expect(await achatEnBase(corps.achat)).toMatchObject({ offre: "pack80", centimes: 990, bulles: 120, offreUnique: "premiere_recharge" });
+    expect((await poster(await issue(corps.achat, "payer"))).status).toBe(200);
+    expect(await soldeDe(u.id)).toBe(120);
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+    /* La recharge d’après, sans bonus */
+    expect(await achatEnBase((await payer({ offre: "pack80", renonciation: CASE_RENONCIATION.version })).corps.achat)).toMatchObject({ bulles: 80, offreUnique: null });
+  });
+
+  it("④ jamais après une recharge déjà payée (même remboursée), ni le jour d’une autre offre unique", async () => {
+    await acheteur("offre-recharge-deja");
+    const { corps } = await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version });
+    expect((await poster(await issue(corps.achat, "payer"))).status).toBe(200);
+    expect((await poster(await issue(corps.achat, "rembourser"))).status).toBe(200);
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+
+    await acheteur("offre-recharge-jour");
+    expect((await montrer("suite")).offre).toBe("suite");
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+  });
+
+  it("④ montré, puis une autre recharge payée d’abord (30 bulles) : le pack conseillé d’après n’a plus le bonus (la feuille ne le montre plus)", async () => {
+    const { u } = await acheteur("offre-recharge-autre-pack");
+    expect((await montrer("premiere_recharge")).offre).toBe("premiere_recharge");
+    const petit = (await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect((await poster(await issue(petit, "payer"))).status).toBe(200);
+    /* La feuille rouverte ne montre plus le bonus : la commande ne le donne pas non plus */
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+    const conseille = (await payer({ offre: "pack80", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect(await achatEnBase(conseille)).toMatchObject({ bulles: 80, offreUnique: null });
+    expect((await poster(await issue(conseille, "payer"))).status).toBe(200);
+    expect(await soldeDe(u.id)).toBe(110);
+  });
 
   it("① la suite : montrée pour la conv de la page (5 minutes), puis payée 6,90 € ; jamais sans prestataire", async () => {
     await acheteur("offre-suite");
@@ -589,5 +633,41 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_r/", "ch_r"]);
     expect(appels).toEqual(["/payments", "/checkout_configurations"]);
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", centimes: 500 });
+  });
+});
+
+describe("« Tes achats » (GET /api/achats)", () => {
+  const achats = async () => {
+    const r = await lireAchats();
+    return { status: r.status, corps: (await r.json()) as { achats?: AchatDuCompte[]; erreur?: string } };
+  };
+
+  it("sans session : 401 ; les achats payés du compte, même remboursés, du plus récent au plus ancien ; ni une commande jamais payée, ni ceux d’un autre", async () => {
+    expect((await achats()).status).toBe(401);
+    const { u } = await acheteur("achats-liste");
+    expect(await achats()).toEqual({ status: 200, corps: { achats: [] } });
+    /* Une commande jamais payée, puis une refusée : rien */
+    await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version });
+    const refusee = (await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect((await poster(await issue(refusee, "refuser"))).status).toBe(200);
+    expect((await achats()).corps.achats).toEqual([]);
+    /* Le rapport payé, puis une recharge payée et remboursée */
+    const rapport = await rapportPaye();
+    const recharge = (await payer({ offre: "pack80", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect((await poster(await issue(recharge, "payer"))).status).toBe(200);
+    expect((await poster(await issue(recharge, "rembourser"))).status).toBe(200);
+    const { corps } = await achats();
+    expect(corps.achats!.map(({ id, offre, centimes, bulles, statut }) => ({ id, offre, centimes, bulles, statut }))).toEqual([
+      { id: recharge, offre: "pack80", centimes: 990, bulles: 80, statut: "rembourse" },
+      { id: rapport, offre: "rapport", centimes: 990, bulles: 10, statut: "paye" },
+    ]);
+    expect(corps.achats!.every((a) => !Number.isNaN(Date.parse(a.le)))).toBe(true);
+    /* Rien de la conv */
+    expect(Object.keys(corps.achats![0]!).sort()).toEqual(["bulles", "centimes", "id", "le", "offre", "statut"]);
+
+    /* Un autre compte ne voit pas les siens */
+    await acheteur("achats-autre");
+    expect((await achats()).corps.achats).toEqual([]);
+    expect(u.id).toBeTruthy();
   });
 });
