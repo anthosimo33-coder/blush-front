@@ -9,7 +9,7 @@ import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { Sheet } from "@/components/ui/surfaces";
-import { CaseRenonciation } from "./CaseRenonciation";
+import { CaseRenonciation, useCase } from "@/components/juridique/cases";
 
 /** Le temps qu’il reste, en minutes et secondes (« 04:59 »). */
 function restant(ms: number) {
@@ -30,8 +30,7 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
   const [maintenant, setMaintenant] = useState(() => Date.now());
   /* Fermée par « Non merci », le voile ou Échap ; passée, elle se ferme seule (le compte à rebours à zéro) */
   const [fermee, setFermee] = useState(false);
-  const [renonce, setRenonce] = useState(false);
-  const [manque, setManque] = useState(false);
+  const renonciation = useCase();
   const [occupe, setOccupe] = useState(false);
   useLibererAuRetour(useCallback(() => setOccupe(false), []));
   const [souci, setSouci] = useState(false);
@@ -43,7 +42,7 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
   }, []);
 
   const prendre = async () => {
-    if (!renonce) return setManque(true);
+    if (!renonciation.exiger()) return;
     setOccupe(true);
     setSouci(false);
     try {
@@ -77,7 +76,7 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
           <span className="text-legende font-black text-elle-ink">{OFFRE_SUITE.contenu}</span>
         </span>
       </div>
-      <CaseRenonciation quoi="rapport" cochee={renonce} onChange={(v) => (setRenonce(v), setManque(false))} manque={manque} />
+      <CaseRenonciation quoi="rapport" etat={renonciation} />
       {souci && <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>}
       <div className="flex flex-col gap-1">
         <Button arrow loading={occupe} loadingLabel="Paiement en cours" onClick={() => void prendre()}>

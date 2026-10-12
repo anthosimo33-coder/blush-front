@@ -15,7 +15,7 @@ import { CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
-import { CaseRenonciation } from "@/components/screens/CaseRenonciation";
+import { CaseRenonciation, useCase } from "@/components/juridique/cases";
 import { Screen } from "@/components/shell/Screen";
 import type { OffreId } from "@/types";
 import { ancreDuChapitre } from "../ancres";
@@ -33,13 +33,12 @@ const ouvert = (bulles: number, restants: number, reprise: number) => [
  */
 function OffrePremiumAjout({ enUnGeste, ici, fermer }: { enUnGeste: boolean; ici: string; fermer: () => void }) {
   const router = useRouter();
-  const [renonce, setRenonce] = useState(false);
-  const [manque, setManque] = useState(false);
+  const renonciation = useCase();
   const [occupe, setOccupe] = useState(false);
   useLibererAuRetour(useCallback(() => setOccupe(false), []));
   const [souci, setSouci] = useState(false);
   const prendre = async () => {
-    if (!renonce) return setManque(true);
+    if (!renonciation.exiger()) return;
     setOccupe(true);
     setSouci(false);
     try {
@@ -58,7 +57,7 @@ function OffrePremiumAjout({ enUnGeste, ici, fermer }: { enUnGeste: boolean; ici
       <span className="text-[22px] font-black leading-[1.1] tracking-[-0.02em]">{OFFRE_PREMIUM_AJOUT.titre}</span>
       <span className="text-note font-extrabold leading-[1.45] text-grey">{OFFRE_PREMIUM_AJOUT.texte}</span>
       {enUnGeste && <span className="text-legende font-extrabold text-soft">{OFFRE_PREMIUM_AJOUT.carte}</span>}
-      <CaseRenonciation quoi="bulles" cochee={renonce} onChange={(v) => (setRenonce(v), setManque(false))} manque={manque} />
+      <CaseRenonciation quoi="bulles" etat={renonciation} />
       {souci && <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>}
       <Button loading={occupe} loadingLabel="Paiement en cours" onClick={() => void prendre()}>
         {OFFRE_PREMIUM_AJOUT.prendre}

@@ -14,7 +14,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import type { Formule } from "@/types";
-import { CaseRenonciation } from "./CaseRenonciation";
+import { CaseRenonciation, useCase } from "@/components/juridique/cases";
 import { OffreSuite } from "./OffreSuite";
 
 /* L’offre ① refusée (« Non merci ») pendant cette visite : la feuille refermée ne la remontre pas (le serveur la garderait 5 minutes) */
@@ -57,8 +57,7 @@ export function PaywallSheet({
   /* Le faux Whop (une page de l’appli) : le bouton reste occupé jusqu’à son arrivée */
   const [navigue, demarrer] = useTransition();
   const occupe = busy || navigue;
-  const [renonce, setRenonce] = useState(false);
-  const [manque, setManque] = useState(false);
+  const renonciation = useCase();
   const [later, setLater] = useState(false);
   /* Autre chose que « bientôt » (le réseau, le serveur) : on le dit, le bouton se libère */
   const [souci, setSouci] = useState(false);
@@ -66,7 +65,7 @@ export function PaywallSheet({
   const [suite, setSuite] = useState<string | null>(null);
 
   const pay = async () => {
-    if (!renonce) return setManque(true);
+    if (!renonciation.exiger()) return;
     setBusy(true);
     setSouci(false);
     try {
@@ -145,7 +144,7 @@ export function PaywallSheet({
             </p>
           )}
           {souci && <Alert className="text-center leading-[1.45]">Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.</Alert>}
-          <CaseRenonciation quoi="rapport" cochee={renonce} onChange={(v) => (setRenonce(v), setManque(false))} manque={manque} />
+          <CaseRenonciation quoi="rapport" etat={renonciation} />
           <Button arrow loading={occupe} loadingLabel="Paiement en cours" onClick={() => void pay()}>
             Débloquer
           </Button>
