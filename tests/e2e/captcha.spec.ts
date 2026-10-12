@@ -1,4 +1,5 @@
 import type { Page, Request } from "@playwright/test";
+import { CASE_IMPORT } from "../../src/contenu/consentements";
 import { ENTETE_CAPTCHA, JETON_DE_TEST, SCRIPT_TURNSTILE } from "../../src/lib/captcha";
 import {
   capturesPng,
@@ -93,7 +94,7 @@ test("l’import sans compte : le laissez-passer pris pendant la préparation du
     const importer = () =>
       request.post("/api/import", {
         headers: { origin: URL_APPLI },
-        multipart: { fichier: { name: "_chat.txt", mimeType: "text/plain", buffer: Buffer.from(texteWhatsApp()) } },
+        multipart: { fichier: { name: "_chat.txt", mimeType: "text/plain", buffer: Buffer.from(texteWhatsApp()) }, consentement: CASE_IMPORT.version },
       });
     const sans = await importer();
     expect([sans.status(), await sans.json()]).toEqual([403, { erreur: "captcha" }]);

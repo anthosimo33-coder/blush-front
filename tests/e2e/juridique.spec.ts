@@ -1,5 +1,5 @@
 import { CASE_IMPORT } from "../../src/contenu/consentements";
-import { caseImport, capturesPng, connecterParApi, emailLibre, expect, exportWhatsApp, ouvrir, sql, test, texteWhatsApp, URL_APPLI } from "./aide";
+import { caseImport, capturesPng, connecterParApi, emailLibre, expect, exportWhatsApp, ouvrir, prouverHumain, sql, test, texteWhatsApp, URL_APPLI } from "./aide";
 
 /*
  * Le juridique : les pages /conditions et /mentions-legales, leurs liens au pied de la landing, de la confidentialité et
@@ -181,7 +181,7 @@ test("les captures : choisies sans la case, « Continuer » n’envoie rien ; co
   expect(envois).toEqual(["POST"]);
 });
 
-test("l’API refuse un import sans la case, ou avec une version périmée : 422 consentement", async ({ request }) => {
+test("l’API refuse un import sans la case, ou avec une version périmée : 422 consentement", async ({ request }, testInfo) => {
   const envoyer = (consentement?: string) =>
     request.post("/api/import", {
       headers: { origin: URL_APPLI },
@@ -192,5 +192,7 @@ test("l’API refuse un import sans la case, ou avec une version périmée : 422
     expect.soft(r.status(), consentement ?? "sans la case").toBe(422);
     expect.soft(await r.json(), consentement ?? "sans la case").toEqual({ erreur: "consentement" });
   }
+  /* La case vérifiée avant le CAPTCHA : les refus n’ont pas usé le laissez-passer, pris pour l’import accepté */
+  await prouverHumain(request, testInfo);
   expect((await envoyer(CASE_IMPORT.version)).status()).toBe(200);
 });
