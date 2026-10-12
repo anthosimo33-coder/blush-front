@@ -40,10 +40,10 @@ export const DELAI_SITEVERIFY_MS = 3_000;
 /** La longueur d’un jeton, au plus (Cloudflare : 2048 caractères) : au-delà, refusé sans appel. */
 const JETON_MAX = 2048;
 /** La durée d’un laissez-passer : de quoi lire un enregistrement d’écran et le rassembler, avec une reprise. */
-export const LAISSEZ_PASSER_S = 20 * 60;
+const LAISSEZ_PASSER_S = 20 * 60;
 
 /** Le CAPTCHA est-il en place (la clé secrète posée) ? */
-export const captchaActif = (): boolean => !!env().TURNSTILE_SECRET_KEY;
+const captchaActif = (): boolean => !!env().TURNSTILE_SECRET_KEY;
 
 /* La réponse de siteverify, ce qu’on en lit */
 type Reponse = { success?: unknown; "error-codes"?: unknown; action?: unknown };

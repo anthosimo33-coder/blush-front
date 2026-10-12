@@ -115,7 +115,7 @@ afterAll(async () => {
 describe("la demande de code : le jeton du widget, avant toute limite", () => {
   it("sans jeton, ou refusé par Cloudflare : 403 « captcha », et la limite de l’adresse n’a rien compté", async () => {
     cloudflare(false);
-    for (const entetes of [{}, { [ENTETE_CAPTCHA]: "jeton-faux" }]) {
+    for (const entetes of [{}, { [ENTETE_CAPTCHA]: "jeton-faux" }] as Record<string, string>[]) {
       const ici = adresse();
       const r = await postCode(requete("/api/auth/code", { method: "POST", body: JSON.stringify({ email: `captcha-${n}@blush.test` }), headers: entetes, ip: ici }));
       expect(await corpsDe(r)).toEqual([403, { erreur: "captcha" }]);
@@ -138,7 +138,9 @@ describe("la demande de code : le jeton du widget, avant toute limite", () => {
     for (const reponse of [true, new TypeError("fetch failed")]) {
       cloudflare(reponse, "code");
       const ici = adresse();
-      const r = await postCode(requete("/api/auth/code", { method: "POST", body: JSON.stringify({ email: `captcha-ok-${n}@blush.test` }), headers: { [ENTETE_CAPTCHA]: "jeton" }, ip: ici }));
+      const r = await postCode(
+        requete("/api/auth/code", { method: "POST", body: JSON.stringify({ email: `captcha-ok-${n}@blush.test` }), headers: { [ENTETE_CAPTCHA]: "jeton" }, ip: ici }),
+      );
       expect(r.status).toBe(200);
       expect(await compteDeLimite(`code:ip:${ici}`, { fenetreS: 3600 })).toBe(1);
       vi.restoreAllMocks();
@@ -202,7 +204,13 @@ describe("le laissez-passer des imports sans compte", () => {
     await laissezPasser();
     const [id, fin, signature] = etat.cookies.get(HUMAIN)!.split(".");
     const passe = Date.now() - 1000;
-    for (const faux of [`${id}.${Number(fin) + 60e3}.${signature}`, `${id}.${fin}.${signature!.slice(1)}x`, `${id}.${passe}.${empreinte(`humain:${id}.${passe}`)}x`, "n-importe-quoi", ""]) {
+    for (const faux of [
+      `${id}.${Number(fin) + 60e3}.${signature}`,
+      `${id}.${fin}.${signature!.slice(1)}x`,
+      `${id}.${passe}.${empreinte(`humain:${id}.${passe}`)}x`,
+      "n-importe-quoi",
+      "",
+    ]) {
       etat.cookies.set(HUMAIN, faux);
       expect((await humainRefuse("brouillon"))?.status, faux).toBe(403);
     }

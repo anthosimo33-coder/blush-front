@@ -16,8 +16,8 @@ type Options = Record<string, unknown> & { callback: (jeton: string) => void };
 function fauxTurnstile() {
   const rendus: { conteneur: HTMLElement; options: Options }[] = [];
   const turnstile = {
-    render: vi.fn((conteneur: HTMLElement, options: Options) => {
-      rendus.push({ conteneur, options });
+    render: vi.fn((conteneur: HTMLElement, options: Record<string, unknown>) => {
+      rendus.push({ conteneur, options: options as Options });
       return `w${rendus.length}`;
     }),
     reset: vi.fn(),

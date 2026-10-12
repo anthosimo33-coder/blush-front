@@ -37,7 +37,8 @@ function cloudflare(reponse: unknown | Error, statut = 200) {
   });
 }
 
-const requete = (entetes: Record<string, string> = {}) => new Request("http://localhost/api/auth/code", { method: "POST", headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1", ...entetes } });
+const requete = (entetes: Record<string, string> = {}) =>
+  new Request("http://localhost/api/auth/code", { method: "POST", headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1", ...entetes } });
 
 beforeEach(() => {
   etat.secret = SECRET;

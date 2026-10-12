@@ -98,6 +98,11 @@ export function ConfidentialiteScreen() {
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, la liste d’attente)" />
+        {/*
+         * Le CAPTCHA (src/server/captcha.ts) : Cloudflare voit l’adresse IP et le navigateur de qui demande un code ou
+         * envoie une conv sans compte, jamais la conv. TODO(produit): texte nouveau, à valider (et à relire avec la page)
+         */}
+        <InsetRow title="Cloudflare" sub="La vérification anti-robot, quand tu demandes un code ou envoies ta conv (ton adresse IP et ton navigateur, jamais ta conv)" />
         <InsetRow
           leading={<RowIcon icon="mail" tone="toi" />}
           title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>}

@@ -122,7 +122,10 @@ describe("le CAPTCHA et le quota des mails", () => {
     expect((await charger()).env().BLUSH_MAILS_PAR_JOUR).toBe(3000);
     for (const mauvais of ["50", "120.5", "beaucoup"]) {
       vi.stubEnv("BLUSH_MAILS_PAR_JOUR", mauvais);
-      await expect(charger().then(({ env }) => env()), mauvais).rejects.toThrow("BLUSH_MAILS_PAR_JOUR");
+      await expect(
+        charger().then(({ env }) => env()),
+        mauvais,
+      ).rejects.toThrow("BLUSH_MAILS_PAR_JOUR");
     }
   });
 });
