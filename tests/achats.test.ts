@@ -203,6 +203,29 @@ describe("commander", () => {
   });
 });
 
+describe("une offre unique commandée deux fois", () => {
+  it("payées toutes les deux : la première profite de l’offre, la seconde ③ n’est pas livrée, la seconde recharge n’a pas son bonus", async () => {
+    const u = await compteDeTest("unique-double");
+    await montrer(u, "premiere_recharge");
+    const [une, deux] = [await commande(u, "pack80", { fournisseur: "factice" }), await commande(u, "pack80", { fournisseur: "factice" })];
+    expect([une.bulles, deux.bulles]).toEqual([80 + PREMIERE_RECHARGE.bonus, 80 + PREMIERE_RECHARGE.bonus]);
+    expect((await livrer(une.id)).effet).toBe("livre");
+    /* Le pack est payé au prix normal : il est livré, sans le bonus déjà pris */
+    expect(await livrer(deux.id)).toMatchObject({ effet: "livre", achat: { bulles: 80 } });
+    expect(await soldeDe(u.id)).toBe(80 + PREMIERE_RECHARGE.bonus + 80);
+
+    const v = await compteDeTest("unique-double-ajout");
+    await livrer((await commande(v, "rapport", { storyId: await conv(v), fournisseur: "factice" })).id);
+    await montrer(v, "premium_ajout");
+    const [a, b] = [await commande(v, "premium_ajout", { fournisseur: "factice" }), await commande(v, "premium_ajout", { fournisseur: "factice" })];
+    const effets = await Promise.all([livrer(a.id), livrer(b.id)]);
+    /* 80 bulles pour 5 € une seule fois : l’autre paiement reste en attente, à rembourser (l’alerte part de la route du webhook) */
+    expect(effets.map((l) => l.effet).sort()).toEqual(["livre", "offre"]);
+    expect(await soldeDe(v.id)).toBe(10 + 80);
+    expect([(await achatEnBase(a.id)).statut, (await achatEnBase(b.id)).statut].sort()).toEqual(["en_attente", "paye"]);
+  });
+});
+
 describe("livrer et reprendre", () => {
   beforeAll(() => {
     etat.apres.length = 0;
@@ -256,6 +279,36 @@ describe("livrer et reprendre", () => {
     expect((await livrer(achat.id)).effet).toBe("annule");
     expect(await soldeDe(u.id)).toBe(-1);
     expect(await estClient(u)).toBe(false);
+  });
+
+  it("deux achats payés du même rapport : l’un remboursé pendant que l’autre se livre, la conv reste ouverte (payée par l’autre)", async () => {
+    const u = await compteDeTest("reprendre-croise");
+    const id = await conv(u);
+    const [a, b] = [await commande(u, "rapport", { storyId: id, fournisseur: "factice" }), await commande(u, "rapport", { storyId: id, fournisseur: "factice" })];
+    await livrer(b.id);
+    /* Le compte tenu par une autre transaction : la livraison de A attend sur lui, au milieu de sa transaction */
+    let lacher!: () => void;
+    const tenu = new Promise<void>((r) => (lacher = r));
+    let pris!: () => void;
+    const verrouille = new Promise<void>((r) => (pris = r));
+    const bloqueur = db().transaction(async (tx) => {
+      await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, u.id)).for("update");
+      pris();
+      await tenu;
+    });
+    await verrouille;
+    const livraison = livrer(a.id);
+    await new Promise((r) => setTimeout(r, 150));
+    /* Pendant ce temps, B est remboursé : A n’est pas encore payé aux yeux de sa transaction */
+    const reprise = reprendre(b.id, "rembourse");
+    await new Promise((r) => setTimeout(r, 150));
+    lacher();
+    await bloqueur;
+    expect((await livraison).effet).toBe("livre");
+    expect((await reprise).effet).toBe("repris");
+    expect((await achatEnBase(a.id)).statut).toBe("paye");
+    expect(await rapportOuvertEnBase(id)).toBe(true);
+    expect(await soldeDe(u.id)).toBe(10);
   });
 
   it("un achat jamais livré : repris sans rien reprendre ; un paiement refusé ne passe qu’un achat en attente", async () => {

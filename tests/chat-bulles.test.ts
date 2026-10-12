@@ -414,6 +414,29 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect((await lire(r.verrouillee!.message)).status).toBe(402);
   });
 
+  it("rechargé sans la lire, la réponse suivante ne la reçoit pas dans son fil : BLUSH ne peut pas la redire pour moins cher", async () => {
+    const { u } = await parleur("verrou-fil", 0);
+    await fluxDe(await envoyer("des captures de notre conv, je réponds quoi ?"));
+    await lancerApres();
+    const v = await derniereVerrouillee(u.id);
+    const [gardee] = await db().select({ data: schema.chatMessages.data }).from(schema.chatMessages).where(eq(schema.chatMessages.id, v.id));
+    const textes = coffre
+      .lire("chat_messages.data:blush", gardee!.data)
+      .resume.split(" / ")
+      .filter((t) => t.length > 3);
+    expect(textes.length).toBeGreaterThan(0);
+    await donnerDesBulles(u, 5);
+    let envoye = "";
+    chat = (req) => ((envoye = JSON.stringify(req.blocs)), fournisseurFactice(req));
+    const suivante = reponseDu((await fluxDe(await envoyer("tu disais quoi juste avant ?"))).evenements);
+    await lancerApres();
+    expect(suivante.verrouillee).toBeUndefined();
+    /* Son message est dans le fil (c’est le sien), la réponse verrouillée non */
+    expect(envoye).toContain("des captures de notre conv");
+    for (const t of textes) expect(envoye.includes(JSON.stringify(t).slice(1, -1)), "la réponse verrouillée est partie au modèle").toBe(false);
+    expect(await reponseVerrouillee(u.id)).toEqual(v);
+  });
+
   it("la réponse d’un autre compte ne se lit pas", async () => {
     const autre = await parleur("verrou-autre", 0);
     await fluxDe(await envoyer("à moi"));

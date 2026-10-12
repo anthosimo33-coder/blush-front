@@ -99,18 +99,33 @@ export async function commander(
   return achat!;
 }
 
+/**
+ * Verrouille la ligne de la conv dans la transaction d’une livraison ou d’une reprise : deux achats de la même conv,
+ * l’un livré pendant que l’autre est repris, passent l’un après l’autre. Sans lui, la reprise ne voit pas l’autre achat
+ * payé (sa transaction n’est pas finie) et re-verrouille un rapport bel et bien payé.
+ */
+const verrouillerLaConv = (tx: Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0], storyId: string) =>
+  tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
+
 /** Ce que le prestataire dit du paiement à la livraison : ses identifiants, à garder sur l’achat (le paiement en un geste). */
 export type Paiement = { paiementId?: string | null; checkoutId?: string | null; membreId?: string | null; moyenId?: string | null };
 
-/** Ce qu’une livraison a fait : livré, déjà livré, rien (l’achat est déjà repris, ou inconnu). `debloquee` : la conv vient de s’ouvrir. */
-export type Livraison = { effet: "livre" | "deja" | "annule" | "inconnu"; achat: Achat | null; debloquee: boolean };
+/**
+ * Ce qu’une livraison a fait : livré, déjà livré, rien (l’achat est déjà repris, ou inconnu), ou rien parce que l’offre
+ * unique à prix réduit dont il profite a déjà été prise par un autre achat (« offre » : l’achat reste en attente, à
+ * rembourser). `debloquee` : la conv vient de s’ouvrir.
+ */
+export type Livraison = { effet: "livre" | "deja" | "annule" | "inconnu" | "offre"; achat: Achat | null; debloquee: boolean };
 
 /**
  * Livre un achat payé, une fois, dans une transaction : l’achat passe « paye » (avec les identifiants du paiement), sa
  * conv se débloque, ses bulles sont créditées, l’offre unique dont il profite est prise (et le mail de relance de cette
  * conv, s’il a été envoyé, compte comme pris). Rejouée : « deja », rien ne change. Un achat déjà remboursé ou contesté
- * (le webhook du remboursement arrivé avant celui du paiement) n’est pas livré. Une fois la conv débloquée, la chaîne
- * du rapport repart après la réponse (reparerLaChaine, comme au déblocage d’avant).
+ * (le webhook du remboursement arrivé avant celui du paiement) n’est pas livré. Une offre unique ne profite qu’à un
+ * achat : deux commandes passées tant qu’elle valait (deux onglets, un nouvel essai), payées toutes les deux, n’en
+ * livrent qu’une à son prix réduit. L’autre n’est pas livrée (« offre », l’achat reste en attente : à rembourser), sauf
+ * la première recharge, payée au prix normal du pack : livrée sans son bonus. Une fois la conv débloquée, la chaîne du
+ * rapport repart après la réponse (reparerLaChaine, comme au déblocage d’avant).
  */
 export async function livrer(achatId: string, paiement: Paiement = {}): Promise<Livraison> {
   const r = await db().transaction(async (tx): Promise<Livraison> => {
@@ -118,9 +133,28 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
     if (!achat) return { effet: "inconnu", achat: null, debloquee: false };
     if (achat.statut === "paye") return { effet: "deja", achat, debloquee: false };
     if (achat.statut === "rembourse" || achat.statut === "conteste") return { effet: "annule", achat, debloquee: false };
+    const { userId, storyId } = achat;
+    const o = schema.offresUniques;
+    /*
+     * L’offre unique dont il profite, prise ici, une fois : sa ligne se verrouille (deux achats de la même offre livrés en
+     * même temps passent l’un après l’autre). Déjà prise par un autre achat : ni le prix réduit, ni le bonus
+     */
+    let bulles = achat.bulles;
+    if (userId && achat.offreUnique) {
+      const prise = await tx
+        .update(o)
+        .set({ priseLe: sql`now()` })
+        .where(and(eq(o.userId, userId), eq(o.offre, achat.offreUnique), isNull(o.priseLe)))
+        .returning({ offre: o.offre });
+      if (!prise.length) {
+        if (achat.offreUnique !== "premiere_recharge") return { effet: "offre", achat, debloquee: false };
+        bulles = bullesDe(achat.offre);
+      }
+    }
     const [paye] = await tx
       .update(a)
       .set({
+        bulles,
         statut: "paye",
         payeLe: sql`now()`,
         annuleLe: null,
@@ -131,11 +165,11 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
       })
       .where(eq(a.id, achatId))
       .returning();
-    const { userId, storyId } = achat;
     if (!userId) return { effet: "livre", achat: paye!, debloquee: false };
     let debloquee = false;
     if (storyId) {
       const s = schema.stories;
+      await verrouillerLaConv(tx, storyId);
       const ouvertes = await tx
         .update(s)
         .set({ debloqueLe: sql`now()` })
@@ -143,13 +177,7 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         .returning({ id: s.id });
       debloquee = ouvertes.length > 0;
     }
-    if (achat.bulles > 0) await mouvementDans(tx, userId, achat.bulles, "achat", achat.id);
-    const o = schema.offresUniques;
-    if (achat.offreUnique)
-      await tx
-        .update(o)
-        .set({ priseLe: sql`now()` })
-        .where(and(eq(o.userId, userId), eq(o.offre, achat.offreUnique), isNull(o.priseLe)));
+    if (bulles > 0) await mouvementDans(tx, userId, bulles, "achat", achat.id);
     if (storyId && CATALOGUE[achat.offre].conv)
       await tx
         .update(o)
@@ -188,6 +216,8 @@ export async function reprendre(achatId: string, statut: "rembourse" | "conteste
     const { userId, storyId } = achat;
     if (storyId) {
       const s = schema.stories;
+      /* Verrouillée d’abord : un autre achat de cette conv en train d’être livré a fini, et compte comme payé ci-dessous */
+      await verrouillerLaConv(tx, storyId);
       const autre = tx
         .select({ un: sql`1` })
         .from(a)

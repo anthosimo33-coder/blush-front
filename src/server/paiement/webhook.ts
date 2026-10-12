@@ -34,7 +34,7 @@ async function achatDuPaiement(paiementId: string): Promise<Achat | null> {
 }
 
 /** Ce qu’a fait une livraison demandée par un paiement : celle du socle (livrer), ou pourquoi rien n’est livré. */
-export type LivraisonDuPaiement = "livre" | "deja" | "annule" | "inconnu" | "autre" | "montant";
+export type LivraisonDuPaiement = "livre" | "deja" | "annule" | "inconnu" | "autre" | "montant" | "offre";
 
 /**
  * Livre l’achat que ce paiement paie, s’il colle : l’achat de ses métadonnées existe et vient de ce prestataire (`mode`),
@@ -69,6 +69,18 @@ export async function livrerLePaiement(mode: Fournisseur["mode"], p: PaiementWho
     return "montant";
   }
   const r = await livrer(achat.id, { paiementId: p.id, checkoutId: p.checkoutId, membreId: p.membreId, moyenId: p.moyenId });
+  /* Une offre unique payée deux fois (deux commandes passées tant qu’elle valait) : la seconde n’est pas livrée */
+  if (r.effet === "offre")
+    after(() =>
+      alerter(
+        "paiement : offre unique déjà prise",
+        [
+          `L’achat ${achat.id} (${achat.offre}, paiement ${p.id}) profite de l’offre unique « ${achat.offreUnique} », déjà prise par un autre achat de ce compte.`,
+          "Rien n’est livré : ce paiement est à rembourser chez Whop.",
+        ],
+        { importante: true },
+      ),
+    );
   /* Déjà livré par un autre paiement (la même page payée deux fois) : celui-ci a été encaissé pour rien */
   const autre = r.achat?.paiementId;
   if (r.effet === "deja" && autre && autre !== p.id)
