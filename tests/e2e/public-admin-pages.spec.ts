@@ -120,8 +120,9 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   await expect(main.getByText("Rien ne sort sans toi")).toBeVisible();
   await expect(main.getByText(/ton verdict, par un lien, ou en image une réponse de BLUSH/)).toBeVisible();
   await expect(main.getByText("BLUSH est réservé aux plus de 18 ans.")).toBeVisible();
-  /* Le CAPTCHA, nommé comme l’hébergement et les mails */
-  await expect(main.getByText(/La vérification anti-robot, quand tu demandes un code ou envoies ta conv/)).toBeVisible();
+  /* Le CAPTCHA, nommé comme l’hébergement et les mails : ce qu’il voit (« Pas de robots »), et sa ligne parmi les prestataires */
+  await expect(main.getByText(/Cloudflare vérifie que tu n’es pas un robot/)).toBeVisible();
+  await expect(main.getByText("La vérification anti-robots, aux États-Unis")).toBeVisible();
   await expect(main.getByRole("link", { name: /Une question\s*\? Écris-nous/ })).toHaveAttribute("href", "mailto:bonjour@askblush.com");
   /* Les prestataires d’IA et de voix ne sont jamais nommés (choix du 9 octobre 2026) */
   const texte = await main.innerText();
