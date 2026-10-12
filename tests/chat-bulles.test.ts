@@ -287,9 +287,16 @@ describe("POST /api/chat, avec des bulles", () => {
 
   it("« Ta question » est une réponse du chat comme une autre : 1 bulle", async () => {
     const { u } = await parleur("bulles-question", 1);
-    const r = reponseDu((await fluxDe(await envoyer("il pense à moi ?", { question: true }))).evenements);
+    const cle = randomUUID();
+    const r = reponseDu((await fluxDe(await envoyer("il pense à moi ?", { question: true, cle }))).evenements);
     await lancerApres();
     expect(r.bulles).toEqual({ depensees: 1, restantes: 0 });
+    expect(await soldeDe(u.id)).toBe(0);
+    /* Renvoyée après une coupure (l’écran la renvoie avec sa clé) : la réponse déjà écrite, sans second débit ni appel */
+    const encore = await reponseDe(await envoyer("il pense à moi ?", { question: true, cle }));
+    await lancerApres();
+    expect(appels).toBe(1);
+    expect(encore.echange).toBe(r.echange);
     expect(await soldeDe(u.id)).toBe(0);
   });
 

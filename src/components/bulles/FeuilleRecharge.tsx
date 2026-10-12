@@ -1,17 +1,14 @@
 "use client";
 
-import type { Route } from "next";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useState, useTransition } from "react";
-import { codeDe } from "@/lib/messages-erreur";
-import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
+import { useEffect, useId, useState } from "react";
 import { proposerOffreUnique } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import { CaseRenonciation, useCase } from "@/components/juridique/cases";
+import { CaseRenonciation } from "@/components/juridique/cases";
+import { usePaiement } from "@/components/paiement/usePaiement";
 import { lePack, PACK_CONSEILLE, PACKS, RECHARGE, type Pack } from "@/contenu/recharge";
 import { Grappe } from "./perles";
 import { LigneOfferte, Option } from "./pieces";
@@ -20,7 +17,9 @@ import { LigneOfferte, Option } from "./pieces";
  * La recharge (le prototype validé des bulles, 12 octobre) : trois packs, le conseillé choisi d’avance et ouvert, et le
  * bonus de la première recharge (④) quand le serveur le montre (POST /api/paiement/offre : une fois par compte, jamais
  * le même jour qu’une autre offre unique). Puis la case de renonciation, et le paiement : la page de Whop (ou le faux
- * Whop en local), d’où l’on revient où la recharge a été ouverte (`suite`).
+ * Whop en local), d’où l’on revient où la recharge a été ouverte (`suite`). Payer passe par usePaiement, comme les
+ * autres feuilles qui font payer : la case exigée, le bouton occupé (libéré au retour de chez Whop par « Retour »), et
+ * ce qu’on dit quand rien ne part (la case périmée, le paiement pas encore branché, le reste).
  */
 
 /** Le bonus ④ : pas encore demandé au serveur, montré par lui, ou pas pour ce compte. */
@@ -46,19 +45,9 @@ export function FeuilleRecharge({
   suite: (bulles: number) => string;
   belowHeader?: boolean;
 }) {
-  const router = useRouter();
   const titre = useId();
   const [choisi, setChoisi] = useState<Pack>(PACK_CONSEILLE);
   const [bonus, setBonus] = useState<Bonus>("inconnu");
-  const renonciation = useCase();
-  const [busy, setBusy] = useState(false);
-  /* Revenu de chez Whop par « Retour » sans payer : le bouton se libère */
-  useLibererAuRetour(useCallback(() => setBusy(false), []));
-  /* Le faux Whop (une page de l’appli) : le bouton reste occupé jusqu’à son arrivée */
-  const [navigue, demarrer] = useTransition();
-  const occupe = busy || navigue;
-  const [bientot, setBientot] = useState(false);
-  const [souci, setSouci] = useState(false);
 
   /* Ouverte : le serveur dit si le bonus de la première recharge vaut pour ce compte (une fois demandé, il reste su) */
   useEffect(() => {
@@ -75,21 +64,8 @@ export function FeuilleRecharge({
 
   const premiere = bonus === "oui";
   const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p, premiere)])) as Record<Pack, ReturnType<typeof lePack>>;
-
-  const payer = async () => {
-    if (!renonciation.exiger()) return;
-    setBusy(true);
-    setSouci(false);
-    try {
-      await partirPayer(choisi, { renonciation: true, suite: suite(packs[choisi].total), aller: (adresse) => demarrer(() => router.push(adresse as Route)) });
-    } catch (e) {
-      /* Sans paiement branché (ni Whop, ni le faux Whop) : rien ne s’achète encore */
-      setBusy(false);
-      if (codeDe(e) === "bientot") setBientot(true);
-      else setSouci(true);
-    }
-    /* Parti : le bouton reste occupé jusqu’à ce que la page s’en aille (celle de Whop, ou le faux Whop par le routeur) */
-  };
+  /* La suite d’après le pack choisi : ses bulles (le mot « +N bulles » du retour, que le serveur corrige s’il le faut) */
+  const paiement = usePaiement({ suite: suite(packs[choisi].total) });
 
   /** Le tag rose d’un pack qui offre des bulles (« +10 offertes »), à côté de son titre. */
   const tag = (p: Pack) => {
@@ -138,14 +114,14 @@ export function FeuilleRecharge({
         })}
       </RadioGroup>
       <div className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
-        {bientot && (
+        {paiement.refus === "bientot" && (
           <p role="status" className="m-0 text-center text-note font-extrabold leading-[1.45] text-soft">
             {RECHARGE.bientot}
           </p>
         )}
-        {souci && <Alert className="text-center leading-[1.45]">{RECHARGE.souci}</Alert>}
-        <CaseRenonciation quoi="bulles" etat={renonciation} />
-        <Button arrow loading={occupe} loadingLabel={RECHARGE.enCours} onClick={() => void payer()}>
+        {paiement.refus === "souci" && <Alert className="text-center leading-[1.45]">{RECHARGE.souci}</Alert>}
+        <CaseRenonciation quoi="bulles" etat={paiement.renonciation} />
+        <Button arrow loading={paiement.occupe} loadingLabel={RECHARGE.enCours} onClick={() => void paiement.payer(choisi)}>
           {RECHARGE.payer(packs[choisi].prix)}
         </Button>
         <span className="text-center text-micro font-extrabold text-grey">

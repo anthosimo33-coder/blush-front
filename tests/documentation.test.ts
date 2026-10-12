@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Env } from "@/server/env";
@@ -6,6 +6,7 @@ import { Env } from "@/server/env";
 /*
  * BACKEND.md suit le code, sans base : chaque route de src/app/api (avec ses méthodes) et chaque variable du schéma Env
  * y ont leur ligne, et la doc n’en cite aucune qui n’existe plus. Une route ou une variable ajoutée arrive avec sa ligne.
+ * Et les cartes du dépôt (README.md, BACKEND.md, AGENTS.md) ne nomment ni un chemin ni un nom de code retirés.
  */
 const RACINE = join(__dirname, "..");
 const DOC = readFileSync(join(RACINE, "BACKEND.md"), "utf8");
@@ -93,5 +94,53 @@ describe("BACKEND.md", () => {
       documentees.filter((v) => !schema.includes(v)),
       "variables du tableau absentes du schéma Env (src/server/env.ts)",
     ).toEqual([]);
+  });
+});
+
+/* ———— Les cartes du dépôt : ce qu’elles nomment existe ———— */
+
+/** Les cartes que lisent les agents et l’équipe avant le code. */
+const CARTES = ["README.md", "BACKEND.md", "AGENTS.md"] as const;
+
+/** Les noms cités entre accents graves qui ne sont pas du code : une commande du terminal. */
+const HORS_DU_CODE = new Set(["uptime"]);
+
+/** Tout le texte du code et de sa configuration (src, scripts, tests, prompts/lib, .github, les fichiers de la racine), sans ce fichier. */
+function texteDuCode(): string {
+  const morceaux: string[] = [];
+  const lire = (chemin: string) => morceaux.push(readFileSync(chemin, "utf8"));
+  const parcourir = (dossier: string) => {
+    for (const e of readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = join(dossier, e.name);
+      if (e.isDirectory()) {
+        if (e.name !== "node_modules") parcourir(chemin);
+      } else if (/\.(ts|tsx|mts|mjs|js|json|ya?ml|sql)$/.test(e.name) && chemin !== __filename) lire(chemin);
+    }
+  };
+  for (const dossier of ["src", "scripts", "tests", "prompts/lib", ".github"]) parcourir(join(RACINE, dossier));
+  for (const e of readdirSync(RACINE, { withFileTypes: true })) if (e.isFile() && /\.(ts|mts|mjs|json)$/.test(e.name)) lire(join(RACINE, e.name));
+  return morceaux.join("\n");
+}
+
+describe("README.md, BACKEND.md et AGENTS.md", () => {
+  const code = texteDuCode();
+
+  it("ne citent aucun chemin du dépôt qui n’existe plus", () => {
+    const absents = CARTES.flatMap((carte) =>
+      [...readFileSync(join(RACINE, carte), "utf8").matchAll(/`((?:src|scripts|tests|drizzle|\.github)\/[^`\s:,*]+)`/g)]
+        .map((m) => m[1]!.replace(/\/$/, ""))
+        .filter((chemin) => !existsSync(join(RACINE, chemin)))
+        .map((chemin) => `${carte} : ${chemin}`),
+    );
+    expect(absents).toEqual([]);
+  });
+
+  it("ne citent aucun nom de code qui n’existe plus (un type, une constante, une fonction retirés)", () => {
+    const absents = CARTES.flatMap((carte) =>
+      [...new Set([...readFileSync(join(RACINE, carte), "utf8").matchAll(/`([A-Za-z_][A-Za-z0-9_]{3,})(?:\(\))?`/g)].map((m) => m[1]!))]
+        .filter((nom) => !HORS_DU_CODE.has(nom) && !new RegExp(`\\b${nom}\\b`).test(code))
+        .map((nom) => `${carte} : ${nom}`),
+    );
+    expect(absents).toEqual([]);
   });
 });

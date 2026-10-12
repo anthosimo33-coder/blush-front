@@ -195,4 +195,21 @@ describe("la recharge", () => {
     await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
     expect(within(feuille).getByRole("alert").textContent).toBe("Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.");
   });
+
+  it("la case refusée par le serveur (son texte a changé depuis l’ouverture) : recharger la page, et plus aucun paiement avec l’ancienne", async () => {
+    const { feuille } = await ouvrir(false);
+    const kase = within(feuille).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles });
+    fireEvent.click(kase);
+    payer.mockRejectedValueOnce(new ErreurApi("renonciation", 422));
+    await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
+    expect(payer).toHaveBeenCalledOnce();
+    /* Ni « vérifie ta connexion » (réessayer renverrait la même version, refusée sans fin), mais le nouveau texte à lire */
+    expect(within(feuille).queryByText("Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.")).toBeNull();
+    expect(within(feuille).getByText(CASE_RENONCIATION.perimee, { exact: false })).toBeTruthy();
+    expect(within(feuille).getByRole("button", { name: CASE_RENONCIATION.recharger })).toBeTruthy();
+    /* Recochée, elle ne repart pas : l’onglet n’a que l’ancienne version */
+    fireEvent.click(kase);
+    await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
+    expect(payer).toHaveBeenCalledOnce();
+  });
 });
