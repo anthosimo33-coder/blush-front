@@ -28,7 +28,7 @@ export function champsEditeurManquants(editeur: Record<keyof typeof EDITEUR, str
 
 /**
  * L’identité de l’éditeur est-elle complète (les mentions légales et le médiateur de la consommation) ? Tant qu’elle
- * ne l’est pas, la production ne doit pas s’ouvrir au public : l’ouverture (refusEnProduction, src/server/env.ts) s’en
- * servira pour refuser BLUSH_BETA_FERMEE=0.
+ * ne l’est pas, la production ne s’ouvre pas au public : refusEnProduction (src/server/env.ts) refuse BLUSH_BETA_FERMEE=0
+ * en nommant les champs vides (champsEditeurManquants).
  */
 export const editeurComplet = (editeur: Record<keyof typeof EDITEUR, string> = EDITEUR) => champsEditeurManquants(editeur).length === 0;

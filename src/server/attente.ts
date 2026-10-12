@@ -10,6 +10,7 @@ import { empreinteDeLaListe, entre } from "./invitations";
 import { compteDe, LIMITES, plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { journalErreur } from "./journal";
 import { mailAttente } from "./mail-attente";
+import { INVITATIONS_PAR_LOT } from "@/lib/limites";
 
 /**
  * Combien de temps une inscription reste sur la liste (S-30) : au-delà, la purge de nuit l’efface (purgerLaListe), et
@@ -62,9 +63,6 @@ export async function purgerLaListe(maintenant = new Date()): Promise<void> {
 
 /* Le compteur du jour des mails de la liste (inscriptions et invitations ensemble) : plafondsDesMails().attente */
 const MAILS_DE_LA_LISTE = "attente:mails";
-
-/** Au plus, les invitations d’un lot (une action de /admin) : le plafond des mails de la liste les arrête souvent avant. */
-export const INVITATIONS_PAR_LOT = 50;
 
 /** Ce qu’un lot d’invitations a fait : les mails partis, ceux qui restent à inviter, et si le plafond des mails du jour l’a arrêté. */
 export type LotInvite = { invites: number; restent: number; plafond: boolean };

@@ -1,7 +1,10 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
+import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique } from "@/types";
+import { etatDeLaListe } from "./attente";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
+import { actionsRecentes, type ActionRecente } from "./equipe";
 import { PERIME_S } from "./taches";
 
 /*
@@ -12,6 +15,16 @@ import { PERIME_S } from "./taches";
 export type Periode = 1 | 7 | 30;
 /** Un chiffre sur la période, et sur la période d’avant (pour la tendance). */
 export type Chiffre = { valeur: number; avant: number };
+
+/** Des achats : combien, et leur montant TTC en centimes d’euro. */
+export type Montant = { n: number; centimes: number };
+/**
+ * Les ventes d’une fenêtre (aujourd’hui, ou les 7 derniers jours, en jours de Paris) : les achats payés dans la fenêtre
+ * (même remboursés depuis), ceux remboursés et ceux contestés dans la fenêtre, et les payés par offre.
+ */
+export type Ventes = { payes: Montant; rembourses: Montant; contestes: Montant; parOffre: ({ offre: OffreId } & Montant)[] };
+/** Les bulles d’une fenêtre : vendues (livrées avec un achat), dépensées (les réponses de BLUSH), offertes (la bêta, l’équipe), rendues. */
+export type Bulles = { vendues: number; depensees: number; offertes: number; rendues: number };
 
 export type StatsAdmin = {
   jours: Periode;
@@ -25,8 +38,30 @@ export type StatsAdmin = {
   partage: { ouvertures: number; liens: number; apercus: number; visites: number; essais: number; imports: number; actifs: number };
   couts: { total: number; avant: number; parRapport: number | null; parVerdict: number | null; postes: { nom: string; dollars: number; appels: number }[] };
   sante: { echecs: { code: string; n: number }[]; enCours: number; bloquees: number; enAttente: number };
-  beta: { fermee: boolean; invites: number | "tous"; attente: number; attenteNouveaux: number; comptes: number };
+  beta: {
+    fermee: boolean;
+    invites: number | "tous";
+    attente: number;
+    attenteNouveaux: number;
+    comptes: number;
+    /** Les inscrits de la liste déjà invités depuis /admin, et les mails de la liste qui peuvent encore partir aujourd’hui. */
+    attenteInvites: number;
+    mailsPossibles: number;
+  };
+  /** Aujourd’hui et les 7 derniers jours (jours de Paris), quelle que soit la période choisie. */
+  ventes: { jour: Ventes; semaine: Ventes };
+  bulles: { jour: Bulles; semaine: Bulles };
+  /** Les commandes créées sur la période (achats.cree_le), et ce qu’elles sont devenues. */
+  achats: { commandes: number; comptes: number; payees: number; echouees: number; enAttente: number };
+  /** Les offres uniques montrées sur la période, et combien de celles-là ont été prises. */
+  offresUniques: { offre: OffreUnique; montrees: number; prises: number }[];
+  /** Les derniers gestes de l’équipe (/admin, le terminal). */
+  actions: ActionRecente[];
 };
+
+/* Le début du jour de Paris, et celui des 7 derniers jours (aujourd’hui compris) */
+const DEBUT_DU_JOUR = sql.raw(`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`);
+const DEBUT_DE_LA_SEMAINE = sql.raw(`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris' - interval '6 days')`);
 
 const lignes = async <T>(q: SQL) => (await db().execute(q)).rows as T[];
 /** La ligne d’un agrégat (count, sum sans group by) : il en rend toujours une. */
@@ -99,6 +134,22 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users) as comptes`),
   ]);
 
+  const [ventes, bulles, achats, offresUniques, liste, actions] = await Promise.all([
+    Promise.all([ventesDepuis(DEBUT_DU_JOUR), ventesDepuis(DEBUT_DE_LA_SEMAINE)]),
+    Promise.all([bullesDepuis(DEBUT_DU_JOUR), bullesDepuis(DEBUT_DE_LA_SEMAINE)]),
+    ligne<{ commandes: string; comptes: string; payees: string; echouees: string; en_attente: string }>(
+      sql`select count(*) as commandes, count(distinct user_id) as comptes, count(*) filter (where paye_le is not null) as payees,
+            count(*) filter (where statut = 'echoue') as echouees, count(*) filter (where statut = 'en_attente') as en_attente
+          from achats where ${dans("cree_le")}`,
+    ),
+    lignes<{ offre: OffreUnique; montrees: string; prises: string }>(
+      sql`select offre, count(*) as montrees, count(*) filter (where prise_le is not null) as prises from offres_uniques where ${dans("montree_le")} group by offre`,
+    ),
+    etatDeLaListe(),
+    actionsRecentes(),
+  ]);
+  const ou = new Map(offresUniques.map((r) => [r.offre, r]));
+
   const c = new Map(compteurs.map((r) => [r.key, n(r.total)]));
   const dollars = (micros: number) => micros / 1e6;
   const total = couts.reduce((s, r) => s + n(r.micros), 0);
@@ -138,6 +189,51 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
       attente: n(totaux.attente),
       attenteNouveaux: attente.valeur,
       comptes: n(totaux.comptes),
+      attenteInvites: liste.invites,
+      mailsPossibles: liste.mailsPossibles,
     },
+    ventes: { jour: ventes[0], semaine: ventes[1] },
+    bulles: { jour: bulles[0], semaine: bulles[1] },
+    achats: { commandes: n(achats.commandes), comptes: n(achats.comptes), payees: n(achats.payees), echouees: n(achats.echouees), enAttente: n(achats.en_attente) },
+    offresUniques: OFFRES_UNIQUES.map((offre) => ({ offre, montrees: n(ou.get(offre)?.montrees), prises: n(ou.get(offre)?.prises) })),
+    actions,
   };
+}
+
+/**
+ * Les ventes depuis `debut` : les achats payés depuis (même remboursés ou contestés ensuite), ceux remboursés ou contestés
+ * depuis (s’ils avaient été payés : une commande jamais payée puis annulée ne compte pas), et les payés par offre, dans
+ * l’ordre du catalogue. Les montants sont TTC (le prix payé, figé à la commande).
+ */
+async function ventesDepuis(debut: SQL): Promise<Ventes> {
+  const r = await ligne<Record<"payes" | "payes_c" | "rembourses" | "rembourses_c" | "contestes" | "contestes_c", string | null>>(
+    sql`select count(*) filter (where paye_le >= ${debut}) as payes, sum(centimes) filter (where paye_le >= ${debut}) as payes_c,
+          count(*) filter (where statut = 'rembourse' and annule_le >= ${debut}) as rembourses,
+          sum(centimes) filter (where statut = 'rembourse' and annule_le >= ${debut}) as rembourses_c,
+          count(*) filter (where statut = 'conteste' and annule_le >= ${debut}) as contestes,
+          sum(centimes) filter (where statut = 'conteste' and annule_le >= ${debut}) as contestes_c
+        from achats where paye_le is not null`,
+  );
+  const parOffre = await lignes<{ offre: OffreId; n: string; centimes: string }>(
+    sql`select offre, count(*) as n, sum(centimes) as centimes from achats where paye_le >= ${debut} group by offre`,
+  );
+  const po = new Map(parOffre.map((l) => [l.offre, l]));
+  return {
+    payes: { n: n(r.payes), centimes: n(r.payes_c) },
+    rembourses: { n: n(r.rembourses), centimes: n(r.rembourses_c) },
+    contestes: { n: n(r.contestes), centimes: n(r.contestes_c) },
+    parOffre: OFFRES.filter((o) => po.has(o)).map((offre) => ({ offre, n: n(po.get(offre)?.n), centimes: n(po.get(offre)?.centimes) })),
+  };
+}
+
+/** Les bulles depuis `debut`, d’après leur journal (mouvements_bulles) : chaque raison a son sens. */
+async function bullesDepuis(debut: SQL): Promise<Bulles> {
+  const r = await ligne<Record<keyof Bulles, string | null>>(
+    sql`select coalesce(sum(delta) filter (where raison = 'achat'), 0) as vendues,
+          coalesce(-sum(delta) filter (where raison = 'reponse'), 0) as depensees,
+          coalesce(sum(delta) filter (where raison in ('beta', 'equipe') and delta > 0), 0) as offertes,
+          coalesce(sum(delta) filter (where raison = 'rendu'), 0) as rendues
+        from mouvements_bulles where cree_le >= ${debut}`,
+  );
+  return { vendues: n(r.vendues), depensees: n(r.depensees), offertes: n(r.offertes), rendues: n(r.rendues) };
 }

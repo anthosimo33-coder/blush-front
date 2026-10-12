@@ -56,6 +56,7 @@ const APPLI = "http://localhost";
 const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/attente",
   "POST /api/attente/retrait",
+  "POST /api/desinscription",
   "POST /api/auth/code",
   "POST /api/auth/deconnexion",
   "POST /api/auth/verifier",
@@ -68,10 +69,11 @@ const SANS_COMPTE = new Set<CleRoute>([
   "DELETE /api/histoire",
 ]);
 /**
- * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron, le réveil qui ne dit rien,
- * et le webhook de Whop (sa signature : Whop n’est pas l’appli, sa requête n’a pas notre origine).
+ * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, et les relances
+ * que la veille de GitHub appelle), le réveil qui ne dit rien, et le webhook de Whop (sa signature : Whop n’est pas
+ * l’appli, sa requête n’a pas notre origine).
  */
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil", "POST /api/paiement/whop"]);
+const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
@@ -85,8 +87,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 28 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(28);
+  it("la table compte 30 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(30);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 

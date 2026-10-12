@@ -50,7 +50,45 @@ export default async function Page({ searchParams }: PageProps<"/apercu/admin">)
             bloquees: 1,
             enAttente: 1,
           },
-    beta: { fermee: true, invites: 12, attente: 87, attenteNouveaux: 9, comptes: 31 },
+    beta: { fermee: true, invites: 12, attente: 87, attenteNouveaux: 9, comptes: 31, attenteInvites: 25, mailsPossibles: 14 },
+    ventes: {
+      jour: {
+        payes: { n: 4, centimes: 4460 },
+        rembourses: { n: 0, centimes: 0 },
+        contestes: { n: 0, centimes: 0 },
+        parOffre: [
+          { offre: "rapport", n: 2, centimes: 1980 },
+          { offre: "premium", n: 1, centimes: 1490 },
+          { offre: "pack80", n: 1, centimes: 990 },
+        ],
+      },
+      semaine: {
+        payes: { n: 23, centimes: 26170 },
+        rembourses: { n: 1, centimes: 990 },
+        contestes: { n: 0, centimes: 0 },
+        parOffre: [
+          { offre: "rapport", n: 9, centimes: 8910 },
+          { offre: "premium", n: 6, centimes: 8940 },
+          { offre: "suite", n: 3, centimes: 2070 },
+          { offre: "premium_ajout", n: 2, centimes: 1000 },
+          { offre: "pack80", n: 2, centimes: 1980 },
+          { offre: "pack200", n: 1, centimes: 1990 },
+        ],
+      },
+    },
+    bulles: { jour: { vendues: 220, depensees: 96, offertes: 0, rendues: 2 }, semaine: { vendues: 1310, depensees: 704, offertes: 150, rendues: 9 } },
+    achats: { commandes: 38, comptes: 31, payees: 23, echouees: 3, enAttente: 12 },
+    offresUniques: [
+      { offre: "suite", montrees: 14, prises: 3 },
+      { offre: "relance_mail", montrees: 9, prises: 2 },
+      { offre: "premium_ajout", montrees: 11, prises: 2 },
+      { offre: "premiere_recharge", montrees: 4, prises: 2 },
+    ],
+    actions: [
+      { action: "inviter", nombre: 10, le: "2026-10-08T09:12:00.000Z", depuisLeTerminal: false },
+      { action: "bulles", nombre: 50, le: "2026-10-07T17:40:00.000Z", depuisLeTerminal: false },
+      { action: "debloquer", nombre: 1, le: "2026-10-07T11:03:00.000Z", depuisLeTerminal: true },
+    ],
   };
   return <AdminScreen s={s} base="/apercu/admin" />;
 }

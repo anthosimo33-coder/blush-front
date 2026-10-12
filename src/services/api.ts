@@ -726,3 +726,23 @@ export async function retirerDeLaListe(lien: { id: string; cle: string }): Promi
     return e instanceof ErreurApi && e.status === 404 ? "lien" : "echec";
   }
 }
+
+/* ———— Les relances par mail ———— */
+
+/**
+ * Couper les relances par mail de son compte, depuis le lien signé de la relance : `coupees`, `lien` (il ne mène à rien :
+ * 404) ou `echec` (le réseau, le serveur : on peut réessayer).
+ */
+export async function couperLesRelances(lien: { id: string; cle: string }): Promise<"coupees" | "lien" | "echec"> {
+  try {
+    await appel("POST /api/desinscription", { corps: lien });
+    return "coupees";
+  } catch (e) {
+    return e instanceof ErreurApi && e.status === 404 ? "lien" : "echec";
+  }
+}
+
+/* ———— L’équipe (/admin) ———— */
+
+/** Un geste de l’équipe depuis /admin (POST /api/admin) : ce qu’il a fait, ou une ErreurApi. */
+export const gesteDeLEquipe = (geste: Routes["POST /api/admin"]["corps"]) => appel("POST /api/admin", { corps: geste });

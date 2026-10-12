@@ -319,12 +319,14 @@ describe("les offres uniques", () => {
     expect(await commander(u, "suite", { storyId: id, fournisseur: "factice" })).toBe("offre");
   });
 
-  it("jamais deux à moins de 24 h l’une de l’autre, même demandées en même temps ; jamais à l’équipe", async () => {
+  it("jamais deux à moins de 24 h l’une de l’autre, même demandées en même temps ; jamais à l’équipe ; la relance par mail n’y compte pas", async () => {
     const u = await compteDeTest("unique-24h");
-    const ensemble = await Promise.all([montrer(u, "relance_mail"), montrer(u, "premiere_recharge")]);
+    const ensemble = await Promise.all([montrer(u, "premium_ajout"), montrer(u, "premiere_recharge")]);
     expect(ensemble.filter((o) => o !== null)).toHaveLength(1);
     const montree = ensemble.find((o) => o !== null)!.offre;
-    const autre = montree === "relance_mail" ? "premiere_recharge" : "relance_mail";
+    const autre = montree === "premium_ajout" ? "premiere_recharge" : "premium_ajout";
+    /* La relance (②) suit la ① de deux heures par définition (src/server/relances.ts) : elle n’arrête rien, rien ne l’arrête */
+    expect(await montrer(u, "relance_mail")).not.toBeNull();
     expect(await montrer(u, autre)).toBeNull();
     await reculer(u.id, montree, 23 * 3600e3);
     expect(await montrer(u, autre)).toBeNull();

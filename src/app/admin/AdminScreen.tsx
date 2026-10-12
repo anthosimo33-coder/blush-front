@@ -2,14 +2,20 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { DoneCheck, NoteIcone } from "@/components/ui/feedback";
+import { CATALOGUE } from "@/contenu/offres";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
-import type { Chiffre, Periode, StatsAdmin } from "@/server/stats";
+import type { Bulles, Chiffre, Montant, Periode, StatsAdmin, Ventes } from "@/server/stats";
+import type { OffreUnique } from "@/types";
+import { GestesDeLEquipe } from "./GestesDeLEquipe";
 
 /*
  * Le tableau de bord de BLUSH : que des nombres (aucune conv, aucun message, aucun email). Une lecture d’un coup
- * d’œil en haut (les chiffres clés et leur tendance), puis le parcours d’une conv, l’activité jour par jour,
- * le partage, les coûts, la santé et la bêta. Textes relus le 8 octobre (voix de BLUSH).
+ * d’œil en haut (les chiffres clés et leur tendance), puis l’argent (les ventes et les bulles, aujourd’hui et sur 7
+ * jours ; l’entonnoir des achats et les offres uniques, sur la période), le parcours d’une conv, l’activité jour par
+ * jour, le partage, les coûts, la santé, la bêta, et les gestes de l’équipe (des bulles, un rapport offert, des
+ * invitations). Textes relus le 8 octobre (voix de BLUSH) ; ceux de l’argent et des gestes sont nouveaux.
+ * TODO(produit): textes de l’argent et des gestes de l’équipe à valider.
  */
 
 const nombre = (v: number) => v.toLocaleString("fr-FR");
@@ -20,6 +26,7 @@ const PERIODES: [Periode, string][] = [
   [7, "7 jours"],
   [30, "30 jours"],
 ];
+const euros = (centimes: number) => `${(centimes / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
 const nomPeriode = (j: Periode) => (j === 1 ? "la veille" : `les ${j}\u00a0jours d’avant`);
 /** Sous un chiffre clé : contre quoi se lit la tendance, en court (une ligne sur téléphone). */
 const contre = (j: Periode) => (j === 1 ? "vs la veille" : `vs ${j}\u00a0j d’avant`);
@@ -274,9 +281,200 @@ function Pastille2({ label, v }: { label: string; v: number }) {
   );
 }
 
+/** Un montant de ventes : son total TTC, et le nombre d’achats. */
+function MontantDe({ m, signe = "" }: { m: Montant; signe?: string }) {
+  return (
+    <span className="flex flex-col items-end">
+      <span className="text-corps font-black tabular-nums">{m.centimes ? `${signe}${euros(m.centimes)}` : euros(0)}</span>
+      <span className="text-micro font-extrabold text-grey tabular-nums">
+        {nombre(m.n)} achat{m.n > 1 ? "s" : ""}
+      </span>
+    </span>
+  );
+}
+
+/** Les ventes d’aujourd’hui et des 7 jours : payé, remboursé, contesté, ce qui reste ; puis les payés par offre. */
+function LesVentes({ v }: { v: StatsAdmin["ventes"] }) {
+  const reste = (x: Ventes) => x.payes.centimes - x.rembourses.centimes - x.contestes.centimes;
+  const lignes: [string, (x: Ventes) => ReactNode][] = [
+    ["Payé", (x) => <MontantDe m={x.payes} />],
+    ["Remboursé", (x) => <MontantDe m={x.rembourses} signe="−" />],
+    ["Contesté", (x) => <MontantDe m={x.contestes} signe="−" />],
+    ["Reste", (x) => <span className="text-corps font-black tabular-nums">{euros(reste(x))}</span>],
+  ];
+  return (
+    <div className="flex flex-col gap-4">
+      <table className="w-full border-collapse text-left">
+        <caption className="sr-only">Les ventes, en euros TTC</caption>
+        <thead>
+          <tr>
+            <td />
+            <th scope="col" className="pb-1 text-right text-micro font-black text-grey">
+              Aujourd’hui
+            </th>
+            <th scope="col" className="pb-1 text-right text-micro font-black text-grey">
+              7 jours
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map(([nom, cellule], k) => (
+            <tr key={nom} className={cn(k > 0 && "border-t-2 border-sep")}>
+              <th scope="row" className="py-2 text-note font-black">
+                {nom}
+              </th>
+              <td className="py-2 pl-3 text-right">{cellule(v.jour)}</td>
+              <td className="py-2 pl-3 text-right">{cellule(v.semaine)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-micro font-black text-grey">Payés par offre, sur 7 jours</span>
+        {v.semaine.parOffre.length ? (
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {v.semaine.parOffre.map((o) => (
+              <li key={o.offre} className="flex items-center justify-between gap-3 rounded-[14px] bg-[#F8F7F4] px-3.5 py-2">
+                <span className="text-legende font-black">{CATALOGUE[o.offre].titre}</span>
+                <span className="text-legende font-black tabular-nums">
+                  {nombre(o.n)} · {euros(o.centimes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="m-0 text-legende font-extrabold text-grey">Aucune vente sur 7 jours.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Les bulles des 7 jours et d’aujourd’hui, d’après leur journal. */
+function LesBulles({ b }: { b: StatsAdmin["bulles"] }) {
+  const cases: [keyof Bulles, string, string][] = [
+    ["vendues", "Vendues", "avec un achat"],
+    ["depensees", "Dépensées", "des réponses de BLUSH"],
+    ["offertes", "Offertes", "la bêta, l’équipe"],
+    ["rendues", "Rendues", "une erreur, une alerte"],
+  ];
+  return (
+    <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0">
+      {cases.map(([cle, nom, aide]) => (
+        <li key={cle} className="flex flex-col gap-0.5 rounded-[18px] bg-[#F8F7F4] px-3.5 py-3">
+          <span className="text-legende font-black">{nom}</span>
+          <span className="text-[24px] font-black leading-tight tabular-nums">{nombre(b.semaine[cle])}</span>
+          <span className="text-micro font-extrabold text-grey">
+            {nombre(b.jour[cle])} aujourd’hui · {aide}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** L’entonnoir des achats sur la période : les verdicts lus, puis les commandes, puis les payées. */
+function Entonnoir({ a, verdicts }: { a: StatsAdmin["achats"]; verdicts: number }) {
+  const etapes: [string, number][] = [
+    ["Verdicts lus", verdicts],
+    ["Commandes créées", a.commandes],
+    ["Commandes payées", a.payees],
+  ];
+  return (
+    <div className="flex flex-col gap-3">
+      <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+        {etapes.map(([nom, v], k) => (
+          <li key={nom} className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-note font-black">{nom}</span>
+              <span className="flex items-baseline gap-2">
+                {k > 0 && <span className="text-micro font-extrabold text-grey">{pourcent(v, etapes[k - 1]?.[1] ?? 0)} de l’étape d’avant</span>}
+                <span className="text-corps font-black tabular-nums">{nombre(v)}</span>
+              </span>
+            </div>
+            <span className="h-2.5 overflow-hidden rounded-full bg-plaque">
+              <span
+                className="block h-full rounded-full"
+                style={{ width: verdicts ? `${Math.max(2, Math.min(100, (v / verdicts) * 100))}%` : "0%", background: "var(--degrade-lecture)" }}
+              />
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="m-0 text-micro font-extrabold text-grey">
+        {nombre(a.comptes)} compte{a.comptes > 1 ? "s" : ""} {a.comptes > 1 ? "ont" : "a"} commandé · {nombre(a.enAttente)} en attente · {nombre(a.echouees)} échouée
+        {a.echouees > 1 ? "s" : ""}
+      </p>
+    </div>
+  );
+}
+
+/** Les offres uniques, dans l’ordre du parcours : leur numéro et leur nom. */
+const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
+  suite: ["①", "La suite à 6,90\u00a0€, 5 minutes"],
+  relance_mail: ["②", "Le mail «\u00a0Ta suite t’attend\u00a0»"],
+  premium_ajout: ["③", "Premium pour 5\u00a0€ de plus"],
+  premiere_recharge: ["④", "+40 bulles, première recharge"],
+};
+
+/** Les offres uniques montrées sur la période, et combien de celles-là ont été prises. */
+function OffresUniques({ o }: { o: StatsAdmin["offresUniques"] }) {
+  return (
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {o.map((l) => {
+        const [numero, nom] = NOMS_OFFRES_UNIQUES[l.offre];
+        return (
+          <li key={l.offre} className="flex items-center gap-3 rounded-[18px] bg-[#F8F7F4] px-3.5 py-2.5">
+            <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-legende font-black text-ink shadow-soft">
+              {numero}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-note font-black">{nom}</span>
+              <span className="text-micro font-extrabold text-grey">
+                {nombre(l.montrees)} montrée{l.montrees > 1 ? "s" : ""} → {nombre(l.prises)} prise{l.prises > 1 ? "s" : ""}
+              </span>
+            </span>
+            <span className="text-[20px] font-black tabular-nums">{pourcent(l.prises, l.montrees)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Ce que dit une action récente de l’équipe. */
+const ACTIONS: Record<StatsAdmin["actions"][number]["action"], (n: number) => string> = {
+  bulles: (n) => `${n > 0 ? "+" : ""}${nombre(n)} bulle${Math.abs(n) > 1 ? "s" : ""} donnée${Math.abs(n) > 1 ? "s" : ""}`,
+  debloquer: (n) => `${nombre(n)} conv${n > 1 ? "s" : ""} débloquée${n > 1 ? "s" : ""}`,
+  inviter: (n) => `${nombre(n)} invitation${n > 1 ? "s" : ""} de la liste`,
+};
+
+/** Les derniers gestes de l’équipe : quoi, combien, quand. Ni qui, ni pour qui. */
+function Journal({ actions }: { actions: StatsAdmin["actions"] }) {
+  if (!actions.length) return <p className="m-0 text-legende font-extrabold text-grey">Aucun geste de l’équipe pour l’instant.</p>;
+  return (
+    <ul aria-label="Les derniers gestes" className="m-0 flex list-none flex-col p-0">
+      {actions.map((a, k) => (
+        <li key={`${a.le}-${k}`} className={cn("flex items-center justify-between gap-3 py-2", k > 0 && "border-t-2 border-sep")}>
+          <span className="text-legende font-black">{ACTIONS[a.action](a.nombre)}</span>
+          <span className="text-micro font-extrabold text-grey tabular-nums">
+            {new Date(a.le).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })}
+            {a.depuisLeTerminal ? " · terminal" : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Beta({ b }: { b: StatsAdmin["beta"] }) {
   const lignes: [string, ReactNode, string?][] = [
     ["Liste d’attente", nombre(b.attente), b.attenteNouveaux ? `+${nombre(b.attenteNouveaux)} sur la période` : undefined],
+    [
+      "Invités de la liste",
+      nombre(b.attenteInvites),
+      `${nombre(b.mailsPossibles)} mail${b.mailsPossibles > 1 ? "s" : ""} de la liste possible${b.mailsPossibles > 1 ? "s" : ""} aujourd’hui`,
+    ],
     ["Comptes", nombre(b.comptes)],
     ["Invités", b.invites === "tous" ? "tout le monde" : nombre(b.invites), "BLUSH_ACCES_LIBRE"],
   ];
@@ -341,6 +539,18 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: "/ad
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
+          <Carte titre="Ventes" sous="En euros TTC, aujourd’hui et sur 7 jours (heure de Paris)">
+            <LesVentes v={s.ventes} />
+          </Carte>
+          <Carte titre="Bulles" sous="Sur 7 jours, et aujourd’hui">
+            <LesBulles b={s.bulles} />
+          </Carte>
+          <Carte titre="L’entonnoir des achats" sous={`Sur la période\u00a0: les convs lues, puis les commandes`}>
+            <Entonnoir a={s.achats} verdicts={s.parcours.verdict} />
+          </Carte>
+          <Carte titre="Les offres uniques" sous="Montrées sur la période, et prises">
+            <OffresUniques o={s.offresUniques} />
+          </Carte>
           <Carte titre="Le parcours d’une conv" sous="Les convs importées sur la période, et jusqu’où elles sont allées">
             <Parcours p={s.parcours} />
           </Carte>
@@ -359,7 +569,14 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: "/ad
           <Carte titre="Bêta" sous="Qui attend, qui est entré">
             <Beta b={s.beta} />
           </Carte>
+          <Carte titre="Les derniers gestes" sous="De l’équipe, ici ou dans le terminal">
+            <Journal actions={s.actions} />
+          </Carte>
         </div>
+
+        <Carte titre="Gestes de l’équipe" sous="Chacun est noté au journal de l’équipe">
+          <GestesDeLEquipe invitables={s.beta.attente - s.beta.attenteInvites} mailsPossibles={s.beta.mailsPossibles} />
+        </Carte>
 
         <NoteIcone icone="shield" taille={15} className="text-micro leading-[1.5]">
           Que des nombres{NBSP}: aucune conv, aucun message, aucun email n’apparaît ici. Une conv effacée (par son auteur ou par la purge) sort des comptes.

@@ -15,7 +15,7 @@ import { peutEntrer } from "./env";
 export const empreinteDeLaListe = (email: string) => empreinte(`attente:${email.trim().toLowerCase()}`);
 
 /** Cet email est-il sur la liste d’attente, invité par l’équipe ? */
-export async function estInviteDeLaListe(email: string): Promise<boolean> {
+async function estInviteDeLaListe(email: string): Promise<boolean> {
   const w = schema.waitlist;
   const [ligne] = await db()
     .select({ id: w.id })

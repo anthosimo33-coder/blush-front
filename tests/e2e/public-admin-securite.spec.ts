@@ -45,15 +45,25 @@ const WEBHOOK = "/api/paiement/whop";
 const PIRATE = "http://site-pirate.test";
 
 test("les en-têtes de sécurité sur les pages, la page introuvable, les routes /api et les fichiers publics", async ({ request }) => {
-  for (const chemin of ["/", "/confidentialite", "/commencer", "/une-adresse-qui-n-existe-pas", "/api/compte", "/api/cron/purge", "/favicon.ico", "/icon.svg"]) {
+  for (const chemin of [
+    "/",
+    "/confidentialite",
+    "/commencer",
+    "/une-adresse-qui-n-existe-pas",
+    "/api/compte",
+    "/api/cron/purge",
+    "/api/cron/relances",
+    "/favicon.ico",
+    "/icon.svg",
+  ]) {
     const entetes = (await request.get(chemin)).headers();
     for (const [nom, valeur] of Object.entries(ENTETES)) expect.soft(entetes[nom], `${nom} sur ${chemin}`).toBe(valeur);
   }
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 27 routes gardées de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(28);
+  await test.step("les 29 routes gardées de la table du contrat, depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(30);
     for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK)) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
