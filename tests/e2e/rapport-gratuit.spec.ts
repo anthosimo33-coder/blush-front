@@ -1,4 +1,4 @@
-import { CHAPITRES_FERMES, compteDe, emailLibre, expect, fermerLaFeuille, histoiresDe, lectureFaite, ouvrirLeRapport, PAIEMENT, reponseAuGeste, tachesDe, test } from "./aide";
+import { CHAPITRES_FERMES, compteDe, emailLibre, expect, fermerLaFeuille, histoiresDe, lectureFaite, OFFRE_SUITE, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
 
 /*
  * Le rapport d’un compte gratuit (un email hors de BLUSH_ACCES_LIBRE). Décision produit : seul le chapitre 1 (le
@@ -48,7 +48,7 @@ test("compte gratuit : le chapitre 1 se lit en entier, les sept autres sont ferm
   });
 });
 
-test("compte gratuit : le paiement, ses deux formules, et « Débloquer » qui répond que BLUSH est sur invitation", async ({ page }, testInfo) => {
+test("compte gratuit : le paiement, ses deux formules, la case de renonciation, et l’offre unique ① en le fermant", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "rapport-paiement");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
@@ -78,22 +78,42 @@ test("compte gratuit : le paiement, ses deux formules, et « Débloquer » qui r
     await expect(premium).not.toBeChecked();
   });
 
-  await test.step("« Débloquer » : pas de paiement branché, BLUSH le dit, et rien n’est débloqué", async () => {
-    const reponse = await reponseAuGeste(page, { chemin: "/api/debloquer" }, () => paiement.getByRole("button", { name: "Débloquer" }).click());
-    expect(reponse.status()).toBe(402);
-    await expect(paiement.getByRole("status")).toHaveText("Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.");
+  await test.step("« Débloquer » sans la case de renonciation cochée : rien ne part, la case le dit", async () => {
+    const envois: string[] = [];
+    page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/paiement") && envois.push(r.url())));
+    const renonce = paiement.getByRole("checkbox", { name: "Je veux mon rapport tout de suite et je renonce à mon droit de rétractation" });
+    await expect(renonce).not.toBeChecked();
+    await paiement.getByRole("button", { name: "Débloquer" }).click();
+    await expect(paiement.getByRole("alert")).toHaveText("Coche la case pour payer.");
     await expect(page).toHaveURL(/\/rapport$/);
     await expect(paiement.getByRole("button", { name: "Débloquer" })).toBeEnabled();
+    expect(envois).toEqual([]);
     expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
+    /* Cochée, l’avertissement s’en va */
+    await renonce.check();
+    await expect(paiement.getByRole("alert")).toHaveCount(0);
   });
 
-  await test.step("le paiement se ferme, et chaque chapitre fermé le rouvre", async () => {
+  await test.step("fermé sans payer : l’offre unique ① (la suite à 6,90 €, 5 minutes, l’heure de fin donnée par le serveur), une fois", async () => {
     await fermerLaFeuille(page);
     await expect(paiement).toBeHidden();
+    const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
+    await expect(offre).toBeVisible();
+    await expect(offre.getByText("Rien que pour toi, et une seule fois.")).toBeVisible();
+    await expect(offre.getByRole("timer")).toHaveText(/^0[45]:\d\d$/);
+    await expect(offre.getByText("6,90\u00a0€", { exact: true })).toBeVisible();
+    await expect(offre.getByText("9,90\u00a0€", { exact: true })).toBeVisible();
+    await expect(offre.getByRole("button", { name: "Je la prends · 6,90\u00a0€" })).toBeVisible();
+    await offre.getByRole("button", { name: "Non merci" }).click();
+    await expect(offre).toBeHidden();
+  });
+
+  await test.step("chaque chapitre fermé rouvre le paiement ; le refermer ne remontre pas l’offre", async () => {
     await rapport.getByRole("button", { name: /Ce qui coince/ }).click();
     await expect(paiement).toBeVisible();
     await fermerLaFeuille(page);
     await expect(paiement).toBeHidden();
+    await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
   });
 
   await test.step("« Lire la suite » de Mon compte ouvre le rapport avec le paiement déjà ouvert", async () => {

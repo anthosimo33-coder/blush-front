@@ -33,6 +33,7 @@ export function PaywallSheet({
   otherName,
   chapitres,
   next,
+  proposerLaSuite = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -41,6 +42,11 @@ export function PaywallSheet({
   chapitres?: number;
   /** Où reprendre après « C’est débloqué » (par défaut : la suite du rapport). */
   next?: string;
+  /**
+   * Fermée sans payer, proposer l’offre ① (par défaut). Faux quand la fermer quitte la page (le chat, sa fiche, « Ta
+   * question » : on revient au rapport) : l’offre serait montrée, et son compte à rebours lancé, sans que personne la voie.
+   */
+  proposerLaSuite?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Formule>(FORMULE_CHOISIE);
@@ -75,7 +81,7 @@ export function PaywallSheet({
   /* Fermée sans payer : l’offre ①, si le serveur la montre (une fois par compte, jamais deux offres le même jour) */
   const fermer = () => {
     onClose();
-    if (suiteRefusee || occupe) return;
+    if (!proposerLaSuite || suiteRefusee || occupe) return;
     proposerOffreUnique("suite").then(
       (o) => o.offre === "suite" && o.fin && setSuite(o.fin),
       () => {},

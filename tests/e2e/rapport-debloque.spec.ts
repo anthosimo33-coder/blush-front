@@ -1,11 +1,10 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
   attendreMail,
   attendreTaches,
   CHAPITRES_FERMES,
   compteDe,
   connecterParApi,
-  debloquerLaConv,
   emailLibre,
   expect,
   lectureFaite,
@@ -14,15 +13,15 @@ import {
   ouvrir,
   ouvrirLeRapport,
   PAIEMENT,
-  reponseAuGeste,
   tachesDe,
   test,
+  URL_APPLI,
 } from "./aide";
 
 /*
- * Débloquer le rapport d’une conv. Le paiement (Whop) n’est pas encore branché : un compte qui paie se débloque ici par
- * la base, comme un achat livré, puis arrive sur « C’est débloqué » comme au retour du paiement, et retrouve la suite qui
- * s’écrit, et le mail « ton rapport est prêt ». Un compte de l’équipe (un invité) se livre son rapport par « Débloquer ».
+ * Débloquer le rapport d’une conv, en le payant à l’écran : la feuille du paiement, la case de renonciation, la page du
+ * faux Whop (BLUSH_PAIEMENT_FACTICE) et son vrai webhook signé, le retour, puis « C’est débloqué », la suite qui s’écrit,
+ * et le mail « ton rapport est prêt ». Un compte de l’équipe (un invité) n’a rien à payer.
  */
 
 /**
@@ -38,7 +37,18 @@ async function titresDuRapport(rapport: Locator): Promise<string[]> {
 /** Le sommaire du mail « ton rapport est prêt », lu dans son HTML : la pastille du numéro, puis le titre. */
 const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`);
 
-test("un rapport débloqué (un achat livré) : « C’est débloqué », puis la suite de son rapport", async ({ page }, testInfo) => {
+/** Paie à l’écran la formule `nom` (« Le rapport », « Rapport + 60 bulles ») de la feuille ouverte : la case cochée, « Débloquer », puis « Payer » chez le faux Whop. */
+async function payerALecran(page: Page, nom: RegExp): Promise<void> {
+  const paiement = page.getByRole("dialog", { name: PAIEMENT });
+  await paiement.getByRole("radio", { name: nom }).click();
+  await paiement.getByRole("checkbox", { name: /je renonce à mon droit de rétractation/ }).check();
+  await paiement.getByRole("button", { name: "Débloquer" }).click();
+  await expect(page).toHaveURL(/\/paiement\/factice\?achat=/);
+  await page.getByRole("button", { name: "Payer", exact: true }).click();
+  await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/);
+}
+
+test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre ③ (Non merci), puis la suite de son rapport", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "debloque");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
@@ -52,18 +62,29 @@ test("un rapport débloqué (un achat livré) : « C’est débloqué », puis l
     expect(titres).toEqual(["Le verdict", ...CHAPITRES_FERMES]);
   });
 
-  await test.step("l’achat livré, le retour du paiement : « C’est débloqué » dit ce qui vient de s’ouvrir, et son prix", async () => {
-    await debloquerLaConv(email);
-    await ouvrir(page, "/rapport/debloque?offre=rapport");
+  await test.step("« Lire la suite », le rapport seul, la case cochée, « Débloquer », « Payer » chez le faux Whop : « C’est débloqué »", async () => {
+    await rapport.getByRole("button", { name: "Lire la suite" }).click();
+    await payerALecran(page, /^Le rapport/);
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
     await expect(ecran.getByText("Les 8 chapitres sont à toi, pour toujours. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await expect(ecran.getByText("9,90\u00a0€ · Paiement unique, pas d’abonnement")).toBeVisible();
+    await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
+    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
+  });
+
+  await test.step("l’offre ③ juste après : Premium pour 5 € de plus, la carte gardée ; « Non merci » montre ce qui vient de s’ouvrir", async () => {
+    const ecran = page.getByRole("main");
+    const offre = ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" });
+    await expect(offre).toBeVisible();
+    await expect(offre.getByText("80 bulles en plus, comme en Premium. Seules, elles coûtent 9,90\u00a0€.")).toBeVisible();
+    await expect(offre.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();
+    await expect(offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" })).toBeVisible();
+    await offre.getByRole("button", { name: "Non merci, je lis la suite" }).click();
+    await expect(offre).toHaveCount(0);
     await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
     await expect(ecran.getByText("Ta lecture reprend au chapitre 2")).toBeVisible();
     await expect(ecran.getByText("10 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
-    await expect(ecran.getByText("9,90\u00a0€ · Paiement unique, pas d’abonnement")).toBeVisible();
-    await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1 });
   });
 
   await test.step("« Lire la suite » ramène au rapport, complet : les huit chapitres arrivent", async () => {
@@ -82,25 +103,31 @@ test("un rapport débloqué (un achat livré) : « C’est débloqué », puis l
   });
 });
 
-test("un compte de l’équipe : « Débloquer » se livre le rapport sans payer, et mène à « C’est débloqué »", async ({ page }, testInfo) => {
+test("Premium, choisie d’avance : payée à l’écran, 90 bulles, et pas d’offre ③", async ({ page }, testInfo) => {
+  const email = emailLibre(testInfo, "premium");
+  await lectureFaite(page, testInfo, email);
+  await ouvrir(page, "/rapport?paiement=1");
+  const paiement = page.getByRole("dialog", { name: PAIEMENT });
+  await expect(paiement.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toBeChecked();
+  await payerALecran(page, /^Rapport \+ 60 bulles/);
+  const ecran = page.getByRole("main");
+  await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
+  await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
+  await expect(ecran.getByText("14,90\u00a0€ · Paiement unique, pas d’abonnement")).toBeVisible();
+  await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);
+  expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 90 });
+});
+
+test("un compte de l’équipe n’a rien à payer : son rapport est ouvert, et le serveur refuse de le faire payer (409 « deja »)", async ({ page }, testInfo) => {
   const email = await nouvelInvite(testInfo);
   await connecterParApi(page, testInfo, email);
   await lireUneConvParApi(page, testInfo);
   await attendreTaches(email);
-  await ouvrir(page, "/rapport?paiement=1");
-  const paiement = page.getByRole("dialog", { name: PAIEMENT });
-
-  await test.step("le paiement : les deux formules, Premium choisie d’avance", async () => {
-    await expect(paiement.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toBeChecked();
-    await expect(paiement.getByRole("radio", { name: /^Le rapport/ })).not.toBeChecked();
-  });
-
-  await test.step("« Débloquer » : la conv débloquée pour de bon, puis « C’est débloqué »", async () => {
-    const reponse = await reponseAuGeste(page, { chemin: "/api/debloquer" }, () => paiement.getByRole("button", { name: "Débloquer" }).click());
-    expect(reponse.status()).toBe(200);
-    await expect(page).toHaveURL(/\/rapport\/debloque\?offre=premium$/);
-    await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
-    await expect(page.getByRole("main").getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 0 });
-  });
+  const rapport = await ouvrirLeRapport(page);
+  await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
+  for (const offre of ["rapport", "pack30"] as const) {
+    const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: true } });
+    expect([r.status(), await r.json()]).toEqual([409, { erreur: "deja" }]);
+  }
+  expect(await compteDe(email)).toMatchObject({ bulles: 0 });
 });

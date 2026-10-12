@@ -83,7 +83,7 @@ export function AppScreen({
       >
         {children}
       </Screen>
-      {(besoin || ferme) && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} />}
+      {(besoin || ferme) && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} proposerLaSuite={false} />}
     </>
   );
 }

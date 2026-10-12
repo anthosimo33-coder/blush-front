@@ -28,20 +28,18 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
   const titre = useId();
   const finMs = Date.parse(fin);
   const [maintenant, setMaintenant] = useState(() => Date.now());
-  const [ouverte, setOuverte] = useState(true);
+  /* Fermée par « Non merci », le voile ou Échap ; passée, elle se ferme seule (le compte à rebours à zéro) */
+  const [fermee, setFermee] = useState(false);
   const [renonce, setRenonce] = useState(false);
   const [manque, setManque] = useState(false);
   const [occupe, setOccupe] = useState(false);
   const [souci, setSouci] = useState(false);
   const reste = Math.max(0, finMs - maintenant);
+  const ouverte = !fermee && reste > 0;
   useEffect(() => {
     const t = setInterval(() => setMaintenant(Date.now()), 250);
     return () => clearInterval(t);
   }, []);
-  /* L’heure passée : l’offre disparaît */
-  useEffect(() => {
-    if (reste === 0) setOuverte(false);
-  }, [reste]);
 
   const prendre = async () => {
     if (!renonce) return setManque(true);
@@ -52,13 +50,13 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
     } catch (e) {
       setOccupe(false);
       /* Passée entre-temps (« offre ») : elle se ferme ; le reste se dit */
-      if (codeDe(e) === "offre") setOuverte(false);
+      if (codeDe(e) === "offre") setFermee(true);
       else setSouci(true);
     }
   };
 
   return (
-    <Sheet open={ouverte} onClose={() => setOuverte(false)} onClosed={onClose} labelledBy={titre}>
+    <Sheet open={ouverte} onClose={() => setFermee(true)} onClosed={onClose} labelledBy={titre}>
       <div className="flex flex-col items-center gap-2 pt-1 text-center">
         <h2 id={titre} className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em]">
           {OFFRE_SUITE.titre}
@@ -84,7 +82,7 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
         <Button arrow loading={occupe} loadingLabel="Paiement en cours" onClick={() => void prendre()}>
           {OFFRE_SUITE.prendre}
         </Button>
-        <Button variant="link" onClick={() => setOuverte(false)}>
+        <Button variant="link" onClick={() => setFermee(true)}>
           {OFFRE_SUITE.non}
         </Button>
       </div>

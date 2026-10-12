@@ -26,6 +26,7 @@ import {
   ouvrirExportWhatsApp,
   ouvrirLePartage,
   ouvrirLeRapport,
+  OFFRE_SUITE,
   PAIEMENT,
   pageAuRepos,
   pagePrete,
@@ -321,6 +322,12 @@ test("compte gratuit : la lecture finie, la révélation du verdict, le rapport,
     await capturer(page, "rapport-gratuit-paiement");
     await fermerLaFeuille(page);
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeHidden();
+    /* Fermé sans payer : l’offre unique ①, une fois */
+    const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
+    await expect(offre).toBeVisible();
+    await capturer(page, "rapport-gratuit-offre-suite");
+    await offre.getByRole("button", { name: "Non merci" }).click();
+    await expect(offre).toBeHidden();
   });
 
   await test.step("Mon compte", async () => {

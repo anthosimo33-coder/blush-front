@@ -224,9 +224,9 @@ test("le rapport pas débloqué : le chat et sa fiche s’ouvrent sous le paieme
     await expect(page.getByRole("group", { name: "Questions toutes prêtes" })).toHaveCount(0);
   });
 
-  await test.step("« Débloquer » : pas de paiement branché, rien n’est débloqué", async () => {
+  await test.step("« Débloquer » sans la case de renonciation cochée : rien ne part, rien n’est débloqué", async () => {
     await paiement.getByRole("button", { name: "Débloquer" }).click();
-    await expect(paiement.getByRole("status")).toHaveText("Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.");
+    await expect(paiement.getByRole("alert")).toHaveText("Coche la case pour payer.");
     expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 

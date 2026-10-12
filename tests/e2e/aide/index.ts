@@ -65,6 +65,7 @@ export * from "./import";
 export * from "./instagram-captures";
 export * from "./lecture";
 export * from "./page";
+export * from "./paiement";
 export * from "./parcours";
 export * from "./partage";
 export * from "./public-admin";
