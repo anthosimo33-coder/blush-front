@@ -31,6 +31,16 @@ const TEXTES_ECHEC: Record<Echec, string> = {
 };
 
 /**
+ * Les mêmes pour le rapport doux du mode sobre (une alerte) : tout entier à écrire, sans verdict montré, donc ni « suite »
+ * ni « verdict ». Un refus du modèle y est plus probable (une conv de détresse, un mineur) : l’aide reste à un toucher.
+ * TODO(produit): le titre de l’échec sobre et son texte de refus, absents des maquettes, à valider.
+ */
+const TEXTES_ECHEC_SOBRE: Record<Echec, string> = {
+  ...TEXTES_ECHEC,
+  refus: "BLUSH ne peut pas écrire ce rapport à partir de cette conv. L’aide ci-dessous reste là.",
+};
+
+/**
  * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
  * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer ; le budget de l’IA du jour
  * atteint (« souffle ») non plus : l’écriture repart d’elle-même après minuit, quand on rouvre le rapport. `sobre` :
@@ -54,7 +64,7 @@ export function EchecEcriture({ raison, sobre = false }: { raison: Echec; sobre?
       <div role="alert" className="text-accent font-black leading-[1.3]">
         {sobre ? "Ton rapport n’a pas pu s’écrire." : "La suite de ton rapport n’a pas pu s’écrire."}
       </div>
-      <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
+      <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{(sobre ? TEXTES_ECHEC_SOBRE : TEXTES_ECHEC)[raison]}</p>
       {souci && <p className="m-0 text-note font-extrabold leading-[1.4] text-ink">{souci}</p>}
       {raison === "panne" && (
         <Button className="mt-1" onClick={() => void relancer()} disabled={busy} loading={busy} loadingLabel="Relance de l’écriture">

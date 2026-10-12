@@ -2,7 +2,7 @@ import { devices } from "@playwright/test";
 import { emailLibre, expect, lectureFaite, test } from "./aide";
 
 /*
- * « Retour » ne sort jamais de BLUSH (useRetourSinon, src/lib/navigation.ts). Le lien du mail ouvert dans un onglet neuf :
+ * « Retour » ne sort jamais de BLUSH (useRetourSinon et revenirVers, src/lib/navigation.ts). Le lien du mail ouvert dans un onglet neuf :
  * « Retour » mène à l’accueil (le repli), le retour du système ramène au rapport, et un nouveau « Retour » reste dans
  * BLUSH. Avant, l’appli se fiait à la seule page d’avant qu’elle avait vue (l’accueil) et revenait en arrière : hors de
  * BLUSH (la messagerie d’où venait le lien), ou nulle part dans un onglet neuf. Seule l’API Navigation dit que l’entrée
@@ -39,5 +39,27 @@ test.describe("sur un téléphone", () => {
       await expect(onglet).toHaveURL(/\/app$/);
       expect(new URL(onglet.url()).origin).toBe(new URL(testInfo.project.use.baseURL!).origin);
     });
+  });
+});
+
+test.describe("sur un ordinateur", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "l’API Navigation est celle de Chromium : WebKit ne l’a pas encore");
+
+  test("un « Retour » vers une adresse fixe (la confidentialité, vers la landing) ne revient pas en arrière hors de BLUSH", async ({ page }) => {
+    /*
+     * Le « Retour » du haut de la page vise une adresse ("/") : ouverte en premier dans l’onglet, la page le suit ; le
+     * retour du système revient ici avec "/" en page d’avant, mais rien de BLUSH en arrière (revenirVers). Avant, ce
+     * second « Retour » revenait en arrière depuis la première entrée de l’onglet : il ne se passait rien.
+     */
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const retour = page.getByRole("link", { name: "Retour", exact: true });
+    await page.goto("/confidentialite");
+    await retour.click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/confidentialite$/);
+    expect(await page.evaluate(() => (window as Window & { navigation?: { currentEntry: { index: number } | null } }).navigation?.currentEntry?.index)).toBe(0);
+    await retour.click();
+    await expect(page).toHaveURL(/\/$/);
   });
 });

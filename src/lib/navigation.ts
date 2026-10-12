@@ -48,6 +48,14 @@ function entreeDAvantDansBlush() {
 const retourDansBlush = () => pagePrecedente() !== null && entreeDAvantDansBlush();
 
 /**
+ * Un « Retour » vers une adresse fixe peut-il revenir en arrière ? Seulement si la page d’avant est cette adresse, et
+ * que l’entrée d’avant de l’historique est à BLUSH : ouvert par le lien d’un mail, un « Retour » puis le retour du
+ * système laissent `href` en page d’avant alors qu’en arrière, c’est la messagerie (ou rien, dans un onglet neuf). Sinon,
+ * le lien s’ouvre.
+ */
+export const revenirVers = (href: string) => pagePrecedente() === cheminDe(href) && entreeDAvantDansBlush();
+
+/**
  * La règle unique des « Retour » vers la page d’avant : en arrière quand on reste dans BLUSH (retourDansBlush), sinon
  * `repli` (ouvert directement par un lien, un nouvel onglet, ou après un retour du système qui a ramené ici : revenir
  * en arrière quitterait BLUSH, ou ne ferait rien). Rend la fonction du toucher. `scroll` : celui de router.push (false

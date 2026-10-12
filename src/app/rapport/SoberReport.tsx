@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setPaused } from "@/services/api";
 import { invalidate } from "@/lib/query";
-import { NBSP } from "@/lib/format";
 import { tracer } from "@/lib/tracer";
+import { PAUSE_RATEE } from "@/contenu/offres";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
 import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
@@ -96,7 +96,8 @@ function FeuilleAide({ open, onClose, titre }: { open: boolean; onClose: () => v
  * Ni scène, ni score, ni partage, ni pastille de l’écriture : quelques mots, l’aide déjà à un toucher, et le rapport
  * doux dès qu’il est là (le rapport continue d’être relu, ReportScreen). `echec` : l’écriture a échoué (EchecEcriture,
  * qui se relance), à la place de l’attente.
- * TODO(produit): les deux phrases de l’attente sobre, absentes des maquettes, à valider.
+ * TODO(produit): les deux phrases de l’attente sobre et son titre en cas d’échec (« Ton rapport »), absents des maquettes, à
+ * valider.
  */
 export function AttenteSobre({ echec }: { echec?: ReactNode }) {
   const back = useRetourSinon("/app", { scroll: false });
@@ -209,7 +210,7 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
                 <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
                 <SoberLink onClick={() => void mettreEnPause()}>Mettre mon abonnement en pause</SoberLink>
-                {pauseRatee && <Alert className="text-center">Pas enregistré{NBSP}: vérifie ta connexion et réessaie.</Alert>}
+                {pauseRatee && <Alert className="text-center">{PAUSE_RATEE}</Alert>}
               </div>
             </>
           )}

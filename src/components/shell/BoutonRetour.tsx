@@ -4,7 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
-import { cheminDe, pagePrecedente, useRetourSinon } from "@/lib/navigation";
+import { revenirVers, useRetourSinon } from "@/lib/navigation";
 import { Icon } from "@/components/ui/icons";
 
 /*
@@ -13,7 +13,8 @@ import { Icon } from "@/components/ui/icons";
  */
 
 /**
- * Où mène un « Retour ». Une adresse : la page d’où l’on vient si c’est elle (en arrière), sinon le lien l’ouvre.
+ * Où mène un « Retour ». Une adresse : la page d’où l’on vient si c’est elle et qu’en arrière on reste dans BLUSH
+ * (revenirVers), sinon le lien l’ouvre.
  * `{ repli, scroll }` : la page d’avant, quelle qu’elle soit, et `repli` quand revenir en arrière quitterait BLUSH (la
  * règle de useRetourSinon, src/lib/navigation.ts) ; `scroll` : celui du lien (false vers l’accueil). Une fonction :
  * l’écran décide (un composant client seulement).
@@ -26,13 +27,13 @@ const clicSimple = (e: MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || 
 type ProprietesLien = { className: string; children: ReactNode; label?: string };
 
 /**
- * Le lien vers une adresse : en arrière quand c’est la page d’avant (l’historique reste propre, et le retour suivant
- * mène bien plus loin) ; sinon, le lien s’ouvre.
+ * Le lien vers une adresse : en arrière quand c’est la page d’avant et qu’en arrière on reste dans BLUSH (revenirVers :
+ * l’historique reste propre, et le retour suivant mène bien plus loin) ; sinon, le lien s’ouvre.
  */
 function LienVersAdresse({ href, className, children, label }: { href: Route } & ProprietesLien) {
   const router = useRouter();
   const retour = (e: MouseEvent) => {
-    if (!clicSimple(e) || pagePrecedente() !== cheminDe(href)) return;
+    if (!clicSimple(e) || !revenirVers(href)) return;
     e.preventDefault();
     router.back();
   };

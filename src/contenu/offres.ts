@@ -75,3 +75,6 @@ export const SUBSCRIPTIONS: Record<Subscription["plan"], Subscription> = {
   rapport: { plan: "rapport", priceLabel: libelle("rapport"), renewLabel: "Payé une fois · à toi pour toujours", stopLabel: "", active: true, paused: false },
   gratuit: { plan: "gratuit", priceLabel: libelle("gratuit"), renewLabel: "Chapitre 1", stopLabel: "", active: false, paused: false },
 };
+
+/** La pause de l’abonnement pas enregistrée : un seul texte pour Mon compte et le rapport doux du mode sobre. */
+export const PAUSE_RATEE = "Pas enregistré\u00a0: vérifie ta connexion et réessaie.";

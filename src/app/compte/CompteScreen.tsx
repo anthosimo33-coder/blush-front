@@ -8,7 +8,7 @@ import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { deleteAccount, deleteStory, seDeconnecter, setPaused } from "@/services/api";
 import type { Account } from "@/types/api";
-import { OFFRE_PAR_PLAN, prixDe, type PrixAffiche } from "@/contenu/offres";
+import { OFFRE_PAR_PLAN, PAUSE_RATEE, prixDe, type PrixAffiche } from "@/contenu/offres";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -183,7 +183,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         {plus && sub && (
           <InsetRow
             title="Mettre en pause"
-            sub={souciPause ? "Pas enregistré\u00a0: vérifie ta connexion et réessaie." : "Ton histoire reste gardée, rien n’est facturé"}
+            sub={souciPause ? PAUSE_RATEE : "Ton histoire reste gardée, rien n’est facturé"}
             trailing={<Switch checked={sub.paused} label="Mettre en pause" onChange={(v) => void mettreEnPause(v)} />}
           />
         )}
