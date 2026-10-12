@@ -343,6 +343,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     const alerte = reponseDu((await fluxDe(await envoyer("j’en peux plus"))).evenements);
     await lancerApres();
     expect(alerte.verrouillee).toBeUndefined();
+    expect(alerte.bulles).toEqual({ depensees: 0, restantes: -4 });
     expect(alerte.bubbles.length).toBeGreaterThan(0);
     expect(await reponseVerrouillee(u.id)).toBeNull();
     chat = null;

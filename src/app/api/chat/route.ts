@@ -195,7 +195,9 @@ async function payer(utilisateur: Utilisateur, story: Parameters<typeof repondEn
       cout,
       regler: async (reel) => {
         reglee = true;
-        if (debit !== "debite") return undefined;
+        if (debit === "equipe") return undefined;
+        /* Verrouillée d’avance mais sortie en alerte de danger (offerte, jamais verrouillée) : rien n’a été débité */
+        if (debit !== "debite") return { depensees: 0, restantes: await soldeDe(utilisateur.id) };
         if (reel < cout) await rendre(utilisateur, ref, cout - reel);
         return { depensees: Math.min(reel, cout), restantes: await soldeDe(utilisateur.id) };
       },

@@ -287,13 +287,13 @@ export async function repondre(
   /* L’échange (l’id de ton message) part avec la réponse : de quoi la partager en image ensuite */
   const echangeId = gardes.find((g) => g.role === "toi")?.id;
   const blushId = gardes.find((g) => g.role === "blush")?.id;
+  if (blushId === undefined) throw new ErreurInvariant("chat_messages:reponse_non_gardee");
   /* Ce qu’elle a coûté, et ce qu’il reste : réglé au moment où elle part (une verrouillée se paie à la lecture) */
   const bulles = verrouillee ? undefined : await reglement?.regler(cout ?? 0);
   /* Ce qui part au navigateur : la réponse, ou rien d’elle si elle est verrouillée */
-  const montree: BlushAnswer =
-    verrouillee && blushId !== undefined
-      ? reponseMasquee(blushId, cout ?? 1, modeVocal)
-      : { ...reponse, ...(bulles ? { bulles } : {}), ...(echangeId === undefined ? {} : { echange: echangeId }) };
+  const montree: BlushAnswer = verrouillee
+    ? reponseMasquee(blushId, cout ?? 1, modeVocal)
+    : { ...reponse, ...(bulles ? { bulles } : {}), ...(echangeId === undefined ? {} : { echange: echangeId }) };
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
   /*
@@ -312,13 +312,13 @@ export async function repondre(
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
   const vocal = (voix ? await voix : null) ?? null;
-  if (vocal && blushId !== undefined)
+  if (vocal)
     await db()
       .update(schema.chatMessages)
       .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde }) })
       .where(eq(schema.chatMessages.id, blushId));
   /* La voix a échoué : la réponse reste écrite, et coûte ce que coûte une réponse écrite (le reste est rendu) */
-  if (voix && !vocal && reglement && blushId !== undefined) {
+  if (voix && !vocal && reglement) {
     const ecrite = coutDe({ ajout: !!ajout, vocal: false });
     await auMieux(
       async () => {
