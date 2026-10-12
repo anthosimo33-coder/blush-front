@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { CATALOGUE } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { EtatAchat, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { commander, marquerEchoue, type Achat, type RefusDeCommande } from "../achats";
+import { commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -150,9 +150,6 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
   return { achat: achat.id, offre: achat.offre, statut: achat.statut, bulles: achat.bulles, conv: achat.storyId };
 }
 
-/** Les recharges : les packs de bulles du catalogue (ni rapport, ni offre unique). */
-const PACKS = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
-
 /**
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
@@ -180,13 +177,8 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .limit(1);
     if (!rapport) return rien;
   } else {
-    /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) */
-    const [recharge] = await db()
-      .select({ id: a.id })
-      .from(a)
-      .where(and(eq(a.userId, compte.id), isNotNull(a.payeLe), inArray(a.offre, PACKS)))
-      .limit(1);
-    if (recharge) return rien;
+    /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) ; commander suit la même règle */
+    if (await rechargeDejaPayee(compte.id)) return rien;
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;

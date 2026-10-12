@@ -509,6 +509,19 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await montrer("premiere_recharge")).toEqual({ offre: null });
   });
 
+  it("④ montré, puis une autre recharge payée d’abord (30 bulles) : le pack conseillé d’après n’a plus le bonus (la feuille ne le montre plus)", async () => {
+    const { u } = await acheteur("offre-recharge-autre-pack");
+    expect((await montrer("premiere_recharge")).offre).toBe("premiere_recharge");
+    const petit = (await payer({ offre: "pack30", renonciation: true })).corps.achat;
+    expect((await poster(await issue(petit, "payer"))).status).toBe(200);
+    /* La feuille rouverte ne montre plus le bonus : la commande ne le donne pas non plus */
+    expect(await montrer("premiere_recharge")).toEqual({ offre: null });
+    const conseille = (await payer({ offre: "pack80", renonciation: true })).corps.achat;
+    expect(await achatEnBase(conseille)).toMatchObject({ bulles: 80, offreUnique: null });
+    expect((await poster(await issue(conseille, "payer"))).status).toBe(200);
+    expect(await soldeDe(u.id)).toBe(110);
+  });
+
   it("① la suite : montrée pour la conv de la page (5 minutes), puis payée 6,90 € ; jamais sans prestataire", async () => {
     await acheteur("offre-suite");
     etat.mode = null;

@@ -28,12 +28,28 @@ const a = schema.achats;
 /** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
 export type RefusDeCommande = "aucune" | "deja" | "offre";
 
+/** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
+const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
+
+/**
+ * Ce compte a-t-il déjà payé une recharge (un pack, même repris ensuite) ? Alors le bonus de la première recharge (④) ne
+ * vaut plus : ni montré (proposerOffreUnique), ni donné à la commande, même montré avant.
+ */
+export async function rechargeDejaPayee(userId: string): Promise<boolean> {
+  const [l] = await db()
+    .select({ id: a.id })
+    .from(a)
+    .where(and(eq(a.userId, userId), isNotNull(a.payeLe), inArray(a.offre, PACKS_DE_BULLES)))
+    .limit(1);
+  return !!l;
+}
+
 /**
  * Le droit d’acheter cette offre, puis l’achat écrit « en_attente », au prix et avec les bulles du catalogue, figés
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
  * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable. Rend l’achat, ou le refus.
+ * montré et valable, et qu’aucune recharge n’a encore été payée. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
@@ -62,7 +78,8 @@ export async function commander(
       .limit(1);
     if (!rapport) return "offre";
   }
-  const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge"));
+  /* ④ : montré et valable, et toujours la première recharge (un autre pack payé depuis l’a passée : la feuille ne le montre plus) */
+  const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge")) && !(await rechargeDejaPayee(compte.id));
   const [achat] = await db()
     .insert(a)
     .values({
