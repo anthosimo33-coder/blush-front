@@ -1,6 +1,7 @@
 import "server-only";
 import { partialParse } from "@anthropic-ai/sdk/_vendor/partial-json-parser/parser";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import type { QueryResult } from "pg";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
@@ -67,18 +68,29 @@ export type IdsDeLEchange = { toi: number; blush: number };
 /* La clé du verrou (pg_advisory_xact_lock) qui fait prendre ses deux identifiants d’un coup à chaque échange */
 const VERROU_DES_ECHANGES = 0x0b1a5c4a7;
 
+/*
+ * Le verrou et les deux identifiants, en un seul message de requête simple : Postgres passe ses deux instructions dans
+ * une seule transaction implicite, et le verrou (« xact ») ne dure pas plus qu’elle. Un seul aller-retour jusqu’à la base.
+ * Sans paramètre (la clé est une constante) : la requête simple n’en prend pas.
+ */
+const RESERVER_DEUX_IDS = `select pg_advisory_xact_lock(${VERROU_DES_ECHANGES}); select nextval(pg_get_serial_sequence('chat_messages', 'id'))::text as id from generate_series(1, 2)`;
+
 /**
  * Les identifiants d’un échange, pris d’avance dans la séquence de chat_messages : le débit de la réponse porte le sien
  * (refDuMessage) avant que BLUSH écrive. Deux identifiants qui se suivent, ton message d’abord, pris sous un verrou
  * court : deux échanges en même temps ne s’entremêlent jamais (l’historique lit chaque message de toi suivi de sa
  * réponse). Une réponse qui échoue laisse un trou dans la séquence, sans conséquence.
+ * Le verrou est le même pour tous les comptes et toutes les instances : il ne reste jamais pris pendant un aller-retour
+ * du réseau ni pendant que Node calcule (RESERVER_DEUX_IDS). Pris dans une transaction de drizzle (BEGIN, le verrou, les
+ * identifiants, COMMIT), il durait quatre allers-retours jusqu’à Neon, et plus encore sur une instance occupée : tous
+ * les messages du chat, de tous les comptes, l’attendaient (docs/charge.md).
  */
 export async function reserverEchange(): Promise<IdsDeLEchange> {
-  const ids = await db().transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${VERROU_DES_ECHANGES})`);
-    const { rows } = await tx.execute<{ id: string }>(sql`select nextval(pg_get_serial_sequence('chat_messages', 'id'))::text as id from generate_series(1, 2)`);
-    return rows.map((r) => Number(r.id)).sort((a, b) => a - b);
-  });
+  /* Deux instructions : node-postgres rend un résultat par instruction (ses types n’en disent qu’un), les identifiants dans le dernier */
+  const resultats: QueryResult<{ id: string }> | QueryResult<{ id: string }>[] = await db().$client.query(RESERVER_DEUX_IDS);
+  const derniers = Array.isArray(resultats) ? resultats[resultats.length - 1] : resultats;
+  const lignes: { id: string }[] = derniers?.rows ?? [];
+  const ids = lignes.map((r) => Number(r.id)).sort((a, b) => a - b);
   const [toi, blush] = ids;
   if (toi === undefined || blush === undefined) throw new ErreurInvariant("chat_messages:ids");
   return { toi, blush };
