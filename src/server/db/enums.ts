@@ -2,7 +2,7 @@
  * Les valeurs fermées des colonnes `text` de la base (schema.ts) : la seule liste de chacune, d’où viennent leurs types.
  * Une colonne `text(…, { enum })` ne change rien en base (ni contrainte, ni migration) : seul le code est vérifié. Sans
  * server-only, et importé en chemin relatif par schema.ts : drizzle-kit le lit hors de Next. Ici, celles que seul le
- * serveur lit ; celles que le navigateur lit aussi (OFFRES, OFFRES_UNIQUES, VOIX, EVENEMENTS_ECOUTE) sont dans src/types. Ce module
+ * serveur lit ; celles que le navigateur lit aussi (OFFRES, OFFRES_UNIQUES, STATUTS_ACHAT, VOIX, EVENEMENTS_ECOUTE) sont dans src/types. Ce module
  * n’importe rien : schema.ts ne dépend ainsi d’aucun module métier.
  */
 
@@ -31,12 +31,6 @@ export const ROLES_CHAT = ["toi", "blush"] as const;
 /** waitlist.source : d’où vient l’inscription (« accueil » : la page de la liste ; « connexion » : refusé à l’écran email). */
 export const SOURCES_ATTENTE = ["accueil", "connexion"] as const;
 export type SourceAttente = (typeof SOURCES_ATTENTE)[number];
-
-/**
- * achats.statut : commandé (en_attente : la configuration de paiement créée, pas encore payé), payé (livré), échoué,
- * remboursé ou contesté (repris : la conv re-verrouillée, les bulles retirées).
- */
-export const STATUTS_ACHAT = ["en_attente", "paye", "echoue", "rembourse", "conteste"] as const;
 
 /** achats.fournisseur : Whop, ou le faux Whop des tests et du dev (BLUSH_PAIEMENT_FACTICE). */
 export const FOURNISSEURS_PAIEMENT = ["whop", "factice"] as const;

@@ -95,7 +95,7 @@ describe("la table des routes", () => {
   });
 
   it("le navigateur n’appelle par sa clé qu’une route sans segment à remplir : « /api/vocal/chat/[id] » n’est pas une adresse", () => {
-    expectTypeOf<Exclude<CleRoute, CleFixe>>().toEqualTypeOf<"GET /api/vocal/chat/[id]">();
+    expectTypeOf<Exclude<CleRoute, CleFixe>>().toEqualTypeOf<"GET /api/vocal/chat/[id]" | "GET /api/paiement/[achat]">();
     // @ts-expect-error : une clé à segment dynamique
     const dynamique: CleFixe = "GET /api/vocal/chat/[id]";
     expect(dynamique).toBeDefined();

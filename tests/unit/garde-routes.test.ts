@@ -66,8 +66,11 @@ const SANS_COMPTE = new Set<CleRoute>([
   "GET /api/histoire",
   "DELETE /api/histoire",
 ]);
-/** Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron, et le réveil qui ne dit rien. */
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil"]);
+/**
+ * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron, le réveil qui ne dit rien,
+ * et le webhook de Whop (sa signature : Whop n’est pas l’appli, sa requête n’a pas notre origine).
+ */
+const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/reveil", "POST /api/paiement/whop"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
@@ -76,17 +79,17 @@ const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
 async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Promise<Response> {
   const [methode, chemin] = auMoins(cle.split(" "), 2);
   const route = (await import(join(process.cwd(), "src/app", chemin, "route.ts"))) as Record<string, (req: Request, ctx: unknown) => Promise<Response>>;
-  const req = new Request(`${APPLI}${chemin.replace("[id]", "1")}`, { method: methode, headers: { "x-forwarded-for": "10.9.8.7", ...entetes } });
-  return route[methode]!(req, { params: Promise.resolve({ id: "1" }) });
+  const req = new Request(`${APPLI}${chemin.replace(/\[\w+\]/, "1")}`, { method: methode, headers: { "x-forwarded-for": "10.9.8.7", ...entetes } });
+  return route[methode]!(req, { params: Promise.resolve({ id: "1", achat: "1" }) });
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 23 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(23);
+  it("la table compte 26 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(26);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 
-  it.each(mutations)("%s refuse (403) une requête venue d’un autre site, ou sans origine", async (cle) => {
+  it.each(mutations.filter((c) => !HORS_GARDE.has(c)))("%s refuse (403) une requête venue d’un autre site, ou sans origine", async (cle) => {
     for (const origine of [{ origin: "http://site-pirate.test", host: "localhost" }, { origin: "null", host: "localhost" }, { host: "localhost" }] as Record<string, string>[]) {
       const r = await appeler(cle, origine);
       expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([403, { erreur: "origine" }]);
@@ -98,6 +101,14 @@ describe("chaque route de la table", () => {
   it.each(cles.filter((c) => !SANS_COMPTE.has(c) && !HORS_GARDE.has(c)))("%s, depuis l’appli mais sans session : 401 « connexion »", async (cle) => {
     const r = await appeler(cle, { origin: APPLI, host: "localhost" });
     expect([r.status, await r.json()]).toEqual([401, { erreur: "connexion" }]);
+    expect(etat.comptees).toEqual([]);
+  });
+
+  it("POST /api/paiement/whop, la seule mutation hors de la garde : d’où qu’elle vienne, sans signature, 401 « interdit » ; ni session lue, ni limite comptée", async () => {
+    for (const origine of [{ origin: "https://api.whop.com", host: "localhost" }, { host: "localhost" }, { origin: APPLI, host: "localhost" }] as Record<string, string>[]) {
+      const r = await appeler("POST /api/paiement/whop", origine);
+      expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([401, { erreur: "interdit" }]);
+    }
     expect(etat.comptees).toEqual([]);
   });
 

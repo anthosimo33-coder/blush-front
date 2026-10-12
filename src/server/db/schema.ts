@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { EVENEMENTS_ECOUTE, OFFRES, OFFRES_UNIQUES, VOIX } from "../../types";
-import { FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_ACHAT, STATUTS_TACHE, type DetailEcriture } from "./enums";
+import { EVENEMENTS_ECOUTE, OFFRES, OFFRES_UNIQUES, STATUTS_ACHAT, VOIX } from "../../types";
+import { FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne

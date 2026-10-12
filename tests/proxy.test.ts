@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { config, proxy } from "@/proxy";
 
 /*
- * Le proxy (src/proxy.ts) : les outils de l’équipe introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
+ * Le proxy (src/proxy.ts) : les outils de l’équipe (et le faux Whop) introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
  * (src/server/drapeaux.ts), à ce poste seulement (src/lib/hote-local.ts), et les variantes de la bêta fermée, qui ne changent pas. Sans base ni serveur : la requête
  * est construite ici, les variables posées par cas. (Le guide de Next appelle unstable_doesProxyMatch ce que cette
  * version exporte encore sous le nom unstable_doesMiddlewareMatch.)
@@ -22,6 +22,9 @@ const OUTILS = [
   "/apercu/mail",
   "/apercu/demander",
   "/styleguide",
+  /* Le faux Whop : sa page de paiement, et ses boutons */
+  "/paiement/factice",
+  "/api/paiement/factice",
 ];
 const VARIANTES = {
   "/commencer": "/commencer/fermee",
@@ -47,7 +50,8 @@ afterEach(() => {
 describe("les outils de l’équipe : jamais sur Vercel", () => {
   it("le proxy passe par chacun d’eux, et par aucune page du produit", () => {
     for (const url of OUTILS) expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(true);
-    for (const url of ["/", "/app", "/rapport", "/admin", "/api/auth/code", "/v/abc"]) expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(false);
+    for (const url of ["/", "/app", "/rapport", "/admin", "/api/auth/code", "/v/abc", "/paiement/retour", "/api/paiement", "/api/paiement/whop"])
+      expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(false);
   });
 
   it("sur Vercel, en ligne comme en préversion : la page introuvable (404), bêta fermée ou non", () => {

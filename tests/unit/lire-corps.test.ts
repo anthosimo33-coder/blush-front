@@ -46,9 +46,11 @@ import { POST as postVerifier } from "@/app/api/auth/verifier/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postChat } from "@/app/api/chat/route";
 import { POST as postVocal } from "@/app/api/chat/vocal/route";
-import { POST as postDebloquer } from "@/app/api/debloquer/route";
 import { PUT as putFiche } from "@/app/api/fiche/route";
 import { POST as postImage } from "@/app/api/partage/image/route";
+import { POST as postPaiement } from "@/app/api/paiement/route";
+import { POST as postFauxWhop } from "@/app/api/paiement/factice/route";
+import { POST as postOffre } from "@/app/api/paiement/offre/route";
 import { POST as postEcoute } from "@/app/api/vocal/ecoute/route";
 
 /** Une requête du navigateur (même origine), avec ce corps tel quel. */
@@ -104,6 +106,10 @@ const TOUT_FAUX = JSON.stringify({
   question: "oui",
   actif: "oui",
   offre: "gratuit",
+  conv: 3,
+  renonciation: "oui",
+  achat: 3,
+  issue: "x",
   facts: "x",
   type: "x",
   evenement: "x",
@@ -129,7 +135,9 @@ describe("un corps mal formé : chaque route répond le code qu’elle répondai
     ["POST /api/captures/video", postVideo, "POST", "fichier", 422],
     ["POST /api/chat", postChat, "POST", "texte", 422],
     ["POST /api/chat/vocal", postVocal, "POST", "invalide", 422],
-    ["POST /api/debloquer", postDebloquer, "POST", "offre", 422],
+    ["POST /api/paiement", postPaiement, "POST", "offre", 422],
+    ["POST /api/paiement/offre", postOffre, "POST", "offre", 422],
+    ["POST /api/paiement/factice", postFauxWhop, "POST", "invalide", 422],
     ["PUT /api/fiche", putFiche, "PUT", "faits", 422],
     ["POST /api/partage/image", postImage, "POST", "cible", 422],
     ["POST /api/vocal/ecoute", postEcoute, "POST", "invalide", 422],

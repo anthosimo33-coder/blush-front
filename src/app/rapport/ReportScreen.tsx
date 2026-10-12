@@ -302,7 +302,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
 
       <SuivreAncre retour={retour} />
 
-      <PaywallSheet open={paywall} onClose={() => setPaywall(false)} otherName={other.name} chapitres={locked.length || undefined} onUnlocked={() => setPaywall(false)} />
+      <PaywallSheet open={paywall} onClose={() => setPaywall(false)} otherName={other.name} chapitres={locked.length || undefined} />
     </Screen>
   );
 }

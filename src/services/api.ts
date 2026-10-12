@@ -14,15 +14,33 @@ import type {
   Fiche,
   FicheFact,
   FicheUpdate,
-  Formule,
   Goal,
   Guess,
+  IssueDuFauxWhop,
+  OffreId,
+  OffreProposee,
   Pronom,
   QuestionAnswer,
   Source,
 } from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
-import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
+import type {
+  Account,
+  AvanceVideo,
+  CibleImage,
+  CleFixe,
+  CleJson,
+  CleRoute,
+  EtatAchat,
+  HistoriqueChat,
+  Moi,
+  OffreUniqueMontree,
+  PaiementCommence,
+  ReponseErreur,
+  ReportPayload,
+  Routes,
+  VerdictMontre,
+} from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
@@ -426,9 +444,44 @@ export function noterEcouteVocal(evenement: EvenementEcoute, position: number): 
   void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch((e: unknown) => tracer("vocal:ecoute", e));
 }
 
-/** Débloquer le rapport de la conv ouverte, avec cette formule (sans paiement branché : l’équipe seulement, sinon « bientot »). */
-export async function unlock(offre: Formule): Promise<void> {
-  return void (await appel("POST /api/debloquer", { corps: { offre } }));
+/* ———— Le paiement (Whop, ou le faux Whop en local) ———— */
+
+/**
+ * Commence le paiement d’une offre (pour la conv de la page, quand elle en débloque le rapport) : l’achat, et la page où
+ * le payer (`url`, celle de Whop ou du faux Whop), ou null : payé en un geste, il se suit par etatDuPaiement.
+ * `renonciation` : la case « je renonce à mon droit de rétractation », cochée (sans elle, 422 « renonciation »).
+ */
+export async function commencerPaiement(offre: OffreId, renonciation: boolean): Promise<PaiementCommence> {
+  return appel("POST /api/paiement", { corps: { offre, renonciation } });
+}
+
+/**
+ * Où en est cet achat (la page du retour la relit) : `paiement`, le pay_… que Whop a mis dans l’adresse du retour, que
+ * le serveur vérifie chez Whop si le webhook tarde. L’adresse a un segment (l’achat) : un appel à part, par fetch.
+ */
+export async function etatDuPaiement(achat: string, paiement: string | null): Promise<EtatAchat> {
+  const recherche = paiement ? `?paiement=${encodeURIComponent(paiement)}` : "";
+  const r = await fetch(`/api/paiement/${encodeURIComponent(achat)}${recherche}`, { credentials: "same-origin", cache: "no-store", headers: avecConv() });
+  const corps = await corpsDe<"GET /api/paiement/[achat]">(r);
+  if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
+  return corps;
+}
+
+/** Demande au serveur de montrer cette offre unique (① en fermant la feuille sans payer, ③ sur « C’est débloqué ») : laquelle, jusqu’à quand, ou aucune. */
+export async function proposerOffreUnique(offre: OffreProposee): Promise<OffreUniqueMontree> {
+  return appel("POST /api/paiement/offre", { corps: { offre } });
+}
+
+/**
+ * Un bouton du faux Whop (jamais en ligne) : le webhook que Whop enverrait pour cet achat, posté ensuite à
+ * /api/paiement/whop comme Whop le ferait (sa signature et la livraison sont les vraies). Rend l’adresse du retour, ou
+ * null (un remboursement). Un webhook refusé : ErreurApi.
+ */
+export async function fauxWhop(achat: string, issue: IssueDuFauxWhop): Promise<string | null> {
+  const { webhook, retour } = await appel("POST /api/paiement/factice", { corps: { achat, issue } });
+  const r = await fetch("/api/paiement/whop", { method: "POST", cache: "no-store", headers: { ...webhook.entetes, "content-type": "application/json" }, body: webhook.corps });
+  if (!r.ok) throw new ErreurApi((await corpsDe<"POST /api/paiement/whop">(r)).erreur ?? "erreur", r.status);
+  return retour;
 }
 
 /* ———— Ta question ———— */

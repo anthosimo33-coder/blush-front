@@ -12,7 +12,7 @@ export const ERREURS_API = {
   origine: 403,
   /** Pas de session (ou plus de session), ou la bêta fermée qui demande un compte. */
   connexion: 401,
-  /** La purge de la nuit, sans le bon secret. */
+  /** La purge de la nuit, sans le bon secret ; un webhook de paiement mal signé (ou le paiement pas branché). */
   interdit: 401,
   /** Bêta fermée : un email retiré de la liste après l’envoi de son code. */
   beta: 403,
@@ -38,9 +38,11 @@ export const ERREURS_API = {
   occupe: 409,
   /** Une alerte de danger (le mode sobre) : le verdict ne se partage pas. */
   sobre: 409,
+  /** Rien à payer : le rapport de cette conv est déjà débloqué, ou le compte est de l’équipe. */
+  deja: 409,
   /** Pas encore payé : sa fiche (un client), la chute d’un chapitre (le rapport débloqué). */
   acces: 402,
-  /** Le paiement n’est pas encore branché : seuls les comptes de l’équipe (BLUSH_ACCES_LIBRE) débloquent. */
+  /** Le paiement n’est pas encore branché (ni Whop, ni le faux Whop) : rien ne s’achète. */
   bientot: 402,
 
   /* Ce qu’elle envoie */
@@ -50,8 +52,10 @@ export const ERREURS_API = {
   texte: 422,
   /** Sa fiche corrigée, mal formée. */
   faits: 422,
-  /** Une offre qui n’existe pas. */
+  /** Une offre qui n’existe pas, ou qui ne s’achète pas (plus) : une offre unique passée, ③ sans rapport payé. */
   offre: 422,
+  /** La case « je renonce à mon droit de rétractation » n’est pas cochée : le paiement ne part pas. */
+  renonciation: 422,
   /** Ce qu’on veut partager en image (une réponse du chat, un chapitre) n’est pas désigné comme il faut. */
   cible: 422,
   /** Le reste de ce qu’une route attend (le mode vocal du chat, un moment de l’écoute du vocal). */

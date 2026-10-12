@@ -71,6 +71,35 @@ export const Env = z.object({
   BLUSH_ADMINS: z.string().transform(emails).optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). Exigé en production. */
   CRON_SECRET: z.string().min(16).optional(),
+  /**
+   * Le paiement par Whop (src/server/paiement) : la clé de l’API du compte (une « Account API key », avec ses seules
+   * permissions : BACKEND.md, « Mise en ligne »), le secret de son webhook (« ws_… », montré une fois par Whop), le compte
+   * (« biz_… ») et le produit sous lequel chaque achat crée son prix (« prod_… »). Les quatre, ou aucune : sans elles (et
+   * sans le faux Whop), « Débloquer » répond « bientot ». À moitié remplies, la production refuse de tourner.
+   */
+  WHOP_API_KEY: z.string().min(1).optional(),
+  WHOP_WEBHOOK_SECRET: z.string().min(1).optional(),
+  WHOP_ACCOUNT_ID: z
+    .string()
+    .regex(/^biz_\w+$/, "WHOP_ACCOUNT_ID commence par biz_")
+    .optional(),
+  WHOP_PRODUCT_ID: z
+    .string()
+    .regex(/^prod_\w+$/, "WHOP_PRODUCT_ID commence par prod_")
+    .optional(),
+  /** 1 : l’API du bac à sable de Whop (ses cartes de test, ses propres clés). Refusé en production. */
+  WHOP_BAC_A_SABLE: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((v) => v === "1"),
+  /**
+   * Tests et dev : le faux Whop (src/server/paiement/factice.ts), une page locale qui paie ou refuse, et poste un vrai
+   * webhook signé d’un secret de test. Refusé sur Vercel.
+   */
+  BLUSH_PAIEMENT_FACTICE: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((v) => v === "1"),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])
@@ -95,6 +124,9 @@ export const URL_SITE = Env.shape.BLUSH_URL.safeParse(process.env.BLUSH_URL).dat
  */
 const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (surVercel() || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
 
+/** Les quatre variables de Whop : toutes, ou aucune (paiementWhop, et la production le vérifie). */
+const WHOP = ["WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID"] as const satisfies readonly (keyof Env)[];
+
 /*
  * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou tous les rapports à
  * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Les préversions,
@@ -108,6 +140,11 @@ function refusEnProduction(e: Env): string[] {
   if (!e.CRON_SECRET) refus.push("CRON_SECRET manque (sans lui, la purge de nuit ne tourne jamais)");
   /* « * » ouvrirait tous les rapports et des bulles illimitées à chaque compte, sans rien payer */
   if (e.BLUSH_ACCES_LIBRE === "*") refus.push("BLUSH_ACCES_LIBRE=* est refusée (tous les rapports offerts à tout le monde) : seulement la liste de l’équipe et des invités");
+  /* Whop à moitié configuré : un paiement pris sans webhook pour le livrer, ou l’inverse */
+  const whop = WHOP.filter((v) => e[v]);
+  if (whop.length && whop.length < WHOP.length) refus.push(`Whop à moitié configuré : ${WHOP.filter((v) => !e[v]).join(", ")} manque (les quatre variables, ou aucune)`);
+  /* Le bac à sable accepte des cartes de test : en production, tous les rapports s’ouvriraient sans payer */
+  if (e.WHOP_BAC_A_SABLE) refus.push("WHOP_BAC_A_SABLE=1 est refusée (ses cartes de test débloqueraient tout sans payer)");
   return refus;
 }
 
@@ -126,6 +163,8 @@ export function env(): Env {
     lu.data.BLUSH_IA_FACTICE = false;
   }
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");
+  /* Le faux Whop paie sans payer : jamais sur Vercel, ni en ligne ni en préversion (refusé, pas seulement ignoré) */
+  if (surVercel() && lu.data.BLUSH_PAIEMENT_FACTICE) throw new Error("BLUSH_PAIEMENT_FACTICE est refusée sur Vercel : retire-la des variables du projet");
   /* `next start` des tests de bout en bout tourne en production, sans Resend : leurs mails vont dans la boîte */
   if (process.env.NODE_ENV === "production" && !lu.data.RESEND_API_KEY && !boiteDe(lu.data)) throw new Error("RESEND_API_KEY manque en production");
   const refus = refusEnProduction(lu.data);
@@ -150,6 +189,19 @@ export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
  * Jamais sur Vercel. Lu directement dans process.env, sans env() : les cookies le demandent avant toute autre variable.
  */
 export const serveurDeTest = () => !surVercel() && process.env.BLUSH_IA_FACTICE === "1" && !!process.env.BLUSH_BOITE_MAILS;
+
+/**
+ * Le faux Whop (BLUSH_PAIEMENT_FACTICE) : en dev et dans les tests, jamais sur Vercel (env() le refuse). Le paiement se
+ * fait sur une page locale (/paiement/factice), qui poste un vrai webhook signé d’un secret de test.
+ */
+export const paiementFactice = (): boolean => env().BLUSH_PAIEMENT_FACTICE;
+
+/** Whop configuré : ses quatre variables, et l’API du bac à sable ou la vraie. Sinon null (à moitié : comme rien, hors production). */
+export function paiementWhop(): { cle: string; secret: string; compte: string; produit: string; bacASable: boolean } | null {
+  const e = env();
+  if (!e.WHOP_API_KEY || !e.WHOP_WEBHOOK_SECRET || !e.WHOP_ACCOUNT_ID || !e.WHOP_PRODUCT_ID) return null;
+  return { cle: e.WHOP_API_KEY, secret: e.WHOP_WEBHOOK_SECRET, compte: e.WHOP_ACCOUNT_ID, produit: e.WHOP_PRODUCT_ID, bacASable: e.WHOP_BAC_A_SABLE };
+}
 
 /** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);

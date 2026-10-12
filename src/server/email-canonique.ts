@@ -53,6 +53,7 @@ export const LIMITES_DU_COMPTE = {
   ecoute: "ecouteParCompte",
   capturesParCompte: "capturesParCompte",
   lotsParCompte: "lotsParCompte",
+  commande: "commandeParCompte",
 } as const satisfies Record<string, keyof typeof LIMITES>;
 
 /** Le nom d’une limite rangée par compte. */

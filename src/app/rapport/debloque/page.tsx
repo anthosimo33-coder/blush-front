@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES, PREMIER_PAYANT } from "@/contenu/chapitres";
+import { CATALOGUE } from "@/contenu/offres";
 import { suiteSure } from "@/lib/suite";
-import { getReport } from "@/services/serveur";
+import { getAchatPaye, getReport } from "@/services/serveur";
 import { UnlockedScreen } from "./UnlockedScreen";
 import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
 
 /*
- * La page lit le rapport par getReport, qui lance ce que le déblocage ouvre (le rapport, la mémoire) et le laisse tourner
- * après la réponse : la durée de la fonction est celle de /api/debloquer, pour que la chaîne ne soit pas coupée en route.
+ * La page lit le rapport par getReport, qui lance ce que le déblocage ouvre (le rapport, la mémoire) s’il n’est pas déjà
+ * parti avec la livraison, et le laisse tourner après la réponse : la durée de la fonction est celle de la chaîne.
+ * Elle dit ce qu’a ouvert l’achat payé de `?achat=` (le retour du paiement y mène), jamais un achat d’un autre compte,
+ * ni pas encore payé : sans lui, le rapport.
  */
 export const maxDuration = 300;
 
@@ -18,7 +22,8 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   /* L’heure du rendu, avant les lectures : le compte posé par PageDeConv en part */
   const rendu = heureDuRendu();
   const sp = await searchParams;
-  const offer = sp.offre === "rapport" ? "rapport" : "premium";
+  const achat = typeof sp.achat === "string" ? await getAchatPaye(sp.achat) : null;
+  if (!achat || !CATALOGUE[achat.offre].conv) redirect("/rapport");
   /* Où reprendre après : seulement une adresse interne */
   const next = suiteSure(sp.suite);
   /*
@@ -31,7 +36,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
   return (
     <PageDeConv rendu={rendu}>
-      <UnlockedScreen offer={offer} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} />
+      <UnlockedScreen achat={achat.id} offre={achat.offre} bulles={achat.bulles} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} />
     </PageDeConv>
   );
 }

@@ -8,6 +8,7 @@ import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, q
 import { rapportOuvert } from "@/server/droits";
 import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
 import { storyAffichee } from "@/server/conv-affichee";
+import { achatDuFauxWhop, achatPaye } from "@/server/paiement/commande";
 import { contexte } from "@/server/requete";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
@@ -174,4 +175,16 @@ export async function getConvs(): Promise<ConvSummary[]> {
 export async function nombreDeConvs(): Promise<number> {
   const { utilisateur } = await contexte();
   return utilisateur ? (await histoiresDuCompte(utilisateur.id)).length : 0;
+}
+
+/** L’achat payé du compte connecté, pour « C’est débloqué » (`?achat=`) : son offre et ses bulles ; null sinon. */
+export async function getAchatPaye(achat: string): Promise<Awaited<ReturnType<typeof achatPaye>>> {
+  const u = await utilisateurCourant();
+  return u ? achatPaye(u, achat) : null;
+}
+
+/** L’achat du compte connecté que montre la page du faux Whop (BLUSH_PAIEMENT_FACTICE seulement) ; null sinon. */
+export async function getAchatDuFauxWhop(achat: string): Promise<Awaited<ReturnType<typeof achatDuFauxWhop>>> {
+  const u = await utilisateurCourant();
+  return u ? achatDuFauxWhop(u, achat) : null;
 }
