@@ -440,4 +440,8 @@ test("le champ du chat porte son seul nom, sans celui du bouton à côté", asyn
   await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true }).fill("elle m’a vu");
   await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toBeVisible();
+  /* La flèche, à côté du champ, ne lui prend pas le focus : après l’envoi, le clavier reste ouvert pour la suite */
+  expect(await ecrireABlush(page, "on s’est vus hier soir")).toBe(200);
+  await expect(champDuChat(page)).toHaveValue("");
+  await expect(champDuChat(page)).toBeFocused();
 });

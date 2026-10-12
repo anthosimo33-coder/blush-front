@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { cn } from "@/lib/cn";
 import { basDePage } from "@/lib/defilement";
 import { figtree } from "@/lib/fonts";
+import { gardeLeFocus } from "@/lib/hooks";
 import { formatCount, NBSP } from "@/lib/format";
 import { QUESTION_MAX } from "@/lib/limites";
 import { moiEtAutre } from "@/lib/participants";
@@ -135,6 +136,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
           type="submit"
           aria-label="Poser ma question"
           disabled={!typed}
+          /* Le champ garde le focus après l’envoi : le clavier reste ouvert */
+          onMouseDown={gardeLeFocus}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink transition-[background-color,box-shadow,transform] duration-200 active:scale-95 disabled:bg-disabled disabled:shadow-none"
         >
           <Icon name="arrow" size={18} stroke={2.8} className="-rotate-90 text-white" />

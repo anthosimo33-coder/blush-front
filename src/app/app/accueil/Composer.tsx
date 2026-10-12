@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type FormEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
-import { useFilePicker } from "@/lib/hooks";
+import { gardeLeFocus, useFilePicker } from "@/lib/hooks";
 import { ACCEPT_EXPORT, ACCEPT_IMAGES } from "@/lib/limites";
 import { bumpPearl, delai, pearlsOf, prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
@@ -297,9 +297,18 @@ export function Composer({
                 className="min-w-0 flex-1 bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey"
               />
             </label>
-            {/* Texte tapé : la flèche pour envoyer. Champ vide : le vocal, comme dans Messages */}
+            {/*
+             * Texte tapé : la flèche pour envoyer. Champ vide : le vocal, comme dans Messages. Toucher la flèche laisse le
+             * focus au champ (gardeLeFocus) : le clavier reste ouvert pour la suite, comme quand le <label> l’entourait
+             */}
             {typed ? (
-              <button type="submit" aria-label="Envoyer" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">
+              <button
+                type="submit"
+                aria-label="Envoyer"
+                data-popin=""
+                onMouseDown={gardeLeFocus}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink"
+              >
                 <Icon name="arrow" size={17} stroke={2.8} className="-rotate-90 text-white" />
               </button>
             ) : (

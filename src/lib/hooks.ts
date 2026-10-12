@@ -47,6 +47,12 @@ export function useFilePicker() {
 }
 
 /** Copie un texte dans le presse-papier (avec repli si l’API n’est pas disponible). Un clic et un toucher confirment, partout pareil. */
+/**
+ * Le bouton d’envoi d’un champ de chat : le toucher (mousedown) ne prend pas le focus au champ, qui le garde après
+ * l’envoi (le clavier du téléphone reste ouvert pour la suite). Le clic, lui, envoie comme avant.
+ */
+export const gardeLeFocus = (e: { preventDefault: () => void }) => e.preventDefault();
+
 export async function copyText(text: string) {
   const ok = await writeClipboard(text);
   if (ok) play("copier");
