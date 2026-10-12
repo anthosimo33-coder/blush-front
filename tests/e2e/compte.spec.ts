@@ -15,12 +15,14 @@ import {
   ouvrir,
   PAIEMENT,
   partagerParApi,
+  rembourser,
+  RESEAU,
   test,
 } from "./aide";
 
 /*
- * Mon compte (/compte), à la manière des Réglages : toi en haut, tes bulles, les sons, puis tes données et les gestes
- * qui effacent. Le compte et sa conv sont préparés par les routes /api (aide/compte.ts) ; tout le reste se fait à l’écran,
+ * Mon compte (/compte), à la manière des Réglages : toi en haut, tes bulles (et la recharge), tes achats, les sons,
+ * puis tes données et les gestes qui effacent. Le compte et sa conv sont préparés par les routes /api (aide/compte.ts) ; tout le reste se fait à l’écran,
  * une fois la page prête aux gestes (ouvrir).
  */
 
@@ -34,7 +36,7 @@ async function lienEteint(page: Page, id: string): Promise<void> {
   expect((await page.request.get(`/v/${id}/image`)).status()).toBe(404);
 }
 
-test("tes bulles suivent le compte : 0 et la suite à lire, puis le rapport débloqué et des bulles reçues", async ({ page }, testInfo) => {
+test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqué et des bulles reçues, puis une recharge et Tes achats", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "compte");
   await connecterParApi(page, testInfo, email);
   await lireUneConvParApi(page, testInfo);
@@ -74,6 +76,44 @@ test("tes bulles suivent le compte : 0 et la suite à lire, puis le rapport déb
     await expect(bulles.getByText("Tes bulles\u00a0: 10", { exact: true })).toBeVisible();
     await expect(bulles.getByRole("link", { name: "Lire la suite" })).toHaveCount(0);
     await expect(bulles.getByRole("switch")).toHaveCount(0);
+    /* Rien d’acheté encore : pas de « Tes achats » */
+    await expect(main.getByRole("region", { name: "Tes achats" })).toHaveCount(0);
+  });
+
+  await test.step("« C’est quoi une bulle ? » : sa feuille, que « Compris » ferme", async () => {
+    await bulles.getByRole("button", { name: /^C’est quoi une bulle/ }).click();
+    const feuille = page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" });
+    await expect(feuille.getByText("1 bulle = 1 réponse de BLUSH")).toBeVisible();
+    await feuille.getByRole("button", { name: "Compris" }).click();
+    await expect(feuille).toBeHidden();
+  });
+
+  let achat = "";
+  await test.step("« Recharger » : 30 bulles au faux Whop, et l’on revient sur Mon compte, le solde et l’achat à jour", async () => {
+    await bulles.getByRole("button", { name: /^Recharger/ }).click();
+    const recharge = page.getByRole("dialog", { name: "Recharge tes bulles" });
+    await recharge.getByRole("radio", { name: /^30 bulles/ }).click();
+    await recharge.getByRole("checkbox").check();
+    await recharge.getByRole("button", { name: "Payer · 4,90\u00a0€" }).click();
+    await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
+    achat = new URL(page.url()).searchParams.get("achat") ?? "";
+    await page.getByRole("button", { name: "Payer", exact: true }).click();
+    await page.waitForURL((u) => u.pathname === "/compte", { timeout: 2 * RESEAU });
+    await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible();
+    const achats = main.getByRole("region", { name: "Tes achats" });
+    await expect(achats.getByText("30 bulles", { exact: true })).toBeVisible();
+    await expect(achats.getByText(/^\d{1,2} \S+ \d{4} · \+30 bulles$/)).toBeVisible();
+    await expect(achats.getByText("4,90\u00a0€")).toBeVisible();
+    await expect(achats.getByText("Payé")).toBeVisible();
+    expect(await compteDe(email)).toMatchObject({ bulles: 40 });
+  });
+
+  await test.step("remboursé (depuis Whop) : l’achat le dit, ses bulles sont reprises", async () => {
+    await rembourser(page, achat);
+    await ouvrir(page, "/compte");
+    const achats = main.getByRole("region", { name: "Tes achats" });
+    await expect(achats.getByText("Remboursé")).toBeVisible();
+    await expect(bulles.getByText("Tes bulles\u00a0: 10", { exact: true })).toBeVisible();
   });
 
   await test.step("« Nouvelle histoire » repart du choix de l’appli", async () => {
@@ -96,6 +136,10 @@ test("un compte de l’équipe : des bulles illimitées, ni abonnement, ni pause
 
   await expect(bulles.getByText("Tes bulles\u00a0: illimitées", { exact: true })).toBeVisible();
   await expect(bulles.getByRole("link")).toHaveCount(0);
+  /* Rien à recharger, rien d’acheté : « C’est quoi une bulle ? » seulement */
+  await expect(bulles.getByRole("button", { name: /^Recharger/ })).toHaveCount(0);
+  await expect(bulles.getByRole("button", { name: /^C’est quoi une bulle/ })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Tes achats" })).toHaveCount(0);
   await expect(main.getByRole("region", { name: "Ton abonnement" })).toHaveCount(0);
   await expect(main.getByRole("switch", { name: "Mettre en pause" })).toHaveCount(0);
   await expect(page.getByText(/Arrêter|BLUSH\+|semaine/)).toHaveCount(0);
