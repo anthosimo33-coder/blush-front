@@ -247,6 +247,10 @@ describe("les lignes de la conv (rowsOf)", () => {
     );
     expect(lu(suite)).toEqual([`jour jour-${idHistorique(7, true)}`, `blush ${idHistorique(7, true)}-0 [${idHistorique(7, true)}, ${idHistorique(8, true)}, 3]`]);
     expect(suite[1]!.kind === "group" && [suite[1]!.at, suite[1]!.echange]).toEqual([le(10, 11), 8]);
+
+    /* Une réponse verrouillée (écrite à 0 bulle) ne se partage pas : son groupe n’a pas d’échange */
+    const verrou = rowsOf(echangesEnMsgs([{ id: 9, answer: { kind: "bubbles", bubbles: [], verrouillee: { message: 19, cout: 1 } }, at: le(10, 12) }]), OUVERT, 1);
+    expect(verrou.flatMap((r) => (r.kind === "group" ? [r.echange] : []))).toEqual([undefined]);
   });
 
   it("un niveau franchi coupe le groupe, sans date ni heure à lui ; il fait son entrée s’il est de la visite", () => {
@@ -321,6 +325,10 @@ describe("ce que les lecteurs d’écran entendent de la conv (annonceDe, la ré
 
   it("la réponse de BLUSH, ses bulles à la suite", () => {
     expect(annonceDe(reponseDeBlush(["oui, elle a vu", "et elle réfléchit"]))).toBe("BLUSH a répondu\u00a0: oui, elle a vu et elle réfléchit");
+  });
+
+  it("une réponse verrouillée (écrite à 0 bulle) : prête, à lire une fois rechargé, sans rien d’elle", () => {
+    expect(annonceDe(reponseDeBlush([], { verrouillee: { message: 9, cout: 1 } }))).toBe("Ta réponse est prête. Recharge tes bulles pour la lire.");
   });
 
   it("une longue réponse est coupée au dernier mot entier, avec des points de suspension", () => {

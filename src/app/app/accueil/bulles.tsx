@@ -4,10 +4,11 @@
  * Les bulles de la conv de l’accueil : le fil (FilDeLaConv, et l’historique plus ancien en haut), ses groupes par
  * expéditeur (Group), la forme d’une bulle (BubbleShape) et ce que chaque message y montre (bubblesOf) : ta question,
  * tes captures, un export, un vocal, la réponse de BLUSH (ses bulles, les messages qu’elle cite, la réponse à lui
- * envoyer : SendReply), « BLUSH écrit », une réponse coupée (Coupure) et un niveau franchi (LevelEvent). Le modèle
+ * envoyer : SendReply), « BLUSH écrit », une réponse coupée (Coupure), une réponse verrouillée (ReponseVerrouillee) et un
+ * niveau franchi (LevelEvent). Le modèle
  * des lignes (jours, groupes, clés) est dans ./conv/modele.ts ; HomeScreen pose le fil et lui donne la conv.
  */
-import { createContext, memo, use, type RefObject } from "react";
+import { createContext, memo, use, useState, type RefObject } from "react";
 import { IlOuElle } from "@/lib/pronom";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
@@ -70,6 +71,7 @@ export function FilDeLaConv({
   chargerAnciens,
   partager,
   relancer,
+  lire,
 }: {
   threadRef: RefObject<HTMLElement | null>;
   hautRef: RefObject<HTMLDivElement | null>;
@@ -81,6 +83,7 @@ export function FilDeLaConv({
   chargerAnciens: () => Promise<unknown>;
   partager: (echange: number) => void;
   relancer: (reponse: number) => void;
+  lire: (reponse: number, message: number) => Promise<unknown>;
 }) {
   return (
     <section
@@ -102,7 +105,9 @@ export function FilDeLaConv({
       )}
       <PartagerContext value={partager}>
         <RelanceContext value={relancer}>
-          <Thread msgs={msgs} opened={opened} depuis={depuis} />
+          <LireContext value={lire}>
+            <Thread msgs={msgs} opened={opened} depuis={depuis} />
+          </LireContext>
         </RelanceContext>
       </PartagerContext>
     </section>
@@ -402,6 +407,40 @@ function Coupure({ reponse }: { reponse: number }) {
   );
 }
 
+/** « La lire » : une réponse verrouillée (`reponse`, son message dans la conv ; `message`, son id en base), une fois rechargé. */
+const LireContext = createContext<(reponse: number, message: number) => Promise<unknown>>(async () => {});
+
+/**
+ * Une réponse écrite à 0 bulle : verrouillée, rien d’elle n’est arrivé (le serveur la garde). « La lire » la demande une
+ * fois rechargé (son coût débité) ; sans bulles, BLUSH le redit. Juste ce qu’il faut : le dessin du prototype des bulles
+ * (floutée, « Recharger pour la lire ») viendra avec la recharge.
+ * TODO(produit): textes repris du prototype (« Ta réponse est prête », « La lire ») ; la ligne du dessous est nouvelle.
+ */
+function ReponseVerrouillee({ reponse, message }: { reponse: number; message: number }) {
+  const lire = use(LireContext);
+  const [enCours, setEnCours] = useState(false);
+  return (
+    <span data-verrouillee="" className="flex flex-col items-start gap-2">
+      <span className="inline-flex items-center gap-1.5 text-corps font-black leading-[1.35]">
+        <Icon name="lock" size={15} stroke={2.6} />
+        Ta réponse est prête
+      </span>
+      <span className="text-detail font-extrabold leading-[1.45] text-soft">Recharge tes bulles pour la lire.</span>
+      <button
+        type="button"
+        disabled={enCours}
+        onClick={() => {
+          setEnCours(true);
+          void lire(reponse, message).finally(() => setEnCours(false));
+        }}
+        className="lift lift-sm lift-ink mt-0.5 inline-flex h-9 items-center rounded-full bg-ink px-3.5 text-legende font-black text-white disabled:opacity-60"
+      >
+        La lire
+      </button>
+    </span>
+  );
+}
+
 /** Les bulles d’un message, d’après son `type`. */
 function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
   switch (m.type) {
@@ -502,6 +541,7 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
       ];
     case "reponse":
       /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
+      if (m.result.verrouillee) return [{ body: <ReponseVerrouillee reponse={m.id} message={m.result.verrouillee.message} /> }];
       return bullesDeLaReponse(m.result, !!m.answered);
     default:
       return typeInconnu(m);

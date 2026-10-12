@@ -1,10 +1,13 @@
 import "server-only";
 import { and, eq, gte, sql } from "drizzle-orm";
+import { COUT_EN_BULLES } from "@/contenu/offres";
+import type { BlushAnswer } from "@/types";
 import type { Utilisateur } from "./auth";
 import { db, schema } from "./db";
 import type { RaisonBulles } from "./db/enums";
 import { estEquipe } from "./droits";
 import { ErreurInvariant } from "./erreurs";
+import { reponseDuCompte } from "./historique";
 
 /*
  * Les bulles : une réponse de BLUSH en coûte (COUT_EN_BULLES, src/contenu/offres.ts). Le solde (users.bulles) ne change
@@ -25,6 +28,12 @@ type Compte = Pick<Utilisateur, "id" | "email">;
 
 /* Levée dans la transaction d’un débit que le solde ne couvre pas : elle annule le mouvement déjà écrit */
 class SoldeInsuffisant extends Error {}
+
+/**
+ * Ce que coûte une réponse de BLUSH (COUT_EN_BULLES) : un message qui joint des captures ou un export, une réponse en
+ * vocal, ou une réponse écrite. Les captures ne s’ajoutent pas au vocal : la plus chère des deux.
+ */
+export const coutDe = ({ ajout, vocal }: { ajout: boolean; vocal: boolean }): number => (ajout ? COUT_EN_BULLES.ajout : vocal ? COUT_EN_BULLES.vocal : COUT_EN_BULLES.reponse);
 
 /** Le solde de bulles du compte, lu en base (0 pour un compte qui n’existe plus). */
 export async function soldeDe(userId: string): Promise<number> {
@@ -98,17 +107,19 @@ export async function debiter(compte: Compte, cout: number, ref: string): Promis
 
 /**
  * Rend les bulles d’une réponse débitée (`ref`, celle du débit) : la réponse a échoué, ou elle est sortie en alerte danger
- * (offerte). Une fois : vrai si elles sont rendues, faux s’il n’y avait rien à rendre (jamais débitée, l’équipe) ou si
+ * (offerte). `n` : une partie seulement, jamais plus que le débit (une réponse attendue en vocal, restée écrite). Une
+ * fois par réponse : vrai si elles sont rendues, faux s’il n’y avait rien à rendre (jamais débitée, l’équipe) ou si
  * c’était déjà fait.
  */
-export async function rendre(compte: Pick<Utilisateur, "id">, ref: string): Promise<boolean> {
+export async function rendre(compte: Pick<Utilisateur, "id">, ref: string, n?: number): Promise<boolean> {
   const m = schema.mouvementsBulles;
   return db().transaction(async (tx) => {
     const [debit] = await tx
       .select({ delta: m.delta })
       .from(m)
       .where(and(eq(m.raison, "reponse"), eq(m.ref, ref), eq(m.userId, compte.id)));
-    return !!debit && (await mouvementDans(tx, compte.id, -debit.delta, "rendu", ref));
+    const rendues = debit ? Math.min(n ?? -debit.delta, -debit.delta) : 0;
+    return rendues > 0 && (await mouvementDans(tx, compte.id, rendues, "rendu", ref));
   });
 }
 
@@ -119,11 +130,12 @@ export const refDuMessage = (messageId: number) => `message:${messageId}`;
 
 /**
  * La réponse de BLUSH verrouillée qui attend d’être payée, pour ce compte (une au plus : la suivante demande la
- * recharge, sans appel au modèle), ou null. Son texte reste en base, chiffré, jamais envoyé avant d’être payé.
+ * recharge, sans appel au modèle), ou null. Son texte reste en base, chiffré, jamais envoyé avant d’être payé. `ex` :
+ * la transaction qui la cherche (garderVerrouillee), sinon la base.
  */
-export async function reponseVerrouillee(userId: string): Promise<{ id: number; storyId: string; cout: number } | null> {
+export async function reponseVerrouillee(userId: string, ex: Pick<Executeur, "select"> = db()): Promise<{ id: number; storyId: string; cout: number } | null> {
   const c = schema.chatMessages;
-  const [r] = await db()
+  const [r] = await ex
     .select({ id: c.id, storyId: c.storyId, cout: c.cout })
     .from(c)
     .innerJoin(schema.stories, eq(schema.stories.id, c.storyId))
@@ -157,4 +169,36 @@ export async function deverrouiller(compte: Compte, messageId: number): Promise<
     if (e instanceof SoldeInsuffisant) return "insuffisant";
     throw e;
   }
+}
+
+/**
+ * Écrit une réponse verrouillée (`ecrire`, dans la transaction), seulement si aucune autre n’attend déjà pour ce compte :
+ * le compte est verrouillé le temps de vérifier et d’écrire (deux réponses à 0 bulle en même temps n’en gardent qu’une).
+ * Rend ce qu’`ecrire` a rendu, ou null : une autre attend déjà (rien n’est écrit).
+ */
+export async function garderVerrouillee<T>(userId: string, ecrire: (tx: Executeur) => Promise<T>): Promise<T | null> {
+  return db().transaction(async (tx) => {
+    await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, userId)).for("update");
+    if (await reponseVerrouillee(userId, tx)) return null;
+    return ecrire(tx);
+  });
+}
+
+/**
+ * Lire une réponse verrouillée de ce compte (`message`), une fois rechargé : son coût est débité (deverrouiller), puis
+ * elle est rendue en entier, avec ce qu’elle a coûté et ce qu’il reste. Déjà payée (un second toucher, un autre
+ * onglet) : rendue telle quelle, sans nouveau débit. « insuffisant » : le solde ne la couvre toujours pas (rien ne
+ * change) ; null : pas une réponse de ce compte.
+ */
+export async function lireLaReponse(compte: Compte, message: number): Promise<BlushAnswer | "insuffisant" | null> {
+  const fait = await deverrouiller(compte, message);
+  if (fait === "insuffisant") return "insuffisant";
+  const lue = await reponseDuCompte(compte.id, message);
+  if (!lue) return null;
+  const payee = fait === "deverrouillee" && !estEquipe(compte);
+  return {
+    ...lue.reponse,
+    ...(lue.echange === null ? {} : { echange: lue.echange }),
+    ...(payee ? { bulles: { depensees: lue.cout ?? COUT_EN_BULLES.reponse, restantes: await soldeDe(compte.id) } } : {}),
+  };
 }

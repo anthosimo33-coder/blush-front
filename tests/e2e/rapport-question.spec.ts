@@ -1,7 +1,9 @@
 import type { Page, TestInfo } from "@playwright/test";
 import {
   attendreTaches,
+  compteDe,
   debloquerLaConv,
+  donnerDesBulles,
   emailLibre,
   expect,
   lectureComplete,
@@ -121,11 +123,12 @@ test("un rapport débloqué (un achat) : le rapport complet, « Ta question » e
 });
 
 /*
- * « Ta question » est une réponse du chat comme une autre (plus de question incluse) : chacune reçoit sa réponse, et
- * l’échange est gardé dans le chat. Le débit des bulles arrive avec le lot du chat.
+ * « Ta question » est une réponse du chat comme une autre (plus de question incluse) : une bulle, et l’échange est gardé
+ * dans le chat. À 0 bulle, la réponse s’écrit, verrouillée (rien d’elle n’arrive) ; une autre attend déjà : « bulles ».
  */
-test("un rapport débloqué : ta question reçoit sa réponse, et la suivante aussi", async ({ page }, testInfo) => {
+test("un rapport débloqué, 1 bulle : ta question reçoit sa réponse ; la suivante s’écrit verrouillée, la troisième attend", async ({ page }, testInfo) => {
   const email = await compteDebloque(page, testInfo);
+  await donnerDesBulles(email, 1);
   const rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ }).click();
   await expect(page).toHaveURL(/\/rapport\/question$/);
@@ -139,9 +142,28 @@ test("un rapport débloqué : ta question reçoit sa réponse, et la suivante au
   /* La suite, c’est le chat ; l’échange y est gardé, à la suite */
   await expect(page.getByRole("link", { name: "Continuer dans ton chat avec BLUSH" })).toBeVisible();
   expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
+  expect(await compteDe(email)).toMatchObject({ bulles: 0 });
 
-  /* Une deuxième question, posée par la route comme le fait l’écran (marquée `question`) : elle part aussi */
-  const seconde = await page.request.post("/api/chat", { headers: origine(testInfo), data: { texte: "et samedi, je fais quoi ?", question: true }, timeout: RESEAU });
+  /* Une deuxième question, posée par la route comme le fait l’écran (marquée `question`), à 0 bulle : écrite, verrouillée */
+  const question = (texte: string) => page.request.post("/api/chat", { headers: origine(testInfo), data: { texte, question: true }, timeout: RESEAU });
+  const seconde = await question("et samedi, je fais quoi ?");
   expect(seconde.status()).toBe(200);
+  expect(await seconde.text()).not.toContain("elle te cherche");
   expect(await messagesDuChat(email)).toEqual(["toi", "blush", "toi", "blush"]);
+  /* La troisième : une réponse verrouillée attend déjà, rien ne part */
+  const troisieme = await question("et dimanche ?");
+  expect([troisieme.status(), await troisieme.json()]).toEqual([402, { erreur: "bulles" }]);
+  expect(await messagesDuChat(email)).toHaveLength(4);
+});
+
+test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans rien d’elle", async ({ page }, testInfo) => {
+  await compteDebloque(page, testInfo);
+  const rapport = await ouvrirLeRapport(page);
+  await rapport.getByRole("link", { name: /^Poser ma question à BLUSH/ }).click();
+  await page.getByRole("textbox", { name: "Ta question à BLUSH" }).fill(QUESTION);
+  expect((await reponseAuGeste(page, { chemin: "/api/chat" }, () => page.getByRole("button", { name: "Poser ma question" }).click())).status()).toBe(200);
+  const conv = page.getByRole("log", { name: "Ta conversation avec BLUSH" });
+  await expect(conv.getByText("Ta réponse est prête")).toBeVisible();
+  await expect(conv.getByText("Recharge tes bulles pour la lire\u00a0: elle t’attend dans ton chat avec BLUSH.")).toBeVisible();
+  await expect(conv.getByText("elle te cherche 👀")).toHaveCount(0);
 });

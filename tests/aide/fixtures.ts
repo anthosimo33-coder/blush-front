@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
 import { executerChaine } from "@/server/pipeline";
 import type { Utilisateur } from "@/server/auth";
+import { crediter, soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
 import { definirQui, importer, rattacherBrouillon, type LigneComplete, type Meta } from "@/server/histoires";
 import { depuisFichier } from "@/server/import";
@@ -45,6 +47,15 @@ export async function compteDeTest(prefixe: string, acces: "gratuit" | "debloque
   creees.comptes.push(u.id);
   if (acces === "debloque") debloques.add(u.id);
   return u;
+}
+
+/**
+ * Donne `n` bulles au compte (une ligne « equipe » au journal, comme l’outil de l’équipe) : de quoi parler à BLUSH, dont
+ * chaque réponse se paie (src/server/bulles.ts). Rend le nouveau solde.
+ */
+export async function donnerDesBulles(u: Pick<Utilisateur, "id">, n: number): Promise<number> {
+  await crediter(u.id, n, "equipe", `equipe:test:${randomUUID()}`);
+  return soldeDe(u.id);
 }
 
 /** Débloque (ou re-verrouille, `ouvert` faux) le rapport de cette conv, comme un achat livré (ou repris), sans relancer la chaîne. */

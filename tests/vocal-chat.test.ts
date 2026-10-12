@@ -51,7 +51,7 @@ import { aujourdhuiParis } from "@/server/temps";
 import { vocalAJour } from "@/server/vocal";
 import type { Utilisateur } from "@/server/auth";
 import type { EvenementChat } from "@/types";
-import { avecFactice, compteDeTest, histoireLue } from "./aide/fixtures";
+import { avecFactice, compteDeTest, donnerDesBulles, histoireLue } from "./aide/fixtures";
 
 let id = "";
 let compte: Utilisateur;
@@ -107,6 +107,8 @@ const oublierLeMois = () =>
 
 beforeAll(async () => {
   compte = await compteDeTest("vocal-chat", "debloque");
+  /* Chaque réponse se paie en bulles : de quoi parler à BLUSH tout le fichier (le compte à 0 bulle : tests/chat-bulles.test.ts) */
+  await donnerDesBulles(compte, 1000);
   id = (await histoireLue(compte, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(compte.id)).secret);

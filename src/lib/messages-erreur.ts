@@ -20,6 +20,11 @@ const CHAT_ET_QUESTION = {
   /* « BLUSH souffle un peu, réessaie demain », dit par BLUSH lui-même */
   souffle: "je souffle un peu, réessaie demain",
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
+  /*
+   * Plus de bulles : une réponse verrouillée attend déjà (src/server/bulles.ts), ou la lire en demande plus que le solde.
+   * TODO(produit): texte nouveau, sans maquette (le prototype des bulles n’a pas ce cas) ; la recharge viendra avec lui
+   */
+  bulles: ["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"],
 } as const;
 
 /** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
@@ -98,6 +103,8 @@ const MESSAGES = {
   /* La question du rapport, qui passe par le chat : BLUSH le dit en une phrase, l’écran garde la question */
   question: {
     ...CHAT_ET_QUESTION,
+    /* TODO(produit): texte nouveau, sans maquette (voir CHAT_ET_QUESTION) */
+    bulles: "plus de bulles pour l’instant, recharge et je te réponds",
     refus: "là-dessus je peux pas t’aider, reformule ta question",
     defaut: "j’ai eu un bug, renvoie-moi ta question",
   },

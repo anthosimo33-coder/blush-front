@@ -9,7 +9,8 @@
  * Testé dans tests/client/useConversation.test.ts.
  */
 import { useEffect, useRef, useState } from "react";
-import { CoupureChat, modeVocalChat, type SuiviChat } from "@/services/api";
+import { CoupureChat, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
+import { messageErreur } from "@/lib/messages-erreur";
 import { noterEcriture } from "@/lib/query";
 import { tracer } from "@/lib/tracer";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
@@ -185,6 +186,13 @@ export function useConversation({
     setMsgs(fn);
   };
 
+  /** Un mot de BLUSH dans la conv (pas de micro, rien entendu, plus de bulles). */
+  const direMot = (notice: string) => {
+    const mot: Msg = { type: "mot", id: nouvelId(), from: "blush", at: Date.now(), notice };
+    changer((m) => [...m, mot]);
+    ecran.current.annoncer(mot);
+  };
+
   /* « Réessayer » une réponse coupée par le réseau : ce qu’elle demandait, par réponse (voir echanger) */
   const relances = useRef(new Map<number, Echange>());
   /* Les minuteurs en route (la fête d’un niveau, 0,7 s après sa réponse) : un accueil quitté avant ne la joue pas */
@@ -315,10 +323,25 @@ export function useConversation({
       return true;
     },
     /** Un mot de BLUSH dans la conv (pas de micro, rien entendu). */
-    direMot: (notice: string) => {
-      const mot: Msg = { type: "mot", id: nouvelId(), from: "blush", at: Date.now(), notice };
-      changer((m) => [...m, mot]);
-      ecran.current.annoncer(mot);
+    direMot,
+    /**
+     * « La lire » : la réponse verrouillée `reponse` (son `message` en base), une fois rechargé. Elle remplace sa version
+     * masquée, et les lecteurs d’écran l’entendent comme une réponse qui arrive ; sinon (plus de bulles, le réseau),
+     * BLUSH dit pourquoi d’un mot.
+     */
+    lire: async (reponse: number, message: number) => {
+      noterEcriture("chat");
+      try {
+        const lue = await lireLaReponse(message);
+        changer((m) => m.map((x) => (x.id === reponse && x.type === "reponse" ? { ...x, result: lue } : x)));
+        const masquee = derniers.current.msgs.find((x) => x.id === reponse);
+        if (masquee?.type === "reponse") ecran.current.annoncer({ ...masquee, result: lue });
+      } catch (e) {
+        tracer("conv:lire", e);
+        direMot([messageErreur("chat", e)].flat().join(" "));
+      } finally {
+        noterEcriture("chat");
+      }
     },
     /** Un repère dans la conv : un niveau franchi. */
     marquerNiveau: (level: LevelId) => {

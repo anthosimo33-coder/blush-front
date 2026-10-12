@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CoupureChat, getChatHistory, modeVocalChat, type SuiviChat } from "@/services/api";
+import { CoupureChat, getChatHistory, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
 import type { BlushAnswer, BulleChat } from "@/types";
 import type { HistoriqueChat } from "@/types/api";
+import { ErreurApi } from "@/types/erreurs-api";
 import { nouvelId, useConversation, type Scene } from "@/app/app/accueil/conv/useConversation";
 import type { Devant } from "@/app/app/accueil/conv/useChargerAnciens";
 import { idHistorique, type EchangeScript, type Msg, type NewMsg } from "@/app/app/accueil/conv/modele";
@@ -14,10 +15,11 @@ import { chaqueTestASonHeure, renduNeuf } from "./temps";
  * l’historique, sans l’écran. Le serveur est simulé : l’historique (GET /api/chat) et le mode vocal (POST
  * /api/chat/vocal) ; chaque réponse de BLUSH est la demande que le test passe lui-même.
  */
-vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), getChatHistory: vi.fn(), modeVocalChat: vi.fn() }));
+vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), getChatHistory: vi.fn(), modeVocalChat: vi.fn(), lireLaReponse: vi.fn() }));
 
 const historique = vi.mocked(getChatHistory);
 const modeVocal = vi.mocked(modeVocalChat);
+const lireReponse = vi.mocked(lireLaReponse);
 
 chaqueTestASonHeure();
 
@@ -26,6 +28,7 @@ beforeEach(() => {
   historique.mockResolvedValue({ echanges: [], plus: false });
   modeVocal.mockReset();
   modeVocal.mockResolvedValue(true);
+  lireReponse.mockReset();
 });
 
 /* Une réponse de BLUSH, en quelques bulles */
@@ -322,6 +325,42 @@ describe("useConversation : un échange", () => {
     expect(s.avantChangement).toHaveBeenCalledTimes(2);
     /* Des messages de la visite : ils font leur entrée */
     expect(result.current.msgs.slice(-2).every((m) => m.id >= result.current.depuis)).toBe(true);
+  });
+});
+
+describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () => {
+  const verrouillee = reponse([], { verrouillee: { message: 41, cout: 1 } });
+
+  it("« La lire » : la réponse payée remplace sa version masquée, à la même place, et les lecteurs d’écran l’entendent", async () => {
+    const { result, scene: s } = monter();
+    await act(() =>
+      result.current.envoyer(
+        texteDe("je lui dis quoi ?"),
+        analyse(async () => enMsg(verrouillee)),
+      ),
+    );
+    const masquee = result.current.msgs.at(-1)!;
+    lireReponse.mockResolvedValue(reponse(["dis-lui oui"], { bulles: { depensees: 1, restantes: 4 }, echange: 40 }));
+    await act(() => result.current.lire(masquee.id, 41));
+    expect(lireReponse).toHaveBeenCalledExactlyOnceWith(41);
+    expect(result.current.msgs.at(-1)).toMatchObject({ id: masquee.id, type: "reponse", result: { bubbles: [{ text: "dis-lui oui" }], echange: 40 } });
+    /* Annoncée « prête » quand elle est arrivée masquée, puis ce qu’elle dit une fois lue */
+    expect(s.annoncer).toHaveBeenLastCalledWith(result.current.msgs.at(-1));
+  });
+
+  it("plus de bulles pour la lire : elle reste verrouillée, et BLUSH le dit d’un mot", async () => {
+    const { result } = monter();
+    await act(() =>
+      result.current.envoyer(
+        texteDe("je lui dis quoi ?"),
+        analyse(async () => enMsg(verrouillee)),
+      ),
+    );
+    const masquee = result.current.msgs.at(-1)!;
+    lireReponse.mockRejectedValue(new ErreurApi("bulles", 402));
+    await act(() => result.current.lire(masquee.id, 41));
+    expect(result.current.msgs.at(-2)).toEqual(masquee);
+    expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: "plus de bulles pour l’instant 🫧 recharge, et je te réponds" });
   });
 });
 

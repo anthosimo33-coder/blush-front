@@ -149,6 +149,8 @@ type Reponses = {
   /** D’un bloc ; en flux, quand le navigateur le demande (Accept), une ligne JSON par événement (EvenementChat, src/types). */
   "POST /api/chat": BlushAnswer;
   "POST /api/chat/vocal": { modeVocal: boolean };
+  /** La réponse verrouillée, payée : en entier, avec ce qu’elle a coûté et ce qu’il reste. */
+  "POST /api/chat/debloquer": BlushAnswer;
   "GET /api/compte": Account;
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
@@ -217,6 +219,8 @@ export const ROUTES = {
    */
   "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional() }), formulaire: true },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
+  /* La réponse verrouillée à lire : son message (BlushAnswer.verrouillee) */
+  "POST /api/chat/debloquer": { corps: z.object({ message: z.number().int().positive() }) },
   "GET /api/compte": {},
   "DELETE /api/compte": {},
   "GET /api/cron/purge": {},

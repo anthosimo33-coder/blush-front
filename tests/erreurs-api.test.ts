@@ -29,6 +29,7 @@ describe("le serveur", () => {
       deja: 409,
       acces: 402,
       bientot: 402,
+      bulles: 402,
       email: 422,
       texte: 422,
       faits: 422,
@@ -126,6 +127,11 @@ describe("les écrans", () => {
     /* Le chat est ouvert à tout compte connecté : un 402 n’y a plus de texte à lui, c’est un bug */
     expect(messageErreur("question", api("acces"))).toBe("j’ai eu un bug, renvoie-moi ta question");
     expect(messageErreur("question", api("panne"))).toBe("j’ai eu un bug, renvoie-moi ta question");
+  });
+
+  it("plus de bulles : BLUSH le dit au chat en bulles, à la question en une phrase", () => {
+    expect(messageErreur("chat", api("bulles"))).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds"]);
+    expect(messageErreur("question", api("bulles"))).toBe("plus de bulles pour l’instant, recharge et je te réponds");
   });
 
   it("un vocal illisible dit le texte de la transcription en panne (qu’il écrive), pas celui d’un vocal vide (qu’il renvoie)", () => {
