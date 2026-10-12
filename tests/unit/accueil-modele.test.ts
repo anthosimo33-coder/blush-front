@@ -247,7 +247,7 @@ describe("les lignes de la conv (rowsOf)", () => {
     );
     expect(lu(suite)).toEqual([`jour jour-${idHistorique(7, true)}`, `blush ${idHistorique(7, true)}-0 [${idHistorique(7, true)}, ${idHistorique(8, true)}, 3]`]);
     expect(suite[1]!.kind === "group" && [suite[1]!.at, suite[1]!.echange]).toEqual([le(10, 11), 8]);
- 
+
     /* Une réponse verrouillée (écrite à 0 bulle) ne se partage pas : son groupe n’a pas d’échange */
     const verrou = rowsOf(echangesEnMsgs([{ id: 9, answer: { kind: "bubbles", bubbles: [], verrouillee: { message: 19, cout: 1 } }, at: le(10, 12) }]), OUVERT, 1);
     expect(verrou.flatMap((r) => (r.kind === "group" ? [r.echange] : []))).toEqual([undefined]);

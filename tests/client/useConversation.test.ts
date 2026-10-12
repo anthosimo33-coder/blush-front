@@ -333,7 +333,12 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
 
   it("« La lire » : la réponse payée remplace sa version masquée, à la même place", async () => {
     const { result } = monter();
-    await act(() => result.current.envoyer(texteDe("je lui dis quoi ?"), analyse(async () => enMsg(verrouillee))));
+    await act(() =>
+      result.current.envoyer(
+        texteDe("je lui dis quoi ?"),
+        analyse(async () => enMsg(verrouillee)),
+      ),
+    );
     const masquee = result.current.msgs.at(-1)!;
     lireReponse.mockResolvedValue(reponse(["dis-lui oui"], { bulles: { depensees: 1, restantes: 4 }, echange: 40 }));
     await act(() => result.current.lire(masquee.id, 41));
@@ -343,7 +348,12 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
 
   it("plus de bulles pour la lire : elle reste verrouillée, et BLUSH le dit d’un mot", async () => {
     const { result } = monter();
-    await act(() => result.current.envoyer(texteDe("je lui dis quoi ?"), analyse(async () => enMsg(verrouillee))));
+    await act(() =>
+      result.current.envoyer(
+        texteDe("je lui dis quoi ?"),
+        analyse(async () => enMsg(verrouillee)),
+      ),
+    );
     const masquee = result.current.msgs.at(-1)!;
     lireReponse.mockRejectedValue(new ErreurApi("bulles", 402));
     await act(() => result.current.lire(masquee.id, 41));

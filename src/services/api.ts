@@ -515,7 +515,7 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
       question,
       title: "Ta réponse est prête",
       evidenceLabel: "Plus de bulles",
-      evidence: "Recharge tes bulles pour la lire : elle t’attend dans ton chat avec BLUSH.",
+      evidence: "Recharge tes bulles pour la lire\u00a0: elle t’attend dans ton chat avec BLUSH.",
       confidence: "probable",
       limits: "",
       verrouillee: true,
