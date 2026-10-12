@@ -4,11 +4,10 @@ import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
-import { passerEnBlushPlus } from "./comptes";
 import { db, schema, uneLigne } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
-import { accesLibre, boiteAMails, peutEntrer } from "./env";
+import { boiteAMails, peutEntrer } from "./env";
 import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, rendre, sousLaLimite } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
@@ -200,16 +199,10 @@ export async function compteDe(email: string): Promise<Utilisateur> {
     uneLigne(
       await db()
         .insert(schema.users)
-        .values({ email, plan: accesLibre(email) ? "blushplus" : "gratuit" })
+        .values({ email })
         .returning(),
       "users:compte_cree",
     );
-  /* La bêta sans paiement : un email ajouté à la liste après coup a son accès à la connexion suivante */
-  if (existant && existant.plan === "gratuit" && accesLibre(email)) {
-    await passerEnBlushPlus(existant.id);
-    utilisateur.plan = "blushplus";
-  }
-
   return utilisateur;
 }
 
@@ -256,7 +249,8 @@ export async function compteDeSession(secret: string | undefined): Promise<Utili
 
 /**
  * Le compte d’une session, ou null. Bêta fermée : un email retiré de la liste n’entre plus, même avec une session
- * ouverte avant (elle dure tant qu’il revient). Son plan ne change pas : ce qui a été donné reste donné, si la bêta s’ouvre.
+ * ouverte avant (elle dure tant qu’il revient). Ce qu’il a payé ne change pas : ses rapports débloqués et ses bulles
+ * restent, si la bêta s’ouvre.
  */
 export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   const utilisateur = await compteDeSession(secret);

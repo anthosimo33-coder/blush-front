@@ -1,23 +1,13 @@
-import { mettreEnPause, supprimerCompte } from "@/server/comptes";
+import { supprimerCompte } from "@/server/comptes";
 import { lireBrouillon, oublierCetAppareil } from "@/server/cookies";
 import { compteDe } from "@/server/donnees";
-import { erreur, lireCorps, OUBLIER_LE_NAVIGATEUR, repondre, route } from "@/server/http";
+import { erreur, OUBLIER_LE_NAVIGATEUR, repondre, route } from "@/server/http";
 import { garde, lecture } from "@/server/requete";
-import { ROUTES } from "@/types/api";
 import { ERREURS_API } from "@/types/erreurs-api";
 
 export const GET = route("GET /api/compte", async () => {
   const g = await lecture({ session: "requise" });
-  return g instanceof Response ? g : repondre("GET /api/compte", compteDe(g.utilisateur, g.story));
-});
-
-/** Mettre BLUSH en pause (ou le reprendre). Un corps mal formé le reprend. */
-export const POST = route("POST /api/compte", async (req: Request) => {
-  const g = await garde(req, { session: "requise" });
-  if (g instanceof Response) return g;
-  const paused = (await lireCorps(req, ROUTES["POST /api/compte"].corps))?.paused === true;
-  await mettreEnPause(g.utilisateur.id, paused);
-  return repondre("POST /api/compte", { ok: true });
+  return g instanceof Response ? g : repondre("GET /api/compte", await compteDe(g.utilisateur, g.story));
 });
 
 /**

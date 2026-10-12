@@ -180,7 +180,6 @@ export function HomeScreen(p: {
     <ContactContext value={live}>
       <MotionContext value={moving}>
         <AppScreen
-          besoin="chat"
           autre={contact.fiche.person.name}
           aside={null}
           mainWidth={WINDOW_W}

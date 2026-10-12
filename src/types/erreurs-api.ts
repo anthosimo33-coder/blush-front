@@ -38,9 +38,9 @@ export const ERREURS_API = {
   occupe: 409,
   /** Une alerte de danger (le mode sobre) : le verdict ne se partage pas. */
   sobre: 409,
-  /** Réservé à BLUSH+. */
+  /** Pas encore payé : sa fiche (un client), la chute d’un chapitre (le rapport débloqué). */
   acces: 402,
-  /** Le paiement n’existe pas encore (la bêta) : seuls les comptes de BLUSH_ACCES_LIBRE débloquent. */
+  /** Le paiement n’est pas encore branché : seuls les comptes de l’équipe (BLUSH_ACCES_LIBRE) débloquent. */
   bientot: 402,
 
   /* Ce qu’elle envoie */

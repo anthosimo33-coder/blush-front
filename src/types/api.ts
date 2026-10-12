@@ -7,15 +7,21 @@
  */
 import { z } from "zod";
 import { PRENOM_MAX } from "@/lib/limites";
-import { EVENEMENTS_ECOUTE, GOALS, GUESSES, PLANS, PRONOMS, SECTIONS_FICHE } from "@/types";
-import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, Plan, Report, SoberReport, Source, Story, Subscription, VocalRapport } from "@/types";
+import { EVENEMENTS_ECOUTE, FORMULES, GOALS, GUESSES, PRONOMS, SECTIONS_FICHE } from "@/types";
+import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, Report, SoberReport, Source, Story, VocalRapport } from "@/types";
 import type { CodeErreur } from "./erreurs-api";
 
 /* ———— Ce qui passe sur le réseau ———— */
 
+/** Le compte, ses droits et ses bulles (src/server/droits.ts). */
 export type Account = {
   email: string | null;
-  subscription: Subscription;
+  /** Son solde de bulles (une réponse de BLUSH en coûte). Il peut être négatif après un remboursement. */
+  bulles: number;
+  /** Un client : au moins un rapport débloqué, ou un achat payé (sa fiche s’ouvre). */
+  client: boolean;
+  /** Un compte de l’équipe (BLUSH_ACCES_LIBRE) : tous ses rapports ouverts, bulles illimitées, rien à payer. */
+  equipe: boolean;
   storyDeleted: boolean;
 };
 
@@ -41,8 +47,9 @@ export type ReportPayload = {
    * serveur (assemblerRapport) ; absent des aperçus de l’équipe, qui n’en ont pas.
    */
   alerte?: boolean;
-  access: Plan;
-  /** Le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
+  /** Le rapport de cette conv est débloqué (payé, offert, ou un compte de l’équipe) : tous ses chapitres. Sinon, le chapitre 1. */
+  debloque: boolean;
+  /** Le rapport s’écrit encore (rapport débloqué, pas fini). Le front repasse dans quelques secondes. */
   generating?: boolean;
   /** Pendant l’écriture : où en est BLUSH, chapitre par chapitre. */
   ecriture?: EcritureRapport;
@@ -124,11 +131,10 @@ type Reponses = {
   "POST /api/chat": BlushAnswer;
   "POST /api/chat/vocal": { modeVocal: boolean };
   "GET /api/compte": Account;
-  "POST /api/compte": Ok;
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "POST /api/debloquer": Subscription;
+  "POST /api/debloquer": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
   "POST /api/fiche": FicheUpdate;
@@ -183,15 +189,15 @@ export const ROUTES = {
   "GET /api/chat": {},
   /*
    * Un message en texte ; des captures, un export ou un vocal partent en formulaire. `question` : la question du rapport
-   * (« Ta question »), en texte seulement : le plan « rapport » en a une par conv, sans le chat (src/server/question-incluse.ts)
+   * (« Ta question »), en texte seulement : une réponse du chat comme une autre
    */
   "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional() }), formulaire: true },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   "GET /api/compte": {},
-  "POST /api/compte": { corps: z.object({ paused: z.boolean() }) },
   "DELETE /api/compte": {},
   "GET /api/cron/purge": {},
-  "POST /api/debloquer": { corps: z.object({ offre: z.enum(PLANS).exclude(["gratuit"]) }) },
+  /* La formule choisie sur la feuille du paiement */
+  "POST /api/debloquer": { corps: z.object({ offre: z.enum(FORMULES) }) },
   "GET /api/fiche": {},
   /* Sa fiche corrigée : la liste entière de ses faits */
   "PUT /api/fiche": {

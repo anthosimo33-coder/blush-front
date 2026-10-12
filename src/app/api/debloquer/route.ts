@@ -1,32 +1,28 @@
-import { passerEnBlushPlus } from "@/server/comptes";
-import { accesLibre } from "@/server/env";
+import { offrirLeRapport } from "@/server/achats";
+import { estEquipe } from "@/server/droits";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
-import { relancerApres, reparerLaChaine } from "@/server/pipeline";
+import { relancerApres } from "@/server/pipeline";
 import { garde } from "@/server/requete";
-import { SUBSCRIPTIONS } from "@/contenu/offres";
-import { peut } from "@/lib/acces";
 import { ROUTES } from "@/types/api";
 
 export const maxDuration = 300;
 
 /**
- * Débloquer le rapport. v1, sans paiement : seulement pour les emails de la bêta (BLUSH_ACCES_LIBRE).
- * Le rapport, puis la mémoire, s’écrivent après la réponse.
+ * Débloquer le rapport de la conv ouverte, sans paiement : un compte de l’équipe (BLUSH_ACCES_LIBRE) se le livre,
+ * gratuitement ; les autres reçoivent « bientot » (402) tant que le paiement n’est pas branché (POST /api/paiement le
+ * remplacera). Le rapport, puis la mémoire, s’écrivent après la réponse.
  */
 export const POST = route("POST /api/debloquer", async (req: Request) => {
   const g = await garde(req, { session: "requise" });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
-  /* Une offre qui n’existe pas : « offre » (laquelle, la v1 ne s’en sert pas encore : tout débloque BLUSH+) */
+  /* Une formule qui n’existe pas : « offre » (laquelle, l’équipe ne paie pas : elle ne change rien) */
   if (!(await lireCorps(req, ROUTES["POST /api/debloquer"].corps))) return erreur("offre");
-  if (!peut(utilisateur.plan, "rapport")) {
-    if (!accesLibre(utilisateur.email)) return erreur("bientot");
-    await passerEnBlushPlus(utilisateur.id);
-  }
+  if (!estEquipe(utilisateur)) return erreur("bientot");
   /* Le rapport s’il n’a jamais été lancé, ou la mémoire d’un rapport sobre déjà offert : ce qui manque part, une seule fois */
-  if (story) {
-    await reparerLaChaine(story);
+  if (story?.userId) {
+    await offrirLeRapport({ id: story.id, userId: story.userId });
     relancerApres(story.id);
   }
-  return repondre("POST /api/debloquer", SUBSCRIPTIONS.blushplus);
+  return repondre("POST /api/debloquer", { ok: true });
 });

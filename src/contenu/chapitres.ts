@@ -1,8 +1,8 @@
 /*
  * Les chapitres du rapport, et ce qui en est offert. Le rapport a huit chapitres, toujours dans le même ordre. En
  * production, seul le chapitre 1, « Le verdict », est offert : il s’écrit avec le verdict, pour tout le monde. Les sept
- * autres se débloquent (BLUSH+ ou le rapport seul) ; avant, ils restent fermés et vides, et rien de leur contenu n’est
- * montré (seule exception : le mode sobre, qui s’ouvre sans paiement, voir rapportDe). La règle s’écrit ici : les
+ * autres se débloquent (le rapport payé, une fois, pour cette conv) ; avant, ils restent fermés et vides, et rien de
+ * leur contenu n’est montré (seule exception : le mode sobre, qui s’ouvre sans paiement, voir rapportDe). La règle s’écrit ici : les
  * chapitres fermés et l’écriture (src/server/donnees.ts), la révélation du verdict (src/app/rapport/verdict/cartes.ts),
  * la reprise après le paiement (/rapport/debloque) et le mail « ton rapport est prêt » (src/server/mail-rapport.ts) la
  * lisent ici.

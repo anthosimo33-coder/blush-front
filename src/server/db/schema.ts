@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { EVENEMENTS_ECOUTE, PLANS, VOIX } from "../../types";
-import { GENRES, GENRES_CHAINE, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
+import { EVENEMENTS_ECOUTE, OFFRES, OFFRES_UNIQUES, VOIX } from "../../types";
+import { FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_ACHAT, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -15,9 +15,22 @@ const quand = (nom: string) => timestamp(nom, { withTimezone: true });
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  /** En v1, sans paiement : activé à la main ou par BLUSH_ACCES_LIBRE. */
-  plan: text("plan", { enum: PLANS }).notNull().default("gratuit"),
+  /**
+   * L’accès d’avant le paiement (la bêta), par compte : plus rien ne le lit ni ne l’écrit. Seule l’étape des testeurs de
+   * la bêta (RATTRAPAGE_BETA, scripts/base.mjs, après les migrations) s’en sert, une fois, pour leur donner leurs rapports et leurs
+   * bulles. Elle reste déclarée tant que la version en ligne la nomme ; son retrait part dans un déploiement à part
+   * (BACKEND.md, « Les migrations »), comme `paused`. Ses valeurs ne s’écrivent qu’ici.
+   * TODO(produit): choisir quand retirer users.plan et users.paused (une migration seule, après la mise en ligne de ce code).
+   */
+  plan: text("plan", { enum: ["gratuit", "rapport", "blushplus"] }).notNull().default("gratuit"),
+  /** La pause de l’abonnement d’avant le paiement : plus rien ne la lit ni ne l’écrit (voir `plan`). */
   paused: boolean("paused").notNull().default(false),
+  /**
+   * Le solde de bulles : une réponse de BLUSH en coûte (src/contenu/offres.ts). Toujours changé dans la même transaction
+   * qu’une ligne de mouvements_bulles (src/server/bulles.ts), et jamais sous zéro par une dépense ; un remboursement peut
+   * l’y faire passer (le chat demande alors une recharge).
+   */
+  bulles: integer("bulles").notNull().default(0),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 
@@ -81,11 +94,17 @@ export const stories = pgTable(
     /** Le chat en vocal : il a demandé à BLUSH de lui parler en vocal (jusqu’à ce qu’il repasse à l’écrit). */
     chatVocal: boolean("chat_vocal").notNull().default(false),
     /**
-     * La question incluse avec le rapport (plan « rapport ») : l’heure où elle est partie au modèle. Un verrou, pris en
-     * une seule requête (prendreLaQuestion, src/server/question-incluse.ts) : elle ne part qu’une fois, même envoyée deux
-     * fois d’un coup. Rendu (null) si la réponse échoue ; posée pour de bon une fois son échange gardé dans le chat.
+     * La question incluse avec le rapport, d’avant les bulles : plus rien ne la lit ni ne l’écrit (« Ta question » est une
+     * réponse du chat comme une autre). Elle reste déclarée tant que la version en ligne la nomme ; son retrait part dans
+     * un déploiement à part (BACKEND.md, « Les migrations »).
+     * TODO(produit): choisir quand retirer stories.question_prise (une migration seule, après la mise en ligne de ce code).
      */
     questionPrise: quand("question_prise"),
+    /**
+     * Le rapport de cette conv est débloqué (payé, offert par l’équipe, ou donné aux testeurs de la bêta) : l’heure. null :
+     * le chapitre 1 seul. Remis à null quand l’achat qui l’a débloqué est remboursé ou contesté (src/server/achats.ts).
+     */
+    debloqueLe: quand("debloque_le"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },
@@ -134,9 +153,22 @@ export const chatMessages = pgTable(
       .references(() => stories.id, { onDelete: "cascade" }),
     role: text("role", { enum: ROLES_CHAT }).notNull(),
     data: chiffre("data").notNull(),
+    /** Ce que la réponse de BLUSH a coûté (ou coûtera, verrouillée), en bulles ; null : offerte, ou d’avant les bulles. */
+    cout: integer("cout"),
+    /**
+     * Une réponse de BLUSH écrite à 0 bulle : gardée (chiffrée dans `data`, comme toutes), mais jamais envoyée au
+     * navigateur avant d’être payée. Une recharge la débloque en débitant son `cout` (src/server/bulles.ts).
+     */
+    verrouillee: boolean("verrouillee").notNull().default(false),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
-  (t) => [index("chat_messages_story_idx").on(t.storyId, t.id)],
+  (t) => [
+    index("chat_messages_story_idx").on(t.storyId, t.id),
+    /* Les réponses verrouillées en attente : une par compte au plus (src/server/bulles.ts), trouvée sans parcourir le chat */
+    index("chat_messages_verrouillees_idx")
+      .on(t.storyId)
+      .where(sql`${t.verrouillee}`),
+  ],
 );
 
 /**
@@ -301,3 +333,90 @@ export const aiUsage = pgTable(
    */
   (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt)],
 );
+
+/**
+ * Un achat : une offre du catalogue (src/contenu/offres.ts), commandée puis payée une fois, par Whop (ou le faux Whop des
+ * tests). Le prix et les bulles sont figés à la commande, d’après le catalogue du serveur. Rien de la conv : seulement
+ * laquelle il débloque (`story_id`, vide pour des bulles seules). Un compte effacé laisse ses achats sans compte (les
+ * ventes, les remboursements à rapprocher) ; une conv effacée, sans conv.
+ */
+export const achats = pgTable(
+  "achats",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+    offre: text("offre", { enum: OFFRES }).notNull(),
+    /** Le prix payé, TTC, en centimes : celui du catalogue à la commande, jamais un prix venu du navigateur. */
+    centimes: integer("centimes").notNull(),
+    devise: text("devise", { enum: ["eur"] })
+      .notNull()
+      .default("eur"),
+    /** Les bulles qu’il donne, figées à la commande (le bonus de la première recharge compris). */
+    bulles: integer("bulles").notNull(),
+    /** L’offre unique dont il profite (src/server/offres-uniques.ts), prise à la livraison, ou null. */
+    offreUnique: text("offre_unique", { enum: OFFRES_UNIQUES }),
+    statut: text("statut", { enum: STATUTS_ACHAT }).notNull().default("en_attente"),
+    fournisseur: text("fournisseur", { enum: FOURNISSEURS_PAIEMENT }).notNull(),
+    /** La configuration de paiement chez Whop (ch_…). */
+    checkoutId: text("checkout_id"),
+    /** Le paiement chez Whop (pay_…) : un paiement ne livre qu’un achat. */
+    paiementId: text("paiement_id").unique(),
+    /** Le membre Whop (mber_…) et son moyen de paiement gardé (payt_…) : le paiement en un geste de l’offre ③. */
+    membreId: text("membre_id"),
+    moyenId: text("moyen_id"),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+    payeLe: quand("paye_le"),
+    /** Remboursé, contesté ou échoué : l’heure. */
+    annuleLe: quand("annule_le"),
+  },
+  (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
+);
+
+/**
+ * Le journal des bulles : chaque changement du solde (users.bulles), dans la même transaction que lui. Une raison et sa
+ * référence (l’achat, la réponse, le compte pour la bêta) ne s’écrivent qu’une fois : un webhook rejoué, une livraison
+ * refaite ou deux débits de la même réponse ne comptent qu’une fois.
+ */
+export const mouvementsBulles = pgTable(
+  "mouvements_bulles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Positif : des bulles reçues ; négatif : dépensées ou reprises. */
+    delta: integer("delta").notNull(),
+    raison: text("raison", { enum: RAISONS_BULLES }).notNull(),
+    ref: text("ref").notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [unique("mouvements_bulles_une_fois").on(t.raison, t.ref), index("mouvements_bulles_user_idx").on(t.userId), check("mouvements_bulles_delta", sql`${t.delta} <> 0`)],
+);
+
+/**
+ * Les offres uniques montrées à un compte (src/server/offres-uniques.ts) : chacune une fois au plus, jamais deux à moins
+ * de 24 h l’une de l’autre. `expire_le` : la fin de l’offre ① ; `prise_le` : payée ; `story_id` : la conv pour laquelle
+ * elle a été montrée.
+ */
+export const offresUniques = pgTable(
+  "offres_uniques",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    offre: text("offre", { enum: OFFRES_UNIQUES }).notNull(),
+    storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+    montreeLe: quand("montree_le").notNull().defaultNow(),
+    expireLe: quand("expire_le"),
+    priseLe: quand("prise_le"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.offre] }), index("offres_uniques_montree_idx").on(t.montreeLe)],
+);
+
+/** Les webhooks de paiement déjà traités, par leur `webhook-id` : un webhook rejoué est ignoré. Aucun contenu. */
+export const evenementsPaiement = pgTable("evenements_paiement", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  recuLe: quand("recu_le").notNull().defaultNow(),
+});

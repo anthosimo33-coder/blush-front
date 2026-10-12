@@ -5,7 +5,6 @@ import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNo
 import { useRetourSinon } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
-import { peut } from "@/lib/acces";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import { useSondage } from "@/lib/useSondage";
@@ -80,7 +79,7 @@ export function ReportScreen({
             ) : undefined
           }
         />
-        {peut(payload.access, "chat") && phase.nom !== "ecriture" && <ChatBubble sobre />}
+        {payload.debloque && phase.nom !== "ecriture" && <ChatBubble sobre />}
       </>
     );
   /*
@@ -112,9 +111,9 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
   const [imageVue, setImageVue] = useState(false);
   if (image && !imageVue) setImageVue(true);
 
-  const { report, access } = payload;
-  /* Avec l’accès au rapport : « Ton rapport complet », son temps de lecture, « Ta question » ; sans lui, le paiement */
-  const full = peut(access, "rapport");
+  const { report, debloque } = payload;
+  /* Le rapport débloqué : « Ton rapport complet », son temps de lecture, « Ta question » ; sinon, le paiement */
+  const full = debloque;
   /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
   const { moi: me, autre: other } = moiEtAutre(story, journeyMe);
   const chapters = report.chapters;
@@ -263,10 +262,10 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         </Fragment>
       ))}
 
-      <Suite phase={phase} fermes={locked} access={access} ouvrirPaiement={ouvrirPaiement} />
+      <Suite phase={phase} fermes={locked} ouvrirPaiement={ouvrirPaiement} />
 
-      {/* Le rapport prêt, avec BLUSH+ : le chat reste à portée, en bas à droite */}
-      {peut(access, "chat") && !ecritureInachevee(phase) && <ChatBubble />}
+      {/* Le rapport débloqué et prêt : le chat reste à portée, en bas à droite */}
+      {debloque && !ecritureInachevee(phase) && <ChatBubble />}
 
       {/* Reprendre là où tu t’étais arrêté : une proposition discrète, jamais un saut forcé */}
       {resume && (

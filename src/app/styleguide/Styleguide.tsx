@@ -460,7 +460,7 @@ export function Styleguide() {
             <InsetGroup title="Ton histoire" footer="Effacer ne se rattrape pas.">
               <InsetRow leading={<RowIcon icon="list" tone="toi" />} title="Le rapport" sub="7 chapitres" href="#" chevron />
               <InsetRow leading={<RowIcon icon="heart" tone="elle" />} title="Sa fiche" sub="Ce que BLUSH sait d’elle" href="#" chevron />
-              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title="BLUSH+" sub="Actif" />
+              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title="Premium" sub="Actif" />
               <InsetRow leading={<RowIcon icon="mail" tone="grey" />} title="Ton email" sub="lea@exemple.fr" />
               <InsetRow
                 leading={<RowIcon icon="trash" tone="danger" />}
@@ -593,7 +593,7 @@ export function Styleguide() {
           <Tag tone="verite" />
           <Tag tone="apercu" />
           <Tag tone="actif" />
-          <Tag tone="ink">BLUSH+</Tag>
+          <Tag tone="ink">Premium</Tag>
         </div>
       </Section>
 

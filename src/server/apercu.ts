@@ -48,7 +48,7 @@ export function apercuDe(b: SortiesDuBanc): Apercu {
   const payload: ReportPayload = {
     report: { storyId: "apercu", ...enTete(b.verdict), chapters, readingTime: lectureDe(chapters) },
     sober: sobreAffiche(b.rapport),
-    access: "blushplus",
+    debloque: true,
   };
   const { messages: tous } = lu;
   const participant = (p: { nomExport: string; prenom: string }): Participant => ({

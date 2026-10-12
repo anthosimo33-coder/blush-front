@@ -2,13 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
+import { FRAIS_DU_RENDU } from "@/lib/query";
 import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
-import { deleteAccount, deleteStory, seDeconnecter, setPaused } from "@/services/api";
+import { deleteAccount, deleteStory, seDeconnecter } from "@/services/api";
 import type { Account } from "@/types/api";
-import { OFFRE_PAR_PLAN, PAUSE_RATEE, prixDe, type PrixAffiche } from "@/contenu/offres";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -16,7 +15,6 @@ import { Switch } from "@/components/ui/controls";
 import { Alert, TypingDots } from "@/components/ui/feedback";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { NotePrivee } from "@/components/ui/NotePrivee";
-import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
@@ -31,14 +29,14 @@ type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
 const RIEN_N_EST_EFFACE = "Tes histoires restent gardées\u00a0: ton email et un code suffisent pour les retrouver.";
 
 /*
- * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, l’abonnement, l’app, ta connexion (se
+ * Écran 20 — Mon compte, à la manière des Réglages : toi en haut, tes histoires, tes bulles, l’app, ta connexion (se
  * déconnecter), puis tes données (les gestes qui effacent en rouge).
  */
 export type NomsDuCompte = { me: Person; other: Person; period: string };
 
 /**
  * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).
- * `compte` : le compte lu par la page serveur à l’heure `rendu` : l’abonnement est là dès l’affichage, rien ne descend
+ * `compte` : le compte lu par la page serveur à l’heure `rendu` : ses bulles sont là dès l’affichage, rien ne descend
  * ensuite, et il n’est pas relu tout de suite.
  */
 export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDuCompte | null; convs?: ConvSummary[]; compte?: Account | null; rendu?: number }) {
@@ -50,18 +48,14 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
   const versAccueil = () => demarrer(() => router.push("/app", { scroll: false }));
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
-  const sub = account?.subscription;
-  const plus = sub?.plan === "blushplus";
   const sons = useSoundsEnabled();
 
   /* La page d’avant ; ouvert d’ailleurs (un lien, un nouvel onglet, un retour du système), l’accueil, comme versAccueil */
   const retourSinon = useRetourSinon("/app", { scroll: false });
   const retour = () => demarrer(retourSinon);
-  const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
   /* Un geste qui n’a pas abouti (réseau, serveur) : on le dit dans la feuille, et le bouton se libère pour réessayer */
   const [souci, setSouci] = useState<string | null>(null);
-  const [souciPause, setSouciPause] = useState(false);
   const fermer = () => {
     setConfirm(null);
     setSouci(null);
@@ -80,18 +74,6 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
     setBusy(false);
     setConfirm(null);
     after();
-  };
-  /* L’interrupteur bouge tout de suite ; si le serveur n’a rien enregistré, il revient où il était */
-  const mettreEnPause = async (v: boolean) => {
-    patch({ paused: v });
-    setSouciPause(false);
-    try {
-      await setPaused(v);
-    } catch (e) {
-      tracer("compte:pause", e);
-      patch({ paused: !v });
-      setSouciPause(true);
-    }
   };
 
   return (
@@ -161,34 +143,18 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         />
       </InsetGroup>
 
-      {/* L’abonnement */}
-      <InsetGroup title="Ton abonnement" id="abonnement" className="mt-6">
-        <div className="flex min-h-[76px] items-center gap-3 px-4 py-3.5">
-          {sub && (
-            <>
-              <RowIcon icon="bolt" tone={plus ? "ink" : "grey"} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="flex items-center gap-2 text-corps font-black">
-                  {plus ? "BLUSH+" : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.title : "Ton rapport"}
-                  {plus && (sub.paused ? <Tag tone="ink">en pause</Tag> : sub.active ? <Tag tone="actif" /> : <Tag tone="ink">arrêté</Tag>)}
-                </span>
-                <span className="text-legende font-extrabold leading-[1.4] text-grey">
-                  {plus ? (sub.active ? sub.renewLabel : sub.stopLabel) : sub.plan === "rapport" ? OFFRE_PAR_PLAN.rapport.note : null}
-                </span>
-              </span>
-              <Prix {...prixDe(sub.plan)} />
-            </>
-          )}
-        </div>
-        {plus && sub && (
-          <InsetRow
-            title="Mettre en pause"
-            sub={souciPause ? PAUSE_RATEE : "Ton histoire reste gardée, rien n’est facturé"}
-            trailing={<Switch checked={sub.paused} label="Mettre en pause" onChange={(v) => void mettreEnPause(v)} />}
-          />
-        )}
-        {/* « Arrêter BLUSH+ » revient avec le paiement (Stripe) : sans lui, il n’y a rien à résilier côté serveur */}
-        {sub?.plan === "gratuit" && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
+      {/*
+       * Tes bulles : le solde (illimitées pour l’équipe). La recharge, « C’est quoi une bulle ? » et la liste des achats
+       * viennent avec les écrans des bulles. TODO(produit): le texte de l’équipe (« illimitées »), pas encore décidé
+       */}
+      <InsetGroup title="Tes bulles" id="bulles" className="mt-6">
+        <InsetRow
+          leading={<RowIcon icon="bolt" tone="elle" />}
+          title={account ? (account.equipe ? "Tes bulles\u00a0: illimitées" : `Tes bulles\u00a0: ${account.bulles}`) : "Tes bulles"}
+          sub="1 bulle = 1 réponse de BLUSH · elles n’expirent jamais"
+        />
+        {/* Aucun rapport débloqué : la suite du rapport ouvert, à payer */}
+        {account && !account.client && <InsetRow title={<span className="text-toi-ink">Lire la suite</span>} href="/rapport?paiement=1" chevron />}
       </InsetGroup>
 
       {/* Un seul réglage pour les sons et les vibrations (textes relus le 8 octobre) */}
@@ -308,15 +274,5 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         )}
       </Sheet>
     </AppScreen>
-  );
-}
-
-/** Le prix de l’abonnement, à droite de sa ligne : le montant, et sa période dessous (prixDe, src/contenu/offres.ts). */
-function Prix({ montant, periode }: PrixAffiche) {
-  return (
-    <span className="flex shrink-0 flex-col items-end">
-      <span className="text-carte font-black leading-none tracking-[-0.01em]">{montant}</span>
-      {periode && <span className="mt-1 text-micro font-extrabold text-grey">/ {periode}</span>}
-    </span>
   );
 }

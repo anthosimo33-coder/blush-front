@@ -108,7 +108,7 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
   );
 }
 
-/* ———— Ensuite, avec BLUSH+ : le message qui fait cogiter, et ce qu’on demande à BLUSH ———— */
+/* ———— Ensuite, au quotidien : le message qui fait cogiter, et ce qu’on demande à BLUSH ———— */
 
 /* Les messages qu’on relit dix fois : ils flottent autour du titre (grand écran) */
 const OVERTHINK: { text: string; at: string; r: number; d: string }[] = [
@@ -177,8 +177,8 @@ const DEMANDES: Demande[] = [
   },
 ];
 
-/** BLUSH+ en un bloc noir : le titre géant, les messages qui font cogiter, puis les questions qu’on lui pose (un îlot). */
-export function BlushPlus() {
+/** Le quotidien avec BLUSH, en un bloc noir : le titre géant, les messages qui font cogiter, puis les questions qu’on lui pose (un îlot). */
+export function Quotidien() {
   return (
     <section aria-labelledby="quotidien-titre" className="py-10 lg:py-16">
       <Container>
@@ -222,8 +222,9 @@ export function BlushPlus() {
                 {b.text}
               </span>
             ))}
+            {/* TODO(produit): le surtitre du bloc depuis le paiement à l’unité (l’abonnement d’avant y était nommé), à relire */}
             <span data-reveal="" className="text-legende font-black text-white/60">
-              Ensuite, avec BLUSH+
+              Ensuite, avec tes bulles
             </span>
             {/* Mobile : les messages qui font cogiter, en autocollants au-dessus du titre */}
             <span aria-hidden="true" className="mt-5 flex flex-wrap justify-center gap-2 lg:hidden">

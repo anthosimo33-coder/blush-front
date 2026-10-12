@@ -44,7 +44,7 @@ export const PUT = route("PUT /api/fiche", async (req: Request) => {
  * sa mémoire se met à jour après la réponse (ajouterALaFiche), et la fiche se relit jusqu’à ce que ce soit fait.
  */
 async function traiter(req: Request) {
-  const g = await garde(req, { session: "requise", plan: "fiche", histoire: true });
+  const g = await garde(req, { session: "requise", client: true, histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
   const fd = await req.formData().catch(() => null);

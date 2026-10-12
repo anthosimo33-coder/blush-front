@@ -52,7 +52,10 @@ export const Env = z.object({
   BLUSH_EMAIL_FROM_CODES: z.string().min(1).optional(),
   /** L’adresse du site : les images des mails viennent de là. */
   BLUSH_URL: z.string().url().default(SITE_EN_LIGNE),
-  /** Bêta sans paiement : les emails qui ont BLUSH+ d’office, séparés par des virgules, ou « * » pour tout le monde (refusé en production). */
+  /**
+   * Les emails de l’équipe et des invités, séparés par des virgules, ou « * » pour tout le monde (refusé en production) :
+   * en bêta fermée, les seuls à entrer ; partout, tous leurs rapports ouverts et des bulles illimitées (src/server/droits.ts).
+   */
   BLUSH_ACCES_LIBRE: z
     .string()
     .default("")
@@ -93,8 +96,8 @@ export const URL_SITE = Env.shape.BLUSH_URL.safeParse(process.env.BLUSH_URL).dat
 const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (surVercel() || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
 
 /*
- * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou BLUSH+ à tout le
- * monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Les préversions,
+ * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou tous les rapports à
+ * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Les préversions,
  * le dev et les tests n’ont pas ces exigences.
  */
 function refusEnProduction(e: Env): string[] {
@@ -103,8 +106,8 @@ function refusEnProduction(e: Env): string[] {
   /* Son défaut ("0") ouvrirait la bêta : en production, elle s’écrit exprès */
   if (process.env.BLUSH_BETA_FERMEE === undefined) refus.push("BLUSH_BETA_FERMEE manque (1 : bêta fermée, 0 : ouverte, à écrire exprès)");
   if (!e.CRON_SECRET) refus.push("CRON_SECRET manque (sans lui, la purge de nuit ne tourne jamais)");
-  /* Un plan donné n’est jamais repris : « * » donnerait BLUSH+ à chaque compte créé, pour toujours */
-  if (e.BLUSH_ACCES_LIBRE === "*") refus.push("BLUSH_ACCES_LIBRE=* est refusée (BLUSH+ d’office pour tout le monde) : seulement la liste des invités");
+  /* « * » ouvrirait tous les rapports et des bulles illimitées à chaque compte, sans rien payer */
+  if (e.BLUSH_ACCES_LIBRE === "*") refus.push("BLUSH_ACCES_LIBRE=* est refusée (tous les rapports offerts à tout le monde) : seulement la liste de l’équipe et des invités");
   return refus;
 }
 
@@ -157,7 +160,7 @@ export function estAdmin(email: string): boolean {
   return (BLUSH_ADMINS ?? BLUSH_ALERTES).includes(email.toLowerCase());
 }
 
-/** L’email a-t-il BLUSH+ d’office (bêta sans paiement) ? */
+/** L’email est-il de l’équipe (ou un invité) : tous ses rapports ouverts, bulles illimitées (src/server/droits.ts) ? */
 export function accesLibre(email: string): boolean {
   const liste = env().BLUSH_ACCES_LIBRE;
   return liste === "*" || liste.includes(email.toLowerCase());

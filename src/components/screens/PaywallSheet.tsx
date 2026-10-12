@@ -5,17 +5,17 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
 import { unlock } from "@/services/api";
-import { OFFERS, PAYWALL, prixDe } from "@/contenu/offres";
+import { CATALOGUE, enEuros, FORMULE_CHOISIE, OFFERS, PAYWALL } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import type { Offer, Plan } from "@/types";
+import type { Formule } from "@/types";
 
 /**
- * Écran 10 — Paiement : BLUSH+ (conseillé) ou le rapport complet, un seul bouton « Débloquer ».
- * `only="blushplus"` sert de porte d’entrée aux fonctions BLUSH+ (accueil, aide à chaque message, fiche).
+ * Écran 10 — Paiement : les deux formules du catalogue (le rapport seul, ou Premium, choisie d’avance), un seul bouton
+ * « Débloquer ». La feuille du prototype des bulles (« Ta formule ») la remplace avec le paiement par Whop.
  */
 export function PaywallSheet({
   open,
@@ -23,22 +23,19 @@ export function PaywallSheet({
   onUnlocked,
   otherName,
   chapitres,
-  only,
   next,
 }: {
   open: boolean;
   onClose: () => void;
-  onUnlocked?: (plan: Exclude<Plan, "gratuit">) => void;
+  onUnlocked?: (offre: Formule) => void;
   otherName?: string;
   /** Combien de chapitres restent à lire (le rapport ouvert) : sans, la suite est dite sans compter. */
   chapitres?: number;
-  only?: Offer["id"];
   /** Où reprendre après la page « C’est débloqué » (par défaut : la suite du rapport). */
   next?: string;
 }) {
   const router = useRouter();
-  const offers = only ? OFFERS.filter((o) => o.id === only) : OFFERS;
-  const [selected, setSelected] = useState<Offer["id"]>(only ?? "blushplus");
+  const [selected, setSelected] = useState<Formule>(FORMULE_CHOISIE);
   const titre = useId();
   const [busy, setBusy] = useState(false);
   /*
@@ -46,14 +43,14 @@ export function PaywallSheet({
    * page). Fermer la feuille et relire le rapport avant faisait redessiner et sauter le rapport dessous.
    */
   const [navigue, demarrer] = useTransition();
-  const paye = useRef<Exclude<Plan, "gratuit"> | null>(null);
+  const paye = useRef<Formule | null>(null);
   const occupe = busy || navigue;
   /* La navigation finie sans quitter la page : le parent ferme le panneau (fermer n’est pas annuler) */
   useEffect(() => {
     if (navigue || !paye.current) return;
-    const plan = paye.current;
+    const offre = paye.current;
     paye.current = null;
-    onUnlocked?.(plan);
+    onUnlocked?.(offre);
   }, [navigue, onUnlocked]);
 
   const [later, setLater] = useState(false);
@@ -66,7 +63,7 @@ export function PaywallSheet({
     try {
       await unlock(selected);
     } catch (e) {
-      /* Back-end v1, sans paiement : l’accès est réservé à la bêta */
+      /* Sans paiement branché : seule l’équipe se débloque un rapport */
       setBusy(false);
       if (codeDe(e) === "bientot") setLater(true);
       else setSouci(true);
@@ -81,14 +78,14 @@ export function PaywallSheet({
   return (
     <Sheet open={open} onClose={onClose} labelledBy={titre}>
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px]">
-        {only ? "BLUSH+" : PAYWALL.title(otherName)}
+        {PAYWALL.title(otherName)}
       </h2>
-      {!only && <p className="m-0 text-note font-bold leading-[1.45] text-soft lg:text-detail">{PAYWALL.subtitle(chapitres)}</p>}
-      {/* Les offres, comme un choix d’abonnement sur iPhone : un rond à cocher, le prix aligné à droite */}
-      <RadioGroup label="Ton offre" className="flex flex-col gap-2.5">
-        {offers.map((o) => {
+      <p className="m-0 text-note font-bold leading-[1.45] text-soft lg:text-detail">{PAYWALL.subtitle(chapitres)}</p>
+      {/* Les formules, comme un choix d’offre sur iPhone : un rond à cocher, le prix aligné à droite (barré dessous) */}
+      <RadioGroup label="Ta formule" className="flex flex-col gap-2.5">
+        {OFFERS.map((o) => {
           const on = selected === o.id;
-          const { montant, periode } = prixDe(o.id);
+          const { barre } = CATALOGUE[o.id];
           return (
             <button
               key={o.id}
@@ -118,8 +115,8 @@ export function PaywallSheet({
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end">
-                <span className="text-[21px] font-black leading-none tracking-[-0.01em] lg:text-[23px]">{montant}</span>
-                {periode && <span className="mt-1 text-micro font-extrabold text-grey">/ {periode}</span>}
+                <span className="text-[21px] font-black leading-none tracking-[-0.01em] lg:text-[23px]">{o.price}</span>
+                {barre !== null && <s className="mt-1 text-micro font-extrabold text-grey">{enEuros(barre)}</s>}
               </span>
             </button>
           );

@@ -36,7 +36,7 @@ export default async function Page({ searchParams }: PageProps<"/apercu/ecriture
       ],
     },
     sober: null,
-    access: "blushplus",
+    debloque: true,
     generating: true,
     ecriture,
   };

@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import { useEffect } from "react";
-import { OFFRE_PAR_PLAN } from "@/contenu/offres";
+import { CATALOGUE, prixDe } from "@/contenu/offres";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
 import { apresDeblocage } from "@/lib/requetes";
@@ -11,21 +11,14 @@ import { CheckBurst } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Screen } from "@/components/shell/Screen";
-import type { Pronom } from "@/types";
+import type { Formule } from "@/types";
 import { ancreDuChapitre } from "../ancres";
 
-/* Ce que l’offre vient d’ouvrir, dit simplement : combien de chapitres restent, d’où la lecture reprend. */
-const ouvert = (offre: "blushplus" | "rapport", restants: number, reprise: number, autre?: Pronom) =>
-  offre === "rapport"
-    ? [
-        { title: `Les ${restants} chapitres qui restent`, sub: `Ta lecture reprend au chapitre ${reprise}` },
-        { title: "Ta question à BLUSH", sub: "Une question incluse avec ton rapport" },
-      ]
-    : [
-        { title: "Le rapport complet", sub: `Les ${restants} chapitres qui restent` },
-        { title: "Le chat avec BLUSH", sub: "Envoie sa réponse\u00a0: BLUSH t’aide à répondre" },
-        { title: "Sa fiche", sub: `Ce qu’${autre === "il" ? "il" : "elle"} t’a dit, toujours sous la main` },
-      ];
+/* Ce que la formule vient d’ouvrir, dit simplement (le prototype des bulles) : les chapitres qui restent, d’où la lecture reprend, les bulles reçues. */
+const ouvert = (offre: Formule, restants: number, reprise: number) => [
+  { title: `Les ${restants} chapitres qui restent`, sub: `Ta lecture reprend au chapitre ${reprise}` },
+  { title: `${CATALOGUE[offre].bulles} bulles pour parler à BLUSH`, sub: "1 bulle = 1 réponse · elles n’expirent jamais" },
+];
 
 /*
  * Paiement réussi : un moment, pas une facture. La gerbe (« une réussite » dans le design system),
@@ -37,19 +30,15 @@ export function UnlockedScreen({
   restants,
   total,
   reprise,
-  autre,
 }: {
-  offer: "blushplus" | "rapport";
+  offer: Formule;
   next: Route | null;
   /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
   restants: number;
   /** Les chapitres du rapport, offerts compris : ceux qu’il a vraiment (un rapport écrit peut en avoir moins de huit). */
   total: number;
   reprise: number;
-  autre?: Pronom;
 }) {
-  const o = OFFRE_PAR_PLAN[offer];
-  const plus = offer === "blushplus";
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
   useSoundOnce("debloque");
   /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
@@ -80,21 +69,22 @@ export function UnlockedScreen({
           </div>
         </div>
         <h1 data-rise="" style={delai(0.2)} className="m-0 mt-5 text-[32px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[40px]">
-          {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
+          C’est débloqué.
         </h1>
         <p data-rise="" style={delai(0.3)} className="m-0 mt-3 max-w-[380px] text-corps font-extrabold leading-[1.45] text-soft">
-          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${total} chapitres sont à toi, pour toujours.`}
+          {/* TODO(produit): « pour toujours » : Whop interdit de promettre un accès « à vie » (sa règle des produits), texte gardé par décision du 12 octobre */}
+          {`Les ${total} chapitres sont à toi, pour toujours. Et ${CATALOGUE[offer].bulles} bulles pour en parler avec BLUSH.`}
         </p>
 
         <div data-rise="" style={delai(0.45)} className="mt-8 w-full text-left">
           <InsetGroup>
-            {ouvert(offer, restants, reprise, autre).map((it) => (
+            {ouvert(offer, restants, reprise).map((it) => (
               <InsetRow key={it.title} leading={<RowIcon icon="check" tone="vrai" />} title={it.title} sub={it.sub} />
             ))}
           </InsetGroup>
         </div>
         <p data-rise="" style={delai(0.55)} className="m-0 mt-4 text-legende font-extrabold text-grey">
-          {o.price} · {o.noteDesktop}
+          {prixDe(offer)} · Paiement unique, pas d’abonnement
         </p>
       </div>
     </Screen>

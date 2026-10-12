@@ -1,0 +1,164 @@
+import "server-only";
+import { and, eq, gte, sql } from "drizzle-orm";
+import type { Utilisateur } from "./auth";
+import { db, schema } from "./db";
+import type { RaisonBulles } from "./db/enums";
+import { estEquipe } from "./droits";
+import { ErreurInvariant } from "./erreurs";
+
+/*
+ * Les bulles : une réponse de BLUSH en coûte (COUT_EN_BULLES, src/contenu/offres.ts). Le solde (users.bulles) ne change
+ * jamais sans sa ligne au journal (mouvements_bulles), dans la même transaction ; une raison et sa référence ne s’y
+ * écrivent qu’une fois (l’index unique) : un achat livré deux fois, un webhook rejoué, deux débits de la même réponse ne
+ * comptent qu’une fois. Une dépense ne fait jamais passer le solde sous zéro (deux débits en même temps sur la dernière
+ * bulle : un seul passe) ; un remboursement le peut (reprendre, src/server/achats.ts). L’équipe (BLUSH_ACCES_LIBRE) a des
+ * bulles illimitées : elles ne se débitent jamais.
+ * Les références : l’id de l’achat (« achat », « remboursement »), celui du compte (« beta »), celui que choisit
+ * l’appelant pour une réponse (« reponse », puis « rendu » sous la même référence), une par réponse.
+ */
+
+/** Une transaction de drizzle, ou la base : de quoi écrire un mouvement dans la transaction d’un autre (livrer, reprendre). */
+type Executeur = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
+/** Le compte d’une dépense : son id, et son email (l’équipe ne paie pas). */
+type Compte = Pick<Utilisateur, "id" | "email">;
+
+/* Levée dans la transaction d’un débit que le solde ne couvre pas : elle annule le mouvement déjà écrit */
+class SoldeInsuffisant extends Error {}
+
+/** Le solde de bulles du compte, lu en base (0 pour un compte qui n’existe plus). */
+export async function soldeDe(userId: string): Promise<number> {
+  const [u] = await db().select({ bulles: schema.users.bulles }).from(schema.users).where(eq(schema.users.id, userId));
+  return u?.bulles ?? 0;
+}
+
+/**
+ * Écrit un mouvement de `delta` bulles et change le solde d’autant, dans la transaction `tx` : vrai s’il est écrit, faux
+ * si cette raison et cette référence l’étaient déjà (rien ne change). Le solde peut passer sous zéro : pour une dépense,
+ * debiter.
+ */
+export async function mouvementDans(tx: Executeur, userId: string, delta: number, raison: RaisonBulles, ref: string): Promise<boolean> {
+  if (!Number.isSafeInteger(delta) || delta === 0) throw new ErreurInvariant("bulles:delta");
+  const m = schema.mouvementsBulles;
+  const [ecrit] = await tx.insert(m).values({ userId, delta, raison, ref }).onConflictDoNothing().returning({ id: m.id });
+  if (!ecrit) return false;
+  await tx
+    .update(schema.users)
+    .set({ bulles: sql`${schema.users.bulles} + ${delta}` })
+    .where(eq(schema.users.id, userId));
+  return true;
+}
+
+/**
+ * Crédite (ou retire, `n` négatif) des bulles au compte, une fois pour cette raison et cette référence : vrai si c’est
+ * fait, faux si c’était déjà fait. Pour un don de l’équipe (« equipe », scripts/acces.mts) ou un cadeau ; un achat passe
+ * par livrer (src/server/achats.ts), qui crédite dans sa transaction.
+ */
+export const crediter = (userId: string, n: number, raison: Exclude<RaisonBulles, "reponse" | "rendu">, ref: string) =>
+  db().transaction((tx) => mouvementDans(tx, userId, n, raison, ref));
+
+/** Ce qu’un débit a fait : débité, déjà débité pour cette réponse, rien (un compte de l’équipe), ou le solde ne suffit pas. */
+export type Debit = "debite" | "deja" | "equipe" | "insuffisant";
+
+/*
+ * Le débit, dans la transaction `tx` : le mouvement d’abord (déjà là : « deja »), puis le solde, seulement s’il couvre le
+ * coût. Postgres verrouille la ligne du compte : un second débit en même temps attend le premier, puis relit le solde, et
+ * ne le trouve plus suffisant. Sinon, SoldeInsuffisant annule la transaction (le mouvement avec).
+ */
+async function debiterDans(tx: Executeur, compte: Compte, cout: number, ref: string): Promise<Exclude<Debit, "insuffisant">> {
+  if (!Number.isSafeInteger(cout) || cout <= 0) throw new ErreurInvariant("bulles:cout");
+  if (estEquipe(compte)) return "equipe";
+  const m = schema.mouvementsBulles;
+  const [ecrit] = await tx
+    .insert(m)
+    .values({ userId: compte.id, delta: -cout, raison: "reponse", ref })
+    .onConflictDoNothing()
+    .returning({ id: m.id });
+  if (!ecrit) return "deja";
+  const u = schema.users;
+  const [paye] = await tx
+    .update(u)
+    .set({ bulles: sql`${u.bulles} - ${cout}` })
+    .where(and(eq(u.id, compte.id), gte(u.bulles, cout)))
+    .returning({ id: u.id });
+  if (!paye) throw new SoldeInsuffisant();
+  return "debite";
+}
+
+/**
+ * Débite `cout` bulles pour une réponse de BLUSH (`ref` : la sienne, une par réponse), atomiquement, sans jamais passer
+ * sous zéro : « insuffisant » si le solde ne le couvre pas (rien n’est écrit), « deja » si cette réponse est déjà payée,
+ * « equipe » pour un compte de l’équipe (rien n’est débité). Une réponse qui échoue, ou qui sort en alerte danger, se
+ * rend (rendre).
+ */
+export async function debiter(compte: Compte, cout: number, ref: string): Promise<Debit> {
+  try {
+    return await db().transaction((tx) => debiterDans(tx, compte, cout, ref));
+  } catch (e) {
+    if (e instanceof SoldeInsuffisant) return "insuffisant";
+    throw e;
+  }
+}
+
+/**
+ * Rend les bulles d’une réponse débitée (`ref`, celle du débit) : la réponse a échoué, ou elle est sortie en alerte danger
+ * (offerte). Une fois : vrai si elles sont rendues, faux s’il n’y avait rien à rendre (jamais débitée, l’équipe) ou si
+ * c’était déjà fait.
+ */
+export async function rendre(compte: Pick<Utilisateur, "id">, ref: string): Promise<boolean> {
+  const m = schema.mouvementsBulles;
+  return db().transaction(async (tx) => {
+    const [debit] = await tx
+      .select({ delta: m.delta })
+      .from(m)
+      .where(and(eq(m.raison, "reponse"), eq(m.ref, ref), eq(m.userId, compte.id)));
+    return !!debit && (await mouvementDans(tx, compte.id, -debit.delta, "rendu", ref));
+  });
+}
+
+/* ———— La réponse verrouillée (à 0 bulle) ———— */
+
+/** La référence du débit d’une réponse verrouillée, payée à la recharge : son message. */
+export const refDuMessage = (messageId: number) => `message:${messageId}`;
+
+/**
+ * La réponse de BLUSH verrouillée qui attend d’être payée, pour ce compte (une au plus : la suivante demande la
+ * recharge, sans appel au modèle), ou null. Son texte reste en base, chiffré, jamais envoyé avant d’être payé.
+ */
+export async function reponseVerrouillee(userId: string): Promise<{ id: number; storyId: string; cout: number } | null> {
+  const c = schema.chatMessages;
+  const [r] = await db()
+    .select({ id: c.id, storyId: c.storyId, cout: c.cout })
+    .from(c)
+    .innerJoin(schema.stories, eq(schema.stories.id, c.storyId))
+    .where(and(eq(schema.stories.userId, userId), eq(c.verrouillee, true)))
+    .orderBy(c.id)
+    .limit(1);
+  return r ? { ...r, cout: r.cout ?? 1 } : null;
+}
+
+/**
+ * Débloque une réponse verrouillée de ce compte en débitant son coût, dans une transaction : « deverrouillee », ou
+ * « insuffisant » (le solde ne couvre toujours pas : rien ne change), ou « aucune » (pas de réponse verrouillée de ce
+ * compte sous cet id : déjà débloquée, ou pas la sienne).
+ */
+export async function deverrouiller(compte: Compte, messageId: number): Promise<"deverrouillee" | "insuffisant" | "aucune"> {
+  const c = schema.chatMessages;
+  try {
+    return await db().transaction(async (tx) => {
+      const [r] = await tx
+        .select({ cout: c.cout })
+        .from(c)
+        .innerJoin(schema.stories, eq(schema.stories.id, c.storyId))
+        .where(and(eq(c.id, messageId), eq(c.verrouillee, true), eq(schema.stories.userId, compte.id)))
+        .for("update", { of: c });
+      if (!r) return "aucune";
+      await debiterDans(tx, compte, r.cout ?? 1, refDuMessage(messageId));
+      await tx.update(c).set({ verrouillee: false }).where(eq(c.id, messageId));
+      return "deverrouillee";
+    });
+  } catch (e) {
+    if (e instanceof SoldeInsuffisant) return "insuffisant";
+    throw e;
+  }
+}

@@ -1,7 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import type { Plan } from "@/types";
 import type { CibleImage } from "@/types/api";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte } from "./chiffrement";
@@ -123,10 +122,11 @@ type MomentPartage = { type: "reponse"; question: string; bulles: string[] } | {
  * jamais ce que l’écran ne montre pas (S-25) :
  * - une réponse du chat, telle que le fil l’affiche, même en mode sobre : le chat y reste ouvert, et chaque réponse y a
  *   son « Partager » ;
- * - la chute d’un chapitre, seulement quand l’écran montre les chapitres (ouvertureDu, `entier` : l’accès au rapport ;
- *   sans lui, le chapitre 1 offert n’est que le verdict, sans chute), et jamais d’une situation difficile (partageable).
+ * - la chute d’un chapitre, seulement quand l’écran montre les chapitres (ouvertureDu, `entier` : le rapport débloqué,
+ *   `debloque` ; sans lui, le chapitre 1 offert n’est que le verdict, sans chute), et jamais d’une situation difficile
+ *   (partageable).
  */
-export async function momentAPartager(story: Ligne, plan: Plan, cible: CibleImage): Promise<MomentPartage | Extract<CodeErreur, "introuvable" | "sobre" | "acces">> {
+export async function momentAPartager(story: Ligne, debloque: boolean, cible: CibleImage): Promise<MomentPartage | Extract<CodeErreur, "introuvable" | "sobre" | "acces">> {
   const masquer = masqueDe(story);
   if (cible.type === "reponse") {
     const echange = await echangeDuChat(story.id, cible.echange);
@@ -141,7 +141,7 @@ export async function momentAPartager(story: Ligne, plan: Plan, cible: CibleImag
   const verdict = await donneesVerdict(story.id);
   if (!verdict) return "introuvable";
   if (!partageable(verdict.sortie)) return "sobre";
-  if (!ouvertureDu(plan, verdict.sortie).entier) return "acces";
+  if (!ouvertureDu(debloque, verdict.sortie).entier) return "acces";
   const chapitre = (await chapitresEcrits(story.id)).find((ch) => ch.number === cible.chapitre);
   const bloc = chapitre?.blocks[cible.bloc];
   if (!chapitre || bloc?.kind !== "punchline") return "introuvable";

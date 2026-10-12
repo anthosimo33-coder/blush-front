@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { offreAProposer, peut, type Besoin } from "@/lib/acces";
+import { peut, type Besoin } from "@/lib/acces";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { auRepos } from "@/lib/repos";
 import { useCompte } from "@/lib/requetes";
@@ -14,27 +14,24 @@ import { AccountPill, Screen } from "./Screen";
 const PaywallSheet = dynamic(() => import("@/components/screens/PaywallSheet").then((m) => m.PaywallSheet), { ssr: false });
 
 /**
- * Les droits d’accès du compte, par besoin (src/lib/acces.ts, la table que l’écran et le serveur lisent ; la lecture de
- * sa fiche n’est encore refusée qu’ici, voir là-bas) : gratuit (le chapitre 1, le verdict), rapport (tous les chapitres,
- * « Ta question », une par conv), BLUSH+ (en plus : le chat, sa fiche).
+ * Les droits du compte, par besoin (src/lib/acces.ts ; la lecture de sa fiche n’est encore refusée qu’ici, voir
+ * là-bas), et ses bulles. Le rapport s’ouvre conv par conv (ReportPayload.debloque), le chat à tout compte connecté.
  * Dans la page d’une conv, le compte part de celui qu’elle a rendu (PageDeConv) : tout juste rendu, il n’est pas relu au
- * montage, et le plan est là dès l’affichage.
+ * montage, et les droits sont là dès l’affichage.
  */
 export function useAccess() {
   const page = useCompteDeLaPage();
   const { data } = useCompte(page?.compte ?? undefined, { rendu: page?.rendu, frais: FRAIS_DU_RENDU });
-  const plan = data?.subscription.plan;
   return {
     initiale: data?.email ? [...data.email][0]?.toUpperCase() : undefined,
     loaded: !!data,
-    plan: plan ?? "gratuit",
-    peut: (besoin: Besoin) => !!plan && peut(plan, besoin),
+    peut: (besoin: Besoin) => !!data && peut(data, besoin),
   };
 }
 
 /**
  * Coque des écrans après le rapport (desktop : une colonne centrée, « Mon compte » en haut ; une colonne d’appoint seulement si l’écran en passe une).
- * `besoin` : ce que l’écran demande (le chat, sa fiche, « Ta question ») ; le paiement s’affiche par-dessus si le plan du compte ne l’ouvre pas.
+ * `besoin` : ce que l’écran demande (sa fiche) ; le paiement s’affiche par-dessus si le compte ne l’ouvre pas.
  */
 export function AppScreen({
   besoin,
@@ -85,8 +82,6 @@ export function AppScreen({
       {besoin && bloqueVu && (
         <PaywallSheet
           open={blocked}
-          /* Ce que le rapport n’ouvre pas (le chat, sa fiche) : qui l’a déjà ne voit que BLUSH+ */
-          only={offreAProposer(access.plan, besoin)}
           onClose={() => router.push("/rapport")}
           next={pathname}
           otherName={autre}

@@ -14,13 +14,12 @@ import type {
   Fiche,
   FicheFact,
   FicheUpdate,
+  Formule,
   Goal,
   Guess,
-  Plan,
   Pronom,
   QuestionAnswer,
   Source,
-  Subscription,
 } from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
 import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, HistoriqueChat, Moi, ReponseErreur, ReportPayload, Routes, VerdictMontre } from "@/types/api";
@@ -427,17 +426,17 @@ export function noterEcouteVocal(evenement: EvenementEcoute, position: number): 
   void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch((e: unknown) => tracer("vocal:ecoute", e));
 }
 
-export async function unlock(offer: Exclude<Plan, "gratuit">): Promise<Subscription> {
-  return appel("POST /api/debloquer", { corps: { offre: offer } });
+/** Débloquer le rapport de la conv ouverte, avec cette formule (sans paiement branché : l’équipe seulement, sinon « bientot »). */
+export async function unlock(offre: Formule): Promise<void> {
+  return void (await appel("POST /api/debloquer", { corps: { offre } }));
 }
 
-/* ———— Question incluse ———— */
+/* ———— Ta question ———— */
 
 /**
- * La question du rapport. Elle passe par le chat, marquée `question` : le plan « rapport » en a une par conv, sans le
- * chat (src/server/question-incluse.ts). Une erreur (le rapport s’écrit encore, plus de réseau, la question déjà posée :
- * « acces ») remonte telle quelle, pour que l’écran garde la question et le dise (voir souciQuestion), au lieu d’en faire
- * une réponse.
+ * La question du rapport (« Ta question »). Elle passe par le chat, marquée `question` : une réponse comme une autre.
+ * Une erreur (le rapport s’écrit encore, plus de réseau) remonte telle quelle, pour que l’écran garde la question et le
+ * dise (voir souciQuestion), au lieu d’en faire une réponse.
  */
 export async function askQuestion(question: string): Promise<QuestionAnswer> {
   return enQuestion(question, await chat({ texte: question, question: true }));
@@ -545,10 +544,6 @@ export async function addToFiche(files: File[]): Promise<FicheUpdate> {
 
 export async function getAccount(): Promise<Account> {
   return appel("GET /api/compte");
-}
-
-export async function setPaused(paused: boolean): Promise<void> {
-  return void (await appel("POST /api/compte", { corps: { paused } }));
 }
 
 /**

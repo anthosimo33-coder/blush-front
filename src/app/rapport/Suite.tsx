@@ -11,7 +11,7 @@ import { TypingDots } from "@/components/ui/feedback";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { LockRow } from "@/components/ui/progress";
 import { ChapterRule } from "@/components/ui/report";
-import type { Chapter, Echec, Plan } from "@/types";
+import type { Chapter, Echec } from "@/types";
 import { SUITE_ECRITURE } from "./ancres";
 import type { PhaseDuRapport } from "./phase";
 
@@ -88,10 +88,10 @@ export function Writing() {
 }
 
 /**
- * La suite du rapport, après ses chapitres ouverts. `fermes` : les chapitres encore fermés ; `access` : le plan du compte
- * (« Une question incluse avec ton rapport », sans BLUSH+) ; `ouvrirPaiement` : un chapitre fermé touché, dans l’aperçu.
+ * La suite du rapport, après ses chapitres ouverts. `fermes` : les chapitres encore fermés ; `ouvrirPaiement` : un
+ * chapitre fermé touché, dans l’aperçu.
  */
-export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseDuRapport; fermes: Chapter[]; access: Plan; ouvrirPaiement: () => void }) {
+export function Suite({ phase, fermes, ouvrirPaiement }: { phase: PhaseDuRapport; fermes: Chapter[]; ouvrirPaiement: () => void }) {
   const ecriture = phase.nom === "ecriture" ? phase.ecriture : undefined;
   const enEcriture = (n: number) => ecriture?.chapitres.find((c) => c.number === n);
   return (
@@ -142,7 +142,6 @@ export function Suite({ phase, fermes, access, ouvrirPaiement }: { phase: PhaseD
             <InsetRow
               leading={<RowIcon icon="bolt" tone="toi" />}
               title="Poser ma question à BLUSH"
-              sub={access === "rapport" ? "Une question incluse avec ton rapport" : undefined}
               href="/rapport/question"
               chevron
             />

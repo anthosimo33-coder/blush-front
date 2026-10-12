@@ -21,7 +21,7 @@ import nextEnv from "@next/env";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { estLocale } from "./base.mjs";
+import { estLocale, rattraper } from "./base.mjs";
 
 const RACINE = fileURLToPath(new URL("..", import.meta.url));
 
@@ -76,6 +76,7 @@ if (estLocale(url.href)) {
     const client = postgres(url.href, { max: 1, onnotice: () => {} });
     try {
       await migrate(drizzle(client), { migrationsFolder: join(RACINE, "drizzle") });
+      await rattraper(client);
     } finally {
       await client.end();
     }

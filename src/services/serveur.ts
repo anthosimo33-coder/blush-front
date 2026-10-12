@@ -137,7 +137,7 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
 
 /**
  * Ce que pose toute page d’une conv (src/components/shell/PageDeConv.tsx) : la conv qu’elle montre (ses gestes la
- * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour son plan.
+ * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour ses droits.
  * Sans requête de plus : le contexte de la requête est déjà lu pour la page (contexte, mémorisé le temps du rendu).
  */
 export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null }> {
@@ -145,10 +145,10 @@ export async function pageDeConv(): Promise<{ id: string | null; compte: Account
   return { id: story?.id ?? null, compte: await getCompte() };
 }
 
-/** Le compte, pour « Mon compte » : son email et son abonnement, dès le rendu serveur. null : pas connecté. */
+/** Le compte, pour « Mon compte » : son email, ses bulles et ses droits, dès le rendu serveur. null : pas connecté. */
 export async function getCompte(): Promise<Account | null> {
   const { utilisateur, story } = await contexte();
-  return utilisateur ? compteDe(utilisateur, story) : null;
+  return utilisateur ? await compteDe(utilisateur, story) : null;
 }
 
 /** Les convs du compte, pour la liste « Tes convs ». Une seule : pas de liste, l’accueil reste comme avant. */

@@ -238,7 +238,7 @@ export const LANDING_CONVS: LandingConv[] = [
  */
 export const TESTIMONIALS: Testimonial[] = [];
 
-/** Dans le bloc BLUSH+, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
+/** Dans le bloc du quotidien, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
 export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confidence" | "limits"> = {
   title: "Rien ne l’indique dans votre conv.",
   evidence: "Elle te parle tous les soirs entre 22\u00a0h et 1\u00a0h, 6\u00a0jours sur 7. Ses week-ends, elle te les raconte.",
@@ -246,7 +246,7 @@ export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confi
   limits: "BLUSH ne voit que vos messages.",
 };
 
-/** Dans le bloc BLUSH+, la réponse de BLUSH à « on en est où ? » : le verdict, la tendance, le prochain pas. */
+/** Dans le bloc du quotidien, la réponse de BLUSH à « on en est où ? » : le verdict, la tendance, le prochain pas. */
 export const VERDICT_EXEMPLE = {
   emoji: "🤏",
   short: "À deux doigts",

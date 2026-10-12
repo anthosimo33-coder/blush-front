@@ -1,11 +1,11 @@
 import "server-only";
 import { and, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { peut } from "@/lib/acces";
 import { nomErreur } from "@/lib/tracer";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
+import { rapportOuvertEnBase } from "./droits";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
@@ -75,12 +75,8 @@ async function lireEtat(storyId: string): Promise<EtatChaine> {
   return etatDepuis({ conv: !!s?.conv, verdict: v ? coffre.lire("verdicts.data", v.data) : null, rapport: r, vocal, taches });
 }
 
-/** Le compte de l’histoire a-t-il l’accès au rapport ? (Sans paiement en v1 : le plan du compte.) */
-async function aAcces(story: Pick<Ligne, "userId">): Promise<boolean> {
-  if (!story.userId) return false;
-  const [u] = await db().select({ plan: schema.users.plan }).from(schema.users).where(eq(schema.users.id, story.userId));
-  return !!u && peut(u.plan, "rapport");
-}
+/** Le rapport de l’histoire est-il ouvert (débloqué, ou un compte de l’équipe : src/server/droits.ts), lu en base ? */
+const aAcces = (story: Pick<Ligne, "id" | "userId">) => (story.userId ? rapportOuvertEnBase(story.id) : Promise.resolve(false));
 
 /** À la fin d’une étape de la chaîne : planifie la suite (l’étape qui finit compte pour finie). */
 async function enchainer(story: Ligne, t: Tache): Promise<void> {
