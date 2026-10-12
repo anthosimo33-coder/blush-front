@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useEffect } from "react";
 import { commencerPaiement } from "@/services/api";
 import type { OffreId } from "@/types";
@@ -18,8 +19,20 @@ import { suiteSure } from "./suite";
 /** La clé de la suite d’un achat dans l’onglet. */
 const cleDeLaSuite = (achat: string) => `blush.paiement.suite.${achat}`;
 
-/** Où reprendre une fois cet achat livré (une adresse de l’appli), si l’écran qui l’a commencé l’a dit ; sinon null. */
-export const suiteDuPaiement = (achat: string) => suiteSure(lire(cleDeLaSuite(achat), "session"));
+/**
+ * Où reprendre une fois cet achat livré (une adresse de l’appli), si l’écran qui l’a commencé l’a dit ; sinon null.
+ * `bulles` : celles que l’achat livré a données (le serveur) ; une recharge revient sur l’accueil avec `?recharge=<bulles>`
+ * (son mot « +N bulles ») : ce nombre-là est celui du serveur, pas celui que la feuille a compté avant de payer (le bonus ④
+ * pas encore su, ou plus valable).
+ */
+export function suiteDuPaiement(achat: string, bulles?: number): Route | null {
+  const suite = suiteSure(lire(cleDeLaSuite(achat), "session"));
+  if (!suite || bulles === undefined) return suite;
+  const u = new URL(suite, "https://blush.invalid");
+  if (!u.searchParams.has("recharge")) return suite;
+  u.searchParams.set("recharge", String(bulles));
+  return `${u.pathname}${u.search}${u.hash}` as Route;
+}
 
 /**
  * Commence le paiement de cette offre et part le payer (`aller` : la navigation de l’écran, pour une page de l’appli) ;

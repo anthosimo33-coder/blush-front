@@ -23,7 +23,7 @@ const ESSAIS = 60;
  * des bulles, là où le paiement a été commencé, sinon l’accueil.
  */
 function destination(e: EtatAchat): Route {
-  const suite = suiteDuPaiement(e.achat);
+  const suite = suiteDuPaiement(e.achat, e.bulles);
   if (CATALOGUE[e.offre].conv) return `/rapport/debloque?achat=${e.achat}${suite ? `&suite=${encodeURIComponent(suite)}` : ""}`;
   return suite ?? "/app";
 }
