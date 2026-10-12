@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { CATALOGUE } from "@/contenu/offres";
+import { CATALOGUE, DUREE_AJOUT_MS } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { EtatAchat, OffreUniqueMontree, PaiementCommence } from "@/types/api";
 import { commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
@@ -157,13 +157,15 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
 /**
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
- * 5 € de plus, après un rapport payé (le rapport seul, ou la suite) ; ④ le bonus de la première recharge, tant qu’aucun
+ * 5 € de plus, juste après un rapport payé (le rapport seul, ou la suite) : sur « C’est débloqué », dont `achatId` est
+ * l’achat, payé il y a moins de 15 minutes (DUREE_AJOUT_MS : ni plus tard, ni ailleurs), et montrée, elle expire 15
+ * minutes après (une commande passée avant se livre quand même, payée après : livrer ne regarde pas la fin) ; ④ le bonus de la première recharge, tant qu’aucun
  * pack n’a été payé (la recharge l’affiche, et la commande du pack conseillé le prend : commander). Jamais sans
  * prestataire (rien ne s’achèterait), ni à l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est
  * enregistrée »). `reste` : le temps qu’il reste à ① à l’heure du serveur, d’où part le compte à rebours de l’écran
  * (l’horloge du téléphone peut être fausse).
  */
-export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null): Promise<OffreUniqueMontree> {
+export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null, achatId: string | null = null): Promise<OffreUniqueMontree> {
   const f = fournisseur();
   const rien = { offre: null } as const;
   if (!f) return rien;
@@ -175,11 +177,19 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s || s.debloqueLe) return rien;
   } else if (offre === "premium_ajout") {
+    if (!achatId || !UUID.test(achatId)) return rien;
     const [rapport] = await db()
       .select({ id: a.id })
       .from(a)
-      .where(and(eq(a.userId, compte.id), eq(a.statut, "paye"), inArray(a.offre, ["rapport", "suite"])))
-      .limit(1);
+      .where(
+        and(
+          eq(a.id, achatId),
+          eq(a.userId, compte.id),
+          eq(a.statut, "paye"),
+          inArray(a.offre, ["rapport", "suite"]),
+          gt(a.payeLe, sql`now() - make_interval(secs => ${DUREE_AJOUT_MS / 1000})`),
+        ),
+      );
     if (!rapport) return rien;
   } else {
     /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) ; commander suit la même règle */

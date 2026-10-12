@@ -5,7 +5,8 @@ import { ROUTES } from "@/types/api";
 
 /**
  * Montrer une offre unique, si le serveur le veut : ① la suite moins chère (la feuille du paiement fermée sans payer, pour
- * la conv de la page), ③ Premium pour 5 € de plus (« C’est débloqué », après le rapport seul). Une fois par compte, jamais
+ * la conv de la page), ③ Premium pour 5 € de plus (« C’est débloqué », `achat` : le rapport seul, payé il y a moins de 15
+ * minutes). Une fois par compte, jamais
  * deux le même jour : la réponse dit laquelle, jusqu’à quand, et si elle se paie en un geste ; ou aucune.
  */
 export const POST = route("POST /api/paiement/offre", async (req: Request) => {
@@ -13,5 +14,5 @@ export const POST = route("POST /api/paiement/offre", async (req: Request) => {
   if (g instanceof Response) return g;
   const corps = await lireCorps(req, ROUTES["POST /api/paiement/offre"].corps);
   if (!corps) return erreur("offre");
-  return repondre("POST /api/paiement/offre", await proposerOffreUnique(g.utilisateur, corps.offre, g.story?.id ?? null));
+  return repondre("POST /api/paiement/offre", await proposerOffreUnique(g.utilisateur, corps.offre, g.story?.id ?? null, corps.achat ?? null));
 });

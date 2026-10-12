@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -505,8 +505,15 @@ describe("le retour (GET /api/paiement/[achat])", () => {
 });
 
 describe("les offres uniques et le paiement en un geste", () => {
-  const montrer = async (o: "suite" | "premium_ajout" | "premiere_recharge") =>
-    (await (await offre(depuisLAppli("/api/paiement/offre", { offre: o }))).json()) as OffreUniqueMontree;
+  /* ③ se montre sur « C’est débloqué », pour l’achat qui vient d’être payé (`achat`) */
+  const montrer = async (o: "suite" | "premium_ajout" | "premiere_recharge", achat?: string) =>
+    (await (await offre(depuisLAppli("/api/paiement/offre", { offre: o, ...(achat ? { achat } : {}) }))).json()) as OffreUniqueMontree;
+  /** Recule dans le temps le paiement d’un achat (payé il y a `ms`). */
+  const payeIlYa = (achat: string, ms: number) =>
+    db()
+      .update(schema.achats)
+      .set({ payeLe: new Date(Date.now() - ms) })
+      .where(eq(schema.achats.id, achat));
 
   it("④ la première recharge : montrée tant qu’aucun pack n’a été payé, prise par le pack conseillé (+40), puis plus jamais", async () => {
     const { u } = await acheteur("offre-recharge");
@@ -573,22 +580,59 @@ describe("les offres uniques et le paiement en un geste", () => {
   it("③ après le rapport seul : montrée, payée en un geste avec le moyen gardé (le webhook suit), +80 bulles ; pas deux fois", async () => {
     const { u } = await acheteur("offre-ajout");
     expect(await montrer("premium_ajout")).toEqual({ offre: null });
-    await rapportPaye();
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+    const rapport = await rapportPaye();
+    expect(await montrer("premium_ajout", rapport)).toMatchObject({ offre: "premium_ajout", enUnGeste: true });
     const { status, corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, null, null]);
     expect((await achatEnBase(corps.achat)).statut).toBe("en_attente");
     await apresLaReponse();
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "paye", centimes: 500 });
     expect(await soldeDe(u.id)).toBe(90);
-    expect(await montrer("premium_ajout")).toEqual({ offre: null });
+    expect(await montrer("premium_ajout", rapport)).toEqual({ offre: null });
     expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 422, corps: { erreur: "offre" } });
+  });
+
+  it("③ seulement dans les 15 minutes qui suivent le paiement d’un rapport (ou d’une suite), sur « C’est débloqué » (son achat), et elle expire 15 minutes après", async () => {
+    const { u } = await acheteur("offre-ajout-fenetre");
+    const rapport = await rapportPaye();
+    /* Ni sans l’achat qui vient d’être payé (un autre écran), ni pour un achat qui n’est pas un rapport payé de ce compte */
+    expect(await montrer("premium_ajout")).toEqual({ offre: null });
+    expect(await montrer("premium_ajout", "0b7e3f4c-0000-4000-8000-000000000001")).toEqual({ offre: null });
+    const pack = (await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect((await poster(await issue(pack, "payer"))).status).toBe(200);
+    expect(await montrer("premium_ajout", pack)).toEqual({ offre: null });
+    /* Ni plus tard : le rapport payé il y a 16 minutes */
+    await payeIlYa(rapport, 16 * 60_000);
+    expect(await montrer("premium_ajout", rapport)).toEqual({ offre: null });
+    /* Payé il y a 14 minutes : montrée, et sa fin vient du serveur (15 minutes) */
+    await payeIlYa(rapport, 14 * 60_000);
+    const m = await montrer("premium_ajout", rapport);
+    expect(m).toMatchObject({ offre: "premium_ajout" });
+    const { fin, reste } = m as { fin: string; reste: number };
+    expect(Date.parse(fin) - Date.now()).toBeGreaterThan(14 * 60_000);
+    expect(Date.parse(fin) - Date.now()).toBeLessThanOrEqual(15 * 60_000);
+    expect(reste).toBeGreaterThan(14 * 60_000);
+    expect(reste).toBeLessThanOrEqual(15 * 60_000);
+    /* Une commande dans le délai (payée en un geste : son webhook part après la réponse) ; puis l’offre passe */
+    const commande = (await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    await db()
+      .update(schema.offresUniques)
+      .set({ expireLe: new Date(Date.now() - 1000) })
+      .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "premium_ajout")));
+    /* Plus de nouvelle commande, ni de nouvelle offre ; mais celle passée dans le délai, payée après, se livre */
+    const avant = etat.apres.splice(0);
+    expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 422, corps: { erreur: "offre" } });
+    expect(await montrer("premium_ajout", rapport)).toEqual({ offre: null });
+    etat.apres.push(...avant);
+    await apresLaReponse();
+    expect(await achatEnBase(commande)).toMatchObject({ statut: "paye", bulles: 80 });
+    expect(await soldeDe(u.id)).toBe(10 + 30 + 80);
   });
 
   it("③ commandée deux fois (deux onglets) puis payée deux fois : livrée une seule fois ; l’autre paiement n’est pas livré, l’équipe est prévenue de le rembourser", async () => {
     const { u } = await acheteur("offre-ajout-double");
-    await rapportPaye();
-    expect((await montrer("premium_ajout")).offre).toBe("premium_ajout");
+    const rapport = await rapportPaye();
+    expect((await montrer("premium_ajout", rapport)).offre).toBe("premium_ajout");
     /* Deux commandes tant que l’offre vaut (deux onglets), chacune payée en un geste : deux webhooks payment.succeeded */
     const une = (await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).corps.achat;
     const deux = (await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).corps.achat;
@@ -615,7 +659,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     );
     const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_g1")))).status).toBe(200);
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+    expect(await montrer("premium_ajout", rapport)).toMatchObject({ offre: "premium_ajout", enUnGeste: true });
     appels.length = 0;
 
     /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, l’achat échoue (son webhook le livrerait quand même) */
@@ -647,7 +691,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     );
     const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_r1")))).status).toBe(200);
-    expect((await montrer("premium_ajout")).offre).toBe("premium_ajout");
+    expect((await montrer("premium_ajout", rapport)).offre).toBe("premium_ajout");
     appels.length = 0;
     const { status, corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_r/", "ch_r"]);

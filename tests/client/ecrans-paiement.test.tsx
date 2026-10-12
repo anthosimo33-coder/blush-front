@@ -366,7 +366,8 @@ describe("« C’est débloqué »", () => {
     /* Tant que le serveur n’a pas répondu, ni la liste ni l’offre : rien ne se remplace sous les yeux */
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();
     await promesses();
-    expect(proposer).toHaveBeenCalledWith("premium_ajout");
+    /* Pour l’achat qui vient d’être payé : le serveur ne la montre que dans les 15 minutes qui le suivent */
+    expect(proposer).toHaveBeenCalledWith("premium_ajout", "a1");
     const offre = screen.getByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre });
     expect(within(offre).getByText(tel(OFFRE_PREMIUM_AJOUT.carte))).toBeTruthy();
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();

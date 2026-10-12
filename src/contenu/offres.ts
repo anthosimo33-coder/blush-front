@@ -44,6 +44,12 @@ export const PREMIERE_RECHARGE = { offre: "pack80", bonus: 40 } as const satisfi
 /** Combien de temps l’offre unique ① reste valable une fois montrée : le compte à rebours de la feuille, l’heure de fin venue du serveur. */
 export const DUREE_SUITE_MS = 5 * 60 * 1000;
 
+/**
+ * L’offre unique ③ (Premium pour 5 € de plus) ne vaut que juste après le paiement : le serveur ne la montre que dans ce
+ * temps après le paiement d’un rapport ou d’une suite (sur « C’est débloqué »), et, montrée, elle expire ce temps après.
+ */
+export const DUREE_AJOUT_MS = 15 * 60 * 1000;
+
 /** Entre deux offres uniques montrées au même compte, au moins ce temps (24 h glissantes) : jamais deux le même jour. */
 export const ECART_OFFRES_UNIQUES_MS = 24 * 3600 * 1000;
 

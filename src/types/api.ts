@@ -292,7 +292,8 @@ export const ROUTES = {
   },
   /* `?paiement=pay_…` : le paiement que Whop a donné au retour, vérifié chez lui si le webhook tarde */
   "GET /api/paiement/[achat]": {},
-  "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES) }) },
+  /* `achat` : pour ③, l’achat du rapport (ou de la suite) qui vient d’être payé (« C’est débloqué ») */
+  "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES), achat: z.string().uuid().optional() }) },
   "POST /api/paiement/factice": { corps: z.object({ achat: z.string().uuid(), issue: z.enum(ISSUES_DU_FAUX_WHOP) }) },
   /* Le corps brut, tel quel : sa signature porte sur ses octets (src/server/paiement/signature.ts) */
   "POST /api/paiement/whop": {},

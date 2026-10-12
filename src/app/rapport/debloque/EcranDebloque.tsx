@@ -106,7 +106,8 @@ export function EcranDebloque({
   /* Ce qui vient de s’ouvrir : relu ici, une fois le paiement parti (pas sous la feuille, où le rapport sautait) */
   useEffect(() => apresDeblocage(), []);
   /*
-   * L’offre ③ : seulement après le rapport seul (ou la suite), si le serveur la montre. `undefined` : la réponse est
+   * L’offre ③ : seulement après le rapport seul (ou la suite), si le serveur la montre (pour cet achat, payé il y a moins
+   * de 15 minutes ; elle expire 15 minutes après : la commande refusée la retire alors). `undefined` : la réponse est
    * attendue (rien ne se pose, pour ne pas montrer la liste puis la remplacer) ; null : pas d’offre.
    */
   const proposable = offre === "rapport" || offre === "suite";
@@ -114,14 +115,14 @@ export function EcranDebloque({
   useEffect(() => {
     if (!proposable) return;
     let vivant = true;
-    proposerOffreUnique("premium_ajout").then(
+    proposerOffreUnique("premium_ajout", achat).then(
       (o) => vivant && setAjout(o.offre === "premium_ajout" ? { enUnGeste: o.enUnGeste } : null),
       () => vivant && setAjout(null),
     );
     return () => {
       vivant = false;
     };
-  }, [proposable]);
+  }, [proposable, achat]);
   const suite = next ?? `/rapport#${ancreDuChapitre(reprise)}`;
   const ici = `/rapport/debloque?achat=${achat}${next ? `&suite=${encodeURIComponent(next)}` : ""}`;
   /* Vers l’accueil, sans remise en haut : il s’ouvre sur le dernier échange */

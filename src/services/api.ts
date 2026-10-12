@@ -514,9 +514,12 @@ export async function etatDuPaiement(achat: string, paiement: string | null): Pr
   return corps;
 }
 
-/** Demande au serveur de montrer cette offre unique (① en fermant la feuille sans payer, ③ sur « C’est débloqué ») : laquelle, jusqu’à quand, ou aucune. */
-export async function proposerOffreUnique(offre: OffreProposee): Promise<OffreUniqueMontree> {
-  return appel("POST /api/paiement/offre", { corps: { offre } });
+/**
+ * Demande au serveur de montrer cette offre unique (① en fermant la feuille sans payer, ③ sur « C’est débloqué », pour
+ * l’achat qui vient d’être payé : `achat`) : laquelle, jusqu’à quand, ou aucune.
+ */
+export async function proposerOffreUnique(offre: OffreProposee, achat?: string): Promise<OffreUniqueMontree> {
+  return appel("POST /api/paiement/offre", { corps: { offre, ...(achat ? { achat } : {}) } });
 }
 
 /**

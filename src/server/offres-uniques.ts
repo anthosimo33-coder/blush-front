@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq, gt, ne, sql } from "drizzle-orm";
-import { DUREE_SUITE_MS, ECART_OFFRES_UNIQUES_MS } from "@/contenu/offres";
+import { DUREE_AJOUT_MS, DUREE_SUITE_MS, ECART_OFFRES_UNIQUES_MS } from "@/contenu/offres";
 import type { OffreUnique } from "@/types";
 import type { Utilisateur } from "./auth";
 import { db, schema } from "./db";
@@ -10,7 +10,7 @@ import { estEquipe } from "./droits";
  * Les offres uniques (OFFRES_UNIQUES, src/types) : le serveur décide seul de les montrer, et les garde
  * (offres_uniques). Chacune une fois par compte au plus ; jamais deux à moins de 24 h l’une de l’autre (glissantes,
  * ECART_OFFRES_UNIQUES_MS) ; la suite (①) n’est valable que 5 minutes, l’heure de fin donnée par le serveur (le compte à
- * rebours de l’écran la lit). Montrée, une offre reste valable (jusqu’à sa fin, s’il y en a une) tant qu’elle n’est pas
+ * rebours de l’écran la lit), et ③ 15 minutes (DUREE_AJOUT_MS : elle ne se montre que juste après un paiement). Montrée, une offre reste valable (jusqu’à sa fin, s’il y en a une) tant qu’elle n’est pas
  * prise : une page rechargée la retrouve. Prise à la livraison de l’achat qui en profite (livrer, src/server/achats.ts).
  * L’équipe ne paie rien : aucune ne lui est montrée. La relance par mail (②) n’est pas montrée par ici : elle s’envoie
  * deux heures après la ① (src/server/relances.ts), qui seule ne l’arrête pas (elle la suit par définition). Pour le
@@ -22,7 +22,7 @@ import { estEquipe } from "./droits";
 export type OffreMontree = { offre: OffreUnique; montreeLe: Date; expireLe: Date | null; storyId: string | null };
 
 /** La durée de chaque offre une fois montrée, en millisecondes, ou null : sans fin, jusqu’à ce qu’elle soit prise. */
-const DUREES: Record<OffreUnique, number | null> = { suite: DUREE_SUITE_MS, relance_mail: null, premium_ajout: null, premiere_recharge: null };
+const DUREES: Record<OffreUnique, number | null> = { suite: DUREE_SUITE_MS, relance_mail: null, premium_ajout: DUREE_AJOUT_MS, premiere_recharge: null };
 
 const o = schema.offresUniques;
 
