@@ -8,6 +8,7 @@ import { commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCo
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
+import { UUID } from "../histoires";
 import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
 import { journalErreur } from "../journal";
@@ -32,7 +33,8 @@ type Compte = Pick<Utilisateur, "id" | "email">;
 
 /** L’achat de cet id, s’il est à ce compte ; sinon null. */
 async function achatDuCompte(userId: string, achatId: string): Promise<Achat | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(achatId)) return null;
+  /* Un vrai uuid seulement : la base refuserait le reste (une erreur, pas « introuvable ») */
+  if (!UUID.test(achatId)) return null;
   const [l] = await db()
     .select()
     .from(a)

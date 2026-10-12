@@ -462,6 +462,12 @@ describe("le retour (GET /api/paiement/[achat])", () => {
     expect((await etatDe(achat)).status).toBe(404);
   });
 
+  it("un id qui n’est pas un vrai uuid (36 caractères de chiffres hexadécimaux et de tirets, mal placés) : 404, jamais 500", async () => {
+    await acheteur("retour-pas-uuid");
+    for (const id of ["a".repeat(36), "-".repeat(36), "0b7e3f4c00004000800000000000000001--", "pas-un-uuid"])
+      expect(await etatDe(id), id).toEqual({ status: 404, corps: { erreur: "introuvable" } });
+  });
+
   it("le webhook tarde : le paiement de l’adresse est vérifié chez Whop, et livré s’il paie cet achat, au bon montant", async () => {
     const { u } = await acheteur("retour-whop");
     etat.mode = "whop";
