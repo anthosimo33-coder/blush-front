@@ -409,12 +409,12 @@ function Entonnoir({ a, verdicts }: { a: StatsAdmin["achats"]; verdicts: number 
   );
 }
 
-/** Les offres uniques, dans l’ordre du parcours : leur numéro et leur nom. */
+/** Les offres uniques, dans l’ordre du parcours : leur numéro (① à ④ de la spécification, en chiffres : la police n’a pas les ronds) et leur nom. */
 const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
-  suite: ["①", "La suite à 6,90\u00a0€, 5 minutes"],
-  relance_mail: ["②", "Le mail «\u00a0Ta suite t’attend\u00a0»"],
-  premium_ajout: ["③", "Premium pour 5\u00a0€ de plus"],
-  premiere_recharge: ["④", "+40 bulles, première recharge"],
+  suite: ["1", "La suite à 6,90\u00a0€, 5 minutes"],
+  relance_mail: ["2", "Le mail «\u00a0Ta suite t’attend\u00a0»"],
+  premium_ajout: ["3", "Premium pour 5\u00a0€ de plus"],
+  premiere_recharge: ["4", "+40 bulles, première recharge"],
 };
 
 /** Les offres uniques montrées sur la période, et combien de celles-là ont été prises. */
