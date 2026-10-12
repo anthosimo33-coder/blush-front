@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapturesScreen } from "@/app/importer/captures/CapturesScreen";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadScreenshots } from "@/services/api";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
@@ -35,6 +36,8 @@ async function continuerAvec(e: unknown) {
   render(<CapturesScreen app="hinge" addMode={false} />);
   const png = (nom: string) => new File(["png"], nom, { type: "image/png" });
   fireEvent.change(screen.getByLabelText("Captures d’écran de la conversation"), { target: { files: [png("1.png"), png("2.png")] } });
+  /* La case de l’import, sans laquelle rien ne part (src/components/juridique/cases.tsx) */
+  fireEvent.click(screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }));
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
   });
@@ -69,6 +72,33 @@ describe("l’import de captures en échec", () => {
     expect(screen.getByRole("button", { name: "Capture 2 sur 2" })).toBeTruthy();
     /* On peut réessayer */
     expect(screen.getByRole("button", { name: "Continuer" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("la case refusée par le serveur (une version périmée) : elle se décoche et le dit, les captures restent là", async () => {
+    await continuerAvec(erreur("consentement", 422));
+    /* L’envoi portait la version de la case cochée */
+    expect(envoi.mock.calls[0]?.[1]).toMatchObject({ consentement: CASE_IMPORT.version });
+    expect(routeur.replace).not.toHaveBeenCalled();
+    expect(routeur.push).not.toHaveBeenCalled();
+    expect((screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.perimee);
+    expect(screen.getByRole("button", { name: "Capture 2 sur 2" })).toBeTruthy();
+    /* Sans la case recochée, « Continuer » n’envoie plus rien */
+    envoi.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    });
+    expect(envoi).not.toHaveBeenCalled();
+  });
+
+  it("sans la case : « Continuer » n’envoie rien, et le dit", async () => {
+    render(<CapturesScreen app="hinge" addMode={false} />);
+    fireEvent.change(screen.getByLabelText("Captures d’écran de la conversation"), { target: { files: [new File(["png"], "1.png", { type: "image/png" })] } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    });
+    expect(envoi).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.manquante);
   });
 
   it("sans session (401) : la connexion, puis retour sur les captures", async () => {

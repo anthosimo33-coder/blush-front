@@ -1,3 +1,4 @@
+import { CASE_IMPORT } from "../../src/contenu/consentements";
 import {
   compteDe,
   connecterParApi,
@@ -146,7 +147,7 @@ test("la purge de la nuit : refusée sans le bon secret, elle efface les brouill
   const importer = async () => {
     const r = await request.post("/api/import", {
       headers: { origin: URL_APPLI },
-      multipart: { fichier: { name: "_chat.txt", mimeType: "text/plain", buffer: Buffer.from(texteWhatsApp()) } },
+      multipart: { fichier: { name: "_chat.txt", mimeType: "text/plain", buffer: Buffer.from(texteWhatsApp()) }, consentement: CASE_IMPORT.version },
     });
     expect(r.status()).toBe(200);
     return ((await r.json()) as { story: { id: string } }).story.id;

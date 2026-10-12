@@ -170,11 +170,26 @@ export async function pageAuRepos(page: Page, { repos = 600, max = 15_000, echou
   return pose;
 }
 
+/** La case de l’import (« J’ai 18 ans ou plus… », src/contenu/consentements.ts), sur l’écran de l’export et sur celui des captures. */
+export const caseImport = (page: Page): Locator => page.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ });
+
+/**
+ * Coche la case de l’import, si l’écran en a une et qu’elle ne l’est pas : sans elle, rien ne part (le choix du fichier
+ * de l’export ne s’ouvre pas, « Continuer » n’envoie pas les captures). choisirFichier le fait avant chaque choix ; le
+ * refus sans la case a son test (juridique.spec.ts).
+ */
+async function accepterImport(page: Page): Promise<void> {
+  const accord = caseImport(page);
+  if ((await accord.count()) && !(await accord.isChecked())) await accord.check();
+}
+
 /**
  * Choisit des fichiers par un bouton de l’écran (par défaut « Choisir le fichier enregistré »), dans le sélecteur du
- * système. L’attente du sélecteur et le toucher partent ensemble : l’une ne reste jamais sans l’autre.
+ * système, la case de l’import cochée d’abord sur les écrans de l’import (accepterImport). L’attente du sélecteur et le
+ * toucher partent ensemble : l’une ne reste jamais sans l’autre.
  */
 export async function choisirFichier(page: Page, chemins: string | string[], bouton: string | Locator = "Choisir le fichier enregistré"): Promise<void> {
+  await accepterImport(page);
   const cible = typeof bouton === "string" ? page.getByRole("button", { name: bouton, exact: true }) : bouton;
   const [selecteur] = await Promise.all([page.waitForEvent("filechooser"), cible.click()]);
   await selecteur.setFiles(chemins);
