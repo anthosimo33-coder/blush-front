@@ -74,21 +74,24 @@ describe("l’import de captures en échec", () => {
     expect(screen.getByRole("button", { name: "Continuer" }).hasAttribute("disabled")).toBe(false);
   });
 
-  it("la case refusée par le serveur (une version périmée) : elle se décoche et le dit, les captures restent là", async () => {
+  it("la case refusée par le serveur (une version périmée) : elle se décoche, demande de recharger la page, les captures restent là", async () => {
     await continuerAvec(erreur("consentement", 422));
     /* L’envoi portait la version de la case cochée */
     expect(envoi.mock.calls[0]?.[1]).toMatchObject({ consentement: CASE_IMPORT.version });
     expect(routeur.replace).not.toHaveBeenCalled();
     expect(routeur.push).not.toHaveBeenCalled();
     expect((screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }) as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.perimee);
+    expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    expect(screen.getByRole("button", { name: CASE_IMPORT.recharger })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Capture 2 sur 2" })).toBeTruthy();
-    /* Sans la case recochée, « Continuer » n’envoie plus rien */
+    /* Même recochée, « Continuer » n’envoie plus rien : la même version périmée serait refusée de nouveau, sans fin */
     envoi.mockClear();
+    fireEvent.click(screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     });
     expect(envoi).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
   });
 
   it("sans la case : « Continuer » n’envoie rien, et le dit", async () => {

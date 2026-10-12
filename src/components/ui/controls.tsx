@@ -216,7 +216,7 @@ export function CaseACocher({
   coche: boolean;
   onChange: (v: boolean) => void;
   refus?: boolean;
-  message?: string;
+  message?: ReactNode;
   inputRef?: Ref<HTMLInputElement>;
   children: ReactNode;
   className?: string;

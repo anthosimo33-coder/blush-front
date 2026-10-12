@@ -93,18 +93,33 @@ describe("la case de l’import", () => {
     expect(envoyer).toHaveBeenCalledTimes(1);
   });
 
-  it("refusée par le serveur (une version périmée) : elle se décoche, et demande d’être recochée", () => {
+  it("refusée par le serveur (une version périmée) : elle se décoche, et rien ne repart avant la page rechargée", () => {
     const envoyer = vi.fn();
     render(<Import envoyer={envoyer} />);
     const caseACocher = screen.getByRole("checkbox") as HTMLInputElement;
     fireEvent.click(caseACocher);
     fireEvent.click(screen.getByRole("button", { name: "Refus du serveur" }));
     expect(caseACocher.checked).toBe(false);
-    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.perimee);
+    expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    /*
+     * Recochée, elle ne laisse rien partir : l’onglet n’a que l’ancien texte et l’ancienne version (le code du navigateur
+     * date de l’ouverture de la page), que le serveur refuserait encore, sans fin
+     */
+    fireEvent.click(caseACocher);
+    expect(caseACocher.checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Choisir le fichier" }));
     expect(envoyer).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.manquante);
-    fireEvent.click(caseACocher);
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    expect(document.activeElement).toBe(caseACocher);
+    /* Le bouton du message recharge la page : le nouveau texte et sa version arrivent avec elle */
+    const recharger = vi.fn();
+    const avant = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...avant, reload: recharger } });
+    try {
+      fireEvent.click(screen.getByRole("button", { name: CASE_IMPORT.recharger }));
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: avant });
+    }
+    expect(recharger).toHaveBeenCalledTimes(1);
   });
 });

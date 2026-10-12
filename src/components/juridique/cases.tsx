@@ -11,7 +11,8 @@ import { CASE_IMPORT, CASE_RENONCIATION, type AchatImmediat } from "@/contenu/co
  * l’écran de l’export et sur celui des captures ; la case de la renonciation au droit de rétractation, dans la feuille
  * du paiement (la feuille « Ta formule » et la recharge, posées par les écrans des bulles). Chacune a son état (useCase) :
  * le geste qui avance (choisir le fichier, envoyer les captures, payer) demande `exiger()`, qui dit non tant qu’elle n’est
- * pas cochée, le montre et y met le focus.
+ * pas cochée, le montre et y met le focus. Refusée par le serveur (`perimer()` : son texte a changé depuis l’ouverture
+ * de la page), elle dit non jusqu’au rechargement de la page : la recocher renverrait la version déjà refusée.
  */
 
 /** L’état d’une case : cochée ou non, son refus montré (un geste tenté sans elle), et le focus à y mettre. */
@@ -23,19 +24,22 @@ export function useCase() {
     coche,
     refus,
     ref,
-    /** Cochée ou décochée à la main : cochée, son refus s’efface. */
+    /** Cochée ou décochée à la main : cochée, son refus « manquante » s’efface (« perimee » reste : la page est à recharger). */
     changer: (v: boolean) => {
       setCoche(v);
-      if (v) setRefus(null);
+      if (v) setRefus((r) => (r === "perimee" ? r : null));
     },
-    /** Avant le geste qui avance : vrai si elle est cochée ; sinon, le refus se montre et le focus y va. */
+    /**
+     * Avant le geste qui avance : vrai si elle est cochée ; sinon, le refus se montre et le focus y va. Jamais vrai une
+     * fois périmée : l’onglet n’a que l’ancien texte et l’ancienne version, que le serveur refuserait encore.
+     */
     exiger: () => {
-      if (coche) return true;
-      setRefus("manquante");
+      if (coche && refus !== "perimee") return true;
+      if (refus !== "perimee") setRefus("manquante");
       ref.current?.focus();
       return false;
     },
-    /** Le serveur a refusé la case (une version qui n’est plus la sienne) : elle se décoche, et le dit. */
+    /** Le serveur a refusé la case (une version qui n’est plus la sienne) : elle se décoche, et demande de recharger la page. */
     perimer: () => {
       setCoche(false);
       setRefus("perimee");
@@ -57,7 +61,19 @@ export function CaseImport({ etat, className }: { etat: EtatCase; className?: st
       coche={etat.coche}
       onChange={etat.changer}
       refus={!!etat.refus}
-      message={etat.refus === "perimee" ? CASE_IMPORT.perimee : CASE_IMPORT.manquante}
+      message={
+        etat.refus === "perimee" ? (
+          <>
+            {CASE_IMPORT.perimee}{" "}
+            {/* Le nouveau texte (et sa version) n’arrive qu’avec la page rechargée : un bouton, car l’appli posée sur l’écran d’accueil n’a pas celui du navigateur */}
+            <button type="button" onClick={() => window.location.reload()} className="font-black text-danger underline underline-offset-2">
+              {CASE_IMPORT.recharger}
+            </button>
+          </>
+        ) : (
+          CASE_IMPORT.manquante
+        )
+      }
       inputRef={etat.ref}
       className={cn("rounded-[16px] bg-white px-3.5 py-3 shadow-card", className)}
     >

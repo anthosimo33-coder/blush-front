@@ -12,7 +12,7 @@ import { NBSP } from "@/lib/format";
  * TODO(produit): à faire relire par un juriste avant d’ouvrir au public.
  * TODO(produit): lignes ajoutées le 12 octobre 2026 pour le lancement, à valider : le paiement par Whop (ce qu’il voit),
  * la vérification anti-robots de Cloudflare, le mail de rappel d’un paiement pas terminé, tes achats. « Ton email » ne
- * dit plus « pas de pub, jamais partagé » (Whop le reçoit pour ton reçu, et le rappel parle d’une offre) ; la promesse
+ * dit plus « pas de pub, jamais partagé » (Whop le reçoit pour ton reçu, Resend pour les mails, et le rappel parle d’une offre) ; la promesse
  * courte « Ton email n’est jamais partagé » (src/contenu/confidentialite.ts) est à revoir avec lui.
  */
 
@@ -43,8 +43,10 @@ export function ConfidentialiteScreen() {
           Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les
           écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
         </Ligne>
+        {/* Resend l’envoie (les mails) et Whop le reçoit (le reçu) : « il ne part que chez Whop » contredisait la liste des prestataires, plus bas */}
         <Ligne icone="mail" titre="Ton email">
-          Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, jamais vendu. Il ne part que chez Whop, quand tu paies, pour ton reçu.
+          Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, jamais vendu. Il ne sort de BLUSH que pour t’écrire (Resend) et, quand tu
+          paies, pour ton reçu (Whop).
         </Ligne>
         {/* Le mail ② du lot « prêt à lancer » : une offre unique, deux heures après une feuille du paiement ouverte sans payer */}
         <Ligne icone="clock" titre="Un rappel, une seule fois">

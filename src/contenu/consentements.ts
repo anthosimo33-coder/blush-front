@@ -21,8 +21,15 @@ export const CASE_IMPORT = {
   apres: ", et que BLUSH analyse cette conv, même ce qu’elle dit d’intime (santé, vie sexuelle).",
   /** Un envoi tenté sans la case. */
   manquante: "Coche la case pour continuer.",
-  /** Le serveur a refusé la case (une version qui n’est plus la sienne, après une mise à jour de BLUSH) : elle se décoche. */
-  perimee: "Coche de nouveau la case pour continuer.",
+  /**
+   * Le serveur a refusé la case : BLUSH a changé son texte depuis l’ouverture de la page. L’onglet porte encore l’ancien
+   * texte et l’ancienne version (le code du navigateur date de son ouverture) : la recocher renverrait la même version,
+   * refusée de nouveau. Il faut recharger la page pour lire le nouveau texte, puis le cocher.
+   * TODO(produit): texte nouveau (il remplace « Coche de nouveau la case pour continuer. »), à valider.
+   */
+  perimee: "Ce texte a changé depuis l’ouverture de la page. Recharge-la pour lire le nouveau.",
+  /** Le bouton sous `perimee`. TODO(produit): texte nouveau, à valider. */
+  recharger: "Recharger la page",
 } as const;
 
 /** Le texte entier de la case de l’import, tel qu’il se lit. */

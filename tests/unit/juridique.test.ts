@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { CONDITIONS, PARTIES_CONDITIONS } from "@/contenu/conditions";
 import { CASE_IMPORT, CASE_RENONCIATION, texteCaseImport } from "@/contenu/consentements";
@@ -34,6 +35,12 @@ describe("l’accord de l’import", () => {
       },
     });
     expect(CONDITIONS.maj).toContain("12 octobre 2026");
+    /*
+     * Les conditions que la case fait accepter : leur empreinte est figée avec la version de la case. Un texte des
+     * conditions changé fait échouer ce test : changez CASE_IMPORT.version (une date), puis ici la version et l’empreinte.
+     */
+    const empreinteDesConditions = createHash("sha256").update(JSON.stringify(PARTIES_CONDITIONS)).digest("hex").slice(0, 16);
+    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-12", conditions: "64238bc0c295101e" });
   });
 
   it("la case de l’import dit les 18 ans, les conditions et l’accord pour ce qui est intime", () => {

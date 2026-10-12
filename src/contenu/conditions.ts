@@ -8,7 +8,7 @@ import { CASE_RENONCIATION } from "./consentements";
  * Les prix sont écrits ici en toutes lettres : ceux du paiement viennent de src/contenu/offres.ts, que le socle du lot
  * réécrit. Un prix changé là se reporte ici (à l’intégration : les lire dans offres.ts).
  * La case de l’import fait accepter ces conditions : un changement ici change aussi la version de CASE_IMPORT
- * (src/contenu/consentements.ts).
+ * (src/contenu/consentements.ts) : tests/unit/juridique.test.ts fige leur empreinte avec cette version.
  * TODO(produit): à relire par un juriste.
  * TODO(produit): textes nouveaux, à valider (dont les bulles perdues quand on efface son compte, le préavis si BLUSH
  * fermait, et les numéros d’urgence).

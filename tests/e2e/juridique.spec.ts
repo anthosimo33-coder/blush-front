@@ -63,6 +63,8 @@ test("la confidentialité nomme Whop et Cloudflare, dit le rappel et l’accord 
   await expect(main.getByText("Pas de robots")).toBeVisible();
   await expect(main.getByText("Un rappel, une seule fois")).toBeVisible();
   await expect(main.getByText("Ton accord, avant chaque conv")).toBeVisible();
+  /* L’email : chaque prestataire qui le reçoit est dit (les mails, le reçu), comme dans la liste plus bas */
+  await expect(main.getByText(/jamais vendu\. Il ne sort de BLUSH que pour t’écrire \(Resend\) et, quand tu paies, pour ton reçu \(Whop\)\./)).toBeVisible();
   for (const prestataire of ["Whop", "Cloudflare"]) await expect(main.getByText(prestataire, { exact: true })).toBeVisible();
   const liens = page.getByRole("navigation", { name: "Pages légales" });
   await expect(liens.getByRole("link", { name: "Conditions" })).toHaveAttribute("href", "/conditions");
@@ -123,6 +125,40 @@ test("l’export : sans la case, le choix du fichier ne s’ouvre pas ; cochée,
     expect(accordGarde?.version).toBe(CASE_IMPORT.version);
     expect(accordGarde?.le).toBeTruthy();
     await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
+  });
+});
+
+test("la case refusée par le serveur (BLUSH a changé son texte) : rien ne repart avant la page rechargée", async ({ page }, testInfo) => {
+  const conv = exportWhatsApp(testInfo, { format: "txt" });
+  await page.goto("/importer/export?app=whatsapp");
+  /* Le serveur a une autre version de la case que cet onglet : il répond comme après une mise à jour de BLUSH */
+  let envois = 0;
+  await page.route("**/api/import", (route) => (envois++, route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ erreur: "consentement" }) })));
+  const accord = caseImport(page);
+  const bouton = page.getByRole("button", { name: "Choisir le fichier enregistré", exact: true });
+  await accord.check();
+  const [selecteur] = await Promise.all([page.waitForEvent("filechooser"), bouton.click()]);
+  await selecteur.setFiles(conv.chemin);
+  const alerte = page.getByRole("alert").filter({ hasText: CASE_IMPORT.perimee });
+  await expect(alerte).toBeVisible();
+  await expect(accord).not.toBeChecked();
+  expect(envois).toBe(1);
+
+  await test.step("recochée, elle ne laisse rien repartir (la même version serait refusée sans fin)", async () => {
+    let selecteurs = 0;
+    page.on("filechooser", () => void selecteurs++);
+    await accord.check();
+    await bouton.click();
+    await expect(accord).toBeFocused();
+    await expect(alerte).toBeVisible();
+    expect(selecteurs).toBe(0);
+    expect(envois).toBe(1);
+  });
+
+  await test.step("« Recharger la page » : la page revient, la case décochée et sans message", async () => {
+    await Promise.all([page.waitForEvent("load"), alerte.getByRole("button", { name: CASE_IMPORT.recharger }).click()]);
+    await expect(caseImport(page)).not.toBeChecked();
+    await expect(alerte).toHaveCount(0);
   });
 });
 

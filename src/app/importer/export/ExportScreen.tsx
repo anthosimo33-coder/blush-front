@@ -63,6 +63,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
   const onFiles = async ([file]: File[]) => {
     if (!file) return;
+    /* La case décochée pendant que le choix du fichier était ouvert : rien ne part sans elle (son accord n’est plus là) */
+    if (!accord.exiger()) return;
     setBusy(true);
     setSouci(null);
     setAvance(null);
