@@ -87,11 +87,7 @@ async function lireEnvoi(req: Request): Promise<Envoi | null> {
  * La mise à jour de la mémoire tourne une fois la réponse partie. `surEchec` : une erreur après le premier événement
  * (les bulles de la réponse sont rendues, si elle n’a pas été réglée : voir traiter).
  */
-async function enFlux(
-  storyId: string,
-  travail: (emettre: (e: EvenementChat) => void) => Promise<{ majMemoire: boolean }>,
-  surEchec: () => Promise<unknown>,
-): Promise<Response> {
+async function enFlux(storyId: string, travail: (emettre: (e: EvenementChat) => void) => Promise<{ majMemoire: boolean }>, surEchec: () => Promise<unknown>): Promise<Response> {
   const encodeur = new TextEncoder();
   let sortie: ReadableStreamDefaultController<Uint8Array> | null = null;
   const flux = new ReadableStream<Uint8Array>({

@@ -244,8 +244,7 @@ export async function repondre(
   const offerte = fuite || !!sortie.alerte;
   const verrouillee = verrouAttendu && !offerte;
   /* La voix part tout de suite, pendant qu’on enregistre l’échange : la réponse écrite ne l’attend pas */
-  const voix =
-    !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie) ? direReponse(story, sortie) : null;
+  const voix = !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie) ? direReponse(story, sortie) : null;
   /* Ce qu’elle coûte vraiment : sa voix est partie ou non, des captures jointes ; verrouillée, ce qu’elle coûtera à la lecture */
   const cout = offerte ? null : verrouillee ? (reglement?.cout ?? null) : coutDe({ ajout: !!ajout, vocal: !!voix });
   const reponse: BlushAnswer = fuite

@@ -49,7 +49,7 @@ import { REFUS_FUITE } from "@/server/ia/garde";
 import { askQuestion, CoupureChat, sendToBlush } from "@/services/api";
 import type { ErreurApi } from "@/types/erreurs-api";
 import type { BulleChat, EvenementChat } from "@/types";
-import { compteDeTest, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
+import { compteDeTest, donnerDesBulles, facticePourChaqueTest, histoireLue } from "./aide/fixtures";
 import { auMoins } from "./aide/listes";
 
 let id = "";
@@ -107,6 +107,8 @@ facticePourChaqueTest((req) => {
 beforeAll(async () => {
   const u = await compteDeTest("chat-flux", "debloque");
   compte = u;
+  /* Chaque réponse se paie en bulles : de quoi parler à BLUSH tout le fichier (le compte à 0 bulle : tests/chat-bulles.test.ts) */
+  await donnerDesBulles(u, 1000);
   id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);

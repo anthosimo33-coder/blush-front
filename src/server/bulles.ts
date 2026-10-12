@@ -33,8 +33,7 @@ class SoldeInsuffisant extends Error {}
  * Ce que coûte une réponse de BLUSH (COUT_EN_BULLES) : un message qui joint des captures ou un export, une réponse en
  * vocal, ou une réponse écrite. Les captures ne s’ajoutent pas au vocal : la plus chère des deux.
  */
-export const coutDe = ({ ajout, vocal }: { ajout: boolean; vocal: boolean }): number =>
-  ajout ? COUT_EN_BULLES.ajout : vocal ? COUT_EN_BULLES.vocal : COUT_EN_BULLES.reponse;
+export const coutDe = ({ ajout, vocal }: { ajout: boolean; vocal: boolean }): number => (ajout ? COUT_EN_BULLES.ajout : vocal ? COUT_EN_BULLES.vocal : COUT_EN_BULLES.reponse);
 
 /** Le solde de bulles du compte, lu en base (0 pour un compte qui n’existe plus). */
 export async function soldeDe(userId: string): Promise<number> {
