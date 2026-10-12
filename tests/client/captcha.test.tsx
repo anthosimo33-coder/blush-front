@@ -1,5 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { ENTETE_CAPTCHA, SCRIPT_TURNSTILE } from "@/lib/captcha";
 
 /*
@@ -167,7 +168,7 @@ describe("le script de Cloudflare bloqué", () => {
     });
     /* Le jeton attendu, ce serait 20 secondes : bien plus que le délai du test */
     const conv = new File(["[01/09/2026 10:00:00] Léa: salut\n[01/09/2026 10:01:00] Tom: hey\n"], "_chat.txt", { type: "text/plain" });
-    await api.uploadExport(conv);
+    await api.uploadExport(conv, CASE_IMPORT.version);
     expect(appels).toEqual(["/api/captcha -", "/api/import -"]);
   });
 });
@@ -198,7 +199,7 @@ describe("les appels", () => {
       return url === "/api/captcha" ? json({ ok: true }) : json({ source: { kind: "export", app: "whatsapp" }, story: { id: "s1" } });
     });
     const conv = new File(["[01/09/2026 10:00:00] Léa: salut\n[01/09/2026 10:01:00] Tom: hey\n"], "_chat.txt", { type: "text/plain" });
-    await api.uploadExport(conv);
+    await api.uploadExport(conv, CASE_IMPORT.version);
     expect(appels).toEqual(["/api/captcha jeton-de-l-import", "/api/import -"]);
 
     /* Le laissez-passer refusé : l’import ne part pas, l’erreur dit « captcha » */
@@ -208,7 +209,7 @@ describe("les appels", () => {
       appels.push(String(url));
       return json({ erreur: "captcha" }, 403);
     });
-    await expect(api.uploadExport(conv)).rejects.toMatchObject({ code: "captcha", status: 403 });
+    await expect(api.uploadExport(conv, CASE_IMPORT.version)).rejects.toMatchObject({ code: "captcha", status: 403 });
     expect(appels).toEqual(["/api/captcha"]);
   });
 

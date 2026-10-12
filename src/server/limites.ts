@@ -149,6 +149,7 @@ export const LIMITES = {
   commandeParCompte: { max: 20, fenetreS: 3600 },
   /** Les vérifications d’un paiement chez Whop, par achat (la page du retour, quand le webhook tarde) : elle repasse chaque seconde. */
   verificationParAchat: { max: 20, fenetreS: 600 },
+  /**
    * Les jetons du CAPTCHA échangés contre un laissez-passer (/api/captcha), par adresse IP : un par import sans compte,
    * comptés à l’entrée (une rafale de faux jetons ne fait pas appeler Cloudflare sans fin).
    */
