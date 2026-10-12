@@ -331,8 +331,8 @@ describe("useConversation : un échange", () => {
 describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () => {
   const verrouillee = reponse([], { verrouillee: { message: 41, cout: 1 } });
 
-  it("« La lire » : la réponse payée remplace sa version masquée, à la même place", async () => {
-    const { result } = monter();
+  it("« La lire » : la réponse payée remplace sa version masquée, à la même place, et les lecteurs d’écran l’entendent", async () => {
+    const { result, scene: s } = monter();
     await act(() =>
       result.current.envoyer(
         texteDe("je lui dis quoi ?"),
@@ -344,6 +344,8 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
     await act(() => result.current.lire(masquee.id, 41));
     expect(lireReponse).toHaveBeenCalledExactlyOnceWith(41);
     expect(result.current.msgs.at(-1)).toMatchObject({ id: masquee.id, type: "reponse", result: { bubbles: [{ text: "dis-lui oui" }], echange: 40 } });
+    /* Annoncée « prête » quand elle est arrivée masquée, puis ce qu’elle dit une fois lue */
+    expect(s.annoncer).toHaveBeenLastCalledWith(result.current.msgs.at(-1));
   });
 
   it("plus de bulles pour la lire : elle reste verrouillée, et BLUSH le dit d’un mot", async () => {

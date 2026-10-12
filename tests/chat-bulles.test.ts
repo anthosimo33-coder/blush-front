@@ -35,7 +35,7 @@ import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { coutDe, crediter, refDuMessage, reponseVerrouillee, soldeDe } from "@/server/bulles";
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
-import { compteDe, LIMITES } from "@/server/limites";
+import { compteDe, compter, LIMITES } from "@/server/limites";
 import { cleDeLimiteDuCompte } from "@/server/email-canonique";
 import { momentAPartager } from "@/server/partages";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
@@ -87,6 +87,12 @@ const envoyer = (texte: string, { flux = true, question = false }: { flux?: bool
       body: JSON.stringify({ texte, ...(question ? { question: true } : {}) }),
     }),
   );
+/* Une capture (de leur conv), comme l’envoie le « + » du chat */
+const envoyerCaptures = () => {
+  const fd = new FormData();
+  fd.append("captures", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "c.png", { type: "image/png" }));
+  return POST(requete("/api/chat", { method: "POST", headers: { accept: "application/x-ndjson" }, body: fd }));
+};
 const lire = (message: number) => debloquer(requete("/api/chat/debloquer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }) }));
 const historique = async () => (await (await GET(requete("/api/chat"))).json()) as HistoriqueChat;
 
@@ -215,6 +221,50 @@ describe("POST /api/chat, avec des bulles", () => {
     expect(reponseDu(ecrite).vocalEnCours).toBeUndefined();
     expect(ecrite.some((e) => "vocal" in e)).toBe(false);
     expect(await soldeDe(u.id)).toBe(0);
+  });
+
+  it("en vocal, la voix ratée (son budget du jour épuisé) : la réponse reste écrite et ne coûte que l’écrit, le surplus rendu", async () => {
+    const { u, id } = await parleur("bulles-voix-ratee", 3);
+    await db().update(schema.stories).set({ chatVocal: true }).where(eq(schema.stories.id, id));
+    await compter(cleDeLimiteDuCompte("voix", u.email), LIMITES.voixParCompte, LIMITES.voixParCompte.max);
+    const evenements = (await fluxDe(await envoyer("dis-moi tout"))).evenements;
+    await lancerApres();
+    expect(evenements.at(-1)).toEqual({ vocal: null });
+    expect(await soldeDe(u.id)).toBe(2);
+    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([
+      ["reponse", -COUT_EN_BULLES.vocal],
+      ["rendu", 1],
+    ]);
+    expect(await derniereReponse(id)).toMatchObject({ cout: COUT_EN_BULLES.reponse, verrouillee: false });
+  });
+
+  it("« parle-moi en vocal » dans un chat écrit : la réponse part en vocal, payée comme écrite ; ce qu’elle garde de son coût est ce qui a été débité", async () => {
+    const { u, id } = await parleur("bulles-voix-demandee", 3);
+    const evenements = (await fluxDe(await envoyer("parle-moi en vocal"))).evenements;
+    await lancerApres();
+    expect(evenements.some((e) => "vocal" in e && e.vocal)).toBe(true);
+    expect(reponseDu(evenements).bulles).toEqual({ depensees: 1, restantes: 2 });
+    expect((await journalDe(u.id)).map((m) => m.delta)).toEqual([-1]);
+    expect(await derniereReponse(id)).toMatchObject({ cout: 1 });
+  });
+
+  it("des captures : 3 bulles ; à 2, la réponse s’écrit verrouillée et se lira pour 3 ; la suivante répond « bulles » et rend l’ajout du jour", async () => {
+    const { u, id } = await parleur("bulles-captures", 5);
+    const payee = reponseDu((await fluxDe(await envoyerCaptures())).evenements);
+    await lancerApres();
+    expect(payee.bulles).toEqual({ depensees: COUT_EN_BULLES.ajout, restantes: 2 });
+    const verrouillee = reponseDu((await fluxDe(await envoyerCaptures())).evenements);
+    await lancerApres();
+    expect(verrouillee.verrouillee).toEqual({ message: (await derniereReponse(id)).id, cout: COUT_EN_BULLES.ajout });
+    expect(await soldeDe(u.id)).toBe(2);
+    const ajouts = () => compteDe(cleDeLimiteDuCompte("ajout", u.email), LIMITES.ajoutParCompte);
+    const avant = await ajouts();
+    const refusee = await envoyerCaptures();
+    expect([refusee.status, await refusee.json()]).toEqual([402, { erreur: "bulles" }]);
+    expect(await ajouts()).toBe(avant);
+    expect((await lire(verrouillee.verrouillee!.message)).status).toBe(402);
+    await donnerDesBulles(u, 1);
+    expect(((await (await lire(verrouillee.verrouillee!.message)).json()) as BlushAnswer).bulles).toEqual({ depensees: COUT_EN_BULLES.ajout, restantes: 0 });
   });
 
   it("« Ta question » est une réponse du chat comme une autre : 1 bulle", async () => {

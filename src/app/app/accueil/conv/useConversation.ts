@@ -326,13 +326,16 @@ export function useConversation({
     direMot,
     /**
      * « La lire » : la réponse verrouillée `reponse` (son `message` en base), une fois rechargé. Elle remplace sa version
-     * masquée ; sinon (plus de bulles, le réseau), BLUSH dit pourquoi d’un mot.
+     * masquée, et les lecteurs d’écran l’entendent comme une réponse qui arrive ; sinon (plus de bulles, le réseau),
+     * BLUSH dit pourquoi d’un mot.
      */
     lire: async (reponse: number, message: number) => {
       noterEcriture("chat");
       try {
         const lue = await lireLaReponse(message);
         changer((m) => m.map((x) => (x.id === reponse && x.type === "reponse" ? { ...x, result: lue } : x)));
+        const masquee = derniers.current.msgs.find((x) => x.id === reponse);
+        if (masquee?.type === "reponse") ecran.current.annoncer({ ...masquee, result: lue });
       } catch (e) {
         tracer("conv:lire", e);
         direMot([messageErreur("chat", e)].flat().join(" "));

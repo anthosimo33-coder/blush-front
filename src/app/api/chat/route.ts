@@ -169,7 +169,11 @@ type Paiement = { reglement: Reglement; rendreSiPasReglee: () => Promise<void> }
  * reviennent (une fois) ; partie, elle est réglée (Reglement.regler : le trop-perçu d’une alerte ou d’un vocal resté écrit
  * est rendu, et la réponse dit ce qu’il reste).
  */
-async function payer(utilisateur: Utilisateur, story: Parameters<typeof repondEnVocal>[0], { fichiers, vocal }: { fichiers: boolean; vocal: boolean }): Promise<Paiement | null> {
+async function payer(
+  utilisateur: Utilisateur,
+  story: Parameters<typeof repondEnVocal>[0] & { id: string },
+  { fichiers, vocal }: { fichiers: boolean; vocal: boolean },
+): Promise<Paiement | null> {
   const ids = await reserverEchange();
   const ref = refDuMessage(ids.blush);
   let cout = coutDe({ ajout: fichiers, vocal: repondEnVocal(story, vocal) });
@@ -205,7 +209,7 @@ async function payer(utilisateur: Utilisateur, story: Parameters<typeof repondEn
     rendreSiPasReglee: async () => {
       if (debit !== "debite" || reglee) return;
       reglee = true;
-      await auMieux(() => rendre(utilisateur, ref), "chat : les bulles d’une réponse en échec non rendues", { histoire: ref });
+      await auMieux(() => rendre(utilisateur, ref), "chat : les bulles d’une réponse en échec non rendues", { histoire: story.id, ref });
     },
   };
 }
