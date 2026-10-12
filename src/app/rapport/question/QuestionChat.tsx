@@ -219,7 +219,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
                     </MessageBubble>
                   )}
                   <span className="text-detail font-extrabold leading-[1.45]">{answer.evidence}</span>
-                  <ConfidenceLine level={answer.confidence}>{answer.limits}</ConfidenceLine>
+                  {!answer.verrouillee && <ConfidenceLine level={answer.confidence}>{answer.limits}</ConfidenceLine>}
                 </span>,
               ]}
             />

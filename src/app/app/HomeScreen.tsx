@@ -210,6 +210,7 @@ export function HomeScreen(p: {
               chargerAnciens={conv.chargerAnciens}
               partager={setImage}
               relancer={relancer}
+              lire={conv.lire}
             />
             {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
             <Composer

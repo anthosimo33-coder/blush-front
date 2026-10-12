@@ -479,6 +479,14 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number }, 
   });
 }
 
+/**
+ * Lire une réponse verrouillée (écrite à 0 bulle, BlushAnswer.verrouillee), une fois rechargé : son coût est débité, elle
+ * revient en entier. ErreurApi « bulles » : le solde ne la couvre toujours pas.
+ */
+export async function lireLaReponse(message: number): Promise<BlushAnswer> {
+  return appel("POST /api/chat/debloquer", { corps: { message } });
+}
+
 /* Une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
 const bulle = (texte: string | readonly string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
 
@@ -498,6 +506,20 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
 
 /** La question du rapport, posée au chat : sa première bulle devient le titre, les autres la preuve. */
 function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
+  /*
+   * Plus de bulles : la réponse est écrite mais verrouillée, sans rien d’elle ici ; elle attend dans le chat.
+   * TODO(produit): textes nouveaux, sans maquette (le prototype des bulles n’a pas « Ta question » à 0 bulle)
+   */
+  if (r.verrouillee)
+    return {
+      question,
+      title: "Ta réponse est prête",
+      evidenceLabel: "Plus de bulles",
+      evidence: "Recharge tes bulles pour la lire : elle t’attend dans ton chat avec BLUSH.",
+      confidence: "probable",
+      limits: "",
+      verrouillee: true,
+    };
   const bulles = r.bubbles;
   const message = bulles.flatMap((b) => b.messages ?? [])[0];
   return {

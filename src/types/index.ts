@@ -245,6 +245,8 @@ export type QuestionAnswer = {
   message?: Message;
   confidence: Confidence;
   limits: string;
+  /** Écrite à 0 bulle : verrouillée, sans rien d’elle (elle attend dans le chat, à lire une fois rechargé). */
+  verrouillee?: true;
 };
 
 /**
@@ -270,6 +272,18 @@ export type BlushAnswer = {
   modeVocal?: boolean;
   /** L’échange (l’id de ton message) auquel cette réponse appartient, pour la partager en image. */
   echange?: number;
+  /**
+   * Ce que cette réponse a coûté en bulles (0 : offerte, une alerte de danger), et ce qu’il en reste après elle. Dit au
+   * moment où elle arrive (POST /api/chat, sa lecture une fois payée), jamais gardé en base. Absent : un compte de
+   * l’équipe (bulles illimitées), ou une réponse de l’historique.
+   */
+  bulles?: { depensees: number; restantes: number };
+  /**
+   * Une réponse écrite à 0 bulle, verrouillée : elle est écrite et gardée, mais son contenu ne quitte pas le serveur
+   * avant d’être payé (`bubbles` vide, rien d’autre). `message` : de quoi la lire une fois rechargé (POST
+   * /api/chat/debloquer, qui débite son `cout`).
+   */
+  verrouillee?: { message: number; cout: number };
 };
 
 /** Une bulle de BLUSH dans le chat, et les messages qu’elle cite. */

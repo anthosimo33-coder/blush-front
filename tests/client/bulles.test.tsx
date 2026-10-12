@@ -49,6 +49,7 @@ function monter(msgs: Msg[], plus: Partial<Props> = {}) {
     chargerAnciens: vi.fn(async () => {}),
     partager: vi.fn(),
     relancer: vi.fn(),
+    lire: vi.fn(async () => {}),
     ...plus,
   };
   render(
@@ -141,6 +142,19 @@ describe("les bulles de la conv de l’accueil", () => {
     expect(within(fil).getByText("j’ai eu un bug, renvoie-moi ça")).toBeTruthy();
     fireEvent.click(within(fil).getByRole("button", { name: "Réessayer" }));
     expect(props.relancer).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it("une réponse verrouillée (écrite à 0 bulle) : prête, sans rien d’elle, ni « Partager » ; « La lire » la demande", async () => {
+    const { props, fil } = monter([
+      { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
+      { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 1 }, echange: 1 }, at: A },
+    ]);
+    expect(within(fil).getByText("Ta réponse est prête")).toBeTruthy();
+    expect(within(fil).getByText("Recharge tes bulles pour la lire.")).toBeTruthy();
+    expect(within(fil).queryByText("Ta meilleure réponse")).toBeNull();
+    expect(within(fil).queryByRole("button", { name: "Partager" })).toBeNull();
+    await act(async () => fireEvent.click(within(fil).getByRole("button", { name: "La lire" })));
+    expect(props.lire).toHaveBeenCalledExactlyOnceWith(2, 77);
   });
 
   it("l’intro : « il vient de répondre ? » d’après son pronom, et un niveau franchi pendant la visite", () => {

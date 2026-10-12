@@ -151,6 +151,7 @@ function texteAnnonce(bulles: readonly BulleChat[]) {
 export function annonceDe(m: Msg): string | null {
   switch (m.type) {
     case "reponse":
+      if (m.result.verrouillee) return "Ta réponse est prête. Recharge tes bulles pour la lire.";
       return m.result.vocal || m.result.vocalEnCours ? "BLUSH t’a répondu en vocal." : `BLUSH a répondu\u00a0: ${texteAnnonce(m.result.bubbles)}`;
     case "ecrit":
       if (!m.coupee) return null;
@@ -286,7 +287,7 @@ export function rowsOf(msgs: readonly Msg[], opened: number | null, depuis: numb
     const neuf = m.id >= depuis;
     const ligne = { m, at, neuf, fresh: !!m.answered && neuf };
     /* La réponse de BLUSH garde son échange : de quoi la partager en image */
-    const echange = m.type === "reponse" ? m.result.echange : undefined;
+    const echange = m.type === "reponse" && !m.result.verrouillee ? m.result.echange : undefined;
     const last = rows[rows.length - 1];
     if (last?.kind === "group" && last.from === m.from) {
       last.msgs.push(ligne);

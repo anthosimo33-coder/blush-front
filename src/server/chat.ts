@@ -1,6 +1,6 @@
 import "server-only";
 import { partialParse } from "@anthropic-ai/sdk/_vendor/partial-json-parser/parser";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
@@ -9,18 +9,20 @@ import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, Message } from "@/types";
-import { ErreurTache } from "./erreurs";
+import { coutDe, garderVerrouillee } from "./bulles";
+import { ErreurInvariant, ErreurPublique, ErreurTache } from "./erreurs";
 import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
 import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
+import { reponseMasquee } from "./historique";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
 import { appelVerifie } from "./ia/appel-verifie";
 import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
 import { dire, voixDisponible, voixPour } from "./ia/voix";
-import { journal, journalErreur } from "./journal";
+import { auMieux, journal, journalErreur } from "./journal";
 import { planifier } from "./taches";
 import { aujourdhuiParis } from "./temps";
 
@@ -51,6 +53,47 @@ const texteDe = (r: ReponseChat) => [resume(r), r.pourquoi ?? ""].join(" ");
 
 /** Ce qu’il écrit quand il envoie des messages sans un mot : la demande qu’on a testée sur les évals. */
 const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
+
+/** BLUSH répondra-t-il en vocal ? Il a envoyé un vocal, ou le chat est en vocal, et la voix est là. Ce que coûte la réponse en dépend. */
+export const repondEnVocal = (story: Pick<Ligne, "chatVocal">, parVocal: boolean) => (parVocal || story.chatVocal) && voixDisponible();
+
+/** Les identifiants d’un échange (ton message, la réponse de BLUSH), pris avant que BLUSH écrive : voir reserverEchange. */
+export type IdsDeLEchange = { toi: number; blush: number };
+
+/* La clé du verrou (pg_advisory_xact_lock) qui fait prendre ses deux identifiants d’un coup à chaque échange */
+const VERROU_DES_ECHANGES = 0x0b1a5c4a7;
+
+/**
+ * Les identifiants d’un échange, pris d’avance dans la séquence de chat_messages : le débit de la réponse porte le sien
+ * (refDuMessage) avant que BLUSH écrive. Deux identifiants qui se suivent, ton message d’abord, pris sous un verrou
+ * court : deux échanges en même temps ne s’entremêlent jamais (l’historique lit chaque message de toi suivi de sa
+ * réponse). Une réponse qui échoue laisse un trou dans la séquence, sans conséquence.
+ */
+export async function reserverEchange(): Promise<IdsDeLEchange> {
+  const ids = await db().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${VERROU_DES_ECHANGES})`);
+    const { rows } = await tx.execute<{ id: string }>(sql`select nextval(pg_get_serial_sequence('chat_messages', 'id'))::text as id from generate_series(1, 2)`);
+    return rows.map((r) => Number(r.id)).sort((a, b) => a - b);
+  });
+  const [toi, blush] = ids;
+  if (toi === undefined || blush === undefined) throw new ErreurInvariant("chat_messages:ids");
+  return { toi, blush };
+}
+
+/**
+ * Ce que coûte la réponse, réglé par la route (src/app/api/chat/route.ts) : le débit est fait avant que BLUSH écrive.
+ * `ids` : ceux de l’échange (le débit porte celui de la réponse). `verrouillee` : le solde ne la couvre pas, elle s’écrit
+ * mais reste en base (ni ses bulles en flux, ni son texte, ni son vocal ne partent), au coût `cout`. `ecrit` : sans voix
+ * (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce qu’elle coûte
+ * vraiment (0 : offerte, une alerte de danger) ; il rend le trop-perçu et dit ce qu’il reste (rien pour l’équipe).
+ */
+export type Reglement = {
+  ids: IdsDeLEchange;
+  verrouillee: boolean;
+  ecrit: boolean;
+  cout: number;
+  regler: (cout: number) => Promise<BlushAnswer["bulles"]>;
+};
 
 /** Une réponse qui peut partir en vocal : la voix est là, la réponse a son texte dit, et pas d’alerte (les ressources d’aide restent écrites). */
 const vocalPossible = (r: ReponseChat) => voixDisponible() && !!r.dit?.length && !r.alerte;
@@ -125,13 +168,21 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
  * `surEvenement` : la réponse en flux (POST /api/chat) : ses bulles une à une pendant qu’il écrit, la réponse validée
  * dès que l’échange est enregistré, puis le vocal, fait après elle. La réponse rendue à la fin a son vocal.
  * `differer` : ce qui peut attendre la fin de la réponse (le suivi des coûts) passe après elle.
+ * `reglement` : ce qu’elle coûte en bulles (Reglement). Une réponse verrouillée part masquée (reponseMasquee), sans
+ * échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une alerte de danger ne se verrouille jamais
+ * (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé.
  */
 export async function repondre(
   story: Ligne,
   memoire: DonneesMemoire,
   ditBrut: string,
   ajout?: { ajout: Ajout; affiche: string },
-  { parVocal = false, surEvenement, differer }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void } = {},
+  {
+    parVocal = false,
+    surEvenement,
+    differer,
+    reglement,
+  }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void; reglement?: Reglement } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
@@ -141,7 +192,10 @@ export async function repondre(
   const lignes = new Map([...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
   const jour = aujourdhuiParis();
-  const vocalAttendu = (parVocal || story.chatVocal) && voixDisponible();
+  /* Une réponse sans voix (verrouillée, ou le solde ne couvrait pas un vocal) s’écrit : le modèle ne prépare pas de texte dit */
+  const sansVoix = !!reglement?.ecrit;
+  const verrouAttendu = !!reglement?.verrouillee;
+  const vocalAttendu = !sansVoix && repondEnVocal(story, parVocal);
   const req = requeteChat({
     h,
     aujourdhui: jour.t,
@@ -168,7 +222,8 @@ export async function repondre(
     storyId: story.id,
     etiquette: "chat",
     ...(differer ? { differer } : {}),
-    ...(surEvenement
+    /* Une réponse verrouillée ne montre rien pendant qu’elle s’écrit */
+    ...(surEvenement && !verrouAttendu
       ? {
           parEssai: () => {
             const auFil = bullesAuFil(lignes, messages, vocalAttendu, surEvenement);
@@ -185,8 +240,14 @@ export async function repondre(
   /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
   const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;
   if (modeVocal !== story.chatVocal) await db().update(schema.stories).set({ chatVocal: modeVocal }).where(eq(schema.stories.id, story.id));
+  /* Une alerte de danger (ou la réponse remplacée par le garde-fou) est offerte : jamais verrouillée, ses bulles rendues */
+  const offerte = fuite || !!sortie.alerte;
+  const verrouillee = verrouAttendu && !offerte;
   /* La voix part tout de suite, pendant qu’on enregistre l’échange : la réponse écrite ne l’attend pas */
-  const voix = !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie) ? direReponse(story, sortie) : null;
+  const voix =
+    !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie) ? direReponse(story, sortie) : null;
+  /* Ce qu’elle coûte vraiment : sa voix est partie ou non, des captures jointes ; verrouillée, ce qu’elle coûtera à la lecture */
+  const cout = offerte ? null : verrouillee ? (reglement?.cout ?? null) : coutDe({ ajout: !!ajout, vocal: !!voix });
   const reponse: BlushAnswer = fuite
     ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })), modeVocal }
     : {
@@ -196,37 +257,79 @@ export async function repondre(
       };
   const resumeGarde = fuite ? REFUS_FUITE.join(" / ") : resume(sortie);
 
-  const gardes = await db()
-    .insert(schema.chatMessages)
-    .values([
-      {
-        storyId: story.id,
-        role: "toi",
-        data: coffre.ecrire("chat_messages.data:toi", {
-          texte: dit,
-          ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}),
-        }),
-      },
-      { storyId: story.id, role: "blush", data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde }) },
-    ])
-    .returning({ id: schema.chatMessages.id, role: schema.chatMessages.role });
+  const lignesDeLEchange = [
+    {
+      ...(reglement ? { id: reglement.ids.toi } : {}),
+      storyId: story.id,
+      role: "toi" as const,
+      data: coffre.ecrire("chat_messages.data:toi", {
+        texte: dit,
+        ...(ajout ? { lignes: nouvelles.slice(-LIGNES_DANS_LE_FIL), affiche: [ajout.affiche, ditBrut].filter(Boolean).join(" ") } : {}),
+      }),
+    },
+    {
+      ...(reglement ? { id: reglement.ids.blush } : {}),
+      storyId: story.id,
+      role: "blush" as const,
+      data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde }),
+      cout,
+      verrouillee,
+    },
+  ];
+  const colonnes = { id: schema.chatMessages.id, role: schema.chatMessages.role };
+  /* Verrouillée : gardée seulement si aucune autre n’attend déjà pour ce compte (garderVerrouillee) */
+  const compte = story.userId;
+  if (verrouillee && !compte) throw new ErreurInvariant("chat:verrouillee_sans_compte");
+  const gardes =
+    verrouillee && compte
+      ? await garderVerrouillee(compte, (tx) => tx.insert(schema.chatMessages).values(lignesDeLEchange).returning(colonnes))
+      : await db().insert(schema.chatMessages).values(lignesDeLEchange).returning(colonnes);
+  if (!gardes) throw new ErreurPublique("bulles");
   /* L’échange (l’id de ton message) part avec la réponse : de quoi la partager en image ensuite */
   const echangeId = gardes.find((g) => g.role === "toi")?.id;
-  surEvenement?.({ reponse: { ...reponse, echange: echangeId, ...(voix ? { vocalEnCours: true } : {}) } });
+  const blushId = gardes.find((g) => g.role === "blush")?.id;
+  /* Ce qu’elle a coûté, et ce qu’il reste : réglé au moment où elle part (une verrouillée se paie à la lecture) */
+  const bulles = verrouillee ? undefined : await reglement?.regler(cout ?? 0);
+  /* Ce qui part au navigateur : la réponse, ou rien d’elle si elle est verrouillée */
+  const montree: BlushAnswer =
+    verrouillee && blushId !== undefined
+      ? reponseMasquee(blushId, cout ?? 1, modeVocal)
+      : { ...reponse, ...(bulles ? { bulles } : {}), ...(echangeId === undefined ? {} : { echange: echangeId }) };
+  surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
-  /* Des messages ajoutés, une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour après la réponse */
+  /*
+   * Des messages ajoutés, une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour
+   * après la réponse. Verrouillée, elle n’apprend que ce qu’il a dit : rien de la réponse ne doit ressortir ailleurs (sa
+   * fiche) avant d’être payé
+   */
   const majMemoire = !fuite && (nouvelles.length > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint);
-  const echange: Echange = { date: jour.iso, dit, reponse: sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []), ...(nouvelles.length ? { lignes: nouvelles } : {}) };
+  const echange: Echange = {
+    date: jour.iso,
+    dit,
+    reponse: verrouillee ? [] : sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []),
+    ...(nouvelles.length ? { lignes: nouvelles } : {}),
+  };
   if (majMemoire) await planifier(story.id, "memoire_maj", echange);
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
   const vocal = (voix ? await voix : null) ?? null;
-  const blushId = gardes.find((g) => g.role === "blush")?.id;
   if (vocal && blushId !== undefined)
     await db()
       .update(schema.chatMessages)
       .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde }) })
       .where(eq(schema.chatMessages.id, blushId));
+  /* La voix a échoué : la réponse reste écrite, et coûte ce que coûte une réponse écrite (le reste est rendu) */
+  if (voix && !vocal && reglement && blushId !== undefined) {
+    const ecrite = coutDe({ ajout: !!ajout, vocal: false });
+    await auMieux(
+      async () => {
+        await reglement.regler(ecrite);
+        await db().update(schema.chatMessages).set({ cout: ecrite }).where(eq(schema.chatMessages.id, blushId));
+      },
+      "chat : les bulles d’un vocal raté non rendues",
+      { histoire: story.id },
+    );
+  }
   if (voix) surEvenement?.({ vocal });
-  return { reponse: { ...reponse, ...(vocal ? { vocal } : {}), echange: echangeId }, majMemoire };
+  return { reponse: { ...montree, ...(vocal ? { vocal } : {}) }, majMemoire };
 }

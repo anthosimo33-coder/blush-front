@@ -42,6 +42,11 @@ export const ERREURS_API = {
   acces: 402,
   /** Le paiement n’est pas encore branché : seuls les comptes de l’équipe (BLUSH_ACCES_LIBRE) débloquent. */
   bientot: 402,
+  /**
+   * Plus assez de bulles (src/server/bulles.ts) : une réponse verrouillée attend déjà d’être payée (une seule par compte),
+   * ou la lire en demande plus que le solde. Rien n’est parti au modèle.
+   */
+  bulles: 402,
 
   /* Ce qu’elle envoie */
   /** Un email qui n’en est pas un (le code de connexion, la liste d’attente). */
