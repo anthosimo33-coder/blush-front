@@ -8,14 +8,11 @@ import { RESEAU, reponseAuGeste } from "./page";
  * garde, et l’enregistrement de sa fiche.
  */
 
-/** La conv avec BLUSH, sur l’accueil (le fil, en role="log"). */
-export const filDuChat = (page: Page) => page.getByRole("log", { name: "Ta conv avec BLUSH" });
+/** La conv avec BLUSH, sur l’accueil (le fil : une région nommée, pas une région live). */
+export const filDuChat = (page: Page) => page.getByRole("region", { name: "Ta conv avec BLUSH" });
 
-/**
- * Le champ du chat (« Écris à BLUSH, ou colle sa réponse »). Son nom lit aussi le bouton à côté (le test.fixme de
- * chat-fiche.spec.ts) : on le prend par le début de son nom.
- */
-export const champDuChat = (page: Page) => page.getByRole("textbox", { name: /^Écris à BLUSH, ou colle sa réponse/ });
+/** Le champ du chat, par son seul nom (« Écris à BLUSH, ou colle sa réponse ») : ses boutons sont à côté de son <label>. */
+export const champDuChat = (page: Page) => page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true });
 
 /**
  * Écrit à BLUSH depuis le champ du chat, et attend sa réponse (POST /api/chat) en entier. Renvoie son statut. La réponse

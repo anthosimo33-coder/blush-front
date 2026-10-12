@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { changerDeConv } from "@/lib/requetes";
 import { sensDeTendance } from "@/lib/tendance";
@@ -26,7 +27,7 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
       contentGap={0}
       mobileTop={
         <header className="flex h-[60px] shrink-0 items-center px-4 lg:hidden">
-          <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
+          <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} size="sm" variant="doux" />
         </header>
       }
     >
@@ -49,6 +50,7 @@ export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
 }
 
 function ConvRow({ conv }: { conv: ConvSummary }) {
+  const router = useRouter();
   const up = sensDeTendance(conv.trend) === "monte";
   /* Pas encore de verdict : BLUSH lit la conv (texte relu le 8 octobre) */
   const where = conv.verdict?.title ?? "BLUSH lit votre conv…";
@@ -59,7 +61,15 @@ function ConvRow({ conv }: { conv: ConvSummary }) {
       prefetch={false}
       scroll={false}
       transitionTypes={["nav-forward"]}
-      onClick={() => changerDeConv(conv.storyId)}
+      /*
+       * Les pages préchargées en entier gardent la conv d’avant (5 min) : sa fiche, préchargée par l’accueil, s’ouvrirait
+       * sur l’autre personne. refresh() oublie tout ce que le navigateur en garde ; la navigation vers l’accueil, partie
+       * juste après, passe devant lui
+       */
+      onClick={() => {
+        changerDeConv(conv.storyId);
+        router.refresh();
+      }}
       aria-label={`${conv.person.name}\u00a0: ${[where, conv.trend].filter(Boolean).join(" ")}, ${conv.lastLabel}`}
       className="row-hover group flex items-center gap-3.5 px-4 py-3.5 text-ink no-underline"
     >

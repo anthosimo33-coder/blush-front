@@ -46,6 +46,7 @@ export function useChargerAnciens({
   depuis,
   derniers,
   rendu,
+  relire,
   modeVocalDuRendu,
   fondre,
   poserDevant,
@@ -58,8 +59,13 @@ export function useChargerAnciens({
   depuis: number;
   /** La conv affichée, à jour après chaque rendu (pour ce qui arrive après coup). */
   derniers: RefObject<Conv<Msg>>;
-  /** L’heure du rendu serveur de la page (voir renduAJour). Sans elle (l’aperçu), l’historique est toujours relu. */
+  /** L’heure du rendu serveur de la page (voir renduAJour). Sans elle, l’historique est toujours relu. */
   rendu?: number;
+  /**
+   * L’historique frais se relit (à l’ouverture, au retour par le bouton du navigateur). Faux pour l’aperçu de l’équipe
+   * (sans conv en base) : il relirait l’historique du compte connecté, et le fondrait dans ses échanges inventés.
+   */
+  relire: boolean;
   /** Le mode vocal rendu par la page avec l’historique : il vaut celui qu’une relecture aurait rapporté. */
   modeVocalDuRendu?: boolean;
   /** L’historique frais, fondu dans la conv affichée : ses nouveaux messages. */
@@ -86,7 +92,7 @@ export function useChargerAnciens({
   useEffect(() => {
     actions.current = { fondre, poserDevant, suivreModeVocal, ecran };
   });
-  const auMontage = useRef({ rendu, modeVocalDuRendu });
+  const auMontage = useRef({ rendu, modeVocalDuRendu, relire });
 
   /*
    * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
@@ -95,6 +101,7 @@ export function useChargerAnciens({
    * visite a déjà écrit (ses messages sont les plus récents). La page qui vient de le rendre n’est pas relue (renduAJour).
    */
   useEffect(() => {
+    if (!auMontage.current.relire) return;
     let fini = false;
     const recharger = () => {
       const suivreModeVocal = actions.current.suivreModeVocal();

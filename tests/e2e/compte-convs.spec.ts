@@ -1,5 +1,19 @@
 import type { Page, TestInfo } from "@playwright/test";
-import { attendreTaches, champDuChat, connecterParApi, expect, histoiresDe, lireUneConvParApi, messagesDeLHistoire, nouvelInvite, ouvrir, test } from "./aide";
+import { STORY_COOKIE } from "../../src/services/session";
+import {
+  attendreTaches,
+  champDuChat,
+  connecterParApi,
+  ecrireABlush,
+  expect,
+  filDuChat,
+  histoiresDe,
+  lireUneConvParApi,
+  messagesDeLHistoire,
+  nouvelInvite,
+  ouvrir,
+  test,
+} from "./aide";
 
 /*
  * Plusieurs convs sur un compte : « Tes convs » (/app/convs) les liste, un toucher ouvre l’accueil de l’une, et il
@@ -114,7 +128,7 @@ test("un geste vise la conv à l’écran, même quand un autre onglet en a ouve
     await ongletA.bringToFront();
     await champDuChat(ongletA).fill("tu crois qu’elle attend que je relance ?");
     await ongletA.getByRole("button", { name: "Envoyer" }).click();
-    await expect(ongletA.getByRole("log", { name: "Ta conv avec BLUSH" }).getByText("elle te cherche 👀")).toBeVisible();
+    await expect(filDuChat(ongletA).getByText("elle te cherche 👀")).toBeVisible();
     /* Ton message et la réponse de BLUSH */
     await expect.poll(() => messagesDeLHistoire(romane)).toBe(avantRomane + 2);
     expect(await messagesDeLHistoire(maelys)).toBe(avantMaelys);
@@ -140,5 +154,55 @@ test("un geste vise la conv à l’écran, même quand un autre onglet en a ouve
     await expect(accueilDe(ongletB, "Romane")).toBeVisible();
     await expect(ongletB.getByRole("link", { name: /^Tes convs/ })).toHaveCount(0);
     expect((await histoiresDe(email)).map((h) => h.id)).toEqual([romane]);
+  });
+});
+
+/*
+ * Connecté sans brouillon (sans le cookie de la conv choisie) : l’accueil et sa fiche gardent ce qu’ils ont vu pendant la
+ * visite sous l’identifiant de la conv affichée, tel que le serveur l’a résolu (idDeLaConv, src/services/serveur.ts),
+ * jamais sous un cookie absent, qui vaudrait pour toutes les convs du compte.
+ */
+test("connecté sans cookie de conv : l’accueil de l’une ne montre rien de l’autre", async ({ page }, testInfo) => {
+  test.slow();
+  const { email } = await deuxConvs(page, testInfo);
+  const question = "une question pour Romane, et rien que pour elle";
+
+  await test.step("une nouvelle connexion, sans aucun cookie : l’accueil s’ouvre sur Romane, la dernière lue", async () => {
+    await page.context().clearCookies();
+    await connecterParApi(page, testInfo, email);
+    expect((await page.context().cookies()).map((c) => c.name)).not.toContain(STORY_COOKIE);
+    await ouvrir(page, "/app");
+    await expect(accueilDe(page, "Romane")).toBeVisible();
+  });
+
+  await test.step("écrire à BLUSH sur Romane, puis passer par sa fiche", async () => {
+    expect(await ecrireABlush(page, question)).toBe(200);
+    await expect(filDuChat(page).getByText(question)).toBeVisible();
+    await accueilDe(page, "Romane").click();
+    await expect(page).toHaveURL(/\/app\/fiche$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Romane" })).toBeVisible();
+    await page.goBack();
+    await expect(accueilDe(page, "Romane")).toBeVisible();
+    await expect(filDuChat(page).getByText(question)).toBeVisible();
+  });
+
+  await test.step("Maëlys, ouverte par « Tes convs » : ni le message de Romane, ni sa fiche", async () => {
+    await page.getByRole("link", { name: "Tes convs (Maëlys)" }).click();
+    await page.getByRole("link", { name: /^Maëlys\s: / }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(accueilDe(page, "Maëlys")).toBeVisible();
+    await expect(filDuChat(page).getByText(question)).toHaveCount(0);
+    await accueilDe(page, "Maëlys").click();
+    await expect(page).toHaveURL(/\/app\/fiche$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Maëlys" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Romane" })).toHaveCount(0);
+  });
+
+  await test.step("revenue sur Romane : son échange y est toujours", async () => {
+    await ouvrir(page, "/app/convs");
+    await page.getByRole("link", { name: /^Romane\s: / }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(accueilDe(page, "Romane")).toBeVisible();
+    await expect(filDuChat(page).getByText(question)).toBeVisible();
   });
 });

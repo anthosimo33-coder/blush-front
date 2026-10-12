@@ -6,9 +6,10 @@ import type { Account, ReportPayload } from "@/types/api";
 import type { Fiche } from "@/types";
 
 /**
- * Ce que le cache garde, clé par clé, et sous quelle forme. La fiche a une clé par conv (`fiche:<id>`) : celle d’une
- * autre conv ne s’affiche jamais à la place de la sienne. « fiche-apercu » : l’aperçu figé d’une vraie fiche. Ce qui
- * se relit quand la conv change : src/lib/requetes.ts.
+ * Ce que le cache garde, clé par clé, et sous quelle forme. La fiche a une clé par conv (`fiche:<id>`, l’identifiant de
+ * la conv affichée tel que le serveur l’a résolu : idDeLaConv, src/services/serveur.ts, jamais le cookie brut, absent
+ * après une connexion) : celle d’une autre conv ne s’affiche jamais à la place de la sienne. « fiche-apercu » : l’aperçu
+ * figé d’une vraie fiche. Ce qui se relit quand la conv change : src/lib/requetes.ts.
  */
 export type Requetes = { report: ReportPayload; account: Account; "fiche-apercu": Fiche; [cle: `fiche:${string}`]: Fiche };
 export type Cle = keyof Requetes;

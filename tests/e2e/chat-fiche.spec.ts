@@ -431,10 +431,10 @@ test("l’historique du chat : les vingt derniers échanges à l’ouverture, le
 });
 
 /*
- * Le champ du chat est dans un <label> qui contient aussi ses boutons (le vocal, ou la flèche) : son nom accessible les
- * lit avec lui (« Écris à BLUSH, ou colle sa réponse Enregistrer un vocal »). Voir le <label> du champ dans Composer (src/app/app/accueil/Composer.tsx).
+ * Le <label> du champ du chat n’entoure que lui : ses boutons (le vocal, ou la flèche) sont à côté, dans la même
+ * pastille (Composer, src/app/app/accueil/Composer.tsx). Son nom ne les lit plus (« … Enregistrer un vocal »).
  */
-test.fixme("le champ du chat porte son seul nom, sans celui du bouton à côté", async ({ page }, testInfo) => {
+test("le champ du chat porte son seul nom, sans celui du bouton à côté", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo);
   await ouvrir(page, "/app");
   await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toBeVisible();

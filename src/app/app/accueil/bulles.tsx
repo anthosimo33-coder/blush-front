@@ -21,7 +21,22 @@ import { ClampedBubble } from "@/components/ui/clamp";
 import { scaleOf } from "@/contenu/niveaux";
 import type { BlushAnswer, BulleChat, LevelId, Pronom } from "@/types";
 import { VocalBlush, VoiceNote } from "../voice";
-import { CLE_INTRO, CLE_JOUR_INTRO, cleDeBulle, clock, dayLabel, depli, maintenantDe, rowsOf, tapeEncore, typeInconnu, type Msg, type MsgABulles, type Row } from "./conv/modele";
+import {
+  CLE_INTRO,
+  CLE_JOUR_INTRO,
+  cleDeBulle,
+  clock,
+  dayLabel,
+  depli,
+  maintenantDe,
+  MOT_DE_LA_COUPURE,
+  rowsOf,
+  tapeEncore,
+  typeInconnu,
+  type Msg,
+  type MsgABulles,
+  type Row,
+} from "./conv/modele";
 import type { HomeContact } from "./contact";
 import { AvecLogoDuFil, LogoDuFil } from "./Entetes";
 import { useHomeMotion } from "./mouvement/contexte";
@@ -40,6 +55,9 @@ function useContact() {
  * l’heure, à droite pour creuser : accueil/mouvement/gestes.ts, sur `threadRef`). En haut, l’historique plus ancien
  * (`plus`) arrive en remontant (`hautRef`, accueil/mouvement/defilement.ts) ou d’un toucher. `partager` : « Partager en
  * image » une réponse (son échange) ; `relancer` : « Réessayer » une réponse coupée.
+ * Une région nommée, pas une région live : un lecteur d’écran relirait chaque bulle posée, et des dizaines à chaque
+ * morceau d’historique remonté. Ce qui arrive est annoncé à part (la région role="status" de HomeScreen : la dernière
+ * réponse de BLUSH, les messages plus anciens chargés).
  */
 export function FilDeLaConv({
   threadRef,
@@ -53,7 +71,7 @@ export function FilDeLaConv({
   partager,
   relancer,
 }: {
-  threadRef: RefObject<HTMLDivElement | null>;
+  threadRef: RefObject<HTMLElement | null>;
   hautRef: RefObject<HTMLDivElement | null>;
   msgs: Msg[];
   opened: number | null;
@@ -65,11 +83,9 @@ export function FilDeLaConv({
   relancer: (reponse: number) => void;
 }) {
   return (
-    <div
+    <section
       ref={threadRef}
-      role="log"
       aria-label="Ta conv avec BLUSH"
-      aria-live="polite"
       className="flex flex-1 flex-col px-[18px] pb-4 pt-8 lg:overflow-y-auto lg:bg-[#F7F5F1] lg:px-7 lg:pb-6 overflow-x-clip [touch-action:pan-y_pinch-zoom] lg:overflow-x-hidden"
     >
       {/* L’historique plus ancien : il arrive en remontant, ou d’un toucher */}
@@ -89,7 +105,7 @@ export function FilDeLaConv({
           <Thread msgs={msgs} opened={opened} depuis={depuis} />
         </RelanceContext>
       </PartagerContext>
-    </div>
+    </section>
   );
 }
 
@@ -374,7 +390,7 @@ function Coupure({ reponse }: { reponse: number }) {
   const relancer = use(RelanceContext);
   return (
     <span className="flex flex-col items-start gap-2.5">
-      <span className="text-corps font-bold leading-[1.4]">j’ai eu un bug, renvoie-moi ça</span>
+      <span className="text-corps font-bold leading-[1.4]">{MOT_DE_LA_COUPURE}</span>
       <button
         type="button"
         onClick={() => relancer(reponse)}

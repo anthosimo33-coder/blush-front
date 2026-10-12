@@ -61,7 +61,7 @@ const CLASSE_DE_COULEUR = new RegExp(
 
 describe("les tokens de couleur", () => {
   it("globals.css se lit : les couleurs de sens et le rouge des soucis sont là (le test ne passe pas à vide)", () => {
-    expect([...COULEURS]).toEqual(expect.arrayContaining(["paper", "ink", "grey", "muted", "toi", "elle", "vrai", "toi-ink", "danger", "danger-ink", "ok"]));
+    expect([...COULEURS]).toEqual(expect.arrayContaining(["paper", "ink", "grey", "muted", "toi", "elle", "vrai", "toi-ink", "danger", "ok"]));
     expect(SRC.length).toBeGreaterThan(100);
   });
 
@@ -140,5 +140,7 @@ describe("les tokens de couleur", () => {
     const valeur = (nom: string) => CSS.match(new RegExp(`^\\s*${nom}\\s*:\\s*(#[0-9a-f]{6})\\s*;`, "im"))?.[1];
     expect(valeur("--color-danger")).toBeDefined();
     expect(valeur("--color-danger")).toBe(valeur("--danger"));
+    /* Un seul rouge (Q59) : #C2363B, lisible en petit texte sur le papier, le voile et le blanc */
+    expect(valeur("--danger")).toBe("#c2363b");
   });
 });

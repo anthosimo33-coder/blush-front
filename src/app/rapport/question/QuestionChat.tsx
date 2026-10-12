@@ -103,27 +103,30 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
   const composer = (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
       {souci && <Alert variant="carte">{souci}</Alert>}
-      <label className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink),0_10px_26px_-16px_rgba(17,17,20,0.35)]">
-        <span className="sr-only">Ta question à BLUSH</span>
-        <textarea
-          rows={1}
-          maxLength={QUESTION_MAX}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setSouci(null);
-          }}
-          onKeyDown={(e) => {
-            /* Entrée envoie, Maj + Entrée passe à la ligne */
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-          placeholder="Écris ta question"
-          enterKeyHint="send"
-          className="max-h-[132px] min-h-10 flex-1 resize-none bg-transparent py-[9px] text-corps font-extrabold leading-[22px] text-ink outline-none [field-sizing:content] placeholder:text-grey"
-        />
+      {/* La pastille du champ, avec son bouton à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom */}
+      <div className="flex min-h-[52px] items-end gap-2 rounded-[26px] bg-white py-1.5 pl-[18px] pr-1.5 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_10px_26px_-16px_rgba(17,17,20,0.35)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink),0_10px_26px_-16px_rgba(17,17,20,0.35)]">
+        <label className="flex min-w-0 flex-1 self-stretch">
+          <span className="sr-only">Ta question à BLUSH</span>
+          <textarea
+            rows={1}
+            maxLength={QUESTION_MAX}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setSouci(null);
+            }}
+            onKeyDown={(e) => {
+              /* Entrée envoie, Maj + Entrée passe à la ligne */
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="Écris ta question"
+            enterKeyHint="send"
+            className="max-h-[132px] min-h-10 flex-1 resize-none bg-transparent py-[9px] text-corps font-extrabold leading-[22px] text-ink outline-none [field-sizing:content] placeholder:text-grey"
+          />
+        </label>
         <button
           type="submit"
           aria-label="Poser ma question"
@@ -132,7 +135,7 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
         >
           <Icon name="arrow" size={18} stroke={2.8} className="-rotate-90 text-white" />
         </button>
-      </label>
+      </div>
     </form>
   );
 

@@ -82,7 +82,9 @@ export function Button({
       <Content arrow={arrow && !rest.disabled && !loading} icon={loading ? undefined : icon} variant={variant}>
         {loading ? (
           <>
-            <TypingDots color={variant === "primary" ? "#FFFFFF" : undefined} label={loadingLabel} />
+            {/* Le bouton principal : les points prennent la couleur de son texte (blancs sur l’encre, gris s’il est grisé).
+                Les autres gardent le gris doux des trois points */}
+            <TypingDots color={variant === "primary" ? "currentColor" : undefined} label={loadingLabel} />
             {/* Sans loadingLabel, le bouton garde son nom pour les lecteurs d’écran : son texte, caché à l’œil */}
             {!loadingLabel && <span className="sr-only">{children}</span>}
           </>
@@ -124,18 +126,16 @@ const FONDS_ICONE: Record<FondIconButton, string> = {
 };
 
 /**
- * Bouton icône (retour, fermer, compte) : 44 × 44 (`md`), ou 40 × 40 (`sm`, dans un en-tête serré). `variant` : son fond
- * (`plain`, l’ancien nom de `nu`, reste compris). Un lien avec `href`, un bouton sinon ; `disabled`, les aria-* et les
- * data-* vont sur l’élément.
+ * Bouton icône (retour, fermer, compte) : 44 × 44 (`md`), ou 40 × 40 (`sm`, dans un en-tête serré). `variant` : son fond.
+ * Un lien avec `href`, un bouton sinon ; `disabled`, les aria-* et les data-* vont sur l’élément.
  */
 export function IconButton({
   icon,
   label,
   href,
   onClick,
-  plain = false,
   size = "md",
-  variant = plain ? "nu" : "carte",
+  variant = "carte",
   iconSize = 22,
   disabled,
   className,
@@ -145,7 +145,6 @@ export function IconButton({
   label: string;
   href?: Route;
   onClick?: () => void;
-  plain?: boolean;
   size?: "md" | "sm";
   variant?: FondIconButton;
   iconSize?: number;

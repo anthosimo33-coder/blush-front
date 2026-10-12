@@ -14,7 +14,7 @@ import { ContactContext, FilDeLaConv } from "./accueil/bulles";
 import { Composer } from "./accueil/Composer";
 import { ContactSheet } from "./accueil/ContactSheet";
 import type { HomeContact } from "./accueil/contact";
-import { cleBulle, type EchangeScript } from "./accueil/conv/modele";
+import { annonceAnciens, annonceDe, cleBulle, type EchangeScript } from "./accueil/conv/modele";
 import { useConversation } from "./accueil/conv/useConversation";
 import { useEnvois, useIdees, type Envoyer } from "./accueil/envois";
 import { useNiveauQuiMonte } from "./accueil/niveau";
@@ -69,7 +69,10 @@ export function HomeScreen(p: {
   introAt?: number;
   /** Les idées de questions masquées sur cet appareil (le cookie, lu par la page). */
   ideesMasquees?: boolean;
-  /** La conv ouverte : la conv gardée pendant la visite n’est reprise que pour elle (sans elle, comme l’aperçu, rien n’est gardé). */
+  /**
+   * La conv affichée (son identifiant, résolu par le serveur) : la conv gardée pendant la visite n’est reprise que pour
+   * elle. Sans elle (l’aperçu de l’équipe), rien n’est gardé, et l’historique n’est pas relu.
+   */
   storyId?: string;
   /** Back-end : l’heure du rendu serveur de la page (heureDuRendu). L’historique qu’elle vient de rendre n’est pas relu à l’ouverture. */
   rendu?: number;
@@ -77,7 +80,7 @@ export function HomeScreen(p: {
   const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
   const page = useRef<HTMLDivElement>(null);
-  const thread = useRef<HTMLDivElement>(null);
+  const thread = useRef<HTMLElement>(null);
   const haut = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -99,6 +102,11 @@ export function HomeScreen(p: {
   const defilement = useDefilement(thread);
   const { flightRef } = defilement;
   const idees = useIdees(cle, quick);
+  /*
+   * Ce que les lecteurs d’écran entendent de la conv (la région role="status", plus bas) : le fil n’est pas une région
+   * live, seuls la dernière réponse de BLUSH (ou un mot de lui) et les messages plus anciens chargés sont dits
+   */
+  const [annonce, setAnnonce] = useState("");
 
   /* La conv elle-même (accueil/conv/useConversation.ts). L’accueil l’habille : ce que fait l’écran pendant qu’elle change, c’est sa scène */
   const conv = useConversation({
@@ -123,6 +131,11 @@ export function HomeScreen(p: {
       reponsePosee: () => {
         if (!input.current?.value) play("reponse");
       },
+      annoncer: (m) => {
+        const texte = annonceDe(m);
+        if (texte) setAnnonce(texte);
+      },
+      anciensPoses: (n) => setAnnonce(annonceAnciens(n)),
       niveau: (to) => {
         if (monter(to)) conv.marquerNiveau(to);
       },
@@ -177,6 +190,9 @@ export function HomeScreen(p: {
           mobileTop={<EnTeteMobile headRef={head} fromReport={fromReport} {...barre} />}
         >
           <h1 className="sr-only">Ta conv avec BLUSH</h1>
+          <p role="status" className="sr-only">
+            {annonce}
+          </p>
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             <BarreDeLaFenetre {...barre} />
             <FilDeLaConv

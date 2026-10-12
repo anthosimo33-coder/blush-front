@@ -54,8 +54,8 @@ describe("Button", () => {
     expect(bouton.getAttribute("aria-busy")).toBe("true");
     expect(screen.getByRole("status", { name: "Envoi du code" })).toBeTruthy();
     expect(screen.queryByText("Recevoir mon code")).toBeNull();
-    /* Les points du bouton principal restent blancs (sa couleur, comme avant), et pas de flèche */
-    expect(bouton.querySelector<HTMLElement>("[data-dots]")!.style.color).toBe("#FFFFFF");
+    /* Les points du bouton principal suivent la couleur de son texte (blancs sur l’encre, gris s’il est grisé), et pas de flèche */
+    expect(bouton.querySelector<HTMLElement>("[data-dots]")!.style.color.toLowerCase()).toBe("currentcolor");
     expect(bouton.querySelector("svg")).toBeNull();
     /* Il garde son allure : seul disabled le grise */
     expect(bouton.disabled).toBe(false);
@@ -124,7 +124,7 @@ describe("IconButton", () => {
       <>
         <IconButton icon="close" label="Fermer" onClick={() => {}} />
         <IconButton icon="back" label="Retour" size="sm" variant="doux" onClick={() => {}} />
-        <IconButton icon="back" label="Nu" plain onClick={() => {}} />
+        <IconButton icon="back" label="Nu" variant="nu" onClick={() => {}} />
       </>,
     );
     const carte = screen.getByRole("button", { name: "Fermer" }).className;

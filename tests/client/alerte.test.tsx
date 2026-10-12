@@ -31,7 +31,7 @@ describe("Alert", () => {
     expect(carte.className).toContain("shadow-card");
     expect(carte.className).toContain("text-danger");
     expect(carte.className).toContain("text-center");
-    expect(voile.className).toContain("text-danger-ink");
+    expect(voile.className).toContain("text-danger");
     expect(voile.dataset.souci).toBe("lien");
     for (const a of [texte, carte, voile]) expect(a.className).toContain("text-note");
   });

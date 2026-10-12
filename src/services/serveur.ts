@@ -4,7 +4,6 @@ import type { ConvSummary, Fiche, Story } from "@/types";
 import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
-import { lireChoisie } from "@/server/cookies";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
 import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
 import { storyAffichee } from "@/server/conv-affichee";
@@ -24,11 +23,14 @@ export async function getStory({ parcours = false } = {}): Promise<Story | null>
 }
 
 /**
- * La conv choisie sur cet appareil (le cookie de « Tes convs », que le serveur pose aussi quand une conv est lue), telle
- * qu’il la donne. Ce que l’accueil et sa fiche gardent pendant la visite n’est repris que pour elle (sa clé).
+ * L’identifiant de la conv que la page montre, telle que le contexte de la requête la résout (le cookie de « Tes
+ * convs », sinon la dernière conv du compte : histoireOuverte). C’est la clé de ce que l’accueil et sa fiche gardent
+ * pendant la visite : sans cookie (une connexion sans brouillon), elle reste celle de la conv affichée, et ce qu’ils
+ * gardent d’une conv ne se fond jamais dans une autre. null : pas de conv.
  */
-export async function convChoisie(): Promise<string | undefined> {
-  return lireChoisie();
+export async function idDeLaConv(): Promise<string | null> {
+  const { story } = await contexte();
+  return story?.id ?? null;
 }
 
 /**

@@ -190,11 +190,11 @@ test("« Complète sa fiche » : une capture, les infos rangées dans leur rubri
 });
 
 /*
- * Les infos de sa fiche ont pour identifiant leur place dans la liste (f0, f1… : faitsAffiches, src/server/ecrans/fiche.ts:17). La fiche
- * retient les infos arrivées par ces identifiants (src/app/app/fiche/FicheScreen.tsx:138) : un retrait décale les
- * suivantes, et le point « Nouveau » (src/app/app/fiche/FicheScreen.tsx:313) passe à une autre info, ou disparaît.
+ * Les infos de sa fiche ont pour identifiant leur place dans la liste (f0, f1… : faitsAffiches, src/server/ecrans/fiche.ts),
+ * qu’un retrait décale. La fiche retient donc les infos arrivées par leur texte (`fresh`, src/app/app/fiche/FicheScreen.tsx) :
+ * le point « Nouveau » reste sur les bonnes infos.
  */
-test.fixme("après un retrait, les infos arrivées gardent leur point « Nouveau »", async ({ page }, testInfo) => {
+test("après un retrait, les infos arrivées gardent leur point « Nouveau »", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo);
   await ouvrir(page, "/app/fiche");
   await choisirFichier(page, capturesPng(testInfo, 1), page.getByRole("button", { name: /^Complète sa fiche/ }));
@@ -208,10 +208,10 @@ test.fixme("après un retrait, les infos arrivées gardent leur point « Nouveau
 });
 
 /*
- * Quand une fille utilise BLUSH, la rubrique s’appelle « Il aime », mais sa ligne d’ajout dit « Ajouter dans « Elle
- * aime » » : src/app/app/fiche/FicheScreen.tsx passe sec.title (src/contenu/fiche.ts) au lieu de sectionTitle().
+ * Quand une fille utilise BLUSH, la rubrique s’appelle « Il aime », et sa ligne d’ajout aussi : le titre suit son pronom
+ * (titreDeRubrique, src/contenu/fiche.ts), et la fiche le lit tel quel.
  */
-test.fixme("quand elle parle de lui, la ligne d’ajout de « Il aime » porte ce nom", async ({ page }, testInfo) => {
+test("quand elle parle de lui, la ligne d’ajout de « Il aime » porte ce nom", async ({ page }, testInfo) => {
   await lectureBlushPlus(page, testInfo, { personnes: { toi: "Inès", autre: "Malo" }, jeSuis: "Une fille" });
   await ouvrir(page, "/app/fiche");
   await page.getByRole("button", { name: "Modifier" }).click();

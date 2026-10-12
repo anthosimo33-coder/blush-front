@@ -74,7 +74,7 @@ function convAuRepos(box: HTMLElement | null) {
  * (pour les faire glisser) et la bulle qui doit voler. `ecran` et `avantChangement` vont à useConversation (sa scène),
  * le reste à useConvSuitLeBas. Pose aussi la conv en bas à l’ouverture, et note où elle en est jusqu’au départ.
  */
-export function useDefilement(threadRef: RefObject<HTMLDivElement | null>) {
+export function useDefilement(threadRef: RefObject<HTMLElement | null>) {
   /* Des messages posés devant (ou fondus dans la conv) : voir Devant (accueil/conv/useChargerAnciens.ts) */
   const devantRef = useRef<Devant | null>(null);
   /* Avant chaque changement de la conv : où étaient ses lignes (pour les faire glisser), et la bulle qui doit voler */
@@ -152,7 +152,7 @@ type Defilement = ReturnType<typeof useDefilement>;
  */
 export function useConvSuitLeBas(
   msgs: Msg[],
-  threadRef: RefObject<HTMLDivElement | null>,
+  threadRef: RefObject<HTMLElement | null>,
   composerRef: RefObject<HTMLFormElement | null>,
   { devantRef, beforeRef, flightRef }: Defilement,
 ) {
@@ -267,7 +267,7 @@ export function useAnciensEnRemontant({
 }: {
   plus: boolean;
   hautRef: RefObject<HTMLDivElement | null>;
-  threadRef: RefObject<HTMLDivElement | null>;
+  threadRef: RefObject<HTMLElement | null>;
   chargerAnciens: () => Promise<unknown>;
   precharger: () => void;
 }) {

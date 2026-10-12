@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CoupureChat, modeVocalChat, type SuiviChat } from "@/services/api";
 import { noterEcriture } from "@/lib/query";
+import { tracer } from "@/lib/tracer";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
 import { fusion, remonter, type Conv } from "../../garde";
 import { echangesEnMsgs, introDe, PREMIER_ID_VISITE, type EchangeScript, type Msg, type NewMsg } from "./modele";
@@ -38,6 +39,13 @@ export type Scene = EcranDeLHistorique & {
   ecritCede: (reponse: number) => void;
   /** Les premières bulles de la réponse remplacent les perles. */
   reponsePosee: () => void;
+  /**
+   * Un message de BLUSH vient d’être posé en entier : sa réponse (coupée ou non), ou un mot. L’écran le dit aux lecteurs
+   * d’écran (le fil, lui, n’est pas une région live).
+   */
+  annoncer: (m: Msg) => void;
+  /** `n` messages plus anciens de l’historique viennent d’être posés devant la conv (en la remontant). */
+  anciensPoses: (n: number) => void;
   /** Une réponse fait passer un cap (0,7 s après elle). */
   niveau: (level: LevelId) => void;
 };
@@ -101,9 +109,9 @@ function useModeVocal(initial: () => boolean, local: boolean) {
 }
 
 /**
- * La conv de l’accueil. `cle` : la conv ouverte (la conv gardée pendant la visite n’est reprise que pour elle ; sans
- * elle, comme l’aperçu, rien n’est gardé). `script`, `plusAnciens`, `modeVocalInitial`, `introAt`, `rendu` : ce que la
- * page a rendu (voir HomeScreen).
+ * La conv de l’accueil. `cle` : la conv affichée (la conv gardée pendant la visite n’est reprise que pour elle ; sans
+ * elle, comme l’aperçu, rien n’est gardé, et l’historique n’est pas relu). `script`, `plusAnciens`, `modeVocalInitial`,
+ * `introAt`, `rendu` : ce que la page a rendu (voir HomeScreen).
  */
 export function useConversation({
   cle,
@@ -148,14 +156,18 @@ export function useConversation({
     depuis,
     derniers,
     rendu,
+    /* L’aperçu (sans conv en base) ne relit pas l’historique : ce serait celui du compte connecté */
+    relire: cle !== undefined,
     modeVocalDuRendu: modeVocalInitial,
     fondre: setMsgs,
-    poserDevant: (nouveaux) =>
+    poserDevant: (nouveaux) => {
       setMsgs((prev) => {
         const deja = new Set(prev.map((m) => m.id));
         const intro = prev.filter((m) => m.type === "intro");
         return [...intro, ...nouveaux.filter((m) => !deja.has(m.id)), ...prev.filter((m) => m.type !== "intro")];
-      }),
+      });
+      ecran.current.anciensPoses(nouveaux.length);
+    },
     suivreModeVocal: vocal.suivreDepuis,
     ecran: scene,
   });
@@ -175,13 +187,22 @@ export function useConversation({
 
   /* « Réessayer » une réponse coupée par le réseau : ce qu’elle demandait, par réponse (voir echanger) */
   const relances = useRef(new Map<number, Echange>());
+  /* Les minuteurs en route (la fête d’un niveau, 0,7 s après sa réponse) : un accueil quitté avant ne la joue pas */
+  const minuteurs = useRef(new Set<number>());
+  useEffect(() => {
+    const enRoute = minuteurs.current;
+    return () => {
+      enRoute.forEach((t) => window.clearTimeout(t));
+      enRoute.clear();
+    };
+  }, []);
 
   /**
    * Ton message part (`mine`), BLUSH tape « … », puis sa réponse remplace les trois points. Back-end : elle arrive au
    * fil de l’eau, ses bulles une à une (chaque arrivée se déplie, ce qui est posé ne bouge plus), puis la réponse
    * validée, qui les complète (ou les remplace) ; un vocal se prépare encore après elle, sa bulle attend. Le réseau qui
-   * coupe : les bulles reçues restent, avec « Réessayer ». `relance` : la réponse coupée qui repart, à sa place (sans
-   * ton message, déjà là).
+   * coupe : les bulles reçues restent, avec « Réessayer ». Toute autre erreur aussi (aucune bulle reçue) : « BLUSH
+   * écrit » ne reste jamais bloqué. `relance` : la réponse coupée qui repart, à sa place (sans ton message, déjà là).
    */
   const echanger = async ({ mine, relance, ...echange }: Echange & ({ mine: Msg; relance?: undefined } | { mine?: undefined; relance: number })) => {
     const { label, demande, vocal: vocalAttendu = false } = echange;
@@ -211,24 +232,19 @@ export function useConversation({
     /* Des bulles arrivées pendant qu’il écrit : elles se posent, BLUSH écrit encore (rien d’animé à part dans une bulle : elle se déplie entière) */
     const poser =
       (recues: BulleChat[], coupee = false) =>
-      async () => {
+      async (): Promise<Msg | undefined> => {
         if (finie && !coupee) return;
         const premiere = remplacer();
         vagues = [...vagues, poses];
         poses = noeudsDe(recues);
         if (coupee) vagues = [...vagues, poses];
-        const v = vagues;
-        changer((m) =>
-          m.map((x) =>
-            x.id === readingId
-              ? { type: "ecrit", id: readingId, from: "blush", reading: label, vocal: vocalAttendu, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues: v }
-              : x,
-          ),
-        );
+        const pose: Msg = { type: "ecrit", id: readingId, from: "blush", reading: label, vocal: vocalAttendu, recues, ...(coupee ? { coupee } : {}), at, answered: true, vagues };
+        changer((m) => m.map((x) => (x.id === readingId ? pose : x)));
         if (premiere && recues.length) ecran.current.reponsePosee();
+        return pose;
       };
     const suivi: SuiviChat = {
-      bulles: (recues) => void (file = file.then(poser(recues))),
+      bulles: (recues) => void (file = file.then(poser(recues)).then(() => {})),
       vocal: (v) => {
         if (!posee) return void (vocalTot = v);
         changer((m) => m.map((x) => (x.id === readingId && x.type === "reponse" ? { ...x, result: avecVocal(x.result, v) } : x)));
@@ -242,12 +258,14 @@ export function useConversation({
     try {
       next = await demande(suivi);
     } catch (e) {
-      if (!(e instanceof CoupureChat)) throw e;
+      /* Une erreur qui n’est pas une coupure (un bug, une réponse illisible) : laissée en trace, elle coupe la réponse aussi */
+      if (!(e instanceof CoupureChat)) tracer("conv:echange", e);
       await file;
       finie = true;
       /* Le réseau a coupé : ce qui est arrivé reste, « Réessayer » relance la même demande, à la même place */
       relances.current.set(readingId, echange);
-      await poser(e.recues, true)();
+      const coupee = await poser(e instanceof CoupureChat ? e.recues : [], true)();
+      if (coupee) ecran.current.annoncer(coupee);
       return;
     } finally {
       noterEcriture("chat");
@@ -258,11 +276,18 @@ export function useConversation({
     const r = next.type === "reponse" && vocalTot !== undefined ? { ...next, result: avecVocal(next.result, vocalTot) } : next;
     posee = true;
     /* Ce qui est déjà posé ne se redéplie pas : la suite de la réponse est une nouvelle arrivée */
-    changer((m) => m.map((x) => (x.id === readingId ? { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) } : x)));
+    const reponse: Msg = { ...r, id: readingId, at, answered: true, ...(poses ? { vagues: [...vagues, poses] } : {}) };
+    changer((m) => m.map((x) => (x.id === readingId ? reponse : x)));
     if (premiere) ecran.current.reponsePosee();
+    ecran.current.annoncer(reponse);
     if (next.type === "reponse" && next.result.modeVocal !== undefined) suivreModeVocal(next.result.modeVocal);
     const up = next.type === "reponse" ? next.result.levelUp : undefined;
-    if (up) window.setTimeout(() => ecran.current.niveau(up), 700);
+    if (!up) return;
+    const t = window.setTimeout(() => {
+      minuteurs.current.delete(t);
+      ecran.current.niveau(up);
+    }, 700);
+    minuteurs.current.add(t);
   };
 
   return {
@@ -288,8 +313,9 @@ export function useConversation({
     },
     /** Un mot de BLUSH dans la conv (pas de micro, rien entendu). */
     direMot: (notice: string) => {
-      const id = nouvelId();
-      changer((m) => [...m, { type: "mot", id, from: "blush", at: Date.now(), notice }]);
+      const mot: Msg = { type: "mot", id: nouvelId(), from: "blush", at: Date.now(), notice };
+      changer((m) => [...m, mot]);
+      ecran.current.annoncer(mot);
     },
     /** Un repère dans la conv : un niveau franchi. */
     marquerNiveau: (level: LevelId) => {

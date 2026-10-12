@@ -279,18 +279,21 @@ export function Composer({
             <RecordingBar ecoute={voice.ecoute} onSend={() => void sendVoice()} />
           </div>
         ) : (
-          <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
-            <span className="sr-only">{about ? "Ta question sur ce point" : "Écris à BLUSH, ou colle sa réponse"}</span>
-            <input
-              ref={inputRef}
-              value={text}
-              onChange={onType}
-              /* Le serveur se réveille pendant que tu écris : ton message ne paiera pas son démarrage */
-              onFocus={() => reveiller()}
-              placeholder={about ? "Ta question sur ce point" : modeVocal ? "Écris ou parle à BLUSH" : "Écris à BLUSH"}
-              enterKeyHint="send"
-              className="min-w-0 flex-1 bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey"
-            />
+          /* La pastille du champ, avec ses boutons à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom */
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white pl-[18px] pr-1 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] lg:bg-paper lg:shadow-none lg:focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
+            <label className="flex h-full min-w-0 flex-1 items-center">
+              <span className="sr-only">{about ? "Ta question sur ce point" : "Écris à BLUSH, ou colle sa réponse"}</span>
+              <input
+                ref={inputRef}
+                value={text}
+                onChange={onType}
+                /* Le serveur se réveille pendant que tu écris : ton message ne paiera pas son démarrage */
+                onFocus={() => reveiller()}
+                placeholder={about ? "Ta question sur ce point" : modeVocal ? "Écris ou parle à BLUSH" : "Écris à BLUSH"}
+                enterKeyHint="send"
+                className="min-w-0 flex-1 bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey"
+              />
+            </label>
             {/* Texte tapé : la flèche pour envoyer. Champ vide : le vocal, comme dans Messages */}
             {typed ? (
               <button type="submit" aria-label="Envoyer" data-popin="" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink shadow-ink">
@@ -311,7 +314,7 @@ export function Composer({
                 <Icon name="wave" size={18} stroke={2.6} className="text-white" />
               </button>
             )}
-          </label>
+          </div>
         )}
       </div>
       <FileInput inputRef={shots.ref} accept={ACCEPT_IMAGES} multiple onFiles={onImages} label="Captures d’écran de sa réponse" />

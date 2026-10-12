@@ -128,6 +128,45 @@ export function typeInconnu(m: never): never {
 /** « BLUSH écrit » sans bulle arrivée ni coupure : sa bulle qui tape, seule dans son message. */
 export const tapeEncore = (m: Msg) => m.type === "ecrit" && !m.recues?.length && !m.coupee;
 
+/** Ce que dit BLUSH d’une réponse coupée, au-dessus de « Réessayer » (Coupure, ../bulles.tsx ; et son annonce, annonceDe). */
+export const MOT_DE_LA_COUPURE = "j’ai eu un bug, renvoie-moi ça";
+
+/* Une annonce reste courte : une longue réponse se lit ensuite dans le fil, bulle par bulle */
+const ANNONCE_MAX = 280;
+
+/** Le texte de ces bulles, à la suite, coupé à ANNONCE_MAX caractères (au dernier mot entier). */
+function texteAnnonce(bulles: readonly BulleChat[]) {
+  const texte = bulles.map((b) => b.text.trim()).join(" ");
+  if (texte.length <= ANNONCE_MAX) return texte;
+  const coupe = texte.lastIndexOf(" ", ANNONCE_MAX);
+  return `${texte.slice(0, coupe > 0 ? coupe : ANNONCE_MAX)}…`;
+}
+
+/**
+ * Ce que les lecteurs d’écran entendent d’un message de BLUSH posé en entier (la région role="status" de l’accueil) :
+ * sa réponse (coupée raisonnablement), sa coupure, ou un mot. Le fil lui-même n’est pas une région live : il relirait
+ * toute la conv, l’historique remonté compris. null : rien à dire (un message à toi, l’intro, un repère).
+ * TODO(produit): textes des annonces (ici et annonceAnciens) écrits sans maquette, entendus seulement au lecteur d’écran, à relire.
+ */
+export function annonceDe(m: Msg): string | null {
+  switch (m.type) {
+    case "reponse":
+      return m.result.vocal || m.result.vocalEnCours ? "BLUSH t’a répondu en vocal." : `BLUSH a répondu\u00a0: ${texteAnnonce(m.result.bubbles)}`;
+    case "ecrit":
+      if (!m.coupee) return null;
+      return m.recues?.length
+        ? `BLUSH a répondu\u00a0: ${texteAnnonce(m.recues)} Puis sa réponse s’est coupée\u00a0: ${MOT_DE_LA_COUPURE}. «\u00a0Réessayer\u00a0» la relance.`
+        : `La réponse de BLUSH s’est coupée\u00a0: ${MOT_DE_LA_COUPURE}. «\u00a0Réessayer\u00a0» la relance.`;
+    case "mot":
+      return `BLUSH\u00a0: ${m.notice}`;
+    default:
+      return null;
+  }
+}
+
+/** L’annonce d’un morceau plus ancien de l’historique, posé devant la conv en la remontant. */
+export const annonceAnciens = (n: number) => (n === 1 ? "1 message plus ancien chargé" : `${n} messages plus anciens chargés`);
+
 /** Un échange de l’historique (back-end : avec son id et sa vraie heure ; aperçu : sans). */
 export type EchangeScript = { id?: number; mine?: string; answer: BlushAnswer; at?: number };
 

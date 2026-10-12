@@ -61,6 +61,8 @@ function scene(): Scene {
     echangeCommence: vi.fn(),
     ecritCede: vi.fn(),
     reponsePosee: vi.fn(),
+    annoncer: vi.fn(),
+    anciensPoses: vi.fn(),
     niveau: vi.fn(),
   };
 }
@@ -207,17 +209,44 @@ describe("useConversation : un échange", () => {
     expect(result.current.relancer(coupee.id)).toBe(false);
   });
 
-  it("une erreur qui n’est pas une coupure remonte, sans rien poser", async () => {
-    const { result } = monter();
-    await act(async () => {
-      await expect(
-        result.current.envoyer(
-          texteDe("allô ?"),
-          analyse(() => Promise.reject(new Error("bug"))),
-        ),
-      ).rejects.toThrow("bug");
-    });
-    expect(result.current.relancer(result.current.msgs.at(-1)!.id)).toBe(false);
+  it("une erreur qui n’est pas une coupure coupe la réponse aussi : « BLUSH écrit » ne reste pas bloqué, « Réessayer » la relance", async () => {
+    const { result, scene: s } = monter();
+    const avertir = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      let essais = 0;
+      const demande = vi.fn(async () => {
+        essais++;
+        if (essais === 1) throw new Error("bug");
+        return enMsg(reponse(["me revoilà"]));
+      });
+      await act(() => result.current.envoyer(texteDe("allô ?"), analyse(demande)));
+      expect(types(result.current.msgs)).toEqual(["intro", "intro", "texte", "ecrit coupé"]);
+      expect(result.current.msgs.at(-1)).toMatchObject({ recues: [], coupee: true });
+      expect(result.current.occupe).toBe(false);
+      /* Laissée en trace (son nom seulement), et annoncée aux lecteurs d’écran comme une coupure */
+      expect(avertir).toHaveBeenCalledWith(expect.stringContaining("conv:echange"));
+      expect(s.annoncer).toHaveBeenLastCalledWith(expect.objectContaining({ type: "ecrit", coupee: true }));
+      const coupee = result.current.msgs.at(-1)!;
+      act(() => void result.current.relancer(coupee.id));
+      await waitFor(() => expect(result.current.msgs.at(-1)?.type).toBe("reponse"));
+      expect(demande).toHaveBeenCalledTimes(2);
+    } finally {
+      avertir.mockRestore();
+    }
+  });
+
+  it("la réponse posée en entier, et un mot de BLUSH, sont annoncés à l’écran (pour les lecteurs d’écran)", async () => {
+    const { result, scene: s } = monter();
+    await act(() =>
+      result.current.envoyer(
+        texteDe("et maintenant ?"),
+        analyse(async () => enMsg(reponse(["maintenant tu attends"]))),
+      ),
+    );
+    expect(s.annoncer).toHaveBeenCalledTimes(1);
+    expect(s.annoncer).toHaveBeenLastCalledWith(result.current.msgs.at(-1));
+    act(() => result.current.direMot("Je n’ai rien entendu."));
+    expect(s.annoncer).toHaveBeenLastCalledWith(expect.objectContaining({ type: "mot", notice: "Je n’ai rien entendu." }));
   });
 
   it("une réponse qui fait passer un cap prévient l’écran, 0,7 s après elle", async () => {
@@ -230,6 +259,24 @@ describe("useConversation : un échange", () => {
     );
     expect(s.niveau).not.toHaveBeenCalled();
     await waitFor(() => expect(s.niveau).toHaveBeenCalledWith("voit"), { timeout: 2000 });
+  });
+
+  it("l’accueil quitté avant les 0,7 s : le minuteur du cap est nettoyé, l’écran n’est pas prévenu", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { result, scene: s, unmount } = monter();
+      await act(() =>
+        result.current.envoyer(
+          texteDe("on en est où ?"),
+          analyse(async () => enMsg(reponse(["vous vous voyez"], { levelUp: "voit" }))),
+        ),
+      );
+      unmount();
+      vi.advanceTimersByTime(1000);
+      expect(s.niveau).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("un mot de BLUSH et un niveau franchi s’ajoutent au bout de la conv", () => {
@@ -355,7 +402,7 @@ describe("useConversation : le mode vocal, un seul propriétaire", () => {
 
 describe("useConversation : l’historique (useChargerAnciens)", () => {
   it("rendu par la page à l’instant, il n’est pas relu à l’ouverture (Q63)", async () => {
-    const { result } = monter({ script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
+    const { result } = monter({ cle: uneCle(), script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
     await act(() => Promise.resolve());
     expect(historique).not.toHaveBeenCalled();
     expect(types(result.current.msgs)).toEqual(["intro", "intro", "texte", "reponse"]);
@@ -374,7 +421,7 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     ailleurs.unmount();
     historique.mockClear();
     historique.mockResolvedValue({ echanges: [echange(5), echange(6)], plus: false });
-    const { result } = monter({ script: [echange(5)], rendu, modeVocalInitial: false });
+    const { result } = monter({ cle: uneCle(), script: [echange(5)], rendu, modeVocalInitial: false });
     await waitFor(() => expect(result.current.msgs).toHaveLength(6));
     expect(historique).toHaveBeenCalledTimes(1);
   });
@@ -390,13 +437,13 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     ailleurs.unmount();
     historique.mockClear();
     vi.setSystemTime(Date.now() + 5_000);
-    monter({ script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
+    monter({ cle: uneCle(), script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
     await act(() => Promise.resolve());
     expect(historique).not.toHaveBeenCalled();
   });
 
   it("revenu par le bouton retour (la page gardée en mémoire par le navigateur) : relu, et fondu dans la conv", async () => {
-    const { result } = monter({ script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
+    const { result } = monter({ cle: uneCle(), script: [echange(5)], rendu: renduNeuf(), modeVocalInitial: false });
     await act(() => Promise.resolve());
     expect(historique).not.toHaveBeenCalled();
     historique.mockResolvedValue({ echanges: [echange(5), echange(6)], plus: false, modeVocal: true });
@@ -409,21 +456,30 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     expect(historique).toHaveBeenCalledTimes(1);
   });
 
-  it("sans heure de rendu (l’aperçu), un rendu ancien, ou le même rendu revu (retour par l’historique) : il est relu", async () => {
-    monter({ script: [echange(5)] });
+  it("sans heure de rendu, un rendu ancien, ou le même rendu revu (retour par l’historique) : il est relu", async () => {
+    monter({ cle: uneCle(), script: [echange(5)] });
     await waitFor(() => expect(historique).toHaveBeenCalledTimes(1));
-    monter({ script: [echange(5)], rendu: renduNeuf(-60_000) });
+    monter({ cle: uneCle(), script: [echange(5)], rendu: renduNeuf(-60_000) });
     await waitFor(() => expect(historique).toHaveBeenCalledTimes(2));
     const rendu = renduNeuf();
-    monter({ script: [echange(5)], rendu });
-    monter({ script: [echange(5)], rendu });
+    monter({ cle: uneCle(), script: [echange(5)], rendu });
+    monter({ cle: uneCle(), script: [echange(5)], rendu });
     await waitFor(() => expect(historique).toHaveBeenCalledTimes(3));
     expect(historique).toHaveBeenCalledWith();
   });
 
+  it("l’aperçu de l’équipe (sans conv en base) ne relit jamais l’historique : ce serait celui du compte connecté", async () => {
+    const { result } = monter({ script: [{ mine: "elle m’a vu ?", answer: reponse(["oui"]) }] });
+    await act(() => Promise.resolve());
+    act(() => pageshow(true));
+    await act(() => Promise.resolve());
+    expect(historique).not.toHaveBeenCalled();
+    expect(types(result.current.msgs)).toEqual(["intro", "intro", "texte", "reponse"]);
+  });
+
   it("relu : ce qui manque se fond dans la conv, et le mode vocal suit la base", async () => {
     historique.mockResolvedValue({ echanges: [echange(5), echange(6)], plus: false, modeVocal: true });
-    const { result, scene: s } = monter({ script: [echange(5)], modeVocalInitial: false });
+    const { result, scene: s } = monter({ cle: uneCle(), script: [echange(5)], modeVocalInitial: false });
     await waitFor(() => expect(result.current.msgs).toHaveLength(6));
     expect(result.current.msgs.slice(2).map((m) => m.id)).toEqual([idHistorique(5, false), idHistorique(5, true), idHistorique(6, false), idHistorique(6, true)]);
     expect(result.current.modeVocal).toBe(true);
@@ -434,7 +490,7 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
   it("relu, mais la visite a déjà écrit : rien ne bouge (ses messages sont les plus récents)", async () => {
     const h = retenue<HistoriqueChat>();
     historique.mockReturnValueOnce(h.promesse);
-    const { result } = monter({ script: [echange(5)] });
+    const { result } = monter({ cle: uneCle(), script: [echange(5)] });
     await act(() =>
       result.current.envoyer(
         texteDe("coucou"),
@@ -451,10 +507,12 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
 
   it("en remontant : les échanges d’avant se posent devant, après l’intro, et il n’en reste plus", async () => {
     historique.mockImplementation(async (avant?: number) => (avant === 10 ? { echanges: [echange(8)], plus: false } : { echanges: [echange(10)], plus: true }));
-    const { result } = monter({ script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
+    const { result, scene: s } = monter({ cle: uneCle(), script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
     expect(result.current.plus).toBe(true);
     await chargerAnciens(result);
     expect(historique).toHaveBeenCalledWith(10);
+    /* L’écran le dit aux lecteurs d’écran : ton message et la réponse de BLUSH, deux messages plus anciens */
+    expect(s.anciensPoses).toHaveBeenCalledWith(2);
     expect(result.current.msgs.map((m) => m.id)).toEqual([-2, -1, idHistorique(8, false), idHistorique(8, true), idHistorique(10, false), idHistorique(10, true)]);
     expect(result.current.plus).toBe(false);
     expect(result.current.anciens).toBe(false);
@@ -465,7 +523,7 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
 
   it("le morceau demandé d’avance sert au chargement, sans redemander", async () => {
     historique.mockImplementation(async (avant?: number) => (avant === 10 ? { echanges: [echange(8)], plus: true } : { echanges: [], plus: false }));
-    const { result } = monter({ script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
+    const { result } = monter({ cle: uneCle(), script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
     act(() => {
       result.current.precharger();
       result.current.precharger();
@@ -481,7 +539,7 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
     const morceau = retenue<HistoriqueChat>();
     /* Écrit ailleurs entre-temps : plus d’un morceau, l’historique frais ne rejoint pas ce qui est affiché */
     historique.mockImplementation((avant?: number) => (avant === 10 ? morceau.promesse : Promise.resolve({ echanges: [echange(20), echange(22)], plus: true })));
-    const { result } = monter({ script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
+    const { result } = monter({ cle: uneCle(), script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
     let fini = false;
     act(() => {
       void result.current.chargerAnciens().then(() => (fini = true));
@@ -504,7 +562,7 @@ describe("useConversation : l’historique (useChargerAnciens)", () => {
 
   it("le réseau coupé pendant le chargement : rien ne bouge, on pourra réessayer", async () => {
     historique.mockRejectedValueOnce(new Error("réseau"));
-    const { result } = monter({ script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
+    const { result } = monter({ cle: uneCle(), script: [echange(10)], plusAnciens: true, rendu: renduNeuf() });
     await chargerAnciens(result);
     expect(result.current.plus).toBe(true);
     expect(result.current.anciens).toBe(false);
@@ -535,6 +593,38 @@ describe("useConversation : la conv gardée pendant la visite", () => {
     const autre = monter({ cle: "conv-b", script: [echange(7)], rendu: renduNeuf() });
     expect(autre.result.current.msgs.some((m) => m.type === "mot")).toBe(false);
     expect(autre.result.current.modeVocal).toBe(false);
+  });
+
+  it("la clé X puis la clé Y : rien de la conv X (sa visite, son historique relu, son mode vocal) n’est fondu dans Y", async () => {
+    /* X : un historique relu (5 et 6), un mot de BLUSH et un échange de la visite, le chat passé en vocal */
+    historique.mockResolvedValueOnce({ echanges: [echange(5), echange(6)], plus: false });
+    const x = monter({ cle: "conv-x", script: [echange(5)] });
+    await waitFor(() => expect(x.result.current.msgs).toHaveLength(6));
+    act(() => x.result.current.direMot("Je n’ai rien entendu."));
+    await act(() =>
+      x.result.current.envoyer(
+        texteDe("question de la conv X"),
+        analyse(async () => enMsg(reponse(["réponse de la conv X"], { modeVocal: true }))),
+      ),
+    );
+    const deX = new Set(x.result.current.msgs.filter((m) => m.type !== "intro").map((m) => m.id));
+    x.unmount();
+
+    /* Y : seulement sa page, et son historique (relu : le chat vient d’être écrit, par X) */
+    historique.mockResolvedValue({ echanges: [echange(40)], plus: false, modeVocal: false });
+    const y = monter({ cle: "conv-y", script: [echange(40)], rendu: renduNeuf(), modeVocalInitial: false });
+    await act(() => Promise.resolve());
+    expect(y.result.current.msgs.filter((m) => deX.has(m.id))).toEqual([]);
+    expect(y.result.current.msgs.map((m) => m.id)).toEqual([-2, -1, idHistorique(40, false), idHistorique(40, true)]);
+    expect(y.result.current.modeVocal).toBe(false);
+    y.unmount();
+
+    /* Y relue (une page plus ancienne) : son historique frais s’y fond, celui de X jamais */
+    historique.mockResolvedValueOnce({ echanges: [echange(40), echange(41)], plus: false, modeVocal: false });
+    const yRelue = monter({ cle: "conv-y", script: [echange(40)], rendu: renduNeuf(-60_000) });
+    await waitFor(() => expect(yRelue.result.current.msgs).toHaveLength(6));
+    expect(yRelue.result.current.msgs.filter((m) => deX.has(m.id))).toEqual([]);
+    expect(yRelue.result.current.msgs.some((m) => m.type === "mot" || (m.type === "texte" && m.text === "question de la conv X"))).toBe(false);
   });
 
   it("revenu sur une page que le serveur vient de rendre : son mode vocal l’emporte sur celui de la conv gardée", async () => {

@@ -1,6 +1,5 @@
 "use client";
 
-import { IlOuElle } from "@/lib/pronom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, ViewTransition } from "react";
@@ -15,14 +14,14 @@ import { play } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
 import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
-import { FICHE_SECTIONS } from "@/contenu/fiche";
+import { rubriquesDeLaFiche, titreDeRubrique } from "@/contenu/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { Alert } from "@/components/ui/feedback";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { AppScreen } from "@/components/shell/AppScreen";
-import type { Fiche, FicheFact, FicheUpdate, Pronom } from "@/types";
+import type { Fiche, FicheFact, FicheUpdate } from "@/types";
 
 /** Largeur de la fiche sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const CARD_W = 600;
@@ -36,9 +35,6 @@ function whatOf(files: File[]) {
   const images = files.filter(estImage).length;
   return [images === 1 ? "ta capture" : images > 1 ? `tes ${images} captures` : null, images < files.length ? "votre conv" : null].filter(Boolean).join(" et ");
 }
-
-/* « Elle aime », ou « Il aime » quand c’est une fille qui utilise BLUSH */
-const sectionTitle = (id: FicheFact["section"], pronoun?: Pronom) => (id === "aime" ? `${IlOuElle(pronoun)} aime` : (FICHE_SECTIONS.find((s) => s.id === id)?.title ?? ""));
 
 type Job =
   | { step: "idle" }
@@ -70,8 +66,12 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   const fiche = data ?? initial;
   const [editing, setEditing] = useState(false);
   const [job, setJob] = useState<Job>({ step: "idle" });
-  /* Les infos arrivées pendant la visite : un point rose, jusqu’à ce qu’on quitte la fiche */
-  const [fresh, setFresh] = useState<string[]>([]);
+  /*
+   * Les infos arrivées pendant la visite : un point rose, jusqu’à ce qu’on quitte la fiche. Retenues par leur texte : leur
+   * identifiant est leur place dans la liste (f0, f1… : faitsAffiches, src/server/ecrans/fiche.ts), qu’un retrait décale
+   */
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  const marquerArrivees = (arrivees: FicheFact[]) => setFresh((avant) => new Set([...avant, ...arrivees.map((f) => f.text)]));
   const [over, setOver] = useState(false);
   const picker = useFilePicker();
   /* Les vignettes des captures en cours de lecture : celles d’une lecture sont libérées à la suivante, toutes au départ de la fiche */
@@ -137,7 +137,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
     if (!s) return;
     suivi.current = null;
     const added = fiche.facts.filter((f) => !s.avant.has(f.text));
-    setFresh((ids) => [...ids, ...added.map((f) => f.id)]);
+    marquerArrivees(added);
     if (!s.ajout) return;
     /* Cinq minutes sans nouvelles, rien d’arrivé : l’écran dit que ça n’a pas marché */
     const update: FicheUpdate = { fiche, added, ...(fiche.updating && !added.length ? { problem: "bug" as const } : {}) };
@@ -203,7 +203,7 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
       setJob({ step: "adding", what, pending: update.pending, before: avant });
       return;
     }
-    setFresh((ids) => [...ids, ...update.added.map((f) => f.id)]);
+    marquerArrivees(update.added);
     setJob({ step: "done", what, update, before });
     /* Un toucher par info rangée, chacun un cran plus haut */
     play("ficheRangee", update.added.length);
@@ -212,9 +212,9 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   /* « Annuler » : la fiche revient comme avant l’ajout */
   const undo = async () => {
     if (job.step !== "done") return;
-    const gone = new Set(job.update.added.map((f) => f.id));
-    play("ficheAnnulee", gone.size);
-    setFresh((ids) => ids.filter((id) => !gone.has(id)));
+    const gone = new Set(job.update.added.map((f) => f.text));
+    play("ficheAnnulee", job.update.added.length);
+    setFresh((avant) => new Set([...avant].filter((texte) => !gone.has(texte))));
     setJob({ step: "idle" });
     await save(job.before);
   };
@@ -320,17 +320,17 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
 
       {/* Ce que BLUSH sait d’elle : une liste par rubrique, la source de chaque info à droite */}
       <div className="mt-7 flex flex-col gap-6">
-        {FICHE_SECTIONS.map((sec) => {
+        {rubriquesDeLaFiche(fiche.person.pronoun).map((sec) => {
           const items = fiche.facts.filter((f) => f.section === sec.id);
           if (items.length === 0 && !editing) return null;
           return (
             <section key={sec.id} aria-labelledby={`sec-${sec.id}`} className="flex flex-col gap-2">
               <h2 id={`sec-${sec.id}`} className="m-0 pl-4 text-legende font-black text-grey">
-                {sectionTitle(sec.id, fiche.person.pronoun)}
+                {sec.title}
               </h2>
               <ul className="m-0 flex list-none flex-col overflow-hidden rounded-[20px] bg-white p-0 shadow-card">
                 {items.map((f, i) => {
-                  const isNew = fresh.includes(f.id);
+                  const isNew = fresh.has(f.text);
                   return (
                     <li
                       key={f.id}
@@ -523,7 +523,7 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
               <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-elle" />
               <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35]">{f.text}</span>
               <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-micro font-black leading-none text-soft">
-                {sectionTitle(f.section, update.fiche.person.pronoun)}
+                {titreDeRubrique(f.section, update.fiche.person.pronoun)}
               </span>
             </li>
           ))}
@@ -564,7 +564,7 @@ function AddRow({ first, label, onAdd }: { first: boolean; label: string; onAdd:
           onChange={(e) => setValue(e.target.value)}
           aria-label={`Ajouter dans «\u00a0${label}\u00a0»`}
           placeholder="Ajouter"
-          className="min-w-0 flex-1 border-none bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-muted focus-visible:outline-none"
+          className="min-w-0 flex-1 border-none bg-transparent text-corps font-extrabold text-ink outline-none placeholder:text-grey focus-visible:outline-none"
         />
       </form>
     </li>

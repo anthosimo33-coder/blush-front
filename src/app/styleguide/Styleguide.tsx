@@ -138,7 +138,6 @@ const ENCRES: Nuance[] = [
 
 const ETATS: Nuance[] = [
   { nom: "Souci", jeton: "--color-danger", classe: "bg-danger", texte: "Le seul rouge des soucis\u00a0: un message d’erreur, un champ refusé, effacer.", sombre: true },
-  { nom: "Souci, sur le voile", jeton: "--color-danger-ink", classe: "bg-danger-ink", texte: "Le texte d’un souci posé sur le voile rouge pâle.", sombre: true },
   { nom: "C’est fait", jeton: "--color-ok", classe: "bg-ok", texte: "La pastille verte d’une étape faite.", sombre: true },
   { nom: "Désactivé", jeton: "--color-disabled", classe: "bg-disabled", texte: "Le bouton principal grisé." },
   { nom: "Piste", jeton: "--color-track", classe: "bg-track", texte: "Les points de progression à venir." },

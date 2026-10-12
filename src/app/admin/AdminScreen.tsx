@@ -47,7 +47,7 @@ function Tendance({ c, inverse = false }: { c: Chiffre; inverse?: boolean }) {
     <span
       className={cn(
         "inline-flex h-6 items-center rounded-full px-2 text-micro font-black tabular-nums",
-        d === 0 ? "bg-plaque text-grey" : bien ? "bg-[rgba(18,192,138,0.12)] text-vrai-ink" : "bg-[rgba(229,72,77,0.1)] text-danger-ink",
+        d === 0 ? "bg-plaque text-grey" : bien ? "bg-[rgba(18,192,138,0.12)] text-vrai-ink" : "bg-danger/10 text-danger",
       )}
     >
       {d === 0 ? "=" : `${d > 0 ? "+" : "−"}${nombre(Math.abs(d))}`}
@@ -244,8 +244,8 @@ function Sante({ s }: { s: StatsAdmin["sante"] }) {
       ) : (
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {s.echecs.map((e) => (
-            <li key={e.code} className="flex items-center justify-between gap-3 rounded-[14px] bg-[rgba(229,72,77,0.07)] px-3.5 py-2">
-              <span className="font-mono text-legende font-bold text-danger-ink">{e.code}</span>
+            <li key={e.code} className="flex items-center justify-between gap-3 rounded-[14px] bg-danger/7 px-3.5 py-2">
+              <span className="font-mono text-legende font-bold text-danger">{e.code}</span>
               <span className="text-note font-black tabular-nums">{nombre(e.n)}</span>
             </li>
           ))}

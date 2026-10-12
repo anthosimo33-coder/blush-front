@@ -69,12 +69,13 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
                 icon="back"
                 label="Revenir au rapport"
                 iconSize={19}
-                className="!size-10 !shadow-soft"
+                size="sm"
+                variant="doux"
               />
             ) : others.length > 0 ? (
               <ConvsButton others={others} />
             ) : (
-              <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} className="!size-10 !shadow-soft" />
+              <IconButton href="/compte" icon="user" label="Mon compte" iconSize={19} size="sm" variant="doux" />
             )}
           </span>
         </div>

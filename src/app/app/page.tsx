@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
-import { convChoisie, getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, sansHistoire } from "@/services/serveur";
+import { getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, sansHistoire } from "@/services/serveur";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
 import { IDEES_MASQUEES } from "./idees";
@@ -19,7 +19,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   /* L’historique du chat rendu ici n’est pas relu à l’ouverture (HomeScreen, `rendu`), ni le compte (PageDeConv) */
   const rendu = heureDuRendu();
   const { depuis } = await searchParams;
-  const [storyId, jar] = await Promise.all([convChoisie(), cookies()]);
+  const jar = await cookies();
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
   const lectures = Promise.all([questionsDeLaConv(), getContact(), getFiche(), getStory(), getChat(), getConvs()]);
@@ -59,7 +59,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
           others={all.filter((c) => !c.current)}
           introAt={chat.introAt}
           ideesMasquees={jar.get(IDEES_MASQUEES)?.value === "1"}
-          storyId={storyId ?? ""}
+          storyId={story.id}
           rendu={rendu}
         />
       </div>

@@ -14,12 +14,12 @@ import { Icon, type IconName } from "./icons";
 /**
  * Les trois habillages d’un souci, tels que les écrans les écrivaient. `texte` : une ligne rouge sous le bouton (le compte,
  * l’effacement, le paiement) ; `carte` : une carte blanche au-dessus du champ ou du bouton (ta question, l’import, « Qui
- * est qui ») ; `voile` : un fond rouge pâle, et dessus le même rouge plus foncé (danger-ink), pour rester lisible (le partage).
+ * est qui ») ; `voile` : un fond rouge pâle, et dessus le même rouge, qui y reste lisible (le partage).
  */
 const HABILLAGES = {
   texte: "m-0 text-note font-extrabold text-danger",
   carte: "m-0 rounded-[16px] bg-white px-4 py-3 text-note font-extrabold leading-[1.4] text-danger shadow-card",
-  voile: "m-0 rounded-[18px] bg-danger/8 px-4 py-3 text-note font-extrabold text-danger-ink",
+  voile: "m-0 rounded-[18px] bg-danger/8 px-4 py-3 text-note font-extrabold text-danger",
 } as const;
 
 export type HabillageAlerte = keyof typeof HABILLAGES;
