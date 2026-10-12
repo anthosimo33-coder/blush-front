@@ -6,7 +6,7 @@ import { db, schema } from "./db";
 import type { SourceAttente } from "./db/enums";
 import { envoyerMail } from "./email";
 import { boiteAMails, env, peutEntrer } from "./env";
-import { LIMITES, sousLaLimite } from "./limites";
+import { LIMITES, plafondsDesMails, sousLaLimite } from "./limites";
 import { mailAttente } from "./mail-attente";
 
 /**
@@ -24,7 +24,7 @@ export const lienRetrait = (emailHash: string) => `${env().BLUSH_URL}/attente/re
 /**
  * Inscrit un email sur la liste d’attente de la bêta (une seule fois, même s’il revient), et le lui écrit : l’inscription a pu
  * venir de quelqu’un d’autre, le mail donne de quoi se retirer. Un email déjà invité apprend que sa place est prête. Trois
- * mails par jour au plus pour un même email, vingt pour tous (LIMITES.mailsAttenteParJour). `convEffacee` : la conv qu’il
+ * mails par jour au plus pour un même email, vingt pour tous au défaut (plafondsDesMails().attente). `convEffacee` : la conv qu’il
  * venait d’importer n’a pas été gardée.
  */
 export async function inscrire(email: string, source: SourceAttente, { convEffacee = false } = {}): Promise<void> {
@@ -37,8 +37,8 @@ export async function inscrire(email: string, source: SourceAttente, { convEffac
   /* Pas de rafale chez une même personne, et un plafond pour tous (le quota des mails sert d’abord aux codes, aux rapports et aux alertes) : au-delà, on inscrit sans écrire */
   if (!(await sousLaLimite(`attente:mail:${emailHash}`, LIMITES.mailAttenteParEmail))) return;
   /* Le plafond pour tous ne compte que les mails qui partent : pas ceux de la boîte des tests de bout en bout (comme les codes) */
-  if (!boiteAMails() && !(await sousLaLimite("attente:mails", LIMITES.mailsAttenteParJour))) return;
-  /* Le moins nécessaire des mails : le premier retenu quand le quota du prestataire se remplit (QUOTA_MAILS) */
+  if (!boiteAMails() && !(await sousLaLimite("attente:mails", plafondsDesMails().attente))) return;
+  /* Le moins nécessaire des mails : le premier retenu quand le quota du prestataire se remplit (plafondsDesMails) */
   await envoyerMail(propre, mailAttente({ base: env().BLUSH_URL, place: peutEntrer(propre) ? "prete" : "liste", retrait: lienRetrait(emailHash), convEffacee }), {
     sorte: "attente",
   });

@@ -1,4 +1,5 @@
 import { AppliCaptures } from "@/server/appli-captures";
+import { humainRefuse } from "@/server/captcha";
 import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
 import { erreur, repondre, route } from "@/server/http";
 import { LIMITES } from "@/server/limites";
@@ -19,6 +20,11 @@ async function traiter(req: Request) {
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
   const images = await imagesDe(fichiers);
+  /* Avant toute limite : la bêta (sans compte, « connexion »), puis le laissez-passer du CAPTCHA (src/server/captcha.ts) */
+  const beta = await lecturePermise(null);
+  if (beta !== "ok") return erreur(beta);
+  const captcha = await humainRefuse("lot");
+  if (captcha) return captcha;
   /*
    * Le modèle va lire : la limite de l’adresse IP, la bêta et les plafonds d’abord, une fois l’envoi vérifié (un envoi
    * invalide ne compte pas : il ne coûte rien, et un voisin derrière la même IP n’y perd rien)

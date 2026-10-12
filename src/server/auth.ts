@@ -9,7 +9,7 @@ import { db, schema, uneLigne } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { accesLibre, boiteAMails, peutEntrer } from "./env";
-import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, rendre, sousLaLimite } from "./limites";
+import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
 /** Une session dure un mois, et chaque visite la prolonge d’autant (prolongerSession) : un mois sans visite la ferme. */
@@ -53,7 +53,7 @@ export async function preparerCode(email: string, navigateur: string, { envoye }
 }
 
 /* Le plafond des mails de code ne compte que ceux qui partent : pas ceux de la boîte des tests de bout en bout */
-const plafondDesMails = () => (boiteAMails() ? null : LIMITES.mailsCodeParJour);
+const plafondDesMails = () => (boiteAMails() ? null : plafondsDesMails().codes);
 
 /** Les mails de code du jour ont-ils atteint leur plafond ? Rien n’est compté : la même question pour tous, invités ou non. */
 export async function mailsDeCodeEpuises(): Promise<boolean> {
@@ -62,7 +62,7 @@ export async function mailsDeCodeEpuises(): Promise<boolean> {
 }
 
 /**
- * Écrit le code à cet email, compté dans le plafond du jour (mailsCodeParJour) : l’équipe est prévenue à 80 % (alerteA),
+ * Écrit le code à cet email, compté dans le plafond du jour (plafondsDesMails().codes) : l’équipe est prévenue à 80 % (alerteA),
  * puis quand il est atteint (tout le monde voit alors « trop de codes »). Un mail qui ne part pas la prévient aussi, sans
  * l’email : l’écran dit « regarde tes mails ». Elle tourne après la réponse : elle ne rejette que si la base ne répond
  * pas, et la route prévient alors l’équipe (src/app/api/auth/code).
@@ -75,7 +75,7 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
       await alerter(
         n === plafond.max ? "mails de code : plafond du jour atteint" : `mails de code : ${Math.round(plafond.alerteA * 100)} % du plafond du jour`,
         [
-          `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (LIMITES.mailsCodeParJour).`,
+          `${n} mails de code depuis le début de la fenêtre, pour un plafond de ${plafond.max} par jour (plafondsDesMails().codes, BLUSH_MAILS_PAR_JOUR).`,
           "Au plafond, plus personne ne reçoit de code : chacun voit « trop de codes » jusqu’à la fin de la fenêtre.",
         ],
         /* Touche tout le monde : passe dans la réserve des alertes importantes (S-19) */

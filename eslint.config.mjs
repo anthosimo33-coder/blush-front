@@ -23,11 +23,13 @@ const PAS_DE_CAST_CSS = [
 const dynamique = (regex, message) => ({ selector: `ImportExpression[source.value=/${regex.replaceAll("/", "\\u002F")}/]`, message });
 const NAVIGATEUR_SANS_SERVEUR = "Le navigateur ne lit pas le serveur : une page serveur passe par src/services/serveur.ts, un écran par les routes /api (src/services/api.ts).";
 /*
- * La configuration se lit à deux endroits : env() (src/server/env.ts, son schéma) et src/server/drapeaux.ts (le proxy et
- * les pages rendues au build). Ailleurs dans src, process.env ne sert qu’à NODE_ENV, que Next écrit en dur au build.
+ * La configuration se lit à trois endroits : env() (src/server/env.ts, son schéma), src/server/drapeaux.ts (le proxy et
+ * les pages rendues au build) et src/lib/publique.ts (les NEXT_PUBLIC_, pour le navigateur). Ailleurs dans src,
+ * process.env ne sert qu’à NODE_ENV, que Next écrit en dur au build.
  * scripts/, tests/ et les fichiers de configuration (next.config.ts, playwright.config.ts…) sont hors de src : libres.
  */
-const LA_CONFIG = "La configuration se lit par env() (src/server/env.ts) ou src/server/drapeaux.ts : ailleurs, process.env ne sert qu’à NODE_ENV.";
+const LA_CONFIG =
+  "La configuration se lit par env() (src/server/env.ts), src/server/drapeaux.ts ou src/lib/publique.ts (le navigateur) : ailleurs, process.env ne sert qu’à NODE_ENV.";
 const PAS_DE_PROCESS_ENV = [
   /* process.env.X ou process.env[x], sauf NODE_ENV */
   { selector: "MemberExpression[object.object.name='process'][object.property.name='env'][property.name!='NODE_ENV']", message: LA_CONFIG },
@@ -247,6 +249,21 @@ const eslintConfig = defineConfig([
         "error",
         ...PAS_DE_CAST_CSS,
         ...PAS_DE_PROCESS_ENV,
+        ...PAS_D_ERREUR_SUPPOSEE,
+        CHIFFREMENT_DYNAMIQUE,
+        CONTRAT_DYNAMIQUE,
+        DRIZZLE_DYNAMIQUE,
+        dynamique(versSrc("server"), NAVIGATEUR_SANS_SERVEUR),
+      ],
+    },
+  },
+  // La configuration publique du navigateur (les NEXT_PUBLIC_) : le bloc du navigateur, sans PAS_DE_PROCESS_ENV.
+  {
+    files: ["src/lib/publique.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...PAS_DE_CAST_CSS,
         ...PAS_D_ERREUR_SUPPOSEE,
         CHIFFREMENT_DYNAMIQUE,
         CONTRAT_DYNAMIQUE,

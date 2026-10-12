@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { estCleDeTest } from "@/lib/captcha";
 import { enProduction, surVercel } from "./drapeaux";
 import { journal } from "./journal";
 
@@ -68,6 +69,22 @@ export const Env = z.object({
   BLUSH_ADMINS: z.string().transform(emails).optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). Exigé en production. */
   CRON_SECRET: z.string().min(16).optional(),
+  /**
+   * Le quota du prestataire de mails, par jour (chaque destinataire compté) : 100 sur son plan gratuit. Les plafonds des
+   * mails en découlent (plafondsDesMails, src/server/limites.ts) : à relever avec un plan payant, jamais au-dessus de ce
+   * qu’il permet.
+   */
+  BLUSH_MAILS_PAR_JOUR: z.coerce.number().int().min(100).default(100),
+  /**
+   * Le CAPTCHA (Cloudflare Turnstile) : la clé secrète, que le serveur envoie à Cloudflare avec chaque jeton
+   * (src/server/captcha.ts). Sans elle, pas de CAPTCHA ; exigée en production dès que la bêta est ouverte.
+   */
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  /**
+   * La clé publique du même widget, écrite dans les pages au build (NEXT_PUBLIC_, lue par le navigateur dans
+   * src/lib/publique.ts) : relue ici pour vérifier qu’elle va avec la clé secrète.
+   */
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1).optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])
@@ -105,7 +122,24 @@ function refusEnProduction(e: Env): string[] {
   if (!e.CRON_SECRET) refus.push("CRON_SECRET manque (sans lui, la purge de nuit ne tourne jamais)");
   /* Un plan donné n’est jamais repris : « * » donnerait BLUSH+ à chaque compte créé, pour toujours */
   if (e.BLUSH_ACCES_LIBRE === "*") refus.push("BLUSH_ACCES_LIBRE=* est refusée (BLUSH+ d’office pour tout le monde) : seulement la liste des invités");
+  /* Ouverte à tous, la porte (les codes, les imports et les captures sans compte) passe par le CAPTCHA */
+  if (!e.BLUSH_BETA_FERMEE && !e.TURNSTILE_SECRET_KEY) refus.push("TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA");
+  /* Une clé de test de Cloudflare laisse passer tout le monde (ou personne) : jamais en production */
+  for (const cle of ["TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY"] as const)
+    if (estCleDeTest(e[cle] ?? "")) refus.push(`${cle} est une clé de test de Cloudflare (elle ne protège rien)`);
   return refus;
+}
+
+/*
+ * Partout, production ou non : les deux clés du CAPTCHA vont ensemble. La secrète seule, le serveur exigerait un jeton
+ * que les pages ne demandent jamais (tout import sans compte refusé) ; la publique seule, les pages le demanderaient pour
+ * rien.
+ */
+function refusDuCaptcha(e: Env): string | null {
+  if (!e.TURNSTILE_SECRET_KEY === !e.NEXT_PUBLIC_TURNSTILE_SITE_KEY) return null;
+  return e.TURNSTILE_SECRET_KEY
+    ? "NEXT_PUBLIC_TURNSTILE_SITE_KEY manque : TURNSTILE_SECRET_KEY va avec elle (le CAPTCHA)"
+    : "TURNSTILE_SECRET_KEY manque : NEXT_PUBLIC_TURNSTILE_SITE_KEY va avec elle (le CAPTCHA)";
 }
 
 let cache: Env | null = null;
@@ -125,6 +159,8 @@ export function env(): Env {
   if (!lu.data.BLUSH_IA_FACTICE && !lu.data.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY manque (ou BLUSH_IA_FACTICE=1)");
   /* `next start` des tests de bout en bout tourne en production, sans Resend : leurs mails vont dans la boîte */
   if (process.env.NODE_ENV === "production" && !lu.data.RESEND_API_KEY && !boiteDe(lu.data)) throw new Error("RESEND_API_KEY manque en production");
+  const captcha = refusDuCaptcha(lu.data);
+  if (captcha) throw new Error(captcha);
   const refus = refusEnProduction(lu.data);
   if (refus.length) throw new Error(`Configuration refusée en production : ${refus.join(" ; ")}`);
   cache = lu.data;

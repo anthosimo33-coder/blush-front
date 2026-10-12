@@ -1,3 +1,4 @@
+import { humainRefuse } from "@/server/captcha";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
@@ -23,6 +24,9 @@ export const POST = route("POST /api/import", async (req: Request) => {
   const fichier = fd?.get("fichier");
   const recu = paquet instanceof File ? paquet : fichier instanceof File ? fichier : null;
   if (!recu) return erreur("fichier");
+  /* Sans compte, le laissez-passer du CAPTCHA (src/server/captcha.ts), avant toute limite : refusé, il n’use rien */
+  const captcha = await humainRefuse("brouillon");
+  if (captcha) return captcha;
   /*
    * La limite de l’adresse IP, une fois le formulaire vérifié (un envoi sans fichier ne compte pas), mais avant de le
    * lire : décompresser et lire un export coûte, un fichier illisible compte aussi

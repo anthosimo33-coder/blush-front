@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Sortie01 } from "@prompts/lib/schemas";
 import { AppliCaptures } from "@/server/appli-captures";
+import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
@@ -66,6 +67,9 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   if (permis !== "ok") return erreur(permis);
   const envoi = await lireCorps(req, Envoi);
   if (!envoi) return erreur("fichier");
+  /* Sans compte, le laissez-passer du CAPTCHA qui a servi aux lots (src/server/captcha.ts), avant toute limite */
+  const captcha = await humainRefuse("brouillon");
+  if (captcha) return captcha;
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const { app, lots, cle } = envoi;

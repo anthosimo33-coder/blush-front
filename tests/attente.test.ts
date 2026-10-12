@@ -5,7 +5,7 @@ import { resumerLaVeille } from "@/server/veille";
 import { ATTENTE_GARDEE_JOURS, empreinteDeLaListe, inscrire, purgerLaListe } from "@/server/attente";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
-import { dansLeQuotaDesMails, partDesAutresMails, QUOTA_MAILS } from "@/server/limites";
+import { dansLeQuotaDesMails, partDesAutresMails, plafondsDesMails } from "@/server/limites";
 
 const n = Date.now();
 const email = `pote-${n}@exemple.fr`;
@@ -60,7 +60,7 @@ describe("la liste d’attente", () => {
   });
 });
 
-describe("S-09 · le quota des mails autres que les codes (QUOTA_MAILS)", () => {
+describe("S-09 · le quota des mails autres que les codes (plafondsDesMails)", () => {
   const cle = empreinte("limite:mails:autres");
   const poser = (count: number) =>
     db()
@@ -77,7 +77,7 @@ describe("S-09 · le quota des mails autres que les codes (QUOTA_MAILS)", () => 
 
   it("la liste d’attente s’arrête la première, puis les alertes (chaque destinataire compté), les rapports en dernier ; un mail retenu ne prend rien", async () => {
     const part = partDesAutresMails(false);
-    const { laisse } = QUOTA_MAILS;
+    const { laisse } = plafondsDesMails();
     const codesAvec = { codesAPart: false };
     /* La liste d’attente laisse sa part aux autres */
     await poser(part - laisse.attente - 1);

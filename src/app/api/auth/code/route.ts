@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { alerter } from "@/server/alertes";
 import { inscrire } from "@/server/attente";
+import { jetonRefuse } from "@/server/captcha";
 import { codeAccorde, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
 import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies";
 import { peutEntrer } from "@/server/env";
@@ -21,6 +22,9 @@ export const POST = route("POST /api/auth/code", async (req: Request) => {
   const lu = await lireCorps(req, Corps);
   if (!lu) return erreur("email");
   const { email } = lu;
+  /* Le CAPTCHA (src/server/captcha.ts), avant toute limite : un jeton refusé n’use rien, ni à l’adresse ni à l’email */
+  const captcha = await jetonRefuse(req, "code");
+  if (captcha) return captcha;
   /*
    * Les mêmes limites pour tous : un « trop » ne dit pas si l’email est invité. Par adresse IP ; puis par email canonique
    * (ses alias comptent avec lui) : ses essais ratés du jour, pour l’email, ce navigateur et cette adresse (un code de

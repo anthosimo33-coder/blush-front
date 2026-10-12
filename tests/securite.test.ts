@@ -82,7 +82,7 @@ import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { convDe, importer, type Meta } from "@/server/histoires";
 import { depuisFichier } from "@/server/import";
-import { LIMITES } from "@/server/limites";
+import { LIMITES, plafondsDesMails } from "@/server/limites";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { etatDesTaches } from "@/server/taches";
 import { suiteSure } from "@/lib/suite";
@@ -627,13 +627,13 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   it("S-09 · le plafond des mails de code du jour : l’équipe prévenue à 80 %, puis « codes » pour tout le monde", async () => {
     const e = email("plafond");
     alertes.length = 0;
-    await poserLimite("code:mails", Math.ceil(LIMITES.mailsCodeParJour.max * LIMITES.mailsCodeParJour.alerteA) - 1);
+    await poserLimite("code:mails", Math.ceil(plafondsDesMails().codes.max * plafondsDesMails().codes.alerteA) - 1);
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : 80 % du plafond du jour"]);
     /* Elle touche tout le monde : elle passe dans la réserve des importantes (S-19) */
     expect(alertes[0]!.importante).toBe(true);
-    await poserLimite("code:mails", LIMITES.mailsCodeParJour.max);
+    await poserLimite("code:mails", plafondsDesMails().codes.max);
     const r = await demander(email("plafond-apres"));
     expect([r.status, await r.json()]).toEqual([429, { erreur: "codes" }]);
   });
@@ -641,7 +641,7 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
   it("S-09 · le dernier mail du plafond part, et l’équipe le sait ; passé le plafond entre la question et l’envoi, aucun mail", async () => {
     const e = email("plafond-atteint");
     alertes.length = 0;
-    await poserLimite("code:mails", LIMITES.mailsCodeParJour.max - 1);
+    await poserLimite("code:mails", plafondsDesMails().codes.max - 1);
     await demander(e);
     expect(codesEcrits(e)).toHaveLength(1);
     expect(alertes.map((a) => a.sujet)).toEqual(["mails de code : plafond du jour atteint"]);

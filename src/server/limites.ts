@@ -2,6 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { empreinte } from "./chiffrement";
 import { db, schema, uneLigne } from "./db";
+import { env } from "./env";
 
 /**
  * Les limites anti-abus : combien de fois, sur quelle fenêtre. Celles « par compte » se rangent sur son email canonique
@@ -9,8 +10,9 @@ import { db, schema, uneLigne } from "./db";
  * (sousLaLimiteDeLIp) : deux familles de clés qui ne se croisent jamais (« analyse:compte:… », « analyse:ip:… »).
  * Ce qu’aucune ne borne : un script qui change d’adresse IP à volonté (des /64 en IPv6, un réseau de proxys) et
  * d’email, pour ouvrir des comptes à la chaîne et leurs lectures offertes (S-04), demander les codes d’une personne (S-08)
- * ou épuiser le plafond des mails de code pour tous (S-09).
- * TODO(produit): un CAPTCHA (Turnstile ou équivalent) sur la demande de code, avant l’ouverture publique.
+ * ou épuiser le plafond des mails de code pour tous (S-09). Le CAPTCHA (src/server/captcha.ts) y répond : la demande de
+ * code, l’import et les captures sans compte passent d’abord par lui, avant toute limite comptée. Il ne fait que rendre
+ * chaque essai plus cher (un humain, ou un service payant qui en résout) : les limites restent la borne.
  */
 export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
@@ -34,17 +36,7 @@ export const LIMITES = {
    */
   codeReserveParEmailEtIp: { max: 1, fenetreS: 86400 },
   codeReserveParEmail: { max: 5, fenetreS: 86400 },
-  /**
-   * Les mails de code, pour tous et par jour (S-09) : leur part du quota du prestataire de mails (QUOTA_MAILS), les
-   * autres mails se comptant sur le reste : les codes n’empêchent pas un rapport de partir, ni l’inverse. L’équipe est
-   * prévenue à `alerteA` du plafond (80 %), puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans
-   * la boîte des tests de bout en bout, dont les mails ne partent pas. Une seule adresse IP peut l’épuiser en trois heures
-   * (codeParIp, sur des emails jetables) : le CAPTCHA prévu avant l’ouverture publique y répond. 60 par jour (le plan
-   * gratuit du prestataire en permet 100) ; à relever avec un plan payant ou une clé réservée aux codes
-   * (RESEND_API_KEY_CODES). Le relever, c’est aussi relever ce qui se devine en un jour sur tous les emails (cinq essais
-   * par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
-   */
-  mailsCodeParJour: { max: 60, fenetreS: 86400, alerteA: 0.8 },
+  /* Les mails de code, pour tous et par jour : plafondsDesMails, plus bas (ils suivent le quota du prestataire) */
   verificationParIp: { max: 30, fenetreS: 3600 },
   /*
    * Les essais de code ratés (S-07, S-08), par jour : un nouveau code ne remet aucun de ces comptes à zéro, un bon code
@@ -119,7 +111,7 @@ export const LIMITES = {
   /**
    * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
    * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant. Elles
-   * partent aussi dans le quota des mails (QUOTA_MAILS : chaque destinataire compte), qui les arrête avant les rapports.
+   * partent aussi dans le quota des mails (plafondsDesMails : chaque destinataire compte), qui les arrête avant les rapports.
    * À revoir à l’usage.
    */
   alertesParJour: { max: 30, fenetreS: 86400, reserveImportantes: 10 },
@@ -129,12 +121,6 @@ export const LIMITES = {
   attenteParIp: { max: 10, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
-  /**
-   * Tous les mails de la liste d’attente, par jour : n’importe qui peut en déclencher, ils ne doivent épuiser ni le quota
-   * des codes, ni la part des rapports et des alertes (QUOTA_MAILS, qui les arrête aussi les premiers). Au-delà, on
-   * inscrit sans écrire. Sans la boîte des tests de bout en bout, dont les mails ne partent pas (comme mailsCodeParJour).
-   */
-  mailsAttenteParJour: { max: 20, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
@@ -156,24 +142,68 @@ export const LIMITES = {
   lotsParCompte: { max: 300, fenetreS: 86400 },
   /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
   ficheParCompte: { max: 60, fenetreS: 86400 },
+  /**
+   * Les jetons du CAPTCHA échangés contre un laissez-passer (/api/captcha), par adresse IP : un par import sans compte,
+   * comptés à l’entrée (une rafale de faux jetons ne fait pas appeler Cloudflare sans fin).
+   */
+  captchaParIp: { max: 60, fenetreS: 3600 },
+  /*
+   * Ce qu’un laissez-passer du CAPTCHA permet (src/server/captcha.ts), pendant ses 20 minutes : un import, un envoi de
+   * captures ou la fin d’un enregistrement (et un nouvel essai après une coupure du réseau), et les lots d’un
+   * enregistrement (seize au plus pour un long, quarante pour le serveur, chacun avec son nouvel essai).
+   */
+  laissezPasserBrouillons: { max: 2, fenetreS: 20 * 60 },
+  laissezPasserLots: { max: 80, fenetreS: 20 * 60 },
 } as const;
 
-/**
- * Le quota du prestataire de mails (S-09), par jour : 100 sur son plan gratuit, chaque destinataire compté. Les codes ont
- * leur part (mailsCodeParJour). Tous les autres mails qui partent avec RESEND_API_KEY (« ton rapport est prêt », les
- * alertes de l’équipe, la liste d’attente) se comptent ensemble sur ce qui reste (partDesAutresMails : 40, ou les 100
- * quand les codes ont leur clé, RESEND_API_KEY_CODES), et les moins nécessaires s’arrêtent les premiers : chaque sorte de
- * mail laisse `laisse[sorte]` mails de cette part aux suivantes. La liste d’attente en laisse 20, les alertes 10 (les
- * rapports les ont toujours), les rapports aucun : au pire, « ton rapport est prêt » ne part pas, et le rapport attend
- * dans l’appli (src/server/email.ts, envoyerMail). tests/unit/limites.test.ts y veille. Les fenêtres des compteurs ne
- * commencent pas à minuit comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
+/*
+ * Le quota du prestataire de mails (S-09), par jour : BLUSH_MAILS_PAR_JOUR (100 par défaut, son plan gratuit), chaque
+ * destinataire compté. Tous les plafonds des mails en découlent, dans les mêmes proportions qu’à 100 (plafondsDesMails) :
+ * relever le quota avec un plan payant les relève tous.
+ * - Les codes ont leur part (`codes`, 60 % : 60 sur 100).
+ * - Tous les autres mails qui partent avec RESEND_API_KEY (« ton rapport est prêt », les alertes de l’équipe, la liste
+ *   d’attente) se comptent ensemble sur ce qui reste (partDesAutresMails : 40, ou les 100 quand les codes ont leur clé,
+ *   RESEND_API_KEY_CODES), et les moins nécessaires s’arrêtent les premiers : chaque sorte de mail laisse `laisse[sorte]`
+ *   mails de cette part aux suivantes. La liste d’attente en laisse 20 %, les alertes 10 % (les rapports les ont
+ *   toujours), les rapports aucun : au pire, « ton rapport est prêt » ne part pas, et le rapport attend dans l’appli
+ *   (src/server/email.ts, envoyerMail).
+ * - Tous les mails de la liste d’attente (`attente`, 20 %) : n’importe qui peut en déclencher, ils ne doivent épuiser ni
+ *   le quota des codes, ni la part des rapports et des alertes (qui les arrête aussi les premiers). Au-delà, on inscrit
+ *   sans écrire. Sans la boîte des tests de bout en bout, dont les mails ne partent pas (comme les codes).
+ * tests/unit/limites.test.ts y veille, au défaut comme relevé. Les fenêtres des compteurs ne commencent pas à minuit
+ * comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
  */
-export const QUOTA_MAILS = { parJour: 100, laisse: { attente: 20, alerte: 10, rapport: 0 } } as const;
+const PARTS_DES_MAILS = { codes: 0.6, attente: 0.2, laisse: { attente: 0.2, alerte: 0.1, rapport: 0 } } as const;
+
 /** Ce qu’est un mail pour le quota : du plus nécessaire (le rapport) au moins nécessaire (la liste d’attente). */
-export type SorteDeMail = keyof typeof QUOTA_MAILS.laisse;
+export type SorteDeMail = keyof typeof PARTS_DES_MAILS.laisse;
+
+/** Les plafonds des mails du jour, tirés du quota du prestataire (`parJour` : BLUSH_MAILS_PAR_JOUR, voir plus haut). */
+export function plafondsDesMails(parJour = env().BLUSH_MAILS_PAR_JOUR) {
+  const part = (p: number) => Math.floor(parJour * p);
+  const { laisse } = PARTS_DES_MAILS;
+  return {
+    parJour,
+    /**
+     * Les mails de code, pour tous et par jour (S-09) : leur part du quota, les autres mails se comptant sur le reste :
+     * les codes n’empêchent pas un rapport de partir, ni l’inverse. L’équipe est prévenue à `alerteA` du plafond (80 %),
+     * puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans la boîte des tests de bout en bout,
+     * dont les mails ne partent pas. Une seule adresse IP pourrait l’épuiser en trois heures (codeParIp, sur des emails
+     * jetables) : chaque demande passe d’abord par le CAPTCHA. 60 par jour au défaut, même avec une clé réservée aux codes
+     * (RESEND_API_KEY_CODES). Le relever, c’est aussi relever ce qui se devine en un jour sur tous les emails (cinq
+     * essais par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
+     */
+    codes: { max: part(PARTS_DES_MAILS.codes), fenetreS: 86400, alerteA: 0.8 },
+    /** Les mails de la liste d’attente, pour tous. */
+    attente: { max: part(PARTS_DES_MAILS.attente), fenetreS: 86400 },
+    laisse: { attente: part(laisse.attente), alerte: part(laisse.alerte), rapport: part(laisse.rapport) },
+  } as const satisfies { parJour: number; codes: Limite & { alerteA: number }; attente: Limite; laisse: Record<SorteDeMail, number> };
+}
 
 /** La part du quota des mails autres que les codes : tout, quand les codes ont leur clé ; sinon, ce que les codes laissent. */
-export const partDesAutresMails = (codesAPart: boolean) => QUOTA_MAILS.parJour - (codesAPart ? 0 : LIMITES.mailsCodeParJour.max);
+export function partDesAutresMails(codesAPart: boolean, plafonds = plafondsDesMails()): number {
+  return plafonds.parJour - (codesAPart ? 0 : plafonds.codes.max);
+}
 
 /** Une limite : combien de passages au plus, sur quelle fenêtre (en secondes). */
 export type Limite = { max: number; fenetreS: number };
@@ -246,11 +276,12 @@ export async function rendre(cle: string, n = 1): Promise<void> {
 const MAILS_DU_JOUR = "mails:autres";
 
 /**
- * `n` mails de cette sorte (un par destinataire) tiennent-ils encore dans leur part du quota (QUOTA_MAILS) ? Comptés si
+ * `n` mails de cette sorte (un par destinataire) tiennent-ils encore dans leur part du quota (plafondsDesMails) ? Comptés si
  * oui. On regarde d’abord sans compter : un mail retenu ne prend rien à ceux qui passent après lui.
  */
 export async function dansLeQuotaDesMails(sorte: SorteDeMail, n: number, { codesAPart }: { codesAPart: boolean }): Promise<boolean> {
-  const limite = { max: partDesAutresMails(codesAPart) - QUOTA_MAILS.laisse[sorte], fenetreS: 86400 };
+  const plafonds = plafondsDesMails();
+  const limite = { max: partDesAutresMails(codesAPart, plafonds) - plafonds.laisse[sorte], fenetreS: 86400 };
   if ((await compteDe(MAILS_DU_JOUR, limite)) + n > limite.max) return false;
   if ((await compter(MAILS_DU_JOUR, limite, n)) <= limite.max) return true;
   /* D’autres mails sont passés entre la question et le compte : celui-ci ne part pas, et rend sa place */
@@ -266,7 +297,12 @@ export const rendreAuQuotaDesMails = (n: number) => rendre(MAILS_DU_JOUR, n);
  * comptent : une IPv4 telle quelle, une IPv6 par son préfixe /64 (voir groupeIp).
  */
 export function ipDe(req: Request): string {
-  return groupeIp(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "") || "inconnue";
+  return groupeIp(adresseDe(req) ?? "") || "inconnue";
+}
+
+/** L’adresse IP de la requête telle quelle (pas regroupée : ce que Cloudflare attend du CAPTCHA), ou null. */
+export function adresseDe(req: Request): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || null;
 }
 
 /* Un groupe de 16 bits d’une IPv6, écrit en hexadécimal */

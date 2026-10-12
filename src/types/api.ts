@@ -115,6 +115,8 @@ type Reponses = {
   "POST /api/auth/deconnexion": Ok;
   /** Un mauvais code : `{ ok: false }`, en 200, la même réponse pour tous. */
   "POST /api/auth/verifier": { ok: false } | { ok: true; email: string };
+  /** Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts). */
+  "POST /api/captcha": Ok;
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
@@ -173,6 +175,8 @@ export const ROUTES = {
   "POST /api/auth/deconnexion": { corps: z.object({ partout: z.boolean().optional() }) },
   /* Le code reçu, et l’email à qui il a été envoyé */
   "POST /api/auth/verifier": { corps: z.object({ email: z.string(), code: z.string() }) },
+  /* Le jeton du widget voyage dans l’en-tête x-blush-captcha (ENTETE_CAPTCHA, src/lib/captcha.ts), comme à la demande de code */
+  "POST /api/captcha": {},
   "POST /api/captures": { formulaire: true },
   "POST /api/captures/lot": { formulaire: true },
   /*

@@ -54,7 +54,7 @@ async function poster(pour: string[], { sujet, texte, html }: Mail, { cle, de }:
 /**
  * Envoie un mail qui n’est pas un code, sa version texte et sa version HTML s’il en a une (une alerte de l’équipe n’en a
  * pas), à un ou plusieurs destinataires, avec RESEND_API_KEY. `sorte` : ce qu’il est pour le quota du prestataire
- * (QUOTA_MAILS, src/server/limites.ts : « rapport » par défaut, « alerte », « attente ») ; au-delà de sa part, il ne part
+ * (plafondsDesMails, src/server/limites.ts : « rapport » par défaut, « alerte », « attente ») ; au-delà de sa part, il ne part
  * pas, le journal le dit, et la réponse est false. Sans clé (dev), seul son sujet s’affiche dans les logs. Rejette avec
  * ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
  */
@@ -99,6 +99,6 @@ export async function envoyerCodeParEmail(email: string, code: string): Promise<
     enLocal(`[dev] code de connexion pour ${email} : ${code}`);
     return;
   }
-  /* Leur part du quota se compte avant (LIMITES.mailsCodeParJour, src/server/auth.ts : envoyerCode) */
+  /* Leur part du quota se compte avant (plafondsDesMails().codes, src/server/auth.ts : envoyerCode) */
   await poster([email], mailCode(code, BLUSH_URL), { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM });
 }
