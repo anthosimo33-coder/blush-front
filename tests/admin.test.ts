@@ -393,14 +393,8 @@ describe("inviter la liste d’attente quand le prestataire des mails refuse", (
     await poserLeCompteur(0);
   });
   const invite = async (k: number) =>
-    (
-      await db()
-        .select({ le: schema.waitlist.inviteLe })
-        .from(schema.waitlist)
-        .where(eq(schema.waitlist.emailHash, hashes[k]!))
-    )[0]?.le instanceof Date;
-  const compteur = async () =>
-    (await db().select({ count: schema.rateLimits.count }).from(schema.rateLimits).where(eq(schema.rateLimits.key, MAILS_DE_LA_LISTE)))[0]?.count ?? 0;
+    (await db().select({ le: schema.waitlist.inviteLe }).from(schema.waitlist).where(eq(schema.waitlist.emailHash, hashes[k]!)))[0]?.le instanceof Date;
+  const compteur = async () => (await db().select({ count: schema.rateLimits.count }).from(schema.rateLimits).where(eq(schema.rateLimits.key, MAILS_DE_LA_LISTE)))[0]?.count ?? 0;
 
   it("une adresse refusée (422) n’arrête pas le lot : elle reste à inviter, sans prendre de place du jour, et les suivants partent", async () => {
     pannes.set(inscrits[0]!, 422);
