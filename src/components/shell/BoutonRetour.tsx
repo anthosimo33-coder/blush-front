@@ -4,7 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
-import { cheminDe, pagePrecedente } from "@/lib/navigation";
+import { cheminDe, pagePrecedente, useRetourSinon } from "@/lib/navigation";
 import { Icon } from "@/components/ui/icons";
 
 /*
@@ -14,41 +14,48 @@ import { Icon } from "@/components/ui/icons";
 
 /**
  * Où mène un « Retour ». Une adresse : la page d’où l’on vient si c’est elle (en arrière), sinon le lien l’ouvre.
- * `{ repli }` : la page d’avant, quelle qu’elle soit, et `repli` quand on arrive d’ailleurs (un lien, un nouvel onglet),
- * où revenir en arrière quitterait BLUSH. Une fonction : l’écran décide (un composant client seulement).
+ * `{ repli, scroll }` : la page d’avant, quelle qu’elle soit, et `repli` quand revenir en arrière quitterait BLUSH (la
+ * règle de useRetourSinon, src/lib/navigation.ts) ; `scroll` : celui du lien (false vers l’accueil). Une fonction :
+ * l’écran décide (un composant client seulement).
  */
-export type BackTarget = Route | { repli: Route } | (() => void);
+export type BackTarget = Route | { repli: Route; scroll?: boolean } | (() => void);
 
-/** L’API Navigation, là où le navigateur l’a (pas encore partout : sans elle, on s’en tient à la page d’avant). */
-type HistoriqueNavigation = { currentEntry: { index: number } | null };
+/** Un clic gauche simple : un clic modifié (nouvel onglet) reste au lien. */
+const clicSimple = (e: MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0);
+
+type ProprietesLien = { className: string; children: ReactNode; label?: string };
 
 /**
- * L’entrée d’avant dans l’historique est-elle à BLUSH ? `pagePrecedente` est la dernière page de BLUSH vue, pas l’entrée
- * d’avant : arrivé par un lien, un « Retour » (le repli, poussé) puis le retour du système ramènent sur la page avec une
- * page d’avant, alors que l’entrée d’avant est le site d’où l’on vient. L’API Navigation ne liste que les entrées de
- * BLUSH (même origine) : un index au-dessus de 0 dit qu’en arrière, on reste chez nous. Sans l’API (des navigateurs
- * plus anciens), cette limite reste : le repli ne protège que la première arrivée.
+ * Le lien vers une adresse : en arrière quand c’est la page d’avant (l’historique reste propre, et le retour suivant
+ * mène bien plus loin) ; sinon, le lien s’ouvre.
  */
-function entreeDAvantDansBlush() {
-  const historique = (window as Window & { navigation?: HistoriqueNavigation }).navigation;
-  const entree = historique?.currentEntry;
-  return entree ? entree.index > 0 : true;
+function LienVersAdresse({ href, className, children, label }: { href: Route } & ProprietesLien) {
+  const router = useRouter();
+  const retour = (e: MouseEvent) => {
+    if (!clicSimple(e) || pagePrecedente() !== cheminDe(href)) return;
+    e.preventDefault();
+    router.back();
+  };
+  return (
+    <Link href={href} onClick={retour} aria-label={label} className={className}>
+      {children}
+    </Link>
+  );
 }
 
-/**
- * Le toucher d’un lien « Retour » : en arrière quand c’est la bonne page d’avant (l’historique reste propre, et le
- * retour suivant mène bien plus loin) ; sinon, le lien s’ouvre. Un clic modifié (nouvel onglet) reste au lien.
- */
-function useRetour(target: Exclude<BackTarget, () => void>) {
-  const router = useRouter();
-  return (e: MouseEvent) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    const avant = pagePrecedente();
-    if (typeof target === "string" ? avant === cheminDe(target) : avant && entreeDAvantDansBlush()) {
-      e.preventDefault();
-      router.back();
-    }
+/** Le lien vers la page d’avant, ou son repli : le toucher passe par useRetourSinon ; le lien (son repli) reste pour un nouvel onglet. */
+function LienRetourSinon({ repli, scroll, className, children, label }: { repli: Route; scroll?: boolean } & ProprietesLien) {
+  const retourSinon = useRetourSinon(repli, { scroll });
+  const retour = (e: MouseEvent) => {
+    if (!clicSimple(e)) return;
+    e.preventDefault();
+    retourSinon();
   };
+  return (
+    <Link href={repli} scroll={scroll} onClick={retour} aria-label={label} className={className}>
+      {children}
+    </Link>
+  );
 }
 
 /** Un lien « Retour » (une adresse, ou la page d’avant avec son repli), ou un bouton quand l’écran décide. */
@@ -59,19 +66,16 @@ function Retour({ target, className, children, label }: { target: BackTarget; cl
         {children}
       </button>
     );
+  if (typeof target === "string")
+    return (
+      <LienVersAdresse href={target} className={className} label={label}>
+        {children}
+      </LienVersAdresse>
+    );
   return (
-    <LienRetour target={target} className={className} label={label}>
+    <LienRetourSinon repli={target.repli} scroll={target.scroll} className={className} label={label}>
       {children}
-    </LienRetour>
-  );
-}
-
-function LienRetour({ target, className, children, label }: { target: Exclude<BackTarget, () => void>; className: string; children: ReactNode; label?: string }) {
-  const retour = useRetour(target);
-  return (
-    <Link href={typeof target === "string" ? target : target.repli} onClick={retour} aria-label={label} className={className}>
-      {children}
-    </Link>
+    </LienRetourSinon>
   );
 }
 

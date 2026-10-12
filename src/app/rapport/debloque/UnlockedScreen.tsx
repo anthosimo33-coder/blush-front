@@ -2,7 +2,6 @@
 
 import type { Route } from "next";
 import { useEffect } from "react";
-import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { OFFRE_PAR_PLAN } from "@/contenu/offres";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
@@ -36,6 +35,7 @@ export function UnlockedScreen({
   offer,
   next,
   restants,
+  total,
   reprise,
   autre,
 }: {
@@ -43,6 +43,8 @@ export function UnlockedScreen({
   next: Route | null;
   /** Les chapitres qui restaient à lire, et le premier d’entre eux (où la lecture reprend). */
   restants: number;
+  /** Les chapitres du rapport, offerts compris : ceux qu’il a vraiment (un rapport écrit peut en avoir moins de huit). */
+  total: number;
   reprise: number;
   autre?: Pronom;
 }) {
@@ -81,7 +83,7 @@ export function UnlockedScreen({
           {plus ? "Bienvenue dans BLUSH+." : "C’est débloqué."}
         </h1>
         <p data-rise="" style={delai(0.3)} className="m-0 mt-3 max-w-[380px] text-corps font-extrabold leading-[1.45] text-soft">
-          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${NB_CHAPITRES} chapitres sont à toi, pour toujours.`}
+          {plus ? "Ton rapport complet, et BLUSH à tes côtés à chaque message." : `Les ${total} chapitres sont à toi, pour toujours.`}
         </p>
 
         <div data-rise="" style={delai(0.45)} className="mt-8 w-full text-left">

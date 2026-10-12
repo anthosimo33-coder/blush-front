@@ -9,6 +9,12 @@ import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "C’est débloqué" };
 
+/*
+ * La page lit le rapport par getReport, qui lance ce que le déblocage ouvre (le rapport, la mémoire) et le laisse tourner
+ * après la réponse : la durée de la fonction est celle de /api/debloquer, pour que la chaîne ne soit pas coupée en route.
+ */
+export const maxDuration = 300;
+
 export default async function Page({ searchParams }: PageProps<"/rapport/debloque">) {
   /* L’heure du rendu, avant les lectures : le compte posé par PageDeConv en part */
   const rendu = heureDuRendu();
@@ -27,7 +33,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const autre = story ? moiEtAutre(story).autre.pronoun : undefined;
   return (
     <PageDeConv rendu={rendu}>
-      <UnlockedScreen offer={offer} next={next} restants={restants} reprise={PREMIER_PAYANT} autre={autre} />
+      <UnlockedScreen offer={offer} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} autre={autre} />
     </PageDeConv>
   );
 }

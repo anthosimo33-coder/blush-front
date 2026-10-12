@@ -23,7 +23,7 @@ import type { PhaseDuRapport } from "./phase";
 /* Ce qui ne sert que pendant l’écriture est chargé à part, quand il sert */
 const LigneEcriture = dynamic(() => import("./Ecriture").then((m) => m.LigneEcriture));
 
-/** Ce que dit l’écriture en échec, selon pourquoi. TODO(produit): la seconde phrase de « souffle », à valider. */
+/** Ce que dit l’écriture en échec, selon pourquoi. */
 const TEXTES_ECHEC: Record<Echec, string> = {
   refus: "BLUSH ne peut pas écrire la suite à partir de cette conv. Ton verdict, lui, reste juste.",
   souffle: `${SOUFFLE} Ta conv est toujours là\u00a0: l’écriture reprendra quand tu reviendras.`,
@@ -33,9 +33,10 @@ const TEXTES_ECHEC: Record<Echec, string> = {
 /**
  * L’écriture a échoué pour de bon : on le dit, au lieu d’une attente sans fin. Une panne se relance (de zéro, quelques
  * fois par jour) ; un refus du modèle reviendrait à chaque essai, il n’y a rien à relancer ; le budget de l’IA du jour
- * atteint (« souffle ») non plus : l’écriture repart d’elle-même après minuit, quand on rouvre le rapport.
+ * atteint (« souffle ») non plus : l’écriture repart d’elle-même après minuit, quand on rouvre le rapport. `sobre` :
+ * le rapport doux du mode sobre (AttenteSobre), tout entier à écrire, pas une suite.
  */
-function EchecEcriture({ raison }: { raison: Echec }) {
+export function EchecEcriture({ raison, sobre = false }: { raison: Echec; sobre?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [souci, setSouci] = useState<string | null>(null);
   const relancer = async () => {
@@ -51,7 +52,7 @@ function EchecEcriture({ raison }: { raison: Echec }) {
   return (
     <Card className="flex flex-col gap-2 p-[18px]">
       <div role="alert" className="text-accent font-black leading-[1.3]">
-        La suite de ton rapport n’a pas pu s’écrire.
+        {sobre ? "Ton rapport n’a pas pu s’écrire." : "La suite de ton rapport n’a pas pu s’écrire."}
       </div>
       <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">{TEXTES_ECHEC[raison]}</p>
       {souci && <p className="m-0 text-note font-extrabold leading-[1.4] text-ink">{souci}</p>}

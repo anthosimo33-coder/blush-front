@@ -7,6 +7,12 @@ import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "Ton rapport" };
 
+/*
+ * La page lit le rapport par getReport, qui lance ce qui manque à la chaîne (le rapport, le vocal) et le laisse tourner
+ * après la réponse : la durée de la fonction est celle de /api/rapport, pour que la chaîne ne soit pas coupée en route.
+ */
+export const maxDuration = 300;
+
 export default async function Page({ searchParams }: PageProps<"/rapport">) {
   const rendu = heureDuRendu();
   const { paiement } = await searchParams;

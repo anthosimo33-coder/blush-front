@@ -11,6 +11,7 @@ import { useRapport } from "@/lib/requetes";
 import type { ReportPayload } from "@/types/api";
 import { BubbleLogo, Sphere, type SphereKind } from "@/components/brand/objects3d";
 import { TypingDots } from "@/components/ui/feedback";
+import { ScoreBar } from "@/components/ui/progress";
 import { Icon } from "@/components/ui/icons";
 import type { Confidence, Message, Story } from "@/types";
 import { moiEtAutre } from "@/lib/participants";
@@ -69,12 +70,17 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
   const card = cards[Math.min(at, last)] ?? cards[0];
   const { verdict } = payload.report;
   /* L’autre personne : « Il » ou « Elle » dans le duel (d’après son pronom, une fois « Qui es-tu ? » rempli) */
-  const autre = IlOuElle(moiEtAutre(story).autre.pronoun);
+  const pronom = moiEtAutre(story).autre.pronoun;
+  const autre = IlOuElle(pronom);
 
-  /* Le mode sobre (une alerte de danger) : pas de mise en scène, le rapport tout de suite */
+  /*
+   * Le mode sobre (une alerte de danger) : pas de mise en scène, le rapport tout de suite. `alerte` le dit dès le
+   * verdict, avant que le rapport doux (`sober`) soit écrit
+   */
+  const sobre = !!payload.sober || !!payload.alerte;
   useEffect(() => {
-    if (payload.sober) toReport();
-  }, [payload.sober]);
+    if (sobre) toReport();
+  }, [sobre]);
 
   /* Rien ne défile derrière la scène (même quand la feuille de partage s’ouvre puis se ferme par-dessus) */
   useEffect(() => bloquerDefilement(), []);
@@ -105,7 +111,12 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
     window.addEventListener("pageshow", remettre);
     return () => window.removeEventListener("pageshow", remettre);
   }, []);
-  /* La dernière carte : le serveur prépare déjà le rapport (une instance réveillée, la base aussi) pendant qu’on la lit */
+  /*
+   * La dernière carte : le serveur prépare déjà le rapport (une instance réveillée, la base aussi) pendant qu’on la lit.
+   * Son coût : un rendu complet de /rapport côté serveur, dont le HTML est jeté (sa garde, verdictEcrit ; la conv ; le
+   * rapport lu et déchiffré par getReport, qui relance ce qui manquerait à la chaîne), une fois par scène, à la dernière
+   * carte seulement : « Voir mon rapport » refait la page (un chargement complet), sur une instance déjà chaude.
+   */
   const chauffe = useRef(false);
   useEffect(() => {
     if (at !== last || chauffe.current) return;
@@ -124,15 +135,15 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
   const [loud, setLoud] = useState(false);
   const onVerdict = card.id === "verdict";
   useEffect(() => {
-    if (onVerdict && !payload.sober) play("verdict", verdict.emoji);
-  }, [onVerdict, payload.sober, verdict.emoji]);
+    if (onVerdict && !sobre) play("verdict", verdict.emoji);
+  }, [onVerdict, sobre, verdict.emoji]);
   /* Le son forcé que tient le bouton son touché : lâché quand on le retouche, ou qu’on quitte le verdict */
   const sonForce = useSonForce();
   const toggleLoud = () => {
     const on = !loud;
     setLoud(on);
     sonForce(on);
-    if (on && onVerdict) play("verdict", verdict.emoji);
+    if (on && onVerdict && !sobre) play("verdict", verdict.emoji);
   };
 
   useEffect(() => {
@@ -174,7 +185,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
     go(e.clientX < window.innerWidth * 0.3 ? at - 1 : at + 1);
   };
 
-  if (payload.sober) return <div className="fixed inset-0 bg-paper" />;
+  if (sobre) return <div className="fixed inset-0 bg-paper" />;
 
   const step = <span className="sr-only">{`Étape ${at + 1} sur ${cards.length}\u00a0: `}</span>;
   const glow = GLOWS[card.id];
@@ -312,21 +323,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
               <ul className="m-0 mt-3 flex list-none flex-col gap-4 p-0 [@media(max-height:600px)]:gap-2.5">
                 {card.rows.map((r, i) => (
                   <li key={r.label} data-rise="" style={delai(0.25 + i * 0.14)}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-corps font-black leading-tight">{r.label}</span>
-                      <span className={cn("shrink-0 text-note font-black", r.winner === "toi" ? "text-toi" : r.winner === "elle" ? "text-elle" : "text-vrai")}>
-                        {r.winner === "elle" ? autre.toLowerCase() : r.winner}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elle">
-                      <span data-bar="" style={{ "--w": `${r.toiPercent}%`, ...delai(0.45 + i * 0.14) }} className="block h-full rounded-full border-r-2 border-ink bg-toi" />
-                    </div>
-                    {(r.captionLeft || r.captionRight) && (
-                      <div className="mt-1.5 flex justify-between gap-3 text-[12.5px] font-extrabold text-white/60 [@media(max-height:600px)]:hidden">
-                        <span>{r.captionLeft}</span>
-                        <span>{r.captionRight}</span>
-                      </div>
-                    )}
+                    <ScoreBar row={r} sombre autre={pronom} delay={0.45 + i * 0.14} />
                   </li>
                 ))}
               </ul>

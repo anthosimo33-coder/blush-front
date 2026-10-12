@@ -50,7 +50,7 @@ test("sommaire sur téléphone : la feuille suit la lecture, et les chapitres fe
     await expect(feuille).toBeVisible();
     await expect(feuille.getByText("8 chapitres", { exact: true })).toBeVisible();
     await expect(feuille.getByRole("button", { name: "Le verdict", exact: true })).toBeVisible();
-    /* Les chapitres fermés : leur titre seul (le cadenas n’est pas dit, voir le test.fixme plus bas) */
+    /* Les chapitres fermés, par leur titre (le cadenas se dit « (verrouillé) » : le test plus bas) */
     for (const titre of CHAPITRES_FERMES) await expect(feuille.getByRole("button", { name: new RegExp(`^${titre}`) })).toBeVisible();
     await expect(feuille.getByRole("link", { name: "Poser ma question à BLUSH" })).toHaveCount(0);
     await feuille.getByRole("button", { name: "Fermer" }).click();

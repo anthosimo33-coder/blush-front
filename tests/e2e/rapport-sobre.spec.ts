@@ -79,14 +79,12 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
 });
 
 /*
- * Bug : avec une alerte, la scène du verdict se joue tant que le rapport doux n’est pas écrit. La scène ne regarde que le
- * rapport sobre (src/app/rapport/verdict/VerdictReveal.tsx:72-75), présent une fois le rapport doux écrit (`sober`,
- * assemblerRapport, src/server/presentation/rapport.ts), alors que le verdict sait déjà qu’il y a une alerte
- * (mode_sobre). Avec le vrai modèle, le rapport doux s’écrit après le verdict : « Voir mon rapport », touché tout de
- * suite, joue la mise en scène (les cartes, les sons, l’emoji 🧊 par défaut) sur une alerte danger, puis le rapport en
- * cours d’écriture.
+ * Avec le vrai modèle, le rapport doux s’écrit après le verdict : « Voir mon rapport », touché tout de suite, ne joue pas
+ * la mise en scène (les cartes, les sons, l’emoji) sur une alerte de danger. Le verdict le sait déjà (`alerte`, son
+ * mode_sobre, assemblerRapport) : /rapport/verdict redirige, et le rapport montre l’attente sobre (ni « Partager », ni
+ * la pastille de l’écriture) jusqu’au rapport doux.
  */
-test.fixme("une alerte : pas de scène du verdict, même avant que le rapport doux soit écrit", async ({ page }, testInfo) => {
+test("une alerte : pas de scène du verdict, même avant que le rapport doux soit écrit", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "sobre-tot");
   await lectureFaite(page, testInfo, email, { ajout: { de: "autre", texte: ALERTE_FACTICE } });
   /* Le verdict est là, le rapport doux pas encore */
@@ -94,6 +92,10 @@ test.fixme("une alerte : pas de scène du verdict, même avant que le rapport do
   await page.goto("/lecture");
   await page.getByRole("link", { name: "Voir mon rapport" }).click();
   await expect(page).toHaveURL(/\/rapport$/);
+  /* L’attente sobre (le rapport doux effacé ne se réécrit pas ici : sa tâche est finie) : jamais le rapport joueur */
+  await expect(page.getByRole("heading", { level: 1, name: "Ton rapport arrive." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Besoin d’en parler à quelqu’un ?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /^Étape \d sur \d/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Partager/ })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /^Chapitre 1/ })).toHaveCount(0);
 });

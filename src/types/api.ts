@@ -35,6 +35,12 @@ export type ReportPayload = {
   report: Report;
   /** Le mode sobre : présent quand la conv lève une alerte de danger (détresse, mineur), le rapport court et doux. */
   sober: SoberReport | null;
+  /**
+   * Le verdict a levé une alerte de danger (son `mode_sobre`) : su dès le verdict, avant que le rapport doux (`sober`)
+   * soit écrit. Ni scène du verdict, ni rapport joueur : l’attente sobre, puis le rapport doux. Toujours rempli par le
+   * serveur (assemblerRapport) ; absent des aperçus de l’équipe, qui n’en ont pas.
+   */
+  alerte?: boolean;
   access: Plan;
   /** Le rapport s’écrit encore (accès débloqué, pas fini). Le front repasse dans quelques secondes. */
   generating?: boolean;

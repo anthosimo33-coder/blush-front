@@ -2,7 +2,6 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppTile } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
@@ -10,7 +9,6 @@ import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { PROMESSE_CONV } from "@/contenu/confidentialite";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
-import { pagePrecedente } from "@/lib/navigation";
 import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
 import { NBSP } from "@/lib/format";
 
@@ -26,7 +24,6 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: Route; wide?
 ];
 
 export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
-  const router = useRouter();
   /* Choisir une appli, c’est commencer une nouvelle conv : les réponses de la précédente (qui est qui, ce que tu veux) repartent de zéro. L’email reste */
   const nouvelleConv = (app: AppKind) => {
     const { email } = readJourney();
@@ -36,8 +33,8 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
   return (
     <ParcoursScreen
       step={1}
-      /* Retour (mobile) : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici directement, l’accueil. Sur ordinateur, le logo y mène */
-      back={() => (pagePrecedente() ? router.back() : router.push("/"))}
+      /* Retour (mobile) : la page d’avant (l’accueil, ou « Tes convs ») ; arrivé ici d’ailleurs, l’accueil. Sur ordinateur, le logo y mène */
+      back={{ repli: "/" }}
       retourDesktop={false}
       head={
         <>
@@ -51,7 +48,7 @@ export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
           <AppTile key={t.app} {...t} onClick={() => nouvelleConv(t.app)} />
         ))}
       </nav>
-      <p className="m-0 text-legende font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale, tu ajouteras le reste juste après.</p>
+      <p className="m-0 text-legende font-bold leading-[1.45] text-grey">Plusieurs applis{NBSP}? Commence par la principale.</p>
       <NotePrivee className="leading-[1.45]">
         {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>
       </NotePrivee>

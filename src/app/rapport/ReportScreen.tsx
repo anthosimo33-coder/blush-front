@@ -1,9 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { pagePrecedente } from "@/lib/navigation";
+import { useRetourSinon } from "@/lib/navigation";
 import { copyText } from "@/lib/hooks";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { peut } from "@/lib/acces";
@@ -30,12 +29,13 @@ import { EnTeteRapport } from "./EnTeteRapport";
 import { PartageEtConfidentialite } from "./PartageVerdict";
 import { ecritureInachevee, phaseDuRapport, type PhaseDuRapport } from "./phase";
 import { FeuilleSommaire, ReadingBar, Sommaire } from "./Sommaire";
-import { Suite, Writing } from "./Suite";
+import { EchecEcriture, Suite, Writing } from "./Suite";
 import { useReprise } from "./useReprise";
 import { VocalDuRapport } from "./Vocal";
 
 /* Ce qui ne sert pas à chaque lecture (le mode sobre, l’écriture en cours, « Partager en image ») est chargé à part, quand il sert */
 const SoberReport = dynamic(() => import("./SoberReport").then((m) => m.SoberReport));
+const AttenteSobre = dynamic(() => import("./SoberReport").then((m) => m.AttenteSobre));
 const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
 const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImageSheet").then((m) => m.PartageImageSheet), { ssr: false });
 
@@ -83,6 +83,14 @@ export function ReportScreen({
         {peut(payload.access, "chat") && phase.nom !== "ecriture" && <ChatBubble sobre />}
       </>
     );
+  /*
+   * Une alerte, le rapport doux pas encore écrit : son attente, sobre (ni le verdict et son emoji, ni « Partager », ni la
+   * pastille de l’écriture). Le rapport est relu toutes les 2 s (la phase `ecriture`) jusqu’au rapport doux
+   */
+  if (payload.alerte) {
+    const echec = phase.nom === "echec" ? phase.raison : phase.nom === "souffle" ? "souffle" : null;
+    return <AttenteSobre echec={echec ? <EchecEcriture raison={echec} sobre /> : undefined} />;
+  }
   return (
     <>
       <ReportBody payload={payload} phase={phase} story={story} openPaywall={openPaywall} />
@@ -92,7 +100,8 @@ export function ReportScreen({
 }
 
 function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPayload; phase: PhaseDuRapport; story: Story; openPaywall: boolean }) {
-  const router = useRouter();
+  /* Retour : la page d’avant ; ouvert d’ailleurs (le lien du mail, un retour du système), l’accueil */
+  const retourSinon = useRetourSinon("/app", { scroll: false });
   /* Du parcours, seul « qui est toi » sert ici : le reste ne re-rend pas tout le rapport */
   const journeyMe = useJourneyMe();
   const [paywall, setPaywall] = useState(openPaywall);
@@ -128,7 +137,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
    * « Partager en image » : chargée une fois la page posée, et montée fermée. Au premier toucher, elle n’a plus qu’à
    * s’ouvrir (montée au toucher, React gardait 0,3 s son écran d’attente avant de la montrer)
    */
-  useEffect(() => auRepos(() => void import("./Partage").then(() => setImageVue(true))), []);
+  useEffect(() => auRepos(() => void import("@/components/partage/PartageImageSheet").then(() => setImageVue(true))), []);
 
   const goTo = useCallback(
     (n: number) => {
@@ -181,12 +190,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
         /* Mobile : la barre reste en haut — le chapitre en cours, la progression, et le sommaire à un toucher */
         <header className="sticky top-0 z-30 shrink-0 bg-[rgba(244,242,237,0.88)] backdrop-blur-xl lg:hidden">
           <div className="grid h-[58px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 px-2">
-            <button
-              type="button"
-              aria-label="Retour"
-              onClick={() => (pagePrecedente() ? router.back() : router.push("/app", { scroll: false }))}
-              className="flex size-11 items-center justify-center"
-            >
+            <button type="button" aria-label="Retour" onClick={retourSinon} className="flex size-11 items-center justify-center">
               <Icon name="back" size={24} stroke={2.6} className="text-ink" />
             </button>
             <button type="button" onClick={() => setMenu(true)} aria-haspopup="dialog" className="flex min-w-0 flex-col items-center px-1 text-center">

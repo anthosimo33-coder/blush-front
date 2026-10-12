@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { FRAIS_DU_RENDU, invalidate, setQueryData } from "@/lib/query";
+import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
 import { changerDeConv, useCompte } from "@/lib/requetes";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
@@ -22,7 +22,7 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
-import { pagePrecedente } from "@/lib/navigation";
+import { useRetourSinon } from "@/lib/navigation";
 
 /* La feuille ouverte : ce que BLUSH garde, une suppression (l’histoire, tout), ou une déconnexion (cet appareil, partout) */
 type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
@@ -54,8 +54,9 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
   const plus = sub?.plan === "blushplus";
   const sons = useSoundsEnabled();
 
-  /* Ouvert directement (un lien, un nouvel onglet) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
-  const retour = () => (pagePrecedente() ? router.back() : versAccueil());
+  /* La page d’avant ; ouvert d’ailleurs (un lien, un nouvel onglet, un retour du système), l’accueil, comme versAccueil */
+  const retourSinon = useRetourSinon("/app", { scroll: false });
+  const retour = () => demarrer(retourSinon);
   const patch = (p: Partial<Account["subscription"]>) => account && setQueryData("account", { ...account, subscription: { ...account.subscription, ...p } });
 
   /* Un geste qui n’a pas abouti (réseau, serveur) : on le dit dans la feuille, et le bouton se libère pour réessayer */
@@ -209,7 +210,6 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
       </InsetGroup>
 
       {/* Se déconnecter : de cet appareil, ou de tous (un appareil perdu, prêté). Rien n’est effacé */}
-      {/* TODO(produit): « Ta connexion », ses lignes et son pied sont absents des maquettes, à valider */}
       <InsetGroup title="Ta connexion" id="connexion" className="mt-6" footer={RIEN_N_EST_EFFACE}>
         <InsetRow leading={<RowIcon icon="user" />} title="Se déconnecter" sub="Sur cet appareil" onClick={() => setConfirm("sortie")} chevron />
         <InsetRow
@@ -235,7 +235,7 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
 
-      {/* TODO(produit): panneaux de confirmation absents des maquettes, textes repris des libellés de l’écran (ceux de la déconnexion compris), à valider */}
+      {/* Les panneaux de confirmation, absents des maquettes : leurs textes reprennent les libellés de l’écran (validés) */}
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">
         {confirm === "keep" && (
           <>
@@ -266,10 +266,11 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
                 if (busy) return;
                 void run(confirm === "story" ? deleteStory : deleteAccount, () => {
                   resetJourney();
-                  invalidate("account", "report");
-                  /* Une autre conv reste : elle s’ouvre à la place */
-                  if (confirm === "story" && convs.length > 1) router.push("/app", { scroll: false });
-                  else router.push("/commencer");
+                  /*
+                   * Un chargement neuf, comme à la déconnexion : rien de l’histoire effacée ne reste en mémoire (le cache des
+                   * requêtes, les pages déjà chargées par le routeur). Une autre conv reste : elle s’ouvre à la place
+                   */
+                  window.location.assign(confirm === "story" && convs.length > 1 ? "/app" : "/commencer");
                 });
               }}
             >

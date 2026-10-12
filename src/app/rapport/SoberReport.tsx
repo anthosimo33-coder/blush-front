@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { setPaused } from "@/services/api";
 import { invalidate } from "@/lib/query";
+import { NBSP } from "@/lib/format";
 import { tracer } from "@/lib/tracer";
+import { LIBELLES_RAPPORT } from "@/contenu/rapport";
+import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
-import { pagePrecedente } from "@/lib/navigation";
+import { useRetourSinon } from "@/lib/navigation";
 
 /*
  * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH laisse la taquinerie de côté.
@@ -19,7 +22,7 @@ import { pagePrecedente } from "@/lib/navigation";
 /* « Quitter vite » et « OK, merci » mènent à l’écran 01, comme dans la maquette */
 const QUIT_HREF: Route = "/commencer";
 
-/* TODO(produit): ressources d’aide absentes des maquettes, à valider. */
+/* Les lignes d’écoute, absentes des maquettes (validées) */
 const HELP = [
   { name: "Fil Santé Jeunes", detail: "Anonyme et gratuit, tous les jours de 9 h à 23 h", tel: "0800235236", label: "0 800 235 236" },
   { name: "SOS Amitié", detail: "À l’écoute 24 h sur 24", tel: "0972394050", label: "09 72 39 40 50" },
@@ -46,48 +49,123 @@ function SoberLink({ children, onClick }: { children: string; onClick: () => voi
   );
 }
 
+/** En haut : « Retour » à gauche, « Quitter vite » toujours visible à droite. */
+function EnTeteSobre({ back }: { back: () => void }) {
+  return (
+    <header className="flex h-[60px] shrink-0 items-center justify-between px-4">
+      <button type="button" aria-label="Retour" onClick={back} className="-ml-2.5 flex size-11 items-center justify-center">
+        <Icon name="back" size={24} stroke={2.4} className="text-soft" />
+      </button>
+      <Link
+        href={QUIT_HREF}
+        replace
+        className="relative flex h-[38px] items-center rounded-[19px] px-3.5 text-note font-extrabold text-soft no-underline shadow-[inset_0_0_0_1.5px_#D6D2C8] after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']"
+      >
+        Quitter vite
+      </Link>
+    </header>
+  );
+}
+
+/** « Besoin d’en parler à quelqu’un ? » : les lignes d’écoute, à appeler d’un toucher. */
+function FeuilleAide({ open, onClose, titre }: { open: boolean; onClose: () => void; titre: string }) {
+  return (
+    <Sheet open={open} onClose={onClose} labelledBy="help-title" belowHeader={false}>
+      <h2 id="help-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
+        {titre}
+      </h2>
+      <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+        {HELP.map((h) => (
+          <li key={h.name}>
+            <a href={`tel:${h.tel}`} className="flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]">
+              <span className="text-corps font-black">
+                {h.name} · {h.label}
+              </span>
+              <span className="text-legende font-extrabold text-grey">{h.detail}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <SoberButton onClick={onClose}>Fermer</SoberButton>
+    </Sheet>
+  );
+}
+
+/**
+ * L’attente du rapport doux : le verdict a levé une alerte (`ReportPayload.alerte`), le rapport sobre s’écrit encore.
+ * Ni scène, ni score, ni partage, ni pastille de l’écriture : quelques mots, l’aide déjà à un toucher, et le rapport
+ * doux dès qu’il est là (le rapport continue d’être relu, ReportScreen). `echec` : l’écriture a échoué (EchecEcriture,
+ * qui se relance), à la place de l’attente.
+ * TODO(produit): les deux phrases de l’attente sobre, absentes des maquettes, à valider.
+ */
+export function AttenteSobre({ echec }: { echec?: ReactNode }) {
+  const back = useRetourSinon("/app", { scroll: false });
+  const [help, setHelp] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+  return (
+    <div className="flex min-h-dvh justify-center bg-paper">
+      <div className="flex w-full flex-col md:max-w-[560px] lg:max-w-[620px] lg:py-10">
+        <EnTeteSobre back={back} />
+        <main className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col gap-3.5 px-[26px] pt-1 lg:flex-none lg:px-0 lg:pt-0">
+            <div className="flex-1 lg:flex-none" />
+            <h1 ref={titleRef} tabIndex={-1} className="m-0 text-titre-1 font-black leading-[1.08] tracking-[-0.02em] outline-none">
+              {echec ? "Ton rapport" : "Ton rapport arrive."}
+            </h1>
+            {echec ?? (
+              <p role="status" className="m-0 text-accent font-bold leading-[1.45] text-soft">
+                BLUSH l’écrit au calme. Il est court, et il t’aide à y voir clair.
+              </p>
+            )}
+            <div className="flex-1 lg:flex-none" />
+          </div>
+          <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
+            <SoberLink onClick={() => setHelp(true)}>{LIBELLES_RAPPORT.aide}</SoberLink>
+          </div>
+        </main>
+      </div>
+      <FeuilleAide open={help} onClose={() => setHelp(false)} titre={LIBELLES_RAPPORT.aide} />
+    </div>
+  );
+}
+
 /** `vocal` : le vocal doux de BLUSH, au-dessus de la nouvelle (src/app/rapport/Vocal.tsx). */
 export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNode }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [help, setHelp] = useState(false);
+  const [pauseRatee, setPauseRatee] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     titleRef.current?.focus();
   }, [step]);
 
-  /* La pause enregistrée, Mon compte la montre ; ratée (réseau), on reste ici : le geste se refait */
+  /* La pause enregistrée, Mon compte la montre ; ratée (réseau), on reste ici et on le dit : le geste se refait */
   const mettreEnPause = async () => {
+    setPauseRatee(false);
     try {
       await setPaused(true);
     } catch (e) {
       tracer("sobre:pause", e);
+      setPauseRatee(true);
       return;
     }
     invalidate("account");
     router.push("/compte");
   };
 
-  /* Ouvert directement (le lien du mail) : pas de page d’avant dans l’appli, le retour mène à l’accueil */
-  const back = () => (step === 2 ? setStep(1) : pagePrecedente() ? router.back() : router.push("/app", { scroll: false }));
+  /* L’étape 2 revient à la 1 ; sinon la page d’avant, ou l’accueil quand on arrive d’ailleurs (le lien du mail) */
+  const retourSinon = useRetourSinon("/app", { scroll: false });
+  const back = () => (step === 2 ? setStep(1) : retourSinon());
 
   return (
     <div className="flex min-h-dvh justify-center bg-paper">
       <div className="flex w-full flex-col md:max-w-[560px] lg:max-w-[620px] lg:py-10">
-        {/* Retour à gauche, « Quitter vite » toujours visible à droite */}
-        <header className="flex h-[60px] shrink-0 items-center justify-between px-4">
-          <button type="button" aria-label="Retour" onClick={back} className="-ml-2.5 flex size-11 items-center justify-center">
-            <Icon name="back" size={24} stroke={2.4} className="text-soft" />
-          </button>
-          <Link
-            href={QUIT_HREF}
-            replace
-            className="relative flex h-[38px] items-center rounded-[19px] px-3.5 text-note font-extrabold text-soft no-underline shadow-[inset_0_0_0_1.5px_#D6D2C8] after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']"
-          >
-            Quitter vite
-          </Link>
-        </header>
+        <EnTeteSobre back={back} />
         <main className="flex flex-1 flex-col">
           {step === 1 ? (
             <>
@@ -131,30 +209,14 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
                 <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
                 <SoberLink onClick={() => void mettreEnPause()}>Mettre mon abonnement en pause</SoberLink>
+                {pauseRatee && <Alert className="text-center">Pas enregistré{NBSP}: vérifie ta connexion et réessaie.</Alert>}
               </div>
             </>
           )}
         </main>
       </div>
 
-      <Sheet open={help} onClose={() => setHelp(false)} labelledBy="help-title" belowHeader={false}>
-        <h2 id="help-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
-          {data.helpLabel}
-        </h2>
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-          {HELP.map((h) => (
-            <li key={h.name}>
-              <a href={`tel:${h.tel}`} className="flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]">
-                <span className="text-corps font-black">
-                  {h.name} · {h.label}
-                </span>
-                <span className="text-legende font-extrabold text-grey">{h.detail}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-        <SoberButton onClick={() => setHelp(false)}>Fermer</SoberButton>
-      </Sheet>
+      <FeuilleAide open={help} onClose={() => setHelp(false)} titre={data.helpLabel} />
     </div>
   );
 }

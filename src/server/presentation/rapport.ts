@@ -128,9 +128,10 @@ function vocalAffiche(v: VocalLu, verdict: Verdict, taches: EtatTaches, voix: bo
  * Le rapport tel que l’affiche le front, assemblé d’après ce qui est lu (rapportDe), sans rien lire, écrire ni
  * planifier. Sans accès : le chapitre offert (le verdict, src/contenu/chapitres.ts) et les chapitres payants,
  * verrouillés, vides, sous leurs titres d’attente : ni le plan ni les chapitres finis ne servent, même si la lecture
- * en apportait. Le mode sobre (une alerte) ouvre sans accès sa partie sobre, et elle seule (S-25).
+ * en apportait. Le mode sobre (une alerte) ouvre sans accès sa partie sobre, et elle seule (S-25) ; `alerte` le dit
+ * dès le verdict, avant que cette partie soit écrite.
  */
-export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: boolean } {
+export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: boolean; alerte: boolean } {
   const { access, autre, donnees, taches } = lu;
   const { sortie, scores } = lu.verdict;
   const { entier, ouvert } = ouvertureDu(access, sortie);
@@ -184,6 +185,8 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
       readingTime: donnees?.lecture ?? { free: "1 min", full: "9 min" },
     },
     sober: ouvert ? (donnees?.sobre ?? null) : null,
+    /* Su dès le verdict : la scène du verdict et le rapport joueur ne se montrent pas, même avant le rapport doux */
+    alerte: sortie.mode_sobre,
     access,
     /* Le rapport s’écrit (accès débloqué, pas encore fini) : le front affiche l’attente, et où en est l’écriture */
     generating: ouvert && !donnees && !echec,
