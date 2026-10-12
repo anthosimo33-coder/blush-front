@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CONDITIONS, PARTIES_CONDITIONS } from "@/contenu/conditions";
 import { CASE_IMPORT, CASE_RENONCIATION, texteCaseImport } from "@/contenu/consentements";
 import { CHAMPS_EDITEUR, EDITEUR, HEBERGEUR, MENTIONS } from "@/contenu/mentions-legales";
-import { champsEditeurManquants, consentementImport, editeurComplet } from "@/server/juridique";
+import { champsEditeurManquants, consentementImport, editeurComplet, renonciationPaiement } from "@/server/juridique";
 
 /*
  * Le juridique, sans base : l’accord de l’import (sa version), l’identité de l’éditeur (complète ou non), et ce que les
@@ -16,6 +16,12 @@ describe("l’accord de l’import", () => {
     const maintenant = new Date("2026-10-12T10:00:00Z");
     expect(consentementImport(CASE_IMPORT.version, maintenant)).toEqual({ version: CASE_IMPORT.version, le: maintenant });
     for (const autre of [null, undefined, "", "2020-01-01", "on", "true", CASE_IMPORT.version + " ", 1]) expect(consentementImport(autre)).toBeNull();
+  });
+
+  it("la renonciation du paiement : la case cochée (true) seule, gardée avec la version d’aujourd’hui de son texte et l’heure", () => {
+    const maintenant = new Date("2026-10-12T10:00:00Z");
+    expect(renonciationPaiement(true, maintenant)).toEqual({ version: CASE_RENONCIATION.version, le: maintenant });
+    for (const autre of [false, null, undefined, "true", 1]) expect(renonciationPaiement(autre)).toBeNull();
   });
 
   it("un texte changé change sa version (le serveur refuse alors une case cochée sous l’ancien texte)", () => {

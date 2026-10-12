@@ -1,5 +1,5 @@
 import "server-only";
-import { CASE_IMPORT } from "@/contenu/consentements";
+import { CASE_IMPORT, CASE_RENONCIATION } from "@/contenu/consentements";
 import { CHAMPS_EDITEUR, EDITEUR } from "@/contenu/mentions-legales";
 
 /*
@@ -18,6 +18,15 @@ export type Consentement = { version: string; le: Date };
  */
 export function consentementImport(valeur: unknown, maintenant = new Date()): Consentement | null {
   return valeur === CASE_IMPORT.version ? { version: CASE_IMPORT.version, le: maintenant } : null;
+}
+
+/**
+ * La renonciation au droit de rétractation que porte une commande (POST /api/paiement : la case cochée, `true`), ou
+ * null sans elle. Gardée avec l’achat (achats.renonciation_le et renonciation_version) : la version du texte
+ * d’aujourd’hui, et l’heure où le serveur l’a reçue.
+ */
+export function renonciationPaiement(valeur: unknown, maintenant = new Date()): Consentement | null {
+  return valeur === true ? { version: CASE_RENONCIATION.version, le: maintenant } : null;
 }
 
 /** Les champs de l’identité de l’éditeur encore vides (src/contenu/mentions-legales.ts, EDITEUR), dans l’ordre de la page. */

@@ -49,6 +49,7 @@ vi.mock("@/server/paiement/fournisseur", async () => {
 });
 
 import { POST as commencer } from "@/app/api/paiement/route";
+import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { GET as lireEtat } from "@/app/api/paiement/[achat]/route";
 import { POST as fauxWhop } from "@/app/api/paiement/factice/route";
 import { POST as offre } from "@/app/api/paiement/offre/route";
@@ -139,6 +140,15 @@ describe("commencer un paiement (POST /api/paiement)", () => {
     etat.mode = null;
     expect(await payer({ offre: "rapport", renonciation: true })).toEqual({ status: 402, corps: { erreur: "bientot" } });
     expect(await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).toEqual([]);
+  });
+
+  it("la renonciation au droit de rétractation est gardée avec l’achat : la version du texte coché, et l’heure où le serveur l’a reçue", async () => {
+    await acheteur("paie-renonciation");
+    const avant = Date.now();
+    const { corps } = await payer({ offre: "rapport", renonciation: true });
+    const achat = await achatEnBase(corps.achat);
+    expect(achat.renonciationVersion).toBe(CASE_RENONCIATION.version);
+    expect(achat.renonciationLe!.getTime()).toBeGreaterThanOrEqual(avant - 1000);
   });
 
   it("le faux Whop : l’achat en attente au prix du catalogue, pour la conv de la page, et sa page de paiement locale", async () => {

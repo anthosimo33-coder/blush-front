@@ -378,6 +378,12 @@ export const achats = pgTable(
     payeLe: quand("paye_le"),
     /** Remboursé, contesté ou échoué : l’heure. */
     annuleLe: quand("annule_le"),
+    /**
+     * La renonciation au droit de rétractation (la case du paiement, CASE_RENONCIATION, src/contenu/consentements.ts) :
+     * l’heure où le serveur l’a reçue, et la version du texte coché. La preuve qu’il a demandé son contenu tout de suite.
+     */
+    renonciationLe: quand("renonciation_le"),
+    renonciationVersion: text("renonciation_version"),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
 );

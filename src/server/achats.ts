@@ -9,6 +9,7 @@ import { db, schema } from "./db";
 import type { FournisseurPaiement } from "./db/enums";
 import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
+import type { Consentement } from "./juridique";
 import { offreValable } from "./offres-uniques";
 import { reparerLaChaine } from "./pipeline";
 
@@ -32,12 +33,13 @@ export type RefusDeCommande = "aucune" | "deja" | "offre";
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
  * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable. Rend l’achat, ou le refus.
+ * montré et valable. `renonciation` : la case du paiement cochée (renonciationPaiement), gardée avec l’achat. Rend
+ * l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
   offre: OffreId,
-  { storyId = null, fournisseur }: { storyId?: string | null; fournisseur: FournisseurPaiement },
+  { storyId = null, fournisseur, renonciation = null }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement | null },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
   if (c.conv) {
@@ -72,6 +74,8 @@ export async function commander(
       bulles: bullesDe(offre, { premiereRecharge: premiere }),
       offreUnique: c.unique ?? (premiere ? "premiere_recharge" : null),
       fournisseur,
+      renonciationLe: renonciation?.le ?? null,
+      renonciationVersion: renonciation?.version ?? null,
     })
     .returning();
   return achat!;
