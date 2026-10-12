@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { OFFRE_SUITE } from "@/contenu/paiement";
 import { codeDe } from "@/lib/messages-erreur";
-import { partirPayer } from "@/lib/paiement";
+import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { Sheet } from "@/components/ui/surfaces";
@@ -33,6 +33,7 @@ export function OffreSuite({ fin, onClose, suite }: { fin: string; onClose: () =
   const [renonce, setRenonce] = useState(false);
   const [manque, setManque] = useState(false);
   const [occupe, setOccupe] = useState(false);
+  useLibererAuRetour(useCallback(() => setOccupe(false), []));
   const [souci, setSouci] = useState(false);
   const reste = Math.max(0, finMs - maintenant);
   const ouverte = !fermee && reste > 0;

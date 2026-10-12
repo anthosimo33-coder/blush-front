@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { commencerPaiement } from "@/services/api";
 import type { OffreId } from "@/types";
 import { ecrire, lire } from "./stockage";
@@ -33,4 +34,19 @@ export async function partirPayer(
   /* La page de Whop est un autre site : une vraie navigation ; le faux Whop et le retour sont des pages de l’appli */
   if (url && /^https?:\/\//.test(url)) window.location.assign(url);
   else aller(url ?? `/paiement/retour?achat=${achat}`);
+}
+
+/**
+ * Libère le bouton qui est parti payer quand on revient de chez Whop par « Retour » : le navigateur rend alors la page
+ * telle qu’il l’avait gardée (le cache des pages, « bfcache », surtout sur iPhone), bouton occupé compris, sans rien
+ * recharger. Seul l’événement pageshow le dit (`persisted`).
+ */
+export function useLibererAuRetour(liberer: () => void): void {
+  useEffect(() => {
+    const retour = (e: PageTransitionEvent) => {
+      if (e.persisted) liberer();
+    };
+    window.addEventListener("pageshow", retour);
+    return () => window.removeEventListener("pageshow", retour);
+  }, [liberer]);
 }

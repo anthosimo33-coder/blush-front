@@ -2,12 +2,12 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { prixDe } from "@/contenu/offres";
 import { OFFRE_PREMIUM_AJOUT } from "@/contenu/paiement";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
-import { partirPayer } from "@/lib/paiement";
+import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
 import { apresDeblocage } from "@/lib/requetes";
 import { useSoundOnce } from "@/lib/sound";
 import { proposerOffreUnique } from "@/services/api";
@@ -36,6 +36,7 @@ function OffrePremiumAjout({ enUnGeste, ici, fermer }: { enUnGeste: boolean; ici
   const [renonce, setRenonce] = useState(false);
   const [manque, setManque] = useState(false);
   const [occupe, setOccupe] = useState(false);
+  useLibererAuRetour(useCallback(() => setOccupe(false), []));
   const [souci, setSouci] = useState(false);
   const prendre = async () => {
     if (!renonce) return setManque(true);

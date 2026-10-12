@@ -124,7 +124,8 @@ export async function commencerPaiement(compte: Compte, offre: OffreId, storyId:
 const ENCAISSE = new Set(["paid", "succeeded"]);
 
 /**
- * Où en est l’achat de ce compte (null : pas le sien). Encore en attente, avec le paiement que Whop a donné au retour
+ * Où en est l’achat de ce compte (null : pas le sien). Encore en attente (ou échoué : une première carte refusée, puis
+ * une autre acceptée sur la même page de Whop, avant son webhook), avec le paiement que Whop a donné au retour
  * (`paiementId`) : vérifié chez Whop (quelques fois par achat au plus, verificationParAchat), et livré s’il est encaissé,
  * pour cet achat, au bon montant (livrerLePaiement, comme le webhook). Le faux Whop n’a rien à vérifier : son webhook
  * part avant le retour.
@@ -134,7 +135,7 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
   if (!achat) return null;
   const f = fournisseur();
   if (
-    achat.statut === "en_attente" &&
+    (achat.statut === "en_attente" || achat.statut === "echoue") &&
     paiementId &&
     f?.mode === "whop" &&
     achat.fournisseur === "whop" &&

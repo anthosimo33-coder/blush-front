@@ -2,10 +2,10 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useCallback, useId, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
-import { partirPayer } from "@/lib/paiement";
+import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
 import { proposerOffreUnique } from "@/services/api";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE, OFFERS, PAYWALL } from "@/contenu/offres";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +52,8 @@ export function PaywallSheet({
   const [selected, setSelected] = useState<Formule>(FORMULE_CHOISIE);
   const titre = useId();
   const [busy, setBusy] = useState(false);
+  /* Revenu de chez Whop par « Retour » sans payer : le bouton se libère */
+  useLibererAuRetour(useCallback(() => setBusy(false), []));
   /* Le faux Whop (une page de l’appli) : le bouton reste occupé jusqu’à son arrivée */
   const [navigue, demarrer] = useTransition();
   const occupe = busy || navigue;

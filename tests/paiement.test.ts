@@ -457,6 +457,22 @@ describe("le retour (GET /api/paiement/[achat])", () => {
     expect((await etatDe(corps.achat, "pay_r")).corps.statut).toBe("paye");
     expect(await soldeDe(u.id)).toBe(10);
   });
+
+  it("une première carte refusée (l’achat échoué), une autre acceptée sur la même page de Whop : le retour le vérifie et le livre, sans attendre le webhook", async () => {
+    const { u, conv } = await acheteur("retour-seconde-carte");
+    etat.mode = "whop";
+    let achat = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => (url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_s" }) : Response.json(paiementDeWhop(achat, "pay_s2")))),
+    );
+    achat = (await payer({ offre: "rapport", renonciation: true })).corps.achat;
+    expect((await poster(signeWhop("payment.failed", { ...paiementDeWhop(achat, "pay_s1"), status: "failed" }))).status).toBe(200);
+    expect((await etatDe(achat)).corps.statut).toBe("echoue");
+    expect((await etatDe(achat, "pay_s2")).corps.statut).toBe("paye");
+    expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
+    expect(await soldeDe(u.id)).toBe(10);
+  });
 });
 
 describe("les offres uniques et le paiement en un geste", () => {
