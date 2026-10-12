@@ -63,7 +63,7 @@ describe("le compteur de bulles", () => {
 
   it("l’équipe : illimitées", () => {
     render(<CompteurBulles bulles={null} ouvrir={() => {}} />);
-    expect(screen.getByRole("button", { name: "Tes bulles\u00a0: illimitées" }).textContent).toBe("illimitées");
+    expect(screen.getByRole("button", { name: "Tes bulles\u00a0: illimitées" }).textContent).toBe("∞");
   });
 });
 

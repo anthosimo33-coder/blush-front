@@ -51,6 +51,8 @@ export const RECHARGE = {
   /** Le nom du choix des packs, pour un lecteur d’écran. */
   choix: "Ton pack",
   payer: (prix: string) => `Payer · ${prix}`,
+  /** Le bouton, pour un lecteur d’écran, pendant qu’on part payer. */
+  enCours: "Paiement en cours",
   /** Le pied du paiement, comme celui de la feuille « Ta formule » : la promesse en gras, puis les moyens. */
   pied: { fort: "Paiement unique, pas d’abonnement", reste: " · Apple Pay ou carte" },
   /** Sans paiement branché (ni Whop, ni le faux Whop) : les mots de la feuille « Ta formule ». */

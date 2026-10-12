@@ -654,7 +654,7 @@ export const STATES = [
     compte: "equipe",
     ref: "13-accueil",
     note: "L’accueil est le chat avec BLUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, BLUSH en grand comme un personnage\u00a0: un toucher ouvre «\u00a0Ce que BLUSH voit\u00a0». À droite, Maëlys comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. Au-dessus du champ, les questions toutes prêtes (celles de sa mémoire), en un toucher.",
-    changement: "Le compteur de bulles, à côté du bouton du compte\u00a0: «\u00a0illimitées\u00a0» pour l’équipe (un compte qui paie\u00a0: 13k à 13o).",
+    changement: "Le compteur de bulles, à côté du bouton du compte\u00a0: «\u00a0∞\u00a0» pour l’équipe (illimitées\u00a0; un compte qui paie\u00a0: 13k à 13o).",
   },
   {
     id: "13b",

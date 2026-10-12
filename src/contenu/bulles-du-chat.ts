@@ -13,8 +13,11 @@ export const SEUIL_PEU_DE_BULLES = 5;
 /** Le compteur de bulles (CompteurBulles) : son nom pour un lecteur d’écran, et l’équipe, aux bulles illimitées. */
 export const COMPTEUR = {
   nom: (bulles: number) => `Tes bulles\u00a0: ${bulles}`,
-  /** TODO(produit): le texte de l’équipe (« illimitées »), sans maquette. */
-  illimitees: "illimitées",
+  /**
+   * L’équipe, à l’œil : « ∞ » (le mot « illimitées » décentrait le logo de BLUSH, et sur 375 px le touchait) ; son nom,
+   * pour un lecteur d’écran, le dit en toutes lettres. TODO(produit): le texte de l’équipe, sans maquette.
+   */
+  illimitees: "∞",
   nomIllimitees: "Tes bulles\u00a0: illimitées",
 };
 
