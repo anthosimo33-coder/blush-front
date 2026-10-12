@@ -168,8 +168,8 @@ describe("la feuille « Ta formule »", () => {
 
   it("fermée sans payer (Échap) : l’offre ① monte une fois la feuille redescendue, à l’heure de fin du serveur", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "Date"] });
-    const fin = new Date(Date.now() + 4 * 60_000 + 30_000).toISOString();
-    proposer.mockResolvedValue({ offre: "suite", fin, enUnGeste: false });
+    const reste = 4 * 60_000 + 30_000;
+    proposer.mockResolvedValue({ offre: "suite", fin: new Date(Date.now() + reste).toISOString(), reste, enUnGeste: false });
     const onClose = vi.fn();
     render(<FeuilleFormule open onClose={onClose} autre="Maëlys" />);
     fireEvent(feuille(), new Event("cancel", { cancelable: true }));
@@ -180,6 +180,23 @@ describe("la feuille « Ta formule »", () => {
     await act(async () => void vi.advanceTimersByTime(500));
     const offre = screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
     expect(within(offre).getByRole("timer", { name: OFFRE_SUITE.fin }).textContent).toBe("04:30");
+  });
+
+  it("l’horloge du téléphone en avance (ou en retard) sur le serveur : le compte à rebours part du temps qu’il reste au serveur", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "Date"] });
+    const reste = 4 * 60_000 + 30_000;
+    for (const ecart of [10 * 60_000, -10 * 60_000]) {
+      /* L’heure de fin du serveur, lue à l’horloge du serveur : le téléphone a `ecart` d’avance */
+      const fin = new Date(Date.now() - ecart + reste).toISOString();
+      proposer.mockResolvedValue({ offre: "suite", fin, reste, enUnGeste: false });
+      const { unmount } = render(<FeuilleFormule open onClose={() => {}} autre="Maëlys" />);
+      fireEvent(feuille(), new Event("cancel", { cancelable: true }));
+      await promesses();
+      await act(async () => void vi.advanceTimersByTime(500));
+      const offre = screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
+      expect(within(offre).getByRole("timer", { name: OFFRE_SUITE.fin }).textContent, `écart ${ecart}`).toBe("04:30");
+      unmount();
+    }
   });
 
   it("fermée là où la fermer quitte la page : pas d’offre ①", async () => {
@@ -194,7 +211,7 @@ describe("l’offre ① et son compte à rebours", () => {
   const offre = () => screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
   const ouvrir = (resteMs: number, props: Partial<Parameters<typeof OffreAvantDePartir>[0]> = {}) => {
     const rappels = { onRefus: vi.fn(), onPassee: vi.fn(), onClosed: vi.fn() };
-    render(<OffreAvantDePartir fin={new Date(Date.now() + resteMs).toISOString()} chapitres={7} {...rappels} {...props} />);
+    render(<OffreAvantDePartir fin={Date.now() + resteMs} chapitres={7} {...rappels} {...props} />);
     return rappels;
   };
 
@@ -344,7 +361,7 @@ describe("« C’est débloqué »", () => {
   const debloque = (offre: "rapport" | "premium") => render(<EcranDebloque achat="a1" offre={offre} bulles={10} next={null} restants={7} total={8} reprise={2} />);
 
   it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : la case, « Ta carte est enregistrée » en un geste", async () => {
-    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, enUnGeste: true });
+    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
     debloque("rapport");
     /* Tant que le serveur n’a pas répondu, ni la liste ni l’offre : rien ne se remplace sous les yeux */
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();
@@ -364,8 +381,23 @@ describe("« C’est débloqué »", () => {
     expect(routeur.push).toHaveBeenCalledWith("/rapport#chapitre-2", { scroll: true });
   });
 
+  it("l’offre ③ que le serveur ne vend plus (prise dans un autre onglet, 422 « offre ») : elle s’efface, la liste revient, sans « souci »", async () => {
+    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+    commencer.mockRejectedValueOnce(new ErreurApi("offre", 422));
+    debloque("rapport");
+    await promesses();
+    const offre = screen.getByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre });
+    fireEvent.click(within(offre).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles }));
+    fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre }));
+    await promesses();
+    expect(screen.queryByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre })).toBeNull();
+    expect(screen.queryByText(OFFRE_PREMIUM_AJOUT.souci)).toBeNull();
+    expect(screen.getByText(DEBLOQUE.restants(7))).toBeTruthy();
+    expect(screen.getByRole("link", { name: DEBLOQUE.lire }).getAttribute("href")).toBe("/rapport#chapitre-2");
+  });
+
   it("sans moyen de paiement gardé, l’offre ③ ne promet pas un geste", async () => {
-    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, enUnGeste: false });
+    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: false });
     debloque("rapport");
     await promesses();
     expect(screen.queryByText(tel(OFFRE_PREMIUM_AJOUT.carte))).toBeNull();

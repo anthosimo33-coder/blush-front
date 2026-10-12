@@ -510,6 +510,11 @@ describe("les offres uniques et le paiement en un geste", () => {
     const reste = Date.parse((m as { fin: string }).fin) - Date.now();
     expect(reste).toBeGreaterThan(4 * 60_000);
     expect(reste).toBeLessThanOrEqual(5 * 60_000);
+    /* Le temps qu’il lui reste, à l’heure du serveur : le compte à rebours de l’écran en part (pas de l’horloge du téléphone) */
+    const dit = (m as { reste: number }).reste;
+    expect(dit).toBeGreaterThan(4 * 60_000);
+    expect(dit).toBeLessThanOrEqual(5 * 60_000);
+    expect(Math.abs(dit - reste)).toBeLessThan(5_000);
     const { status, corps } = await payer({ offre: "suite", renonciation: CASE_RENONCIATION.version });
     expect(status).toBe(200);
     expect(await achatEnBase(corps.achat)).toMatchObject({ offre: "suite", centimes: 690, bulles: 10 });
@@ -519,7 +524,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     const { u } = await acheteur("offre-ajout");
     expect(await montrer("premium_ajout")).toEqual({ offre: null });
     await rapportPaye();
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, enUnGeste: true });
+    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
     const { status, corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, null, null]);
     expect((await achatEnBase(corps.achat)).statut).toBe("en_attente");
@@ -546,7 +551,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     );
     const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_g1")))).status).toBe(200);
-    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, enUnGeste: true });
+    expect(await montrer("premium_ajout")).toEqual({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
     appels.length = 0;
 
     /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, l’achat échoue (son webhook le livrerait quand même) */

@@ -159,8 +159,12 @@ export function FeuilleFormule({
   const [bulle, setBulle] = useState(false);
   /* Le rapport déjà payé dans un autre onglet (409 « deja ») : relu, la feuille se ferme d’elle-même */
   const paiement = usePaiement({ suite, quand: { deja: onClose } });
-  /* L’offre ① montrée par le serveur : l’heure de fin de son compte à rebours ; puis, passée, son toast */
-  const [offre, setOffre] = useState<string | null>(null);
+  /*
+   * L’offre ① montrée par le serveur : l’heure de fin de son compte à rebours, à l’horloge du téléphone (le temps qu’il
+   * lui reste à l’heure du serveur, compté d’ici : une horloge en avance ne la fait pas passer avant l’heure) ; puis,
+   * passée, son toast
+   */
+  const [offre, setOffre] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
   const vivant = useRef(true);
   useEffect(() => {
@@ -182,9 +186,10 @@ export function FeuilleFormule({
     const descendue = new Promise((ok) => setTimeout(ok, APRES_LA_FEUILLE_MS));
     proposerOffreUnique("suite").then(
       async (o) => {
-        if (o.offre !== "suite" || !o.fin) return;
+        if (o.offre !== "suite" || o.reste === null) return;
+        const fin = Date.now() + o.reste;
         await descendue;
-        if (vivant.current) setOffre(o.fin);
+        if (vivant.current) setOffre(fin);
       },
       () => {},
     );

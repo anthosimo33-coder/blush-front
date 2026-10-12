@@ -86,9 +86,11 @@ export type EtatAchat = { achat: string; offre: OffreId; statut: StatutAchat; bu
 
 /**
  * Une offre unique montrée (POST /api/paiement/offre) : laquelle, jusqu’à quand (une date ISO, l’heure de fin du compte
- * à rebours de ①, ou null : sans fin), et si elle se paie en un geste (un moyen de paiement gardé) ; ou aucune.
+ * à rebours de ①, ou null : sans fin), le temps qu’il lui reste à l’heure du serveur (en millisecondes, ou null : sans
+ * fin), et si elle se paie en un geste (un moyen de paiement gardé) ; ou aucune. Le compte à rebours part de `reste`,
+ * pas de `fin` : l’horloge du téléphone peut avancer ou retarder sur celle du serveur.
  */
-export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; enUnGeste: boolean } | { offre: null };
+export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; reste: number | null; enUnGeste: boolean } | { offre: null };
 
 /** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };

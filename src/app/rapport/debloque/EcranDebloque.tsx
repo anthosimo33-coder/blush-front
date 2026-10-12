@@ -29,11 +29,12 @@ const PERLES_RECUES = 5;
  * L’offre unique ③ (le prototype des bulles) : Premium pour 5 € de plus, juste après le rapport seul, une seule fois. Le
  * serveur décide de la montrer (POST /api/paiement/offre) ; « Ta carte est enregistrée » quand elle se paie en un geste
  * (le serveur paie alors sans page de paiement), sinon par la page de paiement de Whop. Payée, on revient ici (`ici`), les
- * 80 bulles en plus. « Non merci, je lis la suite » : la lecture reprend (`lire`).
+ * 80 bulles en plus. « Non merci, je lis la suite » : la lecture reprend (`lire`). Le serveur qui ne la vend plus (prise
+ * dans un autre onglet : 422 « offre ») : elle s’efface (`passee`), sans parler d’un souci de connexion.
  */
-function OffrePremiumAjout({ bulles, enUnGeste, ici, lire }: { bulles: number; enUnGeste: boolean; ici: string; lire: () => void }) {
+function OffrePremiumAjout({ bulles, enUnGeste, ici, lire, passee }: { bulles: number; enUnGeste: boolean; ici: string; lire: () => void; passee: () => void }) {
   const titre = useId();
-  const paiement = usePaiement({ suite: ici });
+  const paiement = usePaiement({ suite: ici, quand: { offre: passee } });
   return (
     <section
       aria-labelledby={titre}
@@ -182,7 +183,7 @@ export function EcranDebloque({
             </InsetGroup>
           </div>
         )}
-        {ajout && <OffrePremiumAjout bulles={bulles} enUnGeste={ajout.enUnGeste} ici={ici} lire={() => router.push(suite as Route, { scroll })} />}
+        {ajout && <OffrePremiumAjout bulles={bulles} enUnGeste={ajout.enUnGeste} ici={ici} lire={() => router.push(suite as Route, { scroll })} passee={() => setAjout(null)} />}
       </div>
     </Screen>
   );

@@ -156,7 +156,8 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
  * 5 € de plus, après un rapport payé (le rapport seul, ou la suite). Jamais sans prestataire (rien ne s’achèterait), ni à
- * l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est enregistrée »).
+ * l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est enregistrée »). `reste` : le temps qu’il reste
+ * à ① à l’heure du serveur, d’où part le compte à rebours de l’écran (l’horloge du téléphone peut être fausse).
  */
 export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null): Promise<OffreUniqueMontree> {
   const f = fournisseur();
@@ -179,7 +180,9 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;
-  return { offre, fin: montree.expireLe?.toISOString() ?? null, enUnGeste: offre === "premium_ajout" && !!(await moyenGarde(compte.id, f.mode)) };
+  const enUnGesteGarde = offre === "premium_ajout" && !!(await moyenGarde(compte.id, f.mode));
+  const fin = montree.expireLe;
+  return { offre, fin: fin?.toISOString() ?? null, reste: fin ? Math.max(0, fin.getTime() - Date.now()) : null, enUnGeste: enUnGesteGarde };
 }
 
 /** Ce que le faux Whop fait d’un achat de ce compte : le webhook à poster, et l’adresse du retour (null pour un remboursement). */

@@ -25,8 +25,9 @@ const PAS_MS = 250;
 
 /**
  * L’offre unique ① (le prototype des bulles) : la feuille « Ta formule » fermée sans payer, la suite moins chère, une
- * seule fois, pendant 5 minutes. BLUSH la lance (« attends… »), le compte à rebours se vide sous tes yeux : il lit l’heure
- * de fin donnée par le serveur (`fin`, POST /api/paiement/offre), une page rechargée retrouve donc le même. Passée, elle
+ * seule fois, pendant 5 minutes. BLUSH la lance (« attends… »), le compte à rebours se vide sous tes yeux : `fin`, l’heure
+ * de fin à l’horloge du téléphone, tirée du temps qu’il lui reste à l’heure du serveur (POST /api/paiement/offre, `reste`) ;
+ * une page rechargée retrouve donc le même, et une horloge fausse ne l’avance ni ne le retarde. Passée, elle
  * se ferme pour de bon (`onPassee` : l’écran le dit). Fermée par « Non merci », le voile ou Échap : `onRefus`.
  * `onClosed` : sa sortie finie. `chapitres` : ceux qu’elle ouvre ; `suite` : où reprendre après le paiement.
  * TODO(produit): une réduction, ou un ajout (+20 bulles) ? (la question du prototype)
@@ -40,7 +41,7 @@ export function OffreAvantDePartir({
   onPassee,
   onClosed,
 }: {
-  fin: string;
+  fin: number;
   chapitres: number;
   suite?: string;
   belowHeader?: boolean;
@@ -50,12 +51,11 @@ export function OffreAvantDePartir({
 }) {
   const titre = useId();
   const idFin = useId();
-  const finMs = Date.parse(fin);
   const [maintenant, setMaintenant] = useState(() => Date.now());
   /* Fermée par « Non merci », le voile ou Échap ; passée (le compte à rebours à zéro, ou le serveur qui ne la vend plus) */
   const [fermee, setFermee] = useState(false);
   const [vendue, setVendue] = useState(true);
-  const reste = vendue ? Math.max(0, finMs - maintenant) : 0;
+  const reste = vendue ? Math.max(0, fin - maintenant) : 0;
   const ouverte = !fermee && reste > 0;
   /* Passée sous nos yeux : l’écran le dit, une fois */
   const dite = useRef(false);
