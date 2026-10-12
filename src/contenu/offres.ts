@@ -54,7 +54,7 @@ export const ECART_OFFRES_UNIQUES_MS = 24 * 3600 * 1000;
  */
 export const COUT_EN_BULLES = { reponse: 1, vocal: 2, ajout: 3 } as const;
 
-/** Les bulles données aux testeurs de la bêta (users.plan « rapport » ou BLUSH d’avant le paiement), une fois. */
+/** Les bulles données aux testeurs de la bêta (users.plan « rapport », ou l’ancien accès au chat), une fois. */
 export const BULLES_DE_LA_BETA = 100;
 
 /** Les bulles qu’un achat de cette offre donne, bonus de la première recharge (④) compris s’il est valable. */
