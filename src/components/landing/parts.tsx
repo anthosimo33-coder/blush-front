@@ -101,6 +101,12 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
             <Link href="/confidentialite" className="text-soft no-underline hover:text-ink">
               Confidentialité
             </Link>
+            <Link href="/conditions" className="text-soft no-underline hover:text-ink">
+              Conditions
+            </Link>
+            <Link href="/mentions-legales" className="text-soft no-underline hover:text-ink">
+              Mentions légales
+            </Link>
           </nav>
         </Container>
       </footer>

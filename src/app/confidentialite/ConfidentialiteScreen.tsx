@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { HeroHeader, InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
+import { LiensJuridiques } from "@/components/juridique/pages";
 import { NBSP } from "@/lib/format";
 
 /*
@@ -9,6 +10,10 @@ import { NBSP } from "@/lib/format";
  * hébergement à Francfort). Textes relus le 8 octobre. Les promesses courtes des écrans (src/contenu/confidentialite.ts)
  * la résument : un changement ici se reporte là-bas.
  * TODO(produit): à faire relire par un juriste avant d’ouvrir au public.
+ * TODO(produit): lignes ajoutées le 12 octobre 2026 pour le lancement, à valider : le paiement par Whop (ce qu’il voit),
+ * la vérification anti-robots de Cloudflare, le mail de rappel d’un paiement pas terminé, tes achats. « Ton email » ne
+ * dit plus « pas de pub, jamais partagé » (Whop le reçoit pour ton reçu, et le rappel parle d’une offre) ; la promesse
+ * courte « Ton email n’est jamais partagé » (src/contenu/confidentialite.ts) est à revoir avec lui.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -39,7 +44,12 @@ export function ConfidentialiteScreen() {
           écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
         </Ligne>
         <Ligne icone="mail" titre="Ton email">
-          Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, pas de pub, jamais partagé.
+          Pour ton code de connexion, et pour te prévenir quand ton rapport est prêt. Pas de mot de passe, jamais vendu. Il ne part que chez Whop, quand tu paies, pour ton reçu.
+        </Ligne>
+        {/* Le mail ② du lot « prêt à lancer » : une offre unique, deux heures après une feuille du paiement ouverte sans payer */}
+        <Ligne icone="clock" titre="Un rappel, une seule fois">
+          Si tu ouvres le paiement sans aller au bout, BLUSH peut t’envoyer un mail deux heures après, une seule fois. Rien de ta conv, aucun prénom, et un lien pour ne plus en
+          recevoir.
         </Ligne>
       </InsetGroup>
 
@@ -75,6 +85,22 @@ export function ConfidentialiteScreen() {
         <Ligne icone="heart" ton="elle" titre="Ce que tu confies au chat">
           Même ce qui est intime (ta santé, ta vie amoureuse) reste dans la mémoire de BLUSH, chiffré, et n’est montré qu’à toi.
         </Ligne>
+        {/* La case de l’import (src/contenu/consentements.ts) : gardée avec la conv, son heure et sa version (src/server/juridique.ts) */}
+        <Ligne icone="check" ton="vrai" titre="Ton accord, avant chaque conv">
+          Avant d’importer une conv, tu confirmes avoir 18 ans ou plus, et tu acceptes que BLUSH lise ce qu’elle dit d’intime. BLUSH garde la date de cet accord avec la conv.
+        </Ligne>
+        <Ligne icone="shield" titre="Pas de robots">
+          Avant d’envoyer un code de connexion, ou une conv sans compte, Cloudflare vérifie que tu n’es pas un robot, le plus souvent sans rien te demander. Il voit ton adresse IP
+          et ton navigateur, jamais ta conv.
+        </Ligne>
+      </InsetGroup>
+
+      {/* Whop est vendeur en titre (le lot « prêt à lancer ») : il reçoit l’id de l’achat, l’email du compte et le montant, jamais la conv ni un prénom */}
+      <InsetGroup title="Quand tu paies" id="paiement" className="mt-6">
+        <Ligne icone="bolt" ton="toi" titre="Whop, pour le paiement">
+          Whop encaisse en son nom et t’envoie ton reçu. Il reçoit ton email, le montant et un numéro de commande{NBSP}: jamais ta conv, ni un prénom. Ta carte, BLUSH ne la voit
+          jamais.
+        </Ligne>
       </InsetGroup>
 
       <InsetGroup title="Combien de temps" id="duree" className="mt-6">
@@ -89,6 +115,10 @@ export function ConfidentialiteScreen() {
         <Ligne icone="mail" titre="Ton email sur la liste d’attente">
           Chiffré, et gardé un an au plus. Tu t’en retires avec le lien de son mail, et «{NBSP}Tout effacer{NBSP}» l’efface aussi.
         </Ligne>
+        {/* TODO(produit): ce que deviennent les achats à « Tout effacer », et ce que la loi oblige à garder (juriste) */}
+        <Ligne icone="file" titre="Tes achats">
+          La date, l’offre, le montant et ce qu’il est devenu (payé, remboursé), sans rien de ta conv, tant que ton compte existe. Whop garde ses reçus de son côté.
+        </Ligne>
       </InsetGroup>
 
       <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 12 octobre 2026.`}>
@@ -97,7 +127,10 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Un prestataire d’IA" sub="L’IA qui lit ta conv, aux États-Unis" />
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
-        <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, la liste d’attente)" />
+        <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, le rappel d’un paiement, la liste d’attente)" />
+        {/* TODO(produit): vérifier où Whop et Cloudflare traitent ces données (leurs conditions) */}
+        <InsetRow title="Whop" sub="Le paiement, qu’il encaisse en son nom (vendeur en titre), aux États-Unis" />
+        <InsetRow title="Cloudflare" sub="La vérification anti-robots, aux États-Unis" />
         <InsetRow
           leading={<RowIcon icon="mail" tone="toi" />}
           title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>}
@@ -106,6 +139,7 @@ export function ConfidentialiteScreen() {
           chevron
         />
       </InsetGroup>
+      <LiensJuridiques ici="/confidentialite" className="mt-6" />
     </Screen>
   );
 }

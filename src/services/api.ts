@@ -231,9 +231,16 @@ function quandVisible(): Promise<void> {
 /**
  * Un export : lu et réduit dans le navigateur. Un export Instagram complet : `choisir` fait choisir la conv
  * (null : on a renoncé, erreur « annule »), et seule celle-là part. `onAvance` : où en est le tour de ses convs (de 0 à 1).
+ * `consentement` : la version de la case de l’import cochée (src/contenu/consentements.ts), sans laquelle le serveur ne lit rien.
  */
-export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]) => Promise<string | null>, onAvance?: (part: number) => void): Promise<Source> {
+export async function uploadExport(
+  file: File,
+  consentement: string,
+  choisir?: (convs: ConvInstagram[]) => Promise<string | null>,
+  onAvance?: (part: number) => void,
+): Promise<Source> {
   const fd = new FormData();
+  fd.append("consentement", consentement);
   const { analyserExport } = await pExport();
   let pret: Awaited<ReturnType<typeof analyserExport>>;
   try {
@@ -253,11 +260,11 @@ export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]
 
 /**
  * Les captures, réduites dans le navigateur, puis lues par BLUSH (une seule fois, pour toutes). `onAvance` ne dit
- * que la reprise, si le réseau coupe pendant la lecture.
+ * que la reprise, si le réseau coupe pendant la lecture. `consentement` : la version de la case de l’import cochée.
  */
 export async function uploadScreenshots(
   files: File[],
-  opts: { app: AppKind; mode: "first" | "add"; onAvance?: (a: AvanceVideo) => void },
+  opts: { app: AppKind; mode: "first" | "add"; consentement: string; onAvance?: (a: AvanceVideo) => void },
 ): Promise<{ source: Source; messagesRead: number }> {
   const fd = new FormData();
   try {
@@ -268,6 +275,7 @@ export async function uploadScreenshots(
   }
   fd.append("app", opts.app);
   fd.append("mode", opts.mode);
+  fd.append("consentement", opts.consentement);
   fd.append("cle", cleEnvoi());
   return avecReprise(
     () => appel("POST /api/captures", { corps: fd }),
@@ -278,9 +286,9 @@ export async function uploadScreenshots(
 /**
  * Un enregistrement d’écran de la conv (sa première importation) : le navigateur en tire les écrans de la conv (la vidéo
  * ne part pas), BLUSH les lit par lots (cinq à la fois), puis les lectures sont rassemblées en une histoire brouillon,
- * comme des captures.
+ * comme des captures. `consentement` : la version de la case de l’import cochée, envoyée avec chaque lot et avec leur fin.
  */
-export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
+export async function uploadRecording(file: File, app: AppKind, consentement: string, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
   const { imagesDeLaVideo, lotsDe, VideoIllisible } = await pVideo();
   let images: Blob[];
   try {
@@ -305,6 +313,7 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
     const fd = new FormData();
     (lots[k] ?? []).forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
     fd.append("app", app);
+    fd.append("consentement", consentement);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   const lecteur = async () => {
@@ -330,7 +339,7 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
   };
   await Promise.all(Array.from({ length: Math.min(LECTEURS, lots.length) }, lecteur));
   /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
-  const corps = { app, lots: lus, cle: cleEnvoi() };
+  const corps = { app, lots: lus, cle: cleEnvoi(), consentement };
   return avecReprise(
     () => appel("POST /api/captures/video", { corps }),
     () => onAvance?.({ etape: "reprise" }),

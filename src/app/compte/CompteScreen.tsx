@@ -19,6 +19,7 @@ import { NotePrivee } from "@/components/ui/NotePrivee";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { AppScreen } from "@/components/shell/AppScreen";
+import { LiensJuridiques } from "@/components/juridique/pages";
 import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
@@ -234,6 +235,9 @@ export function CompteScreen({ noms, convs = [], compte, rendu }: { noms: NomsDu
         />
         <InsetRow leading={<RowIcon icon="trash" tone="danger" />} title="Tout effacer" sub="Ton compte et toutes tes histoires" onClick={() => setConfirm("all")} danger />
       </InsetGroup>
+
+      {/* Les pages légales, au pied du compte */}
+      <LiensJuridiques className="mt-6" />
 
       {/* Les panneaux de confirmation, absents des maquettes : leurs textes reprennent les libellés de l’écran (validés) */}
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">

@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { uploadRecording } from "@/services/api";
 import type { AvanceVideo } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
@@ -85,7 +86,7 @@ describe("uploadRecording sur une 5xx", () => {
   it("un lot qui reçoit une 5xx est relu une fois, 1,5 s plus tard, sans relire les autres ; la conv est assemblée dans l’ordre des lots", async () => {
     const { appels, corpsVideo } = serveur({ lot: (n, essai) => (n === 1 && essai === 1 ? json({ erreur: "erreur" }, 503) : json({ lot: `lecture ${n}` })) });
     const avance: AvanceVideo[] = [];
-    const envoi = uploadRecording(VIDEO, "imessage", (a) => avance.push(a));
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a));
     /* Avant les 1,5 s : le lot 1 n’est pas encore relu, la conv pas assemblée */
     await vi.advanceTimersByTimeAsync(1499);
     expect(appels).toEqual(["lot 1 · essai 1", "lot 2 · essai 1"]);
@@ -105,7 +106,7 @@ describe("uploadRecording sur une 5xx", () => {
     /* Sept lots : cinq partent ensemble, les deux derniers attendent une place */
     ecrans = 36;
     const { appels, signaux } = serveur({ lot: (n) => (n === 1 ? json({ erreur: "erreur" }, 502) : "pend") });
-    const envoi = uploadRecording(VIDEO, "imessage");
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     const resultat = envoi.catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(1500);
     const e = await resultat;
@@ -120,7 +121,7 @@ describe("uploadRecording sur une 5xx", () => {
 
   it("le budget du jour atteint (« souffle »), même en 503 : pas de nouvel essai, il tient jusqu’à minuit", async () => {
     const { appels } = serveur({ lot: (n) => (n === 1 ? json({ erreur: "souffle" }, 503) : "pend") });
-    const resultat = uploadRecording(VIDEO, "imessage").catch((e: unknown) => e);
+    const resultat = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(5000);
     expect(await resultat).toMatchObject({ code: "souffle", status: 503 });
     expect(appels).toEqual(["lot 1 · essai 1", "lot 2 · essai 1"]);
@@ -128,7 +129,7 @@ describe("uploadRecording sur une 5xx", () => {
 
   it("une 5xx à l’assemblage : rendue telle quelle, sans le rejouer (une réponse du serveur n’est pas une coupure)", async () => {
     const { appels } = serveur({ lot: (n) => json({ lot: `lecture ${n}` }), video: () => json({ erreur: "erreur" }, 500) });
-    const resultat = uploadRecording(VIDEO, "imessage").catch((e: unknown) => e);
+    const resultat = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(await resultat).toMatchObject({ code: "erreur", status: 500 });
     expect(appels.filter((a) => a === "video")).toHaveLength(1);
@@ -136,7 +137,7 @@ describe("uploadRecording sur une 5xx", () => {
 
   it("une 5xx sans corps JSON (une page d’erreur de l’hébergeur) : relue comme les autres", async () => {
     const { appels } = serveur({ lot: (n, essai) => (n === 2 && essai === 1 ? new Response("<html>Bad gateway</html>", { status: 502 }) : json({ lot: `lecture ${n}` })) });
-    const envoi = uploadRecording(VIDEO, "imessage");
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     await vi.advanceTimersByTimeAsync(1500);
     await expect(envoi).resolves.toMatchObject({ messagesRead: 42 });
     expect(appels).toEqual(["lot 1 · essai 1", "lot 2 · essai 1", "lot 2 · essai 2", "video"]);

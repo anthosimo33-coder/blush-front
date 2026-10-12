@@ -7,6 +7,7 @@ import { poserBrouillon } from "@/server/cookies";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
+import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { fusionnerLots } from "@/server/video";
@@ -66,12 +67,15 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   if (permis !== "ok") return erreur(permis);
   const envoi = await lireCorps(req, Envoi);
   if (!envoi) return erreur("fichier");
+  /* L’accord de l’import, celui de ses lots (sans lui, 422 `consentement`) : gardé avec l’histoire */
+  const consentement = consentementImport(envoi.consentement);
+  if (!consentement) return erreur("consentement");
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const { app, lots, cle } = envoi;
   const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
     const t = enTexte(fusionnerLots(lots, app));
-    const { id, meta } = await importerCaptures({ appli: app, t, secret });
+    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
     /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
     await compterImportVenuDuPartage();
     return { id, meta, secret, messages: t.messages };

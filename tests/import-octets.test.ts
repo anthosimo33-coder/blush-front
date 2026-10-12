@@ -19,6 +19,7 @@ vi.mock("@/server/alertes", async (original) => ({
   alerter: async (sujet: string, _lignes: string[], o?: { importante?: boolean }) => void alertes.push({ sujet, importante: !!o?.importante }),
 }));
 
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { POST as postImport } from "@/app/api/import/route";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -57,6 +58,7 @@ async function importer(ip: string, fichier = convDeTest(CONV)): Promise<string 
   cles.add(`import:ip:${ip}`).add(`import:ko:ip:${ip}`);
   const fd = new FormData();
   fd.append("fichier", fichier);
+  fd.append("consentement", CASE_IMPORT.version);
   const r = await postImport(
     new Request("http://localhost/api/import", { method: "POST", body: fd, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": ip } }),
   );

@@ -1,6 +1,7 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
 import { erreur, repondre, route } from "@/server/http";
+import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -19,6 +20,8 @@ async function traiter(req: Request) {
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
   const images = await imagesDe(fichiers);
+  /* La conv part au modèle : l’accord de l’import d’abord (sans lui, 422 `consentement`, rien n’est lu ni compté) */
+  if (!consentementImport(fd?.get("consentement"))) return erreur("consentement");
   /*
    * Le modèle va lire : la limite de l’adresse IP, la bêta et les plafonds d’abord, une fois l’envoi vérifié (un envoi
    * invalide ne compte pas : il ne coûte rien, et un voisin derrière la même IP n’y perd rien)
