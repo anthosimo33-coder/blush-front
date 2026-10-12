@@ -121,31 +121,34 @@ describe("le reste", () => {
     expect(m.html).not.toContain(`Il marche ${CODE_MINUTES} minutes.`);
   });
 
-  it("S-09 · BLUSH_MAILS_PAR_JOUR : 100 par défaut (le plan gratuit du prestataire), 60 codes et 20 mails de la liste d’attente", () => {
-    const { parJour, codes, attente, laisse } = plafondsDesMails();
-    expect([codes.max, attente.max, parJour]).toEqual([60, 20, 100]);
-    expect(laisse).toEqual({ attente: 20, alerte: 10, rapport: 0 });
+  it("S-09 · BLUSH_MAILS_PAR_JOUR : 100 par défaut (le plan gratuit du prestataire), 60 codes, 20 mails de la liste d’attente et 20 relances", () => {
+    const { parJour, codes, attente, relances, laisse } = plafondsDesMails();
+    expect([codes.max, attente.max, relances.max, parJour]).toEqual([60, 20, 20, 100]);
+    expect(laisse).toEqual({ attente: 20, relance: 20, alerte: 10, rapport: 0 });
   });
 
   it.each([100, 101, 250, 1000, 3000])(
     "S-09 · à %i mails par jour, tous tiennent dans le quota : les codes ont leur part, les autres se partagent le reste, les moins nécessaires s’arrêtent les premiers",
     (quota) => {
       const plafonds = plafondsDesMails(quota);
-      const { parJour, codes, attente, laisse } = plafonds;
+      const { parJour, codes, attente, relances, laisse } = plafonds;
       expect(parJour).toBe(quota);
       /* Les plafonds suivent le quota, dans les mêmes proportions qu’à 100 */
       expect(codes.max).toBe(Math.floor(quota * 0.6));
       expect(attente.max).toBe(Math.floor(quota * 0.2));
+      expect(relances.max).toBe(Math.floor(quota * 0.2));
       /* Les codes et les autres mails, ensemble, ne dépassent jamais le quota ; avec la clé des codes, les autres ont tout */
       expect(codes.max + partDesAutresMails(false, plafonds)).toBe(parJour);
       expect(partDesAutresMails(true, plafonds)).toBe(parJour);
       /* La liste d’attente s’arrête avant les alertes, les alertes avant les rapports, qui vont jusqu’au bout */
       expect(laisse.attente).toBeGreaterThan(laisse.alerte);
+      expect(laisse.relance).toBe(laisse.attente);
       expect(laisse.alerte).toBeGreaterThan(laisse.rapport);
       expect(laisse.rapport).toBe(0);
       /* Son propre plafond tient dans sa part : rien ne l’arrête plus tôt en temps normal */
       expect(attente.max).toBeLessThanOrEqual(partDesAutresMails(false, plafonds) - laisse.attente);
-      /* Les alertes en ont encore quand la liste a pris toute la sienne */
+      expect(relances.max).toBeLessThanOrEqual(partDesAutresMails(false, plafonds) - laisse.relance);
+      /* Les alertes en ont encore quand la liste et les relances ont pris toute la leur (elles laissent la même part, ensemble) */
       expect(partDesAutresMails(false, plafonds) - laisse.alerte - attente.max).toBeGreaterThanOrEqual(10);
     },
   );

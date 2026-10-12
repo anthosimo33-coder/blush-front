@@ -1,6 +1,6 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import { empreinteDeLaListe } from "./attente";
+import { empreinteDeLaListe } from "./invitations";
 import { db, schema } from "./db";
 import { duBrouillon } from "./histoires";
 

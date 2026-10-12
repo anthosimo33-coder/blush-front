@@ -4,7 +4,7 @@ import { NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
 /*
- * La bêta fermée (BLUSH_BETA_FERMEE) se lit à l’exécution, comme sur le serveur (src/server/env.ts, peutEntrer) : un même
+ * La bêta fermée (BLUSH_BETA_FERMEE) se lit à l’exécution, comme sur le serveur (src/server/invitations.ts, entre) : un même
  * build sert la bêta ouverte ou fermée, et ce qu’en disent les pages ne peut pas dater du build. Les pages du parcours
  * d’arrivée restent statiques (servies et préchargées tout de suite) ; en bêta fermée, ce proxy sert à leur adresse leur
  * variante « fermee », statique elle aussi, sauf les captures, qui vérifient la connexion d’abord (rendue à la demande).

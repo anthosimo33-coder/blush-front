@@ -12,9 +12,12 @@ import { ROUTES } from "@/types/api";
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 300;
 
-/** Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). */
+/**
+ * Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). Comme la corriger ou y ajouter
+ * des captures : à un client seulement (un rapport débloqué, un achat payé, ou l’équipe : 402 « acces » sinon, S-26).
+ */
 export const GET = route("GET /api/fiche", async () => {
-  const g = await lecture({ session: "requise", histoire: true });
+  const g = await lecture({ session: "requise", client: true, histoire: true });
   return g instanceof Response ? g : repondre("GET /api/fiche", await ficheEtMaj(g.story));
 });
 
@@ -22,10 +25,10 @@ export const GET = route("GET /api/fiche", async () => {
  * Sa fiche, corrigée par l’utilisateur (la liste entière). Ce qu’il ajoute ou corrige fait foi pour la mémoire ;
  * ce qu’il supprime, elle ne le remet pas (fusionnerFaits, src/server/fiche.ts). On n’écrit que sur la mémoire qu’on a
  * lue : si une mise à jour l’a changée entre-temps, la correction se refait sur la nouvelle (rien de ce que la mise à
- * jour a appris n’est effacé).
+ * jour a appris n’est effacé). À un client seulement, comme la lire.
  */
 export const PUT = route("PUT /api/fiche", async (req: Request) => {
-  const g = await garde(req, { session: "requise", histoire: true });
+  const g = await garde(req, { session: "requise", client: true, histoire: true });
   if (g instanceof Response) return g;
   const { utilisateur, story } = g;
   const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);

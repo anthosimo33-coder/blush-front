@@ -4,7 +4,8 @@
  * publication et l’hébergeur ; le Code de la consommation (L612-1), un médiateur de la consommation.
  * TODO(produit): à relire par un juriste.
  * TODO(produit): l’identité de l’éditeur n’est pas encore connue : chaque champ vide de EDITEUR est à remplir. Tant
- * qu’il en reste un, editeurComplet (src/server/juridique.ts) répond non, et la production ne s’ouvre pas au public.
+ * qu’il en reste un, editeurComplet (src/server/juridique.ts) répond non, et la production refuse de démarrer ouverte
+ * au public (BLUSH_BETA_FERMEE=0 : refusEnProduction, src/server/env.ts, nomme les champs vides) ; fermée, elle tourne.
  */
 
 /** Ce que la page dit de l’éditeur : chaque champ est un texte, vide tant qu’il n’est pas connu. */
@@ -50,7 +51,7 @@ export const CHAMPS_EDITEUR: readonly { cle: keyof Editeur; libelle: string }[] 
   { cle: "directeurPublication", libelle: "Directeur de la publication" },
 ];
 
-/** Ce que la page montre d’un champ encore vide (la production ne s’ouvre pas au public tant qu’il en reste un). */
+/** Ce que la page montre d’un champ encore vide (la production refuse de s’ouvrir au public tant qu’il en reste un). */
 export const A_COMPLETER = "À compléter";
 
 /**

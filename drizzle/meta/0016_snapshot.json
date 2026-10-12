@@ -1,5 +1,5 @@
 {
-  "id": "657f1da5-b8d6-46e5-8071-599c5e8a72cb",
+  "id": "08c66697-5dd6-4d12-b1b6-67125c60fc37",
   "prevId": "c702aa3e-a951-4aa8-8d2a-713b90261fba",
   "version": "7",
   "dialect": "postgresql",
@@ -212,6 +212,99 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.actions_equipe": {
+      "name": "actions_equipe",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "par_id": {
+          "name": "par_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "compte_id": {
+          "name": "compte_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "actions_equipe_cree_idx": {
+          "name": "actions_equipe_cree_idx",
+          "columns": [
+            {
+              "expression": "cree_le",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "actions_equipe_par_id_users_id_fk": {
+          "name": "actions_equipe_par_id_users_id_fk",
+          "tableFrom": "actions_equipe",
+          "tableTo": "users",
+          "columnsFrom": [
+            "par_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "actions_equipe_compte_id_users_id_fk": {
+          "name": "actions_equipe_compte_id_users_id_fk",
+          "tableFrom": "actions_equipe",
+          "tableTo": "users",
+          "columnsFrom": [
+            "compte_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1491,6 +1584,12 @@
           "notNull": true,
           "default": 0
         },
+        "relances_coupees_le": {
+          "name": "relances_coupees_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1756,6 +1855,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "invite_le": {
+          "name": "invite_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1764,7 +1869,24 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "waitlist_a_inviter_idx": {
+          "name": "waitlist_a_inviter_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"waitlist\".\"invite_le\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {

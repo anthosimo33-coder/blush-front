@@ -40,6 +40,14 @@ export class ErreurResend extends Error {
   }
 }
 
+/**
+ * Resend a-t-il refusé le mail sans regarder l’adresse : trop de mails à la fois (429), une panne (5xx), la clé (401,
+ * 403) ? Alors le mail n’est pas parti, et il pourra repartir plus tard, à la même adresse. Pas une adresse refusée (422),
+ * ni un mail perdu en route (pas de réponse : il a pu partir). Pour les envois en série (les relances, les invitations
+ * de la liste d’attente), qui s’arrêtent là au lieu de compter la personne comme servie.
+ */
+export const refusDuPrestataire = (e: unknown): boolean => e instanceof ErreurResend && (e.statut === 429 || e.statut === 401 || e.statut === 403 || e.statut >= 500);
+
 /* Poste un mail chez le prestataire, avec la clé `cle` et l’expéditeur `de` : rejette avec ErreurResend s’il le refuse */
 async function poster(pour: string[], { sujet, texte, html }: Mail, { cle, de }: { cle: string; de: string }): Promise<void> {
   const r = await fetch("https://api.resend.com/emails", {

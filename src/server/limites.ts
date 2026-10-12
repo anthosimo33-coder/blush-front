@@ -176,13 +176,16 @@ export const LIMITES = {
  *   (src/server/email.ts, envoyerMail).
  * - Tous les mails de la liste d’attente (`attente`, 20 %) : n’importe qui peut en déclencher, ils ne doivent épuiser ni
  *   le quota des codes, ni la part des rapports et des alertes (qui les arrête aussi les premiers). Au-delà, on inscrit
- *   sans écrire. Sans la boîte des tests de bout en bout, dont les mails ne partent pas (comme les codes).
+ *   sans écrire. Les invitations de l’équipe (/admin) partent dans la même part. Sans la boîte des tests de bout en bout,
+ *   dont les mails ne partent pas (comme les codes).
+ * - Les relances (`relances`, 20 %, le mail « Ta suite t’attend », src/server/relances.ts) : aussi peu nécessaires que la
+ *   liste d’attente, elles laissent comme elle 20 % de la part des autres mails. Au-delà, elles attendent le lendemain.
  * tests/unit/limites.test.ts y veille, au défaut comme relevé. Les fenêtres des compteurs ne commencent pas à minuit
  * comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
  */
-const PARTS_DES_MAILS = { codes: 0.6, attente: 0.2, laisse: { attente: 0.2, alerte: 0.1, rapport: 0 } } as const;
+const PARTS_DES_MAILS = { codes: 0.6, attente: 0.2, relances: 0.2, laisse: { attente: 0.2, relance: 0.2, alerte: 0.1, rapport: 0 } } as const;
 
-/** Ce qu’est un mail pour le quota : du plus nécessaire (le rapport) au moins nécessaire (la liste d’attente). */
+/** Ce qu’est un mail pour le quota : du plus nécessaire (le rapport) aux moins nécessaires (la liste d’attente, les relances). */
 export type SorteDeMail = keyof typeof PARTS_DES_MAILS.laisse;
 
 /** Les plafonds des mails du jour, tirés du quota du prestataire (`parJour` : BLUSH_MAILS_PAR_JOUR, voir plus haut). */
@@ -201,10 +204,12 @@ export function plafondsDesMails(parJour = env().BLUSH_MAILS_PAR_JOUR) {
      * essais par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
      */
     codes: { max: part(PARTS_DES_MAILS.codes), fenetreS: 86400, alerteA: 0.8 },
-    /** Les mails de la liste d’attente, pour tous. */
+    /** Les mails de la liste d’attente (les inscriptions et les invitations de l’équipe), pour tous. */
     attente: { max: part(PARTS_DES_MAILS.attente), fenetreS: 86400 },
-    laisse: { attente: part(laisse.attente), alerte: part(laisse.alerte), rapport: part(laisse.rapport) },
-  } as const satisfies { parJour: number; codes: Limite & { alerteA: number }; attente: Limite; laisse: Record<SorteDeMail, number> };
+    /** Les relances (« Ta suite t’attend »), pour tous. */
+    relances: { max: part(PARTS_DES_MAILS.relances), fenetreS: 86400 },
+    laisse: { attente: part(laisse.attente), relance: part(laisse.relance), alerte: part(laisse.alerte), rapport: part(laisse.rapport) },
+  } as const satisfies { parJour: number; codes: Limite & { alerteA: number }; attente: Limite; relances: Limite; laisse: Record<SorteDeMail, number> };
 }
 
 /** La part du quota des mails autres que les codes : tout, quand les codes ont leur clé ; sinon, ce que les codes laissent. */

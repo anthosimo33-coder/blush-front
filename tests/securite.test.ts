@@ -69,11 +69,12 @@ import Connecte from "@/app/connexion/connecte/page";
 import Effacer from "@/app/effacer/page";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
-import { PUT as putFiche } from "@/app/api/fiche/route";
+import { GET as getFiche, PUT as putFiche } from "@/app/api/fiche/route";
 import { POST as postImport } from "@/app/api/import/route";
 import { GET as getReveil } from "@/app/api/reveil/route";
 import { editionsBornees, type DonneesMemoire } from "@/server/stockage/types";
-import { empreinteDeLaListe, inscrire } from "@/server/attente";
+import { inscrire } from "@/server/attente";
+import { empreinteDeLaListe } from "@/server/invitations";
 import { envoyerCode, ouvrirSession, preparerCode } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
@@ -322,10 +323,11 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
       moi: 0,
       pronom: "il",
     };
+    /* Un client (le rapport de sa conv débloqué) : sa fiche s’ouvre (S-26) */
     const s = (
       await db()
         .insert(schema.stories)
-        .values({ userId, messageCount: 20, meta: chiffrer(meta) })
+        .values({ userId, messageCount: 20, meta: chiffrer(meta), debloqueLe: new Date() })
         .returning()
     )[0]!;
     storyId = s.id;
@@ -350,6 +352,27 @@ describe("S-05 · corriger sa fiche : limité, et la liste des infos retirées n
     const supprimees = dechiffrer<DonneesMemoire>(ligne.data).editions!.supprimees;
     expect(supprimees).toHaveLength(100);
     expect(supprimees.at(-1)).toBe("Fait 0");
+  });
+
+  it("S-26 · la lire et la corriger : à un client seulement (402 « acces » sinon), comme y ajouter des captures", async () => {
+    const lire = () => getFiche();
+    const ouvrir = (ouverte: boolean) =>
+      db()
+        .update(schema.stories)
+        .set({ debloqueLe: ouverte ? new Date() : null })
+        .where(eq(schema.stories.id, storyId));
+    const avant = (await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, storyId)))[0]!.data;
+    await ouvrir(false);
+    try {
+      for (const r of [await lire(), await corriger()]) expect([r.status, await r.json()]).toEqual([402, { erreur: "acces" }]);
+      /* Refusée, la correction n’a rien écrit */
+      expect((await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, storyId)))[0]!.data).toEqual(avant);
+    } finally {
+      await ouvrir(true);
+    }
+    const r = await lire();
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ facts: expect.any(Array) });
   });
 
   it("une mémoire écrite avant la borne : le modèle ne reçoit que les 100 plus récentes", () => {

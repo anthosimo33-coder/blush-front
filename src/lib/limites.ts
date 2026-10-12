@@ -11,6 +11,12 @@ const MO = 1024 * 1024;
 /** Au plus 20 captures dans un envoi : l’écran garde les 20 premières, le serveur refuse au-delà (src/server/captures.ts). */
 export const CAPTURES_MAX = 20;
 
+/**
+ * Au plus 50 invitations de la liste d’attente dans un lot (/admin, POST /api/admin) : le formulaire s’arrête là, le
+ * serveur refuse au-delà (src/server/attente.ts, inviterLaListe). Le plafond des mails du jour arrête souvent avant.
+ */
+export const INVITATIONS_PAR_LOT = 50;
+
 /** Ce que propose le sélecteur de captures (l’import, le chat, la fiche) : des images, que le navigateur réduit avant l’envoi. */
 export const ACCEPT_IMAGES = "image/*";
 /** Une image choisie ou déposée : une capture. */

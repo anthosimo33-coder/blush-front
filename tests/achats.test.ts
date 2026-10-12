@@ -333,6 +333,17 @@ describe("les offres uniques", () => {
     expect(await montrer(await compteEquipe(), "suite")).toBeNull();
   });
 
+  it("seule la ① ne retient pas la relance (②), qui la suit de deux heures : la relance retient ensuite ③ et ④", async () => {
+    const u = await compteDeTest("unique-suite-relance");
+    const id = await conv(u);
+    expect(await montrer(u, "suite", { storyId: id })).not.toBeNull();
+    expect(await montrer(u, "relance_mail", { storyId: id })).not.toBeNull();
+    await reculer(u.id, "suite", 30 * 3600e3);
+    for (const offre of ["premium_ajout", "premiere_recharge"] as const) expect(await montrer(u, offre), offre).toBeNull();
+    await reculer(u.id, "relance_mail", 25 * 3600e3);
+    expect(await montrer(u, "premium_ajout")).not.toBeNull();
+  });
+
   it("le mail de relance d’une conv compte comme pris quand son rapport est payé", async () => {
     const u = await compteDeTest("unique-relance");
     const id = await conv(u);

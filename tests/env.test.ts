@@ -39,6 +39,37 @@ const captcha = () => {
   vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "0x4AAAAAAAcle-publique-fictive");
 };
 
+/**
+ * L’identité de l’éditeur remplie (fictive), le temps d’un cas : aujourd’hui vide dans src/contenu/mentions-legales.ts.
+ * `sauf` : ces champs restent vides. Rechargée avec env() (charger), retirée après chaque cas.
+ */
+const editeur = (...sauf: string[]) => {
+  vi.doMock("@/contenu/mentions-legales", async (original) => {
+    const m = await original<typeof import("@/contenu/mentions-legales")>();
+    const rempli = {
+      ...m.EDITEUR,
+      nom: "Exemple SAS",
+      statut: "SAS au capital de 1 000 €",
+      adresse: "1 rue de l’Exemple, 75000 Paris",
+      immatriculation: "RCS Paris 000 000 000",
+      telephone: "01 00 00 00 00",
+      directeurPublication: "Camille Exemple",
+      mediateur: "Un médiateur, exemple.fr",
+    };
+    for (const champ of sauf) rempli[champ as keyof typeof rempli] = "";
+    return { ...m, EDITEUR: rempli };
+  });
+};
+
+/** Tout ce que l’ouverture au public exige, en production : Whop, le CAPTCHA, l’éditeur, et la bêta écrite à 0. */
+const ouverte = () => {
+  production();
+  vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+  whop();
+  captcha();
+  editeur();
+};
+
 beforeEach(() => {
   for (const v of [
     "VERCEL",
@@ -62,6 +93,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  vi.doUnmock("@/contenu/mentions-legales");
 });
 
 describe("les listes d’emails, lues une fois par le schéma", () => {
@@ -169,15 +201,57 @@ describe("les garde-fous de la production", () => {
     production();
     vi.stubEnv("BLUSH_BETA_FERMEE", undefined);
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/Configuration refusée en production : BLUSH_BETA_FERMEE manque/);
-    /* Écrite exprès à 0, la bêta ouverte est un choix (avec le CAPTCHA, plus bas) */
-    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
-    captcha();
+    /* Écrite exprès à 0, la bêta ouverte est un choix (avec Whop, le CAPTCHA et l’éditeur : plus bas) */
+    ouverte();
     expect((await charger()).env().BLUSH_BETA_FERMEE).toBe(false);
+  });
+
+  it("l’ouverture au public (BLUSH_BETA_FERMEE=0) exige Whop, le CAPTCHA et l’identité de l’éditeur ; fermée, aucun des trois", async () => {
+    const refus = () =>
+      charger()
+        .then(({ env }) => env())
+        .then(
+          () => "",
+          (e: Error) => e.message,
+        );
+    /* Tout est là : elle s’ouvre */
+    ouverte();
+    expect(await refus()).toBe("");
+    /* Sans Whop : « Débloquer » répondrait « bientot » à tout le monde */
+    whop("WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID");
+    expect(await refus()).toMatch(/Whop n’est pas configuré \(WHOP_API_KEY, WHOP_WEBHOOK_SECRET, WHOP_ACCOUNT_ID, WHOP_PRODUCT_ID\) : la bêta ouverte exige le paiement/);
+    whop();
+    /* Sans le CAPTCHA (ses deux clés, qui vont ensemble) */
+    vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", undefined);
+    expect(await refus()).toMatch(/TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA/);
+    captcha();
+    /* Un champ de l’éditeur vide : il est nommé */
+    editeur("telephone", "mediateur");
+    expect(await refus()).toMatch(/l’identité de l’éditeur est incomplète \(src\/contenu\/mentions-legales\.ts : telephone, mediateur\) : la bêta ouverte l’exige/);
+    /* L’éditeur d’aujourd’hui (vide) : tous ses champs, sauf l’email déjà connu */
+    vi.doUnmock("@/contenu/mentions-legales");
+    expect(await refus()).toContain("nom, statut, adresse, immatriculation, telephone, directeurPublication, mediateur");
+    /* Les trois manquent d’un coup : un seul message les dit tous */
+    whop("WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", undefined);
+    const tous = await refus();
+    for (const motif of ["Whop n’est pas configuré", "TURNSTILE_SECRET_KEY manque", "l’identité de l’éditeur est incomplète"]) expect(tous).toContain(motif);
+    /* Fermée (la production d’aujourd’hui), rien de tout ça n’est exigé */
+    vi.stubEnv("BLUSH_BETA_FERMEE", "1");
+    expect(await refus()).toBe("");
+    /* Une préversion ouverte non plus */
+    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(await refus()).toBe("");
   });
 
   it("la bêta ouverte exige le CAPTCHA : sans ses clés, la production refuse de tourner", async () => {
     production();
     vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+    whop();
+    editeur();
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA/);
     /* Fermée, il peut attendre (la production d’aujourd’hui) */
     vi.stubEnv("BLUSH_BETA_FERMEE", "1");

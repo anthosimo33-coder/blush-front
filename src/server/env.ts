@@ -3,6 +3,7 @@ import { z } from "zod";
 import { estCleDeTest } from "@/lib/captcha";
 import { enProduction, surVercel } from "./drapeaux";
 import { journal } from "./journal";
+import { champsEditeurManquants, editeurComplet } from "./juridique";
 
 /*
  * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build : `next build` n’a pas
@@ -146,8 +147,10 @@ const WHOP = ["WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PR
 
 /*
  * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou tous les rapports à
- * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Les préversions,
- * le dev et les tests n’ont pas ces exigences.
+ * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Ouverte au
+ * public (BLUSH_BETA_FERMEE=0), elle exige en plus ce qu’une vente à tous demande : le paiement (Whop), le CAPTCHA
+ * (Turnstile) et l’identité de l’éditeur (src/contenu/mentions-legales.ts, que les mentions légales et les conditions
+ * de vente affichent). Les préversions, le dev et les tests n’ont pas ces exigences.
  */
 function refusEnProduction(e: Env): string[] {
   if (!enProduction()) return [];
@@ -164,6 +167,11 @@ function refusEnProduction(e: Env): string[] {
   if (e.WHOP_BAC_A_SABLE) refus.push("WHOP_BAC_A_SABLE=1 est refusée (ses cartes de test débloqueraient tout sans payer)");
   /* Ouverte à tous, la porte (les codes, les imports et les captures sans compte) passe par le CAPTCHA */
   if (!e.BLUSH_BETA_FERMEE && !e.TURNSTILE_SECRET_KEY) refus.push("TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA");
+  /* Ouverte à tous, BLUSH vend : sans Whop, « Débloquer » répondrait « bientot » à tout le monde */
+  if (!e.BLUSH_BETA_FERMEE && !whop.length) refus.push(`Whop n’est pas configuré (${WHOP.join(", ")}) : la bêta ouverte exige le paiement`);
+  /* Ouverte à tous, les mentions légales et les conditions de vente nomment l’éditeur (LCEN, Code de la consommation) */
+  if (!e.BLUSH_BETA_FERMEE && !editeurComplet())
+    refus.push(`l’identité de l’éditeur est incomplète (src/contenu/mentions-legales.ts : ${champsEditeurManquants().join(", ")}) : la bêta ouverte l’exige`);
   /* Une clé de test de Cloudflare laisse passer tout le monde (ou personne) : jamais en production */
   for (const cle of ["TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY"] as const)
     if (estCleDeTest(e[cle] ?? "")) refus.push(`${cle} est une clé de test de Cloudflare (elle ne protège rien)`);
@@ -239,7 +247,10 @@ export function paiementWhop(): { cle: string; secret: string; compte: string; p
   return { cle: e.WHOP_API_KEY, secret: e.WHOP_WEBHOOK_SECRET, compte: e.WHOP_ACCOUNT_ID, produit: e.WHOP_PRODUCT_ID, bacASable: e.WHOP_BAC_A_SABLE };
 }
 
-/** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
+/**
+ * Bêta fermée : cet email peut-il se connecter, d’après les variables seules ? (Ouverte : tout le monde.) Les invités de
+ * la liste d’attente se lisent en base : la question entière est entre (src/server/invitations.ts).
+ */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
 
 /** Cet email peut-il ouvrir le tableau de bord ? */

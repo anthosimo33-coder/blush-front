@@ -4,8 +4,8 @@ import { inscrire } from "@/server/attente";
 import { jetonRefuse } from "@/server/captcha";
 import { codeAccorde, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
 import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies";
-import { peutEntrer } from "@/server/env";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
+import { entre } from "@/server/invitations";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { journalErreur } from "@/server/journal";
 import { ipDe, LIMITES, sousLaLimite } from "@/server/limites";
@@ -40,7 +40,6 @@ export const POST = route("POST /api/auth/code", async (req: Request) => {
   if (!(await codeAccorde(email, ip))) return erreur("codes");
   const navigateur = await poserNavigateur();
   const brouillon = await lireBrouillon();
-  const invite = peutEntrer(email);
   /*
    * Bêta fermée : la même réponse pour tous (« regarde tes mails »), pour que personne ne puisse savoir si un email est
    * invité. Tout ce qui en dépend se fait après la réponse : elle a le même temps, et un mail qui ne part pas ne la change
@@ -49,7 +48,10 @@ export const POST = route("POST /api/auth/code", async (req: Request) => {
    * la réponse) : il ne mène plus à rien.
    */
   after(async () => {
+    /* Hors de la réponse, comme le reste : un invité de la liste d’attente se lit en base */
+    let invite = false;
     try {
+      invite = await entre(email);
       const code = await preparerCode(email, navigateur, { envoye: invite });
       if (invite) {
         if (code) await envoyerCode(email, code);

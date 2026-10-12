@@ -6,7 +6,7 @@
  * ici : tests/unit/contrat.test.ts compare la table aux routes de src/app/api, et vérifie ces imports.
  */
 import { z } from "zod";
-import { PRENOM_MAX } from "@/lib/limites";
+import { INVITATIONS_PAR_LOT, PRENOM_MAX } from "@/lib/limites";
 import { EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
 import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, OffreId, OffreProposee, Report, SoberReport, Source, StatutAchat, Story, VocalRapport } from "@/types";
 import type { CodeErreur } from "./erreurs-api";
@@ -101,6 +101,20 @@ export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; res
 /** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
 
+/**
+ * Ce qu’un geste de l’équipe a fait (POST /api/admin), en nombres : le nouveau solde de bulles, les convs débloquées
+ * (null : aucun compte pour cet email), ou un lot d’invitations (les mails partis, ceux qui restent à inviter, si le
+ * plafond des mails du jour l’a arrêté, les adresses refusées par le prestataire des mails, et s’il l’a arrêté : LotInvite,
+ * src/server/attente.ts).
+ */
+export type GesteDeLEquipe =
+  | { action: "bulles"; solde: number | null }
+  | { action: "debloquer"; convs: number | null }
+  | { action: "inviter"; invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
+
+/** Ce qu’un passage des relances a fait (GET /api/cron/relances) : des nombres seulement, jamais un email ni un identifiant. */
+export type PassageDesRelances = { dues: number; envoyees: number; ecartees: number; retenues: number; echecs: number };
+
 /** Une erreur d’une route : son code (src/types/erreurs-api.ts), jamais de détail interne. */
 export type ReponseErreur = { erreur: CodeErreur };
 
@@ -141,6 +155,7 @@ export type CibleImage = z.input<typeof Cible>;
  * `{ erreur }` (ReponseErreur), avec le statut de son code. `Blob` : un audio ou une image, pas du JSON.
  */
 type Reponses = {
+  "POST /api/admin": GesteDeLEquipe;
   "GET /api/analyse": AnalysisProgress;
   "POST /api/analyse": Ok;
   "POST /api/attente": Ok;
@@ -166,6 +181,8 @@ type Reponses = {
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
+  "GET /api/cron/relances": PassageDesRelances;
+  "POST /api/desinscription": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
   "POST /api/fiche": FicheUpdate;
@@ -204,6 +221,17 @@ type Entree = { corps?: z.ZodType; formulaire?: true };
  * La route lit son corps par ce schéma (lireCorps), qu’elle peut resserrer de ce que seul le serveur sait vérifier.
  */
 export const ROUTES = {
+  /*
+   * Un geste de l’équipe (/admin) : des bulles à un compte (1 à 1 000), le rapport de sa dernière conv ou de toutes, ou
+   * un lot de la liste d’attente à inviter (INVITATIONS_PAR_LOT au plus). L’email se vérifie sur le serveur (Email)
+   */
+  "POST /api/admin": {
+    corps: z.discriminatedUnion("action", [
+      z.object({ action: z.literal("bulles"), email: z.string(), n: z.number().int().min(1).max(1000) }),
+      z.object({ action: z.literal("debloquer"), email: z.string(), cible: z.enum(["derniere", "toutes"]) }),
+      z.object({ action: z.literal("inviter"), n: z.number().int().min(1).max(INVITATIONS_PAR_LOT) }),
+    ]),
+  },
   "GET /api/analyse": {},
   /* « Qui es-tu ? » rempli (depuis /qui, ou le code reçu par email), ou rien : une relance, depuis l’écran de lecture */
   "POST /api/analyse": { corps: z.union([Qui, z.strictObject({})]) },
@@ -241,6 +269,9 @@ export const ROUTES = {
   "GET /api/compte": {},
   "DELETE /api/compte": {},
   "GET /api/cron/purge": {},
+  "GET /api/cron/relances": {},
+  /* Le lien signé de la relance */
+  "POST /api/desinscription": { corps: z.object({ id: z.string(), cle: z.string() }) },
   "GET /api/fiche": {},
   /* Sa fiche corrigée : la liste entière de ses faits */
   "PUT /api/fiche": {

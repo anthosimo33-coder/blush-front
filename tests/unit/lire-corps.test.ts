@@ -19,6 +19,8 @@ vi.mock("@/server/donnees", async (original) => ({
   /* Un compte connecté (le chat lui est ouvert), et sa conv, où « Qui es-tu ? » reste à remplir */
   contexteRequete: async () => ({ utilisateur: { id: "compte", email: "toi@blush.test", bulles: 10 }, story: { id: "conv", chatVocal: false } }),
 }));
+/* Un client (sa fiche s’ouvre : S-26, src/server/droits.ts) */
+vi.mock("@/server/droits", async (original) => ({ ...(await original<typeof import("@/server/droits")>()), estClient: async () => true }));
 vi.mock("@/server/histoires", async (original) => ({ ...(await original<typeof import("@/server/histoires")>()), metaDe: () => ({}), quiRempli: () => false }));
 vi.mock("@/server/limites", async (original) => ({ ...(await original<typeof import("@/server/limites")>()), sousLaLimite: async () => true, limiteAtteinte: async () => false }));
 vi.mock("@/server/captures", async (original) => ({ ...(await original<typeof import("@/server/captures")>()), lecturePermise: async () => "ok" }));

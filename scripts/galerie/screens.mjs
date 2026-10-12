@@ -57,6 +57,7 @@ export const SECTIONS = [
   { id: "convs", title: "Plusieurs convs", sub: "Un compte de l’équipe avec trois convs\u00a0: la liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre" },
   { id: "couple", title: "En couple", sub: "Un compte de l’équipe lu «\u00a0En couple\u00a0» (écran 06)\u00a0: la température à la place des étapes" },
   { id: "etats", title: "États", sub: "Le paiement par-dessus, écrans d’erreur, survol à la souris" },
+  { id: "equipe", title: "L’équipe et les relances", sub: "Le tableau de bord (/admin, des chiffres d’exemple), la relance par mail et sa désinscription" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
 
@@ -1253,6 +1254,62 @@ export const STATES = [
     journey: EXPORT,
     hover: { role: "link", name: /Continuer/ },
     only: "d",
+  },
+
+  /* ———— L’équipe et les relances ———— */
+  {
+    id: "A1",
+    section: "equipe",
+    title: "Tableau de bord",
+    state: "L’argent et les gestes de l’équipe",
+    route: "/apercu/admin",
+    full: true,
+    note: "Les chiffres sont ceux de l’aperçu (/apercu/admin)\u00a0; la vraie page (/admin) est réservée à BLUSH_ADMINS. Nouveaux\u00a0: les ventes et les bulles (aujourd’hui, 7 jours), l’entonnoir des achats, les offres uniques, les derniers gestes, et les trois gestes (des bulles, un rapport offert, des invitations). Textes à valider.",
+    changement: "Nouveau\u00a0: l’argent, l’entonnoir, les offres uniques et les gestes de l’équipe.",
+  },
+  {
+    id: "A2",
+    section: "equipe",
+    title: "Tableau de bord",
+    state: "Un geste fait",
+    route: "/apercu/admin",
+    only: "d",
+    steps: async (page) => {
+      /* L’aperçu n’a pas de session : le geste répond comme à un inconnu, et l’écran dit l’échec */
+      const bulles = page.getByRole("form", { name: "Donner des bulles" });
+      await bulles.getByLabel("Email du compte").fill("ami@exemple.fr");
+      await bulles.getByRole("button", { name: "Donner" }).click();
+      await bulles.getByRole("status").filter({ hasText: /./ }).waitFor();
+      await bulles.scrollIntoViewIfNeeded();
+    },
+    note: "Dans l’aperçu, sans session, le geste est refusé\u00a0: on voit où s’écrit sa réponse (le message, annoncé aux lecteurs d’écran). Textes à valider.",
+  },
+  {
+    id: "R1",
+    section: "equipe",
+    title: "Mail de relance",
+    state: "«\u00a0Ta suite t’attend\u00a0»",
+    route: "/apercu/mail?type=relance",
+    full: true,
+    note: "Deux heures après une feuille de paiement fermée sans payer (une fois par compte). Ni prénom, ni rien de la conv. Texte à valider (et par un juriste\u00a0: la prospection).",
+    changement: "Nouveau.",
+  },
+  {
+    id: "R2",
+    section: "equipe",
+    title: "Désinscription",
+    state: "La question",
+    route: "/desinscription?id=exemple&cle=exemple",
+    note: "Le lien du pied de la relance. Un bouton plutôt que le lien seul (les messageries ouvrent les liens pour les vérifier). Textes à valider.",
+    changement: "Nouveau.",
+  },
+  {
+    id: "R3",
+    section: "equipe",
+    title: "Désinscription",
+    state: "Un lien qui ne marche pas",
+    route: "/desinscription",
+    changement: "Nouveau.",
   },
 
   /* ———— Design system ———— */

@@ -2,6 +2,7 @@ import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { mailAttente } from "@/server/mail-attente";
 import { mailCode } from "@/server/mail-code";
 import { mailRapport } from "@/server/mail-rapport";
+import { mailRelance } from "@/server/mail-relance";
 import { AUTRE } from "../ecriture/exemple";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,8 @@ export const dynamic = "force-dynamic";
 /**
  * Hors de Vercel seulement (src/proxy.ts) : un mail tel qu’il partira. Le code (par défaut) ; `?type=rapport` (`&sobre=1` :
  * le mode sobre), celui de l’histoire d’exemple (son prénom au chapitre 5 du sommaire) ; ou `?type=attente`, celui de la
- * liste d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée).
+ * liste d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
+ * `?type=relance`, la relance « Ta suite t’attend ».
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -25,6 +27,8 @@ export async function GET(req: Request) {
             retrait: `${url.origin}/attente/retirer?id=exemple&cle=exemple`,
             convEffacee: p.get("conv") === "1",
           }).html
-        : mailCode("159714", url.origin).html;
+        : type === "relance"
+          ? mailRelance({ base: url.origin, lien: `${url.origin}/rapport?paiement=1`, desinscription: `${url.origin}/desinscription?id=exemple&cle=exemple` }).html
+          : mailCode("159714", url.origin).html;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
