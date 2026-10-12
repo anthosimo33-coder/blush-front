@@ -5,7 +5,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
  * Le CAPTCHA aux portes sans compte (src/server/captcha.ts), les routes appelées comme le ferait le navigateur : la
  * demande de code (le jeton du widget, un par demande), le laissez-passer des imports (/api/captcha, puis un import et
  * son nouvel essai, ou les lots d’un enregistrement), toujours vérifiés AVANT toute limite comptée. Cloudflare est un
- * faux fetch ; les cookies et la clé secrète sont simulés (`etat`).
+ * faux fetch ; les cookies et la clé secrète sont simulés (`etat`). Chaque import porte la case de l’import cochée
+ * (src/server/juridique.ts), vérifiée avant le CAPTCHA.
  */
 type Attributs = { expires?: Date; httpOnly?: boolean };
 const etat = vi.hoisted(() => ({
@@ -39,6 +40,7 @@ import { POST as postCapturesRoute } from "@/app/api/captures/route";
 import { POST as postLot } from "@/app/api/captures/lot/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postImport } from "@/app/api/import/route";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { nomDuCookie } from "@/lib/noms-cookies";
 import { ouvrirSession } from "@/server/auth";
@@ -86,6 +88,7 @@ const histoires: string[] = [];
 const importer = async (entetes: { ip?: string } = {}) => {
   const fd = new FormData();
   fd.append("fichier", convDeTest("01-a-deux-doigts.txt"));
+  fd.append("consentement", CASE_IMPORT.version);
   const r = await postImport(requete("/api/import", { method: "POST", body: fd, ...entetes }));
   if (r.status === 200) histoires.push(((await r.clone().json()) as { story: { id: string } }).story.id);
   return r;
@@ -247,6 +250,7 @@ describe("les captures et l’enregistrement d’écran sans compte : le laissez
     const fd = new FormData();
     fd.append("captures", png());
     fd.append("app", "instagram");
+    fd.append("consentement", CASE_IMPORT.version);
     return fd;
   };
   const envoyer = {
@@ -257,7 +261,7 @@ describe("les captures et l’enregistrement d’écran sans compte : le laissez
         requete("/api/captures/video", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa", 0), lotVideo("Léa", 100)], cle: crypto.randomUUID() }),
+          body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa", 0), lotVideo("Léa", 100)], cle: crypto.randomUUID(), consentement: CASE_IMPORT.version }),
           ip,
         }),
       ),
