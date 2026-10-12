@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CONDITIONS, PARTIES_CONDITIONS } from "@/contenu/conditions";
 import { CASE_IMPORT, CASE_RENONCIATION, texteCaseImport } from "@/contenu/consentements";
 import { CHAMPS_EDITEUR, EDITEUR, HEBERGEUR, MENTIONS } from "@/contenu/mentions-legales";
+import { CATALOGUE, COUT_EN_BULLES, prixDe } from "@/contenu/offres";
 import { champsEditeurManquants, consentementImport, editeurComplet, renonciationPaiement } from "@/server/juridique";
 
 /*
@@ -46,7 +47,7 @@ describe("l’accord de l’import", () => {
      * conditions changé fait échouer ce test : changez CASE_IMPORT.version (une date), puis ici la version et l’empreinte.
      */
     const empreinteDesConditions = createHash("sha256").update(JSON.stringify(PARTIES_CONDITIONS)).digest("hex").slice(0, 16);
-    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-12", conditions: "64238bc0c295101e" });
+    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-12", conditions: "4b2bebd95de8f5ca" });
   });
 
   it("la case de l’import dit les 18 ans, les conditions et l’accord pour ce qui est intime", () => {
@@ -122,8 +123,24 @@ describe("les conditions", () => {
       "médiateur de la consommation",
     ])
       expect(texte, attendu).toContain(attendu);
-    /* Les prix et le coût des bulles, ceux du lot (src/contenu/offres.ts, réécrit par le socle, les donne au paiement) */
-    for (const prix of ["9,90 €", "14,90 €", "4,90 €", "19,90 €", "10 bulles", "90 bulles", "1 bulle", "2 bulles", "3 bulles"]) expect(texte, prix).toContain(prix);
+  });
+
+  it("disent les prix, les bulles et le coût d’une réponse du catalogue (src/contenu/offres.ts), ceux que le serveur fait payer", () => {
+    /*
+     * Lus dans le catalogue, jamais recopiés ici : un prix ou un nombre de bulles qui change fait échouer ce test tant que
+     * les conditions (et la version de la case de l’import qui les cite, plus haut) ne le disent pas
+     */
+    const n = (b: number) => `${b} bulle${b > 1 ? "s" : ""}`;
+    const { rapport, premium, pack30, pack80, pack200 } = CATALOGUE;
+    for (const attendu of [
+      `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${n(rapport.bulles)}.`,
+      `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${n(premium.bulles)}.`,
+      `Une recharge de bulles\u00a0: ${n(pack30.bulles)} pour ${prixDe("pack30")}, ${pack80.bulles} pour ${prixDe("pack80")}, ${pack200.bulles} pour ${prixDe("pack200")}.`,
+      `Une réponse écrite\u00a0: ${n(COUT_EN_BULLES.reponse)}.`,
+      `Une réponse en vocal\u00a0: ${n(COUT_EN_BULLES.vocal)}.`,
+      `Une réponse à un message avec des captures ou un export\u00a0: ${n(COUT_EN_BULLES.ajout)}.`,
+    ])
+      expect(texte, attendu).toContain(attendu);
   });
 
   it("ne présentent jamais BLUSH comme une thérapie ni un accès « à vie », et ne nomment aucune IA", () => {

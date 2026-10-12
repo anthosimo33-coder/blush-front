@@ -1,19 +1,25 @@
 import { URGENCES } from "./aide";
 import { CASE_RENONCIATION } from "./consentements";
+import { CATALOGUE, COUT_EN_BULLES, prixDe } from "./offres";
 
 /*
  * Les conditions de BLUSH (la page /conditions) : les conditions d’utilisation, puis celles de la vente. Elles suivent
  * les décisions du lot « prêt à lancer » : un achat une fois (pas d’abonnement), Whop vendeur en titre, des prix TTC,
  * les bulles du chat, le contenu livré tout de suite et la renonciation au droit de rétractation, 18 ans et plus, et
  * jamais un service de conseil ni de thérapie (Whop les interdit, et BLUSH n’en est pas un).
- * Les prix sont écrits ici en toutes lettres : ceux du paiement viennent de src/contenu/offres.ts, que le socle du lot
- * réécrit. Un prix changé là se reporte ici (à l’intégration : les lire dans offres.ts).
+ * Les prix, les bulles de chaque offre et le coût d’une réponse sont lus dans le catalogue (src/contenu/offres.ts), celui
+ * que le serveur fait payer : jamais recopiés ici. Un prix changé là change donc ce texte, et son empreinte (plus bas).
  * La case de l’import fait accepter ces conditions : un changement ici change aussi la version de CASE_IMPORT
  * (src/contenu/consentements.ts) : tests/unit/juridique.test.ts fige leur empreinte avec cette version.
  * TODO(produit): à relire par un juriste.
  * TODO(produit): textes nouveaux, à valider (dont les bulles perdues quand on efface son compte, le préavis si BLUSH
  * fermait, et les numéros d’urgence).
  */
+
+/** « 1 bulle », « 10 bulles ». */
+const bulles = (n: number) => `${n} bulle${n > 1 ? "s" : ""}`;
+
+const { rapport, premium, pack30, pack80, pack200 } = CATALOGUE;
 
 /** Un morceau d’une section : un paragraphe, ou une liste à puces. */
 export type Bloc = string | readonly string[];
@@ -82,9 +88,9 @@ const VENTE: readonly Section[] = [
     blocs: [
       "Ton verdict et le premier chapitre de ton rapport sont gratuits. Le reste s’achète une fois\u00a0: pas d’abonnement.",
       [
-        "Le rapport d’une conv, 9,90 €\u00a0: tous ses chapitres, et 10 bulles.",
-        "Premium, 14,90 €\u00a0: le rapport de cette conv, et 90 bulles.",
-        "Une recharge de bulles\u00a0: 30 bulles pour 4,90 €, 80 pour 9,90 €, 200 pour 19,90 €.",
+        `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${bulles(rapport.bulles)}.`,
+        `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${bulles(premium.bulles)}.`,
+        `Une recharge de bulles\u00a0: ${bulles(pack30.bulles)} pour ${prixDe("pack30")}, ${pack80.bulles} pour ${prixDe("pack80")}, ${pack200.bulles} pour ${prixDe("pack200")}.`,
       ],
       "Un rapport, c’est la lecture d’une conv\u00a0: une autre conv a son propre rapport.",
       "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, ou des bulles en plus après un achat ou à ta première recharge. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
@@ -96,7 +102,11 @@ const VENTE: readonly Section[] = [
     titre: "Les bulles",
     blocs: [
       "Une bulle, c’est une réponse de BLUSH, quoi que tu lui dises\u00a0: dans le chat, comme à «\u00a0Ta question\u00a0» sous ton rapport.",
-      ["Une réponse écrite\u00a0: 1 bulle.", "Une réponse en vocal\u00a0: 2 bulles.", "Une réponse à un message avec des captures ou un export\u00a0: 3 bulles."],
+      [
+        `Une réponse écrite\u00a0: ${bulles(COUT_EN_BULLES.reponse)}.`,
+        `Une réponse en vocal\u00a0: ${bulles(COUT_EN_BULLES.vocal)}.`,
+        `Une réponse à un message avec des captures ou un export\u00a0: ${bulles(COUT_EN_BULLES.ajout)}.`,
+      ],
       "Sans bulle\u00a0: ton verdict, ton rapport, sa fiche, et les alertes quand BLUSH s’inquiète pour toi (une réponse du chat qui en devient une t’est rendue).",
       "Tes bulles n’ont pas de date de fin. Elles ne s’échangent pas contre de l’argent et ne passent pas d’un compte à un autre.",
       "À zéro bulle, BLUSH écrit quand même sa réponse\u00a0: elle t’attend, et se lit après une recharge.",
