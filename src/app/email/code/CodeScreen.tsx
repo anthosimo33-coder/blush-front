@@ -14,6 +14,7 @@ import { cheminDe } from "@/lib/navigation";
 import { CODE_RENVOI_S } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
+import { Captcha } from "@/components/ui/Captcha";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
@@ -150,20 +151,24 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         </>
       }
       footer={
-        <Button
-          arrow
-          disabled={code.length !== LENGTH || busy}
-          loading={busy}
-          loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
-          onClick={() => void verify(code)}
-        >
-          {!connexion
-            ? "Créer mon rapport"
-            : suite.startsWith("/importer/")
-              ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv */
-                "Continuer"
-              : "Retrouver mes convs"}
-        </Button>
+        <>
+          {/* Le CAPTCHA de « Renvoyer le code » (un mail de plus) : invisible tant qu’il ne demande pas de geste */}
+          <Captcha action="code" />
+          <Button
+            arrow
+            disabled={code.length !== LENGTH || busy}
+            loading={busy}
+            loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
+            onClick={() => void verify(code)}
+          >
+            {!connexion
+              ? "Créer mon rapport"
+              : suite.startsWith("/importer/")
+                ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv */
+                  "Continuer"
+                : "Retrouver mes convs"}
+          </Button>
+        </>
       }
     >
       {/* Un seul vrai champ, posé sur les 6 cases : saisie, collage et code proposé par le téléphone */}

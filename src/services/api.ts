@@ -27,10 +27,13 @@ import type { Account, AvanceVideo, CibleImage, CleFixe, CleJson, CleRoute, Hist
 import { ErreurApi } from "@/types/erreurs-api";
 import { messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
+import { ENTETE_CAPTCHA } from "@/lib/captcha";
+import { cleDuSiteCaptcha } from "@/lib/publique";
 import { tracer } from "@/lib/tracer";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
 import { ENTETE_CONV, lireConvDeLaPage, writeStoryCookie } from "./session";
+import { jetonCaptcha } from "./captcha";
 
 /*
  * Les préparateurs d’un export (fflate, les lecteurs d’Instagram) et d’un enregistrement d’écran ne sont chargés qu’au
@@ -61,8 +64,11 @@ function avecConv(entetes?: HeadersInit): Headers {
   return h;
 }
 
-/** Ce qu’un appel ajoute à sa requête : sa recherche (`?avant=…`), keepalive (elle part même si la page se ferme), un signal pour l’arrêter. */
-type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal };
+/**
+ * Ce qu’un appel ajoute à sa requête : sa recherche (`?avant=…`), keepalive (elle part même si la page se ferme), un signal
+ * pour l’arrêter, des en-têtes (le jeton du CAPTCHA).
+ */
+type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal; entetes?: HeadersInit };
 
 /** Ce qu’un appel à la route K prend : son corps, quand sa ligne du contrat en reçoit un (un objet JSON, ou un formulaire). */
 type ArgumentsDe<K extends CleRoute> = [Routes[K]["corps"]] extends [never] ? [options?: Options & { corps?: never }] : [options: Options & { corps: Routes[K]["corps"] }];
@@ -78,6 +84,7 @@ function requete<K extends CleFixe>(cle: K, options: Options & { corps?: Routes[
   const chemin = cle.slice(espace + 1);
   const { corps, recherche, keepalive, signal } = options;
   const h = avecConv(entetes);
+  new Headers(options.entetes).forEach((valeur, nom) => h.set(nom, valeur));
   if (corps !== undefined && !(corps instanceof FormData)) h.set("content-type", "application/json");
   return fetch(recherche ? `${chemin}?${recherche}` : chemin, {
     method,
@@ -228,11 +235,31 @@ function quandVisible(): Promise<void> {
 
 /* ———— Import ———— */
 
+/** L’en-tête du jeton du CAPTCHA, s’il y en a un (sinon rien : le serveur dira « captcha » s’il en voulait un). */
+const enteteCaptcha = (jeton: string | null): HeadersInit => (jeton ? { [ENTETE_CAPTCHA]: jeton } : {});
+
+/**
+ * Le laissez-passer du CAPTCHA, avant un import (src/server/captcha.ts) : le jeton du widget de l’écran, échangé contre un
+ * cookie. Lancé pendant que le navigateur prépare ses fichiers, attendu juste avant de les envoyer : il ne retarde rien.
+ * Un compte connecté le reçoit sans rien prouver. Sans clé publique, il n’y a rien à faire. Rejette avec l’ErreurApi du
+ * serveur (« captcha », « trop »).
+ */
+function laissezPasser(): Promise<void> {
+  if (!cleDuSiteCaptcha()) return Promise.resolve();
+  const demande = (async () => {
+    await appel("POST /api/captcha", { entetes: enteteCaptcha(await jetonCaptcha()) });
+  })();
+  /* Attendu plus tard : un échec avant (le fichier illisible) ne doit pas devenir une promesse rejetée sans personne */
+  demande.catch(() => {});
+  return demande;
+}
+
 /**
  * Un export : lu et réduit dans le navigateur. Un export Instagram complet : `choisir` fait choisir la conv
  * (null : on a renoncé, erreur « annule »), et seule celle-là part. `onAvance` : où en est le tour de ses convs (de 0 à 1).
  */
 export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]) => Promise<string | null>, onAvance?: (part: number) => void): Promise<Source> {
+  const passe = laissezPasser();
   const fd = new FormData();
   const { analyserExport } = await pExport();
   let pret: Awaited<ReturnType<typeof analyserExport>>;
@@ -248,6 +275,7 @@ export async function uploadExport(file: File, choisir?: (convs: ConvInstagram[]
     if (id == null) throw new ErreurApi("annule", 0);
     fd.append("export", await pret.paquetDe(id), "export.json.gz");
   }
+  await passe;
   return (await appel("POST /api/import", { corps: fd })).source;
 }
 
@@ -259,6 +287,7 @@ export async function uploadScreenshots(
   files: File[],
   opts: { app: AppKind; mode: "first" | "add"; onAvance?: (a: AvanceVideo) => void },
 ): Promise<{ source: Source; messagesRead: number }> {
+  const passe = laissezPasser();
   const fd = new FormData();
   try {
     (await preparerCaptures(files)).forEach((b, k) => fd.append("captures", b, `capture-${k + 1}.jpg`));
@@ -269,6 +298,7 @@ export async function uploadScreenshots(
   fd.append("app", opts.app);
   fd.append("mode", opts.mode);
   fd.append("cle", cleEnvoi());
+  await passe;
   return avecReprise(
     () => appel("POST /api/captures", { corps: fd }),
     () => opts.onAvance?.({ etape: "reprise" }),
@@ -281,6 +311,7 @@ export async function uploadScreenshots(
  * comme des captures.
  */
 export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
+  const passe = laissezPasser();
   const { imagesDeLaVideo, lotsDe, VideoIllisible } = await pVideo();
   let images: Blob[];
   try {
@@ -295,6 +326,8 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
    * deux fois (celles qui recollent deux lots).
    */
   const lots = lotsDe(images, 6, (b) => b.size, ENVOI_IMAGES_MAX);
+  /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
+  await passe;
   const lus: unknown[] = new Array(lots.length);
   let faits = 0;
   onAvance?.({ etape: "lecture", faits, total: lots.length });
@@ -341,7 +374,8 @@ export async function uploadRecording(file: File, app: AppKind, onAvance?: (a: A
 
 /** Envoie le code à 6 chiffres par email. */
 export async function sendLoginCode(email: string): Promise<{ email: string }> {
-  return appel("POST /api/auth/code", { corps: { email } });
+  /* Le jeton du CAPTCHA de l’écran, un par demande (src/server/captcha.ts) */
+  return appel("POST /api/auth/code", { corps: { email }, entetes: enteteCaptcha(await jetonCaptcha()) });
 }
 
 /** Vérifie le code reçu : le compte est créé (sans mot de passe) à la première vérification. */

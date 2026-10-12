@@ -13,6 +13,7 @@ import {
   derniereHistoire,
   DOMAINE,
   emailLibre,
+  ENTETE_DU_JETON,
   expect,
   exportWhatsApp,
   histoiresDe,
@@ -22,8 +23,10 @@ import {
   nouvelInvite,
   oublierEmail,
   origine,
+  fauxCloudflare,
   pageAuRepos,
   poserLaReprise,
+  prouverHumain,
   poserLeParcours,
   rapportCommeLeVraiModele,
   RESEAU,
@@ -56,6 +59,7 @@ const emailDuParcours = (id: string, ecran: "m" | "d") => `noe-${id.toLowerCase(
 /** Une conv importée sans compte (POST /api/import), comme à l’écran de l’export : le brouillon tient par son cookie. */
 async function importerUnBrouillon(page: Page, testInfo: TestInfo): Promise<string> {
   const conv = exportWhatsApp(testInfo);
+  await prouverHumain(page.request, testInfo);
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
     multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) } },
@@ -111,7 +115,7 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       await oublierEmail(email);
       const histoire = await importerUnBrouillon(page, testInfo);
       const depuis = Date.now();
-      const envoi = await page.request.post("/api/auth/code", { headers: origine(testInfo), data: { email }, timeout: RESEAU });
+      const envoi = await page.request.post("/api/auth/code", { headers: { ...origine(testInfo), ...ENTETE_DU_JETON }, data: { email }, timeout: RESEAU });
       expect(envoi.status(), "le code de connexion est demandé").toBe(200);
       await poserLeParcours(page, { email });
       return { histoire, codeFaux: autreCode(await dernierCode(email, { depuis })) };
@@ -204,6 +208,8 @@ for (const etat of STATES) {
       permissions: ["clipboard-read", "clipboard-write", "microphone"],
     });
     suivreLeNavigateur(contexte);
+    /* Le faux script de Cloudflare : le CAPTCHA passe, sans réseau (tests/e2e/aide/captcha.ts) */
+    await fauxCloudflare(contexte);
     const retenues: Route[] = [];
     try {
       const page = await contexte.newPage();

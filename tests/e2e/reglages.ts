@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { CLES_DE_TEST_TURNSTILE } from "../../src/lib/captcha";
 
 /*
  * Les réglages des tests de bout en bout, lus par playwright.config.ts (les serveurs) et par les aides (tests/e2e/aide).
@@ -28,6 +29,12 @@ export const BOITE_MAILS = resolve(RACINE, `test-results/boite-mails-${PORT}`);
 /** Une clé de chiffrement fictive (32 octets en base64), pour ces tests seulement. */
 export const CLE = "Y2xlLWZpY3RpdmUtZGVzLXRlc3RzLWUyZS1ibHVzaCE=";
 export const CRON_SECRET = "secret-fictif-de-la-purge-e2e";
+
+/**
+ * Les clés de test de Cloudflare qui passent toujours (src/lib/captcha.ts) : la publique est écrite dans les pages au build
+ * (tests/e2e/construire.mjs), la secrète fait répondre le serveur sans appeler Cloudflare (src/server/captcha.ts).
+ */
+export const TURNSTILE = { publique: CLES_DE_TEST_TURNSTILE.publiques[0], secrete: CLES_DE_TEST_TURNSTILE.secretes[0] };
 
 export const DOMAINE = "e2e.blush.test";
 /** L’équipe : reçoit les alertes (BLUSH_ALERTES) et ouvre /admin (BLUSH_ADMINS). */

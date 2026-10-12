@@ -56,6 +56,7 @@ const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/auth/code",
   "POST /api/auth/deconnexion",
   "POST /api/auth/verifier",
+  "POST /api/captcha",
   "POST /api/captures",
   "POST /api/captures/lot",
   "POST /api/captures/video",
@@ -78,8 +79,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 24 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(24);
+  it("la table compte 25 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(25);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { test as base, type BrowserContext, type Page, type TestInfo } from "@playwright/test";
+import { fauxCloudflare } from "./captcha";
 import { couperLesSons, nouvelAppareil, suivreLeNavigateur } from "./page";
 
 /*
@@ -32,6 +33,8 @@ export const test = base.extend<{ autreAppareil: () => Promise<Page>; sonsAuDepa
   /* Chaque page du navigateur du test attend d’être vivante après un chargement (aide/page.ts) */
   context: async ({ context, sonsAuDepart }, fournir) => {
     suivreLeNavigateur(context);
+    /* Le faux script de Cloudflare (aide/captcha.ts) : le CAPTCHA passe sans rien demander au réseau */
+    await fauxCloudflare(context);
     if (!sonsAuDepart) await couperLesSons(context);
     await fournir(context);
   },
@@ -57,6 +60,7 @@ export { CRON_SECRET, DOMAINE, INVITES, URL_APPLI, URL_BETA } from "../reglages"
 export * from "./base";
 export * from "./beta";
 export * from "./boite";
+export * from "./captcha";
 export * from "./chat-fiche";
 export * from "./compte";
 export * from "./emails";

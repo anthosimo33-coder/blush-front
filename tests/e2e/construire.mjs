@@ -12,8 +12,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RACINE = fileURLToPath(new URL("../..", import.meta.url));
+/* La première des clés publiques de test de Cloudflare (CLES_DE_TEST_TURNSTILE, src/lib/captcha.ts) */
+const CLE_PUBLIQUE_DE_TEST = "1x00000000000000000000AA";
 const env = { ...process.env, NEXT_TELEMETRY_DISABLED: "1" };
 for (const cle of ["VERCEL", "DATABASE_URL", "DATABASE_URL_UNPOOLED", "BLUSH_BETA_FERMEE"]) delete env[cle];
+/* La clé publique de test de Cloudflare (le CAPTCHA passe toujours), écrite dans les pages : celle des serveurs des tests (playwright.config.ts) */
+env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = CLE_PUBLIQUE_DE_TEST;
 
 const build = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], { cwd: RACINE, env, stdio: "inherit" });
 if (build.status !== 0) process.exit(build.status ?? 1);

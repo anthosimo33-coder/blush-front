@@ -5,6 +5,9 @@
  * src/server/captcha.ts.
  */
 
+/** Le script de Cloudflare, rendu à la main (explicit) : il ne dessine que les widgets qu’on lui demande (src/services/captcha.ts). */
+export const SCRIPT_TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
 /** L’en-tête où le navigateur envoie le jeton du widget : à la demande de code, et à l’échange contre un laissez-passer (/api/captcha). */
 export const ENTETE_CAPTCHA = "x-blush-captcha";
 

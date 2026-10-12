@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
-import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
+import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, TURNSTILE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
 
 /*
  * Les tests de bout en bout (tests/e2e) : les vrais parcours, dans un vrai navigateur, contre le back-end, avec le
@@ -15,7 +15,8 @@ const CI = !!process.env.CI;
 
 /**
  * Un serveur des tests (tests/e2e/serveur.mjs vérifie le build, recrée la base, puis lance `next start`). Tout est
- * fictif, et il n’a aucune clé d’API : ni Anthropic, ni Resend, ni ElevenLabs, ni Mistral.
+ * fictif, et il n’a aucune clé d’API : ni Anthropic, ni Resend, ni ElevenLabs, ni Mistral ; celles du CAPTCHA sont les
+ * clés de test de Cloudflare.
  */
 const serveur = (port: number, betaFermee: boolean) => ({
   name: betaFermee ? "bêta fermée" : "appli",
@@ -41,6 +42,9 @@ const serveur = (port: number, betaFermee: boolean) => ({
     CRON_SECRET,
     BLUSH_BETA_FERMEE: betaFermee ? "1" : "0",
     BLUSH_BOITE_MAILS: BOITE_MAILS,
+    /* Le CAPTCHA, avec les clés de test de Cloudflare : le serveur répond lui-même (tests/e2e/aide/captcha.ts) */
+    TURNSTILE_SECRET_KEY: TURNSTILE.secrete,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE.publique,
   },
 });
 
