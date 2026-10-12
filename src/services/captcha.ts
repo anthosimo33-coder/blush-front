@@ -23,11 +23,18 @@ declare global {
 }
 
 let chargement: Promise<Turnstile | null> | null = null;
+/**
+ * Le dernier chargement du script a échoué (une extension, un réseau d’entreprise) : aucun jeton ne viendra. Un appel qui
+ * en voudrait un ne l’attend pas 20 secondes pour rien : un compte connecté importe tout de suite (le serveur ne lui demande
+ * rien), un visiteur sans compte lit tout de suite le message « captcha ».
+ */
+let scriptBloque = false;
 
 /** Charge le script de Cloudflare une fois (null : il n’a pas pu venir, une extension qui le bloque, le réseau). */
 function chargerTurnstile(): Promise<Turnstile | null> {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   chargement ??= new Promise((resoudre) => {
+    scriptBloque = false;
     const script = document.createElement("script");
     script.src = SCRIPT_TURNSTILE;
     script.async = true;
@@ -36,7 +43,11 @@ function chargerTurnstile(): Promise<Turnstile | null> {
       /* Le prochain écran réessaiera */
       script.remove();
       chargement = null;
+      scriptBloque = true;
       tracer("captcha:script");
+      /* Ceux qui attendaient un jeton n’en auront pas */
+      for (const attendre of attentes) attendre(null);
+      attentes.clear();
       resoudre(null);
     };
     document.head.appendChild(script);
@@ -49,7 +60,7 @@ function chargerTurnstile(): Promise<Turnstile | null> {
 /** Le widget monté (un seul à la fois : un par écran), et le jeton qu’il a rendu, pas encore pris. */
 let monte: { id: string; turnstile: Turnstile; jeton: string | null } | null = null;
 /** Les appels qui attendent un jeton. */
-const attentes = new Set<(jeton: string) => void>();
+const attentes = new Set<(jeton: string | null) => void>();
 
 /* Un jeton rendu par le widget : au premier qui l’attend, sinon gardé pour le prochain */
 function recu(jeton: string): void {
@@ -122,14 +133,15 @@ export function monterWidget(conteneur: HTMLElement, action: ActionCaptcha, inte
 
 /**
  * Le jeton du widget de l’écran, à envoyer au serveur, pris (il ne sert qu’une fois). S’il n’est pas encore là (le
- * widget travaille, ou attend un geste), on l’attend au plus `delaiMs` ; null au-delà, ou sans clé publique : le serveur
- * dira « captcha » s’il en voulait un.
+ * widget travaille, ou attend un geste), on l’attend au plus `delaiMs` ; null au-delà, sans clé publique, ou tout de suite
+ * quand le script de Cloudflare n’a pas pu venir (scriptBloque) : le serveur dira « captcha » s’il en voulait un.
  */
 export function jetonCaptcha(delaiMs = 20_000): Promise<string | null> {
   if (!cleDuSiteCaptcha()) return Promise.resolve(null);
   if (monte?.jeton) return Promise.resolve(prendre(monte.jeton));
+  if (!monte && scriptBloque) return Promise.resolve(null);
   return new Promise((resoudre) => {
-    const quandRecu = (jeton: string) => {
+    const quandRecu = (jeton: string | null) => {
       clearTimeout(minuteur);
       resoudre(jeton);
     };

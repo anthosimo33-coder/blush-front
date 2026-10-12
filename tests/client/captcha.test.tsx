@@ -134,6 +134,44 @@ describe("le jeton", () => {
   });
 });
 
+describe("le script de Cloudflare bloqué", () => {
+  it("aucun jeton ne viendra : celui qui l’attendait l’apprend tout de suite, et le suivant n’attend pas", async () => {
+    const ajoutes: HTMLScriptElement[] = [];
+    vi.spyOn(document.head, "appendChild").mockImplementation(<T extends Node>(n: T) => (ajoutes.push(n as unknown as HTMLScriptElement), n));
+    const { Captcha, jetonCaptcha } = await charger();
+    render(<Captcha action="import" />);
+    await laisser();
+    /* Un appel attend le jeton pendant que le script charge (le délai, une minute : il ne doit pas compter) */
+    let recu: string | null | undefined;
+    void jetonCaptcha(60_000).then((j) => (recu = j));
+    act(() => ajoutes[0]!.dispatchEvent(new Event("error")));
+    await laisser();
+    expect(recu).toBeNull();
+    /* Le suivant non plus : null tout de suite, sans minuteur */
+    vi.useFakeTimers();
+    await expect(jetonCaptcha(60_000)).resolves.toBeNull();
+  });
+
+  it("un compte connecté importe sans attendre le jeton : le laissez-passer part tout de suite, sans en-tête", async () => {
+    const ajoutes: HTMLScriptElement[] = [];
+    vi.spyOn(document.head, "appendChild").mockImplementation(<T extends Node>(n: T) => (ajoutes.push(n as unknown as HTMLScriptElement), n));
+    const { Captcha, api } = await charger();
+    render(<Captcha action="import" />);
+    await laisser();
+    act(() => ajoutes[0]!.dispatchEvent(new Event("error")));
+    await laisser();
+    const appels: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      appels.push(`${String(url)} ${new Headers(init?.headers).get(ENTETE_CAPTCHA) ?? "-"}`);
+      return url === "/api/captcha" ? json({ ok: true }) : json({ source: { kind: "export", app: "whatsapp" }, story: { id: "s1" } });
+    });
+    /* Le jeton attendu, ce serait 20 secondes : bien plus que le délai du test */
+    const conv = new File(["[01/09/2026 10:00:00] Léa: salut\n[01/09/2026 10:01:00] Tom: hey\n"], "_chat.txt", { type: "text/plain" });
+    await api.uploadExport(conv);
+    expect(appels).toEqual(["/api/captcha -", "/api/import -"]);
+  });
+});
+
 describe("les appels", () => {
   it("la demande de code porte le jeton du widget dans son en-tête", async () => {
     const { repondre } = fauxTurnstile();
