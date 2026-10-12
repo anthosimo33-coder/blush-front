@@ -41,8 +41,12 @@ async function fil(storyId: string): Promise<Fil> {
       .orderBy(desc(schema.chatMessages.id))
       .limit(ECHANGES_DANS_LE_FIL * 2)
   ).reverse();
-  return lignes.map((l) => {
-    if (l.role !== "toi") return { de: "blush" as const, texte: coffre.lire("chat_messages.data:blush", l.data).resume };
+  /*
+   * Une réponse verrouillée (pas encore payée) n’entre pas dans le fil : BLUSH pourrait la redire dans une réponse
+   * suivante, payée moins cher qu’elle (une réponse à des captures coûte 3). Son message à lui y reste
+   */
+  return lignes.flatMap((l) => {
+    if (l.role !== "toi") return l.verrouillee ? [] : [{ de: "blush" as const, texte: coffre.lire("chat_messages.data:blush", l.data).resume }];
     const toi = coffre.lire("chat_messages.data:toi", l.data);
     return { de: "toi" as const, texte: toi.texte, ...(toi.lignes?.length ? { lignes: toi.lignes } : {}) };
   });
