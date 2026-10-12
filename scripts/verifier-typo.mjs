@@ -4,11 +4,11 @@
  * - dans les textes que quelqu’un lit (l’appli, ses images de partage et ses mails : voir regleDesInsecables), une espace
  *   normale avant : ; ? ! » ou après « : il y faut l’insécable, sinon le signe peut partir seul à la ligne ;
  * - dans ces mêmes fichiers, l’insécable s’écrit d’une seule façon : `{NBSP}` (src/lib/format.ts) entre deux morceaux
- *   du JSX, ` ` dans une chaîne ou un gabarit. Ni `&nbsp;` ou `{" "}` dans le JSX, ni `${NBSP}` dans un
+ *   du JSX, `\u00a0` dans une chaîne ou un gabarit. Ni `&nbsp;` ou `{"\u00a0"}` dans le JSX, ni `${NBSP}` dans un
  *   gabarit, ni une constante d’espace à soi : celles d’AdminScreen et de Partage contenaient une espace normale ;
- * - dans src, tests et prompts/lib, les caractères invisibles écrits en clair : l’insécable U+00A0 (à l’œil, une espace normale),
+ * - dans src, tests, scripts, prompts/lib et les configurations de la racine, les caractères invisibles écrits en clair : l’insécable U+00A0 (à l’œil, une espace normale),
  *   U+200E, U+200D et U+FEFF. Une chaîne ou une regex semble vide ou juste, et un éditeur peut les effacer ou les
- *   changer sans que personne le voie. On les écrit en échappement (‎…). Le U+200D qui lie deux emojis en un seul
+ *   changer sans que personne le voie. On les écrit en échappement (\u200e…), ce script compris. Le U+200D qui lie deux emojis en un seul
  *   (😮‍💨) se voit : il reste permis.
  * Seuls les textes comptent pour les deux premières règles (chaînes, gabarits, texte du JSX, lus avec le compilateur
  * TypeScript), jamais les commentaires ; dans le JSX, les morceaux d’une même phrase sont recollés comme à l’écran,
@@ -43,15 +43,15 @@ export function regleDesInsecables(f) {
   return f.startsWith("src/") && !HORS_DES_TEXTES.test(f);
 }
 
-const NBSP = " ";
+const NBSP = "\u00a0";
 /* Ce que le JSX affiche d’une expression qu’on ne sait pas lire : un mot, ni une espace ni un signe */
 const OPAQUE = "￼";
 /* Le signe d’une phrase, pas celui du code (`:root`, `!important`, `!size-10`) : rien de collé après lui */
 const AVANT = /(?<= )[:;?!»](?![\p{L}\p{N}_-])/gu;
 const APRES = /«(?= )/g;
-const INVISIBLES = /[ ‎‍﻿]/g;
+const INVISIBLES = /[\u00a0\u200e\u200d\ufeff]/g;
 const EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}️]/u;
-const NOMS = { " ": "U+00A0", "‎": "U+200E", "‍": "U+200D", "﻿": "U+FEFF" };
+const NOMS = { "\u00a0": "U+00A0", "\u200e": "U+200E", "\u200d": "U+200D", "\ufeff": "U+FEFF" };
 const ENTITES = { nbsp: NBSP, laquo: "«", raquo: "»", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 /* L’insécable écrite en entité dans le texte du JSX */
 const ENTITE_NBSP = /&(nbsp|#160|#xa0);/i;
@@ -130,7 +130,7 @@ export function problemesDe(chemin, source, { insecables = true } = {}) {
   const extrait = (t, i) => JSON.stringify(t.slice(Math.max(0, i - 24), i + 24).replaceAll(NBSP, "⍽")).slice(1, -1);
 
   for (const m of source.matchAll(INVISIBLES)) {
-    if (m[0] === "‍" && EMOJI.test(source.slice(m.index - 2, m.index)) && EMOJI.test(source.slice(m.index + 1, m.index + 3))) continue;
+    if (m[0] === "\u200d" && EMOJI.test(source.slice(m.index - 2, m.index)) && EMOJI.test(source.slice(m.index + 1, m.index + 3))) continue;
     const ecrire = m[0] === NBSP ? "l’écrire {NBSP} dans le JSX, \\u00a0 dans une chaîne" : `l’écrire en échappement (\\u${m[0].codePointAt(0).toString(16).padStart(4, "0")})`;
     problemes.push(`${chemin}:${ligneDe(m.index)} · ${NOMS[m[0]]} écrit en clair : ${ecrire}`);
   }
@@ -169,7 +169,7 @@ export function problemesDe(chemin, source, { insecables = true } = {}) {
       forme(n, '`{"\\u00a0"}` dans le JSX : écrire {NBSP} (src/lib/format.ts)');
     if (ts.isTemplateSpan(n) && ((ts.isIdentifier(n.expression) && n.expression.text === "NBSP") || chaine(n.expression) === NBSP))
       forme(n.expression, 'l’insécable d’un gabarit s’écrit \\u00a0 dans son texte, ni `${NBSP}` ni `${"\\u00a0"}`');
-    if (ts.isVariableDeclaration(n) && /^[  ]$/.test(chaine(n.initializer) ?? "") && chemin !== "src/lib/format.ts")
+    if (ts.isVariableDeclaration(n) && /^[ \u00a0]$/.test(chaine(n.initializer) ?? "") && chemin !== "src/lib/format.ts")
       forme(n, "une constante d’espace : importer NBSP de src/lib/format.ts (une copie peut contenir une espace normale)");
 
     if ((ts.isJsxElement(n) || ts.isJsxFragment(n)) && !lus.has(n)) {
@@ -196,8 +196,18 @@ function* sources(dossier) {
   for (const f of readdirSync(join(RACINE, dossier), { recursive: true })) if (EXTENSIONS.test(f)) yield join(dossier, f).split(sep).join("/");
 }
 
-/** Vérifie des fichiers (par défaut : src, tests et prompts/lib) ; renvoie leurs problèmes, et combien ont été lus. */
-export function verifier(fichiers = [...sources("src"), ...sources("tests"), ...sources("prompts/lib")]) {
+/* Les configurations de la racine (next.config.ts, eslint.config.mjs, playwright.config.ts…) : ses fichiers de code, sans les dossiers */
+function* racine() {
+  for (const e of readdirSync(RACINE, { withFileTypes: true })) if (e.isFile() && EXTENSIONS.test(e.name)) yield e.name;
+}
+
+/** Les fichiers vérifiés par défaut : src, tests, scripts (ce script compris), prompts/lib et les configurations de la racine. */
+export function aVerifier() {
+  return [...sources("src"), ...sources("tests"), ...sources("scripts"), ...sources("prompts/lib"), ...racine()];
+}
+
+/** Vérifie des fichiers (par défaut : aVerifier()) ; renvoie leurs problèmes, et combien ont été lus. */
+export function verifier(fichiers = aVerifier()) {
   const lus = fichiers.map((f) => relative(RACINE, resolve(RACINE, f)).split(sep).join("/")).filter((f) => !GENERES.has(f));
   const problemes = lus.flatMap((f) => problemesDe(f, readFileSync(resolve(RACINE, f), "utf8"), { insecables: regleDesInsecables(f) }));
   return { problemes, lus: lus.length };

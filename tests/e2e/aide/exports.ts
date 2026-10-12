@@ -7,7 +7,8 @@ import { FACTICE } from "../../../src/server/ia/factice-valeurs";
 
 /*
  * Des fichiers à importer, fictifs, au format réel des applis : deux prénoms inventés, une conv inventée. Jamais une
- * vraie conv (prompts/evals/convs en contient : elles restent dans le banc de test des prompts).
+ * vraie conv (le dépôt est public). Les convs du banc de test des prompts (prompts/evals/convs), fictives elles aussi,
+ * restent dans le sous-module privé : on ne les recopie pas ici.
  * Chaque fichier est écrit dans le dossier du test (testInfo.outputPath) : rien n’est partagé entre deux tests.
  */
 

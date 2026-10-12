@@ -144,7 +144,6 @@ export function LectureScreen({ total }: { total: number }) {
           /* Le budget de l’IA du jour : rien à relancer, la lecture repart quand on revient après minuit */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">{SOUFFLE}</h1>
-            {/* TODO(produit): phrase à valider */}
             <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">Ta conv est bien là{NBSP}: la lecture reprendra quand tu reviendras.</p>
           </div>
         ) : failed ? (

@@ -247,14 +247,12 @@ test("captures : une capture illisible, l’écran d’erreur le dit, et « Choi
 });
 
 /*
- * Un bug : dès que la capture qu’on glisse change de place, React déplace son élément dans la liste et le navigateur lui
- * retire la capture du pointeur (lostpointercapture, dans Chromium comme dans WebKit). Lâchée ailleurs que sur une vignette
- * (au-dessus de la grille, entre deux vignettes, sur une vignette encore en mouvement), le pointerup n’arrive à aucune
- * vignette : la capture reste soulevée (sa croix cachée), rien n’est annoncé, et le simple survol d’une autre vignette,
- * bouton relâché, la déplace encore. src/components/ui/ReorderGrid.tsx:68 (setPointerCapture sur la vignette)
- * et :142-143 (la fin du glisser n’écoute que les vignettes).
+ * Dès que la capture qu’on glisse change de place, React déplace son élément dans la liste et le navigateur lui retire
+ * le pointeur (lostpointercapture, dans Chromium comme dans WebKit). La fin du glisser s’écoute donc sur la fenêtre
+ * (src/components/ui/ReorderGrid.tsx) : lâchée ailleurs que sur une vignette (au-dessus de la grille, entre deux
+ * vignettes), la capture se pose, c’est annoncé, et le simple survol d’une autre vignette, bouton relâché, ne la déplace plus.
  */
-test.fixme("captures : au pointeur, lâcher la capture hors de la grille la pose, et survoler ensuite ne déplace plus rien", async ({ page }, testInfo) => {
+test("captures : au pointeur, lâcher la capture hors de la grille la pose, et survoler ensuite ne déplace plus rien", async ({ page }, testInfo) => {
   await page.goto("/importer/captures?app=autre");
   await choisirFichier(page, capturesPng(testInfo, 3), "Choisir mes captures");
   const depart = await centreDeLaVignette(page, 1, 3);
@@ -278,12 +276,10 @@ test.fixme("captures : au pointeur, lâcher la capture hors de la grille la pose
 });
 
 /*
- * Un bug : retirer une capture au clavier (Suppr, ou Entrée sur sa croix) fait perdre le focus, qui retombe sur la page.
- * Il faut tout reparcourir à la tabulation pour revenir à la grille, alors qu’un déplacement aux flèches garde le focus
- * sur la capture. src/components/ui/ReorderGrid.tsx:127-129 (Suppr) et :205 (la croix) appellent onRemove
- * sans redonner le focus à la grille.
+ * Retirer une capture au clavier (Suppr, ou Entrée sur sa croix) ne fait pas retomber le focus sur la page : il va à
+ * la capture qui prend sa place (ou à la précédente), comme un déplacement aux flèches le garde sur la capture.
  */
-test.fixme("captures : après Suppr ou la croix au clavier, le focus reste dans la grille", async ({ page }, testInfo) => {
+test("captures : après Suppr ou la croix au clavier, le focus reste dans la grille", async ({ page }, testInfo) => {
   await page.goto("/importer/captures?app=autre");
   await choisirFichier(page, capturesPng(testInfo, 4), "Choisir mes captures");
   await capture(page, 2, 4).focus();

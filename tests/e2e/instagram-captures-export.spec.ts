@@ -206,13 +206,15 @@ test("Instagram : une conv trop courte choisie dans l’export complet, l’écr
 });
 
 /*
- * Un bug de texte : Instagram s’importe par son export (la tuile, l’écran d’erreur « trop courte » qui envoie vers les
- * captures en disant « Un export doit avoir au moins 50 messages »). Puis l’écran des captures affirme « Instagram et
- * Hinge ne permettent pas d’exporter », juste après un export Instagram.
- * src/app/importer/captures/CapturesScreen.tsx:200 (le texte d’avant le back-end, quand Instagram passait par les captures).
+ * Instagram s’importe par son export (la tuile, l’écran d’erreur « trop courte » qui envoie vers les captures en disant
+ * « Un export doit avoir au moins 50 messages ») : l’écran des captures ne dit donc pas qu’Instagram ne s’exporte pas,
+ * juste après un export Instagram. Hinge, qui ne s’exporte pas, le dit toujours.
  */
-test.fixme("Instagram : l’écran des captures ne dit pas qu’Instagram ne s’exporte pas", async ({ page }) => {
+test("Instagram : l’écran des captures ne dit pas qu’Instagram ne s’exporte pas", async ({ page }) => {
   await page.goto("/importer/captures?app=instagram");
   await expect(page.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeVisible();
   await expect(page.getByRole("main").getByText(/Instagram[^.]*ne permett?(?:ent)? pas d’exporter/)).toHaveCount(0);
+  await expect(page.getByText("Les captures suffisent aussi : on reconnaît les messages, les dates et qui parle.")).toBeVisible();
+  await page.goto("/importer/captures?app=hinge");
+  await expect(page.getByText("Hinge ne permet pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeVisible();
 });

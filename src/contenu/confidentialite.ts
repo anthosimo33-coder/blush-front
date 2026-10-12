@@ -44,24 +44,37 @@ export const NOTE_ENREGISTREMENT = "La vidéo reste sur ton téléphone\u00a0: s
 
 /**
  * Sous l’en-tête du rapport, avant « En savoir plus » : la conv est à toi, rien n’en sort sans toi (le détail est dans
- * FEUILLE_CONFIDENTIALITE). Remplace « Ta conv reste privée », un « 100 % privé » qui ne disait pas que l’IA la lit.
- * TODO(produit): formulation proposée (elle reprend le titre de la feuille), à valider avec les autres.
+ * FEUILLE_CONFIDENTIALITE, dont elle reprend le titre). Remplace « Ta conv reste privée », un « 100 % privé » qui ne
+ * disait pas que l’IA la lit.
  */
 export const PROMESSE_PARTAGE = "Ta conv reste à toi, et c’est toi qui décides.";
 
 /**
- * La feuille « En savoir plus » du rapport : trois lignes, chacune dite aussi par la page (« Personne d’autre »,
- * « Chiffré », « La conv brute, effacée après ton rapport »). La ligne « effacée » dit PROMESSE_CONV, avec son détail.
- * TODO(produit): le détail de la ligne « effacée », réécrit sur la page (l’ancien « Jamais lue, au bout de 24 h » ne
- * disait pas ce qui arrivait), à valider.
+ * La feuille « En savoir plus » du rapport : trois lignes, chacune résumant une ligne de la page, nommée par son titre
+ * (`page` : « Chiffrée », « La conv brute, effacée après ton rapport », « Rien ne sort sans toi » ; tests/unit/promesses.test.ts
+ * vérifie qu’elle y est). La ligne « effacée » dit PROMESSE_CONV, avec le détail de la page (l’ancien « Jamais lue, au bout
+ * de 24 h » ne disait pas ce qui arrivait). La ligne du partage dit les deux façons de partager : le lien, qui ne montre
+ * que le verdict, et l’image (« Partager en image », src/server/partages.ts), une réponse de BLUSH avec ta question ou la
+ * chute d’un chapitre. Dans les deux, son prénom devient une initiale et le tien reste.
+ * TODO(produit): le détail de la ligne du partage, réécrit le 12 octobre (il disait « seul ton verdict part »), à valider avec le juriste.
  */
 export const FEUILLE_CONFIDENTIALITE = {
   titre: "Ta conv reste à toi.",
-  chiffree: { titre: "Chiffrée, lue seulement par l’IA", detail: "Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit." },
+  chiffree: {
+    titre: "Chiffrée, lue seulement par l’IA",
+    page: "Chiffrée",
+    detail: "Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit.",
+  },
   effacee: {
     titre: "Effacée après ton rapport",
+    page: "La conv brute, effacée après ton rapport",
     detail:
       "La conv brute part dès que ton rapport est prêt. D’ici là, elle reste chiffrée, et tu la supprimes quand tu veux. Une conv jamais lue est effacée au bout de 24\u00a0h.",
   },
-  partage: { titre: "Rien ne sort sans toi", detail: "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom." },
+  partage: {
+    titre: "Rien ne sort sans toi",
+    page: "Rien ne sort sans toi",
+    detail:
+      "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH ou un passage de ton rapport. Son prénom y devient une initiale.",
+  },
 } as const;

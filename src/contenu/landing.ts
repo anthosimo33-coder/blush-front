@@ -1,3 +1,4 @@
+import { NB_CHAPITRES } from "@/contenu/chapitres";
 import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
@@ -27,7 +28,7 @@ export const LANDING_CONVS: LandingConv[] = [
     app: "whatsapp",
     avatar: "initial",
     verdict: { emoji: "🤔", title: "Un truc coince.", subtitle: "Elle dit «\u00a0c’est pas grave\u00a0». Ses messages disent le contraire." },
-    proof: { text: "c’est pas grave, vas-y avec tes potes", caption: "28 févr., 19 h 41" },
+    proof: { text: "c’est pas grave, vas-y avec tes potes", caption: "28 févr., 19\u00a0h\u00a041" },
     confidence: "sur",
     proofs: 11,
     next: "Propose-lui une soirée rien qu’à vous deux, avec un jour précis.",
@@ -101,7 +102,7 @@ export const LANDING_CONVS: LandingConv[] = [
     app: "imessage",
     avatar: "initial",
     verdict: { emoji: "🔥", title: "Toujours le feu.", subtitle: "Il parle de vos projets sans que tu lui demandes." },
-    proof: { text: "faut qu’on parte quelque part cet été toi et moi", caption: "9 mars, 22 h 03" },
+    proof: { text: "faut qu’on parte quelque part cet été toi et moi", caption: "9 mars, 22\u00a0h\u00a003" },
     confidence: "sur",
     proofs: 8,
     next: "Réponds avec une date et une destination.",
@@ -187,7 +188,7 @@ export const LANDING_CONVS: LandingConv[] = [
     app: "whatsapp",
     avatar: "initial",
     verdict: { emoji: "🤏", title: "Il manque un petit rien.", subtitle: "Vous vous écrivez tous les jours, mais plus que pour vous organiser." },
-    proof: { text: "tu peux prendre le pain en rentrant", caption: "11 mars, 18 h 12" },
+    proof: { text: "tu peux prendre le pain en rentrant", caption: "11 mars, 18\u00a0h\u00a012" },
     confidence: "probable",
     proofs: 6,
     next: "Envoie-lui un message qui n’a rien à voir avec l’organisation.",
@@ -240,7 +241,7 @@ export const TESTIMONIALS: Testimonial[] = [];
 /** Dans le bloc BLUSH+, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
 export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confidence" | "limits"> = {
   title: "Rien ne l’indique dans votre conv.",
-  evidence: "Elle te parle tous les soirs entre 22 h et 1 h, 6 jours sur 7. Ses week-ends, elle te les raconte.",
+  evidence: "Elle te parle tous les soirs entre 22\u00a0h et 1\u00a0h, 6\u00a0jours sur 7. Ses week-ends, elle te les raconte.",
   confidence: "probable",
   limits: "BLUSH ne voit que vos messages.",
 };
@@ -252,3 +253,15 @@ export const VERDICT_EXEMPLE = {
   trend: "↗ ça se réchauffe",
   nextStep: "Ton prochain pas\u00a0: lui demander samedi, en face.",
 };
+
+/**
+ * Ce que BLUSH promet en chiffres, dans « Rapide. Complet. Discret. ». Le nombre de chapitres vient de la règle
+ * (NB_CHAPITRES) ; le dernier fait reprend PROMESSE_CONV et la page Confidentialité, qui fait foi (« La conv brute,
+ * effacée après ton rapport ») : ce qui en vient (le rapport, sa fiche) reste, chiffré, ce n’est donc pas « 0 message ».
+ * TODO(produit): « conv brute gardée après ton rapport », libellé proposé le 12 octobre (remplace « message gardé »), à valider avec le juriste.
+ */
+export const FAITS_LANDING = [
+  { valeur: "40\u00a0s", libelle: "pour analyser votre conv" },
+  { valeur: `${NB_CHAPITRES}`, libelle: "chapitres dans ton rapport" },
+  { valeur: "0", libelle: "conv brute gardée après ton rapport" },
+] as const;

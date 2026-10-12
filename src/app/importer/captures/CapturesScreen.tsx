@@ -21,7 +21,7 @@ import { ReorderGrid } from "@/components/ui/ReorderGrid";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney, useJourney } from "@/state/journey";
-import type { AppKind } from "@/types";
+import { EXPORTS, type AppKind } from "@/types";
 import { ErreurApi } from "@/types/erreurs-api";
 import { BarreLecture, CarteEnregistrement, CaseAjout, CommentFilmer, Dropzone, TEXTES_GRILLE, VignetteCapture, type Shot } from "./parts";
 
@@ -37,6 +37,16 @@ const texteAvance = (a: AvanceVideo) =>
       : a.total > 1
         ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
         : "BLUSH lit ta conv";
+
+/*
+ * Ce que l’écran des captures dit d’abord, d’après l’appli. Instagram (et WhatsApp) s’exportent : on y arrive souvent
+ * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge et les autres ne s’exportent pas.
+ * TODO(produit): « Les captures suffisent aussi », et « Ton appli » pour les autres applis, textes du 12 octobre, à valider.
+ */
+const leadCaptures = (app: AppKind) =>
+  (EXPORTS as readonly AppKind[]).includes(app)
+    ? "Les captures suffisent aussi\u00a0: on reconnaît les messages, les dates et qui parle."
+    : `${app === "hinge" ? "Hinge" : "Ton appli"} ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle.`;
 
 /** Pendant la lecture des captures (sans avancée à dire) : ce que BLUSH fait, en clair dans le bouton. */
 const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : "BLUSH lit ta capture…");
@@ -167,12 +177,15 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
-      /* La limite du jour, ou le budget de l’IA du jour atteint (« souffle ») : les captures ne sont pas en cause */
-      if (codeDe(e) === "trop" || codeDe(e) === "souffle") return setSouci(messageErreur("captures", e));
-      /* Le réseau, encore après la reprise : les captures ne sont pas en cause, elles restent là */
-      if (!(e instanceof ErreurApi)) return setSouci(messageErreur("captures", e));
-      /* La conv elle-même (trop courte, de groupe), ou la vidéo : son écran d’erreur. Toute autre réponse : illisibles */
-      echec(erreurDeParcours("captures", e) ?? "capture");
+      /*
+       * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit (« capture ») : son écran
+       * d’erreur, comme sur l’export. Tout le reste ne vient pas des captures, qui restent là : la limite du jour, le
+       * budget de l’IA (« souffle »), un refus de l’IA, une panne, une réponse sans code (un 504) ou le réseau, encore
+       * après la reprise. Il se dit sous elles (MESSAGES.captures), et on réessaie.
+       */
+      const parcours = erreurDeParcours("captures", e) ?? (codeDe(e) === "capture" ? "capture" : null);
+      if (parcours) return echec(parcours);
+      setSouci(messageErreur("captures", e));
     }
   };
 
@@ -196,9 +209,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         <>
           <ScreenTitle>{enregistrement ? "Filme ta conv." : "Choisis tes captures."}</ScreenTitle>
           <Lead size={14}>
-            {enregistrement
-              ? "iMessage ne permet pas d’exporter. Enregistre ton écran en remontant la conv\u00a0: BLUSH lit tout, message par message."
-              : "Instagram et Hinge ne permettent pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle."}
+            {enregistrement ? "iMessage ne permet pas d’exporter. Enregistre ton écran en remontant la conv\u00a0: BLUSH lit tout, message par message." : leadCaptures(captureApp)}
           </Lead>
         </>
       }
@@ -222,7 +233,6 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         ) : enregistrement ? (
           <Button onClick={choisirEnregistrement}>Choisir mon enregistrement</Button>
         ) : (
-          /* TODO(produit): libellé avant sélection absent des maquettes, à valider */
           <Button onClick={shots.open}>Choisir mes captures</Button>
         )
       }

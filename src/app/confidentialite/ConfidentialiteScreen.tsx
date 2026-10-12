@@ -44,7 +44,7 @@ export function ConfidentialiteScreen() {
       </InsetGroup>
 
       <InsetGroup title="Qui la lit" id="lecture" className="mt-6">
-        {/* Les prestataires ne sont pas nommés (choix du 9 octobre 2026) : leur rôle, et où ils sont, suffisent */}
+        {/* Les prestataires d’IA et de voix ne sont pas nommés (choix du 9 octobre 2026) : leur rôle, et où ils sont, suffisent. Les autres (l’hébergement, la base, les mails) le sont, plus bas */}
         <Ligne icone="sparkle" ton="toi" titre="Une IA, et seulement elle">
           Elle lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Notre prestataire d’IA ne s’en sert pas pour entraîner ses modèles.
         </Ligne>
@@ -54,6 +54,14 @@ export function ConfidentialiteScreen() {
         </Ligne>
         <Ligne icone="eye" titre="Personne d’autre">
           Personne chez BLUSH ne lit ta conv. Et la personne avec qui tu parles n’est jamais contactée.
+        </Ligne>
+        {/*
+         * Le lien ne montre que le verdict ; l’image, une réponse du chat (avec ta question) ou la chute d’un chapitre. Les deux
+         * sont masqués par le serveur (src/server/partages.ts). TODO(produit): ligne ajoutée le 12 octobre, à valider avec le juriste.
+         */}
+        <Ligne icone="share" ton="elle" titre="Rien ne sort sans toi">
+          Tu choisis ce que tu partages{NBSP}: ton verdict, par un lien, ou en image une réponse de BLUSH (avec ta question) ou un passage de ton rapport. Son prénom y devient une
+          initiale, le tien reste. Ta conv entière ne part jamais.
         </Ligne>
       </InsetGroup>
 
@@ -77,13 +85,13 @@ export function ConfidentialiteScreen() {
         <Ligne icone="list" titre="Ce qui reste, tant que tu le gardes">
           Ton rapport, son vocal, sa fiche et ton chat, chiffrés. Tu les supprimes quand tu veux, dans ton compte{NBSP}: tout part, vraiment.
         </Ligne>
-        {/* TODO(produit): texte à valider avec les autres textes de confidentialité (S-30 : ATTENTE_GARDEE_JOURS, src/server/attente.ts) */}
+        {/* La durée suit ATTENTE_GARDEE_JOURS (S-30, src/server/attente.ts) */}
         <Ligne icone="mail" titre="Ton email sur la liste d’attente">
           Chiffré, et gardé un an au plus. Tu t’en retires avec le lien de son mail, et «{NBSP}Tout effacer{NBSP}» l’efface aussi.
         </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 11 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 12 octobre 2026.`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Un prestataire d’IA" sub="L’IA qui lit ta conv, aux États-Unis" />

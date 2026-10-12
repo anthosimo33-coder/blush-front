@@ -253,11 +253,11 @@ test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en
   });
 });
 
-test.fixme("/email/code en bêta fermée : « On vient d’écrire à », et la liste d’attente expliquée", async ({ page }, testInfo) => {
+test("/email/code en bêta fermée : « On vient d’écrire à », et la liste d’attente expliquée", async ({ page }, testInfo) => {
   /*
-   * Bug : src/app/email/code/page.tsx:7 lit BLUSH_BETA_FERMEE au rendu, mais la page est prérendue au build. Construite
-   * sans la variable (le build des tests), elle dit « On vient de l’envoyer à » même sur un serveur en bêta fermée, et
-   * n’explique pas la liste d’attente. /connexion/code (dynamique) le fait bien.
+   * /email/code est prérendue au build, sans rien lire de la bêta : src/proxy.ts lit BLUSH_BETA_FERMEE à l’exécution et
+   * sert à la même adresse sa variante /email/code/fermee, qui dit « On vient d’écrire à » et explique la liste
+   * d’attente, comme /connexion/code/fermee. Le build des tests est fait sans la variable : ce serveur, lancé avec, le dit.
    */
   const dehors = emailLibre(testInfo, "dehors");
   await jusquALEmail(page, exportWhatsApp(testInfo));

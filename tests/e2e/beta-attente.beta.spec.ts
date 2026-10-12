@@ -173,11 +173,11 @@ test("/attente : après dix inscriptions en une heure depuis la même adresse, l
   });
 });
 
-test.fixme("/commencer annonce la bêta privée à qui n’est pas connecté, et mène à la liste d’attente", async ({ page }) => {
+test("/commencer annonce la bêta privée à qui n’est pas connecté, et mène à la liste d’attente", async ({ page }) => {
   /*
-   * Bug : src/app/commencer/page.tsx:9 lit BLUSH_BETA_FERMEE au rendu, mais la page est prérendue au build : construite
-   * sans la variable (le build des tests), elle n’a pas le bandeau « Bêta privée, sur invitation » sur un serveur en bêta
-   * fermée, et rien ne mène à /attente.
+   * /commencer est prérendue au build, sans rien lire de la bêta : src/proxy.ts lit BLUSH_BETA_FERMEE à l’exécution et
+   * sert à la même adresse sa variante /commencer/fermee, avec le bandeau « Bêta privée, sur invitation ». Le build des
+   * tests est fait sans la variable : ce serveur, lancé avec, montre le bandeau quand même.
    */
   await page.goto("/commencer");
   await page.getByRole("link", { name: /Bêta privée, sur invitation/ }).click();

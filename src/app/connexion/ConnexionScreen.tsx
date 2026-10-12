@@ -15,7 +15,7 @@ import { NBSP } from "@/lib/format";
  * et tout est là. Textes relus le 8 octobre (voix de BLUSH).
  * Venu de l’import (`suite` sous /importer/ : en bêta fermée, les captures se lisent pour un compte connecté) : un premier
  * accès, pas un retour. Le texte le dit, le retour mène au choix de l’appli, et le lien « Analyser ma conv » (qui ramènerait
- * ici) disparaît. Textes à valider.
+ * ici) disparaît.
  */
 export function ConnexionScreen({ suite = null }: { suite?: string | null }) {
   const depuisImport = !!suite?.startsWith("/importer/");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { estImage } from "@/lib/limites";
@@ -161,7 +161,12 @@ export function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?:
   );
 }
 
-/** iMessage : comment filmer sa conv sur iPhone, en quatre gestes, puis la choisir. */
+/**
+ * iMessage : comment filmer sa conv sur iPhone, en quatre gestes, puis la choisir. Une carte, pas un bouton : une liste
+ * dans un <button> n’est pas lue comme une liste (un bouton n’a que du texte). Le vrai bouton est son titre, « Enregistre
+ * ton écran », que son ::after étend à toute la carte (toute la carte reste à toucher). Il ne reprend pas le nom du
+ * bouton du pied d’écran, « Choisir mon enregistrement », qui fait la même chose : deux boutons du même nom se confondent.
+ */
 export function CommentFilmer({ onPick }: { onPick: () => void }) {
   const etapes: ReactNode[] = [
     "Ouvre votre conv dans Messages",
@@ -171,16 +176,27 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
     "Reviens sur la conv, et remonte-la doucement jusqu’au début",
     "Arrête l’enregistrement, puis choisis-le ici",
   ];
+  const sousTitreId = useId();
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" onClick={onPick} className="lift flex flex-col gap-4 rounded-card bg-white p-5 text-left text-ink shadow-soft">
+      {/* Le focus du bouton se voit sur la carte entière (son contour, et le soulèvement de .lift) */}
+      <div className="lift relative flex flex-col gap-4 rounded-card bg-white p-5 text-left text-ink shadow-soft [&:has(:focus-visible)]:-translate-y-0.5 [&:has(:focus-visible)]:outline [&:has(:focus-visible)]:outline-[3px] [&:has(:focus-visible)]:outline-offset-2 [&:has(:focus-visible)]:outline-toi">
         <span className="flex items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[rgba(255,90,96,0.12)]">
+          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[rgba(255,90,96,0.12)]">
             <span className="size-4 rounded-full bg-[#FF5A60] shadow-[0_0_0_4px_rgba(255,90,96,0.22)]" />
           </span>
           <span className="flex flex-col">
-            <span className="text-accent font-black">Enregistre ton écran</span>
-            <span className="text-legende font-extrabold text-grey">Toute votre conv, en une minute</span>
+            <button
+              type="button"
+              onClick={onPick}
+              aria-describedby={sousTitreId}
+              className="text-left text-accent font-black outline-none after:absolute after:inset-0 after:rounded-card after:content-['']"
+            >
+              Enregistre ton écran
+            </button>
+            <span id={sousTitreId} className="text-legende font-extrabold text-grey">
+              Toute votre conv, en une minute
+            </span>
           </span>
         </span>
         <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
@@ -191,7 +207,7 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
             </li>
           ))}
         </ol>
-      </button>
+      </div>
       <NotePrivee petite className="px-1 leading-[1.45]">
         {NOTE_ENREGISTREMENT} Pas de bouton <BoutonRec />
         {NBSP}? Ajoute-le dans Réglages, Centre de contrôle.

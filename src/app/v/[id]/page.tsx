@@ -105,8 +105,12 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
           <p className="m-0 text-detail font-bold leading-[1.45] text-soft [text-wrap:balance]">
             Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
           </p>
-          {/* Une route (essayer/route.ts, qui pose le cookie et redirige), pas une page : typedRoutes ne connaît que les pages */}
-          <ButtonLink href={`/v/${id}/essayer` as Route} arrow className="mt-1 whitespace-nowrap">
+          {/*
+           * Une route (essayer/route.ts, qui compte l’essai, pose le cookie et redirige), pas une page : typedRoutes ne connaît
+           * que les pages. Sans préchargement : le lien visible à l’écran le préchargeait, et comptait un essai que personne
+           * n’avait fait (la route refuse aussi de compter un préchargement)
+           */}
+          <ButtonLink href={`/v/${id}/essayer` as Route} prefetch={false} arrow className="mt-1 whitespace-nowrap">
             Analyser ma conv
           </ButtonLink>
         </section>

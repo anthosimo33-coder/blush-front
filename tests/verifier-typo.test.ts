@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { problemesDe, regleDesInsecables, verifier } from "../scripts/verifier-typo.mjs";
+import { aVerifier, problemesDe, regleDesInsecables, verifier } from "../scripts/verifier-typo.mjs";
 
 /*
  * scripts/verifier-typo.mjs, lancé par `npm run check` (qui le passe sur tout le dépôt) : une espace normale avant
@@ -90,6 +90,26 @@ describe("la vérification de la typographie", () => {
     expect(ecran(`const z = "a\u200db";`)).toEqual([expect.stringContaining("U+200D écrit en clair")]);
     expect(ecran(`const e = "on reprend demain 😮\u200d💨";`)).toEqual([]);
     expect(ecran(`const m = "\\u200eimage omitted";`)).toEqual([]);
+  });
+
+  it("vérifie aussi scripts/ (lui compris) et les configurations de la racine, mais pas node_modules ni le code généré", () => {
+    const fichiers = aVerifier();
+    for (const f of [
+      "scripts/verifier-typo.mjs",
+      "scripts/prompts.mjs",
+      "next.config.ts",
+      "eslint.config.mjs",
+      "playwright.config.ts",
+      "vitest.config.mts",
+      "src/app/layout.tsx",
+      "tests/verifier-typo.test.ts",
+    ])
+      expect(fichiers).toContain(f);
+    expect(fichiers.some((f) => f.includes("node_modules"))).toBe(false);
+  });
+
+  it("écrit ses propres caractères invisibles en échappement : le script passe sa propre vérification", () => {
+    expect(verifier(["scripts/verifier-typo.mjs", "scripts/verifier-typo.d.mts"])).toEqual({ problemes: [], lus: 2 });
   });
 
   it("garde la règle des insécables pour ce que quelqu’un lit : ni ce que le serveur n’écrit qu’à l’équipe, aux logs ou au modèle, ni les tests", () => {

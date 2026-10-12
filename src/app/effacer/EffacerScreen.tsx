@@ -12,8 +12,8 @@ import { ErreurApi } from "@/types/erreurs-api";
 
 /*
  * Ta place dans la bêta est fermée : un testeur retiré de la liste, sa session encore ouverte (src/app/effacer/page.tsx).
- * BLUSH ne lui ouvre plus rien, mais il peut tout effacer, ou se connecter avec un autre email.
- * TODO(produit): textes de l’écran et de sa feuille écrits sans maquette (voix de BLUSH), à relire.
+ * BLUSH ne lui ouvre plus rien, mais il peut tout effacer, ou se connecter avec un autre email. Textes de l’écran et de
+ * sa feuille écrits sans maquette (voix de BLUSH).
  */
 export function EffacerScreen({ email }: { email: string }) {
   const [confirmer, setConfirmer] = useState(false);

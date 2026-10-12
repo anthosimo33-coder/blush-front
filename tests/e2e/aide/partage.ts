@@ -90,13 +90,11 @@ const APRES_LA_REPONSE = 750;
  * compte, dans les tests du partage, passe donc par ici. Certains comptes se font après la réponse (after() du
  * serveur) : on relit jusqu’à les voir, puis une dernière fois un peu plus tard, toujours sous le verrou.
  *
- * lien_essai n’est comparé qu’avec `avecEssais` : aujourd’hui, la page d’un verdict partagé le compte dès qu’elle
- * s’affiche (Next précharge /v/<id>/essayer, le lien de « Analyser ma conv »), parfois après la fin de la mesure. Le
- * test en fixme de partage-lien.spec.ts dit le bon comportement ; une fois corrigé, le comparer partout.
+ * Tous les compteurs sont comparés, lien_essai compris : la page d’un verdict partagé ne précharge plus « Analyser ma
+ * conv » (src/app/v/[id]/page.tsx, prefetch={false}), seul un vrai clic compte un essai (partage-lien.spec.ts).
  */
-export async function mesurerCompteurs<T>(geste: () => Promise<T>, attendus: Partial<Compteurs>, { avecEssais = false }: { avecEssais?: boolean } = {}): Promise<T> {
-  const compares = COMPTEURS_PARTAGE.filter((k) => avecEssais || k !== "lien_essai");
-  const voulu = Object.fromEntries(compares.map((k) => [k, attendus[k] ?? 0]));
+export async function mesurerCompteurs<T>(geste: () => Promise<T>, attendus: Partial<Compteurs>): Promise<T> {
+  const voulu = Object.fromEntries(COMPTEURS_PARTAGE.map((k) => [k, attendus[k] ?? 0]));
   return (
     await sql().begin(async (tx) => {
       await tx`select pg_advisory_xact_lock(${VERROU_COMPTEURS})`;
@@ -105,7 +103,7 @@ export async function mesurerCompteurs<T>(geste: () => Promise<T>, attendus: Par
       const resultat = await geste();
       const ecart = async () => {
         const apres = await compteursDepuis(tx, jour);
-        return Object.fromEntries(compares.map((k) => [k, apres[k] - avant[k]]));
+        return Object.fromEntries(COMPTEURS_PARTAGE.map((k) => [k, apres[k] - avant[k]]));
       };
       await expect.poll(ecart, { message: "les compteurs du partage" }).toEqual(voulu);
       await new Promise((r) => setTimeout(r, APRES_LA_REPONSE));

@@ -167,6 +167,96 @@ describe("ReorderGrid", () => {
     expect(annonce()).toBe("Capture déplacée en position 1.");
   });
 
+  it("à la souris : lâchée hors de la grille, la case se pose et l’annonce ; survoler ensuite, bouton relâché, ne déplace plus rien", () => {
+    render(<Grille ids={["a", "b", "c"]} />);
+    const a = poignee(1, 3);
+    fireEvent.pointerDown(a, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(a, { pointerId: 1, pointerType: "mouse", clientX: 30, clientY: 10 });
+    const [premiere, , troisieme] = screen.getAllByRole("listitem");
+    const sous = vi.spyOn(document, "elementFromPoint").mockReturnValue(troisieme!);
+    /* Le pointeur n’est plus sur la case (React l’a déplacée) : le mouvement arrive ailleurs dans la page */
+    fireEvent.pointerMove(document.body, { pointerId: 1, pointerType: "mouse", clientX: 200, clientY: 10 });
+    expect(ordre()).toEqual(["b:1", "c:2", "a:3"]);
+    /* Lâchée au-dessus de la grille, sur le titre de l’écran */
+    fireEvent.pointerUp(document.body, { pointerId: 1, pointerType: "mouse" });
+    expect(annonce()).toBe("Capture déplacée en position 3.");
+    expect(poignee(3, 3).className).not.toContain("cursor-grabbing");
+    /* Bouton relâché : passer sur la première case ne déplace rien */
+    sous.mockReturnValue(premiere!);
+    fireEvent.pointerMove(poignee(1, 3), { pointerId: 1, pointerType: "mouse", clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(document.body, { pointerId: 1, pointerType: "mouse", clientX: 10, clientY: 10 });
+    expect(ordre()).toEqual(["b:1", "c:2", "a:3"]);
+  });
+
+  it("le pointeur perdu par la case déplacée lui est rendu tant qu’il est appuyé ; relâché, le glisser se finit", () => {
+    render(<Grille ids={["a", "b"]} />);
+    const a = poignee(1, 2);
+    const capture = vi.fn();
+    a.setPointerCapture = capture;
+    fireEvent.pointerDown(a, { pointerId: 4, pointerType: "mouse", button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(a, { pointerId: 4, pointerType: "mouse", clientX: 30, clientY: 10 });
+    expect(capture).toHaveBeenCalledTimes(1);
+    /* Un autre pointeur ne compte pas */
+    fireEvent.lostPointerCapture(a, { pointerId: 9 });
+    expect(capture).toHaveBeenCalledTimes(1);
+    fireEvent.lostPointerCapture(a, { pointerId: 4 });
+    expect(capture).toHaveBeenLastCalledWith(4);
+    expect(capture).toHaveBeenCalledTimes(2);
+    expect(a.className).toContain("cursor-grabbing");
+    /* Le navigateur refuse : le pointeur n’est plus appuyé (relâché hors de la fenêtre). La case se pose */
+    capture.mockImplementation(() => {
+      throw new DOMException("relâché", "InvalidStateError");
+    });
+    fireEvent.lostPointerCapture(a, { pointerId: 4 });
+    expect(a.className).not.toContain("cursor-grabbing");
+    expect(annonce()).toBe("Capture déplacée en position 1.");
+  });
+
+  it("au clavier, après Suppr ou la croix, le focus va à la case qui prend la place, à la précédente, puis à la grille", async () => {
+    render(<Grille ids={["a", "b", "c"]} />);
+    const image = () => act(() => new Promise((r) => requestAnimationFrame(r)));
+    poignee(2, 3).focus();
+    fireEvent.keyDown(poignee(2, 3), { key: "Delete" });
+    await image();
+    expect(document.activeElement?.textContent).toBe("c:2");
+    /* La dernière retirée : la précédente */
+    const croix = screen.getByRole("button", { name: "Retirer la capture 2" });
+    croix.focus();
+    fireEvent.click(croix);
+    await image();
+    expect(document.activeElement?.textContent).toBe("a:1");
+    /* Plus aucune case : la grille elle-même */
+    fireEvent.keyDown(poignee(1, 1), { key: "Backspace" });
+    await image();
+    expect(document.activeElement).toBe(screen.getByRole("list", { name: "Tes captures, dans l’ordre" }));
+  });
+
+  it("au clavier, la dernière case retirée, le focus va à la case d’ajout quand il y en a une", async () => {
+    render(<Grille ids={["a"]} onAdd={() => {}} />);
+    fireEvent.keyDown(poignee(1, 1), { key: "Delete" });
+    await act(() => new Promise((r) => requestAnimationFrame(r)));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ajouter des captures" }));
+  });
+
+  it("démontée en plein glisser, ou pendant l’appui maintenu : ni écouteur de la fenêtre, ni minuteur ne restent", () => {
+    vi.useFakeTimers();
+    const { unmount } = render(<Grille ids={["a", "b"]} />);
+    fireEvent.pointerDown(poignee(1, 2), { pointerId: 5, pointerType: "touch", clientX: 10, clientY: 10 });
+    act(() => vi.advanceTimersByTime(230));
+    expect(poignee(1, 2).className).toContain("cursor-grabbing");
+    const retire = vi.spyOn(window, "removeEventListener");
+    unmount();
+    for (const type of ["touchmove", "pointermove", "pointerup", "pointercancel", "lostpointercapture"]) expect(retire).toHaveBeenCalledWith(type, expect.any(Function));
+    /* L’appui maintenu en cours : son minuteur part avec l’écran */
+    const deuxieme = render(<Grille ids={["c", "d"]} />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Capture 1 sur 2" }), { pointerId: 6, pointerType: "touch", clientX: 10, clientY: 10 });
+    const pose = vi.spyOn(window, "addEventListener");
+    deuxieme.unmount();
+    act(() => vi.advanceTimersByTime(500));
+    expect(pose).not.toHaveBeenCalledWith("touchmove", expect.any(Function), expect.anything());
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("figée (pendant l’envoi) : ni flèches, ni Suppr, ni glisser, et la croix est cachée", () => {
     render(<Grille ids={["a", "b"]} fige />);
     fireEvent.keyDown(poignee(1, 2), { key: "ArrowRight" });

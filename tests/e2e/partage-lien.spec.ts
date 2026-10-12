@@ -165,11 +165,15 @@ test("« Analyser ma conv » mène au début du parcours ; la conv importée ens
       },
       { lien_vu: 1 },
     );
-    await mesurerCompteurs(async () => {
-      await pote.getByRole("link", { name: "Analyser ma conv" }).click();
-      await expect(pote).toHaveURL(/\/commencer$/);
-      await expect(pote.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
-    }, {});
+    /* Le clic compte l’essai (lien_essai) : la page vue, seule, n’en comptait aucun */
+    await mesurerCompteurs(
+      async () => {
+        await pote.getByRole("link", { name: "Analyser ma conv" }).click();
+        await expect(pote).toHaveURL(/\/commencer$/);
+        await expect(pote.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+      },
+      { lien_essai: 1 },
+    );
   });
 
   await test.step("sa conv importée compte comme venue d’un verdict partagé ; la suivante, non", async () => {
@@ -186,40 +190,56 @@ test("« Analyser ma conv » mène au début du parcours ; la conv importée ens
       },
       { lien_vu: 1 },
     );
-    await page.getByRole("link", { name: "Analyser ma conv" }).click();
-    await expect(page).toHaveURL(/\/commencer$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+    /* Un essai compté, mesuré comme les autres gestes du partage pour ne pas fausser les compteurs d’un autre test */
+    await mesurerCompteurs(
+      async () => {
+        await page.getByRole("link", { name: "Analyser ma conv" }).click();
+        await expect(page).toHaveURL(/\/commencer$/);
+        await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+      },
+      { lien_essai: 1 },
+    );
   });
 });
 
 /*
- * Bug : la page d’un verdict partagé compte un essai (lien_essai) et pose la marque « venu du partage » dès qu’elle
- * s’affiche, sans que personne touche « Analyser ma conv ». Le bouton est un <Link> de Next (src/components/ui/Button.tsx:68),
- * que Next précharge en production : le préchargement appelle la route src/app/v/[id]/essayer/route.ts:9-10, qui compte
- * et pose le cookie. Le toucher, lui, reprend le préchargement et ne compte rien. Le bouton est à
- * src/app/v/[id]/page.tsx:90 (prefetch={false}, ou un simple <a>, corrigerait).
+ * La page d’un verdict partagé ne compte un essai (lien_essai), et ne pose la marque « venu du partage », que quand on
+ * touche « Analyser ma conv ». Le bouton ne précharge plus sa route (src/app/v/[id]/page.tsx, prefetch={false}), et la
+ * route (src/app/v/[id]/essayer/route.ts) ne compte rien sur un préchargement.
  */
-test.fixme("voir la page ne compte pas d’essai : seul « Analyser ma conv » touché compte", async ({ page, autreAppareil }, testInfo) => {
+test("voir la page ne compte pas d’essai : seul « Analyser ma conv » touché compte", async ({ page, autreAppareil }, testInfo) => {
   const email = emailLibre(testInfo, "precharge");
   const id = await partagerUnVerdict(page, testInfo, email);
   const pote = await autreAppareil();
+  /* Toute requête vers la route de l’essai, préchargement compris */
+  const versLEssai: string[] = [];
+  pote.on("request", (r) => {
+    if (new URL(r.url()).pathname === `/v/${id}/essayer`) versLEssai.push(r.url());
+  });
   await mesurerCompteurs(
     async () => {
       await pote.goto(`/v/${id}`);
       await expect(pote.getByRole("link", { name: "Analyser ma conv" })).toBeVisible();
-      /* Le temps qu’un éventuel préchargement parte et revienne */
-      await pote.waitForLoadState("networkidle");
+      /* Le temps qu’un éventuel préchargement parte : Next précharge les liens visibles une fois la page au repos */
+      await pote.waitForTimeout(1500);
     },
     { lien_vu: 1 },
-    { avecEssais: true },
   );
+  expect(versLEssai, "aucune requête vers /essayer tant qu’on n’a pas touché le bouton").toEqual([]);
+  /* La route elle-même ne compte pas un préchargement (de Next ou du navigateur) : elle redirige, sans rien compter */
+  await mesurerCompteurs(async () => {
+    for (const headers of [{ "next-router-prefetch": "1" }, { purpose: "prefetch" }, { "sec-purpose": "prefetch;prerender" }] as Record<string, string>[]) {
+      const r = await pote.request.get(`/v/${id}/essayer`, { headers, maxRedirects: 0 });
+      expect(r.status(), JSON.stringify(headers)).toBe(307);
+      expect(r.headers().location).toMatch(/\/commencer$/);
+    }
+  }, {});
   await mesurerCompteurs(
     async () => {
       await pote.getByRole("link", { name: "Analyser ma conv" }).click();
       await expect(pote).toHaveURL(/\/commencer$/);
     },
     { lien_essai: 1 },
-    { avecEssais: true },
   );
 });
 

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { figtree } from "@/lib/fonts";
-import { REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { FAITS_LANDING, REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
 import { AppBadge } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/icons";
 import { ConfidenceLine, Tag } from "@/components/ui/messages";
@@ -282,11 +282,6 @@ export function Reviews({ items }: { items: Testimonial[] }) {
 
 /* ———— Ce que BLUSH promet, en faits ———— */
 export function Facts() {
-  const facts = [
-    { value: "40\u00a0s", label: "pour analyser votre conv" },
-    { value: "8", label: "chapitres dans ton rapport" },
-    { value: "0", label: "message gardé après ton rapport" },
-  ];
   return (
     <section aria-labelledby="faits-titre" className="py-14 lg:py-20">
       <Container className="flex flex-col items-center">
@@ -296,10 +291,10 @@ export function Facts() {
           sub={"Et honnête\u00a0: BLUSH ne garantit rien sur ce que l’autre ressent. Il dit ce que montrent vos messages, et à quel point il en est sûr."}
         />
         <ul className="m-0 mt-10 grid w-full max-w-[1000px] list-none grid-cols-2 gap-3 p-0 lg:mt-14 lg:grid-cols-4 lg:gap-5">
-          {facts.map((f, i) => (
-            <FactTile key={f.label} index={i}>
-              <span className="text-[46px] font-black leading-none tracking-[-0.03em] lg:text-[60px]">{f.value}</span>
-              <span className="max-w-[170px] text-note font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-corps">{f.label}</span>
+          {FAITS_LANDING.map((f, i) => (
+            <FactTile key={f.libelle} index={i}>
+              <span className="text-[46px] font-black leading-none tracking-[-0.03em] lg:text-[60px]">{f.valeur}</span>
+              <span className="max-w-[170px] text-note font-extrabold leading-[1.4] text-grey [text-wrap:balance] lg:text-corps">{f.libelle}</span>
             </FactTile>
           ))}
           <FactTile index={3}>

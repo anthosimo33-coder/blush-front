@@ -1,3 +1,4 @@
+import { NB_CHAPITRES } from "../../src/contenu/chapitres";
 import { desactiverPartage, expect, partageIllisible, test } from "./aide";
 
 /*
@@ -28,8 +29,10 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
   await test.step("les faits, et aucun avis tant qu’il n’y en a pas de vrais", async () => {
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { level: 2, name: "Rapide. Complet. Discret." })).toBeVisible();
-    await expect(main.getByText("chapitres dans ton rapport")).toBeVisible();
-    await expect(main.getByText("message gardé après ton rapport")).toBeVisible();
+    /* Les faits disent ce que dit la page Confidentialité : le nombre de chapitres de la règle, la conv brute effacée après le rapport (pas « 0 message ») */
+    await expect(main.getByRole("listitem").filter({ hasText: "chapitres dans ton rapport" })).toContainText(`${NB_CHAPITRES}`);
+    await expect(main.getByRole("listitem").filter({ hasText: "conv brute gardée après ton rapport" })).toContainText("0");
+    await expect(main.getByText("message gardé après ton rapport")).toHaveCount(0);
     await expect(main.getByRole("heading", { name: "Témoignages" })).toHaveCount(0);
   });
 
@@ -113,6 +116,9 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   }
   await expect(main.getByText("Une IA, et seulement elle")).toBeVisible();
   await expect(main.getByText("La conv brute, effacée après ton rapport")).toBeVisible();
+  /* Le partage, comme la feuille « En savoir plus » du rapport le résume : le lien comme l’image */
+  await expect(main.getByText("Rien ne sort sans toi")).toBeVisible();
+  await expect(main.getByText(/ton verdict, par un lien, ou en image une réponse de BLUSH/)).toBeVisible();
   await expect(main.getByText("BLUSH est réservé aux plus de 18 ans.")).toBeVisible();
   await expect(main.getByRole("link", { name: /Une question\s*\? Écris-nous/ })).toHaveAttribute("href", "mailto:bonjour@askblush.com");
   /* Les prestataires d’IA et de voix ne sont jamais nommés (choix du 9 octobre 2026) */

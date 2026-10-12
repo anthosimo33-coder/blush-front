@@ -160,7 +160,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
           {!connexion
             ? "Créer mon rapport"
             : suite.startsWith("/importer/")
-              ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv (texte à valider) */
+              ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv */
                 "Continuer"
               : "Retrouver mes convs"}
         </Button>

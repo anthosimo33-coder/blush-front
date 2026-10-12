@@ -11,5 +11,8 @@ export function regleDesInsecables(f: string): boolean;
 /** Les problèmes de typographie d’un fichier source : `chemin:ligne · règle · extrait`. */
 export function problemesDe(chemin: string, source: string, options?: { insecables?: boolean }): string[];
 
-/** Vérifie des fichiers (par défaut : src, tests et prompts/lib) ; renvoie leurs problèmes, et combien ont été lus. */
+/** Les fichiers vérifiés par défaut : src, tests, scripts (ce script compris), prompts/lib et les configurations de la racine. */
+export function aVerifier(): string[];
+
+/** Vérifie des fichiers (par défaut : aVerifier()) ; renvoie leurs problèmes, et combien ont été lus. */
 export function verifier(fichiers?: readonly string[]): { problemes: string[]; lus: number };

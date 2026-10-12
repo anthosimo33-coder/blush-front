@@ -209,7 +209,12 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
       ),
     ).toBeVisible();
     await expect(feuille.getByText("Rien ne sort sans toi")).toBeVisible();
-    await expect(feuille.getByText("La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ton verdict part, sans son prénom.")).toBeVisible();
+    /* Le lien comme l’image : la feuille ne dit plus « seul ton verdict part » */
+    await expect(
+      feuille.getByText(
+        "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH ou un passage de ton rapport. Son prénom y devient une initiale.",
+      ),
+    ).toBeVisible();
     /* Cette feuille ne crée aucun lien */
     expect(await liensDe(email)).toEqual([]);
   });
