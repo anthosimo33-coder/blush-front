@@ -42,3 +42,7 @@ export type FournisseurPaiement = (typeof FOURNISSEURS_PAIEMENT)[number];
  */
 export const RAISONS_BULLES = ["achat", "reponse", "rendu", "remboursement", "beta", "equipe"] as const;
 export type RaisonBulles = (typeof RAISONS_BULLES)[number];
+
+/** actions_equipe.action : des bulles données, des convs débloquées, des invitations de la liste d’attente (src/server/equipe.ts). */
+export const ACTIONS_EQUIPE = ["bulles", "debloquer", "inviter"] as const;
+export type ActionEquipe = (typeof ACTIONS_EQUIPE)[number];

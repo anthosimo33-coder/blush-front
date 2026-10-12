@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
 import { EVENEMENTS_ECOUTE, OFFRES, OFFRES_UNIQUES, STATUTS_ACHAT, VOIX } from "../../types";
-import { FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
+import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -33,6 +33,11 @@ export const users = pgTable("users", {
    * l’y faire passer (le chat demande alors une recharge).
    */
   bulles: integer("bulles").notNull().default(0),
+  /**
+   * Le lien de désinscription d’un mail de relance (src/server/relances.ts) touché : l’heure. Plus aucune relance ne part
+   * à ce compte ; les mails qu’il demande (son code, son rapport prêt) partent toujours.
+   */
+  relancesCoupeesLe: quand("relances_coupees_le"),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 
@@ -297,14 +302,28 @@ export const vocalEcoutes = pgTable(
   (t) => [index("vocal_ecoutes_voix_idx").on(t.voix, t.evenement), index("vocal_ecoutes_story_idx").on(t.storyId)],
 );
 
-/** La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. */
-export const waitlist = pgTable("waitlist", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  emailHash: text("email_hash").notNull().unique(),
-  email: chiffre("email").notNull(),
-  source: text("source", { enum: SOURCES_ATTENTE }).notNull(),
-  createdAt: quand("created_at").notNull().defaultNow(),
-});
+/**
+ * La liste d’attente de la bêta fermée : l’email chiffré, et son empreinte pour ne l’inscrire qu’une fois. `invite_le` :
+ * l’équipe l’a invité depuis /admin (src/server/attente.ts, inviterLaListe) et le mail « Ta place est prête » est parti ;
+ * en bêta fermée, il entre alors comme un invité de BLUSH_ACCES_LIBRE, sans en avoir les droits (il paie).
+ */
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    emailHash: text("email_hash").notNull().unique(),
+    email: chiffre("email").notNull(),
+    source: text("source", { enum: SOURCES_ATTENTE }).notNull(),
+    inviteLe: quand("invite_le"),
+    createdAt: quand("created_at").notNull().defaultNow(),
+  },
+  /* Les prochains à inviter, du plus ancien au plus récent */
+  (t) => [
+    index("waitlist_a_inviter_idx")
+      .on(t.createdAt)
+      .where(sql`${t.inviteLe} is null`),
+  ],
+);
 
 /** Les limites (codes envoyés, imports, messages au chat) : une fenêtre et un compteur par clé. */
 export const rateLimits = pgTable("rate_limits", {
@@ -429,3 +448,23 @@ export const evenementsPaiement = pgTable("evenements_paiement", {
   type: text("type").notNull(),
   recuLe: quand("recu_le").notNull().defaultNow(),
 });
+
+/**
+ * Le journal des actions de l’équipe depuis /admin ou l’outil du terminal (src/server/equipe.ts) : qui (son compte, ou
+ * aucun depuis le terminal), quoi, pour quel compte, combien. Ni email, ni conv : des identifiants et des nombres.
+ */
+export const actionsEquipe = pgTable(
+  "actions_equipe",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** Le compte de l’équipe qui l’a faite, ou null : l’outil du terminal (npm run acces), ou un compte effacé depuis. */
+    parId: uuid("par_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action", { enum: ACTIONS_EQUIPE }).notNull(),
+    /** Le compte qui l’a reçue (des bulles, une conv débloquée), ou null : une invitation de la liste d’attente. */
+    compteId: uuid("compte_id").references(() => users.id, { onDelete: "set null" }),
+    /** Combien : les bulles données, les convs débloquées, les invitations parties. */
+    nombre: integer("nombre").notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("actions_equipe_cree_idx").on(t.creeLe)],
+);

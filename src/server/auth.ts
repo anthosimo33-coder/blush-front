@@ -7,7 +7,8 @@ import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import { db, schema, uneLigne } from "./db";
 import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
-import { boiteAMails, peutEntrer } from "./env";
+import { boiteAMails } from "./env";
+import { entre } from "./invitations";
 import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
@@ -246,7 +247,7 @@ export async function compteDeSession(secret: string | undefined): Promise<Utili
  */
 export async function utilisateurDeSession(secret: string | undefined): Promise<Utilisateur | null> {
   const utilisateur = await compteDeSession(secret);
-  return utilisateur && peutEntrer(utilisateur.email) ? utilisateur : null;
+  return utilisateur && (await entre(utilisateur.email)) ? utilisateur : null;
 }
 
 /**
@@ -255,7 +256,7 @@ export async function utilisateurDeSession(secret: string | undefined): Promise<
  */
 export async function compteRetireDeLaBeta(secret: string | undefined): Promise<Utilisateur | null> {
   const utilisateur = await compteDeSession(secret);
-  return utilisateur && !peutEntrer(utilisateur.email) ? utilisateur : null;
+  return utilisateur && !(await entre(utilisateur.email)) ? utilisateur : null;
 }
 
 /**

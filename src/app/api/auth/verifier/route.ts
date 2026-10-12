@@ -1,9 +1,9 @@
 import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
-import { peutEntrer } from "@/server/env";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { brouillonALaConnexion } from "@/server/histoires";
 import { ipDe, LIMITES } from "@/server/limites";
+import { entre } from "@/server/invitations";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
@@ -28,7 +28,7 @@ export const POST = route("POST /api/auth/verifier", async (req: Request) => {
   if (essai === "faux") return repondre("POST /api/auth/verifier", { ok: false });
   await effacerNavigateur();
   /* Bêta fermée : un email retiré de la liste après l’envoi de son code (seul celui qui a le code l’apprend) */
-  if (!peutEntrer(b.email)) return erreur("beta");
+  if (!(await entre(b.email))) return erreur("beta");
   const utilisateur = await compteDe(b.email);
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);

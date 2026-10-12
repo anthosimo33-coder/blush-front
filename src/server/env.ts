@@ -239,7 +239,10 @@ export function paiementWhop(): { cle: string; secret: string; compte: string; p
   return { cle: e.WHOP_API_KEY, secret: e.WHOP_WEBHOOK_SECRET, compte: e.WHOP_ACCOUNT_ID, produit: e.WHOP_PRODUCT_ID, bacASable: e.WHOP_BAC_A_SABLE };
 }
 
-/** Bêta fermée : cet email peut-il se connecter ? (Ouverte : tout le monde.) */
+/**
+ * Bêta fermée : cet email peut-il se connecter, d’après les variables seules ? (Ouverte : tout le monde.) Les invités de
+ * la liste d’attente se lisent en base : la question entière est entre (src/server/invitations.ts).
+ */
 export const peutEntrer = (email: string) => !env().BLUSH_BETA_FERMEE || accesLibre(email);
 
 /** Cet email peut-il ouvrir le tableau de bord ? */
