@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Utilisateur } from "@/server/auth";
 import * as coffre from "@/server/coffre";
@@ -24,6 +24,21 @@ vi.mock("@/server/env", async (original) => {
   return { ...m, env: () => ({ ...m.env(), CRON_SECRET: SECRET }), accesLibre: (email: string) => email === EQUIPE.email || m.accesLibre(email) };
 });
 
+/* Le prestataire des mails, en panne pour certaines adresses : un statut de Resend, ou pas de réponse (le réseau) */
+const pannes = vi.hoisted(() => new Map<string, number | "reseau">());
+vi.mock("@/server/email", async (original) => {
+  const m = await original<typeof import("@/server/email")>();
+  return {
+    ...m,
+    envoyerMail: async (...args: Parameters<typeof m.envoyerMail>) => {
+      const panne = typeof args[0] === "string" ? pannes.get(args[0]) : undefined;
+      if (panne === "reseau") throw new TypeError("fetch failed");
+      if (panne) throw new m.ErreurResend(panne);
+      return m.envoyerMail(...args);
+    },
+  };
+});
+
 import { GET as getRelances } from "@/app/api/cron/relances/route";
 
 /* Le compteur des relances du jour (plafondsDesMails().relances) : la base des tests le garde d’un lancement à l’autre */
@@ -43,6 +58,7 @@ beforeAll(async () => {
   await poserLeCompteur(0);
 }, 60_000);
 afterEach(async () => {
+  pannes.clear();
   await poserLeCompteur(0);
 });
 
@@ -209,6 +225,65 @@ describe("la relance par mail (②)", () => {
     expect([await relanceNotee(a.u), await relanceNotee(b.u)].filter(Boolean)).toHaveLength(2);
   });
 
+  it("le prestataire qui freine (429), en panne (5xx) ou sans la clé : la relance n’est pas partie, elle repart au passage suivant", async () => {
+    for (const statut of [429, 503, 401]) {
+      const { u, conv } = await compteAvecConv(`relance-freine-${statut}`);
+      await feuilleFermee(u, conv);
+      pannes.set(u.email, statut);
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const passage = await envoyerLesRelances();
+      log.mockRestore();
+      expect(passage.retenues, String(statut)).toBeGreaterThanOrEqual(1);
+      expect(await relanceNotee(u), String(statut)).toBeNull();
+      pannes.delete(u.email);
+      expect(await relancesPour(u.email, envoyerLesRelances), String(statut)).toBe(1);
+    }
+  });
+
+  it("une adresse refusée (422), ou un mail perdu en route (il a pu partir) : la relance compte comme faite, rien ne repart", async () => {
+    for (const panne of [422, "reseau"] as const) {
+      const { u, conv } = await compteAvecConv(`relance-refusee-${panne}`);
+      await feuilleFermee(u, conv);
+      pannes.set(u.email, panne);
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      const passage = await envoyerLesRelances();
+      vi.mocked(console.log).mockRestore();
+      expect(passage.echecs, String(panne)).toBeGreaterThanOrEqual(1);
+      expect(await relanceNotee(u), String(panne)).toEqual({ storyId: conv });
+      pannes.delete(u.email);
+      expect(await relancesPour(u.email, envoyerLesRelances), String(panne)).toBe(0);
+    }
+  });
+
+  it("les relances écartées (des alertes) ne prennent la place de personne : au-delà de 50, la relance due part quand même", async () => {
+    const { u, conv } = await compteAvecConv("relance-place");
+    await feuilleFermee(u, conv);
+    /* 50 comptes aux convs en alerte, plus anciens, et rangés avant tous les autres (leurs ids commencent par des zéros) */
+    const [modele] = await db().select({ meta: schema.stories.meta, n: schema.stories.messageCount }).from(schema.stories).where(eq(schema.stories.id, conv));
+    const v = coffre.lire("verdicts.data", verdictLu);
+    const alerte = coffre.ecrire("verdicts.data", { ...v, sortie: { ...v.sortie, alerte: "danger", mode_sobre: true } });
+    const ids = Array.from({ length: 50 }, (_, k) => `00000000-0000-4000-8000-${String(k).padStart(12, "0")}`);
+    await db().delete(schema.users).where(inArray(schema.users.id, ids));
+    try {
+      await db()
+        .insert(schema.users)
+        .values(ids.map((id, k) => ({ id, email: `relance-ecartee-${Date.now()}-${k}@blush.test` })));
+      const convs = await db()
+        .insert(schema.stories)
+        .values(ids.map((userId) => ({ userId, meta: modele!.meta, messageCount: modele!.n })))
+        .returning({ id: schema.stories.id, userId: schema.stories.userId });
+      await db()
+        .insert(schema.verdicts)
+        .values(convs.map((c) => ({ storyId: c.id, data: alerte })));
+      await db()
+        .insert(schema.offresUniques)
+        .values(convs.map((c) => ({ userId: c.userId!, offre: "suite" as const, storyId: c.id, montreeLe: ilYa(10 * HEURES), expireLe: ilYa(10 * HEURES - 5 * 60e3) })));
+      expect(await relancesPour(u.email, envoyerLesRelances)).toBe(1);
+    } finally {
+      await db().delete(schema.users).where(inArray(schema.users.id, ids));
+    }
+  });
+
   it("le mail : le lien de la conv sur la feuille de paiement, le lien de désinscription, rien de la conv", () => {
     const m = mailRelance({
       base: "https://www.askblush.com",
@@ -246,13 +321,36 @@ describe("la relance par mail (②)", () => {
   });
 });
 
-describe("la règle des 24 h des offres uniques ne compte pas la relance", () => {
-  it("après la relance, ③ peut encore être montrée le jour même", async () => {
+describe("la relance et la règle des 24 h des offres uniques", () => {
+  it("seule la ① ne la retient pas : une ③ ou une ④ montrée dans les 24 h la fait attendre, puis elle part", async () => {
+    const { u, conv } = await compteAvecConv("relance-apres-3");
+    await commandeEnAttente(u, conv);
+    await db()
+      .insert(schema.offresUniques)
+      .values({ userId: u.id, offre: "premium_ajout", montreeLe: ilYa(HEURES) });
+    expect(await relancesPour(u.email, envoyerLesRelances)).toBe(0);
+    expect(await relanceNotee(u)).toBeNull();
+    /* 24 h plus tard (la commande, elle, reste fraîche) */
+    await db()
+      .update(schema.offresUniques)
+      .set({ montreeLe: ilYa(25 * HEURES) })
+      .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "premium_ajout")));
+    expect(await relancesPour(u.email, envoyerLesRelances)).toBe(1);
+  });
+
+  it("après la relance, ni ③, ni ④, ni ① le jour même : jamais deux offres uniques dans les 24 h", async () => {
     const { montrer } = await import("@/server/offres-uniques");
     const { u, conv } = await compteAvecConv("relance-24h");
     await db()
       .insert(schema.offresUniques)
       .values({ userId: u.id, offre: "relance_mail", storyId: conv, montreeLe: sql`now()` });
+    expect(await montrer(u, "premium_ajout")).toBeNull();
+    expect(await montrer(u, "premiere_recharge")).toBeNull();
+    expect(await montrer(u, "suite", { storyId: conv })).toBeNull();
+    await db()
+      .update(schema.offresUniques)
+      .set({ montreeLe: ilYa(25 * HEURES) })
+      .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "relance_mail")));
     expect(await montrer(u, "premium_ajout")).toMatchObject({ offre: "premium_ajout" });
   });
 });

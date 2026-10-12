@@ -319,20 +319,29 @@ describe("les offres uniques", () => {
     expect(await commander(u, "suite", { storyId: id, fournisseur: "factice" })).toBe("offre");
   });
 
-  it("jamais deux à moins de 24 h l’une de l’autre, même demandées en même temps ; jamais à l’équipe ; la relance par mail n’y compte pas", async () => {
+  it("jamais deux à moins de 24 h l’une de l’autre, même demandées en même temps ; jamais à l’équipe", async () => {
     const u = await compteDeTest("unique-24h");
-    const ensemble = await Promise.all([montrer(u, "premium_ajout"), montrer(u, "premiere_recharge")]);
+    const ensemble = await Promise.all([montrer(u, "relance_mail"), montrer(u, "premiere_recharge")]);
     expect(ensemble.filter((o) => o !== null)).toHaveLength(1);
     const montree = ensemble.find((o) => o !== null)!.offre;
-    const autre = montree === "premium_ajout" ? "premiere_recharge" : "premium_ajout";
-    /* La relance (②) suit la ① de deux heures par définition (src/server/relances.ts) : elle n’arrête rien, rien ne l’arrête */
-    expect(await montrer(u, "relance_mail")).not.toBeNull();
+    const autre = montree === "relance_mail" ? "premiere_recharge" : "relance_mail";
     expect(await montrer(u, autre)).toBeNull();
     await reculer(u.id, montree, 23 * 3600e3);
     expect(await montrer(u, autre)).toBeNull();
     await reculer(u.id, montree, 2 * 3600e3);
     expect(await montrer(u, autre)).not.toBeNull();
     expect(await montrer(await compteEquipe(), "suite")).toBeNull();
+  });
+
+  it("seule la ① ne retient pas la relance (②), qui la suit de deux heures : la relance retient ensuite ③ et ④", async () => {
+    const u = await compteDeTest("unique-suite-relance");
+    const id = await conv(u);
+    expect(await montrer(u, "suite", { storyId: id })).not.toBeNull();
+    expect(await montrer(u, "relance_mail", { storyId: id })).not.toBeNull();
+    await reculer(u.id, "suite", 30 * 3600e3);
+    for (const offre of ["premium_ajout", "premiere_recharge"] as const) expect(await montrer(u, offre), offre).toBeNull();
+    await reculer(u.id, "relance_mail", 25 * 3600e3);
+    expect(await montrer(u, "premium_ajout")).not.toBeNull();
   });
 
   it("le mail de relance d’une conv compte comme pris quand son rapport est payé", async () => {

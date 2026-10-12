@@ -13,8 +13,9 @@ import { estEquipe } from "./droits";
  * rebours de l’écran la lit). Montrée, une offre reste valable (jusqu’à sa fin, s’il y en a une) tant qu’elle n’est pas
  * prise : une page rechargée la retrouve. Prise à la livraison de l’achat qui en profite (livrer, src/server/achats.ts).
  * L’équipe ne paie rien : aucune ne lui est montrée. La relance par mail (②) n’est pas montrée par ici : elle s’envoie
- * deux heures après la ① (src/server/relances.ts), et ne compte pas dans la règle des 24 h (sinon elle arrêterait ③ et ④
- * le jour où elle ramène quelqu’un, et la ① l’arrêterait toujours).
+ * deux heures après la ① (src/server/relances.ts), qui seule ne l’arrête pas (elle la suit par définition). Pour le
+ * reste, elle compte comme les autres : ni ③ ni ④ dans les 24 h d’une relance, ni de relance dans les 24 h de l’une
+ * d’elles, et pas de ① dans les 24 h d’une relance partie après une commande laissée en attente.
  */
 
 /** Une offre unique montrée à un compte : quand, jusqu’à quand (ou sans fin), pour quelle conv. */
@@ -48,17 +49,19 @@ export async function montrer(compte: Pick<Utilisateur, "id" | "email">, offre: 
       const { valable: encore, ...montree } = deja;
       return encore ? montree : null;
     }
-    /* La relance par mail (②) n’entre pas dans la règle des 24 h, ni dans un sens ni dans l’autre (voir l’en-tête) */
-    const [recente] =
-      offre === "relance_mail"
-        ? []
-        : await tx
-            .select({ offre: o.offre })
-            .from(o)
-            .where(
-              and(eq(o.userId, compte.id), ne(o.offre, offre), ne(o.offre, "relance_mail"), gt(o.montreeLe, sql`now() - make_interval(secs => ${ECART_OFFRES_UNIQUES_MS / 1000})`)),
-            )
-            .limit(1);
+    /* La ① ne retient pas la relance (②), qui la suit de deux heures par définition (voir l’en-tête) */
+    const [recente] = await tx
+      .select({ offre: o.offre })
+      .from(o)
+      .where(
+        and(
+          eq(o.userId, compte.id),
+          ne(o.offre, offre),
+          offre === "relance_mail" ? ne(o.offre, "suite") : undefined,
+          gt(o.montreeLe, sql`now() - make_interval(secs => ${ECART_OFFRES_UNIQUES_MS / 1000})`),
+        ),
+      )
+      .limit(1);
     if (recente) return null;
     const duree = DUREES[offre];
     const [montree] = await tx
