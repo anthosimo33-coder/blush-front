@@ -12,7 +12,7 @@ import { moiEtAutre } from "@/lib/participants";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { noterEcriture } from "@/lib/query";
 import { play } from "@/lib/sound";
-import { askQuestion, souciQuestion } from "@/services/api";
+import { askQuestion, cleEnvoi, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { ButtonLink } from "@/components/ui/Button";
@@ -40,6 +40,12 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
   /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
   const [souci, setSouci] = useState<string | null>(null);
+  /*
+   * La dernière question qui n’a pas eu de réponse, et sa clé : renvoyée telle quelle (« Réessayer »), elle repart avec
+   * la même. Le réseau coupé pendant que BLUSH écrit ne l’arrête pas côté serveur : la réponse s’y écrit et se paie, et
+   * le serveur la rend au nouvel essai sans la débiter de nouveau (src/app/api/chat/route.ts). Une autre question a sa clé
+   */
+  const enSouffrance = useRef<{ question: string; cle: string } | null>(null);
   const first = useRef(true);
   const conv = useRef<HTMLDivElement>(null);
   const avant = useRef<Map<string, number> | null>(null);
@@ -75,11 +81,14 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
     setSouci(null);
     setAsking({ question: q, leaving: false });
     play("envoi");
+    const cle = enSouffrance.current?.question === q ? enSouffrance.current.cle : cleEnvoi();
+    enSouffrance.current = { question: q, cle };
     let a: QuestionAnswer;
     /* La question passe par le chat : l’accueil préchargé avant sa fin doit relire son historique (src/lib/query.ts) */
     noterEcriture("chat");
     try {
-      a = await askQuestion(q);
+      a = await askQuestion(q, cle);
+      enSouffrance.current = null;
     } catch (e) {
       setAsking(null);
       setDraft(q);

@@ -546,10 +546,11 @@ export async function fauxWhop(achat: string, issue: IssueDuFauxWhop): Promise<s
 /**
  * La question du rapport (« Ta question »). Elle passe par le chat, marquée `question` : une réponse comme une autre.
  * Une erreur (le rapport s’écrit encore, plus de réseau) remonte telle quelle, pour que l’écran garde la question et le
- * dise (voir souciQuestion), au lieu d’en faire une réponse.
+ * dise (voir souciQuestion), au lieu d’en faire une réponse. `cle` : la clé de la question (cleEnvoi), la même quand
+ * l’écran la renvoie après une erreur : comme un message du chat, elle n’est jamais débitée deux fois (voir sendToBlush).
  */
-export async function askQuestion(question: string): Promise<QuestionAnswer> {
-  return enQuestion(question, await chat({ texte: question, question: true }));
+export async function askQuestion(question: string, cle?: string): Promise<QuestionAnswer> {
+  return enQuestion(question, await chat({ texte: question, question: true, ...(cle ? { cle } : {}) }));
 }
 
 /* ———— Au quotidien ———— */
