@@ -4,13 +4,15 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/icons";
 import { CEST_QUOI, PIECES } from "@/contenu/bulles";
+import { recu } from "@/contenu/bulles-du-chat";
 import { Perle } from "./perles";
 
 /*
  * Les pièces communes des écrans des bulles (la feuille « Ta formule », la recharge, l’offre ①, « C’est débloqué », le
- * chat) : une option à cocher, ce qu’elle contient, la ligne de ce qui est offert, les pastilles, la carte au-dessus du
- * champ et son petit bouton, et « C’est quoi une bulle ? » en une ligne. Le dessin et les textes sont ceux du prototype
- * validé des bulles (12 octobre) ; les textes vivent dans src/contenu/bulles.ts.
+ * chat, « Ta question ») : une option à cocher, ce qu’elle contient, la ligne de ce qui est offert, les pastilles, la
+ * carte au-dessus du champ et son petit bouton, « C’est quoi une bulle ? » en une ligne, et le reçu sous une réponse de
+ * BLUSH. Le dessin et les textes sont ceux du prototype validé des bulles (12 octobre) ; les textes vivent dans
+ * src/contenu/bulles.ts (et ceux du chat dans src/contenu/bulles-du-chat.ts).
  */
 
 /** Le rose pâle de ce qui est offert, et son filet : les lignes offertes, les pastilles roses, la carte qui appelle à agir. */
@@ -156,5 +158,19 @@ export function CestQuoiUneBulle({ ouvrir }: { ouvrir: () => void }) {
       <span className="flex-1 text-note font-black text-ink">{CEST_QUOI.texte}</span>
       <Icon name="chevron" size={14} stroke={2.8} className="shrink-0 text-toi-ink" />
     </button>
+  );
+}
+
+/**
+ * Le reçu sous une réponse de BLUSH (le chat, « Ta question ») : une petite perle et « 1 bulle · il t’en reste 9 », ce
+ * que la réponse a coûté et ce qu’il reste, dits par le serveur avec elle. En petit gris, comme l’heure à côté de laquelle
+ * le chat le pose.
+ */
+export function RecuDeLaReponse({ depensees, restantes }: { depensees: number; restantes: number }) {
+  return (
+    <span data-recu="" className="inline-flex items-center gap-1 text-[11px] font-bold leading-[14px] text-grey">
+      <Perle taille={11} />
+      {recu(depensees, restantes)}
+    </span>
   );
 }

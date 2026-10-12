@@ -20,7 +20,8 @@ import { Icon } from "@/components/ui/icons";
 import { BlushTyping, BULLE_DE_BLUSH, citation, coinsDeBulle, placeDansLeGroupe, Tag, type BulleDeBlush, type PlaceBulle } from "@/components/ui/messages";
 import { ClampedBubble } from "@/components/ui/clamp";
 import { Perle } from "@/components/bulles/perles";
-import { recu, REPONSE_PRETE } from "@/contenu/bulles-du-chat";
+import { RecuDeLaReponse } from "@/components/bulles/pieces";
+import { REPONSE_PRETE } from "@/contenu/bulles-du-chat";
 import { scaleOf } from "@/contenu/niveaux";
 import type { BlushAnswer, BulleChat, LevelId, Pronom } from "@/types";
 import { VocalBlush, VoiceNote } from "../voice";
@@ -298,12 +299,7 @@ const Group = memo(function Group({ row, intro }: GroupProps) {
         >
           {row.at === null ? NBSP : <time dateTime={new Date(row.at).toISOString()}>{clock(row.at)}</time>}
           {/* Ce que la réponse a coûté, et ce qu’il reste (le serveur le dit avec elle ; offerte, une alerte, rien) */}
-          {row.from === "blush" && !!row.bulles?.depensees && (
-            <span data-recu="" className="inline-flex items-center gap-1">
-              <Perle taille={11} />
-              {recu(row.bulles.depensees, row.bulles.restantes)}
-            </span>
-          )}
+          {row.from === "blush" && !!row.bulles?.depensees && <RecuDeLaReponse depensees={row.bulles.depensees} restantes={row.bulles.restantes} />}
           {/* La réponse se partage en image (story), le prénom de l’autre masqué */}
           {row.from === "blush" && row.echange && (
             <button

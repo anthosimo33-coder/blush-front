@@ -39,6 +39,7 @@ export function AppScreen({
   besoin,
   ferme = false,
   autre,
+  aCoteDuCompte,
   aside = null,
   children,
   ...props
@@ -47,6 +48,8 @@ export function AppScreen({
   ferme?: boolean;
   /** Le prénom de l’autre personne, pour le paiement (« toi et Léa »). */
   autre?: string;
+  /** Desktop : ce qui se pose juste avant « Mon compte », en haut à droite (le compteur de bulles de « Ta question »). */
+  aCoteDuCompte?: ReactNode;
   aside?: ReactNode | null;
   children: ReactNode;
 } & Omit<ComponentProps<typeof Screen>, "aside" | "children">) {
@@ -74,7 +77,16 @@ export function AppScreen({
   return (
     <>
       <Screen
-        desktopHeaderRight={<AccountPill initial={access.initiale} />}
+        desktopHeaderRight={
+          aCoteDuCompte ? (
+            <span className="flex items-center gap-2.5">
+              {aCoteDuCompte}
+              <AccountPill initial={access.initiale} />
+            </span>
+          ) : (
+            <AccountPill initial={access.initiale} />
+          )
+        }
         mainWidth={props.mise ? undefined : 600}
         asideWidth={360}
         columnsGap={64}

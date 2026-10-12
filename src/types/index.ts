@@ -262,6 +262,8 @@ export type QuestionAnswer = {
   limits: string;
   /** Écrite à 0 bulle : verrouillée, sans rien d’elle (elle attend dans le chat, à lire une fois rechargé). */
   verrouillee?: true;
+  /** Ce qu’elle a coûté en bulles, et ce qu’il en reste (le serveur le dit avec elle, voir BlushAnswer). Absent pour l’équipe. */
+  bulles?: BlushAnswer["bulles"];
 };
 
 /**

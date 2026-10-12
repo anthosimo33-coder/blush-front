@@ -2,12 +2,20 @@
 
 import { cn } from "@/lib/cn";
 import { COMPTEUR, SEUIL_PEU_DE_BULLES } from "@/contenu/bulles-du-chat";
+import type { Account } from "@/types/api";
 import { Perle, PerleVide } from "./perles";
 
 /*
- * Le compteur de bulles du chat, à côté du bouton du compte (le prototype validé des bulles, 12 octobre) : une perle et
- * le solde. Rose quand il en reste peu, gris à zéro. Un toucher ouvre « C’est quoi une bulle ? », d’où l’on recharge.
+ * Le compteur de bulles du chat, à côté du bouton du compte (le prototype validé des bulles, 12 octobre), et de « Ta
+ * question », à côté du retour : une perle et le solde. Rose quand il en reste peu, gris à zéro. Un toucher ouvre « C’est
+ * quoi une bulle ? », d’où l’on recharge.
  */
+
+/**
+ * Le solde que montrent le compteur et les feuilles d’un écran qui fait parler BLUSH (le chat, « Ta question ») : null
+ * pour l’équipe (illimitées), ou tant que le compte n’est pas lu.
+ */
+export const soldeAffiche = (compte: Account | undefined) => (compte && !compte.equipe ? compte.bulles : null);
 
 /**
  * Le compteur : `bulles`, le solde (un solde négatif, après un remboursement, se montre à 0), ou null pour l’équipe

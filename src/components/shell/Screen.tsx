@@ -13,12 +13,39 @@ import { LogoIlot } from "./LogoIlot";
  */
 
 /* ———— Barre du haut mobile : retour · titre · progression ———— */
-export function MobileTopBar({ back, title, progress, right, className }: { back?: BackTarget; title?: string; progress?: number; right?: ReactNode; className?: string }) {
+/**
+ * La barre du haut, sur mobile : le retour, le titre au centre, et à droite `right` (ou les points de `progress`).
+ * `aGauche` : ce qui se pose juste après le retour, comme dans l’en-tête du chat (le compteur de bulles de « Ta
+ * question ») ; les deux côtés prennent alors la même largeur, et le titre reste au centre de la barre.
+ */
+export function MobileTopBar({
+  back,
+  aGauche,
+  title,
+  progress,
+  right,
+  className,
+}: {
+  back?: BackTarget;
+  aGauche?: ReactNode;
+  title?: string;
+  progress?: number;
+  right?: ReactNode;
+  className?: string;
+}) {
+  const retour = back ? <BoutonRetour target={back} /> : <span className="size-11" />;
   return (
     <header className={cn("flex h-[60px] shrink-0 items-center gap-2 px-4 lg:hidden", className)}>
-      {back ? <BoutonRetour target={back} /> : <span className="size-11" />}
-      <span className="flex-1 text-center text-note font-black text-grey">{title}</span>
-      <span className="flex w-11 justify-end">{right ?? (progress !== undefined && <ProgressDots current={progress} />)}</span>
+      {aGauche ? (
+        <span className="flex flex-1 basis-0 items-center gap-1.5">
+          {retour}
+          {aGauche}
+        </span>
+      ) : (
+        retour
+      )}
+      <span className={cn("text-center text-note font-black text-grey", aGauche ? "shrink-0" : "flex-1")}>{title}</span>
+      <span className={cn("flex justify-end", aGauche ? "flex-1 basis-0" : "w-11")}>{right ?? (progress !== undefined && <ProgressDots current={progress} />)}</span>
     </header>
   );
 }

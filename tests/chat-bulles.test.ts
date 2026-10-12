@@ -517,7 +517,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
   });
 });
 
-describe("le navigateur (api.ts), à 0 bulle", () => {
+describe("le navigateur (api.ts)", () => {
   /* Le navigateur parle aux vraies routes (le chat, la lecture d’une réponse verrouillée) */
   beforeEach(() =>
     vi.stubGlobal("fetch", (url: string, init: RequestInit) =>
@@ -530,6 +530,15 @@ describe("le navigateur (api.ts), à 0 bulle", () => {
     ),
   );
   afterEach(() => vi.unstubAllGlobals());
+
+  it("« Ta question » avec des bulles : sa réponse dit ce qu’elle a coûté et ce qu’il reste (le reçu de l’écran, et son compteur)", async () => {
+    await parleur("question-recu", 10);
+    const q = await askQuestion("il pense à moi ?");
+    await lancerApres();
+    expect(q.verrouillee).toBeUndefined();
+    expect(q.title).not.toBe("");
+    expect(q.bulles).toEqual({ depensees: 1, restantes: 9 });
+  });
 
   it("« Ta question » verrouillée : prête, sans rien d’elle ; la suivante, BLUSH dit qu’il n’y a plus de bulles ; rechargé, elle se lit", async () => {
     const { u } = await parleur("verrou-navigateur", 0);

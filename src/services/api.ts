@@ -620,7 +620,10 @@ async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<Blush
   }
 }
 
-/** La question du rapport, posée au chat : sa première bulle devient le titre, les autres la preuve. */
+/**
+ * La question du rapport, posée au chat : sa première bulle devient le titre, les autres la preuve. Ce qu’elle a coûté et
+ * ce qu’il reste la suivent (le reçu sous la réponse, et le compteur).
+ */
 function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
   /*
    * Plus de bulles : la réponse est écrite mais verrouillée, sans rien d’elle ici ; elle attend dans le chat.
@@ -649,6 +652,7 @@ function enQuestion(question: string, r: BlushAnswer): QuestionAnswer {
     ...(message ? { message } : {}),
     confidence: "probable",
     limits: r.ask ?? "",
+    ...(r.bulles ? { bulles: r.bulles } : {}),
   };
 }
 

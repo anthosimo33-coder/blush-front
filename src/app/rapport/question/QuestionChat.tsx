@@ -8,18 +8,27 @@ import { figtree } from "@/lib/fonts";
 import { gardeLeFocus } from "@/lib/hooks";
 import { formatCount, NBSP } from "@/lib/format";
 import { QUESTION_MAX } from "@/lib/limites";
+import { codeDe } from "@/lib/messages-erreur";
 import { moiEtAutre } from "@/lib/participants";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
-import { noterEcriture } from "@/lib/query";
+import { FRAIS_DU_RENDU, noterEcriture, setQueryData } from "@/lib/query";
+import { useCompte } from "@/lib/requetes";
 import { play } from "@/lib/sound";
 import { askQuestion, cleEnvoi, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
+import { CompteurBulles, soldeAffiche } from "@/components/bulles/CompteurBulles";
+import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
+import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
+import { Perle } from "@/components/bulles/perles";
+import { PetitBouton, RecuDeLaReponse } from "@/components/bulles/pieces";
+import { CARTES, REPONSE_PRETE } from "@/contenu/bulles-du-chat";
 import { ButtonLink } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Bubble as MessageBubble, ConfidenceLine, BlushTyping, GroupeBulles } from "@/components/ui/messages";
 import { AppScreen } from "@/components/shell/AppScreen";
+import { useCompteDeLaPage } from "@/components/shell/compte-de-la-page";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
 
@@ -28,6 +37,9 @@ import type { Story } from "@/types";
  * BLUSH t’accueille, propose des questions tirées du rapport (un toucher la met dans le champ, sans l’envoyer :
  * la question ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
+ * Sa réponse est une réponse du chat comme une autre (une bulle) : les bulles s’y montrent avec les pièces du chat
+ * (src/components/bulles) : le compteur à côté du retour (de « Mon compte » sur ordinateur), le reçu sous la réponse,
+ * « C’est quoi une bulle ? » et la recharge.
  */
 export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[]; story: Story; ferme?: boolean }) {
   /*
@@ -38,8 +50,12 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
   const [draft, setDraft] = useState("");
   /* La question en route : BLUSH écrit, puis sa bulle se replie (leaving) avant la réponse */
   const [asking, setAsking] = useState<{ question: string; leaving: boolean } | null>(null);
-  /* La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ */
-  const [souci, setSouci] = useState<string | null>(null);
+  /*
+   * La question n’est pas partie : BLUSH dit pourquoi, et la question revient dans le champ. `bulles` : refusée faute de
+   * bulles (402 « bulles ») ; ce souci porte les numéros d’aide (le message n’a atteint personne) : il reste affiché
+   * quand on réécrit, avec « Recharger »
+   */
+  const [souci, setSouci] = useState<{ texte: string; bulles: boolean } | null>(null);
   /*
    * La dernière question qui n’a pas eu de réponse, et sa clé : renvoyée telle quelle (« Réessayer »), elle repart avec
    * la même. Le réseau coupé pendant que BLUSH écrit ne l’arrête pas côté serveur : la réponse s’y écrit et se paie, et
@@ -51,6 +67,20 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
   const avant = useRef<Map<string, number> | null>(null);
   const question = answer?.question ?? asking?.question ?? null;
   const typed = draft.trim().length > 0;
+  const autre = moiEtAutre(story).autre.name;
+
+  /*
+   * Les bulles, comme dans le chat (src/app/app/HomeScreen.tsx) : le solde vient du compte que la page a rendu, puis de
+   * la réponse (ce qu’il en reste, dit par le serveur avec elle). L’équipe a des bulles illimitées : ni reçu, ni recharge.
+   */
+  const comptePage = useCompteDeLaPage();
+  const { data: compte } = useCompte(comptePage?.compte ?? undefined, { rendu: comptePage?.rendu, frais: FRAIS_DU_RENDU });
+  const compteVu = useRef(compte);
+  useEffect(() => {
+    compteVu.current = compte;
+  });
+  const solde = soldeAffiche(compte);
+  const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
 
   /* Chaque nouveau message fait descendre la conv (pas à l’arrivée sur l’écran) */
   useEffect(() => {
@@ -92,8 +122,11 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
     } catch (e) {
       setAsking(null);
       setDraft(q);
-      setSouci(souciQuestion(e));
+      const bulles = codeDe(e) === "bulles";
+      setSouci({ texte: souciQuestion(e), bulles });
       play("non");
+      /* Plus de bulles (une réponse verrouillée attend déjà) : la recharge s’ouvre, comme dans le chat */
+      if (bulles && soldeAffiche(compteVu.current) !== null) setFeuille("recharge");
       return;
     } finally {
       noterEcriture("chat");
@@ -103,6 +136,9 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
       await new Promise((r) => setTimeout(r, 190));
     }
     if (conv.current) avant.current = snapshotTops([conv.current], () => "conv");
+    /* Ce qu’il reste de bulles, dit avec la réponse : le compteur (et Mon compte) le suivent */
+    const c = compteVu.current;
+    if (a.bulles && c) setQueryData("account", { ...c, bulles: a.bulles.restantes });
     setAnswer(a);
     setAsking(null);
     play("reponse");
@@ -110,7 +146,17 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
 
   const composer = (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
-      {souci && <Alert variant="carte">{souci}</Alert>}
+      {souci && (
+        <Alert variant="carte">
+          {souci.texte}
+          {/* Plus de bulles : la recharge, rouverte d’ici une fois fermée (comme la carte du chat, « Recharger ») */}
+          {souci.bulles && solde !== null && (
+            <span className="mt-2.5 flex">
+              <PetitBouton onClick={() => setFeuille("recharge")}>{CARTES.recharger}</PetitBouton>
+            </span>
+          )}
+        </Alert>
+      )}
       {/*
        * La pastille du champ, avec son bouton à côté : le <label> n’entoure que le champ, qui porte ainsi son seul nom. Il
        * couvre la pastille hors du bouton (son retrait de gauche, et le vertical par une marge négative) : un toucher au
@@ -125,7 +171,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
-              setSouci(null);
+              setSouci((s) => (s?.bulles ? s : null));
             }}
             onKeyDown={(e) => {
               /* Entrée envoie, Maj + Entrée passe à la ligne */
@@ -166,11 +212,15 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
     </div>
   );
 
+  /* Le compteur de bulles, dès que le compte est lu : un toucher ouvre « C’est quoi une bulle ? », d’où l’on recharge */
+  const compteur = compte ? <CompteurBulles bulles={solde} ouvrir={() => setFeuille("bulle")} /> : undefined;
+  const fermer = () => setFeuille(null);
+
   return (
     <AppScreen
       /* Le rapport de cette conv pas encore débloqué : « Ta question » vient avec lui, le paiement s’ouvre par-dessus */
       ferme={ferme}
-      autre={moiEtAutre(story).autre.name}
+      autre={autre}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
       className={figtree.variable}
@@ -178,7 +228,9 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
       mise="etroit"
       footerWidth={600}
       contentGap={16}
-      mobileTop={<MobileTopBar back="/rapport" title="Ta question" />}
+      /* Le compteur, au même endroit que dans le chat : à côté du retour sur mobile, de « Mon compte » sur ordinateur */
+      mobileTop={<MobileTopBar back="/rapport" aGauche={compteur} title="Ta question" />}
+      aCoteDuCompte={compteur}
       desktopBack={{ target: "/rapport", trailing: "Ta question" }}
       footer={answer ? after : asking ? null : composer}
     >
@@ -215,23 +267,40 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
             </div>
           )}
           {answer && (
-            <GroupeBulles
-              bulles={[
-                <span key="titre" className="text-[19px] font-black leading-[1.25] tracking-[-0.01em]">
-                  {answer.title}
-                </span>,
-                <span key="preuve" className="flex flex-col gap-2.5">
-                  <span className="text-micro font-black text-grey">{answer.evidenceLabel}</span>
-                  {answer.message && (
-                    <MessageBubble from={answer.message.from} caption={answer.message.caption} className="!max-w-full">
-                      {answer.message.text}
-                    </MessageBubble>
-                  )}
-                  <span className="text-detail font-extrabold leading-[1.45]">{answer.evidence}</span>
-                  {!answer.verrouillee && <ConfidenceLine level={answer.confidence}>{answer.limits}</ConfidenceLine>}
-                </span>,
-              ]}
-            />
+            <div className="flex flex-col gap-[3px]">
+              <GroupeBulles
+                bulles={[
+                  <span key="titre" className="text-[19px] font-black leading-[1.25] tracking-[-0.01em]">
+                    {answer.title}
+                  </span>,
+                  <span key="preuve" className="flex flex-col gap-2.5">
+                    <span className="text-micro font-black text-grey">{answer.evidenceLabel}</span>
+                    {answer.message && (
+                      <MessageBubble from={answer.message.from} caption={answer.message.caption} className="!max-w-full">
+                        {answer.message.text}
+                      </MessageBubble>
+                    )}
+                    <span className="text-detail font-extrabold leading-[1.45]">{answer.evidence}</span>
+                    {!answer.verrouillee && <ConfidenceLine level={answer.confidence}>{answer.limits}</ConfidenceLine>}
+                    {/* Écrite à 0 bulle : la recharge, comme sous la réponse prête du chat ; une fois payé, elle s’y lit */}
+                    {answer.verrouillee && solde !== null && (
+                      <span className="flex">
+                        <PetitBouton onClick={() => setFeuille("recharge")}>
+                          <Perle taille={14} />
+                          {REPONSE_PRETE.recharger}
+                        </PetitBouton>
+                      </span>
+                    )}
+                  </span>,
+                ]}
+              />
+              {/* Ce que la réponse a coûté, et ce qu’il reste, comme sous chaque réponse du chat (offerte, une alerte : rien) */}
+              {!!answer.bulles?.depensees && (
+                <span data-rise="" className="mt-0.5 flex h-3.5 items-center pl-[46px]" style={delai(0.16)}>
+                  <RecuDeLaReponse depensees={answer.bulles.depensees} restantes={answer.bulles.restantes} />
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -265,6 +334,24 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
           </div>
         )}
       </div>
+
+      {/* « C’est quoi une bulle ? » (le compteur), d’où l’on recharge ; puis la recharge, comme dans le chat */}
+      {compte &&
+        (solde === null ? (
+          <FeuilleBulle open={feuille === "bulle"} onClose={fermer} />
+        ) : (
+          <FeuilleBulle open={feuille === "bulle"} onClose={fermer} solde={Math.max(0, solde)} recharger={() => setFeuille("recharge")} />
+        ))}
+      {solde !== null && (
+        <FeuilleRecharge
+          open={feuille === "recharge"}
+          onClose={fermer}
+          reponsePrete={!!answer?.verrouillee}
+          autre={autre}
+          /* Payé : la réponse prête de cette question se lit dans le chat, qui la débloque au retour (`?recharge=`) ; sinon, retour ici */
+          suite={(bulles) => (answer?.verrouillee ? `/app?recharge=${bulles}` : "/rapport/question")}
+        />
+      )}
     </AppScreen>
   );
 }

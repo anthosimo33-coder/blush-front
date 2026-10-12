@@ -9,7 +9,7 @@ import { play } from "@/lib/sound";
 import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
 import { useCompte } from "@/lib/requetes";
 import { drapeauLocal, useDrapeau } from "@/lib/stockage";
-import { CompteurBulles } from "@/components/bulles/CompteurBulles";
+import { CompteurBulles, soldeAffiche } from "@/components/bulles/CompteurBulles";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
 import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { marquerChatOuvert } from "@/components/chat/ouvert";
@@ -18,7 +18,6 @@ import { useCompteDeLaPage } from "@/components/shell/compte-de-la-page";
 import { Toast } from "@/components/ui/surfaces";
 import { apresLaRecharge } from "@/contenu/bulles-du-chat";
 import type { BlushAnswer, ConvSummary } from "@/types";
-import type { Account } from "@/types/api";
 import { BarreDeLaFenetre, EnTeteMobile } from "./accueil/Barres";
 import { useAnnonce } from "./accueil/annonce";
 import { BandeauBulles, etatDuBandeau } from "./accueil/BandeauBulles";
@@ -52,9 +51,6 @@ const BULLES_EXPLIQUEES = drapeauLocal("blush.bulles.expliquees", { defaut: fals
 
 /** Combien de temps reste le mot qui suit une recharge (« +120 bulles, ta réponse est là »). */
 const MOT_DE_LA_RECHARGE_MS = 2600;
-
-/** Le solde de bulles que montre le chat : null pour l’équipe (illimitées), ou tant que le compte n’est pas lu. */
-const soldeDe = (compte: Account | undefined) => (compte && !compte.equipe ? compte.bulles : null);
 
 /* L’heure d’ouverture de l’écran, lue dans le navigateur seulement : rien au rendu serveur, donc pas d’écart à l’hydratation */
 let openedAt: number | null = null;
@@ -151,7 +147,7 @@ export function HomeScreen(p: {
   useEffect(() => {
     compteVu.current = compte;
   });
-  const solde = soldeDe(compte);
+  const solde = soldeAffiche(compte);
   const expliquees = useDrapeau(BULLES_EXPLIQUEES);
   const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
   const [mot, setMot] = useState<string | null>(null);
