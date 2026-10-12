@@ -9,7 +9,9 @@ import { ACCEPT_EXPORT } from "@/lib/limites";
 import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { prechargerExport, uploadExport } from "@/services/api";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { EXPORT_STEPS } from "@/contenu/parcours";
+import { CaseImport, useCase } from "@/components/juridique/cases";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Captcha } from "@/components/ui/Captcha";
@@ -41,6 +43,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useMonte();
+  /* La case de l’import (18 ans, les conditions, ce que la conv dit d’intime) : sans elle, le choix du fichier ne s’ouvre pas */
+  const accord = useCase();
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
@@ -53,19 +57,22 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
   /* La lecture de l’export est chargée à la demande : on la charge dès qu’on ouvre le choix du fichier */
   const choisirFichier = () => {
+    if (!accord.exiger()) return;
     prechargerExport();
     picker.open();
   };
 
   const onFiles = async ([file]: File[]) => {
     if (!file) return;
+    /* La case décochée pendant que le choix du fichier était ouvert : rien ne part sans elle (son accord n’est plus là) */
+    if (!accord.exiger()) return;
     setBusy(true);
     setSouci(null);
     setAvance(null);
     let source;
     try {
       /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
-      source = await uploadExport(file, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
+      source = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
     } catch (e) {
       if (!monte.current) return;
       /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (ErreurDeParcours, ?erreur=) */
@@ -73,6 +80,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       setAvance(null);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
       if (codeDe(e) === "annule") return;
+      /* Le serveur n’a pas reconnu la case (BLUSH a changé de texte depuis l’ouverture de l’onglet) : à recocher */
+      if (codeDe(e) === "consentement") return accord.perimer();
       /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
       const parcours = erreurDeParcours("export", e);
       if (parcours) {
@@ -101,6 +110,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </Alert>
           )}
+          <CaseImport etat={accord} className="mb-1" />
           {/* Le CAPTCHA de l’import sans compte : invisible tant qu’il ne demande pas de geste */}
           <Captcha action="import" />
           {/* aria-busy pour la phase « Je lis ton export · N % » aussi, où loading est faux (Button ne le pose qu’avec loading) */}

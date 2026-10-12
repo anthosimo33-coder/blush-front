@@ -6,6 +6,7 @@ import { poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
+import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -18,7 +19,8 @@ const Appli = AppliCaptures;
 /**
  * Des captures d’écran de la conv (réduites par le navigateur) : BLUSH les lit (prompt 01) et en fait une histoire
  * brouillon, avant l’email, comme un export. Un nouvel essai du même envoi (`cle`, après une coupure du réseau) rend
- * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture). La lecture refusée (LectureRefusee), rien de lisible
+ * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture). Sans la case de l’import cochée : 422 `consentement`
+ * (src/server/juridique.ts). La lecture refusée (LectureRefusee), rien de lisible
  * (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne (l’enveloppe `route`, src/server/http.ts).
  */
 async function traiter(req: Request) {
@@ -30,6 +32,9 @@ async function traiter(req: Request) {
   if (fd?.get("mode") === "add") return erreur("capture");
   const app = appli.success ? appli.data : "autre";
   const images = await imagesDe(fichiers);
+  /* L’accord de l’import (18 ans, les conditions, ce que la conv dit d’intime) : sans lui, rien n’est lu ni compté */
+  const consentement = consentementImport(fd?.get("consentement"));
+  if (!consentement) return erreur("consentement");
   /*
    * Une fois l’envoi vérifié, avant toute limite : la bêta (sans compte, « connexion »), puis le laissez-passer du CAPTCHA
    * d’un visiteur sans compte (src/server/captcha.ts). Un nouvel essai du même envoi en use un second, le dernier
@@ -45,7 +50,7 @@ async function traiter(req: Request) {
     const permis = await lecturePermise("captures");
     if (permis !== "ok") throw new LectureRefusee(permis);
     const t = await lireCaptures(images, app);
-    const { id, meta } = await importerCaptures({ appli: app, t, secret });
+    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
     /* Ici, une fois par lecture : un nouvel essai qui la reprend ne compte pas l’import deux fois */
     await compterImportVenuDuPartage();
     return { id, meta, secret, messages: t.messages };

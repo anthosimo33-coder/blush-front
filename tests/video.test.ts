@@ -8,6 +8,7 @@ import { importerCaptures } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
 import { decalage, lotsDe } from "@/services/preparer-video";
 import { captures, msg } from "./aide/fabriques";
+import { accordDeTest } from "./aide/fixtures";
 
 /** Un lot lu d’un enregistrement iMessage : ses blocs, sur `images` captures. */
 const lot = (blocs: Captures["blocs"], images: number, autre: string | null = "Inès"): Captures =>
@@ -137,7 +138,7 @@ describe("une conv iMessage lue sur un enregistrement", () => {
     const lots = [lot([{ repere: { date: "2026-10-01", heure: "20:00" }, messages: messages.slice(0, 18) }], 12), lot([{ repere: null, messages: messages.slice(14) }], 6)];
     const t = enTexte(fusionnerLots(lots, "imessage"));
     expect(t.messages).toBe(30);
-    const { id, meta } = await importerCaptures({ appli: "imessage", t });
+    const { id, meta } = await importerCaptures({ appli: "imessage", t, consentement: accordDeTest() });
     ids.push(id);
     expect(storyAffichee(id, meta).sources[0]!.label).toBe("iMessage · 17 captures");
   });

@@ -49,6 +49,8 @@ CREATE TABLE "offres_uniques" (
 ALTER TABLE "chat_messages" ADD COLUMN "cout" integer;--> statement-breakpoint
 ALTER TABLE "chat_messages" ADD COLUMN "verrouillee" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "stories" ADD COLUMN "debloque_le" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "stories" ADD COLUMN "consentement_le" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "stories" ADD COLUMN "consentement_version" text;--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "bulles" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "achats" ADD CONSTRAINT "achats_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "achats" ADD CONSTRAINT "achats_story_id_stories_id_fk" FOREIGN KEY ("story_id") REFERENCES "public"."stories"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

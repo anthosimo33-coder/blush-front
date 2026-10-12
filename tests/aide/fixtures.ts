@@ -6,7 +6,9 @@ import { executerChaine } from "@/server/pipeline";
 import type { Utilisateur } from "@/server/auth";
 import { crediter, soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { definirQui, importer, rattacherBrouillon, type LigneComplete, type Meta } from "@/server/histoires";
+import type { Consentement } from "@/server/juridique";
 import { depuisFichier } from "@/server/import";
 import { definirFactice } from "@/server/ia/claude";
 import { planifier } from "@/server/taches";
@@ -73,9 +75,12 @@ export function moiDans(meta: Pick<Meta, "participants">, prenom: string): 0 | 1
   throw new Error(`${prenom} n’est pas l’un des deux participants de la conv`);
 }
 
+/** L’accord de l’import d’une conv de test : la case de l’import cochée (sa version d’aujourd’hui), maintenant. */
+export const accordDeTest = (): Consentement => ({ version: CASE_IMPORT.version, le: new Date() });
+
 /** Une conv des évals importée (prompts/evals/convs) : un brouillon, sans compte. */
 export async function convImportee(nom: string): Promise<Importee> {
-  const imp = await importer(await depuisFichier(convDeTest(nom)));
+  const imp = await importer(await depuisFichier(convDeTest(nom)), accordDeTest());
   creees.histoires.push(imp.id);
   return imp;
 }

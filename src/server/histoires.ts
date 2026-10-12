@@ -24,6 +24,7 @@ import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
 import { ErreurInvariant } from "./erreurs";
 import { borner, ErreurImport } from "./import";
+import type { Consentement } from "./juridique";
 
 /*
  * Les histoires en base : le brouillon d’un import, la conv ouverte, « Qui es-tu ? », l’effacement. L’import d’un export
@@ -85,14 +86,21 @@ export function resumeDe(messages: Message[]): Meta["resume"] {
 }
 
 /**
- * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées. Le
- * cookie du brouillon la retrouve par l’empreinte de `secret`.
+ * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées, et
+ * l’accord de son import (la case cochée, src/server/juridique.ts). Le cookie du brouillon la retrouve par l’empreinte de `secret`.
  */
-async function creerBrouillon(meta: Meta, texte: string, secret: string): Promise<{ id: string; meta: Meta; secret: string }> {
+async function creerBrouillon(meta: Meta, texte: string, secret: string, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
   const ligne = uneLigne(
     await db()
       .insert(schema.stories)
-      .values({ draftToken: empreinte(secret), messageCount: meta.resume.total, meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", texte) })
+      .values({
+        draftToken: empreinte(secret),
+        messageCount: meta.resume.total,
+        meta: coffre.ecrire("stories.meta", meta),
+        conv: coffre.ecrire("stories.conv", texte),
+        consentementLe: consentement.le,
+        consentementVersion: consentement.version,
+      })
       .returning({ id: schema.stories.id }),
     "stories:brouillon_cree",
   );
@@ -103,7 +111,7 @@ async function creerBrouillon(meta: Meta, texte: string, secret: string): Promis
  * Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. Le texte est
  * borné ici aussi (import.ts, borner) : depuisFichier et depuisPaquet l’ont fait, un autre appelant n’y échappe pas.
  */
-export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta; secret: string }> {
+export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
   const { nom, appli, texte, coupe } = borner(recu);
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
@@ -127,7 +135,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     resume: resumeDe(lu.messages),
     ...(coupe ? { coupe: true } : {}),
   };
-  return creerBrouillon(meta, texte, jeton());
+  return creerBrouillon(meta, texte, jeton(), consentement);
 }
 
 /**
@@ -138,10 +146,12 @@ export async function importerCaptures({
   appli,
   t,
   secret = jeton(),
+  consentement,
 }: {
   appli: Meta["appli"];
   t: TexteCaptures;
   secret?: string;
+  consentement: Consentement;
 }): Promise<{ id: string; meta: Meta; secret: string }> {
   const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
   const lu = lire(t.texte, { utilisateur: personne("Moi"), autre: personne(t.autre), format: "captures" });
@@ -160,7 +170,7 @@ export async function importerCaptures({
     resume: resumeDe(lu.messages),
     moi: 0,
   };
-  return creerBrouillon(meta, t.texte, secret);
+  return creerBrouillon(meta, t.texte, secret, consentement);
 }
 
 /**

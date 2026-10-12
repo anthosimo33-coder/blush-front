@@ -10,7 +10,7 @@ import { depuisPaquet, LIGNES_MAX } from "@/server/import";
 import { purger } from "@/server/purge";
 import { analyserExport, garderLaFin } from "@/services/preparer-export";
 import { lirePaquet } from "./aide/fichiers";
-import { compteDeTest, histoireLue } from "./aide/fixtures";
+import { accordDeTest, compteDeTest, histoireLue } from "./aide/fixtures";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 /** Une très longue conv WhatsApp : des messages qui ne se compressent pas (du hasard), une ligne par message. */
@@ -39,7 +39,7 @@ describe("une conv trop longue pour partir", () => {
     /* Le serveur relit le paquet : l’histoire sait qu’elle est coupée, et combien de mois elle couvre */
     const lu = await depuisPaquet(new File([await pret.paquet.arrayBuffer()], "export.json.gz"));
     expect(lu.coupe).toBe(true);
-    const imp = await importer(lu);
+    const imp = await importer(lu, accordDeTest());
     const source = storyAffichee(imp.id, imp.meta).sources[0]!;
     expect(source.moisLus).toBeGreaterThan(0);
     await db().delete(schema.stories).where(eq(schema.stories.id, imp.id));
@@ -67,7 +67,7 @@ describe("une conv trop longue pour partir", () => {
       const d = new Date(debut + k * 86400e3);
       return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} 10:00:00] ${k % 2 ? "Léa" : "Tom"}: message ${k}`;
     }).join("\n");
-    const imp = await importer({ appli: "whatsapp", texte: `${"x\n".repeat(LIGNES_MAX + 5)}${messages}`, nom: "chat.txt" });
+    const imp = await importer({ appli: "whatsapp", texte: `${"x\n".repeat(LIGNES_MAX + 5)}${messages}`, nom: "chat.txt" }, accordDeTest());
     expect(imp.meta.coupe).toBe(true);
     expect(imp.meta.resume.total).toBe(120);
     expect(storyAffichee(imp.id, imp.meta).sources[0]!.moisLus).toBe(4);

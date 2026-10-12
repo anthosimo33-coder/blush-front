@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/cn";
 import { copyText } from "@/lib/hooks";
 import type { AppKind } from "@/types";
@@ -195,6 +195,59 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
         style={{ transform: checked ? "translateX(20px)" : "none" }}
       />
     </button>
+  );
+}
+
+/* ———— Case à cocher : les accords (l’import, la renonciation avant de payer) ———— */
+/**
+ * Une case à cocher, jamais cochée d’avance par l’écran : la vraie case du navigateur (le clavier, les lecteurs d’écran),
+ * redessinée à 24 px, et tout son texte qui la coche aussi. `refus` : on a tenté d’avancer sans elle ; elle se borde de
+ * rouge, et `message` (son id `idMessage`) dit pourquoi, annoncé aux lecteurs d’écran. `inputRef` : pour y mettre le focus.
+ */
+export function CaseACocher({
+  coche,
+  onChange,
+  refus = false,
+  message,
+  inputRef,
+  children,
+  className,
+}: {
+  coche: boolean;
+  onChange: (v: boolean) => void;
+  refus?: boolean;
+  message?: ReactNode;
+  inputRef?: Ref<HTMLInputElement>;
+  children: ReactNode;
+  className?: string;
+}) {
+  const idMessage = useId();
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <label className="flex cursor-pointer items-start gap-3 text-legende font-extrabold leading-[1.45] text-soft">
+        <span className="relative mt-px flex size-6 shrink-0">
+          <input
+            ref={inputRef}
+            type="checkbox"
+            checked={coche}
+            onChange={(e) => onChange(e.target.checked)}
+            aria-invalid={refus || undefined}
+            aria-describedby={refus && message ? idMessage : undefined}
+            className={cn(
+              "peer size-6 cursor-pointer appearance-none rounded-[8px] border-2 bg-white transition-colors checked:border-ink checked:bg-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-toi",
+              refus ? "border-danger" : "border-[rgba(17,17,20,0.24)]",
+            )}
+          />
+          <Icon name="check" size={14} stroke={3.4} className="pointer-events-none absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100" />
+        </span>
+        <span className="min-w-0">{children}</span>
+      </label>
+      {refus && message && (
+        <p id={idMessage} role="alert" className="m-0 pl-9 text-legende font-black text-danger">
+          {message}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, type TestInfo } from "@playwright/test";
+import { CASE_IMPORT } from "../../../src/contenu/consentements";
 import { attendreTaches, sql } from "./base";
 import { ENTETE_DU_JETON, prouverHumain } from "./captcha";
 import { dernierCode } from "./boite";
@@ -54,7 +55,7 @@ export async function lireUneConvParApi(
   await prouverHumain(page.request, testInfo);
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
-    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) } },
+    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
     timeout: RESEAU,
   });
   expect(envoi.status(), `l’export de la conv avec ${personnes.autre} est importé`).toBe(200);

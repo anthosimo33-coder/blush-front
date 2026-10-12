@@ -21,15 +21,15 @@ import { planifier } from "@/server/taches";
 import { audioDuCompte, noterEcoute, statsVocal, vocalAJour, vocalLu } from "@/server/vocal";
 import { rapportEnBase, tachesDe } from "./aide/essai";
 import { convDeTest } from "./aide/fichiers";
-import { compteDeTest, convImportee, debloquerLaConv, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
+import { accordDeTest, compteDeTest, convImportee, debloquerLaConv, histoireLue, ligneEnBase, moiDans, type Importee } from "./aide/fixtures";
 
 /** Le vocal tel que l’affiche le front, s’il est fait (ce que le rapport en montre, par vocalLu). */
 const vocalPret = async (storyId: string) => (await vocalLu(storyId))?.pret ?? null;
 
 describe("import", () => {
   it("refuse une conv de groupe et une conv trop courte", async () => {
-    await expect(importer(await depuisFichier(convDeTest("90-groupe.txt")))).rejects.toMatchObject({ code: "groupe" } satisfies Partial<ErreurImport>);
-    await expect(importer(await depuisFichier(convDeTest("91-trop-courte.txt")))).rejects.toMatchObject({ code: "courte" });
+    await expect(importer(await depuisFichier(convDeTest("90-groupe.txt")), accordDeTest())).rejects.toMatchObject({ code: "groupe" } satisfies Partial<ErreurImport>);
+    await expect(importer(await depuisFichier(convDeTest("91-trop-courte.txt")), accordDeTest())).rejects.toMatchObject({ code: "courte" });
   });
 });
 

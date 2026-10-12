@@ -2,6 +2,7 @@ import { AppliCaptures } from "@/server/appli-captures";
 import { humainRefuse } from "@/server/captcha";
 import { imagesDe, lecturePermise, lireLot } from "@/server/captures";
 import { erreur, repondre, route } from "@/server/http";
+import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -20,6 +21,8 @@ async function traiter(req: Request) {
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = AppliCaptures.safeParse(fd?.get("app"));
   const images = await imagesDe(fichiers);
+  /* La conv part au modèle : l’accord de l’import d’abord (sans lui, 422 `consentement`, rien n’est lu ni compté) */
+  if (!consentementImport(fd?.get("consentement"))) return erreur("consentement");
   /* Avant toute limite : la bêta (sans compte, « connexion »), puis le laissez-passer du CAPTCHA (src/server/captcha.ts) */
   const beta = await lecturePermise(null);
   if (beta !== "ok") return erreur(beta);

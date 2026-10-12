@@ -35,6 +35,7 @@ import {
   test,
   URL_APPLI,
 } from "../../tests/e2e/aide";
+import { CASE_IMPORT } from "../../src/contenu/consentements";
 import { STATES } from "./screens.mjs";
 
 /*
@@ -62,7 +63,7 @@ async function importerUnBrouillon(page: Page, testInfo: TestInfo): Promise<stri
   await prouverHumain(page.request, testInfo);
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
-    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) } },
+    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
     timeout: RESEAU,
   });
   expect(envoi.status(), "l’export de la conv est importé").toBe(200);

@@ -58,6 +58,7 @@ vi.mock("@/server/email", async (original) => {
   };
 });
 
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { POST as postAnalyse } from "@/app/api/analyse/route";
 import { POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postDeconnexion } from "@/app/api/auth/deconnexion/route";
@@ -88,7 +89,7 @@ import { etatDesTaches } from "@/server/taches";
 import { suiteSure } from "@/lib/suite";
 import { lotVideo, memoire } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
-import { compteDeTest, convRattachee, facticePourChaqueTest } from "./aide/fixtures";
+import { accordDeTest, compteDeTest, convRattachee, facticePourChaqueTest } from "./aide/fixtures";
 
 /* Le cookie de session des tests, servis en http : sans le préfixe __Host- (src/lib/noms-cookies.ts) */
 const SESSION = nomDuCookie("session", false);
@@ -168,7 +169,7 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
 
   it("un export importé est gardé compressé, et relu tel quel", async () => {
     const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
-    const { id } = await importer(lu);
+    const { id } = await importer(lu, accordDeTest());
     const ligne = (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
     expect(ligne.conv![0]).toBe(2);
     expect(ligne.conv!.length).toBeLessThan(Buffer.byteLength(lu.texte) / 2);
@@ -180,11 +181,11 @@ describe("S-02 · la conv brute est compressée avant d’être chiffrée", () =
 describe("S-02 · un nom de participant démesuré n’entre pas dans ce qu’on garde", () => {
   it("un export dont un nom fait 150 caractères (ou contient un caractère de contrôle) est refusé", async () => {
     const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
-    const { id, meta } = await importer(lu);
+    const { id, meta } = await importer(lu, accordDeTest());
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
     const nom = meta.participants[0]!.nom;
     for (const autre of ["N".repeat(150), "Nom\u0001"])
-      await expect(importer({ ...lu, texte: lu.texte.split(`${nom}:`).join(`${autre}:`) })).rejects.toMatchObject({ code: "fichier" });
+      await expect(importer({ ...lu, texte: lu.texte.split(`${nom}:`).join(`${autre}:`) }, accordDeTest())).rejects.toMatchObject({ code: "fichier" });
   });
 });
 
@@ -194,6 +195,7 @@ describe("S-01 · lire des captures (le modèle payant) avant l’email", () => 
     etat.cookies.clear();
     const fd = new FormData();
     fd.append("captures", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "c.png", { type: "image/png" }));
+    fd.append("consentement", CASE_IMPORT.version);
     const avant = appelsAuModele.length;
     const r = await postCaptures(requete("/api/captures", { method: "POST", body: fd }));
     expect(r.status).toBe(401);
@@ -226,7 +228,11 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
     etat.fermee = true;
     etat.cookies.clear();
     const r = await postVideo(
-      requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa")] }) }),
+      requete("/api/captures/video", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lotVideo("Léa")] }),
+      }),
     );
     expect(r.status).toBe(401);
   });
@@ -238,7 +244,7 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
       requete("/api/captures/video", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ app: "imessage", lots: [lotVideo("L".repeat(170_000))] }),
+        body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lotVideo("L".repeat(170_000))] }),
       }),
     );
     expect(enorme.status).toBe(422);
@@ -246,7 +252,11 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
     expect(
       (
         await postVideo(
-          requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [trop] }) }),
+          requete("/api/captures/video", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [trop] }),
+          }),
         )
       ).status,
     ).toBe(422);
@@ -254,7 +264,7 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
       requete("/api/captures/video", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ app: "imessage", lots: [lotVideo("Léa"), lotVideo("Léa", 100)] }),
+        body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lotVideo("Léa"), lotVideo("Léa", 100)] }),
       }),
     );
     expect(bon.status).toBe(200);
@@ -271,7 +281,13 @@ describe("S-12 · un enregistrement d’écran : des lots de 300 messages au plu
     return { ...l, blocs: [{ ...l.blocs[0], messages: Array.from({ length: n }, (_, k) => ({ ...(k % 2 ? moi : autre), texte: `message ${k}` })) }] };
   };
   const envoyer = (n: number) =>
-    postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "imessage", lots: [lot(n)] }) }));
+    postVideo(
+      requete("/api/captures/video", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lot(n)] }),
+      }),
+    );
 
   it("301 messages dans un lot : refusé ; 300 : la conv est lue", async () => {
     etat.fermee = false;
@@ -886,7 +902,7 @@ describe("S-30 · « Tout effacer » efface aussi le brouillon de ce navigateur,
     vi.spyOn(console, "log").mockImplementation(() => {});
     await inscrire(u.email, "accueil");
     const lu = await depuisFichier(convDeTest("01-a-deux-doigts.txt"));
-    const [ici, ailleurs] = [await importer(lu), await importer(lu)];
+    const [ici, ailleurs] = [await importer(lu, accordDeTest()), await importer(lu, accordDeTest())];
     const liste = eq(schema.waitlist.emailHash, empreinteDeLaListe(u.email));
     expect(await db().select().from(schema.waitlist).where(liste)).toHaveLength(1);
     /* Un code demandé d’un autre navigateur, encore en cours : sa ligne garde l’email en clair */
@@ -971,6 +987,7 @@ describe("S-04 · S-28 · les lectures du jour se comptent par boîte mail et pa
 describe("S-10 · les limites par adresse IP", () => {
   const importer = (ip: string, fichier: boolean) => {
     const fd = new FormData();
+    fd.append("consentement", CASE_IMPORT.version);
     if (fichier) fd.append("fichier", convDeTest("01-a-deux-doigts.txt"));
     return postImport(requete("/api/import", { method: "POST", body: fd, headers: { "x-forwarded-for": ip } }));
   };

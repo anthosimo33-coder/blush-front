@@ -107,6 +107,13 @@ export const stories = pgTable(
      * le chapitre 1 seul. Remis à null quand l’achat qui l’a débloqué est remboursé ou contesté (src/server/achats.ts).
      */
     debloqueLe: quand("debloque_le"),
+    /**
+     * L’accord de l’import (la case « J’ai 18 ans ou plus… », src/contenu/consentements.ts) : l’heure où la conv est
+     * arrivée avec la case cochée, et la version de son texte. Toute conv importée par l’API l’a (src/server/juridique.ts) ;
+     * vides pour les convs d’avant la case.
+     */
+    consentementLe: quand("consentement_le"),
+    consentementVersion: text("consentement_version"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },

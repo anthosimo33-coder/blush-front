@@ -16,6 +16,7 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { ouvrirSession } from "@/server/auth";
@@ -49,6 +50,7 @@ const captures = (cle?: string) => {
   const fd = new FormData();
   fd.append("captures", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "c.png", { type: "image/png" }));
   fd.append("app", "instagram");
+  fd.append("consentement", CASE_IMPORT.version);
   if (cle) fd.append("cle", cle);
   return requete("/api/captures", { method: "POST", body: fd });
 };
@@ -105,7 +107,7 @@ describe("un envoi de captures repris après une coupure", () => {
   it("l’enregistrement d’écran : le dernier envoi renvoyé retrouve la même histoire", async () => {
     etat.cookies.set("blush-session", sessions[0]!);
     const lot = (k0: number) => lotVideo("Léa", k0);
-    const corps = JSON.stringify({ app: "imessage", lots: [lot(0), lot(100)], cle: crypto.randomUUID() });
+    const corps = JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lot(0), lot(100)], cle: crypto.randomUUID() });
     const envoi = () => postVideo(requete("/api/captures/video", { method: "POST", headers: { "content-type": "application/json" }, body: corps }));
     const a = await lue(await envoi());
     const b = await lue(await envoi());
@@ -117,7 +119,7 @@ describe("un envoi de captures repris après une coupure", () => {
       requete("/api/captures/video", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ app: "imessage", lots: Array.from({ length: 24 }, (_, k) => lot(k * 100)) }),
+        body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: Array.from({ length: 24 }, (_, k) => lot(k * 100)) }),
       }),
     );
     await lue(long);

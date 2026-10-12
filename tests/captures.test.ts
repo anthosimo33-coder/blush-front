@@ -12,7 +12,7 @@ import { ErreurImport } from "@/server/import";
 import { refusFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { FACTICE } from "@/server/ia/factice-valeurs";
 import { captures, msg } from "./aide/fabriques";
-import { avecFactice } from "./aide/fixtures";
+import { accordDeTest, avecFactice } from "./aide/fixtures";
 
 describe("des captures à l’histoire", () => {
   it("transcrit, crée le brouillon, et prend le prénom de l’utilisateur", async () => {
@@ -27,7 +27,7 @@ describe("des captures à l’histoire", () => {
     /* Le modèle factice date ses messages de l’avant-veille et de la veille */
     expect(t.texte).toMatch(/^# captures · instagram · 2 captures\n== \d{4}-\d{2}-\d{2} 13:12 ==\nElias: message 1/);
     expect(t.texte).toContain("Moi: suite 3\nElias: suite 4 image omitted");
-    const { id, meta } = await importerCaptures({ appli: "instagram", t });
+    const { id, meta } = await importerCaptures({ appli: "instagram", t, consentement: accordDeTest() });
     expect(storyAffichee(id, meta).sources[0]).toMatchObject({ mode: "captures", screenshotCount: 2, label: "Instagram · 2 captures" });
     const apres = await definirQui(id, { moi: 0, pronom: "elle", devinette: "parle", objectif: "comprendre", prenom: "Sarah" });
     expect(histoireDe(apres).utilisateur).toEqual({ prenom: "Sarah", pronom: "elle", nomExport: "Moi" });

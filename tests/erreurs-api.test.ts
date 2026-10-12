@@ -38,6 +38,7 @@ describe("le serveur", () => {
       renonciation: 422,
       cible: 422,
       invalide: 422,
+      consentement: 422,
       qui: 422,
       fichier: 422,
       groupe: 422,

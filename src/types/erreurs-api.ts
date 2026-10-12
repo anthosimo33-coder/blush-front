@@ -67,6 +67,8 @@ export const ERREURS_API = {
   cible: 422,
   /** Le reste de ce qu’une route attend (le mode vocal du chat, un moment de l’écoute du vocal). */
   invalide: 422,
+  /** Un import sans la case « J’ai 18 ans ou plus… » cochée, ou avec une version de son texte qui n’est plus la bonne (src/server/juridique.ts). */
+  consentement: 422,
   /** « Qui es-tu ? » n’est pas rempli : la lecture ne peut pas partir. */
   qui: 422,
   /** Un fichier qui n’est pas un export lisible (ou des captures hors des bornes). */

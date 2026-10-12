@@ -1,5 +1,5 @@
 {
-  "id": "5db2cafa-a62d-468f-ae30-e9c7b17132d2",
+  "id": "c702aa3e-a951-4aa8-8d2a-713b90261fba",
   "prevId": "ea71482a-feab-48d5-9476-670d868023f1",
   "version": "7",
   "dialect": "postgresql",
@@ -1216,6 +1216,18 @@
         "debloque_le": {
           "name": "debloque_le",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consentement_le": {
+          "name": "consentement_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consentement_version": {
+          "name": "consentement_version",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

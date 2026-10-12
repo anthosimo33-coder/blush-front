@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { repondre } from "@/server/chat";
 import { db, schema } from "@/server/db";
 import { donneesMemoire, donneesVerdict } from "@/server/depot";
+import { CASE_IMPORT } from "@/contenu/consentements";
 import { definirQui, importer, rattacherBrouillon } from "@/server/histoires";
 import { depuisFichier } from "@/server/import";
 import { executerChaine } from "@/server/pipeline";
@@ -23,7 +24,7 @@ const email = `vrai-modele-${Date.now()}@blush.test`;
 let id: string | null = null;
 try {
   const f = new File([readFileSync(join(EVALS, "convs/11-conv-courte.txt"))], "11.txt", { type: "text/plain" });
-  const imp = await importer(await depuisFichier(f));
+  const imp = await importer(await depuisFichier(f), { version: CASE_IMPORT.version, le: new Date() });
   id = imp.id;
   const u = (await db().insert(schema.users).values({ email }).returning())[0]!;
   await rattacherBrouillon(u, imp.secret);

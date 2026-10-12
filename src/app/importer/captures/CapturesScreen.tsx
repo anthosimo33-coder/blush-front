@@ -11,6 +11,8 @@ import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/api";
+import { CASE_IMPORT } from "@/contenu/consentements";
+import { CaseImport, useCase } from "@/components/juridique/cases";
 import type { AvanceVideo } from "@/types/api";
 import { prereduire, vignette } from "@/services/preparer-captures";
 import { Button } from "@/components/ui/Button";
@@ -80,6 +82,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useMonte();
+  /* La case de l’import (18 ans, les conditions, ce que la conv dit d’intime) : sans elle, rien ne part à la lecture */
+  const accord = useCase();
   const captureApp = app ?? journey.app ?? "instagram";
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
@@ -163,6 +167,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
 
   /* BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite */
   const continuer = async () => {
+    if (!accord.exiger()) return;
     setBusy(true);
     setSouci(null);
     setAvance(null);
@@ -170,10 +175,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     const enregistre = video ? items[0] : undefined;
     try {
       const r = enregistre
-        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", setAvance)
+        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", CASE_IMPORT.version, setAvance)
         : await uploadScreenshots(
             items.map((s) => s.file),
-            { app: captureApp, mode: addMode ? "add" : "first", onAvance: setAvance },
+            { app: captureApp, mode: addMode ? "add" : "first", consentement: CASE_IMPORT.version, onAvance: setAvance },
           );
       if (!monte.current) return;
       /* Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom (vientDeCaptures) */
@@ -186,6 +191,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (e instanceof ErreurApi && e.status === 401) return router.push(connexionPuis(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}`));
       setBusy(false);
       setAvance(null);
+      /* Le serveur n’a pas reconnu la case (BLUSH a changé de texte depuis l’ouverture de l’onglet) : à recocher, les captures restent là */
+      if (codeDe(e) === "consentement") return accord.perimer();
       /*
        * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit : son écran d’erreur, comme
        * sur l’export. Rien ne se lit, c’est « capture », ou « fichier » quand le serveur refuse les images ou ne sait pas
@@ -227,6 +234,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       }
       footer={
         <>
+          {/* La case de l’import, au-dessus du bouton à chaque étape : elle se coche avant « Continuer », qui envoie */}
+          <CaseImport etat={accord} className="mb-1" />
           {/* Le CAPTCHA de l’import sans compte, monté dès l’écran (il a son jeton prêt au « Continuer ») : invisible tant qu’il ne demande pas de geste */}
           <Captcha action="import" />
           {items.length ? (
