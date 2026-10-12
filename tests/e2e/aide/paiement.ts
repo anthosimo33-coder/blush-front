@@ -90,8 +90,12 @@ export async function tientEnPetitEcran(page: Page, quoi: string): Promise<void>
   const avant = page.viewportSize();
   await page.setViewportSize({ width: 375, height: 667 });
   try {
-    /* La mise en page refaite, et le panneau d’une feuille monté jusqu’en haut (son entrée dure 0,35 s) */
+    /* La mise en page refaite, et le panneau d’une feuille monté jusqu’en haut (son entrée dure 0,35 s) ; mesurée avec
+       les polices de l’appli, pas celles du système qui les remplacent le temps qu’elles arrivent (plus hautes sous Linux) */
     await page.waitForTimeout(500);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
     const { haut, visible } = await page.evaluate(() => {
       const feuille = [...document.querySelectorAll("dialog[open]")].at(-1)?.querySelector<HTMLElement>(":scope [tabindex='-1']");
       const el = feuille ?? document.documentElement;

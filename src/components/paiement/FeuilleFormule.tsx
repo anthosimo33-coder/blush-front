@@ -49,7 +49,7 @@ function Barre({ children, className }: { children: string; className?: string }
 /** Une ligne de ce que contient Premium : sa pastille ronde, son texte, et sa coche (ou ce qui la remplace à droite). */
 function LigneDuLot({ pastille, children, droite, rose = false }: { pastille: ReactNode; children: ReactNode; droite?: ReactNode; rose?: boolean }) {
   return (
-    <span className={cn("flex items-center gap-3 px-3.5 py-2 [@media(max-height:700px)]:py-1.5", rose && "bg-[#FFE6F2]")}>
+    <span className={cn("flex items-center gap-3 px-3.5 py-2 [@media(max-height:700px)]:py-1", rose && "bg-[#FFE6F2]")}>
       <span
         aria-hidden="true"
         className={cn(

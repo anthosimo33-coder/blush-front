@@ -177,8 +177,9 @@ export const caseImport = (page: Page): Locator => page.getByRole("checkbox", { 
 
 /**
  * Coche la case de l’import, si l’écran en a une et qu’elle ne l’est pas : sans elle, rien ne part (le choix du fichier
- * de l’export ne s’ouvre pas, « Continuer » n’envoie pas les captures). choisirFichier le fait avant chaque choix ; le
- * refus sans la case a son test (juridique.spec.ts).
+ * de l’export ne s’ouvre pas, « Continuer » n’envoie pas les captures). choisirFichier le fait avant chaque choix, et de
+ * nouveau après : l’écran des captures, arrivé par un lien, peut ne la montrer qu’une fois les captures choisies (la CI,
+ * plus lente, y arrivait avant elle). Le refus sans la case a son test (juridique.spec.ts).
  */
 async function accepterImport(page: Page): Promise<void> {
   const accord = caseImport(page);
@@ -195,6 +196,7 @@ export async function choisirFichier(page: Page, chemins: string | string[], bou
   const cible = typeof bouton === "string" ? page.getByRole("button", { name: bouton, exact: true }) : bouton;
   const [selecteur] = await Promise.all([page.waitForEvent("filechooser"), cible.click()]);
   await selecteur.setFiles(chemins);
+  await accepterImport(page);
 }
 
 /**
