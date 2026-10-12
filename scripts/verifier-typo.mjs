@@ -49,9 +49,9 @@ const OPAQUE = "￼";
 /* Le signe d’une phrase, pas celui du code (`:root`, `!important`, `!size-10`) : rien de collé après lui */
 const AVANT = /(?<= )[:;?!»](?![\p{L}\p{N}_-])/gu;
 const APRES = /«(?= )/g;
-const INVISIBLES = /[\u00a0\u200e\u200d\ufeff]/g;
-const EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}️]/u;
-const NOMS = { "\u00a0": "U+00A0", "\u200e": "U+200E", "\u200d": "U+200D", "\ufeff": "U+FEFF" };
+const INVISIBLES = /[\u00a0\u200e\u200d\ufeff\ufe0f]/g;
+const EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f]/u;
+const NOMS = { "\u00a0": "U+00A0", "\u200e": "U+200E", "\u200d": "U+200D", "\ufeff": "U+FEFF", "\ufe0f": "U+FE0F" };
 const ENTITES = { nbsp: NBSP, laquo: "«", raquo: "»", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 /* L’insécable écrite en entité dans le texte du JSX */
 const ENTITE_NBSP = /&(nbsp|#160|#xa0);/i;
@@ -131,6 +131,8 @@ export function problemesDe(chemin, source, { insecables = true } = {}) {
 
   for (const m of source.matchAll(INVISIBLES)) {
     if (m[0] === "\u200d" && EMOJI.test(source.slice(m.index - 2, m.index)) && EMOJI.test(source.slice(m.index + 1, m.index + 3))) continue;
+    /* Le sélecteur de variante d’un emoji (celui d’un cœur rouge) en fait partie ; ailleurs, il ne se voit pas */
+    if (m[0] === "\ufe0f" && EMOJI.test(source.slice(m.index - 2, m.index))) continue;
     const ecrire = m[0] === NBSP ? "l’écrire {NBSP} dans le JSX, \\u00a0 dans une chaîne" : `l’écrire en échappement (\\u${m[0].codePointAt(0).toString(16).padStart(4, "0")})`;
     problemes.push(`${chemin}:${ligneDe(m.index)} · ${NOMS[m[0]]} écrit en clair : ${ecrire}`);
   }

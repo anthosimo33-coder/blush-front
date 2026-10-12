@@ -21,7 +21,8 @@ test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules
   });
 
   await test.step("l’enregistrement choisi : son aperçu, sa durée, prêt", async () => {
-    await choisirFichier(page, video, "Choisir mon enregistrement");
+    /* La carte « Enregistre ton écran » et le bouton du pied portent le même nom : la carte d’abord */
+    await choisirFichier(page, video, page.getByRole("button", { name: "Choisir mon enregistrement", exact: true }).first());
     await expect(page.getByText("Ton enregistrement")).toBeVisible();
     /* La durée se lit dans la vidéo : quelques secondes (plus quand la machine est chargée : la vidéo dure ce qu’a duré le tournage) */
     await expect(page.getByText(/^(\d+\smin )?\d+\ss · prêt$/)).toBeVisible();

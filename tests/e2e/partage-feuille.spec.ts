@@ -212,7 +212,7 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
     /* Le lien comme l’image : la feuille ne dit plus « seul ton verdict part » */
     await expect(
       feuille.getByText(
-        "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH ou un passage de ton rapport. Son prénom y devient une initiale.",
+        "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH (avec ta question) ou un passage de ton rapport. Son prénom y devient une initiale.",
       ),
     ).toBeVisible();
     /* Cette feuille ne crée aucun lien */

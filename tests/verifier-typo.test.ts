@@ -82,13 +82,15 @@ describe("la vérification de la typographie", () => {
     expect(ecran("/* typo: du code */\nconst CODE = `const x = a ? b : c;`;")).toEqual([]);
   });
 
-  it("signale les caractères invisibles écrits en clair, l’insécable comprise, mais pas l’emoji qu’un U+200D assemble", () => {
+  it("signale les caractères invisibles écrits en clair, l’insécable comprise, mais pas l’emoji qu’un U+200D assemble ni le U+FE0F d’un emoji", () => {
     expect(ecran(`const a = "Une question\u00a0?";`)).toEqual([expect.stringContaining("U+00A0 écrit en clair")]);
     expect(problemesDe("tests/essai.test.ts", `expect(t).toBe("Une question\u00a0?");`, { insecables: false })).toEqual([expect.stringContaining("U+00A0 écrit en clair")]);
     expect(ecran(`const m = "\u200eimage omitted";`)).toEqual([expect.stringContaining("U+200E écrit en clair")]);
     expect(ecran(`const r = /^\ufeff?x/;`)).toEqual([expect.stringContaining("U+FEFF écrit en clair")]);
     expect(ecran(`const z = "a\u200db";`)).toEqual([expect.stringContaining("U+200D écrit en clair")]);
     expect(ecran(`const e = "on reprend demain 😮\u200d💨";`)).toEqual([]);
+    expect(ecran(`const v = "x\ufe0f";`)).toEqual([expect.stringContaining("U+FE0F écrit en clair")]);
+    expect(ecran(`const c = "je t’aime \u2764\ufe0f";`)).toEqual([]);
     expect(ecran(`const m = "\\u200eimage omitted";`)).toEqual([]);
   });
 

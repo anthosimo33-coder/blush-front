@@ -1,13 +1,13 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapturesScreen } from "@/app/importer/captures/CapturesScreen";
 import { SOUFFLE } from "@/lib/messages-erreur";
-import { uploadScreenshots } from "@/services/api";
+import { prechargerVideo, uploadScreenshots } from "@/services/api";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
 
 /*
  * L’écran des captures (src/app/importer/captures/CapturesScreen.tsx) quand la lecture échoue. Seuls les codes du
- * parcours (la conv trop courte, de groupe, la vidéo) et « capture » (rien de lisible) ouvrent l’écran d’erreur
+ * parcours (la conv trop courte, de groupe, la vidéo), « capture » et « fichier » (rien de lisible) ouvrent l’écran d’erreur
  * (?erreur=<code>, « Cette capture est illisible ») ; un refus de l’IA, une panne, une limite, le budget du jour, une
  * réponse sans code (un 504) ou le réseau se disent sur l’écran (MESSAGES.captures), et les captures restent là.
  * L’envoi est simulé ; le Worker des vignettes aussi. Les textes se lisent comme à l’écran : la recherche par texte
@@ -22,6 +22,7 @@ const envoi = vi.mocked(uploadScreenshots);
 beforeEach(() => {
   for (const f of Object.values(routeur)) f.mockReset();
   envoi.mockReset();
+  vi.mocked(prechargerVideo).mockReset();
   /* La barre de la lecture s’anime (BarreLecture) ; happy-dom rejette la promesse d’une animation annulée, que personne n’attend */
   vi.spyOn(HTMLElement.prototype, "animate").mockImplementation(() => new Animation());
 });
@@ -41,13 +42,15 @@ async function continuerAvec(e: unknown) {
 
 describe("l’import de captures en échec", () => {
   it.each([
-    ["capture", erreur("capture", 422)],
-    ["courte", erreur("courte", 422)],
-    ["groupe", erreur("groupe", 422)],
-    ["video", erreur("video", 422)],
-  ])("« %s » : la conv ou les captures en cause, l’écran d’erreur prévu", async (code, e) => {
+    ["capture", erreur("capture", 422), "capture"],
+    /* Des images refusées, ou une sortie du modèle illisible (src/server/captures.ts) : rien ne s’est lu non plus */
+    ["fichier", erreur("fichier", 422), "capture"],
+    ["courte", erreur("courte", 422), "courte"],
+    ["groupe", erreur("groupe", 422), "groupe"],
+    ["video", erreur("video", 422), "video"],
+  ])("« %s » : la conv ou les captures en cause, l’écran d’erreur prévu", async (_, e, ecran) => {
     await continuerAvec(e);
-    expect(routeur.replace).toHaveBeenCalledWith(`/importer/captures?app=hinge&erreur=${code}`, { scroll: false });
+    expect(routeur.replace).toHaveBeenCalledWith(`/importer/captures?app=hinge&erreur=${ecran}`, { scroll: false });
     expect(routeur.push).not.toHaveBeenCalled();
   });
 
@@ -76,22 +79,33 @@ describe("l’import de captures en échec", () => {
 });
 
 describe("ce que l’écran des captures dit d’abord", () => {
-  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit", () => {
+  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit ; une autre, BLUSH n’en lit pas l’export", () => {
     const { unmount } = render(<CapturesScreen app="instagram" addMode={false} />);
     expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
     expect(screen.getByText("Les captures suffisent aussi : on reconnaît les messages, les dates et qui parle.")).toBeTruthy();
     unmount();
     render(<CapturesScreen app="hinge" addMode={false} />);
     expect(screen.getByText("Hinge ne permet pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
+    cleanup();
+    /* Une autre appli s’exporte parfois (Telegram, Messenger) : l’écran dit seulement que BLUSH ne lit pas cet export */
+    render(<CapturesScreen app="autre" addMode={false} />);
+    expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
+    expect(screen.getByText("BLUSH ne lit pas encore l’export de ton appli : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
   });
 
-  it("iMessage : « Comment filmer » est une carte, sa liste hors de tout bouton, et son titre un vrai bouton", () => {
+  it("iMessage : « Comment filmer » est une carte, sa liste hors de tout bouton, et la carte un bouton nommé comme celui du pied", () => {
     render(<CapturesScreen app="imessage" addMode={false} />);
     const etapes = screen.getByText("Ouvre votre conv dans Messages").closest("ol");
     expect(etapes).not.toBeNull();
     expect(etapes?.closest("button")).toBeNull();
     expect(etapes?.querySelectorAll("li")).toHaveLength(4);
-    expect(screen.getByRole("button", { name: "Enregistre ton écran" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Choisir mon enregistrement" })).toHaveLength(1);
+    /* La carte ne filme rien : elle ouvre le choix de la vidéo, comme le bouton du pied d’écran, et porte son nom */
+    expect(screen.queryByRole("button", { name: "Enregistre ton écran" })).toBeNull();
+    const boutons = screen.getAllByRole("button", { name: "Choisir mon enregistrement" });
+    expect(boutons).toHaveLength(2);
+    expect(boutons[0]?.closest("ol")).toBeNull();
+    /* Toucher la carte charge déjà l’extraction de la vidéo, comme le bouton du pied */
+    fireEvent.click(boutons[0]!);
+    expect(prechargerVideo).toHaveBeenCalledTimes(1);
   });
 });

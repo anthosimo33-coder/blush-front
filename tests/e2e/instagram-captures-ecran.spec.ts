@@ -277,9 +277,10 @@ test("captures : au pointeur, lâcher la capture hors de la grille la pose, et s
 
 /*
  * Retirer une capture au clavier (Suppr, ou Entrée sur sa croix) ne fait pas retomber le focus sur la page : il va à
- * la capture qui prend sa place (ou à la précédente), comme un déplacement aux flèches le garde sur la capture.
+ * la capture qui prend sa place (ou à la précédente), comme un déplacement aux flèches le garde sur la capture. La
+ * dernière retirée, il va à la zone d’ajout qui remplace la grille.
  */
-test("captures : après Suppr ou la croix au clavier, le focus reste dans la grille", async ({ page }, testInfo) => {
+test("captures : après Suppr ou la croix au clavier, le focus reste dans la grille, puis va à la zone d’ajout", async ({ page }, testInfo) => {
   await page.goto("/importer/captures?app=autre");
   await choisirFichier(page, capturesPng(testInfo, 4), "Choisir mes captures");
   await capture(page, 2, 4).focus();
@@ -298,4 +299,10 @@ test("captures : après Suppr ou la croix au clavier, le focus reste dans la gri
       .getByRole("button", { name: /^Capture \d+ sur 2$/ })
       .and(page.locator(":focus")),
   ).toHaveCount(1);
+  /* La dernière retirée, la grille part : le focus va à la zone d’ajout qui revient */
+  await capture(page, 1, 2).focus();
+  await page.keyboard.press("Delete");
+  await capture(page, 1, 1).focus();
+  await page.keyboard.press("Delete");
+  await expect(page.getByRole("button", { name: /^Ajoute tes captures/ })).toBeFocused();
 });

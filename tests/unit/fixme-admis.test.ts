@@ -5,20 +5,24 @@ import { describe, expect, it } from "vitest";
 /*
  * Un fixme (un test marqué `.fixme`) est un bug connu, que la CI ne joue pas : il ne doit pas s’oublier. Chaque fixme des tests de bout
  * en bout (tests/e2e/**\/*.spec.ts) est dans FIXME_ADMIS, avec la raison qui le garde, et `npm run todo` les liste avec
- * les TODO(produit). Un nouveau fixme fait échouer ce test : on corrige le bug, ou on l’ajoute ici en le disant. Ce
- * fichier n’écrit jamais le nom complet de l’appel, pour que `npm run todo` ne liste que les vrais fixme.
+ * les marqueurs de produit. Un nouveau fixme fait échouer ce test : on corrige le bug, ou on l’ajoute ici en le disant. Ce
+ * fichier n’écrit jamais en entier ni l’appel ni le marqueur de produit (PRODUIT), pour que `npm run todo` ne liste que
+ * les vrais.
  *
  * La liste ne fait que rétrécir : un fixme corrigé (repassé en test()) en sort. Un fixme admis mais absent ne fait pas
  * échouer (les quatre lots du 12 octobre se fusionnent dans n’importe quel ordre) ; à l’intégration, il ne reste que la
- * question du plan « rapport », qui attend une décision (TODO(produit) dans src/lib/acces.ts).
+ * question du plan « rapport », qui attend une décision (son marqueur de produit, dans src/lib/acces.ts).
  */
+
+/** Le marqueur d’une décision de produit en attente, formé ici seulement */
+const PRODUIT = ["TODO", "(produit)"].join("");
 
 /** Les fixme admis, par fichier (depuis tests/e2e) et par titre, avec ce qui les garde. */
 const FIXME_ADMIS: readonly { fichier: string; titre: string; raison: string }[] = [
   {
     fichier: "rapport-question.spec.ts",
     titre: "compte « rapport » : la question incluse avec le rapport reçoit sa réponse",
-    raison: "TODO(produit) : la question incluse avec le seul plan « rapport » (src/lib/acces.ts)",
+    raison: `${PRODUIT} : la question incluse avec le seul plan « rapport » (src/lib/acces.ts)`,
   },
   /* Corrigés dans les autres lots du 12 octobre : à retirer d’ici une fois ces lots fusionnés */
   { fichier: "chat-fiche-sa-fiche.spec.ts", titre: "après un retrait, les infos arrivées gardent leur point « Nouveau »", raison: "corrigé dans un autre lot" },
@@ -58,6 +62,6 @@ describe("les fixme des tests de bout en bout", () => {
   });
 
   it("la question du plan « rapport » est la seule admise pour une raison de produit", () => {
-    expect(FIXME_ADMIS.filter((a) => a.raison.startsWith("TODO(produit)")).map((a) => a.fichier)).toEqual(["rapport-question.spec.ts"]);
+    expect(FIXME_ADMIS.filter((a) => a.raison.startsWith(PRODUIT)).map((a) => a.fichier)).toEqual(["rapport-question.spec.ts"]);
   });
 });

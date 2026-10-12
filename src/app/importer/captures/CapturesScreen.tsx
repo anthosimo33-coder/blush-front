@@ -41,12 +41,16 @@ const texteAvance = (a: AvanceVideo) =>
 /*
  * Ce que l’écran des captures dit d’abord, d’après l’appli. Instagram (et WhatsApp) s’exportent : on y arrive souvent
  * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge et les autres ne s’exportent pas.
- * TODO(produit): « Les captures suffisent aussi », et « Ton appli » pour les autres applis, textes du 12 octobre, à valider.
+ * Les autres applis (Telegram, Messenger…) s’exportent parfois, mais BLUSH ne lit pas leur export : l’écran dit ce qui est vrai.
+ * TODO(produit): « Les captures suffisent aussi », et « BLUSH ne lit pas encore l’export de ton appli » pour les autres
+ * applis, textes du 12 octobre, à valider.
  */
 const leadCaptures = (app: AppKind) =>
   (EXPORTS as readonly AppKind[]).includes(app)
     ? "Les captures suffisent aussi\u00a0: on reconnaît les messages, les dates et qui parle."
-    : `${app === "hinge" ? "Hinge" : "Ton appli"} ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle.`;
+    : app === "hinge"
+      ? "Hinge ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle."
+      : "BLUSH ne lit pas encore l’export de ton appli\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle.";
 
 /** Pendant la lecture des captures (sans avancée à dire) : ce que BLUSH fait, en clair dans le bouton. */
 const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : "BLUSH lit ta capture…");
@@ -129,14 +133,18 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     setResult({ count: next.length, messages: -1, video });
   };
 
+  /* La zone d’ajout, qui revient quand on retire la dernière capture : le focus y va (sinon, il retomberait sur la page) */
+  const zoneAjout = useRef<HTMLButtonElement>(null);
+
   const remove = (id: string) => {
     apercus.liberer(items.find((s) => s.id === id)?.url);
     const next = items.filter((s) => s.id !== id);
     setItems(next);
     setAnnounce("Capture retirée.");
     setTrop(false);
-    if (!next.length) setResult(null);
-    else setResult((r) => (r ? { ...r, count: next.length } : r));
+    if (next.length) return setResult((r) => (r ? { ...r, count: next.length } : r));
+    setResult(null);
+    requestAnimationFrame(() => zoneAjout.current?.focus());
   };
 
   /** Déplace une capture à une autre place : BLUSH les lit dans cet ordre. */
@@ -178,12 +186,15 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       setBusy(false);
       setAvance(null);
       /*
-       * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit (« capture ») : son écran
-       * d’erreur, comme sur l’export. Tout le reste ne vient pas des captures, qui restent là : la limite du jour, le
-       * budget de l’IA (« souffle »), un refus de l’IA, une panne, une réponse sans code (un 504) ou le réseau, encore
-       * après la reprise. Il se dit sous elles (MESSAGES.captures), et on réessaie.
+       * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit : son écran d’erreur, comme
+       * sur l’export. Rien ne se lit, c’est « capture », ou « fichier » quand le serveur refuse les images ou ne sait pas
+       * lire ce que le modèle en a tiré (src/server/captures.ts) ; les deux ouvrent l’écran « capture ». Tout le reste ne
+       * vient pas des captures, qui restent là : la limite du jour, le budget de l’IA (« souffle »), un refus de l’IA, une
+       * panne, une réponse sans code (un 504) ou le réseau, encore après la reprise. Il se dit sous elles
+       * (MESSAGES.captures), et on réessaie.
        */
-      const parcours = erreurDeParcours("captures", e) ?? (codeDe(e) === "capture" ? "capture" : null);
+      const code = codeDe(e);
+      const parcours = erreurDeParcours("captures", e) ?? (code === "capture" || code === "fichier" ? "capture" : null);
       if (parcours) return echec(parcours);
       setSouci(messageErreur("captures", e));
     }
@@ -239,9 +250,9 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     >
       {!premier ? (
         enregistrement ? (
-          <CommentFilmer onPick={rec.open} />
+          <CommentFilmer onPick={choisirEnregistrement} />
         ) : (
-          <Dropzone onPick={shots.open} onFiles={(f) => handle(f, false)} />
+          <Dropzone ref={zoneAjout} onPick={shots.open} onFiles={(f) => handle(f, false)} />
         )
       ) : result?.video ? (
         <CarteEnregistrement shot={premier} onChange={busy ? undefined : choisirEnregistrement} />

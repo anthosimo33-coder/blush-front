@@ -75,6 +75,6 @@ export const FEUILLE_CONFIDENTIALITE = {
     titre: "Rien ne sort sans toi",
     page: "Rien ne sort sans toi",
     detail:
-      "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH ou un passage de ton rapport. Son prénom y devient une initiale.",
+      "La personne avec qui tu parles n’est jamais contactée. Quand tu partages, seul ce que tu choisis part\u00a0: ton verdict, ou en image une réponse de BLUSH (avec ta question) ou un passage de ton rapport. Son prénom y devient une initiale.",
   },
 } as const;

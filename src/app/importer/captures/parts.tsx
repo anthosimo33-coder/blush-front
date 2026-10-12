@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { estImage } from "@/lib/limites";
@@ -163,9 +163,10 @@ export function CarteEnregistrement({ shot, onChange }: { shot: Shot; onChange?:
 
 /**
  * iMessage : comment filmer sa conv sur iPhone, en quatre gestes, puis la choisir. Une carte, pas un bouton : une liste
- * dans un <button> n’est pas lue comme une liste (un bouton n’a que du texte). Le vrai bouton est son titre, « Enregistre
- * ton écran », que son ::after étend à toute la carte (toute la carte reste à toucher). Il ne reprend pas le nom du
- * bouton du pied d’écran, « Choisir mon enregistrement », qui fait la même chose : deux boutons du même nom se confondent.
+ * dans un <button> n’est pas lue comme une liste (un bouton n’a que du texte). Le vrai bouton couvre toute la carte (toute
+ * la carte reste à toucher) ; il ne filme rien, il ouvre le choix de la vidéo : il porte donc le nom du bouton du pied
+ * d’écran, « Choisir mon enregistrement », qui fait la même chose (même fonction, même nom). Le titre visible,
+ * « Enregistre ton écran », et sa ligne le décrivent.
  */
 export function CommentFilmer({ onPick }: { onPick: () => void }) {
   const etapes: ReactNode[] = [
@@ -176,6 +177,7 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
     "Reviens sur la conv, et remonte-la doucement jusqu’au début",
     "Arrête l’enregistrement, puis choisis-le ici",
   ];
+  const titreId = useId();
   const sousTitreId = useId();
   return (
     <div className="flex flex-col gap-3">
@@ -186,14 +188,9 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
             <span className="size-4 rounded-full bg-[#FF5A60] shadow-[0_0_0_4px_rgba(255,90,96,0.22)]" />
           </span>
           <span className="flex flex-col">
-            <button
-              type="button"
-              onClick={onPick}
-              aria-describedby={sousTitreId}
-              className="text-left text-accent font-black outline-none after:absolute after:inset-0 after:rounded-card after:content-['']"
-            >
+            <span id={titreId} className="text-accent font-black">
               Enregistre ton écran
-            </button>
+            </span>
             <span id={sousTitreId} className="text-legende font-extrabold text-grey">
               Toute votre conv, en une minute
             </span>
@@ -207,6 +204,10 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
             </li>
           ))}
         </ol>
+        {/* Dernier de la carte, au-dessus d’elle : le toucher n’importe où l’ouvre */}
+        <button type="button" onClick={onPick} aria-describedby={`${titreId} ${sousTitreId}`} className="absolute inset-0 rounded-card outline-none">
+          <span className="sr-only">Choisir mon enregistrement</span>
+        </button>
       </div>
       <NotePrivee petite className="px-1 leading-[1.45]">
         {NOTE_ENREGISTREMENT} Pas de bouton <BoutonRec />
@@ -217,10 +218,11 @@ export function CommentFilmer({ onPick }: { onPick: () => void }) {
 }
 
 /** Zone d’ajout (avant sélection) : un vrai appel à déposer, pas de fausses captures. Accepte aussi le glisser-déposer. */
-export function Dropzone({ onPick, onFiles }: { onPick: () => void; onFiles: (files: File[]) => void }) {
+export function Dropzone({ onPick, onFiles, ref }: { onPick: () => void; onFiles: (files: File[]) => void; ref?: Ref<HTMLButtonElement> }) {
   const [over, setOver] = useState(false);
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onPick}
       onDragOver={(e) => {

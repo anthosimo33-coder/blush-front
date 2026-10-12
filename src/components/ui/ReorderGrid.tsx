@@ -167,7 +167,9 @@ function useReordonnable(ids: string[], { onMove, onRemove, onAnnounce, fige, te
 
   /*
    * Retire la case `id` (à la position `i`) ; au clavier comme à la croix, le focus ne retombe pas sur la page : il va à
-   * la case qui prend sa place, ou à la précédente si c’était la dernière, ou à la grille quand il n’en reste aucune.
+   * la case qui prend sa place, ou à la précédente si c’était la dernière. Quand il n’en reste aucune, il va à la case
+   * d’ajout, ou à la grille, si elles restent là ; un écran qui démonte la grille vide (CapturesScreen) donne lui-même
+   * le focus à ce qui la remplace.
    */
   const retirer = (id: string, i: number) => {
     const reste = ids.filter((x) => x !== id);

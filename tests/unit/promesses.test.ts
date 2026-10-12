@@ -41,11 +41,13 @@ describe("la feuille « En savoir plus » du rapport", () => {
     expect(TITRES_DE_LA_PAGE).toContain("Une IA, et seulement elle");
   });
 
-  it("le partage dit le lien comme l’image, et ne dit plus « seul ton verdict part »", () => {
+  it("le partage dit le lien comme l’image, et ne dit plus « seul ton verdict part » ; l’image dit ta question", () => {
     const { detail } = FEUILLE_CONFIDENTIALITE.partage;
     expect(detail).not.toContain("seul ton verdict part");
     expect(detail).toContain("ton verdict");
     expect(detail).toContain("en image");
+    /* L’image d’une réponse montre aussi ta question (src/server/partages.ts), comme le dit la page */
+    expect(detail).toContain("(avec ta question)");
     expect(detail).toContain("initiale");
   });
 });
