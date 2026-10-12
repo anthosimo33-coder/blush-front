@@ -2,6 +2,7 @@ import { expect, type Page, type Request } from "@playwright/test";
 import { CASE_RENONCIATION } from "../../../src/contenu/consentements";
 import type { OffreId } from "../../../src/types";
 import { URL_APPLI } from "../reglages";
+import { sql } from "./base";
 import { RESEAU } from "./page";
 
 /*
@@ -50,4 +51,32 @@ export async function rembourser(page: Page, achat: string): Promise<void> {
   const { webhook } = (await r.json()) as { webhook: { corps: string; entetes: Record<string, string> } };
   const poste = await page.request.post("/api/paiement/whop", { headers: { ...webhook.entetes, "content-type": "application/json" }, data: webhook.corps, timeout: RESEAU });
   expect(poste.status(), "le webhook du remboursement est reçu").toBe(200);
+}
+
+/** L’achat tel qu’il est en base : son offre, son statut, et la case de renonciation gardée avec lui (sa version, son heure). */
+export async function achatEnBase(achat: string): Promise<{ offre: OffreId; statut: string; renonciationVersion: string | null; renonciationLe: Date | null }> {
+  const [a] = await sql()<{ offre: OffreId; statut: string; renonciationVersion: string | null; renonciationLe: Date | null }[]>`
+    select offre, statut, renonciation_version as "renonciationVersion", renonciation_le as "renonciationLe" from achats where id = ${achat}`;
+  if (!a) throw new Error(`l’achat ${achat} n’est pas en base`);
+  return a;
+}
+
+/** Le dernier achat de ce compte (le plus récent commandé) : son id. */
+export async function dernierAchat(email: string): Promise<string> {
+  const [a] = await sql()<{ id: string }[]>`
+    select a.id from achats a join users u on u.id = a.user_id where u.email = ${email.toLowerCase()} order by a.cree_le desc limit 1`;
+  if (!a) throw new Error(`aucun achat pour ${email}`);
+  return a.id;
+}
+
+/**
+ * Le moyen de test du compte à rebours de l’offre ① : la fin de l’offre déjà montrée à ce compte, ramenée à `secondes`
+ * d’ici, en base (le serveur la relit et la redonne telle quelle). Seulement ici : rien dans le code de l’appli ne la
+ * raccourcit, en production comme ailleurs.
+ */
+export async function raccourcirLaSuite(email: string, secondes: number): Promise<void> {
+  const fait = await sql()`
+    update offres_uniques o set expire_le = now() + make_interval(secs => ${secondes})
+    from users u where u.id = o.user_id and u.email = ${email.toLowerCase()} and o.offre = 'suite' and o.prise_le is null`;
+  if (fait.count !== 1) throw new Error(`pas d’offre ① montrée à ${email}`);
 }
