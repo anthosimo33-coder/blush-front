@@ -58,12 +58,14 @@ describe("l’échéance d’une fonction", () => {
   });
 
   /*
-   * Une page la lance aussi, par le service qui la relance après le rendu : getFicheEtMaj (sa fiche). getReport (les
-   * pages du rapport, par ouvrirLeRapport) s’y ajoutera avec leur maxDuration (lot 6, PR2).
+   * Une page la lance aussi, par le service qui la relance après le rendu : getFicheEtMaj (sa fiche), et getReport (les
+   * pages du rapport, du verdict et de « C’est débloqué », par ouvrirLeRapport).
    */
-  it("une route ou une page qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj et getFicheEtMaj qui la relancent) vit DUREE_FONCTION_S", () => {
-    const routes = sources("src/app").filter((f) => /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj|getFicheEtMaj)\(/.test(f.texte));
-    expect(routes.map((f) => f.chemin)).toContain("src/app/app/fiche/page.tsx");
+  it("une route ou une page qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj, getFicheEtMaj et getReport qui la relancent) vit DUREE_FONCTION_S", () => {
+    const routes = sources("src/app").filter((f) => /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj|getFicheEtMaj|getReport)\(/.test(f.texte));
+    expect(routes.map((f) => f.chemin)).toEqual(
+      expect.arrayContaining(["src/app/app/fiche/page.tsx", "src/app/rapport/(rapport)/page.tsx", "src/app/rapport/verdict/page.tsx", "src/app/rapport/debloque/page.tsx"]),
+    );
     expect(routes.length).toBeGreaterThanOrEqual(6);
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);
   });

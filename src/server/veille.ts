@@ -66,7 +66,7 @@ export async function resumerLaVeille(maintenant = new Date()): Promise<void> {
     const total = couts.reduce((s, c) => s + (c.micros ?? 0), 0);
     const voix = await statsVocal();
     if (!histoires && !messages && !couts.length && !attente && !echecs && !arretees) return;
-    /* typo : du code. Un mail à l’équipe seule, comme une alerte : ni l’appli ni un mail à une personne ne l’affichent */
+    /* Un mail à l’équipe seule, comme une alerte : ni l’appli ni un mail à une personne ne l’affichent (HORS_DES_TEXTES de verifier-typo) */
     await envoyerALEquipe(`BLUSH · la veille : ${histoires} import${histoires > 1 ? "s" : ""}, ${dollars(total)}`, [
       `Imports : ${histoires}`,
       `Verdicts : ${verdicts} · rapports : ${rapports} · mémoires : ${memoires}`,

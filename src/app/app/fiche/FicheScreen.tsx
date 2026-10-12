@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { ACCEPT_EXPORT, ACCEPT_IMAGES, estExport, estImage } from "@/lib/limites";
-import { pagePrecedente } from "@/lib/navigation";
+import { pagePrecedente, revenirVers } from "@/lib/navigation";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { ecritDepuis, FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from "@/lib/query";
 import { play } from "@/lib/sound";
@@ -81,10 +81,10 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   /*
    * « Retour » : venu de l’accueil, on y revient par l’historique, comme le geste retour (sinon le retour suivant
    * rouvrirait la fiche). Un retour par l’historique ne glisse pas : Next ne lui donne pas de type de transition.
-   * Arrivé ici autrement, le lien ouvre l’accueil, en glissant.
+   * Arrivé ici autrement, ou quand l’entrée d’avant n’est plus à BLUSH (revenirVers), le lien ouvre l’accueil, en glissant.
    */
   const retour = (e: { preventDefault: () => void }) => {
-    if (pagePrecedente() !== "/app") return;
+    if (!revenirVers("/app")) return;
     e.preventDefault();
     router.back();
   };

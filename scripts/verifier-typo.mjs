@@ -32,7 +32,7 @@ const GENERES = new Set(["src/server/ia/textes.generated.ts"]);
  * alertes et les lignes du journal écrites d’ailleurs (`alerter(…)`, `journal(…)`…) se reconnaissent à l’appel
  * (horsDesTextes).
  */
-const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts|ia\/)/;
+const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts|veille\.ts|ia\/)/;
 
 /**
  * La règle des insécables vaut pour tout ce que quelqu’un lit : src, l’appli, ses images de partage (carte-*.tsx), ses

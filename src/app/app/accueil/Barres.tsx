@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore, type RefObject } from "react";
 import { DESKTOP } from "@/lib/motion";
-import { pagePrecedente } from "@/lib/navigation";
+import { revenirVers } from "@/lib/navigation";
 import { IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import type { ConvSummary } from "@/types";
@@ -65,7 +65,7 @@ export function EnTeteMobile({ headRef, fromReport, contact, others, busy, ouvri
           <span data-a="acc" className="flex">
             {fromReport ? (
               <IconButton
-                onClick={() => (pagePrecedente() === "/rapport" ? router.back() : router.push("/rapport"))}
+                onClick={() => (revenirVers("/rapport") ? router.back() : router.push("/rapport"))}
                 icon="back"
                 label="Revenir au rapport"
                 iconSize={19}

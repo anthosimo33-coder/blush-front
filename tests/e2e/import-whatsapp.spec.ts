@@ -128,6 +128,9 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
     const scene = page.getByRole("main");
     await expect(scene.getByText("Toi", { exact: true })).toBeVisible();
     await expect(scene.getByText("Il", { exact: true })).toBeVisible();
+    /* Les barres du duel se disent aux lecteurs d’écran : la ligne, puis les deux parts (« il », le pronom de Noé). Le nom
+     * accessible ramène l’insécable à une espace (\s) */
+    await expect(scene.getByRole("img", { name: /^Qui .+\s: toi \d+ %, il \d+ %$/ }).first()).toBeVisible();
     await expect(scene.getByText("C’est flou parce que t’as esquivé.")).toBeVisible();
     await toucherLaScene(page, "gauche");
     await expect(carteDuVerdict(page, 2, 4, "Vous êtes à deux doigts.")).toBeVisible();

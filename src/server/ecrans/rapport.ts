@@ -48,7 +48,7 @@ export function scores(c: Chiffres): ScoreRow[] {
 
 /* ———— Le verdict ———— */
 
-/** Le verdict affiché. Le mode sobre (une alerte) ne s’y lit pas : il se voit à `ReportPayload.sober`. */
+/** Le verdict affiché. Le mode sobre (une alerte) ne s’y lit pas : il se voit à `ReportPayload.alerte` dès le verdict, puis à `sober`. */
 export function verdictAffiche(v: Verdict): VerdictAffiche {
   return { emoji: v.emoji ?? "🧊", short: v.court ?? "", title: v.titre ?? "", subtitle: v.sous_titre ?? "" };
 }

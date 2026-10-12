@@ -9,9 +9,8 @@ import { describe, expect, it } from "vitest";
  * fichier n’écrit jamais en entier ni l’appel ni le marqueur de produit (PRODUIT), pour que `npm run todo` ne liste que
  * les vrais.
  *
- * La liste ne fait que rétrécir : un fixme corrigé (repassé en test()) en sort. Un fixme admis mais absent ne fait pas
- * échouer (les quatre lots du 12 octobre se fusionnent dans n’importe quel ordre) ; à l’intégration, il ne reste que la
- * question du plan « rapport », qui attend une décision (son marqueur de produit, dans src/lib/acces.ts).
+ * La liste ne fait que rétrécir : un fixme corrigé (repassé en test()) en sort. Il n’y reste que la question du plan
+ * « rapport », qui attend une décision (son marqueur de produit, dans src/lib/acces.ts).
  */
 
 /** Le marqueur d’une décision de produit en attente, formé ici seulement */
@@ -24,16 +23,6 @@ const FIXME_ADMIS: readonly { fichier: string; titre: string; raison: string }[]
     titre: "compte « rapport » : la question incluse avec le rapport reçoit sa réponse",
     raison: `${PRODUIT} : la question incluse avec le seul plan « rapport » (src/lib/acces.ts)`,
   },
-  /* Corrigés dans les autres lots du 12 octobre : à retirer d’ici une fois ces lots fusionnés */
-  { fichier: "chat-fiche-sa-fiche.spec.ts", titre: "après un retrait, les infos arrivées gardent leur point « Nouveau »", raison: "corrigé dans un autre lot" },
-  { fichier: "chat-fiche-sa-fiche.spec.ts", titre: "quand elle parle de lui, la ligne d’ajout de « Il aime » porte ce nom", raison: "corrigé dans un autre lot" },
-  { fichier: "chat-fiche.spec.ts", titre: "le champ du chat porte son seul nom, sans celui du bouton à côté", raison: "corrigé dans un autre lot" },
-  {
-    fichier: "import-whatsapp.spec.ts",
-    titre: "la durée de la conv est la même pendant la lecture et sur le verdict : 4 jours, du 4 au 7 septembre",
-    raison: "corrigé dans un autre lot",
-  },
-  { fichier: "rapport-sobre.spec.ts", titre: "une alerte : pas de scène du verdict, même avant que le rapport doux soit écrit", raison: "corrigé dans un autre lot" },
 ];
 
 const E2E = join(__dirname, "../e2e");
@@ -59,6 +48,11 @@ describe("les fixme des tests de bout en bout", () => {
     const trouves = SPECS.flatMap((fichier) => fixmeDe(readFileSync(join(E2E, fichier), "utf8")).map((titre) => ({ fichier, titre })));
     const horsListe = trouves.filter(({ fichier, titre }) => !FIXME_ADMIS.some((a) => a.fichier === fichier && a.titre === titre));
     expect(horsListe, "un fixme hors de FIXME_ADMIS : corriger le bug, ou l’admettre en disant pourquoi").toEqual([]);
+  });
+
+  it("sont encore là : un fixme corrigé sort de FIXME_ADMIS", () => {
+    const absents = FIXME_ADMIS.filter((a) => !SPECS.includes(a.fichier) || !fixmeDe(readFileSync(join(E2E, a.fichier), "utf8")).includes(a.titre));
+    expect(absents, "un fixme admis n’existe plus : le retirer de FIXME_ADMIS").toEqual([]);
   });
 
   it("la question du plan « rapport » est la seule admise pour une raison de produit", () => {
