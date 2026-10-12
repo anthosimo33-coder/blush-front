@@ -779,7 +779,7 @@ export const STATES = [
     compte: "equipe",
     ref: "13-accueil",
     note: "L’accueil est le chat avec BLUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, BLUSH en grand comme un personnage\u00a0: un toucher ouvre «\u00a0Ce que BLUSH voit\u00a0». À droite, Maëlys comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. Au-dessus du champ, les questions toutes prêtes (celles de sa mémoire), en un toucher.",
-    changement: "Le compteur de bulles, à côté du bouton du compte\u00a0: «\u00a0∞\u00a0» pour l’équipe (illimitées\u00a0; un compte qui paie\u00a0: 13k à 13o).",
+    changement: "Le compteur de bulles, à côté du bouton du compte\u00a0: «\u00a0∞\u00a0» pour l’équipe (illimitées\u00a0; un compte qui paie\u00a0: 13k à 13p).",
   },
   {
     id: "13b",
@@ -969,6 +969,16 @@ export const STATES = [
       await page.waitForTimeout(1100);
     },
     note: "Le compteur touché\u00a0: ce qu’est une bulle, ce que coûte chaque réponse, et «\u00a0Recharger · il t’en reste 4\u00a0».",
+  },
+  {
+    id: "13p",
+    section: "quotidien",
+    title: "Accueil",
+    state: "Tes bulles sont finies",
+    route: "/app",
+    compte: "rapport",
+    sheet: true,
+    note: "0 bulle, sans réponse qui attend (avant le premier message, ou après un achat repris)\u00a0: la carte «\u00a0Tes bulles sont finies\u00a0», «\u00a0BLUSH garde tout en mémoire.\u00a0» et «\u00a0Recharger\u00a0». Un message envoyé s’écrit quand même, flouté (13m).",
   },
   {
     id: "16",
