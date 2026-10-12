@@ -43,6 +43,7 @@ function refus(e: unknown): Issue {
   const code = e instanceof ErreurApi ? e.code : "erreur";
   if (code === "email") return { ok: false, texte: "Cet email n’en est pas un." };
   if (code === "invalide") return { ok: false, texte: "Ce nombre n’est pas accepté." };
+  if (code === "connexion" || code === "introuvable") return { ok: false, texte: "Ta session n’ouvre pas ces gestes\u00a0: reconnecte-toi avec l’email de l’équipe." };
   return { ok: false, texte: "Ça n’a pas marché. Vérifie ta connexion et réessaie." };
 }
 
