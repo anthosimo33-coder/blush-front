@@ -172,7 +172,12 @@ describe("la recharge", () => {
     expect(within(feuille).getByText(CASE_RENONCIATION.manquante)).toBeTruthy();
     /* Le grand pack, au clavier : les flèches du groupe passent d’un pack à l’autre */
     fireEvent.click(kase);
-    fireEvent.click(within(feuille).getAllByRole("radio")[2]!);
+    const radios = within(feuille).getAllByRole("radio");
+    /* Un seul arrêt de tabulation : le pack conseillé, coché */
+    expect(radios.map((r) => r.tabIndex)).toEqual([-1, 0, -1]);
+    fireEvent.keyDown(radios[1]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(radios[2]);
+    expect(radios[2]!.getAttribute("aria-checked")).toBe("true");
     await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: "Payer · 19,90\u00a0€" })));
     expect(payer).toHaveBeenCalledOnce();
     expect(payer.mock.calls[0]![0]).toBe("pack200");
