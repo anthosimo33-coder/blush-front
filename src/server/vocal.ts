@@ -5,10 +5,13 @@ import { minuter, texteDit } from "@/lib/vocal";
 import type { EvenementEcoute, VocalLigne, VocalRapport, Voix } from "@/types";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
-import { PREDICATS } from "./depot";
+import type { Utilisateur } from "./auth";
+import { donneesVerdict, PREDICATS } from "./depot";
+import { rapportOuvert } from "./droits";
 import { messagesAffiches } from "./ecrans/messages";
 import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
 import { COUPE_VOIX, dire, scriptQuiTient, voixPour } from "./ia/voix";
+import { ouvertureDu } from "./presentation/rapport";
 
 /*
  * Le vocal du rapport, une fois le script écrit (analyse.ts, tâche « vocal ») : on le fait dire par la voix de l’A/B
@@ -112,9 +115,11 @@ export async function audioDuChat(userId: string, id: number): Promise<Buffer | 
 
 /**
  * L’audio du vocal d’une conv de ce compte (MP3), déchiffré, en une seule requête qui vérifie aussi que la conv est à
- * lui. null : pas de conv à ce compte ; `audio` null : son vocal n’est pas prêt.
+ * lui. null : pas de conv à ce compte ; « acces » : le rapport de cette conv n’est pas ouvert à ce compte (ni débloqué,
+ * ni l’équipe, ni le mode sobre : la même règle que sa lecture, ouvertureDu), par exemple payé puis remboursé ; `audio`
+ * null : son vocal n’est pas prêt. Le verdict (le mode sobre) n’est relu que pour un rapport fermé.
  */
-export async function audioDuCompte(userId: string, storyId: string): Promise<{ audio: Buffer | null } | null> {
+export async function audioDuCompte(compte: Pick<Utilisateur, "id" | "email">, storyId: string): Promise<{ audio: Buffer | null } | "acces" | null> {
   if (!UUID.test(storyId)) return null;
   let garde = gardes.get(storyId);
   if (garde && garde.jusqua < Date.now()) {
@@ -123,14 +128,19 @@ export async function audioDuCompte(userId: string, storyId: string): Promise<{ 
   }
   const [l] = await db()
     .select({
+      debloqueLe: schema.stories.debloqueLe,
       fait: schema.vocals.createdAt,
       /* L’audio ne voyage que s’il n’est pas déjà gardé, à la même version (la même date) */
       chiffre: sql<Buffer | null>`case when date_trunc('milliseconds', ${schema.vocals.createdAt}) = ${garde ? new Date(garde.fait).toISOString() : null} then null else ${schema.vocals.audio} end`,
     })
     .from(schema.stories)
     .leftJoin(schema.vocals, eq(schema.vocals.storyId, schema.stories.id))
-    .where(PREDICATS.convDuCompte(storyId, userId));
+    .where(PREDICATS.convDuCompte(storyId, compte.id));
   if (!l) return null;
+  if (!rapportOuvert(l, compte)) {
+    const verdict = await donneesVerdict(storyId);
+    if (!verdict || !ouvertureDu(false, verdict.sortie).ouvert) return "acces";
+  }
   if (!l.fait) return { audio: null };
   const chiffre = l.chiffre ?? garde?.chiffre;
   if (!chiffre) return { audio: null };

@@ -7,6 +7,7 @@ vi.mock("next/server", async (original) => ({ ...(await original<typeof import("
 
 import type { Utilisateur } from "@/server/auth";
 import { chiffrerOctets } from "@/server/chiffrement";
+import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { contactDe, ouvrirLeRapport } from "@/server/donnees";
 import { avecEcheance } from "@/server/echeance";
@@ -105,27 +106,46 @@ describe("l’audio du vocal", () => {
     const plus = await compteDeTest("fluidite-vocal", "debloque");
     const id = await importee("02-reciproque.txt", plus);
     await executerChaine(id);
-    const premier = await audioDuCompte(plus.id, id);
+    const premier = await audioDuCompte(plus, id);
     expect(premier?.audio?.subarray(0, 2).toString("hex")).toBe("fffb");
-    expect(await audioDuCompte(autre.id, id)).toBeNull();
-    expect(await audioDuCompte(plus.id, "../../etc")).toBeNull();
+    expect(await audioDuCompte(autre, id)).toBeNull();
+    expect(await audioDuCompte(plus, "../../etc")).toBeNull();
     /* L’audio change en base, à la même version : l’instance sert celui qu’elle garde (chiffré), sans le relire */
     await db()
       .update(schema.vocals)
       .set({ audio: chiffrerOctets(Buffer.from("autre")) })
       .where(eq(schema.vocals.storyId, id));
-    expect((await audioDuCompte(plus.id, id))?.audio?.equals(premier!.audio!)).toBe(true);
+    expect((await audioDuCompte(plus, id))?.audio?.equals(premier!.audio!)).toBe(true);
     /* Une nouvelle version (le vocal refait) : le nouvel audio */
     await db()
       .update(schema.vocals)
       .set({ createdAt: new Date(Date.now() + 1000) })
       .where(eq(schema.vocals.storyId, id));
-    expect((await audioDuCompte(plus.id, id))?.audio?.toString()).toBe("autre");
+    expect((await audioDuCompte(plus, id))?.audio?.toString()).toBe("autre");
   });
 
   it("dit « pas prêt » quand la conv n’a pas encore de vocal", async () => {
     const id = await importee("03-elle-s-eloigne.txt");
-    expect(await audioDuCompte(u.id, id)).toEqual({ audio: null });
+    await debloquerLaConv(id);
+    expect(await audioDuCompte(u, id)).toEqual({ audio: null });
+  });
+
+  it("n’est servi que si le rapport de sa conv est ouvert (débloqué, l’équipe) ou en mode sobre, comme sa lecture", async () => {
+    /* Un rapport payé puis remboursé : re-verrouillé, son vocal reste en base, mais ne s’écoute plus */
+    const c = await compteDeTest("fluidite-vocal-repris", "debloque");
+    const id = await importee("02-reciproque.txt", c);
+    await executerChaine(id);
+    expect((await audioDuCompte(c, id)) as { audio: Buffer }).toHaveProperty("audio.length");
+    await debloquerLaConv(id, false);
+    expect(await audioDuCompte(c, id)).toBe("acces");
+    /* Le mode sobre l’ouvre sans paiement (ouvertureDu, comme GET /api/rapport) */
+    const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, id));
+    const verdict = coffre.lire("verdicts.data", v!.data);
+    await db()
+      .update(schema.verdicts)
+      .set({ data: coffre.ecrire("verdicts.data", { ...verdict, sortie: { ...verdict.sortie, mode_sobre: true } }) })
+      .where(eq(schema.verdicts.storyId, id));
+    expect((await audioDuCompte(c, id)) as { audio: Buffer }).toHaveProperty("audio.length");
   });
 });
 
