@@ -126,7 +126,7 @@ describe("la révélation du verdict ne montre rien de payant sans accès", () =
     expect(fuite).toEqual(cartes);
   });
 
-  it("un rapport BLUSH+ écrit : le moment, et « à toi de jouer » du chapitre 2", () => {
+  it("un rapport débloqué et écrit : le moment, et « à toi de jouer » du chapitre 2", () => {
     const ecrits = [verdict, bascule, ...fermes.slice(1).map((c) => ({ ...c, locked: false, blocks: [{ kind: "punchline" as const, text: "fin" }] }))];
     const cartes = cardsOf(payload(ecrits, true));
     expect(cartes.map((c) => c.id)).toEqual(["chiffres", "verdict", "duel", "moment", "jouer"]);

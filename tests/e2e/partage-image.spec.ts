@@ -3,7 +3,7 @@ import {
   ecrireABlush,
   expect,
   filDuChat,
-  lectureBlushPlus,
+  lectureComplete,
   mesurerCompteurs,
   noterLaFeuilleDuSysteme,
   ouvrir,
@@ -14,7 +14,7 @@ import {
 } from "./aide";
 
 /*
- * « Partager en image » une réponse de BLUSH dans le chat (BLUSH+, une fois la mémoire faite), ou la chute d’un chapitre
+ * « Partager en image » une réponse de BLUSH dans le chat (le rapport débloqué, une fois la mémoire faite), ou la chute d’un chapitre
  * du rapport : le serveur dessine le moment en story, d’après le compte (jamais d’après la requête), le prénom de l’autre
  * masqué ; on la partage (la feuille du système, là où le navigateur sait partager un fichier) ou on l’enregistre. Le
  * masque ne se lit pas dans un PNG : masqueDe, que la route applique, a ses tests (tests/partage.test.ts).
@@ -24,7 +24,7 @@ test("« Partager en image » une réponse du chat : la story dessinée par le s
   /* Là où le navigateur sait partager un fichier (Safari sur iPhone), « Partager » ouvre la feuille du système : on la remplace par une feuille qui note */
   const partages = (await partageDeFichiers(page)) ? await noterLaFeuilleDuSysteme(page) : null;
   /* Le chat attend la mémoire, la dernière étape de la chaîne */
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
 
   const conv = filDuChat(page);
   await test.step("une question, et la réponse de BLUSH (modèle factice)", async () => {
@@ -79,7 +79,7 @@ test("« Partager en image » une réponse du chat : la story dessinée par le s
 });
 
 test("« Partager cette phrase en image » : la chute d’un chapitre du rapport, dessinée en story par le serveur", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+  await lectureComplete(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
   const chapitre2 = rapport.getByRole("region", { name: "Chapitre 2 : Chapitre 2" });
   const feuille = page.getByRole("dialog", { name: "Partager en image" });

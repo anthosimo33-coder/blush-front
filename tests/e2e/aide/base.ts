@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { cleDeLimiteDuCompte, emailCanonique, LIMITES_DU_COMPTE, type LimiteDuCompte } from "../../../src/server/email-canonique";
 import { CLE, DATABASE_URL } from "../reglages";
@@ -6,7 +6,7 @@ import { oublierMails } from "./boite";
 import { RESEAU } from "./page";
 
 /*
- * La base des tests, lue et écrite directement : vérifier ce qu’un parcours a laissé (le compte, son plan, ses tâches),
+ * La base des tests, lue et écrite directement : vérifier ce qu’un parcours a laissé (le compte, ses bulles, ses tâches),
  * ou préparer un cas qu’aucun écran ne crée. Les colonnes chiffrées (la conv, le verdict…) se lisent avec dechiffrer,
  * le miroir de src/server/chiffrement.ts avec la clé fictive des tests.
  */
@@ -43,20 +43,33 @@ export function chiffrer(valeur: unknown): Buffer {
 
 /* ———— Les comptes et leurs histoires ———— */
 
-export type Plan = "gratuit" | "rapport" | "blushplus";
 export type Tache = { genre: string; statut: "attente" | "en_cours" | "fini" | "echec"; essais: number; erreur: string | null };
 export type Histoire = { id: string; messages: number; convGardee: boolean };
 
-/** Le compte de cet email, ou null : il naît au premier bon code. */
-export async function compteDe(email: string): Promise<{ id: string; plan: Plan } | null> {
-  const [u] = await sql()<{ id: string; plan: Plan }[]>`select id, plan from users where email = ${email.toLowerCase()}`;
+/** Le compte de cet email, ou null (il naît au premier bon code) : son solde de bulles, et combien de ses convs sont débloquées. */
+export async function compteDe(email: string): Promise<{ id: string; bulles: number; debloquees: number } | null> {
+  const [u] = await sql()<{ id: string; bulles: number; debloquees: number }[]>`
+    select u.id, u.bulles, (select count(*) from stories s where s.user_id = u.id and s.debloque_le is not null)::int as debloquees
+    from users u where u.email = ${email.toLowerCase()}`;
   return u ?? null;
 }
 
-/** Change le plan d’un compte, comme `npm run acces` (sans paiement en v1). Le compte doit exister. */
-export async function definirPlan(email: string, plan: Plan): Promise<void> {
-  const r = await sql()`update users set plan = ${plan} where email = ${email.toLowerCase()}`;
-  if (!r.count) throw new Error(`aucun compte pour ${email}`);
+/**
+ * Débloque le rapport de la dernière conv du compte, comme un achat livré ou l’outil de l’équipe (`npm run acces`), sans
+ * relancer la chaîne : elle repart à l’ouverture du rapport (reparerLaChaine). Le compte doit avoir une conv.
+ */
+export async function debloquerLaConv(email: string): Promise<void> {
+  const r = await sql()`update stories set debloque_le = now() where id = ${derniereHistoire(email)} and debloque_le is null`;
+  if (!r.count) throw new Error(`aucune conv à débloquer pour ${email}`);
+}
+
+/** Donne `n` bulles au compte, avec leur ligne au journal (raison « equipe »), comme l’outil de l’équipe. Le compte doit exister. */
+export async function donnerDesBulles(email: string, n: number): Promise<void> {
+  await sql().begin(async (tx) => {
+    const [u] = await tx<{ id: string }[]>`update users set bulles = bulles + ${n} where email = ${email.toLowerCase()} returning id`;
+    if (!u) throw new Error(`aucun compte pour ${email}`);
+    await tx`insert into mouvements_bulles (user_id, delta, raison, ref) values (${u.id}, ${n}, 'equipe', ${`equipe:e2e:${randomUUID()}`})`;
+  });
 }
 
 /** Les histoires du compte, de la plus ancienne à la plus récente. `convGardee` : la conv brute est encore en base. */
@@ -87,7 +100,7 @@ export async function tachesDe(email: string): Promise<Tache[]> {
 
 /**
  * Attend la fin de la chaîne : plus aucune tâche du compte en attente ni en cours. Chaque étape planifie la suivante avant
- * de finir : il n’y a pas de creux entre deux. Utile après la lecture d’un compte BLUSH+ (le rapport, le vocal, la
+ * de finir : il n’y a pas de creux entre deux. Utile après la lecture d’un rapport débloqué (le rapport, le vocal, la
  * mémoire s’écrivent ensuite, sans écran qui l’attende forcément). Une tâche en échec fait échouer tout de suite, avec
  * son erreur, sauf avec `echecPermis` (le test le veut). Renvoie les tâches.
  */

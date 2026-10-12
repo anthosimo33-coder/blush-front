@@ -12,11 +12,11 @@
  * - gratuit : un compte gratuit, sa conv lue (le verdict) ;
  * - lecture-en-cours : un compte gratuit dont la lecture est figée à mi-chemin ;
  * - rapport : le rapport complet acheté une fois (le plan « rapport »), tout écrit ;
- * - blushplus : un compte BLUSH+, toute la suite écrite (le rapport, le vocal, la mémoire) ;
+ * - equipe : un compte de l’équipe (tout ouvert, bulles illimitées), toute la suite écrite (le rapport, le vocal, la mémoire) ;
  * - sobre : un compte gratuit dont la conv lève une alerte (le mode sobre) ;
- * - plusieurs : un compte BLUSH+ avec trois convs lues ;
- * - couple : un compte BLUSH+ dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
- * @typedef {"brouillon" | "code" | "gratuit" | "lecture-en-cours" | "rapport" | "blushplus" | "sobre" | "plusieurs" | "couple"} Compte
+ * - plusieurs : un compte de l’équipe avec trois convs lues ;
+ * - couple : un compte de l’équipe dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
+ * @typedef {"brouillon" | "code" | "gratuit" | "lecture-en-cours" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
  */
 
 /**
@@ -52,10 +52,10 @@ export const SECTIONS = [
   { id: "landing", title: "Landing", sub: "La page d’accueil du site (/), avant le parcours" },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de ta conv (écrans 01 à 08), avec une conv importée pour de vrai" },
   { id: "rapport", title: "Rapport", sub: "La révélation du verdict, l’aperçu gratuit, le paiement, le rapport complet, ta question, le mode sobre (09 à 12, 18 et 19)" },
-  { id: "quotidien", title: "Au quotidien", sub: "Avec BLUSH+\u00a0: l’accueil, l’aide à chaque message, sa fiche, le compte (13, 16 et 20)" },
-  { id: "convs", title: "Plusieurs convs", sub: "Un compte BLUSH+ avec trois convs\u00a0: la liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre" },
-  { id: "couple", title: "En couple", sub: "Un compte BLUSH+ lu «\u00a0En couple\u00a0» (écran 06)\u00a0: la température à la place des étapes" },
-  { id: "etats", title: "États", sub: "Accès BLUSH+, écrans d’erreur, survol à la souris" },
+  { id: "quotidien", title: "Au quotidien", sub: "Le rapport ouvert\u00a0: l’accueil, l’aide à chaque message, sa fiche, le compte (13, 16 et 20)" },
+  { id: "convs", title: "Plusieurs convs", sub: "Un compte de l’équipe avec trois convs\u00a0: la liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre" },
+  { id: "couple", title: "En couple", sub: "Un compte de l’équipe lu «\u00a0En couple\u00a0» (écran 06)\u00a0: la température à la place des étapes" },
+  { id: "etats", title: "États", sub: "Le paiement par-dessus, écrans d’erreur, survol à la souris" },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
 
@@ -69,7 +69,7 @@ export const RETIRES = [
     why: "Les mêmes écrans que sans couple (08b, 09, 11, 12p, 13i, 16, V2 à V5 et VP2 à VP5)\u00a0: «\u00a0En couple\u00a0» ne change à l’écran que le niveau, la température (en C13 et C13d)\u00a0; le reste, ce sont les textes du vrai modèle, que le modèle factice n’écrit pas. Les questions toutes prêtes de C13i et C13k venaient de la démo\u00a0: elles viennent maintenant de sa mémoire, comme en 13i.",
   },
   { ids: "C18", why: "Le mode sobre en couple venait d’un verdict difficile\u00a0: il ne vient plus que d’une alerte (danger), sans niveau, et s’affiche comme en 18." },
-  { ids: "V4 (gratuit)", why: "Un compte gratuit voit 4 cartes\u00a0: «\u00a0le moment\u00a0» vient du chapitre 2, payant. Il est dans la série BLUSH+ (VP4)." },
+  { ids: "V4 (gratuit)", why: "Un compte gratuit voit 4 cartes\u00a0: «\u00a0le moment\u00a0» vient du chapitre 2, payant. Il est dans la série du rapport ouvert (VP4)." },
 ];
 
 /* Le parcours de l’onglet : l’export de Noé et Maëlys importé, puis « Qui es-tu ? » rempli (p0 : Noé, le premier de l’export) */
@@ -206,13 +206,13 @@ export const STATES = [
     state: "Page entière",
     route: "/",
     full: true,
-    note: "Le titre en bulles, les convs qui défilent (figées ici\u00a0; on en touche une, BLUSH montre son verdict), BLUSH+ en bloc noir, les avis s’il y en a de vrais, les faits. Textes à valider.",
+    note: "Le titre en bulles, les convs qui défilent (figées ici\u00a0; on en touche une, BLUSH montre son verdict), le quotidien en bloc noir, les avis s’il y en a de vrais, les faits. Textes à valider.",
   },
   {
     id: "LCc",
     section: "landing",
     title: "Landing",
-    state: "BLUSH+ (bloc noir)",
+    state: "Le quotidien (bloc noir)",
     route: "/",
     sheet: true,
     touch: true,
@@ -434,42 +434,51 @@ export const STATES = [
     id: "10c",
     section: "rapport",
     title: "Paiement réussi",
-    state: "BLUSH+",
-    route: "/rapport/debloque?offre=blushplus",
-    compte: "blushplus",
+    state: "Premium",
+    route: "/rapport/debloque?offre=premium",
+    compte: "equipe",
     wait: 1600,
     note: "Animé (la gerbe). Textes à valider.",
   },
   {
     id: "VP1",
     section: "rapport",
-    title: "Révélation du verdict, BLUSH+",
+    title: "Révélation du verdict, rapport ouvert",
     state: "Les chiffres",
     route: "/rapport/verdict",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     note: "Un compte payant voit 5 cartes\u00a0: «\u00a0le moment\u00a0» et «\u00a0à toi de jouer\u00a0» viennent du chapitre 2.",
     changement:
-      "Nouvelle série\u00a0: la révélation d’un compte BLUSH+, avec les chapitres 1 et 2 tels que les écrit le vrai modèle (le modèle factice n’y met qu’une accroche, un récit et une chute).",
+      "Nouvelle série\u00a0: la révélation d’un rapport ouvert, avec les chapitres 1 et 2 tels que les écrit le vrai modèle (le modèle factice n’y met qu’une accroche, un récit et une chute).",
   },
-  { id: "VP2", section: "rapport", title: "Révélation du verdict, BLUSH+", state: "Le verdict", route: "/rapport/verdict", compte: "blushplus", sheet: true, steps: suivant(1) },
+  {
+    id: "VP2",
+    section: "rapport",
+    title: "Révélation du verdict, rapport ouvert",
+    state: "Le verdict",
+    route: "/rapport/verdict",
+    compte: "equipe",
+    sheet: true,
+    steps: suivant(1),
+  },
   {
     id: "VP3",
     section: "rapport",
-    title: "Révélation du verdict, BLUSH+",
+    title: "Révélation du verdict, rapport ouvert",
     state: "Entre vous deux",
     route: "/rapport/verdict",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: suivant(2),
   },
   {
     id: "VP4",
     section: "rapport",
-    title: "Révélation du verdict, BLUSH+",
+    title: "Révélation du verdict, rapport ouvert",
     state: "Le moment où tout a basculé",
     route: "/rapport/verdict",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: suivant(3),
     note: "La scène rejouée\u00a0: elle écrit (les trois points), sa bulle arrive, puis ta réponse.",
@@ -477,10 +486,10 @@ export const STATES = [
   {
     id: "VP5",
     section: "rapport",
-    title: "Révélation du verdict, BLUSH+",
+    title: "Révélation du verdict, rapport ouvert",
     state: "À toi de jouer",
     route: "/rapport/verdict",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: suivant(4),
     note: "Ton prochain pas (tiré du chapitre 2), puis «\u00a0Voir mon rapport\u00a0» et «\u00a0Partager mon verdict\u00a0».",
@@ -547,7 +556,7 @@ export const STATES = [
     state: "Les idées",
     route: "/rapport/question",
     compte: "rapport",
-    note: "La question en conversation avec BLUSH. BLUSH t’accueille, propose des questions tirées du rapport (celles de sa mémoire), comme des réponses toutes prêtes. «\u00a01 question incluse\u00a0» pour le plan rapport. Textes à valider.",
+    note: "La question en conversation avec BLUSH. BLUSH t’accueille, propose des questions tirées du rapport (celles de sa mémoire), comme des réponses toutes prêtes. Une réponse du chat comme une autre. Textes à valider.",
   },
   {
     id: "12q",
@@ -557,7 +566,7 @@ export const STATES = [
     route: "/rapport/question",
     compte: "rapport",
     steps: premiereIdee,
-    note: "Un toucher met la question dans le champ, sans l’envoyer\u00a0: la question incluse ne part pas par erreur. On peut la modifier, ou retoucher l’idée pour la retirer.",
+    note: "Un toucher met la question dans le champ, sans l’envoyer\u00a0: la question ne part pas par erreur. On peut la modifier, ou retoucher l’idée pour la retirer.",
   },
   {
     id: "12r",
@@ -587,7 +596,7 @@ export const STATES = [
       await premiereIdee(page);
       await reponseDeBlush(page, () => page.getByRole("button", { name: "Poser ma question" }).first().click());
     },
-    note: "Bug de la production (le test.fixme de tests/e2e/rapport-question.spec.ts)\u00a0: avec le plan rapport, la question incluse passe par le chat, réservé à BLUSH+, et BLUSH répond «\u00a0le chat avec moi, c’est dans BLUSH+\u00a0». Avec BLUSH+, la réponse arrive en bulles, preuve et confiance comprises.",
+    note: "Le rapport débloqué\u00a0: la question passe par le chat, et la réponse arrive en bulles, preuve et confiance comprises.",
     changement: "La question est vraiment posée au serveur (la démo inventait une réponse).",
   },
   {
@@ -627,7 +636,7 @@ export const STATES = [
     title: "Accueil",
     state: "Le chat",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     ref: "13-accueil",
     note: "L’accueil est le chat avec BLUSH\u00a0; le rapport et sa fiche passent dans les détails du contact (écart à la maquette). En haut, BLUSH en grand comme un personnage\u00a0: un toucher ouvre «\u00a0Ce que BLUSH voit\u00a0». À droite, Maëlys comme un contact (l’anneau de votre niveau, le verdict en badge)\u00a0: un toucher ouvre sa fiche. Au-dessus du champ, les questions toutes prêtes (celles de sa mémoire), en un toucher.",
   },
@@ -637,7 +646,7 @@ export const STATES = [
     title: "Accueil",
     state: "Après sa réponse",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: ecrire(SA_REPONSE),
     note: "Sa réponse collée dans le chat\u00a0: BLUSH la lit et répond en bulles.",
@@ -649,7 +658,7 @@ export const STATES = [
     title: "Accueil",
     state: "Menu « + »",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     steps: click("Ajouter des captures ou un export", { wait: 600 }),
     sheet: true,
   },
@@ -659,7 +668,7 @@ export const STATES = [
     title: "Accueil",
     state: "Ce que BLUSH voit",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     steps: async (page) => {
       await page.locator("button[aria-haspopup=dialog]:visible").first().click();
       await page.waitForTimeout(800);
@@ -672,7 +681,7 @@ export const STATES = [
     title: "Accueil",
     state: "Après « Copier »",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     ref: "14-son-message-et-ta-reponse",
     steps: async (page) => {
@@ -688,7 +697,7 @@ export const STATES = [
     title: "Accueil",
     state: "Vocal en cours",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: async (page) => {
       await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
@@ -702,7 +711,7 @@ export const STATES = [
     title: "Accueil",
     state: "Vocal envoyé",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: async (page) => {
       await page.getByRole("button", { name: "Enregistrer un vocal" }).click();
@@ -718,7 +727,7 @@ export const STATES = [
     title: "Accueil",
     state: "BLUSH écrit",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     motion: true,
     retenir: { chemin: "/api/chat" },
@@ -732,7 +741,7 @@ export const STATES = [
     title: "Accueil",
     state: "Une question toute prête",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: async (page) => {
       await reponseDeBlush(page, () => page.getByRole("group", { name: "Questions toutes prêtes" }).getByRole("button").first().click());
@@ -747,7 +756,7 @@ export const STATES = [
     title: "Accueil",
     state: "« Je lui envoie quoi ? »",
     route: "/app",
-    compte: "blushplus",
+    compte: "equipe",
     sheet: true,
     steps: ecrire(QUOI_ENVOYER),
     note: "BLUSH lit la situation, puis propose la phrase à lui envoyer, à copier d’un geste, et pourquoi elle marche.",
@@ -758,7 +767,7 @@ export const STATES = [
     section: "quotidien",
     title: "Sa fiche",
     route: "/app/fiche",
-    compte: "blushplus",
+    compte: "equipe",
     ref: "16-sa-fiche",
     note: "Un seul geste pour la remplir, «\u00a0Complète sa fiche\u00a0» (des captures ou un export\u00a0; sur ordinateur, on peut aussi les glisser sur la page). BLUSH trouve les infos et les range lui-même, chacune avec sa source. Rubrique «\u00a0À savoir\u00a0» pour ce qu’il trouve\u00a0; «\u00a0Tes notes\u00a0» restent les tiennes. Textes à valider.",
   },
@@ -768,7 +777,7 @@ export const STATES = [
     title: "Sa fiche",
     state: "Modifier",
     route: "/app/fiche",
-    compte: "blushplus",
+    compte: "equipe",
     steps: click("Modifier", { exact: true }),
     note: "Retirer une info fausse, ou ajouter la tienne dans une rubrique.",
   },
@@ -778,7 +787,7 @@ export const STATES = [
     title: "Sa fiche",
     state: "BLUSH analyse",
     route: "/app/fiche",
-    compte: "blushplus",
+    compte: "equipe",
     motion: true,
     retenir: { chemin: "/api/fiche" },
     steps: (page) => addBio(page, 1000),
@@ -791,20 +800,20 @@ export const STATES = [
     title: "Sa fiche",
     state: "Infos rangées",
     route: "/app/fiche",
-    compte: "blushplus",
+    compte: "equipe",
     full: true,
     steps: (page) => addBio(page),
     note: "Ce que BLUSH a trouvé et où il l’a rangé\u00a0; ce qu’il savait déjà n’est pas doublé. Les nouvelles infos portent un point rose (et s’éclairent en rose à leur arrivée). «\u00a0Annuler\u00a0» retire tout.",
     changement: "Ce que le modèle factice lit dans toute capture\u00a0: «\u00a0Étudiante en droit à Lyon\u00a0» (son profil), puis «\u00a0Adore les soirées improvisées\u00a0».",
   },
-  { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", compte: "blushplus", ref: "20-mon-compte" },
+  { id: "20", section: "quotidien", title: "Mon compte", route: "/compte", compte: "equipe", ref: "20-mon-compte" },
   {
     id: "20b",
     section: "quotidien",
     title: "Mon compte",
     state: "Supprimer l’histoire",
     route: "/compte",
-    compte: "blushplus",
+    compte: "equipe",
     steps: click("Supprimer l’histoire avec Maëlys"),
     sheet: true,
     note: "Confirmation absente des maquettes.",
@@ -815,7 +824,7 @@ export const STATES = [
     title: "Mon compte",
     state: "Se déconnecter",
     route: "/compte",
-    compte: "blushplus",
+    compte: "equipe",
     steps: click("Se déconnecter Sur cet appareil"),
     sheet: true,
     note: "Confirmation absente des maquettes. Textes à valider.",
@@ -826,7 +835,7 @@ export const STATES = [
     title: "Mon compte",
     state: "Se déconnecter de tous les appareils",
     route: "/compte",
-    compte: "blushplus",
+    compte: "equipe",
     steps: click("Se déconnecter de tous les appareils"),
     sheet: true,
     note: "Confirmation absente des maquettes. Textes à valider.",
@@ -898,10 +907,10 @@ export const STATES = [
   {
     id: "E1",
     section: "etats",
-    title: "Accès BLUSH+",
-    state: "Plan « rapport » sur l’accueil",
+    title: "Le paiement par-dessus",
+    state: "Le rapport pas débloqué, sur l’accueil",
     route: "/app",
-    compte: "rapport",
+    compte: "gratuit",
     sheet: true,
     wait: 1000,
     note: "Panneau absent des maquettes.",

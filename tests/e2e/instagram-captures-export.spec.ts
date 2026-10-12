@@ -77,7 +77,7 @@ test("Instagram : l’export JSON importé, les prénoms accentués bien relus, 
   });
 
   await test.step("côté serveur : une histoire Instagram de 64 messages, lue (le verdict seul : compte gratuit)", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect(await histoiresDe(email)).toEqual([expect.objectContaining({ messages: 64 })]);
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
   });

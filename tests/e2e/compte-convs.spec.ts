@@ -19,14 +19,14 @@ import {
  * Plusieurs convs sur un compte : « Tes convs » (/app/convs) les liste, un toucher ouvre l’accueil de l’une, et il
  * s’ouvre encore sur elle ensuite ; Mon compte les liste aussi. Un geste vise toujours la conv à l’écran, même si un
  * autre onglet en a ouvert une autre entre-temps (l’en-tête x-blush-conv, src/services/session.ts).
- * Des comptes BLUSH+ (des invités) : l’accueil s’ouvre sans le paiement. Leurs convs sont préparées par les routes /api.
+ * Des comptes de l’équipe (des invités) : l’accueil s’ouvre sans le paiement. Leurs convs sont préparées par les routes /api.
  * Une page n’est touchée qu’une fois prête aux gestes (ouvrir) : un toucher plus tôt suivrait le lien sans choisir la conv.
  */
 
 const ROMANE = { toi: "Noé", autre: "Romane" };
 
 /**
- * Un compte BLUSH+ avec deux convs lues : Maëlys d’abord, puis Romane (la conv ouverte). Les deux lectures tournent en
+ * Un compte de l’équipe avec deux convs lues : Maëlys d’abord, puis Romane (la conv ouverte). Les deux lectures tournent en
  * même temps sur le serveur ; on attend la fin des deux (le chat d’une conv attend sa mémoire, la dernière étape).
  */
 async function deuxConvs(page: Page, testInfo: TestInfo): Promise<{ email: string; maelys: string; romane: string }> {
@@ -54,7 +54,7 @@ test("une seule conv : pas de liste, l’accueil n’a pas de retour à « Tes c
 });
 
 test("plusieurs convs : « Tes convs » les liste, un toucher ouvre l’accueil de l’autre, et il reste ouvert sur elle", async ({ page }, testInfo) => {
-  /* Deux lectures BLUSH+ complètes avant le premier écran : longues sur une machine chargée */
+  /* Deux lectures complètes avant le premier écran : longues sur une machine chargée */
   test.slow();
   await deuxConvs(page, testInfo);
 

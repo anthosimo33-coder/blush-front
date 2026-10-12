@@ -4,7 +4,7 @@ import { DOMAINE, INVITES } from "../reglages";
 import { oublierEmail } from "./base";
 
 /**
- * Un email neuf, jamais vu par le serveur : son compte sera gratuit (il n’est pas dans BLUSH_ACCES_LIBRE). `prefixe` aide
+ * Un email neuf, jamais vu par le serveur : son compte paiera (il n’est pas dans BLUSH_ACCES_LIBRE : le chapitre 1 seul, 0 bulle). `prefixe` aide
  * à s’y retrouver dans les traces et la boîte à mails.
  */
 export function emailLibre(testInfo: TestInfo, prefixe = "libre"): string {
@@ -12,8 +12,8 @@ export function emailLibre(testInfo: TestInfo, prefixe = "libre"): string {
 }
 
 /**
- * Un invité (BLUSH_ACCES_LIBRE : BLUSH+ d’office, et seul à entrer en bêta fermée), effacé d’abord de la base et de la
- * boîte à mails : le test part d’un email jamais vu, et tous les mails qu’il lira ensuite viennent de lui. Deux par worker
+ * Un invité (BLUSH_ACCES_LIBRE : de l’équipe, tout ouvert, et seul à entrer en bêta fermée), effacé d’abord de la base
+ * et de la boîte à mails : le test part d’un email jamais vu, et tous les mails qu’il lira ensuite viennent de lui. Deux par worker
  * (`k` : 0 ou 1) ; un worker ne fait qu’un test à la fois, donc deux tests en même temps n’ont jamais le même. À prendre
  * au début du test, avant le moindre geste.
  */

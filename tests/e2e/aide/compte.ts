@@ -16,7 +16,7 @@ export const origine = (testInfo: TestInfo) => ({ origin: String(testInfo.projec
 
 /**
  * Se connecter sans passer par l’écran : le code demandé, lu dans la boîte à mails, puis vérifié, dans le même navigateur
- * (le code ne vaut que là où il a été demandé). Le compte naît au premier bon code (gratuit, ou BLUSH+ pour un invité). La
+ * (le code ne vaut que là où il a été demandé). Le compte naît au premier bon code (qui paie, ou de l’équipe pour un invité). La
  * page garde ensuite la session.
  */
 export async function connecterParApi(page: Page, testInfo: TestInfo, email: string): Promise<void> {
@@ -69,8 +69,8 @@ export async function lireUneConvParApi(
 
 /**
  * Un compte dont une conv est lue, préparé par les routes /api : connecté dans ce navigateur (le compte naît au premier
- * bon code : gratuit, ou BLUSH+ pour un invité), la conv importée puis lue, et toute la chaîne finie (le verdict seul
- * pour un compte gratuit ; le rapport, le vocal et la mémoire pour BLUSH+). La page n’a rien affiché : à elle d’aller où
+ * bon code : qui paie, ou de l’équipe pour un invité), la conv importée puis lue, et toute la chaîne finie (le verdict seul
+ * pour un rapport pas débloqué ; le rapport, le vocal et la mémoire pour un invité). La page n’a rien affiché : à elle d’aller où
  * le test commence. Renvoie l’identifiant de l’histoire.
  */
 export async function lectureFaite(page: Page, testInfo: TestInfo, email: string, lecture: Lecture = {}, { echecPermis = false } = {}): Promise<string> {
@@ -101,12 +101,6 @@ export async function sessionsDe(email: string): Promise<number> {
 /** Ferme les sessions du compte côté serveur, comme une session expirée : le navigateur garde son cookie, qui n’ouvre plus rien. */
 export async function fermerLesSessions(email: string): Promise<void> {
   await sql()`delete from sessions where user_id = (select id from users where email = ${email.toLowerCase()})`;
-}
-
-/** BLUSH est-il en pause pour ce compte (« Mettre en pause », dans Mon compte) ? */
-export async function enPause(email: string): Promise<boolean> {
-  const u = (await sql()<{ paused: boolean }[]>`select paused from users where email = ${email.toLowerCase()}`)[0]!;
-  return u.paused;
 }
 
 /** Combien de messages (les tiens et ceux de BLUSH) le chat de cette histoire garde. */

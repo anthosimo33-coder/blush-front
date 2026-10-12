@@ -10,10 +10,10 @@
  * vocal en cours). Sous DEBUG, chaque geste dit où tombe son pire trou.
  * Une animation saine ne touche que transform et opacity : le compositeur la joue même quand le fil principal est occupé.
  * Chrome reste un substitut de l’iPhone : un écart se confirme sur Safari (WebKit) ou sur un vrai téléphone.
- * L’accueil d’un compte BLUSH+ semé dont la conv est lue, sur le serveur des tests : SESSION, la valeur de son cookie
+ * L’accueil d’un compte de l’équipe semé dont la conv est lue, sur le serveur des tests : SESSION, la valeur de son cookie
  * blush-session. Le banc écrit au chat de ce compte (pastille, envoi, niveau) : il ne mesure qu’un serveur local (BASE
  * sur localhost), jamais la production, et SESSION n’est jamais le cookie d’un compte réel (c’est un jeton de connexion).
- *   npm run fluidite                                  (le serveur des tests et un compte BLUSH+ semé : scripts/galerie/fluidite.spec.ts)
+ *   npm run fluidite                                  (le serveur des tests et un compte de l’équipe semé : scripts/galerie/fluidite.spec.ts)
  *   NORAF=1 RUNS=3 npm run fluidite                   (sans la boucle requestAnimationFrame du fil, trois passages)
  *   ONLY=pastille,feuille DEBUG=1 npm run fluidite    (le détail des longues images et de leurs scripts)
  *   ONLY=vocal,rapport npm run fluidite               (le vocal en cours, au micro factice, et le défilement du rapport)
@@ -28,7 +28,7 @@ const CPU = Number(process.env.CPU ?? 4);
 const RUNS = Number(process.env.RUNS ?? 2);
 const ONLY = process.env.ONLY?.split(",");
 const SESSION = process.env.SESSION;
-if (!SESSION) throw new Error("SESSION manque : la valeur du cookie blush-session d’un compte BLUSH+ (ou npm run fluidite, qui en sème un)");
+if (!SESSION) throw new Error("SESSION manque : la valeur du cookie blush-session d’un compte au rapport ouvert (ou npm run fluidite, qui en sème un)");
 /* Un serveur local seulement : le banc écrit au chat du compte, et son cookie ne doit jamais être celui d’un compte réel */
 if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(BASE)) throw new Error(`BASE refusée : « ${BASE} » (le banc ne mesure qu’un serveur local, jamais la production)`);
 

@@ -34,7 +34,7 @@ describe("import", () => {
 });
 
 /*
- * Une conv lue de bout en bout par un compte BLUSH+ (le verdict, le rapport, le vocal, la mémoire), une fois pour tout
+ * Une conv lue de bout en bout par un compte aux convs débloquées (le verdict, le rapport, le vocal, la mémoire), une fois pour tout
  * le describe : chaque test en regarde une étape, et passe seul (it.only) comme dans n’importe quel ordre. Ce que la
  * lecture laisse et que les tests changent ensuite (la conv brute, les tâches) est relevé dans le beforeAll.
  */

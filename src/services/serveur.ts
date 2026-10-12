@@ -5,6 +5,7 @@ import type { Account, HistoriqueChat, ReportPayload } from "@/types/api";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
+import { rapportOuvert } from "@/server/droits";
 import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
 import { storyAffichee } from "@/server/conv-affichee";
 import { contexte } from "@/server/requete";
@@ -143,6 +144,15 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
 export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null }> {
   const { story } = await contexte();
   return { id: story?.id ?? null, compte: await getCompte() };
+}
+
+/**
+ * Le rapport de la conv ouverte est-il débloqué (payé, offert, ou un compte de l’équipe) ? Sans requête de plus : la
+ * conv et le compte de la requête sont déjà lus (contexte, mémorisé le temps du rendu).
+ */
+export async function rapportDebloque(): Promise<boolean> {
+  const { utilisateur, story } = await contexte();
+  return !!story && rapportOuvert(story, utilisateur);
 }
 
 /** Le compte, pour « Mon compte » : son email, ses bulles et ses droits, dès le rendu serveur. null : pas connecté. */

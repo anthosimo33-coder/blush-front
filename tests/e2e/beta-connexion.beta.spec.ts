@@ -109,11 +109,11 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
     expect(lienDeRetrait(mail)).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+$`));
   });
 
-  await test.step("côté serveur : l’email hors de la liste est sur la liste d’attente, sans compte ; l’invité a son compte BLUSH+", async () => {
+  await test.step("côté serveur : l’email hors de la liste est sur la liste d’attente, sans compte ; l’invité a son compte (de l’équipe)", async () => {
     expect(await placeSurLaListe(dehors)).toEqual({ source: "connexion" });
     expect(await compteDe(dehors)).toBeNull();
     expect(await placeSurLaListe(invite)).toBeNull();
-    expect(await compteDe(invite)).toMatchObject({ plan: "blushplus" });
+    expect(await compteDe(invite)).not.toBeNull();
   });
 });
 
@@ -164,9 +164,9 @@ test("/email : après l’import, le même écran pour tous ; la conv d’un ema
     });
   });
 
-  await test.step("côté serveur : l’invité a BLUSH+ et toute sa lecture ; l’email hors de la liste n’a rien reçu d’autre", async () => {
-    expect(await compteDe(invite)).toMatchObject({ plan: "blushplus" });
-    /* La chaîne d’un compte BLUSH+ va jusqu’au bout (rapport, vocal, mémoire) : on l’attend, pour finir propre */
+  await test.step("côté serveur : l’invité (de l’équipe) a toute sa lecture ; l’email hors de la liste n’a rien reçu d’autre", async () => {
+    expect(await compteDe(invite)).not.toBeNull();
+    /* La chaîne d’un compte de l’équipe va jusqu’au bout (rapport, vocal, mémoire) : on l’attend, pour finir propre */
     const taches = await attendreTaches(invite);
     expect(taches.map((t) => [t.genre, t.statut])).toEqual(expect.arrayContaining([["verdict", "fini"]]));
     expect(taches.filter((t) => t.statut !== "fini")).toEqual([]);
@@ -217,7 +217,7 @@ test("une session ouverte hors de la bêta n’ouvre plus rien sur le serveur en
     expect(await reponseDuCode(page, email)).toEqual({ statut: 200, corps: { email }, cookie: COOKIE_DU_CODE });
     await saisirLeCodeRecu(page, email, depuis);
     await expect(page).toHaveURL(`${URL_APPLI}/commencer`);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
   const fermee = page.getByRole("heading", { level: 1, name: "Ta place dans la bêta est fermée." });

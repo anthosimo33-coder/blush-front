@@ -3,9 +3,9 @@ import {
   attendreTaches,
   compteDe,
   connecterParApi,
-  definirPlan,
+  debloquerLaConv,
+  donnerDesBulles,
   emailLibre,
-  enPause,
   expect,
   histoireExiste,
   histoiresDe,
@@ -19,7 +19,7 @@ import {
 } from "./aide";
 
 /*
- * Mon compte (/compte), à la manière des Réglages : toi en haut, ton abonnement, les sons, puis tes données et les gestes
+ * Mon compte (/compte), à la manière des Réglages : toi en haut, tes bulles, les sons, puis tes données et les gestes
  * qui effacent. Le compte et sa conv sont préparés par les routes /api (aide/compte.ts) ; tout le reste se fait à l’écran,
  * une fois la page prête aux gestes (ouvrir).
  */
@@ -34,13 +34,13 @@ async function lienEteint(page: Page, id: string): Promise<void> {
   expect((await page.request.get(`/v/${id}/image`)).status()).toBe(404);
 }
 
-test("le plan affiché suit le compte : l’aperçu gratuit et sa suite à lire, puis le rapport complet", async ({ page }, testInfo) => {
+test("tes bulles suivent le compte : 0 et la suite à lire, puis le rapport débloqué et des bulles reçues", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "compte");
   await connecterParApi(page, testInfo, email);
   await lireUneConvParApi(page, testInfo);
   await attendreTaches(email);
   const main = page.getByRole("main");
-  const abonnement = main.getByRole("region", { name: "Ton abonnement" });
+  const bulles = main.getByRole("region", { name: "Tes bulles" });
 
   await test.step("toi en haut : ton prénom et ton email", async () => {
     await ouvrir(page, "/compte");
@@ -57,24 +57,23 @@ test("le plan affiché suit le compte : l’aperçu gratuit et sa suite à lire,
     await expect(histoires.getByRole("button")).toHaveCount(0);
   });
 
-  await test.step("gratuit : l’aperçu, sans pause ni arrêt, et « Lire la suite » ouvre le paiement sur le rapport", async () => {
-    await expect(abonnement.getByText("Ton rapport", { exact: true })).toBeVisible();
-    await expect(abonnement.getByText("Aperçu gratuit", { exact: true })).toBeVisible();
-    await expect(abonnement.getByRole("switch")).toHaveCount(0);
-    await expect(abonnement.getByRole("button")).toHaveCount(0);
-    await abonnement.getByRole("link", { name: "Lire la suite" }).click();
+  await test.step("rien de payé : 0 bulle, ni abonnement ni pause, et « Lire la suite » ouvre le paiement sur le rapport", async () => {
+    await expect(bulles.getByText("Tes bulles\u00a0: 0", { exact: true })).toBeVisible();
+    await expect(bulles.getByText("1 bulle = 1 réponse de BLUSH · elles n’expirent jamais")).toBeVisible();
+    await expect(main.getByRole("region", { name: "Ton abonnement" })).toHaveCount(0);
+    await expect(main.getByRole("switch", { name: "Mettre en pause" })).toHaveCount(0);
+    await bulles.getByRole("link", { name: "Lire la suite" }).click();
     await expect(page).toHaveURL(/\/rapport\?paiement=1$/);
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   });
 
-  await test.step("le rapport complet, payé une fois : son prix, et plus rien à lire en plus", async () => {
-    await definirPlan(email, "rapport");
+  await test.step("le rapport débloqué et des bulles reçues : le solde, et plus rien à lire en plus", async () => {
+    await debloquerLaConv(email);
+    await donnerDesBulles(email, 10);
     await ouvrir(page, "/compte");
-    await expect(abonnement.getByText("Le rapport complet", { exact: true })).toBeVisible();
-    await expect(abonnement.getByText("Une fois · à toi pour toujours", { exact: true })).toBeVisible();
-    await expect(abonnement.getByText("8,99 €", { exact: true })).toBeVisible();
-    await expect(abonnement.getByRole("link", { name: "Lire la suite" })).toHaveCount(0);
-    await expect(abonnement.getByRole("switch")).toHaveCount(0);
+    await expect(bulles.getByText("Tes bulles\u00a0: 10", { exact: true })).toBeVisible();
+    await expect(bulles.getByRole("link", { name: "Lire la suite" })).toHaveCount(0);
+    await expect(bulles.getByRole("switch")).toHaveCount(0);
   });
 
   await test.step("« Nouvelle histoire » repart du choix de l’appli", async () => {
@@ -87,57 +86,20 @@ test("le plan affiché suit le compte : l’aperçu gratuit et sa suite à lire,
   });
 });
 
-test("BLUSH+ : actif à 7,99 € la semaine, et la pause qui tient après un rechargement", async ({ page }, testInfo) => {
-  /* Un invité : BLUSH+ dès la création du compte (BLUSH_ACCES_LIBRE) */
+test("un compte de l’équipe : des bulles illimitées, ni abonnement, ni pause, ni arrêt", async ({ page }, testInfo) => {
+  /* Un invité (BLUSH_ACCES_LIBRE) : de l’équipe dès la création du compte */
   const email = await nouvelInvite(testInfo);
   await connecterParApi(page, testInfo, email);
   await ouvrir(page, "/compte");
-  const abonnement = page.getByRole("main").getByRole("region", { name: "Ton abonnement" });
-  const pause = abonnement.getByRole("switch", { name: "Mettre en pause" });
+  const main = page.getByRole("main");
+  const bulles = main.getByRole("region", { name: "Tes bulles" });
 
-  await test.step("BLUSH+, actif, son prix et son renouvellement", async () => {
-    /* Le nom du plan, et son état en étiquette juste à côté */
-    await expect(abonnement).toContainText(/BLUSH\+\s*actif/);
-    await expect(abonnement.getByText("Renouvelé lundi · sans engagement")).toBeVisible();
-    await expect(abonnement.getByText("7,99 €", { exact: true })).toBeVisible();
-    await expect(abonnement.getByText("/ semaine", { exact: true })).toBeVisible();
-    await expect(pause).not.toBeChecked();
-  });
-
-  await test.step("en pause d’un toucher : l’écran le dit, le compte le garde, même après un rechargement", async () => {
-    await pause.click();
-    await expect(pause).toBeChecked();
-    await expect(abonnement).toContainText(/BLUSH\+\s*en pause/);
-    await expect.poll(() => enPause(email)).toBe(true);
-    await ouvrir(page);
-    await expect(pause).toBeChecked();
-    await expect(abonnement).toContainText(/BLUSH\+\s*en pause/);
-  });
-
-  await test.step("reprendre : actif de nouveau", async () => {
-    await pause.click();
-    await expect(pause).not.toBeChecked();
-    await expect(abonnement).toContainText(/BLUSH\+\s*actif/);
-    await expect.poll(() => enPause(email)).toBe(false);
-  });
-});
-
-/*
- * « Arrêter BLUSH+ » revient avec le paiement (Stripe) : sans lui, il n’y a rien à résilier côté serveur. D’ici là, ni
- * la ligne ni sa feuille : l’abonnement ne propose que la pause.
- */
-test("BLUSH+ : la pause seulement, sans « Arrêter BLUSH+ » tant que le paiement n’existe pas", async ({ page }, testInfo) => {
-  const email = await nouvelInvite(testInfo);
-  await connecterParApi(page, testInfo, email);
-  await ouvrir(page, "/compte");
-  const abonnement = page.getByRole("main").getByRole("region", { name: "Ton abonnement" });
-
-  await expect(abonnement).toContainText(/BLUSH\+\s*actif/);
-  await expect(abonnement.getByRole("switch", { name: "Mettre en pause" })).toBeVisible();
-  /* Ni bouton ni lien dans l’abonnement, et rien de l’arrêt nulle part sur la page */
-  await expect(abonnement.getByRole("button")).toHaveCount(0);
-  await expect(abonnement.getByRole("link")).toHaveCount(0);
-  await expect(page.getByText(/Arrêter BLUSH\+|effectif lundi/)).toHaveCount(0);
+  await expect(bulles.getByText("Tes bulles\u00a0: illimitées", { exact: true })).toBeVisible();
+  await expect(bulles.getByRole("link")).toHaveCount(0);
+  await expect(main.getByRole("region", { name: "Ton abonnement" })).toHaveCount(0);
+  await expect(main.getByRole("switch", { name: "Mettre en pause" })).toHaveCount(0);
+  await expect(page.getByText(/Arrêter|BLUSH\+|semaine/)).toHaveCount(0);
+  expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
 });
 
 test.describe("Sons et vibrations", () => {
@@ -189,7 +151,7 @@ test("supprimer l’histoire ouverte : Annuler n’efface rien ; confirmé, l’
     await expect(page).toHaveURL(/\/commencer$/);
     await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
     expect(await histoireExiste(histoire)).toBe(false);
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
   await test.step("le compte reste, connecté, sans l’histoire", async () => {

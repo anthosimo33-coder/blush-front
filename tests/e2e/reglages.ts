@@ -35,8 +35,8 @@ export const ADMIN = `admin@${DOMAINE}`;
 /** Les workers en parallèle au plus (playwright test --workers) : chacun a ses invités. */
 const WORKERS_MAX = 16;
 /**
- * Les invités (BLUSH_ACCES_LIBRE) : BLUSH+ d’office, et les seuls à entrer sur le serveur en bêta fermée. Deux par worker
- * (invite-<worker>-<0|1>@e2e.blush.test), effacés au début de chaque test qui les prend (aide/emails.ts) : jamais deux
- * tests en même temps sur le même compte. Tout autre email reste gratuit.
+ * Les invités (BLUSH_ACCES_LIBRE) : de l’équipe (tous leurs rapports ouverts, bulles illimitées), et les seuls à entrer
+ * sur le serveur en bêta fermée. Deux par worker (invite-<worker>-<0|1>@e2e.blush.test), effacés au début de chaque test
+ * qui les prend (aide/emails.ts) : jamais deux tests en même temps sur le même compte. Tout autre email paie.
  */
 export const INVITES = Array.from({ length: WORKERS_MAX }, (_, w) => [0, 1].map((k) => `invite-${w}-${k}@${DOMAINE}`)).flat();

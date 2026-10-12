@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /*
  * La configuration (src/server/env.ts) : les listes d’emails lues une fois par le schéma, l’adresse du site et
  * l’expéditeur par défaut, et les garde-fous de la production (audit S-23) : une variable oubliée lors d’un ménage
- * refuse le service au lieu d’ouvrir la bêta, de donner BLUSH+ à tous ou d’arrêter la purge sans bruit. env() garde ses
+ * refuse le service au lieu d’ouvrir la bêta, de tout offrir à tous ou d’arrêter la purge sans bruit. env() garde ses
  * variables au premier appel : chaque cas recharge le module après avoir posé les siennes. Sans base.
  */
 const charger = async () => {
@@ -44,7 +44,7 @@ describe("les listes d’emails, lues une fois par le schéma", () => {
     expect(peutEntrer("noe@exemple.fr")).toBe(true);
   });
 
-  it("BLUSH_ACCES_LIBRE=* (en dev) : BLUSH+ d’office pour tout le monde, et en bêta fermée tout le monde entre", async () => {
+  it("BLUSH_ACCES_LIBRE=* (en dev) : tout le monde est de l’équipe, et en bêta fermée tout le monde entre", async () => {
     vi.stubEnv("BLUSH_ACCES_LIBRE", " * ");
     vi.stubEnv("BLUSH_BETA_FERMEE", "1");
     const { env, accesLibre, peutEntrer } = await charger();
@@ -123,7 +123,7 @@ describe("les garde-fous de la production", () => {
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/CRON_SECRET manque/);
   });
 
-  it("BLUSH_ACCES_LIBRE=* est refusée : BLUSH+ pour tout le monde, pour toujours", async () => {
+  it("BLUSH_ACCES_LIBRE=* est refusée : tout offert à tout le monde", async () => {
     production();
     vi.stubEnv("BLUSH_ACCES_LIBRE", "*");
     await expect(charger().then(({ env }) => env())).rejects.toThrow(/BLUSH_ACCES_LIBRE=\* est refusée/);

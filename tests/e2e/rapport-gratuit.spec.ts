@@ -40,50 +40,51 @@ test("compte gratuit : le chapitre 1 se lit en entier, les sept autres sont ferm
     await expect(page.getByRole("link", { name: /Poser ma question à BLUSH|Ta question/ })).toHaveCount(0);
   });
 
-  await test.step("ouvrir le rapport ne lance rien de payant : le compte reste gratuit, le verdict seul est écrit", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+  await test.step("ouvrir le rapport ne lance rien de payant : rien de débloqué, le verdict seul est écrit", async () => {
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
     /* La conv reste gardée (chiffrée) tant que la suite n’est pas débloquée : c’est d’elle que la suite s’écrira */
     expect(await histoiresDe(email)).toEqual([expect.objectContaining({ convGardee: true })]);
   });
 });
 
-test("compte gratuit : le paiement, ses deux offres, et « Débloquer » qui répond que BLUSH est sur invitation", async ({ page }, testInfo) => {
+test("compte gratuit : le paiement, ses deux formules, et « Débloquer » qui répond que BLUSH est sur invitation", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "rapport-paiement");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
 
-  await test.step("« Lire la suite » ouvre le paiement : la suite comptée, BLUSH+ conseillé et choisi d’office", async () => {
+  await test.step("« Lire la suite » ouvre le paiement : la suite comptée, le rapport seul ou Premium, choisie d’office", async () => {
     await rapport.getByRole("button", { name: "Lire la suite" }).click();
     await expect(paiement).toBeVisible();
     await expect(paiement.getByText("7 chapitres, ton plan et les phrases pour lui parler.")).toBeVisible();
-    const offres = paiement.getByRole("radiogroup", { name: "Ton offre" }).getByRole("radio");
+    const offres = paiement.getByRole("radiogroup", { name: "Ta formule" }).getByRole("radio");
     await expect(offres).toHaveCount(2);
-    const blushPlus = offres.filter({ hasText: /^BLUSH\+ · / });
-    const rapportComplet = offres.filter({ hasText: /^Le rapport complet/ });
-    await expect(blushPlus).toBeChecked();
-    await expect(blushPlus).toContainText("Conseillé");
-    await expect(blushPlus).toContainText("Sans engagement");
-    await expect(blushPlus).toContainText("7,99 €");
-    await expect(blushPlus).toContainText("/ semaine");
-    await expect(rapportComplet).not.toBeChecked();
-    await expect(rapportComplet).toContainText("Une fois · à toi pour toujours");
-    await expect(rapportComplet).toContainText("8,99 €");
-    await expect(paiement.getByText("Apple Pay, Google Pay ou carte · paiement sécurisé")).toBeVisible();
+    const seul = offres.filter({ hasText: /^Le rapport/ });
+    const premium = offres.filter({ hasText: /^Rapport \+ 60 bulles/ });
+    await expect(premium).toBeChecked();
+    await expect(premium).toContainText("Conseillé");
+    await expect(premium).toContainText("Soit 90 bulles en tout");
+    await expect(premium).toContainText("14,90\u00a0€");
+    await expect(premium).toContainText("19,80\u00a0€");
+    await expect(seul).not.toBeChecked();
+    await expect(seul).toContainText("+ 10 bulles offertes");
+    await expect(seul).toContainText("9,90\u00a0€");
+    await expect(paiement.getByText("Paiement unique, pas d’abonnement · Apple Pay ou carte")).toBeVisible();
+    await expect(paiement.getByText(/BLUSH\+|semaine/)).toHaveCount(0);
 
-    await rapportComplet.click();
-    await expect(rapportComplet).toBeChecked();
-    await expect(blushPlus).not.toBeChecked();
+    await seul.click();
+    await expect(seul).toBeChecked();
+    await expect(premium).not.toBeChecked();
   });
 
-  await test.step("« Débloquer » : pas de paiement en bêta, BLUSH le dit, et le compte reste gratuit", async () => {
+  await test.step("« Débloquer » : pas de paiement branché, BLUSH le dit, et rien n’est débloqué", async () => {
     const reponse = await reponseAuGeste(page, { chemin: "/api/debloquer" }, () => paiement.getByRole("button", { name: "Débloquer" }).click());
     expect(reponse.status()).toBe(402);
     await expect(paiement.getByRole("status")).toHaveText("Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.");
     await expect(page).toHaveURL(/\/rapport$/);
     await expect(paiement.getByRole("button", { name: "Débloquer" })).toBeEnabled();
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
   await test.step("le paiement se ferme, et chaque chapitre fermé le rouvre", async () => {
@@ -102,7 +103,7 @@ test("compte gratuit : le paiement, ses deux offres, et « Débloquer » qui ré
     await expect(paiement).toBeVisible();
   });
 
-  await test.step("« Ta question » est réservée : le paiement s’ouvre par-dessus, le fermer ramène au rapport", async () => {
+  await test.step("« Ta question » vient avec le rapport : le paiement s’ouvre par-dessus, le fermer ramène au rapport", async () => {
     await page.goto("/rapport/question");
     const question = page.getByRole("dialog", { name: PAIEMENT });
     await expect(question).toBeVisible();

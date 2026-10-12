@@ -25,8 +25,10 @@ try {
   const f = new File([readFileSync(join(EVALS, "convs/11-conv-courte.txt"))], "11.txt", { type: "text/plain" });
   const imp = await importer(await depuisFichier(f));
   id = imp.id;
-  const u = (await db().insert(schema.users).values({ email, plan: "blushplus" }).returning())[0]!;
+  const u = (await db().insert(schema.users).values({ email }).returning())[0]!;
   await rattacherBrouillon(u, imp.secret);
+  /* Le rapport débloqué d’avance (comme payé) : toute la chaîne s’écrit après le verdict */
+  await db().update(schema.stories).set({ debloqueLe: new Date() }).where(eq(schema.stories.id, id));
   await definirQui(id, { moi: imp.meta.participants.findIndex((p) => p.prenom === "Julie") as 0 | 1, pronom: "elle", devinette: "parle", objectif: "comprendre" });
   await planifier(id, "verdict");
   const t0 = Date.now();

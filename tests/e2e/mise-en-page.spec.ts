@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { champDuChat, expect, lectureBlushPlus, mesurerCompteurs, ouvrir, partagerParApi, test } from "./aide";
+import { champDuChat, expect, lectureComplete, mesurerCompteurs, ouvrir, partagerParApi, test } from "./aide";
 
 /*
  * La mise en page des écrans, sur ordinateur et sur iPhone : rien ne déborde sur le côté (la page ne glisse pas de
@@ -35,8 +35,8 @@ test("les pages publiques et le parcours d’import : pas de débordement, le ge
     });
 });
 
-test("les écrans d’un compte BLUSH+ : pas de débordement, le geste principal à portée", async ({ page }, testInfo) => {
-  await lectureBlushPlus(page, testInfo);
+test("les écrans d’un compte de l’équipe : pas de débordement, le geste principal à portée", async ({ page }, testInfo) => {
+  await lectureComplete(page, testInfo);
   const ecrans: [string, (p: Page) => Locator][] = [
     ["/lecture", (p) => p.getByRole("link", { name: "Voir mon rapport" })],
     ["/rapport", (p) => p.getByRole("main").getByRole("button", { name: "Partager mon verdict" })],

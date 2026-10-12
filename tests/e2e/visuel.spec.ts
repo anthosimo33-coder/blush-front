@@ -7,7 +7,7 @@ import {
   champDuChat,
   choisirFichier,
   connecterParApi,
-  definirPlan,
+  debloquerLaConv,
   demanderCode,
   derniereHistoire,
   DOMAINE,
@@ -17,7 +17,7 @@ import {
   fermerLaFeuille,
   filDuChat,
   importerWhatsApp,
-  lectureBlushPlus,
+  lectureComplete,
   lectureFaite,
   lireUneConvParApi,
   nouvelInvite,
@@ -329,7 +329,7 @@ test("compte gratuit : la lecture finie, la révélation du verdict, le rapport,
     await capturer(page, "compte-gratuit");
   });
 
-  await test.step("le chat, sous le paiement de BLUSH+", async () => {
+  await test.step("le chat, sous le paiement", async () => {
     await ouvrir(page, "/app");
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await capturer(page, "app-gratuit-paiement");
@@ -345,7 +345,7 @@ test("compte gratuit : la lecture finie, la révélation du verdict, le rapport,
 test("le rapport qui s’écrit, juste après l’accès", async ({ page }, testInfo) => {
   const email = await emailFixe("ecriture");
   await lectureFaite(page, testInfo, email);
-  await definirPlan(email, "blushplus");
+  await debloquerLaConv(email);
   /*
    * Le modèle factice écrit en un instant : le plan du rapport posé « en cours », aux deux cinquièmes, comme pendant
    * l’écriture. Son battement de cœur dans une heure : personne ne le croit abandonné, rien ne le relance, et la suite
@@ -359,9 +359,12 @@ test("le rapport qui s’écrit, juste après l’accès", async ({ page }, test
   await capturer(page, "rapport-ecriture");
 });
 
-test("BLUSH+ : la landing, l’accueil, sa fiche, Mon compte, la révélation, le rapport, le partage, ta question, un message", async ({ page, autreAppareil }, testInfo) => {
+test("un compte de l’équipe : la landing, l’accueil, sa fiche, Mon compte, la révélation, le rapport, le partage, ta question, un message", async ({
+  page,
+  autreAppareil,
+}, testInfo) => {
   test.slow();
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await figerLHeureDuVerdict(email);
   /* Le chapitre 2 tel que l’écrit le vrai modèle : la révélation montre aussi « le moment » et « à toi de jouer » */
   await rapportCommeLeVraiModele(email);
@@ -394,7 +397,7 @@ test("BLUSH+ : la landing, l’accueil, sa fiche, Mon compte, la révélation, l
 
   await test.step("la révélation du verdict, carte par carte : le moment et « à toi de jouer » viennent du chapitre 2", async () => {
     await page.goto("/rapport/verdict");
-    expect(await capturerLaRevelation(page, "blushplus-verdict"), "les cartes d’un compte BLUSH+").toBe(5);
+    expect(await capturerLaRevelation(page, "blushplus-verdict"), "les cartes d’un rapport ouvert").toBe(5);
   });
 
   const rapport = page.getByRole("main");
@@ -439,7 +442,7 @@ test("BLUSH+ : la landing, l’accueil, sa fiche, Mon compte, la révélation, l
   });
 });
 
-test("BLUSH+ : « Tes convs », avec deux convs", async ({ page }, testInfo) => {
+test("un compte de l’équipe : « Tes convs », avec deux convs", async ({ page }, testInfo) => {
   test.slow();
   const email = await nouvelInvite(testInfo, 1);
   await connecterParApi(page, testInfo, email);

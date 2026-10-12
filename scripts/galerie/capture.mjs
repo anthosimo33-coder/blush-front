@@ -6,7 +6,7 @@
  *   npm run galerie -- --page                la page seulement, avec les captures déjà faites
  *   E2E_PORT=3700 E2E_DB=blush_e2e_galerie_b npm run galerie   un autre port (et le suivant) ou une autre base
  *   MAQUETTES=<dossier>                      les maquettes de référence (par défaut ../maquettes/png, facultatives)
- *   npm run fluidite                         le banc de fluidité de l’accueil (scripts/fluidite) sur un compte BLUSH+ semé,
+ *   npm run fluidite                         le banc de fluidité de l’accueil (scripts/fluidite) sur un compte de l’équipe semé,
  *                                            sur la même infrastructure (scripts/galerie/fluidite.spec.ts) ; ni page ni captures
  *
  * Les captures : scripts/galerie/galerie.spec.ts, dans les projets galerie-* de playwright.config.ts (BLUSH_GALERIE=1),

@@ -32,15 +32,19 @@ function useAccess() {
 /**
  * Coque des écrans après le rapport (desktop : une colonne centrée, « Mon compte » en haut ; une colonne d’appoint seulement si l’écran en passe une).
  * `besoin` : ce que l’écran demande (sa fiche) ; le paiement s’affiche par-dessus si le compte ne l’ouvre pas.
+ * `ferme` : ce que l’écran montre demande le rapport de sa conv, pas encore débloqué (« Ta question ») : le paiement
+ * s’affiche par-dessus, quoi que le compte ait d’autre.
  */
 export function AppScreen({
   besoin,
+  ferme = false,
   autre,
   aside = null,
   children,
   ...props
 }: {
   besoin?: Besoin;
+  ferme?: boolean;
   /** Le prénom de l’autre personne, pour le paiement (« toi et Léa »). */
   autre?: string;
   aside?: ReactNode | null;
@@ -49,7 +53,7 @@ export function AppScreen({
   const router = useRouter();
   const pathname = usePathname();
   const access = useAccess();
-  const blocked = !!besoin && access.loaded && !access.peut(besoin);
+  const blocked = ferme || (!!besoin && access.loaded && !access.peut(besoin));
   /*
    * Monté au premier blocage, puis gardé (pour sa sortie). Tant que les droits peuvent manquer (pas encore lus, ou
    * insuffisants), il est aussi monté fermé une fois la page posée : monté au moment de s’ouvrir, React gardait 0,3 s
@@ -57,7 +61,7 @@ export function AppScreen({
    */
   const [bloqueVu, setBloqueVu] = useState(false);
   if (blocked && !bloqueVu) setBloqueVu(true);
-  const peutManquer = !!besoin && (!access.loaded || blocked);
+  const peutManquer = blocked || (!!besoin && !access.loaded);
   useEffect(() => {
     if (!peutManquer || bloqueVu) return;
     let fini = false;
@@ -79,7 +83,7 @@ export function AppScreen({
       >
         {children}
       </Screen>
-      {besoin && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} />}
+      {(besoin || ferme) && bloqueVu && <PaywallSheet open={blocked} onClose={() => router.push("/rapport")} next={pathname} otherName={autre} />}
     </>
   );
 }

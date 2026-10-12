@@ -8,7 +8,7 @@ import {
   expect,
   histoireExiste,
   histoiresDe,
-  lectureBlushPlus,
+  lectureComplete,
   MUTATIONS,
   ouvrir,
   reponseAuGeste,
@@ -106,7 +106,7 @@ test("connecté, une page d’un autre site ne peut ni le déconnecter, ni suppr
 
 test("les vocaux d’une conv ne s’écoutent que depuis son compte : ni un autre compte, ni sans session", async ({ page, request, autreAppareil }, testInfo) => {
   /* Le compte de Noé : le vocal de son rapport, et une réponse du chat dite en vocal (ils citent leur conv) */
-  const email = await lectureBlushPlus(page, testInfo);
+  const email = await lectureComplete(page, testInfo);
   await ouvrir(page, "/app");
   expect(await ecrireABlush(page, "parle-moi en vocal")).toBe(200);
   const histoire = (await histoiresDe(email))[0]!;

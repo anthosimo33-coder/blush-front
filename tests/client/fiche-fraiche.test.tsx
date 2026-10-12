@@ -10,7 +10,7 @@ import { FicheScreen } from "@/app/app/fiche/FicheScreen";
  * Sa fiche rendue à l’instant par le serveur (src/app/app/fiche/FicheScreen.tsx, Q63) : elle n’est pas relue au montage,
  * sauf si le rendu dit qu’une mise à jour de la mémoire tourne (`updating`, getFicheEtMaj) ; la fiche se relit alors
  * toutes les 3 s jusqu’à la fin, et ce qui est arrivé prend son point rose. Rendue avant un message du chat (qui a pu
- * lancer une mise à jour depuis), elle est relue. Le serveur est simulé, le compte a BLUSH+.
+ * lancer une mise à jour depuis), elle est relue. Le serveur est simulé, le compte est client.
  */
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn(), back: vi.fn() }), usePathname: () => "/app/fiche" }));
 vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), getFiche: vi.fn(), prechargerExport: vi.fn() }));

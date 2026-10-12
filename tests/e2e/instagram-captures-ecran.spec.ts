@@ -220,7 +220,7 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
   });
 
   await test.step("côté serveur : une histoire de 24 messages, lue (le verdict seul : compte gratuit)", async () => {
-    expect(await compteDe(email)).toMatchObject({ plan: "gratuit" });
+    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
     expect(await histoiresDe(email)).toEqual([expect.objectContaining({ messages: 24 })]);
     expect((await tachesDe(email)).map((t) => [t.genre, t.statut])).toEqual([["verdict", "fini"]]);
   });

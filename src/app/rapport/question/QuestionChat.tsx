@@ -29,7 +29,7 @@ import type { Story } from "@/types";
  * la question ne part pas par erreur), écrit, puis répond en bulles, preuve et confiance comprises.
  * Absent des maquettes, textes relus le 8 octobre (voix de BLUSH).
  */
-export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }) {
+export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[]; story: Story; ferme?: boolean }) {
   /*
    * La réponse de la visite. Pas de question déjà posée à relire : elle passe par le chat (son historique est sur
    * l’accueil). Le champ et les idées sont là dès le premier affichage ; au retour sur l’écran, la question est à poser.
@@ -159,6 +159,8 @@ export function QuestionChat({ ideas, story }: { ideas: string[]; story: Story }
 
   return (
     <AppScreen
+      /* Le rapport de cette conv pas encore débloqué : « Ta question » vient avec lui, le paiement s’ouvre par-dessus */
+      ferme={ferme}
       autre={moiEtAutre(story).autre.name}
       srTitle="Ta question"
       /* Figtree pour le vrai message cité en preuve (src/lib/fonts.ts) */
