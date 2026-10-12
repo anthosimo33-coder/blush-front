@@ -1,5 +1,5 @@
 import { CASE_IMPORT } from "../../src/contenu/consentements";
-import { caseImport, capturesPng, connecterParApi, emailLibre, expect, exportWhatsApp, ouvrir, test, texteWhatsApp, URL_APPLI } from "./aide";
+import { caseImport, capturesPng, connecterParApi, emailLibre, expect, exportWhatsApp, ouvrir, sql, test, texteWhatsApp, URL_APPLI } from "./aide";
 
 /*
  * Le juridique : les pages /conditions et /mentions-legales, leurs liens au pied de la landing, de la confidentialité et
@@ -112,10 +112,16 @@ test("l’export : sans la case, le choix du fichier ne s’ouvre pas ; cochée,
   await test.step("cochée : le message part, le fichier se choisit, la conv entre", async () => {
     await accord.check();
     await expect(page.getByRole("alert").filter({ hasText: CASE_IMPORT.manquante })).toHaveCount(0);
-    const envoi = page.waitForRequest((r) => new URL(r.url()).pathname === "/api/import");
+    const reponse = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/import");
     const [selecteur] = await Promise.all([page.waitForEvent("filechooser"), bouton.click()]);
     await selecteur.setFiles(conv.chemin);
-    expect((await envoi).postDataBuffer()?.toString("latin1")).toContain(`name="consentement"\r\n\r\n${CASE_IMPORT.version}`);
+    const envoi = await reponse;
+    expect(envoi.status()).toBe(200);
+    /* L’histoire garde l’accord : la version de la case cochée, et son heure */
+    const { story } = (await envoi.json()) as { story: { id: string } };
+    const [accordGarde] = await sql()<{ version: string; le: Date | null }[]>`select consentement_version as version, consentement_le as le from stories where id = ${story.id}`;
+    expect(accordGarde?.version).toBe(CASE_IMPORT.version);
+    expect(accordGarde?.le).toBeTruthy();
     await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
   });
 });

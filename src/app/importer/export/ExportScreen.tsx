@@ -107,7 +107,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </Alert>
           )}
-          <CaseImport etat={accord} className="mb-3" />
+          <CaseImport etat={accord} className="mb-1" />
           {/* aria-busy pour la phase « Je lis ton export · N % » aussi, où loading est faux (Button ne le pose qu’avec loading) */}
           <Button onClick={choisirFichier} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
             {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}

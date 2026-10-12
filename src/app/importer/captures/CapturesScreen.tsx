@@ -234,7 +234,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       footer={
         <>
           {/* La case de l’import, au-dessus du bouton à chaque étape : elle se coche avant « Continuer », qui envoie */}
-          <CaseImport etat={accord} className="mb-3" />
+          <CaseImport etat={accord} className="mb-1" />
           {items.length ? (
             <>
               <Button arrow={!busy} onClick={() => void continuer()} disabled={busy} aria-busy={busy}>

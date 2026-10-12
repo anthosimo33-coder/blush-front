@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 import { CaseACocher } from "@/components/ui/controls";
 import { CASE_IMPORT, CASE_RENONCIATION, type AchatImmediat } from "@/contenu/consentements";
 
@@ -48,6 +49,7 @@ type EtatCase = ReturnType<typeof useCase>;
 /**
  * La case de l’import : 18 ans ou plus, les conditions (le lien s’ouvre dans un autre onglet : les captures choisies
  * restent là), et l’accord pour ce que la conv dit d’intime. Le serveur reçoit la version de son texte (CASE_IMPORT).
+ * Dans une carte opaque : posée dans le pied d’écran, dont le haut est un dégradé, le texte de la page passerait derrière.
  */
 export function CaseImport({ etat, className }: { etat: EtatCase; className?: string }) {
   return (
@@ -57,7 +59,7 @@ export function CaseImport({ etat, className }: { etat: EtatCase; className?: st
       refus={!!etat.refus}
       message={etat.refus === "perimee" ? CASE_IMPORT.perimee : CASE_IMPORT.manquante}
       inputRef={etat.ref}
-      className={className}
+      className={cn("rounded-[16px] bg-white px-3.5 py-3 shadow-card", className)}
     >
       {CASE_IMPORT.avant}
       <Link href="/conditions" target="_blank" rel="noopener" className="font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2">
