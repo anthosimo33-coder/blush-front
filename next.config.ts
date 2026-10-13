@@ -23,6 +23,16 @@ const SECURITE = [
  */
 const avecSession = (source: string, destination: string) => NOMS_DE_SESSION.map((key) => ({ source, has: [{ type: "cookie" as const, key }], destination }));
 
+/**
+ * Le fichier qui fait vérifier askblush.com chez Apple, pour Apple Pay dans nos pages (les Elements de Whop) : servi à
+ * l’adresse qu’Apple lit, tel que Whop le publie (sa doc, « Enable Apple Pay and Google Pay », la réécriture pour
+ * Vercel), sans en garder une copie qui vieillirait. Le domaine s’enregistre ensuite chez Whop (BACKEND.md, « Le paiement »).
+ */
+export const FICHIER_APPLE_PAY = {
+  source: "/.well-known/apple-developer-merchantid-domain-association",
+  destination: "https://whop.com/.well-known/apple-platform-integrator/apple-developer-merchantid-domain-association",
+};
+
 const nextConfig: NextConfig = {
   /* Les liens et les navigations (next/link, useRouter, redirect) ne visent qu’une route qui existe : tsc le vérifie */
   typedRoutes: true,
@@ -45,7 +55,7 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     return {
-      beforeFiles: [...avecSession("/", "/retour"), ...avecSession("/commencer", "/commencer/connecte"), ...avecSession("/connexion", "/connexion/connecte")],
+      beforeFiles: [...avecSession("/", "/retour"), ...avecSession("/commencer", "/commencer/connecte"), ...avecSession("/connexion", "/connexion/connecte"), FICHIER_APPLE_PAY],
       afterFiles: [],
       fallback: [],
     };
