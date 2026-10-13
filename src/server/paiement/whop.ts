@@ -90,13 +90,16 @@ async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string
 
 /**
  * Le prix d’un achat, créé à la volée chez Whop (un « plan » en ligne : Whop réutilise celui qui a déjà ces attributs) :
- * en euros (Whop compte en unités : 9.9), payé une fois, sous notre produit, caché du catalogue de Whop, avec le nom
- * que l’acheteur voit sur la page de paiement (titreChezWhop).
+ * en euros (Whop compte en unités : 9.9), TTC (`override_tax_type` : la taxe comprise dans le prix, jamais ajoutée
+ * par-dessus ; quand Whop est vendeur en titre, c’est le réglage de taxe du compte qui décide, à garder sur « prix TTC »,
+ * BACKEND.md), payé une fois, sous notre produit, caché du catalogue de Whop, avec le nom que l’acheteur voit sur la page
+ * de paiement (titreChezWhop).
  */
 const planEnLigne = (config: ConfigWhop, centimes: number, titre: string) => ({
   title: titre,
   initial_price: centimes / 100,
   currency: "eur",
+  override_tax_type: "inclusive",
   plan_type: "one_time",
   product_id: config.produit,
   visibility: "hidden",

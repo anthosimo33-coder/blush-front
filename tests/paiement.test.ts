@@ -461,6 +461,21 @@ describe("payé deux fois", () => {
     expect(etat.relancees).toEqual([conv]);
   });
 
+  it("la taxe ajoutée par-dessus le prix (un réglage de taxe hors taxe chez Whop) : livré, l’équipe prévenue, une fois", async () => {
+    const { u, conv } = await acheteur("taxe-ajoutee");
+    const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
+    const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
+    const taxe = { ...data, total: { amount: "11.88", currency: "eur" }, subtotal: { amount: "9.90", currency: "eur" } };
+    expect((await poster(webhookFactice("payment.succeeded", taxe))).status).toBe(200);
+    /* Le même paiement, rejoué (la vérification du retour, puis le webhook) : déjà livré, pas de seconde alerte */
+    expect((await poster(webhookFactice("payment.succeeded", taxe))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : taxe ajoutée au prix"]);
+    expect((await achatEnBase(corps.achat)).statut).toBe("paye");
+    expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
+    expect(await soldeDe(u.id)).toBe(10);
+  });
+
   it("un sous-total au prix mais un total plus bas (une remise chez Whop) : rien de livré, l’équipe prévenue", async () => {
     const { u, conv } = await acheteur("remise");
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });

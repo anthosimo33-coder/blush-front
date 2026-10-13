@@ -202,7 +202,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
     appels.length = 0;
   });
 
-  it("une configuration de paiement : le prix en ligne (en euros, une fois, caché), l’achat en métadonnées, la clé d’idempotence, la version épinglée", async () => {
+  it("une configuration de paiement : le prix en ligne (en euros, TTC, une fois, caché), l’achat en métadonnées, la clé d’idempotence, la version épinglée", async () => {
     repondre(200, { id: "ch_1", purchase_url: "https://whop.com/checkout/ch_1/" });
     const achat = "0b7e3f4c-0000-4000-8000-000000000001";
     expect(await creerConfiguration(config, { achat, centimes: 990, titre: "Le rapport complet + 10 bulles", retour: "https://www.askblush.com/paiement/retour?achat=x" })).toEqual(
@@ -217,7 +217,15 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
         methode: "POST",
         entetes: expect.objectContaining({ authorization: "Bearer cle_fictive", "api-version-date": VERSION_API_WHOP, "idempotency-key": `configuration:${achat}` }),
         corps: {
-          plan: { title: "Le rapport complet + 10 bulles", initial_price: 9.9, currency: "eur", plan_type: "one_time", product_id: "prod_1", visibility: "hidden" },
+          plan: {
+            title: "Le rapport complet + 10 bulles",
+            initial_price: 9.9,
+            currency: "eur",
+            override_tax_type: "inclusive",
+            plan_type: "one_time",
+            product_id: "prod_1",
+            visibility: "hidden",
+          },
           metadata: { achat },
           redirect_url: "https://www.askblush.com/paiement/retour?achat=x",
         },
