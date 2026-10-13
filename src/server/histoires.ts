@@ -87,7 +87,7 @@ export function resumeDe(messages: Message[]): Meta["resume"] {
 
 /**
  * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées, et
- * l’accord de son import (la case cochée, src/server/juridique.ts). Le cookie du brouillon la retrouve par l’empreinte de `secret`.
+ * l’accord de son import (src/server/juridique.ts). Le cookie du brouillon la retrouve par l’empreinte de `secret`.
  */
 async function creerBrouillon(meta: Meta, texte: string, secret: string, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
   const ligne = uneLigne(

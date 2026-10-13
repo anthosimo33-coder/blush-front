@@ -3,6 +3,7 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 import { Blocs, EnTeteJuridique, LiensJuridiques, SectionJuridique } from "@/components/juridique/pages";
 import { CONDITIONS, PARTIES_CONDITIONS } from "@/contenu/conditions";
+import { identiteEditeur } from "@/contenu/mentions-legales";
 import { NBSP } from "@/lib/format";
 
 /*
@@ -10,7 +11,7 @@ import { NBSP } from "@/lib/format";
  * serveur, comme la page Confidentialité : seul son « Retour » tourne dans le navigateur.
  */
 
-/** La page : deux parties (utiliser BLUSH, acheter), chacune de ses sections en carte, puis où nous écrire. */
+/** La page : deux parties (utiliser BLUSH, acheter), chacune de ses sections en carte, puis qui l’édite et où nous écrire. */
 export function ConditionsScreen() {
   return (
     <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title={CONDITIONS.titre} />} desktopBack={{ target: "/" }} mainWidth={640}>
@@ -28,6 +29,7 @@ export function ConditionsScreen() {
       ))}
 
       <InsetGroup className="mt-8" footer={CONDITIONS.maj}>
+        <InsetRow leading={<RowIcon icon="list" />} title="L’éditeur" sub={identiteEditeur()} href="/mentions-legales" chevron />
         <InsetRow
           leading={<RowIcon icon="mail" tone="toi" />}
           title={<span className="text-toi-ink">Une question{NBSP}? Écris-nous</span>}

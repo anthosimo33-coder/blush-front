@@ -154,16 +154,22 @@ test("/attente/retirer : un lien incomplet, abîmé ou pris dans le mail d’un 
   });
 });
 
-test("/attente : après dix inscriptions en une heure depuis la même adresse, la onzième ne passe pas", async ({ page, request }, testInfo) => {
-  await test.step("dix inscriptions passent", async () => {
-    for (let k = 0; k < 10; k++) {
+test("/attente : passé la limite d’une heure depuis la même adresse (attenteParIp), l’inscription suivante ne passe pas", async ({ page, request }, testInfo) => {
+  await test.step("les inscriptions passent jusqu’à la limite (lue en la touchant : src/server/limites.ts ne s’importe pas ici)", async () => {
+    /* Au moins les dix de la bêta fermée ; relevée pour l’ouverture (50 le 13 octobre), et bornée ici pour ne pas tourner sans fin */
+    let passees = 0;
+    for (let k = 0; k < 500; k++) {
       const r = await request.post("/api/attente", { headers: { origin: URL_BETA }, data: { email: emailLibre(testInfo, `rafale${k}`) } });
+      if (r.status() === 429) break;
       expect(r.status()).toBe(200);
+      passees++;
     }
+    expect(passees).toBeGreaterThanOrEqual(10);
+    expect(passees).toBeLessThan(500);
   });
 
-  await test.step("la onzième, depuis l’écran : refusée (« trop »), et l’écran dit que ça n’a pas marché", async () => {
-    const email = emailLibre(testInfo, "onzieme");
+  await test.step("la suivante, depuis l’écran : refusée (« trop »), et l’écran dit que ça n’a pas marché", async () => {
+    const email = emailLibre(testInfo, "suivante");
     expect(await rejoindreLaListe(page, email)).toBe(429);
     /* Le message d’une panne : l’écran ne distingue pas « trop » (src/app/attente/AttenteScreen.tsx:30), et la limite dure une heure */
     await expect(page.getByRole("main").getByRole("alert")).toHaveText("Ça n’a pas marché. Réessaie dans un instant.");

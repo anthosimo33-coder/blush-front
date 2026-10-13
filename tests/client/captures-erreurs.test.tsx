@@ -36,8 +36,7 @@ async function continuerAvec(e: unknown) {
   render(<CapturesScreen app="hinge" addMode={false} />);
   const png = (nom: string) => new File(["png"], nom, { type: "image/png" });
   fireEvent.change(screen.getByLabelText("Captures d’écran de la conversation"), { target: { files: [png("1.png"), png("2.png")] } });
-  /* La case de l’import, sans laquelle rien ne part (src/components/juridique/cases.tsx) */
-  fireEvent.click(screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }));
+  /* Pas de case : « Continuer » donne l’accord de l’import (src/components/juridique/cases.tsx) */
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
   });
@@ -74,34 +73,39 @@ describe("l’import de captures en échec", () => {
     expect(screen.getByRole("button", { name: "Continuer" }).hasAttribute("disabled")).toBe(false);
   });
 
-  it("la case refusée par le serveur (une version périmée) : elle se décoche, demande de recharger la page, les captures restent là", async () => {
+  it("l’accord refusé par le serveur (une version périmée) : la ligne demande de recharger la page, les captures restent là", async () => {
     await continuerAvec(erreur("consentement", 422));
-    /* L’envoi portait la version de la case cochée */
+    /* L’envoi portait la version de l’accord */
     expect(envoi.mock.calls[0]?.[1]).toMatchObject({ consentement: CASE_IMPORT.version });
     expect(routeur.replace).not.toHaveBeenCalled();
     expect(routeur.push).not.toHaveBeenCalled();
-    expect((screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }) as HTMLInputElement).checked).toBe(false);
     expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
-    expect(screen.getByRole("button", { name: CASE_IMPORT.recharger })).toBeTruthy();
+    const recharger = screen.getByRole("button", { name: CASE_IMPORT.recharger });
     expect(screen.getByRole("button", { name: "Capture 2 sur 2" })).toBeTruthy();
-    /* Même recochée, « Continuer » n’envoie plus rien : la même version périmée serait refusée de nouveau, sans fin */
+    /* « Continuer » n’envoie plus rien : la même version périmée serait refusée de nouveau, sans fin. Le focus va au rechargement */
     envoi.mockClear();
-    fireEvent.click(screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus/ }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     });
     expect(envoi).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    expect(document.activeElement).toBe(recharger);
   });
 
-  it("sans la case : « Continuer » n’envoie rien, et le dit", async () => {
+  it("aucune case à cocher : la ligne de l’accord, juste au-dessus du bouton, et « Continuer » envoie avec sa version", async () => {
+    envoi.mockResolvedValue({ source: { id: "s1", app: "hinge", mode: "captures", screenshotCount: 1, label: "Hinge", period: "", messageCount: 2 }, messagesRead: 2 });
     render(<CapturesScreen app="hinge" addMode={false} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const ligne = screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "En continuant, tu acceptes les conditions et que BLUSH lise toute ta conv.");
+    expect(screen.getByRole("link", { name: "conditions" }).getAttribute("href")).toBe("/conditions");
+    /* Juste au-dessus du bouton */
+    expect(ligne.nextElementSibling?.textContent).toBe("Choisir mes captures");
     fireEvent.change(screen.getByLabelText("Captures d’écran de la conversation"), { target: { files: [new File(["png"], "1.png", { type: "image/png" })] } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     });
-    expect(envoi).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.manquante);
+    expect(envoi).toHaveBeenCalledTimes(1);
+    expect(envoi.mock.calls[0]?.[1]).toMatchObject({ consentement: CASE_IMPORT.version });
   });
 
   it("sans session (401) : la connexion, puis retour sur les captures", async () => {

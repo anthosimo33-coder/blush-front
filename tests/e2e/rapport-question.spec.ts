@@ -19,6 +19,7 @@ import {
   RESEAU,
   reponseAuGeste,
   test,
+  tientEnPetitEcran,
   titreDuChapitre,
 } from "./aide";
 
@@ -262,10 +263,11 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
     await expect(recharge.getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeVisible();
     await feuilleSurOrdinateur(page, recharge, { titre: 26 });
     await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toBeVisible();
+    /* Sa plus haute version (le bonus ④, la ligne de la renonciation sous « Payer ») tient sur un petit iPhone sans défiler */
+    await tientEnPetitEcran(page, "la recharge, bonus ④ compris");
   });
 
   await test.step("payée au faux Whop : le retour mène au chat, qui lit la réponse prête", async () => {
-    await recharge.getByRole("checkbox", { name: "Je veux mes bulles tout de suite et je renonce à mon droit de rétractation" }).check();
     await recharge.getByRole("button", { name: "Payer · 9,90\u00a0€" }).click();
     await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
     await page.getByRole("button", { name: "Payer", exact: true }).click();

@@ -6,7 +6,7 @@ import { FEUILLE_FORMULE, OFFRE_SUITE } from "@/contenu/paiement";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Perle } from "@/components/bulles/perles";
 import { Pastille } from "@/components/bulles/pieces";
-import { CaseRenonciation } from "@/components/juridique/cases";
+import { MentionRenonciation } from "@/components/juridique/cases";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
@@ -143,12 +143,13 @@ export function OffreAvantDePartir({
           </Pastille>
         </li>
       </ul>
-      <CaseRenonciation quoi="rapport" etat={paiement.renonciation} />
       {paiement.refus && <Alert className="text-center leading-[1.45]">{OFFRE_SUITE.souci}</Alert>}
       <div className="flex flex-col gap-1">
         <Button arrow loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer("suite")}>
           {OFFRE_SUITE.prendre}
         </Button>
+        {/* La renonciation au délai de rétractation, que le geste de payer donne : juste sous le bouton */}
+        <MentionRenonciation quoi="rapport" etat={paiement.renonciation} className="mt-1.5" />
         <Button variant="link" onClick={refuser}>
           {OFFRE_SUITE.non}
         </Button>

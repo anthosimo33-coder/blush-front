@@ -82,7 +82,7 @@ test("compte gratuit, une conv lue avant les titres des chapitres : les chapitre
   await expect(rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" })).toBeVisible();
 });
 
-test("compte gratuit : le paiement, ses deux formules, la case de renonciation, et l’offre unique ① en le fermant", async ({ page }, testInfo) => {
+test("compte gratuit : le paiement, ses deux formules, la renonciation sous le bouton, et l’offre unique ① en le fermant", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "rapport-paiement");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
@@ -146,19 +146,15 @@ test("compte gratuit : le paiement, ses deux formules, la case de renonciation, 
     await expect(paiement).toBeVisible();
   });
 
-  await test.step("« Débloquer » sans la case de renonciation cochée : rien ne part, la case le dit", async () => {
-    const envois: string[] = [];
-    page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/api/paiement") && envois.push(r.url())));
-    const renonce = paiement.getByRole("checkbox", { name: "Je veux mon rapport tout de suite et je renonce à mon droit de rétractation" });
-    await expect(renonce).not.toBeChecked();
-    await paiement.getByRole("button", { name: /^Débloquer/ }).click();
-    await expect(paiement.getByRole("alert")).toHaveText("Coche la case pour payer.");
-    await expect(page).toHaveURL(/\/rapport$/);
-    await expect(paiement.getByRole("button", { name: /^Débloquer/ })).toBeEnabled();
-    expect(envois).toEqual([]);
-    expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
-    /* Cochée, l’avertissement s’en va */
-    await renonce.check();
+  await test.step("pas de case : la renonciation dite juste sous « Débloquer », son lien vers les conditions", async () => {
+    await expect(paiement.getByRole("checkbox")).toHaveCount(0);
+    const debloquer = paiement.getByRole("button", { name: /^Débloquer/ });
+    const ligne = paiement.getByText("En payant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.");
+    await expect(ligne).toBeVisible();
+    await expect(ligne.getByRole("link", { name: "délai de rétractation" })).toHaveAttribute("href", "/conditions#livraison");
+    const [b, l] = [(await debloquer.boundingBox())!, (await ligne.boundingBox())!];
+    expect(l.y - (b.y + b.height), "juste sous le bouton").toBeGreaterThanOrEqual(0);
+    expect(l.y - (b.y + b.height), "juste sous le bouton").toBeLessThan(24);
     await expect(paiement.getByRole("alert")).toHaveCount(0);
   });
 

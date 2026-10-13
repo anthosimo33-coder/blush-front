@@ -6,8 +6,8 @@ import { ROUTES } from "@/types/api";
 
 /**
  * Commencer un paiement : une offre du catalogue, pour la conv du corps (sinon celle de la page) quand elle en débloque
- * le rapport. Sans la case de renonciation au droit de rétractation cochée (sa version d’aujourd’hui), rien ne part
- * (422 « renonciation ») ; cochée, l’achat garde sa version et l’heure. Le serveur écrit l’achat au prix du catalogue, puis rend la page où payer (Whop, ou le faux Whop), ou rien quand l’offre ③
+ * le rapport. Sans la renonciation au délai de rétractation (sa version d’aujourd’hui, que le geste de payer envoie), rien ne part
+ * (422 « renonciation ») ; avec elle, l’achat garde sa version et l’heure. Le serveur écrit l’achat au prix du catalogue, puis rend la page où payer (Whop, ou le faux Whop), ou rien quand l’offre ③
  * se paie en un geste. Sans paiement branché : 402 « bientot » ; l’équipe, ou un rapport déjà ouvert : 409 « deja ».
  */
 export const POST = route("POST /api/paiement", async (req: Request) => {

@@ -8,7 +8,7 @@ import { proposerOffreUnique } from "@/services/api";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
 import { Cadeau, Perle } from "@/components/bulles/perles";
 import { CestQuoiUneBulle, Contenu, Option, RondACocher } from "@/components/bulles/pieces";
-import { CaseRenonciation } from "@/components/juridique/cases";
+import { MentionRenonciation } from "@/components/juridique/cases";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
@@ -21,14 +21,16 @@ import { usePaiement } from "./usePaiement";
 /*
  * Écran 10 — la feuille « Ta formule » (le prototype validé des bulles, 12 octobre) : le rapport seul, ou Premium,
  * choisie d’avance et ouverte (son badge, ce qu’elle contient ligne à ligne, ses bulles offertes sur une bande rose à
- * 0 €), « C’est quoi une bulle ? », la case de renonciation au droit de rétractation, puis un seul bouton, qui part payer
- * sur la page de paiement de Whop (ou du faux Whop en local) : on en revient sur /paiement/retour. Fermée sans payer, elle
- * demande au serveur l’offre unique ① (OffreAvantDePartir : la suite moins chère, 5 minutes, une fois).
+ * 0 €), « C’est quoi une bulle ? », puis un seul bouton, qui part payer au premier toucher sur la page de paiement de
+ * Whop (ou du faux Whop en local) : on en revient sur /paiement/retour. Juste sous lui, la ligne de la renonciation au
+ * délai de rétractation, que le geste de payer donne (MentionRenonciation). Fermée sans payer, elle demande au serveur
+ * l’offre unique ① (OffreAvantDePartir : la suite moins chère, 5 minutes, une fois).
  * La page hébergée de Whop plutôt que ses Elements dans la feuille : décidé pour la vague 2 (les Elements n’existent pas
  * dans son bac à sable), à revoir après un vrai paiement de test.
- * Sur un écran court (375 × 667), la case de renonciation, que le prototype n’avait pas, ne tiendrait pas : le titre, les
- * marges de Premium et l’écart entre les deux formules se resserrent et la case s’écrit plus petit (max-height: 700px),
- * pour que la feuille tienne sans défiler, avec de la marge pour les textes plus larges de Chrome sous Linux et Android.
+ * Les marges du prototype, sauf sur un écran court (375 × 667) : la ligne de la renonciation, que le prototype n’avait
+ * pas (comme la case qu’elle remplace), n’y tiendrait pas ; le titre, les marges de Premium et les écarts s’y resserrent
+ * (max-height: 700px), pour que la feuille tienne sans défiler, avec de la marge pour les textes plus larges de Chrome
+ * sous Linux et Android (tests/e2e/rapport-debloque.spec.ts, tientEnPetitEcran).
  */
 
 /** L’offre ① refusée (« Non merci ») pendant cette visite : la feuille refermée ne la remontre pas (le serveur la garderait 5 minutes). */
@@ -227,10 +229,10 @@ export function FeuilleFormule({
             </p>
           )}
           {paiement.refus === "souci" && <Alert className="text-center leading-[1.45]">{FEUILLE_FORMULE.souci}</Alert>}
-          <CaseRenonciation quoi="rapport" etat={paiement.renonciation} className="[@media(max-height:700px)]:[&_label]:text-micro" />
           <Button arrow loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer(choisie)}>
             {FEUILLE_FORMULE.payer(prix)}
           </Button>
+          <MentionRenonciation quoi="rapport" etat={paiement.renonciation} />
           <span className="text-center text-micro font-extrabold text-grey">
             <b className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</b>
             {FEUILLE_FORMULE.pied.reste}

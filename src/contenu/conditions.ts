@@ -1,19 +1,26 @@
 import { URGENCES } from "./aide";
-import { CASE_RENONCIATION } from "./consentements";
+import { texteRenonciation } from "./consentements";
+import { droitApplicable, EDITEUR, type Editeur } from "./mentions-legales";
 import { CATALOGUE, COUT_EN_BULLES, prixDe } from "./offres";
 
 /*
  * Les conditions de BLUSH (la page /conditions) : les conditions d’utilisation, puis celles de la vente. Elles suivent
  * les décisions du lot « prêt à lancer » : un achat une fois (pas d’abonnement), Whop vendeur en titre, des prix TTC,
- * les bulles du chat, le contenu livré tout de suite et la renonciation au droit de rétractation, 18 ans et plus, et
+ * les bulles du chat, le contenu livré tout de suite et la renonciation au droit de rétractation, ouvert dès 15 ans, et
  * jamais un service de conseil ni de thérapie (Whop les interdit, et BLUSH n’en est pas un).
  * Les prix, les bulles de chaque offre et le coût d’une réponse sont lus dans le catalogue (src/contenu/offres.ts), celui
  * que le serveur fait payer : jamais recopiés ici. Un prix changé là change donc ce texte, et son empreinte (plus bas).
- * La case de l’import fait accepter ces conditions : un changement ici change aussi la version de CASE_IMPORT
+ * L’accord de l’import fait accepter ces conditions : un changement ici change aussi la version de CASE_IMPORT
  * (src/contenu/consentements.ts) : tests/unit/juridique.test.ts fige leur empreinte avec cette version.
- * TODO(produit): à relire par un juriste.
+ * Deux morceaux suivent l’éditeur (src/contenu/mentions-legales.ts) : le médiateur de la consommation, cité seulement
+ * quand l’éditeur en a un, et la loi applicable (son champ `droit`, le droit français par défaut). Les changer change
+ * donc l’empreinte des conditions, et la version de l’accord de l’import.
+ * TODO(produit): à relire par un juriste (dont : sans médiateur, les conditions n’en citent aucun, alors que le Code de
+ * la consommation en demande un, L612-1 et L616-1).
  * TODO(produit): textes nouveaux, à valider (dont les bulles perdues quand on efface son compte, le préavis si BLUSH
- * fermait, et les numéros d’urgence).
+ * fermait, les numéros d’urgence, l’entreprise qui édite BLUSH, le désaccord sans médiateur et la loi applicable avec
+ * les protections du pays de résidence, l’accord de l’import donné en continuant et la renonciation donnée en payant,
+ * sans case).
  */
 
 /** « 1 bulle », « 10 bulles ». */
@@ -31,7 +38,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 12 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 13 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
@@ -41,7 +48,7 @@ const UTILISATION: readonly Section[] = [
     titre: "Ce qu’est BLUSH",
     blocs: [
       "BLUSH lit une conv que tu importes (un export ou des captures) et t’en donne une lecture\u00a0: un verdict, un rapport en chapitres, et un chat pour en parler.",
-      "En important une conv ou en achetant, tu acceptes ces conditions. BLUSH est édité par la société présentée dans les mentions légales.",
+      "En important une conv ou en achetant, tu acceptes ces conditions. BLUSH est édité par l’entreprise présentée dans les mentions légales.",
     ],
   },
   {
@@ -54,17 +61,15 @@ const UTILISATION: readonly Section[] = [
   },
   {
     id: "age",
-    titre: "18 ans et plus",
-    blocs: [
-      "BLUSH est réservé aux personnes de 18 ans ou plus\u00a0: avant chaque import, tu le confirmes en cochant une case. Une conv avec une personne mineure ne s’analyse pas ici.",
-    ],
+    titre: "Dès 15 ans",
+    blocs: ["BLUSH est ouvert dès 15 ans. Plus jeune, il te faut l’accord d’un parent."],
   },
   {
     id: "conv",
     titre: "Ta conv, et ce qu’elle dit d’intime",
     blocs: [
       "Tu n’importes qu’une conv à laquelle tu as pris part.",
-      "Une conv peut dire des choses intimes, sur toi comme sur l’autre personne\u00a0: sa santé, sa vie amoureuse, sa sexualité. Avant chaque import, tu acceptes, en cochant une case, que BLUSH les lise pour écrire ton analyse. BLUSH garde la date de cet accord, et la version du texte que tu as coché.",
+      "Une conv peut dire des choses intimes, sur toi comme sur l’autre personne\u00a0: sa santé, sa vie amoureuse, sa sexualité. Avant chaque import, tu acceptes, en continuant, que BLUSH les lise pour écrire ton analyse. BLUSH garde la date de cet accord, et la version du texte que tu as accepté.",
       "La personne avec qui tu parles n’est jamais contactée. Ce que tu lis ici ne sert pas à la surveiller, la harceler ou l’exposer.",
       "Ce que BLUSH fait de ta conv, combien de temps il la garde et comment tout effacer\u00a0: la page Confidentialité.",
     ],
@@ -125,7 +130,7 @@ const VENTE: readonly Section[] = [
     titre: "Livré tout de suite, sans rétractation",
     blocs: [
       "Ce que tu achètes est un contenu numérique, livré dès le paiement\u00a0: ton rapport se débloque, tes bulles arrivent sur ton compte.",
-      `Pour l’avoir tout de suite, tu renonces à ton droit de rétractation de 14 jours (Code de la consommation, article L221-28, 13°)\u00a0: avant de payer, tu coches la case «\u00a0${CASE_RENONCIATION.textes.rapport}\u00a0». Sans elle, le paiement ne part pas.`,
+      `Pour l’avoir tout de suite, tu renonces à ton droit de rétractation de 14 jours (Code de la consommation, article L221-28, 13°)\u00a0: en payant, tu l’acceptes, comme le dit la ligne sous le bouton qui paie («\u00a0${texteRenonciation("rapport")}\u00a0»).`,
     ],
   },
   {
@@ -144,23 +149,34 @@ const VENTE: readonly Section[] = [
       "On fait tout pour que BLUSH reste disponible, sans pouvoir promettre qu’il ne tombe jamais en panne. Il évolue\u00a0: des écrans changent, d’autres arrivent. S’il devait fermer, on te préviendrait à l’avance.",
     ],
   },
-  {
-    id: "desaccord",
-    titre: "Un désaccord",
-    blocs: [
-      "Écris-nous d’abord à bonjour@askblush.com. Si on ne trouve pas de solution, tu peux saisir gratuitement le médiateur de la consommation présenté dans les mentions légales.",
-      "Ces conditions suivent le droit français.",
-    ],
-  },
-  {
-    id: "changements",
-    titre: "Quand ces conditions changent",
-    blocs: ["Elles peuvent évoluer. Un achat suit les conditions du jour où tu l’as fait, et on te prévient avant un changement qui compte."],
-  },
 ];
 
-/** Les deux parties de la page : utiliser BLUSH, puis acheter. */
-export const PARTIES_CONDITIONS: readonly { titre: string; sections: readonly Section[] }[] = [
+/**
+ * Un désaccord : nous écrire, puis le médiateur de la consommation quand l’éditeur en a un (les mentions légales le
+ * présentent), et la loi qui régit ces conditions, sans priver des protections impératives du pays où l’on vit.
+ */
+const desaccord = (editeur: Editeur): Section => ({
+  id: "desaccord",
+  titre: "Un désaccord",
+  blocs: [
+    editeur.mediateur.trim()
+      ? "Écris-nous d’abord à bonjour@askblush.com. Si on ne trouve pas de solution, tu peux saisir gratuitement le médiateur de la consommation présenté dans les mentions légales."
+      : "Écris-nous à bonjour@askblush.com\u00a0: on cherchera une solution ensemble.",
+    `Ces conditions suivent ${droitApplicable(editeur)}, sans te priver des protections impératives de ton pays de résidence.`,
+  ],
+});
+
+const CHANGEMENTS: Section = {
+  id: "changements",
+  titre: "Quand ces conditions changent",
+  blocs: ["Elles peuvent évoluer. Un achat suit les conditions du jour où tu l’as fait, et on te prévient avant un changement qui compte."],
+};
+
+/** Les deux parties de la page, utiliser BLUSH puis acheter, pour cet éditeur (son médiateur, sa loi applicable). */
+export const partiesConditions = (editeur: Editeur): readonly { titre: string; sections: readonly Section[] }[] => [
   { titre: "Utiliser BLUSH", sections: UTILISATION },
-  { titre: "Acheter", sections: VENTE },
+  { titre: "Acheter", sections: [...VENTE, desaccord(editeur), CHANGEMENTS] },
 ];
+
+/** Les conditions de BLUSH : celles de son éditeur (src/contenu/mentions-legales.ts). */
+export const PARTIES_CONDITIONS = partiesConditions(EDITEUR);

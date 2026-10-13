@@ -61,13 +61,13 @@ export const ERREURS_API = {
   faits: 422,
   /** Une offre qui n’existe pas, ou qui ne s’achète pas (plus) : une offre unique passée, ③ sans rapport payé. */
   offre: 422,
-  /** La case « je renonce à mon droit de rétractation » n’est pas cochée : le paiement ne part pas. */
+  /** Un paiement sans la renonciation au délai de rétractation (sa version, que le geste de payer envoie), ou avec une version qui n’est plus la bonne : le paiement ne part pas. */
   renonciation: 422,
   /** Ce qu’on veut partager en image (une réponse du chat, un chapitre) n’est pas désigné comme il faut. */
   cible: 422,
   /** Le reste de ce qu’une route attend (le mode vocal du chat, un moment de l’écoute du vocal). */
   invalide: 422,
-  /** Un import sans la case « J’ai 18 ans ou plus… » cochée, ou avec une version de son texte qui n’est plus la bonne (src/server/juridique.ts). */
+  /** Un import sans l’accord de l’import (sa version, que le geste du bouton envoie), ou avec une version de son texte qui n’est plus la bonne (src/server/juridique.ts). */
   consentement: 422,
   /** « Qui es-tu ? » n’est pas rempli : la lecture ne peut pas partir. */
   qui: 422,
