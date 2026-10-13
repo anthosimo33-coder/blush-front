@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bullesDe, CATALOGUE, COUT_EN_BULLES, enEuros, FORMULE_CHOISIE, PREMIERE_RECHARGE, prixDe, titreChezWhop } from "@/contenu/offres";
+import { bullesDe, CATALOGUE, COUT_EN_BULLES, enEuros, FORMULE_CHOISIE, PREMIERE_RECHARGE, prixDe, TITRE_MAX_CHEZ_WHOP, titreChezWhop } from "@/contenu/offres";
 import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_PREMIUM_AJOUT, OFFRE_SUITE, PIED_GRATUIT } from "@/contenu/paiement";
 import { FORMULES, OFFRES } from "@/types";
 
@@ -108,9 +108,15 @@ describe("le nom d’un achat chez Whop", () => {
   it("dit l’offre et les bulles figées dans l’achat, sans prénom ni conv", () => {
     expect(titreChezWhop("rapport", 10)).toBe("Le rapport complet + 10 bulles");
     expect(titreChezWhop("suite", 10)).toBe("Le rapport complet + 10 bulles");
-    expect(titreChezWhop("premium", 90)).toBe("Premium\u00a0: le rapport + 90 bulles");
+    expect(titreChezWhop("premium", 90)).toBe("Premium\u00a0: rapport + 90 bulles");
     expect(titreChezWhop("premium_ajout", 80)).toBe("80 bulles en plus");
+    expect(titreChezWhop("second", 0)).toBe("Ton 2e rapport, valable 1 an");
     expect(titreChezWhop("pack80", 120)).toBe("120 bulles");
     expect(titreChezWhop("pack30", 30)).toBe("30 bulles");
+  });
+
+  it("tient dans ce que Whop accepte, pour chaque offre, bonus de la première recharge compris", () => {
+    for (const offre of OFFRES)
+      for (const premiereRecharge of [false, true]) expect(titreChezWhop(offre, bullesDe(offre, { premiereRecharge })).length, offre).toBeLessThanOrEqual(TITRE_MAX_CHEZ_WHOP);
   });
 });
