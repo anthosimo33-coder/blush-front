@@ -13,6 +13,7 @@ import { LockRow } from "@/components/ui/progress";
 import { ChapterRule } from "@/components/ui/report";
 import type { Chapter, Echec } from "@/types";
 import { SUITE_ECRITURE } from "./ancres";
+import { LignePdf } from "./PdfDuRapport";
 import type { PhaseDuRapport } from "./phase";
 
 /*
@@ -143,6 +144,9 @@ export function Suite({ phase, fermes, ouvrirPaiement }: { phase: PhaseDuRapport
           </InsetGroup>
         </>
       )}
+
+      {/* Le rapport tel qu’on vient de le lire, en PDF : sous la suite fermée (l’aperçu), ou sous ta question (le rapport écrit) */}
+      {(phase.nom === "lecture" || phase.nom === "complet") && <LignePdf />}
     </>
   );
 }

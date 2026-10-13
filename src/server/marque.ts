@@ -29,8 +29,43 @@ export const TRAIT = "#EFEDE8";
 export const BLEU = "#1A66DB";
 /** Le dégradé des bulles de BLUSH, tel que les mails et les images l’écrivent. */
 export const DEGRADE_ROSE = `linear-gradient(160deg,${ROSE_CLAIR},${ROSE_FONCE})`;
-/** Le fond des images : le papier crème, sa lueur blanche en haut, rose et bleue dans les coins du bas. */
-export const FOND_IMAGE = `radial-gradient(70% 55% at 50% 0%, #FFFFFF 0%, rgba(255,255,255,0) 70%), radial-gradient(45% 40% at 100% 100%, rgba(255,79,154,0.16), rgba(255,79,154,0) 70%), radial-gradient(45% 40% at 0% 100%, rgba(61,139,255,0.12), rgba(61,139,255,0) 70%), ${PAPIER}`;
+/**
+ * Une lueur du fond des images, posée sur le papier : une ellipse de `couleur` (son `opacite` au centre) qui s’efface au
+ * bord, à 70 % de ses rayons. Le centre et les rayons en pourcentages de l’image, comme un radial-gradient.
+ */
+type Lueur = { centre: readonly [number, number]; rayons: readonly [number, number]; couleur: string; opacite: number };
+/** Les lueurs du fond des images : blanche en haut, rose et bleue dans les coins du bas. La page de garde du rapport en PDF les peint aussi. */
+export const LUEURS: readonly Lueur[] = [
+  { centre: [50, 0], rayons: [70, 55], couleur: "#FFFFFF", opacite: 1 },
+  { centre: [100, 100], rayons: [45, 40], couleur: ROSE, opacite: 0.16 },
+  { centre: [0, 100], rayons: [45, 40], couleur: "#3D8BFF", opacite: 0.12 },
+];
+/** Une couleur hex (#RRGGBB) et son opacité, en rgba(). */
+const rgba = (hex: string, a: number) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(",")},${a})`;
+/** Le fond des images : le papier crème et ses lueurs (LUEURS). */
+export const FOND_IMAGE = `${LUEURS.map(
+  ({ centre: [x, y], rayons: [rx, ry], couleur, opacite }) => `radial-gradient(${rx}% ${ry}% at ${x}% ${y}%, ${rgba(couleur, opacite)}, ${rgba(couleur, 0)} 70%)`,
+).join(", ")}, ${PAPIER}`;
+/**
+ * Les teintes de l’appli que le rapport en PDF peint (src/server/rapport-pdf.tsx), celles de ses tokens
+ * (src/app/globals.css) : toi en bleu, l’autre en rose, la vérité en vert, leurs teintes foncées (un texte en couleur,
+ * une étiquette), la bulle reçue, le trait entre deux chapitres, le fond de « À toi de jouer », la plaque et le gris doux d’un chapitre fermé.
+ */
+export const TEINTES = {
+  toi: "#3D8BFF",
+  elle: ROSE,
+  vrai: "#12C08A",
+  toiFonce: BLEU,
+  elleFonce: "#C81D6B",
+  vraiFonce: "#087A56",
+  attenteFonce: "#A85800",
+  flouFonce: "#6D4BD8",
+  bulleRecue: "#EFEEEA",
+  trait: "#E6E3DC",
+  jouer: "#F3F8FF",
+  plaque: "#F1EFEA",
+  muet: "#8A8780",
+} as const;
 /** Le texte doux des mails en mode sombre (Apple Mail). */
 export const DOUX_SOMBRE = "#B9B6AF";
 /** L’adresse du site telle qu’on l’écrit (c’est elle qu’on retient). */
