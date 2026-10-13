@@ -30,6 +30,15 @@ const VERDICT: Verdict = {
   tendance: "↗ ça monte",
   prochain_pas: "Propose un verre jeudi.",
   devinette: null,
+  titres: {
+    bascule: "Le jeudi du karaoké",
+    histoire: "Du premier verre au karaoké",
+    coince: "Pourquoi tu changes de sujet",
+    autre: "Léa, la reine des relances",
+    toi: "Toi, l’homme qui hésitait",
+    duo: "Vous deux, le jeudi soir",
+    prochain_pas: "Le prochain jeudi",
+  },
 };
 const PLAN: Plan = {
   alerte: null,
@@ -158,6 +167,11 @@ describe("le coffre", () => {
     const { appli, format, fichier, participants, resume } = META;
     const metaDAvant = { appli, format, fichier, participants, resume };
     expect(coffre.lire("stories.meta", chiffrer(metaDAvant))).toEqual(metaDAvant);
+    /* Le verdict avant le 13 octobre : sans les titres des chapitres fermés, qui se relisent null (les titres d’attente) */
+    const verdictDAvant: Partial<Verdict> = { ...VERDICT };
+    delete verdictDAvant.titres;
+    const scores = EXEMPLES["verdicts.data"].scores;
+    expect(coffre.lire("verdicts.data", chiffrer({ sortie: verdictDAvant, scores }))).toEqual({ sortie: { ...VERDICT, titres: null }, scores });
   });
 
   it("garde les champs qu’il ne connaît pas (écrits par une version plus récente), jusque dans les objets imbriqués", () => {
@@ -181,6 +195,7 @@ describe("le coffre", () => {
       expect(() => coffre.lire("stories.meta", chiffrer({ ...META, participants }))).toThrow(/^stories\.meta : forme inattendue \(participants\)$/);
     }
     expect(() => coffre.lire("reports.data", chiffrer({ test: true }))).toThrow(/^reports\.data : forme inattendue \(sortie, chapitres, sobre, lecture\)$/);
+    expect(() => coffre.lire("verdicts.data", chiffrer({ scores: [] }))).toThrow(/^verdicts\.data : forme inattendue \(sortie\)$/);
     /* Une mémoire gardée est faite : sans sa fiche (ou sans sa mémoire), aucun lecteur ne la reçoit */
     for (const vide of [{ fiche: null }, { memoire: null }]) {
       expect(() => coffre.lire("memories.data", chiffrer({ ...EXEMPLES["memories.data"], etat: { ...MEMOIRE, ...vide } }))).toThrow("memories.data : forme inattendue (etat)");

@@ -18,6 +18,7 @@ import {
   RESEAU,
   reponseAuGeste,
   test,
+  titreDuChapitre,
 } from "./aide";
 
 /*
@@ -115,7 +116,7 @@ test("un rapport débloqué (un achat) : le rapport complet, « Ta question » e
   await test.step("les huit chapitres sont ouverts, et l’en-tête dit « Complet »", async () => {
     await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
     await expect(rapport.getByRole("region", { name: /^Chapitre \d : / })).toHaveCount(8);
-    await expect(rapport.getByRole("region", { name: "Chapitre 8 : Chapitre 8" }).getByText("Et voilà.")).toBeVisible();
+    await expect(rapport.getByRole("region", { name: `Chapitre 8 : ${titreDuChapitre(8)}` }).getByText("Et voilà.")).toBeVisible();
     await expect(rapport.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveCount(0);
     await expect(rapport.getByRole("button", { name: "Lire la suite" })).toHaveCount(0);
   });

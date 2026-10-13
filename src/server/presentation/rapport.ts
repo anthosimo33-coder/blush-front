@@ -2,6 +2,7 @@ import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
 import type { Chapter, Echec, VocalRapport } from "@/types";
 import type { Plan as PlanDuRapport, Verdict } from "@prompts/lib/schemas";
+import { titresDuVerdict } from "@prompts/lib/titres";
 import { avanceChapitres, CHAPITRES_PAR_MOITIE, DUREES_MS, ECRITURE_MAX, PART_DU_PLAN, RYTHME_FIABLE } from "../avancement";
 import { echecDe } from "../erreurs";
 import { verdictAffiche } from "../ecrans/rapport";
@@ -70,10 +71,10 @@ const CHAPITRES_S = DUREES_MS.rapport_chapitres / 1000;
 
 /**
  * Pendant que le rapport s’écrit : la vraie avancée (le plan compte pour PART_DU_PLAN, les deux moitiés pour le reste),
- * l’état de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titres` : ceux du plan, une
- * fois fait. `maintenant` : l’heure de la lecture, en millisecondes.
+ * l’état de chaque chapitre, et le temps qui reste, estimé sur le rythme depuis le début. `titreFerme` : le titre d’un
+ * chapitre pas encore lu (titreFermeDe). `maintenant` : l’heure de la lecture, en millisecondes.
  */
-function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: string, prets: Set<number>, maintenant: number): EcritureRapport | undefined {
+function ecritureDe(taches: EtatTaches, titreFerme: (n: number) => string, prets: Set<number>, maintenant: number): EcritureRapport | undefined {
   const { rapport_plan: tp, rapport_chapitres: tc } = taches;
   if (!tp) return undefined;
   const pPlan = tp.status === "fini" ? 1 : tp.progress / 100;
@@ -98,7 +99,7 @@ function ecritureDe(taches: EtatTaches, titres: Map<number, string>, autre: stri
     etape: tp.status === "fini" ? "chapitres" : "plan",
     progres,
     restant: duree(restant),
-    chapitres: CHAPITRES_PAYANTS.map((n) => ({ number: n, title: titres.get(n) ?? titreDAttente(n, autre), etat: etat(n) })),
+    chapitres: CHAPITRES_PAYANTS.map((n) => ({ number: n, title: titreFerme(n), etat: etat(n) })),
   };
 }
 
@@ -121,11 +122,23 @@ function vocalAffiche(v: VocalLu, verdict: Verdict, taches: EtatTaches, voix: bo
 }
 
 /**
+ * Le titre d’un chapitre payant tant qu’il ne se lit pas (fermé, ou en train de s’écrire) : celui que le verdict a écrit
+ * pour leur histoire (prompts/lib/titres.ts, le prompt 04), que le rapport débloqué garde ; sinon, le plan fait, le sien
+ * (pendant l’écriture, avec l’accès) ; sinon, son titre d’attente (src/contenu/chapitres.ts). Un verdict écrit avant les
+ * titres, une alerte ou un titre qui n’a pas passé la vérification gardent donc les titres d’attente.
+ */
+function titreFermeDe(verdict: Verdict, plan: PlanDuRapport | null, autre: string): (n: number) => string {
+  const promis = titresDuVerdict(verdict);
+  const duPlan = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
+  return (n) => promis.get(n) ?? duPlan.get(n) ?? titreDAttente(n, autre);
+}
+
+/**
  * Le rapport tel que l’affiche le front, assemblé d’après ce qui est lu (rapportDe), sans rien lire, écrire ni
  * planifier. Sans accès : le chapitre offert (le verdict, src/contenu/chapitres.ts) et les chapitres payants,
- * verrouillés, vides, sous leurs titres d’attente : ni le plan ni les chapitres finis ne servent, même si la lecture
- * en apportait. Le mode sobre (une alerte) ouvre sans accès sa partie sobre, et elle seule (S-25) ; `alerte` le dit
- * dès le verdict, avant que cette partie soit écrite.
+ * verrouillés, vides, sous les titres que le verdict leur a écrits (ou leurs titres d’attente, titreFermeDe) : ni le
+ * plan ni les chapitres finis ne servent, même si la lecture en apportait. Le mode sobre (une alerte) ouvre sans accès
+ * sa partie sobre, et elle seule (S-25) ; `alerte` le dit dès le verdict, avant que cette partie soit écrite.
  */
 export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: boolean; alerte: boolean } {
   const { debloque, autre, donnees, taches } = lu;
@@ -149,10 +162,10 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
         : []),
     ],
   };
-  /* Le plan fait (le rapport s’écrit) : ses vrais titres remplacent ceux d’attente */
-  const titres = new Map((plan?.chapitres ?? []).map((c) => [c.numero, c.titre_court || c.titre]));
+  /* Fermés : les titres du verdict, sinon (le rapport s’écrit) ceux du plan, sinon ceux d’attente */
+  const titreFerme = titreFermeDe(sortie, plan, autre);
   const verrouilles: Chapter[] = CHAPITRES_PAYANTS.map((n) => {
-    const t = titres.get(n) ?? titreDAttente(n, autre);
+    const t = titreFerme(n);
     return { number: n, title: t, tocTitle: t, free: estOffert(n), locked: true, blocks: [] };
   });
   /*
@@ -170,7 +183,7 @@ export function assemblerRapport(lu: RapportLu): ReportPayload & { generating: b
   /* Les chapitres ne s’ouvrent qu’avec l’accès : le rapport sobre offert n’en montre aucun, même s’il en garde (S-25) */
   const chapters = !entier ? [verdictLibre, ...verrouilles] : donnees ? donnees.chapitres : enEcriture;
   const echec = ouvert && !donnees ? echecDuRapport(taches) : undefined;
-  const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titres, autre, new Set(partiels.keys()), lu.maintenant) : undefined;
+  const ecriture = ouvert && !donnees && !echec ? ecritureDe(taches, titreFerme, new Set(partiels.keys()), lu.maintenant) : undefined;
   const vocal = ouvert ? vocalAffiche(lu.vocal, sortie, taches, lu.voix) : undefined;
 
   return {

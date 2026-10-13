@@ -1,4 +1,21 @@
-import { CHAPITRES_FERMES, compteDe, emailLibre, expect, fermerLaFeuille, histoiresDe, lectureFaite, OFFRE_SUITE, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
+import {
+  CHAPITRES_D_ATTENTE,
+  CHAPITRES_FERMES,
+  compteDe,
+  emailLibre,
+  expect,
+  fermerLaFeuille,
+  histoiresDe,
+  lectureFaite,
+  OFFRE_SUITE,
+  ouvrirLeRapport,
+  PAIEMENT,
+  tachesDe,
+  telQuel,
+  test,
+  titreDuChapitre,
+  verdictDAvantLesTitres,
+} from "./aide";
 
 /*
  * Le rapport d’un compte gratuit (un email hors de BLUSH_ACCES_LIBRE). Décision produit : seul le chapitre 1 (le
@@ -27,11 +44,13 @@ test("compte gratuit : le chapitre 1 se lit en entier, les sept autres sont ferm
     await expect(chapitre1.getByText("7 preuves dans votre conv")).toBeVisible();
   });
 
-  await test.step("les chapitres 2 à 8 ne se lisent pas : ils sont listés, fermés, sous leur titre", async () => {
+  await test.step("les chapitres 2 à 8 ne se lisent pas : ils sont listés, fermés, sous les titres que le verdict a écrits pour leur histoire", async () => {
     await expect(rapport.getByRole("region", { name: /^Chapitre [2-8] / })).toHaveCount(0);
     await expect(rapport.getByText("La suite de ton rapport · 7 chapitres")).toBeVisible();
     const fermes = rapport.getByRole("button", { name: /\(verrouillé\)$/ });
-    await expect(fermes).toHaveText(CHAPITRES_FERMES.map((titre, k) => new RegExp(`^${k + 2}${titre}`)));
+    await expect(fermes).toHaveText(CHAPITRES_FERMES.map((titre, k) => new RegExp(`^${k + 2}${telQuel(titre)}`)));
+    /* Le chapitre de Maëlys porte son prénom */
+    await expect(fermes.nth(3)).toContainText(/^5Maëlys, /);
   });
 
   await test.step("ni chat ni question : « Lire la suite · 9,90 € », et les 10 bulles offertes avec le rapport", async () => {
@@ -47,6 +66,18 @@ test("compte gratuit : le chapitre 1 se lit en entier, les sept autres sont ferm
     /* La conv reste gardée (chiffrée) tant que la suite n’est pas débloquée : c’est d’elle que la suite s’écrira */
     expect(await histoiresDe(email)).toEqual([expect.objectContaining({ convGardee: true })]);
   });
+});
+
+test("compte gratuit, une conv lue avant les titres des chapitres : les chapitres fermés gardent leurs titres d’attente", async ({ page }, testInfo) => {
+  const email = emailLibre(testInfo, "rapport-sans-titres");
+  await lectureFaite(page, testInfo, email);
+  await verdictDAvantLesTitres(email);
+  const rapport = await ouvrirLeRapport(page);
+  const fermes = rapport.getByRole("button", { name: /\(verrouillé\)$/ });
+  await expect(fermes).toHaveText(CHAPITRES_D_ATTENTE.map((titre, k) => new RegExp(`^${k + 2}${telQuel(titre)}`)));
+  /* Le reste de l’aperçu ne change pas : le verdict, et « Lire la suite » */
+  await expect(rapport.getByRole("region", { name: "Chapitre 1 : Le verdict" }).getByText("Vous êtes à deux doigts.", { exact: true })).toBeVisible();
+  await expect(rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" })).toBeVisible();
 });
 
 test("compte gratuit : le paiement, ses deux formules, la case de renonciation, et l’offre unique ① en le fermant", async ({ page }, testInfo) => {
@@ -142,7 +173,7 @@ test("compte gratuit : le paiement, ses deux formules, la case de renonciation, 
   });
 
   await test.step("chaque chapitre fermé rouvre le paiement ; le refermer ne remontre pas l’offre", async () => {
-    await rapport.getByRole("button", { name: /Ce qui coince/ }).click();
+    await rapport.getByRole("button", { name: new RegExp(telQuel(titreDuChapitre(4))) }).click();
     await expect(paiement).toBeVisible();
     await fermerLaFeuille(page);
     await expect(paiement).toBeHidden();

@@ -24,6 +24,7 @@ const VERDICT: Verdict = {
   tendance: "↘ ça baisse",
   prochain_pas: "Laisse-lui de l’air.",
   devinette: null,
+  titres: null,
 };
 const ALERTE: Verdict = { ...VERDICT, alerte: "danger", mode_sobre: true };
 const SOBRE: SoberReport = {

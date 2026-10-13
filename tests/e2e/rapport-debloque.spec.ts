@@ -3,6 +3,7 @@ import {
   achatEnBase,
   attendreMail,
   attendreTaches,
+  CHAPITRES_D_ATTENTE,
   CHAPITRES_FERMES,
   compteDe,
   connecterParApi,
@@ -22,6 +23,7 @@ import {
   tachesDe,
   test,
   tientEnPetitEcran,
+  titreDuChapitre,
   URL_APPLI,
 } from "./aide";
 
@@ -96,18 +98,21 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await offre.getByRole("button", { name: "Non merci, je lis la suite" }).click();
   });
 
-  await test.step("la suite de son rapport, complet : les huit chapitres arrivent", async () => {
+  await test.step("la suite de son rapport, complet : les huit chapitres arrivent, sous les titres vus fermés", async () => {
     await expect(page).toHaveURL(/\/rapport#chapitre-2$/);
     await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
     await attendreTaches(email);
-    await expect(rapport.getByRole("region", { name: "Chapitre 2 : Chapitre 2" })).toBeVisible();
+    await expect(rapport.getByRole("region", { name: `Chapitre 2 : ${titreDuChapitre(2)}` })).toBeVisible();
     await expect(rapport.getByRole("region", { name: /^Chapitre \d : / })).toHaveCount(8);
+    /* Chaque chapitre débloqué porte le titre qu’il avait fermé */
+    const ouverts = await rapport.getByRole("heading", { level: 2, name: /^Chapitre \d : / }).allTextContents();
+    expect(ouverts.map((t) => t.replace(/^Chapitre \d\s*:\s*/, ""))).toEqual(titres);
     expect((await tachesDe(email)).every((t) => t.statut === "fini")).toBe(true);
   });
 
-  await test.step("le mail « ton rapport est prêt » : son sommaire reprend les titres du rapport, le prénom de Maëlys compris", async () => {
+  await test.step("le mail « ton rapport est prêt » : son sommaire garde les titres d’attente (rien de la conv), le prénom de Maëlys compris", async () => {
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });
-    expect(sommaireDuMail(mail.html)).toEqual(titres.map((titre, k) => `${k + 1} ${titre}`));
+    expect(sommaireDuMail(mail.html)).toEqual(["Le verdict", ...CHAPITRES_D_ATTENTE].map((titre, k) => `${k + 1} ${titre}`));
   });
 });
 

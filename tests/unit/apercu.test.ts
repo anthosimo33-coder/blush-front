@@ -38,6 +38,7 @@ const VERDICT: Verdict = {
   tendance: "↗ ça monte",
   prochain_pas: "Propose un verre jeudi.",
   devinette: null,
+  titres: null,
 };
 
 const RAPPORT = Sortie05.parse({

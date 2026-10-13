@@ -47,6 +47,7 @@ const verdict = Sortie04.parse({
   tendance: "en hausse",
   prochain_pas: "Propose le ciné.",
   devinette: null,
+  titres: null,
 });
 const plan = Plan05.parse({
   alerte: null,

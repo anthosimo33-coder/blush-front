@@ -25,7 +25,21 @@ const VERDICT: Verdict = {
   tendance: "↗ ça monte",
   prochain_pas: "Propose un verre jeudi.",
   devinette: null,
+  /* Les titres des chapitres fermés, écrits pour leur histoire (prompts/lib/titres.ts) */
+  titres: {
+    bascule: "Le jeudi du karaoké, et ce que tu n’as pas dit",
+    histoire: "Du premier verre au karaoké",
+    coince: "Pourquoi tu changes de sujet quand elle relance",
+    autre: "Léa, la reine des relances",
+    toi: "Toi, l’homme qui hésitait",
+    duo: "Vous deux, le duo du jeudi soir",
+    prochain_pas: "Le prochain jeudi, et comment le proposer",
+  },
 };
+/** Les mêmes titres, dans l’ordre des chapitres payants (2 à 8). */
+const TITRES_PROMIS = Object.values(VERDICT.titres!);
+/** Un verdict écrit avant les titres (le 13 octobre) : relu par le coffre, ses titres valent null. */
+const ANCIEN: Verdict = { ...VERDICT, titres: null };
 const ALERTE: Verdict = { ...VERDICT, alerte: "danger", mode_sobre: true };
 const SORTIE: Rapport = { alerte: null, mode_sobre: false, decouvertes: [], these: "Elle avance, il recule.", chapitres: [], sobre: null };
 const chapitre = (n: number): Chapter => ({
@@ -94,9 +108,10 @@ describe("le rapport assemblé", () => {
     expect(r.generating).toBe(false);
   });
 
-  it("avec l’accès, pendant l’écriture : les titres du plan, l’écriture, et le vocal qui s’enregistre", () => {
+  it("avec l’accès, pendant l’écriture : les titres du plan (un verdict sans titres), l’écriture, et le vocal qui s’enregistre", () => {
     const r = assemblerRapport(
       lu({
+        verdict: { sortie: ANCIEN, scores: [] },
         debloque: true,
         plan: {
           alerte: null,
@@ -115,9 +130,48 @@ describe("le rapport assemblé", () => {
     expect(r.vocal).toEqual({ etat: "en_cours" });
   });
 
+  it("avec l’accès, pendant l’écriture : les titres promis par le verdict passent avant ceux du plan, dans la liste et sur les chapitres pas encore prêts", () => {
+    const plan = {
+      alerte: null,
+      mode_sobre: false,
+      these: "",
+      decouvertes: [],
+      chapitres: [{ numero: 2, titre: TITRES_PROMIS[0]!, titre_court: "Le karaoké", surtitre: null, periode: "mars", scenes: [], epice: "doux" }],
+    };
+    const r = assemblerRapport(lu({ debloque: true, plan, taches: { rapport_plan: tache("fini"), rapport_chapitres: tache("en_cours", { kind: "rapport_chapitres" }) } }));
+    expect(r.report.chapters.slice(1).map((c) => [c.title, c.tocTitle])).toEqual(TITRES_PROMIS.map((t) => [t, t]));
+    expect(r.ecriture?.chapitres.map((c) => c.title)).toEqual(TITRES_PROMIS);
+  });
+
   it("l’écriture en échec : le rapport le dit, et n’attend plus", () => {
     const r = assemblerRapport(lu({ debloque: true, taches: { rapport_plan: tache("echec", { error: "coupee" }) } }));
     expect([r.generating, r.echec, r.ecriture]).toEqual([false, "panne", undefined]);
+  });
+});
+
+describe("les titres des chapitres fermés", () => {
+  const fermes = (v: Verdict) => assemblerRapport(lu({ verdict: { sortie: v, scores: [] } })).report.chapters.filter((c) => c.locked);
+
+  it("ceux que le verdict a écrits pour leur histoire, dans l’ordre, au titre comme au sommaire", () => {
+    expect(fermes(VERDICT).map((c) => [c.number, c.title, c.tocTitle])).toEqual(CHAPITRES_PAYANTS.map((n, k) => [n, TITRES_PROMIS[k], TITRES_PROMIS[k]]));
+  });
+
+  it("un verdict d’avant les titres, ou sans le champ du tout : les titres d’attente", () => {
+    const attente = CHAPITRES_PAYANTS.map((n) => titreDAttente(n, "Léa"));
+    expect(fermes(ANCIEN).map((c) => c.title)).toEqual(attente);
+    const sansLeChamp: Partial<Verdict> = { ...VERDICT };
+    delete sansLeChamp.titres;
+    expect(fermes(sansLeChamp as Verdict).map((c) => c.title)).toEqual(attente);
+  });
+
+  it("un titre vidé ou illisible : son chapitre seul reprend son titre d’attente", () => {
+    const v: Verdict = { ...VERDICT, titres: { ...VERDICT.titres!, coince: "", duo: "Vos 4 verres" } };
+    expect(fermes(v).map((c) => c.title)).toEqual(CHAPITRES_PAYANTS.map((n, k) => (n === 4 || n === 7 ? titreDAttente(n, "Léa") : TITRES_PROMIS[k])));
+  });
+
+  it("une alerte (le mode sobre) : jamais de titre taquin, les titres d’attente", () => {
+    expect(fermes(ALERTE).map((c) => c.title)).toEqual(CHAPITRES_PAYANTS.map((n) => titreDAttente(n, "Léa")));
+    expect(JSON.stringify(assemblerRapport(lu({ verdict: { sortie: ALERTE, scores: [] } })))).not.toContain("karaoké");
   });
 });
 

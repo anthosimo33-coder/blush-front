@@ -10,13 +10,14 @@
  * - brouillon : une conv importée (POST /api/import), sans email ni compte ;
  * - code : un brouillon, et un code de connexion demandé pour l’email du parcours ;
  * - gratuit : un compte gratuit, sa conv lue (le verdict) ;
+ * - gratuit-sans-titres : le même, son verdict gardé comme avant le 13 octobre, sans les titres des chapitres fermés ;
  * - lecture-en-cours : un compte gratuit dont la lecture est figée à mi-chemin ;
  * - rapport : le rapport complet acheté une fois (le plan « rapport »), tout écrit ;
  * - equipe : un compte de l’équipe (tout ouvert, bulles illimitées), toute la suite écrite (le rapport, le vocal, la mémoire) ;
  * - sobre : un compte gratuit dont la conv lève une alerte (le mode sobre) ;
  * - plusieurs : un compte de l’équipe avec trois convs lues ;
  * - couple : un compte de l’équipe dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
- * @typedef {"brouillon" | "code" | "gratuit" | "lecture-en-cours" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
+ * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
  */
 
 /**
@@ -452,7 +453,18 @@ export const STATES = [
     compte: "gratuit",
     full: true,
     ref: "09-rapport-apercu-gratuit",
-    changement: "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 10 bulles offertes.",
+    changement:
+      "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 10 bulles offertes. Les chapitres fermés portent les titres que le verdict écrit pour leur histoire, comme dans le prototype (ici ceux du modèle factice, inventés)\u00a0; le rapport débloqué les garde.",
+  },
+  {
+    id: "09a",
+    section: "rapport",
+    title: "Rapport, aperçu gratuit",
+    state: "Une conv lue avant les titres des chapitres",
+    route: "/rapport",
+    compte: "gratuit-sans-titres",
+    full: true,
+    note: "Un verdict gardé avant le 13 octobre (ou un titre qui n’a pas passé la vérification, ou une alerte)\u00a0: les chapitres fermés gardent leurs titres d’attente.",
   },
   {
     id: "09q",

@@ -24,4 +24,18 @@ export const FACTICE = {
   /** Les chapitres de son rapport (deux moitiés égales), et leur titre court. */
   chapitres: CHAPITRES,
   titreCourt: (numero: number) => `Ch. ${numero}`,
+  /**
+   * Les titres que son verdict écrit pour les sept chapitres payants (prompts/lib/titres.ts), dans l’ordre du rapport :
+   * inventés, sans rien citer de la conv (ils passent sa vérification, quelle que soit la conv). Celui du chapitre de
+   * l’autre commence par son prénom, lu dans la demande, comme le demande le prompt.
+   */
+  titres: (autre: string) => ({
+    bascule: "La perche du resto, et ce que tu aurais dû répondre",
+    histoire: "Ce que son silence du dimanche voulait dire",
+    coince: "Pourquoi tu réponds par une vanne quand elle t’ouvre une porte",
+    autre: `${autre}, la reine des perches`,
+    toi: "Toi, le roi du peut-être",
+    duo: "Vous deux, champions du ping-pong de vannes",
+    prochain_pas: "Le resto, et comment enfin le proposer",
+  }),
 } as const;

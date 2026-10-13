@@ -23,7 +23,9 @@ const LIGNES = Array.from(
   { length: 12 },
   (_, k) => `m${String(k + 1).padStart(4, "0")} 2026-09-0${1 + (k % 9)} mar. 20:${String(10 + k).padStart(2, "0")} ${k % 2 ? "Inès" : "Hugo"} : message ${k + 1}`,
 );
-const CONV = LIGNES.join("\n");
+/* Avant la conv, son <histoire> : le verdict factice y lit le prénom de l’autre (le titre de son chapitre) */
+const HISTOIRE = "<histoire>\nutilisateur : Hugo (il)\nautre personne : Inès (elle)\n</histoire>";
+const CONV = [HISTOIRE, ...LIGNES].join("\n");
 const IDS = new Set(LIGNES.map((l) => l.slice(0, 5)));
 
 /** Une requête d’une tâche, sur la conv inventée, avec une demande en dernier bloc. */
@@ -97,7 +99,13 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
     expect(lues.profil).toEqual([FACTICE.profil]);
   });
 
+  it("le verdict titre les sept chapitres fermés (FACTICE.titres), celui de l’autre à son prénom ; avec une alerte, aucun", () => {
+    expect(Sortie04.parse(fournisseurFactice(requete("04-verdict"))).titres).toEqual(FACTICE.titres("Inès"));
+    expect(Sortie04.parse(fournisseurFactice(requete("04-verdict", "La demande.", `${CONV}\n${FACTICE.alerte}`))).titres).toBeNull();
+  });
+
   it("un libellé qu’il lit et qui n’est plus dans la demande : il le dit, au lieu de répondre à côté", () => {
+    expect(() => fournisseurFactice(requete("04-verdict", "La demande.", LIGNES.join("\n")))).toThrow(/« autre personne : » introuvable/);
     expect(() => fournisseurFactice({ tache: "01-captures", blocs: [{ texte: "today: 2026-09-09" }] })).toThrow(/« aujourd’hui : » introuvable/);
     expect(() => fournisseurFactice(requete("10-chat", "Hugo : je lui envoie quoi ?"))).toThrow(/son message .* introuvable/);
   });

@@ -10,6 +10,8 @@ import {
   lectureFaite,
   ouvrirLeRapport,
   remplirLaLimite,
+  telQuel,
+  titreDuChapitre,
   reponseAuGeste,
   tachesDe,
   test,
@@ -40,7 +42,7 @@ test("le rapport débloqué après le verdict : le rapport s’écrit sous tes y
     await expect(rapport.getByRole("region", { name: "Chapitre 1 : Le verdict" })).toBeVisible();
     await expect(rapport.getByText("La suite de ton rapport s’écrit · 7 chapitres")).toBeVisible();
     /* Chaque ligne : son numéro, son titre, et son état (le texte de la ligne, d’un bout à l’autre) */
-    for (const [k, titre] of CHAPITRES_FERMES.entries()) await expect(rapport.getByText(new RegExp(`^${k + 2}${titre}En attente$`))).toBeVisible();
+    for (const [k, titre] of CHAPITRES_FERMES.entries()) await expect(rapport.getByText(new RegExp(`^${k + 2}${telQuel(titre)}En attente$`))).toBeVisible();
     /* Les chapitres à venir ne mènent pas au paiement : ce ne sont plus des boutons */
     await expect(rapport.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveCount(0);
     await expect(rapport.getByRole("button", { name: "Lire la suite" })).toHaveCount(0);
@@ -65,7 +67,7 @@ test("le rapport débloqué après le verdict : le rapport s’écrit sous tes y
   await test.step("l’écriture finie, les huit chapitres apparaissent d’eux-mêmes", async () => {
     relacher();
     await attendreTaches(email);
-    await expect(rapport.getByRole("region", { name: "Chapitre 8 : Chapitre 8" })).toBeVisible();
+    await expect(rapport.getByRole("region", { name: `Chapitre 8 : ${titreDuChapitre(8)}` })).toBeVisible();
     await expect(rapport.getByRole("region", { name: /^Chapitre \d : / })).toHaveCount(8);
     await expect(rapport.getByText(/^La suite de ton rapport/)).toHaveCount(0);
     await expect(page.getByText("BLUSH écrit ton rapport", { exact: true })).toHaveCount(0);
@@ -127,7 +129,7 @@ test("l’écriture a échoué : BLUSH le dit, un refus ne se relance pas, une p
     expect((await reponseAuGeste(page, { chemin: "/api/rapport" }, () => relancer.click())).status()).toBe(200);
     await expect(echec).toHaveCount(0);
     const rapport = page.getByRole("main");
-    await expect(rapport.getByRole("region", { name: "Chapitre 8 : Chapitre 8" })).toBeVisible();
+    await expect(rapport.getByRole("region", { name: `Chapitre 8 : ${titreDuChapitre(8)}` })).toBeVisible();
     await expect(rapport.getByRole("region", { name: /^Chapitre \d : / })).toHaveCount(8);
     await expect(rapport.getByRole("link", { name: "Poser ma question à BLUSH" })).toBeVisible();
     expect((await attendreTaches(email)).filter((t) => t.genre === "rapport_plan").map((t) => t.statut)).toEqual(["fini"]);

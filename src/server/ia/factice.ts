@@ -108,6 +108,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       tendance: null,
       prochain_pas: "Cette semaine, parles-en à quelqu’un de confiance.",
       devinette: null,
+      titres: null,
     } satisfies Verdict;
   /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec une alerte ») */
   if (req.tache === "05-rapport" && tout.includes(FACTICE.alerte))
@@ -143,6 +144,8 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       tendance: null,
       prochain_pas: "Samedi, tu lui réponds en face.",
       devinette: "C’est flou parce que t’as esquivé.",
+      /* Les titres des chapitres fermés : celui de l’autre porte son prénom, lu dans <histoire> */
+      titres: FACTICE.titres(lu(tout.match(/^autre personne : (.+) \((?:il|elle)\)$/m)?.[1], "« autre personne : »", req)),
     } satisfies Verdict;
   if (req.tache === "05-rapport" && req.partie === "plan")
     return {

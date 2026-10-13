@@ -15,6 +15,7 @@ import {
   suivreLeDefilement,
   surOrdinateur,
   test,
+  titreDuChapitre,
   URL_APPLI,
 } from "./aide";
 
@@ -41,7 +42,7 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
     const chapitre1 = rapport.getByRole("region", { name: "Chapitre 1 : Le verdict" });
     await expect(chapitre1.getByText("Vous êtes à deux doigts.", { exact: true })).toBeVisible();
     for (let n = 2; n <= 8; n++) {
-      const chapitre = rapport.getByRole("region", { name: `Chapitre ${n} : Chapitre ${n}` });
+      const chapitre = rapport.getByRole("region", { name: `Chapitre ${n} : ${titreDuChapitre(n)}` });
       await expect(chapitre.getByText("Assieds-toi.")).toBeVisible();
       await expect(chapitre.getByText("Le soir où tout a basculé.")).toBeVisible();
       await expect(chapitre.getByText("Et voilà.")).toBeVisible();
@@ -102,7 +103,7 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
     await saisirLeCodeRecu(autre, email, await demanderCode(autre, email));
     /* Le code vérifié, puis le lien du mail, puis le rapport : trois allers-retours */
     await expect(autre).toHaveURL(/\/rapport$/);
-    await expect(autre.getByRole("main").getByRole("region", { name: "Chapitre 8 : Chapitre 8" })).toBeVisible();
+    await expect(autre.getByRole("main").getByRole("region", { name: `Chapitre 8 : ${titreDuChapitre(8)}` })).toBeVisible();
   });
 });
 
@@ -162,7 +163,7 @@ test("un rapport ouvert : « Reprendre ta lecture » propose de revenir au chapi
   /* Jusqu’où chaque page a défilé depuis son chargement : un saut tout seul se verrait, même parti puis revenu */
   const defilement = await suivreLeDefilement(page);
   const rapport = await ouvrirLeRapport(page);
-  const chapitre3 = rapport.getByRole("heading", { level: 2, name: "Chapitre 3 : Chapitre 3" });
+  const chapitre3 = rapport.getByRole("heading", { level: 2, name: `Chapitre 3 : ${titreDuChapitre(3)}` });
   const reprendre = page.getByRole("button", { name: /^Reprendre ta lecture/ });
 
   await test.step("on lit jusqu’au chapitre 3, puis on s’en va", async () => {

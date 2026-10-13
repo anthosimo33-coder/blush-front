@@ -3,8 +3,9 @@ import { BOUTON_SOMBRE, boutonMail, DEGRADE_ROSE, DOUX, DOUX_SOMBRE, ENCRE, gaba
 
 /*
  * Le mail « ton rapport est prêt », dans la famille du mail du code : la bulle, la carte blanche, et BLUSH qui
- * parle en bulles roses, comme sur la landing. Son sommaire reprend les titres du rapport (src/contenu/chapitres.ts),
- * dont le prénom de l’autre (son chapitre). Rien d’autre de la conv : ni verdict, ni message. Le sujet, l’aperçu et le
+ * parle en bulles roses, comme sur la landing. Son sommaire reprend les titres d’attente des chapitres
+ * (src/contenu/chapitres.ts), dont le prénom de l’autre (son chapitre), et non ceux que le verdict a écrits pour leur
+ * histoire, qui citent leur conv. Rien d’autre de la conv : ni verdict, ni message. Le sujet, l’aperçu et le
  * texte brut (ce que montre l’écran verrouillé) ne disent aucun prénom. En mode sobre, ni sommaire ni vanne. Le
  * gabarit commun des mails est dans marque.ts (gabaritMail). Textes relus le 8 octobre (voix de BLUSH).
  */
