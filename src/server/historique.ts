@@ -9,16 +9,37 @@ import { db, schema } from "./db";
  * (le SDK et les prompts de src/server/chat.ts).
  */
 
+/* La longueur d’une ligne, telle que l’écran la dessine : en caractères (un emoji en vaut un), jamais son texte */
+const longueur = (texte: string) => Array.from(texte).length;
+
 /**
- * Une réponse verrouillée (écrite à 0 bulle), telle qu’elle quitte le serveur : sans rien de son contenu, seulement de
- * quoi la lire une fois payée (son message, son coût) et le mode vocal du chat. Son texte reste en base, chiffré.
+ * Une réponse verrouillée (écrite à 0 bulle), telle qu’elle quitte le serveur, à partir de la réponse en base
+ * (`reponse`, déchiffrée ici et jamais envoyée telle quelle) : la lecture de BLUSH se lit en clair (ses bulles et les
+ * messages qu’elles citent) ; la réponse à lui envoyer, son pourquoi, la relance et le geste attendent d’être payés, et
+ * seule la forme de la réponse à envoyer part (VerrouDeLaReponse, « reponse »). Sans réponse à envoyer (une question,
+ * un geste, une lecture seule), rien ne la distingue de ce qui se paie : elle se verrouille en entier, et seule la forme
+ * de ses bulles part (« tout »). Le reste (un niveau franchi, son vocal) attend aussi. Avec de quoi la lire une fois
+ * payée (son message, son coût) et le mode vocal du chat.
  */
-export const reponseMasquee = (message: number, cout: number, modeVocal?: boolean): BlushAnswer => ({
-  kind: "bubbles",
-  bubbles: [],
-  verrouillee: { message, cout },
-  ...(modeVocal === undefined ? {} : { modeVocal }),
-});
+export function reponseMasquee(message: number, cout: number, reponse: BlushAnswer, modeVocal?: boolean): BlushAnswer {
+  const envoi = reponse.send?.filter(Boolean) ?? [];
+  const avecVocal = modeVocal === undefined ? {} : { modeVocal };
+  if (envoi.length)
+    return {
+      kind: "bubbles",
+      bubbles: reponse.bubbles.map(({ text, messages }) => ({ text, ...(messages ? { messages } : {}) })),
+      verrouillee: { message, cout, cache: { quoi: "reponse", lignes: envoi.map(longueur) } },
+      ...avecVocal,
+    };
+  const tout = [...reponse.bubbles.map((b) => b.text), reponse.ask ?? "", reponse.react ?? ""].filter(Boolean);
+  return { kind: "bubbles", bubbles: [], verrouillee: { message, cout, cache: { quoi: "tout", lignes: tout.map(longueur) } }, ...avecVocal };
+}
+
+/** Une réponse de BLUSH telle qu’elle quitte le serveur : en entier, ou masquée si elle est verrouillée (reponseMasquee). */
+function reponseAffichee(blush: { id: number; data: Buffer; cout: number | null; verrouillee: boolean }): BlushAnswer {
+  const { reponse } = coffre.lire("chat_messages.data:blush", blush.data);
+  return blush.verrouillee ? reponseMasquee(blush.id, blush.cout ?? 1, reponse) : reponse;
+}
 
 /** Un échange avec BLUSH, tel que l’accueil le réaffiche : `id` (celui de ton message) sert à charger ceux d’avant. */
 export type EchangeAffiche = { id: number; mine: string; answer: BlushAnswer; at: number };
@@ -28,7 +49,7 @@ export type EchangeAffiche = { id: number; mine: string; answer: BlushAnswer; at
  * échange déjà affiché). Rien n’est jamais effacé tant que la conv existe : on charge simplement par morceaux.
  * `plus` : il en reste d’autres, plus anciens. Un message de BLUSH coupé de sa question (au bord d’un morceau)
  * revient avec elle dans le morceau d’avant. `modeVocal` : celui de l’histoire, quand l’appelant l’a déjà lue. Une
- * réponse verrouillée (écrite à 0 bulle) revient masquée (reponseMasquee) : son texte n’est pas même déchiffré.
+ * réponse verrouillée (écrite à 0 bulle) revient masquée (reponseMasquee) : sa lecture, et la forme de ce qui se paie.
  */
 export async function historique(
   storyId: string,
@@ -42,8 +63,7 @@ export async function historique(
     const suivante = lignes[i + 1];
     if (ligne.role !== "toi" || suivante?.role !== "blush") return;
     const toi = coffre.lire("chat_messages.data:toi", ligne.data);
-    const answer = suivante.verrouillee ? reponseMasquee(suivante.id, suivante.cout ?? 1) : coffre.lire("chat_messages.data:blush", suivante.data).reponse;
-    echanges.push({ id: ligne.id, mine: toi.affiche ?? toi.texte, answer, at: ligne.createdAt.getTime() });
+    echanges.push({ id: ligne.id, mine: toi.affiche ?? toi.texte, answer: reponseAffichee(suivante), at: ligne.createdAt.getTime() });
   });
   /* Le mode vocal, tel qu’il est en base : « Repasser à l’écrit » le coupe sans nouvelle réponse */
   if (modeVocal !== undefined) return { echanges, plus: lignes.length === limite, modeVocal };
@@ -68,8 +88,7 @@ export async function reponseDeLEnvoi(storyId: string, cle: string): Promise<{ r
     if (toi.role !== "toi" || coffre.lire("chat_messages.data:toi", toi.data).cle !== cle) continue;
     const blush = lignes.find((l) => l.id === toi.id + 1);
     if (blush?.role !== "blush") return null;
-    const reponse = blush.verrouillee ? reponseMasquee(blush.id, blush.cout ?? 1) : coffre.lire("chat_messages.data:blush", blush.data).reponse;
-    return { reponse, echange: toi.id, cout: blush.cout, verrouillee: blush.verrouillee };
+    return { reponse: reponseAffichee(blush), echange: toi.id, cout: blush.cout, verrouillee: blush.verrouillee };
   }
   return null;
 }

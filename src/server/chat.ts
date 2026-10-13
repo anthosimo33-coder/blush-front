@@ -99,9 +99,10 @@ export async function reserverEchange(): Promise<IdsDeLEchange> {
 /**
  * Ce que coûte la réponse, réglé par la route (src/app/api/chat/route.ts) : le débit est fait avant que BLUSH écrive.
  * `ids` : ceux de l’échange (le débit porte celui de la réponse). `verrouillee` : le solde ne la couvre pas, elle s’écrit
- * mais reste en base (ni ses bulles en flux, ni son texte, ni son vocal ne partent), au coût `cout`. `ecrit` : sans voix
- * (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce qu’elle coûte
- * vraiment (0 : offerte, une alerte de danger) ; il rend le trop-perçu et dit ce qu’il reste (rien pour l’équipe).
+ * mais reste en base (ni ses bulles en flux, ni ce qui se paie, ni son vocal ne partent), au coût `cout`. `ecrit` :
+ * sans voix (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce
+ * qu’elle coûte vraiment (0 : offerte, une alerte de danger) ; il rend le trop-perçu et dit ce qu’il reste (rien pour
+ * l’équipe).
  * `paye` : ce qui a été débité jusque-là. `ajouterVocal` : la réponse part en vocal alors qu’elle a été payée comme écrite
  * (« parle-moi en vocal », dans ce message même) : la bulle de plus, faux si le solde ne la couvre pas (elle reste alors
  * écrite). `liberer` : la place de la réponse verrouillée du compte, rendue une fois la réponse gardée.
@@ -190,9 +191,10 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
  * `surEvenement` : la réponse en flux (POST /api/chat) : ses bulles une à une pendant qu’il écrit, la réponse validée
  * dès que l’échange est enregistré, puis le vocal, fait après elle. La réponse rendue à la fin a son vocal.
  * `differer` : ce qui peut attendre la fin de la réponse (le suivi des coûts) passe après elle.
- * `reglement` : ce qu’elle coûte en bulles (Reglement). Une réponse verrouillée part masquée (reponseMasquee), sans
- * échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une alerte de danger ne se verrouille jamais
- * (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
+ * `reglement` : ce qu’elle coûte en bulles (Reglement). Une réponse verrouillée part masquée (reponseMasquee : sa
+ * lecture, et la forme de la réponse à envoyer), d’un bloc à la fin (rien en route : on ne sait pas encore ce qui se
+ * paiera), sans échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une alerte de danger ne se
+ * verrouille jamais (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
  * l’envoi, gardée avec ton message (« Réessayer » retrouve sa réponse : reponseDeLEnvoi, src/server/historique.ts).
  */
 export async function repondre(
@@ -246,7 +248,7 @@ export async function repondre(
     storyId: story.id,
     etiquette: "chat",
     ...(differer ? { differer } : {}),
-    /* Une réponse verrouillée ne montre rien pendant qu’elle s’écrit */
+    /* Une réponse verrouillée ne montre rien pendant qu’elle s’écrit : sans réponse à envoyer, sa lecture aussi se paiera */
     ...(surEvenement && !verrouAttendu
       ? {
           parEssai: () => {
@@ -329,12 +331,14 @@ export async function repondre(
   /* Ce qu’elle a coûté, et ce qu’il reste : réglé au moment où elle part (une verrouillée se paie à la lecture) */
   const bulles = verrouillee ? undefined : await reglement?.regler(cout ?? 0);
   /*
-   * Ce qui part au navigateur : la réponse, ou rien d’elle si elle est verrouillée. L’échange part avec l’une comme avec
-   * l’autre : l’accueil y reconnaît la réponse de sa visite dans l’historique (src/app/app/garde.ts), sans la doubler ;
-   * une verrouillée ne se partage pas pour autant (momentAPartager la refuse)
+   * Ce qui part au navigateur : la réponse, ou, verrouillée, sa lecture et la forme de ce qui se paie (reponseMasquee).
+   * L’échange part avec l’une comme avec l’autre : l’accueil y reconnaît la réponse de sa visite dans l’historique
+   * (src/app/app/garde.ts), sans la doubler ; une verrouillée ne se partage pas pour autant (momentAPartager la refuse)
    */
   const avecEchange = echangeId === undefined ? {} : { echange: echangeId };
-  const montree: BlushAnswer = verrouillee ? { ...reponseMasquee(blushId, cout ?? 1, modeVocal), ...avecEchange } : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange };
+  const montree: BlushAnswer = verrouillee
+    ? { ...reponseMasquee(blushId, cout ?? 1, reponse, modeVocal), ...avecEchange }
+    : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange };
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
   /*

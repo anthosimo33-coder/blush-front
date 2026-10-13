@@ -332,7 +332,7 @@ describe("useConversation : un échange", () => {
 });
 
 describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () => {
-  const verrouillee = reponse([], { verrouillee: { message: 41, cout: 1 } });
+  const verrouillee = reponse([], { verrouillee: { message: 41, cout: 1, cache: { quoi: "tout", lignes: [24, 12] } } });
 
   it("« La lire » : la réponse payée remplace sa version masquée, à la même place, et les lecteurs d’écran l’entendent", async () => {
     const { result, scene: s } = monter();

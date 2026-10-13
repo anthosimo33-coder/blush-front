@@ -205,7 +205,8 @@ export function HomeScreen(p: {
 
   /*
    * Revenu d’une recharge payée : l’adresse perd son `?recharge=` (un rechargement ne le redit pas), la réponse prête se
-   * lit (son coût débité), et un mot dit les bulles reçues. Une fois par montage
+   * lit sans débit (la recharge la paie : le solde reste l’ancien plus les bulles achetées), et un mot dit les bulles
+   * reçues. Une fois par montage
    */
   const recharge = p.recharge;
   const rechargeVue = useRef(false);

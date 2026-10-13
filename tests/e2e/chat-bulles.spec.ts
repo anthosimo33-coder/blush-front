@@ -6,6 +6,7 @@ import {
   ecrireABlush,
   emailLibre,
   expect,
+  feuilleSurOrdinateur,
   filDuChat,
   lectureFaite,
   messagesDuChat,
@@ -19,15 +20,20 @@ import {
 /*
  * Les bulles dans le chat (/app), au dessin du prototype validé des bulles, pour un compte qui paie (pas de l’équipe) :
  * le compteur à côté du bouton du compte (sa première apparition expliquée), « 1 bulle · il t’en reste N » sous chaque
- * réponse, la carte à 5 bulles ou moins, puis à 0 la réponse écrite mais verrouillée (floutée, rien d’elle dans la page),
- * la recharge qui s’ouvre (le message suivant refusé), le bonus de la première recharge (④), le paiement au faux Whop,
- * et la réponse lue au retour. Le modèle factice répond toujours « elle te cherche 👀 » en premier : la compter dans la
- * page dit si une réponse verrouillée y a laissé son texte.
+ * réponse, la carte et le compteur rose à 2 bulles ou moins, puis à 0 la réponse écrite mais verrouillée (sa lecture en
+ * clair, « Ta meilleure réponse » floutée, sans son texte dans la page), la recharge qui s’ouvre (le message suivant
+ * refusé), le bonus de la première recharge (④), le paiement au faux Whop, et la réponse lue au retour, sans débit. Le
+ * modèle factice répond toujours « elle te cherche 👀 » en premier : la compter dans la page dit ce qu’une réponse
+ * verrouillée y a laissé ; « je lui envoie quoi » lui fait écrire une réponse à envoyer.
  */
 
 const PREMIERE_BULLE = "elle te cherche 👀";
+/** Ce qu’il demande quand il veut une réponse à envoyer (le chemin du modèle factice qui en écrit une). */
+const QUOI_ENVOYER = "elle me propose un verre, je lui envoie quoi ?";
 
-test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée ; la recharge (④) au faux Whop ; la réponse lue au retour", async ({ page }, testInfo) => {
+test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture en clair et la réponse à envoyer floutée ; la recharge (④) au faux Whop ; la réponse lue au retour, sans débit", async ({
+  page,
+}, testInfo) => {
   test.slow();
   const fil = filDuChat(page);
   const email = emailLibre(testInfo, "bulles");
@@ -49,23 +55,36 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
     await page.getByRole("button", { name: "1 bulle = 1 réponse de BLUSH · comment ça marche" }).click();
     const feuille = page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" });
     await expect(feuille).toBeVisible();
+    await feuilleSurOrdinateur(page, feuille, { titre: 26 });
     await expect(feuille.getByRole("button", { name: "Recharger · il t’en reste 6" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(feuille).toBeHidden();
   });
 
-  await test.step("chaque réponse coûte une bulle, dite sous elle ; à 5, la carte « Plus que 5 bulles »", async () => {
+  await test.step("chaque réponse coûte une bulle, dite sous elle ; à 5, ni carte ni rose (le seuil est à 2)", async () => {
     expect(await ecrireABlush(page, "on s’est parlé ce matin")).toBe(200);
     await expect(fil.getByText("1 bulle · il t’en reste 5")).toBeVisible();
     await expect(compteur(5)).toBeVisible();
     /* La première réponse arrivée : la carte de la première apparition laisse sa place */
     await expect(page.getByText("Tes 6 bulles sont là")).toHaveCount(0);
-    await expect(page.getByText("Plus que 5 bulles")).toBeVisible();
+    await expect(page.getByText(/^Plus que \d+ bulles?$/)).toHaveCount(0);
+    await expect(compteur(5)).toHaveClass(/bg-white/);
     expect(await compteDe(email)).toMatchObject({ bulles: 5 });
   });
 
+  await test.step("à 2 : le compteur rose et la carte « Plus que 2 bulles », comme le prototype", async () => {
+    for (let reste = 4; reste >= 2; reste--) {
+      expect(await ecrireABlush(page, `et là, il m’en reste ${reste} ?`)).toBe(200);
+      await expect(fil.getByText(`1 bulle · il t’en reste ${reste}`)).toBeVisible();
+      await expect(compteur(reste)).toBeVisible();
+      if (reste > 2) await expect(page.getByText(/^Plus que \d+ bulles?$/)).toHaveCount(0);
+    }
+    await expect(page.getByText("Plus que 2 bulles")).toBeVisible();
+    await expect(compteur(2)).toHaveClass(/text-elle-ink/);
+  });
+
   await test.step("jusqu’à 0 : le compteur suit, puis « Tes bulles sont finies »", async () => {
-    for (let reste = 4; reste >= 0; reste--) {
+    for (let reste = 1; reste >= 0; reste--) {
       expect(await ecrireABlush(page, `et là, il m’en reste ${reste} ?`)).toBe(200);
       await expect(fil.getByText(`1 bulle · il t’en reste ${reste}`)).toBeVisible();
       await expect(compteur(reste)).toBeVisible();
@@ -76,16 +95,31 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
     expect(await compteDe(email)).toMatchObject({ bulles: 0 });
   });
 
-  await test.step("à 0 bulle : BLUSH écrit sa réponse, prête et floutée, sans rien d’elle dans la page", async () => {
-    expect(await ecrireABlush(page, "je lui réponds quoi ?")).toBe(200);
-    const prete = fil.locator("[data-verrouillee]");
+  /* La page telle qu’elle est avant le paiement : la réponse à envoyer, lue une fois payée, ne doit pas y être */
+  let avantLePaiement = "";
+  await test.step("à 0 bulle : BLUSH écrit sa réponse ; sa lecture se lit en clair, « Ta meilleure réponse » est floutée, sans son texte dans la page", async () => {
+    expect(await ecrireABlush(page, QUOI_ENVOYER)).toBe(200);
+    const prete = fil.locator("[data-verrouillee=reponse]");
     await expect(prete.getByText("Ta réponse est prête")).toBeVisible();
-    await expect(prete).toHaveText("Ta réponse est prêteRecharger pour la lire");
-    /* Ni son texte, ni son reçu : la réponse reste au serveur */
-    await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(6);
+    await expect(prete.getByText("Ta meilleure réponse")).toBeVisible();
+    await expect(prete.getByText("Recommandée")).toBeVisible();
+    await expect(prete.getByRole("button", { name: "Recharger pour la lire" })).toBeVisible();
+    /* Ses lignes : floutées, neutres (la forme de la réponse, pas son texte) */
+    const lignes = prete.locator("[data-ligne-floutee]");
+    expect(await lignes.count()).toBeGreaterThan(0);
+    for (const l of await lignes.allTextContents()) expect(l).toMatch(/^[x ]+$/);
+    /* Sa lecture, en clair : sa première bulle en plus des six d’avant ; ni « Copier », ni reçu */
+    await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
+    await expect(prete.getByRole("button", { name: "Copier" })).toHaveCount(0);
+    await expect(fil.locator("[data-recu]")).toHaveCount(6);
     await expect(page.getByText("Ta réponse à Maëlys est écrite")).toBeVisible();
     expect(await messagesDuChat(email)).toHaveLength(14);
     expect(await compteDe(email)).toMatchObject({ bulles: 0 });
+    /* Rechargée : l’historique rendu par le serveur (la page et ses données) la redonne telle quelle */
+    await ouvrir(page);
+    await expect(fil.locator("[data-verrouillee=reponse]")).toBeVisible();
+    await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
+    avantLePaiement = [await page.content(), await page.locator("body").textContent()].join("\n");
   });
 
   const recharge = page.getByRole("dialog", { name: "Recharge tes bulles" });
@@ -94,6 +128,7 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
     expect(await ecrireABlush(page, "allô ?")).toBe(402);
     await expect(fil.getByText("plus de bulles pour l’instant 🫧")).toBeVisible();
     await expect(recharge).toBeVisible();
+    await feuilleSurOrdinateur(page, recharge);
     await expect(recharge.getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeVisible();
     expect(await messagesDuChat(email)).toHaveLength(14);
     await page.keyboard.press("Escape");
@@ -122,23 +157,31 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
     await page.waitForURL((u) => u.pathname === "/app" && !u.search.includes("recharge"), { timeout: 2 * RESEAU });
   });
 
-  await test.step("revenu : « +120 bulles, ta réponse est là », la réponse lue à sa place (une bulle), le compteur à 119", async () => {
+  await test.step("revenu : « +120 bulles, ta réponse est là », la réponse lue à sa place, sans débit : le compteur à 120 (l’ancien solde + 120)", async () => {
     await expect(page.getByRole("status").filter({ hasText: "+120 bulles, ta réponse est là" })).toBeVisible();
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
     await expect(fil.locator("[data-verrouillee]")).toHaveCount(0);
-    await expect(fil.getByText("1 bulle · il t’en reste 119")).toBeVisible();
-    await expect(compteur(119)).toBeVisible();
+    await expect(fil.getByText("Ta meilleure réponse")).toBeVisible();
+    await expect(fil.getByRole("button", { name: "Copier" })).toBeVisible();
+    /* Ni reçu sous elle (elle n’a rien coûté ; ceux d’avant ne sont pas gardés dans l’historique), ni débit */
+    await expect(fil.locator("[data-recu]")).toHaveCount(0);
+    await expect(compteur(120)).toBeVisible();
     await expect(page.getByText("Ta réponse à Maëlys est écrite")).toHaveCount(0);
-    expect(await compteDe(email)).toMatchObject({ bulles: 119 });
+    expect(await compteDe(email)).toMatchObject({ bulles: 120 });
+    /* Rien de la réponse à envoyer n’était dans la page avant d’être payé */
+    const envoi = (await fil.locator(".bg-toi-ink.font-message").allTextContents()).filter((t) => t.trim().length > 3);
+    expect(envoi.length).toBeGreaterThan(0);
+    for (const t of envoi) expect(avantLePaiement.includes(t), `« ${t} » était dans la page avant d’être payé`).toBe(false);
     /* Payée, l’historique la rend en entier */
     await ouvrir(page);
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
     await expect(fil.locator("[data-verrouillee]")).toHaveCount(0);
+    await expect(fil.getByText("Ta meilleure réponse")).toBeVisible();
   });
 
   await test.step("le bonus ④ ne vaut qu’une fois : la recharge suivante, sans lui", async () => {
-    await compteur(119).click();
-    await page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" }).getByRole("button", { name: "Recharger · il t’en reste 119" }).click();
+    await compteur(120).click();
+    await page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" }).getByRole("button", { name: "Recharger · il t’en reste 120" }).click();
     await expect(recharge.getByRole("radio", { name: /70 bulles/ })).toBeVisible();
     await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toHaveCount(0);
     await expect(recharge.getByText("80 bulles · 0,12\u00a0€ la bulle")).toBeVisible();
@@ -147,7 +190,7 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
   await test.step("Mon compte : le solde, et l’achat dans « Tes achats »", async () => {
     await ouvrir(page, "/compte");
     const main = page.getByRole("main");
-    await expect(main.getByRole("region", { name: "Tes bulles" }).getByText("Tes bulles\u00a0: 119", { exact: true })).toBeVisible();
+    await expect(main.getByRole("region", { name: "Tes bulles" }).getByText("Tes bulles\u00a0: 120", { exact: true })).toBeVisible();
     const achats = main.getByRole("region", { name: "Tes achats" });
     await expect(achats.getByText("80 bulles", { exact: true })).toBeVisible();
     await expect(achats.getByText(/ · \+120 bulles$/)).toBeVisible();
@@ -156,7 +199,9 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête et floutée 
   });
 });
 
-test("« La lire » sur la carte : rechargé ailleurs (le solde couvre la réponse prête), elle se lit d’un toucher", async ({ page }, testInfo) => {
+test("sans réponse à envoyer, la réponse prête se verrouille en entier ; « La lire » sur la carte : des bulles venues d’ailleurs (le solde la couvre), elle se lit d’un toucher, son coût débité", async ({
+  page,
+}, testInfo) => {
   const fil = filDuChat(page);
   const email = emailLibre(testInfo, "bulles-ailleurs");
   await lectureFaite(page, testInfo, email);
@@ -168,6 +213,10 @@ test("« La lire » sur la carte : rechargé ailleurs (le solde couvre la répon
   await expect(page.getByText("Tes bulles sont finies")).toBeVisible();
   expect(await ecrireABlush(page, "je lui réponds quoi ?")).toBe(200);
   await expect(fil.getByText("Ta réponse est prête")).toBeVisible();
+  /* Une question sans réponse à envoyer : rien d’elle ne se lit, sa lecture comprise ; ni « Ta meilleure réponse » */
+  await expect(fil.locator("[data-verrouillee=tout]")).toBeVisible();
+  await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(0);
+  await expect(fil.getByText("Ta meilleure réponse")).toHaveCount(0);
 
   /* Des bulles données ailleurs (l’équipe), la page relue : « La lire » sur la réponse et sur la carte */
   await donnerDesBulles(email, 3);

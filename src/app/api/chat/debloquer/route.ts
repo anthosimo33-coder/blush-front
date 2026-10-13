@@ -4,8 +4,9 @@ import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /**
- * Lire la réponse de BLUSH verrouillée (écrite à 0 bulle), une fois rechargé : son coût est débité, elle revient en
- * entier (src/server/bulles.ts, lireLaReponse). « bulles » : le solde ne la couvre toujours pas.
+ * Lire la réponse de BLUSH verrouillée (écrite à 0 bulle), une fois rechargé : payée par la recharge (sans débit), ou
+ * son coût débité, elle revient en entier (src/server/bulles.ts, lireLaReponse). « bulles » : le solde ne la couvre
+ * toujours pas.
  */
 export const POST = route("POST /api/chat/debloquer", async (req: Request) => {
   const g = await garde(req, { session: "requise" });

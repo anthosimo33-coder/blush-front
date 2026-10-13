@@ -1,6 +1,7 @@
 import "server-only";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { COUT_EN_BULLES } from "@/contenu/offres";
+import { PACKS } from "@/contenu/recharge";
 import type { BlushAnswer } from "@/types";
 import type { Utilisateur } from "./auth";
 import { db, schema } from "./db";
@@ -147,8 +148,8 @@ export async function rendues(userId: string, ref: string): Promise<boolean> {
 
 /**
  * La réponse de BLUSH verrouillée qui attend d’être payée, pour ce compte (une au plus : la suivante demande la
- * recharge, sans appel au modèle), ou null. Son texte reste en base, chiffré, jamais envoyé avant d’être payé. `ex` :
- * la transaction qui la cherche (garderVerrouillee), sinon la base.
+ * recharge, sans appel au modèle), ou null. Elle reste en base, chiffrée : ce qui se paie n’est jamais envoyé avant
+ * (src/server/historique.ts, reponseMasquee). `ex` : la transaction qui la cherche (garderVerrouillee), sinon la base.
  */
 export async function reponseVerrouillee(userId: string, ex: Pick<Executeur, "select"> = db()): Promise<{ id: number; storyId: string; cout: number } | null> {
   const c = schema.chatMessages;
@@ -162,12 +163,33 @@ export async function reponseVerrouillee(userId: string, ex: Pick<Executeur, "se
   return r ? { ...r, cout: r.cout ?? 1 } : null;
 }
 
-/**
- * Débloque une réponse verrouillée de ce compte en débitant son coût, dans une transaction : « deverrouillee », ou
- * « insuffisant » (le solde ne couvre toujours pas : rien ne change), ou « aucune » (pas de réponse verrouillée de ce
- * compte sous cet id : déjà débloquée, ou pas la sienne).
+/*
+ * Une recharge (un pack de bulles, src/contenu/recharge.ts) payée par ce compte depuis que la réponse `messageId` s’est
+ * écrite, et toujours payée (une recharge remboursée ou contestée ne compte plus) : elle paie cette réponse
+ * (deverrouiller). Les deux heures comparées dans la base, à la microseconde
  */
-export async function deverrouiller(compte: Compte, messageId: number): Promise<"deverrouillee" | "insuffisant" | "aucune"> {
+async function rechargeDepuis(tx: Pick<Executeur, "select">, userId: string, messageId: number): Promise<boolean> {
+  const a = schema.achats;
+  const c = schema.chatMessages;
+  const ecrite = sql`(select ${c.createdAt} from ${c} where ${c.id} = ${messageId})`;
+  const [r] = await tx
+    .select({ id: a.id })
+    .from(a)
+    .where(and(eq(a.userId, userId), eq(a.statut, "paye"), inArray(a.offre, [...PACKS]), gt(a.payeLe, ecrite)))
+    .limit(1);
+  return !!r;
+}
+
+/**
+ * Débloque une réponse verrouillée de ce compte, dans une transaction. Une recharge payée depuis qu’elle s’est écrite
+ * la paie (le prototype validé des bulles : rechargé, le solde devient l’ancien plus les bulles achetées, et la réponse
+ * prête est là) : « offerte », sans débit, son coût passe à null (offerte, comme une alerte), et une seule réponse en
+ * profite (il n’y en a qu’une en attente par compte, et la suivante s’écrit après cette recharge). Sinon (des bulles
+ * données, un rapport payé), son coût est débité : « deverrouillee », ou « insuffisant » (le solde ne couvre toujours
+ * pas : rien ne change). « aucune » : pas de réponse verrouillée de ce compte sous cet id (déjà débloquée, ou pas la
+ * sienne).
+ */
+export async function deverrouiller(compte: Compte, messageId: number): Promise<"deverrouillee" | "offerte" | "insuffisant" | "aucune"> {
   const c = schema.chatMessages;
   try {
     return await db().transaction(async (tx) => {
@@ -178,6 +200,10 @@ export async function deverrouiller(compte: Compte, messageId: number): Promise<
         .where(and(eq(c.id, messageId), eq(c.verrouillee, true), eq(schema.stories.userId, compte.id)))
         .for("update", { of: c });
       if (!r) return "aucune";
+      if (await rechargeDepuis(tx, compte.id, messageId)) {
+        await tx.update(c).set({ verrouillee: false, cout: null }).where(eq(c.id, messageId));
+        return "offerte";
+      }
       await debiterDans(tx, compte, r.cout ?? 1, refDuMessage(messageId));
       await tx.update(c).set({ verrouillee: false }).where(eq(c.id, messageId));
       return "deverrouillee";
@@ -202,20 +228,20 @@ export async function garderVerrouillee<T>(userId: string, ecrire: (tx: Executeu
 }
 
 /**
- * Lire une réponse verrouillée de ce compte (`message`), une fois rechargé : son coût est débité (deverrouiller), puis
- * elle est rendue en entier, avec ce qu’elle a coûté et ce qu’il reste. Déjà payée (un second toucher, un autre
- * onglet) : rendue telle quelle, sans nouveau débit. « insuffisant » : le solde ne la couvre toujours pas (rien ne
- * change) ; null : pas une réponse de ce compte.
+ * Lire une réponse verrouillée de ce compte (`message`), une fois rechargé (deverrouiller) : payée par la recharge, sans
+ * débit, ou son coût débité ; puis elle est rendue en entier, avec ce qu’elle a coûté (0 : la recharge l’a payée) et ce
+ * qu’il reste. Déjà lue (un second toucher, un autre onglet) : rendue telle quelle, sans nouveau débit. « insuffisant » :
+ * le solde ne la couvre toujours pas (rien ne change) ; null : pas une réponse de ce compte.
  */
 export async function lireLaReponse(compte: Compte, message: number): Promise<BlushAnswer | "insuffisant" | null> {
   const fait = await deverrouiller(compte, message);
   if (fait === "insuffisant") return "insuffisant";
   const lue = await reponseDuCompte(compte.id, message);
   if (!lue) return null;
-  const payee = fait === "deverrouillee" && !estEquipe(compte);
+  const depensees = fait === "offerte" ? 0 : fait === "deverrouillee" ? (lue.cout ?? COUT_EN_BULLES.reponse) : null;
   return {
     ...lue.reponse,
     ...(lue.echange === null ? {} : { echange: lue.echange }),
-    ...(payee ? { bulles: { depensees: lue.cout ?? COUT_EN_BULLES.reponse, restantes: await soldeDe(compte.id) } } : {}),
+    ...(depensees !== null && !estEquipe(compte) ? { bulles: { depensees, restantes: await soldeDe(compte.id) } } : {}),
   };
 }

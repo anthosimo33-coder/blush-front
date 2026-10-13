@@ -32,7 +32,8 @@ vi.mock("@/server/env", async (original) => {
 import { GET, POST } from "@/app/api/chat/route";
 import { POST as debloquer } from "@/app/api/chat/debloquer/route";
 import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
-import { COUT_EN_BULLES } from "@/contenu/offres";
+import { CATALOGUE, COUT_EN_BULLES } from "@/contenu/offres";
+import { commander, livrer } from "@/server/achats";
 import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { coutDe, crediter, refDuMessage, reponseVerrouillee, soldeDe } from "@/server/bulles";
 import * as coffre from "@/server/coffre";
@@ -137,6 +138,16 @@ const derniereReponse = async (storyId: string) =>
 
 /** Tout ce que BLUSH a écrit dans cette réponse, texte par texte (ses bulles, la réponse à envoyer, sa question). */
 const textesDe = (r: BlushAnswer) => [...r.bubbles.map((b) => b.text), ...(r.send ?? []), ...(r.why ? [r.why] : []), ...(r.ask ? [r.ask] : [])].filter((t) => t.length > 3);
+/** Ce qui se paie dans une réponse qui a une réponse à envoyer : la réponse à envoyer, son pourquoi, la relance, le geste. */
+const payantsDe = (r: BlushAnswer) => [...(r.send ?? []), ...(r.why ? [r.why] : []), ...(r.ask ? [r.ask] : []), ...(r.react ? [r.react] : [])].filter((t) => t.length > 3);
+/** La forme de ces lignes, telle que le serveur la dit à la place de leur texte : leur longueur en caractères (un emoji en vaut un). */
+const formes = (textes: readonly string[]) => textes.map((t) => Array.from(t).length);
+/* Le modèle factice, avec une réponse à envoyer (des lignes et un pourquoi inventés) : sa lecture, elle, reste la sienne */
+const avecUneReponseAEnvoyer = (req: Requete) => ({
+  ...(fournisseurFactice(req) as object),
+  a_envoyer: ["t’es libre samedi ?", "j’ai une idée 🍷"],
+  pourquoi: "court, et c’est elle qui choisit",
+});
 
 describe("le coût d’une réponse", () => {
   it("des captures ou un export 3, une réponse en vocal 2, écrite 1, jamais cumulés", () => {
@@ -273,7 +284,7 @@ describe("POST /api/chat, avec des bulles", () => {
     expect(payee.bulles).toEqual({ depensees: COUT_EN_BULLES.ajout, restantes: 2 });
     const verrouillee = reponseDu((await fluxDe(await envoyerCaptures())).evenements);
     await lancerApres();
-    expect(verrouillee.verrouillee).toEqual({ message: (await derniereReponse(id)).id, cout: COUT_EN_BULLES.ajout });
+    expect(verrouillee.verrouillee).toEqual({ message: (await derniereReponse(id)).id, cout: COUT_EN_BULLES.ajout, cache: { quoi: "tout", lignes: expect.any(Array) } });
     expect(await soldeDe(u.id)).toBe(2);
     const ajouts = () => compteDe(cleDeLimiteDuCompte("ajout", u.email), LIMITES.ajoutParCompte);
     const avant = await ajouts();
@@ -360,7 +371,7 @@ describe("POST /api/chat, avec des bulles", () => {
     expect(verrouillee).toEqual({
       kind: "bubbles",
       bubbles: [],
-      verrouillee: { message: (await derniereVerrouillee(u.id)).id, cout: 1 },
+      verrouillee: { message: (await derniereVerrouillee(u.id)).id, cout: 1, cache: { quoi: "tout", lignes: expect.any(Array) } },
       modeVocal: false,
       echange: expect.any(Number),
     });
@@ -380,7 +391,7 @@ async function derniereVerrouillee(userId: string) {
 }
 
 describe("à 0 bulle : la réponse verrouillée", () => {
-  it("BLUSH écrit sa réponse, mais rien d’elle ne sort : ni le flux, ni l’historique, ni l’image partagée, ni la mémoire ; payée, elle se lit une fois", async () => {
+  it("sans réponse à envoyer, BLUSH écrit sa réponse, mais rien d’elle ne sort (seulement la forme de ses bulles) : ni le flux, ni l’historique, ni l’image partagée, ni la mémoire ; payée, elle se lit une fois", async () => {
     const { u, id } = await parleur("verrou", 0);
     const { brut, evenements } = await fluxDe(await envoyer("elle m’a écrit « on verra », je réponds quoi ?"));
     await lancerApres();
@@ -389,14 +400,15 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse"]);
     const v = await derniereVerrouillee(u.id);
     const masquee = reponseDu(evenements);
-    expect(masquee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1 }, modeVocal: false, echange: expect.any(Number) });
+    const cache = { quoi: "tout", lignes: expect.any(Array) };
+    expect(masquee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: expect.any(Number) });
     expect(await derniereReponse(id)).toMatchObject({ id: v.id, cout: 1, verrouillee: true });
     expect(await soldeDe(u.id)).toBe(0);
 
     /* L’historique : l’échange est là, sa réponse masquée ; celui que la réponse a dit (l’accueil s’y reconnaît au retour) */
     const avant = await historique();
     const echange = avant.echanges.at(-1)!;
-    expect(echange.answer).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1 } });
+    expect(echange.answer).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1, cache } });
     expect(masquee.echange).toBe(echange.id);
     /* L’image partagée de cet échange : refusée */
     expect(await momentAPartager(await ligneEnBase(id), true, { type: "reponse", echange: echange.id })).toBe("introuvable");
@@ -423,12 +435,101 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect(await soldeDe(u.id)).toBe(2);
     expect((await journalDe(u.id)).map((m) => [m.raison, m.delta, m.ref])).toEqual([["reponse", -1, refDuMessage(v.id)]]);
 
-    /* Rien de ce qu’elle dit n’était sorti avant d’être payé */
+    /* Rien de ce qu’elle dit n’était sorti avant d’être payé : seulement la forme de ses bulles, dans l’ordre (la lecture, la relance) */
     const sorti = [brut, JSON.stringify(avant)].join("\n");
     for (const t of textes) expect(sorti.includes(t), "un texte de la réponse verrouillée est sorti").toBe(false);
+    expect(masquee.verrouillee!.cache.lignes).toEqual(formes([...lue.bubbles.map((b) => b.text), lue.ask ?? ""].filter(Boolean)));
     /* Payée, l’historique la rend en entier */
     expect(textesDe((await historique()).echanges.at(-1)!.answer)).toEqual(textes);
     expect(await reponseVerrouillee(u.id)).toBeNull();
+  });
+
+  it("avec une réponse à envoyer : la lecture de BLUSH se lit en clair (ses bulles, les messages qu’elles citent) ; la réponse à envoyer, son pourquoi et la relance ne sortent jamais (ni le flux, ni l’historique, ni « Réessayer », ni l’image partagée), seulement la forme de ses lignes", async () => {
+    const { u, id } = await parleur("verrou-lecture", 0);
+    chat = avecUneReponseAEnvoyer;
+    const cle = randomUUID();
+    const { brut, evenements } = await fluxDe(await envoyer("elle me propose un verre, je dis quoi ?", { cle }));
+    await lancerApres();
+    /* Rien en route : la lecture arrive avec la réponse, d’un bloc */
+    expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse"]);
+    const v = await derniereVerrouillee(u.id);
+    const masquee = reponseDu(evenements);
+    /* « Réessayer » (la même clé) : la même réponse masquée, sans appel ni débit */
+    const encore = (await (await envoyer("elle me propose un verre, je dis quoi ?", { cle })).json()) as BlushAnswer;
+    expect(appels).toBe(1);
+    const avant = await historique();
+    const echange = avant.echanges.at(-1)!;
+    expect(await momentAPartager(await ligneEnBase(id), true, { type: "reponse", echange: echange.id })).toBe("introuvable");
+
+    /* Payée : la réponse entière, à quoi comparer ce qui était sorti avant */
+    await donnerDesBulles(u, 1);
+    const lue = (await (await lire(v.id)).json()) as BlushAnswer;
+    expect(lue.send?.length).toBeGreaterThan(0);
+    expect(lue.why).toBeTruthy();
+    const cache = { quoi: "reponse", lignes: formes(lue.send!) };
+    /* La lecture, en clair, telle que la réponse payée la montre (ses bulles, avec les messages qu’elles citent) ; et rien d’autre */
+    expect(lue.bubbles.length).toBeGreaterThan(0);
+    expect(lue.bubbles.some((b) => b.messages?.length)).toBe(true);
+    expect(masquee).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: echange.id });
+    expect(echange.answer).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache } });
+    expect(encore).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache }, echange: echange.id });
+    for (const b of lue.bubbles) expect(brut.includes(JSON.stringify(b.text)), "la lecture se lit dans le flux").toBe(true);
+    /* Ce qui se paie n’était sorti nulle part : ni le flux, ni l’historique, ni « Réessayer » */
+    const payants = payantsDe(lue);
+    expect(payants.length).toBeGreaterThanOrEqual(3);
+    const sorti = [brut, JSON.stringify(avant), JSON.stringify(encore)].join("\n");
+    for (const t of payants) expect(sorti.includes(t), "un texte payant de la réponse verrouillée est sorti").toBe(false);
+    /* La mise à jour de la mémoire n’apprend que ce qu’il a dit */
+    for (const t of (await tachesDe(id)).filter((t) => t.kind === "memoire_maj")) expect(coffre.lire("tasks.input", t.input!).reponse).toEqual([]);
+  });
+
+  it("rechargé (un pack payé après elle) : elle se lit sans débit, elle a coûté 0 et le solde reste l’ancien plus les bulles achetées ; une seule fois", async () => {
+    const { u } = await parleur("verrou-recharge", 0);
+    await fluxDe(await envoyer("je dis quoi ?"));
+    await lancerApres();
+    const v = await derniereVerrouillee(u.id);
+    const achat = await commander(u, "pack30", { fournisseur: "factice" });
+    if (typeof achat === "string") throw new Error(`commande refusée : ${achat}`);
+    expect((await livrer(achat.id)).effet).toBe("livre");
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+
+    const lue = await lire(v.id);
+    expect(lue.status).toBe(200);
+    const r = (await lue.json()) as BlushAnswer;
+    expect(r.verrouillee).toBeUndefined();
+    expect(r.bubbles.length).toBeGreaterThan(0);
+    expect(r.bulles).toEqual({ depensees: 0, restantes: CATALOGUE.pack30.bulles });
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+    /* Le journal : l’achat seul, aucun débit ; la réponse n’attend plus, offerte */
+    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([["achat", CATALOGUE.pack30.bulles]]);
+    const [ligne] = await db()
+      .select({ cout: schema.chatMessages.cout, verrouillee: schema.chatMessages.verrouillee })
+      .from(schema.chatMessages)
+      .where(eq(schema.chatMessages.id, v.id));
+    expect(ligne).toEqual({ cout: null, verrouillee: false });
+    expect(await reponseVerrouillee(u.id)).toBeNull();
+    /* Un second toucher : rendue telle quelle, sans rien de plus */
+    const encore = (await (await lire(v.id)).json()) as BlushAnswer;
+    expect(encore.bulles).toBeUndefined();
+    expect(textesDe(encore)).toEqual(textesDe(r));
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+  });
+
+  it("une recharge payée avant la réponse verrouillée ne la paie pas : des bulles venues d’ailleurs, son coût est débité", async () => {
+    const { u } = await parleur("verrou-recharge-avant", 0);
+    const achat = await commander(u, "pack30", { fournisseur: "factice" });
+    if (typeof achat === "string") throw new Error(`commande refusée : ${achat}`);
+    await livrer(achat.id);
+    /* Les bulles de ce pack, parties ailleurs : le solde revient à 0 */
+    await crediter(u.id, -CATALOGUE.pack30.bulles, "remboursement", `test:depense:${u.id}`);
+    await fluxDe(await envoyer("je dis quoi ?"));
+    await lancerApres();
+    const v = await derniereVerrouillee(u.id);
+    expect((await lire(v.id)).status).toBe(402);
+    await donnerDesBulles(u, 1);
+    const r = (await (await lire(v.id)).json()) as BlushAnswer;
+    expect(r.bulles).toEqual({ depensees: 1, restantes: 0 });
+    expect((await journalDe(u.id)).at(-1)).toEqual({ raison: "reponse", delta: -1, ref: refDuMessage(v.id) });
   });
 
   it("une seule en attente par compte : la suivante répond « bulles », sans appel au modèle, le message du jour rendu", async () => {

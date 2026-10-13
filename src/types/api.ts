@@ -176,7 +176,7 @@ type Reponses = {
   /** D’un bloc ; en flux, quand le navigateur le demande (Accept), une ligne JSON par événement (EvenementChat, src/types). */
   "POST /api/chat": BlushAnswer;
   "POST /api/chat/vocal": { modeVocal: boolean };
-  /** La réponse verrouillée, payée : en entier, avec ce qu’elle a coûté et ce qu’il reste. */
+  /** La réponse verrouillée, payée (par la recharge, ou son coût débité) : en entier, avec ce qu’elle a coûté et ce qu’il reste. */
   "POST /api/chat/debloquer": BlushAnswer;
   "GET /api/compte": Account;
   "DELETE /api/compte": Ok;
