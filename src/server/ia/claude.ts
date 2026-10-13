@@ -167,6 +167,18 @@ const SYSTEMES: Record<Tache, string> = {
 /** Les textes système, pour le garde-fou anti-fuite (src/server/ia/garde.ts). */
 export const textesSysteme = () => Object.values(SYSTEMES);
 
+/**
+ * Le format de sortie demandé : le schéma JSON tiré du schéma zod, sans la lecture que le SDK y attache (`parse`). Avec
+ * elle, le SDK lit lui-même chaque texte d’une réponse en flux, et lève une erreur sans nom ni code (« Error ») devant un
+ * refus en cours d’écriture, un repli (le texte coupé du premier modèle reste dans la réponse) ou une sortie coupée :
+ * lireMessage sait traiter les trois, encore faut-il qu’il les voie (la mémoire du 13 octobre : « erreur:Error » à
+ * chaque essai, tests/unit/claude.test.ts).
+ */
+function formatDeSortie(schema: z.ZodType) {
+  const { type, schema: json } = betaZodOutputFormat(schema);
+  return { type, schema: json };
+}
+
 /** Les paramètres d’un appel : le modèle, les réglages de la tâche, son texte système (en cache), la requête et le format de sortie. */
 function parametres(req: Requete, schema: z.ZodType) {
   const reglage = REGLAGES[req.tache];
@@ -174,7 +186,7 @@ function parametres(req: Requete, schema: z.ZodType) {
     model: MODELE,
     max_tokens: reglage.maxTokens,
     thinking: { type: "adaptive" as const },
-    output_config: { effort: req.effort ?? reglage.effort, format: betaZodOutputFormat(schema) },
+    output_config: { effort: req.effort ?? reglage.effort, format: formatDeSortie(schema) },
     system: [{ type: "text" as const, text: SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
     messages: [
       {
