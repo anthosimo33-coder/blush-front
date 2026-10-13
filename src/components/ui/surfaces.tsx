@@ -171,11 +171,17 @@ export function Sheet({
     <dialog
       ref={refDialogue}
       aria-labelledby={labelledBy}
+      /*
+       * Seulement les siens : React fait remonter « cancel » et « close » d’une feuille posée dans celle-ci (la carte dans
+       * l’offre ①) jusqu’à elle, qui se croirait fermée (Échap, ou la feuille du dessus refermée)
+       */
       onCancel={(e) => {
+        if (e.target !== e.currentTarget) return;
         e.preventDefault();
         onClose();
       }}
-      onClose={() => {
+      onClose={(e) => {
+        if (e.target !== e.currentTarget) return;
         liberer.current?.();
         liberer.current = null;
         onClosed?.();

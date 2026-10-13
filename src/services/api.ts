@@ -33,6 +33,7 @@ import type {
   CleJson,
   CleRoute,
   EtatAchat,
+  FeuilleDuPaiement,
   HistoriqueChat,
   Moi,
   OffreUniqueMontree,
@@ -516,8 +517,24 @@ export const lireLeDirect = (signal?: AbortSignal) => appel("GET /api/admin/dire
  * du texte que l’onglet montre), et la garde avec l’achat. Sans elle, ou une version qui n’est plus la sienne (le texte
  * a changé depuis l’ouverture de la page) : 422 « renonciation ».
  */
-export async function commencerPaiement(offre: OffreId, renonciation: boolean): Promise<PaiementCommence> {
-  return appel("POST /api/paiement", { corps: { offre, ...(renonciation ? { renonciation: CASE_RENONCIATION.version } : {}) } });
+export async function commencerPaiement(offre: OffreId, renonciation: boolean, { jeton }: { jeton?: string } = {}): Promise<PaiementCommence> {
+  return appel("POST /api/paiement", { corps: { offre, ...(renonciation ? { renonciation: CASE_RENONCIATION.version } : {}), ...(jeton ? { jeton } : {}) } });
+}
+
+/**
+ * Ce que la feuille du paiement doit savoir avant de s’ouvrir : comment payer dans la feuille (les Elements de Whop, le
+ * faux Whop, ou rien), et ce que le compte a d’avance (un rapport d’avance, le −50 % gardé).
+ */
+export async function lireFeuilleDuPaiement(): Promise<FeuilleDuPaiement> {
+  return appel("GET /api/paiement/feuille");
+}
+
+/**
+ * Débloque le rapport de la conv de la page avec le rapport d’avance du compte : rien à payer, et le geste donne la
+ * renonciation au délai de rétractation, comme un paiement. Rend l’achat du rapport d’avance (« C’est débloqué » le dit).
+ */
+export async function utiliserAvance(): Promise<{ achat: string }> {
+  return appel("POST /api/paiement/avance", { corps: { renonciation: CASE_RENONCIATION.version } });
 }
 
 /**

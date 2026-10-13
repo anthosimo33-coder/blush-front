@@ -414,6 +414,11 @@ export const achats = pgTable(
     payeLe: quand("paye_le"),
     /** Remboursé, contesté ou échoué : l’heure. */
     annuleLe: quand("annule_le"),
+    /**
+     * Le rapport d’avance (l’offre « second », RAPPORT_D_AVANCE) : l’heure où il a débloqué la conv de son choix (alors
+     * `storyId`, et la renonciation donnée à ce moment-là), ou null tant qu’il attend. Null pour toute autre offre.
+     */
+    utiliseLe: quand("utilise_le"),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
 );

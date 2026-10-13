@@ -1,33 +1,41 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useAuPaiement } from "@/lib/presence";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE, prixDe } from "@/contenu/offres";
 import { CHAPITRES_A_DEBLOQUER, FEUILLE_FORMULE, OFFRE_SUITE } from "@/contenu/paiement";
-import { proposerOffreUnique } from "@/services/api";
+import { jourEnLettres } from "@/lib/format";
+import { codeDe } from "@/lib/messages-erreur";
+import { versDebloque } from "@/lib/paiement";
+import { apresDeblocage, useFeuilleDuPaiement } from "@/lib/requetes";
+import { proposerOffreUnique, utiliserAvance } from "@/services/api";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
 import { Cadeau, Perle } from "@/components/bulles/perles";
 import { CestQuoiUneBulle, Contenu, Option, RondACocher } from "@/components/bulles/pieces";
-import { MentionRenonciation } from "@/components/juridique/cases";
+import { MentionRenonciation, useAccord } from "@/components/juridique/cases";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet, Toast } from "@/components/ui/surfaces";
-import type { Formule } from "@/types";
+import type { Formule, OffreId } from "@/types";
+import { PetitBillet } from "./Billet";
+import { PayerDansLaFeuille } from "./integre/PayerDansLaFeuille";
 import { OffreAvantDePartir } from "./OffreAvantDePartir";
-import { usePaiement } from "./usePaiement";
 
 /*
  * Écran 10 — la feuille « Ta formule » (le prototype validé des bulles, 12 octobre) : le rapport seul, ou Premium,
  * choisie d’avance et ouverte (son badge, ce qu’elle contient ligne à ligne, ses bulles offertes sur une bande rose à
- * 0 €), « C’est quoi une bulle ? », puis un seul bouton, qui part payer au premier toucher sur la page de paiement de
- * Whop (ou du faux Whop en local) : on en revient sur /paiement/retour. Juste sous lui, la ligne de la renonciation au
- * délai de rétractation, que le geste de payer donne (MentionRenonciation). Fermée sans payer, elle demande au serveur
- * l’offre unique ① (OffreAvantDePartir : la suite moins chère, 5 minutes, une fois).
- * La page hébergée de Whop plutôt que ses Elements dans la feuille : décidé pour la vague 2 (les Elements n’existent pas
- * dans son bac à sable), à revoir après un vrai paiement de test.
+ * 0 €), « C’est quoi une bulle ? », puis le paiement dans la feuille (PayerDansLaFeuille : Apple Pay ou Google Pay,
+ * la carte de Whop dans sa feuille, sans quitter BLUSH ; la page de Whop en repli). Juste sous lui, la ligne de la
+ * renonciation au délai de rétractation, que le geste de payer donne (MentionRenonciation). Payé : « C’est payé » prend
+ * toute la feuille, puis « C’est débloqué ». Fermée sans payer, elle demande au serveur l’offre unique ① (OffreAvantDePartir :
+ * la suite moins chère, 5 minutes, une fois).
+ * Les avoirs du compte (GET /api/paiement/feuille) : un rapport d’avance (le 2e rapport, payé sur « C’est débloqué »)
+ * vient en tête, choisi d’avance, et débloque sans rien payer ; le −50 % gardé fait payer le rapport seul à moitié prix
+ * (l’offre rapport_garde), jusqu’à sa fin.
  * Les marges du prototype, sauf sur un écran court (375 × 667) : la ligne de la renonciation, que le prototype n’avait
  * pas (comme la case qu’elle remplace), n’y tiendrait pas ; le titre, les marges de Premium et les écarts s’y resserrent
  * (max-height: 700px), pour que la feuille tienne sans défiler, avec de la marge pour les textes plus larges de Chrome
@@ -36,6 +44,9 @@ import { usePaiement } from "./usePaiement";
 
 /** L’offre ① refusée (« Non merci ») pendant cette visite : la feuille refermée ne la remontre pas (le serveur la garderait 5 minutes). */
 let suiteRefusee = false;
+
+/** Ce qu’on choisit dans la feuille : une des deux formules, ou le rapport d’avance du compte. */
+type Choix = Formule | "avance";
 
 /** Le temps que la feuille redescende avant que l’offre ① ne monte (le prototype) : elles ne se croisent pas. */
 const APRES_LA_FEUILLE_MS = 450;
@@ -159,16 +170,22 @@ export function FeuilleFormule({
 }) {
   const titre = useId();
   useAuPaiement(open);
-  const [choisie, setChoisie] = useState<Formule>(FORMULE_CHOISIE);
+  const avoirs = useFeuilleDuPaiement().data;
+  /* Le choix fait à la main ; sans lui, le rapport d’avance s’il y en a un, sinon la formule choisie d’avance */
+  const [choix, setChoix] = useState<Choix | null>(null);
+  const choisie: Choix = choix ?? (avoirs?.avance ? "avance" : FORMULE_CHOISIE);
   const [bulle, setBulle] = useState(false);
-  /* Le rapport déjà payé dans un autre onglet (409 « deja ») : relu, la feuille se ferme d’elle-même */
-  const paiement = usePaiement({ suite, quand: { deja: onClose } });
+  /* Payé : « C’est payé » prend toute la feuille, qui ne se ferme plus, le temps de la livraison */
+  const [paye, setPaye] = useState(false);
+  /* Le −50 % gardé fait payer le rapport seul à moitié prix (rapport_garde) */
+  const garde = avoirs?.garde ?? null;
+  const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
   /*
    * L’offre ① montrée par le serveur : l’heure de fin de son compte à rebours, à l’horloge du téléphone (le temps qu’il
    * lui reste à l’heure du serveur, compté d’ici : une horloge en avance ne la fait pas passer avant l’heure) ; puis,
    * passée, son toast
    */
-  const [offre, setOffre] = useState<number | null>(null);
+  const [suiteMontree, setSuiteMontree] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
   const vivant = useRef(true);
   useEffect(() => {
@@ -185,77 +202,152 @@ export function FeuilleFormule({
 
   /* Fermée sans payer : l’offre ①, si le serveur la montre (une fois par compte, jamais deux offres le même jour), une fois la feuille redescendue */
   const fermer = () => {
+    if (paye) return;
     onClose();
-    if (!proposerLaSuite || suiteRefusee || paiement.occupe) return;
+    if (!proposerLaSuite || suiteRefusee) return;
     const descendue = new Promise((ok) => setTimeout(ok, APRES_LA_FEUILLE_MS));
     proposerOffreUnique("suite").then(
       async (o) => {
         if (o.offre !== "suite" || o.reste === null) return;
         const fin = Date.now() + o.reste;
         await descendue;
-        if (vivant.current) setOffre(fin);
+        if (vivant.current) setSuiteMontree(fin);
       },
       () => {},
     );
   };
 
-  const prix = prixDe(choisie);
   return (
     <>
       <Sheet open={open} onClose={fermer} labelledBy={titre} belowHeader={false}>
-        <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] [@media(max-height:700px)]:text-[22px]">
+        <h2
+          id={titre}
+          className={cn(
+            "m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] [@media(max-height:700px)]:text-[22px]",
+            /* Payé : le titre reste pour le lecteur d’écran (le nom de la feuille), « C’est payé » se lit à sa place */
+            paye && "sr-only",
+          )}
+        >
           {FEUILLE_FORMULE.titre(autre)}
         </h2>
-        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
-          <Option
-            on={choisie === "rapport"}
-            choisir={() => setChoisie("rapport")}
-            titre={FEUILLE_FORMULE.rapport.titre}
-            note={
-              <span className="flex items-center gap-1 text-elle-ink">
-                <Perle taille={12} />
-                {FEUILLE_FORMULE.rapport.note}
-              </span>
-            }
-            prix={prixDe("rapport")}
-          >
-            <Contenu>{FEUILLE_FORMULE.rapport.contenu(chapitres)}</Contenu>
-          </Option>
-          <CartePremium on={choisie === "premium"} choisir={() => setChoisie("premium")} chapitres={chapitres} />
-        </RadioGroup>
-        <CestQuoiUneBulle ouvrir={() => setBulle(true)} />
+        {!paye && (
+          <>
+            <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
+              {avoirs?.avance && (
+                <Option
+                  on={choisie === "avance"}
+                  choisir={() => setChoix("avance")}
+                  titre={
+                    <span className="flex items-center gap-2">
+                      <PetitBillet taille={18} />
+                      {FEUILLE_FORMULE.avance.titre}
+                    </span>
+                  }
+                  note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note}</span>}
+                  prix={FEUILLE_FORMULE.avance.prix}
+                />
+              )}
+              <Option
+                on={choisie === "rapport"}
+                choisir={() => setChoix("rapport")}
+                titre={FEUILLE_FORMULE.rapport.titre}
+                note={
+                  <span className="flex items-center gap-1 text-elle-ink">
+                    <Perle taille={12} />
+                    {garde ? FEUILLE_FORMULE.garde(jourEnLettres(garde.fin)) : FEUILLE_FORMULE.rapport.note}
+                  </span>
+                }
+                prix={prixDe(garde ? "rapport_garde" : "rapport")}
+                barre={garde ? prixDe("rapport") : undefined}
+              >
+                <Contenu>{FEUILLE_FORMULE.rapport.contenu(chapitres)}</Contenu>
+              </Option>
+              <CartePremium on={choisie === "premium"} choisir={() => setChoix("premium")} chapitres={chapitres} />
+            </RadioGroup>
+            <CestQuoiUneBulle ouvrir={() => setBulle(true)} />
+          </>
+        )}
         <div className="flex flex-col gap-3 lg:w-[400px] lg:self-center [@media(max-height:700px)]:gap-2">
-          {paiement.refus === "bientot" && (
-            <p role="status" className="m-0 text-center text-note font-extrabold leading-[1.45] text-soft">
-              {FEUILLE_FORMULE.bientot}
-            </p>
+          {choisie === "avance" ? (
+            <DebloquerAvecLAvance suite={suite} deja={onClose} />
+          ) : (
+            <PayerDansLaFeuille
+              offre={offre}
+              centimes={CATALOGUE[offre].centimes}
+              titre={CATALOGUE[offre].titre}
+              libelle={FEUILLE_FORMULE.payer(prixDe(offre))}
+              quoi="rapport"
+              suite={suite}
+              /* Le rapport déjà payé dans un autre onglet (409 « deja ») : relu, la feuille se ferme d’elle-même */
+              quand={{ deja: onClose }}
+              surPaye={setPaye}
+              fleche
+            />
           )}
-          {paiement.refus === "souci" && <Alert className="text-center leading-[1.45]">{FEUILLE_FORMULE.souci}</Alert>}
-          <Button arrow loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer(choisie)}>
-            {FEUILLE_FORMULE.payer(prix)}
-          </Button>
-          <MentionRenonciation quoi="rapport" etat={paiement.renonciation} />
-          <span className="text-center text-micro font-extrabold text-grey">
-            <b className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</b>
-            {FEUILLE_FORMULE.pied.reste}
-          </span>
+          {/* Rien ne se paie avec le rapport d’avance : ni « Paiement unique », ni ses moyens */}
+          {!paye && choisie !== "avance" && (
+            <span className="text-center text-micro font-extrabold text-grey">
+              <b className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</b>
+              {FEUILLE_FORMULE.pied.reste}
+            </span>
+          )}
         </div>
       </Sheet>
       {/* Par-dessus la feuille : elle reste ouverte dessous, et « Compris » y revient */}
       <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />
-      {offre && (
+      {suiteMontree && (
         <OffreAvantDePartir
-          fin={offre}
+          fin={suiteMontree}
           chapitres={chapitres}
           suite={suite}
           onRefus={() => {
             suiteRefusee = true;
           }}
           onPassee={() => setPassee(true)}
-          onClosed={() => setOffre(null)}
+          onClosed={() => setSuiteMontree(null)}
         />
       )}
       {passee && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{OFFRE_SUITE.passee}</Toast>}
+    </>
+  );
+}
+
+/**
+ * Le rapport d’avance choisi : « Débloquer · 0 € » (POST /api/paiement/avance), puis « C’est débloqué ». Le geste donne
+ * la renonciation au délai de rétractation, que la ligne dessous dit, comme pour un paiement. Déjà débloqué ailleurs
+ * (409 « deja ») : relu, la feuille se ferme (`deja`).
+ */
+function DebloquerAvecLAvance({ suite, deja }: { suite?: string; deja: () => void }) {
+  const router = useRouter();
+  const renonciation = useAccord();
+  const [occupe, setOccupe] = useState(false);
+  const [souci, setSouci] = useState(false);
+  const debloquer = async () => {
+    if (!renonciation.exiger()) return;
+    setOccupe(true);
+    setSouci(false);
+    try {
+      const { achat } = await utiliserAvance();
+      apresDeblocage();
+      router.replace(versDebloque(achat, suite ?? null));
+    } catch (e) {
+      setOccupe(false);
+      const code = codeDe(e);
+      if (code === "renonciation") renonciation.perimer();
+      else if (code === "deja") {
+        apresDeblocage();
+        router.refresh();
+        deja();
+      } else setSouci(true);
+    }
+  };
+  return (
+    <>
+      {souci && <Alert className="text-center leading-[1.45]">{FEUILLE_FORMULE.souci}</Alert>}
+      <Button arrow loading={occupe} loadingLabel="Déblocage en cours" onClick={() => void debloquer()}>
+        {FEUILLE_FORMULE.avance.debloquer}
+      </Button>
+      <MentionRenonciation quoi="avance" etat={renonciation} />
     </>
   );
 }

@@ -17,7 +17,8 @@
  * TODO(produit): à relire par un juriste (le consentement explicite que demande le RGPD, article 9, pour ce qui est intime).
  */
 export const CASE_IMPORT = {
-  version: "2026-10-13",
+  /* Le 13 octobre, deuxième version : les conditions disent le 2e rapport, le rapport d’avance et la carte gardée chez Whop */
+  version: "2026-10-13.2",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",
@@ -46,10 +47,12 @@ export const texteCaseImport = () => `${CASE_IMPORT.avant}${CASE_IMPORT.lien}${C
  * TODO(produit): à relire par un juriste (le renoncement exprès que demande l’article L221-28, 13°, donné par le geste de payer).
  */
 export const CASE_RENONCIATION = {
-  version: "2026-10-13",
+  /* Le 13 octobre, deuxième version : la ligne du rapport d’avance (le 2e rapport), utilisé pour une conv */
+  version: "2026-10-13.2",
   avant: {
     rapport: "En payant, tu as ton rapport tout de suite et tu renonces au ",
     bulles: "En payant, tu as tes bulles tout de suite et tu renonces au ",
+    avance: "En débloquant, tu as ton rapport tout de suite et tu renonces au ",
   },
   lien: "délai de rétractation",
   apres: ".",
@@ -57,7 +60,7 @@ export const CASE_RENONCIATION = {
   ancre: "/conditions#livraison",
 } as const;
 
-/** Ce qu’on achète, pour la renonciation : le rapport (« Ta formule », l’offre ①), ou des bulles (la recharge, l’offre ③). */
+/** Ce qu’on reçoit, pour la renonciation : le rapport (« Ta formule », l’offre ①), des bulles (la recharge, l’offre ③), ou le rapport d’un rapport d’avance utilisé. */
 export type AchatImmediat = keyof typeof CASE_RENONCIATION.avant;
 
 /** Le texte entier de la renonciation, tel qu’il se lit sous le bouton. */

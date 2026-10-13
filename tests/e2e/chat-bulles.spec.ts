@@ -12,6 +12,7 @@ import {
   messagesDuChat,
   ouvrir,
   ouvrirLeRapport,
+  payerParCarte,
   reponseAuGeste,
   RESEAU,
   test,
@@ -145,14 +146,13 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await expect(recharge.getByText("+ 50 bulles offertes")).toBeVisible();
   });
 
-  await test.step("payer au premier toucher (pas de case : la renonciation dite sous le bouton), la page du faux Whop, puis le retour sur le chat", async () => {
+  await test.step("payer (pas de case : la renonciation dite sous le bouton), la carte dans la feuille, puis le chat", async () => {
     const payer = recharge.getByRole("button", { name: "Payer · 9,90\u00a0€" });
     await expect(recharge.getByRole("checkbox")).toHaveCount(0);
     await expect(recharge.getByText("En payant, tu as tes bulles tout de suite et tu renonces au délai de rétractation.")).toBeVisible();
     await payer.click();
-    await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
-    await page.getByRole("button", { name: "Payer", exact: true }).click();
-    /* Le retour attend la livraison, puis revient au chat, qui lit la réponse prête et retire `?recharge=` de l’adresse */
+    await payerParCarte(page);
+    /* La feuille attend la livraison, puis revient au chat, qui lit la réponse prête et retire `?recharge=` de l’adresse */
     await page.waitForURL((u) => u.pathname === "/app" && !u.search.includes("recharge"), { timeout: 2 * RESEAU });
   });
 

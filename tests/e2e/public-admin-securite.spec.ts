@@ -62,8 +62,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 30 routes gardées de la table du contrat (le signe des onglets compris), depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(31);
+  await test.step("les 31 routes gardées de la table du contrat (le signe des onglets compris), depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(32);
     for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK)) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });

@@ -1,6 +1,6 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
-import { bullesDe, CATALOGUE, PREMIERE_RECHARGE } from "@/contenu/offres";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { bullesDe, CATALOGUE, PREMIERE_RECHARGE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import type { OffreId } from "@/types";
 import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
@@ -77,7 +77,7 @@ export async function commander(
     const [rapport] = await db()
       .select({ id: a.id })
       .from(a)
-      .where(and(eq(a.userId, compte.id), eq(a.statut, "paye"), inArray(a.offre, ["rapport", "suite"])))
+      .where(and(eq(a.userId, compte.id), eq(a.statut, "paye"), inArray(a.offre, RAPPORTS_SEULS)))
       .limit(1);
     if (!rapport) return "offre";
   }
@@ -100,13 +100,15 @@ export async function commander(
   return achat!;
 }
 
+/** Une transaction de la base, telle que db().transaction la donne. */
+type Transaction = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
 /**
  * Verrouille la ligne de la conv dans la transaction d’une livraison ou d’une reprise : deux achats de la même conv,
  * l’un livré pendant que l’autre est repris, passent l’un après l’autre. Sans lui, la reprise ne voit pas l’autre achat
  * payé (sa transaction n’est pas finie) et re-verrouille un rapport bel et bien payé.
  */
-const verrouillerLaConv = (tx: Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0], storyId: string) =>
-  tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
+const verrouillerLaConv = (tx: Transaction, storyId: string) => tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
 
 /** Ce que le prestataire dit du paiement à la livraison : ses identifiants, à garder sur l’achat (le paiement en un geste). */
 export type Paiement = { paiementId?: string | null; checkoutId?: string | null; membreId?: string | null; moyenId?: string | null };
@@ -167,32 +169,94 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
       .where(eq(a.id, achatId))
       .returning();
     if (!userId) return { effet: "livre", achat: paye!, debloquee: false };
-    let debloquee = false;
-    if (storyId) {
-      const s = schema.stories;
-      await verrouillerLaConv(tx, storyId);
-      const ouvertes = await tx
-        .update(s)
-        .set({ debloqueLe: sql`now()` })
-        .where(and(eq(s.id, storyId), eq(s.userId, userId), isNull(s.debloqueLe)))
-        .returning({ id: s.id });
-      debloquee = ouvertes.length > 0;
-    }
+    const debloquee = storyId ? await ouvrirLaConv(tx, userId, storyId) : false;
     if (bulles > 0) await mouvementDans(tx, userId, bulles, "achat", achat.id);
-    if (storyId && CATALOGUE[achat.offre].conv)
-      await tx
-        .update(o)
-        .set({ priseLe: sql`now()` })
-        .where(and(eq(o.userId, userId), eq(o.offre, "relance_mail"), eq(o.storyId, storyId), isNull(o.priseLe)));
     return { effet: "livre", achat: paye!, debloquee };
   });
   /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
   if (r.effet === "livre" && r.achat) await noterAchatAuFil(r.achat);
-  /* Le rapport (et la mémoire) d’une conv qui vient de s’ouvrir : planifiés, puis écrits après la réponse */
-  if (r.debloquee && r.achat?.storyId && r.achat.userId) {
-    const story = { id: r.achat.storyId, userId: r.achat.userId };
-    await auMieux(() => reparerLaChaine(story), "rapport non relancé après la livraison", { achat: achatId });
-  }
+  if (r.debloquee && r.achat) await relancerLaChaine(r.achat, "rapport non relancé après la livraison");
+  return r;
+}
+
+/**
+ * Débloque le rapport de cette conv du compte, dans la transaction d’une livraison ou d’un rapport d’avance utilisé : la
+ * conv verrouillée (verrouillerLaConv), ouverte si elle ne l’était pas, et le mail de relance de cette conv, s’il a été
+ * envoyé, compté comme pris. Vrai si elle vient de s’ouvrir.
+ */
+async function ouvrirLaConv(tx: Transaction, userId: string, storyId: string): Promise<boolean> {
+  const s = schema.stories;
+  const o = schema.offresUniques;
+  await verrouillerLaConv(tx, storyId);
+  const ouvertes = await tx
+    .update(s)
+    .set({ debloqueLe: sql`now()` })
+    .where(and(eq(s.id, storyId), eq(s.userId, userId), isNull(s.debloqueLe)))
+    .returning({ id: s.id });
+  await tx
+    .update(o)
+    .set({ priseLe: sql`now()` })
+    .where(and(eq(o.userId, userId), eq(o.offre, "relance_mail"), eq(o.storyId, storyId), isNull(o.priseLe)));
+  return ouvertes.length > 0;
+}
+
+/** Le rapport (et la mémoire) de la conv qu’un achat vient d’ouvrir : planifiés, puis écrits après la réponse. */
+async function relancerLaChaine(achat: Achat, quoi: string): Promise<void> {
+  if (!achat.storyId || !achat.userId) return;
+  const story = { id: achat.storyId, userId: achat.userId };
+  await auMieux(() => reparerLaChaine(story), quoi, { achat: achat.id });
+}
+
+/** Le rapport d’avance encore valable : payé (ni repris, ni échoué) il y a moins d’un an, et pas encore utilisé. */
+const avanceValable = (userId: string) =>
+  and(
+    eq(a.userId, userId),
+    eq(a.offre, RAPPORT_D_AVANCE.offre),
+    eq(a.statut, "paye"),
+    isNull(a.utiliseLe),
+    gt(a.payeLe, sql`now() - make_interval(secs => ${RAPPORT_D_AVANCE.dureeMs / 1000})`),
+  );
+
+/** Le rapport d’avance que la prochaine conv de ce compte utiliserait (le plus ancien encore valable), et sa fin ; ou null. */
+export async function avanceDuCompte(userId: string): Promise<{ achat: string; fin: Date } | null> {
+  const [l] = await db().select({ id: a.id, payeLe: a.payeLe }).from(a).where(avanceValable(userId)).orderBy(asc(a.payeLe)).limit(1);
+  return l?.payeLe ? { achat: l.id, fin: new Date(l.payeLe.getTime() + RAPPORT_D_AVANCE.dureeMs) } : null;
+}
+
+/** Pourquoi un rapport d’avance ne s’utilise pas : aucun n’est valable (« offre »), la conv manque (« aucune »), ou son rapport est déjà ouvert (« deja »). */
+export type RefusDAvance = "offre" | "aucune" | "deja";
+
+/**
+ * Utilise le rapport d’avance de ce compte (le plus ancien encore valable) pour cette conv, à lui et pas encore
+ * débloquée, dans une transaction : l’achat garde la conv (storyId), l’heure (utiliseLe), les bulles du rapport, qu’il
+ * crédite, et la renonciation au délai de rétractation que ce geste donne ; la conv s’ouvre, et sa chaîne repart après
+ * la réponse, comme après une livraison. Ensuite, l’achat vit comme un rapport payé : remboursé ou contesté, il
+ * re-verrouille sa conv et reprend ses bulles (reprendre). L’achat se verrouille avant la conv, dans l’ordre de livrer
+ * et de reprendre : deux transactions qui s’attendraient l’une l’autre s’annuleraient. Rend l’achat utilisé, ou le refus.
+ */
+export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, storyId: string, renonciation: Consentement): Promise<Achat | RefusDAvance> {
+  if (estEquipe(compte)) return "deja";
+  const r = await db().transaction(async (tx): Promise<Achat | RefusDAvance> => {
+    const [avance] = await tx.select({ id: a.id }).from(a).where(avanceValable(compte.id)).orderBy(asc(a.payeLe)).limit(1).for("update");
+    if (!avance) return "offre";
+    /* La conv lue sous son verrou : un paiement livré au même moment l’a ouverte avant, ou attend la fin de celle-ci */
+    const [s] = await tx
+      .select({ debloqueLe: schema.stories.debloqueLe })
+      .from(schema.stories)
+      .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)))
+      .for("update");
+    if (!s) return "aucune";
+    if (s.debloqueLe) return "deja";
+    const [utilise] = await tx
+      .update(a)
+      .set({ storyId, utiliseLe: sql`now()`, bulles: RAPPORT_D_AVANCE.bulles, renonciationVersion: renonciation.version, renonciationLe: renonciation.le })
+      .where(eq(a.id, avance.id))
+      .returning();
+    await ouvrirLaConv(tx, compte.id, storyId);
+    await mouvementDans(tx, compte.id, RAPPORT_D_AVANCE.bulles, "achat", avance.id);
+    return utilise!;
+  });
+  if (typeof r !== "string") await relancerLaChaine(r, "rapport non relancé après le rapport d’avance");
   return r;
 }
 

@@ -23,10 +23,11 @@ export type Confidence = "sur" | "probable" | "verifier";
 type Side = "toi" | "elle" | "pareil";
 /**
  * Les offres du catalogue (src/contenu/offres.ts) : ce qu’on achète, une fois (achats.offre). Le rapport d’une conv seul
- * ou avec des bulles (les deux formules, et la suite de l’offre unique ①), des bulles en plus après le rapport (③), et
- * les recharges.
+ * ou avec des bulles (les deux formules, la suite de l’offre unique ①, et le rapport à −50 % que le repli de « C’est
+ * débloqué » a gardé), des bulles en plus après le rapport (③), le 2e rapport à −50 % (un rapport d’avance, pour la conv
+ * de son choix), et les recharges.
  */
-export const OFFRES = ["rapport", "premium", "suite", "premium_ajout", "pack30", "pack80", "pack200"] as const;
+export const OFFRES = ["rapport", "premium", "suite", "rapport_garde", "premium_ajout", "second", "pack30", "pack80", "pack200"] as const;
 export type OffreId = (typeof OFFRES)[number];
 /** Les deux formules de la feuille du paiement : le rapport seul, ou Premium (choisie d’avance). */
 export const FORMULES = ["rapport", "premium"] as const satisfies readonly OffreId[];
@@ -34,15 +35,16 @@ export type Formule = (typeof FORMULES)[number];
 /**
  * Les offres uniques, chacune une fois par compte au plus, décidée par le serveur (src/server/offres-uniques.ts) : ① la
  * suite moins chère pendant 5 minutes, ② le mail de relance, ③ Premium pour 5 € de plus après le paiement, ④ le bonus
- * de la première recharge.
+ * de la première recharge, ⑤ le 2e rapport à −50 % après le paiement, et ⑥ son repli : le −50 % gardé 7 jours pour la
+ * conv suivante.
  */
-export const OFFRES_UNIQUES = ["suite", "relance_mail", "premium_ajout", "premiere_recharge"] as const;
+export const OFFRES_UNIQUES = ["suite", "relance_mail", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"] as const;
 export type OffreUnique = (typeof OFFRES_UNIQUES)[number];
 /**
- * Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ sur
- * « C’est débloqué », ④ en ouvrant la recharge.
+ * Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ et
+ * ⑤ sur « C’est débloqué », ④ en ouvrant la recharge, ⑥ quand « C’est débloqué » garde le −50 % refusé (« Garde-le-moi »).
  */
-export const OFFRES_PROPOSEES = ["suite", "premium_ajout", "premiere_recharge"] as const satisfies readonly OffreUnique[];
+export const OFFRES_PROPOSEES = ["suite", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"] as const satisfies readonly OffreUnique[];
 export type OffreProposee = (typeof OFFRES_PROPOSEES)[number];
 /** Ce que le faux Whop (BLUSH_PAIEMENT_FACTICE, jamais en ligne) fait d’un achat : le payer, le refuser, ou le rembourser (un moyen de test). */
 export const ISSUES_DU_FAUX_WHOP = ["payer", "refuser", "rembourser"] as const;

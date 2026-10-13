@@ -116,20 +116,38 @@ const ecrire = (texte, retenue) => async (page) => {
   await envoyer();
   await page.waitForTimeout(retenue);
 };
+/** Paie dans la feuille de la carte que le bouton de l’écran vient d’ouvrir, avec la carte de test du faux Whop (BLUSH_PAIEMENT_FACTICE). */
+const payerParCarte = async (page) => {
+  await page
+    .getByRole("dialog", { name: "Payer par carte" })
+    .getByRole("button", { name: /^Payer / })
+    .click();
+};
 /**
- * Paie la formule `nom` de la feuille du paiement au faux Whop (BLUSH_PAIEMENT_FACTICE), comme à l’écran (sans case de
- * renonciation) : « Débloquer », puis « Payer » sur sa page ; on arrive sur « C’est débloqué ».
+ * Paie la formule `nom` de la feuille du paiement au faux Whop, comme à l’écran (sans case de renonciation) :
+ * « Débloquer », puis la carte de test dans la feuille ; on arrive sur « C’est débloqué ».
  */
 const payerLaFormule = (nom) => async (page) => {
   const feuille = page.getByRole("dialog");
   await feuille.getByRole("radio", { name: nom }).click();
-  await feuille.getByRole("button", { name: "Débloquer" }).click();
-  await page.getByRole("button", { name: "Payer", exact: true }).click();
+  await feuille.getByRole("button", { name: /^Débloquer/ }).click();
+  await payerParCarte(page);
   await page.waitForURL(/\/rapport\/debloque\?achat=/);
   await page.waitForTimeout(1600);
 };
-/** Commence le paiement de la formule choisie d’avance, puis touche `bouton` (« Refuser », « Annuler ») chez le faux Whop : la page du retour. */
+/**
+ * La feuille sans le paiement dans la feuille (le repli : la page de Whop, ici celle du faux Whop), pour montrer la page
+ * du retour : ce que la feuille doit savoir répond « rien » à l’écran (le serveur, lui, garde le faux Whop), puis la page
+ * se recharge pour le relire.
+ */
+const surLaPageDuFauxWhop = async (page) => {
+  await page.route("**/api/paiement/feuille", (route) => route.fulfill({ json: { paiement: { mode: null }, avance: null, garde: null } }));
+  await page.reload();
+  await page.getByRole("dialog").waitFor();
+};
+/** Commence le paiement de la formule choisie d’avance sur la page du faux Whop, puis touche `bouton` (« Refuser », « Annuler ») : la page du retour. */
 const retourDuFauxWhop = (bouton) => async (page) => {
+  await surLaPageDuFauxWhop(page);
   const feuille = page.getByRole("dialog");
   await feuille.getByRole("button", { name: /^Débloquer/ }).click();
   await page.getByRole("button", { name: bouton, exact: true }).click();
@@ -580,6 +598,7 @@ export const STATES = [
     sheet: true,
     steps: async (page) => {
       /* Pas d’écran de recharge dans ce lot : la commande de la feuille part en pack (la version de la renonciation est celle de l’écran) */
+      await surLaPageDuFauxWhop(page);
       await page.route("**/api/paiement", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), offre: "pack80" }) }));
       const feuille = page.getByRole("dialog");
       await feuille.getByRole("button", { name: /^Débloquer/ }).click();
@@ -1044,12 +1063,12 @@ export const STATES = [
     bulles: 10,
     full: true,
     steps: async (page) => {
-      /* Une recharge de 30 bulles, payée au faux Whop depuis Mon compte, qui y revient */
+      /* Une recharge de 30 bulles, payée dans la feuille depuis Mon compte, qui y revient */
       await click("Recharger 30, 80 ou 200 bulles")(page);
       const feuille = page.getByRole("dialog");
       await feuille.getByRole("radio", { name: /^30 bulles/ }).click();
       await feuille.getByRole("button", { name: /^Payer/ }).click();
-      await page.getByRole("button", { name: "Payer", exact: true }).click();
+      await payerParCarte(page);
       await page.waitForURL((u) => u.pathname === "/compte");
       await page.waitForTimeout(1200);
     },

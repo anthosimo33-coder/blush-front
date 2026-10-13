@@ -58,6 +58,8 @@ const MOMENTS_DES_COUPS: Record<OffreUnique, string> = {
   relance_mail: "deux heures après",
   premium_ajout: "juste après le paiement",
   premiere_recharge: "à la première recharge",
+  second_rapport: "juste après le paiement",
+  garde_second: "le 2e rapport refusé, juste après",
 };
 
 /* Les couleurs propres au pilotage : le rose de la case en cours, l’orange de la fuite et de la marge sous la cible, le vert de la marge tenue */

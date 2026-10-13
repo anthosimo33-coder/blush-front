@@ -1,6 +1,7 @@
 "use client";
 
 import { PIED_GRATUIT } from "@/contenu/paiement";
+import { useFeuilleDuPaiement } from "@/lib/requetes";
 import { Grappe } from "@/components/bulles/perles";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -8,13 +9,15 @@ import { Icon } from "@/components/ui/icons";
 /**
  * Le bas de l’aperçu gratuit (le prototype des bulles), après les chapitres fermés : « Lire la suite », son prix, qui
  * ouvre la feuille « Ta formule » (`ouvrirPaiement`), et les bulles offertes avec le rapport, en rose, qui ouvrent « C’est
- * quoi une bulle ? » (`expliquer`).
+ * quoi une bulle ? » (`expliquer`). Les avoirs du compte changent le bouton : un rapport d’avance débloque sans payer, le
+ * −50 % gardé dit son prix.
  */
 export function PiedGratuit({ ouvrirPaiement, expliquer }: { ouvrirPaiement: () => void; expliquer: () => void }) {
+  const avoirs = useFeuilleDuPaiement().data;
   return (
     <div className="flex flex-col gap-3">
       <Button arrow onClick={ouvrirPaiement} aria-haspopup="dialog">
-        {PIED_GRATUIT.lire}
+        {avoirs?.avance ? PIED_GRATUIT.lireAvance : avoirs?.garde ? PIED_GRATUIT.lireGarde : PIED_GRATUIT.lire}
       </Button>
       <button
         type="button"

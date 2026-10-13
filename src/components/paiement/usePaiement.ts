@@ -21,7 +21,7 @@ import type { OffreId } from "@/types";
 type Refus = "bientot" | "souci";
 
 /** Ce que l’écran fait quand le serveur refuse : le rapport déjà ouvert (un autre onglet a payé), l’offre unique passée. */
-type QuandRefuse = { deja?: () => void; offre?: () => void };
+export type QuandRefuse = { deja?: () => void; offre?: () => void };
 
 /** La renonciation (que le geste de payer donne), l’état du bouton, et `payer(offre)` : le paiement au premier toucher, ou le refus dit. */
 export function usePaiement({ suite, quand = {} }: { suite?: string | null; quand?: QuandRefuse }) {

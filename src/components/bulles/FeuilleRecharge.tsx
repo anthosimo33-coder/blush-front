@@ -3,13 +3,11 @@
 import { useEffect, useId, useState } from "react";
 import { useAuPaiement } from "@/lib/presence";
 import { proposerOffreUnique } from "@/services/api";
-import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
-import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import { MentionRenonciation } from "@/components/juridique/cases";
-import { usePaiement } from "@/components/paiement/usePaiement";
+import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeuille";
+import { CATALOGUE } from "@/contenu/offres";
 import { lePack, PACK_CONSEILLE, PACKS, RECHARGE, type Pack } from "@/contenu/recharge";
 import { Grappe } from "./perles";
 import { LigneOfferte, Option } from "./pieces";
@@ -17,11 +15,10 @@ import { LigneOfferte, Option } from "./pieces";
 /*
  * La recharge (le prototype validé des bulles, 12 octobre) : trois packs, le conseillé choisi d’avance et ouvert, et le
  * bonus de la première recharge (④) quand le serveur le montre (POST /api/paiement/offre : une fois par compte, jamais
- * le même jour qu’une autre offre unique). Puis le paiement, au premier toucher : la page de Whop (ou le faux
- * Whop en local), d’où l’on revient où la recharge a été ouverte (`suite`). Payer passe par usePaiement, comme les
- * autres feuilles qui font payer : la renonciation (une ligne sous le bouton, que le geste de payer donne), le bouton
- * occupé (libéré au retour de chez Whop par « Retour »), et
- * ce qu’on dit quand rien ne part (la renonciation périmée, le paiement pas encore branché, le reste). Sans la case de
+ * le même jour qu’une autre offre unique). Puis le paiement dans la feuille (PayerDansLaFeuille, comme les autres
+ * feuilles qui font payer : Apple Pay, Google Pay ou la carte de Whop, sans quitter BLUSH ; la page de Whop en repli),
+ * la renonciation (une ligne sous le bouton, que le geste de payer donne), et ce qu’on dit quand rien ne part. Payé : les
+ * packs s’effacent derrière « C’est payé », puis on revient où la recharge a été ouverte (`suite`). Sans la case de
  * renonciation (retirée le 13 octobre), la feuille a les marges du prototype, sauf ses écarts sur un écran bas.
  */
 
@@ -66,8 +63,8 @@ export function FeuilleRecharge({
 
   const premiere = bonus === "oui";
   const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p, premiere)])) as Record<Pack, ReturnType<typeof lePack>>;
-  /* La suite d’après le pack choisi : ses bulles (le mot « +N bulles » du retour, que le serveur corrige s’il le faut) */
-  const paiement = usePaiement({ suite: suite(packs[choisi].total) });
+  /* Payé : « C’est payé » prend la place des packs, le temps de la livraison ; la feuille ne se ferme plus */
+  const [paye, setPaye] = useState(false);
 
   /** Le tag rose d’un pack qui offre des bulles (« +10 offertes »), à côté de son titre. */
   const tag = (p: Pack) => {
@@ -77,7 +74,7 @@ export function FeuilleRecharge({
 
   return (
     /* Un écran bas (375 × 667) : le titre, le bonus et les écarts se resserrent pour tenir sans défiler, bonus ④, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
-    <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
+    <Sheet open={open} onClose={paye ? () => {} : onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[22px]">
         {RECHARGE.titre}
       </h2>
@@ -94,7 +91,7 @@ export function FeuilleRecharge({
           </p>
         </div>
       )}
-      <RadioGroup label={RECHARGE.choix} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
+      <RadioGroup label={RECHARGE.choix} className={paye ? "hidden" : "flex flex-col gap-3 [@media(max-height:700px)]:gap-2"}>
         {PACKS.map((p) => {
           const pack = packs[p];
           /* Le prix de la bulle en vert quand il baisse (le bonus, le grand pack) ; en gris pour le repère et le conseillé seul */
@@ -116,16 +113,17 @@ export function FeuilleRecharge({
         })}
       </RadioGroup>
       <div className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
-        {paiement.refus === "bientot" && (
-          <p role="status" className="m-0 text-center text-note font-extrabold leading-[1.45] text-soft">
-            {RECHARGE.bientot}
-          </p>
-        )}
-        {paiement.refus === "souci" && <Alert className="text-center leading-[1.45]">{RECHARGE.souci}</Alert>}
-        <Button arrow loading={paiement.occupe} loadingLabel={RECHARGE.enCours} onClick={() => void paiement.payer(choisi)}>
-          {RECHARGE.payer(packs[choisi].prix)}
-        </Button>
-        <MentionRenonciation quoi="bulles" etat={paiement.renonciation} />
+        <PayerDansLaFeuille
+          offre={choisi}
+          centimes={CATALOGUE[choisi].centimes}
+          titre={packs[choisi].titre}
+          libelle={RECHARGE.payer(packs[choisi].prix)}
+          quoi="bulles"
+          /* La suite d’après le pack choisi : ses bulles (le mot « +N bulles » de l’arrivée, que le serveur corrige s’il le faut) */
+          suite={suite(packs[choisi].total)}
+          surPaye={setPaye}
+          fleche
+        />
         <span className="text-center text-micro font-extrabold text-grey">
           <b className="font-black text-ink">{RECHARGE.pied.fort}</b>
           {RECHARGE.pied.reste}

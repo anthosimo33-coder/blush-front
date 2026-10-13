@@ -8,7 +8,7 @@ import { RETOUR_PAIEMENT } from "@/contenu/paiement";
 import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
-import { suiteDuPaiement } from "@/lib/paiement";
+import { suiteDuPaiement, versDebloque } from "@/lib/paiement";
 import { apresDeblocage } from "@/lib/requetes";
 import { etatDuPaiement } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
@@ -18,7 +18,6 @@ import { TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Screen } from "@/components/shell/Screen";
 import type { OffreId } from "@/types";
-import type { EtatAchat } from "@/types/api";
 
 /** Toutes les combien relire l’achat, et combien de fois avant de dire que ça prend du temps (une minute). */
 const PAS_MS = 1_000;
@@ -34,9 +33,6 @@ export type StatutDuRetour = "succeeded" | "failed" | "canceled";
 
 /** Ce que la page montre : l’attente, l’achat qui ne sera pas livré, ou les bulles reçues (`recu`) avant d’y retourner (`vers`). */
 type Etat = { nom: "attente" | "long" | "echoue" | "abandon" | "annule" | "introuvable" } | { nom: "recu"; bulles: number; vers: Route };
-
-/** Où mener une fois l’achat payé : « C’est débloqué » pour un rapport (qui reprend ensuite où le paiement a commencé). */
-const versDebloque = (e: EtatAchat, suite: string | null): Route => `/rapport/debloque?achat=${e.achat}${suite ? `&suite=${encodeURIComponent(suite)}` : ""}`;
 
 /** Où « Réessayer » mène : la feuille « Ta formule » pour un rapport ; sinon là où le paiement a commencé, ou l’accueil. */
 const versReessayer = (offre: OffreId, suite: string | null): Route => (CATALOGUE[offre].conv ? "/rapport?paiement=1" : ((suite ?? "/app") as Route));
@@ -82,7 +78,7 @@ export function RetourScreen({ achat, paiement, statut }: { achat: string | null
         if (e.statut === "paye") {
           fini = true;
           apresDeblocage();
-          if (CATALOGUE[e.offre].conv) router.replace(versDebloque(e, suite));
+          if (CATALOGUE[e.offre].conv) router.replace(versDebloque(e.achat, suite));
           else {
             const vers = (suite ?? "/app") as Route;
             setEtat({ nom: "recu", bulles: e.bulles, vers });
@@ -111,7 +107,7 @@ export function RetourScreen({ achat, paiement, statut }: { achat: string | null
     };
   }, [achat, paiement, statut, router]);
 
-  const textes = etat.nom === "recu" ? RETOUR_PAIEMENT.recu(etat.bulles) : RETOUR_PAIEMENT[etat.nom];
+  const textes = etat.nom === "recu" ? (offre === "second" ? RETOUR_PAIEMENT.avance : RETOUR_PAIEMENT.recu(etat.bulles)) : RETOUR_PAIEMENT[etat.nom];
   const pied =
     etat.nom === "attente" ? undefined : etat.nom === "recu" ? (
       <ButtonLink href={etat.vers} arrow>

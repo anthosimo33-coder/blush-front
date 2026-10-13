@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { lirePaiementWhop, lireWebhook, montantJuste } from "@/server/paiement/evenements";
 import { signerWebhook, TOLERANCE_WEBHOOK_S, verifierWebhook } from "@/server/paiement/signature";
-import { creerConfiguration, ErreurWhop, lirePaiement, payerEnUnGeste, VERSION_API_WHOP, type ConfigWhop } from "@/server/paiement/whop";
+import { creerConfiguration, ErreurWhop, lirePaiement, payerAvecJeton, payerEnUnGeste, VERSION_API_WHOP, type ConfigWhop } from "@/server/paiement/whop";
 
 /*
  * Le paiement par Whop, sans base ni réseau : la signature des webhooks (Standard Webhooks, écrite à la main), ce que
@@ -254,7 +254,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
     expect(appels).toHaveLength(avant);
   });
 
-  it("le paiement en un geste : le moyen gardé du membre, à sa demande (off_session faux) ; la page de la 3-D Secure si la banque la demande", async () => {
+  it("le paiement en un geste : le moyen gardé du membre (sans off_session, que l’API n’a pas) ; la page de la 3-D Secure si la banque la demande", async () => {
     repondre(200, { id: "pay_2", status: "paid" });
     const demande = { achat: "a1", centimes: 500, titre: "80 bulles en plus", membre: "mber_1", moyen: "payt_1", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
     expect(await payerEnUnGeste(config, demande)).toEqual({ id: "pay_2", confirmer: null });
@@ -265,14 +265,44 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
         account_id: "biz_1",
         member_id: "mber_1",
         payment_method_id: "payt_1",
-        off_session: false,
         return_url: demande.retour,
         metadata: { achat: "a1" },
         plan: expect.objectContaining({ initial_price: 5, title: "80 bulles en plus" }),
       },
     });
+    expect(appels[0]?.corps).not.toHaveProperty("off_session");
     repondre(200, { id: "pay_3", status: "requires_action", next_action: { type: "redirect", redirect_to_url: { url: "https://banque.example/3ds" } } });
     expect(await payerEnUnGeste(config, demande)).toEqual({ id: "pay_3", confirmer: "https://banque.example/3ds" });
+  });
+
+  it("le paiement dans la feuille : le jeton des Elements, le prix en ligne, l’achat en métadonnées, l’email du compte, le retour ; la clé d’idempotence vient du jeton", async () => {
+    repondre(200, { id: "pay_4", status: "open", substatus: "pending", client_secret: "pay_4_secret_v1_x" });
+    const demande = { achat: "a1", centimes: 1490, titre: "Premium", jeton: "ctok_abc", email: "toi@example.com", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
+    expect(await payerAvecJeton(config, demande)).toEqual({ id: "pay_4", statut: "open", sousStatut: "pending", secret: "pay_4_secret_v1_x" });
+    expect(appels[0]).toMatchObject({
+      url: "https://api.whop.com/api/v1/payments",
+      corps: {
+        account_id: "biz_1",
+        confirmation_token: "ctok_abc",
+        email: "toi@example.com",
+        return_url: demande.retour,
+        metadata: { achat: "a1" },
+        plan: expect.objectContaining({ initial_price: 14.9, currency: "eur", plan_type: "one_time", title: "Premium", visibility: "hidden" }),
+      },
+    });
+    /* Le jeton n’est pas dans la clé en clair : son empreinte, la même pour le même jeton, une autre pour un autre */
+    const cle = appels[0]?.entetes["idempotency-key"];
+    expect(cle).toMatch(/^jeton:[0-9a-f]{40}$/);
+    expect(cle).not.toContain("ctok_abc");
+    repondre(200, { id: "pay_5", status: "paid", client_secret: null });
+    await payerAvecJeton(config, demande);
+    expect(appels[1]?.entetes["idempotency-key"]).toBe(cle);
+    repondre(200, { id: "pay_6", status: "paid" });
+    await payerAvecJeton(config, { ...demande, jeton: "ctok_autre" });
+    expect(appels[2]?.entetes["idempotency-key"]).not.toBe(cle);
+    /* Une réponse sans id de paiement : illisible, rien n’est supposé payé */
+    repondre(200, { status: "paid" });
+    await expect(payerAvecJeton(config, demande)).rejects.toMatchObject({ code: "whop_illisible" });
   });
 
   it("Whop qui ne répond pas : ErreurWhop « whop_delai »", async () => {

@@ -1,5 +1,6 @@
 import {
   achatEnBase,
+  CARTE,
   commencerPaiement,
   compteDe,
   dernierAchat,
@@ -9,9 +10,11 @@ import {
   ouvrirLeRapport,
   PAIEMENT,
   payer,
+  payerParCarte,
   rejouerWebhook,
   rembourser,
   RENONCIATION,
+  RESEAU,
   test,
   URL_APPLI,
 } from "./aide";
@@ -54,14 +57,31 @@ test("refusé chez le faux Whop : la page du retour le dit, rien n’est crédit
   expect(await compteDe(email)).toMatchObject({ bulles: 0 });
 });
 
-test("annulé chez le faux Whop (« Retour » sur sa page) : rien n’est payé, le retour le dit, « Réessayer » rouvre « Ta formule »", async ({ page }, testInfo) => {
-  const email = emailLibre(testInfo, "annule");
+test("refusé dans la feuille (la banque dit non) : la feuille le dit, rien n’est payé, on peut réessayer sans la quitter", async ({ page }, testInfo) => {
+  const email = emailLibre(testInfo, "refus-feuille");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
-  const feuille = page.getByRole("dialog", { name: PAIEMENT });
-  await feuille.getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
-  await expect(page).toHaveURL(/\/paiement\/factice\?achat=/);
+  await page.getByRole("dialog", { name: PAIEMENT }).getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
+  await payerParCarte(page, { refuser: true });
+  const carte = page.getByRole("dialog", { name: CARTE });
+  await expect(carte.getByText("Ta banque a dit non. Rien n’a été débité\u00a0: essaie une autre carte.")).toBeVisible();
+  expect(await achatEnBase(await dernierAchat(email))).toMatchObject({ offre: "premium", statut: "echoue" });
+  expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
+  /* Une autre carte, et c’est payé */
+  await payerParCarte(page);
+  await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
+  expect(await compteDe(email)).toMatchObject({ bulles: 90, debloquees: 1 });
+});
+
+test("annulé chez le faux Whop (« Retour » sur sa page, le repli de la feuille) : rien n’est payé, le retour le dit, « Réessayer » rouvre « Ta formule »", async ({
+  page,
+}, testInfo) => {
+  const email = emailLibre(testInfo, "annule");
+  await lectureFaite(page, testInfo, email);
+  await ouvrirLeRapport(page);
+  const { url } = await commencerPaiement(page, "premium");
+  await page.goto(url);
   await page.getByRole("button", { name: "Annuler" }).click();
 
   await expect(page).toHaveURL(/\/paiement\/retour\?achat=.*status=canceled/);
@@ -89,14 +109,14 @@ test("l’offre ③ après le rapport seul : payée en un geste avec la carte ga
     await expect(offre.getByRole("link", { name: "délai de rétractation" })).toHaveAttribute("href", "/conditions#livraison");
   });
 
-  await test.step("un geste, sans page de paiement, et l’on revient sur « C’est débloqué » avec 90 bulles", async () => {
+  await test.step("un geste, sans page de paiement ni retour : « C’est débloqué » le dit sur place, avec 90 bulles", async () => {
     await offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" }).click();
-    /* Le retour les dit, puis ramène sur « C’est débloqué » */
-    await expect(page.getByRole("heading", { level: 1, name: "+80 bulles" })).toBeVisible();
+    /* La page attend la livraison sans se quitter, puis le dit ; une offre prise ne mène à aucune autre */
+    await expect(page.getByRole("status").filter({ hasText: "+80 bulles" })).toBeVisible({ timeout: RESEAU });
     await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 90 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/);
-    await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);
+    await expect(ecran.getByRole("region", { name: /Passe en Premium|Ton 2e rapport/ })).toHaveCount(0);
     expect(await compteDe(email)).toMatchObject({ bulles: 90, debloquees: 1 });
   });
 });

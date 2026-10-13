@@ -1,13 +1,14 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { lirePaiementWhop, type PaiementWhop } from "./evenements";
 
 /*
- * Le client de l’API REST de Whop, par fetch, sans leur bibliothèque (@whop/sdk : trop récente, et trois appels
+ * Le client de l’API REST de Whop, par fetch, sans leur bibliothèque (@whop/sdk : trop récente, et quatre appels
  * suffisent). La clé du compte en Bearer, la version de l’API épinglée (Api-Version-Date : sans elle, Whop répond sous
- * les formes de 2025), et une clé d’idempotence sur chaque création (l’id de l’achat : un nouvel essai ne crée pas un
- * second paiement, Whop la garde 24 h). Ce que Whop voit de nous : l’id de l’achat, son prix, l’adresse du retour ;
- * jamais un prénom ni la conv. Le bac à sable (WHOP_BAC_A_SABLE) a sa propre adresse, et ses propres clés.
+ * les formes de 2025), et une clé d’idempotence sur chaque création (l’id de l’achat, ou le jeton de la feuille : un
+ * nouvel essai ne crée pas un second paiement, Whop la garde 24 h). Ce que Whop voit de nous : l’id de l’achat, son
+ * prix, l’adresse du retour, l’email du compte (le paiement dans la feuille) ; jamais un prénom ni la conv. Le bac à sable (WHOP_BAC_A_SABLE) a sa propre adresse, et ses propres clés.
  */
 
 /** La version de l’API de Whop sous laquelle ce client est écrit (celle de leur bibliothèque 2.4.0, le 12 octobre 2026). */
@@ -116,9 +117,10 @@ const PaiementCree = z.looseObject({
 });
 
 /**
- * Le paiement en un geste (l’offre ③, POST /payments) : le moyen de paiement gardé du membre (payt_…, mber_…), payé
- * maintenant, à sa demande (off_session: false : une 3-D Secure peut être demandée). Rend son id, et l’adresse où le
- * confirmer si la banque le demande (« requires_action »), sinon null : le webhook payment.succeeded livrera.
+ * Le paiement en un geste (les offres de « C’est débloqué », POST /payments) : le moyen de paiement gardé du membre
+ * (payt_…, mber_…), payé maintenant, à sa demande. Rend son id, et l’adresse où le confirmer si la banque le demande
+ * (« requires_action »), sinon null : le webhook payment.succeeded livrera. L’API n’a pas de champ pour dire « à sa
+ * demande » (off_session, qu’on envoyait, n’existe pas chez elle : vérifié dans sa référence du 13 octobre).
  */
 export async function payerEnUnGeste(
   config: ConfigWhop,
@@ -130,7 +132,6 @@ export async function payerEnUnGeste(
       plan: planEnLigne(config, centimes, titre),
       member_id: membre,
       payment_method_id: moyen,
-      off_session: false,
       return_url: retour,
       metadata: { achat },
     },
@@ -140,4 +141,47 @@ export async function payerEnUnGeste(
   if (!p.success) throw new ErreurWhop("illisible");
   const action = p.data.next_action;
   return { id: p.data.id, confirmer: p.data.status === "requires_action" ? (action?.redirect_to_url?.url ?? action?.url ?? null) : null };
+}
+
+/** Ce que Whop répond à un paiement créé d’un jeton de confirmation : son id, son statut et son sous-statut, et sa clé pour le navigateur. */
+const PaiementDuJeton = z.looseObject({
+  id: z.string().regex(/^pay_[A-Za-z0-9_-]+$/),
+  status: z.string().nullish(),
+  substatus: z.string().nullish(),
+  client_secret: z.string().nullish(),
+});
+
+/**
+ * Un paiement créé dans la feuille : son id (pay_…), son statut chez Whop (« paid » : payé ; le reste : une étape attend
+ * l’acheteur, ou la banque décide encore), son sous-statut (« failed », « blocked »… : refusé pour de bon), et la clé qui
+ * laisse le navigateur finir l’étape (une 3-D Secure : handleNextAction des Elements), ou null.
+ */
+export type PaiementDansLaFeuille = { id: string; statut: string; sousStatut: string | null; secret: string | null };
+
+/**
+ * Le paiement dans la feuille (POST /payments, avec le jeton de confirmation ctok_… que les Elements de Whop ont donné au
+ * navigateur : la carte, Apple Pay ou Google Pay, sans qu’aucun numéro ne passe par nous) : le prix de l’achat en ligne,
+ * l’achat dans les métadonnées (le webhook payment.succeeded le livre, comme les autres paiements), l’adresse du retour
+ * pour une étape hors de la page (une 3-D Secure, une banque), et l’email du compte, qui rattache chaque achat au même
+ * acheteur chez Whop (et à ses moyens de paiement gardés : le paiement en un geste). La clé d’idempotence vient du jeton,
+ * à usage unique : un nouvel essai du même jeton ne paie pas deux fois ; une autre carte, un autre jeton.
+ */
+export async function payerAvecJeton(
+  config: ConfigWhop,
+  { achat, centimes, titre, jeton, email, retour }: { achat: string; centimes: number; titre: string; jeton: string; email: string; retour: string },
+): Promise<PaiementDansLaFeuille> {
+  const brut = await appel(config, "POST", "/payments", {
+    corps: {
+      account_id: config.compte,
+      plan: planEnLigne(config, centimes, titre),
+      confirmation_token: jeton,
+      email,
+      metadata: { achat },
+      return_url: retour,
+    },
+    idempotence: `jeton:${createHash("sha256").update(jeton).digest("hex").slice(0, 40)}`,
+  });
+  const p = PaiementDuJeton.safeParse(brut);
+  if (!p.success) throw new ErreurWhop("illisible");
+  return { id: p.data.id, statut: (p.data.status ?? "").toLowerCase(), sousStatut: p.data.substatus?.toLowerCase() ?? null, secret: p.data.client_secret ?? null };
 }

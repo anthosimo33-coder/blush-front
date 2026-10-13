@@ -149,7 +149,7 @@ describe("le pilotage (/admin)", () => {
       centimes: 1490 + 990 + 990,
     });
     const groupe = (p: typeof avant, g: string) => p.mix.find((m) => m.groupe === g)!;
-    expect(apres.mix.map((m) => m.groupe)).toEqual(["premium", "rapport", "suite", "bulles"]);
+    expect(apres.mix.map((m) => m.groupe)).toEqual(["premium", "rapport", "suite", "second", "bulles"]);
     expect([d((p) => groupe(p, "premium").centimes), d((p) => groupe(p, "bulles").centimes), d((p) => groupe(p, "rapport").n)]).toEqual([1490, 990, 1]);
     /* Les cases : 7 jours de Paris, la dernière (aujourd’hui) a les achats d’aujourd’hui */
     expect(apres.pas).toBe("jour");

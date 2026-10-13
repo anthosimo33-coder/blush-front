@@ -1,0 +1,1 @@
+ALTER TABLE "achats" ADD COLUMN "utilise_le" timestamp with time zone;

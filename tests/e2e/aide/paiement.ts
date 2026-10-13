@@ -6,10 +6,24 @@ import { sql } from "./base";
 import { RESEAU } from "./page";
 
 /*
- * Le paiement par le faux Whop (BLUSH_PAIEMENT_FACTICE, posé par playwright.config.ts) : sa page de paiement est locale,
- * et son bouton « Payer » poste un vrai webhook signé à /api/paiement/whop, que le serveur vérifie et livre comme ceux
- * de Whop. Les états d’un achat se lisent en base (aide/base.ts, compteDe).
+ * Le paiement par le faux Whop (BLUSH_PAIEMENT_FACTICE, posé par playwright.config.ts) : à l’écran, dans la feuille (sa
+ * carte de test, que le serveur paie par un jeton qu’il reconnaît, puis son vrai webhook signé, livré comme ceux de
+ * Whop) ; et, par l’API, sa page de paiement locale (le repli de la page de Whop), dont le bouton « Payer » poste ce
+ * webhook. Les états d’un achat se lisent en base (aide/base.ts, compteDe).
  */
+
+/** Le nom de la feuille de la carte (le paiement dans la feuille). */
+export const CARTE = "Payer par carte";
+
+/**
+ * Paie à l’écran, dans la feuille de la carte que le bouton de l’écran vient d’ouvrir, avec la carte de test du faux
+ * Whop : « Payer … », ou « Simuler un refus » (`refuser`). La feuille se ferme une fois payé ; la livraison suit.
+ */
+export async function payerParCarte(page: Page, { refuser = false }: { refuser?: boolean } = {}): Promise<void> {
+  const carte = page.getByRole("dialog", { name: CARTE });
+  await expect(carte).toBeVisible();
+  await carte.getByRole("button", refuser ? { name: "Simuler un refus" } : { name: /^Payer / }).click();
+}
 
 /** Ce que l’écran envoie de la renonciation (le geste de payer la donne) : la version de son texte. */
 export const RENONCIATION = CASE_RENONCIATION.version;

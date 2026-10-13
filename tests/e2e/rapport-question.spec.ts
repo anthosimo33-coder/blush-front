@@ -16,8 +16,9 @@ import {
   ouvrir,
   ouvrirLeRapport,
   PAIEMENT,
-  RESEAU,
+  payerParCarte,
   reponseAuGeste,
+  RESEAU,
   test,
   tientEnPetitEcran,
   titreDuChapitre,
@@ -267,10 +268,9 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
     await tientEnPetitEcran(page, "la recharge, bonus ④ compris");
   });
 
-  await test.step("payée au faux Whop : le retour mène au chat, qui lit la réponse prête", async () => {
+  await test.step("payée dans la feuille : la livraison mène au chat, qui lit la réponse prête", async () => {
     await recharge.getByRole("button", { name: "Payer · 9,90\u00a0€" }).click();
-    await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
-    await page.getByRole("button", { name: "Payer", exact: true }).click();
+    await payerParCarte(page);
     await page.waitForURL((u) => u.pathname === "/app" && !u.search.includes("recharge"), { timeout: 2 * RESEAU });
     await expect(page.getByRole("status").filter({ hasText: "+120 bulles, ta réponse est là" })).toBeVisible();
     const fil = filDuChat(page);

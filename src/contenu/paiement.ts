@@ -1,6 +1,6 @@
 import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
-import { CATALOGUE, enEuros, prixDe } from "./offres";
+import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
 
 /*
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
@@ -26,6 +26,10 @@ const BULLE_PREMIUM = Math.round((PREMIUM.centimes - CATALOGUE.rapport.centimes)
 /** Le bas de l’aperçu gratuit (PiedGratuit) : « Lire la suite », son prix, et les bulles offertes avec le rapport. */
 export const PIED_GRATUIT = {
   lire: `Lire la suite · ${prixDe("rapport")}`,
+  /** Le −50 % gardé (⑥) : le rapport à son prix réduit. */
+  lireGarde: `Lire la suite · ${prixDe("rapport_garde")}`,
+  /** Un rapport d’avance (⑤ payé) : la suite sans rien payer (la feuille dit pourquoi). */
+  lireAvance: `Lire la suite · ${prixCourt(0)}`,
   offertes: `${CATALOGUE.rapport.bulles} bulles offertes avec ton rapport`,
   regle: `${CEST_QUOI.texte}, sur tout ce que tu veux`,
 };
@@ -57,6 +61,15 @@ export const FEUILLE_FORMULE = {
     gratuit: PIECES.gratuit,
     economie: `Économise ${enEuros((PREMIUM.barre ?? PREMIUM.centimes) - PREMIUM.centimes)} · la bulle à ${enEuros(BULLE_PREMIUM)}`,
   },
+  /** Un rapport d’avance (⑤ payé) : la suite sans rien payer, choisie d’avance. */
+  avance: {
+    titre: "Ton rapport d’avance",
+    note: `Déjà payé · + ${RAPPORT_D_AVANCE.bulles} bulles offertes`,
+    prix: prixCourt(0),
+    debloquer: `Débloquer · ${prixCourt(0)}`,
+  },
+  /** Le −50 % gardé (⑥) : sous le rapport, à son prix réduit, jusqu’à quand. */
+  garde: (jusquau: string) => `Ton −50\u00a0% · jusqu’au ${jusquau}`,
   /** Pour un lecteur d’écran, devant un prix barré : il n’entend pas le trait. */
   auLieuDe: "au lieu de ",
   payer: (prix: string) => `Débloquer · ${prix}`,
@@ -102,8 +115,51 @@ export const OFFRE_PREMIUM_AJOUT = {
   plus: `+ ${CATALOGUE.premium_ajout.bulles}`,
   carte: "Ta carte est enregistrée\u00a0: un geste et c’est fait.",
   prendre: `Ajouter ${CATALOGUE.premium_ajout.bulles} bulles · ${prixCourt(CATALOGUE.premium_ajout.centimes)}`,
-  non: "Non merci, je lis la suite",
+  /* Refusée, son repli suit (le 2e rapport à −50 %) : « je lis la suite » n’est plus vrai */
+  non: "Non merci",
   souci: FEUILLE_FORMULE.souci,
+};
+
+/** Le 2e rapport à −50 % (⑤, sur « C’est débloqué ») : un rapport d’avance, sur un billet détachable, valable un an. */
+const SECOND = CATALOGUE.second;
+/** Sa remise, en pourcentage (« −50 % »), en rose dans son titre. */
+const REMISE_SECOND = `−${Math.round(100 - (100 * SECOND.centimes) / (SECOND.barre ?? CATALOGUE.rapport.centimes))}\u00a0%`;
+
+export const OFFRE_SECOND = {
+  badge: "Une seule fois, ici",
+  /** Le titre en deux morceaux : la remise se pose en rose. */
+  avant: "Ton 2e rapport à ",
+  remise: REMISE_SECOND,
+  texte: "Un autre crush, un ex qui revient, un pote chelou… Garde un rapport sous le coude.",
+  billet: {
+    titre: "Ton prochain rapport",
+    sous: "L’histoire de ton choix",
+    contenu: [`${NB_CHAPITRES} chapitres`, "ton vocal", `${RAPPORT_D_AVANCE.bulles} bulles`],
+    prix: prixDe("second"),
+    barre: enEuros(SECOND.barre ?? CATALOGUE.rapport.centimes),
+    tampon: "À toi",
+  },
+  carte: OFFRE_PREMIUM_AJOUT.carte,
+  prendre: `Je le prends · ${prixDe("second")}`,
+  pris: "Ton 2e rapport t’attend.",
+  non: "Non merci, je lis la suite",
+  /* Rien n’est livré à l’achat : le délai de rétractation court tant qu’il n’est pas utilisé (RAPPORT_D_AVANCE, son TODO juriste) */
+  pied: "Valable 1 an. Pas utilisé\u00a0? Remboursable 14 jours.",
+  souci: FEUILLE_FORMULE.souci,
+};
+
+/** Le repli de ⑤ refusée (⑥) : le −50 % gardé 7 jours pour une autre conv, sans rien payer maintenant. */
+export const OFFRE_GARDE = {
+  /** Ce que BLUSH lance, dans sa bulle, au-dessus du titre. */
+  bulle: "pas grave",
+  titre: "Pas d’autre histoire en tête\u00a0?",
+  texte: (jusquau: string) => `Je te garde ton ${REMISE_SECOND} jusqu’au ${jusquau}. Il se pose tout seul sur ta prochaine conv.`,
+  /** Sur la souche du billet, au-dessus du jour. */
+  jusquau: "jusqu’au",
+  remise: REMISE_SECOND,
+  garder: "Garde-le-moi",
+  garde: (jusquau: string) => `Ton ${REMISE_SECOND} t’attend jusqu’au ${jusquau}.`,
+  non: "Non merci",
 };
 
 /** « C’est débloqué » (EcranDebloque) : ce que l’achat vient d’ouvrir. */
@@ -115,6 +171,10 @@ export const DEBLOQUE = {
   reprise: (chapitre: number) => `Ta lecture reprend au chapitre ${chapitre}`,
   bulles: (bulles: number) => `${bulles} bulles pour parler à BLUSH`,
   bullesSous: "1 bulle = 1 réponse · elles n’expirent jamais",
+  avance: "1 rapport d’avance",
+  avanceSous: (fin: string) => `Pour l’histoire de ton choix, jusqu’au ${fin}`,
+  garde: `Ton ${REMISE_SECOND} sur le prochain rapport`,
+  gardeSous: (fin: string) => `Jusqu’au ${fin}, il se pose tout seul`,
   lire: "Lire la suite",
   continuer: "Continuer",
 };
@@ -134,7 +194,34 @@ export const RETOUR_PAIEMENT = {
   introuvable: { titre: "Ce paiement n’existe pas, ou pas sur ce compte.", texte: null },
   /** Des bulles reçues (un pack, l’offre ③), avant de revenir là où le paiement a commencé. */
   recu: (bulles: number) => ({ titre: `+${bulles} bulles`, texte: "Elles n’expirent jamais." }),
+  /** Le 2e rapport payé (⑤, après une étape de la banque) : il attend la conv de son choix, sans bulles tout de suite. */
+  avance: { titre: "Ton 2e rapport t’attend.", texte: "Il débloque la conv de ton choix, dans l’année." },
   reessayer: "Réessayer",
   revenir: "Revenir au rapport",
   continuer: "Continuer",
+};
+
+/**
+ * Le paiement dans la feuille (src/components/paiement/integre : les Elements de Whop, sans quitter BLUSH) : le bouton
+ * du portefeuille (Apple Pay, Google Pay), la carte dans sa feuille, ce qu’on dit de la carte gardée, et chaque étape.
+ * TODO(produit): textes nouveaux (le paiement dans la feuille, 13 octobre) ; la ligne de la carte gardée, à faire relire
+ * par un juriste (le consentement que demande l’enregistrement d’un moyen de paiement).
+ */
+export const DANS_LA_FEUILLE = {
+  /** Le nom du bouton du portefeuille, pour un lecteur d’écran (son dessin est celui d’Apple, ou de Google). */
+  portefeuille: { apple_pay: "Payer avec Apple Pay", google_pay: "Payer avec Google Pay" },
+  avecCarte: "Payer par carte",
+  carte: {
+    titre: "Payer par carte",
+    payer: (prix: string) => `Payer ${prix}`,
+    /** Le faux Whop (en local) : sa carte de test, et son refus. */
+    test: "Carte de test · rien n’est débité",
+    refuser: "Simuler un refus",
+  },
+  /* Garder le moyen de paiement (setupFutureUsage) demande de le dire avant le geste qui paie */
+  garder: "Whop garde ta carte\u00a0: tes prochains achats se paient en un geste.",
+  paye: { titre: "C’est payé.", rapport: "J’ouvre ton rapport…", bulles: "J’ajoute tes bulles…" },
+  carteRefusee: "Ta banque a dit non. Rien n’a été débité\u00a0: essaie une autre carte.",
+  /** Les Elements de Whop ne se chargent pas (le réseau, un bloqueur) : on paie sur sa page, comme avant. */
+  pageDeWhop: "Payer sur la page de Whop",
 };

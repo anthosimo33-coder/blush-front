@@ -32,6 +32,7 @@ describe("le serveur", () => {
       deja: 409,
       acces: 402,
       bientot: 402,
+      carte: 402,
       bulles: 402,
       email: 422,
       texte: 422,
