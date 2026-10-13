@@ -95,7 +95,7 @@ test("l’offre ③ après le rapport seul : payée en un geste avec la carte ga
     await offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" }).click();
     /* Le retour les dit, puis ramène sur « C’est débloqué » */
     await expect(page.getByRole("heading", { level: 1, name: "+80 bulles" })).toBeVisible();
-    await expect(ecran.getByText("Les 8 chapitres sont à toi, pour toujours. Et 90 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 90 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/);
     await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);

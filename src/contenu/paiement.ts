@@ -109,8 +109,8 @@ export const OFFRE_PREMIUM_AJOUT = {
 /** « C’est débloqué » (EcranDebloque) : ce que l’achat vient d’ouvrir. */
 export const DEBLOQUE = {
   titre: "C’est débloqué.",
-  /* TODO(produit): « pour toujours » : Whop interdit de promettre un accès « à vie » (sa règle des produits), texte gardé par décision du 12 octobre */
-  phrase: (chapitres: number, bulles: number) => `Les ${chapitres} chapitres sont à toi, pour toujours. Et ${bulles} bulles pour en parler avec BLUSH.`,
+  /* Sans « pour toujours » : Whop interdit de promettre un accès « à vie » (sa règle des produits ; décision du 13 octobre) */
+  phrase: (chapitres: number, bulles: number) => `Les ${chapitres} chapitres sont à toi. Et ${bulles} bulles pour en parler avec BLUSH.`,
   restants: (chapitres: number) => `Les ${chapitres} chapitres qui restent`,
   reprise: (chapitre: number) => `Ta lecture reprend au chapitre ${chapitre}`,
   bulles: (bulles: number) => `${bulles} bulles pour parler à BLUSH`,

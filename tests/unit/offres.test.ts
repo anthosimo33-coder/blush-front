@@ -98,6 +98,6 @@ describe("les textes du paiement, tirés du catalogue", () => {
       prendre: "Ajouter 80 bulles · 5\u00a0€",
       plus: "+ 80",
     });
-    expect(DEBLOQUE.phrase(8, 10)).toBe("Les 8 chapitres sont à toi, pour toujours. Et 10 bulles pour en parler avec BLUSH.");
+    expect(DEBLOQUE.phrase(8, 10)).toBe("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.");
   });
 });

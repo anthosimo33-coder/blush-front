@@ -75,7 +75,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await payerALecran(page, /^Le rapport/);
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
-    await expect(ecran.getByText("Les 8 chapitres sont à toi, pour toujours. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
     /* La case cochée est gardée avec l’achat : sa version, son heure */
@@ -162,7 +162,7 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
   await test.step("« C’est débloqué » : les 10 bulles, et la liste (jamais deux offres le même jour)", async () => {
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/);
     const ecran = page.getByRole("main");
-    await expect(ecran.getByText("Les 8 chapitres sont à toi, pour toujours. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(ecran.getByText("10 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
     await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
