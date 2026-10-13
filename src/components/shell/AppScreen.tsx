@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
@@ -33,11 +34,13 @@ function useAccess() {
  * Coque des écrans après le rapport (desktop : une colonne centrée, « Mon compte » en haut ; une colonne d’appoint seulement si l’écran en passe une).
  * `besoin` : ce que l’écran demande (sa fiche) ; le paiement (la feuille « Ta formule ») s’affiche par-dessus si le compte ne l’ouvre pas.
  * `ferme` : ce que l’écran montre demande le rapport de sa conv, pas encore débloqué (« Ta question ») : le paiement
- * s’affiche par-dessus, quoi que le compte ait d’autre.
+ * s’affiche par-dessus, quoi que le compte ait d’autre. Fermé sans payer, il mène au rapport de la conv (son aperçu
+ * gratuit), ou à `quitter`.
  */
 export function AppScreen({
   besoin,
   ferme = false,
+  quitter = "/rapport",
   autre,
   aCoteDuCompte,
   aside = null,
@@ -46,6 +49,8 @@ export function AppScreen({
 }: {
   besoin?: Besoin;
   ferme?: boolean;
+  /** Où mène le paiement fermé sans payer : le rapport de la conv, ou « Tes convs » (l’accueil d’une conv parmi d’autres). */
+  quitter?: Route;
   /** Le prénom de l’autre personne, pour le paiement (« toi et Léa »). */
   autre?: string;
   /** Desktop : ce qui se pose juste avant « Mon compte », en haut à droite (le compteur de bulles de « Ta question »). */
@@ -95,7 +100,7 @@ export function AppScreen({
       >
         {children}
       </Screen>
-      {(besoin || ferme) && bloqueVu && <FeuilleFormule open={blocked} onClose={() => router.push("/rapport")} suite={pathname} autre={autre} proposerLaSuite={false} />}
+      {(besoin || ferme) && bloqueVu && <FeuilleFormule open={blocked} onClose={() => router.push(quitter)} suite={pathname} autre={autre} proposerLaSuite={false} />}
     </>
   );
 }

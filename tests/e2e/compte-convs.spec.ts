@@ -4,10 +4,14 @@ import {
   attendreTaches,
   champDuChat,
   connecterParApi,
+  debloquerLaConv,
   ecrireABlush,
+  emailLibre,
   expect,
+  fermerLaFeuille,
   filDuChat,
   histoiresDe,
+  lectureFaite,
   lireUneConvParApi,
   messagesDeLHistoire,
   nouvelInvite,
@@ -19,7 +23,8 @@ import {
  * Plusieurs convs sur un compte : « Tes convs » (/app/convs) les liste, un toucher ouvre l’accueil de l’une, et il
  * s’ouvre encore sur elle ensuite ; Mon compte les liste aussi. Un geste vise toujours la conv à l’écran, même si un
  * autre onglet en a ouvert une autre entre-temps (l’en-tête x-blush-conv, src/services/session.ts).
- * Des comptes de l’équipe (des invités) : l’accueil s’ouvre sans le paiement. Leurs convs sont préparées par les routes /api.
+ * Des comptes de l’équipe (des invités) : l’accueil s’ouvre sans le paiement ; un compte qui paie, pour une conv payée
+ * à côté d’une autre qui ne l’est pas. Leurs convs sont préparées par les routes /api.
  * Une page n’est touchée qu’une fois prête aux gestes (ouvrir) : un toucher plus tôt suivrait le lien sans choisir la conv.
  */
 
@@ -104,6 +109,43 @@ test("plusieurs convs : « Tes convs » les liste, un toucher ouvre l’accueil 
     await expect(page).toHaveURL(/\/app$/);
     await expect(accueilDe(page, "Romane")).toBeVisible();
     await expect(page.getByRole("link", { name: "Tes convs (Maëlys)" })).toBeVisible();
+  });
+});
+
+test("une conv payée, l’autre pas : la landing mène à « Tes convs », le paiement de celle qui n’est pas payée y ramène, la payée s’ouvre sans lui", async ({ page }, testInfo) => {
+  /* Deux lectures avant le premier écran ; un compte qui paie (pas de l’équipe) : le paiement s’ouvre sur l’accueil d’une conv pas débloquée */
+  test.slow();
+  const email = emailLibre(testInfo, "payee-et-pas");
+  await lectureFaite(page, testInfo, email);
+  await debloquerLaConv(email);
+  await lireUneConvParApi(page, testInfo, { personnes: ROMANE });
+  await attendreTaches(email);
+
+  await test.step("la landing : « Retrouver ma conv » mène à « Tes convs » (Romane, ouverte, n’est pas payée), et de quoi en analyser une autre", async () => {
+    await page.goto("/");
+    await expect(page.getByRole("main").getByRole("link", { name: "Analyser une autre conv" }).first()).toHaveAttribute("href", "/commencer");
+    await page.getByRole("main").getByRole("link", { name: "Retrouver ma conv" }).first().click();
+    await expect(page).toHaveURL(/\/app\/convs$/);
+  });
+
+  await test.step("Romane : son accueil, le paiement par-dessus ; fermé sans payer, il ramène à « Tes convs »", async () => {
+    await page
+      .getByRole("main")
+      .getByRole("link", { name: /^Romane\s: / })
+      .click();
+    await expect(page.getByRole("dialog", { name: "La suite parle de vous deux\u00a0: toi et Romane." })).toBeVisible();
+    await fermerLaFeuille(page);
+    await expect(page).toHaveURL(/\/app\/convs$/);
+  });
+
+  await test.step("Maëlys, payée : son accueil, sans paiement", async () => {
+    await page
+      .getByRole("main")
+      .getByRole("link", { name: /^Maëlys\s: / })
+      .click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(accueilDe(page, "Maëlys")).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 });
 

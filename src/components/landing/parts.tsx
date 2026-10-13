@@ -40,6 +40,20 @@ export function CtaButton({ retour, className }: { retour: Retour; className?: s
   );
 }
 
+/** Sous le bouton principal : la ligne qui rassure (qui découvre), ou le lien pour analyser une autre conv (qui revient). */
+export function SousLeBouton({ retour }: { retour: Retour }) {
+  const cta = ctaDe(retour);
+  if (!cta.autre) return <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>;
+  return (
+    <Link
+      href={cta.autre.href}
+      className="mt-1 inline-flex h-11 items-center px-3 text-note font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2 transition-colors hover:decoration-ink"
+    >
+      {cta.autre.label}
+    </Link>
+  );
+}
+
 function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string; kicker?: string; title: ReactNode; sub?: ReactNode; align?: "center" | "start" }) {
   /* Aligné à gauche = section à deux colonnes : le titre descend d’un cran pour tenir sur deux lignes */
   return (
@@ -332,7 +346,6 @@ function FactTile({ index, children }: { index: number; children: ReactNode }) {
 
 /* ———— Le dernier appel ———— */
 export function FinalCta({ retour }: { retour: Retour }) {
-  const cta = ctaDe(retour);
   return (
     <section className="pb-20 pt-6 lg:pb-28 lg:pt-10">
       <Container>
@@ -340,7 +353,7 @@ export function FinalCta({ retour }: { retour: Retour }) {
           <LogoBulle size={68} animated />
           <h2 className="m-0 mt-6 max-w-[640px] text-titre-1 font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-affiche">Ta conv a déjà la réponse.</h2>
           <CtaButton retour={retour} className="mt-8" />
-          <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>
+          <SousLeBouton retour={retour} />
         </div>
       </Container>
     </section>

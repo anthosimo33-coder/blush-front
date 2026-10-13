@@ -139,6 +139,20 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
 }
 
 /**
+ * Où mène « Retrouver ma conv » sur la landing : là où getRetour mène, sauf vers l’accueil d’une conv dont le rapport
+ * n’est pas débloqué alors que le compte en a d’autres. Le paiement s’ouvre par-dessus cet accueil et cachait le retour
+ * aux autres (une conv payée, introuvable) : la landing mène à « Tes convs », d’où l’on choisit. L’accueil, lui, garde
+ * getRetour : choisie dans la liste, la conv pas débloquée s’ouvre encore.
+ */
+export async function getRetourDeLaLanding(): Promise<{ destination: Route } | null> {
+  const retour = await getRetour();
+  if (retour?.destination !== "/app") return retour;
+  const { utilisateur, story } = await contexte();
+  if (!utilisateur || !story || rapportOuvert(story, utilisateur) || (await nombreDeConvs()) < 2) return retour;
+  return { destination: "/app/convs" };
+}
+
+/**
  * Ce que pose toute page d’une conv (src/components/shell/PageDeConv.tsx) : la conv qu’elle montre (ses gestes la
  * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour ses droits.
  * Sans requête de plus : le contexte de la requête est déjà lu pour la page (contexte, mémorisé le temps du rendu).
