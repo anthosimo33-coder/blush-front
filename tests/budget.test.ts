@@ -29,6 +29,7 @@ import { progression } from "@/server/donnees";
 import { ErreurTache } from "@/server/erreurs";
 import { appeler } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
+import { noterCout } from "@/server/ia/usage";
 import { cloreLesAbandons, executerChaine } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
@@ -115,6 +116,21 @@ describe("la dépense d’un compte", () => {
     oublierLeBudget();
     expect(await controle(autreConvDeA)).toBe("budget");
     expect(await controle()).toBe("ok");
+  });
+
+  it("la voix, comptée au caractère (des millionièmes à virgule), compte aussi dans sa dépense du jour", async () => {
+    const a = await compteEtConv();
+    payeurs.add(a.payeur);
+    const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      /* 3 $ en vocaux : 16 500 caractères à 22 $ les 121 000. Avant l’arrondi, Postgres refusait la dépense (22P02) */
+      await noterCout({ storyId: a.id, tache: ETIQUETTE, modele: "voix", sortie: 16_500, micros: 16_500 * (22 / 121_000) * 1e6 + 0.4, ms: 1, payeur: a.payeur });
+      expect(erreur).not.toHaveBeenCalled();
+    } finally {
+      erreur.mockRestore();
+    }
+    oublierLeBudget();
+    expect(await controle(a.id)).toBe("budget");
   });
 
   it("sans conv, l’appel est sans compte : sa part à lui ne touche pas celle des comptes", async () => {
