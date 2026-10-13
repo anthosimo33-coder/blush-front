@@ -74,14 +74,17 @@ export function FeuilleRecharge({
   };
 
   return (
-    /* Un écran bas (375 × 667) : les écarts de la feuille se resserrent pour tenir sans défiler, bonus ④ et ligne de la renonciation compris */
+    /* Un écran bas (375 × 667) : le titre, le bonus et les écarts se resserrent pour tenir sans défiler, bonus ④, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
     <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
-      <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em]">
+      <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[22px]">
         {RECHARGE.titre}
       </h2>
       <p className="m-0 text-note font-bold leading-[1.45] text-soft">{reponsePrete && autre ? RECHARGE.reponsePrete(autre) : RECHARGE.sousTitre}</p>
       {premiere && (
-        <div data-bonus="" className="flex items-center gap-3 rounded-[20px] bg-[linear-gradient(120deg,#FFE6F2_0%,#EFE4FF_55%,#E2F0FF_100%)] px-4 py-3">
+        <div
+          data-bonus=""
+          className="flex items-center gap-3 rounded-[20px] bg-[linear-gradient(120deg,#FFE6F2_0%,#EFE4FF_55%,#E2F0FF_100%)] px-4 py-3 [@media(max-height:700px)]:py-2"
+        >
           <Grappe taille={42} />
           <p className="m-0 flex flex-col gap-0.5">
             <span className="text-detail font-black">{RECHARGE.bonus}</span>
@@ -89,7 +92,7 @@ export function FeuilleRecharge({
           </p>
         </div>
       )}
-      <RadioGroup label={RECHARGE.choix} className="flex flex-col gap-3">
+      <RadioGroup label={RECHARGE.choix} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
         {PACKS.map((p) => {
           const pack = packs[p];
           /* Le prix de la bulle en vert quand il baisse (le bonus, le grand pack) ; en gris pour le repère et le conseillé seul */
@@ -110,7 +113,7 @@ export function FeuilleRecharge({
           );
         })}
       </RadioGroup>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
         {paiement.refus === "bientot" && (
           <p role="status" className="m-0 text-center text-note font-extrabold leading-[1.45] text-soft">
             {RECHARGE.bientot}
