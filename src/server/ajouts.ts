@@ -134,20 +134,24 @@ export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<Fiche
   return { fiche: { ...fiche, updating: true }, added: [], confirmed: [], pending: { profile: profilLu(ajout), messages: ajout.messages } };
 }
 
-/** Une mise à jour de la mémoire est-elle en attente ou en cours (un ajout à sa fiche, un échange du chat) ? */
+/**
+ * La mémoire s’écrit-elle : la première (après le rapport), ou une mise à jour (un ajout à sa fiche, un échange du
+ * chat), en attente ou en cours ?
+ */
 export async function majEnCours(storyId: string): Promise<boolean> {
   const [t] = await db()
     .select({ id: schema.tasks.id })
     .from(schema.tasks)
-    .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, "memoire_maj"), inArray(schema.tasks.status, ["attente", "en_cours"])))
+    .where(and(eq(schema.tasks.storyId, storyId), inArray(schema.tasks.kind, ["memoire", "memoire_maj"]), inArray(schema.tasks.status, ["attente", "en_cours"])))
     .limit(1);
   return !!t;
 }
 
 /**
- * Sa fiche, et si une mise à jour de la mémoire est en attente ou en cours (`updating`) : l’écran la relit toutes les
- * 3 s jusqu’à ce qu’elle ait fini. Une mise à jour restée en plan (l’instance arrêtée, ou plus le temps de la commencer
- * après la lecture des captures) repart après la réponse ; si une autre la tient, executerChaine la laisse faire.
+ * Sa fiche, et si la mémoire s’écrit (`updating`, majEnCours : la première, ou une mise à jour) : l’écran la relit
+ * toutes les 3 s jusqu’à ce qu’elle ait fini. Une mémoire restée en plan (l’instance arrêtée, ou plus le temps de la
+ * commencer après le rapport ou la lecture des captures) repart après la réponse ; si une autre la tient,
+ * executerChaine la laisse faire.
  * La même pour GET et PUT /api/fiche et pour la page rendue par le serveur (getFiche) : une fiche rendue à l’instant,
  * que l’écran ne relit pas au montage (Q63), dit déjà qu’une mise à jour tourne.
  */
