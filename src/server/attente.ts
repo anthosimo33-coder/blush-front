@@ -8,7 +8,7 @@ import { envoyerMail, ErreurResend, refusDuPrestataire } from "./email";
 import { boiteAMails, env } from "./env";
 import { empreinteDeLaListe, entre } from "./invitations";
 import { compteDe, LIMITES, plafondsDesMails, rendre, sousLaLimite } from "./limites";
-import { journalErreur } from "./journal";
+import { journal, journalErreur } from "./journal";
 import { mailAttente } from "./mail-attente";
 import { INVITATIONS_PAR_LOT } from "@/lib/limites";
 
@@ -130,8 +130,20 @@ export async function inviterLaListe(n: number): Promise<LotInvite> {
         prestataire = true;
         break;
       }
+      if (e instanceof ErreurResend && e.statut === 422) {
+        /*
+         * Une adresse que le prestataire refuse pour elle-même (422 : invalide, ou d’un domaine réservé comme
+         * example.com) ne partira jamais : gardée, elle resterait la plus ancienne et chaque lot retomberait sur elle.
+         * Elle sort de la liste (sa place du jour rendue), et le lot passe à la suivante
+         */
+        await db().delete(w).where(eq(w.id, id));
+        if (!boite) await rendre(MAILS_DE_LA_LISTE);
+        journal("invitation de la liste : adresse refusée par le prestataire, retirée de la liste", {}, "alerte");
+        refusees++;
+        continue;
+      }
       if (e instanceof ErreurResend) {
-        /* L’adresse refusée : elle reste à inviter, on passe à la suivante */
+        /* Un autre refus pour ce mail : l’adresse reste à inviter, on passe à la suivante */
         await rendreLaPlace();
         refusees++;
         continue;
