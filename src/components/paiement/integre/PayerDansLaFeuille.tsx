@@ -253,7 +253,9 @@ function Boutons({
 
 /**
  * Le bouton du portefeuille, au dessin officiel d’Apple ou de Google (celui que Whop donne : leurs règles l’exigent), à
- * la hauteur de nos boutons. Sans dessin, son nom, sur le noir d’Apple.
+ * la hauteur de nos boutons. Ce dessin est un bouton entier (380 × 44, son fond et ses coins compris) : il couvre le
+ * nôtre, à sa hauteur, ses bords de fond rognés, le logo aux proportions que son dessin lui donne. Sans dessin, son nom,
+ * sur le noir d’Apple.
  */
 function BoutonDuPortefeuille({ portefeuille, occupe, onClick }: { portefeuille: Portefeuille; occupe: boolean; onClick: () => void }) {
   const nom = DANS_LA_FEUILLE.portefeuille[portefeuille.type];
@@ -264,14 +266,14 @@ function BoutonDuPortefeuille({ portefeuille, occupe, onClick }: { portefeuille:
       aria-busy={occupe}
       aria-label={nom}
       style={{ background: portefeuille.art?.color ?? "#000000" }}
-      className="lift lift-ink flex h-[60px] w-full items-center justify-center rounded-[30px] text-white shadow-ink"
+      className="lift lift-ink flex h-[60px] w-full items-center justify-center overflow-hidden rounded-[30px] text-white shadow-ink"
     >
       {occupe ? (
         <TypingDots color="#FFFFFF" />
       ) : portefeuille.art ? (
         /* Le dessin officiel, tel quel : une image servie par Whop (Apple et Google en fixent la forme) */
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={portefeuille.art.image} alt="" className="h-[26px] w-auto" />
+        <img src={portefeuille.art.image} alt="" className="size-full object-cover" />
       ) : (
         <span className="text-carte font-black">{nom}</span>
       )}

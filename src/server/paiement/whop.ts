@@ -26,16 +26,37 @@ const DELAI_WHOP_MS = 8_000;
 export type ConfigWhop = { cle: string; compte: string; produit: string; bacASable: boolean };
 
 /**
- * Whop a refusé l’appel (ou n’a pas répondu) : son statut HTTP, rien d’autre (ni la clé, ni le corps). Le journal le lit
- * dans `code` (« whop_401 », « whop_delai » : champsDErreur, src/lib/tracer.ts).
+ * Whop a refusé l’appel (ou n’a pas répondu) : son statut HTTP, et, pour un refus, ce qu’il en dit (`motif`, motifDuRefus),
+ * jamais la clé ni le reste du corps. Le journal les lit dans `code` (« whop_400 », « whop_delai ») et `motif`
+ * (champsDErreur, src/lib/tracer.ts).
  */
 export class ErreurWhop extends Error {
   readonly code: string;
-  constructor(readonly statut: number | "delai" | "illisible") {
+  constructor(
+    readonly statut: number | "delai" | "illisible",
+    readonly motif?: string,
+  ) {
     super(`Whop a répondu ${statut}`);
     this.name = "ErreurWhop";
     this.code = `whop_${statut}`;
   }
+}
+
+/** Le corps d’un refus de Whop : `{ error: { type (ou code), message } }`. */
+const Refus = z.looseObject({ error: z.looseObject({ type: z.string().nullish(), code: z.string().nullish(), message: z.string().nullish() }) });
+
+/**
+ * Ce que Whop dit d’un refus, pour le journal : son type d’erreur et son message (« invalid_request · Missing required
+ * parameter: plan »), le seul moyen de savoir quel champ il refuse. Sans les adresses email qu’il pourrait citer (celle
+ * du compte, dans le paiement dans la feuille) ; undefined s’il ne dit rien de lisible.
+ */
+async function motifDuRefus(r: Response): Promise<string | undefined> {
+  const corps: unknown = await r.json().catch(() => null);
+  const refus = Refus.safeParse(corps);
+  if (!refus.success) return undefined;
+  const { type, code, message } = refus.data.error;
+  const morceaux = [type ?? code, message].filter((m) => typeof m === "string" && m !== "");
+  return morceaux.length > 0 ? morceaux.join(" · ").replace(/[^\s@]+@[^\s@]+/g, "‹email›") : undefined;
 }
 
 /** Un appel à l’API : son corps JSON lu, ou ErreurWhop. Une lecture (GET) de ce qui n’existe pas (404) rend null. */
@@ -59,7 +80,7 @@ async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string
     throw new ErreurWhop("delai");
   }
   if (methode === "GET" && r.status === 404) return null;
-  if (!r.ok) throw new ErreurWhop(r.status);
+  if (!r.ok) throw new ErreurWhop(r.status, await motifDuRefus(r));
   try {
     return await r.json();
   } catch {
