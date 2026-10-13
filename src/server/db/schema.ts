@@ -119,9 +119,9 @@ export const stories = pgTable(
      */
     debloqueLe: quand("debloque_le"),
     /**
-     * L’accord de l’import (la case « J’ai 18 ans ou plus… », src/contenu/consentements.ts) : l’heure où la conv est
-     * arrivée avec la case cochée, et la version de son texte. Toute conv importée par l’API l’a (src/server/juridique.ts) ;
-     * vides pour les convs d’avant la case.
+     * L’accord de l’import (sa ligne au-dessus du bouton, src/contenu/consentements.ts) : l’heure où la conv est
+     * arrivée avec lui, et la version de son texte. Toute conv importée par l’API l’a (src/server/juridique.ts) ;
+     * vides pour les convs d’avant l’accord.
      */
     consentementLe: quand("consentement_le"),
     consentementVersion: text("consentement_version"),
@@ -404,9 +404,9 @@ export const achats = pgTable(
     membreId: text("membre_id"),
     moyenId: text("moyen_id"),
     /**
-     * La case de renonciation au droit de rétractation (src/contenu/consentements.ts), cochée avant de payer : la version
+     * La renonciation au délai de rétractation (src/contenu/consentements.ts), que le geste de payer donne : la version
      * de son texte et l’heure où le serveur l’a reçue, avec la commande. Null pour un achat sans paiement (l’équipe, un
-     * achat d’avant la case).
+     * achat d’avant la renonciation).
      */
     renonciationVersion: text("renonciation_version"),
     renonciationLe: quand("renonciation_le"),

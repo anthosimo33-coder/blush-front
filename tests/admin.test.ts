@@ -396,14 +396,20 @@ describe("inviter la liste d’attente quand le prestataire des mails refuse", (
     (await db().select({ le: schema.waitlist.inviteLe }).from(schema.waitlist).where(eq(schema.waitlist.emailHash, hashes[k]!)))[0]?.le instanceof Date;
   const compteur = async () => (await db().select({ count: schema.rateLimits.count }).from(schema.rateLimits).where(eq(schema.rateLimits.key, MAILS_DE_LA_LISTE)))[0]?.count ?? 0;
 
-  it("une adresse refusée (422) n’arrête pas le lot : elle reste à inviter, sans prendre de place du jour, et les suivants partent", async () => {
+  it("une adresse refusée (422) n’arrête pas le lot : elle sort de la liste (elle ne partirait jamais), sans prendre de place du jour, et les suivants partent", async () => {
     pannes.set(inscrits[0]!, 422);
     vi.spyOn(console, "log").mockImplementation(() => {});
     const lot = await inviterLaListe(3);
     vi.mocked(console.log).mockRestore();
     expect(lot).toMatchObject({ invites: 2, refusees: 1, plafond: false, prestataire: false });
     expect([await invite(0), await invite(1), await invite(2)]).toEqual([false, true, true]);
+    expect(await db().select({ id: schema.waitlist.id }).from(schema.waitlist).where(eq(schema.waitlist.emailHash, hashes[0]!))).toEqual([]);
     expect(await compteur()).toBe(2);
+    /* Les tests suivants repartent de cette inscrite, toujours à inviter */
+    pannes.delete(inscrits[0]!);
+    await db()
+      .insert(schema.waitlist)
+      .values({ emailHash: hashes[0]!, email: coffre.ecrire("waitlist.email", inscrits[0]!), source: "accueil", createdAt: new Date(Date.UTC(2000, 0, 1)) });
   });
 
   it("le prestataire qui freine (429), en panne ou sans la clé : le lot s’arrête, la personne reste à inviter, et ce n’est pas « le plafond »", async () => {

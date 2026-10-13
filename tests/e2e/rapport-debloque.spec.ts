@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { texteRenonciation } from "../../src/contenu/consentements";
 import {
   achatEnBase,
   attendreMail,
@@ -28,8 +29,8 @@ import {
 } from "./aide";
 
 /*
- * Débloquer le rapport d’une conv, en le payant à l’écran : la feuille « Ta formule », la case de renonciation (gardée
- * avec l’achat), la page du faux Whop (BLUSH_PAIEMENT_FACTICE) et son vrai webhook signé, le retour, puis « C’est
+ * Débloquer le rapport d’une conv, en le payant à l’écran : la feuille « Ta formule », la renonciation sans case (la
+ * ligne sous le bouton, le geste de payer la donne, gardée avec l’achat), la page du faux Whop (BLUSH_PAIEMENT_FACTICE) et son vrai webhook signé, le retour, puis « C’est
  * débloqué », la suite qui s’écrit, et le mail « ton rapport est prêt ». Le rapport seul, Premium, et l’offre ① (la
  * feuille fermée sans payer), prise, puis passée. Un compte de l’équipe (un invité) n’a rien à payer.
  */
@@ -47,11 +48,11 @@ async function titresDuRapport(rapport: Locator): Promise<string[]> {
 /** Le sommaire du mail « ton rapport est prêt », lu dans son HTML : la pastille du numéro, puis le titre. */
 const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`);
 
-/** Paie à l’écran la formule `nom` (« Le rapport », « Rapport + 60 bulles ») de la feuille ouverte : la case cochée, « Débloquer », puis « Payer » chez le faux Whop. */
+/** Paie à l’écran la formule `nom` (« Le rapport », « Rapport + 60 bulles ») de la feuille ouverte : « Débloquer » (sans case), puis « Payer » chez le faux Whop. */
 async function payerALecran(page: Page, nom: RegExp): Promise<void> {
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
   await paiement.getByRole("radio", { name: nom }).click();
-  await paiement.getByRole("checkbox", { name: /je renonce à mon droit de rétractation/ }).check();
+  await expect(paiement.getByRole("checkbox")).toHaveCount(0);
   await paiement.getByRole("button", { name: "Débloquer" }).click();
   await expect(page).toHaveURL(/\/paiement\/factice\?achat=/);
   await page.getByRole("button", { name: "Payer", exact: true }).click();
@@ -72,7 +73,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     expect(titres).toEqual(["Le verdict", ...CHAPITRES_FERMES]);
   });
 
-  await test.step("« Lire la suite », le rapport seul, la case cochée, « Débloquer », « Payer » chez le faux Whop : « C’est débloqué »", async () => {
+  await test.step("« Lire la suite », le rapport seul, « Débloquer » au premier toucher, « Payer » chez le faux Whop : « C’est débloqué »", async () => {
     await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
     await payerALecran(page, /^Le rapport/);
     const ecran = page.getByRole("main");
@@ -82,7 +83,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
-    /* La case cochée est gardée avec l’achat : sa version, son heure */
+    /* La renonciation, donnée en payant, est gardée avec l’achat : sa version, son heure */
     expect(await achatEnBase(await dernierAchat(email))).toMatchObject({ offre: "rapport", statut: "paye", renonciationVersion: RENONCIATION, renonciationLe: expect.any(Date) });
   });
 
@@ -157,10 +158,8 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
    */
   await page.mouse.move(0, 0);
 
-  await test.step("« Je la prends » sans la case : rien ne part ; cochée, la page du faux Whop, à 6,90 €", async () => {
-    await offre.getByRole("button", { name: "Je la prends · 6,90\u00a0€" }).click();
-    await expect(offre.getByRole("alert")).toHaveText("Coche la case pour payer.");
-    await offre.getByRole("checkbox", { name: /je renonce à mon droit de rétractation/ }).check();
+  await test.step("« Je la prends », au premier toucher (la renonciation dite juste sous lui) : la page du faux Whop, à 6,90 €", async () => {
+    await expect(offre.getByText(texteRenonciation("rapport"))).toBeVisible();
     await offre.getByRole("button", { name: "Je la prends · 6,90\u00a0€" }).click();
     await expect(page).toHaveURL(/\/paiement\/factice\?achat=/);
     await expect(page.getByRole("heading", { level: 1, name: "Ta suite" })).toBeVisible();

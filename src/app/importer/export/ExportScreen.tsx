@@ -10,8 +10,8 @@ import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { prechargerExport, uploadExport } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
-import { EXPORT_STEPS } from "@/contenu/parcours";
-import { CaseImport, useCase } from "@/components/juridique/cases";
+import { EXPORT_STEPS, VIDEOS_EXPORT } from "@/contenu/parcours";
+import { MentionImport, useAccord } from "@/components/juridique/cases";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Captcha } from "@/components/ui/Captcha";
@@ -43,8 +43,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const [souci, setSouci] = useState<string | null>(null);
   /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useMonte();
-  /* La case de l’import (18 ans, les conditions, ce que la conv dit d’intime) : sans elle, le choix du fichier ne s’ouvre pas */
-  const accord = useCase();
+  /* L’accord de l’import : la ligne au-dessus du bouton le dit, choisir le fichier le donne (refusé par le serveur, plus rien ne part) */
+  const accord = useAccord();
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
@@ -53,6 +53,8 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
     setChoix(null);
   };
   const data = EXPORT_STEPS[app];
+  /* La vidéo de l’export de cette appli : sans elle, ni bouton ni feuille */
+  const adresseVideo = VIDEOS_EXPORT[app];
   const steps = device === "ios" ? data.steps.ios : device === "android" ? data.steps.android : data.steps.all;
 
   /* La lecture de l’export est chargée à la demande : on la charge dès qu’on ouvre le choix du fichier */
@@ -64,7 +66,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
   const onFiles = async ([file]: File[]) => {
     if (!file) return;
-    /* La case décochée pendant que le choix du fichier était ouvert : rien ne part sans elle (son accord n’est plus là) */
+    /* L’accord refusé par le serveur pendant que le choix du fichier était ouvert : rien ne repart avant la page rechargée */
     if (!accord.exiger()) return;
     setBusy(true);
     setSouci(null);
@@ -80,7 +82,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       setAvance(null);
       /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
       if (codeDe(e) === "annule") return;
-      /* Le serveur n’a pas reconnu la case (BLUSH a changé de texte depuis l’ouverture de l’onglet) : à recocher */
+      /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger */
       if (codeDe(e) === "consentement") return accord.perimer();
       /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
       const parcours = erreurDeParcours("export", e);
@@ -110,9 +112,10 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
               {souci}
             </Alert>
           )}
-          <CaseImport etat={accord} className="mb-1" />
           {/* Le CAPTCHA de l’import sans compte : invisible tant qu’il ne demande pas de geste */}
           <Captcha action="import" />
+          {/* L’accord de l’import, juste au-dessus du bouton qui le donne */}
+          <MentionImport etat={accord} />
           {/* aria-busy pour la phase « Je lis ton export · N % » aussi, où loading est faux (Button ne le pose qu’avec loading) */}
           <Button onClick={choisirFichier} disabled={busy} aria-busy={busy} loading={busy && avance == null} loadingLabel="Analyse du fichier">
             {/* Le texte de l’avancée reste lisible sur le bouton grisé : les points y restent blancs */}
@@ -148,39 +151,50 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
 
       {/* L’écran à reconnaître à gauche (au-dessus sur mobile), les étapes à côté */}
       <div className="isolate flex flex-col items-center gap-7 lg:flex-row lg:items-start lg:gap-9">
-        <div className="relative flex w-full shrink-0 justify-center pb-[22px] lg:w-[260px]">
+        {/* Le bas laisse la place au bouton de la vidéo, quand il y en a une */}
+        <div className={cn("relative flex w-full shrink-0 justify-center lg:w-[260px]", adresseVideo && "pb-[22px]")}>
           <span
             aria-hidden="true"
             className="pointer-events-none absolute left-1/2 top-[45%] -z-10 size-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]"
           />
           <PhoneScreen menu={data.menu} />
-          <button
-            type="button"
-            onClick={() => setVideo(true)}
-            className="lift lift-sm absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-note font-black text-ink shadow-soft"
-          >
-            <span className="lift-pop flex size-8 items-center justify-center rounded-full bg-ink">
-              <Icon name="play" size={14} fill="currentColor" stroke={0} className="text-white" />
-            </span>
-            Voir la vidéo
-            <span className="font-extrabold text-grey">30 s</span>
-          </button>
+          {adresseVideo && (
+            <button
+              type="button"
+              onClick={() => setVideo(true)}
+              className="lift lift-sm absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-note font-black text-ink shadow-soft"
+            >
+              <span className="lift-pop flex size-8 items-center justify-center rounded-full bg-ink">
+                <Icon name="play" size={14} fill="currentColor" stroke={0} className="text-white" />
+              </span>
+              Voir la vidéo
+              <span className="font-extrabold text-grey">30 s</span>
+            </button>
+          )}
         </div>
         <StepTimeline steps={[...steps]} className="w-full lg:flex-1 lg:pt-2" />
       </div>
 
-      <Sheet open={video} onClose={() => setVideo(false)} labelledBy="video-title">
-        <h2 id="video-title" className="m-0 text-[22px] font-black leading-[1.1] tracking-[-0.02em]">
-          Voir la vidéo (30 s)
-        </h2>
-        {/* TODO(produit): la vidéo de démonstration n’est pas fournie ; l’emplacement est prêt à recevoir le fichier. */}
-        <div className="mx-auto flex aspect-[9/16] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-[28px] bg-ink pt-10">
-          <PhoneScreen menu={data.menu} />
-        </div>
-        <Button variant="secondary" onClick={() => setVideo(false)}>
-          Fermer
-        </Button>
-      </Sheet>
+      {/* La vidéo de l’export (VIDEOS_EXPORT, src/contenu/parcours.ts) : muette au départ, ses contrôles pour le son, jouée dans la page sur iPhone */}
+      {adresseVideo && (
+        <Sheet open={video} onClose={() => setVideo(false)} labelledBy="video-title">
+          <h2 id="video-title" className="m-0 text-[22px] font-black leading-[1.1] tracking-[-0.02em]">
+            Voir la vidéo (30 s)
+          </h2>
+          <video
+            key={adresseVideo}
+            src={adresseVideo}
+            controls
+            muted
+            playsInline
+            preload="metadata"
+            className="mx-auto aspect-[9/16] w-full max-w-[260px] rounded-[28px] bg-ink object-contain"
+          />
+          <Button variant="secondary" onClick={() => setVideo(false)}>
+            Fermer
+          </Button>
+        </Sheet>
+      )}
 
       <ChoixConv open={!!choix} convs={choix?.convs ?? []} onChoisir={(id) => fermerChoix(id)} onClose={() => fermerChoix(null)} />
     </ParcoursScreen>

@@ -119,7 +119,7 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   /* Le partage, comme la feuille « En savoir plus » du rapport le résume : le lien comme l’image */
   await expect(main.getByText("Rien ne sort sans toi")).toBeVisible();
   await expect(main.getByText(/ton verdict, par un lien, ou en image une réponse de BLUSH/)).toBeVisible();
-  await expect(main.getByText("BLUSH est réservé aux plus de 18 ans.")).toBeVisible();
+  await expect(main.getByText("BLUSH est ouvert dès 15 ans.")).toBeVisible();
   /* Le CAPTCHA, nommé comme l’hébergement et les mails : ce qu’il voit (« Pas de robots »), et sa ligne parmi les prestataires */
   await expect(main.getByText(/Cloudflare vérifie que tu n’es pas un robot/)).toBeVisible();
   await expect(main.getByText("La vérification anti-robots, aux États-Unis")).toBeVisible();

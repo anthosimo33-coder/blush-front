@@ -27,7 +27,7 @@ export const POST = route("POST /api/import", async (req: Request) => {
   const fichier = fd?.get("fichier");
   const recu = paquet instanceof File ? paquet : fichier instanceof File ? fichier : null;
   if (!recu) return erreur("fichier");
-  /* L’accord de l’import (18 ans, les conditions, ce que la conv dit d’intime) : avant la limite, rien n’est lu sans lui */
+  /* L’accord de l’import (les conditions, et que BLUSH lise toute la conv) : avant la limite, rien n’est lu sans lui */
   const consentement = consentementImport(fd?.get("consentement"));
   if (!consentement) return erreur("consentement");
   /* Sans compte, le laissez-passer du CAPTCHA (src/server/captcha.ts), avant toute limite : refusé, il n’use rien */

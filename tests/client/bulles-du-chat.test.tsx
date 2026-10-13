@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BandeauBulles, etatDuBandeau } from "@/app/app/accueil/BandeauBulles";
 import { CompteurBulles } from "@/components/bulles/CompteurBulles";
 import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
-import { CASE_RENONCIATION } from "@/contenu/consentements";
+import { CASE_IMPORT, CASE_RENONCIATION, texteRenonciation } from "@/contenu/consentements";
 import { CATALOGUE, PREMIERE_RECHARGE } from "@/contenu/offres";
 import { lePack } from "@/contenu/recharge";
 import { partirPayer } from "@/lib/paiement";
@@ -162,16 +162,13 @@ describe("la recharge", () => {
     expect(within(feuille).getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeTruthy();
   });
 
-  it("payer : rien sans la case de renonciation (le focus y va) ; cochée, le pack choisi part, et revient avec ses bulles", async () => {
+  it("payer : pas de case, la ligne de la renonciation sous le bouton ; le pack choisi part au premier toucher, et revient avec ses bulles", async () => {
     const { feuille, suite } = await ouvrir(true);
     const bouton = within(feuille).getByRole("button", { name: "Payer · 9,90\u00a0€" });
-    await act(async () => fireEvent.click(bouton));
-    expect(payer).not.toHaveBeenCalled();
-    const kase = within(feuille).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles });
-    expect(document.activeElement).toBe(kase);
-    expect(within(feuille).getByText(CASE_RENONCIATION.manquante)).toBeTruthy();
+    expect(within(feuille).queryByRole("checkbox")).toBeNull();
+    expect(bouton.nextElementSibling?.textContent).toBe(texteRenonciation("bulles"));
+    expect(within(feuille).getByRole("link", { name: CASE_RENONCIATION.lien }).getAttribute("href")).toBe(CASE_RENONCIATION.ancre);
     /* Le grand pack, au clavier : les flèches du groupe passent d’un pack à l’autre */
-    fireEvent.click(kase);
     const radios = within(feuille).getAllByRole("radio");
     /* Un seul arrêt de tabulation : le pack conseillé, coché */
     expect(radios.map((r) => r.tabIndex)).toEqual([-1, 0, -1]);
@@ -187,7 +184,6 @@ describe("la recharge", () => {
 
   it("sans paiement branché : « Le paiement arrive très vite » ; une autre erreur : réessayer", async () => {
     const { feuille } = await ouvrir(false);
-    fireEvent.click(within(feuille).getByRole("checkbox"));
     payer.mockRejectedValueOnce(new ErreurApi("bientot", 402));
     await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
     expect(within(feuille).getByText("Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.")).toBeTruthy();
@@ -196,20 +192,18 @@ describe("la recharge", () => {
     expect(within(feuille).getByRole("alert").textContent).toBe("Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.");
   });
 
-  it("la case refusée par le serveur (son texte a changé depuis l’ouverture) : recharger la page, et plus aucun paiement avec l’ancienne", async () => {
+  it("la renonciation refusée par le serveur (son texte a changé depuis l’ouverture) : recharger la page, et plus aucun paiement avec l’ancienne", async () => {
     const { feuille } = await ouvrir(false);
-    const kase = within(feuille).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles });
-    fireEvent.click(kase);
     payer.mockRejectedValueOnce(new ErreurApi("renonciation", 422));
     await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
     expect(payer).toHaveBeenCalledOnce();
     /* Ni « vérifie ta connexion » (réessayer renverrait la même version, refusée sans fin), mais le nouveau texte à lire */
     expect(within(feuille).queryByText("Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.")).toBeNull();
-    expect(within(feuille).getByText(CASE_RENONCIATION.perimee, { exact: false })).toBeTruthy();
-    expect(within(feuille).getByRole("button", { name: CASE_RENONCIATION.recharger })).toBeTruthy();
-    /* Recochée, elle ne repart pas : l’onglet n’a que l’ancienne version */
-    fireEvent.click(kase);
+    expect(within(feuille).getByText(CASE_IMPORT.perimee, { exact: false })).toBeTruthy();
+    const recharger = within(feuille).getByRole("button", { name: CASE_IMPORT.recharger });
+    /* Retouché, « Payer » ne repart pas : l’onglet n’a que l’ancienne version ; le focus va au rechargement */
     await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
     expect(payer).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(recharger);
   });
 });

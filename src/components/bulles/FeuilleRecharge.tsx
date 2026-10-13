@@ -8,7 +8,7 @@ import { RadioGroup } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import { CaseRenonciation } from "@/components/juridique/cases";
+import { MentionRenonciation } from "@/components/juridique/cases";
 import { usePaiement } from "@/components/paiement/usePaiement";
 import { lePack, PACK_CONSEILLE, PACKS, RECHARGE, type Pack } from "@/contenu/recharge";
 import { Grappe } from "./perles";
@@ -17,10 +17,12 @@ import { LigneOfferte, Option } from "./pieces";
 /*
  * La recharge (le prototype validé des bulles, 12 octobre) : trois packs, le conseillé choisi d’avance et ouvert, et le
  * bonus de la première recharge (④) quand le serveur le montre (POST /api/paiement/offre : une fois par compte, jamais
- * le même jour qu’une autre offre unique). Puis la case de renonciation, et le paiement : la page de Whop (ou le faux
+ * le même jour qu’une autre offre unique). Puis le paiement, au premier toucher : la page de Whop (ou le faux
  * Whop en local), d’où l’on revient où la recharge a été ouverte (`suite`). Payer passe par usePaiement, comme les
- * autres feuilles qui font payer : la case exigée, le bouton occupé (libéré au retour de chez Whop par « Retour »), et
- * ce qu’on dit quand rien ne part (la case périmée, le paiement pas encore branché, le reste).
+ * autres feuilles qui font payer : la renonciation (une ligne sous le bouton, que le geste de payer donne), le bouton
+ * occupé (libéré au retour de chez Whop par « Retour »), et
+ * ce qu’on dit quand rien ne part (la renonciation périmée, le paiement pas encore branché, le reste). Sans la case de
+ * renonciation (retirée le 13 octobre), la feuille a les marges du prototype, sauf ses écarts sur un écran bas.
  */
 
 /** Le bonus ④ : pas encore demandé au serveur, montré par lui, ou pas pour ce compte. */
@@ -74,9 +76,9 @@ export function FeuilleRecharge({
   };
 
   return (
-    /* Un écran bas (375 × 667) : la feuille se resserre pour tenir sans défiler, case de renonciation et bonus ④ compris */
+    /* Un écran bas (375 × 667) : le titre, le bonus et les écarts se resserrent pour tenir sans défiler, bonus ④, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
     <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
-      <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[24px]">
+      <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[22px]">
         {RECHARGE.titre}
       </h2>
       <p className="m-0 text-note font-bold leading-[1.45] text-soft">{reponsePrete && autre ? RECHARGE.reponsePrete(autre) : RECHARGE.sousTitre}</p>
@@ -92,7 +94,7 @@ export function FeuilleRecharge({
           </p>
         </div>
       )}
-      <RadioGroup label={RECHARGE.choix} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2.5">
+      <RadioGroup label={RECHARGE.choix} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
         {PACKS.map((p) => {
           const pack = packs[p];
           /* Le prix de la bulle en vert quand il baisse (le bonus, le grand pack) ; en gris pour le repère et le conseillé seul */
@@ -120,10 +122,10 @@ export function FeuilleRecharge({
           </p>
         )}
         {paiement.refus === "souci" && <Alert className="text-center leading-[1.45]">{RECHARGE.souci}</Alert>}
-        <CaseRenonciation quoi="bulles" etat={paiement.renonciation} />
         <Button arrow loading={paiement.occupe} loadingLabel={RECHARGE.enCours} onClick={() => void paiement.payer(choisi)}>
           {RECHARGE.payer(packs[choisi].prix)}
         </Button>
+        <MentionRenonciation quoi="bulles" etat={paiement.renonciation} />
         <span className="text-center text-micro font-extrabold text-grey">
           <b className="font-black text-ink">{RECHARGE.pied.fort}</b>
           {RECHARGE.pied.reste}

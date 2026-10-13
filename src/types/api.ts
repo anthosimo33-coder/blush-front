@@ -340,8 +340,8 @@ export const ROUTES = {
   "DELETE /api/histoire": {},
   "POST /api/import": { formulaire: true },
   /*
-   * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la case « je renonce à mon droit
-   * de rétractation » cochée : la version de son texte (CASE_RENONCIATION.version), gardée avec l’achat. Sans elle, ou
+   * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la renonciation au délai
+   * de rétractation (le geste de payer la donne) : la version de son texte (CASE_RENONCIATION.version), gardée avec l’achat. Sans elle, ou
    * une version qui n’est plus la bonne (dont l’ancien `true` d’un onglet ouvert avant la version) : 422 « renonciation »,
    * rien ne part
    */

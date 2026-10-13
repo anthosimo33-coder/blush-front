@@ -1,9 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { estCleDeTest } from "@/lib/captcha";
-import { enProduction, surVercel } from "./drapeaux";
-import { journal } from "./journal";
-import { champsEditeurManquants, editeurComplet } from "./juridique";
+import { enProduction, manquesPourOuvrir, surVercel, VARIABLES_WHOP } from "./drapeaux";
+import { auMieux, journal } from "./journal";
 
 /*
  * Les variables d’environnement du back-end, vérifiées une fois au premier usage (pas au build : `next build` n’a pas
@@ -62,7 +61,11 @@ export const Env = z.object({
     .string()
     .default("")
     .transform((v) => (v.trim() === "*" ? ("*" as const) : emails(v))),
-  /** Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). Exigée en production. */
+  /**
+   * Bêta fermée : seuls les emails de BLUSH_ACCES_LIBRE peuvent se connecter (et donc lancer une lecture). Exigée en
+   * production, où 0 n’ouvre que si l’ouverture a ce qu’elle exige (manquesPourOuvrir, src/server/drapeaux.ts) : sinon,
+   * env() la garde fermée et prévient l’équipe.
+   */
   BLUSH_BETA_FERMEE: z
     .enum(["0", "1"])
     .default("0")
@@ -77,7 +80,8 @@ export const Env = z.object({
    * Le paiement par Whop (src/server/paiement) : la clé de l’API du compte (une « Account API key », avec ses seules
    * permissions : BACKEND.md, « Mise en ligne »), le secret de son webhook (« ws_… », montré une fois par Whop), le compte
    * (« biz_… ») et le produit sous lequel chaque achat crée son prix (« prod_… »). Les quatre, ou aucune : sans elles (et
-   * sans le faux Whop), « Débloquer » répond « bientot ». À moitié remplies, la production refuse de tourner.
+   * sans le faux Whop), « Débloquer » répond « bientot », et en production la bêta reste fermée. À moitié remplies, la
+   * production refuse de tourner.
    */
   WHOP_API_KEY: z.string().min(1).optional(),
   WHOP_WEBHOOK_SECRET: z.string().min(1).optional(),
@@ -110,7 +114,7 @@ export const Env = z.object({
   BLUSH_MAILS_PAR_JOUR: z.coerce.number().int().min(100).default(100),
   /**
    * Le CAPTCHA (Cloudflare Turnstile) : la clé secrète, que le serveur envoie à Cloudflare avec chaque jeton
-   * (src/server/captcha.ts). Sans elle, pas de CAPTCHA ; exigée en production dès que la bêta est ouverte.
+   * (src/server/captcha.ts). Sans elle, pas de CAPTCHA ; en production, la bêta reste alors fermée.
    */
   TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
   /**
@@ -143,14 +147,14 @@ export const URL_SITE = Env.shape.BLUSH_URL.safeParse(process.env.BLUSH_URL).dat
 const boiteDe = (e: Pick<Env, "BLUSH_BOITE_MAILS" | "BLUSH_IA_FACTICE">) => (surVercel() || !e.BLUSH_IA_FACTICE ? null : (e.BLUSH_BOITE_MAILS ?? null));
 
 /** Les quatre variables de Whop : toutes, ou aucune (paiementWhop, et la production le vérifie). */
-const WHOP = ["WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID"] as const satisfies readonly (keyof Env)[];
+const WHOP = VARIABLES_WHOP satisfies readonly (keyof Env)[];
 
 /*
  * En production (VERCEL_ENV), une variable oubliée lors d’un ménage ne doit ni ouvrir la bêta ou tous les rapports à
- * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Ouverte au
- * public (BLUSH_BETA_FERMEE=0), elle exige en plus ce qu’une vente à tous demande : le paiement (Whop), le CAPTCHA
- * (Turnstile) et l’identité de l’éditeur (src/contenu/mentions-legales.ts, que les mentions légales et les conditions
- * de vente affichent). Les préversions, le dev et les tests n’ont pas ces exigences.
+ * tout le monde, ni arrêter la purge sans bruit : le service refuse de tourner, et les logs disent pourquoi. Ce qu’une
+ * ouverture au public exige en plus (le paiement, le CAPTCHA, l’identité de l’éditeur : manquesPourOuvrir) n’est pas
+ * ici : son absence n’est pas un danger, la bêta reste fermée (verrouOuverture, plus bas) au lieu d’une panne. Les
+ * préversions, le dev et les tests n’ont pas ces exigences.
  */
 function refusEnProduction(e: Env): string[] {
   if (!enProduction()) return [];
@@ -165,13 +169,6 @@ function refusEnProduction(e: Env): string[] {
   if (whop.length && whop.length < WHOP.length) refus.push(`Whop à moitié configuré : ${WHOP.filter((v) => !e[v]).join(", ")} manque (les quatre variables, ou aucune)`);
   /* Le bac à sable accepte des cartes de test : en production, tous les rapports s’ouvriraient sans payer */
   if (e.WHOP_BAC_A_SABLE) refus.push("WHOP_BAC_A_SABLE=1 est refusée (ses cartes de test débloqueraient tout sans payer)");
-  /* Ouverte à tous, la porte (les codes, les imports et les captures sans compte) passe par le CAPTCHA */
-  if (!e.BLUSH_BETA_FERMEE && !e.TURNSTILE_SECRET_KEY) refus.push("TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA");
-  /* Ouverte à tous, BLUSH vend : sans Whop, « Débloquer » répondrait « bientot » à tout le monde */
-  if (!e.BLUSH_BETA_FERMEE && !whop.length) refus.push(`Whop n’est pas configuré (${WHOP.join(", ")}) : la bêta ouverte exige le paiement`);
-  /* Ouverte à tous, les mentions légales et les conditions de vente nomment l’éditeur (LCEN, Code de la consommation) */
-  if (!e.BLUSH_BETA_FERMEE && !editeurComplet())
-    refus.push(`l’identité de l’éditeur est incomplète (src/contenu/mentions-legales.ts : ${champsEditeurManquants().join(", ")}) : la bêta ouverte l’exige`);
   /* Une clé de test de Cloudflare laisse passer tout le monde (ou personne) : jamais en production */
   for (const cle of ["TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY"] as const)
     if (estCleDeTest(e[cle] ?? "")) refus.push(`${cle} est une clé de test de Cloudflare (elle ne protège rien)`);
@@ -188,6 +185,28 @@ function refusDuCaptcha(e: Env): string | null {
   return e.TURNSTILE_SECRET_KEY
     ? "NEXT_PUBLIC_TURNSTILE_SITE_KEY manque : TURNSTILE_SECRET_KEY va avec elle (le CAPTCHA)"
     : "TURNSTILE_SECRET_KEY manque : NEXT_PUBLIC_TURNSTILE_SITE_KEY va avec elle (le CAPTCHA)";
+}
+
+/*
+ * Le verrou de l’ouverture. En production, BLUSH_BETA_FERMEE=0 sans le paiement, le CAPTCHA ou l’identité de l’éditeur
+ * (manquesPourOuvrir) ne fait pas tomber le site : la bêta reste fermée, ici pour le serveur comme dans
+ * src/server/drapeaux.ts pour le proxy (betaFermee, la même liste), et l’équipe est prévenue de ce qui manque. Une fois
+ * par instance : env() ne passe ici qu’à sa première lecture, avant de garder ses variables. Le mail part après coup
+ * (alertes.ts relit env(), alors déjà gardée : pas de boucle), dans le budget des alertes (5 par sujet et par jour, toutes
+ * instances confondues : pas de rafale).
+ */
+function verrouOuverture(e: Env): void {
+  const manques = manquesPourOuvrir();
+  if (e.BLUSH_BETA_FERMEE || !manques.length) return;
+  e.BLUSH_BETA_FERMEE = true;
+  /* Un champ par manque : le journal coupe chaque champ à 120 caractères */
+  journal("bêta ouverte demandée mais gardée fermée", Object.fromEntries(manques.map((m, i) => [`manque${i + 1}`, m])), "alerte");
+  const lignes = [
+    "BLUSH_BETA_FERMEE=0 en production, mais il manque de quoi ouvrir au public : la bêta reste fermée (seuls l’équipe et les invités entrent).",
+    ...manques.map((m) => `- ${m}`),
+    "Le site tourne. Une fois ce qui manque ajouté, une nouvelle mise en production ouvre la bêta.",
+  ];
+  void auMieux(async () => (await import("./alertes")).alerter("bêta restée fermée", lignes, { importante: true }), "alerte de la bêta restée fermée");
 }
 
 let cache: Env | null = null;
@@ -213,6 +232,7 @@ export function env(): Env {
   if (captcha) throw new Error(captcha);
   const refus = refusEnProduction(lu.data);
   if (refus.length) throw new Error(`Configuration refusée en production : ${refus.join(" ; ")}`);
+  verrouOuverture(lu.data);
   cache = lu.data;
   return cache;
 }

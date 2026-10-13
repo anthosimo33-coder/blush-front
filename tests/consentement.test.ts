@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
- * L’accord de l’import (la case « J’ai 18 ans ou plus… », src/contenu/consentements.ts) : chaque route qui reçoit une
+ * L’accord de l’import (que le geste du bouton donne, src/contenu/consentements.ts) : chaque route qui reçoit une
  * conv la demande (src/server/juridique.ts). Sans elle, ou avec une version périmée, 422 `consentement`, avant toute
  * limite et avant tout appel au modèle ; avec elle, l’histoire garde l’heure et la version. Les routes sont appelées
  * comme le ferait le navigateur, ses cookies simulés.

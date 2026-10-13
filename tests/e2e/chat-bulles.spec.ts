@@ -145,11 +145,10 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await expect(recharge.getByText("+ 50 bulles offertes")).toBeVisible();
   });
 
-  await test.step("payer : la case de renonciation d’abord, puis la page du faux Whop, puis le retour sur le chat", async () => {
+  await test.step("payer au premier toucher (pas de case : la renonciation dite sous le bouton), la page du faux Whop, puis le retour sur le chat", async () => {
     const payer = recharge.getByRole("button", { name: "Payer · 9,90\u00a0€" });
-    await payer.click();
-    await expect(recharge.getByText("Coche la case pour payer.")).toBeVisible();
-    await recharge.getByRole("checkbox", { name: "Je veux mes bulles tout de suite et je renonce à mon droit de rétractation" }).check();
+    await expect(recharge.getByRole("checkbox")).toHaveCount(0);
+    await expect(recharge.getByText("En payant, tu as tes bulles tout de suite et tu renonces au délai de rétractation.")).toBeVisible();
     await payer.click();
     await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
     await page.getByRole("button", { name: "Payer", exact: true }).click();

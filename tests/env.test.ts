@@ -1,14 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import type { Editeur } from "@/contenu/mentions-legales";
 import { CLES_DE_TEST_TURNSTILE } from "@/lib/captcha";
 
 /*
  * La configuration (src/server/env.ts) : les listes d’emails lues une fois par le schéma, l’adresse du site et
  * l’expéditeur par défaut, et les garde-fous de la production (audit S-23) : une variable oubliée lors d’un ménage
- * refuse le service au lieu d’ouvrir la bêta, de tout offrir à tous ou d’arrêter la purge sans bruit. env() garde ses
- * variables au premier appel : chaque cas recharge le module après avoir posé les siennes. Sans base.
+ * refuse le service au lieu d’ouvrir la bêta, de tout offrir à tous ou d’arrêter la purge sans bruit ; ce qui manque à
+ * l’ouverture au public (le paiement, le CAPTCHA, l’identité de l’éditeur) garde la bêta fermée, sans panne, et prévient
+ * l’équipe. env() garde ses variables au premier appel : chaque cas recharge le module après avoir posé les siennes. Sans
+ * base : l’alerte par mail est simulée (alertes.ts).
  */
+/** L’éditeur fictif du cas (editeur(), plus bas), ou null : celui de src/contenu/mentions-legales.ts. */
+let editeurFictif: Partial<Editeur> | null = null;
+
 const charger = async () => {
   vi.resetModules();
+  /* L’éditeur fictif du cas, posé sur l’instance neuve du contenu : celle qu’env() va lire (plus sûr qu’un mock refait) */
+  if (editeurFictif) Object.assign((await import("@/contenu/mentions-legales")).EDITEUR, editeurFictif);
   return import("@/server/env");
 };
 
@@ -40,26 +48,17 @@ const captcha = () => {
 };
 
 /**
- * L’identité de l’éditeur remplie (fictive), le temps d’un cas : aujourd’hui vide dans src/contenu/mentions-legales.ts.
- * `sauf` : ces champs restent vides. Rechargée avec env() (charger), retirée après chaque cas.
+ * L’identité de l’éditeur, le temps d’un cas, fictive (jamais celle de src/contenu/mentions-legales.ts) : `complete`, le
+ * nom, un SIRET et l’email, sans adresse (ce qui suffit pour ouvrir) ; sinon le nom et l’email seuls (il manque
+ * l’adresse ou l’immatriculation). Posée par charger() sur le module rechargé, retirée après chaque cas.
  */
-const editeur = (...sauf: string[]) => {
-  vi.doMock("@/contenu/mentions-legales", async (original) => {
-    const m = await original<typeof import("@/contenu/mentions-legales")>();
-    const rempli = {
-      ...m.EDITEUR,
-      nom: "Exemple SAS",
-      statut: "SAS au capital de 1 000 €",
-      adresse: "1 rue de l’Exemple, 75000 Paris",
-      immatriculation: "RCS Paris 000 000 000",
-      telephone: "01 00 00 00 00",
-      directeurPublication: "Camille Exemple",
-      mediateur: "Un médiateur, exemple.fr",
-    };
-    for (const champ of sauf) rempli[champ as keyof typeof rempli] = "";
-    return { ...m, EDITEUR: rempli };
-  });
+const editeur = (complete = true) => {
+  editeurFictif = { nom: "Exemple", adresse: "", pays: "", immatriculation: complete ? "SIRET 000 000 000 00000" : "", email: "bonjour@exemple.test" };
 };
+
+/** L’alerte par mail à l’équipe (src/server/alertes.ts), simulée : env() la charge à la demande. Neuve à chaque cas. */
+type Alerter = (sujet: string, lignes: string[], options?: { importante?: boolean }) => Promise<void>;
+let alerter: Mock<Alerter>;
 
 /** Tout ce que l’ouverture au public exige, en production : Whop, le CAPTCHA, l’éditeur, et la bêta écrite à 0. */
 const ouverte = () => {
@@ -89,11 +88,14 @@ beforeEach(() => {
     "BLUSH_MAILS_PAR_JOUR",
   ])
     vi.stubEnv(v, undefined);
+  alerter = vi.fn<Alerter>(async () => {});
+  vi.doMock("@/server/alertes", () => ({ alerter }));
 });
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
-  vi.doUnmock("@/contenu/mentions-legales");
+  editeurFictif = null;
+  vi.doUnmock("@/server/alertes");
 });
 
 describe("les listes d’emails, lues une fois par le schéma", () => {
@@ -206,56 +208,105 @@ describe("les garde-fous de la production", () => {
     expect((await charger()).env().BLUSH_BETA_FERMEE).toBe(false);
   });
 
-  it("l’ouverture au public (BLUSH_BETA_FERMEE=0) exige Whop, le CAPTCHA et l’identité de l’éditeur ; fermée, aucun des trois", async () => {
-    const refus = () =>
-      charger()
-        .then(({ env }) => env())
-        .then(
-          () => "",
-          (e: Error) => e.message,
-        );
-    /* Tout est là : elle s’ouvre */
-    ouverte();
-    expect(await refus()).toBe("");
-    /* Sans Whop : « Débloquer » répondrait « bientot » à tout le monde */
-    whop("WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID");
-    expect(await refus()).toMatch(/Whop n’est pas configuré \(WHOP_API_KEY, WHOP_WEBHOOK_SECRET, WHOP_ACCOUNT_ID, WHOP_PRODUCT_ID\) : la bêta ouverte exige le paiement/);
-    whop();
-    /* Sans le CAPTCHA (ses deux clés, qui vont ensemble) */
-    vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
-    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", undefined);
-    expect(await refus()).toMatch(/TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA/);
-    captcha();
-    /* Un champ de l’éditeur vide : il est nommé */
-    editeur("telephone", "mediateur");
-    expect(await refus()).toMatch(/l’identité de l’éditeur est incomplète \(src\/contenu\/mentions-legales\.ts : telephone, mediateur\) : la bêta ouverte l’exige/);
-    /* L’éditeur d’aujourd’hui (vide) : tous ses champs, sauf l’email déjà connu */
-    vi.doUnmock("@/contenu/mentions-legales");
-    expect(await refus()).toContain("nom, statut, adresse, immatriculation, telephone, directeurPublication, mediateur");
-    /* Les trois manquent d’un coup : un seul message les dit tous */
-    whop("WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_ACCOUNT_ID", "WHOP_PRODUCT_ID");
-    vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
-    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", undefined);
-    const tous = await refus();
-    for (const motif of ["Whop n’est pas configuré", "TURNSTILE_SECRET_KEY manque", "l’identité de l’éditeur est incomplète"]) expect(tous).toContain(motif);
-    /* Fermée (la production d’aujourd’hui), rien de tout ça n’est exigé */
-    vi.stubEnv("BLUSH_BETA_FERMEE", "1");
-    expect(await refus()).toBe("");
-    /* Une préversion ouverte non plus */
-    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect(await refus()).toBe("");
-  });
+  describe("le verrou de l’ouverture : sans le paiement, le CAPTCHA ou l’identité de l’éditeur, la bêta reste fermée, sans panne", () => {
+    /** Les lignes du journal sur la bêta gardée fermée (console.warn : le niveau alerte). */
+    let journal: () => string[];
+    beforeEach(() => {
+      const avertir = vi.spyOn(console, "warn").mockImplementation(() => {});
+      journal = () => avertir.mock.calls.map(([ligne]) => String(ligne)).filter((l) => l.includes("bêta ouverte demandée mais gardée fermée"));
+    });
 
-  it("la bêta ouverte exige le CAPTCHA : sans ses clés, la production refuse de tourner", async () => {
-    production();
-    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
-    whop();
-    editeur();
-    await expect(charger().then(({ env }) => env())).rejects.toThrow(/TURNSTILE_SECRET_KEY manque : la bêta ouverte exige le CAPTCHA/);
-    /* Fermée, il peut attendre (la production d’aujourd’hui) */
-    vi.stubEnv("BLUSH_BETA_FERMEE", "1");
-    expect((await charger()).env().TURNSTILE_SECRET_KEY).toBeUndefined();
+    /**
+     * env() d’une instance neuve, lue deux fois (la seconde ne refait rien) : la bêta est-elle fermée, et que disent le
+     * journal et l’alerte de l’instance ? Jamais une erreur. L’alerte part après coup : on attend son import.
+     */
+    const lire = async () => {
+      const avant = { journal: journal().length, alertes: alerter.mock.calls.length };
+      const { env, peutEntrer } = await charger();
+      const fermee = env().BLUSH_BETA_FERMEE;
+      expect(env().BLUSH_BETA_FERMEE).toBe(fermee);
+      expect(peutEntrer("inconnu@exemple.test")).toBe(!fermee);
+      await vi.dynamicImportSettled();
+      await new Promise((fin) => setTimeout(fin, 0));
+      return { fermee, journal: journal().slice(avant.journal), alertes: alerter.mock.calls.slice(avant.alertes) };
+    };
+    const sansWhop = () => whop(...WHOP);
+    const sansCaptcha = () => {
+      vi.stubEnv("TURNSTILE_SECRET_KEY", undefined);
+      vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", undefined);
+    };
+
+    it("tout est là : elle s’ouvre, sans rien dire", async () => {
+      ouverte();
+      expect(await lire()).toEqual({ fermee: false, journal: [], alertes: [] });
+    });
+
+    it("chaque manque, seul : fermée, une ligne au journal et une alerte importante qui le nomment", async () => {
+      const cas: [string, () => void, string][] = [
+        ["sans Whop", sansWhop, "le paiement (Whop, aucune de ses variables WHOP_API_KEY, WHOP_WEBHOOK_SECRET, WHOP_ACCOUNT_ID, WHOP_PRODUCT_ID)"],
+        ["sans le CAPTCHA", sansCaptcha, "le CAPTCHA (TURNSTILE_SECRET_KEY)"],
+        ["l’éditeur sans adresse ni immatriculation", () => editeur(false), "l’identité de l’éditeur (src/contenu/mentions-legales.ts, il manque adresse ou immatriculation)"],
+      ];
+      for (const [nom, manquer, manque] of cas) {
+        ouverte();
+        manquer();
+        const lu = await lire();
+        expect(lu.fermee, nom).toBe(true);
+        expect(lu.journal, nom).toHaveLength(1);
+        expect(JSON.parse(lu.journal[0]!), nom).toMatchObject({ niveau: "alerte", manque1: manque });
+        expect(lu.alertes, nom).toHaveLength(1);
+        const [sujet, lignes, options] = lu.alertes[0]!;
+        expect([sujet, options], nom).toEqual(["bêta restée fermée", { importante: true }]);
+        expect(lignes, nom).toContain(`- ${manque}`);
+        editeurFictif = null;
+      }
+    });
+
+    it("les trois d’un coup : une seule alerte par instance, qui les dit tous ; une autre instance prévient à son tour", async () => {
+      ouverte();
+      sansWhop();
+      sansCaptcha();
+      editeur(false);
+      const lu = await lire();
+      expect(lu.fermee).toBe(true);
+      expect(Object.keys(JSON.parse(lu.journal[0]!))).toEqual(expect.arrayContaining(["manque1", "manque2", "manque3"]));
+      expect(lu.alertes).toHaveLength(1);
+      expect(lu.alertes[0]![1].filter((l) => l.startsWith("- "))).toHaveLength(3);
+      /* Une autre instance (le module rechargé) : sa propre alerte, une seule (le budget des alertes borne le reste) */
+      expect((await lire()).alertes).toHaveLength(1);
+    });
+
+    it("l’éditeur d’une micro-entreprise (le nom, un SIRET, l’email, sans adresse) suffit ; le nom et l’email seuls, non", async () => {
+      ouverte();
+      editeur(true);
+      expect((await lire()).fermee).toBe(false);
+      editeur(false);
+      expect((await lire()).fermee).toBe(true);
+    });
+
+    it("fermée exprès (BLUSH_BETA_FERMEE=1) ou hors de la production : rien n’est exigé, rien n’est dit", async () => {
+      ouverte();
+      sansWhop();
+      sansCaptcha();
+      editeur(false);
+      vi.stubEnv("BLUSH_BETA_FERMEE", "1");
+      expect(await lire()).toEqual({ fermee: true, journal: [], alertes: [] });
+      /* Une préversion ouverte (et le dev, les tests) : ouverte, comme avant */
+      vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      expect(await lire()).toEqual({ fermee: false, journal: [], alertes: [] });
+    });
+
+    it("une configuration dangereuse reste refusée, même quand l’ouverture manque aussi de quelque chose", async () => {
+      ouverte();
+      sansCaptcha();
+      vi.stubEnv("CRON_SECRET", undefined);
+      await expect(charger().then(({ env }) => env())).rejects.toThrow(/Configuration refusée en production : CRON_SECRET manque/);
+      vi.stubEnv("CRON_SECRET", "un-secret-fictif-assez-long");
+      whop("WHOP_PRODUCT_ID");
+      await expect(charger().then(({ env }) => env())).rejects.toThrow(/Whop à moitié configuré/);
+      expect(alerter).not.toHaveBeenCalled();
+    });
   });
 
   it("les clés de test de Cloudflare y sont refusées, même bêta fermée : elles ne protègent rien", async () => {

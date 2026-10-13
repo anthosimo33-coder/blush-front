@@ -51,3 +51,14 @@ export const EXPORT_STEPS = {
     },
   },
 } as const satisfies Record<ExportApp, unknown>;
+
+/**
+ * La vidéo qui montre l’export, par appli : son adresse (un fichier de public/, « /videos/export-whatsapp.mp4 », ou une
+ * adresse complète), ou null tant qu’elle n’est pas fournie. Sans elle, l’écran de l’export n’a ni le bouton « Voir la
+ * vidéo » ni sa feuille ; avec, la feuille la joue (src/app/importer/export/ExportScreen.tsx).
+ * TODO(produit): les vidéos de démonstration ne sont pas fournies ; la durée dite sur le bouton (30 s) est à accorder à la leur.
+ */
+export const VIDEOS_EXPORT: Record<ExportApp, string | null> = {
+  whatsapp: null,
+  instagram: null,
+};

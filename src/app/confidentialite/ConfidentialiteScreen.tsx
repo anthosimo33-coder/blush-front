@@ -95,9 +95,9 @@ export function ConfidentialiteScreen() {
         <Ligne icone="heart" ton="elle" titre="Ce que tu confies au chat">
           Même ce qui est intime (ta santé, ta vie amoureuse) reste dans la mémoire de BLUSH, chiffré, et n’est montré qu’à toi.
         </Ligne>
-        {/* La case de l’import (src/contenu/consentements.ts) : gardée avec la conv, son heure et sa version (src/server/juridique.ts) */}
+        {/* L’accord de l’import (src/contenu/consentements.ts) : gardé avec la conv, son heure et sa version (src/server/juridique.ts) */}
         <Ligne icone="check" ton="vrai" titre="Ton accord, avant chaque conv">
-          Avant d’importer une conv, tu confirmes avoir 18 ans ou plus, et tu acceptes que BLUSH lise ce qu’elle dit d’intime. BLUSH garde la date de cet accord avec la conv.
+          Avant d’importer une conv, tu acceptes que BLUSH la lise en entier, même ce qu’elle dit d’intime. BLUSH garde la date de cet accord avec la conv.
         </Ligne>
         <Ligne icone="shield" titre="Pas de robots">
           Avant d’envoyer un code de connexion, ou une conv sans compte, Cloudflare vérifie que tu n’es pas un robot, le plus souvent sans rien te demander. Il voit ton adresse IP
@@ -131,7 +131,7 @@ export function ConfidentialiteScreen() {
         </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est réservé aux plus de 18 ans. Dernière mise à jour\u00a0: 13 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 13 octobre 2026.`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Un prestataire d’IA" sub="L’IA qui lit ta conv, aux États-Unis" />

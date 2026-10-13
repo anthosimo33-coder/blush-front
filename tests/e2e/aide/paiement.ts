@@ -11,10 +11,10 @@ import { RESEAU } from "./page";
  * de Whop. Les états d’un achat se lisent en base (aide/base.ts, compteDe).
  */
 
-/** Ce que l’écran envoie de la case de renonciation cochée : la version de son texte. */
+/** Ce que l’écran envoie de la renonciation (le geste de payer la donne) : la version de son texte. */
 export const RENONCIATION = CASE_RENONCIATION.version;
 
-/** Le paiement commencé comme l’écran le fait (POST /api/paiement, la case de renonciation cochée) : l’achat, et la page où le payer. */
+/** Le paiement commencé comme l’écran le fait (POST /api/paiement, avec la renonciation) : l’achat, et la page où le payer. */
 export async function commencerPaiement(page: Page, offre: OffreId): Promise<{ achat: string; url: string }> {
   const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: RENONCIATION }, timeout: RESEAU });
   expect(r.status(), `le paiement de ${offre} commence`).toBe(200);
@@ -53,7 +53,7 @@ export async function rembourser(page: Page, achat: string): Promise<void> {
   expect(poste.status(), "le webhook du remboursement est reçu").toBe(200);
 }
 
-/** L’achat tel qu’il est en base : son offre, son statut, et la case de renonciation gardée avec lui (sa version, son heure). */
+/** L’achat tel qu’il est en base : son offre, son statut, et la renonciation gardée avec lui (sa version, son heure). */
 export async function achatEnBase(achat: string): Promise<{ offre: OffreId; statut: string; renonciationVersion: string | null; renonciationLe: Date | null }> {
   const [a] = await sql()<{ offre: OffreId; statut: string; renonciationVersion: string | null; renonciationLe: Date | null }[]>`
     select offre, statut, renonciation_version as "renonciationVersion", renonciation_le as "renonciationLe" from achats where id = ${achat}`;

@@ -6,7 +6,7 @@ import { CATALOGUE, enEuros, prixDe } from "./offres";
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
  * l’offre unique ① (OffreAvantDePartir), « C’est débloqué » et l’offre ③, et la page du retour. Repris tels quels du
  * prototype validé des bulles (12 octobre) ; leurs nombres et leurs prix viennent du catalogue (src/contenu/offres.ts),
- * jamais recopiés. Les mots ne changent pas sans décision. La case de renonciation au droit de rétractation est dans
+ * jamais recopiés. Les mots ne changent pas sans décision. La renonciation au délai de rétractation est dans
  * src/contenu/consentements.ts, « C’est quoi une bulle ? » dans src/contenu/bulles.ts.
  */
 

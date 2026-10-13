@@ -33,7 +33,7 @@ async function traiter(req: Request) {
   if (fd?.get("mode") === "add") return erreur("capture");
   const app = appli.success ? appli.data : "autre";
   const images = await imagesDe(fichiers);
-  /* L’accord de l’import (18 ans, les conditions, ce que la conv dit d’intime) : sans lui, rien n’est lu ni compté */
+  /* L’accord de l’import (les conditions, et que BLUSH lise toute la conv) : sans lui, rien n’est lu ni compté */
   const consentement = consentementImport(fd?.get("consentement"));
   if (!consentement) return erreur("consentement");
   /*
