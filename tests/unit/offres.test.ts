@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bullesDe, CATALOGUE, COUT_EN_BULLES, enEuros, FORMULE_CHOISIE, PREMIERE_RECHARGE, prixDe } from "@/contenu/offres";
+import { bullesDe, CATALOGUE, COUT_EN_BULLES, enEuros, FORMULE_CHOISIE, PREMIERE_RECHARGE, prixDe, titreChezWhop } from "@/contenu/offres";
 import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_PREMIUM_AJOUT, OFFRE_SUITE, PIED_GRATUIT } from "@/contenu/paiement";
 import { FORMULES, OFFRES } from "@/types";
 
@@ -99,5 +99,16 @@ describe("les textes du paiement, tirés du catalogue", () => {
       plus: "+ 80",
     });
     expect(DEBLOQUE.phrase(8, 10)).toBe("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.");
+  });
+});
+
+describe("le nom d’un achat chez Whop", () => {
+  it("dit l’offre et les bulles figées dans l’achat, sans prénom ni conv", () => {
+    expect(titreChezWhop("rapport", 10)).toBe("Le rapport complet + 10 bulles");
+    expect(titreChezWhop("suite", 10)).toBe("Le rapport complet + 10 bulles");
+    expect(titreChezWhop("premium", 90)).toBe("Premium\u00a0: le rapport + 90 bulles");
+    expect(titreChezWhop("premium_ajout", 80)).toBe("80 bulles en plus");
+    expect(titreChezWhop("pack80", 120)).toBe("120 bulles");
+    expect(titreChezWhop("pack30", 30)).toBe("30 bulles");
   });
 });
