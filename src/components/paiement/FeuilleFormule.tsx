@@ -26,8 +26,9 @@ import { usePaiement } from "./usePaiement";
  * demande au serveur l’offre unique ① (OffreAvantDePartir : la suite moins chère, 5 minutes, une fois).
  * La page hébergée de Whop plutôt que ses Elements dans la feuille : décidé pour la vague 2 (les Elements n’existent pas
  * dans son bac à sable), à revoir après un vrai paiement de test.
- * Sur un écran court (375 × 667), la case de renonciation, que le prototype n’avait pas, ne tiendrait pas : les marges de
- * Premium se resserrent et la case s’écrit plus petit (max-height: 700px), pour que la feuille tienne sans défiler.
+ * Sur un écran court (375 × 667), la case de renonciation, que le prototype n’avait pas, ne tiendrait pas : le titre, les
+ * marges de Premium et l’écart entre les deux formules se resserrent et la case s’écrit plus petit (max-height: 700px),
+ * pour que la feuille tienne sans défiler, avec de la marge pour les textes plus larges de Chrome sous Linux et Android.
  */
 
 /** L’offre ① refusée (« Non merci ») pendant cette visite : la feuille refermée ne la remontre pas (le serveur la garderait 5 minutes). */
@@ -80,7 +81,7 @@ function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => 
       onClick={choisir}
       className={cn("lift relative flex flex-col rounded-[22px] bg-white text-left text-ink", on ? "shadow-selected" : "shadow-soft")}
     >
-      <span className="flex w-full items-center gap-3.5 px-4 pb-3 pt-4 [@media(max-height:700px)]:pb-2 [@media(max-height:700px)]:pt-3.5">
+      <span className="flex w-full items-center gap-3.5 px-4 pb-3 pt-4 [@media(max-height:700px)]:pb-1.5 [@media(max-height:700px)]:pt-3">
         <RondACocher on={on} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -118,7 +119,7 @@ function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => 
               {p.plus} <span className="text-elle-ink">{p.offertesMot}</span>
             </LigneDuLot>
           </span>
-          <span className="pt-1.5 text-center text-legende font-black text-vrai-ink [@media(max-height:700px)]:pt-1">{p.economie}</span>
+          <span className="pt-1.5 text-center text-legende font-black text-vrai-ink [@media(max-height:700px)]:pt-0.5">{p.economie}</span>
         </span>
       )}
       {/* Le badge, posé sur le bord haut de la carte : après le titre dans le texte lu */}
@@ -199,10 +200,10 @@ export function FeuilleFormule({
   return (
     <>
       <Sheet open={open} onClose={fermer} labelledBy={titre} belowHeader={belowHeader}>
-        <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px] [@media(max-height:700px)]:text-[24px]">
+        <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px] [@media(max-height:700px)]:text-[22px]">
           {FEUILLE_FORMULE.titre(autre)}
         </h2>
-        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3">
+        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
           <Option
             on={choisie === "rapport"}
             choisir={() => setChoisie("rapport")}
