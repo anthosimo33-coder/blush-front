@@ -7,7 +7,7 @@ import type { Requete } from "@prompts/lib/contextes";
  * Le budget de l’IA (src/server/budget.ts) en base : ce que chaque appel a coûté, par jour de Paris, pour tous (ai_usage),
  * par compte et sans compte (comptés à l’appel, dans rate_limits). Les dépenses d’un test sont des lignes d’ai_usage à
  * l’étiquette ETIQUETTE et les dépenses du jour de ses payeurs : effacées avant et après chaque test (un lancement
- * interrompu ne laisse pas 30 $ peser sur les autres fichiers : tests/preparer-la-base.ts efface aussi l’étiquette). Ce
+ * interrompu ne laisse pas le budget du jour peser sur les autres fichiers : tests/preparer-la-base.ts efface aussi l’étiquette). Ce
  * qu’un test a lu du budget est oublié avant le suivant. Les captures sont lues comme le ferait la route (cookies simulés).
  */
 const etat = vi.hoisted(() => ({ cookies: new Map<string, string>() }));
@@ -21,7 +21,7 @@ vi.mock("next/headers", () => ({
 
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
-import { cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, type Payeur } from "@/server/budget";
+import { BUDGET_IA, cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, type Payeur } from "@/server/budget";
 import { lireCaptures } from "@/server/captures";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -140,12 +140,14 @@ describe("la dépense d’un compte", () => {
     expect(await controle(a.id)).toBe("ok");
   });
 
-  it("au-delà de 30 $ pour tous, plus personne n’appelle le modèle", async () => {
+  it("au-delà du budget du jour pour tous, plus personne n’appelle le modèle", async () => {
     const a = await compteEtConv();
     await depense(null, 4);
     await depense(a.payeur, 2.5);
     await depense((await compteEtConv()).payeur, 2.9);
-    for (let i = 0; i < 7; i++) await depense(`compte:budget-autre-${i}@blush.test`, 2.95);
+    /* Le reste du budget du jour, par d’autres comptes chacun sous ses 3 $ */
+    const autres = Math.ceil((BUDGET_IA.jour - 9.4) / 2.95);
+    for (let i = 0; i < autres; i++) await depense(`compte:budget-autre-${i}@blush.test`, 2.95);
     expect(await controle(a.id)).toBe("budget");
   });
 });
@@ -293,7 +295,8 @@ describe("l’alerte à l’équipe", () => {
     const dites: string[] = [];
     vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void dites.push(String(ligne)));
     const a = await compteEtConv();
-    await depense(null, 15.5);
+    /* Un peu plus de la moitié du budget du jour, sans atteindre 80 % */
+    await depense(null, BUDGET_IA.jour * 0.52);
     await controle(a.id);
     await vi.waitFor(() => expect(dites.filter((l) => l.includes("50 % du jour"))).toHaveLength(1));
     /* La même instance, puis une autre (qui n’a rien gardé) : le seuil est déjà dit */

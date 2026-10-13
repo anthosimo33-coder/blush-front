@@ -76,7 +76,7 @@ export default async function preparerLaBase(projet: TestProject): Promise<void>
   try {
     if (!creee && !choisie) {
       /*
-       * Les dépenses de tests/budget.test.ts qu’un lancement interrompu a laissées (jusqu’à 30 $ aujourd’hui : tout appel au
+       * Les dépenses de tests/budget.test.ts qu’un lancement interrompu a laissées (jusqu’au budget du jour : tout appel au
        * modèle, même factice, serait refusé jusqu’à minuit). Celles de plus de 10 minutes seulement : un autre dossier
        * peut être en train de s’en servir
        */

@@ -21,7 +21,7 @@ import * as schema from "./schema";
 const globale = globalThis as unknown as { blushDb?: ReturnType<typeof creer> };
 
 function creer() {
-  const pool = new Pool({ connectionString: urlVerifiee(env().DATABASE_URL), max: 5, idleTimeoutMillis: 120_000, connectionTimeoutMillis: 30_000, maxLifetimeSeconds: 1800 });
+  const pool = new Pool({ connectionString: urlVerifiee(env().DATABASE_URL), max: 10, idleTimeoutMillis: 120_000, connectionTimeoutMillis: 30_000, maxLifetimeSeconds: 1800 });
   /* Une connexion au repos que la base coupe (Neon qui se met en veille, le pooler qui redémarre) : le pool l’écarte. Sans écouteur, l’erreur ferait tomber l’instance */
   pool.on("error", (e) => journalErreur("connexion à la base perdue", e));
   return drizzle({ client: pool, schema });

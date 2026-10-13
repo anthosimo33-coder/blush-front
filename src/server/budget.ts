@@ -28,8 +28,8 @@ import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
 
 /** Les budgets du jour, en dollars, et les seuils où l’équipe est prévenue (une part du budget du jour). */
 export const BUDGET_IA = {
-  /** Tous les appels du jour (décidé). */
-  jour: 30,
+  /** Tous les appels du jour (décidé : 100 $ pour l’ouverture, le 13 octobre). */
+  jour: 100,
   /** Les appels pour un compte (décidé). */
   compte: 3,
   /** Les appels sans compte, pris dans le budget du jour ; à revoir avec les chiffres de l’ouverture. */
