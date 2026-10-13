@@ -136,7 +136,8 @@ function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => 
  * rapport ouvert), sinon ceux d’un rapport entier ; `suite` : où reprendre après « C’est débloqué » (par défaut, la suite
  * du rapport). `proposerLaSuite` : fermée sans payer, proposer l’offre ① (par défaut) ; faux quand la fermer quitte la
  * page (le chat, sa fiche, « Ta question » : on revient au rapport), où l’offre serait montrée, et son compte à rebours
- * lancé, sans que personne la voie. `belowHeader` : comme pour Sheet.
+ * lancé, sans que personne la voie. Sur ordinateur, ses feuilles couvrent tout l’écran, en-tête compris (belowHeader
+ * faux), et son titre garde sa taille du prototype (26 px).
  */
 export function FeuilleFormule({
   open,
@@ -145,7 +146,6 @@ export function FeuilleFormule({
   chapitres = CHAPITRES_A_DEBLOQUER,
   suite,
   proposerLaSuite = true,
-  belowHeader,
 }: {
   open: boolean;
   onClose: () => void;
@@ -153,7 +153,6 @@ export function FeuilleFormule({
   chapitres?: number;
   suite?: string;
   proposerLaSuite?: boolean;
-  belowHeader?: boolean;
 }) {
   const titre = useId();
   const [choisie, setChoisie] = useState<Formule>(FORMULE_CHOISIE);
@@ -199,8 +198,8 @@ export function FeuilleFormule({
   const prix = prixDe(choisie);
   return (
     <>
-      <Sheet open={open} onClose={fermer} labelledBy={titre} belowHeader={belowHeader}>
-        <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] lg:text-[32px] [@media(max-height:700px)]:text-[22px]">
+      <Sheet open={open} onClose={fermer} labelledBy={titre} belowHeader={false}>
+        <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance] [@media(max-height:700px)]:text-[22px]">
           {FEUILLE_FORMULE.titre(autre)}
         </h2>
         <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3 [@media(max-height:700px)]:gap-2">
@@ -239,13 +238,12 @@ export function FeuilleFormule({
         </div>
       </Sheet>
       {/* Par-dessus la feuille : elle reste ouverte dessous, et « Compris » y revient */}
-      <FeuilleBulle open={bulle} onClose={() => setBulle(false)} belowHeader={belowHeader} />
+      <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />
       {offre && (
         <OffreAvantDePartir
           fin={offre}
           chapitres={chapitres}
           suite={suite}
-          belowHeader={belowHeader}
           onRefus={() => {
             suiteRefusee = true;
           }}

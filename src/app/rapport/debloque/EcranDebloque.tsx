@@ -158,11 +158,7 @@ export function EcranDebloque({
             <CheckBurst size={vue ? 64 : 88} pop />
           </div>
         </div>
-        <h1
-          data-rise=""
-          style={delai(0.2)}
-          className={cn("m-0 font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance]", vue ? "mt-2 text-[28px]" : "mt-4 text-[32px] lg:text-[40px]")}
-        >
+        <h1 data-rise="" style={delai(0.2)} className={cn("m-0 font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance]", vue ? "mt-2 text-[28px]" : "mt-4 text-[32px]")}>
           {DEBLOQUE.titre}
         </h1>
         <p data-rise="" style={delai(0.3)} className="m-0 mt-2 max-w-[380px] text-corps font-extrabold leading-[1.45] text-soft">

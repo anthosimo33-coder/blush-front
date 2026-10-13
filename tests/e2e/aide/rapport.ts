@@ -60,6 +60,21 @@ export async function ouvrirLeRapport(page: Page, adresse = "/rapport"): Promise
 }
 
 /**
+ * Une feuille des bulles ou du paiement (« Ta formule », l’offre ①, « C’est quoi une bulle ? », la recharge), au dessin du
+ * prototype des bulles sur ordinateur : son voile couvre tout l’écran, en-tête compris (pas de bande blanche au-dessus),
+ * et son titre garde sa taille (`titre`, en px). Sur téléphone, rien de plus : la feuille y monte du bas, sur tout l’écran.
+ */
+export async function feuilleSurOrdinateur(page: Page, feuille: Locator, { titre }: { titre?: number } = {}): Promise<void> {
+  if (!surOrdinateur(page)) return;
+  const voile = await feuille.locator(":scope > div[aria-hidden='true']").boundingBox();
+  expect(voile?.y, "le voile de la feuille couvre aussi l’en-tête").toBe(0);
+  if (titre !== undefined) await expect(feuille.locator("h2").first()).toHaveCSS("font-size", `${titre}px`);
+}
+
+/** La police de l’appli (Nunito), pas celle des messages (Figtree) : la pile de polices que le navigateur a retenue. */
+export const NUNITO = /^nunito/i;
+
+/**
  * Ferme la feuille ouverte (le paiement, le sommaire, « Quelle conv ? ») comme on le fait : Échap sur ordinateur ; sur
  * téléphone, un toucher sur le voile, au-dessus de la feuille (elle monte du bas de l’écran, sans bouton pour la fermer).
  */

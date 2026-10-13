@@ -21,23 +21,22 @@ type Recharge = { solde: number; recharger: () => void } | { solde?: undefined; 
 /**
  * La feuille qui explique les bulles : la règle, trois exemples, ce que coûte chaque réponse, et ce qui est offert. Avec
  * `solde` et `recharger` (ouverte depuis le chat), son bouton est « Recharger · il t’en reste N » ; sans, « Compris », qui
- * la ferme. `belowHeader` : comme pour Sheet (faux sur un écran sans en-tête).
+ * la ferme. Sur ordinateur, son voile couvre tout l’écran, en-tête compris, comme dans le prototype (belowHeader faux) :
+ * pas de bande blanche au-dessus.
  */
 export function FeuilleBulle({
   open,
   onClose,
   solde,
   recharger,
-  belowHeader,
 }: {
   open: boolean;
   onClose: () => void;
-  belowHeader?: boolean;
 } & Recharge) {
   const titre = useId();
   const exemples = useId();
   return (
-    <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={belowHeader}>
+    <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={false}>
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em]">
         {FEUILLE_BULLE.titre}
       </h2>
@@ -55,12 +54,12 @@ export function FeuilleBulle({
         <ul aria-labelledby={exemples} className="m-0 flex list-none flex-col gap-2 p-0">
           {FEUILLE_BULLE.exemples.map((e) => (
             <li key={e.toi} className="flex items-center gap-1.5">
-              <span className="truncate rounded-[14px] rounded-br-[5px] bg-toi-ink px-2.5 py-1 font-message text-legende font-bold text-white">
+              <span className="truncate rounded-[14px] rounded-br-[5px] bg-toi-ink px-2.5 py-1 font-sans text-legende font-bold text-white">
                 <span className="sr-only">{FEUILLE_BULLE.toi}</span>
                 {e.toi}
               </span>
               <Icon name="arrow" size={12} stroke={2.6} className="shrink-0 text-grey" />
-              <span className="shrink-0 rounded-[14px] rounded-bl-[5px] bg-plaque px-2.5 py-1 font-message text-legende font-bold text-ink">
+              <span className="shrink-0 rounded-[14px] rounded-bl-[5px] bg-plaque px-2.5 py-1 font-sans text-legende font-bold text-ink">
                 <span className="sr-only">{FEUILLE_BULLE.blush}</span>
                 {e.blush}
               </span>
