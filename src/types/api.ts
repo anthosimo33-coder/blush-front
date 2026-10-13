@@ -142,7 +142,7 @@ export type GesteDuFil =
 export type Direct = {
   /** L’heure du calcul (ISO). */
   le: string;
-  /** Les personnes en ligne : les onglets qui ont fait signe dans la dernière minute et quart. */
+  /** Les personnes en ligne : les onglets qui ont fait signe dans la dernière minute et demie (EN_LIGNE_S). */
   enLigne: number;
   /** Où elles en sont, par écran (toutes les étapes, même à 0, dans l’ordre d’ETAPES_VISITE). */
   etapes: { etape: EtapeVisite; n: number }[];

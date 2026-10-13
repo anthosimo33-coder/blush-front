@@ -224,7 +224,16 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   expect(styleguide.status()).toBe(200);
   expect(await styleguide.text()).toContain("Les briques de BLUSH");
   /* Des données fictives seulement */
-  for (const chemin of ["/apercu/admin", "/apercu/ecriture", "/apercu/instagram", "/apercu/mail"]) {
+  for (const chemin of [
+    "/apercu/admin",
+    "/apercu/admin?p=1&suivi=0",
+    "/apercu/admin?p=30&calme=1",
+    "/apercu/admin?version=actuelle",
+    "/apercu/admin/direct",
+    "/apercu/ecriture",
+    "/apercu/instagram",
+    "/apercu/mail",
+  ]) {
     expect((await request.get(chemin)).status(), chemin).toBe(200);
   }
   const carte = await request.get("/apercu/carte?cas=court");
