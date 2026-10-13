@@ -94,7 +94,8 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  * L’accès est celui du compte de l’histoire, lu en base comme à la fin de chaque étape (aAcces) : jamais celui que
  * croit l’appelant. Il n’est lu que s’il change ce qui reste à lancer : le rapport ouvert, sondé toutes les 2 s pendant
  * qu’il s’écrit, ne paie pas une requête de plus à chaque sondage. `etat` : celui déjà lu par l’appelant (le rapport le
- * lit une fois pour tout). Vrai si une tâche vient d’être lancée.
+ * lit une fois pour tout). Vrai si une tâche vient d’être lancée. Une étape qui attend encore repart aussi après la
+ * réponse, sans rien changer à ce qu’on montre (faux).
  */
 export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?: EtatChaine): Promise<boolean> {
   /*
@@ -112,7 +113,16 @@ export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?
   const genres = sans.join() === avec.join() ? sans : (await aAcces(story)) ? avec : sans;
   /* La mémoire en échec repart, si elle peut (relancerLaMemoire) : lu seulement quand l’état la montre en échec */
   const memoireRelancee = lu.taches.memoire?.status === "echec" && lu.conv && (await relancerLaMemoire(story.id));
-  if (!genres.length && !memoireRelancee) return false;
+  if (!genres.length && !memoireRelancee) {
+    /*
+     * Rien de neuf, mais une étape planifiée attend encore (la fonction qui écrivait le rapport arrivait à son échéance :
+     * la mémoire n’a pas eu le temps de commencer) : elle repart après la réponse. Le suivi de l’écriture la reprenait,
+     * mais il s’arrête avec le rapport écrit : sans ceci, elle attendait pour de bon (la fiche vide, le chat sur sa
+     * mémoire de secours). Une étape en cours est à l’exécution qui l’écrit (coupée, le suivi et la fiche la reprennent).
+     */
+    if (Object.values(lu.taches).some((t) => t?.status === "attente")) relancerApres(story.id);
+    return false;
+  }
   for (const g of genres) await planifier(story.id, g);
   relancerApres(story.id);
   return true;

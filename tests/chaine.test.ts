@@ -6,6 +6,7 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import type { Utilisateur } from "@/server/auth";
+import { majEnCours } from "@/server/ajouts";
 import { repondre } from "@/server/chat";
 import { historique } from "@/server/historique";
 import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
@@ -225,5 +226,32 @@ describe("hors de la chaîne (reparerLaChaine)", () => {
     expect(await plans(id)).toEqual([{ status: "attente" }]);
     expect(apres).toHaveLength(lances + 1);
     apres.length = 0;
+  });
+
+  it("une étape planifiée qui n’a pas commencé (la fonction à son échéance) repart à la réouverture, jusqu’à la vraie mémoire et sa fiche", async () => {
+    const u = await compteDeTest("en-suspens");
+    const { id } = await histoireLue(u, "06-elle-hesite.txt");
+    await debloquerLaConv(id);
+    expect(await reparerLaChaine(await ligneEnBase(id))).toBe(true);
+    /* La chaîne lancée après la réponse ne tourne pas (la fonction coupée avant) : le plan reste en attente */
+    apres.length = 0;
+    expect(await plans(id)).toEqual([{ status: "attente" }]);
+    /* Rien de neuf à planifier (faux), mais une étape attend : elle repart après la réponse, et la chaîne va jusqu’au bout */
+    expect(await reparerLaChaine(await ligneEnBase(id))).toBe(false);
+    expect(apres).toHaveLength(1);
+    while (apres.length) await apres.shift()!();
+    const m = await memoireDe(id);
+    expect(m && !m.secours && m.etat.fiche.faits.length > 0).toBe(true);
+    /* Plus rien n’attend : la réouverture ne relance rien */
+    expect(await reparerLaChaine(await ligneEnBase(id))).toBe(false);
+    expect(apres).toHaveLength(0);
+  });
+
+  it("la première mémoire en attente compte comme une mémoire qui s’écrit : la fiche la relance et se relit (majEnCours)", async () => {
+    const u = await compteDeTest("memoire-attend");
+    const { id } = await histoireLue(u, "06-elle-hesite.txt");
+    expect(await majEnCours(id)).toBe(false);
+    await planifier(id, "memoire");
+    expect(await majEnCours(id)).toBe(true);
   });
 });
