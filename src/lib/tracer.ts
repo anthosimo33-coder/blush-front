@@ -1,7 +1,8 @@
 /*
  * Ce qu’on garde d’une erreur, dans le navigateur comme sur le serveur (src/server/journal.ts) : son nom, son code, son
  * empreinte (digest), jamais son message. Le message d’une erreur SQL cite ses paramètres (un email), celui d’un JSON
- * illisible un morceau de la conv, celui d’une erreur du navigateur une adresse avec ses paramètres.
+ * illisible un morceau de la conv, celui d’une erreur du navigateur une adresse avec ses paramètres. Seule exception :
+ * le motif d’un refus de Whop (ErreurWhop.motif, sans email), qui dit quel champ de notre appel il refuse.
  * Dans le navigateur, tracer() écrit seulement dans sa console (décidé) : rien n’est envoyé au serveur. Une route
  * /api/journal bornée serait un ajout à décider. Une erreur inattendue qu’on attrape sans la montrer y passe ; un
  * `catch` qui reste muet est un repli voulu (un stockage refusé, une adresse illisible), dit par son commentaire.
@@ -32,8 +33,9 @@ function codeSur(e: unknown, cle: "code" | "digest"): string | undefined {
 
 /**
  * Ce qu’une ligne du journal dit d’une erreur : son nom, son code (celui d’une ErreurTache, d’une ErreurPublique, d’une
- * erreur de Postgres ou de Node), son empreinte (`digest`, que Next pose et que la page d’erreur montre), et le nom et le
- * code de sa cause (une erreur de Drizzle enveloppe celle de Postgres). Jamais son message ni sa pile.
+ * erreur de Postgres ou de Node), son empreinte (`digest`, que Next pose et que la page d’erreur montre), le motif d’un
+ * refus de Whop, et le nom et le code de sa cause (une erreur de Drizzle enveloppe celle de Postgres). Jamais son message
+ * ni sa pile.
  */
 export function champsDErreur(e: unknown): Champs {
   const cause = e instanceof Error ? e.cause : undefined;
@@ -41,6 +43,7 @@ export function champsDErreur(e: unknown): Champs {
     erreur: nomErreur(e),
     code: codeSur(e, "code"),
     digest: codeSur(e, "digest"),
+    ...(e instanceof Error && e.name === "ErreurWhop" && "motif" in e && typeof e.motif === "string" ? { motif: e.motif } : {}),
     ...champsDuPrestataire(e),
     ...(cause === undefined ? {} : { cause: nomErreur(cause), codeCause: codeSur(cause, "code") }),
   };

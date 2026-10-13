@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { champsDErreur } from "@/lib/tracer";
 import { lirePaiementWhop, lireWebhook, montantJuste } from "@/server/paiement/evenements";
 import { signerWebhook, TOLERANCE_WEBHOOK_S, verifierWebhook } from "@/server/paiement/signature";
 import { creerConfiguration, ErreurWhop, lirePaiement, payerAvecJeton, payerEnUnGeste, VERSION_API_WHOP, type ConfigWhop } from "@/server/paiement/whop";
@@ -303,6 +304,20 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
     /* Une réponse sans id de paiement : illisible, rien n’est supposé payé */
     repondre(200, { status: "paid" });
     await expect(payerAvecJeton(config, demande)).rejects.toMatchObject({ code: "whop_illisible" });
+  });
+
+  it("un refus de Whop (400) : son motif, son type et son message, sans l’email qu’il cite ; le journal le garde", async () => {
+    repondre(400, { error: { type: "invalid_request", message: "Buyer toi@example.com cannot pay plan" } });
+    const demande = { achat: "a1", centimes: 1490, titre: "Premium", jeton: "ctok_abc", email: "toi@example.com", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
+    const e = await payerAvecJeton(config, demande).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ErreurWhop);
+    expect(e).toMatchObject({ code: "whop_400", statut: 400, motif: "invalid_request · Buyer ‹email› cannot pay plan" });
+    expect(champsDErreur(e)).toMatchObject({ erreur: "ErreurWhop", code: "whop_400", motif: "invalid_request · Buyer ‹email› cannot pay plan" });
+    /* Le code à la place du type ; un corps sans rien de lisible : pas de motif */
+    repondre(422, { error: { code: "promo_invalid" } });
+    await expect(payerAvecJeton(config, demande)).rejects.toMatchObject({ motif: "promo_invalid" });
+    repondre(400, "pas du JSON qu’on lit");
+    expect(await payerAvecJeton(config, demande).catch((x: unknown) => x)).toMatchObject({ code: "whop_400", motif: undefined });
   });
 
   it("Whop qui ne répond pas : ErreurWhop « whop_delai »", async () => {

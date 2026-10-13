@@ -35,6 +35,8 @@ describe("ce qu’on garde d’une erreur", () => {
     expect(champsDErreur(null).erreur).toBe("null");
     /* Le refus de Resend : son statut dans le code, ni l’adresse ni le message */
     expect(champsDErreur(new ErreurResend(422))).toMatchObject({ erreur: "ErreurResend", code: "resend_422" });
+    /* Un motif n’est gardé que d’un refus de Whop (ErreurWhop, tests/unit/paiement.test.ts) */
+    expect(champsDErreur(Object.assign(new Error("x"), { motif: "Ines a écrit…" }))).not.toHaveProperty("motif");
   });
 
   it("d’une erreur du SDK du modèle (toutes nommées « Error ») : son statut et le type que l’API donne, jamais son message", () => {
