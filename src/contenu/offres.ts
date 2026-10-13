@@ -68,6 +68,24 @@ export const bullesDe = (offre: OffreId, { premiereRecharge = false }: { premier
   CATALOGUE[offre].bulles + (premiereRecharge && offre === PREMIERE_RECHARGE.offre ? PREMIERE_RECHARGE.bonus : 0);
 
 /** « 9,90 € » : des centimes en euros, la virgule française, l’espace insécable avant €. */
+/**
+ * Le nom de l’achat sur la page de paiement de Whop (le « title » de son prix) : l’offre, et les bulles figées dans l’achat
+ * à la commande (la première recharge compte son bonus). Le produit, lui, s’appelle BLUSH chez Whop.
+ */
+export function titreChezWhop(offre: OffreId, bulles: number): string {
+  switch (offre) {
+    case "rapport":
+    case "suite":
+      return `Le rapport complet + ${bulles} bulles`;
+    case "premium":
+      return `Premium\u00a0: le rapport + ${bulles} bulles`;
+    case "premium_ajout":
+      return `${bulles} bulles en plus`;
+    default:
+      return `${bulles} bulles`;
+  }
+}
+
 export const enEuros = (centimes: number) => `${Math.floor(centimes / 100)},${String(centimes % 100).padStart(2, "0")}\u00a0€`;
 
 /** Le prix d’une offre, à afficher : « 9,90 € ». */

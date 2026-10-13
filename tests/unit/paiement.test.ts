@@ -204,17 +204,19 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
   it("une configuration de paiement : le prix en ligne (en euros, une fois, caché), l’achat en métadonnées, la clé d’idempotence, la version épinglée", async () => {
     repondre(200, { id: "ch_1", purchase_url: "https://whop.com/checkout/ch_1/" });
     const achat = "0b7e3f4c-0000-4000-8000-000000000001";
-    expect(await creerConfiguration(config, { achat, centimes: 990, retour: "https://www.askblush.com/paiement/retour?achat=x" })).toEqual({
-      id: "ch_1",
-      url: "https://whop.com/checkout/ch_1/",
-    });
+    expect(await creerConfiguration(config, { achat, centimes: 990, titre: "Le rapport complet + 10 bulles", retour: "https://www.askblush.com/paiement/retour?achat=x" })).toEqual(
+      {
+        id: "ch_1",
+        url: "https://whop.com/checkout/ch_1/",
+      },
+    );
     expect(appels).toEqual([
       {
         url: "https://api.whop.com/api/v1/checkout_configurations",
         methode: "POST",
         entetes: expect.objectContaining({ authorization: "Bearer cle_fictive", "api-version-date": VERSION_API_WHOP, "idempotency-key": `configuration:${achat}` }),
         corps: {
-          plan: { initial_price: 9.9, currency: "eur", plan_type: "one_time", product_id: "prod_1", visibility: "hidden" },
+          plan: { title: "Le rapport complet + 10 bulles", initial_price: 9.9, currency: "eur", plan_type: "one_time", product_id: "prod_1", visibility: "hidden" },
           metadata: { achat },
           redirect_url: "https://www.askblush.com/paiement/retour?achat=x",
         },
@@ -224,7 +226,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
 
   it("le bac à sable a son adresse ; sans purchase_url, la page se déduit de l’id", async () => {
     repondre(200, { id: "ch_2" });
-    expect(await creerConfiguration({ ...config, bacASable: true }, { achat: "a", centimes: 500, retour: "r" })).toEqual({
+    expect(await creerConfiguration({ ...config, bacASable: true }, { achat: "a", centimes: 500, titre: "80 bulles en plus", retour: "r" })).toEqual({
       id: "ch_2",
       url: "https://sandbox.whop.com/checkout/ch_2/",
     });
@@ -233,12 +235,12 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
 
   it("un refus de Whop : ErreurWhop avec son seul statut (« whop_401 ») ; une réponse illisible aussi", async () => {
     repondre(401, { error: "la clé, ses détails" });
-    const e = await creerConfiguration(config, { achat: "a", centimes: 990, retour: "r" }).catch((x: unknown) => x);
+    const e = await creerConfiguration(config, { achat: "a", centimes: 990, titre: "Le rapport complet + 10 bulles", retour: "r" }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(ErreurWhop);
     expect(e).toMatchObject({ code: "whop_401", statut: 401 });
     expect(String((e as Error).message)).not.toContain("clé");
     repondre(200, { pas: "un id" });
-    await expect(creerConfiguration(config, { achat: "a", centimes: 990, retour: "r" })).rejects.toMatchObject({ code: "whop_illisible" });
+    await expect(creerConfiguration(config, { achat: "a", centimes: 990, titre: "Le rapport complet + 10 bulles", retour: "r" })).rejects.toMatchObject({ code: "whop_illisible" });
   });
 
   it("lire un paiement : lu ; introuvable (404), ou un id qui n’est pas un paiement : null, sans appel pour ce dernier", async () => {
@@ -254,7 +256,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
 
   it("le paiement en un geste : le moyen gardé du membre, à sa demande (off_session faux) ; la page de la 3-D Secure si la banque la demande", async () => {
     repondre(200, { id: "pay_2", status: "paid" });
-    const demande = { achat: "a1", centimes: 500, membre: "mber_1", moyen: "payt_1", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
+    const demande = { achat: "a1", centimes: 500, titre: "80 bulles en plus", membre: "mber_1", moyen: "payt_1", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
     expect(await payerEnUnGeste(config, demande)).toEqual({ id: "pay_2", confirmer: null });
     expect(appels[0]).toMatchObject({
       url: "https://api.whop.com/api/v1/payments",
@@ -266,7 +268,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
         off_session: false,
         return_url: demande.retour,
         metadata: { achat: "a1" },
-        plan: expect.objectContaining({ initial_price: 5 }),
+        plan: expect.objectContaining({ initial_price: 5, title: "80 bulles en plus" }),
       },
     });
     repondre(200, { id: "pay_3", status: "requires_action", next_action: { type: "redirect", redirect_to_url: { url: "https://banque.example/3ds" } } });

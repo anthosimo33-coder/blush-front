@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { CATALOGUE, DUREE_AJOUT_MS } from "@/contenu/offres";
+import { CATALOGUE, DUREE_AJOUT_MS, titreChezWhop } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { EtatAchat, OffreUniqueMontree, PaiementCommence } from "@/types/api";
 import { commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
@@ -76,7 +76,14 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
     return { achat: achat.id, checkout: null, url: null };
   }
   try {
-    const p = await payerEnUnGeste(f.whop, { achat: achat.id, centimes: achat.centimes, membre: moyen.membreId, moyen: moyen.moyenId, retour });
+    const p = await payerEnUnGeste(f.whop, {
+      achat: achat.id,
+      centimes: achat.centimes,
+      titre: titreChezWhop(achat.offre, achat.bulles),
+      membre: moyen.membreId,
+      moyen: moyen.moyenId,
+      retour,
+    });
     return { achat: achat.id, checkout: null, url: p.confirmer };
   } catch (e) {
     /*
@@ -94,7 +101,7 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
 async function pageDePaiement(f: Fournisseur, achat: Achat, retour: string): Promise<PaiementCommence> {
   const page =
     f.mode === "whop"
-      ? await creerConfiguration(f.whop, { achat: achat.id, centimes: achat.centimes, retour })
+      ? await creerConfiguration(f.whop, { achat: achat.id, centimes: achat.centimes, titre: titreChezWhop(achat.offre, achat.bulles), retour })
       : { id: `ch_faux_${achat.id.replaceAll("-", "")}`, url: `/paiement/factice?achat=${achat.id}` };
   await db().update(a).set({ checkoutId: page.id }).where(eq(a.id, achat.id));
   return { achat: achat.id, checkout: page.id, url: page.url };

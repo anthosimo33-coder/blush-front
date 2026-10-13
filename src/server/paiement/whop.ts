@@ -68,9 +68,11 @@ async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string
 
 /**
  * Le prix d’un achat, créé à la volée chez Whop (un « plan » en ligne : Whop réutilise celui qui a déjà ces attributs) :
- * en euros (Whop compte en unités : 9.9), payé une fois, sous notre produit, caché du catalogue de Whop.
+ * en euros (Whop compte en unités : 9.9), payé une fois, sous notre produit, caché du catalogue de Whop, avec le nom
+ * que l’acheteur voit sur la page de paiement (titreChezWhop).
  */
-const planEnLigne = (config: ConfigWhop, centimes: number) => ({
+const planEnLigne = (config: ConfigWhop, centimes: number, titre: string) => ({
+  title: titre,
   initial_price: centimes / 100,
   currency: "eur",
   plan_type: "one_time",
@@ -88,10 +90,10 @@ const Configuration = z.looseObject({ id: z.string().regex(/^[A-Za-z0-9_-]+$/), 
  */
 export async function creerConfiguration(
   config: ConfigWhop,
-  { achat, centimes, retour }: { achat: string; centimes: number; retour: string },
+  { achat, centimes, titre, retour }: { achat: string; centimes: number; titre: string; retour: string },
 ): Promise<{ id: string; url: string }> {
   const brut = await appel(config, "POST", "/checkout_configurations", {
-    corps: { plan: planEnLigne(config, centimes), metadata: { achat }, redirect_url: retour },
+    corps: { plan: planEnLigne(config, centimes, titre), metadata: { achat }, redirect_url: retour },
     idempotence: `configuration:${achat}`,
   });
   const c = Configuration.safeParse(brut);
@@ -120,12 +122,12 @@ const PaiementCree = z.looseObject({
  */
 export async function payerEnUnGeste(
   config: ConfigWhop,
-  { achat, centimes, membre, moyen, retour }: { achat: string; centimes: number; membre: string; moyen: string; retour: string },
+  { achat, centimes, titre, membre, moyen, retour }: { achat: string; centimes: number; titre: string; membre: string; moyen: string; retour: string },
 ): Promise<{ id: string; confirmer: string | null }> {
   const brut = await appel(config, "POST", "/payments", {
     corps: {
       account_id: config.compte,
-      plan: planEnLigne(config, centimes),
+      plan: planEnLigne(config, centimes, titre),
       member_id: membre,
       payment_method_id: moyen,
       off_session: false,

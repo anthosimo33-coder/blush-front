@@ -28,12 +28,12 @@ import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
 
 /** Les budgets du jour, en dollars, et les seuils où l’équipe est prévenue (une part du budget du jour). */
 export const BUDGET_IA = {
-  /** Tous les appels du jour (décidé). */
-  jour: 30,
-  /** Les appels pour un compte (décidé). */
-  compte: 3,
-  /** Les appels sans compte, pris dans le budget du jour ; à revoir avec les chiffres de l’ouverture. */
-  anonyme: 5,
+  /** Tous les appels du jour (décidé : 500 $ pour l’ouverture, le 13 octobre). */
+  jour: 500,
+  /** Les appels pour un compte (décidé : 10 $ pour l’ouverture, le 13 octobre ; ce sont les bulles qui comptent ce qu’on paie). */
+  compte: 10,
+  /** Les appels sans compte (les captures lues avant l’email), pris dans le budget du jour ; relevé pour l’ouverture. */
+  anonyme: 50,
   /** L’équipe est prévenue à 50 % et 80 % (décidé), puis quand le budget du jour est atteint. */
   seuils: [0.5, 0.8, 1],
 } as const;

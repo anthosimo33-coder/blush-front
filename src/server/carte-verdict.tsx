@@ -26,10 +26,16 @@ const ressources = Promise.all([
   readFile(join(process.cwd(), "assets/fonts/Nunito-Black.ttf")),
   readFile(join(process.cwd(), "assets/fonts/Nunito-ExtraBold.ttf")),
   readFile(join(process.cwd(), "public/mail/bulle.png")),
-]).then(([noir, extra, png]) => ({ noir, extra, bulle: `data:image/png;base64,${png.toString("base64")}` }));
+]).then(([noir, extra, png]) => ({ noir, extra, png, bulle: `data:image/png;base64,${png.toString("base64")}` }));
 
 /** La bulle de la marque, en data-URL : une image la dessine où elle veut (à côté d’une réponse du chat, par exemple). */
 export const imageBulle = async () => (await ressources).bulle;
+
+/** Les fichiers de la marque tels quels : Nunito 900 (`noir`) et 800 (`extra`), et la bulle en PNG (312 px). Le rapport en PDF les embarque. */
+export async function fichiersDeLaMarque(): Promise<{ noir: Buffer; extra: Buffer; bulle: Buffer }> {
+  const { noir, extra, png } = await ressources;
+  return { noir, extra, bulle: png };
+}
 
 /** La réponse de celui qui regarde, en bas de chaque image : la phrase de la landing. */
 const ACCROCHE = "et la mienne, elle dit quoi\u00a0?";

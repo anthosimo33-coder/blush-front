@@ -35,7 +35,7 @@ vi.mock("@/server/ia/claude", async (original) => ({ ...(await original<typeof i
 
 import { POST } from "@/app/api/chat/route";
 import { ouvrirSession } from "@/server/auth";
-import { cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/server/budget";
+import { BUDGET_IA, cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/server/budget";
 import { chiffrer, empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import { aujourdhuiParis } from "@/server/temps";
@@ -277,7 +277,7 @@ describe("POST /api/chat en flux", () => {
 
   it("le budget de l’IA du compte atteint avant toute bulle : « souffle » (503), sans appeler le modèle ni alerter l’équipe", async () => {
     const cle = empreinte(`limite:${cleDeDepense(payeurDuCompte(compte), aujourdhuiParis().iso)}`);
-    await noterDepense(payeurDuCompte(compte), 3e6);
+    await noterDepense(payeurDuCompte(compte), BUDGET_IA.compte * 1e6);
     oublierLeBudget();
     try {
       for (const flux of [true, false]) {

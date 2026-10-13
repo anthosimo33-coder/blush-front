@@ -48,8 +48,8 @@ const cles = () => routes.flatMap((r) => r.methodes.map((m) => `${m} ${r.chemin}
 const lignes = Object.keys(ROUTES) as CleRoute[];
 const routeDe = (cle: string) => routes.find((r) => r.chemin === cle.slice(cle.indexOf(" ") + 1))!;
 
-/* Les routes qui répondent un audio ou une image : pas de repondre. Le compilateur vérifie que la liste est complète */
-const BINAIRES = ["POST /api/partage/image", "GET /api/vocal/audio", "GET /api/vocal/chat/[id]"] as const satisfies readonly Exclude<CleRoute, CleJson>[];
+/* Les routes qui répondent un audio, une image ou un PDF : pas de repondre. Le compilateur vérifie que la liste est complète */
+const BINAIRES = ["POST /api/partage/image", "GET /api/rapport/pdf", "GET /api/vocal/audio", "GET /api/vocal/chat/[id]"] as const satisfies readonly Exclude<CleRoute, CleJson>[];
 
 describe("la table des routes", () => {
   it("a une ligne par méthode exportée de chaque route de src/app/api, et rien d’autre", () => {

@@ -215,8 +215,8 @@ describe("S-01 · lire des captures (le modèle payant) avant l’email", () => 
     etat.cookies.clear();
     await db()
       .insert(schema.rateLimits)
-      .values({ key: cles[0]!, windowStart: new Date(), count: 49 })
-      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: 49, windowStart: new Date() } });
+      .values({ key: cles[0]!, windowStart: new Date(), count: LIMITES.capturesAnonymesParJour.max - 1 })
+      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: LIMITES.capturesAnonymesParJour.max - 1, windowStart: new Date() } });
     expect(await lecturePermise("captures")).toBe("ok");
     expect(await lecturePermise("captures")).toBe("trop");
     etat.cookies.set(SESSION, secretSession);
@@ -979,17 +979,17 @@ describe("S-04 · S-28 · les lectures du jour se comptent par boîte mail et pa
     await poserChoisie(conv.id);
     const verdict = async () => (await etatDesTaches(conv.id, ["verdict"])).verdict;
 
-    /* La boîte a lu ses cinq convs du jour (sous un autre compte, ou avant d’effacer le sien) */
-    await poser(cleDeLimiteDuCompte("analyse", boite), 5);
+    /* La boîte a lu ses convs du jour (sous un autre compte, ou avant d’effacer le sien) */
+    await poser(cleDeLimiteDuCompte("analyse", boite), LIMITES.analyseParCompte.max);
     expect(await (await lancer()).json()).toEqual({ erreur: "trop" });
     expect(await verdict()).toBeUndefined();
 
     /*
-     * Un compte frais, mais une adresse IP qui en a déjà lancé vingt aujourd’hui. Refusée par l’adresse, la lecture ne
-     * coûte rien au compte : derrière un réseau saturé, réessayer n’use pas ses cinq lectures
+     * Un compte frais, mais une adresse IP qui a déjà lancé toutes les siennes aujourd’hui. Refusée par l’adresse, la
+     * lecture ne coûte rien au compte : derrière un réseau saturé, réessayer n’use pas ses lectures
      */
     await poser(cleDeLimiteDuCompte("analyse", boite), 2);
-    await poser(`analyse:ip:${ipLecture}`, 20);
+    await poser(`analyse:ip:${ipLecture}`, LIMITES.analyseParIp.max);
     for (let k = 0; k < 4; k++) {
       const parIp = await lancer();
       expect([parIp.status, await parIp.json()]).toEqual([429, { erreur: "trop" }]);
@@ -1018,12 +1018,12 @@ describe("S-10 · les limites par adresse IP", () => {
   it("un envoi invalide ne compte pas ; une IPv6 compte pour son /64 : changer d’adresse dans sa box ne remet pas le compteur à zéro", async () => {
     const reseau = `2001:db8:${(n % 65535).toString(16)}:${((n >> 16) % 65535).toString(16)}`;
     const cle = `import:ip:${reseau}::/64`;
-    await poserLimite(cle, 19);
+    await poserLimite(cle, LIMITES.importParIp.max - 1);
     try {
       /* Sans fichier : refusé pour ça, sans toucher au compteur */
       for (let k = 0; k < 3; k++) expect(await (await importer(`${reseau}::${k + 1}`, false)).json()).toEqual({ erreur: "fichier" });
-      expect(await compteDeLimite(cle)).toBe(19);
-      /* Le vingtième import de la box passe ; le suivant, d’une autre adresse de la même box, non */
+      expect(await compteDeLimite(cle)).toBe(LIMITES.importParIp.max - 1);
+      /* Le dernier import permis de la box passe ; le suivant, d’une autre adresse de la même box, non */
       const vingtieme = await importer(`${reseau}::a`, true);
       expect(vingtieme.status).toBe(200);
       await db()

@@ -7,7 +7,7 @@ import type { Requete } from "@prompts/lib/contextes";
  * Le budget de l’IA (src/server/budget.ts) en base : ce que chaque appel a coûté, par jour de Paris, pour tous (ai_usage),
  * par compte et sans compte (comptés à l’appel, dans rate_limits). Les dépenses d’un test sont des lignes d’ai_usage à
  * l’étiquette ETIQUETTE et les dépenses du jour de ses payeurs : effacées avant et après chaque test (un lancement
- * interrompu ne laisse pas 30 $ peser sur les autres fichiers : tests/preparer-la-base.ts efface aussi l’étiquette). Ce
+ * interrompu ne laisse pas le budget du jour peser sur les autres fichiers : tests/preparer-la-base.ts efface aussi l’étiquette). Ce
  * qu’un test a lu du budget est oublié avant le suivant. Les captures sont lues comme le ferait la route (cookies simulés).
  */
 const etat = vi.hoisted(() => ({ cookies: new Map<string, string>() }));
@@ -21,7 +21,7 @@ vi.mock("next/headers", () => ({
 
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
-import { cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, type Payeur } from "@/server/budget";
+import { BUDGET_IA, cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, type Payeur } from "@/server/budget";
 import { lireCaptures } from "@/server/captures";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -94,14 +94,15 @@ describe("la dépense d’un compte", () => {
   it("additionne ses convs du jour, pas celles d’hier ni celles des autres", async () => {
     const [a, b] = [await compteEtConv(), await compteEtConv()];
     const { id: autreConvDeA } = await convPrete(a.u, "06-elle-hesite.txt");
-    await depense(a.payeur, 1.5, { storyId: a.id });
-    await depense(a.payeur, 1.4, { storyId: autreConvDeA });
-    await depense(a.payeur, 10, { jour: hier() });
-    await depense(b.payeur, 2.9, { storyId: b.id });
+    const c = BUDGET_IA.compte;
+    await depense(a.payeur, c * 0.5, { storyId: a.id });
+    await depense(a.payeur, c * 0.46, { storyId: autreConvDeA });
+    await depense(a.payeur, c * 3, { jour: hier() });
+    await depense(b.payeur, c * 0.96, { storyId: b.id });
     expect(await controle(a.id)).toBe("ok");
     expect(await controle(b.id)).toBe("ok");
-    /* 3 $ pour A sur ses deux convs : arrêté, B non */
-    await depense(a.payeur, 0.1, { storyId: autreConvDeA });
+    /* Son budget pour A sur ses deux convs : arrêté, B non */
+    await depense(a.payeur, c * 0.04, { storyId: autreConvDeA });
     oublierLeBudget();
     expect(await controle(a.id)).toBe("budget");
     expect(await controle(autreConvDeA)).toBe("budget");
@@ -111,7 +112,7 @@ describe("la dépense d’un compte", () => {
   it("effacer une conv ne rend pas au compte ce qu’elle a coûté, et ne le fait pas passer dans la part sans compte", async () => {
     const a = await compteEtConv();
     const { id: autreConvDeA } = await convPrete(a.u, "06-elle-hesite.txt");
-    await depense(a.payeur, 3, { storyId: a.id });
+    await depense(a.payeur, BUDGET_IA.compte, { storyId: a.id });
     await db().delete(schema.stories).where(eq(schema.stories.id, a.id));
     oublierLeBudget();
     expect(await controle(autreConvDeA)).toBe("budget");
@@ -123,8 +124,9 @@ describe("la dépense d’un compte", () => {
     payeurs.add(a.payeur);
     const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      /* 3 $ en vocaux : 16 500 caractères à 22 $ les 121 000. Avant l’arrondi, Postgres refusait la dépense (22P02) */
-      await noterCout({ storyId: a.id, tache: ETIQUETTE, modele: "voix", sortie: 16_500, micros: 16_500 * (22 / 121_000) * 1e6 + 0.4, ms: 1, payeur: a.payeur });
+      /* Son budget en vocaux, à 22 $ les 121 000 caractères. Avant l’arrondi, Postgres refusait la dépense (22P02) */
+      const caracteres = Math.ceil((BUDGET_IA.compte * 121_000) / 22);
+      await noterCout({ storyId: a.id, tache: ETIQUETTE, modele: "voix", sortie: caracteres, micros: caracteres * (22 / 121_000) * 1e6 + 0.4, ms: 1, payeur: a.payeur });
       expect(erreur).not.toHaveBeenCalled();
     } finally {
       erreur.mockRestore();
@@ -135,17 +137,20 @@ describe("la dépense d’un compte", () => {
 
   it("sans conv, l’appel est sans compte : sa part à lui ne touche pas celle des comptes", async () => {
     const a = await compteEtConv();
-    await depense(null, 5);
+    await depense(null, BUDGET_IA.anonyme);
     expect(await controle()).toBe("budget");
     expect(await controle(a.id)).toBe("ok");
   });
 
-  it("au-delà de 30 $ pour tous, plus personne n’appelle le modèle", async () => {
+  it("au-delà du budget du jour pour tous, plus personne n’appelle le modèle", async () => {
     const a = await compteEtConv();
     await depense(null, 4);
     await depense(a.payeur, 2.5);
     await depense((await compteEtConv()).payeur, 2.9);
-    for (let i = 0; i < 7; i++) await depense(`compte:budget-autre-${i}@blush.test`, 2.95);
+    /* Le reste du budget du jour, par d’autres comptes chacun sous son budget */
+    const chacun = BUDGET_IA.compte - 0.05;
+    const autres = Math.ceil((BUDGET_IA.jour - 9.4) / chacun);
+    for (let i = 0; i < autres; i++) await depense(`compte:budget-autre-${i}@blush.test`, chacun);
     expect(await controle(a.id)).toBe("budget");
   });
 });
@@ -156,7 +161,7 @@ describe("des captures lues avant l’import", () => {
   it("sont payées par le compte connecté, pas par la part sans compte", async () => {
     const { u, payeur } = await compteEtConv();
     etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
-    await depense(payeur, 3);
+    await depense(payeur, BUDGET_IA.compte);
     await expect(lireCaptures(images, "instagram")).rejects.toMatchObject({ code: "budget" });
     /* Sans compte, la part sans compte, intacte : la lecture part */
     etat.cookies.clear();
@@ -165,7 +170,7 @@ describe("des captures lues avant l’import", () => {
 
   it("sans compte, la part sans compte épuisée n’arrête pas un compte connecté", async () => {
     const { u } = await compteEtConv();
-    await depense(null, 5);
+    await depense(null, BUDGET_IA.anonyme);
     await expect(lireCaptures(images, "instagram")).rejects.toMatchObject({ code: "budget" });
     etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
     await expect(lireCaptures(images, "instagram")).resolves.toMatchObject({ messages: expect.any(Number) });
@@ -175,7 +180,7 @@ describe("des captures lues avant l’import", () => {
 describe("avant l’appel", () => {
   it("le budget atteint, le modèle n’est pas appelé (en mode factice aussi)", async () => {
     const a = await compteEtConv();
-    await depense(a.payeur, 3);
+    await depense(a.payeur, BUDGET_IA.compte);
     const modele = vi.fn(() => ({ ok: true }));
     const appel = avecFactice(modele, () => appeler({ tache: "10-chat", blocs: [{ texte: "salut" }] }, z.object({ ok: z.boolean() }), { storyId: a.id }));
     await expect(appel).rejects.toMatchObject({ code: "budget" });
@@ -186,7 +191,7 @@ describe("avant l’appel", () => {
 describe("une lecture arrêtée par le budget", () => {
   it("n’use pas son essai, se dit « souffle », et repart après minuit", async () => {
     const a = await compteEtConv();
-    await depense(a.payeur, 3);
+    await depense(a.payeur, BUDGET_IA.compte);
     await planifier(a.id, "verdict");
     const modele = vi.fn(() => ({}));
     await avecFactice(modele, () => executerChaine(a.id));
@@ -211,7 +216,7 @@ describe("une lecture arrêtée par le budget", () => {
 describe("deux lectures arrêtées le même jour", () => {
   it("seule la dernière repart après minuit, sans buter sur l’index des tâches en cours", async () => {
     const a = await compteEtConv();
-    await depense(a.payeur, 3);
+    await depense(a.payeur, BUDGET_IA.compte);
     /* Arrêtée par le budget, puis relancée le jour même (POST /api/analyse planifie un nouveau verdict) : arrêtée encore */
     await planifier(a.id, "verdict");
     await executerChaine(a.id);
@@ -236,7 +241,7 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
     const { id } = await histoireLue(u, "02-reciproque.txt");
     expect((await etatDesTaches(id, ["memoire"])).memoire?.status).toBe("fini");
     /* Le jour J : deux échanges du chat, chacun arrêté par le budget (la chaîne s’arrête au premier) */
-    await depense(payeur, 3);
+    await depense(payeur, BUDGET_IA.compte);
     await planifier(id, "memoire_maj", echange(1));
     await executerChaine(id);
     await planifier(id, "memoire_maj", echange(2));
@@ -293,7 +298,8 @@ describe("l’alerte à l’équipe", () => {
     const dites: string[] = [];
     vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void dites.push(String(ligne)));
     const a = await compteEtConv();
-    await depense(null, 15.5);
+    /* Un peu plus de la moitié du budget du jour, sans atteindre 80 % */
+    await depense(null, BUDGET_IA.jour * 0.52);
     await controle(a.id);
     await vi.waitFor(() => expect(dites.filter((l) => l.includes("50 % du jour"))).toHaveLength(1));
     /* La même instance, puis une autre (qui n’a rien gardé) : le seuil est déjà dit */

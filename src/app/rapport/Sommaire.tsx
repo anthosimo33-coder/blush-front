@@ -10,6 +10,7 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { Sheet } from "@/components/ui/surfaces";
 import type { Chapter } from "@/types";
 import { ancreDuChapitre } from "./ancres";
+import { LignePdf, LienPdfSommaire } from "./PdfDuRapport";
 import { ecritureInachevee, type PhaseDuRapport } from "./phase";
 import { brancherBarre } from "./useReprise";
 
@@ -118,16 +119,20 @@ export function Sommaire({ chapters, current, allerAuChapitre, ouvrirPaiement, p
           </li>
         ))}
       </ol>
-      {phase.nom === "complet" && (
+      {(phase.nom === "complet" || phase.nom === "lecture") && (
         /* Le trait est hors de la ligne cliquable : le voile du survol reste centré sur elle, comme pour les chapitres */
         <div className="mt-2 border-t border-[rgba(17,17,20,0.06)] pt-1.5">
-          <Link href="/rapport/question" className="row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline">
-            <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
-              <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
-            </span>
-            <span className="flex-1 text-note font-black">Ta question</span>
-            <Icon name="chevron" size={15} stroke={2.6} className="text-pale" />
-          </Link>
+          {phase.nom === "complet" && (
+            <Link href="/rapport/question" className="row-hover flex items-center gap-2.5 py-[7px] text-ink no-underline">
+              <span className="flex h-[26px] min-w-[26px] items-center justify-center rounded-[13px] bg-[rgba(61,139,255,0.12)]">
+                <Icon name="bolt" size={14} color="#2F7BFF" stroke={2.4} />
+              </span>
+              <span className="flex-1 text-note font-black">Ta question</span>
+              <Icon name="chevron" size={15} stroke={2.6} className="text-pale" />
+            </Link>
+          )}
+          {/* Le rapport tel qu’on le lit, en PDF (l’aperçu gratuit comme le rapport écrit) */}
+          <LienPdfSommaire />
         </div>
       )}
       {/* Le sommaire suit la lecture : l’adresse du site est sur chaque capture du rapport (ordinateur) */}
@@ -199,6 +204,8 @@ export function FeuilleSommaire({ open, onClose, chapters, current, allerAuChapi
           <InsetRow leading={<RowIcon icon="bolt" tone="toi" />} title="Poser ma question à BLUSH" href="/rapport/question" chevron />
         </InsetGroup>
       )}
+      {/* Le rapport tel qu’on le lit, en PDF : pas pendant l’écriture, ni après un échec */}
+      {(phase.nom === "complet" || phase.nom === "lecture") && <LignePdf />}
     </Sheet>
   );
 }
