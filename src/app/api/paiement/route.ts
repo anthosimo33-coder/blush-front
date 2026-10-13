@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { commencerPaiement } from "@/server/paiement/commande";
 import { renonciationPaiement } from "@/server/juridique";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
+import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
 
 /**
@@ -21,5 +23,7 @@ export const POST = route("POST /api/paiement", async (req: Request) => {
   if (!(await sousLaLimiteDuCompte(utilisateur, "commande"))) return erreur("trop");
   const r = await commencerPaiement(utilisateur, corps.offre, corps.conv ?? story?.id ?? null, renonciation);
   if (typeof r === "string") return erreur(r);
+  /* Au fil du direct, avec la ville de la connexion : l’achat payé la reprendra (le webhook n’a pas de connexion à situer) */
+  after(() => noterAuFil(req, { genre: "paiement", offre: corps.offre, ref: r.achat }));
   return repondre("POST /api/paiement", { achat: r.achat, checkout: r.checkout, url: r.url });
 });

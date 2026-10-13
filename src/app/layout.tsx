@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SoundBoot } from "@/components/shell/SoundBoot";
 import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
+import { Presence } from "@/lib/presence";
 import { ErreurDeParcours } from "@/components/screens/ErreurDeParcours";
 import { surVercel } from "@/server/drapeaux";
 import { URL_SITE } from "@/server/env";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SoundBoot />
         <Reveil />
         <SuiviNavigation />
+        <Presence />
         <Suspense fallback={null}>
           <ErreurDeParcours />
         </Suspense>

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useAuPaiement } from "@/lib/presence";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE, prixDe } from "@/contenu/offres";
 import { CHAPITRES_A_DEBLOQUER, FEUILLE_FORMULE, OFFRE_SUITE } from "@/contenu/paiement";
 import { proposerOffreUnique } from "@/services/api";
@@ -155,6 +156,7 @@ export function FeuilleFormule({
   proposerLaSuite?: boolean;
 }) {
   const titre = useId();
+  useAuPaiement(open);
   const [choisie, setChoisie] = useState<Formule>(FORMULE_CHOISIE);
   const [bulle, setBulle] = useState(false);
   /* Le rapport déjà payé dans un autre onglet (409 « deja ») : relu, la feuille se ferme d’elle-même */

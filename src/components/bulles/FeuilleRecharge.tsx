@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { useAuPaiement } from "@/lib/presence";
 import { proposerOffreUnique } from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
@@ -44,6 +45,7 @@ export function FeuilleRecharge({
   suite: (bulles: number) => string;
 }) {
   const titre = useId();
+  useAuPaiement(open);
   const [choisi, setChoisi] = useState<Pack>(PACK_CONSEILLE);
   const [bonus, setBonus] = useState<Bonus>("inconnu");
 

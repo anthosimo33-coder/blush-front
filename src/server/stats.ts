@@ -1,9 +1,10 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { CATALOGUE } from "@/contenu/offres";
-import type { GroupeDOffres } from "@/contenu/pilotage";
+import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
 import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
+import { BUDGET_IA } from "./budget";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
@@ -120,10 +121,11 @@ export type Pilotage = {
   /** La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars. */
   iaDuJour: { dollars: number; budget: number };
   /**
-   * Ce qui coince sur la période : les tâches en échec, celles bloquées en ce moment, les achats en attente de paiement
-   * depuis plus de 15 minutes, et les réponses de BLUSH sorties en alerte danger (leurs bulles rendues).
+   * Ce qui coince sur la période : les tâches en échec, celles bloquées en ce moment, les paiements refusés (un achat
+   * resté en attente, lui, est surtout un paiement abandonné), et les réponses de BLUSH sorties en alerte danger (leurs
+   * bulles rendues).
    */
-  sante: { echecs: number; bloquees: number; paiementsEnAttente: number; alertes: number };
+  sante: { echecs: number; bloquees: number; paiementsEchoues: number; alertes: number };
   /** Le premier jour où les visites se comptent (AAAA-MM-JJ), ou null : aucune encore. */
   suiviDepuis: string | null;
 };
@@ -276,27 +278,104 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   };
 }
 
-/* À écrire : le pilotage de la période */
+/* Une fenêtre glissante de `jours` sur une colonne de date : la période (k = 0) ou celle d’avant (k = 1) */
+const fenetre = (col: string, jours: Periode, k = 0) =>
+  sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
+
+/**
+ * Le pilotage de la période : l’argent, les visiteurs, le tunnel, les sources, ce qui se vend, l’IA et ce qui coince.
+ * Les chiffres suivent la fenêtre glissante des autres (`jours` jusqu’à maintenant) ; les cases des graphiques, elles,
+ * sont des heures pleines (24 h) ou des jours de Paris entiers (la première commence à minuit).
+ */
 async function pilotageDe(jours: Periode): Promise<Pilotage> {
-  const zero = { valeur: 0, avant: 0 };
-  const rien = { n: 0, centimes: 0 };
+  const W = (col: string, k = 0) => fenetre(col, jours, k);
+  const pas = jours === 1 ? "heure" : "jour";
+  /* Les cases : leur début, et la case d’une date (la même expression des deux côtés de la jointure) */
+  const cases =
+    pas === "heure"
+      ? sql.raw(`select generate_series(date_trunc('hour', now()) - interval '23 hours', date_trunc('hour', now()), interval '1 hour') as debut`)
+      : sql.raw(
+          `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
+        );
+  const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
+  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, suivi] = await Promise.all([
+    lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
+      sql`with c as (${cases}),
+            v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
+            a as (select ${caseDe("paye_le")} as b, count(distinct user_id) as acheteurs, sum(centimes) as centimes from achats
+                  where paye_le >= (select min(debut) from c) group by 1),
+            i as (select ${caseDe("created_at")} as b, sum(cost_micros) as micros from ai_usage where created_at >= (select min(debut) from c) group by 1)
+          select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, i.micros
+          from c left join v on v.b = c.debut left join a on a.b = c.debut left join i on i.b = c.debut order by c.debut`,
+    ),
+    ligne<Record<"payes" | "payes_c" | "payes_av_c" | "remb" | "remb_c" | "remb_av_c" | "cont" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
+      sql`select count(*) filter (where ${W("paye_le")}) as payes, sum(centimes) filter (where ${W("paye_le")}) as payes_c,
+            sum(centimes) filter (where ${W("paye_le", 1)}) as payes_av_c,
+            count(*) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb, sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb_c,
+            sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le", 1)}) as remb_av_c,
+            count(*) filter (where statut = 'conteste' and ${W("annule_le")}) as cont, sum(centimes) filter (where statut = 'conteste' and ${W("annule_le")}) as cont_c,
+            sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
+            count(distinct user_id) filter (where ${W("paye_le")}) as acheteurs, count(distinct user_id) filter (where ${W("paye_le", 1)}) as acheteurs_av
+          from achats where paye_le is not null`,
+    ),
+    ligne<{ a: string; b: string }>(sql`select count(*) filter (where ${W("arrive_le")}) as a, count(*) filter (where ${W("arrive_le", 1)}) as b from visites`),
+    ligne<{ a: string | null; b: string | null }>(
+      sql`select sum(cost_micros) filter (where ${W("created_at")}) as a, sum(cost_micros) filter (where ${W("created_at", 1)}) as b from ai_usage`,
+    ),
+    ligne<{ imports: string; verdicts: string; racheteurs: string }>(
+      sql`select (select count(*) from stories s where ${W("s.created_at")}) as imports,
+            (select count(*) from stories s where ${W("s.created_at")} and exists (select 1 from verdicts v where v.story_id = s.id)) as verdicts,
+            (select count(*) from (select user_id from achats where paye_le is not null and user_id in (select user_id from achats where ${W("paye_le")})
+              group by user_id having count(*) >= 2) as r) as racheteurs`,
+    ),
+    lignes<{ source: SourceVisite; n: string }>(sql`select source, count(*) as n from visites where ${W("arrive_le")} group by source`),
+    lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
+      sql`select u.source, count(distinct a.user_id) as acheteurs, sum(a.centimes) as centimes
+          from achats a left join users u on u.id = a.user_id where ${W("a.paye_le")} group by u.source`,
+    ),
+    lignes<{ offre: OffreId; n: string; centimes: string }>(sql`select offre, count(*) as n, sum(centimes) as centimes from achats where ${W("paye_le")} group by offre`),
+    ligne<{ micros: string | null }>(sql`select sum(cost_micros) as micros from ai_usage where created_at >= ${DEBUT_DU_JOUR}`),
+    ligne<{ echecs: string; bloquees: string; echoues: string; alertes: string }>(
+      sql`select (select count(*) from tasks where status = 'echec' and ${W("updated_at")}) as echecs,
+            (select count(*) from tasks where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
+            (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
+            (select count(*) from mouvements_bulles where raison = 'rendu' and ${W("cree_le")}) as alertes`,
+    ),
+    ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from visites`),
+  ]);
+
+  const m = (c: unknown) => n(c);
+  const net = { valeur: m(argent.payes_c) - m(argent.remb_c) - m(argent.cont_c), avant: m(argent.payes_av_c) - m(argent.remb_av_c) - m(argent.cont_av_c) };
+  const parSource = new Map<SourceVisite | null, { visiteurs: number; acheteurs: number; centimes: number }>();
+  const ligneDe = (source: SourceVisite | null) => parSource.get(source) ?? parSource.set(source, { visiteurs: 0, acheteurs: 0, centimes: 0 }).get(source)!;
+  for (const v of visiteursParSource) ligneDe(v.source).visiteurs = n(v.n);
+  for (const a of achatsParSource) Object.assign(ligneDe(a.source), { acheteurs: n(a.acheteurs), centimes: n(a.centimes) });
+  const groupes = new Map(GROUPES_D_OFFRES.map((g) => [g, { n: 0, centimes: 0 }]));
+  for (const o of parOffre) {
+    const g = groupes.get(GROUPE_DE_L_OFFRE[o.offre])!;
+    g.n += n(o.n);
+    g.centimes += n(o.centimes);
+  }
+
   return {
-    pas: jours === 1 ? "heure" : "jour",
-    cases: [],
-    net: zero,
-    payes: rien,
-    rembourses: rien,
-    contestes: rien,
-    visiteurs: zero,
-    acheteurs: zero,
-    centimesPayes: zero,
-    dollars: zero,
-    tunnel: { visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 },
-    sources: [],
-    mix: [],
-    iaDuJour: { dollars: 0, budget: 30 },
-    sante: { echecs: 0, bloquees: 0, paiementsEnAttente: 0, alertes: 0 },
-    suiviDepuis: null,
+    pas,
+    cases: parCase.map((c) => ({ le: new Date(c.debut).toISOString(), visiteurs: n(c.visiteurs), acheteurs: n(c.acheteurs), centimes: n(c.centimes), dollars: n(c.micros) / 1e6 })),
+    net,
+    payes: { n: n(argent.payes), centimes: m(argent.payes_c) },
+    rembourses: { n: n(argent.remb), centimes: m(argent.remb_c) },
+    contestes: { n: n(argent.cont), centimes: m(argent.cont_c) },
+    visiteurs: { valeur: n(visiteurs.a), avant: n(visiteurs.b) },
+    acheteurs: { valeur: n(argent.acheteurs), avant: n(argent.acheteurs_av) },
+    centimesPayes: { valeur: m(argent.payes_c), avant: m(argent.payes_av_c) },
+    dollars: { valeur: n(dollars.a) / 1e6, avant: n(dollars.b) / 1e6 },
+    tunnel: { visiteurs: n(visiteurs.a), imports: n(tunnel.imports), verdicts: n(tunnel.verdicts), acheteurs: n(argent.acheteurs), racheteurs: n(tunnel.racheteurs) },
+    sources: [...parSource]
+      .map(([source, l]) => ({ source, ...l }))
+      .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
+    mix: GROUPES_D_OFFRES.map((groupe) => ({ groupe, ...groupes.get(groupe)! })),
+    iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour },
+    sante: { echecs: n(sante.echecs), bloquees: n(sante.bloquees), paiementsEchoues: n(sante.echoues), alertes: n(sante.alertes) },
+    suiviDepuis: suivi.depuis,
   };
 }
 

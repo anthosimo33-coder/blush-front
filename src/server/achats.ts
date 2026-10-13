@@ -13,6 +13,7 @@ import { auMieux } from "./journal";
 import type { Consentement } from "./juridique";
 import { offreValable } from "./offres-uniques";
 import { reparerLaChaine } from "./pipeline";
+import { noterAchatAuFil } from "./visites";
 
 /*
  * Les achats : commandés au prix du catalogue (src/contenu/offres.ts), puis livrés une fois payés, ou repris s’ils sont
@@ -185,6 +186,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         .where(and(eq(o.userId, userId), eq(o.offre, "relance_mail"), eq(o.storyId, storyId), isNull(o.priseLe)));
     return { effet: "livre", achat: paye!, debloquee };
   });
+  /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
+  if (r.effet === "livre" && r.achat) await noterAchatAuFil(r.achat);
   /* Le rapport (et la mémoire) d’une conv qui vient de s’ouvrir : planifiés, puis écrits après la réponse */
   if (r.debloquee && r.achat?.storyId && r.achat.userId) {
     const story = { id: r.achat.storyId, userId: r.achat.userId };

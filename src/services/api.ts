@@ -496,6 +496,17 @@ export function noterEcouteVocal(evenement: EvenementEcoute, position: number): 
   void appel("POST /api/vocal/ecoute", { corps: { evenement, position }, keepalive: true }).catch((e: unknown) => tracer("vocal:ecoute", e));
 }
 
+/* ———— Les visiteurs, et /admin en direct ———— */
+
+/** Le signe d’un onglet ouvert (src/lib/presence.ts). Sans réponse attendue : un signe raté ne se voit pas, il y en aura un autre. */
+export function faireSigne(corps: Routes["POST /api/presence"]["corps"]): void {
+  /* keepalive : le signe d’un changement d’écran part même si la page se ferme juste après */
+  void appel("POST /api/presence", { corps, keepalive: true }).catch((e: unknown) => tracer("presence", e));
+}
+
+/** /admin en direct, à cet instant (réservé à l’équipe). */
+export const lireLeDirect = (signal?: AbortSignal) => appel("GET /api/admin/direct", signal ? { signal } : {});
+
 /* ———— Le paiement (Whop, ou le faux Whop en local) ———— */
 
 /**

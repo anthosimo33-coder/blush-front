@@ -5,6 +5,8 @@ import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
 import { PREDICATS } from "./depot";
 import { journalErreur } from "./journal";
+import { aujourdhuiParis } from "./temps";
+import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
 
 /*
  * La purge quotidienne (Vercel Cron) : on ne garde rien plus longtemps qu’utile.
@@ -16,7 +18,10 @@ import { journalErreur } from "./journal";
  * - les sessions expirées, les vieux codes de connexion, et les compteurs de limites dont la fenêtre est finie ;
  * - les inscriptions à la liste d’attente de plus d’un an (ATTENTE_GARDEE_JOURS, src/server/attente.ts) ;
  * - les webhooks de paiement déjà traités (evenements_paiement) de plus de 90 jours (EVENEMENTS_PAIEMENT_GARDES_JOURS) :
- *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien.
+ *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien ;
+ * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
+ *   (PRESENCES_GARDEES_JOURS), les visites de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel des empreintes dès le
+ *   surlendemain : plus rien ne relie alors une empreinte à une connexion.
  */
 
 /** Combien de jours on garde un webhook de paiement déjà traité (son `webhook-id`, pour l’ignorer s’il revient). */
@@ -76,6 +81,27 @@ export async function purger(maintenant = new Date()) {
       .where(lt(schema.evenementsPaiement.recuLe, il_y_a(EVENEMENTS_PAIEMENT_GARDES_JOURS)));
   });
   await etape("liste d’attente", () => purgerLaListe(maintenant));
+  await etape("signes des onglets", async () => {
+    await db()
+      .delete(schema.presences)
+      .where(lt(schema.presences.vuLe, il_y_a(PRESENCES_GARDEES_JOURS)));
+  });
+  await etape("fil du direct", async () => {
+    await db()
+      .delete(schema.filDirect)
+      .where(lt(schema.filDirect.le, il_y_a(PRESENCES_GARDEES_JOURS)));
+  });
+  await etape("visites", async () => {
+    await db()
+      .delete(schema.visites)
+      .where(lt(schema.visites.arriveLe, il_y_a(VISITES_GARDEES_JOURS)));
+  });
+  /* Le sel d’hier sert encore (sourceDeLaVisite retrouve la visite de la veille) ; celui d’avant-hier, plus rien */
+  await etape("sels des visites", async () => {
+    await db()
+      .delete(schema.selsDesVisites)
+      .where(lt(schema.selsDesVisites.jour, aujourdhuiParis(il_y_a(1)).iso));
+  });
   if (echecs.length)
     await alerter(
       "purge de la nuit incomplète",

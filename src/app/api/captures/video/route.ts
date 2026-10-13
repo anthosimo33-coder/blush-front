@@ -12,6 +12,7 @@ import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { fusionnerLots } from "@/server/video";
+import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
 
 /* Rassembler les lots ne fait appel à aucun modèle : quelques dixièmes de seconde, et jamais plus de 30 s */
@@ -82,6 +83,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
     const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
     /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
     await compterImportVenuDuPartage();
+    await noterAuFil(req, { genre: "import" });
     return { id, meta, secret, messages: t.messages };
   });
   await poserBrouillon(lu.secret);
