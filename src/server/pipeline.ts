@@ -1,7 +1,6 @@
 import "server-only";
-import { and, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { nomErreur } from "@/lib/tracer";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -9,12 +8,13 @@ import { rapportOuvertEnBase } from "./droits";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
-import { ARRETS_DU_BUDGET, ErreurTache, estBudget, estBudgetVoix, estRefus, type ArretDuBudget } from "./erreurs";
+import { ARRETS_DU_BUDGET, codeImprevu, ErreurTache, estBudget, estBudgetVoix, estRefus, type ArretDuBudget } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
 import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, planifier, prendre, type Tache } from "./taches";
-import type { DonneesVerdict } from "./stockage/types";
+import { donneesMemoire } from "./depot";
+import type { DonneesMemoire, DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
 import { DEBUT_DU_JOUR, pause } from "./temps";
 import { vocalLu } from "./vocal";
@@ -31,7 +31,8 @@ import { vocalLu } from "./vocal";
 /** Une étape : le travail d’une tâche de ce genre, sur la ligne complète de son histoire (conv brute comprise). */
 export type Etape = (story: LigneComplete, t: Tache) => Promise<void>;
 
-const etapes = async () => (await import("./analyse")).ETAPES;
+const analyse = () => import("./analyse");
+const etapes = async () => (await analyse()).ETAPES;
 
 /* ———— La suite ———— */
 
@@ -109,10 +110,90 @@ export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?
   }
   const [sans, avec] = [suite(lu, false), suite(lu, true)];
   const genres = sans.join() === avec.join() ? sans : (await aAcces(story)) ? avec : sans;
-  if (!genres.length) return false;
+  /* La mémoire en échec repart, si elle peut (relancerLaMemoire) : lu seulement quand l’état la montre en échec */
+  const memoireRelancee = lu.taches.memoire?.status === "echec" && lu.conv && (await relancerLaMemoire(story.id));
+  if (!genres.length && !memoireRelancee) return false;
   for (const g of genres) await planifier(story.id, g);
   relancerApres(story.id);
   return true;
+}
+
+/* ———— La mémoire, coûte que coûte ———— */
+
+/** Une mémoire en échec repart après cette pause (une panne passagère : une limite de débit, une surcharge)… */
+const PAUSE_AVANT_RELANCE_MEMOIRE_MS = 30 * 60_000;
+/** … et au plus ce nombre de fois : chaque relance refait jusqu’à ESSAIS_MAX essais, un appel au modèle chacun. */
+export const RELANCES_MEMOIRE_MAX = 2;
+
+/**
+ * La vraie mémoire en échec repart, et remplacera celle de secours que le chat lit en attendant : seulement après une
+ * panne (pas un refus du modèle, qui reviendrait ; pas le budget du jour, qui a sa reprise), passé la pause, tant qu’il
+ * reste des relances et la conv brute (elle s’efface au bout de 30 jours). Planifiée ici, la chaîne la reprend. À
+ * l’ouverture du rapport (reparerLaChaine), et à chaque message du chat tant qu’il répond sur la mémoire de secours.
+ */
+async function relancerLaMemoire(storyId: string): Promise<boolean> {
+  const [faites, [story]] = await Promise.all([
+    db()
+      .select({ status: schema.tasks.status, error: schema.tasks.error, updatedAt: schema.tasks.updatedAt })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, "memoire")))
+      .orderBy(desc(schema.tasks.createdAt)),
+    db()
+      .select({ conv: sql<boolean>`${schema.stories.conv} is not null` })
+      .from(schema.stories)
+      .where(eq(schema.stories.id, storyId)),
+  ]);
+  const [derniere] = faites;
+  if (!derniere || derniere.status !== "echec" || !story?.conv || estRefus(derniere.error) || estBudget(derniere.error)) return false;
+  if (faites.length > RELANCES_MEMOIRE_MAX || Date.now() - derniere.updatedAt.getTime() < PAUSE_AVANT_RELANCE_MEMOIRE_MS) return false;
+  await planifier(storyId, "memoire");
+  journal("mémoire relancée", { histoire: storyId, relance: faites.length });
+  return true;
+}
+
+/**
+ * La mémoire que lit le chat (et l’ajout à sa fiche) : la vraie, ou, faute d’elle, une mémoire de secours tirée du
+ * verdict et du rapport, écrite à l’instant (garderUneMemoireDeSecours, src/server/analyse.ts). Null seulement sans
+ * verdict, ou sans rapport écrit ni débloqué. Tant qu’elle est de secours, la vraie repart si elle peut, après la réponse.
+ */
+export async function memoireAssuree(story: Pick<Ligne, "id" | "userId">): Promise<DonneesMemoire | null> {
+  const m = (await donneesMemoire(story.id)) ?? (await (await analyse()).garderUneMemoireDeSecours(story.id));
+  if (m?.secours) await auMieux(() => reparerLaChaine(story), "chaîne non réparée", { histoire: story.id });
+  return m;
+}
+
+/**
+ * Après l’échec pour de bon de la vraie mémoire : celle de secours s’écrit, pour que le chat réponde quand même. Vrai si
+ * l’histoire a une mémoire ensuite. Ne lève jamais : l’échec, lui, doit encore être dit à l’équipe.
+ */
+async function secoursApresEchec(storyId: string): Promise<boolean> {
+  try {
+    return !!(await (await analyse()).garderUneMemoireDeSecours(storyId));
+  } catch (e) {
+    journalErreur("mémoire de secours non écrite", e, { histoire: storyId });
+    return false;
+  }
+}
+
+/** Ce que l’alerte d’une mémoire en échec ajoute quand celle de secours a pris le relais : et si la vraie repartira. */
+async function ligneDuSecours(t: Tache, erreur: string): Promise<string> {
+  const secours = "Le chat répond sur une mémoire de secours (tirée du verdict et du rapport).";
+  if (estRefus(erreur)) return `${secours} La vraie ne repart pas, le modèle refuserait encore.`;
+  const [faites] = await db()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.storyId, t.storyId), eq(schema.tasks.kind, "memoire")));
+  const reste = RELANCES_MEMOIRE_MAX + 1 - (faites?.n ?? 1);
+  return reste > 0
+    ? `${secours} La vraie repart à la prochaine ouverture du rapport ou au prochain message, dans 30 min au moins (encore ${reste} fois au plus).`
+    : `${secours} La vraie ne repartira plus d’elle-même.`;
+}
+
+/** L’alerte d’une étape en échec pour de bon, et, pour la mémoire, la mémoire de secours d’abord. */
+async function echecPourDeBon(t: Tache, erreur: string): Promise<void> {
+  const secours = t.kind === "memoire" && (await secoursApresEchec(t.storyId));
+  const suite = secours ? await ligneDuSecours(t, erreur).catch(() => "Le chat répond sur une mémoire de secours.") : null;
+  await alerterEchec(t, erreur, suite ? [suite] : []);
 }
 
 /* ———— L’échéance et les durées ———— */
@@ -205,9 +286,9 @@ type Issue = "finie" | "echec" | "budget" | "reportee";
 /** Les échecs de ces étapes touchent ce qu’on a promis (la lecture, le rapport, le chat) : leur alerte est importante (S-19). */
 const ALERTE_IMPORTANTE: ReadonlySet<Genre> = new Set(["verdict", "rapport_plan", "rapport_chapitres", "memoire"]);
 
-/** L’alerte à l’équipe d’une étape en échec pour de bon : son genre, la tâche, le code, jamais de contenu. */
-const alerterEchec = (t: Tache, erreur: string) =>
-  alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${erreur}`, `Essais : ${t.attempts}`], {
+/** L’alerte à l’équipe d’une étape en échec pour de bon : son genre, la tâche, le code, jamais de contenu ; `suite` : ce qui a pris le relais. */
+const alerterEchec = (t: Tache, erreur: string, suite: string[] = []) =>
+  alerter(`${t.kind} en échec`, [`Tâche ${t.kind} (${t.id})`, `Histoire ${t.storyId}`, `Erreur : ${erreur}`, `Essais : ${t.attempts}`, ...suite], {
     importante: ALERTE_IMPORTANTE.has(t.kind),
   });
 
@@ -256,15 +337,15 @@ async function executer(t: Tache): Promise<Issue> {
       await suspendre(t, "voix_budget");
       return "reportee";
     }
-    const code = e instanceof ErreurTache ? e.code : `erreur:${nomErreur(e)}`;
-    /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche (le nom d’une erreur imprévue, jamais son message) */
+    const code = e instanceof ErreurTache ? e.code : codeImprevu(e);
+    /* Jamais de contenu dans les logs : le code, l’identifiant de la tâche (d’une erreur imprévue : son nom, le statut et le type d’une erreur du prestataire, jamais son message) */
     if (e instanceof ErreurTache) journal("tâche en échec", { genre: t.kind, tache: t.id, code }, "erreur");
     else journalErreur("tâche en échec", e, { genre: t.kind, tache: t.id });
     /* Un refus du modèle (ses règles, ou les filtres d’Anthropic) revient à chaque essai : on ne le relance pas */
     const definitif = estRefus(code);
     await echouer(t, code, definitif);
     /* Le dernier essai a échoué : l’équipe est prévenue (le code et la tâche, jamais de contenu) */
-    if (definitif || t.attempts >= ESSAIS_MAX) await alerterEchec(t, code);
+    if (definitif || t.attempts >= ESSAIS_MAX) await echecPourDeBon(t, code);
     return "echec";
   } finally {
     clearInterval(coeur);
@@ -318,5 +399,5 @@ export function relancerApres(storyId: string): void {
  */
 export async function cloreLesAbandons(storyId: string): Promise<void> {
   const [, coupees] = await Promise.all([reprendreApresMinuit(storyId), clore(storyId)]);
-  for (const t of coupees) await alerterEchec(t, "coupée à chaque essai (délai dépassé)");
+  for (const t of coupees) await echecPourDeBon(t, "coupée à chaque essai (délai dépassé)");
 }

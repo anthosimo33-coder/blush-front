@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { champsDErreur, ligneDuJournal, nomErreur, tracer } from "@/lib/tracer";
 import { ErreurResend } from "@/server/email";
@@ -34,6 +35,18 @@ describe("ce qu’on garde d’une erreur", () => {
     expect(champsDErreur(null).erreur).toBe("null");
     /* Le refus de Resend : son statut dans le code, ni l’adresse ni le message */
     expect(champsDErreur(new ErreurResend(422))).toMatchObject({ erreur: "ErreurResend", code: "resend_422" });
+  });
+
+  it("d’une erreur du SDK du modèle (toutes nommées « Error ») : son statut et le type que l’API donne, jamais son message", () => {
+    const limite = new Anthropic.RateLimitError(429, { type: "error", error: { type: "rate_limit_error", message: "Ines a écrit…" } }, undefined, new Headers());
+    expect(champsDErreur(limite)).toMatchObject({ erreur: "Error", statut: 429, type: "rate_limit_error" });
+    expect(JSON.stringify(champsDErreur(limite))).not.toContain("Ines");
+    /* En plein flux : pas de statut, le type seulement */
+    const flux = new Anthropic.APIError(undefined, { type: "error", error: { type: "overloaded_error", message: "x" } }, undefined, new Headers());
+    expect(champsDErreur(flux)).toMatchObject({ erreur: "Error", type: "overloaded_error" });
+    expect(champsDErreur(flux)).not.toHaveProperty("statut");
+    /* Un type qui n’a pas la forme d’un code est tu */
+    expect(champsDErreur(Object.assign(new Error("x"), { error: { error: { type: "Ines a écrit" } } }))).not.toHaveProperty("type");
   });
 
   it("nomErreur : le nom d’une erreur, le type de ce qui n’en est pas une (là où `(e as Error).name` donnait undefined)", () => {

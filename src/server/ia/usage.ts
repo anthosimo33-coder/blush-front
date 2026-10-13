@@ -31,7 +31,13 @@ type Cout = {
  * Note un appel dans le suivi des coûts (et, avec `payeur`, dans la dépense du jour de qui paie). Ne lève jamais : le
  * suivi des coûts ne doit pas faire échouer une réponse, une ligne perdue part dans les logs (son étiquette seulement).
  */
-export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0, cacheLu = 0, cacheEcrit = 0, micros, ms, payeur }: Cout): Promise<void> {
+export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0, cacheLu = 0, cacheEcrit = 0, micros: brut, ms, payeur }: Cout): Promise<void> {
+  /*
+   * Arrondi une fois pour les deux : la dépense du jour s’ajoute à un compteur entier (rate_limits.count). La voix est
+   * comptée au caractère (22 $ pour 121 000), des millionièmes à virgule : sans l’arrondi, Postgres refusait chaque
+   * dépense de voix (22P02), qui ne comptait jamais dans le budget du jour
+   */
+  const micros = Math.round(brut);
   if (payeur !== undefined) await auMieux(noterDepense(payeur, micros), "dépense non notée", { tache });
   try {
     await db()
@@ -44,7 +50,7 @@ export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0
         outputTokens: Math.round(sortie),
         cacheReadTokens: cacheLu,
         cacheWriteTokens: cacheEcrit,
-        costMicros: Math.round(micros),
+        costMicros: micros,
         ms: Math.round(ms),
       });
   } catch (e) {

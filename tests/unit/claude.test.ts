@@ -293,6 +293,34 @@ describe("prestataireSDK : le vrai client du SDK", () => {
     expect(m.stop_reason).toBe("end_turn");
   });
 
+  it("en flux, avec le vrai format de sortie : un refus en cours d’écriture, un repli, une sortie coupée arrivent jusqu’à la lecture, jamais en erreur du SDK", async () => {
+    /* La mémoire du 13 octobre : le SDK lisait lui-même la sortie en flux, et levait « Error » sur un texte inachevé */
+    const debut = { type: "message_start", message: { ...MESSAGE_SDK, content: [], stop_reason: null } };
+    const bloc = (index: number, t: string) => [
+      { type: "content_block_start", index, content_block: { type: "text", text: "", citations: null } },
+      { type: "content_block_delta", index, delta: { type: "text_delta", text: t } },
+      { type: "content_block_stop", index },
+    ];
+    const repliEnFlux = [
+      { type: "content_block_start", index: 1, content_block: { type: "fallback", from: { model: "premier" }, to: { model: "second" }, trigger: { category: "cyber" } } },
+      { type: "content_block_stop", index: 1 },
+    ];
+    const fin = (stop: string) => [{ type: "message_delta", delta: { stop_reason: stop, stop_sequence: null }, usage: { output_tokens: 5 } }, { type: "message_stop" }];
+    const { sdk, recus } = clientSDK(
+      () => flux(debut, ...bloc(0, '{"ok":'), ...fin("refusal")),
+      () => flux(debut, ...bloc(0, '{"ok":'), ...repliEnFlux, ...bloc(2, '{"ok":true}'), ...fin("end_turn")),
+      () => flux(debut, ...bloc(0, '{"ok":tr'), ...fin("max_tokens")),
+    );
+    definirFournisseur(sdk);
+    const memoire: Requete = { tache: "07-memoire", blocs: [{ texte: "la conv" }] };
+    expect(await appeler(memoire, Format, { storyId: "histoire" })).toMatchObject({ sortie: null, refus: true });
+    expect((await appeler(memoire, Format, { storyId: "histoire" })).sortie).toEqual({ ok: true });
+    expect(await appeler(memoire, Format, { storyId: "histoire" })).toMatchObject({ sortie: null, refus: false, stop: "max_tokens" });
+    /* Le format de sortie part quand même : le schéma JSON du schéma zod */
+    expect(recus.map((r) => r.corps.stream)).toEqual([true, true, true]);
+    expect(recus[0]!.corps.output_config).toMatchObject({ format: { type: "json_schema", schema: expect.objectContaining({ type: "object" }) } });
+  });
+
   it("demande le repli du prestataire ; s’il le refuse, renvoie sans lui, et ne le redemande plus", async () => {
     const ok = () => json({ ...MESSAGE_SDK, content: [{ type: "text", text: '{"ok":true}', citations: null }] });
     const { sdk, recus } = clientSDK(() => json({ type: "error", error: { type: "invalid_request_error", message: "fallbacks: unknown option" } }, 400), ok, ok);

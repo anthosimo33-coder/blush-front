@@ -227,13 +227,16 @@ export const compteDe = (utilisateur: Utilisateur, story: Ligne | null): Promise
  */
 export const memoireDe = cache(donneesMemoire);
 
-/** Sa fiche, remplie par la mémoire. Avant la mémoire : vide, avec son prénom. */
+/**
+ * Sa fiche, remplie par la mémoire. Avant la mémoire, et sur une mémoire de secours (src/server/secours.ts, sa fiche
+ * reste vide) tant qu’il n’y a rien ajouté : vide, avec son prénom.
+ */
 export async function ficheDe(story: Ligne): Promise<Fiche> {
   const meta = metaDe(story);
   const { autre } = personnesDe(meta);
   const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomOppose(meta.pronom) };
   const m = await memoireDe(story.id);
-  if (!m) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
+  if (!m || (m.secours && !m.etat.fiche.faits.length)) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
   return ficheAffichee(person, m.etat, new Map(m.lignes));
 }
 

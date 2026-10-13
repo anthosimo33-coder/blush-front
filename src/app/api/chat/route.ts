@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import type { Ajout } from "@prompts/lib/ajouts";
 import { depuisCaptures, depuisExport, resumeAjout } from "@/server/ajouts";
-import { relancerApres, relancerChaine } from "@/server/pipeline";
+import { memoireAssuree, relancerApres, relancerChaine } from "@/server/pipeline";
 import { imagesDe } from "@/server/captures";
 import { controlerBudget } from "@/server/budget";
 import { coutDe, debiter, refDeLEnvoi, refDuMessage, rendre, rendues, reponseVerrouillee, soldeDe, type Debit } from "@/server/bulles";
@@ -10,7 +10,6 @@ import { estEquipe } from "@/server/droits";
 import { historique, reponseDeLEnvoi } from "@/server/historique";
 import { UUID } from "@/server/histoires";
 import { rendre as rendreALaLimite, sousLaLimite } from "@/server/limites";
-import { memoireDe } from "@/server/donnees";
 import { depuisPaquet } from "@/server/import";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, route, signalerErreur } from "@/server/http";
 import { lireVocal, signatureDuVocal, transcrire } from "@/server/ia/transcription";
@@ -326,7 +325,7 @@ async function dejaFait(utilisateur: Utilisateur, d: EnvoiDejaFait): Promise<Res
 
 /**
  * Ce qu’il envoie à BLUSH : un texte, des captures (de leur conv ou de son profil), un nouvel export, ou un vocal. Ouvert
- * à tout compte connecté, une fois la mémoire faite (après le rapport) ; la question du rapport (`question`, « Ta
+ * à tout compte connecté, dès que le rapport est écrit ou débloqué (sa mémoire, ou celle de secours : memoireAssuree) ; la question du rapport (`question`, « Ta
  * question ») est une réponse comme une autre. Ce que coûte une réponse se paie en bulles, avant que BLUSH écrive (payer) ;
  * une réponse qui échoue rend les siennes.
  * Ce qui se lit avant que BLUSH écrive (le vocal transcrit, les captures, l’export) répond encore d’un bloc en cas
@@ -346,7 +345,8 @@ async function traiter(req: Request) {
   if (!(await sousLaLimiteDuCompte(utilisateur, "chat"))) return erreur("trop");
   /* Lire des captures coûte plus qu’un message : une limite à part */
   if (fichiers && !(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
-  const memoire = await memoireDe(story.id);
+  /* La vraie mémoire, ou celle de secours : le chat répond toujours, dès que le rapport est écrit ou débloqué */
+  const memoire = await memoireAssuree(story);
   if (!memoire) return erreur("pas_pret");
   const paiement = await payer(utilisateur, story, { fichiers, vocal: !!envoi.vocal, cle: envoi.cle });
   if (typeof paiement === "string" || "deja" in paiement) {
@@ -376,7 +376,7 @@ async function repondreA(
     story,
     memoire,
     paiement,
-  }: { utilisateur: Utilisateur; story: Parameters<typeof blushRepond>[0]; memoire: NonNullable<Awaited<ReturnType<typeof memoireDe>>>; paiement: Paiement },
+  }: { utilisateur: Utilisateur; story: Parameters<typeof blushRepond>[0]; memoire: NonNullable<Awaited<ReturnType<typeof memoireAssuree>>>; paiement: Paiement },
 ) {
   let dit = envoi.texte;
   let ajout: { ajout: Ajout; affiche: string } | undefined;

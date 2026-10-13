@@ -22,11 +22,13 @@ import { aujourdhuiParis } from "./temps";
 import type { Avance } from "./ia/claude";
 import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
-import { auMieux, journalErreur } from "./journal";
+import { rapportOuvertEnBase } from "./droits";
+import { auMieux, journal, journalErreur } from "./journal";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
-import { editionsBornees, lignesGardees, type Contexte, type DonneesRapport } from "./stockage/types";
+import { memoireDeSecours, remplacerLeSecours } from "./secours";
+import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
 import { entreeDe, type Tache } from "./taches";
 import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
@@ -376,7 +378,11 @@ async function vocalTache(story: LigneComplete) {
   await vocal(story, { verdict: v.sortie, rapport: { court: rapportCourt(r) + sobre }, lignes, sobre: r.mode_sobre || v.sortie.mode_sobre });
 }
 
-/** La mémoire, créée d’après la conv, le verdict et le rapport. Ensuite, la conv brute est effacée. */
+/**
+ * La mémoire, créée d’après la conv, le verdict et le rapport. Une mémoire de secours écrite entre-temps (le chat a
+ * répondu avant elle, ou elle repart après un échec) lui laisse la place (remplacerLeSecours) ; une vraie déjà là reste
+ * telle quelle. Ensuite, la conv brute est effacée.
+ */
 async function memoire(story: LigneComplete) {
   const { rendu, lu } = relire(story);
   const v = await donneesVerdict(story.id);
@@ -385,13 +391,59 @@ async function memoire(story: LigneComplete) {
   const r = coffre.lire("reports.data", ligne.data).sortie;
   const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, { preuves: preuvesMemoire, lignes: rendu.lignes, storyId: story.id, etiquette: "memoire" });
   if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
-  const data = coffre.ecrire("memories.data", { etat, lignes: lignesGardees(etat, rendu.lignes), suivant: lu.messages.length + 1 });
-  await db()
+  const donnees = { etat, lignes: lignesGardees(etat, rendu.lignes), suivant: lu.messages.length + 1 };
+  const [neuve] = await db()
     .insert(schema.memories)
-    .values({ storyId: story.id, data })
-    .onConflictDoUpdate({ target: schema.memories.storyId, set: { data, version: sql`${schema.memories.version} + 1`, updatedAt: new Date() } });
+    .values({ storyId: story.id, data: coffre.ecrire("memories.data", donnees) })
+    .onConflictDoNothing()
+    .returning({ storyId: schema.memories.storyId });
+  if (!neuve) {
+    /* Sur la mémoire lue : une fiche corrigée pendant l’écriture fait recommencer le remplacement, sans rien perdre */
+    const remplacee = await modifierMemoire(story.id, (avant) => (avant.secours ? remplacerLeSecours(avant, donnees) : null), { essais: 3 });
+    /* Effacée entre-temps, ou toujours changée : on recommence (la conv n’est effacée qu’une mémoire écrite) */
+    if (remplacee === "occupee" || remplacee === "absente") throw new ErreurTache("memoire_changee");
+  }
   /* Le rapport et la mémoire sont faits : la conv brute n’a plus de raison d’être gardée */
   if (contexteDe(story)) await db().update(schema.stories).set({ conv: null, convPurgedAt: new Date(), updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
+}
+
+/**
+ * Écrit une mémoire de secours (src/server/secours.ts) quand l’histoire n’en a aucune, et rend sa mémoire : le chat
+ * répond toujours. Tirée du verdict, et du rapport s’il est écrit, avec les messages qu’ils citent tant que la conv est
+ * là. Rien sans verdict, ni sans rapport écrit ou débloqué (le chat s’ouvre avec lui). Une mémoire déjà là n’est jamais
+ * touchée. Après un échec de la vraie (src/server/pipeline.ts), au premier message du chat, à un ajout à sa fiche, et
+ * avant une mise à jour qui ne trouverait rien à mettre à jour.
+ */
+export async function garderUneMemoireDeSecours(storyId: string): Promise<DonneesMemoire | null> {
+  const deja = await donneesMemoire(storyId);
+  if (deja) return deja;
+  const [[story], v, ligne] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), donneesVerdict(storyId), ligneRapport(storyId)]);
+  if (!story || !v) return null;
+  const rapport = ligne?.data ? coffre.lire("reports.data", ligne.data).sortie : null;
+  if (!rapport && !(await rapportOuvertEnBase(storyId))) return null;
+  const { lignes, suivant } = banqueDuSecours(story);
+  const secours = memoireDeSecours({ verdict: v.sortie, rapport, lignes, suivant, jour: aujourdhuiParis().iso });
+  const [ecrite] = await db()
+    .insert(schema.memories)
+    .values({ storyId, data: coffre.ecrire("memories.data", secours) })
+    .onConflictDoNothing()
+    .returning({ storyId: schema.memories.storyId });
+  if (ecrite) journal("mémoire de secours écrite", { histoire: storyId, rapport: !!rapport, lignes: secours.lignes.length }, "alerte");
+  return donneesMemoire(storyId);
+}
+
+/** Les messages qu’une mémoire de secours peut citer, et le prochain identifiant libre : de la conv tant qu’elle est là. */
+function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; suivant: number } {
+  if (convDe(story)) {
+    try {
+      const { lu, rendu } = relire(story);
+      return { lignes: rendu.lignes, suivant: lu.messages.length + 1 };
+    } catch (e) {
+      /* Une conv qu’on ne relit plus ne prive pas le chat de sa mémoire : elle part sans citations */
+      journalErreur("mémoire de secours : conv illisible", e, { histoire: story.id });
+    }
+  }
+  return { lignes: new Map(), suivant: story.nextMessage ?? 1 };
 }
 
 /**
@@ -403,6 +455,8 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const ech = entreeDe(t);
   if (!ech) throw new ErreurTache("memoire_absente");
   const h = histoireDe(metaDe(story));
+  /* Pas encore de mémoire (la vraie a échoué, et celle de secours n’a pas pu s’écrire à ce moment-là) : celle de secours d’abord */
+  if (!(await donneesMemoire(story.id))) await garderUneMemoireDeSecours(story.id);
   /* Deux essais : chacun rappelle le modèle */
   const ecrite = await modifierMemoire(
     story.id,
@@ -420,7 +474,14 @@ async function memoireMaj(story: Ligne, t: Tache) {
       });
       if (maj.rien_de_neuf) return null;
       const etat = appliquerMaj(avant.etat, maj);
-      return { etat, lignes: lignesGardees(etat, lignes), suivant: nouveau.suivant, ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}) };
+      return {
+        etat,
+        lignes: lignesGardees(etat, lignes),
+        suivant: nouveau.suivant,
+        ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}),
+        /* Mise à jour, une mémoire de secours le reste : la vraie la remplacera */
+        ...(avant.secours ? { secours: true as const } : {}),
+      };
     },
     { essais: 2 },
   );
