@@ -78,6 +78,8 @@ describe("la vidéo de l’export", () => {
     expect(video.hasAttribute("controls")).toBe(true);
     expect(video.muted).toBe(true);
     expect(video.hasAttribute("playsinline")).toBe(true);
+    expect(video.autoplay).toBe(true);
+    expect(video.getAttribute("poster")).toBe("/videos/export-whatsapp.jpg");
   });
 
   it("une vidéo pour une autre appli seulement : pas de bouton sur celle-ci", () => {

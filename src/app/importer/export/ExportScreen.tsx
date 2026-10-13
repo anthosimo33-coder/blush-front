@@ -10,7 +10,7 @@ import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { prechargerExport, uploadExport } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
-import { EXPORT_STEPS, VIDEOS_EXPORT } from "@/contenu/parcours";
+import { EXPORT_STEPS, imageDeLaVideo, VIDEOS_EXPORT } from "@/contenu/parcours";
 import { MentionImport, useAccord } from "@/components/juridique/cases";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -175,7 +175,7 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
         <StepTimeline steps={[...steps]} className="w-full lg:flex-1 lg:pt-2" />
       </div>
 
-      {/* La vidéo de l’export (VIDEOS_EXPORT, src/contenu/parcours.ts) : muette au départ, ses contrôles pour le son, jouée dans la page sur iPhone */}
+      {/* La vidéo de l’export (VIDEOS_EXPORT, src/contenu/parcours.ts) : elle part seule et en boucle à l’ouverture de la feuille, muette, jouée dans la page sur iPhone, son image d’attente le temps qu’elle charge */}
       {adresseVideo && (
         <Sheet open={video} onClose={() => setVideo(false)} labelledBy="video-title">
           <h2 id="video-title" className="m-0 text-[22px] font-black leading-[1.1] tracking-[-0.02em]">
@@ -184,7 +184,10 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           <video
             key={adresseVideo}
             src={adresseVideo}
+            poster={imageDeLaVideo(adresseVideo)}
             controls
+            autoPlay
+            loop
             muted
             playsInline
             preload="metadata"

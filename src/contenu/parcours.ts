@@ -53,12 +53,17 @@ export const EXPORT_STEPS = {
 } as const satisfies Record<ExportApp, unknown>;
 
 /**
- * La vidéo qui montre l’export, par appli : son adresse (un fichier de public/, « /videos/export-whatsapp.mp4 », ou une
- * adresse complète), ou null tant qu’elle n’est pas fournie. Sans elle, l’écran de l’export n’a ni le bouton « Voir la
- * vidéo » ni sa feuille ; avec, la feuille la joue (src/app/importer/export/ExportScreen.tsx).
- * TODO(produit): les vidéos de démonstration ne sont pas fournies ; la durée dite sur le bouton (30 s) est à accorder à la leur.
+ * La vidéo qui montre l’export, par appli : son adresse (un fichier de public/, « /videos/export-whatsapp.mp4 », son
+ * image d’attente à côté, au même nom en .jpg), ou null tant qu’elle n’est pas fournie. Sans elle, l’écran de l’export
+ * n’a ni le bouton « Voir la vidéo » ni sa feuille ; avec, la feuille la joue (src/app/importer/export/ExportScreen.tsx).
+ * Celle de WhatsApp (32 s, filmée le 13 octobre) : le numéro, la photo et les contacts, les noms des fichiers et le
+ * prénom de l’écran « Qui es-tu » y sont floutés ; sans le son.
+ * TODO(produit): la vidéo d’Instagram n’est pas fournie.
  */
 export const VIDEOS_EXPORT: Record<ExportApp, string | null> = {
-  whatsapp: null,
+  whatsapp: "/videos/export-whatsapp.mp4",
   instagram: null,
 };
+
+/** L’image d’attente d’une vidéo de l’export : le même fichier, en .jpg (affichée tant que la vidéo n’a pas démarré). */
+export const imageDeLaVideo = (adresse: string) => adresse.replace(/\.mp4$/, ".jpg");
