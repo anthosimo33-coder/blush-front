@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
 import type { SoberReport as SoberData } from "@/types";
 import { useRetourSinon } from "@/lib/navigation";
+import { LienPdfSobre } from "./PdfDuRapport";
 
 /*
  * Écrans 18-19 — Mode sobre : quand la conv lève une alerte de danger (détresse, mineur), BLUSH laisse la taquinerie de côté.
@@ -185,6 +186,8 @@ export function SoberReport({ data, vocal }: { data: SoberData; vocal?: ReactNod
               </div>
               <div className="flex flex-col gap-2 px-[22px] pb-[max(24px,env(safe-area-inset-bottom))] pt-3 lg:mt-2.5 lg:w-[400px] lg:px-0 lg:pb-0 lg:pt-0">
                 <SoberButton href={QUIT_HREF}>OK, merci</SoberButton>
+                {/* Le rapport doux à garder, tel quel, en PDF (GET /api/rapport/pdf) */}
+                <LienPdfSobre />
               </div>
             </>
           )}

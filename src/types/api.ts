@@ -153,7 +153,7 @@ export type CibleImage = z.input<typeof Cible>;
 
 /**
  * Ce que chaque route répond en cas de succès (en 200, sauf dit autrement), par sa clé « MÉTHODE /api/… ». Ses erreurs :
- * `{ erreur }` (ReponseErreur), avec le statut de son code. `Blob` : un audio ou une image, pas du JSON.
+ * `{ erreur }` (ReponseErreur), avec le statut de son code. `Blob` : un audio, une image ou un PDF, pas du JSON.
  */
 type Reponses = {
   "POST /api/admin": GesteDeLEquipe;
@@ -204,6 +204,8 @@ type Reponses = {
   "POST /api/partage/image": Blob;
   "GET /api/rapport": ReportPayload;
   "POST /api/rapport": ReportPayload;
+  /** Le rapport en PDF, tel que la lecture le rend à ce compte. */
+  "GET /api/rapport/pdf": Blob;
   /** `{ ok: false }` en 503 : la base ne répond pas. */
   "GET /api/reveil": { ok: boolean };
   /** L’audio du vocal du rapport (MP3). */
@@ -305,6 +307,8 @@ export const ROUTES = {
   "POST /api/partage/image": { corps: Cible },
   "GET /api/rapport": {},
   "POST /api/rapport": {},
+  /* `?moi=` : qui est toi pour l’écran, quand le serveur ne le sait pas */
+  "GET /api/rapport/pdf": {},
   "GET /api/reveil": {},
   "GET /api/vocal/audio": {},
   "GET /api/vocal/chat/[id]": {},
@@ -324,7 +328,7 @@ export type Routes = { [K in keyof Reponses]: { corps: EnvoiDe<(typeof ROUTES)[K
 /** La clé d’une route du contrat : « POST /api/analyse ». */
 export type CleRoute = keyof Routes;
 
-/** Les routes qui répondent du JSON. Les autres répondent un audio ou une image (Blob), hors de repondre et d’appel. */
+/** Les routes qui répondent du JSON. Les autres répondent un audio, une image ou un PDF (Blob), hors de repondre et d’appel. */
 export type CleJson = { [K in CleRoute]: Routes[K]["reponse"] extends Blob ? never : K }[CleRoute];
 
 /**

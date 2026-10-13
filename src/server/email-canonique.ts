@@ -50,6 +50,8 @@ export const LIMITES_DU_COMPTE = {
   fiche: "ficheParCompte",
   image: "imageParCompte",
   "partage-compte": "imageParCompte",
+  /* Le rapport en PDF : dessiné à la demande, comme une image, sous le même plafond */
+  pdf: "imageParCompte",
   ecoute: "ecouteParCompte",
   capturesParCompte: "capturesParCompte",
   lotsParCompte: "lotsParCompte",

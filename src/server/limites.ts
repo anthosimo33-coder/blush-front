@@ -123,7 +123,7 @@ export const LIMITES = {
   attenteParIp: { max: 50, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
-  /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
+  /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre) et le rapport en PDF, dessinés à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
    * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six écrans (douze avant),

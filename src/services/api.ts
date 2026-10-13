@@ -704,6 +704,16 @@ export async function creerLienPartage(): Promise<{ url: string; verdict: Verdic
   return { url, verdict, story: `${url}/image?format=story&v=${encodeURIComponent(v)}` };
 }
 
+/**
+ * Le rapport en PDF, dessiné par le serveur d’après ce que ce compte peut lire, en fichier prêt à partager ou à
+ * enregistrer. `moi` : qui est toi pour l’écran (le parcours de l’onglet), quand le serveur ne le sait pas.
+ */
+export async function pdfDuRapport(moi?: string | null): Promise<File> {
+  const r = await requete("GET /api/rapport/pdf", moi ? { recherche: new URLSearchParams({ moi }).toString() } : {});
+  if (!r.ok) throw new ErreurApi(r.status === 429 ? "trop" : "erreur", r.status);
+  return new File([await r.blob()], "rapport-blush.pdf", { type: "application/pdf" });
+}
+
 /** L’image « Partager en image » (story), dessinée par le serveur d’après le contenu du compte. */
 export async function imagePartage(cible: CibleImage): Promise<Blob> {
   const r = await requete("POST /api/partage/image", { corps: cible });
