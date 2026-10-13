@@ -1,9 +1,9 @@
 import { ajouterALaFiche, depuisCaptures, depuisExport, ficheEtMaj } from "@/server/ajouts";
 import { imagesDe } from "@/server/captures";
 import { modifierMemoire } from "@/server/depot";
-import { memoireDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
 import { depuisPaquet } from "@/server/import";
+import { memoireAssuree } from "@/server/pipeline";
 import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
@@ -34,6 +34,8 @@ export const PUT = route("PUT /api/fiche", async (req: Request) => {
   const corrigee = await lireCorps(req, ROUTES["PUT /api/fiche"].corps);
   if (!corrigee) return erreur("faits");
   if (!(await sousLaLimiteDuCompte(utilisateur, "fiche"))) return erreur("trop");
+  /* Sans mémoire encore (la vraie en échec, ou pas encore écrite) : celle de secours, que la correction complète */
+  await memoireAssuree(story);
   /* Trois essais : une mise à jour de la mémoire qui finit pendant la correction ne la fait pas échouer */
   const modifiee = await modifierMemoire(story.id, (m) => fusionnerFaits(m, corrigee.facts), { essais: 3 });
   if (modifiee === "occupee") return erreur("occupe");
@@ -55,7 +57,7 @@ async function traiter(req: Request) {
   const paquet = fd?.get("export");
   if (!captures.length && !(paquet instanceof File)) return erreur("fichier");
   if (!(await sousLaLimiteDuCompte(utilisateur, "ajout"))) return erreur("trop");
-  const memoire = await memoireDe(story.id);
+  const memoire = await memoireAssuree(story);
   if (!memoire) return erreur("pas_pret");
   try {
     const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));

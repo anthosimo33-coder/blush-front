@@ -19,8 +19,10 @@ export type DonneesRapport = { sortie: Rapport; chapitres: Chapter[]; sobre: Sob
  * La mémoire, sa banque de messages (les lignes citées), le prochain identifiant libre pour les messages ajoutés,
  * et ce que l’utilisateur a corrigé lui-même dans sa fiche. Une mémoire gardée est faite (sa mémoire et sa fiche) : la
  * création refuse une sortie sans elles, une mise à jour appliquée en rend une, et le coffre le vérifie à la lecture.
+ * `secours` : une mémoire de secours (src/server/secours.ts), tirée du verdict et du rapport faute de la vraie ; ses
+ * mises à jour la gardent telle, et la vraie la remplace dès qu’elle se fait.
  */
-export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; suivant: number; editions?: EditionsFiche };
+export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; suivant: number; editions?: EditionsFiche; secours?: true };
 
 /**
  * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans

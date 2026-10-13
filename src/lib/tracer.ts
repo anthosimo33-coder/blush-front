@@ -41,7 +41,23 @@ export function champsDErreur(e: unknown): Champs {
     erreur: nomErreur(e),
     code: codeSur(e, "code"),
     digest: codeSur(e, "digest"),
+    ...champsDuPrestataire(e),
     ...(cause === undefined ? {} : { cause: nomErreur(cause), codeCause: codeSur(cause, "code") }),
+  };
+}
+
+/**
+ * Ce qu’une erreur du SDK du modèle dit d’elle sans son message : son statut HTTP (429, 529…) et le type que l’API donne
+ * dans sa réponse (« rate_limit_error », « overloaded_error » ; une erreur arrivée en plein flux n’a que lui). Ses
+ * classes s’appellent toutes « Error » : sans eux, une limite de débit, une surcharge et une clé refusée se ressemblent.
+ */
+function champsDuPrestataire(e: unknown): Champs {
+  if (typeof e !== "object" || e === null) return {};
+  const { status, error } = e as { status?: unknown; error?: { error?: { type?: unknown } } | null };
+  const type = error?.error?.type;
+  return {
+    ...(typeof status === "number" ? { statut: status } : {}),
+    ...(typeof type === "string" && CODE_SUR.test(type) ? { type } : {}),
   };
 }
 

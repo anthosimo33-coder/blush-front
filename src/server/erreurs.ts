@@ -1,4 +1,5 @@
 import "server-only";
+import { champsDErreur } from "@/lib/tracer";
 import type { Echec } from "@/types";
 import { codePublic, type CodeErreur } from "@/types/erreurs-api";
 
@@ -77,6 +78,16 @@ export const estBudget = (e: ErreurTache | string | null | undefined): boolean =
 
 /** Le budget de la voix a arrêté le vocal du rapport (une erreur, ou le code gardé en base) : il repart après minuit, sans user ses essais. */
 export const estBudgetVoix = (e: ErreurTache | string | null | undefined): boolean => (typeof e === "string" ? e : e?.code) === "voix_budget";
+
+/**
+ * Le code d’une erreur imprévue d’une étape (pas une ErreurTache), gardé avec la tâche (tasks.error) et dit dans
+ * l’alerte : le statut et le type d’une erreur du prestataire (« api:429:rate_limit_error », « api:overloaded_error »
+ * en plein flux), sinon son nom (« erreur:TypeError »). Jamais son message.
+ */
+export function codeImprevu(e: unknown): string {
+  const { erreur, statut, type } = champsDErreur(e);
+  return statut !== undefined || type !== undefined ? ["api", statut, type].filter((x) => x !== undefined).join(":") : `erreur:${String(erreur)}`;
+}
 
 /**
  * Ce que l’écran dit d’une étape en échec, d’après le code gardé en base (tasks.error) : le refus du modèle, le budget du

@@ -1,7 +1,8 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
 import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SOUFFLE } from "@/lib/messages-erreur";
-import { ErreurTache, estRefus } from "@/server/erreurs";
+import { codeImprevu, echecDe, ErreurTache, estRefus } from "@/server/erreurs";
 import { erreur, route } from "@/server/http";
 import { codePublic, ERREURS_API, ErreurApi, type CodeErreur } from "@/types/erreurs-api";
 
@@ -82,6 +83,17 @@ describe("le serveur", () => {
     expect(estRefus(new ErreurTache("sortie_illisible"))).toBe(false);
     expect(estRefus("refus")).toBe(true);
     expect([estRefus("coupee"), estRefus("erreur:TypeError"), estRefus(null), estRefus(undefined)]).toEqual([false, false, false, false]);
+  });
+
+  it("le code d’une erreur imprévue d’une étape : le statut et le type d’une erreur du prestataire, sinon son nom (jamais son message)", () => {
+    const corps = (type: string) => ({ type: "error", error: { type, message: "Ines a écrit…" } });
+    expect(codeImprevu(new Anthropic.RateLimitError(429, corps("rate_limit_error"), undefined, new Headers()))).toBe("api:429:rate_limit_error");
+    /* Une erreur arrivée en plein flux n’a pas de statut, seulement son type */
+    expect(codeImprevu(new Anthropic.APIError(undefined, corps("overloaded_error"), undefined, new Headers()))).toBe("api:overloaded_error");
+    expect(codeImprevu(new Anthropic.InternalServerError(529, undefined, "surcharge", new Headers()))).toBe("api:529");
+    expect(codeImprevu(new TypeError("Ines a écrit…"))).toBe("erreur:TypeError");
+    /* Une panne pour l’écran, que la mémoire peut relancer */
+    expect([estRefus("api:429:rate_limit_error"), echecDe("api:429:rate_limit_error")]).toEqual([false, "panne"]);
   });
 });
 

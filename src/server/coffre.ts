@@ -118,6 +118,8 @@ const MemoireGardee = z.looseObject({
    * reçoit pas de corrections vides) ; chaque lecteur la lit comme « rien corrigé ».
    */
   editions: z.looseObject({ parToi: z.array(z.string()), supprimees: z.array(z.string()) }).optional(),
+  /* Une mémoire de secours (src/server/secours.ts) ; absent de toute autre, et de toute mémoire écrite avant le 13 octobre */
+  secours: z.literal(true).optional(),
 });
 
 /*
