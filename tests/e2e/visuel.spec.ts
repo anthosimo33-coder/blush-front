@@ -469,7 +469,8 @@ test("le tableau de bord de l’équipe", async ({ page }, testInfo) => {
   await lectureFaite(page, testInfo, await emailFixe("tableau"));
   await page.context().clearCookies();
   await seConnecterAdmin(page);
-  await page.goto("/admin");
+  /* L’ancien tableau de bord, gardé à côté du pilotage (sa capture de référence) */
+  await page.goto("/admin?version=actuelle");
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await figerLeTableauDeBord(page);
   await capturer(page, "admin");

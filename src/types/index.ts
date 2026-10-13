@@ -59,6 +59,25 @@ export type Voix = (typeof VOIX)[number];
 /** vocal_ecoutes.evenement : un moment de l’écoute du vocal (le début, la fin, une réécoute, fermé avant la fin). */
 export const EVENEMENTS_ECOUTE = ["debut", "fin", "reecoute", "ferme"] as const;
 export type EvenementEcoute = (typeof EVENEMENTS_ECOUTE)[number];
+/**
+ * L’écran où se trouve un visiteur en ce moment (presences.etape, /admin en direct), d’après son adresse : l’accueil, un
+ * verdict partagé (/v/…), l’import, le verdict, le rapport, le paiement, le chat, son compte, ou ailleurs (src/lib/presence.ts).
+ */
+export const ETAPES_VISITE = ["accueil", "partage", "import", "verdict", "rapport", "paiement", "chat", "compte", "autre"] as const;
+export type EtapeVisite = (typeof ETAPES_VISITE)[number];
+/**
+ * D’où vient un visiteur (visites.source, users.source) : le lien d’une créatrice (utm_source), sinon le site d’où il
+ * arrive, sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct » (src/server/visites.ts, sourceDe).
+ * « partage » : le lien d’un verdict partagé (/v/…).
+ */
+export const SOURCES_VISITE = ["tiktok", "instagram", "snapchat", "partage", "google", "autre", "direct"] as const;
+export type SourceVisite = (typeof SOURCES_VISITE)[number];
+/**
+ * Les gestes du fil d’/admin en direct (fil_direct.genre) : une première visite du jour, une conv importée, la page du
+ * paiement ouverte, un achat payé, un verdict partagé. Une ville et un geste, jamais un compte ni une conv.
+ */
+export const GENRES_FIL = ["arrivee", "import", "paiement", "achat", "partage"] as const;
+export type GenreFil = (typeof GENRES_FIL)[number];
 /** La devinette de « Qui es-tu ? » : où vous en êtes, d’après toi. */
 export const GUESSES = ["parle", "vus", "flou", "ensemble"] as const;
 export type Guess = (typeof GUESSES)[number];

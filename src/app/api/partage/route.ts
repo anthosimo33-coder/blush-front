@@ -3,6 +3,7 @@ import { CLES, compter } from "@/server/compteurs";
 import { repondre, route } from "@/server/http";
 import { arreterPartage, partager, versionImage } from "@/server/partages";
 import { garde } from "@/server/requete";
+import { noterAuFil } from "@/server/visites";
 
 /*
  * Le lien de partage du verdict : le créer (POST, toujours le même), le désactiver (DELETE). La feuille de partage reçoit
@@ -17,7 +18,7 @@ export const POST = route("POST /api/partage", async (req: Request) => {
   /* Le verdict tel que le montre le lien (le prénom de l’autre masqué) : c’est lui que le texte partagé reprend */
   const { id, verdict } = await partager(story);
   /* Compté après la réponse : la feuille attend ce lien pour demander l’image story */
-  after(() => compter(CLES.partageOuvert));
+  after(() => Promise.all([compter(CLES.partageOuvert), noterAuFil(req, { genre: "partage" })]));
   /*
    * `v` : la version de l’image story, gardée par le CDN à cette adresse (`/v/<id>/image?format=story&v=<v>`). Du
    * verdict, ce que la feuille montre et reprend dans le texte partagé (VerdictMontre), pas son sous-titre

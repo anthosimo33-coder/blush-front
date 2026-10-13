@@ -8,6 +8,7 @@ import { depuisFichier, depuisPaquet } from "@/server/import";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
+import { noterAuFil } from "@/server/visites";
 
 export const maxDuration = 60;
 
@@ -48,6 +49,7 @@ export const POST = route("POST /api/import", async (req: Request) => {
   });
   await poserBrouillon(secret);
   await compterImportVenuDuPartage();
+  await noterAuFil(req, { genre: "import" });
   const { story, source } = storyEtSource(id, meta);
   return repondre("POST /api/import", { source, story });
 });

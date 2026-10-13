@@ -410,7 +410,7 @@ function Entonnoir({ a, verdicts }: { a: StatsAdmin["achats"]; verdicts: number 
 }
 
 /** Les offres uniques, dans l’ordre du parcours : leur numéro (① à ④ de la spécification, en chiffres : la police n’a pas les ronds) et leur nom. */
-const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
+export const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
   suite: ["1", "La suite à 6,90\u00a0€, 5 minutes"],
   relance_mail: ["2", "Le mail «\u00a0Ta suite t’attend\u00a0»"],
   premium_ajout: ["3", "Premium pour 5\u00a0€ de plus"],
@@ -450,7 +450,7 @@ const ACTIONS: Record<StatsAdmin["actions"][number]["action"], (n: number) => st
 };
 
 /** Les derniers gestes de l’équipe : quoi, combien, quand. Ni qui, ni pour qui. */
-function Journal({ actions }: { actions: StatsAdmin["actions"] }) {
+export function Journal({ actions }: { actions: StatsAdmin["actions"] }) {
   if (!actions.length) return <p className="m-0 text-legende font-extrabold text-grey">Aucun geste de l’équipe pour l’instant.</p>;
   return (
     <ul aria-label="Les derniers gestes" className="m-0 flex list-none flex-col p-0">
@@ -467,7 +467,7 @@ function Journal({ actions }: { actions: StatsAdmin["actions"] }) {
   );
 }
 
-function Beta({ b }: { b: StatsAdmin["beta"] }) {
+export function Beta({ b }: { b: StatsAdmin["beta"] }) {
   const lignes: [string, ReactNode, string?][] = [
     ["Liste d’attente", nombre(b.attente), b.attenteNouveaux ? `+${nombre(b.attenteNouveaux)} sur la période` : undefined],
     [
@@ -493,7 +493,10 @@ function Beta({ b }: { b: StatsAdmin["beta"] }) {
   );
 }
 
-/** `base` : l’adresse de la page, à laquelle s’ajoute `?p=` pour changer de période. */
+/**
+ * L’ancien tableau de bord, gardé à côté du pilotage jusqu’à la décision (`?version=actuelle`). `base` : l’adresse de la
+ * page, à laquelle s’ajoutent `?p=` pour changer de période et `version=actuelle` pour y rester.
+ */
 export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: "/admin" | "/apercu/admin" }) {
   const heure = new Date(s.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
   const avant = contre(s.jours);
@@ -509,7 +512,7 @@ export function AdminScreen({ s, base = "/admin" }: { s: StatsAdmin; base?: "/ad
             {PERIODES.map(([j, nom]) => (
               <Link
                 key={j}
-                href={`${base}?p=${j}`}
+                href={`${base}?p=${j}&version=actuelle`}
                 aria-current={j === s.jours ? "page" : undefined}
                 className={cn(
                   "flex h-8 items-center rounded-full px-3.5 text-legende font-black no-underline",

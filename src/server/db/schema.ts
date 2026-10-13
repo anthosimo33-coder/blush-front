@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { EVENEMENTS_ECOUTE, OFFRES, OFFRES_UNIQUES, STATUTS_ACHAT, VOIX } from "../../types";
+import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GENRES_FIL, OFFRES, OFFRES_UNIQUES, SOURCES_VISITE, STATUTS_ACHAT, VOIX } from "../../types";
 import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
@@ -38,6 +38,12 @@ export const users = pgTable("users", {
    * à ce compte ; les mails qu’il demande (son code, son rapport prêt) partent toujours.
    */
   relancesCoupeesLe: quand("relances_coupees_le"),
+  /**
+   * D’où il est venu (SOURCES_VISITE) : la source de sa visite du jour, retrouvée à la création du compte par l’empreinte
+   * anonyme de sa connexion (src/server/visites.ts). null : un compte d’avant le suivi des visites, ou sa visite pas
+   * retrouvée. Le tableau de bord en tire les ventes par source.
+   */
+  source: text("source", { enum: SOURCES_VISITE }),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 
@@ -478,4 +484,68 @@ export const actionsEquipe = pgTable(
     creeLe: quand("cree_le").notNull().defaultNow(),
   },
   (t) => [index("actions_equipe_cree_idx").on(t.creeLe)],
+);
+
+/**
+ * Les visiteurs, un par jour (de Paris) : l’empreinte anonyme de sa connexion (src/server/visites.ts : son adresse IP et
+ * son navigateur, mêlés au sel du jour, qui s’efface le surlendemain ; jamais l’adresse elle-même), et d’où il est venu
+ * ce jour-là. Sans cookie : la même personne revenue un autre jour compte une fois de plus. Gardés VISITES_GARDEES_JOURS.
+ */
+export const visites = pgTable(
+  "visites",
+  {
+    jour: date("jour").notNull(),
+    empreinte: text("empreinte").notNull(),
+    source: text("source", { enum: SOURCES_VISITE }).notNull(),
+    arriveLe: quand("arrive_le").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.jour, t.empreinte] }), index("visites_arrive_idx").on(t.arriveLe)],
+);
+
+/** Le sel du jour (de Paris) des empreintes des visites : tiré au hasard, effacé le surlendemain (la purge). */
+export const selsDesVisites = pgTable("sels_des_visites", {
+  jour: date("jour").primaryKey(),
+  sel: text("sel").notNull(),
+});
+
+/**
+ * Les onglets ouverts sur le site, minute par minute (src/server/visites.ts) : chacun fait signe toutes les 40 secondes
+ * tant qu’il est visible. `onglet` : un identifiant tiré au hasard à l’ouverture de la page, jamais gardé dans le
+ * navigateur. L’écran où il est, d’où il est venu, et la ville de sa connexion (celle que donne l’hébergeur, avec ses
+ * coordonnées) : ni compte, ni adresse IP. Gardées PRESENCES_GARDEES_JOURS, pour /admin en direct.
+ */
+export const presences = pgTable(
+  "presences",
+  {
+    onglet: uuid("onglet").notNull(),
+    /** La minute du signe (son début) : une ligne par onglet et par minute. */
+    minute: quand("minute").notNull(),
+    vuLe: quand("vu_le").notNull().defaultNow(),
+    etape: text("etape", { enum: ETAPES_VISITE }).notNull(),
+    source: text("source", { enum: SOURCES_VISITE }).notNull(),
+    ville: text("ville"),
+    pays: text("pays"),
+    lat: real("lat"),
+    lon: real("lon"),
+  },
+  (t) => [primaryKey({ columns: [t.onglet, t.minute] }), index("presences_vu_idx").on(t.vuLe), index("presences_minute_idx").on(t.minute)],
+);
+
+/**
+ * Le fil d’/admin en direct (GENRES_FIL) : une ville et un geste. `source` : d’où vient une arrivée ; `offre` : celle
+ * d’un paiement ouvert ou d’un achat payé ; `ref` : l’achat d’un paiement ouvert, pour retrouver sa ville quand il est
+ * payé (le webhook n’a pas de connexion à situer). Ni compte, ni conv. Gardé PRESENCES_GARDEES_JOURS.
+ */
+export const filDirect = pgTable(
+  "fil_direct",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    le: quand("le").notNull().defaultNow(),
+    genre: text("genre", { enum: GENRES_FIL }).notNull(),
+    ville: text("ville"),
+    source: text("source", { enum: SOURCES_VISITE }),
+    offre: text("offre", { enum: OFFRES }),
+    ref: text("ref"),
+  },
+  (t) => [index("fil_direct_le_idx").on(t.le), index("fil_direct_ref_idx").on(t.ref)],
 );

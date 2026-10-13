@@ -14,6 +14,8 @@ import { NBSP } from "@/lib/format";
  * la vérification anti-robots de Cloudflare, le mail de rappel d’un paiement pas terminé, tes achats. « Ton email » ne
  * dit plus « pas de pub, jamais partagé » (Whop le reçoit pour ton reçu, Resend pour les mails, et le rappel parle d’une offre) ; la promesse
  * courte « Ton email n’est jamais partagé » (src/contenu/confidentialite.ts) est à revoir avec lui.
+ * « Les visites, sans cookie » (la mesure d’audience d’/admin, src/server/visites.ts) : ligne ajoutée et validée le
+ * 13 octobre 2026.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -52,6 +54,12 @@ export function ConfidentialiteScreen() {
         <Ligne icone="clock" titre="Un rappel, une seule fois">
           Si tu ouvres le paiement sans aller au bout, BLUSH peut t’envoyer un mail deux heures après, une seule fois. Rien de ta conv, aucun prénom, et un lien pour ne plus en
           recevoir.
+        </Ligne>
+        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour) */}
+        <Ligne icone="people" titre="Les visites, sans cookie">
+          Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
+          sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Si tu
+          crées un compte, il garde seulement d’où tu es venu.
         </Ligne>
       </InsetGroup>
 

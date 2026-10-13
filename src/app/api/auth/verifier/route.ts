@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { compteDe, Email, ouvrirSession, prendreCode } from "@/server/auth";
 import { effacerBrouillon, effacerNavigateur, lireBrouillon, lireNavigateur, poserChoisie, poserSession } from "@/server/cookies";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
@@ -6,6 +7,7 @@ import { ipDe, LIMITES } from "@/server/limites";
 import { entre } from "@/server/invitations";
 import { garde } from "@/server/requete";
 import { ROUTES } from "@/types/api";
+import { noterLaSourceDuCompte } from "@/server/visites";
 
 /* Le corps du contrat, l’email vérifié comme à la demande du code */
 const Corps = ROUTES["POST /api/auth/verifier"].corps.extend({ email: Email });
@@ -30,6 +32,8 @@ export const POST = route("POST /api/auth/verifier", async (req: Request) => {
   /* Bêta fermée : un email retiré de la liste après l’envoi de son code (seul celui qui a le code l’apprend) */
   if (!(await entre(b.email))) return erreur("beta");
   const utilisateur = await compteDe(b.email);
+  /* Un compte qui vient de naître : d’où il est venu (sa visite du jour), après la réponse */
+  if (Date.now() - new Date(utilisateur.createdAt).getTime() < 10 * 60_000) after(() => noterLaSourceDuCompte(req, utilisateur.id));
   const { secret, expiresAt } = await ouvrirSession(utilisateur.id);
   await poserSession(secret, expiresAt);
   const rattachee = await brouillonALaConnexion(utilisateur, await lireBrouillon());
