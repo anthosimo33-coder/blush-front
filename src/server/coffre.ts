@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
-import type { Memoire, Plan, Rapport } from "@prompts/lib/schemas";
-import type { BlushAnswer, Chapter, SoberReport, VocalLigne } from "@/types";
+import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
+import type { BlushAnswer, Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { ErreurInvariant } from "./erreurs";
 import type { Meta } from "./histoires";
@@ -120,6 +120,14 @@ const MemoireGardee = z.looseObject({
   editions: z.looseObject({ parToi: z.array(z.string()), supprimees: z.array(z.string()) }).optional(),
 });
 
+/*
+ * Le verdict suit le prompt 04 : on vérifie que c’est un objet. Avant le 13 octobre, il n’avait pas les titres des
+ * chapitres fermés (`titres`, absents) : ils se relisent null, et ces chapitres gardent leurs titres d’attente.
+ */
+const VerdictGarde = z
+  .looseObject({ sortie: objet<Verdict>(), scores: z.array(objet<ScoreRow>()) })
+  .transform((v) => ({ ...v, sortie: { ...v.sortie, titres: v.sortie.titres ?? null } }));
+
 /* Le rapport suit le prompt 05 (sa sortie, ses blocs) : on vérifie ce que les écrans et le vocal lisent sans le modèle */
 const RapportGarde = z.looseObject({
   sortie: objet<Rapport>(),
@@ -142,7 +150,7 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "stories.meta": { relecture: MetaGardee },
   "stories.conv": { compressee: true },
   "stories.context": { relecture: ContexteGarde },
-  "verdicts.data": {},
+  "verdicts.data": { relecture: VerdictGarde },
   "reports.plan": {},
   "reports.data": { relecture: RapportGarde },
   "reports.partiel": {},

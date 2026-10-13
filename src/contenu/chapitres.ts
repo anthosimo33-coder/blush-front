@@ -37,8 +37,11 @@ export const CHAPITRE_DE_LA_BASCULE = 2;
 const DE_L_AUTRE = 5;
 
 /*
- * Les titres de chaque chapitre, sauf celui de l’autre. Le rapport les montre tant que le plan n’a pas donné les vrais
- * (les chapitres fermés, la liste de l’écriture) ; le sommaire du mail « ton rapport est prêt » les reprend tels quels.
+ * Les titres de chaque chapitre, sauf celui de l’autre : les titres d’attente. Les chapitres fermés montrent ceux que le
+ * verdict a écrits pour leur histoire (prompts/lib/titres.ts, src/server/presentation/rapport.ts) ; ceux-ci les
+ * remplacent quand il n’en a pas (un verdict d’avant le 13 octobre, une alerte, un titre qui n’a pas passé la
+ * vérification), ou, pendant l’écriture, quand le plan n’a pas encore donné les siens. Le sommaire du mail « ton rapport
+ * est prêt » les reprend tels quels : il ne dit rien de la conv.
  */
 const TITRES: Record<number, string> = {
   [CHAPITRE_DU_VERDICT]: TITRE_DU_VERDICT,
@@ -51,7 +54,8 @@ const TITRES: Record<number, string> = {
 };
 
 /**
- * Le titre d’un chapitre avant que le plan donne le sien (et dans le mail). `autre` : le prénom de l’autre personne.
+ * Le titre d’attente d’un chapitre : fermé sans titre du verdict, pendant l’écriture avant le plan, et dans le mail.
+ * `autre` : le prénom de l’autre personne.
  * Chacun des NB_CHAPITRES en a un : un autre numéro est une erreur du code, levée ici plutôt qu’un titre vide à l’écran
  * ou dans le mail.
  */

@@ -6,6 +6,7 @@ import { appliquerMaj, estFaite, rapportCourt, rendreNouveau } from "@prompts/li
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
+import { imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
 import type { Message, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
@@ -101,8 +102,12 @@ async function verdict(story: LigneComplete, t: Tache) {
     etiquette: "verdict",
     surAvance: suivreAvance(t.id, avanceVerdict),
   });
-  /* Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse, mineur */
-  const sortie = verdictNormalise(brute);
+  /*
+   * Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse,
+   * mineur. Les titres des chapitres fermés sont vérifiés sur la conv, encore là (ce qu’ils citent, un message le dit) :
+   * ceux qui ne passent pas sont vidés, et leur chapitre garde son titre d’attente (prompts/lib/titres.ts)
+   */
+  const sortie = verdictNormalise(brute, rendu.lignes);
   const data = coffre.ecrire("verdicts.data", { sortie, scores: scores(chiffres) });
   await db()
     .insert(schema.verdicts)
@@ -143,7 +148,11 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     complet: (e) => !!e.plan,
   });
   if (!sortiePlan.plan) throw new ErreurTache("plan_vide");
-  const plan = coffre.ecrire("reports.plan", sortiePlan.plan);
+  /*
+   * Les titres que le verdict a promis (montrés sur les chapitres fermés) remplacent ceux du plan : les deux moitiés les
+   * reçoivent avec lui (le prompt 05 les y suit déjà ; le code s’en assure, au mot près)
+   */
+  const plan = coffre.ecrire("reports.plan", { ...sortiePlan.plan, chapitres: imposerTitres(sortiePlan.plan.chapitres, titresDuVerdict(v.sortie)) });
   await db()
     .insert(schema.reports)
     .values({ storyId: story.id, plan })
@@ -165,14 +174,17 @@ const dansLaMoitie = (n: number, premier: Moitie) => n >= premier && n < premier
  * rapport. `surAvance(premier, signal)` : le suivi du flux d’une moitié ; `enregistre()` : la fin des écritures en cours
  * (l’une après l’autre).
  */
-function suiviDesChapitres(story: Ligne, t: Tache, messages: Map<string, Message>, lignesScores: ScoreRow[]) {
+function suiviDesChapitres(story: Ligne, t: Tache, messages: Map<string, Message>, lignesScores: ScoreRow[], titres: Map<number, string>) {
   const detail: DetailEcriture = { a: { progres: 0, ecrits: [], enCours: null }, b: { progres: 0, ecrits: [], enCours: null } };
   const ecrire = ecrireAvance(t.id);
   const prets = new Map<number, Chapitre>();
   let enregistrement = Promise.resolve();
   const garderPrets = () => {
     const affiches = chapitresAffiches(
-      [...prets.values()].sort((x, y) => x.numero - y.numero),
+      imposerTitres(
+        [...prets.values()].sort((x, y) => x.numero - y.numero),
+        titres,
+      ),
       messages,
       lignesScores,
     );
@@ -208,8 +220,10 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
   const plan = coffre.lire("reports.plan", ligne.plan);
   const h = histoireDe(metaDe(story));
+  /* Les titres promis par le verdict : chaque chapitre écrit les porte, au mot près (le plan les a déjà) */
+  const titres = titresDuVerdict(v.sortie);
   /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre */
-  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, h.utilisateur.prenom), v.scores);
+  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, h.utilisateur.prenom), v.scores, titres);
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
@@ -251,7 +265,10 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
       mode_sobre: v.sortie.mode_sobre,
       decouvertes: plan.decouvertes,
       these: plan.these,
-      chapitres: [...ca, ...cb].sort((x, y) => x.numero - y.numero),
+      chapitres: imposerTitres(
+        [...ca, ...cb].sort((x, y) => x.numero - y.numero),
+        titres,
+      ),
       sobre: null,
     };
     await garderRapport(story, r, rendu.lignes, v.scores);

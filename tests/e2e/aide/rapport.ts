@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { FACTICE } from "../../../src/server/ia/factice-valeurs";
 import { CLE_REPRISE } from "../../../src/state/cles";
-import { chiffrer, dechiffrer, histoiresDe, sql } from "./base";
+import { chiffrer, dechiffrer, derniereHistoire, histoiresDe, sql } from "./base";
 import { pagePrete } from "./page";
 
 /*
@@ -37,10 +38,39 @@ export async function toucherLaScene(page: Page, cote: "gauche" | "droite"): Pro
 /* ———— Le rapport (/rapport) ———— */
 
 /**
- * Les sept chapitres fermés d’un rapport gratuit, dans l’ordre : leurs titres d’attente (src/contenu/chapitres.ts,
- * titreDAttente), le 5 porte le prénom de l’autre. Recopiés ici : les tests ne lisent pas la source qu’ils vérifient.
+ * Les sept chapitres fermés d’un rapport gratuit, dans l’ordre (2 à 8) : les titres que le verdict du modèle factice
+ * écrit pour l’histoire de Noé et Maëlys (FACTICE.titres, lus là, jamais recopiés). Le rapport débloqué les garde.
  */
-export const CHAPITRES_FERMES = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "Maëlys", "Toi", "Votre duo", "Ton prochain pas"];
+export const CHAPITRES_FERMES: string[] = Object.values(FACTICE.titres("Maëlys"));
+
+/** Le titre du chapitre `n` (2 à 8) du rapport de Noé et Maëlys : celui que son verdict a écrit, fermé comme débloqué. */
+export const titreDuChapitre = (n: number): string => {
+  const titre = CHAPITRES_FERMES[n - 2];
+  if (titre === undefined) throw new RangeError(`chapitre ${n} : pas de titre écrit par le verdict (2 à 8)`);
+  return titre;
+};
+
+/**
+ * Les titres d’attente des chapitres 2 à 8 (src/contenu/chapitres.ts, titreDAttente), le 5 au prénom de l’autre : ceux
+ * d’un verdict sans titres, et du sommaire du mail « ton rapport est prêt ». Recopiés ici : les tests ne lisent pas la
+ * source qu’ils vérifient.
+ */
+export const CHAPITRES_D_ATTENTE = ["Le moment où tout a basculé", "Votre histoire, en actes", "Ce qui coince", "Maëlys", "Toi", "Votre duo", "Ton prochain pas"];
+
+/**
+ * Le verdict de la dernière conv du compte, tel que l’appli le gardait avant le 13 octobre : sans les titres des
+ * chapitres fermés (une conv lue avant eux, en production). Le rapport retombe alors sur leurs titres d’attente.
+ */
+export async function verdictDAvantLesTitres(email: string): Promise<void> {
+  const [v] = await sql()<{ data: Uint8Array }[]>`select data from verdicts where story_id = ${derniereHistoire(email)}`;
+  if (!v) throw new Error(`aucun verdict pour ${email}`);
+  const donnees = dechiffrer<{ sortie: Record<string, unknown> }>(v.data);
+  const avant = Object.fromEntries(Object.entries(donnees.sortie).filter(([champ]) => champ !== "titres"));
+  await sql()`update verdicts set data = ${chiffrer({ ...donnees, sortie: avant })} where story_id = ${derniereHistoire(email)}`;
+}
+
+/** Un titre dans une expression régulière, tel quel. */
+export const telQuel = (titre: string) => titre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Le titre du paiement, sur le rapport de Noé et Maëlys. */
 export const PAIEMENT = "La suite parle de vous deux\u00a0: toi et Maëlys.";

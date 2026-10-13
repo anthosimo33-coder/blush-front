@@ -35,6 +35,7 @@ import {
   suivreLeNavigateur,
   test,
   URL_APPLI,
+  verdictDAvantLesTitres,
 } from "../../tests/e2e/aide";
 import { CASE_IMPORT } from "../../src/contenu/consentements";
 import { STATES } from "./screens.mjs";
@@ -129,6 +130,13 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
     }
     case "gratuit":
       return { ...sans, histoire: await lectureFaite(page, testInfo, emailLibre(testInfo, "galerie")) };
+    case "gratuit-sans-titres": {
+      /* Le verdict sans les titres des chapitres fermés, comme ceux gardés avant le 13 octobre */
+      const email = emailLibre(testInfo, "galerie-sans-titres");
+      const histoire = await lectureFaite(page, testInfo, email);
+      await verdictDAvantLesTitres(email);
+      return { ...sans, histoire };
+    }
     case "lecture-en-cours": {
       const email = emailLibre(testInfo, "galerie-lecture");
       const histoire = await lectureFaite(page, testInfo, email);

@@ -37,7 +37,9 @@ import {
   REPONSES_NOE,
   seConnecterAdmin,
   sql,
+  telQuel,
   test,
+  titreDuChapitre,
   URL_BETA,
 } from "./aide";
 
@@ -317,7 +319,7 @@ test("compte gratuit : la lecture finie, la révélation du verdict, le rapport,
   });
 
   await test.step("le paiement, ouvert par un chapitre fermé", async () => {
-    await rapport.getByRole("button", { name: /Ce qui coince/ }).click();
+    await rapport.getByRole("button", { name: new RegExp(telQuel(titreDuChapitre(4))) }).click();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await capturer(page, "rapport-gratuit-paiement");
     await fermerLaFeuille(page);

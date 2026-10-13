@@ -10,6 +10,7 @@ import {
   ouvrirLeRapport,
   partageDeFichiers,
   reponseAuGeste,
+  titreDuChapitre,
   test,
 } from "./aide";
 
@@ -81,7 +82,7 @@ test("« Partager en image » une réponse du chat : la story dessinée par le s
 test("« Partager cette phrase en image » : la chute d’un chapitre du rapport, dessinée en story par le serveur", async ({ page }, testInfo) => {
   await lectureComplete(page, testInfo);
   const rapport = await ouvrirLeRapport(page);
-  const chapitre2 = rapport.getByRole("region", { name: "Chapitre 2 : Chapitre 2" });
+  const chapitre2 = rapport.getByRole("region", { name: `Chapitre 2 : ${titreDuChapitre(2)}` });
   const feuille = page.getByRole("dialog", { name: "Partager en image" });
 
   /* La chute du modèle factice, « Et voilà. » : le troisième bloc du chapitre (l’accroche, le récit, la chute) */

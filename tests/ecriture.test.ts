@@ -6,6 +6,7 @@ import { chiffrer } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { progression, rapportDe } from "@/server/donnees";
 import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { avecFactice, compteDeTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 describe("le rapport pendant son écriture", () => {
@@ -24,7 +25,7 @@ describe("le rapport pendant son écriture", () => {
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_chapitres")));
   }
 
-  it("donne les vrais titres du plan, l’état de chaque chapitre et l’avancée", async () => {
+  it("donne les titres promis par le verdict, l’état de chaque chapitre et l’avancée", async () => {
     await auMilieuDeLEcriture();
     const r = (await rapportDe(await ligneEnBase(id), u))!;
     expect(r.generating).toBe(true);
@@ -39,9 +40,13 @@ describe("le rapport pendant son écriture", () => {
       [7, "attente"],
       [8, "attente"],
     ]);
-    /* Les titres viennent du plan (le modèle factice les appelle « Ch. N »), dans le sommaire aussi */
-    expect(r.ecriture?.chapitres[0]!.title).toBe("Ch. 2");
-    expect(r.report.chapters[1]!.tocTitle).toBe("Ch. 2");
+    /*
+     * Les titres que le verdict a promis (ceux du modèle factice, FACTICE.titres, au prénom de Sophie), ceux qu’ils
+     * avaient fermés : ils passent avant ceux du plan (« Ch. N »), dans la liste de l’écriture et dans le sommaire
+     */
+    const promis = Object.values(FACTICE.titres("Sophie"));
+    expect(r.ecriture?.chapitres.map((c) => c.title)).toEqual(promis);
+    expect(r.report.chapters[1]!.tocTitle).toBe(promis[0]);
   });
 
   it("donne à lire les chapitres finis, dans l’ordre : un chapitre prêt en avance attend ceux d’avant", async () => {

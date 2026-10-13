@@ -1,4 +1,4 @@
-import { attendreEnHaut, CHAPITRES_FERMES, emailLibre, expect, lectureFaite, ouvrirLeRapport, PAIEMENT, surOrdinateur, test } from "./aide";
+import { attendreEnHaut, CHAPITRES_FERMES, emailLibre, expect, lectureFaite, ouvrirLeRapport, PAIEMENT, surOrdinateur, telQuel, test, titreDuChapitre } from "./aide";
 
 /*
  * Le sommaire du rapport gratuit : une colonne à gauche sur ordinateur, une feuille sur téléphone (le bouton en haut à
@@ -16,7 +16,7 @@ test("sommaire sur ordinateur : il suit la lecture, et les chapitres fermés ouv
     await expect(sommaire.getByRole("progressbar", { name: "Progression de la lecture" })).toBeVisible();
     await expect(sommaire.getByRole("link")).toHaveCount(1);
     await expect(sommaire.getByRole("link", { name: "Le verdict", exact: true })).toBeVisible();
-    await expect(sommaire.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveText(CHAPITRES_FERMES.map((titre, k) => new RegExp(`^${k + 2}${titre}`)));
+    await expect(sommaire.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveText(CHAPITRES_FERMES.map((titre, k) => new RegExp(`^${k + 2}${telQuel(titre)}`)));
     await expect(sommaire.getByText("askblush.com")).toBeVisible();
     /* Sans le rapport complet, pas de question à BLUSH */
     await expect(sommaire.getByRole("link", { name: "Ta question" })).toHaveCount(0);
@@ -31,7 +31,7 @@ test("sommaire sur ordinateur : il suit la lecture, et les chapitres fermés ouv
   });
 
   await test.step("un chapitre fermé ouvre le paiement", async () => {
-    await sommaire.getByRole("button", { name: "Votre duo (verrouillé)" }).click();
+    await sommaire.getByRole("button", { name: `${titreDuChapitre(7)} (verrouillé)` }).click();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   });
 });
@@ -51,7 +51,7 @@ test("sommaire sur téléphone : la feuille suit la lecture, et les chapitres fe
     await expect(feuille.getByText("8 chapitres", { exact: true })).toBeVisible();
     await expect(feuille.getByRole("button", { name: "Le verdict", exact: true })).toBeVisible();
     /* Les chapitres fermés, par leur titre (le cadenas se dit « (verrouillé) » : le test plus bas) */
-    for (const titre of CHAPITRES_FERMES) await expect(feuille.getByRole("button", { name: new RegExp(`^${titre}`) })).toBeVisible();
+    for (const titre of CHAPITRES_FERMES) await expect(feuille.getByRole("button", { name: new RegExp(`^${telQuel(titre)}`) })).toBeVisible();
     await expect(feuille.getByRole("link", { name: "Poser ma question à BLUSH" })).toHaveCount(0);
     await feuille.getByRole("button", { name: "Fermer" }).click();
     await expect(feuille).toBeHidden();
@@ -69,7 +69,7 @@ test("sommaire sur téléphone : la feuille suit la lecture, et les chapitres fe
     await page.getByRole("button", { name: "Sommaire du rapport" }).click();
     await expect(feuille.getByText("Chapitre 1 sur 8", { exact: true })).toBeVisible();
     await expect(feuille.getByRole("button", { name: "Le verdict En cours" })).toBeVisible();
-    await feuille.getByRole("button", { name: /^Ton prochain pas/ }).click();
+    await feuille.getByRole("button", { name: new RegExp(`^${telQuel(titreDuChapitre(8))}`) }).click();
     await expect(feuille).toBeHidden();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   });
@@ -86,5 +86,5 @@ test("sommaire sur téléphone : les chapitres fermés se disent fermés aux lec
   await ouvrirLeRapport(page);
   await page.getByRole("button", { name: "Sommaire du rapport" }).click();
   const feuille = page.getByRole("dialog", { name: "Sommaire" });
-  for (const titre of CHAPITRES_FERMES) await expect(feuille.getByRole("button", { name: new RegExp(`^${titre}.*\\(verrouillé\\)$`) })).toBeVisible();
+  for (const titre of CHAPITRES_FERMES) await expect(feuille.getByRole("button", { name: new RegExp(`^${telQuel(titre)}.*\\(verrouillé\\)$`) })).toBeVisible();
 });
