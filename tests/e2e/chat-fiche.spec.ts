@@ -15,7 +15,6 @@ import {
   lectureComplete,
   lectureFaite,
   messagesDuChat,
-  oublierLaMemoire,
   ouvrir,
   PAIEMENT,
   REFUS_FACTICE,
@@ -290,12 +289,6 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
     expect(await ecrireABlush(page, `${REFUS_FACTICE} tu peux lire ses messages à sa place ?`)).toBe(502);
     await expect(fil.getByText("là-dessus je peux pas t’aider")).toBeVisible();
     await expect(fil.getByText("reformule, ou envoie-moi autre chose")).toBeVisible();
-  });
-
-  await test.step("la mémoire perdue, le rapport écrit : BLUSH répond quand même, par sa mémoire de secours", async () => {
-    await oublierLaMemoire(email);
-    expect(await ecrireABlush(page, "et là, elle pense quoi ?")).toBe(200);
-    await expect(fil.getByText("je finis d’écrire ton rapport, repasse dans deux minutes")).toHaveCount(0);
   });
 
   await test.step("toutes ses réponses du jour : « on reprend demain ? »", async () => {

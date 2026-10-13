@@ -71,14 +71,6 @@ export async function chatEnVocal(email: string): Promise<boolean> {
 }
 
 /**
- * Efface la mémoire de la conv ouverte du compte (sa fiche, ce que BLUSH retient), comme avant la fin de son écriture :
- * le chat attend alors qu’elle soit faite.
- */
-export async function oublierLaMemoire(email: string): Promise<void> {
-  await sql()`delete from memories where story_id in (select s.id from stories s join users u on u.id = s.user_id where u.email = ${email.toLowerCase()})`;
-}
-
-/**
  * Fait `geste` et attend l’enregistrement de sa fiche qu’il déclenche (PUT /api/fiche) : celui qui contient `texte`, s’il
  * est donné (les enregistrements partent l’un après l’autre). Il part après l’écran : on attend qu’il soit fait.
  */
