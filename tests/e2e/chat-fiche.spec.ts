@@ -292,14 +292,15 @@ test("les soucis du chat, dits par BLUSH : l’export d’une autre conv, un fic
     await expect(fil.getByText("reformule, ou envoie-moi autre chose")).toBeVisible();
   });
 
-  await test.step("la mémoire pas encore faite : « repasse dans deux minutes »", async () => {
+  await test.step("la mémoire perdue, le rapport écrit : BLUSH répond quand même, par sa mémoire de secours", async () => {
     await oublierLaMemoire(email);
-    expect(await ecrireABlush(page, "et là, elle pense quoi ?")).toBe(409);
-    await expect(fil.getByText("je finis d’écrire ton rapport, repasse dans deux minutes")).toBeVisible();
+    expect(await ecrireABlush(page, "et là, elle pense quoi ?")).toBe(200);
+    await expect(fil.getByText("je finis d’écrire ton rapport, repasse dans deux minutes")).toHaveCount(0);
   });
 
-  await test.step("150 messages dans la journée : « on reprend demain ? »", async () => {
-    await remplirLaLimite(email, "chat", 150);
+  await test.step("toutes ses réponses du jour : « on reprend demain ? »", async () => {
+    /* LIMITES.chatParCompte (src/server/limites.ts, qu’un test de bout en bout ne peut pas importer : server-only) */
+    await remplirLaLimite(email, "chat", 500);
     expect(await ecrireABlush(page, "dernière question promis")).toBe(429);
     const bulle = fil.getByText("tu m’as fait parler toute la journée 😮‍💨 on reprend demain ?");
     await expect(bulle).toBeVisible();
