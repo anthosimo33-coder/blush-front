@@ -69,6 +69,18 @@ export async function livrerLePaiement(mode: Fournisseur["mode"], p: PaiementWho
     return "montant";
   }
   const r = await livrer(achat.id, { paiementId: p.id, checkoutId: p.checkoutId, membreId: p.membreId, moyenId: p.moyenId });
+  /* Livré, mais payé plus cher que le prix affiché : Whop a ajouté la taxe par-dessus (le réglage de taxe du compte, plus sur « prix TTC ») */
+  if (r.effet === "livre" && p.total !== null && p.total > achat.centimes)
+    after(() =>
+      alerter(
+        "paiement : taxe ajoutée au prix",
+        [
+          `Achat ${achat.id} (${achat.offre}, paiement ${p.id}) : ${achat.centimes} centimes affichés, ${p.total} payés. Whop a ajouté la taxe par-dessus le prix TTC.`,
+          "Le réglage de taxe du compte Whop doit dire « prix TTC » (taxe comprise). La différence est à rembourser à l’acheteur.",
+        ],
+        { importante: true },
+      ),
+    );
   /* Une offre unique payée deux fois (deux commandes passées tant qu’elle valait) : la seconde n’est pas livrée */
   if (r.effet === "offre")
     after(() =>
