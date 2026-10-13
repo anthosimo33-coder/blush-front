@@ -171,7 +171,7 @@ describe("les chiffres de l’argent (/admin)", () => {
     expect(ecart((s) => s.bulles.semaine.rendues)).toBe(1);
     expect(ecart((s) => s.bulles.semaine.offertes)).toBe(150);
     const offre = (s: typeof avant, o: string) => s.offresUniques.find((l) => l.offre === o)!;
-    expect(apres.offresUniques.map((l) => l.offre)).toEqual(["suite", "relance_mail", "premium_ajout", "premiere_recharge"]);
+    expect(apres.offresUniques.map((l) => l.offre)).toEqual(["suite", "relance_mail", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"]);
     expect([ecart((s) => offre(s, "suite").montrees), ecart((s) => offre(s, "suite").prises)]).toEqual([1, 1]);
     expect([ecart((s) => offre(s, "relance_mail").montrees), ecart((s) => offre(s, "relance_mail").prises)]).toEqual([1, 0]);
     /* Montrée il y a 20 jours : hors des 7 jours, dans les 30 */

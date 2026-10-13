@@ -40,6 +40,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@react-pdf/renderer": "4.8.0",
+    "@whop/elements": "1.9.0",
+    "@whop/elements-react": "1.9.0",
     "client-only": "0.0.1",
     "drizzle-orm": "^0.45.3",
     "fflate": "^0.8.3",

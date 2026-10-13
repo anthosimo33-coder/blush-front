@@ -2,16 +2,24 @@
 
 /* Petit cache de lecture autour de src/services/api.ts (pas de dépendance externe). */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { Account, AchatDuCompte, ReportPayload } from "@/types/api";
+import type { Account, AchatDuCompte, FeuilleDuPaiement, ReportPayload } from "@/types/api";
 import type { Fiche } from "@/types";
 
 /**
  * Ce que le cache garde, clé par clé, et sous quelle forme. La fiche a une clé par conv (`fiche:<id>`, l’identifiant de
  * la conv affichée tel que le serveur l’a résolu : idDeLaConv, src/services/serveur.ts, jamais le cookie brut, absent
  * après une connexion) : celle d’une autre conv ne s’affiche jamais à la place de la sienne. « fiche-apercu » : l’aperçu
- * figé d’une vraie fiche. Ce qui se relit quand la conv change : src/lib/requetes.ts.
+ * figé d’une vraie fiche. « feuille » : ce que la feuille du paiement doit savoir (comment payer, les avoirs du compte).
+ * Ce qui se relit quand la conv change : src/lib/requetes.ts.
  */
-export type Requetes = { report: ReportPayload; account: Account; achats: AchatDuCompte[]; "fiche-apercu": Fiche; [cle: `fiche:${string}`]: Fiche };
+export type Requetes = {
+  report: ReportPayload;
+  account: Account;
+  achats: AchatDuCompte[];
+  feuille: FeuilleDuPaiement;
+  "fiche-apercu": Fiche;
+  [cle: `fiche:${string}`]: Fiche;
+};
 export type Cle = keyof Requetes;
 
 type Listener = (data?: unknown) => void;

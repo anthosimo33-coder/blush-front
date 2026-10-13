@@ -19,7 +19,13 @@ import { ErreurApi } from "@/types/erreurs-api";
  */
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }) }));
 vi.mock("@/lib/paiement", async (vrai) => ({ ...(await vrai<typeof import("@/lib/paiement")>()), partirPayer: vi.fn(async () => {}) }));
-vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), proposerOffreUnique: vi.fn() }));
+/* Sans paiement dans la feuille (le mode null) : la recharge paie sur la page de Whop, par partirPayer (simulé) */
+vi.mock("@/services/api", async (vrai) => ({
+  ...(await vrai<typeof import("@/services/api")>()),
+  proposerOffreUnique: vi.fn(),
+  lireFeuilleDuPaiement: vi.fn(async () => ({ paiement: { mode: null }, avance: null, garde: null })),
+  getAccount: vi.fn(async () => ({ email: "toi@example.com", bulles: 0, client: false, equipe: false, storyDeleted: false })),
+}));
 const payer = vi.mocked(partirPayer);
 const proposer = vi.mocked(proposerOffreUnique);
 

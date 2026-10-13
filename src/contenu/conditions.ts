@@ -1,7 +1,7 @@
 import { URGENCES } from "./aide";
 import { texteRenonciation } from "./consentements";
 import { droitApplicable, EDITEUR, type Editeur } from "./mentions-legales";
-import { CATALOGUE, COUT_EN_BULLES, prixDe } from "./offres";
+import { CATALOGUE, COUT_EN_BULLES, prixDe, RAPPORT_D_AVANCE } from "./offres";
 
 /*
  * Les conditions de BLUSH (la page /conditions) : les conditions d’utilisation, puis celles de la vente. Elles suivent
@@ -96,9 +96,10 @@ const VENTE: readonly Section[] = [
         `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${bulles(rapport.bulles)}.`,
         `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${bulles(premium.bulles)}.`,
         `Une recharge de bulles\u00a0: ${bulles(pack30.bulles)} pour ${prixDe("pack30")}, ${pack80.bulles} pour ${prixDe("pack80")}, ${pack200.bulles} pour ${prixDe("pack200")}.`,
+        `Ton 2e rapport, ${prixDe("second")}, proposé une fois juste après un rapport payé\u00a0: un rapport d’avance, à utiliser dans l’année pour la conv de ton choix, avec ${bulles(RAPPORT_D_AVANCE.bulles)}.`,
       ],
       "Un rapport, c’est la lecture d’une conv\u00a0: une autre conv a son propre rapport.",
-      "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, ou des bulles en plus après un achat ou à ta première recharge. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
+      "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, des bulles en plus après un achat ou à ta première recharge, ou ton prochain rapport moins cher, gardé quelques jours. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
       "Les prix sont en euros, toutes taxes comprises. Celui qui compte est le prix affiché au moment de payer.",
     ],
   },
@@ -123,6 +124,7 @@ const VENTE: readonly Section[] = [
     blocs: [
       "Le paiement passe par Whop, qui vend en son nom (le vendeur en titre)\u00a0: il encaisse, collecte la TVA et t’envoie ton reçu. Ce qu’il vend, c’est BLUSH qui te le livre.",
       "Whop reçoit ton email, le montant et un numéro de commande\u00a0: jamais ta conv, ni un prénom. Ta carte, BLUSH ne la voit jamais. Sur ton relevé, le paiement porte le nom de Whop.",
+      "Quand tu paies dans BLUSH, Whop garde ta carte (la ligne sous le bouton le dit)\u00a0: tes achats suivants se paient en un geste, toujours à ta demande.",
     ],
   },
   {
@@ -131,6 +133,7 @@ const VENTE: readonly Section[] = [
     blocs: [
       "Ce que tu achètes est un contenu numérique, livré dès le paiement\u00a0: ton rapport se débloque, tes bulles arrivent sur ton compte.",
       `Pour l’avoir tout de suite, tu renonces à ton droit de rétractation de 14 jours (Code de la consommation, article L221-28, 13°)\u00a0: en payant, tu l’acceptes, comme le dit la ligne sous le bouton qui paie («\u00a0${texteRenonciation("rapport")}\u00a0»).`,
+      `Le rapport d’avance n’est livré que quand tu l’utilises\u00a0: tant que tu ne l’as pas utilisé, tu peux te rétracter dans les 14 jours qui suivent son achat, et il t’est remboursé. En l’utilisant pour une conv, tu renonces à ce droit («\u00a0${texteRenonciation("avance")}\u00a0»).`,
     ],
   },
   {

@@ -46,6 +46,8 @@ export const ERREURS_API = {
   acces: 402,
   /** Le paiement n’est pas encore branché (ni Whop, ni le faux Whop) : rien ne s’achète. */
   bientot: 402,
+  /** Le paiement dans la feuille refusé par la banque (la carte, le portefeuille) : rien n’a été débité, on peut réessayer. */
+  carte: 402,
   /**
    * Plus assez de bulles (src/server/bulles.ts) : une réponse verrouillée attend déjà d’être payée (une seule par compte),
    * ou la lire en demande plus que le solde. Rien n’est parti au modèle.

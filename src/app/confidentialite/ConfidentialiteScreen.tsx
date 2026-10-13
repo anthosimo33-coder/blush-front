@@ -109,7 +109,7 @@ export function ConfidentialiteScreen() {
       <InsetGroup title="Quand tu paies" id="paiement" className="mt-6">
         <Ligne icone="bolt" ton="toi" titre="Whop, pour le paiement">
           Whop encaisse en son nom et t’envoie ton reçu. Il reçoit ton email, le montant et un numéro de commande{NBSP}: jamais ta conv, ni un prénom. Ta carte, BLUSH ne la voit
-          jamais.
+          jamais{NBSP}: elle se tape dans un cadre de Whop, qui la garde pour tes achats suivants en un geste.
         </Ligne>
       </InsetGroup>
 

@@ -65,13 +65,20 @@ describe("l’accord de l’import", () => {
      * L’accord de l’import fait aussi accepter les conditions : leur changement change sa version.
      */
     expect({ version: CASE_IMPORT.version, texte: texteCaseImport() }).toEqual({
-      version: "2026-10-13",
+      version: "2026-10-13.2",
       texte: "En continuant, tu acceptes les conditions et que BLUSH lise toute ta conv.",
     });
-    expect({ version: CASE_RENONCIATION.version, rapport: texteRenonciation("rapport"), bulles: texteRenonciation("bulles"), lien: CASE_RENONCIATION.ancre }).toEqual({
-      version: "2026-10-13",
+    expect({
+      version: CASE_RENONCIATION.version,
+      rapport: texteRenonciation("rapport"),
+      bulles: texteRenonciation("bulles"),
+      avance: texteRenonciation("avance"),
+      lien: CASE_RENONCIATION.ancre,
+    }).toEqual({
+      version: "2026-10-13.2",
       rapport: "En payant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.",
       bulles: "En payant, tu as tes bulles tout de suite et tu renonces au délai de rétractation.",
+      avance: "En débloquant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.",
       lien: "/conditions#livraison",
     });
     expect(CONDITIONS.maj).toContain("13 octobre 2026");
@@ -81,7 +88,7 @@ describe("l’accord de l’import", () => {
      * ce test : changez CASE_IMPORT.version (une date), puis ici la version et l’empreinte.
      */
     const empreinteDesConditions = createHash("sha256").update(JSON.stringify(PARTIES_CONDITIONS)).digest("hex").slice(0, 16);
-    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-13", conditions: "dfcfbc3d957f6e10" });
+    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-13.2", conditions: "25e47f9c9368bb7f" });
   });
 
   it("l’accord de l’import dit les conditions et toute la conv, sans case, sans âge, sans détailler l’intime", () => {

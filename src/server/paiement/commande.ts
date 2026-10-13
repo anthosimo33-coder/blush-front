@@ -1,10 +1,10 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { CATALOGUE, DUREE_AJOUT_MS, titreChezWhop } from "@/contenu/offres";
+import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
-import type { EtatAchat, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
+import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
+import { avanceDuCompte, commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -13,15 +13,17 @@ import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
 import { journalErreur } from "../journal";
 import { LIMITES, sousLaLimite } from "../limites";
-import { montrer } from "../offres-uniques";
+import { montrer, offreValable } from "../offres-uniques";
 import { webhookDeLIssue, type WebhookFactice } from "./factice";
 import { fournisseur, type Fournisseur } from "./fournisseur";
 import { livrerLePaiement, recevoirWebhook } from "./webhook";
-import { creerConfiguration, ErreurWhop, lirePaiement, payerEnUnGeste } from "./whop";
+import { creerConfiguration, ErreurWhop, lirePaiement, payerAvecJeton, payerEnUnGeste } from "./whop";
 
 /*
- * Le paiement, côté acheteur : le commencer (POST /api/paiement), le suivre au retour (GET /api/paiement/[achat]), les
- * offres uniques que l’écran demande à montrer (POST /api/paiement/offre), et les boutons du faux Whop. Le prix vient
+ * Le paiement, côté acheteur : ce que la feuille du paiement doit savoir (GET /api/paiement/feuille), le commencer
+ * (POST /api/paiement : dans la feuille, avec le jeton des Elements de Whop ; en un geste ; ou sur la page de Whop), le
+ * suivre jusqu’à sa livraison (GET /api/paiement/[achat]), les offres uniques que l’écran demande à montrer
+ * (POST /api/paiement/offre), et les boutons du faux Whop. Le prix vient
  * toujours du catalogue, figé dans l’achat à la commande (commander, src/server/achats.ts) ; rien n’est livré ici, sauf
  * un paiement vérifié chez Whop au retour quand le webhook tarde (livré par le même chemin, une fois).
  */
@@ -59,13 +61,20 @@ async function moyenGarde(userId: string, mode: Fournisseur["mode"]): Promise<{ 
   return l?.membreId && l.moyenId ? { membreId: l.membreId, moyenId: l.moyenId } : null;
 }
 
+/** Les offres qui se paient en un geste, avec le moyen de paiement gardé du paiement d’avant : celles de « C’est débloqué ». */
+const EN_UN_GESTE: ReadonlySet<OffreId> = new Set(["premium_ajout", "second"]);
+
+/** Les rapports payés après lesquels « C’est débloqué » propose ses offres (le 2e rapport, son repli) : les formules, la suite, le −50 % gardé. */
+const RAPPORTS_PAYES: readonly OffreId[] = ["rapport", "premium", "suite", "rapport_garde"];
+
 /** Whop a refusé l’appel, sans rien faire (un 4xx) : ni une panne, ni un délai, ni une réponse illisible, où le paiement a pu partir. */
 const refusNet = (e: ErreurWhop) => typeof e.statut === "number" && e.statut >= 400 && e.statut < 500;
 
 /**
- * L’offre ③ payée en un geste, avec le moyen de paiement gardé d’un achat payé : chez Whop (POST /payments ; l’adresse où
- * le confirmer si la banque le demande), ou par le faux Whop, qui envoie son webhook payment.succeeded juste après la
- * réponse. Null : pas de moyen gardé, ou Whop refuse (le paiement passe alors par une page de paiement).
+ * Une offre de « C’est débloqué » payée en un geste, avec le moyen de paiement gardé d’un achat payé : chez Whop
+ * (POST /payments ; l’adresse où le confirmer si la banque le demande), ou par le faux Whop, qui envoie son webhook
+ * payment.succeeded juste après la réponse. Null : pas de moyen gardé, ou Whop refuse (le paiement passe alors par la
+ * feuille, ou une page de paiement).
  */
 async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: string): Promise<PaiementCommence | null> {
   const moyen = await moyenGarde(compte.id, f.mode);
@@ -73,7 +82,7 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
   if (f.mode === "factice") {
     const w = webhookDeLIssue(achat, "payer");
     if (w) after(() => recevoirWebhook(w.corps, new Headers(w.entetes)));
-    return { achat: achat.id, checkout: null, url: null };
+    return { achat: achat.id, checkout: null, url: null, paiement: null };
   }
   try {
     const p = await payerEnUnGeste(f.whop, {
@@ -84,7 +93,7 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
       moyen: moyen.moyenId,
       retour,
     });
-    return { achat: achat.id, checkout: null, url: p.confirmer };
+    return { achat: achat.id, checkout: null, url: p.confirmer, paiement: null };
   } catch (e) {
     /*
      * Seul un refus net de Whop (4xx : rien n’a été débité) passe à une page de paiement. Sans réponse, ou une réponse
@@ -104,27 +113,84 @@ async function pageDePaiement(f: Fournisseur, achat: Achat, retour: string): Pro
       ? await creerConfiguration(f.whop, { achat: achat.id, centimes: achat.centimes, titre: titreChezWhop(achat.offre, achat.bulles), retour })
       : { id: `ch_faux_${achat.id.replaceAll("-", "")}`, url: `/paiement/factice?achat=${achat.id}` };
   await db().update(a).set({ checkoutId: page.id }).where(eq(a.id, achat.id));
-  return { achat: achat.id, checkout: page.id, url: page.url };
+  return { achat: achat.id, checkout: page.id, url: page.url, paiement: null };
 }
 
-/** Pourquoi un paiement ne commence pas : pas de prestataire (« bientot »), rien à payer (« deja » : l’équipe, un rapport déjà ouvert), ou le refus de la commande. */
-export type RefusDePaiement = "bientot" | RefusDeCommande;
+/** Les sous-statuts d’un paiement de Whop refusé pour de bon dès sa création : rien n’est débité, une autre carte peut réessayer. */
+const REFUSE_PAR_WHOP = new Set(["failed", "blocked", "canceled", "price_too_low", "uncollectible"]);
+
+/** Le jeton du faux Whop (sa feuille de test, BLUSH_PAIEMENT_FACTICE) : le paiement qu’elle a choisi, payé ou refusé. */
+const JETON_FACTICE = /^ctok_faux_(payer|refuser)$/;
+
+/**
+ * Le paiement dans la feuille : le jeton de confirmation que les Elements de Whop ont donné au navigateur (la carte,
+ * Apple Pay ou Google Pay), payé au prix de l’achat (POST /payments). Rend le paiement créé, que le navigateur finit
+ * (« paid » : rien à faire ; sinon une étape, une 3-D Secure, par sa clé), ou « carte » : la banque a dit non, rien
+ * n’est débité. Le faux Whop lit son jeton de test : payé, son webhook payment.succeeded part après la réponse.
+ * La livraison reste au webhook, ou à la vérification du suivi (etatDeLAchat), jamais à ce que dit le navigateur.
+ */
+async function dansLaFeuille(f: Fournisseur, compte: Compte, achat: Achat, jeton: string, retour: string): Promise<PaiementCommence | "carte"> {
+  if (f.mode === "factice") {
+    if (JETON_FACTICE.exec(jeton)?.[1] !== "payer") return "carte";
+    const w = webhookDeLIssue(achat, "payer");
+    if (!w) return "carte";
+    after(() => recevoirWebhook(w.corps, new Headers(w.entetes)));
+    const { data } = JSON.parse(w.corps) as { data: { id: string } };
+    return { achat: achat.id, checkout: null, url: null, paiement: { id: data.id, statut: "paid", secret: null } };
+  }
+  try {
+    const p = await payerAvecJeton(f.whop, {
+      achat: achat.id,
+      centimes: achat.centimes,
+      titre: titreChezWhop(achat.offre, achat.bulles),
+      jeton,
+      email: compte.email,
+      retour,
+    });
+    if (p.sousStatut && REFUSE_PAR_WHOP.has(p.sousStatut)) return "carte";
+    return { achat: achat.id, checkout: null, url: null, paiement: { id: p.id, statut: p.statut, secret: p.secret } };
+  } catch (e) {
+    /* Whop dit 402 (le paiement refusé) : la carte ; tout autre refus est le nôtre (un champ, une clé), une panne à voir */
+    if (e instanceof ErreurWhop && e.statut === 402) return "carte";
+    throw e;
+  }
+}
+
+/**
+ * Pourquoi un paiement ne commence pas : pas de prestataire (« bientot »), rien à payer (« deja » : l’équipe, un rapport
+ * déjà ouvert), le refus de la commande, ou la carte refusée dans la feuille (« carte » : l’achat est échoué, rien n’est
+ * débité).
+ */
+export type RefusDePaiement = "bientot" | "carte" | RefusDeCommande;
 
 /**
  * Commence le paiement d’une offre (la renonciation déjà vérifiée par la route : `renonciation`, sa version et
- * son heure, gardées avec l’achat) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
- * l’acheter), puis la page où le payer, ou le paiement en un geste (③).
- * Une page que Whop refuse de créer laisse l’achat « echoue » (rien n’a été payé), et l’erreur remonte (« panne »).
+ * son heure, gardées avec l’achat ; null pour le rapport d’avance, livré seulement à son usage) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
+ * l’acheter), puis, avec un `jeton` des Elements de Whop, le paiement dans la feuille ; sinon le paiement en un geste
+ * (les offres de « C’est débloqué »), ou la page de Whop où le payer.
+ * Refusé dans la feuille (« carte »), ou une page que Whop refuse de créer, l’achat passe « echoue » (rien n’a été
+ * payé) ; une panne remonte (« panne »). Un paiement parti malgré tout se livre quand même par son webhook (livrer, depuis « echoue »).
  */
-export async function commencerPaiement(compte: Compte, offre: OffreId, storyId: string | null, renonciation: Consentement): Promise<PaiementCommence | RefusDePaiement> {
+export async function commencerPaiement(
+  compte: Compte,
+  offre: OffreId,
+  storyId: string | null,
+  renonciation: Consentement | null,
+  { jeton = null }: { jeton?: string | null } = {},
+): Promise<PaiementCommence | RefusDePaiement> {
   const f = fournisseur();
   if (!f) return "bientot";
   if (estEquipe(compte)) return "deja";
-  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation });
+  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation: renonciation ?? undefined });
   if (typeof achat === "string") return achat;
   const retour = adresseDuRetour(f, achat.id);
   try {
-    return (offre === "premium_ajout" && (await enUnGeste(f, compte, achat, retour))) || (await pageDePaiement(f, achat, retour));
+    if (jeton) {
+      const r = await dansLaFeuille(f, compte, achat, jeton, retour);
+      if (r === "carte") await marquerEchoue(achat.id);
+      return r;
+    }
+    return (EN_UN_GESTE.has(offre) && (await enUnGeste(f, compte, achat, retour))) || (await pageDePaiement(f, achat, retour));
   } catch (e) {
     await marquerEchoue(achat.id);
     throw e;
@@ -183,30 +249,57 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .from(schema.stories)
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s || s.debloqueLe) return rien;
-  } else if (offre === "premium_ajout") {
-    if (!achatId || !UUID.test(achatId)) return rien;
-    const [rapport] = await db()
-      .select({ id: a.id })
-      .from(a)
-      .where(
-        and(
-          eq(a.id, achatId),
-          eq(a.userId, compte.id),
-          eq(a.statut, "paye"),
-          inArray(a.offre, ["rapport", "suite"]),
-          gt(a.payeLe, sql`now() - make_interval(secs => ${DUREE_AJOUT_MS / 1000})`),
-        ),
-      );
-    if (!rapport) return rien;
+  } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {
+    /* ③ complète le rapport seul ; ⑤ suit tout rapport payé ; ⑥ garde le −50 % de ⑤, montrée et pas prise */
+    if (!(await justeApresUnRapport(compte.id, achatId, offre === "premium_ajout" ? RAPPORTS_SEULS : RAPPORTS_PAYES))) return rien;
+    if (offre === "garde_second" && !(await offreValable(compte.id, "second_rapport"))) return rien;
   } else {
     /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) ; commander suit la même règle */
     if (await rechargeDejaPayee(compte.id)) return rien;
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;
-  const enUnGesteGarde = offre === "premium_ajout" && !!(await moyenGarde(compte.id, f.mode));
+  const enUnGesteGarde = (offre === "premium_ajout" || offre === "second_rapport") && !!(await moyenGarde(compte.id, f.mode));
   const fin = montree.expireLe;
   return { offre, fin: fin?.toISOString() ?? null, reste: fin ? Math.max(0, fin.getTime() - Date.now()) : null, enUnGeste: enUnGesteGarde };
+}
+
+/** L’achat `achatId` de ce compte est-il un de ces rapports, payé il y a moins de 15 minutes (DUREE_AJOUT_MS) : « C’est débloqué », juste après le paiement ? */
+async function justeApresUnRapport(userId: string, achatId: string | null, offres: readonly OffreId[]): Promise<boolean> {
+  if (!achatId || !UUID.test(achatId)) return false;
+  const [rapport] = await db()
+    .select({ id: a.id })
+    .from(a)
+    .where(
+      and(eq(a.id, achatId), eq(a.userId, userId), eq(a.statut, "paye"), inArray(a.offre, [...offres]), gt(a.payeLe, sql`now() - make_interval(secs => ${DUREE_AJOUT_MS / 1000})`)),
+    );
+  return !!rapport;
+}
+
+/**
+ * Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille (les Elements de
+ * Whop, sur son compte, en ligne ou dans son bac à sable ; la feuille de test du faux Whop ; ou rien : « bientôt »), et
+ * ce que le compte a d’avance pour une conv pas encore débloquée (avoirsDuCompte).
+ */
+export async function feuilleDuPaiement(compte: Compte): Promise<FeuilleDuPaiement> {
+  const f = fournisseur();
+  const paiement: FeuilleDuPaiement["paiement"] = !f
+    ? { mode: null }
+    : f.mode === "factice"
+      ? { mode: "factice" }
+      : { mode: "whop", compte: f.compte, bacASable: f.whop.bacASable };
+  return { paiement, ...(await avoirsDuCompte(compte)) };
+}
+
+/**
+ * Ce que ce compte a d’avance pour sa prochaine conv : un rapport d’avance (⑤ payé, à utiliser dans l’année), et le −50 %
+ * gardé (⑥, 7 jours ; seulement avec un prestataire : il se paie), chacun avec sa fin (une date ISO), ou null. L’équipe,
+ * qui ne paie rien, n’en a jamais.
+ */
+async function avoirsDuCompte(compte: Compte): Promise<Avoirs> {
+  if (estEquipe(compte)) return { avance: null, garde: null };
+  const [avance, garde] = await Promise.all([avanceDuCompte(compte.id), fournisseur() ? offreValable(compte.id, "garde_second") : null]);
+  return { avance: avance && { fin: avance.fin.toISOString() }, garde: garde?.expireLe ? { fin: garde.expireLe.toISOString() } : null };
 }
 
 /** Ce que le faux Whop fait d’un achat de ce compte : le webhook à poster, et l’adresse du retour (null pour un remboursement). */
@@ -246,6 +339,6 @@ export async function achatPaye(compte: Compte, achatId: string): Promise<Pick<A
     .select({ bulles: sql<number>`coalesce(sum(${a.bulles}), 0)::int` })
     .from(a)
     .where(and(eq(a.userId, compte.id), eq(a.offre, "premium_ajout"), eq(a.statut, "paye"), gt(a.creeLe, achat.creeLe)));
-  const bulles = achat.bulles + (achat.offre === "rapport" || achat.offre === "suite" ? (ajout?.bulles ?? 0) : 0);
+  const bulles = achat.bulles + ((RAPPORTS_SEULS as readonly OffreId[]).includes(achat.offre) ? (ajout?.bulles ?? 0) : 0);
   return { id: achat.id, offre: achat.offre, bulles, storyId: achat.storyId };
 }

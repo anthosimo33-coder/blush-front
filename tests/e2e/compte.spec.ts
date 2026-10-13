@@ -4,6 +4,7 @@ import {
   compteDe,
   connecterParApi,
   debloquerLaConv,
+  dernierAchat,
   donnerDesBulles,
   emailLibre,
   expect,
@@ -16,6 +17,7 @@ import {
   ouvrir,
   PAIEMENT,
   partagerParApi,
+  payerParCarte,
   rembourser,
   RESEAU,
   test,
@@ -98,11 +100,11 @@ test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqu�
     await feuilleSurOrdinateur(page, recharge);
     await recharge.getByRole("radio", { name: /^30 bulles/ }).click();
     await recharge.getByRole("button", { name: "Payer · 4,90\u00a0€" }).click();
-    await page.waitForURL(/\/paiement\/factice\?achat=/, { timeout: RESEAU });
-    achat = new URL(page.url()).searchParams.get("achat") ?? "";
-    await page.getByRole("button", { name: "Payer", exact: true }).click();
-    await page.waitForURL((u) => u.pathname === "/compte", { timeout: 2 * RESEAU });
-    await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible();
+    await payerParCarte(page);
+    /* Payé dans la feuille, sans quitter Mon compte : le solde se relit une fois l’achat livré */
+    await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible({ timeout: 2 * RESEAU });
+    await expect(page).toHaveURL(/\/compte$/);
+    achat = await dernierAchat(email);
     const achats = main.getByRole("region", { name: "Tes achats" });
     await expect(achats.getByText("30 bulles", { exact: true })).toBeVisible();
     await expect(achats.getByText(/^\d{1,2} \S+ \d{4} · \+30 bulles$/)).toBeVisible();

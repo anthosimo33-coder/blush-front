@@ -5,7 +5,7 @@
  * écrans passent par ici, pour qu’un changement de conv ou un paiement n’oublie aucune donnée.
  */
 import type { useRouter } from "next/navigation";
-import { getAccount, getAchats, getReport, openConv } from "@/services/api";
+import { getAccount, getAchats, getReport, lireFeuilleDuPaiement, openConv } from "@/services/api";
 import type { Account, AchatDuCompte, ReportPayload } from "@/types/api";
 import { invalidate, useQuery, type Cle, type OptionsLecture } from "./query";
 
@@ -20,6 +20,13 @@ export const useCompte = (initial?: Account, options?: OptionsLecture) => useQue
 
 /** « Tes achats » (Mon compte), à partir de ceux que la page serveur a rendus (`initial`) ; un paiement les fait relire. */
 export const useAchats = (initial?: AchatDuCompte[], options?: OptionsLecture) => useQuery("achats", getAchats, initial, options);
+
+/**
+ * Ce que la feuille du paiement doit savoir (comment payer dans la feuille, les avoirs du compte), lu une fois la page
+ * posée, pour que la feuille s’ouvre prête. Sans session (un aperçu de l’équipe), la lecture échoue, et la feuille fait
+ * comme avant (la page de Whop).
+ */
+export const useFeuilleDuPaiement = (options?: OptionsLecture) => useQuery("feuille", lireFeuilleDuPaiement, undefined, options);
 
 /** Le rapport de la conv ouverte, à partir de celui que la page serveur a rendu (`initial`, voir useQuery). */
 export const useRapport = (initial: ReportPayload, options?: OptionsLecture) => useQuery("report", getReport, initial, options);
@@ -36,5 +43,5 @@ export function changerDeConv(storyId: string, router: Pick<ReturnType<typeof us
   router.refresh();
 }
 
-/** Après un paiement : le rapport (ses chapitres ouverts), le compte (ses bulles) et ses achats se relisent. */
-export const apresDeblocage = () => invalidate("report", "account", "achats");
+/** Après un paiement : le rapport (ses chapitres ouverts), le compte (ses bulles), ses achats et ses avoirs se relisent. */
+export const apresDeblocage = () => invalidate("report", "account", "achats", "feuille");

@@ -184,7 +184,13 @@ export function texteDeLaFuite(f: Fuite): { titre: string; texte: string } {
 /* ———— Ce qui se vend ———— */
 
 /** La couleur de chaque groupe d’offres (la palette validée pour les daltoniens). L’orange est sous 3:1 : sa valeur s’écrit toujours à côté. */
-export const COULEURS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "#e8358a", rapport: "var(--toi)", suite: "#e08600", bulles: "#0fa877" };
+export const COULEURS_DES_GROUPES: Record<GroupeDOffres, string> = {
+  premium: "#e8358a",
+  rapport: "var(--toi)",
+  suite: "#e08600",
+  second: "var(--color-flou-ink)",
+  bulles: "#0fa877",
+};
 
 /* ———— En direct ———— */
 

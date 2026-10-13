@@ -93,10 +93,32 @@ export type VerdictMontre = { emoji: string; title: string };
 
 /**
  * Un paiement commencé (POST /api/paiement) : son achat, sa configuration de paiement chez Whop (ch_…), et la page où
- * payer (celle de Whop, ou du faux Whop), ou null : payé en un geste (l’offre ③), l’achat se suit par
- * GET /api/paiement/[achat] jusqu’à sa livraison.
+ * payer (celle de Whop, ou du faux Whop), ou null : payé en un geste, ou dans la feuille. Dans la feuille (un jeton des
+ * Elements de Whop), `paiement` : le paiement créé chez Whop (pay_…), son statut (« paid » : payé ; le reste : une étape
+ * attend l’acheteur, ou la banque décide encore), et la clé qui laisse le navigateur finir l’étape (une 3-D Secure), ou
+ * null. Dans tous les cas, l’achat se suit par GET /api/paiement/[achat] jusqu’à sa livraison.
  */
-export type PaiementCommence = { achat: string; checkout: string | null; url: string | null };
+export type PaiementCommence = {
+  achat: string;
+  checkout: string | null;
+  url: string | null;
+  paiement: { id: string; statut: string; secret: string | null } | null;
+};
+
+/**
+ * Comment payer dans la feuille : les Elements de Whop (son compte, biz_…, en ligne ou dans son bac à sable), la feuille
+ * de test du faux Whop (BLUSH_PAIEMENT_FACTICE, jamais en ligne), ou rien (le paiement pas branché : « bientôt »).
+ */
+type PaiementDansLaFeuille = { mode: "whop"; compte: string; bacASable: boolean } | { mode: "factice" } | { mode: null };
+
+/**
+ * Ce que le compte a d’avance pour une conv pas encore débloquée : un rapport d’avance (le 2e rapport à −50 %, payé sur
+ * « C’est débloqué », valable un an) et le −50 % gardé (7 jours), chacun avec sa fin (une date ISO), ou null.
+ */
+export type Avoirs = { avance: { fin: string } | null; garde: { fin: string } | null };
+
+/** Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille, et les avoirs du compte. */
+export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille } & Avoirs;
 
 /**
  * Un achat du compte, pour « Tes achats » (GET /api/achats) : son offre, son prix TTC (en centimes), les bulles qu’il a
@@ -243,6 +265,8 @@ type Reponses = {
   "DELETE /api/histoire": Ok;
   "POST /api/import": ConvImportee;
   "POST /api/paiement": PaiementCommence;
+  "GET /api/paiement/feuille": FeuilleDuPaiement;
+  "POST /api/paiement/avance": { achat: string };
   "GET /api/paiement/[achat]": EtatAchat;
   "POST /api/paiement/offre": OffreUniqueMontree;
   "POST /api/paiement/factice": WebhookDuFauxWhop;
@@ -343,14 +367,25 @@ export const ROUTES = {
    * L’offre à payer, la conv dont elle débloque le rapport (sans : celle de la page), et la renonciation au délai
    * de rétractation (le geste de payer la donne) : la version de son texte (CASE_RENONCIATION.version), gardée avec l’achat. Sans elle, ou
    * une version qui n’est plus la bonne (dont l’ancien `true` d’un onglet ouvert avant la version) : 422 « renonciation »,
-   * rien ne part
+   * rien ne part. `jeton` : le jeton de confirmation des Elements de Whop (ctok_…), le paiement dans la feuille
    */
   "POST /api/paiement": {
-    corps: z.object({ offre: z.enum(OFFRES), conv: z.string().uuid().optional(), renonciation: z.union([z.string().max(40), z.boolean()]).optional() }),
+    corps: z.object({
+      offre: z.enum(OFFRES),
+      conv: z.string().uuid().optional(),
+      renonciation: z.union([z.string().max(40), z.boolean()]).optional(),
+      jeton: z
+        .string()
+        .regex(/^ctok_[A-Za-z0-9_-]{1,200}$/)
+        .optional(),
+    }),
   },
-  /* `?paiement=pay_…` : le paiement que Whop a donné au retour, vérifié chez lui si le webhook tarde */
+  "GET /api/paiement/feuille": {},
+  /* Le rapport d’avance utilisé pour la conv du corps (sans : celle de la page), et la renonciation que ce geste donne, comme un paiement */
+  "POST /api/paiement/avance": { corps: z.object({ conv: z.string().uuid().optional(), renonciation: z.union([z.string().max(40), z.boolean()]).optional() }) },
+  /* `?paiement=pay_…` : le paiement que Whop a donné (au retour, ou dans la feuille), vérifié chez lui si le webhook tarde */
   "GET /api/paiement/[achat]": {},
-  /* `achat` : pour ③, l’achat du rapport (ou de la suite) qui vient d’être payé (« C’est débloqué ») */
+  /* `achat` : pour ③, ⑤ et ⑥, l’achat du rapport qui vient d’être payé (« C’est débloqué ») */
   "POST /api/paiement/offre": { corps: z.object({ offre: z.enum(OFFRES_PROPOSEES), achat: z.string().uuid().optional() }) },
   "POST /api/paiement/factice": { corps: z.object({ achat: z.string().uuid(), issue: z.enum(ISSUES_DU_FAUX_WHOP) }) },
   /* Le corps brut, tel quel : sa signature porte sur ses octets (src/server/paiement/signature.ts) */

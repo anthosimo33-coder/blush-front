@@ -30,19 +30,24 @@ export function margeApresIA(centimes: number, dollars: number): number | null {
   return ((ht - dollars * EUROS_PAR_DOLLAR) / ht) * 100;
 }
 
-/** Les offres réunies par ce qu’elles vendent, pour « Ce qui se vend » : les deux formules, la suite (①), et les bulles. */
-export const GROUPES_D_OFFRES = ["premium", "rapport", "suite", "bulles"] as const;
+/**
+ * Les offres réunies par ce qu’elles vendent, pour « Ce qui se vend » : les deux formules (le rapport seul compte aussi
+ * son −50 % gardé), la suite (①), le 2e rapport (⑤, un rapport d’avance), et les bulles.
+ */
+export const GROUPES_D_OFFRES = ["premium", "rapport", "suite", "second", "bulles"] as const;
 export type GroupeDOffres = (typeof GROUPES_D_OFFRES)[number];
 export const GROUPE_DE_L_OFFRE: Record<OffreId, GroupeDOffres> = {
   premium: "premium",
   rapport: "rapport",
   suite: "suite",
+  rapport_garde: "rapport",
+  second: "second",
   premium_ajout: "bulles",
   pack30: "bulles",
   pack80: "bulles",
   pack200: "bulles",
 };
-export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Ta suite", bulles: "Bulles" };
+export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Ta suite", second: "2e rapport", bulles: "Bulles" };
 
 /** Le nom d’une source de visiteurs ; null : un acheteur venu avant que les visites se comptent. */
 export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {

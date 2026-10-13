@@ -24,7 +24,12 @@ import { ErreurApi } from "@/types/erreurs-api";
 const page = vi.hoisted(() => ({ compte: null as unknown as Account }));
 vi.mock("@/lib/requetes", async () => {
   const { useQuery } = await import("@/lib/query");
-  return { useCompte: () => useQuery("account", async () => page.compte, page.compte, { fetch: false }), apresDeblocage: vi.fn() };
+  return {
+    useCompte: () => useQuery("account", async () => page.compte, page.compte, { fetch: false }),
+    /* Sans paiement dans la feuille : la recharge paie sur la page de Whop, comme avant (tests/client/paiement-integre.test.tsx pour la feuille) */
+    useFeuilleDuPaiement: () => ({ data: undefined }),
+    apresDeblocage: vi.fn(),
+  };
 });
 vi.mock("@/lib/sound", () => ({ play: vi.fn() }));
 vi.mock("@/components/shell/Reveil", () => ({ reveiller: vi.fn() }));

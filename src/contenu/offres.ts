@@ -30,13 +30,20 @@ export const CATALOGUE: Record<OffreId, Offre> = {
   premium: { id: "premium", centimes: 1490, barre: 1980, bulles: 90, conv: true, unique: null, titre: "Premium" },
   /* ① : la suite moins chère, 5 minutes après avoir fermé la feuille sans payer */
   suite: { id: "suite", centimes: 690, barre: 990, bulles: 10, conv: true, unique: "suite", titre: "Ta suite" },
+  /* ⑥ : le rapport à −50 %, gardé 7 jours par le repli de « C’est débloqué » (le 2e rapport refusé), pour une autre conv */
+  rapport_garde: { id: "rapport_garde", centimes: 495, barre: 990, bulles: 10, conv: true, unique: "garde_second", titre: "Le rapport à −50\u00a0%" },
   /* ③ : Premium pour 5 € de plus, juste après avoir pris le rapport seul (ou la suite) */
   premium_ajout: { id: "premium_ajout", centimes: 500, barre: 990, bulles: 80, conv: false, unique: "premium_ajout", titre: "80 bulles en plus" },
+  /* ⑤ : le 2e rapport à −50 %, juste après un rapport payé : un rapport d’avance, sans conv ni bulles à l’achat (RAPPORT_D_AVANCE) */
+  second: { id: "second", centimes: 495, barre: 990, bulles: 0, conv: false, unique: "second_rapport", titre: "Ton 2e rapport" },
   pack30: { id: "pack30", centimes: 490, barre: null, bulles: 30, conv: false, unique: null, titre: "30 bulles" },
   /* Le pack conseillé : 70 + 10 offertes, et +40 à la première recharge (④) */
   pack80: { id: "pack80", centimes: 990, barre: null, bulles: 80, conv: false, unique: null, titre: "80 bulles" },
   pack200: { id: "pack200", centimes: 1990, barre: null, bulles: 200, conv: false, unique: null, titre: "200 bulles" },
 };
+
+/** Le rapport seul, à son prix ou moins cher (la suite ①, le −50 % gardé ⑥) : ce que ③, Premium pour 5 € de plus, complète. */
+export const RAPPORTS_SEULS = ["rapport", "suite", "rapport_garde"] as const satisfies readonly OffreId[];
 
 /** Le bonus de la première recharge (offre unique ④), sur le pack conseillé seulement. */
 export const PREMIERE_RECHARGE = { offre: "pack80", bonus: 40 } as const satisfies { offre: OffreId; bonus: number };
@@ -45,10 +52,34 @@ export const PREMIERE_RECHARGE = { offre: "pack80", bonus: 40 } as const satisfi
 export const DUREE_SUITE_MS = 5 * 60 * 1000;
 
 /**
- * L’offre unique ③ (Premium pour 5 € de plus) ne vaut que juste après le paiement : le serveur ne la montre que dans ce
- * temps après le paiement d’un rapport ou d’une suite (sur « C’est débloqué »), et, montrée, elle expire ce temps après.
+ * Les offres uniques de « C’est débloqué » (③ Premium pour 5 € de plus, ⑤ le 2e rapport à −50 %) ne valent que juste
+ * après le paiement : le serveur ne les montre que dans ce temps après le paiement d’un rapport, et, montrées, elles
+ * expirent ce temps après.
  */
 export const DUREE_AJOUT_MS = 15 * 60 * 1000;
+
+/** Combien de temps le repli de « C’est débloqué » (⑥) garde le −50 % pour une autre conv : 7 jours, l’heure de fin venue du serveur. */
+export const DUREE_GARDE_MS = 7 * 24 * 3600 * 1000;
+
+/**
+ * Le rapport d’avance (l’offre ⑤, « second ») : payé sur « C’est débloqué », il débloque plus tard le rapport de la conv
+ * de son choix, pas encore débloquée, sans rien payer (utiliserAvance, src/server/achats.ts), dans l’année qui suit son
+ * paiement (`dureeMs`), et donne alors les bulles du rapport (`bulles`). Rien n’est livré à l’achat : le délai de
+ * rétractation court tant qu’il n’est pas utilisé, et c’est en l’utilisant qu’on y renonce.
+ * TODO(produit): à relire par un juriste (un avoir valable un an, remboursable tant qu’il n’est pas utilisé).
+ */
+export const RAPPORT_D_AVANCE = { offre: "second", dureeMs: 365 * 24 * 3600 * 1000, bulles: CATALOGUE.rapport.bulles } as const satisfies {
+  offre: OffreId;
+  dureeMs: number;
+  bulles: number;
+};
+
+/**
+ * Cette offre est-elle livrée dès le paiement (un rapport qui s’ouvre, des bulles qui arrivent) ? Alors le geste de
+ * payer donne la renonciation au délai de rétractation. Seul le rapport d’avance attend son usage : à son achat, aucune
+ * renonciation (elle se donne en l’utilisant).
+ */
+export const livreeAuPaiement = (offre: OffreId) => offre !== RAPPORT_D_AVANCE.offre;
 
 /** Entre deux offres uniques montrées au même compte, au moins ce temps (24 h glissantes) : jamais deux le même jour. */
 export const ECART_OFFRES_UNIQUES_MS = 24 * 3600 * 1000;
@@ -67,25 +98,28 @@ export const BULLES_DE_LA_BETA = 100;
 export const bullesDe = (offre: OffreId, { premiereRecharge = false }: { premiereRecharge?: boolean } = {}) =>
   CATALOGUE[offre].bulles + (premiereRecharge && offre === PREMIERE_RECHARGE.offre ? PREMIERE_RECHARGE.bonus : 0);
 
-/** « 9,90 € » : des centimes en euros, la virgule française, l’espace insécable avant €. */
 /**
- * Le nom de l’achat sur la page de paiement de Whop (le « title » de son prix) : l’offre, et les bulles figées dans l’achat
- * à la commande (la première recharge compte son bonus). Le produit, lui, s’appelle BLUSH chez Whop.
+ * Le nom de l’achat chez Whop (le « title » de son prix : sur sa page de paiement, dans son reçu) : l’offre, et les
+ * bulles figées dans l’achat à la commande (la première recharge compte son bonus). Le produit, lui, s’appelle BLUSH chez Whop.
  */
 export function titreChezWhop(offre: OffreId, bulles: number): string {
   switch (offre) {
     case "rapport":
     case "suite":
+    case "rapport_garde":
       return `Le rapport complet + ${bulles} bulles`;
     case "premium":
       return `Premium\u00a0: le rapport + ${bulles} bulles`;
     case "premium_ajout":
       return `${bulles} bulles en plus`;
+    case "second":
+      return "Ton 2e rapport, à utiliser dans l’année";
     default:
       return `${bulles} bulles`;
   }
 }
 
+/** « 9,90 € » : des centimes en euros, la virgule française, l’espace insécable avant €. */
 export const enEuros = (centimes: number) => `${Math.floor(centimes / 100)},${String(centimes % 100).padStart(2, "0")}\u00a0€`;
 
 /** Le prix d’une offre, à afficher : « 9,90 € ». */

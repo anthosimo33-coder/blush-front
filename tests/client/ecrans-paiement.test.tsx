@@ -8,7 +8,8 @@ import { PiedGratuit } from "@/components/paiement/PiedGratuit";
 import { CEST_QUOI, FEUILLE_BULLE } from "@/contenu/bulles";
 import { CASE_IMPORT, CASE_RENONCIATION, texteRenonciation, type AchatImmediat } from "@/contenu/consentements";
 import { DUREE_SUITE_MS, prixDe } from "@/contenu/offres";
-import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_PREMIUM_AJOUT, OFFRE_SUITE, PIED_GRATUIT, RETOUR_PAIEMENT } from "@/contenu/paiement";
+import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_GARDE, OFFRE_PREMIUM_AJOUT, OFFRE_SECOND, OFFRE_SUITE, PIED_GRATUIT, RETOUR_PAIEMENT } from "@/contenu/paiement";
+import { jourEnLettres } from "@/lib/format";
 import { commencerPaiement, etatDuPaiement, proposerOffreUnique } from "@/services/api";
 import { ErreurApi } from "@/types/erreurs-api";
 import type { EtatAchat } from "@/types/api";
@@ -18,8 +19,10 @@ import type { EtatAchat } from "@/types/api";
  * choisie d’avance, les flèches, le paiement au premier toucher et la ligne de la renonciation sous le bouton, « C’est
  * quoi une bulle ? », l’offre ① en la fermant), l’offre ① et
  * son compte à rebours (l’heure de fin du serveur), le bas de l’aperçu gratuit, la page du retour (l’attente, l’échec,
- * l’annulation, les bulles reçues) et « C’est débloqué » avec l’offre ③. Le serveur est simulé (services/api), le routeur
- * aussi ; les feuilles s’ouvrent sans animation (le DOM simulé n’en a pas : moins de mouvement).
+ * l’annulation, les bulles reçues) et « C’est débloqué » avec ses offres (③, le 2e rapport, le −50 % gardé). Le serveur
+ * est simulé (services/api), le routeur aussi ; les feuilles s’ouvrent sans animation (le DOM simulé n’en a pas : moins
+ * de mouvement). Sans paiement dans la feuille (le mode null de GET /api/paiement/feuille) : la page de Whop, comme
+ * avant ; le paiement dans la feuille a ses tests (tests/client/paiement-integre.test.tsx).
  */
 
 const routeur = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn() };
@@ -30,6 +33,8 @@ vi.mock("@/services/api", async (vrai) => ({
   commencerPaiement: vi.fn(),
   proposerOffreUnique: vi.fn(),
   etatDuPaiement: vi.fn(),
+  lireFeuilleDuPaiement: vi.fn(async () => ({ paiement: { mode: null }, avance: null, garde: null })),
+  getAccount: vi.fn(async () => ({ email: "toi@example.com", bulles: 10, client: true, equipe: false, storyDeleted: false })),
 }));
 
 const commencer = vi.mocked(commencerPaiement);
@@ -42,7 +47,7 @@ beforeEach(() => {
     (requete: string) => ({ matches: requete.includes("reduced-motion"), media: requete, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
   );
   Element.prototype.getAnimations = () => [];
-  commencer.mockResolvedValue({ achat: "a1", checkout: "ch_1", url: "/paiement/factice?achat=a1" });
+  commencer.mockResolvedValue({ achat: "a1", checkout: "ch_1", url: "/paiement/factice?achat=a1", paiement: null });
   proposer.mockResolvedValue({ offre: null });
   sessionStorage.clear();
 });
@@ -362,10 +367,19 @@ describe("la page du retour", () => {
 });
 
 describe("« C’est débloqué »", () => {
-  const debloque = (offre: "rapport" | "premium") => render(<EcranDebloque achat="a1" offre={offre} bulles={10} next={null} restants={7} total={8} reprise={2} />);
+  const debloque = (offre: "rapport" | "premium" | "second") => render(<EcranDebloque achat="a1" offre={offre} bulles={10} next={null} restants={7} total={8} reprise={2} />);
+  /** Le serveur montre ces offres de la page, et aucune autre. */
+  const montre = (...offres: ("premium_ajout" | "second_rapport")[]) =>
+    proposer.mockImplementation(async (o) => (offres.includes(o as "premium_ajout") ? { offre: o, fin: null, reste: null, enUnGeste: true } : { offre: null }));
+  /** L’achat payé en un geste, livré à la première relecture. */
+  const livre = (offre: EtatAchat["offre"], bulles: number) => {
+    commencer.mockResolvedValueOnce({ achat: "a2", checkout: null, url: null, paiement: null });
+    etat.mockResolvedValueOnce({ achat: "a2", offre, statut: "paye", bulles, conv: null });
+  };
 
-  it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : « Ta carte est enregistrée » en un geste, payée au premier toucher", async () => {
-    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+  it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : « Ta carte est enregistrée », payée en un geste sans quitter la page", async () => {
+    montre("premium_ajout");
+    livre("premium_ajout", 80);
     debloque("rapport");
     /* Tant que le serveur n’a pas répondu, ni la liste ni l’offre : rien ne se remplace sous les yeux */
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();
@@ -380,12 +394,33 @@ describe("« C’est débloqué »", () => {
     fireEvent.click(prendre);
     await promesses();
     expect(commencer).toHaveBeenCalledWith("premium_ajout", true);
-    fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.non }));
-    expect(routeur.push).toHaveBeenCalledWith("/rapport#chapitre-2", { scroll: true });
+    /* Livrée : ses bulles comptées ici, la liste, et la page ne s’est pas quittée */
+    expect(etat).toHaveBeenCalledWith("a2", null);
+    expect(screen.getByText(tel(DEBLOQUE.phrase(8, 90)))).toBeTruthy();
+    expect(screen.getByText(DEBLOQUE.bulles(90))).toBeTruthy();
+    expect(routeur.push).not.toHaveBeenCalled();
+    expect(routeur.replace).not.toHaveBeenCalled();
+  });
+
+  it("③ refusée : son repli, le 2e rapport à −50 % sur son billet ; refusé à son tour, la liste (après le rapport seul, pas de −50 % gardé)", async () => {
+    montre("premium_ajout", "second_rapport");
+    debloque("rapport");
+    await promesses();
+    fireEvent.click(within(screen.getByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre })).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.non }));
+    await promesses();
+    expect(proposer).toHaveBeenLastCalledWith("second_rapport", "a1");
+    const second = screen.getByRole("region", { name: `${OFFRE_SECOND.avant}${OFFRE_SECOND.remise}` });
+    for (const texte of [OFFRE_SECOND.billet.titre, OFFRE_SECOND.billet.prix, OFFRE_SECOND.billet.barre, OFFRE_SECOND.pied])
+      expect(within(second).getByText(tel(texte))).toBeTruthy();
+    fireEvent.click(within(second).getByRole("button", { name: OFFRE_SECOND.non }));
+    await promesses();
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.getByText(DEBLOQUE.restants(7))).toBeTruthy();
+    expect(screen.getByRole("link", { name: DEBLOQUE.lire }).getAttribute("href")).toBe("/rapport#chapitre-2");
   });
 
   it("l’offre ③ que le serveur ne vend plus (prise dans un autre onglet, 422 « offre ») : elle s’efface, la liste revient, sans « souci »", async () => {
-    proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
+    montre("premium_ajout");
     commencer.mockRejectedValueOnce(new ErreurApi("offre", 422));
     debloque("rapport");
     await promesses();
@@ -403,10 +438,53 @@ describe("« C’est débloqué »", () => {
     debloque("rapport");
     await promesses();
     expect(screen.queryByText(tel(OFFRE_PREMIUM_AJOUT.carte))).toBeNull();
+    expect(screen.getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre })).toBeTruthy();
   });
 
-  it("après Premium : pas d’offre demandée, la liste (les chapitres, les bulles) et « Lire la suite »", async () => {
+  it("après Premium : le 2e rapport à −50 %, payé en un geste ; le tampon « À toi », puis la liste dit le rapport d’avance", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    montre("second_rapport");
+    livre("second", 0);
     debloque("premium");
+    await promesses();
+    expect(proposer).toHaveBeenCalledWith("second_rapport", "a1");
+    const second = screen.getByRole("region", { name: `${OFFRE_SECOND.avant}${OFFRE_SECOND.remise}` });
+    const prendre = within(second).getByRole("button", { name: OFFRE_SECOND.prendre });
+    /* Livré seulement à son usage : aucune renonciation à son achat, ni dite, ni envoyée ; le délai de 14 jours, lui, est dit */
+    expect(within(second).queryByRole("link", { name: CASE_RENONCIATION.lien })).toBeNull();
+    expect(within(second).getByText(tel(OFFRE_SECOND.pied))).toBeTruthy();
+    fireEvent.click(prendre);
+    await promesses();
+    expect(commencer).toHaveBeenCalledWith("second", false);
+    expect(within(second).getByText(OFFRE_SECOND.billet.tampon)).toBeTruthy();
+    await act(async () => void vi.advanceTimersByTime(1_600));
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.getByText(DEBLOQUE.avance)).toBeTruthy();
+    /* Le 2e rapport ne donne pas de bulles tout de suite : celles du rapport, à son usage */
+    expect(screen.getByText(DEBLOQUE.bulles(10))).toBeTruthy();
+  });
+
+  it("après Premium, le 2e rapport refusé : le −50 % gardé 7 jours, sans rien payer ; « Garde-le-moi » le fait garder au serveur, et la liste le dit", async () => {
+    montre("second_rapport");
+    debloque("premium");
+    await promesses();
+    fireEvent.click(within(screen.getByRole("region", { name: `${OFFRE_SECOND.avant}${OFFRE_SECOND.remise}` })).getByRole("button", { name: OFFRE_SECOND.non }));
+    await promesses();
+    /* Le repli se montre sans appeler le serveur : il ne garde rien tant qu’on ne le demande pas */
+    expect(proposer).toHaveBeenCalledTimes(1);
+    const garde = screen.getByRole("region", { name: OFFRE_GARDE.titre });
+    const fin = new Date(Date.now() + 7 * 864e5).toISOString();
+    proposer.mockResolvedValueOnce({ offre: "garde_second", fin, reste: null, enUnGeste: false });
+    fireEvent.click(within(garde).getByRole("button", { name: OFFRE_GARDE.garder }));
+    await promesses();
+    expect(proposer).toHaveBeenLastCalledWith("garde_second", "a1");
+    expect(screen.getByText(tel(OFFRE_GARDE.garde(jourEnLettres(fin))))).toBeTruthy();
+    expect(screen.getByText(tel(DEBLOQUE.garde))).toBeTruthy();
+    expect(commencer).not.toHaveBeenCalled();
+  });
+
+  it("après un rapport d’avance utilisé : aucune offre demandée, la liste (les chapitres, ses bulles) et « Lire la suite »", async () => {
+    debloque("second");
     await promesses();
     expect(proposer).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { level: 1, name: DEBLOQUE.titre })).toBeTruthy();

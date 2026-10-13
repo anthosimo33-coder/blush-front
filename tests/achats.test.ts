@@ -182,9 +182,10 @@ describe("commander", () => {
     expect(suite).toMatchObject({ centimes: 690, bulles: 10, offreUnique: "suite" });
     expect(await commander(u, "premium_ajout", { fournisseur: "factice" })).toBe("offre");
     await livrer(suite.id);
-    /* Montrée juste après le paiement : mais la suite l’a été il y a moins de 24 h. Le lendemain, elle passe */
-    expect(await montrer(u, "premium_ajout")).toBeNull();
-    await reculer(u.id, "suite", 25 * 3600e3);
+    /*
+     * Montrée juste après le paiement, alors que la suite l’a été il y a moins de 24 h : les offres de « C’est débloqué »
+     * suivent la suite qu’on vient de payer (décidé le 13 octobre ; avant, ③ attendait le lendemain)
+     */
     expect(await montrer(u, "premium_ajout")).not.toBeNull();
     expect(await commande(u, "premium_ajout", { fournisseur: "factice" })).toMatchObject({ centimes: 500, bulles: 80, offreUnique: "premium_ajout", storyId: null });
   });

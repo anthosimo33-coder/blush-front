@@ -56,6 +56,8 @@ describe("les textes du paiement, tirés du catalogue", () => {
   it("le bas de l’aperçu gratuit", () => {
     expect(PIED_GRATUIT).toEqual({
       lire: "Lire la suite · 9,90\u00a0€",
+      lireGarde: "Lire la suite · 4,95\u00a0€",
+      lireAvance: "Lire la suite · 0\u00a0€",
       offertes: "10 bulles offertes avec ton rapport",
       regle: "1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux",
     });

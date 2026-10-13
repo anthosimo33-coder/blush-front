@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { DUREE_SUITE_MS } from "@/contenu/offres";
+import { CATALOGUE, DUREE_SUITE_MS } from "@/contenu/offres";
 import { FEUILLE_FORMULE, OFFRE_SUITE } from "@/contenu/paiement";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Perle } from "@/components/bulles/perles";
 import { Pastille } from "@/components/bulles/pieces";
-import { MentionRenonciation } from "@/components/juridique/cases";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
-import { usePaiement } from "./usePaiement";
+import { PayerDansLaFeuille } from "./integre/PayerDansLaFeuille";
 
 /** Le temps qu’il reste, en minutes et secondes (« 04:59 »). */
 export function restant(ms: number) {
@@ -55,21 +53,22 @@ export function OffreAvantDePartir({
   /* Fermée par « Non merci », le voile ou Échap ; passée (le compte à rebours à zéro, ou le serveur qui ne la vend plus) */
   const [fermee, setFermee] = useState(false);
   const [vendue, setVendue] = useState(true);
+  /* Payée : la feuille ne se ferme plus, et le compte à rebours ne la fait plus passer, le temps de la livraison */
+  const [paye, setPaye] = useState(false);
   const reste = vendue ? Math.max(0, fin - maintenant) : 0;
-  const ouverte = !fermee && reste > 0;
+  const ouverte = paye || (!fermee && reste > 0);
   /* Passée sous nos yeux : l’écran le dit, une fois */
   const dite = useRef(false);
-  const paiement = usePaiement({ suite, quand: { offre: () => setVendue(false) } });
 
   useEffect(() => {
     const t = setInterval(() => setMaintenant(Date.now()), PAS_MS);
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    if (fermee || reste > 0 || dite.current) return;
+    if (paye || fermee || reste > 0 || dite.current) return;
     dite.current = true;
     onPassee();
-  }, [fermee, reste, onPassee]);
+  }, [paye, fermee, reste, onPassee]);
 
   const refuser = () => {
     setFermee(true);
@@ -77,7 +76,7 @@ export function OffreAvantDePartir({
   };
 
   return (
-    <Sheet open={ouverte} onClose={refuser} onClosed={onClosed} labelledBy={titre} belowHeader={false}>
+    <Sheet open={ouverte} onClose={paye ? () => {} : refuser} onClosed={onClosed} labelledBy={titre} belowHeader={false}>
       <div className="flex flex-col items-center gap-2 pt-1 text-center">
         <div className="relative">
           <BubbleLogo size={76} />
@@ -143,16 +142,24 @@ export function OffreAvantDePartir({
           </Pastille>
         </li>
       </ul>
-      {paiement.refus && <Alert className="text-center leading-[1.45]">{OFFRE_SUITE.souci}</Alert>}
       <div className="flex flex-col gap-1">
-        <Button arrow loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer("suite")}>
-          {OFFRE_SUITE.prendre}
-        </Button>
-        {/* La renonciation au délai de rétractation, que le geste de payer donne : juste sous le bouton */}
-        <MentionRenonciation quoi="rapport" etat={paiement.renonciation} className="mt-1.5" />
-        <Button variant="link" onClick={refuser}>
-          {OFFRE_SUITE.non}
-        </Button>
+        <PayerDansLaFeuille
+          offre="suite"
+          centimes={CATALOGUE.suite.centimes}
+          titre={CATALOGUE.suite.titre}
+          libelle={OFFRE_SUITE.prendre}
+          quoi="rapport"
+          suite={suite}
+          /* Plus vendue (prise dans un autre onglet, ou passée côté serveur) : elle s’efface, comme à la fin du compte à rebours */
+          quand={{ offre: () => setVendue(false) }}
+          surPaye={setPaye}
+          fleche
+        />
+        {!paye && (
+          <Button variant="link" onClick={refuser}>
+            {OFFRE_SUITE.non}
+          </Button>
+        )}
       </div>
     </Sheet>
   );
