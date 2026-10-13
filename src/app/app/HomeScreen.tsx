@@ -96,7 +96,10 @@ export function HomeScreen(p: {
   storyId?: string;
   /** Back-end : l’heure du rendu serveur de la page (heureDuRendu). L’historique qu’elle vient de rendre n’est pas relu à l’ouverture. */
   rendu?: number;
-  /** Le rapport de cette conv pas encore débloqué : le chat vient avec lui (sa mémoire), le paiement s’ouvre par-dessus. */
+  /**
+   * Le rapport de cette conv pas encore débloqué : le chat vient avec lui (sa mémoire), le paiement s’ouvre par-dessus.
+   * Fermé sans payer, il mène à son rapport, ou à « Tes convs » s’il y en a d’autres (il couvre le retour vers elles).
+   */
   ferme?: boolean;
   /**
    * Revenu d’une recharge payée (`/app?recharge=<bulles>`, l’adresse que la recharge a donnée au paiement) : les bulles
@@ -276,6 +279,8 @@ export function HomeScreen(p: {
       <MotionContext value={moving}>
         <AppScreen
           ferme={p.ferme}
+          /* D’autres convs : le paiement fermé mène à leur liste (il couvre le retour vers elles), pas au rapport de celle-ci */
+          quitter={others.length > 0 ? "/app/convs" : undefined}
           autre={contact.fiche.person.name}
           aside={null}
           mainWidth={WINDOW_W}

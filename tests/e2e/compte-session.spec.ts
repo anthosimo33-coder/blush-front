@@ -68,7 +68,9 @@ test("sans session, Mon compte et les pages d’une conv mènent à la connexion
   });
 });
 
-test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrouver ma conv », qui mènent à son accueil", async ({ page }, testInfo) => {
+test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrouver ma conv », qui mènent à son accueil, et « Analyser une autre conv »", async ({
+  page,
+}, testInfo) => {
   /* Un invité (de l’équipe) : l’accueil s’ouvre sans le paiement */
   const email = await nouvelInvite(testInfo);
   await connecterParApi(page, testInfo, email);
@@ -84,12 +86,12 @@ test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrou
   await lireUneConvParApi(page, testInfo);
   await attendreTaches(email);
 
-  await test.step("avec sa conv : « Ouvrir BLUSH », « Retrouver ma conv », sa conv qui attend sans le prénom de l’autre, et Mon compte en bas", async () => {
+  await test.step("avec sa conv : « Ouvrir BLUSH », « Retrouver ma conv », de quoi en analyser une autre, sans le prénom de l’autre, et Mon compte en bas", async () => {
     await page.goto("/");
     await expect(entete.getByRole("link", { name: "Ouvrir BLUSH" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Retrouver ma conv" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Analyser une autre conv" }).first()).toHaveAttribute("href", "/commencer");
     /* Qui tient l’appareil lit la landing sans rien toucher : elle ne dit pas avec qui */
-    await expect(page.getByText("Ta conv t’attend").first()).toBeVisible();
     await expect(page.getByText(/Ta conv avec/)).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Pied de page" }).getByRole("link", { name: "Mon compte" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Se connecter" })).toHaveCount(0);

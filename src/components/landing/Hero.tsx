@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { delai } from "@/lib/motion";
-import { ctaDe, type Retour } from "./cta";
-import { Container, CtaButton } from "./parts";
+import type { Retour } from "./cta";
+import { Container, CtaButton, SousLeBouton } from "./parts";
 
 /* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
 
@@ -11,7 +11,6 @@ const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[110
 
 /** `children` : ce qui suit dans le héros (les convs qui défilent). `retour` : qui revient (cta.ts). */
 export function Hero({ retour, children }: { retour: Retour; children?: ReactNode }) {
-  const cta = ctaDe(retour);
   return (
     <section className={cn("relative isolate pt-14 lg:pt-24", children ? "pb-10 lg:pb-14" : "pb-12 lg:pb-16")}>
       <span aria-hidden="true" className={GLOW} />
@@ -28,7 +27,7 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
           Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
         </p>
         <CtaButton retour={retour} className="mt-8 lg:mt-10" />
-        <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>
+        <SousLeBouton retour={retour} />
       </Container>
       {children}
     </section>
