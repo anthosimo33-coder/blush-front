@@ -7,8 +7,25 @@
  */
 import { z } from "zod";
 import { INVITATIONS_PAR_LOT, PRENOM_MAX } from "@/lib/limites";
-import { EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
-import type { AnalysisProgress, BlushAnswer, Echec, Fiche, FicheUpdate, OffreId, OffreProposee, Report, SoberReport, Source, StatutAchat, Story, VocalRapport } from "@/types";
+import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
+import type {
+  AnalysisProgress,
+  BlushAnswer,
+  Echec,
+  EtapeVisite,
+  Fiche,
+  FicheUpdate,
+  GenreFil,
+  OffreId,
+  OffreProposee,
+  Report,
+  SoberReport,
+  Source,
+  SourceVisite,
+  StatutAchat,
+  Story,
+  VocalRapport,
+} from "@/types";
 import type { CodeErreur } from "./erreurs-api";
 
 /* ———— Ce qui passe sur le réseau ———— */
@@ -112,6 +129,40 @@ export type GesteDeLEquipe =
   | { action: "debloquer"; convs: number | null }
   | { action: "inviter"; invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
 
+/** Un geste du fil d’/admin en direct : une ville (null : inconnue), quand, et ce qui va avec (la source d’une arrivée, l’offre d’un paiement ou d’un achat). */
+export type GesteDuFil =
+  | { genre: Extract<GenreFil, "arrivee">; ville: string | null; le: string; source: SourceVisite }
+  | { genre: Extract<GenreFil, "paiement" | "achat">; ville: string | null; le: string; offre: OffreId }
+  | { genre: Extract<GenreFil, "import" | "partage">; ville: string | null; le: string };
+
+/**
+ * /admin en direct, à cet instant (GET /api/admin/direct, src/server/direct.ts) : qui est sur le site, où il en est, d’où
+ * il arrive, de quelle ville, et le fil des derniers gestes. Des nombres, des villes et des écrans : ni compte, ni conv.
+ */
+export type Direct = {
+  /** L’heure du calcul (ISO). */
+  le: string;
+  /** Les personnes en ligne : les onglets qui ont fait signe dans la dernière minute et quart. */
+  enLigne: number;
+  /** Où elles en sont, par écran (toutes les étapes, même à 0, dans l’ordre d’ETAPES_VISITE). */
+  etapes: { etape: EtapeVisite; n: number }[];
+  /** D’où elles arrivent (les sources présentes seulement, de la plus nombreuse à la moins nombreuse). */
+  sources: { source: SourceVisite; n: number }[];
+  /**
+   * D’où elles se connectent : la ville, son pays (code ISO à deux lettres) et ses coordonnées (celles que donne
+   * l’hébergeur pour la connexion, à la ville près), de la plus nombreuse à la moins nombreuse. `ville` null : inconnue.
+   */
+  villes: { ville: string | null; pays: string | null; lat: number | null; lon: number | null; n: number }[];
+  /** Les personnes en ligne minute par minute, sur les 30 dernières (la dernière est en cours). */
+  minutes: { le: string; n: number }[];
+  /** Le plus de monde en ligne en même temps aujourd’hui (jour de Paris), et la minute, ou null. */
+  record: { n: number; le: string } | null;
+  /** Les derniers gestes, du plus récent au plus ancien (30 au plus, des dernières 24 h). */
+  fil: GesteDuFil[];
+  /** Aujourd’hui (jour de Paris) : les visiteurs, les achats payés et leur montant TTC en centimes. */
+  jour: { visiteurs: number; achats: number; centimes: number };
+};
+
 /** Ce qu’un passage des relances a fait (GET /api/cron/relances) : des nombres seulement, jamais un email ni un identifiant. */
 export type PassageDesRelances = { dues: number; envoyees: number; ecartees: number; retenues: number; echecs: number };
 
@@ -157,6 +208,7 @@ export type CibleImage = z.input<typeof Cible>;
  */
 type Reponses = {
   "POST /api/admin": GesteDeLEquipe;
+  "GET /api/admin/direct": Direct;
   "GET /api/analyse": AnalysisProgress;
   "POST /api/analyse": Ok;
   "POST /api/attente": Ok;
@@ -205,6 +257,7 @@ type Reponses = {
   "GET /api/rapport": ReportPayload;
   "POST /api/rapport": ReportPayload;
   /** `{ ok: false }` en 503 : la base ne répond pas. */
+  "POST /api/presence": Ok;
   "GET /api/reveil": { ok: boolean };
   /** L’audio du vocal du rapport (MP3). */
   "GET /api/vocal/audio": Blob;
@@ -233,6 +286,7 @@ export const ROUTES = {
       z.object({ action: z.literal("inviter"), n: z.number().int().min(1).max(INVITATIONS_PAR_LOT) }),
     ]),
   },
+  "GET /api/admin/direct": {},
   "GET /api/analyse": {},
   /* « Qui es-tu ? » rempli (depuis /qui, ou le code reçu par email), ou rien : une relance, depuis l’écran de lecture */
   "POST /api/analyse": { corps: z.union([Qui, z.strictObject({})]) },
@@ -305,6 +359,19 @@ export const ROUTES = {
   "POST /api/partage/image": { corps: Cible },
   "GET /api/rapport": {},
   "POST /api/rapport": {},
+  /*
+   * Le signe d’un onglet ouvert (src/lib/presence.ts) : son identifiant (tiré au hasard à l’ouverture de la page, jamais
+   * gardé), l’écran, et à son premier signe d’où il vient (utm_source, le site d’avant)
+   */
+  "POST /api/presence": {
+    corps: z.strictObject({
+      onglet: z.uuid(),
+      etape: z.enum(ETAPES_VISITE),
+      premier: z.boolean(),
+      utm: z.string().max(80).optional(),
+      referent: z.string().max(200).optional(),
+    }),
+  },
   "GET /api/reveil": {},
   "GET /api/vocal/audio": {},
   "GET /api/vocal/chat/[id]": {},

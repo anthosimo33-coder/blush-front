@@ -1,7 +1,8 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { CATALOGUE } from "@/contenu/offres";
-import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique } from "@/types";
+import type { GroupeDOffres } from "@/contenu/pilotage";
+import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
@@ -62,6 +63,69 @@ export type StatsAdmin = {
   offresUniques: { offre: OffreUnique; montrees: number; prises: number }[];
   /** Les derniers gestes de l’équipe (/admin, le terminal). */
   actions: ActionRecente[];
+  /** Le pilotage : l’argent, les visiteurs et le tunnel, sur la période (l’écran d’/admin). */
+  pilotage: Pilotage;
+};
+
+/**
+ * Une case des graphiques du pilotage : une heure (sur 24 h) ou un jour de Paris (7 ou 30 jours). Les cases vont de la
+ * plus ancienne à la plus récente ; la dernière est en cours.
+ */
+export type CaseDuPilotage = {
+  /** Son début (ISO). */
+  le: string;
+  /** Les visiteurs arrivés dans la case (une personne par jour : visites). */
+  visiteurs: number;
+  /** Les comptes qui ont payé un achat dans la case. */
+  acheteurs: number;
+  /** Les achats payés dans la case, TTC, en centimes (même remboursés depuis). */
+  centimes: number;
+  /** Ce qu’a coûté l’IA dans la case, en dollars. */
+  dollars: number;
+};
+
+/**
+ * Le pilotage, sur la période (`jours`, une fenêtre glissante comme les autres chiffres) et celle d’avant. L’argent est
+ * TTC, en centimes ; l’IA en dollars (couts). La marge en sort par margeApresIA (src/contenu/pilotage.ts).
+ */
+export type Pilotage = {
+  /** Les cases des graphiques : des heures (24 h) ou des jours de Paris. */
+  pas: "heure" | "jour";
+  cases: CaseDuPilotage[];
+  /** Le chiffre d’affaires net : payé − remboursé − contesté, sur la période (comme ventesDepuis). */
+  net: Chiffre;
+  payes: Montant;
+  rembourses: Montant;
+  contestes: Montant;
+  /** Les visiteurs : une personne par jour (une personne revenue deux jours compte deux fois). */
+  visiteurs: Chiffre;
+  /** Les comptes qui ont payé au moins un achat. */
+  acheteurs: Chiffre;
+  /** Le payé TTC, en centimes : le revenu par acheteur en sort. */
+  centimesPayes: Chiffre;
+  /** Ce qu’a coûté l’IA, en dollars, sur la période et celle d’avant (comme couts.total et couts.avant). */
+  dollars: Chiffre;
+  /**
+   * Le tunnel de la période : les visiteurs, les convs importées, celles qui ont leur verdict, les acheteurs, et ceux
+   * d’entre eux qui ont payé au moins deux achats (depuis toujours).
+   */
+  tunnel: { visiteurs: number; imports: number; verdicts: number; acheteurs: number; racheteurs: number };
+  /**
+   * Les sources : leurs visiteurs, et les acheteurs (et leur payé) d’après la source de leur compte (users.source).
+   * `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
+   */
+  sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
+  /** Le payé par groupe d’offres (GROUPES_D_OFFRES), dans l’ordre des groupes, même vides. */
+  mix: { groupe: GroupeDOffres; n: number; centimes: number }[];
+  /** La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars. */
+  iaDuJour: { dollars: number; budget: number };
+  /**
+   * Ce qui coince sur la période : les tâches en échec, celles bloquées en ce moment, les achats en attente de paiement
+   * depuis plus de 15 minutes, et les réponses de BLUSH sorties en alerte danger (leurs bulles rendues).
+   */
+  sante: { echecs: number; bloquees: number; paiementsEnAttente: number; alertes: number };
+  /** Le premier jour où les visites se comptent (AAAA-MM-JJ), ou null : aucune encore. */
+  suiviDepuis: string | null;
 };
 
 /* Les offres qui débloquent le rapport d’une conv : l’entonnoir des achats part des verdicts lus */
@@ -208,6 +272,31 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     achats: { commandes: n(achats.commandes), comptes: n(achats.comptes), payees: n(achats.payees), echouees: n(achats.echouees), enAttente: n(achats.en_attente) },
     offresUniques: OFFRES_UNIQUES.map((offre) => ({ offre, montrees: n(ou.get(offre)?.montrees), prises: n(ou.get(offre)?.prises) })),
     actions,
+    pilotage: await pilotageDe(jours),
+  };
+}
+
+/* À écrire : le pilotage de la période */
+async function pilotageDe(jours: Periode): Promise<Pilotage> {
+  const zero = { valeur: 0, avant: 0 };
+  const rien = { n: 0, centimes: 0 };
+  return {
+    pas: jours === 1 ? "heure" : "jour",
+    cases: [],
+    net: zero,
+    payes: rien,
+    rembourses: rien,
+    contestes: rien,
+    visiteurs: zero,
+    acheteurs: zero,
+    centimesPayes: zero,
+    dollars: zero,
+    tunnel: { visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 },
+    sources: [],
+    mix: [],
+    iaDuJour: { dollars: 0, budget: 30 },
+    sante: { echecs: 0, bloquees: 0, paiementsEnAttente: 0, alertes: 0 },
+    suiviDepuis: null,
   };
 }
 
