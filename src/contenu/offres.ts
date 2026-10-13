@@ -98,9 +98,13 @@ export const BULLES_DE_LA_BETA = 100;
 export const bullesDe = (offre: OffreId, { premiereRecharge = false }: { premiereRecharge?: boolean } = {}) =>
   CATALOGUE[offre].bulles + (premiereRecharge && offre === PREMIERE_RECHARGE.offre ? PREMIERE_RECHARGE.bonus : 0);
 
+/** La longueur la plus grande d’un nom de prix chez Whop : au-delà, il refuse de créer le prix (« Title is too long », le 13 octobre). */
+export const TITRE_MAX_CHEZ_WHOP = 30;
+
 /**
  * Le nom de l’achat chez Whop (le « title » de son prix : sur sa page de paiement, dans son reçu) : l’offre, et les
- * bulles figées dans l’achat à la commande (la première recharge compte son bonus). Le produit, lui, s’appelle BLUSH chez Whop.
+ * bulles figées dans l’achat à la commande (la première recharge compte son bonus), en TITRE_MAX_CHEZ_WHOP caractères
+ * au plus. Le produit, lui, s’appelle BLUSH chez Whop.
  */
 export function titreChezWhop(offre: OffreId, bulles: number): string {
   switch (offre) {
@@ -109,11 +113,11 @@ export function titreChezWhop(offre: OffreId, bulles: number): string {
     case "rapport_garde":
       return `Le rapport complet + ${bulles} bulles`;
     case "premium":
-      return `Premium\u00a0: le rapport + ${bulles} bulles`;
+      return `Premium\u00a0: rapport + ${bulles} bulles`;
     case "premium_ajout":
       return `${bulles} bulles en plus`;
     case "second":
-      return "Ton 2e rapport, à utiliser dans l’année";
+      return "Ton 2e rapport, valable 1 an";
     default:
       return `${bulles} bulles`;
   }
