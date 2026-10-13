@@ -14,8 +14,8 @@ import { NBSP } from "@/lib/format";
  * la vérification anti-robots de Cloudflare, le mail de rappel d’un paiement pas terminé, tes achats. « Ton email » ne
  * dit plus « pas de pub, jamais partagé » (Whop le reçoit pour ton reçu, Resend pour les mails, et le rappel parle d’une offre) ; la promesse
  * courte « Ton email n’est jamais partagé » (src/contenu/confidentialite.ts) est à revoir avec lui.
- * TODO(produit): ligne ajoutée le 13 octobre 2026, à valider (juriste) : « Les visites, sans cookie » (la mesure
- * d’audience d’/admin, src/server/visites.ts).
+ * « Les visites, sans cookie » (la mesure d’audience d’/admin, src/server/visites.ts) : ligne ajoutée et validée le
+ * 13 octobre 2026.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
