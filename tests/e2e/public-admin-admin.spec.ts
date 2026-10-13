@@ -172,7 +172,8 @@ test("le direct de l’équipe : qui est là, où, d’où, et le fil ; il se re
       await expect(page.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
     }
     await expect(page.getByRole("img", { name: /^Personnes en ligne minute par minute|^Pas encore de minutes comptées$/ })).toBeAttached();
-    await expect(page.getByRole("img", { name: /^Carte des personnes en ligne\u00a0: / })).toBeAttached();
+    /* Le nom accessible a ses espaces normalisés (l’insécable devient une espace) */
+    await expect(page.getByRole("img", { name: /^Carte des personnes en ligne\s: / })).toBeAttached();
     await expect(page.getByRole("navigation", { name: "Rubriques" }).getByRole("link", { name: /^En direct/ })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: "Rubriques" }).getByRole("link", { name: "Outils" })).toHaveAttribute("href", "/admin#outils");
     await expect(page.getByRole("main")).not.toContainText(/NaN|Infinity|undefined/);
