@@ -45,7 +45,7 @@ En charge soutenue (N parcours à la fois pendant 90 s, sans montée qui étale)
 
 ## Avec le réseau jusqu’à la base (2 ms par aller-retour)
 
-Le même parcours, chaque webhook rejoué (`--latence 2 --rejeu`). Le pool de l’appli (5 connexions par processus au moment de ces mesures, 10 depuis le 13 octobre, `src/server/db/index.ts`) est jugé plein sur les connexions prises vues de l’appli.
+Le même parcours, chaque webhook rejoué (`--latence 2 --rejeu`). Le pool de l’appli (5 connexions par processus au moment de ces mesures, 20 depuis le 13 octobre, `src/server/db/index.ts`) est jugé plein sur les connexions prises vues de l’appli.
 
 | Parcours (sur 30 s) | Code   | Charge de la machine | Parcours p50 / p95 | Requêtes/s | Processeur (moy. / max) | Pool plein |
 | ------------------- | ------ | -------------------- | ------------------ | ---------- | ----------------------- | ---------- |
@@ -85,7 +85,7 @@ Avec 15 connexions, le pool ne lâche plus en premier : le plafond double (220 �
 
 ## Les réglages conseillés
 
-- **Le pool : 10 à 15 connexions par instance** (`max` dans `src/server/db/index.ts`) : mesuré ici, 15 double le débit d’un processus avec 2 ms de réseau, sans erreur. Chaque instance de Vercel ouvre jusqu’à ce nombre de connexions au pooler de Neon. Décidé le 13 octobre : 10, avec Neon payant (Launch, sans mise en veille).
+- **Le pool : 10 à 15 connexions par instance** (`max` dans `src/server/db/index.ts`) : mesuré ici, 15 double le débit d’un processus avec 2 ms de réseau, sans erreur. Chaque instance de Vercel ouvre jusqu’à ce nombre de connexions au pooler de Neon. Décidé le 13 octobre : 20, avec Neon payant (Launch, sans mise en veille) : Vercel multiplie les instances, le pooler de Neon en accepte des milliers.
 - **Garder Vercel en `fra1` et Neon à Francfort** (`vercel.json`, BACKEND.md) : chaque milliseconde de plus sur l’aller-retour se paie sur le débit du pool (il suit 1 ÷ l’aller-retour : passer de 2 à 3 ms en retire un tiers).
 - **Relever `BLUSH_MAILS_PAR_JOUR` avec un plan payant de Resend** avant d’inviter la liste d’attente par lots : c’est la première limite qu’un afflux atteindra.
 - **Espacer les relectures de l’écran** pendant que le rapport s’écrit (toutes les 2 à 3 s plutôt qu’une, avec un plafond) si la base de Neon chauffe : c’est la part de la charge qui grandit avec la durée des appels au modèle.

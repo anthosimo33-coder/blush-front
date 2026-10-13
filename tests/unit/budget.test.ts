@@ -8,19 +8,20 @@ import { codePublic } from "@/types/erreurs-api";
 const $ = (dollars: number) => Math.round(dollars * 1e6);
 
 describe("le budget de l’IA du jour", () => {
-  it("vaut 100 $ pour tous, 3 $ par compte, et une part sans compte prise dans les 100 $", () => {
-    expect(BUDGET_IA.jour).toBe(100);
-    expect(plafondDe("compte-1")).toBe($(3));
+  it("vaut 500 $ pour tous, 10 $ par compte, et une part sans compte prise dans les 500 $", () => {
+    expect(BUDGET_IA.jour).toBe(500);
+    expect(BUDGET_IA.compte).toBe(10);
+    expect(plafondDe("compte-1")).toBe($(BUDGET_IA.compte));
     expect(plafondDe(null)).toBe($(BUDGET_IA.anonyme));
     expect(BUDGET_IA.anonyme).toBeLessThan(BUDGET_IA.jour);
   });
 
   it("laisse partir un appel sous les deux budgets, l’arrête dès que l’un est atteint", () => {
-    expect(budgetEpuise({ jour: $(BUDGET_IA.jour - 0.01), payeur: $(2.99) }, "compte-1")).toBeNull();
-    expect(budgetEpuise({ jour: $(10), payeur: $(3) }, "compte-1")).toBe("compte");
+    expect(budgetEpuise({ jour: $(BUDGET_IA.jour - 0.01), payeur: $(BUDGET_IA.compte - 0.01) }, "compte-1")).toBeNull();
+    expect(budgetEpuise({ jour: $(10), payeur: $(BUDGET_IA.compte) }, "compte-1")).toBe("compte");
     expect(budgetEpuise({ jour: $(BUDGET_IA.jour), payeur: 0 }, "compte-1")).toBe("jour");
     /* Le budget de tous passe avant celui du compte : c’est lui que le journal dit */
-    expect(budgetEpuise({ jour: $(BUDGET_IA.jour + 1), payeur: $(4) }, "compte-1")).toBe("jour");
+    expect(budgetEpuise({ jour: $(BUDGET_IA.jour + 1), payeur: $(BUDGET_IA.compte + 1) }, "compte-1")).toBe("jour");
     expect(budgetEpuise({ jour: $(10), payeur: $(BUDGET_IA.anonyme) }, null)).toBe("anonyme");
     expect(budgetEpuise({ jour: $(10), payeur: $(BUDGET_IA.anonyme) - 1 }, null)).toBeNull();
   });

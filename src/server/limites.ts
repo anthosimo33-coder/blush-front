@@ -16,7 +16,7 @@ import { env } from "./env";
  */
 export const LIMITES = {
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
-  codeParIp: { max: 20, fenetreS: 3600 },
+  codeParIp: { max: 100, fenetreS: 3600 },
   /**
    * Les codes demandés pour un email (canonique : src/server/email-canonique.ts) depuis une même adresse IP, par jour. Égal
    * au plafond de l’email depuis la réserve des codes (plus bas) : il garde une adresse sous ce plafond si on le relève.
@@ -37,7 +37,7 @@ export const LIMITES = {
   codeReserveParEmailEtIp: { max: 1, fenetreS: 86400 },
   codeReserveParEmail: { max: 5, fenetreS: 86400 },
   /* Les mails de code, pour tous et par jour : plafondsDesMails, plus bas (ils suivent le quota du prestataire) */
-  verificationParIp: { max: 30, fenetreS: 3600 },
+  verificationParIp: { max: 150, fenetreS: 3600 },
   /*
    * Les essais de code ratés (S-07, S-08), par jour : un nouveau code ne remet aucun de ces comptes à zéro, un bon code
    * rend son essai à chacun. Ils se comptent à trois endroits : le navigateur qui tape (echecsCodeParNavigateur), son
@@ -65,45 +65,47 @@ export const LIMITES = {
    * au-delà, et c’est elle qui l’arrête. Une défense en profondeur (20 par jour avant).
    */
   echecsCodeParEmail: { max: 60, fenetreS: 86400 },
-  importParIp: { max: 20, fenetreS: 3600 },
+  importParIp: { max: 100, fenetreS: 3600 },
   /*
    * Le budget d’octets des imports (S-02), en Ko (le compte de rate_limits est un entier de 32 bits) : la taille du
    * fichier reçu, comptée avant de le lire (src/app/api/import, octetsDansLeBudget de src/server/requete.ts). Un brouillon
    * reste en base jusqu’à environ 48 h (la purge passe une fois par nuit, et efface ceux de plus d’un jour) : sans ce
-   * budget, des imports à la chaîne (20 par heure et par adresse, de 4,5 Mo chacun) rempliraient la base de Neon sans
+   * budget, des imports à la chaîne (100 par heure et par adresse, de 4,5 Mo chacun) rempliraient la base de Neon sans
    * rien payer. Par adresse IP (24 h), de quoi importer trois des plus gros exports par jour, des dizaines d’ordinaires ;
    * un fichier illisible y compte aussi. Pour tous, par jour de Paris (la clé porte le jour ; sa fenêtre ne fait que la
    * garder jusqu’au lendemain), seuls les imports devenus brouillons : dix adresses au moins pour le remplir. Prévenu à
    * `alerteA` (80 %), puis quand il refuse : tout le monde voit alors « trop_jour » à l’import, jusqu’à minuit.
-   * TODO(produit): 15 000 Ko par adresse et 150 000 Ko pour tous, par jour, à caler sur l’offre Neon : la base peut
-   * garder environ deux fois koBrouillonsParJour (deux nuits de brouillons).
+   * Relevés pour l’ouverture (13 octobre, Neon payant) : 75 000 Ko par adresse (le NAT d’un opérateur mobile met des
+   * centaines de personnes derrière une adresse) et 1 500 000 Ko pour tous, par jour ; la base garde environ deux fois
+   * koBrouillonsParJour (deux nuits de brouillons), payés au Go chez Neon.
    */
-  koImportParIp: { max: 15_000, fenetreS: 86400 },
-  koBrouillonsParJour: { max: 150_000, fenetreS: 2 * 86400, alerteA: 0.8 },
-  chatParCompte: { max: 150, fenetreS: 86400 },
+  koImportParIp: { max: 75_000, fenetreS: 86400 },
+  koBrouillonsParJour: { max: 1_500_000, fenetreS: 2 * 86400, alerteA: 0.8 },
+  /** Les réponses de BLUSH pour un compte, par jour : larges, ce sont les bulles qui comptent ce qu’on paie. */
+  chatParCompte: { max: 500, fenetreS: 86400 },
   /**
    * Les vocaux envoyés au chat (S-15), par jour : chacun est transcrit, à la durée. Un message du chat les compte aussi
    * (chatParCompte).
    */
-  vocalParCompte: { max: 40, fenetreS: 86400 },
+  vocalParCompte: { max: 100, fenetreS: 86400 },
   /**
    * Les secondes de son transcrites pour un compte, par jour : la durée mesurée, ou celle que le prestataire dit avoir
-   * facturée si elle est plus longue (src/server/ia/transcription.ts) : une demi-heure de vocaux.
+   * facturée si elle est plus longue (src/server/ia/transcription.ts) : une heure et demie de vocaux.
    */
-  secondesVocalParCompte: { max: 1800, fenetreS: 86400 },
+  secondesVocalParCompte: { max: 5400, fenetreS: 86400 },
   /**
    * Les caractères que la voix dit pour un compte (S-13), par jour : ses réponses du chat en vocal et le vocal de son
-   * rapport, environ 6 minutes de voix. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts).
+   * rapport, environ 20 minutes de voix. Au-delà, BLUSH répond par écrit (src/server/ia/voix.ts).
    */
-  voixParCompte: { max: 6000, fenetreS: 86400 },
+  voixParCompte: { max: 20_000, fenetreS: 86400 },
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
   /**
    * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
-   * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur ; à revoir avec les chiffres de
-   * l’ouverture.
+   * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur (relevé pour l’ouverture, le
+   * CAPTCHA arrête les robots).
    */
-  analyseParIp: { max: 20, fenetreS: 86400 },
+  analyseParIp: { max: 100, fenetreS: 86400 },
   /** Les moments d’écoute du vocal notés pour l’A/B test des voix. */
   ecouteParCompte: { max: 200, fenetreS: 86400 },
   /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
@@ -118,7 +120,7 @@ export const LIMITES = {
   /** Les alertes d’un même sujet (« rapport_chapitres en échec », « repli sur un autre modèle »), par jour ; à revoir à l’usage. */
   alertesParSujet: { max: 5, fenetreS: 86400 },
   /** Les inscriptions à la liste d’attente. */
-  attenteParIp: { max: 10, fenetreS: 3600 },
+  attenteParIp: { max: 50, fenetreS: 3600 },
   /** Les mails de la liste d’attente à un même email (l’inscription peut venir de n’importe qui : pas de rafale chez lui). */
   mailAttenteParEmail: { max: 3, fenetreS: 86400 },
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre), dessinées à la demande. */
@@ -128,15 +130,17 @@ export const LIMITES = {
    * jusqu’à seize pour un long enregistrement. Les plafonds des lots ont doublé avec eux : autant d’enregistrements
    * qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer plusieurs), pour à peu près autant d’images lues.
    */
-  lotParIp: { max: 120, fenetreS: 3600 },
+  lotParIp: { max: 600, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**
    * Bêta ouverte : les lectures de captures et de lots par des visiteurs sans compte, pour tous et par jour. Chacune fait
    * travailler le modèle payant avant l’email : changer d’adresse IP ne doit pas faire grimper la facture sans fin.
+   * Relevés pour l’ouverture (13 octobre) : le CAPTCHA arrête les robots, et la part sans compte du budget de l’IA
+   * (BUDGET_IA.anonyme) tient la facture.
    */
-  capturesAnonymesParJour: { max: 50, fenetreS: 86400 },
-  lotsAnonymesParJour: { max: 400, fenetreS: 86400 },
+  capturesAnonymesParJour: { max: 1000, fenetreS: 86400 },
+  lotsAnonymesParJour: { max: 8000, fenetreS: 86400 },
   /** Les mêmes lectures pour un compte connecté, par jour (un compte gratuit suffirait sinon à passer outre le plafond). */
   capturesParCompte: { max: 30, fenetreS: 86400 },
   lotsParCompte: { max: 300, fenetreS: 86400 },
@@ -153,7 +157,7 @@ export const LIMITES = {
    * Les jetons du CAPTCHA échangés contre un laissez-passer (/api/captcha), par adresse IP : un par import sans compte,
    * comptés à l’entrée (une rafale de faux jetons ne fait pas appeler Cloudflare sans fin).
    */
-  captchaParIp: { max: 60, fenetreS: 3600 },
+  captchaParIp: { max: 300, fenetreS: 3600 },
   /*
    * Ce qu’un laissez-passer du CAPTCHA permet (src/server/captcha.ts), pendant ses 20 minutes : un import, un envoi de
    * captures ou la fin d’un enregistrement (et un nouvel essai après une coupure du réseau), et les lots d’un
@@ -198,7 +202,7 @@ export function plafondsDesMails(parJour = env().BLUSH_MAILS_PAR_JOUR) {
      * Les mails de code, pour tous et par jour (S-09) : leur part du quota, les autres mails se comptant sur le reste :
      * les codes n’empêchent pas un rapport de partir, ni l’inverse. L’équipe est prévenue à `alerteA` du plafond (80 %),
      * puis quand il est atteint : tout le monde voit alors « trop de codes ». Sans la boîte des tests de bout en bout,
-     * dont les mails ne partent pas. Une seule adresse IP pourrait l’épuiser en trois heures (codeParIp, sur des emails
+     * dont les mails ne partent pas. Une seule adresse IP pourrait l’épuiser en moins d’une heure au défaut (codeParIp, sur des emails
      * jetables) : chaque demande passe d’abord par le CAPTCHA. 60 par jour au défaut, même avec une clé réservée aux codes
      * (RESEND_API_KEY_CODES). Le relever, c’est aussi relever ce qui se devine en un jour sur tous les emails (cinq
      * essais par code) : revoir alors echecsCodeParEmail, codeParEmail et la réserve des codes (tests/unit/limites.test.ts).
