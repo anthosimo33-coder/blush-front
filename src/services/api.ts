@@ -501,7 +501,7 @@ export function noterEcouteVocal(evenement: EvenementEcoute, position: number): 
 /**
  * Commence le paiement d’une offre (pour la conv de la page, quand elle en débloque le rapport) : l’achat, et la page où
  * le payer (`url`, celle de Whop ou du faux Whop), ou null : payé en un geste, il se suit par etatDuPaiement.
- * `renonciation` : la case « je renonce à mon droit de rétractation », cochée ; le serveur en reçoit la version (celle
+ * `renonciation` : la renonciation au délai de rétractation, que le geste de payer donne ; le serveur en reçoit la version (celle
  * du texte que l’onglet montre), et la garde avec l’achat. Sans elle, ou une version qui n’est plus la sienne (le texte
  * a changé depuis l’ouverture de la page) : 422 « renonciation ».
  */

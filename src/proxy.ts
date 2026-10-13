@@ -5,9 +5,11 @@ import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
 /*
  * La bêta fermée (BLUSH_BETA_FERMEE) se lit à l’exécution, comme sur le serveur (src/server/invitations.ts, entre) : un même
- * build sert la bêta ouverte ou fermée, et ce qu’en disent les pages ne peut pas dater du build. Les pages du parcours
- * d’arrivée restent statiques (servies et préchargées tout de suite) ; en bêta fermée, ce proxy sert à leur adresse leur
- * variante « fermee », statique elle aussi, sauf les captures, qui vérifient la connexion d’abord (rendue à la demande).
+ * build sert la bêta ouverte ou fermée, et ce qu’en disent les pages ne peut pas dater du build. En production, elle reste
+ * fermée tant que son ouverture n’a pas ce qu’elle exige, comme pour env() (betaFermee, src/server/drapeaux.ts). Les
+ * pages du parcours d’arrivée restent statiques (servies et préchargées tout de suite) ; en bêta fermée, ce proxy sert à
+ * leur adresse leur variante « fermee », statique elle aussi, sauf les captures, qui vérifient la connexion d’abord
+ * (rendue à la demande).
  * Hors bêta fermée, il laisse tout passer.
  */
 const VARIANTES: Record<string, string> = {

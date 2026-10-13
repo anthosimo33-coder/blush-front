@@ -1,36 +1,24 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { CaseImport, CaseRenonciation, useCase } from "@/components/juridique/cases";
-import { CASE_IMPORT, CASE_RENONCIATION, type AchatImmediat } from "@/contenu/consentements";
+import { MentionImport, MentionRenonciation, useAccord } from "@/components/juridique/cases";
+import { CASE_IMPORT, CASE_RENONCIATION, texteCaseImport, texteRenonciation, type AchatImmediat } from "@/contenu/consentements";
 
 /*
- * Les cases que la loi demande (src/components/juridique/cases.tsx) : jamais cochées d’avance, et le geste qui avance
- * (choisir le fichier, payer) ne part pas sans elles. La case de la renonciation est testée seule : la feuille du
- * paiement qui la posera (les écrans des bulles) n’est pas encore là.
+ * Les accords que la loi demande (src/components/juridique/cases.tsx), sans case à cocher : une ligne les dit près du
+ * bouton, et le geste du bouton les donne. Refusés par le serveur (une version périmée), plus rien ne part avant la page
+ * rechargée.
  */
 
-/** Une feuille du paiement réduite à sa case et à son bouton, comme la posera la feuille « Ta formule » ou la recharge. */
-function Paiement({ quoi, payer }: { quoi: AchatImmediat; payer: () => void }) {
-  const renonciation = useCase();
+/** Un écran réduit à la ligne de son accord et à son bouton ; « Refus du serveur » simule une version périmée. */
+function Ecran({ envoyer, quoi }: { envoyer: () => void; quoi?: AchatImmediat }) {
+  const accord = useAccord();
   return (
     <>
-      <CaseRenonciation etat={renonciation} quoi={quoi} />
-      <button type="button" onClick={() => renonciation.exiger() && payer()}>
-        Payer
-      </button>
-    </>
-  );
-}
-
-/** Un écran de l’import réduit à sa case et à son bouton ; `perimee` simule le refus du serveur (une version périmée). */
-function Import({ envoyer }: { envoyer: () => void }) {
-  const accord = useCase();
-  return (
-    <>
-      <CaseImport etat={accord} />
+      {!quoi && <MentionImport etat={accord} />}
       <button type="button" onClick={() => accord.exiger() && envoyer()}>
-        Choisir le fichier
+        Avancer
       </button>
+      {quoi && <MentionRenonciation etat={accord} quoi={quoi} />}
       <button type="button" onClick={accord.perimer}>
         Refus du serveur
       </button>
@@ -38,88 +26,63 @@ function Import({ envoyer }: { envoyer: () => void }) {
   );
 }
 
-describe("la case de la renonciation au droit de rétractation", () => {
-  it.each(["rapport", "bulles"] as const)("%s : son texte, décochée d’avance ; le bouton ne paie qu’une fois cochée", (quoi) => {
-    const payer = vi.fn();
-    render(<Paiement quoi={quoi} payer={payer} />);
-    const caseACocher = screen.getByRole("checkbox", { name: CASE_RENONCIATION.textes[quoi] });
-    expect((caseACocher as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByRole("alert")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Payer" }));
-    expect(payer).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(CASE_RENONCIATION.manquante);
-    expect(caseACocher.getAttribute("aria-invalid")).toBe("true");
-    expect(caseACocher.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
-    /* Le focus va à la case : le lecteur d’écran la lit, avec son message */
-    expect(document.activeElement).toBe(caseACocher);
-
-    fireEvent.click(caseACocher);
-    expect((caseACocher as HTMLInputElement).checked).toBe(true);
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(caseACocher.getAttribute("aria-invalid")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Payer" }));
-    expect(payer).toHaveBeenCalledTimes(1);
-
-    /* Décochée de nouveau : le bouton ne paie plus */
-    fireEvent.click(caseACocher);
-    fireEvent.click(screen.getByRole("button", { name: "Payer" }));
-    expect(payer).toHaveBeenCalledTimes(1);
-  });
-
-  it("tout son texte la coche (le libellé), pas seulement le carré", () => {
-    render(<Paiement quoi="rapport" payer={() => {}} />);
-    fireEvent.click(screen.getByText(CASE_RENONCIATION.textes.rapport));
-    expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
-  });
-});
-
-describe("la case de l’import", () => {
-  it("dit les 18 ans, les conditions (dans un autre onglet) et l’intime ; rien ne part sans elle", () => {
+describe("la ligne de l’accord de l’import", () => {
+  it("dit les conditions (dans un autre onglet) et toute la conv ; aucune case, le bouton avance au premier toucher", () => {
     const envoyer = vi.fn();
-    render(<Import envoyer={envoyer} />);
-    const caseACocher = screen.getByRole("checkbox", { name: /^J’ai 18 ans ou plus\. J’accepte les conditions\s?, et que BLUSH analyse cette conv/ });
-    expect((caseACocher as HTMLInputElement).checked).toBe(false);
+    render(<Ecran envoyer={envoyer} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText((_, el) => el?.tagName === "P" && el.textContent === texteCaseImport())).toBeTruthy();
     const lien = screen.getByRole("link", { name: CASE_IMPORT.lien });
     expect(lien.getAttribute("href")).toBe("/conditions");
     expect(lien.getAttribute("target")).toBe("_blank");
-
-    fireEvent.click(screen.getByRole("button", { name: "Choisir le fichier" }));
-    expect(envoyer).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(CASE_IMPORT.manquante);
-
-    fireEvent.click(caseACocher);
-    fireEvent.click(screen.getByRole("button", { name: "Choisir le fichier" }));
+    fireEvent.click(screen.getByRole("button", { name: "Avancer" }));
     expect(envoyer).toHaveBeenCalledTimes(1);
   });
+});
 
-  it("refusée par le serveur (une version périmée) : elle se décoche, et rien ne repart avant la page rechargée", () => {
+describe("la ligne de la renonciation au délai de rétractation", () => {
+  it.each(["rapport", "bulles"] as const)("%s : son texte sous le bouton, son lien vers les conditions ; aucune case, le bouton paie au premier toucher", (quoi) => {
+    const payer = vi.fn();
+    render(<Ecran envoyer={payer} quoi={quoi} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const bouton = screen.getByRole("button", { name: "Avancer" });
+    expect(bouton.nextElementSibling?.textContent).toBe(texteRenonciation(quoi));
+    const lien = screen.getByRole("link", { name: CASE_RENONCIATION.lien });
+    expect(lien.getAttribute("href")).toBe("/conditions#livraison");
+    fireEvent.click(bouton);
+    expect(payer).toHaveBeenCalledTimes(1);
+  });
+
+  it("dit le rapport ou les bulles, tout de suite, et le délai de rétractation auquel on renonce", () => {
+    expect(texteRenonciation("rapport")).toBe("En payant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.");
+    expect(texteRenonciation("bulles")).toBe("En payant, tu as tes bulles tout de suite et tu renonces au délai de rétractation.");
+  });
+});
+
+describe("un accord refusé par le serveur (une version périmée)", () => {
+  it.each([undefined, "rapport", "bulles"] as const)("%s : la ligne laisse place au message, rien ne repart, le focus va au rechargement, qui recharge la page", (quoi) => {
     const envoyer = vi.fn();
-    render(<Import envoyer={envoyer} />);
-    const caseACocher = screen.getByRole("checkbox") as HTMLInputElement;
-    fireEvent.click(caseACocher);
+    render(<Ecran envoyer={envoyer} quoi={quoi} />);
     fireEvent.click(screen.getByRole("button", { name: "Refus du serveur" }));
-    expect(caseACocher.checked).toBe(false);
     expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    expect(screen.queryByRole("link")).toBeNull();
     /*
-     * Recochée, elle ne laisse rien partir : l’onglet n’a que l’ancien texte et l’ancienne version (le code du navigateur
-     * date de l’ouverture de la page), que le serveur refuserait encore, sans fin
+     * Rien ne repart : l’onglet n’a que l’ancien texte et l’ancienne version (le code du navigateur date de l’ouverture
+     * de la page), que le serveur refuserait encore, sans fin
      */
-    fireEvent.click(caseACocher);
-    expect(caseACocher.checked).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Choisir le fichier" }));
+    fireEvent.click(screen.getByRole("button", { name: "Avancer" }));
     expect(envoyer).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
-    expect(document.activeElement).toBe(caseACocher);
+    const recharger = screen.getByRole("button", { name: CASE_IMPORT.recharger });
+    expect(document.activeElement).toBe(recharger);
     /* Le bouton du message recharge la page : le nouveau texte et sa version arrivent avec elle */
-    const recharger = vi.fn();
+    const recharge = vi.fn();
     const avant = window.location;
-    Object.defineProperty(window, "location", { configurable: true, value: { ...avant, reload: recharger } });
+    Object.defineProperty(window, "location", { configurable: true, value: { ...avant, reload: recharge } });
     try {
-      fireEvent.click(screen.getByRole("button", { name: CASE_IMPORT.recharger }));
+      fireEvent.click(recharger);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: avant });
     }
-    expect(recharger).toHaveBeenCalledTimes(1);
+    expect(recharge).toHaveBeenCalledTimes(1);
   });
 });

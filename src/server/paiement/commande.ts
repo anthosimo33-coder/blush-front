@@ -111,7 +111,7 @@ async function pageDePaiement(f: Fournisseur, achat: Achat, retour: string): Pro
 export type RefusDePaiement = "bientot" | RefusDeCommande;
 
 /**
- * Commence le paiement d’une offre (la case de renonciation déjà vérifiée par la route : `renonciation`, sa version et
+ * Commence le paiement d’une offre (la renonciation déjà vérifiée par la route : `renonciation`, sa version et
  * son heure, gardées avec l’achat) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
  * l’acheter), puis la page où le payer, ou le paiement en un geste (③).
  * Une page que Whop refuse de créer laisse l’achat « echoue » (rien n’a été payé), et l’erreur remonte (« panne »).

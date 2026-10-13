@@ -223,9 +223,9 @@ test("le rapport pas débloqué : le chat et sa fiche s’ouvrent sous le paieme
     await expect(page.getByRole("group", { name: "Questions toutes prêtes" })).toHaveCount(0);
   });
 
-  await test.step("« Débloquer » sans la case de renonciation cochée : rien ne part, rien n’est débloqué", async () => {
-    await paiement.getByRole("button", { name: "Débloquer" }).click();
-    await expect(paiement.getByRole("alert")).toHaveText("Coche la case pour payer.");
+  await test.step("« Débloquer », sans case : la renonciation dite juste sous lui ; rien n’est débloqué tant qu’on ne paie pas", async () => {
+    await expect(paiement.getByRole("checkbox")).toHaveCount(0);
+    await expect(paiement.getByText("En payant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.")).toBeVisible();
     expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 

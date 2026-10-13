@@ -50,8 +50,8 @@ export async function rechargeDejaPayee(userId: string): Promise<boolean> {
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
  * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable, et qu’aucune recharge n’a encore été payée. `renonciation` : la case de renonciation au droit de
- * rétractation cochée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
+ * montré et valable, et qu’aucune recharge n’a encore été payée. `renonciation` : la renonciation au délai de
+ * rétractation donnée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,

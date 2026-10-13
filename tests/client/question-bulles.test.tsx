@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuestionChat } from "@/app/rapport/question/QuestionChat";
 import { URGENCES } from "@/contenu/aide";
 import { FEUILLE_BULLE } from "@/contenu/bulles";
-import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { partirPayer } from "@/lib/paiement";
 import { askQuestion, proposerOffreUnique } from "@/services/api";
 import type { QuestionAnswer, Story } from "@/types";
@@ -101,9 +100,8 @@ async function envoyer(question: string) {
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Poser ma question" })));
 }
 
-/** La recharge ouverte : la case de renonciation cochée, puis « Payer » ; ce que le paiement a reçu. */
+/** La recharge ouverte : « Payer », au premier toucher (pas de case) ; ce que le paiement a reçu. */
 async function payerLaRecharge(feuille: HTMLElement) {
-  fireEvent.click(within(feuille).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles }));
   await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: /^Payer/ })));
   expect(payer).toHaveBeenCalledOnce();
   return payer.mock.calls[0]![1];

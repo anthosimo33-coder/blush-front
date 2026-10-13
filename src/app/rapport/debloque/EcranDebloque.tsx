@@ -12,7 +12,7 @@ import { useSoundOnce } from "@/lib/sound";
 import { proposerOffreUnique } from "@/services/api";
 import { CheckBurst } from "@/components/brand/objects3d";
 import { Grappe, Perle, Rangee } from "@/components/bulles/perles";
-import { CaseRenonciation } from "@/components/juridique/cases";
+import { MentionRenonciation } from "@/components/juridique/cases";
 import { usePaiement } from "@/components/paiement/usePaiement";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/feedback";
@@ -61,11 +61,12 @@ function OffrePremiumAjout({ bulles, enUnGeste, ici, lire, passee }: { bulles: n
           {OFFRE_PREMIUM_AJOUT.carte}
         </span>
       )}
-      <CaseRenonciation quoi="bulles" etat={paiement.renonciation} className="[@media(max-height:700px)]:[&_label]:text-micro" />
       {paiement.refus && <Alert className="text-center leading-[1.45]">{OFFRE_PREMIUM_AJOUT.souci}</Alert>}
       <Button loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer("premium_ajout")}>
         {OFFRE_PREMIUM_AJOUT.prendre}
       </Button>
+      {/* La renonciation au délai de rétractation, que le geste de payer donne : juste sous le bouton */}
+      <MentionRenonciation quoi="bulles" etat={paiement.renonciation} />
       <Button variant="link" onClick={lire}>
         {OFFRE_PREMIUM_AJOUT.non}
       </Button>
@@ -78,7 +79,8 @@ function OffrePremiumAjout({ bulles, enUnGeste, ici, lire, passee }: { bulles: n
  * d’ouvrir (les chapitres qui restent, les bulles reçues, dans l’anneau rose de leur perle), puis un seul bouton pour
  * reprendre. Après le rapport seul (ou la suite), si le serveur la montre, l’offre ③ prend la place de la liste : elle
  * est alors le bouton principal, et « Non merci, je lis la suite » continue la lecture. Sur un écran court (375 × 667),
- * l’offre se resserre (sa case, que le prototype n’avait pas, s’écrit plus petit) pour tenir sans défiler.
+ * l’offre se resserre (la ligne de la renonciation, comme la case qu’elle remplace, le prototype ne l’avait pas) pour
+ * tenir sans défiler.
  */
 export function EcranDebloque({
   achat,

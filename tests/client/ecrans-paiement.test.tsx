@@ -6,7 +6,7 @@ import { FeuilleFormule } from "@/components/paiement/FeuilleFormule";
 import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDePartir";
 import { PiedGratuit } from "@/components/paiement/PiedGratuit";
 import { CEST_QUOI, FEUILLE_BULLE } from "@/contenu/bulles";
-import { CASE_RENONCIATION } from "@/contenu/consentements";
+import { CASE_IMPORT, CASE_RENONCIATION, texteRenonciation, type AchatImmediat } from "@/contenu/consentements";
 import { DUREE_SUITE_MS, prixDe } from "@/contenu/offres";
 import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_PREMIUM_AJOUT, OFFRE_SUITE, PIED_GRATUIT, RETOUR_PAIEMENT } from "@/contenu/paiement";
 import { commencerPaiement, etatDuPaiement, proposerOffreUnique } from "@/services/api";
@@ -15,7 +15,8 @@ import type { EtatAchat } from "@/types/api";
 
 /*
  * Les écrans du paiement (le prototype validé des bulles), dans le DOM simulé : la feuille « Ta formule » (Premium
- * choisie d’avance, les flèches, la case obligatoire, « C’est quoi une bulle ? », l’offre ① en la fermant), l’offre ① et
+ * choisie d’avance, les flèches, le paiement au premier toucher et la ligne de la renonciation sous le bouton, « C’est
+ * quoi une bulle ? », l’offre ① en la fermant), l’offre ① et
  * son compte à rebours (l’heure de fin du serveur), le bas de l’aperçu gratuit, la page du retour (l’attente, l’échec,
  * l’annulation, les bulles reçues) et « C’est débloqué » avec l’offre ③. Le serveur est simulé (services/api), le routeur
  * aussi ; les feuilles s’ouvrent sans animation (le DOM simulé n’en a pas : moins de mouvement).
@@ -63,7 +64,20 @@ const promesses = () => act(async () => {});
 
 const feuille = () => screen.getByRole("dialog", { name: FEUILLE_FORMULE.titre("Maëlys") });
 const formule = (nom: RegExp) => within(feuille()).getByRole("radio", { name: nom });
-const case_ = () => within(feuille()).getByRole("checkbox", { name: CASE_RENONCIATION.textes.rapport });
+/**
+ * La ligne de la renonciation dans `ici`, juste sous le bouton qui paie (`bouton`) : son texte, son lien vers la section
+ * des conditions, et aucune case à cocher.
+ */
+function renonciationSous(ici: HTMLElement, bouton: HTMLElement, quoi: AchatImmediat) {
+  expect(within(ici).queryByRole("checkbox")).toBeNull();
+  const ligne = bouton.nextElementSibling;
+  expect(ligne?.textContent).toBe(texteRenonciation(quoi));
+  expect(
+    within(ligne as HTMLElement)
+      .getByRole("link", { name: CASE_RENONCIATION.lien })
+      .getAttribute("href"),
+  ).toBe(CASE_RENONCIATION.ancre);
+}
 
 describe("la feuille « Ta formule »", () => {
   it("Premium choisie d’avance, ouverte : ce qu’elle contient ligne à ligne, son badge, et le bouton à son prix ; le focus va sur la feuille", () => {
@@ -99,52 +113,47 @@ describe("la feuille « Ta formule »", () => {
     expect(within(feuille()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("rapport")) })).toBeTruthy();
   });
 
-  it("la case est obligatoire : sans elle, rien ne part, la case le dit et prend le focus ; cochée, la formule choisie part payer", async () => {
+  it("pas de case : la ligne de la renonciation sous le bouton, qui paie au premier toucher la formule choisie", async () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame"] });
     render(<FeuilleFormule open onClose={() => {}} autre="Maëlys" suite="/app" />);
     /* Le focus posé sur la feuille à l’ouverture, d’abord */
     act(() => void vi.advanceTimersToNextFrame());
     const payer = within(feuille()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("premium")) });
+    renonciationSous(feuille(), payer, "rapport");
     fireEvent.click(payer);
     await promesses();
-    expect(commencer).not.toHaveBeenCalled();
-    expect(within(feuille()).getByRole("alert").textContent).toBe(CASE_RENONCIATION.manquante);
-    expect(document.activeElement).toBe(case_());
-    fireEvent.click(case_());
     expect(within(feuille()).queryByRole("alert")).toBeNull();
-    fireEvent.click(payer);
-    await promesses();
+    /* Le geste de payer donne la renonciation : sa version part avec la commande (services/api) */
     expect(commencer).toHaveBeenCalledWith("premium", true);
     /* Le faux Whop est une page de l’appli : le routeur y va ; où reprendre ensuite est gardé dans l’onglet */
     expect(routeur.push).toHaveBeenCalledWith("/paiement/factice?achat=a1");
     expect(sessionStorage.getItem("blush.paiement.suite.a1")).toContain("/app");
   });
 
-  it("refusé par le serveur : la case périmée demande de recharger, « bientot » se dit, le rapport déjà ouvert ferme la feuille", async () => {
+  it("refusé par le serveur : la renonciation périmée demande de recharger, « bientot » se dit, le rapport déjà ouvert ferme la feuille", async () => {
     const onClose = vi.fn();
     render(<FeuilleFormule open onClose={onClose} autre="Maëlys" />);
-    fireEvent.click(case_());
     const payer = () => fireEvent.click(within(feuille()).getByRole("button", { name: /^Débloquer/ }));
 
     commencer.mockRejectedValueOnce(new ErreurApi("renonciation", 422));
     payer();
     await promesses();
-    expect(within(feuille()).getByRole("alert").textContent).toContain(CASE_RENONCIATION.perimee);
-    expect(within(feuille()).getByRole("button", { name: CASE_RENONCIATION.recharger })).toBeTruthy();
-    expect((case_() as HTMLInputElement).checked).toBe(false);
+    expect(within(feuille()).getByRole("alert").textContent).toContain(CASE_IMPORT.perimee);
+    const recharger = within(feuille()).getByRole("button", { name: CASE_IMPORT.recharger });
+    expect(within(feuille()).queryByText(texteRenonciation("rapport"))).toBeNull();
 
     commencer.mockClear();
     payer();
     await promesses();
-    /* Périmée, elle ne laisse plus rien partir avant le rechargement de la page */
+    /* Périmée, elle ne laisse plus rien partir avant le rechargement de la page : le focus va au rechargement */
     expect(commencer).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(recharger);
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it("sans paiement branché, la feuille dit « bientôt » ; le rapport déjà payé ailleurs la ferme, relu", async () => {
     const onClose = vi.fn();
     render(<FeuilleFormule open onClose={onClose} autre="Maëlys" />);
-    fireEvent.click(case_());
     commencer.mockRejectedValueOnce(new ErreurApi("bientot", 402));
     fireEvent.click(within(feuille()).getByRole("button", { name: /^Débloquer/ }));
     await promesses();
@@ -247,14 +256,10 @@ describe("l’offre ① et son compte à rebours", () => {
     expect(onRefus).not.toHaveBeenCalled();
   });
 
-  it("« Je la prends » demande la case ; cochée, la suite part payer. « Non merci » la refuse", async () => {
+  it("« Je la prends » paie la suite au premier toucher, la renonciation dite juste sous lui. « Non merci » la refuse", async () => {
     const { onRefus } = ouvrir(120_000, { suite: "/rapport" });
     const prendre = within(offre()).getByRole("button", { name: OFFRE_SUITE.prendre });
-    fireEvent.click(prendre);
-    await promesses();
-    expect(commencer).not.toHaveBeenCalled();
-    expect(within(offre()).getByRole("alert").textContent).toBe(CASE_RENONCIATION.manquante);
-    fireEvent.click(within(offre()).getByRole("checkbox", { name: CASE_RENONCIATION.textes.rapport }));
+    renonciationSous(offre(), prendre, "rapport");
     fireEvent.click(prendre);
     await promesses();
     expect(commencer).toHaveBeenCalledWith("suite", true);
@@ -265,7 +270,6 @@ describe("l’offre ① et son compte à rebours", () => {
   it("passée entre-temps côté serveur (« offre ») : elle se ferme, comme à zéro", async () => {
     const { onPassee } = ouvrir(120_000);
     commencer.mockRejectedValueOnce(new ErreurApi("offre", 422));
-    fireEvent.click(within(offre()).getByRole("checkbox"));
     fireEvent.click(within(offre()).getByRole("button", { name: OFFRE_SUITE.prendre }));
     await promesses();
     expect(screen.queryByRole("dialog", { name: OFFRE_SUITE.titre })).toBeNull();
@@ -360,7 +364,7 @@ describe("la page du retour", () => {
 describe("« C’est débloqué »", () => {
   const debloque = (offre: "rapport" | "premium") => render(<EcranDebloque achat="a1" offre={offre} bulles={10} next={null} restants={7} total={8} reprise={2} />);
 
-  it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : la case, « Ta carte est enregistrée » en un geste", async () => {
+  it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : « Ta carte est enregistrée » en un geste, payée au premier toucher", async () => {
     proposer.mockResolvedValue({ offre: "premium_ajout", fin: null, reste: null, enUnGeste: true });
     debloque("rapport");
     /* Tant que le serveur n’a pas répondu, ni la liste ni l’offre : rien ne se remplace sous les yeux */
@@ -371,11 +375,9 @@ describe("« C’est débloqué »", () => {
     const offre = screen.getByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre });
     expect(within(offre).getByText(tel(OFFRE_PREMIUM_AJOUT.carte))).toBeTruthy();
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();
-    fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre }));
-    await promesses();
-    expect(commencer).not.toHaveBeenCalled();
-    fireEvent.click(within(offre).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles }));
-    fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre }));
+    const prendre = within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre });
+    renonciationSous(offre, prendre, "bulles");
+    fireEvent.click(prendre);
     await promesses();
     expect(commencer).toHaveBeenCalledWith("premium_ajout", true);
     fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.non }));
@@ -388,7 +390,6 @@ describe("« C’est débloqué »", () => {
     debloque("rapport");
     await promesses();
     const offre = screen.getByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre });
-    fireEvent.click(within(offre).getByRole("checkbox", { name: CASE_RENONCIATION.textes.bulles }));
     fireEvent.click(within(offre).getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre }));
     await promesses();
     expect(screen.queryByRole("region", { name: OFFRE_PREMIUM_AJOUT.titre })).toBeNull();
