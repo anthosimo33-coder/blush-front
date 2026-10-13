@@ -69,7 +69,8 @@ test("le modèle refuse la conv : « BLUSH ne peut pas lire cette conv. », une 
   });
 
   await test.step("après trois relances dans la journée, l’écran dit de revenir demain", async () => {
-    await remplirLaLimite(email, "relance:verdict", 3);
+    /* LIMITES.relanceParCompte (src/server/limites.ts, server-only : pas importable ici) */
+    await remplirLaLimite(email, "relance:verdict", 20);
     await page.goto("/lecture");
     await expect(ecran.getByRole("alert")).toContainText(COINCE);
     await expect(ecran.getByRole("alert")).toContainText("Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain : ta conv t’attend.");

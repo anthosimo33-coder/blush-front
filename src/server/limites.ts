@@ -108,8 +108,12 @@ export const LIMITES = {
   analyseParIp: { max: 100, fenetreS: 86400 },
   /** Les moments d’écoute du vocal notés pour l’A/B test des voix. */
   ecouteParCompte: { max: 200, fenetreS: 86400 },
-  /** « Relancer l’écriture » d’un rapport en échec (un rapport coûte environ 1 $). */
-  relanceParCompte: { max: 3, fenetreS: 86400 },
+  /**
+   * « Relancer » une lecture ou l’écriture d’un rapport en échec, par jour (un rapport coûte environ 1 $). Large : un échec
+   * vient le plus souvent de notre côté (le prestataire d’IA en panne, son crédit épuisé, une clé changée), et la personne
+   * ne doit pas buter dessus ; le budget de l’IA par compte (BUDGET_IA.compte) tient la facture.
+   */
+  relanceParCompte: { max: 20, fenetreS: 86400 },
   /**
    * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
    * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant. Elles

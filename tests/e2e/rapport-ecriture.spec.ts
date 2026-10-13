@@ -118,7 +118,8 @@ test("l’écriture a échoué : BLUSH le dit, un refus ne se relance pas, une p
   });
 
   await test.step("déjà relancé trois fois aujourd’hui : la relance est refusée, et c’est dit", async () => {
-    await remplirLaLimite(email, "relance", 3);
+    /* LIMITES.relanceParCompte (src/server/limites.ts, server-only : pas importable ici) */
+    await remplirLaLimite(email, "relance", 20);
     expect((await reponseAuGeste(page, { chemin: "/api/rapport" }, () => relancer.click())).status()).toBe(429);
     await expect(page.getByText("Tu as déjà relancé plusieurs fois aujourd’hui. Réessaie demain.")).toBeVisible();
     expect((await tachesDe(email)).find((t) => t.genre === "rapport_plan")).toMatchObject({ statut: "echec" });
