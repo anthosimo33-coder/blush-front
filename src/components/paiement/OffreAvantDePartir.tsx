@@ -29,14 +29,15 @@ const PAS_MS = 250;
  * de fin à l’horloge du téléphone, tirée du temps qu’il lui reste à l’heure du serveur (POST /api/paiement/offre, `reste`) ;
  * une page rechargée retrouve donc le même, et une horloge fausse ne l’avance ni ne le retarde. Passée, elle
  * se ferme pour de bon (`onPassee` : l’écran le dit). Fermée par « Non merci », le voile ou Échap : `onRefus`.
- * `onClosed` : sa sortie finie. `chapitres` : ceux qu’elle ouvre ; `suite` : où reprendre après le paiement.
+ * `onClosed` : sa sortie finie. `chapitres` : ceux qu’elle ouvre ; `suite` : où reprendre après le paiement. Sur
+ * ordinateur, son voile couvre tout l’écran, en-tête compris (belowHeader faux). « attends… » est dans la police de
+ * l’appli (Nunito), comme dans le prototype, pas dans celle des messages.
  * TODO(produit): une réduction, ou un ajout (+20 bulles) ? (la question du prototype)
  */
 export function OffreAvantDePartir({
   fin,
   chapitres,
   suite,
-  belowHeader,
   onRefus,
   onPassee,
   onClosed,
@@ -44,7 +45,6 @@ export function OffreAvantDePartir({
   fin: number;
   chapitres: number;
   suite?: string;
-  belowHeader?: boolean;
   onRefus: () => void;
   onPassee: () => void;
   onClosed: () => void;
@@ -77,11 +77,11 @@ export function OffreAvantDePartir({
   };
 
   return (
-    <Sheet open={ouverte} onClose={refuser} onClosed={onClosed} labelledBy={titre} belowHeader={belowHeader}>
+    <Sheet open={ouverte} onClose={refuser} onClosed={onClosed} labelledBy={titre} belowHeader={false}>
       <div className="flex flex-col items-center gap-2 pt-1 text-center">
         <div className="relative">
           <BubbleLogo size={76} />
-          <span className="absolute -right-[58px] -top-1 rotate-[8deg] rounded-[16px] rounded-bl-[5px] bg-[linear-gradient(160deg,#FF9BCB,#E8358A)] px-3 py-1.5 font-message text-detail font-bold text-white shadow-[0_10px_20px_-10px_rgba(232,53,138,0.8)]">
+          <span className="absolute -right-[58px] -top-1 rotate-[8deg] rounded-[16px] rounded-bl-[5px] bg-[linear-gradient(160deg,#FF9BCB,#E8358A)] px-3 py-1.5 font-sans text-detail font-bold text-white shadow-[0_10px_20px_-10px_rgba(232,53,138,0.8)]">
             {OFFRE_SUITE.attends}
           </span>
         </div>

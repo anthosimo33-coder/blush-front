@@ -4,7 +4,7 @@ import { IlOuElle } from "@/lib/pronom";
 import { Icon } from "@/components/ui/icons";
 import { Grappe, Perle, PerleVide, Rangee } from "@/components/bulles/perles";
 import { Carte, PetitBouton } from "@/components/bulles/pieces";
-import { CARTES, SEUIL_PEU_DE_BULLES } from "@/contenu/bulles-du-chat";
+import { CARTES, PERLES_DE_LA_CARTE, SEUIL_PEU_DE_BULLES } from "@/contenu/bulles-du-chat";
 import type { Pronom } from "@/types";
 
 /*
@@ -73,7 +73,7 @@ export function BandeauBulles({
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-2">
             <span className="text-note font-black">{CARTES.peu(bulles)}</span>
-            <Rangee pleines={bulles} vides={Math.max(0, SEUIL_PEU_DE_BULLES - bulles)} taille={11} />
+            <Rangee pleines={bulles} vides={Math.max(0, PERLES_DE_LA_CARTE - bulles)} taille={11} />
           </span>
           <span className="text-legende font-extrabold leading-[1.35] text-soft">{CARTES.peuNote(IlOuElle(pronom))}</span>
         </span>

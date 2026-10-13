@@ -596,8 +596,8 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number; cl
 }
 
 /**
- * Lire une réponse verrouillée (écrite à 0 bulle, BlushAnswer.verrouillee), une fois rechargé : son coût est débité, elle
- * revient en entier. ErreurApi « bulles » : le solde ne la couvre toujours pas.
+ * Lire une réponse verrouillée (écrite à 0 bulle, BlushAnswer.verrouillee), une fois rechargé : payée par la recharge
+ * (sans débit), ou son coût débité, elle revient en entier. ErreurApi « bulles » : le solde ne la couvre toujours pas.
  */
 export async function lireLaReponse(message: number): Promise<BlushAnswer> {
   return appel("POST /api/chat/debloquer", { corps: { message } });

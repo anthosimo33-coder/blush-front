@@ -7,6 +7,7 @@ import {
   donnerDesBulles,
   emailLibre,
   expect,
+  feuilleSurOrdinateur,
   filDuChat,
   lectureComplete,
   lectureFaite,
@@ -218,6 +219,8 @@ test("un rapport débloqué, 10 bulles : « 1 bulle · il t’en reste 9 » sous
   await test.step("le compteur ouvre « C’est quoi une bulle ? », d’où l’on recharge", async () => {
     await compteur(page, 9).click();
     const bulle = page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" });
+    await expect(bulle).toBeVisible();
+    await feuilleSurOrdinateur(page, bulle);
     await bulle.getByRole("button", { name: "Recharger · il t’en reste 9" }).click();
     const recharge = page.getByRole("dialog", { name: "Recharge tes bulles" });
     await expect(recharge.getByText("Elles n’expirent jamais.")).toBeVisible();
@@ -256,6 +259,7 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
   await test.step("« Recharger pour la lire » ouvre la recharge, qui la rappelle (avec le bonus de la première recharge, ④)", async () => {
     await conv.getByRole("button", { name: "Recharger pour la lire" }).click();
     await expect(recharge.getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeVisible();
+    await feuilleSurOrdinateur(page, recharge, { titre: 26 });
     await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toBeVisible();
   });
 
@@ -270,9 +274,10 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
     await expect(fil.getByText(QUESTION)).toBeVisible();
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(1);
     await expect(fil.locator("[data-verrouillee]")).toHaveCount(0);
-    await expect(fil.getByText("1 bulle · il t’en reste 119")).toBeVisible();
-    await expect(compteur(page, 119)).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ bulles: 119 });
+    /* La recharge la paie : ni reçu, ni débit, le compteur à l’ancien solde + 120 */
+    await expect(fil.locator("[data-recu]")).toHaveCount(0);
+    await expect(compteur(page, 120)).toBeVisible();
+    expect(await compteDe(email)).toMatchObject({ bulles: 120 });
   });
 });
 

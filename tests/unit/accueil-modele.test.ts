@@ -249,7 +249,11 @@ describe("les lignes de la conv (rowsOf)", () => {
     expect(suite[1]!.kind === "group" && [suite[1]!.at, suite[1]!.echange]).toEqual([le(10, 11), 8]);
 
     /* Une réponse verrouillée (écrite à 0 bulle) ne se partage pas : son groupe n’a pas d’échange */
-    const verrou = rowsOf(echangesEnMsgs([{ id: 9, answer: { kind: "bubbles", bubbles: [], verrouillee: { message: 19, cout: 1 } }, at: le(10, 12) }]), OUVERT, 1);
+    const verrou = rowsOf(
+      echangesEnMsgs([{ id: 9, answer: { kind: "bubbles", bubbles: [], verrouillee: { message: 19, cout: 1, cache: { quoi: "tout", lignes: [20] } } }, at: le(10, 12) }]),
+      OUVERT,
+      1,
+    );
     expect(verrou.flatMap((r) => (r.kind === "group" ? [r.echange] : []))).toEqual([undefined]);
   });
 
@@ -328,7 +332,15 @@ describe("ce que les lecteurs d’écran entendent de la conv (annonceDe, la ré
   });
 
   it("une réponse verrouillée (écrite à 0 bulle) : prête, à lire une fois rechargé, sans rien d’elle", () => {
-    expect(annonceDe(reponseDeBlush([], { verrouillee: { message: 9, cout: 1 } }))).toBe("Ta réponse est prête. Recharge tes bulles pour la lire.");
+    expect(annonceDe(reponseDeBlush([], { verrouillee: { message: 9, cout: 1, cache: { quoi: "tout", lignes: [20] } } }))).toBe(
+      "Ta réponse est prête. Recharge tes bulles pour la lire.",
+    );
+  });
+
+  it("une réponse verrouillée dont la lecture se lit (sa réponse à envoyer attend) : la lecture, puis « prête »", () => {
+    expect(annonceDe(reponseDeBlush(["elle te teste"], { verrouillee: { message: 9, cout: 1, cache: { quoi: "reponse", lignes: [18] } } }))).toBe(
+      "BLUSH a répondu\u00a0: elle te teste Ta réponse est prête. Recharge tes bulles pour la lire.",
+    );
   });
 
   it("une longue réponse est coupée au dernier mot entier, avec des points de suspension", () => {

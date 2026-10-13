@@ -7,8 +7,14 @@ import { CATALOGUE } from "./offres";
  * (12 octobre), sauf ce que marque un TODO(produit).
  */
 
-/** À partir de combien de bulles (ou moins) la carte « Plus que N bulles » se pose au-dessus du champ. */
-export const SEUIL_PEU_DE_BULLES = 5;
+/**
+ * À partir de combien de bulles (ou moins) la carte « Plus que N bulles » se pose au-dessus du champ, et le compteur
+ * passe au rose : 2, comme le prototype (décidé le 13 octobre).
+ */
+export const SEUIL_PEU_DE_BULLES = 2;
+
+/** Les places de la rangée de perles de la carte « Plus que N bulles » : les bulles qui restent, pleines, puis des vides. */
+export const PERLES_DE_LA_CARTE = 5;
 
 /** Le compteur de bulles (CompteurBulles) : son nom pour un lecteur d’écran, et l’équipe, aux bulles illimitées. */
 export const COMPTEUR = {

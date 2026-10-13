@@ -296,17 +296,26 @@ export type BlushAnswer = {
    */
   bulles?: { depensees: number; restantes: number };
   /**
-   * Une réponse écrite à 0 bulle, verrouillée : elle est écrite et gardée, mais son contenu ne quitte pas le serveur
-   * avant d’être payé (`bubbles` vide, rien d’autre). `message` : de quoi la lire une fois rechargé (POST
-   * /api/chat/debloquer, qui débite son `cout`).
+   * Une réponse écrite à 0 bulle, verrouillée : elle est écrite et gardée, mais ce qui se paie ne quitte pas le serveur
+   * avant d’être payé. `message` : de quoi la lire une fois rechargé (POST /api/chat/debloquer, qui débite son `cout`,
+   * sauf après une recharge, qui la paie). `cache` : ce qui attend, en forme seulement (VerrouDeLaReponse).
    */
-  verrouillee?: { message: number; cout: number };
+  verrouillee?: { message: number; cout: number; cache: VerrouDeLaReponse };
   /**
    * Jamais du serveur : le mot de BLUSH que le navigateur pose à la place d’une réponse refusée faute de bulles (402
    * « bulles », src/services/api.ts). L’accueil ouvre alors la recharge.
    */
   plusDeBulles?: true;
 };
+
+/**
+ * Ce qu’une réponse verrouillée cache, et sa forme : la longueur (en caractères) de chacune de ses lignes, jamais leur
+ * texte ; l’écran dessine à leur place des lignes neutres, floutées, de la même longueur. `reponse` : la réponse à lui
+ * envoyer (« Ta meilleure réponse », ses `lignes`), avec son pourquoi, la relance et le geste ; la lecture de BLUSH, elle,
+ * se lit en clair (`bubbles`). `tout` : une réponse sans réponse à envoyer (une question, un geste, une lecture seule)
+ * se verrouille en entier : `bubbles` est vide, et `lignes` dit ses bulles, dans l’ordre.
+ */
+type VerrouDeLaReponse = { quoi: "reponse" | "tout"; lignes: number[] };
 
 /** Une bulle de BLUSH dans le chat, et les messages qu’elle cite. */
 export type BulleChat = BlushAnswer["bubbles"][number];

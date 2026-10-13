@@ -422,25 +422,55 @@ const LireContext = createContext<(reponse: number, message: number) => Promise<
  */
 export const CreditContext = createContext<{ solde: number | null; recharger: () => void }>({ solde: null, recharger: () => {} });
 
-/* Les lignes floutées d’une réponse prête : de simples barres, jamais son texte (le serveur le garde), en largeurs de phrases */
-const LIGNES_FLOUTEES = [168, 214, 120];
+/* Les longueurs des mots d’une ligne neutre (ligneNeutre), à tour de rôle : un texte qui passe à la ligne comme une phrase */
+const MOTS_NEUTRES = [4, 2, 6, 3, 7, 5, 2, 4, 6, 3];
 
 /**
- * Une réponse écrite à 0 bulle (le prototype validé des bulles) : verrouillée, rien d’elle n’est arrivé (le serveur la
- * garde), floutée sous « Ta réponse est prête ». « Recharger pour la lire » ouvre la recharge ; si le solde couvre déjà
- * son coût (rechargé ailleurs), « La lire » la demande (son coût débité), et sans bulles, BLUSH le redit.
+ * Une ligne neutre de `n` caractères, floutée à la place d’une ligne que le serveur garde (VerrouDeLaReponse) : des mots
+ * de x, jamais son texte, de la même longueur, pour que la bulle ait la forme de la vraie.
  */
-function ReponseVerrouillee({ reponse, message, cout }: { reponse: number; message: number; cout: number }) {
+function ligneNeutre(n: number) {
+  let ligne = "";
+  for (let i = 0; ligne.length < n; i++) ligne += `${ligne ? " " : ""}${"x".repeat(MOTS_NEUTRES[i % MOTS_NEUTRES.length]!)}`;
+  return ligne.slice(0, Math.max(1, n));
+}
+
+/**
+ * Ce qui attend d’être payé dans une réponse écrite à 0 bulle (le prototype validé des bulles) : sa forme, floutée sous
+ * « Ta réponse est prête » (le serveur garde le texte). Avec une réponse à envoyer (`cache.quoi` « reponse »), la
+ * lecture de BLUSH se lit au-dessus, et c’est « Ta meilleure réponse », « Recommandée », ses bulles bleues floutées ;
+ * sinon (« tout »), la réponse entière, ses bulles floutées. « Recharger pour la lire » ouvre la recharge ; si le solde
+ * couvre déjà son coût (rechargé ailleurs), « La lire » la demande, et sans bulles, BLUSH le redit.
+ */
+function ReponseVerrouillee({ reponse, verrou }: { reponse: number; verrou: NonNullable<BlushAnswer["verrouillee"]> }) {
   const lire = use(LireContext);
   const credit = use(CreditContext);
   const [enCours, setEnCours] = useState(false);
+  const { message, cout, cache } = verrou;
   const lisible = credit.solde === null || credit.solde >= cout;
+  const envoi = cache.quoi === "reponse";
   return (
-    <span data-verrouillee="" className="flex flex-col gap-2">
-      <span className="relative flex flex-col items-start gap-[3px]">
-        {LIGNES_FLOUTEES.map((largeur, i) => (
-          <span key={i} aria-hidden="true" className="flex select-none rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-[13px] blur-[5px]">
-            <span className="block h-[9px] rounded-full bg-white/85" style={{ width: largeur }} />
+    <span data-verrouillee={cache.quoi} className="flex flex-col gap-2">
+      {envoi && (
+        <span className="flex items-center justify-between gap-2">
+          <span className="text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
+          <Tag tone="recommandee" />
+        </span>
+      )}
+      <span className="relative flex min-h-10 flex-col items-start gap-[3px]">
+        {cache.lignes.map((n, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            data-ligne-floutee=""
+            className={cn(
+              "select-none blur-[6px]",
+              envoi
+                ? "rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white"
+                : "text-corps font-bold leading-[1.4] text-ink",
+            )}
+          >
+            {ligneNeutre(n)}
           </span>
         ))}
         <span className="absolute inset-0 flex items-center justify-center">
@@ -568,7 +598,8 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
       ];
     case "reponse":
       /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
-      if (m.result.verrouillee) return [{ body: <ReponseVerrouillee reponse={m.id} message={m.result.verrouillee.message} cout={m.result.verrouillee.cout} /> }];
+      /* Verrouillée (écrite à 0 bulle) : sa lecture, s’il y en a une en clair, puis ce qui attend d’être payé */
+      if (m.result.verrouillee) return [...m.result.bubbles.flatMap(bulleEcrite), { body: <ReponseVerrouillee reponse={m.id} verrou={m.result.verrouillee} /> }];
       return bullesDeLaReponse(m.result, !!m.answered);
     default:
       return typeInconnu(m);

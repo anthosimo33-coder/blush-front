@@ -28,7 +28,7 @@ type Bonus = "inconnu" | "oui" | "non";
 /**
  * La feuille de la recharge. `reponsePrete` : ouverte depuis une réponse écrite à 0 bulle (floutée), elle le rappelle
  * (`autre`, le prénom de l’autre personne). `suite` : où revenir une fois payé, d’après les bulles achetées (l’accueil,
- * qui y lit la réponse prête et le dit).
+ * qui y lit la réponse prête et le dit). Sur ordinateur, son voile couvre tout l’écran, en-tête compris (belowHeader faux).
  */
 export function FeuilleRecharge({
   open,
@@ -36,14 +36,12 @@ export function FeuilleRecharge({
   reponsePrete = false,
   autre,
   suite,
-  belowHeader,
 }: {
   open: boolean;
   onClose: () => void;
   reponsePrete?: boolean;
   autre?: string;
   suite: (bulles: number) => string;
-  belowHeader?: boolean;
 }) {
   const titre = useId();
   const [choisi, setChoisi] = useState<Pack>(PACK_CONSEILLE);
@@ -75,7 +73,7 @@ export function FeuilleRecharge({
 
   return (
     /* Un écran bas (375 × 667) : la feuille se resserre pour tenir sans défiler, case de renonciation et bonus ④ compris */
-    <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={belowHeader} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
+    <Sheet open={open} onClose={onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[24px]">
         {RECHARGE.titre}
       </h2>

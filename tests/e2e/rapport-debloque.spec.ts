@@ -75,6 +75,8 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await payerALecran(page, /^Le rapport/);
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
+    /* Avec l’offre ③, 28 px, sur ordinateur comme sur téléphone (le prototype) */
+    await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toHaveCSS("font-size", "28px");
     await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
@@ -120,6 +122,8 @@ test("Premium, choisie d’avance : payée à l’écran, 90 bulles, et pas d’
   await payerALecran(page, /^Rapport \+ 60 bulles/);
   const ecran = page.getByRole("main");
   await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
+  /* Sans offre, 32 px, sur ordinateur comme sur téléphone (le prototype, pas 40 sur ordinateur) */
+  await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toHaveCSS("font-size", "32px");
   await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
   await expect(ecran.getByText("Ta lecture reprend au chapitre 2")).toBeVisible();
   await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();

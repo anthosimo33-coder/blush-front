@@ -163,21 +163,75 @@ describe("les bulles de la conv de l’accueil", () => {
     expect([...fil.querySelectorAll("[data-recu]")].map((r) => r.textContent)).toEqual(["1 bulle · il t’en reste 9", "3 bulles · il t’en reste 6"]);
   });
 
-  it("une réponse verrouillée (écrite à 0 bulle) : prête et floutée, sans rien d’elle dans la page, ni « Partager » ; « Recharger pour la lire » ouvre la recharge", () => {
+  /** Le texte qu’un lecteur d’écran entend d’un élément : sans ce qui lui est caché (aria-hidden). */
+  const texteLu = (el: Element): string =>
+    [...el.childNodes].map((n) => (n.nodeType === Node.TEXT_NODE ? n.textContent : n instanceof Element && n.getAttribute("aria-hidden") !== "true" ? texteLu(n) : "")).join("");
+  /** Les lignes floutées d’une réponse prête : leur texte (neutre) et leur longueur. */
+  const floutees = (el: Element) => [...el.querySelectorAll("[data-ligne-floutee]")].map((l) => l.textContent ?? "");
+
+  it("une réponse verrouillée avec une réponse à envoyer : la lecture de BLUSH se lit en clair ; « Ta meilleure réponse » et « Recommandée », la réponse floutée en lignes neutres de sa longueur, « Ta réponse est prête »", () => {
     const recharger = vi.fn();
-    const { props, fil } = monter(
+    const { fil } = monter(
       [
         { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
-        { type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 1 }, echange: 1 }, at: A },
+        {
+          type: "reponse",
+          id: 2,
+          from: "blush",
+          result: {
+            kind: "bubbles",
+            bubbles: [{ text: "elle te teste encore un peu" }, { text: "réponds léger", messages: [{ from: "elle", text: "on verra 🙂", caption: "Elle · hier" }] }],
+            verrouillee: { message: 77, cout: 1, cache: { quoi: "reponse", lignes: [19, 42] } },
+            echange: 1,
+          },
+          at: A,
+        },
       ],
       {},
       { solde: 0, recharger },
     );
-    const prete = fil.querySelector("[data-verrouillee]")!;
+    /* La lecture, en clair, avec le message qu’elle cite */
+    expect(within(fil).getByText("elle te teste encore un peu")).toBeTruthy();
+    expect(within(fil).getByText("réponds léger")).toBeTruthy();
+    expect(within(fil).getByText("on verra 🙂")).toBeTruthy();
+    /* Puis ce qui attend : le dessin du prototype, la réponse floutée en deux lignes de 19 et 42 caractères neutres */
+    const prete = fil.querySelector("[data-verrouillee=reponse]")!;
+    expect(within(prete as HTMLElement).getByText("Ta meilleure réponse")).toBeTruthy();
+    expect(within(prete as HTMLElement).getByText("Recommandée")).toBeTruthy();
+    expect(within(prete as HTMLElement).getByText("Ta réponse est prête")).toBeTruthy();
+    expect(floutees(prete).map((l) => l.length)).toEqual([19, 42]);
+    for (const l of floutees(prete)) expect(l).toMatch(/^[x ]+$/);
+    expect([...prete.querySelectorAll("[data-ligne-floutee]")].every((l) => l.getAttribute("aria-hidden") === "true" && l.className.includes("blur-"))).toBe(true);
+    expect(texteLu(prete)).toBe("Ta meilleure réponseRecommandéeTa réponse est prêteRecharger pour la lire");
+    /* Ni « Copier » (rien à copier), ni « Partager », ni reçu */
+    expect(within(fil).queryByRole("button", { name: "Copier" })).toBeNull();
+    expect(within(fil).queryByRole("button", { name: "Partager" })).toBeNull();
+    expect(fil.querySelector("[data-recu]")).toBeNull();
+    fireEvent.click(within(fil).getByRole("button", { name: "Recharger pour la lire" }));
+    expect(recharger).toHaveBeenCalledOnce();
+  });
+
+  it("une réponse verrouillée sans réponse à envoyer (écrite à 0 bulle) : verrouillée en entier, floutée en lignes neutres de la forme de ses bulles, ni « Ta meilleure réponse », ni « Partager » ; « Recharger pour la lire » ouvre la recharge", () => {
+    const recharger = vi.fn();
+    const { props, fil } = monter(
+      [
+        { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
+        {
+          type: "reponse",
+          id: 2,
+          from: "blush",
+          result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 1, cache: { quoi: "tout", lignes: [17, 28, 23] } }, echange: 1 },
+          at: A,
+        },
+      ],
+      {},
+      { solde: 0, recharger },
+    );
+    const prete = fil.querySelector("[data-verrouillee=tout]")!;
     expect(within(fil).getByText("Ta réponse est prête")).toBeTruthy();
-    /* Floutée : des barres, jamais de texte (le serveur garde la réponse) ; ce qui se lit, c’est « prête » et le bouton */
-    expect(prete.textContent).toBe("Ta réponse est prêteRecharger pour la lire");
-    expect(prete.querySelectorAll("[aria-hidden=true].blur-\\[5px\\]")).toHaveLength(3);
+    /* Floutée : des lignes neutres de la longueur de ses bulles, jamais son texte (le serveur le garde) ; ce qui se lit, c’est « prête » et le bouton */
+    expect(texteLu(prete)).toBe("Ta réponse est prêteRecharger pour la lire");
+    expect(floutees(prete).map((l) => l.length)).toEqual([17, 28, 23]);
     expect(within(fil).queryByText("Ta meilleure réponse")).toBeNull();
     expect(within(fil).queryByRole("button", { name: "Partager" })).toBeNull();
     const bouton = within(fil).getByRole("button", { name: "Recharger pour la lire" });
@@ -190,7 +244,7 @@ describe("les bulles de la conv de l’accueil", () => {
   it("une réponse verrouillée que le solde couvre déjà (rechargé ailleurs) : « La lire » la demande", async () => {
     const recharger = vi.fn();
     const { props, fil } = monter(
-      [{ type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 3 } }, at: A }],
+      [{ type: "reponse", id: 2, from: "blush", result: { kind: "bubbles", bubbles: [], verrouillee: { message: 77, cout: 3, cache: { quoi: "tout", lignes: [20] } } }, at: A }],
       {},
       { solde: 3, recharger },
     );

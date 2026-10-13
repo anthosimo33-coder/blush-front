@@ -1,4 +1,19 @@
-import { CHAPITRES_FERMES, compteDe, emailLibre, expect, fermerLaFeuille, histoiresDe, lectureFaite, OFFRE_SUITE, ouvrirLeRapport, PAIEMENT, tachesDe, test } from "./aide";
+import {
+  CHAPITRES_FERMES,
+  compteDe,
+  emailLibre,
+  expect,
+  feuilleSurOrdinateur,
+  fermerLaFeuille,
+  histoiresDe,
+  lectureFaite,
+  NUNITO,
+  OFFRE_SUITE,
+  ouvrirLeRapport,
+  PAIEMENT,
+  tachesDe,
+  test,
+} from "./aide";
 
 /*
  * Le rapport d’un compte gratuit (un email hors de BLUSH_ACCES_LIBRE). Décision produit : seul le chapitre 1 (le
@@ -59,6 +74,9 @@ test("compte gratuit : le paiement, ses deux formules, la case de renonciation, 
     await rapport.getByRole("button", { name: /^10 bulles offertes avec ton rapport/ }).click();
     const bulle = page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" });
     await expect(bulle.getByText("Sur tout ce que tu veux. Elles n’expirent jamais.")).toBeVisible();
+    await feuilleSurOrdinateur(page, bulle, { titre: 26 });
+    /* Ses bulles d’exemple, dans la police de l’appli (comme le prototype), pas dans celle des messages */
+    await expect(bulle.getByText("elle a liké ma story")).toHaveCSS("font-family", NUNITO);
     await bulle.getByRole("button", { name: "Compris" }).click();
     await expect(bulle).toBeHidden();
   });
@@ -66,6 +84,8 @@ test("compte gratuit : le paiement, ses deux formules, la case de renonciation, 
   await test.step("« Lire la suite » ouvre « Ta formule » : le rapport seul, ou Premium, choisie d’avance et ouverte", async () => {
     await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
     await expect(paiement).toBeVisible();
+    /* Sur ordinateur, le titre à 26 px du prototype (pas 32), et pas de bande blanche au-dessus */
+    await feuilleSurOrdinateur(page, paiement, { titre: 26 });
     const offres = paiement.getByRole("radiogroup", { name: "Ta formule" }).getByRole("radio");
     await expect(offres).toHaveCount(2);
     const seul = offres.filter({ hasText: /^Le rapport/ });
@@ -129,7 +149,9 @@ test("compte gratuit : le paiement, ses deux formules, la case de renonciation, 
     await expect(paiement).toBeHidden();
     const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
     await expect(offre).toBeVisible();
+    await feuilleSurOrdinateur(page, offre);
     await expect(offre.getByText("attends…")).toBeVisible();
+    await expect(offre.getByText("attends…")).toHaveCSS("font-family", NUNITO);
     await expect(offre.getByText("Rien que pour toi, et une seule fois.")).toBeVisible();
     await expect(offre.getByRole("timer", { name: "L’offre se termine dans" })).toHaveText(/^0[45]:\d\d$/);
     await expect(offre.getByText("6,90\u00a0€", { exact: true })).toBeVisible();

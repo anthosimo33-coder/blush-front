@@ -167,11 +167,15 @@ export const chatMessages = pgTable(
       .references(() => stories.id, { onDelete: "cascade" }),
     role: text("role", { enum: ROLES_CHAT }).notNull(),
     data: chiffre("data").notNull(),
-    /** Ce que la réponse de BLUSH a coûté (ou coûtera, verrouillée), en bulles ; null : offerte, ou d’avant les bulles. */
+    /**
+     * Ce que la réponse de BLUSH a coûté (ou coûtera, verrouillée), en bulles ; null : offerte (une alerte, une réponse
+     * verrouillée payée par une recharge), ou d’avant les bulles.
+     */
     cout: integer("cout"),
     /**
-     * Une réponse de BLUSH écrite à 0 bulle : gardée (chiffrée dans `data`, comme toutes), mais jamais envoyée au
-     * navigateur avant d’être payée. Une recharge la débloque en débitant son `cout` (src/server/bulles.ts).
+     * Une réponse de BLUSH écrite à 0 bulle : gardée (chiffrée dans `data`, comme toutes), mais ce qui se paie n’est jamais
+     * envoyé au navigateur avant (sa lecture, si elle a une réponse à envoyer, se lit en clair). Une recharge payée après
+     * elle la débloque sans débit ; d’autres bulles, en débitant son `cout` (src/server/bulles.ts, deverrouiller).
      */
     verrouillee: boolean("verrouillee").notNull().default(false),
     createdAt: quand("created_at").notNull().defaultNow(),

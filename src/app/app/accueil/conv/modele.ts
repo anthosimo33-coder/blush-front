@@ -151,7 +151,9 @@ function texteAnnonce(bulles: readonly BulleChat[]) {
 export function annonceDe(m: Msg): string | null {
   switch (m.type) {
     case "reponse":
-      if (m.result.verrouillee) return "Ta réponse est prête. Recharge tes bulles pour la lire.";
+      /* Verrouillée : sa lecture, si elle se lit, puis ce qui attend */
+      if (m.result.verrouillee)
+        return `${m.result.bubbles.length ? `BLUSH a répondu\u00a0: ${texteAnnonce(m.result.bubbles)} ` : ""}Ta réponse est prête. Recharge tes bulles pour la lire.`;
       return m.result.vocal || m.result.vocalEnCours ? "BLUSH t’a répondu en vocal." : `BLUSH a répondu\u00a0: ${texteAnnonce(m.result.bubbles)}`;
     case "ecrit":
       if (!m.coupee) return null;

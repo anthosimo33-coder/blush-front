@@ -12,7 +12,7 @@ import { ErreurApi } from "@/types/erreurs-api";
 
 /*
  * Les bulles dans le chat, à l’écran (le prototype validé des bulles) : le compteur à côté du bouton du compte, la carte
- * au-dessus du champ (la première apparition expliquée, plus que 5 bulles, une réponse prête, plus de bulles) et la
+ * au-dessus du champ (la première apparition expliquée, plus que 2 bulles, une réponse prête, plus de bulles) et la
  * recharge, avec le bonus de la première recharge (④) seulement quand le serveur le montre. Le paiement et le serveur
  * sont simulés : ici, ce que l’écran en fait. La feuille s’ouvre sans animation (le DOM simulé n’en a pas). getByText
  * compare un texte où l’insécable devient une espace : ses textes attendus s’écrivent avec des espaces.
@@ -49,11 +49,14 @@ describe("le compteur de bulles", () => {
     expect(ouvrir).toHaveBeenCalledOnce();
   });
 
-  it("rose quand il en reste 5 ou moins, gris et sa perle vide à 0 ; un solde négatif (un remboursement) se montre à 0", () => {
-    const { rerender } = render(<CompteurBulles bulles={6} ouvrir={() => {}} />);
+  it("rose quand il en reste 2 ou moins (comme le prototype), gris et sa perle vide à 0 ; un solde négatif (un remboursement) se montre à 0", () => {
+    const { rerender } = render(<CompteurBulles bulles={3} ouvrir={() => {}} />);
     const compteur = () => screen.getByRole("button");
     expect(compteur().className).toContain("bg-white");
-    rerender(<CompteurBulles bulles={5} ouvrir={() => {}} />);
+    expect(compteur().className).not.toContain("text-elle-ink");
+    rerender(<CompteurBulles bulles={2} ouvrir={() => {}} />);
+    expect(compteur().className).toContain("text-elle-ink");
+    rerender(<CompteurBulles bulles={1} ouvrir={() => {}} />);
     expect(compteur().className).toContain("text-elle-ink");
     rerender(<CompteurBulles bulles={-3} ouvrir={() => {}} />);
     expect(compteur().getAttribute("aria-label")).toBe("Tes bulles\u00a0: 0");
@@ -68,31 +71,28 @@ describe("le compteur de bulles", () => {
 });
 
 describe("la carte au-dessus du champ", () => {
-  it("laquelle : rien pour l’équipe ; une réponse prête d’abord ; puis plus de bulles ; la première apparition ; 5 ou moins", () => {
+  it("laquelle : rien pour l’équipe ; une réponse prête d’abord ; puis plus de bulles ; la première apparition ; 2 ou moins", () => {
     expect(etatDuBandeau({ solde: null, prete: true, expliquees: false })).toBeNull();
     expect(etatDuBandeau({ solde: 0, prete: true, expliquees: true })).toBe("prete");
     expect(etatDuBandeau({ solde: -2, prete: false, expliquees: false })).toBe("finies");
     expect(etatDuBandeau({ solde: 10, prete: false, expliquees: false })).toBe("offertes");
     expect(etatDuBandeau({ solde: 6, prete: false, expliquees: true })).toBeNull();
-    expect(etatDuBandeau({ solde: 5, prete: false, expliquees: true })).toBe("peu");
+    expect(etatDuBandeau({ solde: 5, prete: false, expliquees: true })).toBeNull();
+    expect(etatDuBandeau({ solde: 3, prete: false, expliquees: true })).toBeNull();
+    expect(etatDuBandeau({ solde: 2, prete: false, expliquees: true })).toBe("peu");
     expect(etatDuBandeau({ solde: 1, prete: false, expliquees: true })).toBe("peu");
   });
 
   const cartes = { autre: "Maëlys", pronom: "elle" as const, recharger: vi.fn(), lire: vi.fn(), expliquer: vi.fn(), fermer: vi.fn() };
 
-  it("à 5 bulles : « Plus que 5 bulles », cinq perles, et « Recharger »", () => {
-    const { container } = render(<BandeauBulles etat="peu" bulles={5} {...cartes} />);
-    expect(screen.getByText("Plus que 5 bulles")).toBeTruthy();
+  it("à 2 bulles : « Plus que 2 bulles », deux perles pleines et trois vides (comme le prototype), et « Recharger » ; au singulier à 1", () => {
+    const { container, rerender } = render(<BandeauBulles etat="peu" bulles={2} {...cartes} />);
+    expect(screen.getByText("Plus que 2 bulles")).toBeTruthy();
     expect(screen.getByText("Elle va te répondre. Tu auras de quoi lui répondre ?")).toBeTruthy();
-    /* La rangée : 5 places, toutes pleines (et une perle sur le bouton) */
-    expect(container.querySelectorAll('[data-perle="vide"]')).toHaveLength(0);
+    /* La rangée : 5 places, 2 pleines et 3 vides (et une perle sur le bouton) */
+    expect(container.querySelectorAll('[data-perle="vide"]')).toHaveLength(3);
     fireEvent.click(screen.getByRole("button", { name: "Recharger" }));
     expect(cartes.recharger).toHaveBeenCalledOnce();
-  });
-
-  it("à 2 bulles : deux pleines, trois vides ; au singulier à 1", () => {
-    const { container, rerender } = render(<BandeauBulles etat="peu" bulles={2} {...cartes} />);
-    expect(container.querySelectorAll('[data-perle="vide"]')).toHaveLength(3);
     rerender(<BandeauBulles etat="peu" bulles={1} {...cartes} />);
     expect(screen.getByText("Plus que 1 bulle")).toBeTruthy();
   });
