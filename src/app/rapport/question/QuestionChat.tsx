@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
@@ -13,13 +14,13 @@ import { moiEtAutre } from "@/lib/participants";
 import { delai, flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { FRAIS_DU_RENDU, noterEcriture, setQueryData } from "@/lib/query";
 import { useCompte } from "@/lib/requetes";
+import { useChargeAuRepos } from "@/lib/repos";
 import { play } from "@/lib/sound";
 import { askQuestion, cleEnvoi, souciQuestion } from "@/services/api";
 import type { QuestionAnswer } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { CompteurBulles, soldeAffiche } from "@/components/bulles/CompteurBulles";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
-import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { Perle } from "@/components/bulles/perles";
 import { PetitBouton, RecuDeLaReponse } from "@/components/bulles/pieces";
 import { CARTES, REPONSE_PRETE } from "@/contenu/bulles-du-chat";
@@ -31,6 +32,10 @@ import { AppScreen } from "@/components/shell/AppScreen";
 import { useCompteDeLaPage } from "@/components/shell/compte-de-la-page";
 import { MobileTopBar } from "@/components/shell/Screen";
 import type { Story } from "@/types";
+
+/* La recharge (et le paiement de Whop qu’elle porte) n’arrive pas avec la page : chargée au repos, ou à la demande */
+const FeuilleRecharge = dynamic(() => import("@/components/bulles/FeuilleRecharge").then((m) => m.FeuilleRecharge), { ssr: false });
+const chargerLaRecharge = () => import("@/components/bulles/FeuilleRecharge");
 
 /*
  * Écran 12 — Ta question, en conversation avec BLUSH.
@@ -81,6 +86,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
   });
   const solde = soldeAffiche(compte);
   const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
+  const recharge = useChargeAuRepos(chargerLaRecharge, { ouverte: feuille === "recharge" });
 
   /* Chaque nouveau message fait descendre la conv (pas à l’arrivée sur l’écran) */
   useEffect(() => {
@@ -342,7 +348,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
         ) : (
           <FeuilleBulle open={feuille === "bulle"} onClose={fermer} solde={Math.max(0, solde)} recharger={() => setFeuille("recharge")} />
         ))}
-      {solde !== null && (
+      {solde !== null && recharge && (
         <FeuilleRecharge
           open={feuille === "recharge"}
           onClose={fermer}

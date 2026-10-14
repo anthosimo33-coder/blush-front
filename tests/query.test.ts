@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { depart, invalidate, lirePartage, memeValeur, renduFrais, setQueryData } from "@/lib/query";
+import { depart, garderCeQuiNaPasChange, invalidate, lirePartage, renduFrais, setQueryData } from "@/lib/query";
 import type { Fiche } from "@/types";
 
 /* Le petit cache de lecture du navigateur (src/lib/query.ts) : ce qui se décide hors de React */
@@ -104,13 +104,32 @@ describe("renduFrais", () => {
   });
 });
 
-describe("memeValeur", () => {
-  it("compare le contenu, pas l’objet", () => {
+describe("garderCeQuiNaPasChange", () => {
+  it("la même réponse : l’objet d’avant lui-même (l’écran ne se re-rend pas) ; null, undefined et les valeurs simples comparés tels quels", () => {
     const a = { plan: "gratuit", chapitres: [1, 2] };
-    expect(memeValeur(a, { plan: "gratuit", chapitres: [1, 2] })).toBe(true);
-    expect(memeValeur(a, { plan: "rapport", chapitres: [1, 2] })).toBe(false);
-    expect(memeValeur(null, null)).toBe(true);
-    expect(memeValeur(undefined, null)).toBe(false);
-    expect(memeValeur(a, undefined)).toBe(false);
+    expect(garderCeQuiNaPasChange(a, { plan: "gratuit", chapitres: [1, 2] })).toBe(a);
+    expect(garderCeQuiNaPasChange(null, null)).toBeNull();
+    expect(garderCeQuiNaPasChange(undefined, null)).toBeNull();
+    expect(garderCeQuiNaPasChange(a, { plan: "gratuit" })).toEqual({ plan: "gratuit" });
+    expect(garderCeQuiNaPasChange(a, undefined)).toBeUndefined();
+  });
+
+  it("un rapport relu pendant son écriture (PERF-3) : le temps qui reste change, les chapitres déjà écrits gardent leurs objets", () => {
+    const chapitre = (n: number, texte: string) => ({ number: n, title: `Chapitre ${n}`, blocks: [{ kind: "texte", text: texte }] });
+    const avant = { restant: 40, progres: 0.4, chapters: [chapitre(1, "a"), chapitre(2, "b")] };
+    const apres = { restant: 30, progres: 0.6, chapters: [chapitre(1, "a"), chapitre(2, "b"), chapitre(3, "c")] };
+    const r = garderCeQuiNaPasChange(avant, apres);
+    expect(r).toEqual(apres);
+    expect(r).not.toBe(avant);
+    expect(r.chapters[0]).toBe(avant.chapters[0]);
+    expect(r.chapters[1]).toBe(avant.chapters[1]);
+    expect(r.chapters[2]).toBe(apres.chapters[2]);
+    /* Un chapitre réécrit : neuf, ses voisins gardés */
+    const reecrit = garderCeQuiNaPasChange(r, { ...apres, chapters: [chapitre(1, "a"), chapitre(2, "b2"), chapitre(3, "c")] });
+    expect(reecrit.chapters[0]).toBe(r.chapters[0]);
+    expect(reecrit.chapters[1]).not.toBe(r.chapters[1]);
+    expect(reecrit.chapters[2]).toBe(r.chapters[2]);
+    /* Une clé retirée change l’objet */
+    expect(garderCeQuiNaPasChange(avant, { restant: 40, chapters: avant.chapters })).not.toBe(avant);
   });
 });

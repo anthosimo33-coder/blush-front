@@ -18,12 +18,11 @@ import { Blocks, ChapterHeader, ChapterRule } from "@/components/ui/report";
 import { Toast } from "@/components/ui/surfaces";
 import { Screen } from "@/components/shell/Screen";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
-import { FeuilleFormule } from "@/components/paiement/FeuilleFormule";
 import { PiedGratuit } from "@/components/paiement/PiedGratuit";
 import { useHydrated, useJourneyMe } from "@/state/journey";
 import type { Chapter, ChapterBlock, Pronom, Story } from "@/types";
 import { figtree } from "@/lib/fonts";
-import { auRepos } from "@/lib/repos";
+import { auRepos, useChargeAuRepos } from "@/lib/repos";
 import { ancreDuChapitre, chapitreDeLAncre, PARLER_A_BLUSH, PASTILLE_REPRISE, sectionDuChapitre, titreDuChapitre } from "./ancres";
 import { ChatBubble } from "./ChatBubble";
 import { EnTeteRapport } from "./EnTeteRapport";
@@ -39,6 +38,9 @@ const SoberReport = dynamic(() => import("./SoberReport").then((m) => m.SoberRep
 const AttenteSobre = dynamic(() => import("./SoberReport").then((m) => m.AttenteSobre));
 const PastilleEcriture = dynamic(() => import("./Ecriture").then((m) => m.PastilleEcriture));
 const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImageSheet").then((m) => m.PartageImageSheet), { ssr: false });
+/* « Ta formule » (et le paiement de Whop qu’elle porte) : chargée au repos, seulement tant que le rapport n’est pas débloqué */
+const FeuilleFormule = dynamic(() => import("@/components/paiement/FeuilleFormule").then((m) => m.FeuilleFormule), { ssr: false });
+const chargerLaFormule = () => import("@/components/paiement/FeuilleFormule");
 
 /*
  * Écrans 09 (aperçu gratuit, et son pied : PiedGratuit), 10 (la feuille « Ta formule »), 11 (rapport complet) et 18-19 (mode sobre).
@@ -118,6 +120,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
   const { report, debloque } = payload;
   /* Le rapport débloqué : « Ton rapport complet », son temps de lecture, « Ta question » ; sinon, le paiement */
   const full = debloque;
+  const formule = useChargeAuRepos(chargerLaFormule, { utile: !full, ouverte: paywall });
   /* Qui est toi : d’après le serveur (le rapport ouvert depuis le mail n’a pas le parcours de cet onglet), sinon le parcours */
   const { moi: me, autre: other } = moiEtAutre(story, journeyMe);
   const chapters = report.chapters;
@@ -305,7 +308,7 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
 
       <SuivreAncre retour={retour} />
 
-      <FeuilleFormule open={paywall} onClose={() => setPaywall(false)} autre={other.name} chapitres={locked.length || undefined} />
+      {formule && <FeuilleFormule open={paywall} onClose={() => setPaywall(false)} autre={other.name} chapitres={locked.length || undefined} />}
       {!full && <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />}
     </Screen>
   );

@@ -201,6 +201,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
   await lectureFaite(page, testInfo, email);
   let rapport = await ouvrirLeRapport(page);
   await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   await fermerLaFeuille(page);
   await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible();
 
@@ -208,6 +209,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
     await raccourcirLaSuite(email, 8);
     rapport = await ouvrirLeRapport(page);
     await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await fermerLaFeuille(page);
     const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
     await expect(offre.getByRole("timer", { name: "L’offre se termine dans" })).toHaveText(/^00:0[0-8]$/);
@@ -220,6 +222,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
     expect([r.status(), await r.json()]).toEqual([422, { erreur: "offre" }]);
     /* La feuille refermée ne la remontre pas */
     await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await fermerLaFeuille(page);
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeHidden();
     await page.waitForTimeout(800);

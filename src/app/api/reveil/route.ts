@@ -5,6 +5,13 @@ import { repondre, route } from "@/server/http";
 import { journalErreur } from "@/server/journal";
 
 /*
+ * La durée du chat et du rapport (leurs routes et leurs pages vivent 300 s) : Vercel regroupe dans une même fonction les
+ * routes de même réglage, et c’est celle-là qu’il faut réveiller. Une page qui appelle le réveil vient d’être servie,
+ * sa propre fonction est déjà chaude ; avec la durée par défaut, il ne réveillait que celle-là, pas le chat ni le rapport.
+ */
+export const maxDuration = 300;
+
+/*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes
  * sans requête, et la première qui suit attend environ une seconde). Le navigateur l’appelle sans attendre la réponse
  * (src/components/shell/Reveil.tsx), à chaque visite ; un service de ping peut l’appeler toutes les 4 minutes. Elle ne

@@ -1,9 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { changerDeConv, useAchats, useCompte } from "@/lib/requetes";
+import { useChargeAuRepos } from "@/lib/repos";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { deleteAccount, deleteStory, seDeconnecter } from "@/services/api";
@@ -13,7 +15,6 @@ import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } f
 import { CATALOGUE, enEuros } from "@/contenu/offres";
 import { Perle } from "@/components/bulles/perles";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
-import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/controls";
@@ -27,6 +28,10 @@ import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
 import { useRetourSinon } from "@/lib/navigation";
+
+/* La recharge (et le paiement de Whop qu’elle porte) n’arrive pas avec la page : chargée au repos, ou à la demande */
+const FeuilleRecharge = dynamic(() => import("@/components/bulles/FeuilleRecharge").then((m) => m.FeuilleRecharge), { ssr: false });
+const chargerLaRecharge = () => import("@/components/bulles/FeuilleRecharge");
 
 /* La feuille ouverte : ce que BLUSH garde, une suppression (l’histoire, tout), ou une déconnexion (cet appareil, partout) */
 type Confirm = "keep" | "story" | "all" | "sortie" | "partout" | null;
@@ -68,6 +73,7 @@ export function CompteScreen({
   const { data: account } = useCompte(compte ?? undefined, { rendu, frais: FRAIS_DU_RENDU });
   const { data: achats = [] } = useAchats(achatsRendus, { rendu, frais: FRAIS_DU_RENDU });
   const [bulles, setBulles] = useState<FeuilleDesBulles>(null);
+  const recharge = useChargeAuRepos(chargerLaRecharge, { ouverte: bulles === "recharge" });
   /* L’accueil s’ouvre : la ligne touchée le montre jusqu’à son arrivée. Sans remise en haut : il s’ouvre sur le dernier échange */
   const [ouverture, demarrer] = useTransition();
   const [ouverte, setOuverte] = useState<string | null>(null);
@@ -267,7 +273,7 @@ export function CompteScreen({
 
       {/* « C’est quoi une bulle ? », et la recharge, qui revient ici une fois payée */}
       <FeuilleBulle open={bulles === "bulle"} onClose={() => setBulles(null)} />
-      {account && !account.equipe && <FeuilleRecharge open={bulles === "recharge"} onClose={() => setBulles(null)} suite={() => "/compte"} />}
+      {account && !account.equipe && recharge && <FeuilleRecharge open={bulles === "recharge"} onClose={() => setBulles(null)} suite={() => "/compte"} />}
 
       {/* Les panneaux de confirmation, absents des maquettes : leurs textes reprennent les libellés de l’écran (validés) */}
       <Sheet open={confirm !== null} onClose={fermer} labelledBy="confirm-title">
