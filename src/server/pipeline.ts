@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
@@ -406,11 +406,17 @@ const CHAINES_PAR_VEILLE = 20;
 /** Une étape en attente depuis plus que ça, sans exécution qui la tienne, est restée en plan (un relais raté). */
 const EN_PLAN_APRES_S = 300;
 
+/** Un rapport payé arrêté par le budget d’un jour passé : repris par le cron jusqu’à une semaine après (au-delà, à la visite). */
+const REPRISE_DU_BUDGET_S = 7 * 86400;
+
 /**
- * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes, ou abandonnée (son battement de cœur
- * perdu), qu’un essai peut encore faire. Le passage des 5 minutes (GET /api/cron/relances) les reprend, chacune dans sa
- * propre fonction (passerLaMain) : le filet du relais, qu’un réseau coupé ou un déploiement peut rater. Les plus
- * récemment arrêtées d’abord (celles qu’on attend sans doute encore). Rend le nombre de chaînes reprises.
+ * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes qu’un essai peut encore faire ; une étape
+ * abandonnée (son battement de cœur perdu), même à son dernier essai : la chaîne relancée la clôt et prévient l’équipe
+ * (cloreLesAbandons), sans attendre qu’un écran revienne ; et, pour un rapport payé, une étape arrêtée par le budget
+ * d’un jour passé (la chaîne relancée la remet en attente, reprendreApresMinuit) : le rapport s’écrit et son mail part
+ * sans que la personne revienne. Le passage des 5 minutes (GET /api/cron/relances) les reprend, chacune dans sa propre
+ * fonction (passerLaMain) : le filet du relais, qu’un réseau coupé ou un déploiement peut rater. Les plus récemment
+ * arrêtées d’abord (celles qu’on attend sans doute encore). Rend le nombre de chaînes reprises.
  */
 export async function reprendreLesChainesEnPlan(): Promise<number> {
   const t = schema.tasks;
@@ -418,11 +424,16 @@ export async function reprendreLesChainesEnPlan(): Promise<number> {
     .select({ storyId: t.storyId })
     .from(t)
     .where(
-      and(
-        lt(t.attempts, ESSAIS_MAX),
-        or(
-          and(eq(t.status, "attente"), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)),
-          and(eq(t.status, "en_cours"), lt(t.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
+      or(
+        and(lt(t.attempts, ESSAIS_MAX), eq(t.status, "attente"), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)),
+        and(eq(t.status, "en_cours"), lt(t.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
+        and(
+          eq(t.status, "echec"),
+          inArray(t.error, [...ARRETS_DU_BUDGET]),
+          lt(t.updatedAt, DEBUT_DU_JOUR),
+          gt(t.updatedAt, sql`now() - make_interval(secs => ${REPRISE_DU_BUDGET_S})`),
+          repartPourDeBon,
+          sql`exists (select 1 from ${schema.stories} where ${schema.stories.id} = ${t.storyId} and ${schema.stories.debloqueLe} is not null)`,
         ),
       ),
     )

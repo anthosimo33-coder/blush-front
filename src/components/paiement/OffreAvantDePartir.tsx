@@ -55,8 +55,10 @@ export function OffreAvantDePartir({
   const [vendue, setVendue] = useState(true);
   /* Payée : la feuille ne se ferme plus, et le compte à rebours ne la fait plus passer, le temps de la livraison */
   const [paye, setPaye] = useState(false);
+  /* Un paiement en route (dès le geste) : le compte à rebours qui arrive à zéro ne ferme pas la feuille, il couperait son suivi (UI-3) */
+  const [occupe, setOccupe] = useState(false);
   const reste = vendue ? Math.max(0, fin - maintenant) : 0;
-  const ouverte = paye || (!fermee && reste > 0);
+  const ouverte = paye || occupe || (!fermee && reste > 0);
   /* Passée sous nos yeux : l’écran le dit, une fois */
   const dite = useRef(false);
 
@@ -65,10 +67,10 @@ export function OffreAvantDePartir({
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    if (paye || fermee || reste > 0 || dite.current) return;
+    if (paye || occupe || fermee || reste > 0 || dite.current) return;
     dite.current = true;
     onPassee();
-  }, [paye, fermee, reste, onPassee]);
+  }, [paye, occupe, fermee, reste, onPassee]);
 
   const refuser = () => {
     setFermee(true);
@@ -76,7 +78,7 @@ export function OffreAvantDePartir({
   };
 
   return (
-    <Sheet open={ouverte} onClose={paye ? () => {} : refuser} onClosed={onClosed} labelledBy={titre} belowHeader={false}>
+    <Sheet open={ouverte} onClose={paye || occupe ? () => {} : refuser} onClosed={onClosed} labelledBy={titre} belowHeader={false}>
       <div className="flex flex-col items-center gap-2 pt-1 text-center">
         <div className="relative">
           <BubbleLogo size={76} />
@@ -153,9 +155,10 @@ export function OffreAvantDePartir({
           /* Plus vendue (prise dans un autre onglet, ou passée côté serveur) : elle s’efface, comme à la fin du compte à rebours */
           quand={{ offre: () => setVendue(false) }}
           surPaye={setPaye}
+          surOccupe={setOccupe}
           fleche
         />
-        {!paye && (
+        {!paye && !occupe && (
           <Button variant="link" onClick={refuser}>
             {OFFRE_SUITE.non}
           </Button>
