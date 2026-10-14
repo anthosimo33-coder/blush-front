@@ -1,7 +1,9 @@
 # La veille de la production, toutes les 15 minutes : la page d’accueil et le réveil (/api/reveil, qui répond 503 quand
 # la base ne répond pas) doivent répondre. Sinon le lancement échoue, et GitHub l’écrit par mail (pour un workflow
-# planifié, à qui a modifié sa ligne `cron` en dernier). Elle appelle aussi les relances par mail (/api/cron/relances) :
-# Vercel Hobby n’autorise qu’un cron par jour (vercel.json : la purge de nuit).
+# planifié, à qui a modifié sa ligne `cron` en dernier). Elle appelle aussi, en secours, les relances par mail
+# (/api/cron/relances) : Vercel Cron les appelle d’abord, toutes les 5 minutes (vercel.json), car GitHub décale ses
+# lancements planifiés de plusieurs heures (le 13 octobre : trois en neuf heures). Deux passages proches ne relancent
+# pas deux fois.
 #
 # Ce qu’elle attend du dépôt (BACKEND.md, « Mise en ligne ») : le secret CRON_SECRET, le même que dans Vercel. Sans lui,
 # ou tant que la route des relances n’existe pas (404), l’étape des relances se saute et le dit ; la veille tourne.
@@ -13,7 +15,7 @@ name: Veille
 
 on:
   schedule:
-    # Toutes les 15 minutes (GitHub peut décaler un lancement planifié de quelques minutes quand il est chargé)
+    # Toutes les 15 minutes, en principe : GitHub décale un lancement planifié, parfois de plusieurs heures
     - cron: "*/15 * * * *"
   # À la main, pour l’essayer : onglet Actions, « Veille », « Run workflow »
   workflow_dispatch:

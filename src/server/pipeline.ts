@@ -408,7 +408,7 @@ const EN_PLAN_APRES_S = 300;
 
 /**
  * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes, ou abandonnée (son battement de cœur
- * perdu), qu’un essai peut encore faire. La veille des 15 minutes (GET /api/cron/relances) les reprend, chacune dans sa
+ * perdu), qu’un essai peut encore faire. Le passage des 5 minutes (GET /api/cron/relances) les reprend, chacune dans sa
  * propre fonction (passerLaMain) : le filet du relais, qu’un réseau coupé ou un déploiement peut rater. Les plus
  * récemment arrêtées d’abord (celles qu’on attend sans doute encore). Rend le nombre de chaînes reprises.
  */

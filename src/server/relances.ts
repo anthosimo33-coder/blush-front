@@ -21,8 +21,8 @@ import type { PassageDesRelances } from "@/types/api";
  * ni pour une conv en alerte (le mode sobre), ni à l’équipe, ni à qui la bêta fermée ne laisse pas entrer, ni après la
  * désinscription (users.relances_coupees_le, le lien signé du mail). Dans la règle des 24 h entre deux offres montrées
  * (src/server/offres-uniques.ts), seule la ① ne la retient pas : elle la suit de deux heures, par définition. Une ③ ou
- * une ④ montrée dans les 24 h la fait attendre (tant qu’elle reste fraîche). Envoyée par GET /api/cron/relances (la
- * veille de GitHub, toutes les 15 minutes), dans le plafond des relances du jour puis dans le quota des mails (sorte
+ * une ④ montrée dans les 24 h la fait attendre (tant qu’elle reste fraîche). Envoyée par GET /api/cron/relances (Vercel
+ * Cron, toutes les 5 minutes), dans le plafond des relances du jour puis dans le quota des mails (sorte
  * « relance », parmi les premières retenues).
  */
 
