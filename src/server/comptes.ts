@@ -19,9 +19,13 @@ import { duBrouillon } from "./histoires";
  */
 export async function supprimerCompte({ id, email }: { id: string; email: string }, { brouillon }: { brouillon?: string } = {}): Promise<void> {
   await db().transaction(async (tx) => {
-    if (brouillon) await tx.delete(schema.stories).where(duBrouillon(brouillon));
+    const brouillons = brouillon ? await tx.delete(schema.stories).where(duBrouillon(brouillon)).returning({ id: schema.stories.id }) : [];
     await tx.delete(schema.loginCodes).where(eq(schema.loginCodes.email, email));
     await tx.delete(schema.waitlist).where(eq(schema.waitlist.emailHash, empreinteDeLaListe(email)));
     await tx.delete(schema.users).where(eq(schema.users.id, id));
+    /* Au registre : une base restaurée à un instant d’avant les ré-effacera (BACKEND.md, « Les sauvegardes ») */
+    await tx
+      .insert(schema.effacements)
+      .values([{ quoi: "compte", cible: id }, { quoi: "liste", cible: empreinteDeLaListe(email) }, ...brouillons.map((b) => ({ quoi: "conv" as const, cible: b.id }))]);
   });
 }

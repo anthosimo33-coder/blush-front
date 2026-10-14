@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GENRES_FIL, OFFRES, OFFRES_UNIQUES, SOURCES_VISITE, STATUTS_ACHAT, VOIX } from "../../types";
+import { ETAPES_VISITE, EVENEMENTS_ECOUTE, FAMILLES_NAVIGATEUR, GENRES_FIL, METRIQUES_WEB, OFFRES, OFFRES_UNIQUES, SOURCES_VISITE, STATUTS_ACHAT, VOIX } from "../../types";
 import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
@@ -534,6 +534,63 @@ export const presences = pgTable(
     lon: real("lon"),
   },
   (t) => [primaryKey({ columns: [t.onglet, t.minute] }), index("presences_vu_idx").on(t.vuLe), index("presences_minute_idx").on(t.minute)],
+);
+
+/**
+ * Le registre des effacements demandés (« Tout effacer », « Supprimer l’histoire » : src/server/comptes.ts,
+ * src/server/histoires.ts) : quoi (un compte, une conv, une inscription à la liste d’attente), son identifiant (l’id,
+ * ou l’empreinte de l’email pour la liste : jamais l’email), et quand. Une base restaurée à un instant passé (BACKEND.md,
+ * « Les sauvegardes ») ramène ce qui a été effacé depuis : ce registre, lu avant la restauration, dit quoi ré-effacer.
+ * Gardé EFFACEMENTS_GARDES_JOURS (la purge).
+ */
+export const effacements = pgTable(
+  "effacements",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    quoi: text("quoi", { enum: ["compte", "conv", "liste"] }).notNull(),
+    cible: text("cible").notNull(),
+    le: quand("le").notNull().defaultNow(),
+  },
+  (t) => [index("effacements_le_idx").on(t.le)],
+);
+
+/**
+ * Les erreurs des navigateurs (src/server/navigateur.ts) : une ligne par signature et par jour (de Paris), son nombre de
+ * fois, l’écran et la famille du navigateur de la première. Le message est coupé et masqué (emails, longs nombres), la
+ * source réduite à un fichier de l’appli : ni compte, ni adresse IP, ni adresse de page. Gardées NAVIGATEUR_GARDE_JOURS.
+ */
+export const erreursNavigateur = pgTable(
+  "erreurs_navigateur",
+  {
+    jour: date("jour").notNull(),
+    signature: text("signature").notNull(),
+    nom: text("nom").notNull(),
+    message: text("message").notNull(),
+    source: text("source"),
+    etape: text("etape", { enum: ETAPES_VISITE }).notNull(),
+    famille: text("famille", { enum: FAMILLES_NAVIGATEUR }).notNull(),
+    fois: integer("fois").notNull().default(1),
+    premiereLe: quand("premiere_le").notNull().defaultNow(),
+    derniereLe: quand("derniere_le").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.jour, t.signature] }), index("erreurs_navigateur_derniere_idx").on(t.derniereLe)],
+);
+
+/**
+ * Les mesures de vitesse des navigateurs (les Web Vitals, src/server/navigateur.ts) : l’écran, téléphone ou non, la
+ * mesure et sa valeur. Ni compte, ni adresse IP. Gardées NAVIGATEUR_GARDE_JOURS, pour les médianes d’/admin.
+ */
+export const mesuresNavigateur = pgTable(
+  "mesures_navigateur",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    le: quand("le").notNull().defaultNow(),
+    etape: text("etape", { enum: ETAPES_VISITE }).notNull(),
+    mobile: boolean("mobile").notNull(),
+    metrique: text("metrique", { enum: METRIQUES_WEB }).notNull(),
+    valeur: real("valeur").notNull(),
+  },
+  (t) => [index("mesures_navigateur_le_idx").on(t.le)],
 );
 
 /**

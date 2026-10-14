@@ -16,6 +16,7 @@ import { NBSP } from "@/lib/format";
  * courte « Ton email n’est jamais partagé » (src/contenu/confidentialite.ts) est à revoir avec lui.
  * « Les visites, sans cookie » (la mesure d’audience d’/admin, src/server/visites.ts) : ligne ajoutée et validée le
  * 13 octobre 2026.
+ * TODO(produit): ligne « Les erreurs et la vitesse de l’appli » ajoutée le 14 octobre 2026 (src/server/navigateur.ts), à valider.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -60,6 +61,11 @@ export function ConfidentialiteScreen() {
           Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
           sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Si tu
           crées un compte, il garde seulement d’où tu es venu.
+        </Ligne>
+        {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
+        <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">
+          Quand l’appli plante ou rame chez toi, ton navigateur nous l’envoie pour qu’on corrige{NBSP}: le message d’erreur (sans email ni numéro), l’écran où tu étais, le type
+          d’appareil et le temps d’affichage. Rien de ta conv, ni ton nom, ni ton adresse IP. Gardé 30 jours.
         </Ligne>
       </InsetGroup>
 

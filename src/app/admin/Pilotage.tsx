@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icons";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
+import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
 import type { OffreUnique } from "@/types";
 import type { Direct } from "@/types/api";
@@ -33,6 +34,7 @@ import {
 import { CarteEnDirect } from "./CarteEnDirect";
 import { EnTete, type BaseDeLAdmin } from "./EnTete";
 import { GestesDeLEquipe } from "./GestesDeLEquipe";
+import { Navigateurs } from "./Navigateurs";
 import { Barre, Bloc, PastilleEcart, type AideDuBloc } from "./morceaux";
 import { SondeDuDirect } from "./SondeDuDirect";
 
@@ -83,7 +85,20 @@ const jourDeParis = (t: number) => new Date(t).toLocaleDateString("sv-SE", { tim
  * `direct` : le direct lu par la page (null : pas lu, la carte le lit) ; `base` : /admin, ou l’aperçu de l’équipe ;
  * `sonder` faux : l’aperçu, dont le direct reste figé.
  */
-export function Pilotage({ s, direct, base = "/admin", sonder = true }: { s: StatsAdmin; direct: Direct | null; base?: BaseDeLAdmin; sonder?: boolean }) {
+export function Pilotage({
+  s,
+  direct,
+  navigateurs = null,
+  base = "/admin",
+  sonder = true,
+}: {
+  s: StatsAdmin;
+  direct: Direct | null;
+  /** Les erreurs et la vitesse chez les visiteurs (src/server/navigateur.ts) ; null : pas lues. */
+  navigateurs?: SanteDesNavigateurs | null;
+  base?: BaseDeLAdmin;
+  sonder?: boolean;
+}) {
   const p = s.pilotage;
   const periode = PERIODES[s.jours];
   return (
@@ -118,6 +133,8 @@ export function Pilotage({ s, direct, base = "/admin", sonder = true }: { s: Sta
             <Couts s={s} />
             <Sante s={s} />
           </div>
+
+          {navigateurs && <Navigateurs n={navigateurs} />}
 
           <Bloc id="outils" titre="Outils" sous="Chaque geste est noté au journal de l’équipe">
             <div className="mt-4 flex flex-col gap-4">

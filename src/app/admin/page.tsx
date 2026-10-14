@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { direct } from "@/server/direct";
 import { estAdmin } from "@/server/env";
 import { journalErreur } from "@/server/journal";
+import { santeDesNavigateurs } from "@/server/navigateur";
 import { contexte } from "@/server/requete";
 import { statsAdmin, type Periode } from "@/server/stats";
 import { AdminScreen } from "./AdminScreen";
@@ -22,12 +23,17 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
   const jours: Periode = p === 1 || p === 30 ? p : 7;
   if (q.version === "actuelle") return <AdminScreen s={await statsAdmin(jours)} />;
   /* Le direct n’empêche jamais le pilotage : lu ici pour le premier rendu, il se relit seul dans la page en cas d’échec */
-  const [s, d] = await Promise.all([
+  const [s, d, n] = await Promise.all([
     statsAdmin(jours),
     direct().catch((e: unknown) => {
       journalErreur("admin:direct", e);
       return null;
     }),
+    /* Les navigateurs non plus : sans eux, le pilotage s’affiche sans leur bloc */
+    santeDesNavigateurs(jours).catch((e: unknown) => {
+      journalErreur("admin:navigateurs", e);
+      return null;
+    }),
   ]);
-  return <Pilotage s={s} direct={d} />;
+  return <Pilotage s={s} direct={d} navigateurs={n} />;
 }

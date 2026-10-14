@@ -5,6 +5,7 @@ import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
 import { PREDICATS } from "./depot";
 import { journalErreur } from "./journal";
+import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
 import { aujourdhuiParis } from "./temps";
 import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
 
@@ -21,8 +22,13 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien ;
  * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
  *   (PRESENCES_GARDEES_JOURS), les visites de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel des empreintes dès le
- *   surlendemain : plus rien ne relie alors une empreinte à une connexion.
+ *   surlendemain : plus rien ne relie alors une empreinte à une connexion ;
+ * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
+ * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base.
  */
+
+/** Combien de jours on garde le registre des effacements : plus que la fenêtre de restauration de Neon (BACKEND.md, « Les sauvegardes »). */
+const EFFACEMENTS_GARDES_JOURS = 90;
 
 /** Combien de jours on garde un webhook de paiement déjà traité (son `webhook-id`, pour l’ignorer s’il revient). */
 const EVENEMENTS_PAIEMENT_GARDES_JOURS = 90;
@@ -95,6 +101,19 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.visites)
       .where(lt(schema.visites.arriveLe, il_y_a(VISITES_GARDEES_JOURS)));
+  });
+  await etape("registre des effacements", async () => {
+    await db()
+      .delete(schema.effacements)
+      .where(lt(schema.effacements.le, il_y_a(EFFACEMENTS_GARDES_JOURS)));
+  });
+  await etape("erreurs et mesures des navigateurs", async () => {
+    await db()
+      .delete(schema.erreursNavigateur)
+      .where(lt(schema.erreursNavigateur.derniereLe, il_y_a(NAVIGATEUR_GARDE_JOURS)));
+    await db()
+      .delete(schema.mesuresNavigateur)
+      .where(lt(schema.mesuresNavigateur.le, il_y_a(NAVIGATEUR_GARDE_JOURS)));
   });
   /* Le sel d’hier sert encore (sourceDeLaVisite retrouve la visite de la veille) ; celui d’avant-hier, plus rien */
   await etape("sels des visites", async () => {

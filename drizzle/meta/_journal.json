@@ -134,6 +134,13 @@
       "when": 1791908219075,
       "tag": "0018_rapport_d_avance",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791988663467,
+      "tag": "0019_navigateurs_et_effacements",
+      "breakpoints": true
     }
   ]
 }

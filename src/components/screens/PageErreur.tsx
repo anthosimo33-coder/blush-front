@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { NBSP } from "@/lib/format";
+import { signalerErreur } from "@/lib/sentinelle";
 import { tracer } from "@/lib/tracer";
 import { PageProbleme } from "./PageProbleme";
 
@@ -10,10 +11,14 @@ import { PageProbleme } from "./PageProbleme";
  * Une page qui plante (la base qui tarde au réveil, un souci passager) : on le dit, et on réessaie. Celle de
  * src/app/error.tsx, et celle de src/app/global-error.tsx quand le cadre lui-même a planté. Une erreur du serveur a une
  * empreinte (digest), que le journal du serveur garde aussi (src/instrumentation.ts) : la page la montre sous le bouton,
- * pour qu’on la retrouve si on nous l’envoie. `trace` : l’événement écrit dans la console (src/lib/tracer.ts).
+ * pour qu’on la retrouve si on nous l’envoie. `trace` : l’événement écrit dans la console (src/lib/tracer.ts). Une
+ * erreur du navigateur (sans empreinte : le serveur ne l’a pas vue) est signalée à l’équipe (signalerErreur).
  */
 export function PageErreur({ error, retry, trace }: { error: Error & { digest?: string }; retry: () => void; trace: string }) {
-  useEffect(() => tracer(trace, error), [trace, error]);
+  useEffect(() => {
+    tracer(trace, error);
+    if (!error.digest) signalerErreur(error);
+  }, [trace, error]);
   return (
     <PageProbleme
       titre="Ça a coincé de notre côté."

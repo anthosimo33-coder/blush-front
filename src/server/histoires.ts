@@ -318,5 +318,9 @@ export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<M
 
 /** Efface l’histoire et tout ce qui en vient (verdict, rapport, mémoire, chat, tâches : en cascade). */
 export async function supprimerHistoire(id: string): Promise<void> {
-  await db().delete(schema.stories).where(eq(schema.stories.id, id));
+  await db().transaction(async (tx) => {
+    const [effacee] = await tx.delete(schema.stories).where(eq(schema.stories.id, id)).returning({ id: schema.stories.id });
+    /* Au registre : une base restaurée à un instant d’avant la ré-effacera (BACKEND.md, « Les sauvegardes ») */
+    if (effacee) await tx.insert(schema.effacements).values({ quoi: "conv", cible: id });
+  });
 }

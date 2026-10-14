@@ -4,6 +4,7 @@ import { SoundBoot } from "@/components/shell/SoundBoot";
 import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
 import { Presence } from "@/lib/presence";
+import { Sentinelle } from "@/lib/sentinelle";
 import { ErreurDeParcours } from "@/components/screens/ErreurDeParcours";
 import { surVercel } from "@/server/drapeaux";
 import { URL_SITE } from "@/server/env";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Reveil />
         <SuiviNavigation />
         <Presence />
+        <Sentinelle />
         <Suspense fallback={null}>
           <ErreurDeParcours />
         </Suspense>

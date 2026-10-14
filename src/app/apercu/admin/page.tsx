@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { Periode } from "@/server/stats";
 import { AdminScreen } from "@/app/admin/AdminScreen";
 import { Pilotage } from "@/app/admin/Pilotage";
-import { directDExemple, statsDExemple } from "./exemple";
+import { directDExemple, navigateursDExemple, statsDExemple } from "./exemple";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -17,5 +17,5 @@ export default async function Page({ searchParams }: PageProps<"/apercu/admin">)
   const jours: Periode = p === 1 || p === 30 ? p : 7;
   const s = statsDExemple(jours, { calme: q.calme === "1", suivi: q.suivi !== "0" });
   if (q.version === "actuelle") return <AdminScreen s={s} base="/apercu/admin" />;
-  return <Pilotage s={s} direct={directDExemple()} base="/apercu/admin" sonder={false} />;
+  return <Pilotage s={s} direct={directDExemple()} navigateurs={navigateursDExemple({ calme: q.calme === "1" })} base="/apercu/admin" sonder={false} />;
 }

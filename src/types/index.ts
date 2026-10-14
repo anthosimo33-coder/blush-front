@@ -67,6 +67,13 @@ export type EvenementEcoute = (typeof EVENEMENTS_ECOUTE)[number];
  */
 export const ETAPES_VISITE = ["accueil", "partage", "import", "verdict", "rapport", "paiement", "chat", "compte", "autre"] as const;
 export type EtapeVisite = (typeof ETAPES_VISITE)[number];
+
+/** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
+export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
+export type MetriqueWeb = (typeof METRIQUES_WEB)[number];
+/** La famille d’un navigateur, tirée de son User-Agent par le serveur (src/server/navigateur.ts) : jamais l’User-Agent lui-même. */
+export const FAMILLES_NAVIGATEUR = ["iphone", "iphone-appli", "android", "android-appli", "ordinateur", "autre"] as const;
+export type FamilleNavigateur = (typeof FAMILLES_NAVIGATEUR)[number];
 /**
  * D’où vient un visiteur (visites.source, users.source) : le lien d’une créatrice (utm_source), sinon le site d’où il
  * arrive, sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct » (src/server/visites.ts, sourceDe).
