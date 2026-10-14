@@ -255,8 +255,9 @@ type Reponses = {
   "GET /api/compte": Account;
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
+  "GET /api/cron/chaine": Ok;
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "GET /api/cron/relances": PassageDesRelances;
+  "GET /api/cron/relances": PassageDesRelances & { chaines: number };
   "POST /api/desinscription": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
@@ -350,6 +351,8 @@ export const ROUTES = {
   "POST /api/chat/debloquer": { corps: z.object({ message: z.number().int().positive() }) },
   "GET /api/compte": {},
   "DELETE /api/compte": {},
+  /* Le relais de la chaîne (src/server/relais.ts) : `?histoire=<uuid>&relais=<rang>`, avec le secret CRON_SECRET */
+  "GET /api/cron/chaine": {},
   "GET /api/cron/purge": {},
   "GET /api/cron/relances": {},
   /* Le lien signé de la relance */

@@ -12,7 +12,8 @@ import { ARRETS_DU_BUDGET, codeImprevu, ErreurTache, estBudget, estBudgetVoix, e
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
-import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, planifier, prendre, type Tache } from "./taches";
+import { passerLaMain } from "./relais";
+import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, PERIME_S, planifier, prendre, type Tache } from "./taches";
 import { donneesMemoire } from "./depot";
 import type { DonneesMemoire, DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
@@ -363,18 +364,23 @@ async function executer(t: Tache): Promise<Issue> {
 }
 
 /**
- * Enchaîne les tâches d’une histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance
- * (sinon elle repart au prochain passage : le suivi de la lecture et du rapport relance la chaîne). Deux appels en même
- * temps ne font jamais deux fois la même tâche : `prendre` est atomique. Le budget de l’IA atteint arrête la chaîne : les
- * étapes suivantes l’attendraient aussi.
+ * Enchaîne les tâches d’une histoire tant qu’il en reste, et tant que la suivante a le temps de finir avant l’échéance ;
+ * sinon, elle passe la main à une nouvelle fonction, qui la reprend aussitôt (passerLaMain, src/server/relais.ts ;
+ * `relais` : combien de fois d’affilée elle l’a déjà fait). Deux appels en même temps ne font jamais deux fois la même
+ * tâche : `prendre` est atomique. Le budget de l’IA atteint arrête la chaîne : les étapes suivantes l’attendraient aussi.
  */
-export async function executerChaine(storyId: string): Promise<void> {
+export async function executerChaine(storyId: string, { relais = 0 }: { relais?: number } = {}): Promise<void> {
   await cloreLesAbandons(storyId);
   if (await occupee(storyId)) return;
   await avecEcheance(ECHEANCE_CHAINE_MS, async () => {
     for (;;) {
       const [t] = await aRelancer(storyId);
-      if (!t || tempsRestant() < tempsPourCommencer(t.kind)) return;
+      if (!t) return;
+      /* Plus le temps de la commencer ici (la mémoire, après le rapport) : une fonction neuve la reprend tout de suite */
+      if (tempsRestant() < tempsPourCommencer(t.kind)) {
+        await passerLaMain(storyId, relais + 1);
+        return;
+      }
       const pris = await prendre(t.id);
       if (!pris) return;
       const issue = await executer(pris);
@@ -389,8 +395,42 @@ export async function executerChaine(storyId: string): Promise<void> {
  * aRelancer) laisse une ligne au journal, son nom et son code, jamais son message (une erreur SQL cite ses paramètres).
  * Ne rejette jamais. executerChaine, elle, rejette : les tests et la tâche de nuit voient ses erreurs.
  */
-export function relancerChaine(storyId: string): Promise<void> {
-  return auMieux(() => executerChaine(storyId), "chaîne non relancée", { histoire: storyId });
+export function relancerChaine(storyId: string, options: { relais?: number } = {}): Promise<void> {
+  return auMieux(() => executerChaine(storyId, options), "chaîne non relancée", { histoire: storyId });
+}
+
+/* ———— La veille ———— */
+
+/** Ce que la veille reprend au plus à chaque passage : autant de fonctions lancées d’un coup. */
+const CHAINES_PAR_VEILLE = 20;
+/** Une étape en attente depuis plus que ça, sans exécution qui la tienne, est restée en plan (un relais raté). */
+const EN_PLAN_APRES_S = 300;
+
+/**
+ * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes, ou abandonnée (son battement de cœur
+ * perdu), qu’un essai peut encore faire. La veille des 15 minutes (GET /api/cron/relances) les reprend, chacune dans sa
+ * propre fonction (passerLaMain) : le filet du relais, qu’un réseau coupé ou un déploiement peut rater. Les plus
+ * récemment arrêtées d’abord (celles qu’on attend sans doute encore). Rend le nombre de chaînes reprises.
+ */
+export async function reprendreLesChainesEnPlan(): Promise<number> {
+  const t = schema.tasks;
+  const lignes = await db()
+    .select({ storyId: t.storyId })
+    .from(t)
+    .where(
+      and(
+        lt(t.attempts, ESSAIS_MAX),
+        or(
+          and(eq(t.status, "attente"), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)),
+          and(eq(t.status, "en_cours"), lt(t.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
+        ),
+      ),
+    )
+    .groupBy(t.storyId)
+    .orderBy(desc(sql`max(${t.updatedAt})`))
+    .limit(CHAINES_PAR_VEILLE);
+  const reprises = await Promise.all(lignes.map((l) => passerLaMain(l.storyId, 1)));
+  return reprises.filter(Boolean).length;
 }
 
 /**

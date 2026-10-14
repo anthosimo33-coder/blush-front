@@ -4,6 +4,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 /* after() de Next ne vit que dans une requête : ici, on garde ce qui devait partir après la réponse, pour le lancer soi-même */
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
+/* Le relais de la chaîne (src/server/relais.ts) : chaque passage de main noté, sans appel réseau */
+const relais = vi.hoisted(() => [] as [string, number][]);
+vi.mock("@/server/relais", () => ({ RELAIS_MAX: 5, passerLaMain: async (histoire: string, rang: number) => (relais.push([histoire, rang]), true) }));
 
 import type { Utilisateur } from "@/server/auth";
 import { chiffrerOctets } from "@/server/chiffrement";
@@ -14,7 +17,7 @@ import { avecEcheance } from "@/server/echeance";
 import { historique } from "@/server/historique";
 import { histoireOuverte, histoiresDuCompte } from "@/server/histoires";
 import { versionImage } from "@/server/partages";
-import { executerChaine, tempsPourCommencer } from "@/server/pipeline";
+import { executerChaine, reprendreLesChainesEnPlan, tempsPourCommencer } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { audioDuCompte } from "@/server/vocal";
 import { compteDeTest, convPrete, debloquerLaConv } from "./aide/fixtures";
@@ -87,17 +90,38 @@ describe("ce que lisent les écrans", () => {
 });
 
 describe("la chaîne", () => {
-  it("ne commence pas une étape qu’elle n’aurait pas le temps de finir", async () => {
+  it("ne commence pas une étape qu’elle n’aurait pas le temps de finir : elle passe la main à une fonction neuve", async () => {
     const compte = await compteDeTest("fluidite-chaine");
     const id = await importee("01-a-deux-doigts.txt", compte);
-    /* Moins que le temps d’un verdict avant l’échéance : il attend le prochain passage */
+    /* Moins que le temps d’un verdict avant l’échéance : il attend, et la chaîne passe la main (le premier relais) */
+    relais.length = 0;
     await avecEcheance(tempsPourCommencer("verdict") - 5_000, () => executerChaine(id));
     expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("attente");
+    expect(relais).toEqual([[id, 1]]);
+    /* Reprise par un relais, elle donne son rang au suivant */
+    await avecEcheance(tempsPourCommencer("verdict") - 5_000, () => executerChaine(id, { relais: 2 }));
+    expect(relais).toEqual([
+      [id, 1],
+      [id, 3],
+    ]);
     /* Le temps qu’il faut : verdict, puis le plan et les chapitres s’enchaînent sans attendre un sondage */
     await debloquerLaConv(id);
     await executerChaine(id);
     const { verdict, rapport_chapitres } = await etatDesTaches(id, ["verdict", "rapport_chapitres"]);
     expect([verdict?.status, rapport_chapitres?.status]).toEqual(["fini", "fini"]);
+  });
+
+  it("la veille reprend une chaîne restée en plan (une étape en attente depuis plus de 5 minutes), pas une qui vient d’être planifiée", async () => {
+    const compte = await compteDeTest("fluidite-en-plan");
+    const [enPlan, fraiche] = [await importee("01-a-deux-doigts.txt", compte), await importee("04-ghosting.txt", compte)];
+    await db()
+      .update(schema.tasks)
+      .set({ updatedAt: new Date(Date.now() - 10 * 60_000) })
+      .where(eq(schema.tasks.storyId, enPlan));
+    relais.length = 0;
+    expect(await reprendreLesChainesEnPlan()).toBeGreaterThanOrEqual(1);
+    expect(relais).toContainEqual([enPlan, 1]);
+    expect(relais.map(([h]) => h)).not.toContain(fraiche);
   });
 
   it("donne à chaque étape le temps de finir avant que Vercel coupe la fonction", () => {
