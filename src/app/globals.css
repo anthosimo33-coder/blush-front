@@ -1411,7 +1411,9 @@ html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) 
 
 /* ———— Survol des boîtes cliquables ————
    Défini une fois ici (hors couche, donc prioritaire sur les ombres utilitaires).
-   Survol seulement avec une souris ; la pression (« il s’enfonce d’1 px ») partout. */
+   Survol seulement avec une souris ; la pression (« il s’enfonce d’1 px ») partout.
+   Il écrit `translate` : une boîte qui se soulève ne se place jamais par un translate de Tailwind, elle sauterait
+   (centrée : par ses marges ; tests/unit/lift.test.ts). */
 .lift {
   transition:
     translate 0.22s cubic-bezier(0.2, 0.7, 0.2, 1),

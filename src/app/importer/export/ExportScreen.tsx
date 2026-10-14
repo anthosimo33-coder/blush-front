@@ -159,10 +159,11 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
           />
           <PhoneScreen menu={data.menu} />
           {adresseVideo && (
+            /* Centré par ses marges, jamais par translate : le soulevé du survol et du toucher (lift) le réécrit, le bouton sautait de côté */
             <button
               type="button"
               onClick={() => setVideo(true)}
-              className="lift lift-sm absolute bottom-0 left-1/2 inline-flex h-11 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-note font-black text-ink shadow-soft"
+              className="lift lift-sm absolute inset-x-0 bottom-0 mx-auto inline-flex h-11 w-fit items-center gap-2.5 whitespace-nowrap rounded-full bg-white pl-1.5 pr-4 text-note font-black text-ink shadow-soft"
             >
               <span className="lift-pop flex size-8 items-center justify-center rounded-full bg-ink">
                 <Icon name="play" size={14} fill="currentColor" stroke={0} className="text-white" />
