@@ -505,6 +505,16 @@ export function faireSigne(corps: Routes["POST /api/presence"]["corps"]): void {
   void appel("POST /api/presence", { corps, keepalive: true }).catch((e: unknown) => tracer("presence", e));
 }
 
+/** Une erreur du navigateur, pour l’équipe (src/lib/sentinelle.tsx). keepalive : elle part même si la page se ferme ; ratée, rien ne se dit (une erreur de plus ne s’annonce pas). */
+export function signalerErreurDuNavigateur(corps: Routes["POST /api/navigateur/erreur"]["corps"]): void {
+  void appel("POST /api/navigateur/erreur", { corps, keepalive: true }).catch(() => {});
+}
+
+/** Les mesures de vitesse d’une page quittée (src/lib/sentinelle.tsx). keepalive : elles partent pendant que la page se ferme. */
+export function envoyerMesuresDuNavigateur(corps: Routes["POST /api/navigateur/mesures"]["corps"]): void {
+  void appel("POST /api/navigateur/mesures", { corps, keepalive: true }).catch(() => {});
+}
+
 /** /admin en direct, à cet instant (réservé à l’équipe). */
 export const lireLeDirect = (signal?: AbortSignal) => appel("GET /api/admin/direct", signal ? { signal } : {});
 

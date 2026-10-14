@@ -1,5 +1,6 @@
 import type { CaseDuPilotage, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { Direct, GesteDuFil } from "@/types/api";
+import type { SanteDesNavigateurs } from "@/server/navigateur";
 
 /*
  * Les chiffres d’exemple du tableau de bord, pour l’aperçu de l’équipe (/apercu/admin, jamais en ligne), la galerie et les
@@ -262,5 +263,32 @@ export function directDExemple(): Direct {
     record: { n: 41, le: iso(Date.UTC(2026, 9, 13, 11, 20)) },
     fil: FIL,
     jour: { visiteurs: 660, achats: 18, centimes: 22140 },
+  };
+}
+
+/** Les navigateurs d’exemple : des écrans rapides, un lent sur téléphone, et deux erreurs inventées (`calme` : aucune). */
+export function navigateursDExemple({ calme = false }: { calme?: boolean } = {}): SanteDesNavigateurs {
+  return {
+    vitesse: [
+      { etape: "accueil", mobile: true, pages: 812, LCP: 1840, INP: 96, CLS: 0.02, TTFB: 310 },
+      { etape: "chat", mobile: true, pages: 433, LCP: 2620, INP: 180, CLS: 0.04, TTFB: 420 },
+      { etape: "rapport", mobile: true, pages: 201, LCP: 4310, INP: 240, CLS: 0.12, TTFB: 980 },
+      { etape: "accueil", mobile: false, pages: 96, LCP: 1210, INP: 48, CLS: 0.01, TTFB: 260 },
+    ],
+    erreurs: calme
+      ? []
+      : [
+          {
+            nom: "TypeError",
+            message: "Cannot read properties of undefined (reading 'bulles')",
+            source: "/_next/static/chunks/0a1b.js:1:2345",
+            etape: "chat",
+            famille: "iphone-appli",
+            fois: 14,
+            derniere: "2026-10-14T09:12:00.000Z",
+          },
+          { nom: "Rejet", message: "AbortError: The operation was aborted.", source: null, etape: "rapport", famille: "android", fois: 3, derniere: "2026-10-14T08:40:00.000Z" },
+        ],
+    totalErreurs: calme ? 0 : 17,
   };
 }

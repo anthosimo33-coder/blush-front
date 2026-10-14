@@ -169,6 +169,12 @@ export const LIMITES = {
    */
   laissezPasserBrouillons: { max: 2, fenetreS: 20 * 60 },
   laissezPasserLots: { max: 80, fenetreS: 20 * 60 },
+  /** Les erreurs qu’un navigateur remonte (POST /api/navigateur/erreur), par adresse IP : une page qui boucle sur une erreur n’inonde pas la base. */
+  erreurNavigateurParIp: { max: 30, fenetreS: 3600 },
+  /** Les envois de mesures de vitesse (POST /api/navigateur/mesures, un par page quittée), par adresse IP. */
+  mesuresParIp: { max: 120, fenetreS: 3600 },
+  /** Les alertes d’une erreur de navigateur jamais vue du jour, pour tous et par jour : les suivantes ne se lisent que dans /admin. */
+  alertesNavigateurParJour: { max: 10, fenetreS: 86400 },
 } as const;
 
 /*

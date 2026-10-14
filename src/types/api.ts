@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { INVITATIONS_PAR_LOT, PRENOM_MAX } from "@/lib/limites";
-import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
+import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, METRIQUES_WEB, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
 import type {
   AnalysisProgress,
   BlushAnswer,
@@ -285,6 +285,9 @@ type Reponses = {
   "GET /api/rapport/pdf": Blob;
   /** `{ ok: false }` en 503 : la base ne répond pas. */
   "POST /api/presence": Ok;
+  /** Toujours `{ ok: true }` : une erreur ignorée (la limite d’une adresse) ne se dit pas. */
+  "POST /api/navigateur/erreur": Ok;
+  "POST /api/navigateur/mesures": Ok;
   "GET /api/reveil": { ok: boolean };
   /** L’audio du vocal du rapport (MP3). */
   "GET /api/vocal/audio": Blob;
@@ -410,6 +413,23 @@ export const ROUTES = {
       premier: z.boolean(),
       utm: z.string().max(80).optional(),
       referent: z.string().max(200).optional(),
+    }),
+  },
+  /** Une erreur du navigateur (src/lib/sentinelle.tsx) : son nom, son message, d’où elle vient, et l’écran. Bornés : le serveur masque le reste. */
+  "POST /api/navigateur/erreur": {
+    corps: z.strictObject({
+      nom: z.string().max(200),
+      message: z.string().max(2000),
+      source: z.string().max(500).optional(),
+      etape: z.enum(ETAPES_VISITE),
+    }),
+  },
+  /** Les mesures de vitesse d’une page quittée (les Web Vitals) : l’écran, téléphone ou non, et une valeur par mesure. */
+  "POST /api/navigateur/mesures": {
+    corps: z.strictObject({
+      etape: z.enum(ETAPES_VISITE),
+      mobile: z.boolean(),
+      mesures: z.array(z.strictObject({ metrique: z.enum(METRIQUES_WEB), valeur: z.number().finite().min(0).max(120_000) })).max(METRIQUES_WEB.length),
     }),
   },
   /* `?moi=` : qui est toi pour l’écran, quand le serveur ne le sait pas */
