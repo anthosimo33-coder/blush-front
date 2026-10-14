@@ -75,7 +75,13 @@ function Panneau({ aide, valeur, contexte, fermer }: { aide: AideDuPilotage; val
         e.preventDefault();
         fermerTout();
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden bg-transparent p-0 text-ink backdrop:bg-transparent"
+      /*
+       * overflow-clip, pas hidden : un dialogue en hidden défile encore. showModal() donne le focus à « Fermer » pendant que
+       * le panneau arrive de la droite, hors de l’écran : Safari faisait défiler le dialogue pour le montrer, et tout le
+       * panneau glissait décalé à gauche, par-dessus le voile (le toucher y tombait sur le panneau), puis sautait à sa place
+       * en fin d’animation. Même précaution que les feuilles (src/components/ui/surfaces.tsx)
+       */
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-clip bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
       {/* Le voile : un clic dessus ferme (au clavier, Échap ou « Fermer ») */}
       <div aria-hidden="true" onClick={fermerTout} className="absolute inset-0 cursor-pointer bg-ink/28 motion-safe:[animation:fadeIn_0.25s_ease-out_both]" />
