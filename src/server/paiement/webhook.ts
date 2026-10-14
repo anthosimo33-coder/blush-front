@@ -109,6 +109,22 @@ export async function livrerLePaiement(mode: Fournisseur["mode"], p: PaiementWho
         "Le rapport a peut-être été payé deux fois : à voir chez Whop, et à rembourser s’il le demande.",
       ]),
     );
+  /*
+   * Payé après que la personne a effacé sa conv (le rapport qu’il débloquait n’existe plus : seules ses bulles sont
+   * livrées) ou tout son compte (rien n’est livré) : encaissé sans rien de ce qu’elle a payé, à rembourser (PAY-2).
+   */
+  const sansConv = r.achat && CATALOGUE[r.achat.offre].conv && !r.achat.storyId;
+  if (r.effet === "livre" && r.achat && (!r.achat.userId || sansConv))
+    after(() =>
+      alerter(
+        "paiement : conv ou compte effacé avant le paiement",
+        [
+          `L’achat ${achat.id} (${achat.offre}, paiement ${p.id}) est payé, mais ${r.achat?.userId ? "sa conv a été effacée entre la commande et le paiement : seules ses bulles sont livrées" : "son compte a été effacé entre la commande et le paiement : rien n’est livré"}.`,
+          "Ce paiement est à rembourser chez Whop.",
+        ],
+        { importante: true },
+      ),
+    );
   return r.effet;
 }
 

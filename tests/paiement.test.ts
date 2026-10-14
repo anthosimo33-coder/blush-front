@@ -444,6 +444,29 @@ describe("payé deux fois", () => {
     expect(await soldeDe(u.id)).toBe(0);
   });
 
+  it("payé après avoir effacé sa conv, ou tout son compte (PAY-2) : l’équipe est prévenue, le paiement est à rembourser", async () => {
+    const { u, conv } = await acheteur("paye-apres-effacement");
+    const { achat } = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps;
+    /* Le webhook préparé avant (le faux Whop lit l’achat du compte), posté après que la conv est effacée */
+    const webhook = await issue(achat, "payer");
+    await db().delete(schema.stories).where(eq(schema.stories.id, conv));
+    expect((await poster(webhook)).status).toBe(200);
+    await apresLaReponse();
+    expect(await achatEnBase(achat)).toMatchObject({ statut: "paye", storyId: null });
+    expect(etat.alertes).toEqual(["paiement : conv ou compte effacé avant le paiement"]);
+
+    etat.alertes.length = 0;
+    const autre = await acheteur("paye-apres-tout-effacer");
+    const deux = (await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    const webhook2 = await issue(deux, "payer");
+    await db().delete(schema.users).where(eq(schema.users.id, autre.u.id));
+    expect((await poster(webhook2)).status).toBe(200);
+    await apresLaReponse();
+    expect(await achatEnBase(deux)).toMatchObject({ statut: "paye", userId: null });
+    expect(etat.alertes).toEqual(["paiement : conv ou compte effacé avant le paiement"]);
+    expect(await soldeDe(u.id)).toBe(10);
+  });
+
   it("deux commandes du même rapport, payées toutes les deux : les bulles de chacune, l’équipe prévenue de la seconde", async () => {
     const { u, conv } = await acheteur("double-commande");
     const [une, deux] = [

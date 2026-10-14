@@ -2,8 +2,9 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { FeuilleFormule } from "@/components/paiement/FeuilleFormule";
+import { OffreAvantDePartir } from "@/components/paiement/OffreAvantDePartir";
 import { PiedGratuit } from "@/components/paiement/PiedGratuit";
-import { DANS_LA_FEUILLE, FEUILLE_FORMULE, PIED_GRATUIT } from "@/contenu/paiement";
+import { DANS_LA_FEUILLE, FEUILLE_FORMULE, OFFRE_SUITE, PIED_GRATUIT } from "@/contenu/paiement";
 import { prixDe } from "@/contenu/offres";
 import { jourEnLettres } from "@/lib/format";
 import { invalidate } from "@/lib/query";
@@ -135,6 +136,57 @@ describe("le faux Whop : sa carte de test, dans la feuille", () => {
     expect(within(carte()).getByText(tel(DANS_LA_FEUILLE.carteRefusee))).toBeTruthy();
     expect(routeur.replace).not.toHaveBeenCalled();
     expect(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("premium")) })).toBeTruthy();
+  });
+});
+
+describe("un paiement en route ne se perd pas", () => {
+  /** Un paiement parti, dont le serveur n’a pas encore répondu (et ne répondra pas pendant le test). */
+  const enRoute = () => commencer.mockImplementationOnce(() => new Promise(() => {}));
+
+  it("« Ta formule » ne se ferme pas pendant « Paiement en cours » (UI-2) : son suivi serait coupé", async () => {
+    const onClose = vi.fn();
+    enRoute();
+    render(<FeuilleFormule open onClose={onClose} autre="Maëlys" chapitres={7} />);
+    await promesses();
+    await promesses();
+    fireEvent.click(within(formule()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("premium")) }));
+    fireEvent.click(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("premium")) }));
+    await promesses();
+    fireEvent(formule(), new Event("cancel", { cancelable: true }));
+    await promesses();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(formule()).toBeTruthy();
+  });
+
+  it("l’offre ① : son compte à rebours à zéro ne la ferme pas pendant le paiement (UI-3), et ne la dit pas passée", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "Date"] });
+    try {
+      enRoute();
+      const rappels = { onRefus: vi.fn(), onPassee: vi.fn(), onClosed: vi.fn() };
+      render(<OffreAvantDePartir fin={Date.now() + 2_000} chapitres={7} {...rappels} />);
+      await promesses();
+      await promesses();
+      const offre = () => screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
+      fireEvent.click(within(offre()).getByRole("button", { name: OFFRE_SUITE.prendre }));
+      fireEvent.click(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("suite")) }));
+      await promesses();
+      act(() => void vi.advanceTimersByTime(3_000));
+      expect(offre()).toBeTruthy();
+      expect(within(offre()).queryByRole("button", { name: OFFRE_SUITE.non })).toBeNull();
+      expect(rappels.onPassee).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Whop sans réponse sûre (PAY-1) : pas de « souci », la page du retour attend la livraison", async () => {
+    commencer.mockResolvedValueOnce({ achat: "a1", checkout: null, url: null, paiement: null });
+    await ouvrir();
+    fireEvent.click(within(formule()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("premium")) }));
+    fireEvent.click(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("premium")) }));
+    await promesses();
+    expect(routeur.replace).toHaveBeenCalledWith("/paiement/retour?achat=a1");
+    expect(screen.queryByText(tel(FEUILLE_FORMULE.souci))).toBeNull();
   });
 });
 

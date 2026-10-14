@@ -124,6 +124,43 @@ describe("la chaîne", () => {
     expect(relais.map(([h]) => h)).not.toContain(fraiche);
   });
 
+  it("la veille reprend un rapport payé arrêté par le budget d’un jour passé (CHAIN-1), pas une lecture gratuite ni un arrêt du jour", async () => {
+    const compte = await compteDeTest("fluidite-budget");
+    const [payee, gratuite, duJour] = [await importee("01-a-deux-doigts.txt", compte), await importee("04-ghosting.txt", compte), await importee("02-reciproque.txt", compte)];
+    await debloquerLaConv(payee);
+    await debloquerLaConv(duJour);
+    const hier = new Date(Date.now() - 26 * 3600_000);
+    for (const [id, quand] of [
+      [payee, hier],
+      [gratuite, hier],
+      [duJour, new Date()],
+    ] as const)
+      await db().update(schema.tasks).set({ status: "echec", error: "budget", updatedAt: quand }).where(eq(schema.tasks.storyId, id));
+    relais.length = 0;
+    await reprendreLesChainesEnPlan();
+    const repris = relais.map(([h]) => h);
+    expect(repris).toContain(payee);
+    expect(repris).not.toContain(gratuite);
+    expect(repris).not.toContain(duJour);
+    /* La chaîne relancée remet l’étape en attente (reprendreApresMinuit), puis la fait */
+    await executerChaine(payee);
+    expect((await etatDesTaches(payee, ["verdict"])).verdict?.status).toBe("fini");
+  });
+
+  it("la veille relance une étape abandonnée à son dernier essai (CHAIN-2) : la chaîne la clôt en échec, sans attendre un écran", async () => {
+    const compte = await compteDeTest("fluidite-dernier-essai");
+    const id = await importee("01-a-deux-doigts.txt", compte);
+    await db()
+      .update(schema.tasks)
+      .set({ status: "en_cours", attempts: 3, heartbeatAt: new Date(Date.now() - 30 * 60_000) })
+      .where(eq(schema.tasks.storyId, id));
+    relais.length = 0;
+    await reprendreLesChainesEnPlan();
+    expect(relais).toContainEqual([id, 1]);
+    await executerChaine(id);
+    expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("echec");
+  });
+
   it("donne à chaque étape le temps de finir avant que Vercel coupe la fonction", () => {
     expect(tempsPourCommencer("rapport_chapitres")).toBeGreaterThan(tempsPourCommencer("rapport_plan"));
     expect(tempsPourCommencer("rapport_chapitres")).toBeLessThan(285_000);
