@@ -24,6 +24,9 @@ vi.mock("@/server/env", async (original) => {
   return { ...m, env: () => ({ ...m.env(), CRON_SECRET: SECRET }), accesLibre: (email: string) => email === EQUIPE.email || m.accesLibre(email) };
 });
 
+/* Le relais de la chaîne, que la même route lance pour les chaînes en plan : jamais vers le vrai site depuis les tests */
+vi.mock("@/server/relais", () => ({ RELAIS_MAX: 5, passerLaMain: async () => false }));
+
 /* Le prestataire des mails, en panne pour certaines adresses : un statut de Resend, ou pas de réponse (le réseau) */
 const pannes = vi.hoisted(() => new Map<string, number | "reseau">());
 vi.mock("@/server/email", async (original) => {
@@ -313,7 +316,7 @@ describe("la relance par mail (②)", () => {
     log.mockRestore();
     expect(r.status).toBe(200);
     const corps = (await r.json()) as Record<string, unknown>;
-    expect(Object.keys(corps).sort()).toEqual(["dues", "ecartees", "echecs", "envoyees", "retenues"]);
+    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "retenues"]);
     expect(Object.values(corps).every((v) => typeof v === "number")).toBe(true);
     expect(corps.envoyees).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(corps)).not.toContain(u.email);

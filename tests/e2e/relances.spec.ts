@@ -19,7 +19,7 @@ test("la relance : le mail « Ta suite t’attend », son lien vers la feuille d
     const r = await request.get("/api/cron/relances", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
     expect(r.status()).toBe(200);
     const corps = (await r.json()) as Record<string, unknown>;
-    expect(Object.keys(corps).sort()).toEqual(["dues", "ecartees", "echecs", "envoyees", "retenues"]);
+    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "retenues"]);
     expect(JSON.stringify(corps)).not.toContain(email);
     return attendreMail(email, { depuis, filtre: (m) => m.sujet === "Ta suite t’attend" });
   });

@@ -70,11 +70,11 @@ const SANS_COMPTE = new Set<CleRoute>([
   "DELETE /api/histoire",
 ]);
 /**
- * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, et les relances
- * que la veille de GitHub appelle), le réveil qui ne dit rien, et le webhook de Whop (sa signature : Whop n’est pas
- * l’appli, sa requête n’a pas notre origine).
+ * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, les relances
+ * que la veille de GitHub appelle, et le relais de la chaîne), le réveil qui ne dit rien, et le webhook de Whop (sa
+ * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine).
  */
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop"]);
+const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/chaine", "GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop"]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
