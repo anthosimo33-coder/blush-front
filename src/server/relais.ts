@@ -7,7 +7,7 @@ import { journal, journalErreur } from "./journal";
  * finirait pas avant l’échéance (la mémoire, après le rapport écrit dans la fonction qui a livré l’achat), la chaîne
  * passe la main à une nouvelle fonction (GET /api/cron/chaine, avec le secret CRON_SECRET), qui la reprend aussitôt,
  * avec tout son temps. Sans lui, l’étape attendait qu’un écran vienne la chercher, et la fiche d’une conv payée restait
- * vide. La veille des 15 minutes rattrape un relais raté (reprendreLesChainesEnPlan, src/server/pipeline.ts).
+ * vide. Le passage des 5 minutes (Vercel Cron) rattrape un relais raté (reprendreLesChainesEnPlan, src/server/pipeline.ts).
  */
 
 /** Combien de relais d’affilée pour une histoire : chaque étape tient dans une fonction neuve, au-delà c’est une boucle. */
