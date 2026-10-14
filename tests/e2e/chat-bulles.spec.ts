@@ -154,6 +154,8 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await payerParCarte(page);
     /* La feuille attend la livraison, puis revient au chat, qui lit la réponse prête et retire `?recharge=` de l’adresse */
     await page.waitForURL((u) => u.pathname === "/app" && !u.search.includes("recharge"), { timeout: 2 * RESEAU });
+    /* Livré, la feuille se ferme d’elle-même (UI-1) : elle ne reste pas sur « C’est payé », modale, par-dessus le chat */
+    await expect(recharge).toBeHidden();
   });
 
   await test.step("revenu : « +120 bulles, ta réponse est là », la réponse lue à sa place, sans débit : le compteur à 120 (l’ancien solde + 120)", async () => {

@@ -210,7 +210,7 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", fournisseur: "whop", centimes: 1490 });
   });
 
-  it("Whop qui refuse : un sous-statut refusé ou un 402, 402 « carte » (l’achat échoue) ; une panne, 502 « panne » (l’achat échoue aussi, son webhook le livrerait)", async () => {
+  it("Whop qui refuse : un sous-statut refusé ou un 402, 402 « carte » (l’achat échoue) ; un autre refus net (4xx), 502 « panne » (l’achat échoue aussi)", async () => {
     const { u } = await acheteur("feuille-whop-refus");
     etat.mode = "whop";
     const repondre = (reponse: () => Response) =>
@@ -222,10 +222,58 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
     expect(await payer({ offre: "rapport", jeton: "ctok_w2" })).toEqual({ status: 402, corps: { erreur: "carte" } });
     repondre(() => Response.json({ error: { message: "declined" } }, { status: 402 }));
     expect(await payer({ offre: "rapport", jeton: "ctok_w3" })).toEqual({ status: 402, corps: { erreur: "carte" } });
-    repondre(() => new Response("{}", { status: 500 }));
+    repondre(() => Response.json({ error: { message: "Missing required parameter: plan" } }, { status: 400 }));
     expect(await payer({ offre: "rapport", jeton: "ctok_w4" })).toEqual({ status: 502, corps: { erreur: "panne" } });
     const statuts = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).map((a) => a.statut);
     expect(statuts).toEqual(["echoue", "echoue", "echoue"]);
+  });
+
+  it("Whop sans réponse sûre (PAY-1) : une panne se réessaie une fois avec la même clé ; un délai, ou deux pannes, laissent l’achat en attente sans « panne » (l’écran attend son webhook)", async () => {
+    const { u } = await acheteur("feuille-whop-incertain");
+    etat.mode = "whop";
+    const cles: (string | null)[] = [];
+    const suite = (...reponses: (() => Response)[]) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_url: string, init: RequestInit) => {
+          cles.push(new Headers(init.headers).get("idempotency-key"));
+          const r = reponses.shift();
+          if (!r) throw new Error("un appel de trop");
+          return r();
+        }),
+      );
+    /* Une panne, puis le paiement : le même jeton repart avec la même clé d’idempotence, Whop ne paie qu’une fois */
+    suite(
+      () => new Response("{}", { status: 502 }),
+      () => Response.json({ id: "pay_w5", status: "paid", substatus: "succeeded", client_secret: null }),
+    );
+    const repris = await payer({ offre: "rapport", jeton: "ctok_w5" });
+    expect(repris).toMatchObject({ status: 200, corps: { paiement: { id: "pay_w5", statut: "paid", secret: null } } });
+    expect(cles).toHaveLength(2);
+    expect(cles[0]).toBe(cles[1]);
+    expect(cles[0]).toMatch(/^jeton:/);
+    /* Pas de réponse à temps (le réseau, le délai) : pas de nouvel essai, l’achat attend son webhook */
+    cles.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        cles.push(null);
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const sansReponse = await payer({ offre: "rapport", jeton: "ctok_w6" });
+    expect(sansReponse).toEqual({ status: 200, corps: { achat: expect.any(String), checkout: null, url: null, paiement: null } });
+    expect(cles).toHaveLength(1);
+    expect((await achatEnBase(sansReponse.corps.achat)).statut).toBe("en_attente");
+    /* Deux pannes de suite : l’achat attend aussi, l’acheteur n’est pas invité à repayer */
+    suite(
+      () => new Response("{}", { status: 500 }),
+      () => new Response("pas du json", { status: 200 }),
+    );
+    const deuxPannes = await payer({ offre: "rapport", jeton: "ctok_w7" });
+    expect(deuxPannes).toMatchObject({ status: 200, corps: { paiement: null, url: null } });
+    expect((await achatEnBase(deuxPannes.corps.achat)).statut).toBe("en_attente");
+    expect((await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).map((a) => a.statut)).not.toContain("echoue");
   });
 });
 

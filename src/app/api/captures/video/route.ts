@@ -5,12 +5,13 @@ import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { poserBrouillon } from "@/server/cookies";
+import { ErreurPublique } from "@/server/erreurs";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
-import { garde, sousLaLimiteDeLIp } from "@/server/requete";
+import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
 import { fusionnerLots } from "@/server/video";
 import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
@@ -80,7 +81,17 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   const { app, lots, cle } = envoi;
   const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
     const t = enTexte(fusionnerLots(lots, app));
-    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
+    /*
+     * Ses octets dans le budget du jour de l’adresse et de tous (S-02), comme /api/import : ce texte entre en base tel
+     * quel. Comptés ici, une seule fois par envoi (un nouvel essai qui retrouve le brouillon ne recompte rien).
+     */
+    const place = await octetsDansLeBudget(req, Buffer.byteLength(JSON.stringify(t)));
+    if (!place) throw new ErreurPublique("trop_jour");
+    /* Rien n’entre en base : sa place revient à tous, l’adresse garde son compte */
+    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement }).catch(async (e: unknown) => {
+      await place.rendre();
+      throw e;
+    });
     /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
     await compterImportVenuDuPartage();
     await noterAuFil(req, { genre: "import" });

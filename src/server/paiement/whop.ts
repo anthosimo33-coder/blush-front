@@ -21,6 +21,11 @@ const PAGE = { vraie: "https://whop.com/checkout", bacASable: "https://sandbox.w
 
 /** Combien de temps attendre Whop (le webhook doit répondre en moins de 5 s ; la commande, elle, a l’utilisateur qui attend). */
 const DELAI_WHOP_MS = 8_000;
+/**
+ * Un paiement (POST /payments) a plus de temps : l’acheteur attend de toute façon sa réponse, et la couper trop tôt
+ * laisserait un paiement peut-être parti sans que l’on sache s’il l’est (commencerPaiement le vérifie alors).
+ */
+const DELAI_PAIEMENT_MS = 25_000;
 
 /** Ce qu’il faut pour appeler Whop : la clé, le compte (biz_…), le produit (prod_…) et l’API (le bac à sable ou la vraie). */
 export type ConfigWhop = { cle: string; compte: string; produit: string; bacASable: boolean };
@@ -60,7 +65,12 @@ async function motifDuRefus(r: Response): Promise<string | undefined> {
 }
 
 /** Un appel à l’API : son corps JSON lu, ou ErreurWhop. Une lecture (GET) de ce qui n’existe pas (404) rend null. */
-async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string, { corps, idempotence }: { corps?: unknown; idempotence?: string } = {}): Promise<unknown> {
+async function appel(
+  config: ConfigWhop,
+  methode: "GET" | "POST",
+  chemin: string,
+  { corps, idempotence, delai = DELAI_WHOP_MS }: { corps?: unknown; idempotence?: string; delai?: number } = {},
+): Promise<unknown> {
   let r: Response;
   try {
     r = await fetch(`${config.bacASable ? API.bacASable : API.vraie}${chemin}`, {
@@ -73,7 +83,7 @@ async function appel(config: ConfigWhop, methode: "GET" | "POST", chemin: string
         ...(idempotence && { "idempotency-key": idempotence }),
       },
       ...(corps !== undefined && { body: JSON.stringify(corps) }),
-      signal: AbortSignal.timeout(DELAI_WHOP_MS),
+      signal: AbortSignal.timeout(delai),
       cache: "no-store",
     });
   } catch {
@@ -160,6 +170,7 @@ export async function payerEnUnGeste(
       metadata: { achat },
     },
     idempotence: `paiement:${achat}`,
+    delai: DELAI_PAIEMENT_MS,
   });
   const p = PaiementCree.safeParse(brut);
   if (!p.success) throw new ErreurWhop("illisible");
@@ -204,6 +215,7 @@ export async function payerAvecJeton(
       return_url: retour,
     },
     idempotence: `jeton:${createHash("sha256").update(jeton).digest("hex").slice(0, 40)}`,
+    delai: DELAI_PAIEMENT_MS,
   });
   const p = PaiementDuJeton.safeParse(brut);
   if (!p.success) throw new ErreurWhop("illisible");

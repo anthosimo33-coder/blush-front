@@ -14,7 +14,7 @@ import { codeDe, messageErreur } from "@/lib/messages-erreur";
 import { noterEcriture } from "@/lib/query";
 import { tracer } from "@/lib/tracer";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
-import { fusion, remonter, type Conv } from "../../garde";
+import { attenteArrivee, fusion, remonter, sansAttente, type Conv } from "../../garde";
 import { echangesEnMsgs, introDe, PREMIER_ID_VISITE, type EchangeScript, type Msg, type NewMsg } from "./modele";
 import { useChargerAnciens, type EcranDeLHistorique } from "./useChargerAnciens";
 
@@ -148,9 +148,15 @@ export function useConversation({
    * (les échanges de la visite, les morceaux d’historique déjà chargés : voir ../../garde.ts).
    */
   const [reprise] = useState(() => (cle !== undefined && gardee?.cle === cle ? gardee : null));
+  /* Un échange parti avant de quitter l’accueil, que la page n’a pas encore : il reste affiché jusqu’à son arrivée (garde.ts) */
+  const [remontee] = useState(() => {
+    if (!reprise) return null;
+    const r = remonter(reprise);
+    return r.attente && attenteArrivee(r.attente, script) ? { ...sansAttente(r, r.attente), attente: null } : r;
+  });
   const [depart] = useState((): Conv<Msg> => {
     const page = { msgs: [...introDe(introAt), ...echangesEnMsgs(script)], plus: plusAnciens, plusAncien: script[0]?.id ?? null };
-    return reprise ? fusion(remonter(reprise), page) : page;
+    return remontee ? fusion(remontee, page) : page;
   });
   const [msgs, setMsgs] = useState(depart.msgs);
   /* Les messages nés à partir d’ici sont ceux de cette visite : eux seuls font leur entrée, le reste est déjà lu */
@@ -168,6 +174,7 @@ export function useConversation({
     depart,
     depuis,
     derniers,
+    attente: remontee?.attente ?? null,
     rendu,
     /* L’aperçu (sans conv en base) ne relit pas l’historique : ce serait celui du compte connecté */
     relire: cle !== undefined,

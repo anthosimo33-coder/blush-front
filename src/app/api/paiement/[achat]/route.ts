@@ -2,6 +2,9 @@ import { erreur, repondre, route } from "@/server/http";
 import { etatDeLAchat } from "@/server/paiement/commande";
 import { garde } from "@/server/requete";
 
+/* Un achat livré ici (vérifié chez Whop quand le webhook tarde) relance la chaîne du rapport après la réponse (after) : elle a la durée d’une fonction de la chaîne */
+export const maxDuration = 300;
+
 /**
  * Où en est un achat du compte (la page du retour du paiement le relit chaque seconde). `?paiement=pay_…` : le paiement
  * que Whop a donné au retour ; tant que le webhook tarde, il est vérifié chez Whop, et livré s’il est encaissé.

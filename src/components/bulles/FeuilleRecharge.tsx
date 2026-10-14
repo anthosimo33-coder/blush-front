@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
+import { apresLaLivraison } from "@/lib/paiement";
 import { useAuPaiement } from "@/lib/presence";
 import { proposerOffreUnique } from "@/services/api";
 import { RadioGroup } from "@/components/ui/controls";
@@ -63,8 +65,11 @@ export function FeuilleRecharge({
 
   const premiere = bonus === "oui";
   const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p, premiere)])) as Record<Pack, ReturnType<typeof lePack>>;
+  const router = useRouter();
   /* Payé : « C’est payé » prend la place des packs, le temps de la livraison ; la feuille ne se ferme plus */
   const [paye, setPaye] = useState(false);
+  /* Un paiement en route (dès le geste) : la feuille ne se ferme pas, elle arrêterait son suivi */
+  const [occupe, setOccupe] = useState(false);
 
   /** Le tag rose d’un pack qui offre des bulles (« +10 offertes »), à côté de son titre. */
   const tag = (p: Pack) => {
@@ -74,7 +79,13 @@ export function FeuilleRecharge({
 
   return (
     /* Un écran bas (375 × 667) : le titre, le bonus et les écarts se resserrent pour tenir sans défiler, bonus ④, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
-    <Sheet open={open} onClose={paye ? () => {} : onClose} labelledBy={titre} belowHeader={false} className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4">
+    <Sheet
+      open={open}
+      onClose={paye || occupe ? () => {} : onClose}
+      labelledBy={titre}
+      belowHeader={false}
+      className="[@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:pb-4"
+    >
       <h2 id={titre} className="m-0 text-[26px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[22px]">
         {RECHARGE.titre}
       </h2>
@@ -122,6 +133,16 @@ export function FeuilleRecharge({
           /* La suite d’après le pack choisi : ses bulles (le mot « +N bulles » de l’arrivée, que le serveur corrige s’il le faut) */
           suite={suite(packs[choisi].total)}
           surPaye={setPaye}
+          surOccupe={setOccupe}
+          /*
+           * Livré : la feuille se ferme d’abord, puis on va à la suite. Souvent la page même où elle est ouverte (l’accueil,
+           * « Mon compte ») : Next la garde montée, son état compris, et la feuille resterait sinon sur « C’est payé ».
+           */
+          livre={(e) => {
+            setPaye(false);
+            onClose();
+            router.replace(apresLaLivraison(e));
+          }}
           fleche
         />
         <span className="text-center text-micro font-extrabold text-grey">

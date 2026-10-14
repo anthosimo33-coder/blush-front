@@ -23,18 +23,28 @@ const fixe = (m: { id: number }) => {
 /** L’échange auquel appartient une réponse de BLUSH (back-end : l’id de ton message). */
 const echangeRepondu = (m: Msg) => (m.type === "reponse" ? m.result.echange : undefined);
 
-/** Ce qui ne remonte pas : « BLUSH écrit » (l’échange revient fini par l’historique), et ce qui montre un fichier local. */
-const neRemontePas = (m: Msg) => m.type === "ecrit" || m.type === "images" || m.type === "vocal";
+/** Ce qui ne remonte pas : une réponse coupée (sa relance est partie avec l’accueil), et ce qui montre un fichier local. */
+const neRemontePas = (m: Msg) => (m.type === "ecrit" && m.coupee) || m.type === "images" || m.type === "vocal";
 
 /**
- * La conv gardée, prête à remonter. Sans « BLUSH écrit » ni ton message qui l’attendait (l’échange, fini depuis, revient
- * par l’historique), ni ce qui montre un fichier local (ses adresses sont révoquées au départ de l’accueil). Rien n’y
- * rejoue son arrivée (`answered` : les réponses ne se déplient plus). Back-end : un échange de la visite prend
- * l’identifiant qu’il a dans l’historique, l’historique frais le reconnaît au lieu de le doubler.
+ * Un échange parti avant de quitter l’accueil, et pas encore revenu : le serveur ne l’écrit dans l’historique qu’une
+ * fois la réponse finie. Ton message et « BLUSH écrit » restent affichés (`ids`) jusqu’à ce que l’historique ait un
+ * échange plus récent que `apres` (le dernier qu’il avait ; null : aucun), qui les remplace (useChargerAnciens).
  */
-export function remonter(conv: Conv<Msg>): Conv<Msg> {
-  const enAttente = new Set(conv.msgs.filter((m) => m.type === "ecrit").map((m) => questionDe(m.id)));
-  const gardes = conv.msgs.filter((m) => !neRemontePas(m) && !(m.from === "toi" && deLaVisite(m) && enAttente.has(m.id)));
+export type Attente = { ids: number[]; apres: number | null };
+
+/**
+ * La conv gardée, prête à remonter, et l’échange encore en route (`attente`, ou null). Sans une réponse coupée, ni ce
+ * qui montre un fichier local (ses adresses sont révoquées au départ de l’accueil). Rien n’y rejoue son arrivée
+ * (`answered` : les réponses ne se déplient plus). Back-end : un échange de la visite prend l’identifiant qu’il a dans
+ * l’historique, l’historique frais le reconnaît au lieu de le doubler.
+ */
+export function remonter(conv: Conv<Msg>): Conv<Msg> & { attente: Attente | null } {
+  const enRoute = conv.msgs.filter((m) => m.type === "ecrit" && !m.coupee);
+  const questions = new Set(enRoute.map((m) => questionDe(m.id)));
+  /* Le message d’une réponse coupée part avec elle : s’il a fini côté serveur, l’historique le rapporte */
+  const coupees = new Set(conv.msgs.filter((m) => m.type === "ecrit" && m.coupee).map((m) => questionDe(m.id)));
+  const gardes = conv.msgs.filter((m) => !neRemontePas(m) && !(m.from === "toi" && deLaVisite(m) && coupees.has(m.id)));
   const parId = new Map(gardes.map((m) => [m.id, m]));
   const renommes = new Map<number, number>();
   for (const m of gardes) {
@@ -48,8 +58,16 @@ export function remonter(conv: Conv<Msg>): Conv<Msg> {
     const id = renommes.get(m.id) ?? m.id;
     return id === m.id && !m.answered ? m : { ...m, id, answered: false };
   });
-  return { ...conv, msgs };
+  const ids = msgs.filter((m) => deLaVisite(m) && (enRoute.includes(m) || (m.from === "toi" && questions.has(m.id)))).map((m) => m.id);
+  const historique = msgs.filter(estHistorique).map((m) => echangeDe(m.id));
+  return { ...conv, msgs, attente: ids.length ? { ids, apres: historique.length ? Math.max(...historique) : null } : null };
 }
+
+/** L’historique `h` (ses échanges) a-t-il l’échange attendu : un échange plus récent que le dernier qu’il avait ? */
+export const attenteArrivee = (attente: Attente, h: readonly { id?: number }[]) => h.some((e) => e.id !== undefined && (attente.apres === null || e.id > attente.apres));
+
+/** La conv sans ce qui attendait l’échange en route : l’historique le rapporte, fini. */
+export const sansAttente = (conv: Conv<Msg>, attente: Attente): Conv<Msg> => ({ ...conv, msgs: conv.msgs.filter((m) => !attente.ids.includes(m.id)) });
 
 /**
  * La conv affichée `s`, où se fond une version plus fraîche (ou plus ancienne) de l’historique `f`. L’historique des

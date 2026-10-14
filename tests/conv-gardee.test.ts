@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fusion, memesMessages, remonter, type Conv } from "@/app/app/garde";
+import { attenteArrivee, fusion, memesMessages, remonter, sansAttente, type Conv } from "@/app/app/garde";
 import { idHistorique, type Msg, type Stamp } from "@/app/app/accueil/conv/modele";
 
 /* La conv de l’accueil gardée pendant la visite (src/app/app/garde.ts) : au retour, rien ne disparaît, rien ne double, rien ne bouge */
@@ -32,7 +32,7 @@ const conv = (msgs: M[], plus = false): Conv<M> => ({
 const ids = (c: Conv<M>) => c.msgs.map((m) => m.id);
 
 describe("remonter", () => {
-  it("retire « BLUSH écrit » et ton message qui l’attendait, et ce qui montre un fichier local", () => {
+  it("retire ce qui montre un fichier local ; garde « BLUSH écrit » et ton message qui l’attendait, notés en attente (UI-4)", () => {
     const c = remonter(
       conv([
         ...intro,
@@ -43,8 +43,27 @@ describe("remonter", () => {
         { type: "ecrit", id: 5, from: "blush", reading: "BLUSH analyse sa réponse" },
       ]),
     );
-    expect(ids(c)).toEqual([-2, -1, 2]);
+    expect(ids(c)).toEqual([-2, -1, 2, 4, 5]);
     expect(c.msgs[2]!.answered).toBe(false);
+    expect(c.attente).toEqual({ ids: [4, 5], apres: null });
+  });
+
+  it("une réponse coupée part avec ton message (sa relance est partie avec l’accueil) : rien n’attend", () => {
+    const c = remonter(conv([...intro, ...historique(10), texte(1, "et là ?"), { type: "ecrit", id: 2, from: "blush", reading: "…", coupee: true }]));
+    expect(ids(c)).toEqual([-2, -1, idHistorique(10, false), idHistorique(10, true)]);
+    expect(c.attente).toBeNull();
+  });
+
+  it("l’échange en route : attendu après le dernier de l’historique ; arrivé, ce qui l’attendait s’efface sans rien doubler", () => {
+    const gardee = remonter(conv([...intro, ...historique(8, 10), texte(1, "q12"), { type: "ecrit", id: 2, from: "blush", reading: "…" }]));
+    expect(gardee.attente).toEqual({ ids: [1, 2], apres: 10 });
+    /* L’historique relu avant la fin de la réponse : pas encore là, ton message et « BLUSH écrit » restent */
+    expect(attenteArrivee(gardee.attente!, [{ id: 8 }, { id: 10 }])).toBe(false);
+    expect(ids(fusion(gardee, conv(historique(8, 10))))).toEqual([-2, -1, ...ids(conv(historique(8, 10))), 1, 2]);
+    /* Fini côté serveur : l’échange 12 remplace ce qui l’attendait */
+    expect(attenteArrivee(gardee.attente!, [{ id: 10 }, { id: 12 }])).toBe(true);
+    const r = fusion(sansAttente(gardee, gardee.attente!), conv(historique(8, 10, 12)));
+    expect(ids(r)).toEqual([-2, -1, ...ids(conv(historique(8, 10, 12)))]);
   });
 
   it("back-end : un échange de la visite prend son identifiant de l’historique", () => {

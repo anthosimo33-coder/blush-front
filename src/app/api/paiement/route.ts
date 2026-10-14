@@ -7,6 +7,9 @@ import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
 
+/* Le faux Whop livre l’achat après la réponse (after), ce qui relance la chaîne du rapport : la durée d’une fonction de la chaîne */
+export const maxDuration = 300;
+
 /**
  * Commencer un paiement : une offre du catalogue, pour la conv du corps (sinon celle de la page) quand elle en débloque
  * le rapport. Sans la renonciation au délai de rétractation (sa version d’aujourd’hui, que le geste de payer envoie),

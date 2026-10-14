@@ -25,7 +25,7 @@ import { controlerBudget } from "@/server/budget";
 import { avecEcheance } from "@/server/echeance";
 import { ErreurTache } from "@/server/erreurs";
 import { journal } from "@/server/journal";
-import { appeler, definirFournisseur, prestataireSDK, type Avance, type Demande, type Ecoute, type Fournisseur, type MessageRecu } from "@/server/ia/claude";
+import { appeler, cout, definirFournisseur, prestataireSDK, type Avance, type Demande, type Ecoute, type Fournisseur, type MessageRecu } from "@/server/ia/claude";
 import { noterCout } from "@/server/ia/usage";
 
 const Format = z.object({ ok: z.boolean() });
@@ -36,7 +36,7 @@ const USAGE = { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_
 const message = (content: MessageRecu["content"], autres: Partial<MessageRecu> = {}): MessageRecu => ({
   content,
   usage: USAGE,
-  model: "modele-de-test",
+  model: "claude-opus-5-5",
   stop_reason: "end_turn",
   ...autres,
 });
@@ -61,8 +61,32 @@ describe("appeler : la réponse du modèle", () => {
     const a = await appeler(VERDICT, Format, { storyId: "histoire", etiquette: "verdict" });
     expect(a).toEqual({ sortie: { ok: true }, refus: false, stop: "end_turn", cout: 4 });
     expect(noterCout).toHaveBeenCalledWith(
-      expect.objectContaining({ storyId: "histoire", tache: "verdict", modele: "modele-de-test", entree: 1_000_000, micros: 4_000_000, payeur: "payeur" }),
+      expect.objectContaining({ storyId: "histoire", tache: "verdict", modele: "claude-opus-5-5", entree: 1_000_000, micros: 4_000_000, payeur: "payeur" }),
     );
+  });
+
+  it("le coût d’un repli : chaque modèle à son tarif (usage.iterations) ; un modèle sans prix, au plus cher, et le journal le dit (QUAL-2)", async () => {
+    const million = { input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    /* Sans repli : le tarif du modèle qui a répondu */
+    expect(cout(million, "claude-opus-5-5")).toBe(4);
+    expect(cout(million, "claude-sonnet-5-5")).toBe(2);
+    /* Le nôtre a refusé (un peu lu), un autre a tout écrit : chacun à son prix */
+    const usage = {
+      ...million,
+      iterations: [
+        { type: "message", model: "claude-opus-5-5", input_tokens: 500_000, output_tokens: 0 },
+        { type: "fallback_message", model: "claude-fable-5-1", input_tokens: 1_000_000, output_tokens: 100_000 },
+      ],
+    };
+    expect(cout(usage, "claude-fable-5-1")).toBeCloseTo(2 + 10 + 5, 6);
+    faux(rend(message([texte('{"ok":true}')], { usage, model: "claude-fable-5-1" })));
+    expect((await appeler(VERDICT, Format, { storyId: "histoire" })).cout).toBeCloseTo(17, 6);
+    expect(noterCout).toHaveBeenCalledWith(expect.objectContaining({ modele: "claude-fable-5-1", micros: 17_000_000 }));
+    /* Un modèle que la table ne connaît pas : au plus cher, jamais à zéro */
+    expect(cout(million, "claude-inconnu-9")).toBe(10);
+    expect(journal).toHaveBeenCalledWith("modèle sans prix, compté au plus cher", { modele: "claude-inconnu-9" }, "alerte");
+    /* Le modèle factice n’écrit rien : rien à compter */
+    expect(cout({}, "factice")).toBe(0);
   });
 
   it("un texte qui n’est pas la sortie attendue : pas de sortie, pas de refus", async () => {

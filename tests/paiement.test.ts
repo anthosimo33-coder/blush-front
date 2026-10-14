@@ -685,7 +685,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(etat.alertes).toEqual(["paiement : offre unique déjà prise"]);
   });
 
-  it("③ en un geste chez Whop, sans réponse ou illisible : aucune page de plus (pas de second débit), l’achat échoue, et son webhook le livre quand même", async () => {
+  it("③ en un geste chez Whop, sans réponse sûre (une panne, une réponse illisible) : aucune page de plus (pas de second débit), l’achat reste en attente (le retour attend son webhook, PAY-1), et son webhook le livre", async () => {
     const { u } = await acheteur("offre-geste-whop");
     etat.mode = "whop";
     let reponseAuGeste: () => Response = () => new Response("{}", { status: 500 });
@@ -704,17 +704,20 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await montrer("premium_ajout", rapport)).toMatchObject({ offre: "premium_ajout", enUnGeste: true });
     appels.length = 0;
 
-    /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, l’achat échoue (son webhook le livrerait quand même) */
+    /* Whop ne répond pas (ou une panne) : le paiement a pu partir ; aucune page de plus, ni « panne » qui ferait repayer : l’achat attend son webhook */
     for (const reponse of [() => new Response("{}", { status: 500 }), () => new Response("pas du json", { status: 200 })]) {
       reponseAuGeste = reponse;
-      expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 502, corps: { erreur: "panne" } });
+      expect(await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version })).toEqual({
+        status: 200,
+        corps: { achat: expect.any(String), checkout: null, url: null, paiement: null },
+      });
     }
     expect(appels).toEqual(["/payments", "/payments"]);
-    const echoues = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).filter((a) => a.offre === "premium_ajout");
-    expect(echoues.map((a) => a.statut)).toEqual(["echoue", "echoue"]);
-    /* Débité malgré la panne : le webhook livre l’achat échoué */
-    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(echoues[1]!.id, "pay_g2", "5.00")))).status).toBe(200);
-    expect(await achatEnBase(echoues[1]!.id)).toMatchObject({ statut: "paye" });
+    const enAttente = (await db().select().from(schema.achats).where(eq(schema.achats.userId, u.id))).filter((a) => a.offre === "premium_ajout");
+    expect(enAttente.map((a) => a.statut)).toEqual(["en_attente", "en_attente"]);
+    /* Débité malgré la panne : le webhook le livre */
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(enAttente[1]!.id, "pay_g2", "5.00")))).status).toBe(200);
+    expect(await achatEnBase(enAttente[1]!.id)).toMatchObject({ statut: "paye" });
     expect(await soldeDe(u.id)).toBe(90);
   });
 

@@ -21,10 +21,12 @@ vi.mock("@/server/alertes", async (original) => ({
 
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { POST as postImport } from "@/app/api/import/route";
+import { POST as postVideo } from "@/app/api/captures/video/route";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { compteDe, LIMITES } from "@/server/limites";
 import { aujourdhuiParis } from "@/server/temps";
+import { lotVideo } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
 import { creees } from "./aide/nettoyage";
 
@@ -61,6 +63,21 @@ async function importer(ip: string, fichier = convDeTest(CONV)): Promise<string 
   fd.append("consentement", CASE_IMPORT.version);
   const r = await postImport(
     new Request("http://localhost/api/import", { method: "POST", body: fd, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": ip } }),
+  );
+  const corps = (await r.json()) as { erreur?: string; story?: { id: string } };
+  if (corps.story) creees.histoires.push(corps.story.id);
+  return corps.erreur ?? null;
+}
+
+/** Un enregistrement d’écran (deux lots) depuis cette adresse : le code d’erreur, ou null s’il est passé. */
+async function envoyerVideo(ip: string): Promise<string | null> {
+  cles.add(`import:ip:${ip}`).add(`import:ko:ip:${ip}`);
+  const r = await postVideo(
+    new Request("http://localhost/api/captures/video", {
+      method: "POST",
+      body: JSON.stringify({ app: "imessage", consentement: CASE_IMPORT.version, lots: [lotVideo("Léa"), lotVideo("Léa", 100)] }),
+      headers: { origin: "http://localhost", "x-forwarded-host": "localhost", "x-forwarded-for": ip, "content-type": "application/json" },
+    }),
   );
   const corps = (await r.json()) as { erreur?: string; story?: { id: string } };
   if (corps.story) creees.histoires.push(corps.story.id);
@@ -121,6 +138,21 @@ describe("le budget d’octets des imports (S-02)", () => {
     await poser(`${HIER}:alerte:1`, 1);
     await poser(TOUS, LIMITES.koBrouillonsParJour.max);
     expect(await importer(nouvelleIp())).toBe("trop_jour");
+    expect(alertes).toEqual([{ sujet: "imports : plafond du jour atteint", importante: true }]);
+  });
+
+  it("un enregistrement d’écran compte son texte dans le même budget (SEC-1) : il ne contourne plus le plafond de l’adresse ni celui de tous", async () => {
+    const ip = nouvelleIp();
+    expect(await envoyerVideo(ip)).toBeNull();
+    const ko = await compteDe(`import:ko:ip:${ip}`, LIMITES.koImportParIp);
+    expect(ko).toBeGreaterThan(0);
+    expect(await compteDe(TOUS, LIMITES.koBrouillonsParJour)).toBe(ko);
+    /* L’adresse au plafond : refusée, comme un export */
+    await poser(`import:ko:ip:${ip}`, LIMITES.koImportParIp.max);
+    expect(await envoyerVideo(ip)).toBe("trop_jour");
+    /* Tous au plafond : une autre adresse aussi, et l’équipe est prévenue */
+    await poser(TOUS, LIMITES.koBrouillonsParJour.max);
+    expect(await envoyerVideo(nouvelleIp())).toBe("trop_jour");
     expect(alertes).toEqual([{ sujet: "imports : plafond du jour atteint", importante: true }]);
   });
 
