@@ -115,7 +115,12 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(bouton).toBeFocused();
     await bouton.click();
     await expect(panneau).toBeVisible();
-    /* Le voile : la bande laissée à gauche du panneau */
+    /*
+     * Le panneau arrive de la droite sans faire défiler le dialogue : le focus va à « Fermer », encore hors de l’écran, et
+     * Safari le faisait défiler pour le montrer. Tout le panneau glissait alors décalé à gauche, sur la bande du voile.
+     */
+    expect(await panneau.evaluate((d) => d.scrollLeft)).toBe(0);
+    /* Le voile : la bande laissée à gauche du panneau, qui répond dès l’ouverture (le panneau glisse encore) */
     await page.mouse.click(4, 300);
     await expect(panneau).toBeHidden();
     await expect(bouton).toBeFocused();
