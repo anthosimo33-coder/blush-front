@@ -139,24 +139,37 @@ export function ecritDepuis(key: "chat", rendu: number): boolean {
   return (ecritLe.get(key) ?? -Infinity) > rendu - 2000;
 }
 
-/* Chaque donnée n’est mise en texte qu’une fois (le rapport, relu toutes les 2 s pendant son écriture, pèse son poids) */
-const textes = new WeakMap<object, string>();
-const texteDe = (v: unknown) => {
-  if (v === null || typeof v !== "object") return JSON.stringify(v);
-  let t = textes.get(v);
-  if (t === undefined) textes.set(v, (t = JSON.stringify(v)));
-  return t;
-};
+/** Un objet tel que JSON en rend (ni tableau, ni Date, ni classe) : ses champs se comparent un à un. */
+const objetSimple = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && Object.getPrototypeOf(v) === Object.prototype;
 
-/** Deux réponses identiques : l’écran ne se re-rend pas pour rien. */
-export function memeValeur(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (a === undefined || b === undefined) return false;
-  try {
-    return texteDe(a) === texteDe(b);
-  } catch {
-    return false;
+/**
+ * La nouvelle réponse `apres`, où chaque partie identique à celle d’`avant` garde son objet (le partage de structure) :
+ * tout pareil, c’est `avant` lui-même, et l’écran ne se re-rend pas pour rien ; sinon, seul ce qui a changé est neuf. Un
+ * rapport relu toutes les 2 s pendant son écriture change presque à chaque fois (le temps qui reste, l’avancement), mais
+ * ses chapitres déjà écrits gardent leurs objets : leurs sections mémorisées (ChapterSection) ne se refont pas.
+ */
+export function garderCeQuiNaPasChange<T>(avant: unknown, apres: T): T {
+  if (Object.is(avant, apres)) return avant as T;
+  if (Array.isArray(avant) && Array.isArray(apres)) {
+    let pareil = avant.length === apres.length;
+    const r = apres.map((v, i) => {
+      const g = garderCeQuiNaPasChange(avant[i], v);
+      if (g !== avant[i]) pareil = false;
+      return g;
+    });
+    return (pareil ? avant : r) as T;
   }
+  if (objetSimple(avant) && objetSimple(apres)) {
+    const cles = Object.keys(apres);
+    let pareil = cles.length === Object.keys(avant).length;
+    const r: Record<string, unknown> = {};
+    for (const k of cles) {
+      r[k] = garderCeQuiNaPasChange(avant[k], apres[k]);
+      if (r[k] !== avant[k] || !(k in avant)) pareil = false;
+    }
+    return (pareil ? avant : r) as T;
+  }
+  return apres;
 }
 
 /** Comment useQuery lit sa donnée (voir useQuery). */
@@ -231,7 +244,7 @@ export function useQuery<K extends Cle>(key: K, fn: () => Promise<Requetes[K]>, 
         /* Partie avant une mise à jour optimiste : la réponse est déjà dépassée, on garde ce qu’on montre */
         if ((modifieLe.get(key) ?? 0) <= debut) {
           ecrire(key, d);
-          setData((avant) => (memeValeur(avant, d) ? avant : d));
+          setData((avant) => garderCeQuiNaPasChange(avant, d));
         }
         setError(false);
         fin();

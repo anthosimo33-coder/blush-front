@@ -37,7 +37,24 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
   usePathname: () => "/rapport/question",
 }));
-vi.mock("next/dynamic", () => ({ default: () => () => null }));
+/* Un composant chargé à part (next/dynamic) arrive comme dans Next : son module chargé, il se rend (la recharge en dépend) */
+vi.mock("next/dynamic", async () => {
+  const { createElement, useEffect, useState } = await import("react");
+  return {
+    default: (charger: () => Promise<unknown>) =>
+      function Dynamique(props: Record<string, unknown>) {
+        const [C, setC] = useState<null | ((p: Record<string, unknown>) => React.ReactNode)>(null);
+        useEffect(() => {
+          let vivant = true;
+          void charger().then((c) => vivant && setC(() => c as (p: Record<string, unknown>) => React.ReactNode));
+          return () => {
+            vivant = false;
+          };
+        }, []);
+        return C ? createElement(C, props) : null;
+      },
+  };
+});
 /* Les polices de Next ne se chargent pas hors de Next */
 vi.mock("@/lib/fonts", () => ({ figtree: { variable: "" } }));
 vi.mock("@/lib/paiement", async (vrai) => ({ ...(await vrai<typeof import("@/lib/paiement")>()), partirPayer: vi.fn(async () => {}) }));
@@ -120,7 +137,7 @@ describe("le compteur de « Ta question »", () => {
     fireEvent.click(compteurs(10)[0]!);
     const bulle = screen.getByRole("dialog", { name: FEUILLE_BULLE.titre });
     await act(async () => fireEvent.click(within(bulle).getByRole("button", { name: "Recharger · il t’en reste 10" })));
-    const recharge = screen.getByRole("dialog", { name: "Recharge tes bulles" });
+    const recharge = await screen.findByRole("dialog", { name: "Recharge tes bulles" });
     expect(within(recharge).getByText("Elles n’expirent jamais.")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: FEUILLE_BULLE.titre })).toBeNull();
     /* Rien n’attend la recharge : une fois payé, retour à la question */
@@ -172,7 +189,7 @@ describe("à 0 bulle", () => {
     expect(compteurs(0)).toHaveLength(2);
     poser.mockRejectedValueOnce(new ErreurApi("bulles", 402));
     await envoyer("et là ?");
-    const recharge = screen.getByRole("dialog", { name: "Recharge tes bulles" });
+    const recharge = await screen.findByRole("dialog", { name: "Recharge tes bulles" });
     expect(within(recharge).getByText("Elles n’expirent jamais.")).toBeTruthy();
     fireEvent(recharge, new Event("cancel", { cancelable: true }));
     expect(screen.queryByRole("dialog", { name: "Recharge tes bulles" })).toBeNull();
@@ -184,7 +201,7 @@ describe("à 0 bulle", () => {
     fireEvent.change(champ, { target: { value: "et là, alors ?" } });
     expect(screen.getByRole("alert").textContent).toContain(URGENCES);
     await act(async () => fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Recharger" })));
-    expect(await payerLaRecharge(screen.getByRole("dialog", { name: "Recharge tes bulles" }))).toMatchObject({ suite: "/rapport/question" });
+    expect(await payerLaRecharge(await screen.findByRole("dialog", { name: "Recharge tes bulles" }))).toMatchObject({ suite: "/rapport/question" });
   });
 
   it("un autre souci (le réseau) s’efface quand on réécrit, sans recharge", async () => {
@@ -204,7 +221,7 @@ describe("à 0 bulle", () => {
     expect(await screen.findByText("Ta réponse est prête")).toBeTruthy();
     expect(document.querySelector("[data-recu]")).toBeNull();
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Recharger pour la lire" })));
-    const recharge = screen.getByRole("dialog", { name: "Recharge tes bulles" });
+    const recharge = await screen.findByRole("dialog", { name: "Recharge tes bulles" });
     expect(within(recharge).getByText("Ta réponse à Léa s’affiche dès que c’est payé.")).toBeTruthy();
     /* Le pack conseillé (80 bulles, sans le bonus ④ ici) : le chat lit la réponse prête au retour */
     expect(await payerLaRecharge(recharge)).toMatchObject({ suite: "/app?recharge=80" });

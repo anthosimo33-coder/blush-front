@@ -8,10 +8,10 @@ import { prefersReducedMotion } from "@/lib/motion";
 import { play } from "@/lib/sound";
 import { FRAIS_DU_RENDU, setQueryData } from "@/lib/query";
 import { useCompte } from "@/lib/requetes";
+import { useChargeAuRepos } from "@/lib/repos";
 import { drapeauLocal, useDrapeau } from "@/lib/stockage";
 import { CompteurBulles, soldeAffiche } from "@/components/bulles/CompteurBulles";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
-import { FeuilleRecharge } from "@/components/bulles/FeuilleRecharge";
 import { marquerChatOuvert } from "@/components/chat/ouvert";
 import { AppScreen } from "@/components/shell/AppScreen";
 import { useCompteDeLaPage } from "@/components/shell/compte-de-la-page";
@@ -39,6 +39,9 @@ import { departs, useRegistreEntete, type Departs } from "./accueil/mouvement/re
 
 /* « Partager en image » ne s’ouvre qu’au toucher : sa feuille (src/components/partage) arrive à part, après l’affichage */
 const PartageImageSheet = dynamic(() => import("@/components/partage/PartageImageSheet").then((m) => m.PartageImageSheet), { ssr: false });
+/* La recharge (et le paiement de Whop qu’elle porte) n’arrive pas avec la page : chargée au repos, ou à la demande */
+const FeuilleRecharge = dynamic(() => import("@/components/bulles/FeuilleRecharge").then((m) => m.FeuilleRecharge), { ssr: false });
+const chargerLaRecharge = () => import("@/components/bulles/FeuilleRecharge");
 
 /** Largeur de la fenêtre de conv sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const WINDOW_W = 720;
@@ -153,6 +156,7 @@ export function HomeScreen(p: {
   const solde = soldeAffiche(compte);
   const expliquees = useDrapeau(BULLES_EXPLIQUEES);
   const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
+  const rechargePrete = useChargeAuRepos(chargerLaRecharge, { ouverte: feuille === "recharge" });
   const [mot, setMot] = useState<string | null>(null);
   /** Ce qu’une réponse dit des bulles : ce qu’il en reste (le compteur, Mon compte), ou qu’il n’y en a plus (la recharge). */
   const bullesDeLaReponse = (r: BlushAnswer) => {
@@ -354,7 +358,7 @@ export function HomeScreen(p: {
             ) : (
               <FeuilleBulle open={feuille === "bulle"} onClose={() => setFeuille(null)} solde={Math.max(0, solde)} recharger={() => setFeuille("recharge")} />
             ))}
-          {solde !== null && (
+          {solde !== null && rechargePrete && (
             <FeuilleRecharge
               open={feuille === "recharge"}
               onClose={() => setFeuille(null)}
