@@ -9,6 +9,7 @@ import { envoyerCodeParEmail, ErreurResend } from "./email";
 import { emailCanonique } from "./email-canonique";
 import { boiteAMails } from "./env";
 import { entre } from "./invitations";
+import { auMieux } from "./journal";
 import { compteDe as compteDeLaLimite, compter, LIMITES, limiteAtteinte, plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { CODE_MINUTES, CODE_RENVOI_S } from "@/lib/limites";
 
@@ -87,6 +88,12 @@ export async function envoyerCode(email: string, code: string): Promise<void> {
   try {
     await envoyerCodeParEmail(email, code);
   } catch (e) {
+    /*
+     * Le mail n’est pas parti : il rend sa place au plafond du jour. Sinon une panne du prestataire (des refus, ou pas de
+     * réponse) viderait le plafond sans qu’aucun mail parte, et plus personne ne pourrait se connecter jusqu’à la fin
+     * de la fenêtre. Un mail perdu en route a pu partir quand même : au pire, quelques mails de plus que le plafond.
+     */
+    if (plafond) await auMieux(() => rendre("code:mails"), "plafond des mails de code non rendu");
     /* Une erreur réseau peut contenir l’email : seul le statut de Resend passe */
     await alerter("code de connexion non envoyé", ["Le mail du code n’est pas parti.", `Erreur : ${e instanceof ErreurResend ? `Resend : ${e.statut}` : "le réseau"}`]);
   }

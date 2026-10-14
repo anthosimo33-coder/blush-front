@@ -711,6 +711,28 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
       { sujet: "code de connexion non envoyé", lignes: ["Le mail du code n’est pas parti.", "Erreur : la base"] },
     ]);
   });
+
+  it("S-09 · une panne de Resend n’use pas le plafond : sinon elle bloquerait la connexion de tous jusqu’à la fin de la fenêtre", async () => {
+    const e = email("panne-plafond");
+    alertes.length = 0;
+    const avant = plafondsDesMails().codes.max - 3;
+    await poserLimite("code:mails", avant);
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      etat.panne = "resend";
+      expect((await demander(e)).status).toBe(200);
+    } finally {
+      etat.panne = null;
+      erreurs.mockRestore();
+    }
+    expect(codesEcrits(e)).toHaveLength(0);
+    expect(await compteDeLimite("code:mails")).toBe(avant);
+    /* Le mail suivant part, et compte */
+    autreNavigateur();
+    await demander(e);
+    expect(codesEcrits(e)).toHaveLength(1);
+    expect(await compteDeLimite("code:mails")).toBe(avant + 1);
+  });
 });
 
 describe("S-16 · la session : glissante, et fermée partout d’un geste", () => {

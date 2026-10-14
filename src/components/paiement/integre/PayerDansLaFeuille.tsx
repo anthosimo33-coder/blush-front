@@ -56,6 +56,12 @@ type Proprietes = {
   quand?: QuandRefuse;
   /** Payé (vrai), ou finalement refusé (faux) : l’écran peut s’effacer derrière « C’est payé », qui attend la livraison. */
   surPaye?: (paye: boolean) => void;
+  /**
+   * Un paiement en route (le jeton, le serveur, l’étape de la banque, puis la livraison attendue) : vrai jusqu’à ce qu’il
+   * aboutisse ou revienne au bouton. La feuille qui pose ce composant ne doit pas se fermer pendant ce temps : son
+   * contenu démonté arrêterait le suivi d’un paiement peut-être débité.
+   */
+  surOccupe?: (occupe: boolean) => void;
   /** Livré : où mener (sans lui, apresLaLivraison : « C’est débloqué » pour un rapport, la suite pour des bulles). */
   livre?: (e: EtatAchat) => void;
   /** La flèche du bouton principal, comme celui qu’il remplace. */
@@ -111,9 +117,10 @@ function useParcours({
   suite,
   quand = {},
   surPaye,
+  surOccupe,
   livre,
   finirEtape,
-}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "livre"> & { finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse"> }) {
+}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "surOccupe" | "livre"> & { finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse"> }) {
   const router = useRouter();
   const renonciation = useAccord();
   const [etat, setEtat] = useState<"pret" | "envoi" | "paye">("pret");
@@ -125,6 +132,15 @@ function useParcours({
     fin.current = c;
     return () => c.abort();
   }, []);
+  /* L’écran sait qu’un paiement est en route (surOccupe), et qu’il ne l’est plus quand ce composant part */
+  const surOccupeActuel = useRef(surOccupe);
+  useEffect(() => {
+    surOccupeActuel.current = surOccupe;
+  });
+  useEffect(() => {
+    surOccupeActuel.current?.(etat !== "pret");
+    return () => surOccupeActuel.current?.(false);
+  }, [etat]);
 
   const revenir = (r: Refus | null) => {
     setEtat("pret");
@@ -142,7 +158,9 @@ function useParcours({
       const r = await commencerPaiement(offre, quoi !== null, { jeton: j });
       noterLaSuite(r.achat, suite);
       const p = r.paiement;
-      if (p && p.statut !== "paid" && p.secret) {
+      /* Whop n’a pas dit si le paiement est parti (aVerifier, côté serveur) : la page du retour attend son webhook, et le dit */
+      if (!p) return router.replace(versLeRetour(r.achat, null));
+      if (p.statut !== "paid" && p.secret) {
         const issue = await finirEtape(p.secret);
         if (issue === "parti") return;
         if (issue === "refuse") return revenir("carte");

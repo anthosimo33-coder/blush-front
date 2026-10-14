@@ -96,14 +96,25 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
     return { achat: achat.id, checkout: null, url: p.confirmer, paiement: null };
   } catch (e) {
     /*
-     * Seul un refus net de Whop (4xx : rien n’a été débité) passe à une page de paiement. Sans réponse, ou une réponse
-     * illisible, le paiement a pu partir : une page de plus le ferait payer deux fois. L’erreur remonte (l’achat échoue,
-     * « panne ») ; s’il a été débité, son webhook le livre quand même (livrer, depuis « echoue »).
+     * Seul un refus net de Whop (4xx : rien n’a été débité) passe à une page de paiement. Sans réponse, une réponse
+     * illisible ou une panne de Whop, le paiement a pu partir : une page de plus le ferait payer deux fois. L’achat reste
+     * en attente et l’acheteur va au retour, qui attend son webhook (aVerifier).
      */
-    if (!(e instanceof ErreurWhop) || !refusNet(e)) throw e;
+    if (!(e instanceof ErreurWhop)) throw e;
+    if (!refusNet(e)) return aVerifier(achat, e);
     journalErreur("paiement en un geste refusé, page de paiement à la place", e, { achat: achat.id });
     return null;
   }
+}
+
+/**
+ * Whop n’a pas dit si le paiement est parti (pas de réponse à temps, une réponse illisible, une panne) : l’achat reste en
+ * attente, sans page ni paiement, et l’écran attend sa livraison sur la page du retour (son webhook le livre s’il a été
+ * débité ; sinon la page finit par proposer de réessayer). Le marquer échoué ferait repayer quelqu’un peut-être débité.
+ */
+function aVerifier(achat: Achat, e: ErreurWhop): PaiementCommence {
+  journalErreur("paiement parti sans réponse de Whop, à vérifier par son webhook", e, { achat: achat.id });
+  return { achat: achat.id, checkout: null, url: null, paiement: null };
 }
 
 /** La page où payer un achat : celle de Whop (sa configuration de paiement, notée sur l’achat), ou celle du faux Whop. */
@@ -138,8 +149,8 @@ async function dansLaFeuille(f: Fournisseur, compte: Compte, achat: Achat, jeton
     const { data } = JSON.parse(w.corps) as { data: { id: string } };
     return { achat: achat.id, checkout: null, url: null, paiement: { id: data.id, statut: "paid", secret: null } };
   }
-  try {
-    const p = await payerAvecJeton(f.whop, {
+  const payer = () =>
+    payerAvecJeton(f.whop, {
       achat: achat.id,
       centimes: achat.centimes,
       titre: titreChezWhop(achat.offre, achat.bulles),
@@ -147,13 +158,25 @@ async function dansLaFeuille(f: Fournisseur, compte: Compte, achat: Achat, jeton
       email: compte.email,
       retour,
     });
-    if (p.sousStatut && REFUSE_PAR_WHOP.has(p.sousStatut)) return "carte";
-    return { achat: achat.id, checkout: null, url: null, paiement: { id: p.id, statut: p.statut, secret: p.secret } };
+  let p: Awaited<ReturnType<typeof payer>>;
+  try {
+    /*
+     * Une panne de Whop qui répond vite (un 5xx, une réponse illisible) se réessaie une fois, avec le même jeton : sa clé
+     * d’idempotence ne paie pas deux fois. Un délai ne se réessaie pas : l’acheteur a déjà attendu.
+     */
+    p = await payer().catch((e: unknown) => {
+      if (e instanceof ErreurWhop && e.statut !== "delai" && !refusNet(e)) return payer();
+      throw e;
+    });
   } catch (e) {
-    /* Whop dit 402 (le paiement refusé) : la carte ; tout autre refus est le nôtre (un champ, une clé), une panne à voir */
+    /* Whop dit 402 (le paiement refusé) : la carte ; tout autre refus net est le nôtre (un champ, une clé), une panne à voir */
     if (e instanceof ErreurWhop && e.statut === 402) return "carte";
+    /* Sans réponse sûre, le paiement a pu partir : on attend son webhook au lieu de dire « panne » (aVerifier) */
+    if (e instanceof ErreurWhop && !refusNet(e)) return aVerifier(achat, e);
     throw e;
   }
+  if (p.sousStatut && REFUSE_PAR_WHOP.has(p.sousStatut)) return "carte";
+  return { achat: achat.id, checkout: null, url: null, paiement: { id: p.id, statut: p.statut, secret: p.secret } };
 }
 
 /**
@@ -169,7 +192,9 @@ export type RefusDePaiement = "bientot" | "carte" | RefusDeCommande;
  * l’acheter), puis, avec un `jeton` des Elements de Whop, le paiement dans la feuille ; sinon le paiement en un geste
  * (les offres de « C’est débloqué »), ou la page de Whop où le payer.
  * Refusé dans la feuille (« carte »), ou une page que Whop refuse de créer, l’achat passe « echoue » (rien n’a été
- * payé) ; une panne remonte (« panne »). Un paiement parti malgré tout se livre quand même par son webhook (livrer, depuis « echoue »).
+ * payé) ; une panne remonte (« panne »). Un paiement dont Whop n’a pas dit s’il est parti (aVerifier) reste en attente,
+ * sans paiement : l’écran attend son webhook sur la page du retour. Un paiement parti malgré tout se livre quand même
+ * par son webhook (livrer, depuis « echoue »).
  */
 export async function commencerPaiement(
   compte: Compte,

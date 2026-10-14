@@ -59,12 +59,28 @@ describe("l’échéance d’une fonction", () => {
 
   /*
    * Une page la lance aussi, par le service qui la relance après le rendu : getFicheEtMaj (sa fiche), et getReport (les
-   * pages du rapport, du verdict et de « C’est débloqué », par ouvrirLeRapport).
+   * pages du rapport, du verdict et de « C’est débloqué », par ouvrirLeRapport). Et une route de paiement, par la
+   * livraison d’un achat (livrer, src/server/achats.ts) : le suivi qui vérifie chez Whop (etatDeLAchat), le rapport
+   * d’avance (utiliserAvance), le webhook (recevoirWebhook), et le faux Whop qui livre après la réponse (commencerPaiement).
    */
-  it("une route ou une page qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj, getFicheEtMaj et getReport qui la relancent) vit DUREE_FONCTION_S", () => {
-    const routes = sources("src/app").filter((f) => /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj|getFicheEtMaj|getReport)\(/.test(f.texte));
+  it("une route ou une page qui lance la chaîne des tâches (executerChaine, relancerApres ou relancerChaine, ou ficheEtMaj, getFicheEtMaj, getReport et les livraisons d’un achat qui la relancent) vit DUREE_FONCTION_S", () => {
+    /* Les écrans du navigateur appellent des services du même nom (src/services/api.ts) : seuls comptent les fichiers du serveur */
+    const routes = sources("src/app").filter(
+      (f) =>
+        !f.texte.startsWith('"use client"') &&
+        /\b(executerChaine|relancerApres|relancerChaine|ficheEtMaj|getFicheEtMaj|getReport|etatDeLAchat|utiliserAvance|recevoirWebhook|commencerPaiement)\(/.test(f.texte),
+    );
     expect(routes.map((f) => f.chemin)).toEqual(
-      expect.arrayContaining(["src/app/app/fiche/page.tsx", "src/app/rapport/(rapport)/page.tsx", "src/app/rapport/verdict/page.tsx", "src/app/rapport/debloque/page.tsx"]),
+      expect.arrayContaining([
+        "src/app/app/fiche/page.tsx",
+        "src/app/rapport/(rapport)/page.tsx",
+        "src/app/rapport/verdict/page.tsx",
+        "src/app/rapport/debloque/page.tsx",
+        "src/app/api/paiement/route.ts",
+        "src/app/api/paiement/[achat]/route.ts",
+        "src/app/api/paiement/avance/route.ts",
+        "src/app/api/paiement/whop/route.ts",
+      ]),
     );
     expect(routes.length).toBeGreaterThanOrEqual(6);
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);

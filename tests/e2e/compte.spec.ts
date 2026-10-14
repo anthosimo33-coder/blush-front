@@ -104,6 +104,8 @@ test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqu�
     /* Payé dans la feuille, sans quitter Mon compte : le solde se relit une fois l’achat livré */
     await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible({ timeout: 2 * RESEAU });
     await expect(page).toHaveURL(/\/compte$/);
+    /* Livré, la feuille se ferme d’elle-même (UI-1) : elle ne reste pas sur « C’est payé », modale, par-dessus la page */
+    await expect(recharge).toBeHidden();
     achat = await dernierAchat(email);
     const achats = main.getByRole("region", { name: "Tes achats" });
     await expect(achats.getByText("30 bulles", { exact: true })).toBeVisible();

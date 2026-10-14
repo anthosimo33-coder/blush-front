@@ -22,15 +22,34 @@ import { TEXTES } from "./textes.generated";
  * budget, l’échéance, la lecture et le refus. Le coût de chaque vrai appel est noté par src/server/ia/usage.ts.
  */
 const MODELE = "claude-opus-5-5";
-/* Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
-const PRIX = { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 };
+
+/** Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
+type Prix = { entree: number; sortie: number; ecritureCache: number; lectureCache: number };
+/*
+ * Le prix de chaque modèle qui peut répondre : le nôtre, et ceux du repli (fallbacks « default » : sur un refus, l’API
+ * rejoue la requête sur un autre modèle, facturé à son propre tarif). Un modèle inconnu se compte au plus cher : le
+ * budget du jour coupe alors trop tôt plutôt que trop tard.
+ */
+const PRIX_DES_MODELES: Record<string, Prix> = {
+  "claude-opus-5-5": { entree: 4, sortie: 20, ecritureCache: 5, lectureCache: 0.2 },
+  "claude-fable-5-1": { entree: 10, sortie: 50, ecritureCache: 12.5, lectureCache: 0.25 },
+  "claude-fable-5": { entree: 10, sortie: 50, ecritureCache: 12.5, lectureCache: 1 },
+  "claude-opus-5": { entree: 5, sortie: 25, ecritureCache: 6.25, lectureCache: 0.5 },
+  "claude-opus-4-8": { entree: 5, sortie: 25, ecritureCache: 6.25, lectureCache: 0.5 },
+  "claude-sonnet-5-5": { entree: 2, sortie: 10, ecritureCache: 2.5, lectureCache: 0.2 },
+  "claude-sonnet-5": { entree: 2, sortie: 10, ecritureCache: 2.5, lectureCache: 0.2 },
+  "claude-haiku-5-5": { entree: 0.1, sortie: 0.5, ecritureCache: 0.125, lectureCache: 0.01 },
+};
+const PRIX_INCONNU: Prix = { entree: 10, sortie: 50, ecritureCache: 12.5, lectureCache: 1 };
 
 /** Ce que le modèle a déjà écrit : sa réflexion (en caractères), sa réponse (en caractères, et le texte lui-même). */
 export type Avance = { reflexion: number; texte: number; ecrit: string };
 
 /** La sortie (vérifiée par son schéma), et ce que l’appel a coûté en dollars. `categorie` : celle d’un refus. */
 export type Appel<T> = { sortie: T | null; refus: boolean; stop: string | null; cout: number; categorie?: string | null };
-type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
+type Tokens = { input_tokens?: number | null; output_tokens?: number | null; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null };
+/** L’usage d’une réponse, et, avec un repli, celui de chaque modèle qui a écrit (`iterations`, son modèle avec). */
+type Usage = Tokens & { iterations?: readonly (Tokens & { type?: string; model?: string | null })[] | null };
 
 /** Moins de temps que ça avant l’échéance (src/server/echeance.ts) : l’appel ne part pas, il serait coupé avant de répondre. */
 const TEMPS_MIN_APPEL = 20_000;
@@ -241,7 +260,7 @@ type Repli = { categorie: string | null; de: string; vers: string };
  * y en a eu un. Après un repli (bloc « fallback »), seul ce que le second modèle a écrit compte.
  */
 function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { appel: Appel<z.infer<S>>; repli: Repli | null } {
-  const c = cout(message.usage);
+  const c = cout(message.usage, message.model);
   const bloc = message.content.find((b): b is Extract<BlocRecu, { type: "fallback" }> => b.type === "fallback");
   const repli = bloc ? { categorie: bloc.trigger.category ?? null, de: bloc.from.model, vers: bloc.to.model } : null;
   if (message.stop_reason === "refusal")
@@ -261,12 +280,31 @@ function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { ap
   return { appel: { sortie, refus: false, stop: message.stop_reason, cout: c }, repli };
 }
 
-const cout = (u: Usage) =>
-  ((u.input_tokens ?? 0) * PRIX.entree +
-    (u.output_tokens ?? 0) * PRIX.sortie +
-    (u.cache_creation_input_tokens ?? 0) * PRIX.ecritureCache +
-    (u.cache_read_input_tokens ?? 0) * PRIX.lectureCache) /
+/** Le prix d’un modèle ; un modèle inconnu se compte au plus cher, et le journal le dit (la table est à compléter). */
+function prixDe(modele: string | null | undefined): Prix {
+  const prix = modele ? PRIX_DES_MODELES[modele] : PRIX_DES_MODELES[MODELE];
+  if (prix) return prix;
+  journal("modèle sans prix, compté au plus cher", { modele: modele ?? null }, "alerte");
+  return PRIX_INCONNU;
+}
+
+const coutDe = (t: Tokens, prix: Prix) =>
+  ((t.input_tokens ?? 0) * prix.entree +
+    (t.output_tokens ?? 0) * prix.sortie +
+    (t.cache_creation_input_tokens ?? 0) * prix.ecritureCache +
+    (t.cache_read_input_tokens ?? 0) * prix.lectureCache) /
   1e6;
+
+/**
+ * Ce qu’un appel a coûté, en dollars : chaque passage du modèle à son tarif (`iterations` : le nôtre, puis celui du
+ * repli ; sans modèle dit, celui qui a répondu), sinon tout au tarif du modèle qui a répondu (`modele`).
+ */
+export function cout(u: Usage, modele: string): number {
+  /* Rien d’écrit (le modèle factice) : rien à compter, ni de prix à chercher */
+  if (!u.input_tokens && !u.output_tokens && !u.cache_creation_input_tokens && !u.cache_read_input_tokens && !u.iterations?.length) return 0;
+  if (u.iterations?.length) return u.iterations.reduce((n, i) => n + coutDe(i, prixDe(i.model ?? modele)), 0);
+  return coutDe(u, prixDe(modele));
+}
 
 /** Les options d’un appel (appeler). */
 export type OptionsAppel = {
@@ -331,7 +369,7 @@ export async function appeler<S extends z.ZodType>(
   const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: surAvance ? suivreFlux(surAvance, req.tache) : null });
   const { usage, model } = message;
   const ms = Date.now() - debut;
-  if (!prestataire.gratuit) await ensuite(() => noterUsage(usage, Math.round(cout(usage) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));
+  if (!prestataire.gratuit) await ensuite(() => noterUsage(usage, Math.round(cout(usage, model) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model }));
   const { appel, repli } = lireMessage(message, schema);
   /*
    * Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le

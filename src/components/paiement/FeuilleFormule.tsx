@@ -177,6 +177,8 @@ export function FeuilleFormule({
   const [bulle, setBulle] = useState(false);
   /* Payé : « C’est payé » prend toute la feuille, qui ne se ferme plus, le temps de la livraison */
   const [paye, setPaye] = useState(false);
+  /* Un paiement en route (dès le geste) : la feuille ne se ferme pas, elle arrêterait son suivi */
+  const [occupe, setOccupe] = useState(false);
   /* Le −50 % gardé fait payer le rapport seul à moitié prix (rapport_garde) */
   const garde = avoirs?.garde ?? null;
   const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
@@ -202,7 +204,7 @@ export function FeuilleFormule({
 
   /* Fermée sans payer : l’offre ①, si le serveur la montre (une fois par compte, jamais deux offres le même jour), une fois la feuille redescendue */
   const fermer = () => {
-    if (paye) return;
+    if (paye || occupe) return;
     onClose();
     if (!proposerLaSuite || suiteRefusee) return;
     const descendue = new Promise((ok) => setTimeout(ok, APRES_LA_FEUILLE_MS));
@@ -281,6 +283,7 @@ export function FeuilleFormule({
               /* Le rapport déjà payé dans un autre onglet (409 « deja ») : relu, la feuille se ferme d’elle-même */
               quand={{ deja: onClose }}
               surPaye={setPaye}
+              surOccupe={setOccupe}
               fleche
             />
           )}

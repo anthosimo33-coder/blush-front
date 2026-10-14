@@ -13,7 +13,7 @@ import { getChatHistory } from "@/services/api";
 import { ecritDepuis, FRAIS_DU_RENDU, renduFrais } from "@/lib/query";
 import { tracer } from "@/lib/tracer";
 import type { HistoriqueChat } from "@/types/api";
-import { fusion, memesMessages, type Conv } from "../../garde";
+import { attenteArrivee, fusion, memesMessages, sansAttente, type Attente, type Conv } from "../../garde";
 import { echangesEnMsgs, type Msg } from "./modele";
 
 /**
@@ -41,10 +41,19 @@ export type EcranDeLHistorique = {
  */
 const renduAJour = (rendu: number | undefined) => rendu !== undefined && renduFrais("chat", rendu, FRAIS_DU_RENDU) && !ecritDepuis("chat", rendu);
 
+/*
+ * Un échange parti avant de quitter l’accueil (garde.ts, Attente) : l’historique se relit toutes les 2,5 s jusqu’à ce
+ * qu’il le rapporte, deux minutes au plus (une réponse met moins d’une minute ; le champ reste pris pendant ce temps).
+ * Au-delà, ce qui l’attendait s’efface, comme une réponse qui a échoué : la prochaine visite relira l’historique.
+ */
+const PAS_DE_L_ATTENTE_MS = 2_500;
+const DUREE_DE_L_ATTENTE_MS = 120_000;
+
 export function useChargerAnciens({
   depart,
   depuis,
   derniers,
+  attente,
   rendu,
   relire,
   modeVocalDuRendu,
@@ -59,6 +68,8 @@ export function useChargerAnciens({
   depuis: number;
   /** La conv affichée, à jour après chaque rendu (pour ce qui arrive après coup). */
   derniers: RefObject<Conv<Msg>>;
+  /** Un échange parti avant de quitter l’accueil, pas encore dans l’historique (garde.ts), ou null. */
+  attente: Attente | null;
   /** L’heure du rendu serveur de la page (voir renduAJour). Sans elle, l’historique est toujours relu. */
   rendu?: number;
   /**
@@ -92,7 +103,7 @@ export function useChargerAnciens({
   useEffect(() => {
     actions.current = { fondre, poserDevant, suivreModeVocal, ecran };
   });
-  const auMontage = useRef({ rendu, modeVocalDuRendu, relire });
+  const auMontage = useRef({ rendu, modeVocalDuRendu, relire, attente });
 
   /*
    * L’historique, frais du serveur, à chaque ouverture : un retour en arrière remontre la page telle qu’elle était
@@ -103,6 +114,10 @@ export function useChargerAnciens({
   useEffect(() => {
     if (!auMontage.current.relire) return;
     let fini = false;
+    /* L’échange encore en route au montage, et jusqu’à quand l’attendre */
+    let enAttente = auMontage.current.attente;
+    const finDeLAttente = Date.now() + DUREE_DE_L_ATTENTE_MS;
+    let minuteur: number | undefined;
     const recharger = () => {
       const suivreModeVocal = actions.current.suivreModeVocal();
       return (
@@ -111,8 +126,18 @@ export function useChargerAnciens({
             if (fini) return;
             /* Le mode vocal suit la base, même quand l’historique n’a pas bougé (« Repasser à l’écrit » ailleurs) */
             if (h.modeVocal !== undefined) suivreModeVocal(h.modeVocal);
-            const s = derniers.current;
+            let s = derniers.current;
             if (s.msgs.some((m) => m.id >= depuis)) return;
+            if (enAttente) {
+              const attendu = enAttente;
+              if (attenteArrivee(attendu, h.echanges) || Date.now() >= finDeLAttente) {
+                s = sansAttente(s, attendu);
+                enAttente = null;
+              } else {
+                window.clearTimeout(minuteur);
+                minuteur = window.setTimeout(() => void recharger(), PAS_DE_L_ATTENTE_MS);
+              }
+            }
             const r = fusion(s, { msgs: echangesEnMsgs(h.echanges), plus: h.plus, plusAncien: h.echanges[0]?.id ?? null });
             /* Le même historique que celui affiché : rien ne bouge */
             if (memesMessages(r.msgs, s.msgs)) return;
@@ -125,14 +150,20 @@ export function useChargerAnciens({
             setPlus(r.plus);
             actions.current.fondre(r.msgs);
           })
-          /* Pas de réseau : la conv affichée reste telle quelle, le prochain retour sur la page relira */
-          .catch((e) => tracer("conv:historique", e))
+          /* Pas de réseau : la conv affichée reste telle quelle ; l’échange attendu se relit encore, sinon le prochain retour relira */
+          .catch((e) => {
+            tracer("conv:historique", e);
+            if (fini || !enAttente) return;
+            window.clearTimeout(minuteur);
+            minuteur = window.setTimeout(() => void recharger(), PAS_DE_L_ATTENTE_MS);
+          })
       );
     };
     const premier = montage.current;
     montage.current = false;
     const page = auMontage.current;
-    if (premier && renduAJour(page.rendu)) {
+    /* Un échange en route se relit toujours : la page, même fraîche, a pu être rendue avant qu’il finisse */
+    if (premier && renduAJour(page.rendu) && !enAttente) {
       /* Ce que la relecture aurait rapporté : la conv de départ a déjà l’historique de la page, reste le mode vocal en base */
       if (page.modeVocalDuRendu !== undefined) actions.current.suivreModeVocal()(page.modeVocalDuRendu);
     } else void recharger();
@@ -143,6 +174,7 @@ export function useChargerAnciens({
     window.addEventListener("pageshow", auRetour);
     return () => {
       fini = true;
+      window.clearTimeout(minuteur);
       window.removeEventListener("pageshow", auRetour);
     };
   }, [depuis, derniers]);
