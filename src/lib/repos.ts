@@ -17,10 +17,13 @@ export function auRepos(faire: () => void, delai = 1200): () => void {
 /**
  * Le code d’une feuille rare (le paiement, la recharge), chargé quand la page est au repos plutôt qu’avec elle : vrai
  * une fois `charger` fini (son module est alors prêt, la feuille s’ouvre sans attendre), ou dès que la feuille est
- * demandée (`ouverte`). Rien n’est chargé tant que la feuille n’est pas `utile` (un rapport déjà débloqué ne se paie plus).
+ * demandée (`ouverte`), et pour de bon. Rien n’est chargé tant que la feuille n’est pas `utile` (un rapport déjà débloqué ne se paie plus).
  */
 export function useChargeAuRepos(charger: () => Promise<unknown>, { utile = true, ouverte = false }: { utile?: boolean; ouverte?: boolean } = {}): boolean {
   const [pret, setPret] = useState(false);
+  /* Ouverte une fois, elle reste montée : refermée avant la fin du chargement au repos, elle perdrait ce qu’elle montre encore (l’offre ① de « Ta formule ») */
+  const [demandee, setDemandee] = useState(false);
+  if (ouverte && !demandee) setDemandee(true);
   const aCharger = useRef(charger);
   useEffect(() => {
     if (!utile || pret) return;
@@ -31,5 +34,5 @@ export function useChargeAuRepos(charger: () => Promise<unknown>, { utile = true
       annuler();
     };
   }, [utile, pret]);
-  return pret || ouverte;
+  return pret || ouverte || demandee;
 }
