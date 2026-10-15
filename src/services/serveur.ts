@@ -2,7 +2,7 @@ import "server-only";
 import type { Route } from "next";
 import type { ConvSummary, Fiche, Story } from "@/types";
 import type { Account, AchatDuCompte, HistoriqueChat, ReportPayload } from "@/types/api";
-import { achatsDuCompte } from "@/server/achats";
+import { achatsDuCompte, convEnAlerte } from "@/server/achats";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
@@ -169,6 +169,15 @@ export async function pageDeConv(): Promise<{ id: string | null; compte: Account
 export async function rapportDebloque(): Promise<boolean> {
   const { utilisateur, story } = await contexte();
   return !!story && rapportOuvert(story, utilisateur);
+}
+
+/**
+ * La conv ouverte est-elle en alerte (danger, détresse, ou la règle de l’âge) ? Son rapport est alors le rapport doux,
+ * offert, et rien ne s’y vend (convEnAlerte) : l’accueil ne la met pas derrière le paiement.
+ */
+export async function convOuverteEnAlerte(): Promise<boolean> {
+  const { story } = await contexte();
+  return !!story && (await convEnAlerte(story.id));
 }
 
 /** Le compte, pour « Mon compte » : son email, ses bulles et ses droits, dès le rendu serveur. null : pas connecté. */
