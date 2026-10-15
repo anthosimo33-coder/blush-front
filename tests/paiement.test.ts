@@ -58,6 +58,9 @@ import { CASE_RENONCIATION } from "@/contenu/consentements";
 import type { Utilisateur } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
+import { empreinte } from "@/server/chiffrement";
+import { cleDeLimiteDuCompte } from "@/server/email-canonique";
+import { LIMITES } from "@/server/limites";
 import { webhookFactice, type WebhookFactice } from "@/server/paiement/factice";
 import { signerWebhook } from "@/server/paiement/signature";
 import type { AchatDuCompte, EtatAchat, OffreUniqueMontree, PaiementCommence, WebhookDuFauxWhop } from "@/types/api";
@@ -596,6 +599,54 @@ describe("le retour (GET /api/paiement/[achat])", () => {
     expect((await etatDe(achat, "pay_s2")).corps.statut).toBe("paye");
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect(await soldeDe(u.id)).toBe(10);
+  });
+});
+
+describe("la vérification chez Whop, bornée (SECA-1)", () => {
+  const etatDe = async (achat: string, paiement?: string) => {
+    const r = await lireEtat(new Request(`${APPLI}/api/paiement/${achat}${paiement ? `?paiement=${paiement}` : ""}`), { params: Promise.resolve({ achat }) });
+    return { status: r.status, corps: (await r.json()) as EtatAchat };
+  };
+
+  it("une commande de plus de 48 h n’est plus vérifiée chez Whop ; un compte a un plafond de vérifications par heure, tous achats compris", async () => {
+    const { u } = await acheteur("verif-bornee");
+    etat.mode = "whop";
+    const appels: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        appels.push(new URL(url).pathname);
+        return url.endsWith("/checkout_configurations") ? Response.json({ id: "ch_v" }) : Response.json({ id: "pay_v", status: "pending", metadata: {} });
+      }),
+    );
+    const vieux = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    await db()
+      .update(schema.achats)
+      .set({ creeLe: new Date(Date.now() - 49 * 3600e3) })
+      .where(eq(schema.achats.id, vieux));
+    appels.length = 0;
+    expect((await etatDe(vieux, "pay_v")).corps.statut).toBe("en_attente");
+    expect(appels).toEqual([]);
+    /* Le plafond du compte, posé presque plein : une vérification passe, la suivante non */
+    const cle = cleDeLimiteDuCompte("verification", u.email);
+    await db()
+      .insert(schema.rateLimits)
+      .values({ key: empreinte(`limite:${cle}`), windowStart: new Date(), count: LIMITES.verificationParCompte.max - 1 })
+      .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count: LIMITES.verificationParCompte.max - 1, windowStart: new Date() } });
+    const recent = (await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    appels.length = 0;
+    await etatDe(recent, "pay_v");
+    await etatDe(recent, "pay_v");
+    expect(appels.filter((c) => c.startsWith("/api/v1/payments/"))).toHaveLength(1);
+    await db()
+      .delete(schema.rateLimits)
+      .where(eq(schema.rateLimits.key, empreinte(`limite:${cle}`)));
+  });
+
+  it("pas plus de 10 commandes jamais payées en même temps par compte : la suivante, 429 « trop »", async () => {
+    await acheteur("trop-de-commandes");
+    for (let i = 0; i < 10; i++) expect((await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).status, `commande ${i + 1}`).toBe(200);
+    expect(await payer({ offre: "pack30", renonciation: CASE_RENONCIATION.version })).toEqual({ status: 429, corps: { erreur: "trop" } });
   });
 });
 

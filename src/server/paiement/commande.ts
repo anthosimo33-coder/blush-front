@@ -8,6 +8,7 @@ import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, rechargeDejaPay
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
+import { cleDeLimiteDuCompte } from "../email-canonique";
 import { UUID } from "../histoires";
 import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
@@ -226,6 +227,9 @@ export async function commencerPaiement(
   }
 }
 
+/** Combien de temps après la commande on vérifie encore un paiement chez Whop (au-delà, seul son webhook le livre). */
+const VERIFICATION_MS = 48 * 3600e3;
+
 /** Le statut que Whop donne à un paiement encaissé. */
 const ENCAISSE = new Set(["paid", "succeeded"]);
 
@@ -245,7 +249,10 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
     paiementId &&
     f?.mode === "whop" &&
     achat.fournisseur === "whop" &&
-    (await sousLaLimite(`paiement:verification:${achat.id}`, LIMITES.verificationParAchat))
+    /* Seulement un achat récent : une commande de plus de 48 h n’est plus attendue (son webhook l’aurait livrée) */
+    Date.now() - achat.creeLe.getTime() < VERIFICATION_MS &&
+    (await sousLaLimite(`paiement:verification:${achat.id}`, LIMITES.verificationParAchat)) &&
+    (await sousLaLimite(cleDeLimiteDuCompte("verification", compte.email), LIMITES.verificationParCompte))
   ) {
     const p = await lirePaiement(f.whop, paiementId);
     if (p && p.achat === achat.id && ENCAISSE.has(p.statut) && !p.autoRembourse) {
