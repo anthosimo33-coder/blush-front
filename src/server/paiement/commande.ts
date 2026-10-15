@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { avanceDuCompte, commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
+import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -283,6 +283,8 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .from(schema.stories)
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s || s.debloqueLe) return rien;
+    /* Une conv en alerte ne se vend pas (convEnAlerte) */
+    if (await convEnAlerte(storyId)) return rien;
     /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (4,95 €) ; ① (6,90 €) ne se montre pas */
     const avoirs = await avoirsDuCompte(compte);
     if (avoirs.avance || avoirs.garde) return rien;

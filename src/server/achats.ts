@@ -6,6 +6,7 @@ import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
 import { mouvementDans } from "./bulles";
+import { donneesVerdict } from "./depot";
 import { db, schema } from "./db";
 import type { FournisseurPaiement } from "./db/enums";
 import { estEquipe } from "./droits";
@@ -27,11 +28,21 @@ export type Achat = typeof schema.achats.$inferSelect;
 
 const a = schema.achats;
 
-/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
 /** Le délai de rétractation d’un rapport d’avance pas encore utilisé : 14 jours après son achat (les conditions, « livraison »). */
 const RETRACTATION_MS = 14 * 24 * 3600e3;
 
-export type RefusDeCommande = "aucune" | "deja" | "offre";
+/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée, ou la conv est en alerte. */
+export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre";
+
+/**
+ * La conv est-elle en alerte (danger, détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un mineur) ? Son
+ * rapport est alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport d’avance
+ * (« une alerte n’appelle aucune vente », comme les relances). Sans verdict encore écrit : pas en alerte.
+ */
+export async function convEnAlerte(storyId: string): Promise<boolean> {
+  const v = await donneesVerdict(storyId);
+  return !!v && (!!v.sortie.alerte || v.sortie.mode_sobre);
+}
 
 /** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
 const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
@@ -71,6 +82,7 @@ export async function commander(
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s) return "aucune";
     if (s.debloqueLe || estEquipe(compte)) return "deja";
+    if (await convEnAlerte(storyId)) return "sobre";
   }
   if (c.unique) {
     const montree = await offreValable(compte.id, c.unique);
@@ -234,7 +246,7 @@ export async function avanceDuCompte(userId: string): Promise<{ achat: string; f
 }
 
 /** Pourquoi un rapport d’avance ne s’utilise pas : aucun n’est valable (« offre »), la conv manque (« aucune »), ou son rapport est déjà ouvert (« deja »). */
-export type RefusDAvance = "offre" | "aucune" | "deja";
+export type RefusDAvance = "offre" | "aucune" | "deja" | "sobre";
 
 /**
  * Utilise le rapport d’avance de ce compte (le plus ancien encore valable) pour cette conv, à lui et pas encore
@@ -246,6 +258,8 @@ export type RefusDAvance = "offre" | "aucune" | "deja";
  */
 export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, storyId: string, renonciation: Consentement): Promise<Achat | RefusDAvance> {
   if (estEquipe(compte)) return "deja";
+  /* Une conv en alerte ne se paie pas, même d’avance : son rapport doux est offert */
+  if (await convEnAlerte(storyId)) return "sobre";
   const r = await db().transaction(async (tx): Promise<Achat | RefusDAvance> => {
     const [avance] = await tx.select({ id: a.id }).from(a).where(avanceValable(compte.id)).orderBy(asc(a.payeLe)).limit(1).for("update");
     if (!avance) return "offre";

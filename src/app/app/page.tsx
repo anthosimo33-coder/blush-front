@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
-import { getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, rapportDebloque, sansHistoire } from "@/services/serveur";
+import { convOuverteEnAlerte, getChat, getContact, getConvs, getFiche, getRetour, getStory, questionsDeLaConv, rapportDebloque, sansHistoire } from "@/services/serveur";
 import { ARRIVAL_COOKIE } from "@/services/session";
 import { HomeScreen } from "./HomeScreen";
 import { IDEES_MASQUEES } from "./idees";
@@ -24,7 +24,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
   const jar = await cookies();
   const arrived = jar.has(ARRIVAL_COOKIE);
   /* Du rapport, l’accueil ne montre que le verdict, le niveau, la tendance et le prochain pas : getContact ne lit que le verdict */
-  const lectures = Promise.all([questionsDeLaConv(), getContact(), getFiche(), getStory(), getChat(), getConvs(), rapportDebloque()]);
+  const lectures = Promise.all([questionsDeLaConv(), getContact(), getFiche(), getStory(), getChat(), getConvs(), rapportDebloque(), convOuverteEnAlerte()]);
   /* Une erreur remonte quand l’accueil les attend (plus bas) ; redirigé avant, on ne les attend pas */
   lectures.catch(() => {});
   /*
@@ -34,9 +34,11 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
    */
   const retour = await getRetour();
   if (retour && retour.destination !== "/app") redirect(retour.destination);
-  const [quick, report, fiche, story, chat, all, debloque] = await lectures;
+  const [quick, report, fiche, story, chat, all, debloque, enAlerte] = await lectures;
   if (!story) redirect(await sansHistoire("/app"));
   if (!report || !fiche) redirect("/rapport");
+  /* Une conv en alerte n’est jamais vendue : pas de paiement par-dessus le chat, retour à son rapport doux (offert) */
+  if (enAlerte && !debloque) redirect("/rapport");
   /*
    * Vers sa fiche, l’accueil recule à gauche ; au retour, il revient de la gauche (globals.css, « Sophie, en glissé »).
    * Plusieurs convs : choisi dans la liste, il arrive par la droite ; vers la liste, il repart à droite.
