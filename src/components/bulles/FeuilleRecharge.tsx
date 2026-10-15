@@ -140,6 +140,8 @@ export function FeuilleRecharge({
            */
           livre={(e) => {
             setPaye(false);
+            /* Une recharge payée : le bonus de la première ne vaut plus, il se redemande à la prochaine ouverture (la feuille reste montée) */
+            setBonus("inconnu");
             onClose();
             router.replace(apresLaLivraison(e));
           }}

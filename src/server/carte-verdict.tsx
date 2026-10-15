@@ -214,3 +214,45 @@ export async function carteVerdict(v: VerdictPartage, format: Format, cache = "p
     cache,
   );
 }
+
+/**
+ * L’image d’aperçu du site (la landing et les pages publiques, quand un lien vers askblush.com est partagé ou montré
+ * par un moteur) : la marque, la promesse en bulles roses, la phrase de la landing, et la réponse de celui qui regarde.
+ * Rien de personnel : la même pour tous, gardée par le CDN.
+ */
+export async function carteDuSite(): Promise<ImageResponse> {
+  return dessiner(
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width: "100%",
+        height: "100%",
+        padding: "46px 60px 44px",
+        background: FOND_IMAGE,
+        fontFamily: "Nunito",
+      }}
+    >
+      <Marque bulle={await imageBulle()} taille={72} police={40} ecart={13} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
+        <Bulle taille={30} angle={-1}>
+          j’ai lu toute votre conv 👀
+        </Bulle>
+        <span style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.04, letterSpacing: "-0.035em", color: ENCRE, marginTop: 16, maxWidth: 1000, textWrap: "balance" }}>
+          Ta conv en dit plus que tu crois.
+        </span>
+        <span style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.32, color: DOUX, maxWidth: 900 }}>
+          Ce qui se passe vraiment entre vous, messages à l’appui, et quoi lui répondre.
+        </span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Bulle moi taille={28} angle={1.5}>
+          {ACCROCHE}
+        </Bulle>
+      </div>
+    </div>,
+    "carte",
+    "public, max-age=86400",
+  );
+}

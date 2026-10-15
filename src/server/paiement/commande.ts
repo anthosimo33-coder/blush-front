@@ -1,10 +1,10 @@
 import "server-only";
-import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { avanceDuCompte, commander, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
+import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -51,12 +51,16 @@ async function achatDuCompte(userId: string, achatId: string): Promise<Achat | n
  */
 const adresseDuRetour = (f: Fournisseur, achatId: string) => `${f.mode === "whop" ? URL_SITE : ""}/paiement/retour?achat=${achatId}`;
 
-/** Le dernier achat payé de ce compte chez ce prestataire qui a gardé un moyen de paiement : de quoi payer l’offre ③ en un geste. */
+/**
+ * Le dernier achat payé de ce compte chez ce prestataire qui a gardé un moyen de paiement : de quoi payer l’offre ③ en un
+ * geste. Jamais d’un achat payé sur la page de Whop (une configuration de paiement : son lien s’ouvre chez n’importe
+ * qui, le moyen est celui de qui a payé) : livrer ne le garde plus, et les achats d’avant le correctif sont écartés ici.
+ */
 async function moyenGarde(userId: string, mode: Fournisseur["mode"]): Promise<{ membreId: string; moyenId: string } | null> {
   const [l] = await db()
     .select({ membreId: a.membreId, moyenId: a.moyenId })
     .from(a)
-    .where(and(eq(a.userId, userId), eq(a.statut, "paye"), eq(a.fournisseur, mode), isNotNull(a.membreId), isNotNull(a.moyenId)))
+    .where(and(eq(a.userId, userId), eq(a.statut, "paye"), eq(a.fournisseur, mode), isNotNull(a.membreId), isNotNull(a.moyenId), isNull(a.checkoutId)))
     .orderBy(desc(a.payeLe))
     .limit(1);
   return l?.membreId && l.moyenId ? { membreId: l.membreId, moyenId: l.moyenId } : null;
@@ -281,6 +285,11 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
       .from(schema.stories)
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s || s.debloqueLe) return rien;
+    /* Une conv en alerte ne se vend pas (convEnAlerte) */
+    if (await convEnAlerte(storyId)) return rien;
+    /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (4,95 €) ; ① (6,90 €) ne se montre pas */
+    const avoirs = await avoirsDuCompte(compte);
+    if (avoirs.avance || avoirs.garde) return rien;
   } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {
     /* ③ complète le rapport seul ; ⑤ suit tout rapport payé ; ⑥ garde le −50 % de ⑤, montrée et pas prise */
     if (!(await justeApresUnRapport(compte.id, achatId, offre === "premium_ajout" ? RAPPORTS_SEULS : RAPPORTS_PAYES))) return rien;

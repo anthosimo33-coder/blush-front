@@ -126,9 +126,14 @@ async function acheteur(prefixe: string): Promise<{ u: Utilisateur; conv: string
 }
 
 /** Commande le rapport de sa conv au faux Whop, puis le paie : l’id de l’achat. */
+/**
+ * Un rapport payé dans la feuille (la carte de test du faux Whop, puis son webhook) : son moyen de paiement est gardé,
+ * celui du compte, de quoi payer ensuite en un geste.
+ */
 async function rapportPaye(offreId: "rapport" | "premium" = "rapport"): Promise<string> {
-  const { corps } = await payer({ offre: offreId, renonciation: CASE_RENONCIATION.version });
-  expect((await poster(await issue(corps.achat, "payer"))).status).toBe(200);
+  const { corps } = await payer({ offre: offreId, renonciation: CASE_RENONCIATION.version, jeton: "ctok_faux_payer" });
+  await apresLaReponse();
+  expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "paye", moyenId: "payt_faux_whop" });
   return corps.achat;
 }
 
@@ -224,7 +229,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
 });
 
 describe("le webhook (POST /api/paiement/whop)", () => {
-  it("payé : la conv débloquée, les bulles créditées, la chaîne relancée, le paiement et son moyen gardés ; rejoué, rien de plus", async () => {
+  it("payé sur la page de Whop : la conv débloquée, les bulles créditées, la chaîne relancée, le paiement gardé, mais pas le moyen de qui a payé (SECA-3) ; rejoué, rien de plus", async () => {
     const { u, conv } = await acheteur("hook-livre");
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const w = await issue(corps.achat, "payer");
@@ -233,8 +238,9 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect(await achatEnBase(corps.achat)).toMatchObject({
       statut: "paye",
       paiementId: expect.stringMatching(/^pay_faux_/),
-      membreId: "mber_faux_whop",
-      moyenId: "payt_faux_whop",
+      /* Le lien de la page de Whop s’ouvre chez n’importe qui : sa carte ne servira jamais à payer en un geste */
+      membreId: null,
+      moyenId: null,
     });
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect(await soldeDe(u.id)).toBe(10);
@@ -417,6 +423,30 @@ const paiementDeWhop = (achat: string, id: string, montant = "9.90") => ({
   currency: "eur",
   member_id: "mber_w",
   payment_method_id: "payt_w",
+});
+
+describe("encaissé mais rien à livrer (QSRV-1, OPS-1)", () => {
+  it("un paiement réussi sans achat connu, illisible, ou un webhook bien signé illisible : rien n’est livré, et l’équipe est prévenue", async () => {
+    await acheteur("encaisse-rien");
+    etat.mode = "whop";
+    /* Sans achat dans ses métadonnées (une page payée d’ailleurs), et avec un achat qui n’existe pas */
+    const sansAchat = { ...paiementDeWhop("x", "pay_x1"), metadata: {} };
+    expect((await poster(signeWhop("payment.succeeded", sansAchat))).status).toBe(200);
+    expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(crypto.randomUUID(), "pay_x2")))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : encaissé sans achat connu", "paiement : encaissé sans achat connu"]);
+    /* Un paiement réussi qu’on ne sait pas lire (son identifiant hors forme) */
+    etat.alertes.length = 0;
+    expect((await poster(signeWhop("payment.succeeded", { ...paiementDeWhop("x", "pay x3") }))).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : encaissé mais illisible"]);
+    /* Un webhook bien signé dont l’enveloppe ne se lit pas */
+    etat.alertes.length = 0;
+    const corps = JSON.stringify({ pas: "un webhook" });
+    expect((await poster({ corps, entetes: signerWebhook(WHOP.secret, `msg_${crypto.randomUUID()}`, corps) })).status).toBe(200);
+    await apresLaReponse();
+    expect(etat.alertes).toEqual(["paiement : webhook illisible"]);
+  });
 });
 
 describe("payé deux fois", () => {
@@ -762,7 +792,8 @@ describe("les offres uniques et le paiement en un geste", () => {
   it("③ en un geste chez Whop, sans réponse sûre (une panne, une réponse illisible) : aucune page de plus (pas de second débit), l’achat reste en attente (le retour attend son webhook, PAY-1), et son webhook le livre", async () => {
     const { u } = await acheteur("offre-geste-whop");
     etat.mode = "whop";
-    let reponseAuGeste: () => Response = () => new Response("{}", { status: 500 });
+    /* Le rapport d’abord payé dans la feuille (son moyen gardé, celui du compte), puis les gestes */
+    let reponseAuGeste: () => Response = () => Response.json({ id: "pay_g1", status: "paid", substatus: "succeeded", client_secret: null });
     const appels: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -773,7 +804,7 @@ describe("les offres uniques et le paiement en un geste", () => {
         return Response.json({ id: "ch_g", purchase_url: "https://whop.com/checkout/ch_g/" });
       }),
     );
-    const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version, jeton: "ctok_w_rapport" })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_g1")))).status).toBe(200);
     expect(await montrer("premium_ajout", rapport)).toMatchObject({ offre: "premium_ajout", enUnGeste: true });
     appels.length = 0;
@@ -795,8 +826,8 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await soldeDe(u.id)).toBe(90);
   });
 
-  it("③ en un geste chez Whop, refusé net : la page de paiement normale", async () => {
-    await acheteur("offre-geste-refus");
+  it("SECA-3 · un rapport payé sur la page de Whop (son lien s’ouvre chez n’importe qui) : ③ se paie sur une page, jamais en un geste sur la carte de qui a payé", async () => {
+    await acheteur("offre-geste-page");
     etat.mode = "whop";
     const appels: string[] = [];
     vi.stubGlobal(
@@ -804,11 +835,36 @@ describe("les offres uniques et le paiement en un geste", () => {
       vi.fn(async (url: string) => {
         const chemin = new URL(url).pathname.replace("/api/v1", "");
         appels.push(chemin);
-        if (chemin === "/payments") return new Response("{}", { status: 400 });
-        return Response.json({ id: "ch_r", purchase_url: "https://whop.com/checkout/ch_r/" });
+        return Response.json({ id: "ch_p", purchase_url: "https://whop.com/checkout/ch_p/" });
       }),
     );
     const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version })).corps.achat;
+    expect((await poster(signeWhop("payment.succeeded", { ...paiementDeWhop(rapport, "pay_p1"), checkout_configuration_id: "ch_p" }))).status).toBe(200);
+    expect(await achatEnBase(rapport)).toMatchObject({ statut: "paye", membreId: null, moyenId: null });
+    expect(await montrer("premium_ajout", rapport)).toMatchObject({ offre: "premium_ajout", enUnGeste: false });
+    appels.length = 0;
+    const { corps } = await payer({ offre: "premium_ajout", renonciation: CASE_RENONCIATION.version });
+    expect(appels).toEqual(["/checkout_configurations"]);
+    expect(corps.url).toBe("https://whop.com/checkout/ch_p/");
+  });
+
+  it("③ en un geste chez Whop, refusé net : la page de paiement normale", async () => {
+    await acheteur("offre-geste-refus");
+    etat.mode = "whop";
+    const appels: string[] = [];
+    /* Le rapport d’abord payé dans la feuille (son moyen gardé), puis Whop refuse net le geste */
+    let paiementsVus = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const chemin = new URL(url).pathname.replace("/api/v1", "");
+        appels.push(chemin);
+        if (chemin === "/payments")
+          return paiementsVus++ === 0 ? Response.json({ id: "pay_r1", status: "paid", substatus: "succeeded", client_secret: null }) : new Response("{}", { status: 400 });
+        return Response.json({ id: "ch_r", purchase_url: "https://whop.com/checkout/ch_r/" });
+      }),
+    );
+    const rapport = (await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version, jeton: "ctok_w_rapport" })).corps.achat;
     expect((await poster(signeWhop("payment.succeeded", paiementDeWhop(rapport, "pay_r1")))).status).toBe(200);
     expect((await montrer("premium_ajout", rapport)).offre).toBe("premium_ajout");
     appels.length = 0;

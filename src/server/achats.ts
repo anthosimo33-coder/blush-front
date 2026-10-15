@@ -6,6 +6,7 @@ import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
 import { mouvementDans } from "./bulles";
+import { donneesVerdict } from "./depot";
 import { db, schema } from "./db";
 import type { FournisseurPaiement } from "./db/enums";
 import { estEquipe } from "./droits";
@@ -28,7 +29,17 @@ export type Achat = typeof schema.achats.$inferSelect;
 const a = schema.achats;
 
 /** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
-export type RefusDeCommande = "aucune" | "deja" | "offre" | "trop";
+export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
+
+/**
+ * La conv est-elle en alerte (danger, détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un mineur) ? Son
+ * rapport est alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport d’avance
+ * (« une alerte n’appelle aucune vente », comme les relances). Sans verdict encore écrit : pas en alerte.
+ */
+export async function convEnAlerte(storyId: string): Promise<boolean> {
+  const v = await donneesVerdict(storyId);
+  return !!v && (!!v.sortie.alerte || v.sortie.mode_sobre);
+}
 
 /**
  * Combien de commandes jamais payées un compte peut avoir en même temps (des 48 dernières heures) : chacune crée une
@@ -80,6 +91,7 @@ export async function commander(
       .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
     if (!s) return "aucune";
     if (s.debloqueLe || estEquipe(compte)) return "deja";
+    if (await convEnAlerte(storyId)) return "sobre";
   }
   if (c.unique) {
     const montree = await offreValable(compte.id, c.unique);
@@ -166,6 +178,13 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         bulles = bullesDe(achat.offre);
       }
     }
+    /*
+     * Le moyen de paiement n’est gardé (pour payer ensuite en un geste, moyenGarde) que d’un paiement fait dans BLUSH, par
+     * le compte (la feuille, à son email ; ou déjà en un geste). Payé sur la page de Whop (une configuration de paiement,
+     * son lien ouvrable par n’importe qui), le moyen est celui de qui a payé : peut-être un autre, à qui on ne débitera
+     * jamais rien d’autre.
+     */
+    const pageDeWhop = !!(achat.checkoutId ?? paiement.checkoutId);
     const [paye] = await tx
       .update(a)
       .set({
@@ -175,8 +194,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         annuleLe: null,
         paiementId: paiement.paiementId ?? achat.paiementId,
         checkoutId: paiement.checkoutId ?? achat.checkoutId,
-        membreId: paiement.membreId ?? achat.membreId,
-        moyenId: paiement.moyenId ?? achat.moyenId,
+        membreId: pageDeWhop ? null : (paiement.membreId ?? achat.membreId),
+        moyenId: pageDeWhop ? null : (paiement.moyenId ?? achat.moyenId),
       })
       .where(eq(a.id, achatId))
       .returning();
@@ -236,7 +255,7 @@ export async function avanceDuCompte(userId: string): Promise<{ achat: string; f
 }
 
 /** Pourquoi un rapport d’avance ne s’utilise pas : aucun n’est valable (« offre »), la conv manque (« aucune »), ou son rapport est déjà ouvert (« deja »). */
-export type RefusDAvance = "offre" | "aucune" | "deja";
+export type RefusDAvance = "offre" | "aucune" | "deja" | "sobre";
 
 /**
  * Utilise le rapport d’avance de ce compte (le plus ancien encore valable) pour cette conv, à lui et pas encore
@@ -248,6 +267,8 @@ export type RefusDAvance = "offre" | "aucune" | "deja";
  */
 export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, storyId: string, renonciation: Consentement): Promise<Achat | RefusDAvance> {
   if (estEquipe(compte)) return "deja";
+  /* Une conv en alerte ne se paie pas, même d’avance : son rapport doux est offert */
+  if (await convEnAlerte(storyId)) return "sobre";
   const r = await db().transaction(async (tx): Promise<Achat | RefusDAvance> => {
     const [avance] = await tx.select({ id: a.id }).from(a).where(avanceValable(compte.id)).orderBy(asc(a.payeLe)).limit(1).for("update");
     if (!avance) return "offre";

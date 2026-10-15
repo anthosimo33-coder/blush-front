@@ -320,6 +320,8 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     const { u } = await acheteur("second-usage");
     const second = await secondPris();
     const conv = await autreConv(u);
+    /* Le rapport d’avance (0 €) vaut mieux qu’① (6,90 €) : elle ne se montre pas (ARG-2) */
+    expect(await montrer("suite")).toEqual({ offre: null });
     expect(await utiliser({ renonciation: "2020-01-01" })).toEqual({ status: 422, corps: { erreur: "renonciation" } });
     const avant = Date.now();
     expect(await utiliser()).toEqual({ status: 200, corps: { achat: second } });
@@ -396,6 +398,8 @@ describe("le −50 % gardé (⑥) et les offres du merci", () => {
     expect(Math.abs(fin - (Date.now() + DUREE_GARDE_MS))).toBeLessThan(60_000);
     expect((await feuille()).garde).toEqual({ fin: (garde as { fin: string }).fin });
     const conv = await autreConv(u);
+    /* Le −50 % gardé (4,95 €) vaut mieux qu’① (6,90 €) : elle ne se montre pas (ARG-2) */
+    expect(await montrer("suite")).toEqual({ offre: null });
     /* Sans le −50 % : pas de rapport à moitié prix ; avec lui, pour cette autre conv */
     const achat = await payeDansLaFeuille("rapport_garde");
     expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 495, bulles: 10, storyId: conv, offreUnique: "garde_second" });

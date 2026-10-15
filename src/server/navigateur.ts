@@ -28,17 +28,25 @@ export const NAVIGATEUR_GARDE_JOURS = 30;
 const MESSAGE_MAX = 300;
 
 /**
- * Un message ou une source sans ce qui pourrait désigner quelqu’un : les emails, les nombres de 4 chiffres ou plus (un
- * téléphone, un code), les identifiants (uuid), les paramètres d’une adresse ; coupé à `max` caractères.
+ * Un message ou une source sans ce qui pourrait désigner quelqu’un, ni de quoi tromper qui le lit : les caractères de
+ * contrôle, les emails, les adresses web (avec ou sans « https:// » : ‹url›, rien de cliquable), les identifiants
+ * (uuid), les nombres de 4 chiffres ou plus, même écrits par morceaux (« 06 12 34 56 78 », un code), les paramètres
+ * d’une adresse ; coupé à `max` caractères.
  */
 export function masquer(texte: string, max = MESSAGE_MAX): string {
   return texte
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, " ")
     .replace(/[^\s@"'<>]+@[^\s@"'<>]+\.[a-z]{2,}/gi, "‹email›")
+    .replace(/\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.)\S+/gi, "‹url›")
+    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|fr|net|org|io|co|app|dev|me|ly|link|xyz|info|biz|site|online|shop|be|ch|ca|de|uk|eu|ru|cn|tk|ml|gq)\b\S*/gi, "‹url›")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "‹id›")
     .replace(/\?[^\s)]*/g, "")
-    .replace(/\d{4,}/g, "‹n›")
+    .replace(/\d(?:[\s.\-/]?\d){3,}/g, "‹n›")
     .slice(0, max);
 }
+
+/** Le nom d’une erreur tel qu’un navigateur le donne (TypeError, AbortError…) : un mot ; tout le reste devient « Erreur ». */
+const nomDeLErreur = (nom: string) => (/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(nom) ? nom : "Erreur");
 
 /** La source d’une erreur réduite à un fichier de l’appli et sa ligne (« /_next/static/chunks/a1b2.js:1:2345 ») ; null pour tout le reste (une extension, un autre site). */
 export function sourceDeLAppli(source: string | undefined): string | null {
@@ -62,12 +70,15 @@ export type ErreurDuNavigateur = { nom: string; message: string; source?: string
 
 /**
  * Note une erreur remontée par un navigateur : une ligne par signature (son nom, son message aux nombres effacés, son
- * fichier) et par jour, dont le nombre de fois monte. La première du jour d’une signature prévient l’équipe, dix par
- * jour au plus. Au-delà de sa limite (LIMITES.erreurNavigateurParIp), une adresse n’est plus écoutée, sans le dire.
+ * fichier) et par jour, dont le nombre de fois monte. La première du jour d’une signature prévient l’équipe (au plus
+ * LIMITES.alertesNavigateurParJour) par un mail qui ne recopie RIEN de ce que le navigateur a écrit : n’importe qui peut
+ * appeler cette route, et un message libre dans un mail signé BLUSH serait une porte ouverte au hameçonnage. Le mail
+ * dit le genre d’erreur (un mot), l’écran, la famille du navigateur, et renvoie à /admin, où le message masqué se lit.
+ * Au-delà de sa limite (LIMITES.erreurNavigateurParIp), une adresse n’est plus écoutée, sans le dire.
  */
 export async function noterErreurDuNavigateur(req: Request, e: ErreurDuNavigateur): Promise<void> {
   if (!(await sousLaLimiteDeLIp(req, "navigateur:erreur", LIMITES.erreurNavigateurParIp))) return;
-  const nom = masquer(e.nom, 60) || "Error";
+  const nom = nomDeLErreur(e.nom);
   const message = masquer(e.message);
   const source = sourceDeLAppli(e.source);
   const famille = familleDe(req.headers.get("user-agent"));
@@ -89,9 +100,8 @@ export async function noterErreurDuNavigateur(req: Request, e: ErreurDuNavigateu
   await auMieux(async () => {
     if (!(await sousLaLimite("alertes:navigateur", LIMITES.alertesNavigateurParJour))) return;
     await alerter("erreur dans un navigateur", [
-      `${nom} : ${message}`,
-      `Écran : ${e.etape} · navigateur : ${famille}${source ? ` · ${source}` : ""}.`,
-      "Première fois aujourd’hui. Les suivantes se comptent dans /admin (Santé des navigateurs).",
+      `Une erreur ${nom} jamais vue aujourd’hui, sur l’écran « ${e.etape} » (navigateur : ${famille}${source ? ", dans le code de l’appli" : ""}).`,
+      "Son message (masqué, non vérifié : n’importe quel navigateur peut écrire ici) et ses suivantes se lisent dans /admin, bloc « Navigateurs ».",
     ]);
   }, "alerte d’une erreur de navigateur");
 }
