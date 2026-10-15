@@ -79,10 +79,16 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
         <Container className="flex h-16 items-center justify-between">
           <LogoIlot size={30} fontSize={22} href="/" />
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Déjà un compte, sur un autre appareil : on retrouve ses convs avec son email */}
-            {!retour && (
-              <Link href="/connexion" className="relative inline-flex h-10 items-center px-2.5 text-note font-black text-soft no-underline transition-colors hover:text-ink">
-                Se connecter
+            {/*
+             * Déjà un compte, sur un autre appareil : on retrouve ses convs avec son email. Connecté sans conv : son compte
+             * (ses achats, la déconnexion, tout effacer), que « Se connecter » ne montrait plus (il ramène au parcours)
+             */}
+            {(!retour || "sansConv" in retour) && (
+              <Link
+                href={retour ? "/compte" : "/connexion"}
+                className="relative inline-flex h-10 items-center px-2.5 text-note font-black text-soft no-underline transition-colors hover:text-ink"
+              >
+                {retour ? "Mon compte" : "Se connecter"}
               </Link>
             )}
             {/* Le bouton noir reste celui de la page : ici, le blanc qui s’efface */}

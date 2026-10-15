@@ -143,11 +143,13 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
  * n’est pas débloqué alors que le compte en a d’autres. Le paiement s’ouvre par-dessus cet accueil et cachait le retour
  * aux autres (une conv payée, introuvable) : la landing mène à « Tes convs », d’où l’on choisit. L’accueil, lui, garde
  * getRetour : choisie dans la liste, la conv pas débloquée s’ouvre encore.
+ * Connecté sans conv (il a effacé la seule) : `sansConv`, la landing montre alors « Mon compte » (cta.ts).
  */
-export async function getRetourDeLaLanding(): Promise<{ destination: Route } | null> {
+export async function getRetourDeLaLanding(): Promise<{ destination: Route } | { sansConv: true } | null> {
   const retour = await getRetour();
-  if (retour?.destination !== "/app") return retour;
   const { utilisateur, story } = await contexte();
+  if (!retour) return utilisateur && !story ? { sansConv: true } : null;
+  if (retour.destination !== "/app") return retour;
   if (!utilisateur || !story || rapportOuvert(story, utilisateur) || (await nombreDeConvs()) < 2) return retour;
   return { destination: "/app/convs" };
 }
