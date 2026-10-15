@@ -50,6 +50,15 @@ describe("le pilotage, rendu", () => {
     expect(html).toMatch(/role="img" aria-label="Ce qui se vend\u00a0: Premium \d+\u00a0%/);
   });
 
+  it("la santé : les pannes du serveur de la période, leurs routes et leurs pages, et celles du jour", () => {
+    const t = texte(renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(7), direct: null, base: "/apercu/admin", sonder: false })));
+    expect(t).toContain("Pannes du serveur 2");
+    expect(t).toContain("POST /api/import · 2");
+    expect(t).toContain("Aujourd’hui\u00a0: 1\u00a0panne du serveur.");
+    const calme = texte(renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(7, { calme: true }), direct: null, base: "/apercu/admin", sonder: false })));
+    expect(calme).toContain("Aujourd’hui\u00a0: 0\u00a0panne du serveur.");
+  });
+
   it("sans visites comptées : « — » à la place de ce qui en dépend, et la carte qui le dit", () => {
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(7, { suivi: false, calme: true }), direct: null, base: "/apercu/admin", sonder: false })));
     expect(t).not.toMatch(SALE);

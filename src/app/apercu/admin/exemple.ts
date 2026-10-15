@@ -107,7 +107,9 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { groupe: "bulles", n: Math.round(bulles / 790), centimes: bulles },
     ],
     iaDuJour: { dollars: 12.4, budget: 30 },
-    sante: calme ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0 } : { echecs: 3, bloquees: 1, paiementsEchoues: 2, alertes: 1 },
+    sante: calme
+      ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }
+      : { echecs: 3, bloquees: 1, paiementsEchoues: 2, alertes: 1, pannes: 2, pannesDuJour: 1 },
     suiviDepuis: suivi ? "2026-09-01" : null,
   };
 }
@@ -151,12 +153,13 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
       ],
     },
     sante: variante.calme
-      ? { echecs: [], enCours: 2, bloquees: 0, enAttente: 1 }
+      ? { echecs: [], pannes: [], enCours: 2, bloquees: 0, enAttente: 1 }
       : {
           echecs: [
             { code: "refus", n: 2 },
             { code: "panne", n: 1 },
           ],
+          pannes: [{ lieu: "POST /api/import", n: 2 }],
           enCours: 2,
           bloquees: 1,
           enAttente: 1,

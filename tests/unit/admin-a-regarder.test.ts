@@ -35,7 +35,7 @@ function vide(p: Partial<Pilotage> = {}): StatsAdmin {
     tunnel: { visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 },
     sources: [],
     mix: [],
-    sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0 },
+    sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 },
     suiviDepuis: "2026-09-01",
     ...p,
   });
@@ -61,14 +61,25 @@ describe("« À regarder »", () => {
   });
 
   it("ce qui coince passe d’abord : la santé, avec ses lignes non nulles", () => {
-    const cartes = aRegarder(stats({ sante: { echecs: 3, bloquees: 1, paiementsEchoues: 2, alertes: 5 } }));
+    const cartes = aRegarder(stats({ sante: { echecs: 3, bloquees: 1, paiementsEchoues: 2, alertes: 5, pannes: 0, pannesDuJour: 0 } }));
     expect(cartes).toHaveLength(3);
     expect(cartes[0]).toMatchObject({ ton: "mal", titre: `3${NB}tâches en échec, 1${NB}tâche bloquée et 2${NB}paiements refusés`, lien: { ancre: "sante" } });
     /* Trois soucis : la bonne nouvelle ne tient plus */
     expect(cartes.every((c) => c.ton === "mal")).toBe(true);
-    expect(aRegarder(stats({ sante: { echecs: 0, bloquees: 0, paiementsEchoues: 1, alertes: 0 } }))[0]?.titre).toBe(`1${NB}paiement refusé`);
+    expect(aRegarder(stats({ sante: { echecs: 0, bloquees: 0, paiementsEchoues: 1, alertes: 0, pannes: 0, pannesDuJour: 0 } }))[0]?.titre).toBe(`1${NB}paiement refusé`);
     /* Les alertes danger seules ne sont pas une panne : la carte Santé les montre, « À regarder » non */
-    expect(titres(aRegarder(stats({ sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 4 } })))).not.toContainEqual(expect.stringMatching(/alerte/));
+    expect(titres(aRegarder(stats({ sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 4, pannes: 0, pannesDuJour: 0 } })))).not.toContainEqual(
+      expect.stringMatching(/alerte/),
+    );
+    /* Les pannes du serveur (une route /api, une page) : de la santé, comptées sur la période */
+    expect(aRegarder(stats({ sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 3, pannesDuJour: 1 } }))[0]).toMatchObject({
+      ton: "mal",
+      titre: `3${NB}pannes du serveur`,
+      lien: { ancre: "sante" },
+    });
+    expect(aRegarder(stats({ sante: { echecs: 1, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 1, pannesDuJour: 0 } }))[0]?.titre).toBe(
+      `1${NB}tâche en échec et 1${NB}panne du serveur`,
+    );
   });
 
   it("les remboursements au-delà de 5 % du payé", () => {
@@ -113,7 +124,7 @@ describe("« À regarder »", () => {
     expect(cartes.map((c) => c.ton)).toEqual(["neutre", "bon"]);
     const pleines = aRegarder(
       vide({
-        sante: { echecs: 1, bloquees: 1, paiementsEchoues: 1, alertes: 0 },
+        sante: { echecs: 1, bloquees: 1, paiementsEchoues: 1, alertes: 0, pannes: 0, pannesDuJour: 0 },
         tunnel: { visiteurs: 1000, imports: 100, verdicts: 90, acheteurs: 20, racheteurs: 0 },
         suiviDepuis: null,
       }),

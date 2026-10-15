@@ -23,6 +23,15 @@ const DIGEST_SUR = /^[\w@:.-]{1,60}$/;
  */
 export const nomErreur = (e: unknown): string => (e instanceof Error ? e.name : e === null ? "null" : typeof e);
 
+/**
+ * Une requête que le navigateur a quittée en route (« Retour » ou un lien touché pendant qu’une page arrive en flux) :
+ * pas une panne. Next la nomme AbortError ou ResponseAborted (node_modules/next/dist/server/pipe-readable.js), React
+ * lève une Error simple dont seul le message le dit (« The destination stream closed early. »,
+ * node_modules/react-dom/cjs/react-dom-server.node.production.js) : il sert à la reconnaître, jamais à l’écrire.
+ */
+export const estUnAbandon = (e: unknown): boolean =>
+  e instanceof Error && (e.name === "AbortError" || e.name === "ResponseAborted" || /^The destination stream (closed early|errored while writing data)\.?$/.test(e.message));
+
 /** Le champ `cle` de `e`, s’il est un code sûr à écrire. */
 function codeSur(e: unknown, cle: "code" | "digest"): string | undefined {
   if (typeof e !== "object" || e === null || !(cle in e)) return undefined;

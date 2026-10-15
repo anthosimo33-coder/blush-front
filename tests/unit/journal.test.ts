@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { champsDErreur, ligneDuJournal, nomErreur, tracer } from "@/lib/tracer";
+import { champsDErreur, estUnAbandon, ligneDuJournal, nomErreur, tracer } from "@/lib/tracer";
 import { ErreurResend } from "@/server/email";
 import { ErreurTache } from "@/server/erreurs";
 import { auMieux, enLocal, journal, journalErreur } from "@/server/journal";
@@ -57,6 +57,25 @@ describe("ce qu’on garde d’une erreur", () => {
     expect(nomErreur("une chaîne")).toBe("string");
     expect(nomErreur(undefined)).toBe("undefined");
     expect(nomErreur(null)).toBe("null");
+  });
+
+  it("estUnAbandon : une page ou une réponse quittée par le navigateur n’est pas une panne ; une vraie erreur, si", () => {
+    const abandons = [
+      new Error("The destination stream closed early."),
+      new Error("The destination stream errored while writing data."),
+      Object.assign(new Error("This operation was aborted"), { name: "AbortError" }),
+      Object.assign(new Error(""), { name: "ResponseAborted" }),
+    ];
+    for (const e of abandons) expect(estUnAbandon(e), e.message || e.name).toBe(true);
+    /* Le message seul ne suffit pas : il doit être celui de React, en entier */
+    for (const e of [
+      erreurSql(),
+      new TypeError("Cannot read properties of undefined"),
+      new Error("Ines a écrit… The destination stream closed early."),
+      "The destination stream closed early.",
+      null,
+    ])
+      expect(estUnAbandon(e)).toBe(false);
   });
 
   it("une ligne JSON : l’événement, puis des champs bornés, sans les vides", () => {

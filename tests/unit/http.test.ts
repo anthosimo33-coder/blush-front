@@ -4,14 +4,18 @@ import { ErreurAjout } from "@/server/ajouts";
 import { ErreurCaptures, LectureRefusee } from "@/server/captures";
 import { ErreurPublique, ErreurTache } from "@/server/erreurs";
 import { ErreurImport } from "@/server/import";
-import { codeDErreur, memeOrigine, reponseAudio, reponseErreur } from "@/server/http";
+import { codeDErreur, memeOrigine, reponseAudio, reponseErreur, route } from "@/server/http";
 import { groupeIp, ipDe } from "@/server/limites";
+import { signalerUnePanne } from "@/server/pannes";
 import { ErreurPartage } from "@/server/partages";
+
+/* Le compteur des pannes et l’alerte (src/server/pannes.ts, tests/pannes.test.ts avec la base) : ici, ce que l’enveloppe lui passe */
+vi.mock("@/server/pannes", () => ({ signalerUnePanne: vi.fn(async () => {}) }));
 
 /*
  * Les briques pures des routes /api : l’origine d’une mutation (memeOrigine), l’audio par plages (reponseAudio, que
  * Safari demande en deux fois), l’adresse IP des limites (ipDe, une IPv6 par son /64), et la traduction des erreurs en
- * réponses (reponseErreur). Sans base, sans requête réelle.
+ * réponses (reponseErreur), et ce que l’enveloppe des routes signale d’une panne (route). Sans base, sans requête réelle.
  */
 
 const requete = (entetes: Record<string, string>) => new Request("http://localhost/api/x", { method: "POST", headers: entetes });
@@ -187,5 +191,40 @@ describe("reponseErreur", () => {
       interne = e;
     }
     expect(() => reponseErreur(interne)).toThrow(interne as Error);
+  });
+});
+
+describe("route : une panne se compte sous la clé de la route", () => {
+  const panne = vi.mocked(signalerUnePanne);
+
+  it("une erreur imprévue : « panne » au navigateur, et la panne comptée sous la clé de la route (hors d’une requête, sans after)", async () => {
+    panne.mockClear();
+    const logs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const bug = Object.assign(new Error("insert into users values ($1) : noe@exemple.fr"), { name: "DrizzleQueryError" });
+      const r = await route("POST /api/import", async () => Promise.reject(bug))();
+      expect([r.status, await r.json()]).toEqual([502, { erreur: "panne" }]);
+      expect(panne).toHaveBeenCalledExactlyOnceWith("POST /api/import", bug, "route");
+      /* La ligne du journal part tout de suite, avant le compteur : elle nomme la route, sans le message */
+      const journal = logs.mock.calls.flat().join(" ");
+      expect(journal).toContain("POST /api/import");
+      expect(journal).not.toContain("exemple");
+    } finally {
+      logs.mockRestore();
+    }
+  });
+
+  it("une erreur attendue (publique) ou d’étape n’est pas une panne du serveur ; une erreur sans route non plus", async () => {
+    panne.mockClear();
+    const logs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await route("POST /api/import", async () => Promise.reject(new ErreurImport("groupe")))()).status).toBe(422);
+      expect((await route("POST /api/chat", async () => Promise.reject(new ErreurTache("delai")))()).status).toBe(502);
+      reponseErreur(new Error("x"));
+      await Promise.resolve();
+      expect(panne).not.toHaveBeenCalled();
+    } finally {
+      logs.mockRestore();
+    }
   });
 });

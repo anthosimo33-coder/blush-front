@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cookieSecurise } from "./cookies";
 import { db, schema } from "./db";
-import { auMieux } from "./journal";
+import { auMieux, journalErreur } from "./journal";
 
 /*
  * Les compteurs du tableau de bord : un nom, un jour (heure de Paris), un nombre. Rien d’autre : ni contenu,
@@ -39,6 +39,31 @@ export async function compter(cle: Cle): Promise<void> {
     "compteur non noté",
     { cle },
   );
+}
+
+/**
+ * Le début de la clé d’un compteur de pannes (src/server/pannes.ts), suivi du lieu de la panne : la clé du contrat d’une
+ * route (« panne:POST /api/chat ») ou le fichier d’une page (« panne:/rapport »). Jamais une adresse demandée.
+ */
+export const PANNE = "panne:";
+
+/**
+ * Compte une panne de `lieu` aujourd’hui (jour de Paris), et rend le compte du jour avec elle : 1 pour la première.
+ * L’ajout est atomique : deux pannes en même temps ne lisent jamais toutes deux 1. Null si la base ne l’a pas noté (la
+ * base en panne, justement) : une ligne au journal le dit, sans rien faire échouer.
+ */
+export async function compterUnePanne(lieu: string): Promise<number | null> {
+  try {
+    const [ligne] = await db()
+      .insert(schema.counters)
+      .values({ day: sql`(now() at time zone 'Europe/Paris')::date`, key: `${PANNE}${lieu}`, count: 1 })
+      .onConflictDoUpdate({ target: [schema.counters.day, schema.counters.key], set: { count: sql`${schema.counters.count} + 1` } })
+      .returning({ count: schema.counters.count });
+    return ligne?.count ?? null;
+  } catch (e) {
+    journalErreur("panne non comptée", e, { lieu });
+    return null;
+  }
 }
 
 /** Les robots qui ouvrent un lien pour en dessiner l’aperçu (WhatsApp, iMessage, Slack…) : pas des visites. */
