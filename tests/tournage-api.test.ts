@@ -111,13 +111,15 @@ describe("l’API du mode tournage", () => {
   });
 
   it("refuse un prénom absent du fichier (422 « qui ») et un fichier illisible, sans rien lire ni garder", async () => {
-    const avant = appels.length;
+    const convs = async () => (await db().select({ n: count() }).from(schema.stories))[0]!.n;
+    const avant = [appels.length, await convs()];
     const qui = await preparer({ nom: "Kelly · A1", fichier: texteDeConv(FICHIER), moi: "Personne" });
     expect([qui.status, await qui.json()]).toEqual([422, { erreur: "qui" }]);
     const illisible = await preparer({ nom: "Kelly · A1", fichier: "pas un export", moi });
     expect(illisible.status).toBe(422);
-    expect(appels.length).toBe(avant);
-    expect(etat.apres).toEqual([]);
+    /* Ce qui part après la réponse ne fait que signaler l’erreur d’import (reponseErreur) : aucune lecture */
+    await apres();
+    expect([appels.length, await convs()]).toEqual(avant);
   });
 
   it("prépare un lien : la vraie lecture une fois, dans le compte des convs de tournage, puis le lien une fois prête", async () => {
