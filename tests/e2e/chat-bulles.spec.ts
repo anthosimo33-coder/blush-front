@@ -173,6 +173,13 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     const envoi = (await fil.locator(".bg-toi-ink.font-message").allTextContents()).filter((t) => t.trim().length > 3);
     expect(envoi.length).toBeGreaterThan(0);
     for (const t of envoi) expect(avantLePaiement.includes(t), `« ${t} » était dans la page avant d’être payé`).toBe(false);
+    /* La recharge rouverte sur la même page (sans recharger) ne repromet pas le bonus ④, déjà pris (ARG-1) */
+    await compteur(120).click();
+    await page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" }).getByRole("button", { name: "Recharger · il t’en reste 120" }).click();
+    await expect(recharge.getByRole("radio", { name: /70 bulles/ })).toBeVisible();
+    await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(recharge).toBeHidden();
     /* Payée, l’historique la rend en entier */
     await ouvrir(page);
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);

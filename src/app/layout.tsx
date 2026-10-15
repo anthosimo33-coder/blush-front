@@ -12,12 +12,21 @@ import { PAPIER } from "@/server/marque";
 import { classesDesPolices } from "./polices";
 import "./globals.css";
 
+/*
+ * Les moteurs de recherche : seules les pages publiques s’indexent (la landing, les conditions, les mentions légales, la
+ * confidentialité : PAGE_PUBLIQUE, src/lib/referencement.ts). Toutes les autres, privées (le parcours, le rapport, le
+ * chat, le compte) ou outils de l’équipe, restent hors des moteurs par défaut : une nouvelle page aussi, tant qu’elle ne
+ * le demande pas. robots.txt (src/app/robots.ts) et le plan du site (src/app/sitemap.ts) disent la même chose.
+ */
 export const metadata: Metadata = {
-  /* Les images des liens partagés (/v/…) en adresse complète : celle du site en ligne, l’adresse locale en dev */
+  /* Les images des liens partagés (/v/…) et des pages publiques en adresse complète : celle du site en ligne, l’adresse locale en dev */
   metadataBase: surVercel() ? new URL(URL_SITE) : undefined,
   title: { default: "BLUSH", template: "%s · BLUSH" },
   description: "Ta conv en dit plus que tu crois.",
-  robots: { index: false },
+  applicationName: "BLUSH",
+  robots: { index: false, follow: false },
+  openGraph: { siteName: "BLUSH", locale: "fr_FR", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

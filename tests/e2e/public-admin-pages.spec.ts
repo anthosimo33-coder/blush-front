@@ -13,7 +13,7 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
   await test.step("la promesse, et le bouton principal deux fois (en haut, en bas)", async () => {
     const reponse = await page.goto("/");
     expect(reponse?.status()).toBe(200);
-    await expect(page).toHaveTitle("BLUSH · Ta conv en dit plus que tu crois");
+    await expect(page).toHaveTitle("BLUSH · Analyse ta conv\u00a0: ce qui se passe vraiment entre vous");
     const main = page.getByRole("main");
     const titre = main.getByRole("heading", { level: 1 });
     await expect(titre).toContainText("en dit plus");
@@ -247,4 +247,27 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
     expect((await request.get(chemin)).status(), chemin).toBe(404);
   }
   expect((await request.post("/apercu/demander", { data: { text: "elle m’a répondu « on verra »" } })).status(), "/apercu/demander").toBe(404);
+});
+
+test("les moteurs de recherche : les pages publiques s’indexent (canonique, aperçu, données structurées), le parcours non ; robots.txt et le plan du site répondent", async ({
+  page,
+  request,
+}) => {
+  for (const chemin of ["/", "/conditions", "/confidentialite", "/mentions-legales"]) {
+    await page.goto(chemin);
+    await expect(page.locator('meta[name="robots"]'), chemin).toHaveAttribute("content", /^index, follow/);
+    await expect(page.locator('link[rel="canonical"]'), chemin).toHaveCount(1);
+    await expect(page.locator('meta[property="og:image"]'), chemin).toHaveCount(1);
+  }
+  await page.goto("/");
+  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent()) ?? "{}") as { "@graph"?: { "@type": string }[] };
+  expect(ld["@graph"]?.map((n) => n["@type"])).toEqual(["Organization", "WebApplication"]);
+  /* Le parcours reste hors des moteurs */
+  await page.goto("/commencer");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  /* L’image d’aperçu se dessine, robots.txt et le plan du site répondent (hors de Vercel, robots.txt n’ouvre rien) */
+  const og = await request.get("/opengraph-image");
+  expect([og.status(), og.headers()["content-type"]]).toEqual([200, "image/png"]);
+  expect((await request.get("/robots.txt")).status()).toBe(200);
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("/conditions");
 });
