@@ -307,22 +307,37 @@ async function direChezLePrestataire(
 
 /* ———— Ce que le prestataire garde (S-17) ———— */
 
-/* Un identifiant rendu par le prestataire : il entre dans une adresse, rien d’autre n’y passe */
-const IDENTIFIANT = /^[A-Za-z0-9_-]{1,128}$/;
+/*
+ * Ce qui s’efface : un élément de l’historique ou une transcription, par l’identifiant rendu par le prestataire. Il
+ * entre dans une adresse : le chemin entier est vérifié, rien d’autre n’y passe (« ../ » compris)
+ */
+const CHEMIN_A_EFFACER = /^\/v1\/(?:history|speech-to-text\/transcripts)\/[A-Za-z0-9_-]{1,128}$/;
 /**
  * Les attentes avant chaque essai d’effacement : un élément d’historique peut mettre un instant à apparaître (404), un
  * prestataire débordé répond 429 ou 5xx.
  */
 const ESSAIS_EFFACEMENT_MS = [0, 2_000, 6_000];
 const DELAI_EFFACEMENT_MS = 10_000;
+/** Un 429 qui demande d’attendre (Retry-After, en secondes) : écouté jusqu’à cette attente, au-delà l’essai suivant garde la sienne. */
+const RETRY_AFTER_MAX_MS = 10_000;
 
 /* Le dernier jour où chaque appel sans identifiant a été dit au journal (par instance) */
 const SANS_IDENTIFIANT = new Map<string, string>();
 
+/** Un travail qui court après la réponse (after), ou seul hors d’une requête (un script) ; il ne la retient jamais. */
+function apresLaReponse(travail: Promise<unknown>): void {
+  try {
+    after(() => travail);
+  } catch {
+    /* Hors d’une requête : il court seul */
+  }
+}
+
 /**
  * Un appel réussi sans l’identifiant de ce que le prestataire en garde (l’en-tête « history-item-id » de la voix, le
  * `transcription_id` de la transcription) : rien ne sera effacé. Sans la non-conservation, c’est une fuite à voir :
- * une ligne d’alerte au journal, une fois par jour et par instance. `quoi` : « voix » ou « transcription ».
+ * une ligne d’alerte au journal et une alerte à l’équipe, une fois par jour et par instance (l’alerte, aussi bornée
+ * par sujet pour toutes les instances). `quoi` : « voix » ou « transcription ».
  * TODO(produit): vérifier sur un vrai appel que l’identifiant arrive (curl -i sur le compte du prestataire) ; sinon,
  * balayer l’historique (GET puis DELETE /v1/history), voir restant.json.
  */
@@ -332,43 +347,63 @@ export function signalerSansIdentifiant(quoi: "voix" | "transcription"): void {
   if (SANS_IDENTIFIANT.get(quoi) === jour) return;
   SANS_IDENTIFIANT.set(quoi, jour);
   journal("prestataire de voix : rien à effacer, sans identifiant", { quoi }, "alerte");
+  apresLaReponse(
+    alerter("prestataire de voix : rien à effacer", [
+      `Un appel (${quoi}) a réussi sans l’identifiant de ce que le prestataire en garde : rien n’a pu être effacé chez lui.`,
+      "Son texte reste dans l’historique du compte du prestataire, contrairement à la page de confidentialité : à vérifier (src/server/ia/voix.ts, S-17).",
+    ]),
+  );
 }
 
 /**
  * Efface chez le prestataire ce qu’il a gardé d’un appel : `chemin` (« /v1/history/<id> » pour un vocal dit,
  * « /v1/speech-to-text/transcripts/<id> » pour une transcription). Ne retient pas la réponse : l’effacement court après
- * elle (after), et un échec laisse une ligne au journal (son statut, jamais l’identifiant).
+ * elle (after), et un échec laisse une ligne au journal et prévient l’équipe (son statut, jamais l’identifiant).
  */
 export function effacerChezLePrestataire(chemin: string): void {
   const cle = env().ELEVENLABS_API_KEY;
-  const id = chemin.slice(chemin.lastIndexOf("/") + 1);
-  if (!cle || !IDENTIFIANT.test(id)) return;
-  const travail = effacer(chemin, cle);
-  try {
-    after(() => travail);
-  } catch {
-    /* Hors d’une requête (un script) : l’effacement court seul */
-  }
+  if (!cle || !CHEMIN_A_EFFACER.test(chemin)) return;
+  apresLaReponse(effacer(chemin, cle));
+}
+
+/** L’attente que demande un 429 (Retry-After, en secondes), bornée ; 0 si elle manque ou ne se lit pas. */
+function attenteDemandee(r: Response | null): number {
+  const s = Number(r?.status === 429 ? r.headers.get("retry-after") : NaN);
+  return Number.isFinite(s) && s > 0 ? Math.min(s * 1000, RETRY_AFTER_MAX_MS) : 0;
 }
 
 /**
- * Les essais d’effacement. Au bout : 404 (jamais gardé, ou déjà effacé) n’est pas une fuite, une ligne d’information ;
- * 401 ou 403, la clé n’a pas le droit d’effacer (une alerte à part, à régler sur le compte) ; le reste (429, 5xx, le
- * réseau) après les trois essais, une alerte. Le statut seulement, jamais l’identifiant.
+ * Les essais d’effacement : jusqu’à trois, sur un 404 (l’élément pas encore là), un 429 (son Retry-After écouté) ou
+ * une panne (5xx, le réseau, le délai) ; un autre refus arrête tout. Au bout : 404 (jamais gardé, ou déjà effacé)
+ * n’est pas une fuite, une ligne d’information ; 401 ou 403, la clé n’a pas le droit d’effacer (une alerte à part, à
+ * régler sur le compte) ; le reste, une alerte. Le statut seulement, jamais l’identifiant. Ne lève jamais (alerter non
+ * plus) : l’effacement court après la réponse, personne ne l’attend.
  */
 async function effacer(chemin: string, cle: string): Promise<void> {
   let statut = 0;
+  let demandee = 0;
   for (const attente of ESSAIS_EFFACEMENT_MS) {
-    if (attente) await pause(attente);
+    const pourCetEssai = Math.max(attente, demandee);
+    if (pourCetEssai) await pause(pourCetEssai);
     const r = await fetch(`${ELEVENLABS}${chemin}`, { method: "DELETE", headers: { "xi-api-key": cle }, signal: AbortSignal.timeout(DELAI_EFFACEMENT_MS) }).catch(() => null);
     if (r?.ok) return;
     statut = r?.status ?? 0;
+    demandee = attenteDemandee(r);
     if (statut && statut !== 404 && statut !== 429 && statut < 500) break;
   }
   const quoi = chemin.split("/")[2] ?? "";
-  if (statut === 404) journal("prestataire de voix : rien de gardé à effacer", { quoi }, "info");
-  else if (statut === 401 || statut === 403) journal("prestataire de voix : clé sans droit d’effacement", { quoi, statut }, "alerte");
-  else journal("prestataire de voix : rien d’effacé", { quoi, statut }, "alerte");
+  if (statut === 404) {
+    journal("prestataire de voix : rien de gardé à effacer", { quoi }, "info");
+    return;
+  }
+  const refuse = statut === 401 || statut === 403;
+  journal(refuse ? "prestataire de voix : clé sans droit d’effacement" : "prestataire de voix : rien d’effacé", { quoi, statut }, "alerte");
+  await alerter(refuse ? "prestataire de voix : clé sans droit d’effacement" : "prestataire de voix : effacement en échec", [
+    `Ce que le prestataire a gardé d’un appel (${quoi}) n’a pas été effacé : ${statut ? `statut ${statut}` : "pas de réponse"}${refuse ? "." : ", après trois essais."}`,
+    refuse
+      ? "La clé de l’API n’a pas le droit d’effacer : à régler dans les réglages du compte du prestataire."
+      : "Le texte du vocal reste dans l’historique du compte du prestataire : à effacer à la main s’il le faut.",
+  ]);
 }
 
 /* ———— La voix muette (mode factice) : un vrai MP3 de silence, à la durée du texte ———— */
