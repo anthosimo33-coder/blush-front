@@ -124,7 +124,20 @@ export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille } & Avoirs;
  * Un achat du compte, pour « Tes achats » (GET /api/achats) : son offre, son prix TTC (en centimes), les bulles qu’il a
  * données, son statut, et quand (son paiement, une date ISO).
  */
-export type AchatDuCompte = { id: string; offre: OffreId; centimes: number; bulles: number; statut: StatutAchat; le: string };
+/**
+ * Un achat payé du compte (« Tes achats ») : son offre, son montant, ses bulles, son état et son jour (une date ISO). Un
+ * rapport d’avance dit aussi jusqu’à quand il vaut et quand il a servi (`avance`, des dates ISO, `utiliseLe` null tant
+ * qu’il attend), et jusqu’à quand on peut s’en rétracter (`retractation`, 14 jours après l’achat ; null une fois utilisé ou passé).
+ */
+export type AchatDuCompte = {
+  id: string;
+  offre: OffreId;
+  centimes: number;
+  bulles: number;
+  statut: StatutAchat;
+  le: string;
+  avance?: { fin: string; utiliseLe: string | null; retractation: string | null };
+};
 
 /** Où en est un achat (GET /api/paiement/[achat]) : son offre, son statut, les bulles qu’il donne, la conv dont il débloque le rapport. */
 export type EtatAchat = { achat: string; offre: OffreId; statut: StatutAchat; bulles: number; conv: string | null };

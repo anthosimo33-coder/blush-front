@@ -55,6 +55,7 @@ import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { DUREE_GARDE_MS, RAPPORT_D_AVANCE } from "@/contenu/offres";
 import type { Utilisateur } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
+import { achatsDuCompte } from "@/server/achats";
 import { db, schema } from "@/server/db";
 import type { WebhookFactice } from "@/server/paiement/factice";
 import type { FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence, WebhookDuFauxWhop } from "@/types/api";
@@ -354,6 +355,24 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     await autreConv(u);
     expect(await utiliser()).toEqual({ status: 422, corps: { erreur: "offre" } });
     expect((await feuille()).avance).toBeNull();
+  });
+
+  it("« Tes achats » dit où en est le rapport d’avance : jusqu’à quand il vaut et la rétractation possible tant qu’il attend ; utilisé, quand (SUP14-2)", async () => {
+    const { u } = await acheteur("second-tes-achats");
+    const second = await secondPris();
+    const avant = (await achatsDuCompte(u.id)).find((x) => x.id === second)!;
+    const paye = Date.parse(avant.le);
+    expect(avant.avance).toEqual({
+      fin: new Date(paye + RAPPORT_D_AVANCE.dureeMs).toISOString(),
+      utiliseLe: null,
+      retractation: new Date(paye + 14 * 24 * 3600e3).toISOString(),
+    });
+    /* Les autres achats n’en disent rien */
+    expect((await achatsDuCompte(u.id)).filter((x) => x.id !== second).every((x) => x.avance === undefined)).toBe(true);
+    await autreConv(u);
+    expect((await utiliser()).status).toBe(200);
+    const apres = (await achatsDuCompte(u.id)).find((x) => x.id === second)!;
+    expect(apres.avance).toMatchObject({ utiliseLe: expect.any(String), retractation: null });
   });
 
   it("remboursé : pas utilisé, il ne s’utilise plus ; utilisé, sa conv se re-verrouille et ses bulles repartent", async () => {

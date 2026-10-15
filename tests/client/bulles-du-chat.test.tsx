@@ -7,7 +7,8 @@ import { CASE_IMPORT, CASE_RENONCIATION, texteRenonciation } from "@/contenu/con
 import { CATALOGUE, PREMIERE_RECHARGE } from "@/contenu/offres";
 import { lePack } from "@/contenu/recharge";
 import { partirPayer } from "@/lib/paiement";
-import { proposerOffreUnique } from "@/services/api";
+import { invalidate } from "@/lib/query";
+import { getAccount, proposerOffreUnique } from "@/services/api";
 import { ErreurApi } from "@/types/erreurs-api";
 
 /*
@@ -55,7 +56,7 @@ describe("le compteur de bulles", () => {
     expect(ouvrir).toHaveBeenCalledOnce();
   });
 
-  it("rose quand il en reste 2 ou moins (comme le prototype), gris et sa perle vide à 0 ; un solde négatif (un remboursement) se montre à 0", () => {
+  it("rose quand il en reste 2 ou moins (comme le prototype), gris et sa perle vide à 0 ; un solde négatif (un remboursement) se montre tel quel, en gris (SUP14-1)", () => {
     const { rerender } = render(<CompteurBulles bulles={3} ouvrir={() => {}} />);
     const compteur = () => screen.getByRole("button");
     expect(compteur().className).toContain("bg-white");
@@ -65,7 +66,8 @@ describe("le compteur de bulles", () => {
     rerender(<CompteurBulles bulles={1} ouvrir={() => {}} />);
     expect(compteur().className).toContain("text-elle-ink");
     rerender(<CompteurBulles bulles={-3} ouvrir={() => {}} />);
-    expect(compteur().getAttribute("aria-label")).toBe("Tes bulles\u00a0: 0");
+    expect(compteur().getAttribute("aria-label")).toBe("Tes bulles\u00a0: -3");
+    expect(compteur().textContent).toBe("\u22123");
     expect(compteur().className).toContain("text-grey");
     expect(compteur().querySelector('[data-perle="vide"]')).not.toBeNull();
   });
@@ -139,7 +141,19 @@ describe("la recharge", () => {
     return { feuille: screen.getByRole("dialog", { name: "Recharge tes bulles" }), suite };
   }
 
+  it("un solde sous zéro (un remboursement) : la feuille le dit, avec ce que le pack choisi en fera (SUP14-1) ; à 0 ou plus, rien", async () => {
+    vi.mocked(getAccount).mockResolvedValueOnce({ email: "toi@example.com", bulles: -80, client: true, equipe: false, storyDeleted: false });
+    invalidate("account");
+    const { feuille } = await ouvrir(false);
+    await act(async () => {});
+    /* Le pack conseillé, 80 bulles en tout : −80 + 80 */
+    expect(within(feuille).getByText(/^Ton solde est à .80 bulles \(après un remboursement\) : ce pack le remonte à 0\.$/)).toBeTruthy();
+    fireEvent.click(within(feuille).getAllByRole("radio")[0]!);
+    expect(within(feuille).getByText(/ce pack le remonte à .50\.$/)).toBeTruthy();
+  });
+
   it("trois packs, le conseillé choisi d’avance et ouvert (70 + 10 offertes) ; sans le bonus, pas de bandeau ④", async () => {
+    invalidate("account");
     const { feuille } = await ouvrir(false);
     expect(proposer).toHaveBeenCalledExactlyOnceWith("premiere_recharge");
     const packs = within(feuille).getAllByRole("radio");

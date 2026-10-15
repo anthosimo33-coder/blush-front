@@ -15,6 +15,7 @@ import { CATALOGUE, COUT_EN_BULLES, prixDe, RAPPORT_D_AVANCE } from "./offres";
  * Deux morceaux suivent l’éditeur (src/contenu/mentions-legales.ts) : le médiateur de la consommation, cité seulement
  * quand l’éditeur en a un, et la loi applicable (son champ `droit`, le droit français par défaut). Les changer change
  * donc l’empreinte des conditions, et la version de l’accord de l’import.
+ * TODO(produit): le rapport d’avance promet une rétractation sans dire comment : « Tes achats » (Mon compte) a un lien « Me rétracter » (un mail à l’adresse de contact) ; l’écrire aussi ici, avec le juriste (SUP14-2).
  * TODO(produit): à relire par un juriste (dont : sans médiateur, les conditions n’en citent aucun, alors que le Code de
  * la consommation en demande un, L612-1 et L616-1).
  * TODO(produit): textes nouveaux, à valider (dont les bulles perdues quand on efface son compte, le préavis si BLUSH

@@ -12,6 +12,7 @@ import { deleteAccount, deleteStory, seDeconnecter } from "@/services/api";
 import type { Account, AchatDuCompte } from "@/types/api";
 import { ETAT_ACHAT, TES_ACHATS, TES_BULLES } from "@/contenu/achats";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
+import { EDITEUR } from "@/contenu/mentions-legales";
 import { CATALOGUE, enEuros } from "@/contenu/offres";
 import { Perle } from "@/components/bulles/perles";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
@@ -212,7 +213,32 @@ export function CompteScreen({
               key={a.id}
               variant="compact"
               title={CATALOGUE[a.offre].titre}
-              sub={`${JOUR_D_ACHAT.format(new Date(a.le))}${a.bulles > 0 ? ` · ${TES_ACHATS.bulles(a.bulles)}` : ""}`}
+              sub={
+                <>
+                  {JOUR_D_ACHAT.format(new Date(a.le))}
+                  {a.bulles > 0 && ` · ${TES_ACHATS.bulles(a.bulles)}`}
+                  {/* Le rapport d’avance : utilisé, ou jusqu’à quand il vaut ; et, tant qu’il attend dans ses 14 jours, s’en rétracter */}
+                  {a.avance && a.statut === "paye" && (
+                    <>
+                      {" · "}
+                      {a.avance.utiliseLe
+                        ? TES_ACHATS.avanceUtilisee(JOUR_D_ACHAT.format(new Date(a.avance.utiliseLe)))
+                        : TES_ACHATS.avanceValable(JOUR_D_ACHAT.format(new Date(a.avance.fin)))}
+                      {a.avance.retractation && (
+                        <>
+                          {" · "}
+                          <a
+                            className="font-black text-toi-ink underline"
+                            href={`mailto:${EDITEUR.email}?subject=${encodeURIComponent(TES_ACHATS.retracterSujet)}&body=${encodeURIComponent(TES_ACHATS.retracterCorps(a.id))}`}
+                          >
+                            {TES_ACHATS.retracter}
+                          </a>
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              }
               trailing={
                 <span className="flex flex-col items-end gap-0.5">
                   <span className="text-detail font-black text-ink">{enEuros(a.centimes)}</span>

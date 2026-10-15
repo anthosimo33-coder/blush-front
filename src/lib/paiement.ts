@@ -87,11 +87,12 @@ export async function partirPayer(
   offre: OffreId,
   { renonciation, suite, aller }: { renonciation: boolean; suite?: string | null; aller: (adresse: string) => void },
 ): Promise<void> {
-  const { achat, url } = await commencerPaiement(offre, renonciation);
+  const { achat, url, paiement } = await commencerPaiement(offre, renonciation);
   noterLaSuite(achat, suite);
-  /* La page de Whop est un autre site : une vraie navigation ; le faux Whop et le retour sont des pages de l’appli */
+  /* La page de Whop est un autre site : une vraie navigation ; le faux Whop et le retour sont des pages de l’appli. Le
+     paiement en un geste va au retour avec son paiement, que le serveur vérifie chez Whop si le webhook tarde (ARG-3) */
   if (url && /^https?:\/\//.test(url)) window.location.assign(url);
-  else aller(url ?? versLeRetour(achat, null));
+  else aller(url ?? versLeRetour(achat, paiement?.id ?? null));
 }
 
 /**

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { apresLaLivraison } from "@/lib/paiement";
 import { useAuPaiement } from "@/lib/presence";
+import { useCompte } from "@/lib/requetes";
 import { proposerOffreUnique } from "@/services/api";
 import { RadioGroup } from "@/components/ui/controls";
 import { Tag } from "@/components/ui/messages";
@@ -64,6 +65,9 @@ export function FeuilleRecharge({
   }, [open, bonus]);
 
   const premiere = bonus === "oui";
+  /* Un solde sous zéro (des bulles reprises après un remboursement) : la feuille le dit, avec ce que le pack en fera */
+  const compte = useCompte().data;
+  const dette = compte && !compte.equipe && compte.bulles < 0 ? compte.bulles : null;
   const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p, premiere)])) as Record<Pack, ReturnType<typeof lePack>>;
   const router = useRouter();
   /* Payé : « C’est payé » prend la place des packs, le temps de la livraison ; la feuille ne se ferme plus */
@@ -90,6 +94,11 @@ export function FeuilleRecharge({
         {RECHARGE.titre}
       </h2>
       <p className="m-0 text-note font-bold leading-[1.45] text-soft">{reponsePrete && autre ? RECHARGE.reponsePrete(autre) : RECHARGE.sousTitre}</p>
+      {dette !== null && (
+        <p data-dette="" className="m-0 rounded-[16px] bg-plaque px-3.5 py-2.5 text-note font-extrabold leading-[1.45] text-ink">
+          {RECHARGE.dette(dette, dette + packs[choisi].total)}
+        </p>
+      )}
       {premiere && (
         <div
           data-bonus=""

@@ -58,4 +58,10 @@ export const RECHARGE = {
   /** Sans paiement branché (ni Whop, ni le faux Whop) : les mots de la feuille « Ta formule ». */
   bientot: "Le paiement arrive très vite. Pour l’instant, BLUSH est ouvert sur invitation.",
   souci: "Ça n’a pas pu se faire. Vérifie ta connexion et réessaie.",
+  /**
+   * Un solde sous zéro (des bulles reprises après un remboursement, les CGU le disent) : ce qu’il est, et ce que le pack
+   * choisi en fera, pour que personne ne paie en croyant rouvrir une réponse qu’il ne rouvrira pas (SUP14-1).
+   */
+  dette: (solde: number, apres: number) =>
+    `Ton solde est à \u2212${-solde} bulles (après un remboursement)\u00a0: ce pack le ${apres > 0 ? `remet à ${apres}` : `remonte à ${apres === 0 ? "0" : `\u2212${-apres}`}`}.`,
 };

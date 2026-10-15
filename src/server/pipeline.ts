@@ -12,6 +12,7 @@ import { ARRETS_DU_BUDGET, codeImprevu, ErreurTache, estBudget, estBudgetVoix, e
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
+import { sousLaLimite } from "./limites";
 import { passerLaMain } from "./relais";
 import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, PERIME_S, planifier, prendre, type Tache } from "./taches";
 import { donneesMemoire } from "./depot";
@@ -418,6 +419,50 @@ const EN_PLAN_APRES_S = 300;
 /** Un rapport payé arrêté par le budget d’un jour passé : repris par le cron jusqu’à une semaine après (au-delà, à la visite). */
 const REPRISE_DU_BUDGET_S = 7 * 86400;
 
+/*
+ * Une panne passagère du prestataire d’IA (surchargé, 529 ; trop de demandes, 429 ; une erreur 5xx ; la connexion ou le
+ * délai) épuise les trois essais d’une étape en une vingtaine de secondes : un rapport payé tombait en échec pour de
+ * bon pendant quelques minutes de surcharge (CHAI-2). Le cron la remet en attente 10 minutes après, au plus trois fois
+ * par jour et par étape, pour un rapport payé ou un verdict qu’on attend : la panne a souvent passé.
+ */
+const ECHEC_PASSAGER = "^(api:(429|5[0-9][0-9])|erreur:APIConnection|delai$)";
+/** Combien de temps après un échec passager le cron le reprend, et jusqu’à quand (au-delà, « Relancer » à la main). */
+const REPRISE_PASSAGERE_APRES_S = 600;
+const REPRISE_PASSAGERE_JUSQUA_S = 2 * 86400;
+/** Les reprises d’une même étape en échec passager, par jour : une panne qui dure finit en échec, l’équipe prévenue. */
+const REPRISES_PASSAGERES = { max: 3, fenetreS: 86400 };
+
+/** Remet en attente les étapes en échec passager (voir ECHEC_PASSAGER) qu’on peut encore reprendre. Rend leurs convs. */
+async function reprendreLesEchecsPassagers(): Promise<string[]> {
+  const t = schema.tasks;
+  const candidates = await db()
+    .select({ id: t.id, storyId: t.storyId })
+    .from(t)
+    .where(
+      and(
+        eq(t.status, "echec"),
+        sql`${t.error} ~ ${ECHEC_PASSAGER}`,
+        lt(t.updatedAt, sql`now() - make_interval(secs => ${REPRISE_PASSAGERE_APRES_S})`),
+        gt(t.updatedAt, sql`now() - make_interval(secs => ${REPRISE_PASSAGERE_JUSQUA_S})`),
+        repartPourDeBon,
+        or(eq(t.kind, "verdict"), sql`exists (select 1 from ${schema.stories} where ${schema.stories.id} = ${t.storyId} and ${schema.stories.debloqueLe} is not null)`),
+      ),
+    )
+    .orderBy(desc(t.updatedAt))
+    .limit(CHAINES_PAR_VEILLE);
+  const reprises: string[] = [];
+  for (const c of candidates) {
+    if (!(await sousLaLimite(`tache:reprise:${c.id}`, REPRISES_PASSAGERES))) continue;
+    const [r] = await db()
+      .update(t)
+      .set({ status: "attente", attempts: 0, error: null, updatedAt: new Date() })
+      .where(and(eq(t.id, c.id), eq(t.status, "echec")))
+      .returning({ storyId: t.storyId });
+    if (r) reprises.push(r.storyId);
+  }
+  return reprises;
+}
+
 /**
  * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes qu’un essai peut encore faire ; une étape
  * abandonnée (son battement de cœur perdu), même à son dernier essai : la chaîne relancée la clôt et prévient l’équipe
@@ -429,6 +474,8 @@ const REPRISE_DU_BUDGET_S = 7 * 86400;
  */
 export async function reprendreLesChainesEnPlan(): Promise<number> {
   const t = schema.tasks;
+  /* D’abord les échecs passagers, remis en attente : leurs chaînes repartent à ce passage (CHAI-2) */
+  const passagers = await reprendreLesEchecsPassagers();
   const lignes = await db()
     .select({ storyId: t.storyId })
     .from(t)
@@ -449,7 +496,8 @@ export async function reprendreLesChainesEnPlan(): Promise<number> {
     .groupBy(t.storyId)
     .orderBy(desc(sql`max(${t.updatedAt})`))
     .limit(CHAINES_PAR_VEILLE);
-  const reprises = await Promise.all(lignes.map((l) => passerLaMain(l.storyId, 1)));
+  const convs = [...new Set([...passagers, ...lignes.map((l) => l.storyId)])];
+  const reprises = await Promise.all(convs.map((id) => passerLaMain(id, 1)));
   return reprises.filter(Boolean).length;
 }
 

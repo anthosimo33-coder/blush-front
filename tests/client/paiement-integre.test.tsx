@@ -264,6 +264,9 @@ describe("les avoirs du compte, dans la feuille et sous l’aperçu", () => {
     const rapport = within(formule()).getByRole("radio", { name: new RegExp(`^${FEUILLE_FORMULE.rapport.titre}`) });
     expect(within(rapport).getByText(tel(prixDe("rapport_garde")))).toBeTruthy();
     expect(within(rapport).getByText(tel(FEUILLE_FORMULE.garde(jourEnLettres("2026-10-20T12:00:00.000Z"))))).toBeTruthy();
+    /* Choisi d’avance, au prix que le bouton d’ouverture annonce (SUP16-1) : payer sans rien toucher paie 4,95 € */
+    expect(rapport.getAttribute("aria-checked")).toBe("true");
+    expect(within(formule()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("rapport_garde")) })).toBeTruthy();
     fireEvent.click(rapport);
     fireEvent.click(within(formule()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("rapport_garde")) }));
     fireEvent.click(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("rapport_garde")) }));

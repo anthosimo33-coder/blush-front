@@ -161,6 +161,28 @@ describe("la chaîne", () => {
     expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("echec");
   });
 
+  it("la veille reprend une étape en échec passager (le prestataire d’IA surchargé) 10 minutes après, pour un rapport payé, trois fois par jour au plus (CHAI-2) ; pas un échec pour de bon", async () => {
+    const compte = await compteDeTest("fluidite-surcharge");
+    const [surchargee, refusee] = [await importee("01-a-deux-doigts.txt", compte), await importee("04-ghosting.txt", compte)];
+    await debloquerLaConv(surchargee);
+    await debloquerLaConv(refusee);
+    const ilYA = new Date(Date.now() - 15 * 60_000);
+    await db().update(schema.tasks).set({ status: "echec", error: "api:529:overloaded_error", attempts: 3, updatedAt: ilYA }).where(eq(schema.tasks.storyId, surchargee));
+    await db().update(schema.tasks).set({ status: "echec", error: "refus:cyber", attempts: 3, updatedAt: ilYA }).where(eq(schema.tasks.storyId, refusee));
+    relais.length = 0;
+    await reprendreLesChainesEnPlan();
+    expect(relais.map(([h]) => h)).toContain(surchargee);
+    expect(relais.map(([h]) => h)).not.toContain(refusee);
+    expect((await etatDesTaches(surchargee, ["verdict"])).verdict).toMatchObject({ status: "attente" });
+    expect((await etatDesTaches(refusee, ["verdict"])).verdict).toMatchObject({ status: "echec" });
+    /* Une surcharge qui dure : trois reprises par jour, pas une de plus */
+    for (let k = 0; k < 3; k++) {
+      await db().update(schema.tasks).set({ status: "echec", error: "api:529:overloaded_error", updatedAt: ilYA }).where(eq(schema.tasks.storyId, surchargee));
+      await reprendreLesChainesEnPlan();
+    }
+    expect((await etatDesTaches(surchargee, ["verdict"])).verdict).toMatchObject({ status: "echec" });
+  });
+
   it("donne à chaque étape le temps de finir avant que Vercel coupe la fonction", () => {
     expect(tempsPourCommencer("rapport_chapitres")).toBeGreaterThan(tempsPourCommencer("rapport_plan"));
     expect(tempsPourCommencer("rapport_chapitres")).toBeLessThan(285_000);
