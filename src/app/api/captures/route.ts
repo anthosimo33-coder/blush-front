@@ -9,6 +9,7 @@ import { importerCaptures } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
+import { brouillonDeTournage, tournageDuNavigateur } from "@/server/tournage";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { noterAuFil } from "@/server/visites";
 
@@ -46,7 +47,10 @@ async function traiter(req: Request) {
   if (captcha) return captcha;
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
+  /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, le brouillon reprend la conv de tournage, sans compter d’import */
+  const tournage = await tournageDuNavigateur();
   const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {
+    if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: images.length, secret, consentement });
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("captures");
     if (permis !== "ok") throw new LectureRefusee(permis);

@@ -5,10 +5,14 @@ import { erreur, repondre, route } from "@/server/http";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
+import { tournageDuNavigateur } from "@/server/tournage";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 
 /* Un lot de six images : une trentaine de secondes de lecture, une minute au pire */
 export const maxDuration = 180;
+
+/** Le lot d’un enregistrement en mode tournage : vide, sans appel au modèle (POST /api/captures/video n’en lit rien). */
+const LOT_DU_TOURNAGE = { appli: null, autre: null, captures: [], blocs: [], profil: [], doutes: [] };
 
 /**
  * Un lot d’images tirées d’un enregistrement d’écran (dans le navigateur) : BLUSH les lit (prompt 01) et rend
@@ -33,6 +37,8 @@ async function traiter(req: Request) {
    * invalide ne compte pas : il ne coûte rien, et un voisin derrière la même IP n’y perd rien)
    */
   if (!(await sousLaLimiteDeLIp(req, "lot", LIMITES.lotParIp))) return erreur("trop");
+  /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, la fin de l’enregistrement reprend la conv de tournage */
+  if (await tournageDuNavigateur()) return repondre("POST /api/captures/lot", { lot: LOT_DU_TOURNAGE });
   const permis = await lecturePermise("lots");
   if (permis !== "ok") return erreur(permis);
   return repondre("POST /api/captures/lot", { lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });

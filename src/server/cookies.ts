@@ -69,6 +69,15 @@ export const lireHumain = async () => (await cookies()).get(nom("humain"))?.valu
 export const poserHumain = (valeur: string, expires: Date) => poser("humain", valeur, expires);
 
 /*
+ * Le mode tournage (src/server/tournage.ts) : le secret du lien d’une conv de tournage, que ses routes relisent à
+ * chaque import et à chaque lecture. Posé pour 30 jours par le lien (/tournage/<cle>), effacé par « Quitter le mode
+ * tournage » ou quand on s’en va de l’appareil (oublierCetAppareil).
+ */
+export const lireTournage = async () => (await cookies()).get(nom("tournage"))?.value;
+export const poserTournage = (cle: string) => poser("tournage", cle, new Date(Date.now() + 30 * 86400e3));
+export const effacerTournage = () => effacer("tournage");
+
+/*
  * La conv choisie dans « Tes convs » : son identifiant, rien d’autre. Pas httpOnly : un toucher dans la liste l’écrit
  * (src/services/api.ts, openConv), et le serveur vérifie qu’elle est bien au compte (histoireOuverte).
  */
@@ -79,7 +88,7 @@ export const effacerChoisie = async () => (await cookies()).delete(STORY_COOKIE)
 
 /**
  * Ce que cet appareil oublie quand on s’en va (se déconnecter, « Tout effacer ») : la session, le brouillon d’un import
- * laissé en plan, la conv choisie et le navigateur d’un code demandé. Ce que le navigateur garde lui-même, la réponse le
+ * laissé en plan, la conv choisie, le navigateur d’un code demandé et le mode tournage. Ce que le navigateur garde lui-même, la réponse le
  * lui fait oublier (OUBLIER_LE_NAVIGATEUR, src/server/http.ts).
  */
 export async function oublierCetAppareil(): Promise<void> {
@@ -87,4 +96,5 @@ export async function oublierCetAppareil(): Promise<void> {
   await effacerBrouillon();
   await effacerChoisie();
   await effacerNavigateur();
+  await effacerTournage();
 }

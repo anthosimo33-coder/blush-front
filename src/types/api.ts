@@ -6,7 +6,7 @@
  * ici : tests/unit/contrat.test.ts compare la table aux routes de src/app/api, et vérifie ces imports.
  */
 import { z } from "zod";
-import { INVITATIONS_PAR_LOT, PRENOM_MAX } from "@/lib/limites";
+import { INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, METRIQUES_WEB, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
 import type {
   AnalysisProgress,
@@ -141,12 +141,21 @@ export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; res
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
 
 /**
+ * Pourquoi une conv ne devient pas une conv de tournage (src/server/tournage.ts) : elle n’est pas au compte de l’équipe
+ * qui la choisit (ou c’est déjà une prise), elle n’est pas lue, une étape est encore en route, son rapport n’est pas
+ * écrit, ou sa mémoire pas faite.
+ */
+export type RefusDuTournage = "aucune" | "pas_lue" | "en_cours" | "sans_rapport" | "sans_memoire";
+
+/**
  * Ce qu’un geste de l’équipe a fait (POST /api/admin), en nombres : le nouveau solde de bulles, les convs débloquées
  * (null : aucun compte pour cet email), ou un lot d’invitations (les mails partis, ceux qui restent à inviter, si le
  * plafond des mails du jour l’a arrêté, les adresses refusées par le prestataire des mails, et s’il l’a arrêté : LotInvite,
- * src/server/attente.ts).
+ * src/server/attente.ts) ; une conv de tournage créée (`refus` : pourquoi elle ne l’a pas été), ou arrêtée.
  */
 export type GesteDeLEquipe =
+  | { action: "tournage"; refus: RefusDuTournage | null }
+  | { action: "tournage_arret"; arretee: boolean }
   | { action: "bulles"; solde: number | null }
   | { action: "debloquer"; convs: number | null }
   | { action: "inviter"; invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
@@ -306,14 +315,17 @@ type Entree = { corps?: z.ZodType; formulaire?: true };
  */
 export const ROUTES = {
   /*
-   * Un geste de l’équipe (/admin) : des bulles à un compte (1 à 1 000), le rapport de sa dernière conv ou de toutes, ou
-   * un lot de la liste d’attente à inviter (INVITATIONS_PAR_LOT au plus). L’email se vérifie sur le serveur (Email)
+   * Un geste de l’équipe (/admin) : des bulles à un compte (1 à 1 000), le rapport de sa dernière conv ou de toutes, un
+   * lot de la liste d’attente à inviter (INVITATIONS_PAR_LOT au plus), une conv de tournage à créer (une conv de son
+   * compte, et un nom) ou à arrêter. L’email se vérifie sur le serveur (Email)
    */
   "POST /api/admin": {
     corps: z.discriminatedUnion("action", [
       z.object({ action: z.literal("bulles"), email: z.string(), n: z.number().int().min(1).max(1000) }),
       z.object({ action: z.literal("debloquer"), email: z.string(), cible: z.enum(["derniere", "toutes"]) }),
       z.object({ action: z.literal("inviter"), n: z.number().int().min(1).max(INVITATIONS_PAR_LOT) }),
+      z.object({ action: z.literal("tournage"), conv: z.string().max(64), nom: z.string().trim().min(1).max(NOM_TOURNAGE_MAX) }),
+      z.object({ action: z.literal("tournage_arret"), id: z.string().max(64) }),
     ]),
   },
   "GET /api/admin/direct": {},

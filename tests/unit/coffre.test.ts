@@ -123,6 +123,7 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
   "shares.data": { emoji: "🔥", title: "Elle attend que tu proposes", subtitle: "L. relance, Tom hésite." },
   "vocals.data": { sobre: false, lignes: [{ texte: "Elle relance.", punch: true, debut: 0, fin: 1.2, mots: [{ t: "Elle", debut: 0 }] }], version: 2 },
   "waitlist.email": "tom@exemple.fr",
+  "tournages.cle": "x".repeat(43),
 };
 
 describe("le coffre", () => {

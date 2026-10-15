@@ -17,6 +17,9 @@ export const CAPTURES_MAX = 20;
  */
 export const INVITATIONS_PAR_LOT = 50;
 
+/** Le nom d’une conv de tournage (/admin, POST /api/admin : sa campagne), en caractères (src/server/tournage.ts). */
+export const NOM_TOURNAGE_MAX = 80;
+
 /** Ce que propose le sélecteur de captures (l’import, le chat, la fiche) : des images, que le navigateur réduit avant l’envoi. */
 export const ACCEPT_IMAGES = "image/*";
 /** Une image choisie ou déposée : une capture. */

@@ -16,6 +16,8 @@ const NOMS = {
   code: "blush-code",
   /** Le laissez-passer du CAPTCHA : un import sans compte (src/server/captcha.ts). */
   humain: "blush-humain",
+  /** Le mode tournage : le secret du lien d’une conv de tournage, posé par ce lien (src/server/tournage.ts). */
+  tournage: "blush-tournage",
 } as const;
 
 export type CookieDuServeur = keyof typeof NOMS;

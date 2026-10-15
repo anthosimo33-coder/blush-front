@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { NombreEnLigne } from "./SondeDuDirect";
 
 /*
- * L’en-tête d’/admin : le logo, « Admin », et les rubriques (Pilotage, En direct avec le nombre en ligne, Outils). Sur un
+ * L’en-tête d’/admin : le logo, « Admin », et les rubriques (Pilotage, En direct avec le nombre en ligne, Outils, Tournage). Sur un
  * grand écran, les rubriques sont des onglets dans l’en-tête ; sur un téléphone, une barre fixée en bas de l’écran (la
  * même nav, posée autrement). `base` : /admin, ou l’aperçu de l’équipe (/apercu/admin).
  */
@@ -37,7 +37,7 @@ function Icone({ children }: { children: ReactNode }) {
   );
 }
 
-export function EnTete({ base, ici, droite }: { base: BaseDeLAdmin; ici: "pilotage" | "direct"; droite?: ReactNode }) {
+export function EnTete({ base, ici, droite }: { base: BaseDeLAdmin; ici: "pilotage" | "direct" | "tournage"; droite?: ReactNode }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -82,6 +82,14 @@ export function EnTete({ base, ici, droite }: { base: BaseDeLAdmin; ici: "pilota
               Outils
             </Link>
           )}
+          {/* Le mode tournage n’a pas d’aperçu : il lit les convs du compte de l’équipe */}
+          <Link href="/admin/tournage" aria-current={ici === "tournage" ? "page" : undefined} className={cn(ONGLET, ici === "tournage" ? ONGLET_ICI : ONGLET_AILLEURS)}>
+            <Icone>
+              <rect x="2" y="6" width="14" height="12" rx="2.5" />
+              <path d="m16 10.5 6-3.5v10l-6-3.5" />
+            </Icone>
+            Tournage
+          </Link>
         </nav>
       </div>
       {droite}

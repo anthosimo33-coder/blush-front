@@ -60,6 +60,8 @@ export type Formes = {
   "vocals.data": DonneesVocal;
   /** L’email de la liste d’attente, en minuscules (src/server/attente.ts). */
   "waitlist.email": string;
+  /** Le secret du lien d’une conv de tournage (src/server/tournage.ts), que /admin remontre. */
+  "tournages.cle": string;
 };
 export type Colonne = keyof Formes;
 
@@ -163,6 +165,7 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "shares.data": {},
   "vocals.data": { relecture: VocalGarde },
   "waitlist.email": {},
+  "tournages.cle": {},
 };
 
 /** Les colonnes d’audio (des MP3) : chiffrées telles quelles, sans JSON (ecrireAudio, lireAudio). */

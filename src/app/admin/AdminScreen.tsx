@@ -449,6 +449,8 @@ const ACTIONS: Record<StatsAdmin["actions"][number]["action"], (n: number) => st
   bulles: (n) => `${n > 0 ? "+" : ""}${nombre(n)} bulle${Math.abs(n) > 1 ? "s" : ""} donnée${Math.abs(n) > 1 ? "s" : ""}`,
   debloquer: (n) => `${nombre(n)} conv${n > 1 ? "s" : ""} débloquée${n > 1 ? "s" : ""}`,
   inviter: (n) => `${nombre(n)} invitation${n > 1 ? "s" : ""} de la liste`,
+  tournage: () => "Une conv de tournage créée",
+  tournage_arret: () => "Une conv de tournage arrêtée",
 };
 
 /** Les derniers gestes de l’équipe : quoi, combien, quand. Ni qui, ni pour qui. */

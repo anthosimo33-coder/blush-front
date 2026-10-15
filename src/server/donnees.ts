@@ -7,7 +7,7 @@ import type { Account, ReportPayload } from "@/types/api";
 import type { AnalysisProgress, ConvSummary, Fiche } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
-import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
+import { avanceRejouee, etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { compteAffiche, rapportOuvert } from "./droits";
@@ -118,8 +118,18 @@ export async function relancer(storyId: string): Promise<void> {
  * jusqu’à 15 %. Les étapes affichées suivent ces phases ; le compteur de messages est plein quand l’écriture commence.
  */
 export async function progression(story: Ligne): Promise<AnalysisProgress> {
-  const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   const total = story.messageCount;
+  /* Une prise du mode tournage : sa lecture, déjà faite, se rejoue à partir de sa copie (src/server/tournage.ts) */
+  const rejouee = story.tournageLe ? avanceRejouee(Date.now() - story.tournageLe.getTime()) : 1;
+  if (rejouee < 1)
+    return {
+      progress: rejouee,
+      messagesRead: Math.round(Math.min(1, rejouee / (VERDICT_REFLEXION / 100)) * total),
+      stepsDone: etapeDeLecture(rejouee),
+      discoveries: decouvertes(story, rejouee),
+      done: false,
+    };
+  const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   const fini = verdict?.status === "fini";
   const echec = verdict?.status === "echec";
   /* Le début de l’essai en cours : `prendre` met updatedAt à jour (le battement de cœur ne touche que heartbeatAt) */

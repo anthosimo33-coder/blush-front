@@ -40,6 +40,7 @@ export const cleDuCompte = (email: string) => `compte:${emailCanonique(email)}`;
  */
 export const LIMITES_DU_COMPTE = {
   analyse: "analyseParCompte",
+  tournage: "tournageParCompte",
   "relance:verdict": "relanceParCompte",
   relance: "relanceParCompte",
   chat: "chatParCompte",

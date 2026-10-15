@@ -58,6 +58,8 @@ describe("les prénoms dans ce qui se partage", () => {
         chatVocal: false,
         questionPrise: null,
         debloqueLe: null,
+        tournageId: null,
+        tournageLe: null,
         consentementLe: null,
         consentementVersion: null,
         createdAt: t,

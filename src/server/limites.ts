@@ -101,6 +101,11 @@ export const LIMITES = {
   /** Les nouvelles convs lues (un verdict, puis un rapport et une mémoire : environ 1 $ chacune). */
   analyseParCompte: { max: 5, fenetreS: 86400 },
   /**
+   * Les prises du mode tournage (src/server/tournage.ts), par jour : sans modèle, mais chacune recopie une lecture
+   * entière, vocal compris. Large, pour une créatrice qui refait ses prises.
+   */
+  tournageParCompte: { max: 40, fenetreS: 86400 },
+  /**
    * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
    * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur (relevé pour l’ouverture, le
    * CAPTCHA arrête les robots).

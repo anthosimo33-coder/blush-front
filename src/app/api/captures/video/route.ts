@@ -12,6 +12,7 @@ import { importerCaptures } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
+import { brouillonDeTournage, tournageDuNavigateur } from "@/server/tournage";
 import { fusionnerLots } from "@/server/video";
 import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
@@ -79,7 +80,10 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   const { app, lots, cle } = envoi;
+  /* Le mode tournage (src/server/tournage.ts) : ses lots n’ont rien lu, le brouillon reprend la conv de tournage */
+  const tournage = await tournageDuNavigateur();
   const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
+    if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: lots.length, secret, consentement });
     const t = enTexte(fusionnerLots(lots, app));
     /*
      * Ses octets dans le budget du jour de l’adresse et de tous (S-02), comme /api/import : ce texte entre en base tel
