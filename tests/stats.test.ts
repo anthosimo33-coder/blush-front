@@ -84,4 +84,30 @@ describe("le tableau de bord", () => {
     expect(Object.keys(s.cles)).toEqual(["comptes", "convs", "verdicts", "rapports", "messages", "actifs"]);
     expect(typeof s.couts.total).toBe("number");
   });
+
+  it("l’activité par jour de Paris : les imports, les verdicts et les rapports du jour et de la veille, sans les prises du tournage", async () => {
+    const u = await compteDeTest("stats-activite");
+    const jour = (a: Awaited<ReturnType<typeof statsAdmin>>["activite"], k: number) => a.at(k)!;
+    const avant = (await statsAdmin(7)).activite;
+    /* Aujourd’hui : une conv lue (son verdict, son rapport) ; hier, à midi de Paris : une conv importée, rien d’autre */
+    const lue = await convRattachee(u, "01-a-deux-doigts.txt");
+    const meta = (await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, lue.id)))[0]!.meta;
+    await db().insert(schema.verdicts).values({ storyId: lue.id, data: meta });
+    await db().insert(schema.reports).values({ storyId: lue.id, data: meta });
+    const hier = await convRattachee(u, "02-reciproque.txt");
+    const midiHier = new Date(Date.now() - 86400e3);
+    await db().update(schema.stories).set({ createdAt: midiHier }).where(eq(schema.stories.id, hier.id));
+    /* Une prise du tournage, aujourd’hui, avec son verdict : elle ne compte pas */
+    const [prise] = await db().insert(schema.stories).values({ userId: u.id, messageCount: 1, meta, tournageLe: new Date() }).returning({ id: schema.stories.id });
+    await db().insert(schema.verdicts).values({ storyId: prise!.id, data: meta });
+    const apres = (await statsAdmin(7)).activite;
+    expect(apres.map((j) => j.jour)).toEqual(avant.map((j) => j.jour));
+    const d = (k: number) => ({
+      imports: jour(apres, k).imports - jour(avant, k).imports,
+      verdicts: jour(apres, k).verdicts - jour(avant, k).verdicts,
+      rapports: jour(apres, k).rapports - jour(avant, k).rapports,
+    });
+    expect(d(-1)).toEqual({ imports: 1, verdicts: 1, rapports: 1 });
+    expect(d(-2)).toEqual({ imports: 1, verdicts: 0, rapports: 0 });
+  });
 });

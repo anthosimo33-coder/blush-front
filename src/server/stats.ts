@@ -205,14 +205,24 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
             count(*) filter (where exists (select 1 from chat_messages c where c.story_id = s.id and c.role = 'toi')) as chat
           from stories s where ${dans("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}`,
     ),
+    /*
+     * Une passe par table depuis le premier jour, comptée par jour de Paris, puis posée sur les jours : pas une
+     * sous-requête par jour. Le planificateur estime la série des jours à 1 000 lignes : refaire trois sous-requêtes à
+     * chacune (avec l’exclusion du tournage) gonflait le coût estimé au-delà du seuil de la compilation JIT de Postgres,
+     * qui coûtait alors des centaines de millisecondes par appel (la CI du 15 octobre)
+     */
     lignes<{ jour: string; imports: string; verdicts: string; rapports: string }>(
       sql`with j as (
-            select generate_series((now() at time zone 'Europe/Paris')::date - ${nbJours - 1}::int, (now() at time zone 'Europe/Paris')::date, interval '1 day')::date as jour)
-          select to_char(j.jour, 'YYYY-MM-DD') as jour,
-            (select count(*) from stories s where (s.created_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(VRAIE_CONV_S)}) as imports,
-            (select count(*) from verdicts v where (v.created_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(DUNE_VRAIE_CONV("v.story_id"))}) as verdicts,
-            (select count(*) from reports r where r.data is not null and (r.updated_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(DUNE_VRAIE_CONV("r.story_id"))}) as rapports
-          from j order by j.jour`,
+            select generate_series((now() at time zone 'Europe/Paris')::date - ${nbJours - 1}::int, (now() at time zone 'Europe/Paris')::date, interval '1 day')::date as jour),
+          debut as (select (((now() at time zone 'Europe/Paris')::date - ${nbJours - 1}::int)::timestamp at time zone 'Europe/Paris') as t),
+          i as (select (s.created_at at time zone 'Europe/Paris')::date as jour, count(*) as n from stories s
+            where s.created_at >= (select t from debut) and ${sql.raw(VRAIE_CONV_S)} group by 1),
+          v as (select (v.created_at at time zone 'Europe/Paris')::date as jour, count(*) as n from verdicts v
+            where v.created_at >= (select t from debut) and ${sql.raw(DUNE_VRAIE_CONV("v.story_id"))} group by 1),
+          r as (select (r.updated_at at time zone 'Europe/Paris')::date as jour, count(*) as n from reports r
+            where r.data is not null and r.updated_at >= (select t from debut) and ${sql.raw(DUNE_VRAIE_CONV("r.story_id"))} group by 1)
+          select to_char(j.jour, 'YYYY-MM-DD') as jour, coalesce(i.n, 0) as imports, coalesce(v.n, 0) as verdicts, coalesce(r.n, 0) as rapports
+          from j left join i on i.jour = j.jour left join v on v.jour = j.jour left join r on r.jour = j.jour order by j.jour`,
     ),
     lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`),
     ligne<{ n: string }>(sql`select count(*) as n from shares`),
