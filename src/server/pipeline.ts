@@ -322,6 +322,15 @@ async function executer(t: Tache): Promise<Issue> {
     /* tasks.kind est un text que la base ne contrôle pas (src/server/db/enums.ts) : un genre sans étape est une tâche inconnue */
     const etape = (await etapes())[t.kind] as Etape | undefined;
     if (!story || !etape) throw new ErreurTache("tache_inconnue");
+    /*
+     * Une prise du mode tournage (src/server/tournage.ts) : sa lecture est recopiée, rien de la chaîne ne passe au modèle
+     * pour elle (un vocal d’une version du script plus récente, par exemple). L’étape s’arrête là, sans alerte ni essai
+     * de plus, et ne repart plus. Les mises à jour de la mémoire, à côté de la chaîne, restent celles du vrai chat
+     */
+    if ((story.tournageId || story.tournageLe) && (GENRES_CHAINE as readonly Genre[]).includes(t.kind)) {
+      await echouer(t, "tournage", true);
+      return "echec";
+    }
     await etape(story, t);
     if (DETRUIT_SON_ENTREE.has(t.kind)) {
       /*

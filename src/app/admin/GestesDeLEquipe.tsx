@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { INVITATIONS_PAR_LOT } from "@/lib/limites";
 import { gesteDeLEquipe } from "@/services/api";
-import type { GesteDeLEquipe } from "@/types/api";
+import type { GesteDeLEquipe, RefusDuTournage } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
 
 /*
@@ -17,13 +17,24 @@ import { ErreurApi } from "@/types/erreurs-api";
  */
 
 /** Une réponse d’un geste : un texte, et s’il a marché. */
-type Issue = { ok: boolean; texte: string };
+export type Issue = { ok: boolean; texte: string };
 
 const nombre = (v: number) => v.toLocaleString("fr-FR");
 const s = (n: number) => (Math.abs(n) > 1 ? "s" : "");
 
+/** Ce que dit un refus de conv de tournage (src/server/tournage.ts). */
+const REFUS_DU_TOURNAGE: Record<RefusDuTournage, string> = {
+  aucune: "Cette conv n’est pas dans ton compte (ou c’est déjà une prise).",
+  pas_lue: "Cette conv n’est pas encore lue.",
+  en_cours: "Son rapport s’écrit encore\u00a0: réessaie dans quelques minutes.",
+  sans_rapport: "Son rapport n’est pas écrit\u00a0: ouvre-le une fois en entier.",
+  sans_memoire: "Sa mémoire n’est pas faite\u00a0: ouvre son rapport, puis réessaie dans quelques minutes.",
+};
+
 /** Ce qu’un geste a fait, dit en clair. */
-function issueDe(r: GesteDeLEquipe): Issue {
+export function issueDe(r: GesteDeLEquipe): Issue {
+  if (r.action === "tournage") return r.refus ? { ok: false, texte: REFUS_DU_TOURNAGE[r.refus] } : { ok: true, texte: "C’est fait\u00a0: son lien est prêt." };
+  if (r.action === "tournage_arret") return r.arretee ? { ok: true, texte: "Arrêtée\u00a0: son lien ne marche plus." } : { ok: false, texte: "Elle était déjà arrêtée." };
   if (r.action === "bulles")
     return r.solde === null
       ? { ok: false, texte: "Aucun compte pour cet email (la personne doit s’être connectée une fois)." }
@@ -44,7 +55,7 @@ function issueDe(r: GesteDeLEquipe): Issue {
 }
 
 /** Un refus du serveur, dit en clair. */
-function refus(e: unknown): Issue {
+export function refus(e: unknown): Issue {
   const code = e instanceof ErreurApi ? e.code : "erreur";
   if (code === "email") return { ok: false, texte: "Cet email n’en est pas un." };
   if (code === "invalide") return { ok: false, texte: "Ce nombre n’est pas accepté." };
@@ -52,7 +63,7 @@ function refus(e: unknown): Issue {
   return { ok: false, texte: "Ça n’a pas marché. Vérifie ta connexion et réessaie." };
 }
 
-function Champ({ label, children }: { label: string; children: (id: string) => ReactNode }) {
+export function Champ({ label, children }: { label: string; children: (id: string) => ReactNode }) {
   const id = useId();
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -64,10 +75,10 @@ function Champ({ label, children }: { label: string; children: (id: string) => R
   );
 }
 
-const CHAMP = "h-11 w-full min-w-0 rounded-[14px] bg-[#F8F7F4] px-3.5 text-note font-extrabold text-ink outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--elle)]";
+export const CHAMP = "h-11 w-full min-w-0 rounded-[14px] bg-[#F8F7F4] px-3.5 text-note font-extrabold text-ink outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--elle)]";
 
 /** Un geste : son titre, ce qu’il fait, ses champs, son bouton et sa réponse annoncée. */
-function Geste({ titre, aide, bouton, envoyer, children }: { titre: string; aide: string; bouton: string; envoyer: () => Promise<GesteDeLEquipe>; children: ReactNode }) {
+export function Geste({ titre, aide, bouton, envoyer, children }: { titre: string; aide: string; bouton: string; envoyer: () => Promise<GesteDeLEquipe>; children: ReactNode }) {
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
   const [issue, setIssue] = useState<Issue | null>(null);

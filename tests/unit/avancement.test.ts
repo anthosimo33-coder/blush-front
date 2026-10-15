@@ -3,12 +3,16 @@ import {
   avanceChapitres,
   avanceMoitie,
   avancePlan,
+  avanceRejouee,
   avanceVerdict,
   CHAPITRES_PAR_MOITIE,
   chapitresCommences,
   chapitresFinis,
+  DUREE_RELECTURE_MS,
   etapeDeLecture,
   ETAPES_DE_LECTURE,
+  LECTURE_DEPART,
+  LECTURE_MAX,
   VERDICT_REFLEXION,
 } from "@/server/avancement";
 
@@ -82,5 +86,22 @@ describe("l’écran de lecture", () => {
     expect(ETAPES_DE_LECTURE.at(-1)).toBe(VERDICT_REFLEXION / 100);
     expect(avanceVerdict({ reflexion: 1e9, texte: 0, ecrit: "" })).toBe(VERDICT_REFLEXION);
     expect(avanceVerdict({ reflexion: 0, texte: 1, ecrit: "" })).toBe(VERDICT_REFLEXION);
+  });
+});
+
+describe("la relecture d’une prise du mode tournage", () => {
+  it("part comme une vraie lecture, monte sans jamais redescendre, et n’est finie qu’au bout de sa durée", () => {
+    expect(avanceRejouee(0)).toBe(LECTURE_DEPART);
+    expect(avanceRejouee(-5000)).toBe(LECTURE_DEPART);
+    expect(avanceRejouee(DUREE_RELECTURE_MS * 0.1)).toBeCloseTo(LECTURE_MAX);
+    /* La réflexion jusqu’au seuil de la dernière étape, puis le verdict qui s’écrit */
+    expect(avanceRejouee(DUREE_RELECTURE_MS * 0.7)).toBeCloseTo(VERDICT_REFLEXION / 100);
+    const pas = Array.from({ length: 101 }, (_, k) => avanceRejouee((DUREE_RELECTURE_MS * k) / 100));
+    for (let k = 1; k < pas.length; k++) expect(pas[k]!).toBeGreaterThanOrEqual(pas[k - 1]!);
+    expect(Math.max(...pas.slice(0, -1))).toBeLessThan(1);
+    expect(avanceRejouee(DUREE_RELECTURE_MS)).toBe(1);
+    expect(avanceRejouee(DUREE_RELECTURE_MS * 3)).toBe(1);
+    /* Les quatre étapes de l’écran défilent toutes pendant la relecture */
+    expect(new Set(pas.map(etapeDeLecture)).size).toBe(ETAPES_DE_LECTURE.length + 1);
   });
 });

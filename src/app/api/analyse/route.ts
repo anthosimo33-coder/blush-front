@@ -6,6 +6,7 @@ import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/hist
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
 import { etatDesTaches, planifier } from "@/server/taches";
+import { rejouer, tournageDe, tournageDuNavigateur } from "@/server/tournage";
 import { ROUTES } from "@/types/api";
 
 /* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
@@ -36,17 +37,29 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   if (!verdict || verdict.status === "echec") {
     /*
-     * Chaque lecture coûte : un nombre de nouvelles convs par jour, par compte (son email canonique : un alias ou un
-     * compte recréé ne repart pas de zéro) et par adresse IP (des comptes ouverts à la chaîne d’une même box), et
-     * quelques relances après un échec. Refusée par l’adresse IP, la lecture du compte lui est rendue : rien n’est parti,
-     * et derrière un réseau partagé, réessayer ne doit pas user ses lectures du jour
+     * Le mode tournage (src/server/tournage.ts), pour une nouvelle lecture : la conv de tournage de son brouillon (des
+     * captures importées en mode tournage), sinon celle du lien ouvert sur ce navigateur (un export importé comme
+     * d’habitude). Sa lecture déjà faite sera recopiée : rien ne part au modèle, rien ne compte dans les lectures du jour
      */
-    if (!verdict && !(await sousLaLimiteDuCompte(utilisateur, "analyse"))) return erreur("trop");
-    if (!verdict && !(await sousLaLimiteDeLIp(req, "analyse", LIMITES.analyseParIp))) {
-      await rendreAuCompte(utilisateur, "analyse");
-      return erreur("trop");
+    const tournage = verdict ? null : story.tournageId ? await tournageDe(story.tournageId) : await tournageDuNavigateur();
+    /* Rien à lire : un brouillon de tournage dont la conv de tournage a été effacée depuis n’a pas de conv brute */
+    if (!tournage && !verdict && !story.aConv) return erreur("aucune");
+    if (tournage) {
+      if (!(await sousLaLimiteDuCompte(utilisateur, "tournage"))) return erreur("trop");
+    } else {
+      /*
+       * Chaque lecture coûte : un nombre de nouvelles convs par jour, par compte (son email canonique : un alias ou un
+       * compte recréé ne repart pas de zéro) et par adresse IP (des comptes ouverts à la chaîne d’une même box), et
+       * quelques relances après un échec. Refusée par l’adresse IP, la lecture du compte lui est rendue : rien n’est parti,
+       * et derrière un réseau partagé, réessayer ne doit pas user ses lectures du jour
+       */
+      if (!verdict && !(await sousLaLimiteDuCompte(utilisateur, "analyse"))) return erreur("trop");
+      if (!verdict && !(await sousLaLimiteDeLIp(req, "analyse", LIMITES.analyseParIp))) {
+        await rendreAuCompte(utilisateur, "analyse");
+        return erreur("trop");
+      }
+      if (verdict && !(await sousLaLimiteDuCompte(utilisateur, "relance:verdict"))) return erreur("trop");
     }
-    if (verdict && !(await sousLaLimiteDuCompte(utilisateur, "relance:verdict"))) return erreur("trop");
     if (!story.userId) {
       await rattacherBrouillon(utilisateur, await lireBrouillon());
       await effacerBrouillon();
@@ -54,6 +67,11 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
     await poserChoisie(story.id);
     if (qui)
       await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
+    /* Une prise : sa lecture recopiée (avec son prénom, que « Qui es-tu ? » vient d’écrire), que l’écran de lecture rejoue */
+    if (tournage) {
+      await rejouer(story.id, tournage, utilisateur);
+      return repondre("POST /api/analyse", { ok: true });
+    }
     await planifier(story.id, "verdict");
   }
   relancerApres(story.id);

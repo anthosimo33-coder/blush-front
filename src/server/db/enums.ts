@@ -38,11 +38,15 @@ export type FournisseurPaiement = (typeof FOURNISSEURS_PAIEMENT)[number];
 
 /**
  * mouvements_bulles.raison : un achat livré, une réponse de BLUSH payée, une réponse rendue (une erreur, une alerte
- * danger), un achat remboursé ou contesté (ses bulles reprises), le cadeau des testeurs de la bêta, un don de l’équipe.
+ * danger), un achat remboursé ou contesté (ses bulles reprises), le cadeau des testeurs de la bêta, un don de l’équipe,
+ * celles d’une créatrice en mode tournage (une fois par conv de tournage : src/server/tournage.ts).
  */
-export const RAISONS_BULLES = ["achat", "reponse", "rendu", "remboursement", "beta", "equipe"] as const;
+export const RAISONS_BULLES = ["achat", "reponse", "rendu", "remboursement", "beta", "equipe", "tournage"] as const;
 export type RaisonBulles = (typeof RAISONS_BULLES)[number];
 
-/** actions_equipe.action : des bulles données, des convs débloquées, des invitations de la liste d’attente (src/server/equipe.ts). */
-export const ACTIONS_EQUIPE = ["bulles", "debloquer", "inviter"] as const;
+/**
+ * actions_equipe.action : des bulles données, des convs débloquées, des invitations de la liste d’attente
+ * (src/server/equipe.ts), une conv de tournage créée ou arrêtée (src/server/tournage.ts).
+ */
+export const ACTIONS_EQUIPE = ["bulles", "debloquer", "inviter", "tournage", "tournage_arret"] as const;
 export type ActionEquipe = (typeof ACTIONS_EQUIPE)[number];

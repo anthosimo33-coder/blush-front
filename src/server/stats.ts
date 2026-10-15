@@ -151,6 +151,18 @@ const POSTES: [string, (tache: string) => boolean][] = [
   ["Captures", (t) => t.startsWith("captures") || t === "01"],
 ];
 
+/*
+ * Les prises du mode tournage (src/server/tournage.ts) ne comptent pas : une créatrice qui filme n’est ni un import, ni
+ * un verdict, ni un rapport du tunnel. Une conv en est une prise si elle porte sa conv de tournage, ou l’heure de sa
+ * relecture (sa conv de tournage effacée depuis). En SQL brut : `stories` sous son nom, ou sous l’alias `s`.
+ */
+const VRAIE_CONV = "tournage_id is null and tournage_le is null";
+const VRAIE_CONV_S = "s.tournage_id is null and s.tournage_le is null";
+/** La conv de la ligne (sa colonne `story_id`) n’est pas une prise du mode tournage. */
+const DUNE_VRAIE_CONV = (col: string) => `${col} in (select id from stories where ${VRAIE_CONV})`;
+/** Une étape arrêtée parce que sa conv est une prise du mode tournage n’est pas un échec (src/server/pipeline.ts). */
+const VRAI_ECHEC = "coalesce(error, '') <> 'tournage'";
+
 export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   /* La période (k = 0) et celle d’avant (k = 1), sur une colonne de date */
   const dans = (col: string, k = 0) => sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
@@ -164,9 +176,9 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
 
   const [comptes, convs, verdicts, rapports, messages, actifs, parcours, activite, compteurs, liensActifs, couts, coutsAvant, echecs, taches, attente, totaux] = await Promise.all([
     chiffre("users", "created_at"),
-    chiffre("stories", "created_at"),
-    chiffre("verdicts", "created_at"),
-    chiffre("reports", "updated_at", "data is not null"),
+    chiffre("stories", "created_at", VRAIE_CONV),
+    chiffre("verdicts", "created_at", DUNE_VRAIE_CONV("story_id")),
+    chiffre("reports", "updated_at", `data is not null and ${DUNE_VRAIE_CONV("story_id")}`),
     chiffre("chat_messages", "created_at", "role = 'toi'"),
     ligne<{ a: string; b: string }>(
       sql`select count(distinct s.user_id) filter (where ${dans("c.created_at")}) as a, count(distinct s.user_id) filter (where ${dans("c.created_at", 1)}) as b
@@ -178,15 +190,15 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
             count(*) filter (where exists (select 1 from verdicts v where v.story_id = s.id)) as verdict,
             count(*) filter (where exists (select 1 from reports r where r.story_id = s.id and r.data is not null)) as rapport,
             count(*) filter (where exists (select 1 from chat_messages c where c.story_id = s.id and c.role = 'toi')) as chat
-          from stories s where ${dans("s.created_at")}`,
+          from stories s where ${dans("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}`,
     ),
     lignes<{ jour: string; imports: string; verdicts: string; rapports: string }>(
       sql`with j as (
             select generate_series((now() at time zone 'Europe/Paris')::date - ${nbJours - 1}::int, (now() at time zone 'Europe/Paris')::date, interval '1 day')::date as jour)
           select to_char(j.jour, 'YYYY-MM-DD') as jour,
-            (select count(*) from stories s where (s.created_at at time zone 'Europe/Paris')::date = j.jour) as imports,
-            (select count(*) from verdicts v where (v.created_at at time zone 'Europe/Paris')::date = j.jour) as verdicts,
-            (select count(*) from reports r where r.data is not null and (r.updated_at at time zone 'Europe/Paris')::date = j.jour) as rapports
+            (select count(*) from stories s where (s.created_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(VRAIE_CONV_S)}) as imports,
+            (select count(*) from verdicts v where (v.created_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(DUNE_VRAIE_CONV("v.story_id"))}) as verdicts,
+            (select count(*) from reports r where r.data is not null and (r.updated_at at time zone 'Europe/Paris')::date = j.jour and ${sql.raw(DUNE_VRAIE_CONV("r.story_id"))}) as rapports
           from j order by j.jour`,
     ),
     lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`),
@@ -196,7 +208,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     ligne<{ micros: string }>(sql`select coalesce(sum(cost_micros), 0) as micros from ai_usage where ${dans("created_at", 1)}`),
     lignes<{ code: string; n: string }>(
-      sql`select coalesce(error, 'inconnu') as code, count(*) as n from tasks where status = 'echec' and ${dans("updated_at")} group by 1 order by 2 desc limit 8`,
+      sql`select coalesce(error, 'inconnu') as code, count(*) as n from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${dans("updated_at")} group by 1 order by 2 desc limit 8`,
     ),
     ligne<{ en_cours: string; bloquees: string; attente: string }>(
       sql`select count(*) filter (where status = 'en_cours') as en_cours,
@@ -323,8 +335,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select sum(cost_micros) filter (where ${W("created_at")}) as a, sum(cost_micros) filter (where ${W("created_at", 1)}) as b from ai_usage`,
     ),
     ligne<{ imports: string; verdicts: string; racheteurs: string }>(
-      sql`select (select count(*) from stories s where ${W("s.created_at")}) as imports,
-            (select count(*) from stories s where ${W("s.created_at")} and exists (select 1 from verdicts v where v.story_id = s.id)) as verdicts,
+      sql`select (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}) as imports,
+            (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and exists (select 1 from verdicts v where v.story_id = s.id)) as verdicts,
             (select count(*) from (select user_id from achats where paye_le is not null and user_id in (select user_id from achats where ${W("paye_le")})
               group by user_id having count(*) >= 2) as r) as racheteurs`,
     ),
@@ -336,7 +348,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ offre: OffreId; n: string; centimes: string }>(sql`select offre, count(*) as n, sum(centimes) as centimes from achats where ${W("paye_le")} group by offre`),
     ligne<{ micros: string | null }>(sql`select sum(cost_micros) as micros from ai_usage where created_at >= ${DEBUT_DU_JOUR}`),
     ligne<{ echecs: string; bloquees: string; echoues: string; alertes: string }>(
-      sql`select (select count(*) from tasks where status = 'echec' and ${W("updated_at")}) as echecs,
+      sql`select (select count(*) from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${W("updated_at")}) as echecs,
             (select count(*) from tasks where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
             (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
             (select count(*) from mouvements_bulles where raison = 'rendu' and ${W("cree_le")}) as alertes`,

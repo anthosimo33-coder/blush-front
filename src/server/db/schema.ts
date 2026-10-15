@@ -1,5 +1,23 @@
 import { sql } from "drizzle-orm";
-import { bigserial, boolean, check, customType, date, index, integer, jsonb, pgTable, primaryKey, real, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  bigserial,
+  boolean,
+  check,
+  customType,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
 import { ETAPES_VISITE, EVENEMENTS_ECOUTE, FAMILLES_NAVIGATEUR, GENRES_FIL, METRIQUES_WEB, OFFRES, OFFRES_UNIQUES, SOURCES_VISITE, STATUTS_ACHAT, VOIX } from "../../types";
 import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
@@ -125,11 +143,44 @@ export const stories = pgTable(
      */
     consentementLe: quand("consentement_le"),
     consentementVersion: text("consentement_version"),
+    /**
+     * Le mode tournage (src/server/tournage.ts) : la conv de tournage dont cette conv est une prise. Posé sur le brouillon
+     * de captures importées en mode tournage (sans conv brute : rien n’est lu), ou à la relecture. null : une conv comme
+     * une autre, ou sa conv de tournage effacée depuis (`tournageLe` le dit encore).
+     */
+    tournageId: uuid("tournage_id").references((): AnyPgColumn => tournages.id, { onDelete: "set null" }),
+    /**
+     * L’heure où la lecture déjà faite de la conv de tournage a été recopiée ici : l’écran de lecture la rejoue à partir
+     * de là, sans modèle, et la chaîne des tâches ne lance plus rien pour cette conv (src/server/pipeline.ts, executer).
+     */
+    tournageLe: quand("tournage_le"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("stories_user_idx").on(t.userId)],
+  (t) => [index("stories_user_idx").on(t.userId), index("stories_tournage_idx").on(t.tournageId)],
 );
+
+/**
+ * Une conv de tournage (src/server/tournage.ts) : une conv de l’équipe, lue une fois par le vrai modèle, que le lien de
+ * tournage rejoue chez les créatrices, sans modèle, autant de fois qu’il faut. `cle` : le secret du lien (chiffré, pour
+ * que /admin le remontre) ; `cleHash` : son empreinte, par laquelle le lien la retrouve. Arrêtée (`arreteLe`), son lien ne
+ * pose plus le mode tournage ; les prises déjà faites restent lisibles.
+ */
+export const tournages = pgTable("tournages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Son nom dans /admin (la campagne : « A · Il répond plus pareil »). Jamais montré aux créatrices au-delà de leur page du mode tournage. */
+  nom: text("nom").notNull(),
+  /** La conv lue une fois, celle qu’on rejoue : l’effacer efface la conv de tournage. */
+  storyId: uuid("story_id")
+    .notNull()
+    .references(() => stories.id, { onDelete: "cascade" }),
+  cle: chiffre("cle").notNull(),
+  cleHash: text("cle_hash").notNull().unique(),
+  /** Le compte de l’équipe qui l’a créée (null : effacé depuis). */
+  creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  arreteLe: quand("arrete_le"),
+  creeLe: quand("cree_le").notNull().defaultNow(),
+});
 
 /** Le verdict de l’histoire (prompt 04) et ses scores, chiffrés. */
 export const verdicts = pgTable("verdicts", {

@@ -141,6 +141,13 @@
       "when": 1791988663467,
       "tag": "0019_navigateurs_et_effacements",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792056157811,
+      "tag": "0020_tournage",
+      "breakpoints": true
     }
   ]
 }
