@@ -1,4 +1,18 @@
-import { ALERTE_FACTICE, attendreMail, compteDe, emailLibre, expect, lectureFaite, mailsPour, pagePrete, rapportPasEncoreEcrit, tachesDe, test } from "./aide";
+import {
+  ALERTE_FACTICE,
+  attendreMail,
+  compteDe,
+  emailLibre,
+  expect,
+  lectureFaite,
+  mailsPour,
+  pagePrete,
+  rapportPasEncoreEcrit,
+  RENONCIATION,
+  tachesDe,
+  test,
+  URL_APPLI,
+} from "./aide";
 
 /*
  * Le mode sobre : quand la conv montre un danger (une détresse, un mineur), BLUSH laisse la taquinerie de côté. Pas de mise en scène du
@@ -75,6 +89,17 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
     expect(mail.texte).toContain("Il est court, et il t’aide à y voir clair. Prends le temps de le lire au calme");
     expect(mail.texte).not.toContain("chapitres");
     expect(mailsPour(email).map((m) => m.sujet)).not.toContain("📖 Ton rapport BLUSH est prêt");
+  });
+
+  await test.step("jamais vendue (SUP22-1) : l’accueil ramène au rapport doux sans paiement, et le serveur refuse de la faire payer (409 « sobre »)", async () => {
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/rapport$/);
+    await expect(ecran.getByRole("heading", { level: 1, name: TITRE })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    for (const offre of ["rapport", "premium"] as const) {
+      const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: RENONCIATION } });
+      expect([r.status(), await r.json()]).toEqual([409, { erreur: "sobre" }]);
+    }
   });
 });
 
