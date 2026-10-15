@@ -66,6 +66,16 @@ describe("ce qui désigne quelqu’un ne reste pas", () => {
     expect(masquer("x".repeat(500))).toHaveLength(300);
   });
 
+  it("masquer : rien de cliquable ni de trompeur (une adresse web, avec ou sans https, un numéro écrit par morceaux, des caractères de contrôle)", () => {
+    expect(masquer("Session expirée : reconnecte-toi sur https://connexion-vercel.example/x ou www.blush-aide.net")).toBe("Session expirée : reconnecte-toi sur ‹url› ou ‹url›");
+    expect(masquer("va sur blush-support.com/aide maintenant")).toBe("va sur ‹url› maintenant");
+    expect(masquer("appelle le 06 12 34 56 78 ou le 06.12.34.56.78")).toBe("appelle le ‹n› ou le ‹n›");
+    expect(masquer("ligne 1\r\nSujet : urgent\u202e")).toBe("ligne 1  Sujet : urgent ");
+    /* Les messages d’erreur ordinaires restent lisibles */
+    expect(masquer("Cannot read properties of undefined (reading 'bulles')")).toBe("Cannot read properties of undefined (reading 'bulles')");
+    expect(masquer("e.target.value is null at line 12")).toBe("e.target.value is null at line 12");
+  });
+
   it("la source : un fichier de l’appli seulement ; la famille du navigateur, jamais son User-Agent", () => {
     expect(sourceDeLAppli("https://www.askblush.com/_next/static/chunks/0a1b.js:1:2345")).toBe("/_next/static/chunks/0a1b.js:1:2345");
     expect(sourceDeLAppli("chrome-extension://abc/script.js:1:2")).toBeNull();
@@ -92,7 +102,20 @@ describe("POST /api/navigateur/erreur", () => {
       fois: 3,
     });
     expect(alertes.map((a) => a.sujet)).toEqual(["erreur dans un navigateur"]);
-    expect(alertes[0]!.lignes.join(" ")).not.toContain("lea@exemple.fr");
+    /* Le mail ne recopie rien de ce que le navigateur a écrit : ni le message, ni la source (seulement le genre d’erreur, l’écran, la famille) */
+    const mail = alertes[0]!.lignes.join(" ");
+    expect(mail).not.toContain(MARQUE);
+    expect(mail).not.toContain("ab12.js");
+    expect(mail).toContain("TypeError");
+    expect(mail).toContain("« chat »");
+  });
+
+  it("un nom d’erreur qui n’est pas un mot devient « Erreur » : un mail d’alerte n’en reprend jamais un texte libre", async () => {
+    const corps = { nom: "Urgent : votre compte BLUSH sera fermé", message: `${MARQUE} nom libre`, etape: "accueil" };
+    await envoyer(postErreur, "/api/navigateur/erreur", corps);
+    const [ligne] = (await nosErreurs()).filter((e) => e.message.includes("nom libre"));
+    expect(ligne?.nom).toBe("Erreur");
+    expect(alertes.flatMap((a) => a.lignes).join(" ")).not.toContain("fermé");
   });
 
   it("un corps hors contrat est refusé ; au-delà de sa limite, une adresse n’est plus écoutée, sans le dire", async () => {

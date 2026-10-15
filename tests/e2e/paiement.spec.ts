@@ -98,7 +98,14 @@ test("annulé chez le faux Whop (« Retour » sur sa page, le repli de la feuill
 test("l’offre ③ après le rapport seul : payée en un geste avec la carte gardée, 80 bulles de plus, puis « C’est débloqué »", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "ajout");
   await lectureFaite(page, testInfo, email);
-  await payer(page, "rapport");
+  /* Le rapport payé dans la feuille, avec la carte de test : sa carte est gardée (pas une page de Whop, ouvrable par n’importe qui : SECA-3) */
+  const rapport = await ouvrirLeRapport(page);
+  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  const formule = page.getByRole("dialog", { name: PAIEMENT });
+  await formule.getByRole("radio", { name: /^Le rapport/ }).click();
+  await formule.getByRole("button", { name: /^Débloquer/ }).click();
+  await payerParCarte(page);
+  await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
   const ecran = page.getByRole("main");
   const offre = ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" });
   await expect(offre.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();

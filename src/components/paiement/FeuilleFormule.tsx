@@ -206,7 +206,8 @@ export function FeuilleFormule({
   const fermer = () => {
     if (paye || occupe) return;
     onClose();
-    if (!proposerLaSuite || suiteRefusee) return;
+    /* Déjà mieux qu’① (le rapport d’avance, le −50 % gardé) : rien à proposer ; le serveur le refuse aussi */
+    if (!proposerLaSuite || suiteRefusee || avoirs?.avance || avoirs?.garde) return;
     const descendue = new Promise((ok) => setTimeout(ok, APRES_LA_FEUILLE_MS));
     proposerOffreUnique("suite").then(
       async (o) => {

@@ -46,6 +46,17 @@ export async function livrerLePaiement(mode: Fournisseur["mode"], p: PaiementWho
   const achat = p.achat ? await achatDe(p.achat) : null;
   if (!achat) {
     journal("paiement sans achat connu", { paiement: p.id }, "alerte");
+    /* Encaissé, mais rien à livrer : quelqu’un a peut-être payé sans rien recevoir. L’équipe le sait, avec de quoi le retrouver chez Whop */
+    after(() =>
+      alerter(
+        "paiement : encaissé sans achat connu",
+        [
+          `Le paiement ${p.id} (${p.total ?? "?"} centimes, statut « ${p.statut} ») ne dit pas quel achat il paie (metadata.achat ${p.achat ? "inconnu en base" : "absent"}) : rien n’est livré.`,
+          "À regarder chez Whop : qui a payé et quoi, puis livrer à la main (npm run acces) ou rembourser.",
+        ],
+        { importante: true },
+      ),
+    );
     return "inconnu";
   }
   if (achat.fournisseur !== mode) return "autre";
@@ -222,6 +233,17 @@ export async function recevoirWebhook(corps: string, entetes: Headers): Promise<
   const lu = lireWebhook(json);
   if (!lu) {
     journal("webhook de paiement illisible", { id: v.id }, "alerte");
+    /* Signé de notre secret, donc de Whop, mais d’une forme qu’on ne lit pas : peut-être un paiement qu’on ne livre pas */
+    after(() =>
+      alerter(
+        "paiement : webhook illisible",
+        [
+          `Un webhook bien signé de Whop (${v.id}) n’a pas la forme attendue : rien n’en est fait.`,
+          "Si c’est un paiement, il n’est pas livré : à vérifier chez Whop (la forme de ses webhooks a-t-elle changé ?).",
+        ],
+        { importante: true },
+      ),
+    );
     return "ok";
   }
   /* Signé de notre secret, mais d’un autre compte Whop : ignoré (le compte n’est vérifié que s’il est dit) */
@@ -229,6 +251,18 @@ export async function recevoirWebhook(corps: string, entetes: Headers): Promise<
     journal("webhook d’un autre compte Whop", { id: v.id, type: lu.type }, "alerte");
     return "ok";
   }
+  /* Un paiement encaissé qu’on ne sait pas lire : rien n’est livré, l’équipe le sait (Whop a peut-être changé la forme de ses paiements) */
+  if (lu.type === "payment.succeeded" && lu.action.faire === "rien")
+    after(() =>
+      alerter(
+        "paiement : encaissé mais illisible",
+        [
+          `Le webhook ${v.id} annonce un paiement réussi qu’on ne sait pas lire (${lu.action.faire === "rien" ? lu.action.pourquoi : ""}) : rien n’est livré.`,
+          "À regarder chez Whop, puis livrer à la main (npm run acces) ou rembourser.",
+        ],
+        { importante: true },
+      ),
+    );
   const effet = await uneFoisParEvenement(v.id, lu.type, () => appliquer(f, lu.action));
   journal("webhook de paiement", { id: v.id, type: lu.type, effet: lu.action.faire === "rien" ? lu.action.pourquoi : effet });
   return "ok";

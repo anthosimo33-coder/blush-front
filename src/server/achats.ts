@@ -154,6 +154,13 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         bulles = bullesDe(achat.offre);
       }
     }
+    /*
+     * Le moyen de paiement n’est gardé (pour payer ensuite en un geste, moyenGarde) que d’un paiement fait dans BLUSH, par
+     * le compte (la feuille, à son email ; ou déjà en un geste). Payé sur la page de Whop (une configuration de paiement,
+     * son lien ouvrable par n’importe qui), le moyen est celui de qui a payé : peut-être un autre, à qui on ne débitera
+     * jamais rien d’autre.
+     */
+    const pageDeWhop = !!(achat.checkoutId ?? paiement.checkoutId);
     const [paye] = await tx
       .update(a)
       .set({
@@ -163,8 +170,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         annuleLe: null,
         paiementId: paiement.paiementId ?? achat.paiementId,
         checkoutId: paiement.checkoutId ?? achat.checkoutId,
-        membreId: paiement.membreId ?? achat.membreId,
-        moyenId: paiement.moyenId ?? achat.moyenId,
+        membreId: pageDeWhop ? null : (paiement.membreId ?? achat.membreId),
+        moyenId: pageDeWhop ? null : (paiement.moyenId ?? achat.moyenId),
       })
       .where(eq(a.id, achatId))
       .returning();

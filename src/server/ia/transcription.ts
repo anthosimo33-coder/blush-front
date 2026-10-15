@@ -63,7 +63,9 @@ export async function signatureDuVocal(vocal: File): Promise<{ type: string; tai
   const debut = new Uint8Array(await vocal.slice(0, 12).arrayBuffer());
   const ascii = (a: number, b: number) => String.fromCharCode(...debut.subarray(a, b));
   const marque = debut.length >= 12 && ascii(4, 8) === "ftyp" ? ascii(8, 12).replace(/[^\x20-\x7e]/g, "?") : null;
-  return { type: vocal.type || "(aucun)", taille: vocal.size, signature: Buffer.from(debut).toString("hex"), marque };
+  /* Le type annoncé par le navigateur, s’il en a la forme (« audio/mp4 ») : il part dans une alerte, rien d’autre n’y entre */
+  const type = !vocal.type ? "(aucun)" : /^[a-z0-9.+-]{1,30}\/[a-z0-9.+-]{1,40}(;[\w =.+-]{0,40})?$/i.test(vocal.type) ? vocal.type : "(illisible)";
+  return { type, taille: vocal.size, signature: Buffer.from(debut).toString("hex"), marque };
 }
 
 /**
