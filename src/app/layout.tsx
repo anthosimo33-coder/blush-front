@@ -27,6 +27,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   openGraph: { siteName: "BLUSH", locale: "fr_FR", type: "website" },
   twitter: { card: "summary_large_image" },
+  /* La preuve que le site est à nous, pour Google Search Console (propriété « préfixe de l’URL ») : un code public */
+  verification: { google: "7533LOUYN9qhhPqLVZ_-4HC-fi-gr3QlpwDe31kA46k" },
 };
 
 export const viewport: Viewport = {
