@@ -86,6 +86,32 @@ test("une conv d’exemple qui défile montre le verdict de BLUSH, qui se ferme 
   });
 });
 
+test("une conv de la copie qui boucle s’ouvre aussi au toucher (elle est à l’écran une bonne part du tour)", async ({ page }, testInfo) => {
+  await page.goto("/");
+  /*
+   * La première rangée arrêtée là où la copie est à l’écran (45 % de la piste, qui glisse de 0 à −50 %) : Playwright ne
+   * vise pas un élément qui bouge. Le toucher se fait à l’endroit de la conv, comme un doigt : c’est la page qui dit ce
+   * qu’il y a dessous (une liste `inert` laissait passer le toucher, et rien ne s’ouvrait).
+   */
+  await page.addStyleTag({ content: "[data-marquee] { animation: none !important; transform: translateX(-45%) !important; }" });
+  const copie = page.locator("[data-marquee]").first().locator("ul").nth(1);
+  await expect(copie).toHaveAttribute("aria-hidden", "true");
+  const conv = copie.getByRole("button", { includeHidden: true }).first();
+  /* Hors du clavier et des lecteurs d’écran, comme avant */
+  await expect(conv).toHaveAttribute("tabindex", "-1");
+  const nom = (await conv.locator("span span").first().textContent())!;
+  const boite = (await conv.boundingBox())!;
+  const x = boite.x + boite.width / 2;
+  const y = boite.y + boite.height / 2;
+  expect(x).toBeGreaterThan(0);
+  expect(x).toBeLessThan(page.viewportSize()!.width);
+  if (testInfo.project.use.hasTouch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+  const feuille = page.getByRole("dialog", { name: nom, exact: true });
+  await expect(feuille).toBeVisible();
+  await expect(feuille.getByText("Ton prochain pas")).toBeVisible();
+});
+
 test("le bloc du quotidien : une question touchée ouvre sa réponse et referme la précédente", async ({ page }) => {
   await page.goto("/");
   const bloc = page.getByRole("region", { name: /un nouveau\s*message/ });

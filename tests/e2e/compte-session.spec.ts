@@ -76,11 +76,17 @@ test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrou
   await connecterParApi(page, testInfo, email);
   const entete = page.getByRole("banner");
 
-  await test.step("connecté sans conv lue : la landing de tous, qui fait commencer", async () => {
+  await test.step("connecté sans conv lue : la landing de tous, qui fait commencer, mais « Mon compte » à la place de « Se connecter »", async () => {
     await page.goto("/");
     await expect(entete.getByRole("link", { name: "Commencer" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Analyser ma conv" }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Retrouver ma conv" })).toHaveCount(0);
+    /* « Se connecter » ramenait au parcours (déjà connecté) : son compte, ses achats et « Tout effacer » restaient introuvables */
+    await expect(page.getByRole("link", { name: "Se connecter" })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Pied de page" }).getByRole("link", { name: "Mon compte" })).toHaveAttribute("href", "/compte");
+    await entete.getByRole("link", { name: "Mon compte" }).click();
+    await expect(page).toHaveURL(/\/compte$/);
+    await expect(page.getByRole("main").getByText(email)).toBeVisible();
   });
 
   await lireUneConvParApi(page, testInfo);
