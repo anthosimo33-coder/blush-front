@@ -106,6 +106,11 @@ export const LIMITES = {
    */
   tournageParCompte: { max: 40, fenetreS: 86400 },
   /**
+   * Les convs de tournage préparées par l’API (POST /api/admin/tournage), pour tous et par jour : chacune est une vraie
+   * lecture (environ 1 $). De quoi préparer les liens de quatre créatrices d’un coup ; une boucle de l’outil s’arrête là.
+   */
+  tournageApiParJour: { max: 40, fenetreS: 86400 },
+  /**
    * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
    * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur (relevé pour l’ouverture, le
    * CAPTCHA arrête les robots).

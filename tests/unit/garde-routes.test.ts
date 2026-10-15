@@ -73,10 +73,12 @@ const SANS_COMPTE = new Set<CleRoute>([
 ]);
 /**
  * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, les relances
- * que la veille de GitHub appelle, et le relais de la chaîne), le réveil qui ne dit rien, et le webhook de Whop (sa
- * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine).
+ * que la veille de GitHub appelle, et le relais de la chaîne), le réveil qui ne dit rien, le webhook de Whop (sa
+ * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine), et l’API du mode tournage (la clé de l’outil
+ * des créatrices, un serveur lui aussi).
  */
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/chaine", "GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop"]);
+const API_DU_TOURNAGE = ["POST /api/admin/tournage", "GET /api/admin/tournage/[id]", "POST /api/admin/tournage/[id]/arreter"] as const satisfies CleRoute[];
+const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/chaine", "GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop", ...API_DU_TOURNAGE]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
@@ -90,8 +92,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 34 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(34);
+  it("la table compte 36 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(36);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 
@@ -113,6 +115,17 @@ describe("chaque route de la table", () => {
   it("POST /api/paiement/whop, la seule mutation hors de la garde : d’où qu’elle vienne, sans signature, 401 « interdit » ; ni session lue, ni limite comptée", async () => {
     for (const origine of [{ origin: "https://api.whop.com", host: "localhost" }, { host: "localhost" }, { origin: APPLI, host: "localhost" }] as Record<string, string>[]) {
       const r = await appeler("POST /api/paiement/whop", origine);
+      expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([401, { erreur: "interdit" }]);
+    }
+    expect(etat.comptees).toEqual([]);
+  });
+
+  it.each(API_DU_TOURNAGE)("%s, l’API du mode tournage : d’où qu’elle vienne, sans la clé de l’outil, 401 « interdit » ; ni session lue, ni limite comptée", async (cle) => {
+    for (const origine of [
+      { origin: APPLI, host: "localhost" },
+      { host: "localhost", authorization: "Bearer une-cle-qui-n-est-pas-la-bonne-du-tout" },
+    ] as Record<string, string>[]) {
+      const r = await appeler(cle, origine);
       expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([401, { erreur: "interdit" }]);
     }
     expect(etat.comptees).toEqual([]);

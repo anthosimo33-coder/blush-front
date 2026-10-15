@@ -74,12 +74,16 @@ function ConvRow({ convs, reverse, seconds, offset, onPick }: (typeof ROWS)[numb
 
 function ConvList({ convs, onPick, copy = false }: { convs: LandingConv[]; onPick: (c: LandingConv) => void; copy?: boolean }) {
   return (
-    /* La copie sert seulement à boucler sans à-coup : ni lecteur d’écran, ni clavier, et rien en mouvement réduit */
-    <ul aria-hidden={copy || undefined} inert={copy || undefined} className={cn("m-0 flex list-none gap-3 p-0 pr-3", copy && "motion-reduce:hidden")}>
+    /*
+     * La copie sert seulement à boucler sans à-coup : ni lecteur d’écran, ni clavier, et rien en mouvement réduit. Pas
+     * `inert` : il couperait aussi la souris et le doigt, et la copie est à l’écran une bonne part du tour
+     */
+    <ul aria-hidden={copy || undefined} className={cn("m-0 flex list-none gap-3 p-0 pr-3", copy && "motion-reduce:hidden")}>
       {convs.map((c) => (
         <li key={c.id} className="shrink-0">
           <button
             type="button"
+            tabIndex={copy ? -1 : undefined}
             onClick={() => onPick(c)}
             onFocus={keepInView}
             className="lift lift-card my-1.5 flex h-[66px] w-[226px] items-center gap-3 rounded-[20px] bg-white pl-3 pr-4 text-left shadow-card lg:h-[74px] lg:w-[258px] lg:pl-3.5"

@@ -151,7 +151,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: [verifier, e2e]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Le build chez Vercel, puis la vérification (quelques minutes au pire) et, s’il le faut, le retour arrière
+    timeout-minutes: 30
     # Pas d’environnement GitHub : Vercel garde l’historique des mises en production
     # Une mise en production à la fois, dans l’ordre des lancements
     concurrency:
@@ -162,6 +163,9 @@ jobs:
       VERCEL_ORG_ID: team_K67R5gXFJUCr6pCA4YLkgwwH
       VERCEL_PROJECT_ID: prj_rbFHQuTvI4cqSUdmeuDEUTUDZmjZ
       VERCEL_TELEMETRY_DISABLED: "1"
+      # La CLI de scripts/deployer, et l’adresse de la production (BLUSH_URL, src/server/env.ts : son défaut)
+      VERCEL: scripts/deployer/node_modules/.bin/vercel
+      DOMAINE: https://www.askblush.com
     steps:
       # « Re-run » d’un ancien lancement redéploierait son commit : seule la tête de main part en production
       - name: Le commit est toujours la tête de main
@@ -187,7 +191,82 @@ jobs:
       - name: La CLI Vercel (scripts/deployer)
         run: npm ci --prefix scripts/deployer --ignore-scripts --no-audit --no-fund
 
-      - name: vercel deploy --prod
+      # Le déploiement en ligne avant celui-ci (celui que sert le domaine) : le retour arrière le remettra si le nouveau ne
+      # répond pas. Sans lui (une lecture qui échoue), la mise en production part quand même, sans retour arrière possible.
+      - name: Le déploiement en ligne avant
+        id: avant
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: scripts/deployer/node_modules/.bin/vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        run: |
+          if id="$("$VERCEL" inspect "$DOMAINE" --format json --token "$VERCEL_TOKEN" | jq -er .id)"; then
+            echo "id=$id" >> "$GITHUB_OUTPUT"
+            echo "En ligne avant : $id"
+          else
+            echo "::warning::Le déploiement en ligne n’a pas pu être lu : pas de retour arrière si le nouveau ne répond pas."
+          fi
+
+      # La CLI n’écrit que l’adresse du déploiement sur sa sortie (le reste va aux logs) : on la garde pour la vérifier
+      - name: vercel deploy --prod
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url="$("$VERCEL" deploy --prod --yes --token "$VERCEL_TOKEN")"
+          [[ "$url" =~ ^https://[a-z0-9.-]+$ ]] || { echo "::error::La CLI n’a pas rendu d’adresse de déploiement : « $url »"; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Déployé : $url"
+
+      # Le build ne voit pas une variable d’environnement mal mise : env() ne la vérifie qu’à la première requête, et
+      # toutes les routes répondent alors « panne » (BACKEND.md, « Mise en ligne »). Le nouveau déploiement doit donc
+      # répondre avant de laisser le job au vert : / en 200, et /api/reveil {"ok":true} (la base répond, la configuration
+      # est acceptée). D’abord sur son adresse à lui, si la protection des déploiements de Vercel la laisse lire (sinon
+      # 401 : elle est sautée), puis sur le domaine, une fois sûr qu’il le sert. Au pire quatre minutes par adresse.
+      - name: Le nouveau déploiement répond
+        id: verifier
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # Cinq essais, 10 s d’écart : une instance qui démarre ou une base qui se réveille n’est pas une panne
+          repond() {
+            curl --fail --silent --show-error --location --max-time 20 --retry 4 --retry-delay 10 --retry-all-errors \
+              --output /dev/null --write-out "$1/ : %{http_code} en %{time_total} s\n" "$1/" || return 1
+            local corps
+            corps="$(curl --fail --silent --show-error --max-time 20 --retry 4 --retry-delay 10 --retry-all-errors "$1/api/reveil")" || return 1
+            echo "$1/api/reveil : $corps"
+            [ "$(jq -r '.ok' <<< "$corps" 2>/dev/null)" = "true" ]
+          }
+          # L’adresse du déploiement que sert le domaine ; rien si Vercel ne la donne pas
+          enLigne() { "$VERCEL" inspect "$DOMAINE" --format json --token "$VERCEL_TOKEN" | jq -er '.url | select(. != null) | "https://" + .' || true; }
+
+          statut="$(curl --silent --output /dev/null --max-time 20 --write-out '%{http_code}' "$URL/api/reveil" || true)"
+          if [ "$statut" = "401" ] || [ "$statut" = "403" ]; then
+            echo "::notice::$URL est protégé par Vercel ($statut) : vérifié par le domaine seulement."
+          else
+            repond "$URL" || { echo "::error::$URL ne répond pas comme il faut"; exit 1; }
+          fi
+
+          # Après un retour arrière, Vercel ne met plus de lui-même les déploiements suivants sur le domaine : on l’y met.
+          # Sans réponse de Vercel sur ce qu’il sert, le domaine se vérifie tel quel.
+          sert="$(enLigne)"
+          if [ -z "$sert" ]; then
+            echo "::warning::Vercel ne dit pas quel déploiement sert $DOMAINE : vérifié tel quel."
+          elif [ "$sert" != "$URL" ]; then
+            echo "::notice::$DOMAINE sert $sert, pas encore $URL : vercel promote."
+            "$VERCEL" promote "$URL" --yes --timeout 3m --token "$VERCEL_TOKEN"
+            test "$(enLigne)" = "$URL" || { echo "::error::$DOMAINE ne sert toujours pas $URL"; exit 1; }
+          fi
+          repond "$DOMAINE" || { echo "::error::$DOMAINE ne répond pas comme il faut avec $URL"; exit 1; }
+
+      # Le nouveau déploiement ne répond pas : le déploiement d’avant revient en ligne, et le job reste en échec (GitHub
+      # prévient celui qui a lancé la mise en production). Vercel ne mettra plus les suivants sur le domaine de lui-même :
+      # la prochaine mise en production l’y met (vercel promote, plus haut), une fois corrigé ce qui coinçait.
+      - name: Retour au déploiement d’avant
+        if: failure() && steps.verifier.outcome == 'failure' && steps.avant.outputs.id != ''
+        env:
+          AVANT: ${{ steps.avant.outputs.id }}
+          URL: ${{ steps.deploy.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          "$VERCEL" rollback "$AVANT" --yes --timeout 3m --token "$VERCEL_TOKEN"
+          echo "::error::$URL ne répondait pas : $AVANT est revenu en ligne. Regarde ses logs dans Vercel (une variable d’environnement refusée, la base), corrige, puis relance la mise en production."

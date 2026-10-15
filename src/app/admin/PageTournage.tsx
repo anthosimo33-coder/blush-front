@@ -127,7 +127,7 @@ function LigneDuTournage({ t }: { t: TournageAffiche }) {
   const [envoi, setEnvoi] = useState(false);
   const [issue, setIssue] = useState<Issue | null>(null);
   const copier = async () => {
-    if (await copyText(`${window.location.origin}${t.lien}`)) {
+    if (t.lien && (await copyText(`${window.location.origin}${t.lien}`))) {
       setCopie(true);
       setTimeout(() => setCopie(false), 2000);
     }
@@ -155,17 +155,23 @@ function LigneDuTournage({ t }: { t: TournageAffiche }) {
         </div>
         {t.arrete && <span className="shrink-0 rounded-full bg-sep px-2.5 py-1 text-legende font-black text-soft">Arrêtée</span>}
       </div>
-      {!t.arrete && (
+      {!t.arrete && t.lien && (
         <code className="block min-w-0 overflow-x-auto whitespace-nowrap rounded-[12px] bg-[#F8F7F4] px-3 py-2.5 text-micro font-bold text-ink" translate="no">
           {t.lien}
         </code>
+      )}
+      {!t.arrete && t.statut === "en_lecture" && <p className="m-0 text-micro font-black text-soft">BLUSH lit sa conv (quelques minutes){NBSP}: son lien arrive ici.</p>}
+      {t.statut === "echec" && (
+        <p className="m-0 text-micro font-black text-danger">
+          Sa lecture a échoué ({t.erreur ?? "inconnue"}){NBSP}: arrête-la et prépares-en une autre.
+        </p>
       )}
       <p className="m-0 text-micro font-extrabold text-soft">
         {t.comptes ? `${pluriel(t.comptes, "créatrice")} avec une prise · la dernière le ${t.derniere ?? "—"}` : "Aucune prise pour l’instant"}
       </p>
       {!t.arrete && (
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" size="md" onClick={() => void copier()}>
+          <Button variant="secondary" size="md" disabled={!t.lien} onClick={() => void copier()}>
             {copie ? "Copié" : "Copier le lien"}
           </Button>
           <Button variant="secondary" size="md" loading={envoi} onClick={() => void arreter()}>

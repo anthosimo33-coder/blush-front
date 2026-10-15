@@ -176,8 +176,13 @@ export const tournages = pgTable("tournages", {
     .references(() => stories.id, { onDelete: "cascade" }),
   cle: chiffre("cle").notNull(),
   cleHash: text("cle_hash").notNull().unique(),
-  /** Le compte de l’équipe qui l’a créée (null : effacé depuis). */
+  /** Le compte de l’équipe qui l’a créée (null : effacé depuis, ou créée par l’API du tournage). */
   creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  /**
+   * La référence que l’outil des créatrices lui a donnée (POST /api/admin/tournage, `ref` : sa mission) : la même rend la
+   * même conv de tournage, sans la relire (un double clic, un nouvel essai après une coupure ne paient pas deux lectures).
+   */
+  ref: text("ref").unique(),
   arreteLe: quand("arrete_le"),
   creeLe: quand("cree_le").notNull().defaultNow(),
 });

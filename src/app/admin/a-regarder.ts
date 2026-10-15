@@ -44,17 +44,18 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
   const bon: CarteARegarder[] = [];
   const neutre: CarteARegarder[] = [];
 
-  /* La santé : des tâches en échec ou bloquées, des paiements refusés */
+  /* La santé : des tâches en échec ou bloquées, des paiements refusés, des pannes du serveur */
   const souci = [
     p.sante.echecs > 0 && `${pluriel(p.sante.echecs, "tâche")} en échec`,
     p.sante.bloquees > 0 && `${pluriel(p.sante.bloquees, "tâche bloquée", "tâches bloquées")}`,
     p.sante.paiementsEchoues > 0 && `${pluriel(p.sante.paiementsEchoues, "paiement refusé", "paiements refusés")}`,
+    p.sante.pannes > 0 && `${pluriel(p.sante.pannes, "panne du serveur", "pannes du serveur")}`,
   ].filter((t): t is string => Boolean(t));
   if (souci.length)
     mal.push({
       ton: "mal",
       titre: souci.length > 1 ? `${souci.slice(0, -1).join(", ")} et ${souci.at(-1)}` : (souci[0] ?? ""),
-      texte: "Le détail est dans la carte Santé\u00a0: les codes d’échec, ce qui est bloqué, ce que Whop a refusé.",
+      texte: "Le détail est dans la carte Santé\u00a0: les codes d’échec, ce qui est bloqué, ce que Whop a refusé, les routes et les pages en panne.",
       lien: { texte: "Voir la santé", ancre: "sante" },
     });
 

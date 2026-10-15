@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExportScreen } from "@/app/importer/export/ExportScreen";
 import { CASE_IMPORT, texteCaseImport } from "@/contenu/consentements";
 import { uploadExport } from "@/services/api";
+import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { ErreurApi } from "@/types/erreurs-api";
 
 /*
@@ -58,6 +59,23 @@ describe("l’écran de l’export et l’accord de l’import", () => {
     await fichierChoisi();
     expect(envoi).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: CASE_IMPORT.recharger }));
+  });
+});
+
+describe("une nouvelle conv redemande « qui est toi »", () => {
+  it("après un mauvais fichier et le retour arrière : le « c’est moi » de la conv d’avant ne reste pas coché sur la nouvelle", async () => {
+    /* La conv d’avant : « Qui es-tu ? » rempli en entier, toi en « p1 » */
+    setJourney({ exportFileName: "ami.txt", me: "p1", pronom: "il", guess: "parle", goal: "comprendre" });
+    try {
+      render(<ExportScreen initialApp="whatsapp" />);
+      fireEvent.click(bouton());
+      await fichierChoisi();
+      expect(routeur.push).toHaveBeenCalledWith("/importer/ok");
+      /* Les « p0 »/« p1 » de la nouvelle conv ne sont pas ceux d’avant : « Continuer » attendra qu’on se choisisse */
+      expect(readJourney()).toMatchObject({ exportFileName: "_chat.txt", me: null, pronom: "il", guess: "parle", goal: "comprendre" });
+    } finally {
+      resetJourney();
+    }
   });
 });
 

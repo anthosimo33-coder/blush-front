@@ -41,8 +41,8 @@ let chain: Chain | null = null;
 
 /*
  * Les échantillons de la pièce (1,1 s de réverbération en stéréo) et du bruit : une centaine de milliers de calculs.
- * Faits au repos après le chargement, pas dans le premier toucher (qui passe avant les gestionnaires de la page).
- * Pour 48 kHz, la fréquence de l’iPhone ; refaits hors du geste si la sortie en a une autre.
+ * Faits au repos, à la fréquence de la sortie, une fois le contexte créé (preparerAuRepos), jamais dans un toucher (qui
+ * passe avant les gestionnaires de la page).
  */
 type Echantillons = { sr: number; piece: [Float32Array, Float32Array]; bruit: Float32Array };
 let prets: Echantillons | null = null;
@@ -108,22 +108,58 @@ function remplirLaPiece(c: Chain) {
   c.room.buffer = b;
 }
 
+/*
+ * Les pages qui ne jouent aucun son : la landing, un verdict partagé, les pages légales. Ni contexte audio ni réveil :
+ * le tout premier contexte de la visite bloque le fil principal 0,1 à 0,2 s (le navigateur démarre sa sortie audio),
+ * et c’est le premier toucher de la page qui l’aurait payé.
+ */
+const SANS_SON = /^\/(?:v\/.*|conditions|confidentialite|mentions-legales)?$/;
+/* La page joue-t-elle des sons ? Posé par SoundBoot à chaque page ; rien tant qu’il ne l’a pas dit */
+let avecSons = false;
+/* La préparation au repos en attente (une seule à la fois) */
+let annulerPreparation: (() => void) | null = null;
+/* Le son vide qui ouvre la sortie de l’iPhone : une fois, dans le premier geste */
+let ouverte = false;
+
+/** Le contexte audio et sa chaîne, une fois pour la visite. La réverbération suit au repos. */
+function creer(): Chain | null {
+  const ac = creerAudioContext({ latencyHint: "interactive" });
+  if (!ac) return null;
+  const c = (chain = build(ac));
+  auRepos(() => remplirLaPiece(c), 100);
+  return c;
+}
+
+/**
+ * Prépare le son au repos, hors de tout geste : le contexte naît suspendu (aucune page ne sonne avant un toucher), et
+ * le premier toucher n’a plus qu’à le reprendre (wake), en une ou deux millisecondes.
+ */
+function preparerAuRepos() {
+  if (chain || annulerPreparation) return;
+  annulerPreparation = auRepos(() => {
+    annulerPreparation = null;
+    if (!chain && avecSons && enabled() && audioContextDisponible()) {
+      appliquerSession();
+      creer();
+    }
+  });
+}
+
 /** Réveille le son pendant un geste : Safari garde une page muette tant qu’on ne l’a pas touchée. */
 function wake() {
-  if (!enabled() || !audioContextDisponible()) return;
+  if (!enabled() || !avecSons || !audioContextDisponible()) return;
   appliquerSession();
-  if (!chain) {
-    const ac = creerAudioContext({ latencyHint: "interactive" });
-    if (!ac) return;
-    const c = (chain = build(ac));
-    /* iPhone : un son vide joué dans le geste ouvre la sortie */
-    const s = ac.createBufferSource();
-    s.buffer = ac.createBuffer(1, 1, 22050);
-    s.connect(ac.destination);
-    s.start(0);
-    auRepos(() => remplirLaPiece(c), 100);
-  }
-  if (chain.ac.state !== "running") chain.ac.resume().catch((e: unknown) => tracer("son:reprise", e));
+  /* Pas encore préparé au repos (un toucher dès l’arrivée, ou le réglage rallumé) : créé ici, comme avant */
+  const c = chain ?? creer();
+  if (!c) return;
+  if (c.ac.state !== "running") c.ac.resume().catch((e: unknown) => tracer("son:reprise", e));
+  if (ouverte) return;
+  ouverte = true;
+  /* iPhone : un son vide joué dans le geste ouvre la sortie */
+  const s = c.ac.createBufferSource();
+  s.buffer = c.ac.createBuffer(1, 1, 22050);
+  s.connect(c.ac.destination);
+  s.start(0);
 }
 
 let booted = false;
@@ -132,10 +168,20 @@ export function bootSound() {
   if (booted || typeof window === "undefined") return;
   booted = true;
   for (const type of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(type, wake, { capture: true, passive: true });
-  /* Les échantillons se calculent pendant que la page est au repos, avant le premier toucher */
-  auRepos(() => {
-    if (enabled()) echantillons(48000);
-  });
+}
+
+/**
+ * La page a changé (SoundBoot), `chemin` : son adresse dans le navigateur. Une page qui joue des sons prépare le son au
+ * repos ; une page sans son (SANS_SON) n’y touche pas, et ses touchers ne le réveillent pas.
+ */
+export function sonsDeLaPage(chemin: string) {
+  avecSons = !SANS_SON.test(chemin);
+  if (!avecSons) {
+    annulerPreparation?.();
+    annulerPreparation = null;
+    return;
+  }
+  preparerAuRepos();
 }
 
 /* ———— Les instruments ———— */

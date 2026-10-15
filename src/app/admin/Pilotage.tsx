@@ -728,11 +728,13 @@ function Pastille({ valeur, nom }: { valeur: string; nom: string }) {
 
 function Sante({ s }: { s: StatsAdmin }) {
   const x = s.pilotage.sante;
-  const lignes: [string, number][] = [
-    ["Tâches en échec", x.echecs],
-    ["Tâches bloquées en ce moment", x.bloquees],
-    ["Paiements refusés", x.paiementsEchoues],
-    ["Réponses en alerte danger", x.alertes],
+  /* Chaque ligne, et le détail qui l’accompagne quand elle s’allume : les codes des échecs, les lieux des pannes */
+  const lignes: [string, number, { cle: string; n: number }[]][] = [
+    ["Tâches en échec", x.echecs, s.sante.echecs.map((e) => ({ cle: e.code, n: e.n }))],
+    ["Tâches bloquées en ce moment", x.bloquees, []],
+    ["Paiements refusés", x.paiementsEchoues, []],
+    ["Réponses en alerte danger", x.alertes, []],
+    ["Pannes du serveur", x.pannes, s.sante.pannes.map((p) => ({ cle: p.lieu, n: p.n }))],
   ];
   const calme = lignes.every(([, n]) => n === 0);
   return (
@@ -740,7 +742,7 @@ function Sante({ s }: { s: StatsAdmin }) {
       id="sante"
       titre="Santé"
       sous="Ne s’allume que si ça coince"
-      aide={{ cle: "sante", valeur: calme ? "Tout tourne" : "À regarder", contexte: `${lignes.filter(([, n]) => n > 0).length} sur 4 lignes allumées` }}
+      aide={{ cle: "sante", valeur: calme ? "Tout tourne" : "À regarder", contexte: `${lignes.filter(([, n]) => n > 0).length} sur ${lignes.length} lignes allumées` }}
       className="grow basis-[320px]"
     >
       <p className="m-0 mb-2 mt-[18px]">
@@ -755,17 +757,17 @@ function Sante({ s }: { s: StatsAdmin }) {
         </span>
       </p>
       <ul className="m-0 flex list-none flex-col p-0">
-        {lignes.map(([nom, n], k) => (
+        {lignes.map(([nom, n, detail]) => (
           <li key={nom} className="flex flex-col gap-2 border-t border-sep py-3">
             <span className={cn("flex justify-between gap-3 text-detail", n > 0 ? "font-black text-attente-ink" : "font-extrabold")}>
               <span>{nom}</span>
               <span className={cn("tabular-nums", n === 0 && "text-soft")}>{nombre(n)}</span>
             </span>
-            {k === 0 && n > 0 && s.sante.echecs.length > 0 && (
+            {n > 0 && detail.length > 0 && (
               <span className="flex flex-wrap gap-1.5">
-                {s.sante.echecs.map((e) => (
-                  <span key={e.code} className="rounded-full bg-paper px-2.5 py-0.5 font-mono text-micro font-bold text-soft">
-                    {e.code} · {nombre(e.n)}
+                {detail.map((d) => (
+                  <span key={d.cle} className="rounded-full bg-paper px-2.5 py-0.5 font-mono text-micro font-bold text-soft">
+                    {d.cle} · {nombre(d.n)}
                   </span>
                 ))}
               </span>
@@ -774,7 +776,8 @@ function Sante({ s }: { s: StatsAdmin }) {
         ))}
       </ul>
       <p className="m-0 mt-1 text-legende font-bold text-grey">
-        En ce moment{NBSP}: {pluriel(s.sante.enCours, "tâche")} en cours, {nombre(s.sante.enAttente)} en attente.
+        En ce moment{NBSP}: {pluriel(s.sante.enCours, "tâche")} en cours, {nombre(s.sante.enAttente)} en attente. Aujourd’hui{NBSP}:{" "}
+        {pluriel(x.pannesDuJour, "panne du serveur", "pannes du serveur")}.
       </p>
     </Bloc>
   );

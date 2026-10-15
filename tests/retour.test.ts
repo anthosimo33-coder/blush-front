@@ -67,7 +67,20 @@ describe("« Retrouver ma conv » sur la landing", () => {
     etat.cookies.delete("blush-session");
     try {
       expect(await getRetour()).toBeNull();
+      expect(await getRetourDeLaLanding()).toBeNull();
       expect(await getCompte()).toBeNull();
+    } finally {
+      etat.cookies.set("blush-session", session);
+    }
+  });
+
+  it("connecté sans conv (la seule effacée) : la landing le sait, pour montrer « Mon compte » et non « Se connecter »", async () => {
+    const session = etat.cookies.get("blush-session")!;
+    const vide = await compteDeTest("retour-vide");
+    etat.cookies.set("blush-session", (await ouvrirSession(vide.id)).secret);
+    try {
+      expect(await getRetour()).toBeNull();
+      expect(await getRetourDeLaLanding()).toEqual({ sansConv: true });
     } finally {
       etat.cookies.set("blush-session", session);
     }

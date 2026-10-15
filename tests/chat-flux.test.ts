@@ -38,6 +38,7 @@ import { ouvrirSession } from "@/server/auth";
 import { BUDGET_IA, cleDeDepense, noterDepense, oublierLeBudget, payeurDuCompte } from "@/server/budget";
 import { chiffrer, empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
+import { PANNE } from "@/server/compteurs";
 import { aujourdhuiParis } from "@/server/temps";
 import { historique } from "@/server/historique";
 import { db, schema } from "@/server/db";
@@ -321,12 +322,19 @@ describe("POST /api/chat en flux", () => {
        * Elle ne remonte pas jusqu’à Next : l’enveloppe `route` (src/server/http.ts) en fait une panne, et le journal n’en
        * garde que la route, le nom et le code de l’erreur (celui du coffre)
        */
+      /* La première panne du jour de la route (les fichiers d’avant ont pu en compter) : elle part à l’équipe */
+      await db()
+        .delete(schema.counters)
+        .where(eq(schema.counters.key, `${PANNE}POST /api/chat`));
       const r = await envoyer("elle veut quoi ?");
       expect([r.status, await r.json()]).toEqual([502, { erreur: "panne" }]);
       expect(appels).toBe(0);
       expect(erreur.mock.calls.map((c) => JSON.parse(String(c[0])) as unknown)).toEqual([
         { evenement: "route /api en panne", niveau: "erreur", route: "POST /api/chat", erreur: "ErreurInvariant", code: "memories.data:forme_inattendue" },
       ]);
+      /* Comptée, et à l’équipe une fois la réponse partie : la route, le nom et le code de l’erreur (src/server/pannes.ts) */
+      await lancerApres();
+      expect(etat.alertes.map((a) => a.slice(0, 3))).toEqual([["route /api en panne", "Route : POST /api/chat", "Erreur : ErreurInvariant (memories.data:forme_inattendue)"]]);
     } finally {
       await db().update(schema.memories).set({ data: ligne.data }).where(eq(schema.memories.storyId, id));
     }

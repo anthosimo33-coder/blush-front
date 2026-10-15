@@ -173,7 +173,9 @@ export function FeuilleFormule({
   const avoirs = useFeuilleDuPaiement().data;
   /* Le choix fait à la main ; sans lui, le rapport d’avance s’il y en a un, sinon la formule choisie d’avance */
   const [choix, setChoix] = useState<Choix | null>(null);
-  const choisie: Choix = choix ?? (avoirs?.avance ? "avance" : FORMULE_CHOISIE);
+  /* Ce que le compte a d’avance passe en tête : le rapport d’avance (0 €), sinon le rapport seul à −50 % gardé (⑥, 4,95 €,
+     le prix que le bouton d’ouverture annonce : SUP16-1), sinon la formule conseillée */
+  const choisie: Choix = choix ?? (avoirs?.avance ? "avance" : avoirs?.garde ? "rapport" : FORMULE_CHOISIE);
   const [bulle, setBulle] = useState(false);
   /* Payé : « C’est payé » prend toute la feuille, qui ne se ferme plus, le temps de la livraison */
   const [paye, setPaye] = useState(false);

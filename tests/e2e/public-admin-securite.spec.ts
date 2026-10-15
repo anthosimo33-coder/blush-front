@@ -40,6 +40,8 @@ const ENTETES = {
 
 /** Le webhook de Whop, hors de la garde commune : Whop n’a pas notre origine, seule sa signature compte. */
 const WEBHOOK = "/api/paiement/whop";
+/** L’API du mode tournage, hors de la garde commune elle aussi : l’outil des créatrices est un serveur, seule sa clé compte. */
+const API_DU_TOURNAGE = ["/api/admin/tournage", "/api/admin/tournage/[id]/arreter"];
 
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
@@ -63,8 +65,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
   await test.step("les 33 routes gardées de la table du contrat (le signe des onglets et ce que remontent les navigateurs compris), depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(34);
-    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK)) {
+    expect(MUTATIONS).toHaveLength(36);
+    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && !API_DU_TOURNAGE.includes(c))) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
         const qui = `${methode} ${chemin} depuis ${origine ?? "nulle part"}`;
@@ -80,6 +82,15 @@ test("une route qui modifie refuse (403) une requête venue d’un autre site, d
       expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
       expect.soft(await r.json()).toEqual({ erreur: "interdit" });
     }
+  });
+
+  await test.step("l’API du mode tournage, d’où qu’elle vienne : sans la clé de l’outil, 401 « interdit »", async () => {
+    for (const chemin of API_DU_TOURNAGE)
+      for (const origine of [PIRATE, URL_APPLI, null]) {
+        const r = await request.post(chemin.replace("[id]", "00000000-0000-0000-0000-000000000000"), { headers: origine ? { origin: origine } : {}, data: {} });
+        expect.soft(r.status(), `${chemin} depuis ${origine ?? "nulle part"}`).toBe(401);
+        expect.soft(await r.json()).toEqual({ erreur: "interdit" });
+      }
   });
 
   await test.step("depuis l’appli, la même requête passe ce contrôle", async () => {

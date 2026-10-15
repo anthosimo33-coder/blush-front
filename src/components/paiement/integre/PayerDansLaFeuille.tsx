@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
 import { apresLaLivraison, attendreLaLivraison, noterLaSuite, versLeRetour } from "@/lib/paiement";
 import { apresDeblocage, useCompte, useFeuilleDuPaiement } from "@/lib/requetes";
-import { commencerPaiement } from "@/services/api";
+import { commencerPaiement, etatDuPaiement } from "@/services/api";
 import { CheckBurst } from "@/components/brand/objects3d";
 import { MentionRenonciation, useAccord } from "@/components/juridique/cases";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -148,6 +148,42 @@ function useParcours({
     surPaye?.(false);
   };
 
+  /** « C’est payé », puis la livraison attendue (le webhook, ou la vérification du serveur avec le paiement de Whop), puis la suite. */
+  const suivreLaLivraison = async (achat: string, paiement: string | null) => {
+    setEtat("paye");
+    surPaye?.(true);
+    const signal = fin.current?.signal;
+    const e = await attendreLaLivraison(achat, paiement, { signal });
+    if (signal?.aborted) return;
+    if (e === "echoue") return revenir("carte");
+    /* La livraison tarde : la page du retour attend plus longtemps, et le dit */
+    if (e === null) return router.replace(versLeRetour(achat, paiement));
+    apresDeblocage();
+    if (livre) livre(e);
+    else router.replace(apresLaLivraison(e));
+  };
+
+  /*
+   * Parti finir une étape de la banque hors de la page (une 3-D Secure par redirection), puis revenu par « Retour » : le
+   * navigateur rend la page telle qu’il l’avait gardée (bfcache), bouton occupé compris, et la feuille refuserait de se
+   * fermer (UIX-2). Au retour, on relit l’achat une fois : payé, on suit sa livraison ; sinon, le bouton se libère (un
+   * paiement fini plus tard est livré par son webhook).
+   */
+  const parti = useRef<{ achat: string; paiement: string | null } | null>(null);
+  useEffect(() => {
+    const retour = (ev: PageTransitionEvent) => {
+      const p = parti.current;
+      if (!ev.persisted || !p) return;
+      parti.current = null;
+      etatDuPaiement(p.achat, p.paiement).then(
+        (e) => (e.statut === "paye" ? void suivreLaLivraison(p.achat, p.paiement) : revenir(null)),
+        () => revenir(null),
+      );
+    };
+    window.addEventListener("pageshow", retour);
+    return () => window.removeEventListener("pageshow", retour);
+  });
+
   const payer = async (jeton: Promise<string | null>) => {
     setEtat("envoi");
     setRefus(null);
@@ -161,21 +197,14 @@ function useParcours({
       /* Whop n’a pas dit si le paiement est parti (aVerifier, côté serveur) : la page du retour attend son webhook, et le dit */
       if (!p) return router.replace(versLeRetour(r.achat, null));
       if (p.statut !== "paid" && p.secret) {
+        /* Noté avant : la banque peut quitter la page pendant l’étape (« parti »), et le retour doit savoir quoi relire */
+        parti.current = { achat: r.achat, paiement: p.id };
         const issue = await finirEtape(p.secret);
         if (issue === "parti") return;
+        parti.current = null;
         if (issue === "refuse") return revenir("carte");
       }
-      setEtat("paye");
-      surPaye?.(true);
-      const signal = fin.current?.signal;
-      const e = await attendreLaLivraison(r.achat, p?.id ?? null, { signal });
-      if (signal?.aborted) return;
-      if (e === "echoue") return revenir("carte");
-      /* La livraison tarde : la page du retour attend plus longtemps, et le dit */
-      if (e === null) return router.replace(versLeRetour(r.achat, p?.id ?? null));
-      apresDeblocage();
-      if (livre) livre(e);
-      else router.replace(apresLaLivraison(e));
+      await suivreLaLivraison(r.achat, p.id);
     } catch (e) {
       const code = codeDe(e);
       revenir(null);
