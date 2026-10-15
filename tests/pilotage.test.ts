@@ -110,7 +110,7 @@ describe("la source d’un compte et le fil du direct", () => {
 });
 
 /**
- * Le temps de ce test : il calcule cinq fois tout le pilotage (statsAdmin), qui parcourt les tables entières, pannes et
+ * Le temps de ce test : il calcule quatre fois tout le pilotage (statsAdmin), qui parcourt les tables entières, pannes et
  * visites des créatrices comprises. Seul, il dure 0,2 s ; au milieu de la suite, qui écrit en même temps dans la même
  * base, il a dépassé les 5 s par défaut sur la CI.
  */
