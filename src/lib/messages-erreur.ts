@@ -49,6 +49,9 @@ const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Rées
  */
 const CAPTCHA = "On n’a pas pu vérifier que tu n’es pas un robot. Réessaie dans un instant (et coche la case si elle apparaît).";
 
+/** Le mode tournage arrêté : son lien a changé, ou ce compte de créatrice n’a plus le sien (src/server/tournage.ts). */
+const TOURNAGE_ARRETE = "Ce lien de tournage a été arrêté. Rouvre le nouveau lien de ta mission sur ce téléphone, puis recommence la prise.";
+
 const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
@@ -75,6 +78,7 @@ const MESSAGES = {
   },
   /* L’import de captures ou d’un enregistrement d’écran (la conv elle-même a son écran : erreurDeParcours) */
   captures: {
+    tournage: TOURNAGE_ARRETE,
     trop: "BLUSH a lu beaucoup de captures d’un coup\u00a0: réessaie un peu plus tard. Tes captures restent là.",
     /* La lecture des captures est payée par le compte connecté, ou par la part sans compte (src/server/budget.ts) */
     souffle: `${SOUFFLE} Tes captures restent là.`,
@@ -86,6 +90,8 @@ const MESSAGES = {
   /* « Lancer la lecture », sur « Qui es-tu ? » */
   lecture: {
     trop: "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain.",
+    /* Le mode tournage arrêté (src/server/tournage.ts). TODO(produit): texte nouveau, à valider */
+    tournage: TOURNAGE_ARRETE,
     defaut: "La lecture n’a pas pu partir. Réessaie dans un instant.",
   },
   /* « Relancer l’écriture » du rapport */

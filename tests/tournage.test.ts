@@ -91,7 +91,7 @@ const navigateur = async (u: Pick<Utilisateur, "id">, cle?: string) => {
 const cleDe = async (id: string) =>
   (await tournagesAffiches())
     .find((t) => t.id === id)!
-    .lien.split("/")
+    .lien!.split("/")
     .pop()!;
 /** Une prise : des captures importées en mode tournage, puis lancées (« Qui es-tu ? », le prénom de la créatrice). */
 const prise = async () => {
@@ -319,7 +319,7 @@ describe("une prise", () => {
 });
 
 describe("une conv de tournage arrêtée, ou effacée", () => {
-  it("arrêtée : son lien ne pose plus rien et des captures se lisent comme d’habitude ; un brouillon déjà fait se lit encore", async () => {
+  it("arrêtée : son lien ne pose plus rien et de nouvelles captures ne sont pas lues (409) ; un brouillon déjà fait se lit encore", async () => {
     const t = await creerTournage({ conv: source, nom: "D · Quoi lui répondre", par: equipe });
     if (!("id" in t)) throw new Error("conv de tournage refusée");
     const cleD = await cleDe(t.id);
@@ -334,11 +334,10 @@ describe("une conv de tournage arrêtée, ou effacée", () => {
     expect((await lancer()).status).toBe(200);
     expect(appels.length).toBe(avant);
     expect((await ligneEnBase(story.id)).tournageLe).toBeInstanceOf(Date);
-    /* De nouvelles captures, avec ce lien arrêté : lues par le modèle, comme pour tout le monde */
+    /* De nouvelles captures, avec ce lien arrêté : rien n’est lu, qu’elle rouvre le nouveau lien (lecturePayeeRefusee) */
     const lues = await captures();
-    expect(lues.status).toBe(200);
-    brouillons.push(((await lues.json()) as { story: { id: string } }).story.id);
-    expect(appels.length).toBeGreaterThan(avant);
+    expect([lues.status, await lues.json()]).toEqual([409, { erreur: "tournage" }]);
+    expect(appels.length).toBe(avant);
   });
 
   it("effacée : un brouillon de tournage n’a plus rien à lire (404 aucune)", async () => {

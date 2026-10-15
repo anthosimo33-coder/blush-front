@@ -2,6 +2,7 @@ import "server-only";
 import { eq, gte, sql } from "drizzle-orm";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { alerter } from "./alertes";
+import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
 import { db, schema } from "./db";
 import { cleDuCompte } from "./email-canonique";
 import { ErreurTache } from "./erreurs";
@@ -34,6 +35,11 @@ export const BUDGET_IA = {
   compte: 10,
   /** Les appels sans compte (les captures lues avant l’email), pris dans le budget du jour ; relevé pour l’ouverture. */
   anonyme: 50,
+  /**
+   * Les lectures des convs de tournage préparées par l’API (COMPTE_DU_TOURNAGE) : une lecture entière par lien et par
+   * créatrice, environ 1 $ chacune, une trentaine par jour au plus (la limite tournageApiParJour les borne avant lui).
+   */
+  tournage: 40,
   /** L’équipe est prévenue à 50 % et 80 % (décidé), puis quand le budget du jour est atteint. */
   seuils: [0.5, 0.8, 1],
 } as const;
@@ -49,8 +55,8 @@ export type Depenses = { jour: number; payeur: number };
 
 const micros = (dollars: number) => Math.round(dollars * 1e6);
 
-/** Le budget du jour de ce payeur, en millionièmes de dollar. */
-export const plafondDe = (payeur: Payeur): number => micros(payeur ? BUDGET_IA.compte : BUDGET_IA.anonyme);
+/** Le budget du jour de ce payeur, en millionièmes de dollar : le compte des convs de tournage a le sien. */
+export const plafondDe = (payeur: Payeur): number => micros(payeur === cleDuCompte(COMPTE_DU_TOURNAGE) ? BUDGET_IA.tournage : payeur ? BUDGET_IA.compte : BUDGET_IA.anonyme);
 
 /** Quel budget est épuisé (celui de tous d’abord), ou null : l’appel peut partir. */
 export function budgetEpuise({ jour, payeur: duPayeur }: Depenses, payeur: Payeur): "jour" | "compte" | "anonyme" | null {

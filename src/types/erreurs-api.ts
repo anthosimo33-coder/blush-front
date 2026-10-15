@@ -40,6 +40,11 @@ export const ERREURS_API = {
   occupe: 409,
   /** Une alerte de danger (le mode sobre) : le verdict ne se partage pas. */
   sobre: 409,
+  /**
+   * Le mode tournage arrêté (src/server/tournage.ts) : ce navigateur garde un lien de tournage arrêté, ou le compte est
+   * celui d’une créatrice. Aucune vraie lecture ne part : elle doit rouvrir le nouveau lien de l’équipe.
+   */
+  tournage: 409,
   /** Rien à payer : le rapport de cette conv est déjà débloqué, ou le compte est de l’équipe. */
   deja: 409,
   /** Pas encore payé : sa fiche (un client), la chute d’un chapitre (le rapport débloqué). */

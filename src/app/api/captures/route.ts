@@ -9,7 +9,9 @@ import { importerCaptures } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
-import { brouillonDeTournage, tournageDuNavigateur } from "@/server/tournage";
+import { brouillonDeTournage, lecturePayeeRefusee, tournageDuNavigateur } from "@/server/tournage";
+import { utilisateurDeSession } from "@/server/auth";
+import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { noterAuFil } from "@/server/visites";
 
@@ -49,6 +51,8 @@ async function traiter(req: Request) {
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
   /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, le brouillon reprend la conv de tournage, sans compter d’import */
   const tournage = await tournageDuNavigateur();
+  /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
+  if (!tournage && (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession())))) return erreur("tournage");
   const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {
     if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: images.length, secret, consentement });
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
