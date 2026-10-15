@@ -27,6 +27,7 @@ vi.mock("@/server/alertes", async (original) => ({
 
 import { GET, POST, PUT } from "@/app/api/fiche/route";
 import { ouvrirSession } from "@/server/auth";
+import { soldeDe } from "@/server/bulles";
 import { db, schema } from "@/server/db";
 import { ErreurTache } from "@/server/erreurs";
 import { contexteDe } from "@/server/histoires";
@@ -36,11 +37,13 @@ import { getFiche, getFicheEtMaj } from "@/services/serveur";
 import type { Fiche, FicheUpdate } from "@/types";
 import { echange } from "./aide/fabriques";
 import { texteDeConv } from "./aide/fichiers";
-import { avecFactice, compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { avecFactice, compteDeTest, donnerDesBulles, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 /* Les étapes demandées au modèle (factice) pendant les tests */
 const taches: string[] = [];
 let id = "";
+/* Son compte : ses bulles */
+let compte = "";
 
 const requete = (init: RequestInit = {}) =>
   new Request("http://localhost/api/fiche", { ...init, headers: { origin: "http://localhost", "x-forwarded-host": "localhost", ...init.headers } });
@@ -65,6 +68,7 @@ const majDuChat = () => planifier(id, "memoire_maj", echange(1, { dit: "on s’e
 facticePourChaqueTest((req: Requete) => (taches.push(req.tache), fournisseurFactice(req)));
 beforeAll(async () => {
   const u = await compteDeTest("fiche-async", "debloque");
+  compte = u.id;
   id = (await histoireLue(u, "01-a-deux-doigts.txt", { qui: { moi: "Hugo" } })).id;
   await lancerApres();
   etat.cookies.set("blush-session", (await ouvrirSession(u.id)).secret);
@@ -113,6 +117,17 @@ describe("ajouter des captures à sa fiche", () => {
     const apres = await lire();
     expect(apres.updating).toBeUndefined();
     expect(apres.facts.find((f) => f.text === "Étudiante en droit à Lyon")).toMatchObject({ sourceLabel: expect.stringMatching(/^son profil · /) });
+  });
+
+  it("lire des captures pour sa fiche ne coûte aucune bulle : la fiche est offerte, tant que le produit n’en a pas décidé autrement (SUIVI-1)", async () => {
+    const avant = await donnerDesBulles({ id: compte }, 5);
+    const fd = new FormData();
+    fd.append("captures", new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(60)])], "profil.jpg", { type: "image/jpeg" }));
+    taches.length = 0;
+    expect((await POST(requete({ method: "POST", body: fd }))).status).toBe(200);
+    expect(taches).toEqual(["01-captures"]);
+    expect(await soldeDe(compte)).toBe(avant);
+    await lancerApres();
   });
 
   it("corriger sa fiche pendant une mise à jour : la réponse le dit, et la mise à jour garde la correction", async () => {

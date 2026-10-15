@@ -97,7 +97,7 @@ export async function reserverEchange(): Promise<IdsDeLEchange> {
 }
 
 /**
- * Ce que coûte la réponse, réglé par la route (src/app/api/chat/route.ts) : le débit est fait avant que BLUSH écrive.
+ * Ce que coûte la réponse, réglé par payer (src/server/paiement-chat.ts, pour POST /api/chat) : le débit est fait avant que BLUSH écrive.
  * `ids` : ceux de l’échange (le débit porte celui de la réponse). `verrouillee` : le solde ne la couvre pas, elle s’écrit
  * mais reste en base (ni ses bulles en flux, ni ce qui se paie, ni son vocal ne partent), au coût `cout`. `ecrit` :
  * sans voix (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce

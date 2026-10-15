@@ -47,6 +47,10 @@ export const PUT = route("PUT /api/fiche", async (req: Request) => {
 /**
  * Des captures (son profil, leur conv) ou un nouvel export, pour sa fiche : BLUSH les lit et répond avec ce qu’il a lu ;
  * sa mémoire se met à jour après la réponse (ajouterALaFiche), et la fiche se relit jusqu’à ce que ce soit fait.
+ * Sans bulle : la fiche est offerte (COUT_EN_BULLES, src/contenu/offres.ts, et les conditions de vente), seule la limite
+ * « ajout » du compte borne ces lectures, alors que le même envoi coûte 3 bulles dans le chat.
+ * TODO(produit): lire des captures ou un export pour la fiche doit-il coûter des bulles (3, comme dans le chat) ? Si oui,
+ * le paiement du chat (payer, src/server/paiement-chat.ts) se réutilise ici, et les conditions de vente changent.
  */
 async function traiter(req: Request) {
   const g = await garde(req, { session: "requise", client: true, histoire: true });
