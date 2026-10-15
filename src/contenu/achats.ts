@@ -25,6 +25,13 @@ export const TES_ACHATS = {
   pied: "Le reçu de chaque paiement t’a été envoyé par email.",
   /** Les bulles qu’un achat a données, après son jour. */
   bulles: (n: number) => `+${n} bulles`,
+  /** Le rapport d’avance : ce qu’il en est (SUP14-2). */
+  avanceUtilisee: (jour: string) => `utilisé le ${jour}`,
+  avanceValable: (jour: string) => `valable jusqu’au ${jour}`,
+  /** Tant qu’il n’a pas servi, dans les 14 jours : s’en rétracter (les conditions, « livraison »), par un mail tout prêt. */
+  retracter: "Me rétracter",
+  retracterSujet: "Rétractation de mon rapport d’avance",
+  retracterCorps: (achat: string) => `Bonjour,\n\nJe me rétracte de mon rapport d’avance, pas encore utilisé (achat ${achat}). Merci de me rembourser.\n`,
 };
 
 /** L’état d’un achat, à côté de son montant. */

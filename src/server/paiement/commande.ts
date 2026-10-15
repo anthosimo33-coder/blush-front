@@ -98,7 +98,12 @@ async function enUnGeste(f: Fournisseur, compte: Compte, achat: Achat, retour: s
       moyen: moyen.moyenId,
       retour,
     });
-    return { achat: achat.id, checkout: null, url: p.confirmer, paiement: null };
+    /*
+     * Le paiement créé est rendu (ARG-3) : l’écran le suit avec son identifiant, que le serveur vérifie chez Whop si le
+     * webhook tarde, comme un paiement dans la feuille. Sa clé n’est jamais donnée (rien à finir dans le navigateur) :
+     * une confirmation de la banque se fait sur la page de Whop (`url`).
+     */
+    return { achat: achat.id, checkout: null, url: p.confirmer, paiement: { id: p.id, statut: p.confirmer ? "requires_action" : "en_cours", secret: null } };
   } catch (e) {
     /*
      * Seul un refus net de Whop (4xx : rien n’a été débité) passe à une page de paiement. Sans réponse, une réponse

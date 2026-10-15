@@ -28,7 +28,10 @@ export type Achat = typeof schema.achats.$inferSelect;
 
 const a = schema.achats;
 
-/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
+/** Le délai de rétractation d’un rapport d’avance pas encore utilisé : 14 jours après son achat (les conditions, « livraison »). */
+const RETRACTATION_MS = 14 * 24 * 3600e3;
+
+/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée, la conv est en alerte, ou trop de paiements attendent déjà. */
 export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
 
 /**
@@ -388,10 +391,22 @@ const ACHATS_MONTRES = 100;
  */
 export async function achatsDuCompte(userId: string): Promise<AchatDuCompte[]> {
   const lignes = await db()
-    .select({ id: a.id, offre: a.offre, centimes: a.centimes, bulles: a.bulles, statut: a.statut, payeLe: a.payeLe })
+    .select({ id: a.id, offre: a.offre, centimes: a.centimes, bulles: a.bulles, statut: a.statut, payeLe: a.payeLe, utiliseLe: a.utiliseLe })
     .from(a)
     .where(and(eq(a.userId, userId), isNotNull(a.payeLe)))
     .orderBy(desc(a.payeLe), desc(a.creeLe))
     .limit(ACHATS_MONTRES);
-  return lignes.map(({ payeLe, ...l }) => ({ ...l, le: payeLe!.toISOString() }));
+  return lignes.map(({ payeLe, utiliseLe, ...l }) => {
+    const le = payeLe!;
+    /* Le rapport d’avance : jusqu’à quand il vaut, quand il a servi, et le délai de rétractation tant qu’il attend (SUP14-2) */
+    const avance =
+      l.offre === RAPPORT_D_AVANCE.offre
+        ? {
+            fin: new Date(le.getTime() + RAPPORT_D_AVANCE.dureeMs).toISOString(),
+            utiliseLe: utiliseLe?.toISOString() ?? null,
+            retractation: utiliseLe || Date.now() - le.getTime() > RETRACTATION_MS ? null : new Date(le.getTime() + RETRACTATION_MS).toISOString(),
+          }
+        : undefined;
+    return { ...l, le: le.toISOString(), ...(avance && { avance }) };
+  });
 }

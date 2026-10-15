@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { CATALOGUE, DUREE_GARDE_MS, livreeAuPaiement, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, DEBLOQUE, OFFRE_GARDE, OFFRE_PREMIUM_AJOUT, OFFRE_SECOND } from "@/contenu/paiement";
@@ -10,7 +10,7 @@ import { jourEnLettres } from "@/lib/format";
 import { codeDe } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { cheminDe } from "@/lib/navigation";
-import { attendreLaLivraison, noterLaSuite, versLeRetour } from "@/lib/paiement";
+import { attendreLaLivraison, noterLaSuite, useLibererAuRetour, versLeRetour } from "@/lib/paiement";
 import { apresDeblocage } from "@/lib/requetes";
 import { useSoundOnce } from "@/lib/sound";
 import { commencerPaiement, proposerOffreUnique } from "@/services/api";
@@ -78,24 +78,33 @@ function useEnUnGeste({ ici, passee }: { ici: string; passee: () => void }) {
   const renonciation = useAccord();
   const [occupe, setOccupe] = useState(false);
   const [refus, setRefus] = useState<"carte" | "souci" | null>(null);
+  /* Revenu de la page de Whop (ou de la confirmation de la banque) par « Retour » : le bouton se libère */
+  useLibererAuRetour(useCallback(() => setOccupe(false), []));
   const payer = async (offre: OffreId): Promise<EtatAchat | null> => {
     if (!renonciation.exiger()) return null;
     setOccupe(true);
     setRefus(null);
+    /* Parti vers une autre page : le bouton reste occupé jusqu’au départ, un second toucher paierait deux fois (UIQ-1) */
+    let parti = false;
     try {
       /* La renonciation part avec le geste, sauf pour le rapport d’avance, livré à son usage */
       const r = await commencerPaiement(offre, livreeAuPaiement(offre));
       noterLaSuite(r.achat, ici);
       if (r.url) {
+        parti = true;
         /* La page de Whop est un autre site ; le faux Whop, une page de l’appli */
         if (/^https?:\/\//.test(r.url)) window.location.assign(r.url);
         else router.push(r.url as Route);
         return null;
       }
-      const e = await attendreLaLivraison(r.achat, null);
+      /* Le paiement créé, quand le serveur le donne : vérifié chez Whop si le webhook tarde (ARG-3) */
+      const paiement = r.paiement?.id ?? null;
+      const e = await attendreLaLivraison(r.achat, paiement);
       if (e === "echoue") setRefus("carte");
-      else if (e === null) router.replace(versLeRetour(r.achat, null));
-      else apresDeblocage();
+      else if (e === null) {
+        parti = true;
+        router.replace(versLeRetour(r.achat, paiement));
+      } else apresDeblocage();
       return typeof e === "object" && e ? e : null;
     } catch (e) {
       const code = codeDe(e);
@@ -105,7 +114,7 @@ function useEnUnGeste({ ici, passee }: { ici: string; passee: () => void }) {
       else setRefus("souci");
       return null;
     } finally {
-      setOccupe(false);
+      if (!parti) setOccupe(false);
     }
   };
   return { renonciation, occupe, refus, payer };
