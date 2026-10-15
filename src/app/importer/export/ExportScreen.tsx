@@ -94,7 +94,12 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       return;
     }
     if (!monte.current) return;
-    setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false });
+    /*
+     * Une nouvelle conv : « qui est toi » se redemande. Ses « p0 »/« p1 » sont ceux de cette conv-ci, et celui d’une conv
+     * d’avant (un mauvais fichier, puis le retour arrière) cocherait n’importe qui, « Continuer » déjà actif : tout le
+     * rapport à l’envers
+     */
+    setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false, me: null });
     router.push("/importer/ok");
   };
 
