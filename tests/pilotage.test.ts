@@ -109,15 +109,8 @@ describe("la source d’un compte et le fil du direct", () => {
   });
 });
 
-/**
- * Le temps de ce test : il calcule quatre fois tout le pilotage (statsAdmin), qui parcourt les tables entières, pannes et
- * visites des créatrices comprises. Seul, il dure 0,2 s ; au milieu de la suite, qui écrit en même temps dans la même
- * base, il a dépassé les 5 s par défaut sur la CI.
- */
-const PILOTAGE_MS = 30_000;
-
 describe("le pilotage (/admin)", () => {
-  it("l’argent net, les acheteurs, les rachats, les sources et ce qui se vend, sur la période et celle d’avant", { timeout: PILOTAGE_MS }, async () => {
+  it("l’argent net, les acheteurs, les rachats, les sources et ce qui se vend, sur la période et celle d’avant", async () => {
     const avant = (await statsAdmin(7)).pilotage;
     const ip = ipNeuve();
     await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "accueil", premier: true, utm: "snapchat" });
