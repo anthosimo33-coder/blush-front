@@ -8,6 +8,7 @@ import { codePublic, ERREURS_API, type CodeErreur } from "@/types/erreurs-api";
 import { alerter } from "./alertes";
 import { ErreurPublique, ErreurTache, estBudget } from "./erreurs";
 import { journal, journalErreur } from "./journal";
+import { signalerUnePanne } from "./pannes";
 
 /*
  * Les réponses des routes /api : du JSON, celui que dit leur ligne du contrat (src/types/api.ts), et des erreurs qui ne
@@ -57,9 +58,11 @@ export type ContexteDErreur = { route?: CleRoute; alerte?: AlerteDErreur };
  * Ce que l’équipe apprend d’une erreur levée pendant une route, jamais son message ni ses détails : le message d’une
  * erreur SQL cite ses paramètres (un email), celui d’un JSON illisible un morceau du contenu. Une ErreurPublique est
  * attendue : rien. Une erreur d’étape : son code interne (« refus:cyber », « delai »), au journal, et à l’équipe avec
- * `alerte` ; sauf le budget de l’IA atteint, dont l’équipe est déjà prévenue (src/server/budget.ts). Le reste : son nom
- * et son code seulement (« DrizzleQueryError », « ErreurInvariant » et « stories:curseur:aucune_ligne », journalErreur,
- * src/server/journal.ts). Chaque ligne nomme la route (`route`, sa clé du contrat).
+ * `alerte` ; sauf le budget de l’IA atteint, dont l’équipe est déjà prévenue (src/server/budget.ts). Le reste, une
+ * panne : son nom et son code seulement (« DrizzleQueryError », « ErreurInvariant » et « stories:curseur:aucune_ligne »,
+ * journalErreur, src/server/journal.ts), puis, avec la clé de la route, comptée pour le jour et à l’équipe si c’est sa
+ * première du jour (signalerUnePanne, src/server/pannes.ts). Chaque ligne nomme la route (`route`, sa clé du contrat).
+ * La ligne du journal s’écrit tout de suite (avant la première attente) ; la promesse ne rejette jamais.
  */
 export async function signalerErreur(e: unknown, { route, alerte }: ContexteDErreur = {}): Promise<void> {
   if (e instanceof ErreurPublique) return;
@@ -69,17 +72,32 @@ export async function signalerErreur(e: unknown, { route, alerte }: ContexteDErr
     return;
   }
   journalErreur("route /api en panne", e, { route });
+  if (route) await signalerUnePanne(route, e, "route");
+}
+
+/**
+ * Un travail lancé pendant la réponse et qui doit finir après elle (compter une panne, l’alerte) : after() garde la
+ * fonction en vie jusqu’à sa fin sur Vercel. Hors d’une requête (un test qui appelle reponseErreur seul), after() lève :
+ * le travail va alors à son terme sans lui.
+ */
+function jusquAuBout(travail: Promise<void>): void {
+  try {
+    after(() => travail);
+  } catch {
+    /* Hors d’une requête : rien à garder en vie, la promesse court seule (elle ne rejette jamais) */
+  }
 }
 
 /**
  * La réponse d’une erreur levée pendant une route, la même partout : son code (codeDErreur), sans rien d’interne. Elle
  * est signalée (signalerErreur, avec la clé de la route) ; `alerte` : une erreur d’étape part aussi à l’équipe, une fois
- * la réponse envoyée. Les erreurs de Next lui-même (redirect, notFound, le rendu dynamique) repartent telles quelles.
+ * la réponse envoyée. Une panne s’écrit au journal tout de suite, puis se compte (et alerte) pendant que la réponse part.
+ * Les erreurs de Next lui-même (redirect, notFound, le rendu dynamique) repartent telles quelles.
  */
 export function reponseErreur(e: unknown, { route, alerte }: ContexteDErreur = {}): Response {
   unstable_rethrow(e);
   if (alerte && e instanceof ErreurTache) after(() => signalerErreur(e, { route, alerte }));
-  else void signalerErreur(e, { route });
+  else jusquAuBout(signalerErreur(e, { route }));
   return erreur(codeDErreur(e));
 }
 

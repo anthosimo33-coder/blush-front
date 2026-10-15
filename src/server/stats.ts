@@ -5,6 +5,7 @@ import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/conte
 import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
+import { PANNE } from "./compteurs";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
@@ -40,7 +41,11 @@ export type StatsAdmin = {
   activite: { jour: string; imports: number; verdicts: number; rapports: number }[];
   partage: { ouvertures: number; liens: number; apercus: number; visites: number; essais: number; imports: number; actifs: number };
   couts: { total: number; avant: number; parRapport: number | null; parVerdict: number | null; postes: { nom: string; dollars: number; appels: number }[] };
-  sante: { echecs: { code: string; n: number }[]; enCours: number; bloquees: number; enAttente: number };
+  /**
+   * `pannes` : les lieux des pannes du serveur sur la période (une route /api par sa clé, une page par son fichier), par
+   * jours de Paris entiers (la période de 24 h : aujourd’hui), les plus nombreuses d’abord (src/server/pannes.ts).
+   */
+  sante: { echecs: { code: string; n: number }[]; pannes: { lieu: string; n: number }[]; enCours: number; bloquees: number; enAttente: number };
   beta: {
     fermee: boolean;
     invites: number | "tous";
@@ -122,10 +127,12 @@ export type Pilotage = {
   iaDuJour: { dollars: number; budget: number };
   /**
    * Ce qui coince sur la période : les tâches en échec, celles bloquées en ce moment, les paiements refusés (un achat
-   * resté en attente, lui, est surtout un paiement abandonné), et les réponses de BLUSH sorties en alerte danger (leurs
-   * bulles rendues).
+   * resté en attente, lui, est surtout un paiement abandonné), les réponses de BLUSH sorties en alerte danger (leurs
+   * bulles rendues), et les pannes du serveur (une route /api qui répond « panne », une page qui plante :
+   * src/server/pannes.ts), comptées par jour de Paris : sur la période en jours entiers (sur 24 h, aujourd’hui), et
+   * aujourd’hui.
    */
-  sante: { echecs: number; bloquees: number; paiementsEchoues: number; alertes: number };
+  sante: { echecs: number; bloquees: number; paiementsEchoues: number; alertes: number; pannes: number; pannesDuJour: number };
   /** Le premier jour où les visites se comptent (AAAA-MM-JJ), ou null : aucune encore. */
   suiviDepuis: string | null;
 };
@@ -271,7 +278,17 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
       parVerdict: verdicts.valeur ? dollars(coutDe((t) => t === "verdict")) / verdicts.valeur : null,
       postes: postes.filter((p) => p.appels > 0).sort((a, b) => b.dollars - a.dollars),
     },
-    sante: { echecs: echecs.map((r) => ({ code: r.code, n: n(r.n) })), enCours: n(taches.en_cours), bloquees: n(taches.bloquees), enAttente: n(taches.attente) },
+    sante: {
+      echecs: echecs.map((r) => ({ code: r.code, n: n(r.n) })),
+      pannes: compteurs
+        .filter((r) => r.key.startsWith(PANNE))
+        .map((r) => ({ lieu: r.key.slice(PANNE.length), n: n(r.total) }))
+        .sort((a, b) => b.n - a.n || a.lieu.localeCompare(b.lieu))
+        .slice(0, 8),
+      enCours: n(taches.en_cours),
+      bloquees: n(taches.bloquees),
+      enAttente: n(taches.attente),
+    },
     beta: {
       fermee: env().BLUSH_BETA_FERMEE,
       invites: invites === "*" ? "tous" : invites.length,
@@ -310,7 +327,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
-  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, suivi] = await Promise.all([
+  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
@@ -353,6 +370,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
             (select count(*) from mouvements_bulles where raison = 'rendu' and ${W("cree_le")}) as alertes`,
     ),
+    ligne<{ periode: string | null; jour: string | null }>(
+      sql`select sum(count) filter (where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as periode,
+            sum(count) filter (where day = (now() at time zone 'Europe/Paris')::date) as jour
+          from counters where key like ${`${PANNE}%`}`,
+    ),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from visites`),
   ]);
 
@@ -386,7 +408,14 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
     mix: GROUPES_D_OFFRES.map((groupe) => ({ groupe, ...groupes.get(groupe)! })),
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour },
-    sante: { echecs: n(sante.echecs), bloquees: n(sante.bloquees), paiementsEchoues: n(sante.echoues), alertes: n(sante.alertes) },
+    sante: {
+      echecs: n(sante.echecs),
+      bloquees: n(sante.bloquees),
+      paiementsEchoues: n(sante.echoues),
+      alertes: n(sante.alertes),
+      pannes: n(pannes.periode),
+      pannesDuJour: n(pannes.jour),
+    },
     suiviDepuis: suivi.depuis,
   };
 }
