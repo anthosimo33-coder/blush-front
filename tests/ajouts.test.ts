@@ -135,6 +135,28 @@ describe("après l’import : le chat et sa fiche", () => {
     await expect(depuisExport(await ligneEnBase(id), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({ code: "rien_de_neuf" });
   });
 
+  it("le message suivant peut citer un message de l’envoi d’avant, que la mémoire n’a pas encore relu : un seul appel, la citation montrée", async () => {
+    const id = await convLue();
+    const memoire = (await memoireDe(id))!;
+    const ajout = await depuisExport(await ligneEnBase(id), memoire, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
+    await repondre(await ligneEnBase(id), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
+    /* Sa mise à jour n’est pas passée : la mémoire ne connaît pas la ligne que le modèle cite, seul le fil la remontre */
+    const citee = ajout.lignes.at(-1)!;
+    const cite = /^m\d+/.exec(citee)![0];
+    expect(new Map((await memoireDe(id))!.lignes).has(cite)).toBe(false);
+    let appels = 0;
+    const { reponse } = await avecFactice(
+      (req) => {
+        if (req.tache !== "10-chat") return fournisseurFactice(req);
+        appels++;
+        return { ...(fournisseurFactice(req) as Record<string, unknown>), lecture: [{ texte: "elle te relance", preuves: [cite] }] };
+      },
+      async () => repondre(await ligneEnBase(id), (await memoireDe(id))!, "et son dernier message ?"),
+    );
+    expect(appels).toBe(1);
+    expect(reponse.kind === "bubbles" && reponse.bubbles.map((b) => [b.text, b.messages?.length ?? 0])).toEqual([["elle te relance", 1]]);
+  });
+
   describe("après un nouvel export, envoyé dans le chat puis relu par la mémoire", () => {
     let id = "";
     /** L’export ajouté par le beforeAll : ses lignes, numérotées à la suite de la conv. */

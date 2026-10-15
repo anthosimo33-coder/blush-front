@@ -64,7 +64,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
   /*
    * La dernière question qui n’a pas eu de réponse, et sa clé : renvoyée telle quelle (« Réessayer »), elle repart avec
    * la même. Le réseau coupé pendant que BLUSH écrit ne l’arrête pas côté serveur : la réponse s’y écrit et se paie, et
-   * le serveur la rend au nouvel essai sans la débiter de nouveau (src/app/api/chat/route.ts). Une autre question a sa clé
+   * le serveur la rend au nouvel essai sans la débiter de nouveau (src/server/paiement-chat.ts). Une autre question a sa clé
    */
   const enSouffrance = useRef<{ question: string; cle: string } | null>(null);
   const first = useRef(true);

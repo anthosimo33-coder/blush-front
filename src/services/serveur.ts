@@ -146,12 +146,17 @@ export async function getRetour(): Promise<{ destination: Route } | null> {
  * Connecté sans conv (il a effacé la seule) : `sansConv`, la landing montre alors « Mon compte » (cta.ts).
  */
 export async function getRetourDeLaLanding(): Promise<{ destination: Route } | { sansConv: true } | null> {
-  const retour = await getRetour();
   const { utilisateur, story } = await contexte();
-  if (!retour) return utilisateur && !story ? { sansConv: true } : null;
-  if (retour.destination !== "/app") return retour;
-  if (!utilisateur || !story || rapportOuvert(story, utilisateur) || (await nombreDeConvs()) < 2) return retour;
-  return { destination: "/app/convs" };
+  if (!utilisateur) return null;
+  if (!story) return { sansConv: true };
+  if (!quiRempli(metaDe(story))) return { destination: "/qui" };
+  /*
+   * Les deux lectures en même temps (PERF-4) : la landing d’un habitué attend la base avant de s’afficher, une fois
+   * plutôt que deux. Ses convs ne se comptent que si le rapport n’est pas débloqué (le seul cas où elles comptent)
+   */
+  const [lue, convs] = await Promise.all([finDeLecture(story.id), rapportOuvert(story, utilisateur) ? 0 : nombreDeConvs()]);
+  if (!lue) return { destination: "/lecture" };
+  return { destination: convs >= 2 ? "/app/convs" : "/app" };
 }
 
 /**

@@ -204,7 +204,12 @@ function parametres(req: Requete, schema: z.ZodType) {
   return {
     model: MODELE,
     max_tokens: reglage.maxTokens,
-    thinking: { type: "adaptive" as const },
+    /*
+     * La réflexion résumée : sur notre modèle, elle arrive vide par défaut (« omitted »), et les jauges de lecture et
+     * d’écriture, qui avancent sur sa longueur (suivreFlux, src/server/avancement.ts), resteraient figées jusqu’aux
+     * premiers mots. Le résumé ne coûte rien de plus (la réflexion est facturée pareil), et son texte ne sort pas d’ici
+     */
+    thinking: { type: "adaptive" as const, display: "summarized" as const },
     output_config: { effort: req.effort ?? reglage.effort, format: formatDeSortie(schema) },
     system: [{ type: "text" as const, text: SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
     messages: [

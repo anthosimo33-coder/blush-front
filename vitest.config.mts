@@ -100,6 +100,11 @@ export default defineConfig({
            * avant chaque test, et ce que les fixtures créent est effacé à la fin du fichier (tests/aide/isolation.ts).
            */
           fileParallelism: false,
+          /*
+           * 15 s par test plutôt que 5 : en CI, les projets unit et client tournent en même temps sur la petite machine, et un test
+           * qui calcule tout /admin (statsAdmin, une cinquantaine de requêtes) y a dépassé les 5 s, quand il dure 0,1 s en local
+           */
+          testTimeout: 15_000,
           restoreMocks: true,
           setupFiles: ["tests/aide/isolation.ts"],
         },

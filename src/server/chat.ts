@@ -97,7 +97,7 @@ export async function reserverEchange(): Promise<IdsDeLEchange> {
 }
 
 /**
- * Ce que coûte la réponse, réglé par la route (src/app/api/chat/route.ts) : le débit est fait avant que BLUSH écrive.
+ * Ce que coûte la réponse, réglé par payer (src/server/paiement-chat.ts, pour POST /api/chat) : le débit est fait avant que BLUSH écrive.
  * `ids` : ceux de l’échange (le débit porte celui de la réponse). `verrouillee` : le solde ne la couvre pas, elle s’écrit
  * mais reste en base (ni ses bulles en flux, ni ce qui se paie, ni son vocal ne partent), au coût `cout`. `ecrit` :
  * sans voix (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce
@@ -215,7 +215,13 @@ export async function repondre(
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
   const nouvelles = ajout?.ajout.lignes ?? [];
-  const lignes = new Map([...memoire.lignes, ...parIdentifiant(nouvelles)]);
+  const leFil = await fil(story.id);
+  /*
+   * Ce qu’il peut citer : les lignes de la mémoire, celles qu’il vient d’envoyer, et celles des envois précédents que le
+   * fil lui remontre avec leurs identifiants (la mémoire ne garde que celles qu’elle cite, et sa mise à jour n’est peut-être
+   * pas encore passée). Sans elles, une citation d’un envoi précédent serait introuvable : appel rejoué, citation perdue
+   */
+  const lignes = new Map([...parIdentifiant(leFil.flatMap((x) => x.lignes ?? [])), ...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
   const jour = aujourdhuiParis();
   /* Une réponse sans voix (verrouillée, ou le solde ne couvrait pas un vocal) s’écrit : le modèle ne prépare pas de texte dit */
@@ -231,7 +237,7 @@ export async function repondre(
     lignes,
     editions: editionsBornees(memoire.editions),
     style: ctx.style,
-    fil: await fil(story.id),
+    fil: leFil,
     dit,
     ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
     vocal: vocalAttendu,
