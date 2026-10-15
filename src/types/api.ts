@@ -140,6 +140,15 @@ export type OffreUniqueMontree = { offre: OffreProposee; fin: string | null; res
 /** Le webhook que le faux Whop fabrique (BLUSH_PAIEMENT_FACTICE) : son corps et ses en-têtes signés, que le navigateur poste à /api/paiement/whop ; puis l’adresse du retour. */
 export type WebhookDuFauxWhop = { webhook: { corps: string; entetes: Record<string, string> }; retour: string | null };
 
+/** Où en est la lecture d’une conv de tournage (src/server/tournage.ts) : en route, prête à rejouer, ou en échec pour de bon. */
+export type StatutDuTournage = "en_lecture" | "pret" | "echec";
+
+/**
+ * Une conv de tournage vue par l’API du mode tournage (GET /api/admin/tournage/[id]) : sa lecture (`erreur` : l’étape en
+ * échec et son code, ou « alerte »), et son lien, l’adresse entière, une fois prête et tant qu’elle n’est pas arrêtée.
+ */
+export type ConvDeTournage = { id: string; nom: string; statut: StatutDuTournage; erreur: string | null; lien: string | null; arrete: boolean };
+
 /**
  * Pourquoi une conv ne devient pas une conv de tournage (src/server/tournage.ts) : elle n’est pas au compte de l’équipe
  * qui la choisit (ou c’est déjà une prise), elle n’est pas lue, une étape est encore en route, son rapport n’est pas
@@ -240,6 +249,10 @@ export type CibleImage = z.input<typeof Cible>;
 type Reponses = {
   "POST /api/admin": GesteDeLEquipe;
   "GET /api/admin/direct": Direct;
+  /** Une conv de tournage préparée (ou retrouvée par sa `ref` : `nouvelle` faux), sa lecture lancée. */
+  "POST /api/admin/tournage": { id: string; nouvelle: boolean; statut: StatutDuTournage };
+  "GET /api/admin/tournage/[id]": ConvDeTournage;
+  "POST /api/admin/tournage/[id]/arreter": { arretee: boolean };
   "GET /api/analyse": AnalysisProgress;
   "POST /api/analyse": Ok;
   "POST /api/attente": Ok;
@@ -329,6 +342,24 @@ export const ROUTES = {
     ]),
   },
   "GET /api/admin/direct": {},
+  /*
+   * L’API du mode tournage, pour l’outil des créatrices (sa clé : Authorization: Bearer BLUSH_TOURNAGE_CLE) : un lien à
+   * préparer depuis le .txt de la créatrice (son nom, le fichier, son prénom dans le fichier, ses réponses à « Qui
+   * es-tu ? », et sa mission : `ref`), puis son statut, et l’arrêter
+   */
+  "POST /api/admin/tournage": {
+    corps: z.object({
+      nom: z.string().trim().min(1).max(NOM_TOURNAGE_MAX),
+      fichier: z.string().min(1),
+      moi: z.string().trim().min(1).max(PRENOM_MAX),
+      pronom: z.enum(PRONOMS).default("elle"),
+      devinette: z.enum(GUESSES).default("vus"),
+      objectif: z.enum(GOALS).default("ensemble"),
+      ref: z.string().trim().min(1).max(200).optional(),
+    }),
+  },
+  "GET /api/admin/tournage/[id]": {},
+  "POST /api/admin/tournage/[id]/arreter": {},
   "GET /api/analyse": {},
   /* « Qui es-tu ? » rempli (depuis /qui, ou le code reçu par email), ou rien : une relance, depuis l’écran de lecture */
   "POST /api/analyse": { corps: z.union([Qui, z.strictObject({})]) },

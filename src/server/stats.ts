@@ -5,6 +5,7 @@ import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/conte
 import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
+import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
 import { PANNE } from "./compteurs";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
@@ -161,12 +162,17 @@ const POSTES: [string, (tache: string) => boolean][] = [
 /*
  * Les prises du mode tournage (src/server/tournage.ts) ne comptent pas : une créatrice qui filme n’est ni un import, ni
  * un verdict, ni un rapport du tunnel. Une conv en est une prise si elle porte sa conv de tournage, ou l’heure de sa
- * relecture (sa conv de tournage effacée depuis). En SQL brut : `stories` sous son nom, ou sous l’alias `s`.
+ * relecture (sa conv de tournage effacée depuis) ; la conv lue une fois pour un lien (la source d’une conv de tournage)
+ * n’en est pas une vraie non plus. En SQL brut : `stories` sous son nom, ou sous l’alias `s`. Les comptes des créatrices
+ * (une prise, ou un brouillon de tournage) et celui des convs de tournage ne comptent pas parmi les comptes, et leur chat
+ * ne compte pas.
  */
-const VRAIE_CONV = "tournage_id is null and tournage_le is null";
-const VRAIE_CONV_S = "s.tournage_id is null and s.tournage_le is null";
+const VRAIE_CONV = "tournage_id is null and tournage_le is null and not exists (select 1 from tournages t where t.story_id = stories.id)";
+const VRAIE_CONV_S = "s.tournage_id is null and s.tournage_le is null and not exists (select 1 from tournages t where t.story_id = s.id)";
 /** La conv de la ligne (sa colonne `story_id`) n’est pas une prise du mode tournage. */
 const DUNE_VRAIE_CONV = (col: string) => `${col} in (select id from stories where ${VRAIE_CONV})`;
+/** Le compte n’est ni celui d’une créatrice, ni celui des convs de tournage (COMPTE_DU_TOURNAGE). En SQL brut, `users` sous son nom. */
+const VRAI_COMPTE = `email <> '${COMPTE_DU_TOURNAGE}' and not exists (select 1 from stories s where s.user_id = users.id and (s.tournage_id is not null or s.tournage_le is not null))`;
 /** Une étape arrêtée parce que sa conv est une prise du mode tournage n’est pas un échec (src/server/pipeline.ts). */
 const VRAI_ECHEC = "coalesce(error, '') <> 'tournage'";
 
@@ -182,14 +188,14 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   const nbJours = jours === 30 ? 30 : 14;
 
   const [comptes, convs, verdicts, rapports, messages, actifs, parcours, activite, compteurs, liensActifs, couts, coutsAvant, echecs, taches, attente, totaux] = await Promise.all([
-    chiffre("users", "created_at"),
+    chiffre("users", "created_at", VRAI_COMPTE),
     chiffre("stories", "created_at", VRAIE_CONV),
     chiffre("verdicts", "created_at", DUNE_VRAIE_CONV("story_id")),
     chiffre("reports", "updated_at", `data is not null and ${DUNE_VRAIE_CONV("story_id")}`),
-    chiffre("chat_messages", "created_at", "role = 'toi'"),
+    chiffre("chat_messages", "created_at", `role = 'toi' and ${DUNE_VRAIE_CONV("story_id")}`),
     ligne<{ a: string; b: string }>(
       sql`select count(distinct s.user_id) filter (where ${dans("c.created_at")}) as a, count(distinct s.user_id) filter (where ${dans("c.created_at", 1)}) as b
-          from chat_messages c join stories s on s.id = c.story_id where c.role = 'toi'`,
+          from chat_messages c join stories s on s.id = c.story_id where c.role = 'toi' and ${sql.raw(VRAIE_CONV_S)}`,
     ).then((r) => ({ valeur: n(r.a), avant: n(r.b) })),
     ligne<{ importees: string; compte: string; verdict: string; rapport: string; chat: string }>(
       sql`select count(*) as importees,
@@ -224,7 +230,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
           from tasks`,
     ),
     chiffre("waitlist", "created_at"),
-    ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users) as comptes`),
+    ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users where ${sql.raw(VRAI_COMPTE)}) as comptes`),
   ]);
 
   const [ventes, bulles, achats, offresUniques, liste, actions] = await Promise.all([

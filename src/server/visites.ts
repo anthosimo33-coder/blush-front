@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { EtapeVisite, GenreFil, OffreId, SourceVisite } from "@/types";
+import { nomDuCookie } from "@/lib/noms-cookies";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
 import { ipDe } from "./limites";
@@ -152,15 +153,22 @@ function signeAdmis(req: Request, maintenant = Date.now()): boolean {
   return c.n <= SIGNES_PAR_IP.max;
 }
 
+/** Les deux noms du cookie du mode tournage (__Host- en https), lus dans la requête elle-même (src/server/cookies.ts le pose). */
+const COOKIES_DU_TOURNAGE = [nomDuCookie("tournage", true), nomDuCookie("tournage", false)];
+
+/** La requête vient-elle d’un navigateur en mode tournage ? Son cookie, quelle que soit sa valeur (un lien arrêté compris). */
+const enModeTournage = (req: Request) => (req.headers.get("cookie") ?? "").split(";").some((c) => COOKIES_DU_TOURNAGE.includes(c.split("=")[0]!.trim()));
+
 /** Le signe d’un onglet (POST /api/presence) : son identifiant, l’écran, et d’où il vient (son premier signe compte la visite). */
 export type Signe = { onglet: string; etape: EtapeVisite; premier: boolean; utm?: string; referent?: string };
 
 /**
  * Note le signe d’un onglet : sa ligne de la minute (en ligne maintenant, l’écran, la ville), et à son premier signe la
- * visite du jour (une par empreinte) ; une première visite du jour va au fil du direct (« arrive de TikTok »).
+ * visite du jour (une par empreinte) ; une première visite du jour va au fil du direct (« arrive de TikTok »). Un
+ * navigateur en mode tournage (une créatrice qui filme, src/server/tournage.ts) n’est ni une visite, ni dans le direct.
  */
 export async function noterSigne(req: Request, signe: Signe): Promise<void> {
-  if (!signeAdmis(req)) return;
+  if (!signeAdmis(req) || enModeTournage(req)) return;
   const agent = req.headers.get("user-agent");
   const chemin = signe.etape === "partage" ? "/v/" : undefined;
   const source = sourceDe({ utm: signe.utm, referent: signe.referent, chemin, agent });

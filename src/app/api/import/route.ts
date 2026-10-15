@@ -1,6 +1,6 @@
 import { humainRefuse } from "@/server/captcha";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
-import { poserBrouillon } from "@/server/cookies";
+import { lireTournage, poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
 import { importer } from "@/server/histoires";
@@ -48,8 +48,11 @@ export const POST = route("POST /api/import", async (req: Request) => {
     throw e;
   });
   await poserBrouillon(secret);
-  await compterImportVenuDuPartage();
-  await noterAuFil(req, { genre: "import" });
+  /* Une créatrice qui filme (le mode tournage, src/server/tournage.ts) n’est ni un import du direct, ni un import venu d’un partage */
+  if (!(await lireTournage())) {
+    await compterImportVenuDuPartage();
+    await noterAuFil(req, { genre: "import" });
+  }
   const { story, source } = storyEtSource(id, meta);
   return repondre("POST /api/import", { source, story });
 });

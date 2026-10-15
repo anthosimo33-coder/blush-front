@@ -6,7 +6,7 @@ import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/hist
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
 import { etatDesTaches, planifier } from "@/server/taches";
-import { rejouer, tournageDe, tournageDuNavigateur } from "@/server/tournage";
+import { lecturePayeeRefusee, rejouer, tournageDe, tournageDuNavigateur } from "@/server/tournage";
 import { ROUTES } from "@/types/api";
 
 /* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
@@ -44,6 +44,8 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
     const tournage = verdict ? null : story.tournageId ? await tournageDe(story.tournageId) : await tournageDuNavigateur();
     /* Rien à lire : un brouillon de tournage dont la conv de tournage a été effacée depuis n’a pas de conv brute */
     if (!tournage && !verdict && !story.aConv) return erreur("aucune");
+    /* Le lien de tournage arrêté (ou une créatrice sans son lien) : jamais une vraie lecture, qu’elle rouvre le nouveau */
+    if (!tournage && !verdict && (await lecturePayeeRefusee(utilisateur))) return erreur("tournage");
     if (tournage) {
       if (!(await sousLaLimiteDuCompte(utilisateur, "tournage"))) return erreur("trop");
     } else {

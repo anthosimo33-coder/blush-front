@@ -90,6 +90,11 @@ export const Env = z.object({
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). Exigé en production. */
   CRON_SECRET: z.string().min(16).optional(),
   /**
+   * La clé de l’API du mode tournage (POST /api/admin/tournage et la suite : Authorization: Bearer …), que l’outil des
+   * créatrices envoie pour préparer ses liens. Sans elle, l’API répond 401 à tous.
+   */
+  BLUSH_TOURNAGE_CLE: z.string().min(32).optional(),
+  /**
    * Le paiement par Whop (src/server/paiement) : la clé de l’API du compte (une « Account API key », avec ses seules
    * permissions : BACKEND.md, « Mise en ligne »), le secret de son webhook (« ws_… », montré une fois par Whop), le compte
    * (« biz_… ») et le produit sous lequel chaque achat crée son prix (« prod_… »). Les quatre, ou aucune : sans elles (et

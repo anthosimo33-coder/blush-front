@@ -5,7 +5,9 @@ import { erreur, repondre, route } from "@/server/http";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
-import { tournageDuNavigateur } from "@/server/tournage";
+import { lecturePayeeRefusee, tournageDuNavigateur } from "@/server/tournage";
+import { utilisateurDeSession } from "@/server/auth";
+import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 
 /* Un lot de six images : une trentaine de secondes de lecture, une minute au pire */
@@ -39,6 +41,8 @@ async function traiter(req: Request) {
   if (!(await sousLaLimiteDeLIp(req, "lot", LIMITES.lotParIp))) return erreur("trop");
   /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, la fin de l’enregistrement reprend la conv de tournage */
   if (await tournageDuNavigateur()) return repondre("POST /api/captures/lot", { lot: LOT_DU_TOURNAGE });
+  /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
+  if (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession()))) return erreur("tournage");
   const permis = await lecturePermise("lots");
   if (permis !== "ok") return erreur(permis);
   return repondre("POST /api/captures/lot", { lot: await lireLot(images, appli.success ? appli.data : "autre", "captures_video") });

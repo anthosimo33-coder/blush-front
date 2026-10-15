@@ -29,6 +29,7 @@ describe("le serveur", () => {
       pas_pret: 409,
       occupe: 409,
       sobre: 409,
+      tournage: 409,
       deja: 409,
       acces: 402,
       bientot: 402,
