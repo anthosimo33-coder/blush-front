@@ -72,6 +72,19 @@ export const Env = z.object({
     .transform((v) => v === "1"),
   /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */
   BLUSH_ALERTES: z.string().default("").transform(emails),
+  /**
+   * Facultatif : le second canal des alertes, qui ne dépend pas du prestataire de mails (src/server/telegram.ts). Le jeton
+   * du bot Telegram (de @BotFather) et la conversation où il écrit (son identifiant). Sans eux, les alertes ne partent
+   * que par mail : une panne du prestataire de mails coupe alors aussi l’alerte qui devrait la signaler.
+   */
+  TELEGRAM_BOT_TOKEN: z
+    .string()
+    .regex(/^\d+:[\w-]{20,}$/)
+    .optional(),
+  TELEGRAM_CHAT_ID: z
+    .string()
+    .regex(/^-?\d{1,20}$/)
+    .optional(),
   /** Qui peut ouvrir le tableau de bord (/admin) : un ou des emails, séparés par des virgules. Sans elle, ceux de BLUSH_ALERTES. */
   BLUSH_ADMINS: z.string().transform(emails).optional(),
   /** Le secret que Vercel Cron envoie à /api/cron/purge (Authorization: Bearer …). Exigé en production. */

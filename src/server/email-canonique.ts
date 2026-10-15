@@ -57,6 +57,7 @@ export const LIMITES_DU_COMPTE = {
   capturesParCompte: "capturesParCompte",
   lotsParCompte: "lotsParCompte",
   commande: "commandeParCompte",
+  verification: "verificationParCompte",
 } as const satisfies Record<string, keyof typeof LIMITES>;
 
 /** Le nom d’une limite rangée par compte. */

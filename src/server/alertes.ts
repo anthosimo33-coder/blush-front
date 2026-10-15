@@ -3,11 +3,14 @@ import { env } from "./env";
 import { envoyerMail } from "./email";
 import { enLocal, journal, journalErreur } from "./journal";
 import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
+import { envoyerSurTelegram } from "./telegram";
 
 /*
  * Les alertes de l’équipe, par mail (BLUSH_ALERTES) : un échec définitif, un plafond qui approche. Le résumé de chaque
  * nuit part par le même chemin (src/server/veille.ts). Jamais de contenu : des codes d’erreur, des identifiants, des
  * comptes et des coûts. Ce module n’importe ni la voix ni les vocaux : tout ce qui alerte peut l’importer sans cycle.
+ * Le second canal, Telegram (src/server/telegram.ts, s’il est branché), ne dépend pas du prestataire de mails : les
+ * alertes importantes y partent aussi, et toute alerte ou tout résumé dont le mail échoue (OPS-3).
  */
 
 /**
@@ -15,7 +18,7 @@ import { LIMITES, limiteAtteinte, sousLaLimite } from "./limites";
  * les mails (src/server/email.ts) : un refus du prestataire le fait rejeter. En local, sans clé, il s’écrit dans le
  * terminal du serveur de dev.
  */
-export async function envoyerALEquipe(sujet: string, lignes: string[]): Promise<void> {
+export async function envoyerALEquipe(sujet: string, lignes: string[], { aussiSurTelegram = false }: { aussiSurTelegram?: boolean } = {}): Promise<void> {
   const { BLUSH_ALERTES, RESEND_API_KEY } = env();
   if (!BLUSH_ALERTES.length) return;
   if (!RESEND_API_KEY) {
@@ -24,7 +27,15 @@ export async function envoyerALEquipe(sujet: string, lignes: string[]): Promise<
     return;
   }
   /* Dans le quota du prestataire, une alerte passe avant la liste d’attente, après les rapports (plafondsDesMails) */
-  await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") }, { sorte: "alerte" });
+  try {
+    await envoyerMail(BLUSH_ALERTES, { sujet, texte: lignes.join("\n") }, { sorte: "alerte" });
+  } catch (e) {
+    /* Le mail n’est pas parti (le prestataire en panne, sa clé refusée) : Telegram le dit, et dit pourquoi le mail manque */
+    await envoyerSurTelegram([sujet, ...lignes, "", "(Le mail de cette alerte n’est pas parti : le prestataire de mails est peut-être en panne.)"].join("\n"));
+    throw e;
+  }
+  /* Une alerte importante part aussi sur Telegram, même quand le mail passe : elle ne doit pas attendre qu’on lise ses mails */
+  if (aussiSurTelegram) await envoyerSurTelegram([sujet, ...lignes].join("\n"));
 }
 
 /*
@@ -54,7 +65,9 @@ export async function alerter(sujet: string, lignes: string[], { importante = fa
       journal("alerte retenue", { sujet }, "alerte");
       return;
     }
-    await envoyerALEquipe(`BLUSH · ${sujet}`, [...lignes, "", `${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (heure de Paris)`]);
+    await envoyerALEquipe(`BLUSH · ${sujet}`, [...lignes, "", `${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} (heure de Paris)`], {
+      aussiSurTelegram: importante,
+    });
   } catch (e) {
     journalErreur("alerte non envoyée", e, { sujet });
   }

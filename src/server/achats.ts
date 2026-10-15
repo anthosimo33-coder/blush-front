@@ -28,7 +28,14 @@ export type Achat = typeof schema.achats.$inferSelect;
 const a = schema.achats;
 
 /** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, ou l’offre n’est pas (plus) proposée. */
-export type RefusDeCommande = "aucune" | "deja" | "offre";
+export type RefusDeCommande = "aucune" | "deja" | "offre" | "trop";
+
+/**
+ * Combien de commandes jamais payées un compte peut avoir en même temps (des 48 dernières heures) : chacune crée une
+ * page chez Whop et peut y être vérifiée ; au-delà, « trop », le temps qu’elles vieillissent (SECA-1). Un acheteur qui
+ * hésite en ouvre deux ou trois.
+ */
+const EN_ATTENTE_MAX = 10;
 
 /** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
 const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
@@ -60,6 +67,11 @@ export async function commander(
   { storyId = null, fournisseur, renonciation }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
+  const [attente] = await db()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(a)
+    .where(and(eq(a.userId, compte.id), eq(a.statut, "en_attente"), gt(a.creeLe, sql`now() - interval '48 hours'`)));
+  if ((attente?.n ?? 0) >= EN_ATTENTE_MAX) return "trop";
   if (c.conv) {
     if (!storyId) return "aucune";
     const [s] = await db()

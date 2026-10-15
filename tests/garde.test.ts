@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { recopieLesPrompts } from "@/server/ia/garde";
 
 const prompts = () => [
@@ -11,6 +11,25 @@ describe("garde-fou anti-fuite", () => {
   });
   it("laisse passer une réponse normale", () => {
     expect(recopieLesPrompts("elle te cherche 👀 son « déjà ? » c’est qu’elle voulait que tu restes", prompts)).toBe(false);
+  });
+});
+
+describe("garde-fou anti-fuite, sur les vrais prompts (IA-1)", () => {
+  it("laisse passer les phrases que les prompts donnent à dire (citées, ou dans un exemple de sortie), mais pas leurs consignes", async () => {
+    const { readFileSync } = await import("node:fs");
+    const textes = () => ["00-socle.md", "10-chat.md"].map((f) => readFileSync(`prompts/${f}`, "utf8"));
+    /* L’index est fait une fois par module : un module neuf, indexé sur les vrais prompts */
+    vi.resetModules();
+    const { recopieLesPrompts, sansCeQuiSeDit } = await import("@/server/ia/garde");
+    /* Chaque phrase entre guillemets du socle, dite telle quelle, n’est pas une fuite */
+    const citees = [...readFileSync("prompts/00-socle.md", "utf8").matchAll(/«\s*([^»]{40,})»/g)].map((m) => m[1]!.trim());
+    expect(citees.length).toBeGreaterThan(0);
+    for (const c of citees) expect(recopieLesPrompts(`${c} ${c}`, textes), c).toBe(false);
+    /* Une consigne recopiée (le texte hors guillemets), si */
+    const consigne = sansCeQuiSeDit(readFileSync("prompts/10-chat.md", "utf8"))
+      .split("\n")
+      .find((l) => l.split(" ").length > 24)!;
+    expect(recopieLesPrompts(consigne, textes)).toBe(true);
   });
 });
 
