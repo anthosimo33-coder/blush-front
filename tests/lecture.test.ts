@@ -66,6 +66,81 @@ describe("lire un export WhatsApp", () => {
   });
 });
 
+describe("ignorer les lignes système de WhatsApp", () => {
+  /* Un export inventé : les lignes système d’iOS sont écrites au nom du contact, leur texte précédé d’un U+200E */
+  const ios = [
+    "[12/09/2026 10:00:00] Léa: \u200eLes messages et les appels sont chiffrés de bout en bout.",
+    "[12/09/2026 10:01:00] Léa: salut",
+    "[12/09/2026 10:02:00] Léa: \u200eVous avez bloqué ce contact.",
+    "\u200e[12/09/2026 10:03:00] Léa: \u200eVotre code de sécurité avec Léa a changé.",
+    "[12/09/2026 10:04:00] Léa: \u200eLéa a changé de numéro.",
+    "[12/09/2026 10:05:00] Tom: première ligne",
+    "deuxième ligne",
+    "\u200e[12/09/2026 10:06:00] Léa: \u200eimage omitted",
+    "[12/09/2026 10:07:00] Léa: \u200eThis message was deleted.",
+    "[12/09/2026 10:08:00] Léa: \u200eaudio omitted",
+    "[12/09/2026 10:09:00] Léa: \u200eMissed voice call",
+    "[12/09/2026 10:10:00] Léa: on y va ? \u200eimage omitted",
+    "[12/09/2026 10:11:00] Tom: c’est noté \u200e<This message was edited>",
+    "[12/09/2026 10:12:00] Léa: \u200eLes messages éphémères sont activés.",
+    "[12/09/2026 10:13:00] Léa: à plus",
+  ].join("\n");
+
+  /* Le même, sur Android : les lignes système n’ont pas de « Nom: » */
+  const android = [
+    "12/09/2026 10:00 - Les messages et les appels sont chiffrés de bout en bout. Appuyez pour en savoir plus.",
+    "12/09/2026 10:01 - Léa: salut",
+    "12/09/2026 10:02 - Vous avez bloqué ce contact. Appuyez pour débloquer.",
+    "12/09/2026 10:03 - Votre code de sécurité avec Léa a changé. Appuyez pour en savoir plus.",
+    "12/09/2026 10:04 - Léa a changé de numéro. Appuyez pour lui écrire ou ajouter le nouveau numéro.",
+    "12/09/2026 10:05 - Tom: première ligne",
+    "deuxième ligne",
+    "12/09/2026 10:06 - Léa: <Médias omis>",
+    "12/09/2026 10:07 - Léa: Ce message a été supprimé",
+    "12/09/2026 10:08 - Léa: PTT-20260912-WA0003.opus (fichier joint)",
+    "12/09/2026 10:09 - Les messages éphémères sont désactivés.",
+    "12/09/2026 10:10 - Léa: à plus",
+  ].join("\n");
+
+  const resume = (texte: string, format: "whatsapp-ios" | "whatsapp-android", autresEnTexte: boolean) =>
+    lire(texte, { ...qui("Tom", "Léa"), format }, { autresEnTexte }).messages.map((m) => [m.nom, m.media ?? m.texte]);
+
+  it.each([true, false])(
+    "iOS : une ligne marquée d’un U+200E n’est pas un message, sauf un média, un message supprimé ou un appel manqué (autresEnTexte : %s)",
+    (autresEnTexte) => {
+      expect(resume(ios, "whatsapp-ios", autresEnTexte)).toEqual([
+        ["Léa", "salut"],
+        ["Tom", "première ligne\ndeuxième ligne"],
+        ["Léa", "photo"],
+        ["Léa", "message supprimé"],
+        ["Léa", "vocal"],
+        ["Léa", "appel manqué"],
+        ["Léa", "on y va ? [photo]"],
+        ["Tom", "c’est noté"],
+        ["Léa", "à plus"],
+      ]);
+      expect(participantsDe(ios)).toEqual([
+        { nom: "Léa", messages: 7 },
+        { nom: "Tom", messages: 2 },
+      ]);
+    },
+  );
+
+  it.each([true, false])("Android : une ligne datée sans « Nom: » n’est pas un message, ni la suite du précédent (autresEnTexte : %s)", (autresEnTexte) => {
+    const lu = lire(android, { ...qui("Tom", "Léa"), format: "whatsapp-android" }, { autresEnTexte });
+    expect(resume(android, "whatsapp-android", autresEnTexte)).toEqual([
+      ["Léa", "salut"],
+      ["Tom", "première ligne\ndeuxième ligne"],
+      ["Léa", "média"],
+      ["Léa", "message supprimé"],
+      ["Léa", "vocal"],
+      ["Léa", "à plus"],
+    ]);
+    expect(lu.problemes).toEqual([]);
+    expect(lu.participants).toEqual(["Léa", "Tom"]);
+  });
+});
+
 describe("lire un export Instagram", () => {
   it("garde un message qui parle de réaction, retire les vraies lignes système, garde un reel partagé", () => {
     const json = JSON.stringify({
