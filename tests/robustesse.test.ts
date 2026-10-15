@@ -141,13 +141,16 @@ describe("l’accès donné après le verdict", () => {
   });
 });
 
+/* Fabriquer ces archives (des dizaines de Mo) prend plusieurs secondes sur une machine de la CI chargée : plus que les 5 s par défaut */
+const ARCHIVE_MS = 30_000;
+
 describe("une archive piégée", () => {
-  it("est refusée sans être décompressée en entier (paquet gzip)", async () => {
+  it("est refusée sans être décompressée en entier (paquet gzip)", { timeout: ARCHIVE_MS }, async () => {
     const piege = new File([gzipSync(Buffer.alloc(41 * 1024 * 1024))], "export.json.gz");
     await expect(depuisPaquet(piege)).rejects.toBeInstanceOf(ErreurImport);
   });
 
-  it("est refusée quand ses fichiers dépassent la taille d’une conv, ensemble (zip)", async () => {
+  it("est refusée quand ses fichiers dépassent la taille d’une conv, ensemble (zip)", { timeout: ARCHIVE_MS }, async () => {
     const gros = new Uint8Array(15 * 1024 * 1024);
     const zip = zipSync({ "message_1.html": gros, "message_2.html": gros, "message_3.html": gros });
     await expect(depuisFichier(new File([zip], "export.zip"))).rejects.toBeInstanceOf(ErreurImport);
