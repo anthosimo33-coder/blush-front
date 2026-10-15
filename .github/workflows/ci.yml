@@ -239,8 +239,9 @@ jobs:
           # L’adresse du déploiement que sert le domaine ; rien si Vercel ne la donne pas
           enLigne() { "$VERCEL" inspect "$DOMAINE" --format json --token "$VERCEL_TOKEN" | jq -er '.url | select(. != null) | "https://" + .' || true; }
 
-          statut="$(curl --silent --output /dev/null --max-time 20 --write-out '%{http_code}' "$URL/api/reveil" || true)"
-          if [ "$statut" = "401" ] || [ "$statut" = "403" ]; then
+          # Protégé par Vercel : un refus (401, 403), ou un renvoi vers sa connexion (302 vers vercel.com/sso-api…)
+          read -r statut renvoi <<< "$(curl --silent --output /dev/null --max-time 20 --write-out '%{http_code} %{redirect_url}' "$URL/api/reveil" || true)"
+          if [ "$statut" = "401" ] || [ "$statut" = "403" ] || [[ "${renvoi:-}" == https://vercel.com/sso* ]]; then
             echo "::notice::$URL est protégé par Vercel ($statut) : vérifié par le domaine seulement."
           else
             repond "$URL" || { echo "::error::$URL ne répond pas comme il faut"; exit 1; }
