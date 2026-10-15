@@ -31,8 +31,8 @@ const a = schema.achats;
 /** Le délai de rétractation d’un rapport d’avance pas encore utilisé : 14 jours après son achat (les conditions, « livraison »). */
 const RETRACTATION_MS = 14 * 24 * 3600e3;
 
-/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée, ou la conv est en alerte. */
-export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre";
+/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée, la conv est en alerte, ou trop de paiements attendent déjà. */
+export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
 
 /**
  * La conv est-elle en alerte (danger, détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un mineur) ? Son
@@ -43,6 +43,13 @@ export async function convEnAlerte(storyId: string): Promise<boolean> {
   const v = await donneesVerdict(storyId);
   return !!v && (!!v.sortie.alerte || v.sortie.mode_sobre);
 }
+
+/**
+ * Combien de commandes jamais payées un compte peut avoir en même temps (des 48 dernières heures) : chacune crée une
+ * page chez Whop et peut y être vérifiée ; au-delà, « trop », le temps qu’elles vieillissent (SECA-1). Un acheteur qui
+ * hésite en ouvre deux ou trois.
+ */
+const EN_ATTENTE_MAX = 10;
 
 /** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
 const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
@@ -74,6 +81,11 @@ export async function commander(
   { storyId = null, fournisseur, renonciation }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
+  const [attente] = await db()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(a)
+    .where(and(eq(a.userId, compte.id), eq(a.statut, "en_attente"), gt(a.creeLe, sql`now() - interval '48 hours'`)));
+  if ((attente?.n ?? 0) >= EN_ATTENTE_MAX) return "trop";
   if (c.conv) {
     if (!storyId) return "aucune";
     const [s] = await db()
