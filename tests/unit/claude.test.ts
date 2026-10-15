@@ -218,6 +218,12 @@ describe("appeler : l’envoi", () => {
     await appeler(VERDICT, Format, { partie: "plan" });
     expect(envois[0]![0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
   });
+
+  it("demande la réflexion résumée : par défaut, notre modèle l’envoie vide, et les jauges qui avancent sur sa longueur resteraient figées (IA-3)", async () => {
+    const envois = faux(rend(message([texte('{"ok":true}')])));
+    await appeler(VERDICT, Format);
+    expect(envois[0]![0].params.thinking).toEqual({ type: "adaptive", display: "summarized" });
+  });
 });
 
 /* ———— L’adaptateur du SDK, sur un faux `fetch` ———— */
