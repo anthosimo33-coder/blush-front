@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import type { ReactElement } from "react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 /*
@@ -29,10 +30,12 @@ import { GET as getAnalyse, POST as postAnalyse } from "@/app/api/analyse/route"
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postLot } from "@/app/api/captures/lot/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
+import { POST as postImport } from "@/app/api/import/route";
+import PageExportTournage from "@/app/importer/export/tournage/page";
 import { GET as getLien } from "@/app/tournage/[cle]/route";
 import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
-import { nomDuCookie } from "@/lib/noms-cookies";
+import { nomDuCookie, NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { mentionne, renommer } from "@/lib/renommer";
 import { DUREE_RELECTURE_MS } from "@/server/avancement";
 import type { Utilisateur } from "@/server/auth";
@@ -51,6 +54,7 @@ import {
   convsCandidates,
   creerTournage,
   metaDeLaPrise,
+  prenomDuLien,
   renommerLesPrises,
   tournageDe,
   tournageDeLaCle,
@@ -58,10 +62,12 @@ import {
   type Tournage,
 } from "@/server/tournage";
 import { STORY_COOKIE } from "@/services/session";
+import nextConfig from "../next.config";
 import { compteDeTest, convPrete, convRattachee, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const SESSION = nomDuCookie("session", false);
 const TOURNAGE = nomDuCookie("tournage", false);
+const PRENOM = nomDuCookie("prenomDuTournage", false);
 /* Les appels au modèle (factice) pendant les tests : une prise n’en fait aucun */
 const appels: unknown[] = [];
 facticePourChaqueTest((req) => (appels.push(req), fournisseurFactice(req)));
@@ -421,6 +427,160 @@ describe("une prise", () => {
     await prise();
     const apres = (await statsAdmin(1)).cles;
     expect([apres.convs.valeur, apres.verdicts.valeur, apres.rapports.valeur]).toEqual([avant.convs.valeur, avant.verdicts.valeur, avant.rapports.valeur]);
+  });
+});
+
+describe("l’export sans fichier", () => {
+  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  const ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
+  /** « Choisir le fichier enregistré » en mode tournage, comme ExportScreen : l’accord et l’appli choisie, aucun fichier. */
+  const exporter = (app = "whatsapp", agent = IPHONE) => {
+    const fd = new FormData();
+    fd.append("consentement", CASE_IMPORT.version);
+    fd.append("tournage", app);
+    return postImport(requete("/api/import", { method: "POST", body: fd, headers: { "user-agent": agent } }));
+  };
+  type Importe = { story: { id: string; participants: { name: string }[] }; source: { mode: string; fileName: string; messageCount: number } };
+  const brouillon = async (r: Response) => {
+    expect(r.status).toBe(200);
+    const corps = (await r.json()) as Importe;
+    brouillons.push(corps.story.id);
+    return corps;
+  };
+  /** Le lien de la conv de tournage (`la`, celui de `cle` par défaut) ouvert sur un navigateur neuf, avec ou sans le prénom de la créatrice. */
+  const ouvrirLeLien = async (prenom?: string, la = cle) => {
+    etat.cookies.clear();
+    const r = await getLien(requete(`/tournage/${la}${prenom == null ? "" : `?prenom=${encodeURIComponent(prenom)}`}`), { params: Promise.resolve({ cle: la }) });
+    expect(r.status).toBe(307);
+  };
+  /** Les prénoms de la conv de tournage, celui de sa créatrice remplacé par `prenom` (aucun : tels quels), et sa place. */
+  const prenomsDeLaSource = async (prenom?: string) => {
+    const meta = metaDe(await ligneEnBase(source));
+    const k = meta.moi!;
+    const prenoms = meta.participants.map((p) => p.prenom);
+    if (prenom) prenoms[k] = prenom;
+    return { prenoms, k, meta };
+  };
+
+  it("prend la conv du lien sans rien lire : ses deux personnes, la créatrice sous le prénom de son lien, ses chiffres, un nom de fichier WhatsApp", async () => {
+    await ouvrirLeLien("Juliette");
+    expect(etat.cookies.get(PRENOM)).toBe("Juliette");
+    const avant = appels.length;
+    const { story, source: src } = await brouillon(await exporter());
+    expect(appels.length).toBe(avant);
+    const { prenoms, meta } = await prenomsDeLaSource("Juliette");
+    expect(meta.participants.map((p) => p.prenom)).not.toContain("Juliette");
+    expect(story.participants.map((p) => p.name)).toEqual(prenoms);
+    expect(src).toEqual(expect.objectContaining({ mode: "export", fileName: `WhatsApp Chat - ${personnesDe(meta).autre.nom}.zip`, messageCount: meta.resume.total }));
+    const ligne = await ligneEnBase(story.id);
+    expect(ligne).toMatchObject({ tournageId: tournage.id, tournageLe: null, conv: null, userId: null, messageCount: (await ligneEnBase(source)).messageCount });
+    /* Comme un export qu’on vient d’importer : « Qui es-tu ? » reste à remplir */
+    expect(metaDe(ligne)).toEqual({
+      appli: "whatsapp",
+      format: meta.format,
+      fichier: src.fileName,
+      participants: expect.any(Array) as unknown,
+      resume: meta.resume,
+      ...(meta.coupe ? { coupe: true } : {}),
+    });
+  });
+
+  it("sa lecture se rejoue sous ce prénom, sans modèle", async () => {
+    const juliette = await compteDeTest("tournage-juliette");
+    await ouvrirLeLien("Juliette");
+    etat.cookies.set(SESSION, (await ouvrirSession(juliette.id)).secret);
+    const { story, source: src } = await brouillon(await exporter());
+    const { k, meta } = await prenomsDeLaSource();
+    const avant = appels.length;
+    expect((await lancer({ me: `p${k}`, pronom: "elle", guess: "vus", goal: "ensemble" })).status).toBe(200);
+    expect(appels.length).toBe(avant);
+    const ligne = await ligneEnBase(story.id);
+    expect(ligne).toMatchObject({ userId: juliette.id, tournageId: tournage.id, conv: null });
+    expect(ligne.tournageLe).toBeInstanceOf(Date);
+    const prise = metaDe(ligne);
+    expect(personnesDe(prise).moi.prenom).toBe("Juliette");
+    expect(personnesDe(prise).autre).toEqual(personnesDe(meta).autre);
+    expect(prise).toMatchObject({ appli: "whatsapp", format: meta.format, fichier: src.fileName, moi: k });
+    expect(prise).not.toHaveProperty("captures");
+    /* Ce que le modèle avait écrit pour la créatrice de la source prend son prénom */
+    const memoire = coffre.lire("memories.data", (await db().select().from(schema.memories).where(eq(schema.memories.storyId, story.id)))[0]!.data);
+    expect(mentionne(memoire, personnesDe(meta).moi.prenom)).toBe(false);
+    expect(await soldeDe(juliette.id)).toBe(BULLES_DU_TOURNAGE);
+  });
+
+  it("un lien sans prénom : celui de sa dernière prise si elle est connectée, sinon celui de la conv de tournage", async () => {
+    const mia = await compteDeTest("tournage-mia");
+    const { k } = await prenomsDeLaSource();
+    /* Sa première prise, depuis un lien qui portait son prénom */
+    await ouvrirLeLien("Mia");
+    etat.cookies.set(SESSION, (await ouvrirSession(mia.id)).secret);
+    await brouillon(await exporter());
+    expect((await lancer({ me: `p${k}`, pronom: "elle", guess: "vus", goal: "ensemble" })).status).toBe(200);
+    /* Puis un lien sans prénom, connectée : son prénom revient */
+    await ouvrirLeLien();
+    etat.cookies.set(SESSION, (await ouvrirSession(mia.id)).secret);
+    expect((await brouillon(await exporter())).story.participants.map((p) => p.name)).toEqual((await prenomsDeLaSource("Mia")).prenoms);
+    /* Sans compte ni prénom : la conv de tournage telle qu’elle est */
+    await ouvrirLeLien();
+    expect((await brouillon(await exporter())).story.participants.map((p) => p.name)).toEqual((await prenomsDeLaSource()).prenoms);
+  });
+
+  it("le nom du fichier suit le téléphone et l’appli choisie à l’écran", async () => {
+    await ouvrirLeLien("Juliette");
+    const { meta } = await prenomsDeLaSource();
+    expect((await brouillon(await exporter("whatsapp", ANDROID))).source.fileName).toBe(`Discussion WhatsApp avec ${personnesDe(meta).autre.nom}.txt`);
+    const insta = await brouillon(await exporter("instagram"));
+    expect(insta.source.fileName).toMatch(/^instagram-juliette-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(metaDe(await ligneEnBase(insta.story.id)).appli).toBe("instagram");
+  });
+
+  it("hors du mode tournage, rien ne change (sans fichier : 422) ; son lien arrêté depuis l’ouverture de l’écran : 409, sans brouillon", async () => {
+    etat.cookies.clear();
+    const sans = await exporter();
+    expect([sans.status, await sans.json()]).toEqual([422, { erreur: "fichier" }]);
+    /* Une appli qui ne s’exporte pas */
+    await ouvrirLeLien("Juliette");
+    expect((await exporter("imessage")).status).toBe(422);
+    /* Sans l’accord de l’import, rien n’est fait */
+    const fd = new FormData();
+    fd.append("tournage", "whatsapp");
+    const accord = await postImport(requete("/api/import", { method: "POST", body: fd }));
+    expect([accord.status, await accord.json()]).toEqual([422, { erreur: "consentement" }]);
+    /* Le lien arrêté entre l’ouverture de l’écran et le bouton */
+    const t = await creerTournage({ conv: source, nom: "F · Arrêtée", par: equipe });
+    if (!("id" in t)) throw new Error("conv de tournage refusée");
+    await ouvrirLeLien("Juliette", await cleDe(t.id));
+    expect(await arreterTournage(t.id)).toBe(true);
+    const arretee = await exporter();
+    expect([arretee.status, await arretee.json()]).toEqual([409, { erreur: "tournage" }]);
+    expect(etat.cookies.has(nomDuCookie("brouillon", false))).toBe(false);
+  });
+
+  it("le lien garde le prénom qu’il porte, s’il en est un ; sans, celui d’avant ; un lien faux et « Quitter » l’effacent", async () => {
+    expect(["Juliette", "Marie-Lou", "Léa", "  Anne   Sophie ", "N’Dey"].map((p) => prenomDuLien(p))).toEqual(["Juliette", "Marie-Lou", "Léa", "Anne Sophie", "N’Dey"]);
+    expect(["", " ", "<b>Kelly</b>", "Kelly2", "-Kelly", "a".repeat(41), null].map((p) => prenomDuLien(p))).toEqual(Array(7).fill(null));
+    await ouvrirLeLien("Juliette");
+    await getLien(requete(`/tournage/${cle}`), { params: Promise.resolve({ cle }) });
+    await getLien(requete(`/tournage/${cle}?prenom=%3Cb%3E`), { params: Promise.resolve({ cle }) });
+    expect([etat.cookies.get(TOURNAGE), etat.cookies.get(PRENOM)]).toEqual([cle, "Juliette"]);
+    await getLien(requete("/tournage/faux?prenom=Kelly"), { params: Promise.resolve({ cle: "faux" }) });
+    expect([etat.cookies.has(TOURNAGE), etat.cookies.has(PRENOM)]).toEqual([false, false]);
+    await ouvrirLeLien("Juliette");
+    await postFin(requete("/tournage/fin", { method: "POST" }));
+    expect([etat.cookies.has(TOURNAGE), etat.cookies.has(PRENOM)]).toEqual([false, false]);
+  });
+
+  it("l’écran de l’export : sa variante est servie à la même adresse sous le cookie du mode tournage, et vérifie son lien", async () => {
+    const reecritures = await nextConfig.rewrites!();
+    const avantLesPages = Array.isArray(reecritures) ? reecritures : reecritures.beforeFiles;
+    for (const key of NOMS_DU_TOURNAGE)
+      expect(avantLesPages).toContainEqual({ source: "/importer/export", has: [{ type: "cookie", key }], destination: "/importer/export/tournage" });
+    const variante = async () => ((await PageExportTournage()) as ReactElement<{ children: ReactElement<{ tournage: boolean }> }>).props.children.props.tournage;
+    await ouvrirLeLien();
+    expect(await variante()).toBe(true);
+    /* Le cookie d’un lien arrêté (ou faux) : l’écran de tout le monde */
+    etat.cookies.set(TOURNAGE, "x".repeat(43));
+    expect(await variante()).toBe(false);
   });
 });
 

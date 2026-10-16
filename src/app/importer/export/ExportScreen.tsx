@@ -8,7 +8,7 @@ import { useDevice, useFilePicker } from "@/lib/hooks";
 import { ACCEPT_EXPORT } from "@/lib/limites";
 import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
-import { prechargerExport, uploadExport } from "@/services/api";
+import { importerLaConvDuTournage, prechargerExport, uploadExport } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { EXPORT_STEPS, imageDeLaVideo, VIDEOS_EXPORT } from "@/contenu/parcours";
 import { MentionImport, useAccord } from "@/components/juridique/cases";
@@ -23,14 +23,22 @@ import { Sheet } from "@/components/ui/surfaces";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
-import type { ExportApp } from "@/types";
+import { APPLIS, type ExportApp } from "@/types";
 import { ChoixConv } from "./ChoixConv";
 import type { ConvInstagram } from "@/services/preparer-export";
 
 type Menu = { contact: string; items: readonly string[]; highlight: number };
 
-/* Écran 02 — Exporter : l’appli, l’écran du téléphone à reconnaître, les étapes en frise, puis le fichier. */
-export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
+/** Le mode tournage : combien de temps se joue « Je lis ton export · N % », pendant que le serveur prend la conv du lien. */
+const LECTURE_DU_TOURNAGE_MS = 1600;
+
+/*
+ * Écran 02 — Exporter : l’appli, l’écran du téléphone à reconnaître, les étapes en frise, puis le fichier.
+ * `tournage` : le mode tournage (src/server/tournage.ts, la variante ./tournage/page.tsx). Le même écran, mais le bouton
+ * n’ouvre pas le choix d’un fichier : la créatrice n’a rien à chercher, le serveur prend la conv de son lien, et le bouton
+ * dit « Je lis ton export · N % » le temps d’une courte lecture, comme un vrai import. Rien d’autre ne le montre.
+ */
+export function ExportScreen({ initialApp, tournage = false }: { initialApp: ExportApp; tournage?: boolean }) {
   const router = useRouter();
   const device = useDevice();
   const picker = useFilePicker();
@@ -57,9 +65,54 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
   const adresseVideo = VIDEOS_EXPORT[app];
   const steps = device === "ios" ? data.steps.ios : device === "android" ? data.steps.android : data.steps.all;
 
+  /* La conv est partie : « Qui es-tu ? » vient après l’écran qui dit ce qu’on a reçu */
+  const suite = (fichier: string) => {
+    /*
+     * Une nouvelle conv : « qui est toi » se redemande. Ses « p0 »/« p1 » sont ceux de cette conv-ci, et celui d’une conv
+     * d’avant (un mauvais fichier, puis le retour arrière) cocherait n’importe qui, « Continuer » déjà actif : tout le
+     * rapport à l’envers
+     */
+    setJourney({ exportApp: app, app, exportFileName: fichier, capturesAdded: false, me: null });
+    router.push("/importer/ok");
+  };
+
+  /* L’envoi raté : le fichier lui-même a son écran d’erreur (ErreurDeParcours, ?erreur=) ; le reste (réseau, limite), un message ici, et on réessaie */
+  const surEchec = (e: unknown) => {
+    if (!monte.current) return;
+    setBusy(false);
+    setAvance(null);
+    /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
+    if (codeDe(e) === "annule") return;
+    /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger */
+    if (codeDe(e) === "consentement") return accord.perimer();
+    /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu */
+    const parcours = erreurDeParcours("export", e);
+    if (parcours) {
+      router.replace(`/importer/export?app=${app}&erreur=${parcours}`, { scroll: false });
+      return;
+    }
+    setSouci(messageErreur("export", e));
+  };
+
+  /* Le mode tournage : la conv du lien part pendant que l’avancée se joue, la suite attend les deux */
+  const importerLeTournage = async () => {
+    setBusy(true);
+    setSouci(null);
+    const lecture = jouerLAvance(LECTURE_DU_TOURNAGE_MS, (p) => monte.current && setAvance(p));
+    let source;
+    try {
+      [source] = await Promise.all([importerLaConvDuTournage(app, CASE_IMPORT.version), lecture.fin]);
+    } catch (e) {
+      lecture.arreter();
+      return surEchec(e);
+    }
+    if (monte.current) suite(source.fileName ?? APPLIS[app]);
+  };
+
   /* La lecture de l’export est chargée à la demande : on la charge dès qu’on ouvre le choix du fichier */
   const choisirFichier = () => {
     if (!accord.exiger()) return;
+    if (tournage) return void importerLeTournage();
     prechargerExport();
     picker.open();
   };
@@ -76,31 +129,9 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
       source = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
     } catch (e) {
-      if (!monte.current) return;
-      /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu (ErreurDeParcours, ?erreur=) */
-      setBusy(false);
-      setAvance(null);
-      /* On a fermé « Quelle conv ? » sans choisir : on reste sur l’écran, sans erreur */
-      if (codeDe(e) === "annule") return;
-      /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger */
-      if (codeDe(e) === "consentement") return accord.perimer();
-      /* Le fichier lui-même : l’écran d’erreur prévu. Le reste (réseau, limite) : un message ici, et on réessaie */
-      const parcours = erreurDeParcours("export", e);
-      if (parcours) {
-        router.replace(`/importer/export?app=${app}&erreur=${parcours}`, { scroll: false });
-        return;
-      }
-      setSouci(messageErreur("export", e));
-      return;
+      return surEchec(e);
     }
-    if (!monte.current) return;
-    /*
-     * Une nouvelle conv : « qui est toi » se redemande. Ses « p0 »/« p1 » sont ceux de cette conv-ci, et celui d’une conv
-     * d’avant (un mauvais fichier, puis le retour arrière) cocherait n’importe qui, « Continuer » déjà actif : tout le
-     * rapport à l’envers
-     */
-    setJourney({ exportApp: app, app, exportFileName: source.fileName ?? file.name, capturesAdded: false, me: null });
-    router.push("/importer/ok");
+    if (monte.current) suite(source.fileName ?? file.name);
   };
 
   return (
@@ -208,6 +239,27 @@ export function ExportScreen({ initialApp }: { initialApp: ExportApp }) {
       <ChoixConv open={!!choix} convs={choix?.convs ?? []} onChoisir={(id) => fermerChoix(id)} onClose={() => fermerChoix(null)} />
     </ParcoursScreen>
   );
+}
+
+/**
+ * Une avancée de 0 à 1 jouée en `ms` (vite d’abord, plus lente vers la fin), dite à `surAvance` à chaque pour cent.
+ * Comptée sur l’horloge : un onglet en arrière-plan, qui ralentit les minuteries, la finit quand même à l’heure.
+ * `arreter` la coupe là, sans finir `fin`.
+ */
+function jouerLAvance(ms: number, surAvance: (p: number) => void): { fin: Promise<void>; arreter: () => void } {
+  let minuterie: ReturnType<typeof setInterval> | undefined;
+  const fin = new Promise<void>((finie) => {
+    const debut = Date.now();
+    surAvance(0);
+    minuterie = setInterval(() => {
+      const t = Math.min(1, (Date.now() - debut) / ms);
+      surAvance(Math.round((1 - (1 - t) ** 2) * 100) / 100);
+      if (t < 1) return;
+      clearInterval(minuterie);
+      finie();
+    }, 40);
+  });
+  return { fin, arreter: () => clearInterval(minuterie) };
 }
 
 /** Le haut d’un téléphone sur la fiche du contact : la bonne option surlignée, qui pulse. Le bas se fond dans la page. */

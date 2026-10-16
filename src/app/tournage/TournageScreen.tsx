@@ -7,18 +7,19 @@ import { NBSP } from "@/lib/format";
 /*
  * La page du mode tournage, où mène le lien d’une conv de tournage (src/server/tournage.ts) : pour la créatrice, jamais
  * filmée. Ce que fait le mode, comment filmer, et le quitter (un formulaire : POST /tournage/fin). `nom` : le nom de la
- * conv de tournage (sa campagne), ou null : pas de mode tournage sur ce navigateur.
- * TODO(produit): textes à valider.
+ * conv de tournage (sa campagne), ou null : pas de mode tournage sur ce navigateur. `prenom` : celui que son lien porte.
+ * Les étapes, relues le 16 octobre : l’outil des créatrices recopie les mêmes dans ses missions, à changer ensemble.
  */
 
 const ETAPES = [
-  "Importe la conv qu’on t’a envoyée, comme d’habitude\u00a0: ses captures, ou son export.",
+  "Touche «\u00a0Commencer une prise\u00a0», puis WhatsApp.",
+  "Sur «\u00a0Exporte votre conv.\u00a0», touche «\u00a0Choisir le fichier enregistré\u00a0»\u00a0: BLUSH prend tout seul la conv de ce lien. Tu n’as aucun fichier à chercher.",
   "Réponds à «\u00a0Qui es-tu\u00a0?\u00a0», puis connecte-toi avec ton email (une fois suffit).",
   "BLUSH lit la conv pendant 40 secondes, puis montre le verdict et le rapport en entier.",
   "Une nouvelle prise remplace la précédente\u00a0: recommence autant de fois que tu veux.",
 ];
 
-export function TournageScreen({ nom }: { nom: string | null }) {
+export function TournageScreen({ nom, prenom = null }: { nom: string | null; prenom?: string | null }) {
   if (!nom)
     return (
       <Screen
@@ -49,7 +50,10 @@ export function TournageScreen({ nom }: { nom: string | null }) {
       head={
         <>
           <span className="self-start rounded-full bg-ink px-2.5 py-1 text-legende font-black text-white">Mode tournage</span>
-          <ScreenTitle>Prête à filmer{NBSP}?</ScreenTitle>
+          <ScreenTitle>
+            Prête à filmer{prenom && `, ${prenom}`}
+            {NBSP}?
+          </ScreenTitle>
           <Lead size={15} weight={800}>
             Pour «{NBSP}
             {nom}

@@ -3,15 +3,16 @@ import { and, count, desc, eq, inArray, isNotNull, isNull, max, ne, or, sql } fr
 import type { Devinette, Objectif, Pronom } from "@prompts/lib/conv";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { CATALOGUE } from "@/contenu/offres";
-import { NOM_TOURNAGE_MAX } from "@/lib/limites";
+import { NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import { mentionne, renommer } from "@/lib/renommer";
+import type { ExportApp } from "@/types";
 import type { RefusDuTournage, StatutDuTournage } from "@/types/api";
 import type { Utilisateur } from "./auth";
 import { crediter } from "./bulles";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
-import { lireTournage } from "./cookies";
+import { lirePrenomDuTournage, lireTournage } from "./cookies";
 import { db, schema, uneLigne } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
 import { donneesVerdict } from "./depot";
@@ -32,7 +33,8 @@ import { etatDesTaches, planifier } from "./taches";
  * de tournage : un lien secret (/tournage/<cle>) qui pose le mode tournage sur le téléphone de la créatrice (un cookie,
  * src/server/cookies.ts). Elle filme ensuite le parcours habituel, et rien ne part au modèle :
  * - ses captures ne sont pas lues (le prompt 01) : leur brouillon reprend les participants et les chiffres de la conv
- *   de tournage (brouillonDeTournage) ; un export se lit comme d’habitude, sans modèle ;
+ *   de tournage (brouillonDeTournage) ; l’export ne demande aucun fichier : « Choisir le fichier enregistré » prend la
+ *   conv du lien (brouillonDExportDeTournage), avec le prénom de la créatrice (prenomDeLaCreatrice) ;
  * - la lecture (POST /api/analyse) recopie le verdict, le rapport, la mémoire et le vocal déjà écrits (rejouer), et
  *   l’écran de lecture les rejoue en DUREE_RELECTURE_MS (avanceRejouee, src/server/avancement.ts) ;
  * - la chaîne des tâches ne lance plus rien pour cette conv (src/server/pipeline.ts, executer), sauf le vocal d’une prise
@@ -394,6 +396,91 @@ export async function brouillonDeTournage(
     "stories:brouillon_de_tournage",
   );
   return { id: ligne.id, meta, secret, messages: source.messageCount };
+}
+
+/**
+ * Le prénom qu’un lien de tournage porte (`?prenom=`, ajouté par l’outil des créatrices), s’il en est un : des lettres
+ * (avec leurs accents), des espaces, des traits d’union et des apostrophes, PRENOM_MAX au plus. Sinon null : rien n’est gardé.
+ */
+export function prenomDuLien(brut: string | null): string | null {
+  const prenom = brut?.trim().replace(/\s+/g, " ") ?? "";
+  return prenom.length <= PRENOM_MAX && /^\p{L}[\p{L}\p{M}'’ -]*$/u.test(prenom) ? prenom : null;
+}
+
+/** Le prénom que le lien de tournage ouvert sur ce navigateur portait (son cookie), ou null. */
+export const prenomDuNavigateur = async () => prenomDuLien((await lirePrenomDuTournage()) ?? null);
+
+/**
+ * Le prénom de la créatrice qui filme, que l’export sans fichier lui donne à « Qui es-tu ? » : les liens se partagent
+ * entre créatrices, et la conv de tournage porte celui de la créatrice dont le fichier a été lu. Celui que son lien porte
+ * (`?prenom=`, posé avec le mode tournage), sinon celui de sa dernière prise (son compte, si elle est connectée : elle
+ * l’a choisi devant la caméra), sinon null : la conv de tournage garde le sien.
+ */
+export async function prenomDeLaCreatrice(compte: Pick<Utilisateur, "id"> | null): Promise<string | null> {
+  const duLien = await prenomDuNavigateur();
+  if (duLien || !compte) return duLien;
+  const [derniere] = await db()
+    .select({ meta: s.meta })
+    .from(s)
+    .where(and(eq(s.userId, compte.id), isNotNull(s.tournageLe)))
+    .orderBy(desc(s.tournageLe))
+    .limit(1);
+  const prenom = derniere ? prenomDeMoi(metaDe(derniere)) : null;
+  return prenom && prenom !== "Moi" ? prenom : null;
+}
+
+/**
+ * Le nom de fichier qu’aurait l’export de cette conv, tel que l’appli le donne : sur iPhone, WhatsApp fait un .zip au nom
+ * du contact ; sur Android, un .txt ; Instagram, un .zip au nom du compte (ici le prénom de la créatrice) et du jour.
+ */
+function nomDExport(appli: ExportApp, { moi, autre }: { moi: string; autre: string }, android: boolean): string {
+  if (appli === "instagram") return `instagram-${sansAccent(moi).replace(/[^a-z0-9]+/g, "")}-${new Date().toISOString().slice(0, 10)}.zip`;
+  return android ? `Discussion WhatsApp avec ${autre}.txt` : `WhatsApp Chat - ${autre}.zip`;
+}
+
+/**
+ * Le brouillon d’un export en mode tournage, sans fichier : « Choisir le fichier enregistré » prend la conv du lien
+ * (/importer/export, la variante du mode tournage). Le même qu’un export de la conv de tournage, sans rien lire : ses
+ * deux personnes (la créatrice sous son prénom, prenomDeLaCreatrice, s’il est connu), ses chiffres, l’appli choisie à
+ * l’écran, un nom de fichier de son appli (nomDExport), « Qui es-tu ? » à remplir, et pas de conv brute. Il garde sa conv
+ * de tournage (`tournageId`) : la lecture (rejouer) le remplira, même si son lien est arrêté entre-temps.
+ */
+export async function brouillonDExportDeTournage(
+  tournage: Tournage,
+  { appli, prenom, android, consentement }: { appli: ExportApp; prenom: string | null; android: boolean; consentement: Consentement },
+): Promise<{ id: string; meta: Meta; secret: string }> {
+  const source = uneLigne(await db().select({ meta: s.meta, messageCount: s.messageCount }).from(s).where(eq(s.id, tournage.storyId)), "tournages:source");
+  const src = metaDe(source);
+  /* La créatrice : celle que la conv de tournage dit être l’utilisateur (« Qui es-tu ? » rempli à sa lecture) */
+  const k = src.moi ?? 0;
+  const l = k === 0 ? 1 : 0;
+  const participants: Meta["participants"] = [src.participants[0], src.participants[1]];
+  if (prenom) participants[k] = { ...participants[k], nom: prenom, prenom };
+  const meta: Meta = {
+    appli,
+    /* Une conv de tournage faite de captures (depuis /admin) n’a pas de format d’export : celui de l’iPhone */
+    format: src.format === "captures" ? "whatsapp-ios" : src.format,
+    fichier: nomDExport(appli, { moi: participants[k].prenom, autre: participants[l].nom }, android).slice(0, 200),
+    participants,
+    resume: src.resume,
+    ...(src.coupe ? { coupe: true } : {}),
+  };
+  const secret = jeton();
+  const ligne = uneLigne(
+    await db()
+      .insert(s)
+      .values({
+        draftToken: empreinte(secret),
+        messageCount: source.messageCount,
+        meta: coffre.ecrire("stories.meta", meta),
+        consentementLe: consentement.le,
+        consentementVersion: consentement.version,
+        tournageId: tournage.id,
+      })
+      .returning({ id: s.id }),
+    "stories:export_de_tournage",
+  );
+  return { id: ligne.id, meta, secret };
 }
 
 /**

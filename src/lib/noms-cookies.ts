@@ -18,6 +18,8 @@ const NOMS = {
   humain: "blush-humain",
   /** Le mode tournage : le secret du lien d’une conv de tournage, posé par ce lien (src/server/tournage.ts). */
   tournage: "blush-tournage",
+  /** Le prénom de la créatrice qui filme, quand son lien de tournage le porte (`?prenom=`, src/server/tournage.ts). */
+  prenomDuTournage: "blush-tournage-prenom",
 } as const;
 
 export type CookieDuServeur = keyof typeof NOMS;
@@ -27,3 +29,6 @@ export const nomDuCookie = (cookie: CookieDuServeur, securise: boolean) => (secu
 
 /** Les deux noms que peut avoir le cookie de session : sa seule présence choisit la variante d’une page. */
 export const NOMS_DE_SESSION = [nomDuCookie("session", true), nomDuCookie("session", false)] as const;
+
+/** Les deux noms que peut avoir le cookie du mode tournage : sa seule présence choisit la variante de l’export (next.config.ts). */
+export const NOMS_DU_TOURNAGE = [nomDuCookie("tournage", true), nomDuCookie("tournage", false)] as const;
