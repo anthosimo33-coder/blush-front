@@ -1,6 +1,6 @@
 import "server-only";
 import type { Route } from "next";
-import type { ConvSummary, Fiche, ScoreRow, Story } from "@/types";
+import type { ApercuDuPaywall, ConvSummary, Fiche, Story } from "@/types";
 import type { Account, AchatDuCompte, HistoriqueChat, ReportPayload } from "@/types/api";
 import { achatsDuCompte, convEnAlerte } from "@/server/achats";
 import { apercuAvantPaiement } from "@/server/analyse";
@@ -22,9 +22,10 @@ import { connexionPuis } from "@/lib/suite";
 
 /**
  * Le paywall de la conv ouverte, quand elle attend son paiement (le paywall d’abord) : ce que le code a compté, sans le
- * modèle. null : elle n’attend pas son paiement (payée, de l’équipe, ou pas encore passée par « Qui es-tu ? »).
+ * modèle (le haut du paywall). null : elle n’attend pas son paiement (payée, de l’équipe, ou pas encore passée par « Qui
+ * es-tu ? »).
  */
-export async function getApercuAvantPaiement(): Promise<ScoreRow[] | null> {
+export async function getApercuAvantPaiement(): Promise<ApercuDuPaywall | null> {
   const { story } = await contexte();
   return story ? apercuAvantPaiement(story.id) : null;
 }

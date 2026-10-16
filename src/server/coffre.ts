@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
+import { GENRES_DU_HAUT } from "@/contenu/haut-du-paywall";
 import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
 import type { BlushAnswer, Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
@@ -102,6 +103,8 @@ const ContexteGarde = z
     dernier: z.number().optional(),
     /* Avant le 8 octobre : absentes, la lecture n’en montre aucune */
     trouvailles: z.array(z.string()).default(() => []),
+    /* Avant le 17 octobre : absent, l’achat ne compte pour aucun titre */
+    accroche: z.enum(GENRES_DU_HAUT).optional(),
   })
   /* Sans `dernier`, les messages ajoutés repartent de la fin du jour du dernier message (`fin`, sans fuseau comme lui) */
   .transform((c) => ({ ...c, dernier: c.dernier ?? Date.parse(`${c.fin}T23:59:59Z`) }));

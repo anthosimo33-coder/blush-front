@@ -7,14 +7,17 @@ import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRappo
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
-import type { Message, ScoreRow } from "@/types";
+import { genreDuHaut } from "@/contenu/haut-du-paywall";
+import type { ApercuDuPaywall, Message, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
+import { compterLeHaut } from "./compteurs";
 import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
+import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
@@ -94,29 +97,35 @@ function contexteDuCode(story: LigneComplete) {
     fin: rendu.fin,
     dernier: lu.messages.at(-1)!.t,
     trouvailles: trouvailles(chiffres, h, lu.messages),
+    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
   };
-  return { rendu, chiffres, contexte };
+  return { rendu, chiffres, contexte, messages: lu.messages };
 }
 
 /**
  * Le contexte d’une conv qui attend son paiement, écrit sans aucun appel au modèle : la lecture et le paywall montrent
- * ses trouvailles avant que rien ne soit payé. Le verdict le récrit, le même, avant son appel.
+ * ses trouvailles avant que rien ne soit payé. Le verdict le récrit, le même, avant son appel. Le titre que son paywall
+ * montre y est gardé (chiffré, comme le reste) et compté ici, une fois par conv : /admin compte les achats de chaque titre.
  */
 export async function ecrireLeContexte(storyId: string): Promise<void> {
   const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, storyId));
   if (!story?.conv) return;
-  const context = coffre.ecrire("stories.context", contexteDuCode(story).contexte);
+  const { contexte } = contexteDuCode(story);
+  const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
+  if (contexte.accroche) await compterLeHaut(contexte.accroche, "vu");
 }
 
 /**
- * Ce que le paywall montre d’une conv qui attend son paiement, calculé par le code sans aucun appel au modèle : qui ouvre
- * la journée, qui relance, qui répond vite (les mêmes lignes que le verdict). null : elle n’attend pas son paiement.
+ * Ce que le haut du paywall montre d’une conv qui attend son paiement, calculé par le code sans aucun appel au modèle :
+ * qui ouvre la journée, reprend, relance, répond vite, écrit long, et la chute de ses messages s’il y en a une
+ * (src/server/ecrans/haut-du-paywall.ts). null : elle n’attend pas son paiement.
  */
-export async function apercuAvantPaiement(storyId: string): Promise<ScoreRow[] | null> {
+export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPaywall | null> {
   const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
   if (!story?.conv || verdict?.status !== "paiement") return null;
-  return scores(contexteDuCode(story).chiffres);
+  const { chiffres, messages } = contexteDuCode(story);
+  return apercuDuPaywall(chiffres, messages);
 }
 
 async function verdict(story: LigneComplete, t: Tache) {

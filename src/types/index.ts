@@ -186,6 +186,32 @@ export type ScoreRow = {
   captionRight?: string;
 };
 
+/**
+ * Un déséquilibre que le code a compté entre vous deux, sans le modèle (src/server/ecrans/haut-du-paywall.ts) : le haut
+ * du paywall en tire son titre (src/contenu/haut-du-paywall.ts). `cote` : qui y met le plus (qui ouvre, reprend, relance,
+ * répond le plus vite, écrit le plus long), ou personne nettement (« pareil »). `toi` et `elle` : des jours ou des fois
+ * (ouvre, reprend, relance), des millisecondes (delai, le délai de réponse médian), des mots (longueur, par message).
+ */
+export type SignalDuPaywall = { id: "ouvre" | "reprend" | "relance" | "delai" | "longueur"; cote: Side; toi: number; elle: number };
+
+/**
+ * Ses messages ont chuté, et ne sont pas remontés depuis (src/server/ecrans/tendance.ts). `depuis` : le premier jour de
+ * la chute (AAAA-MM-JJ) ; `avant` et `apres` : ses messages par jour, avant et depuis ; `semaines` : ses messages par
+ * jour, semaine par semaine (la courbe), et `coupure` la place de la première semaine de la chute ; `delai` : son délai
+ * de réponse médian avant et depuis, en millisecondes, quand il a nettement grandi.
+ */
+export type TendanceDuPaywall = {
+  depuis: string;
+  avant: number;
+  apres: number;
+  semaines: number[];
+  coupure: number;
+  delai: { avant: number; apres: number } | null;
+};
+
+/** Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en a une. */
+export type ApercuDuPaywall = { signaux: SignalDuPaywall[]; tendance: TendanceDuPaywall | null };
+
 export type ChapterBlock =
   | { kind: "essential"; text: string }
   | { kind: "seen"; title?: string; facts?: string[]; messages?: Message[]; factsAfter?: string[] }

@@ -1,5 +1,6 @@
 import { citees, type EditionsFiche, type MemoireFaite } from "@prompts/lib/memoire";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
+import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 
 /*
@@ -27,8 +28,10 @@ export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; s
 /**
  * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans
  * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (ecrans/trouvailles.ts).
+ * `accroche` : le titre du haut de son paywall (src/contenu/haut-du-paywall.ts), compté avec son achat dans /admin ;
+ * absent avant le 17 octobre.
  */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[] };
+export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[]; accroche?: GenreDuHaut };
 
 /** Le script du vocal du rapport, minuté d’après l’audio. `version` : celle du script (VERSION_VOCAL, src/server/vocal.ts). */
 export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version: number };

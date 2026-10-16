@@ -12,7 +12,7 @@ import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { DoneCheck, TypingDots } from "@/components/ui/feedback";
 import { Screen } from "@/components/shell/Screen";
-import type { ScoreRow, Story } from "@/types";
+import type { ApercuDuPaywall, Story } from "@/types";
 import { Paywall } from "./Paywall";
 import { useSuiviLecture } from "./suivi";
 
@@ -23,7 +23,7 @@ import { useSuiviLecture } from "./suivi";
  * d’abord) : sa lecture, calculée par le code, se déroule en quelques secondes, puis « Voir mon rapport » mène au paywall
  * (`apercu` : la conv et ce que le code a compté, lus par la page).
  */
-export function LectureScreen({ total, apercu }: { total: number; apercu?: { story: Story; scores: ScoreRow[] } | null }) {
+export function LectureScreen({ total, apercu }: { total: number; apercu?: { story: Story; haut: ApercuDuPaywall } | null }) {
   const reduced = useReducedMotion();
   /* La lecture lancée en arrivant, puis suivie jusqu’à son verdict (suivi.ts). `failed` : le serveur a tout essayé, on le dit et on propose de relancer */
   const { p, phase, echec: failed, trop, enDirect: live, relancer: retry, paiement } = useSuiviLecture();
@@ -58,7 +58,7 @@ export function LectureScreen({ total, apercu }: { total: number; apercu?: { sto
   const step = p.done ? etapes.length - 1 : Math.min(p.stepsDone, etapes.length - 1);
   const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
 
-  if (paywall && apercu) return <Paywall story={apercu.story} scores={apercu.scores} trouvailles={p.discoveries} />;
+  if (paywall && apercu) return <Paywall story={apercu.story} apercu={apercu.haut} />;
 
   return (
     <Screen

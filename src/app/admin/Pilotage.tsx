@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
+import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
@@ -123,6 +124,7 @@ export function Pilotage({
 
           <ChiffresCles s={s} />
           <Tunnel p={p} jours={s.jours} />
+          <HautsDuPaywall p={p} />
 
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Sources p={p} />
@@ -512,6 +514,68 @@ function Tunnel({ p, jours }: { p: Chiffres; jours: Periode }) {
         <Icon name={texte ? "alert" : "clock"} size={20} stroke={2.4} style={{ marginTop: 1 }} />
         <span>{texte ? `${texte.titre}. ${texte.texte}` : "Pas encore de fuite à comparer\u00a0: il faut du monde à deux étapes qui se suivent."}</span>
       </p>
+    </Bloc>
+  );
+}
+
+/* ———— Le haut du paywall ———— */
+
+function HautsDuPaywall({ p }: { p: Chiffres }) {
+  const vus = p.hauts.reduce((t, h) => t + h.vus, 0);
+  const lignes = p.hauts.filter((h) => h.vus || h.payes);
+  const maxVus = Math.max(1, ...lignes.map((h) => h.vus));
+  return (
+    <Bloc
+      id="haut-du-paywall"
+      titre="Le haut du paywall"
+      sous="Chaque conv voit un titre parmi cinq, d’après ses chiffres"
+      aide={{ cle: "hauts", valeur: pluriel(vus, "paywall vu", "paywalls vus"), contexte: "sur la période" }}
+    >
+      {lignes.length ? (
+        <div role="region" aria-label="Les titres du paywall, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[520px] border-collapse text-left">
+            <caption className="sr-only">Les titres du haut du paywall, leurs vus et leurs rapports débloqués</caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 font-black">
+                  Titre
+                </th>
+                <th scope="col" className="w-[30%] pb-2.5 font-black">
+                  Vus
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Payés
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Taux
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((h) => {
+                const taux = rapport(h.payes, h.vus);
+                return (
+                  <tr key={h.genre} className="border-t border-sep text-detail font-extrabold">
+                    <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                      {NOM_DU_GENRE[h.genre]}
+                    </th>
+                    <td className="py-3 pr-3">
+                      <span className="flex items-center gap-2.5">
+                        <Barre part={h.vus / maxVus} couleur="var(--elle)" />
+                        <span className="min-w-[40px] text-right tabular-nums">{nombre(h.vus)}</span>
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(h.payes)}</td>
+                    <td className="py-3 text-right tabular-nums">{taux === null ? "—" : pourcent(taux * 100)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun paywall vu sur la période.</p>
+      )}
     </Bloc>
   );
 }
