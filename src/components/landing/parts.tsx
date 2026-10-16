@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { figtree } from "@/lib/fonts";
-import { AUTEURS_DES_TEMOIGNAGES, FAITS_LANDING, REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { FAITS_LANDING, REPONSE_EXEMPLE, VERDICT_EXEMPLE } from "@/contenu/landing";
 import { AppBadge } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/icons";
 import { ConfidenceLine, Tag } from "@/components/ui/messages";
@@ -300,7 +300,7 @@ export function Reviews({ items }: { items: Testimonial[] }) {
   return (
     <section aria-labelledby="avis-titre" className="py-14 lg:py-20">
       <Container>
-        <SectionHead id="avis-titre" title="Témoignages" sub={AUTEURS_DES_TEMOIGNAGES} />
+        <SectionHead id="avis-titre" title="Témoignages" />
       </Container>
       <AvisDefilants items={items} />
     </section>

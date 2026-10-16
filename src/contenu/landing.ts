@@ -234,12 +234,9 @@ export const LANDING_CONVS: LandingConv[] = [
 /**
  * Les témoignages, sur la landing et sous le paywall. Vide : la section n’apparaît pas. Uniquement de vrais avis, avec
  * l’accord écrit des personnes : jamais d’avis inventé. Ces trois-là sont ceux de testeurs de BLUSH, dans leurs mots,
- * donnés le 16 octobre (l’écran les présente comme des testeurs).
+ * donnés le 16 octobre.
  * TODO(produit): garder leur accord écrit, et les remplacer par des avis de clients quand il y en aura.
  */
-/** Sous le titre des témoignages (la landing, le paywall) : qui les a écrits. */
-export const AUTEURS_DES_TEMOIGNAGES = "Nos testeurs, avec leurs mots";
-
 export const TESTIMONIALS: Testimonial[] = [
   {
     name: "Mattheo",

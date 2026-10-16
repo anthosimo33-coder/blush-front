@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { AUTEURS_DES_TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
+import { TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
@@ -426,7 +426,15 @@ function Temoignages({ items }: { items: Testimonial[] }) {
         <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
           {PAYWALL.temoignages}
         </h2>
-        <p className="m-0 text-legende font-extrabold text-grey lg:text-note">{AUTEURS_DES_TEMOIGNAGES}</p>
+        {NOTE_DES_AVIS && (
+          <p className="m-0 flex items-center gap-1.5 text-legende font-extrabold text-grey lg:text-note">
+            <span aria-hidden="true" className="text-attente">
+              ★
+            </span>
+            <span className="font-black text-ink">{NOTE_DES_AVIS.note}</span>
+            {PAYWALL.avis(NOTE_DES_AVIS.nombre)}
+          </p>
+        )}
       </div>
       <div
         ref={piste}
