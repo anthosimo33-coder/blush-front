@@ -343,9 +343,12 @@ async function executer(t: Tache): Promise<Issue> {
     /*
      * Une prise du mode tournage (src/server/tournage.ts) : sa lecture est recopiée, rien de la chaîne ne passe au modèle
      * pour elle (un vocal d’une version du script plus récente, par exemple). L’étape s’arrête là, sans alerte ni essai
-     * de plus, et ne repart plus. Les mises à jour de la mémoire, à côté de la chaîne, restent celles du vrai chat
+     * de plus, et ne repart plus. Sauf le vocal d’une prise rejouée qui n’en a pas : celui de la source disait le prénom
+     * de sa créatrice (rejouer, renommerLesPrises). Les mises à jour de la mémoire, à côté de la chaîne, restent celles du
+     * vrai chat
      */
-    if ((story.tournageId || story.tournageLe) && (GENRES_CHAINE as readonly Genre[]).includes(t.kind)) {
+    const vocalAuPrenom = t.kind === "vocal" && !!story.tournageLe && !(await vocalLu(story.id));
+    if ((story.tournageId || story.tournageLe) && (GENRES_CHAINE as readonly Genre[]).includes(t.kind) && !vocalAuPrenom) {
       await echouer(t, "tournage", true);
       return "echec";
     }
