@@ -25,18 +25,33 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
   const achat = typeof sp.achat === "string" ? await getAchatPaye(sp.achat) : null;
   if (!achat?.storyId) redirect("/rapport");
   /* Où reprendre après : seulement une adresse interne */
-  const next = suiteSure(sp.suite);
+  const demandee = suiteSure(sp.suite);
   /*
    * Ce que le déblocage ouvre : les chapitres du rapport moins ceux qui étaient offerts (src/contenu/chapitres.ts), et
    * la lecture reprend au premier payant.
    */
   const payload = await getReport();
   const chapitres = payload?.report.chapters ?? [];
+  /*
+   * Payée avant d’être lue (le paywall d’abord) : pas encore de verdict, le rapport entier s’ouvre, et la suite est la
+   * lecture qui commence (/lecture), puis le verdict
+   */
+  const avantLecture = !payload;
+  const next = demandee ?? (avantLecture ? "/lecture" : null);
   /* Un rapport écrit peut avoir moins de huit chapitres (une moitié rendue incomplète) : on compte les siens */
-  const restants = Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
+  const restants = avantLecture ? NB_CHAPITRES : Math.max(1, (chapitres.length || NB_CHAPITRES) - CHAPITRES_OFFERTS);
+  const offerts = avantLecture ? 0 : CHAPITRES_OFFERTS;
   return (
     <PageDeConv rendu={rendu}>
-      <EcranDebloque achat={achat.id} offre={achat.offre} bulles={achat.bulles} next={next} restants={restants} total={restants + CHAPITRES_OFFERTS} reprise={PREMIER_PAYANT} />
+      <EcranDebloque
+        achat={achat.id}
+        offre={achat.offre}
+        bulles={achat.bulles}
+        next={next}
+        restants={restants}
+        total={restants + offerts}
+        reprise={avantLecture ? 1 : PREMIER_PAYANT}
+      />
     </PageDeConv>
   );
 }

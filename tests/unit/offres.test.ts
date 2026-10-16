@@ -10,13 +10,13 @@ import { FORMULES, OFFRES } from "@/types";
  */
 describe("le catalogue", () => {
   it.each<[string, number, number | null, number, boolean, string | null]>([
-    ["rapport", 990, null, 10, true, null],
-    ["premium", 1490, 1980, 90, true, null],
-    ["suite", 690, 990, 10, true, "suite"],
-    ["premium_ajout", 500, 990, 80, false, "premium_ajout"],
-    ["pack30", 490, null, 30, false, null],
-    ["pack80", 990, null, 80, false, null],
-    ["pack200", 1990, null, 200, false, null],
+    ["rapport", 1390, null, 10, true, null],
+    ["premium", 1890, 2780, 90, true, null],
+    ["suite", 1090, 1390, 10, true, "suite"],
+    ["premium_ajout", 500, 1390, 80, false, "premium_ajout"],
+    ["pack30", 890, null, 30, false, null],
+    ["pack80", 1390, null, 80, false, null],
+    ["pack200", 2390, null, 200, false, null],
   ])("%s : %i centimes (barré %s), %i bulles, conv %s, offre unique %s", (id, centimes, barre, bulles, conv, unique) => {
     expect(CATALOGUE[id as keyof typeof CATALOGUE]).toMatchObject({ id, centimes, barre, bulles, conv, unique });
   });
@@ -39,7 +39,7 @@ describe("le catalogue", () => {
   it("les prix s’écrivent à la française, l’insécable avant €", () => {
     expect(enEuros(990)).toBe("9,90\u00a0€");
     expect(enEuros(500)).toBe("5,00\u00a0€");
-    expect(prixDe("premium")).toBe("14,90\u00a0€");
+    expect(prixDe("premium")).toBe("18,90\u00a0€");
   });
 
   it("la feuille « Ta formule » : le rapport seul, puis Premium, choisie d’avance", () => {
@@ -55,8 +55,8 @@ describe("le catalogue", () => {
 describe("les textes du paiement, tirés du catalogue", () => {
   it("le bas de l’aperçu gratuit", () => {
     expect(PIED_GRATUIT).toEqual({
-      lire: "Lire la suite · 9,90\u00a0€",
-      lireGarde: "Lire la suite · 4,95\u00a0€",
+      lire: "Lire la suite · 13,90\u00a0€",
+      lireGarde: "Lire la suite · 6,95\u00a0€",
       lireAvance: "Lire la suite · 0\u00a0€",
       offertes: "10 bulles offertes avec ton rapport",
       regle: "1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux",
@@ -74,21 +74,21 @@ describe("les textes du paiement, tirés du catalogue", () => {
       note: "Soit 90 bulles en tout",
       bulles: "60 bulles",
       plus: "+ 30 bulles",
-      barreOffertes: "4,90\u00a0€",
+      barreOffertes: "8,90\u00a0€",
       gratuit: "0\u00a0€",
-      economie: "Économise 4,90\u00a0€ · la bulle à 0,06\u00a0€",
+      economie: "Économise 8,90\u00a0€ · la bulle à 0,06\u00a0€",
     });
-    expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 14,90\u00a0€");
+    expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 18,90\u00a0€");
   });
 
-  it("l’offre ① : la suite à −30 %, 3 € de moins, 10 bulles offertes", () => {
+  it("l’offre ① : la suite à −22 %, 3 € de moins, 10 bulles offertes", () => {
     expect(OFFRE_SUITE).toMatchObject({
-      titre: "Ta suite à −30\u00a0%",
-      prix: "6,90\u00a0€",
-      barre: "9,90\u00a0€",
+      titre: "Ta suite à −22\u00a0%",
+      prix: "10,90\u00a0€",
+      barre: "13,90\u00a0€",
       economie: "−3\u00a0€",
       contenu: "10 bulles offertes",
-      prendre: "Je la prends · 6,90\u00a0€",
+      prendre: "Je la prends · 10,90\u00a0€",
     });
     expect(`${OFFRE_SUITE.avant}${OFFRE_SUITE.remise}`).toBe(OFFRE_SUITE.titre);
   });
@@ -96,7 +96,7 @@ describe("les textes du paiement, tirés du catalogue", () => {
   it("l’offre ③ et « C’est débloqué »", () => {
     expect(OFFRE_PREMIUM_AJOUT).toMatchObject({
       titre: "Passe en Premium pour 5\u00a0€ de plus",
-      texte: "80 bulles en plus, comme en Premium. Seules, elles coûtent 9,90\u00a0€.",
+      texte: "80 bulles en plus, comme en Premium. Seules, elles coûtent 13,90\u00a0€.",
       prendre: "Ajouter 80 bulles · 5\u00a0€",
       plus: "+ 80",
     });

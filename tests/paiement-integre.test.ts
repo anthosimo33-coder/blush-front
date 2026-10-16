@@ -202,13 +202,13 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
           email: u.email,
           metadata: { achat: corps.achat },
           return_url: `https://www.askblush.com/paiement/retour?achat=${corps.achat}`,
-          plan: expect.objectContaining({ initial_price: 14.9, currency: "eur", plan_type: "one_time", product_id: "prod_test", visibility: "hidden" }),
+          plan: expect.objectContaining({ initial_price: 18.9, currency: "eur", plan_type: "one_time", product_id: "prod_test", visibility: "hidden" }),
         }),
       },
     ]);
     /* Ni la conv ni un prénom chez Whop */
     expect(JSON.stringify(envoyes)).not.toMatch(/stories|prenom/);
-    expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", fournisseur: "whop", centimes: 1490 });
+    expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", fournisseur: "whop", centimes: 1890 });
   });
 
   it("Whop qui refuse : un sous-statut refusé ou un 402, 402 « carte » (l’achat échoue) ; un autre refus net (4xx), 502 « panne » (l’achat échoue aussi)", async () => {
@@ -292,7 +292,7 @@ describe("ce que la feuille doit savoir (GET /api/paiement/feuille)", () => {
 });
 
 describe("le 2e rapport (⑤), un rapport d’avance", () => {
-  it("après Premium : montré pour l’achat qui vient d’être payé, payé 4,95 € ; rien n’est livré à l’achat (ni conv, ni bulles), la feuille le dit, valable un an", async () => {
+  it("après Premium : montré pour l’achat qui vient d’être payé, payé 6,95 € ; rien n’est livré à l’achat (ni conv, ni bulles), la feuille le dit, valable un an", async () => {
     const { u } = await acheteur("second-prix");
     const premium = await payeDansLaFeuille("premium");
     expect(await montrer("second_rapport")).toEqual({ offre: null });
@@ -301,7 +301,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     /* Livré seulement à son usage : aucune renonciation gardée à l’achat, même envoyée par le navigateur */
     expect(await achatEnBase(second)).toMatchObject({
       offre: "second",
-      centimes: 495,
+      centimes: 695,
       bulles: 0,
       storyId: null,
       utiliseLe: null,
@@ -321,7 +321,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     const { u } = await acheteur("second-usage");
     const second = await secondPris();
     const conv = await autreConv(u);
-    /* Le rapport d’avance (0 €) vaut mieux qu’① (6,90 €) : elle ne se montre pas (ARG-2) */
+    /* Le rapport d’avance (0 €) vaut mieux qu’① (10,90 €) : elle ne se montre pas (ARG-2) */
     expect(await montrer("suite")).toEqual({ offre: null });
     expect(await utiliser({ renonciation: "2020-01-01" })).toEqual({ status: 422, corps: { erreur: "renonciation" } });
     const avant = Date.now();
@@ -405,7 +405,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
 });
 
 describe("le −50 % gardé (⑥) et les offres du merci", () => {
-  it("le 2e rapport refusé après Premium : « Garde-le-moi » le garde 7 jours ; la conv suivante paie le rapport seul 4,95 €, une fois", async () => {
+  it("le 2e rapport refusé après Premium : « Garde-le-moi » le garde 7 jours ; la conv suivante paie le rapport seul 6,95 €, une fois", async () => {
     const { u } = await acheteur("garde");
     const premium = await payeDansLaFeuille("premium");
     /* Sans le 2e rapport montré d’abord, rien à garder */
@@ -417,11 +417,11 @@ describe("le −50 % gardé (⑥) et les offres du merci", () => {
     expect(Math.abs(fin - (Date.now() + DUREE_GARDE_MS))).toBeLessThan(60_000);
     expect((await feuille()).garde).toEqual({ fin: (garde as { fin: string }).fin });
     const conv = await autreConv(u);
-    /* Le −50 % gardé (4,95 €) vaut mieux qu’① (6,90 €) : elle ne se montre pas (ARG-2) */
+    /* Le −50 % gardé (6,95 €) vaut mieux qu’① (10,90 €) : elle ne se montre pas (ARG-2) */
     expect(await montrer("suite")).toEqual({ offre: null });
     /* Sans le −50 % : pas de rapport à moitié prix ; avec lui, pour cette autre conv */
     const achat = await payeDansLaFeuille("rapport_garde");
-    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 495, bulles: 10, storyId: conv, offreUnique: "garde_second" });
+    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 695, bulles: 10, storyId: conv, offreUnique: "garde_second" });
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect((await feuille()).garde).toBeNull();
     await autreConv(u);

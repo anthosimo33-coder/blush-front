@@ -34,6 +34,24 @@ export const PIED_GRATUIT = {
   regle: `${CEST_QUOI.texte}, sur tout ce que tu veux`,
 };
 
+/**
+ * Le paywall, avant toute lecture (décidé le 16 octobre) : à la fin de la lecture d’une conv pas encore payée, ce que le
+ * code a compté (les chiffres, les trouvailles), les chapitres du rapport fermés, et le bouton qui ouvre « Ta formule ».
+ * TODO(produit): textes nouveaux, à valider.
+ */
+export const PAYWALL = {
+  surtitre: "Ta lecture est prête",
+  titre: (autre: string) => `Ton rapport sur toi et ${autre} n’attend que toi.`,
+  vu: "Ce que BLUSH voit déjà",
+  chapitres: (n: number) => `Ton rapport · ${n} chapitres`,
+  /* Court, sur une ligne même sur un petit écran : comme le bouton de la feuille (« Débloquer · 18,90 € ») */
+  debloquer: `Débloquer · ${prixDe("rapport")}`,
+  debloquerGarde: `Débloquer · ${prixDe("rapport_garde")}`,
+  debloquerAvance: `Débloquer · ${prixCourt(0)}`,
+  /** Le titre de la feuille « Ta formule » ouverte depuis le paywall : le rapport entier, pas « la suite ». */
+  formule: (autre?: string) => (autre ? `Ton rapport parle de vous deux\u00a0: toi et ${autre}.` : "Ton rapport parle de vous deux."),
+};
+
 /** La feuille « Ta formule » (FeuilleFormule) : le rapport seul, ou Premium, choisie d’avance. */
 export const FEUILLE_FORMULE = {
   titre: (autre?: string) => (autre ? `La suite parle de vous deux\u00a0: toi et ${autre}.` : "La suite parle de vous deux."),
@@ -167,8 +185,9 @@ export const DEBLOQUE = {
   titre: "C’est débloqué.",
   /* Sans « pour toujours » : Whop interdit de promettre un accès « à vie » (sa règle des produits ; décision du 13 octobre) */
   phrase: (chapitres: number, bulles: number) => `Les ${chapitres} chapitres sont à toi. Et ${bulles} bulles pour en parler avec BLUSH.`,
-  restants: (chapitres: number) => `Les ${chapitres} chapitres qui restent`,
-  reprise: (chapitre: number) => `Ta lecture reprend au chapitre ${chapitre}`,
+  /** `tous` : rien n’était encore lu (le paywall d’abord), le rapport entier s’ouvre. */
+  restants: (chapitres: number, tous = false) => (tous ? `Tes ${chapitres} chapitres` : `Les ${chapitres} chapitres qui restent`),
+  reprise: (chapitre: number) => (chapitre === 1 ? "BLUSH lit ta conv\u00a0: ton verdict arrive dans une minute" : `Ta lecture reprend au chapitre ${chapitre}`),
   bulles: (bulles: number) => `${bulles} bulles pour parler à BLUSH`,
   bullesSous: "1 bulle = 1 réponse · elles n’expirent jamais",
   avance: "1 rapport d’avance",

@@ -151,7 +151,8 @@ function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => 
  * du rapport). `proposerLaSuite` : fermée sans payer, proposer l’offre ① (par défaut) ; faux quand la fermer quitte la
  * page (le chat, sa fiche, « Ta question » : on revient au rapport), où l’offre serait montrée, et son compte à rebours
  * lancé, sans que personne la voie. Sur ordinateur, ses feuilles couvrent tout l’écran, en-tête compris (belowHeader
- * faux), et son titre garde sa taille du prototype (26 px).
+ * faux), et son titre garde sa taille du prototype (26 px). `entete` : un autre titre (le paywall, avant toute lecture :
+ * le rapport entier, pas « la suite »).
  */
 export function FeuilleFormule({
   open,
@@ -160,6 +161,7 @@ export function FeuilleFormule({
   chapitres = CHAPITRES_A_DEBLOQUER,
   suite,
   proposerLaSuite = true,
+  entete,
 }: {
   open: boolean;
   onClose: () => void;
@@ -167,13 +169,14 @@ export function FeuilleFormule({
   chapitres?: number;
   suite?: string;
   proposerLaSuite?: boolean;
+  entete?: string;
 }) {
   const titre = useId();
   useAuPaiement(open);
   const avoirs = useFeuilleDuPaiement().data;
   /* Le choix fait à la main ; sans lui, le rapport d’avance s’il y en a un, sinon la formule choisie d’avance */
   const [choix, setChoix] = useState<Choix | null>(null);
-  /* Ce que le compte a d’avance passe en tête : le rapport d’avance (0 €), sinon le rapport seul à −50 % gardé (⑥, 4,95 €,
+  /* Ce que le compte a d’avance passe en tête : le rapport d’avance (0 €), sinon le rapport seul à −50 % gardé (⑥, 6,95 €,
      le prix que le bouton d’ouverture annonce : SUP16-1), sinon la formule conseillée */
   const choisie: Choix = choix ?? (avoirs?.avance ? "avance" : avoirs?.garde ? "rapport" : FORMULE_CHOISIE);
   const [bulle, setBulle] = useState(false);
@@ -233,7 +236,7 @@ export function FeuilleFormule({
             paye && "sr-only",
           )}
         >
-          {FEUILLE_FORMULE.titre(autre)}
+          {entete ?? FEUILLE_FORMULE.titre(autre)}
         </h2>
         {!paye && (
           <>

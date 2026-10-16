@@ -175,8 +175,8 @@ describe("le direct", () => {
     [{ genre: "arrivee", ville: "Lyon", le: "", source: "direct" }, "arrive en direct", null],
     [{ genre: "import", ville: "Lyon", le: "" }, "a importé une conv", null],
     [{ genre: "paiement", ville: "Lyon", le: "", offre: "premium" }, "ouvre le paiement · Premium", null],
-    [{ genre: "achat", ville: "Lyon", le: "", offre: "pack80" }, "a pris 80 bulles", `9,90${NB}€`],
-    [{ genre: "achat", ville: "Lyon", le: "", offre: "suite" }, "a pris Ta suite", `6,90${NB}€`],
+    [{ genre: "achat", ville: "Lyon", le: "", offre: "pack80" }, "a pris 80 bulles", `13,90${NB}€`],
+    [{ genre: "achat", ville: "Lyon", le: "", offre: "suite" }, "a pris Ta suite", `10,90${NB}€`],
     [{ genre: "partage", ville: "Lyon", le: "" }, "a partagé son verdict", null],
   ])("le geste %o : « %s »", (g, quoi, prix) => {
     expect(texteDuGeste(g)).toEqual({ ville: "Lyon", quoi, prix });

@@ -61,7 +61,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le revenu par acheteur",
     quoi: "Ce qu’un acheteur dépense en moyenne sur la période, recharges de bulles comprises.",
     calcul: "Le payé TTC de la période (remboursements non retirés), divisé par les comptes qui ont payé au moins un achat.",
-    repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 15\u00a0€.",
+    repere: "Au-dessus de 13,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 19\u00a0€.",
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
   marge: {

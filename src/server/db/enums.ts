@@ -21,8 +21,12 @@ export type AvanceMoitie = { progres: number; ecrits: number[]; enCours: number 
 /** Le détail de l’avancée d’une tâche (tasks.detail) : les deux moitiés du rapport, chapitre par chapitre. */
 export type DetailEcriture = { a: AvanceMoitie; b: AvanceMoitie };
 
-/** tasks.status : attente → en_cours → fini, ou echec (BACKEND.md, « Les tâches »). */
-export const STATUTS_TACHE = ["attente", "en_cours", "fini", "echec"] as const;
+/**
+ * tasks.status : attente → en_cours → fini, ou echec (BACKEND.md, « Les tâches »). `paiement` : le verdict d’une conv
+ * pas encore payée, qui attend son paiement sans jamais partir (le paywall passe avant toute lecture, décidé le
+ * 16 octobre) ; le paiement le passe en attente (lancerApresPaiement, src/server/pipeline.ts).
+ */
+export const STATUTS_TACHE = ["attente", "en_cours", "fini", "echec", "paiement"] as const;
 export type StatutTache = (typeof STATUTS_TACHE)[number];
 
 /** chat_messages.role : son message, ou la réponse de BLUSH. */

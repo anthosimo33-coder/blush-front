@@ -98,7 +98,7 @@ async function relancesPour(email: string, etape: () => Promise<unknown>): Promi
   const log = vi.spyOn(console, "log").mockImplementation(() => {});
   try {
     await etape();
-    return log.mock.calls.flat().filter((l) => String(l) === `[dev] mail « Ta suite t’attend » pour ${email}`).length;
+    return log.mock.calls.flat().filter((l) => String(l) === `[dev] mail « Ton rapport t’attend » pour ${email}`).length;
   } finally {
     log.mockRestore();
   }
@@ -114,7 +114,21 @@ const relanceNotee = async (u: Utilisateur) =>
   )[0] ?? null;
 
 describe("la relance par mail (②)", () => {
-  it("deux heures après la ① montrée sans paiement : « Ta suite t’attend », une seule fois par compte, pour la bonne conv", async () => {
+  it("une conv qui attend son paiement (le paywall d’abord, sans verdict) : la relance part ; sans verdict ni paiement attendu, non", async () => {
+    const u = await compteDeTest("relance-paywall");
+    const conv = (await convRattachee(u, "01-a-deux-doigts.txt")).id;
+    await feuilleFermee(u, conv);
+    /* Ni verdict, ni « Qui es-tu ? » envoyé : rien à relancer */
+    expect(await relancesPour(u.email, envoyerLesRelances)).toBe(0);
+    await db()
+      .delete(schema.offresUniques)
+      .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "relance_mail")));
+    await db().insert(schema.tasks).values({ storyId: conv, kind: "verdict", status: "paiement" });
+    expect(await relancesPour(u.email, envoyerLesRelances)).toBe(1);
+    expect(await relanceNotee(u)).toEqual({ storyId: conv });
+  });
+
+  it("deux heures après la ① montrée sans paiement : « Ton rapport t’attend », une seule fois par compte, pour la bonne conv", async () => {
     const { u, conv } = await compteAvecConv("relance-feuille");
     await feuilleFermee(u, conv);
     expect(await relancesPour(u.email, envoyerLesRelances)).toBe(1);
@@ -211,7 +225,7 @@ describe("la relance par mail (②)", () => {
     await poserLeCompteur(max - 1);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const passage = await envoyerLesRelances();
-    const pour = (e: string) => log.mock.calls.flat().filter((l) => String(l) === `[dev] mail « Ta suite t’attend » pour ${e}`).length;
+    const pour = (e: string) => log.mock.calls.flat().filter((l) => String(l) === `[dev] mail « Ton rapport t’attend » pour ${e}`).length;
     /* Une seule part (la dernière place du jour), l’autre attend : retenue, et pas notée */
     expect(pour(a.u.email) + pour(b.u.email)).toBe(1);
     expect(passage.retenues).toBeGreaterThanOrEqual(1);
@@ -293,7 +307,7 @@ describe("la relance par mail (②)", () => {
       lien: "https://www.askblush.com/ouvrir/abc?paiement=1",
       desinscription: "https://www.askblush.com/desinscription?id=u1&cle=k1",
     });
-    expect(m.sujet).toBe("Ta suite t’attend");
+    expect(m.sujet).toBe("Ton rapport t’attend");
     expect(m.html).toContain('href="https://www.askblush.com/ouvrir/abc?paiement=1"');
     expect(m.html).toContain('href="https://www.askblush.com/desinscription?id=u1&amp;cle=k1"');
     expect(m.texte).toContain("https://www.askblush.com/ouvrir/abc?paiement=1");

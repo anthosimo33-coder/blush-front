@@ -63,10 +63,11 @@ export function Option({
       role="radio"
       aria-checked={on}
       onClick={choisir}
-      className={cn("lift relative flex flex-col gap-2.5 rounded-[20px] bg-white px-4 py-3.5 text-left text-ink", on ? "shadow-selected" : "shadow-soft")}
+      /* Sous 400 px de large, la ligne se resserre (les marges, les écarts, le prix) : « 150 bulles », son tag et « 23,90 € » tiennent sur une ligne, même avec les textes plus larges de Chrome sous Linux */
+      className={cn("lift relative flex flex-col gap-2.5 rounded-[20px] bg-white px-4 py-3.5 text-left text-ink max-[399px]:px-3", on ? "shadow-selected" : "shadow-soft")}
     >
       {badge && <span className="absolute -top-[13px] right-4">{badge}</span>}
-      <span className="flex w-full items-center gap-3.5">
+      <span className="flex w-full items-center gap-3.5 max-[399px]:gap-2.5">
         <RondACocher on={on} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -76,11 +77,11 @@ export function Option({
           <span className="text-legende font-extrabold leading-[1.4]">{note}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end">
-          <span className="text-[21px] font-black leading-none tracking-[-0.01em]">{prix}</span>
+          <span className="text-[21px] font-black leading-none tracking-[-0.01em] max-[399px]:text-[18px]">{prix}</span>
           {barre && <s className="mt-1 text-micro font-extrabold text-grey">{barre}</s>}
         </span>
       </span>
-      {on && children && <span className="flex w-full flex-col gap-1.5 pl-[38px]">{children}</span>}
+      {on && children && <span className="flex w-full flex-col gap-1.5 pl-[38px] max-[399px]:pl-[34px]">{children}</span>}
     </button>
   );
 }

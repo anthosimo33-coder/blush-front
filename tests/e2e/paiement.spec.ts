@@ -34,7 +34,7 @@ test("un pack de bulles : payé chez le faux Whop, crédité, puis l’accueil",
   const { url } = await commencerPaiement(page, "pack30");
   await page.goto(url);
   await expect(page.getByRole("heading", { level: 1, name: "30 bulles" })).toBeVisible();
-  await expect(page.getByText("4,90\u00a0€", { exact: true })).toBeVisible();
+  await expect(page.getByText("8,90\u00a0€", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Payer", exact: true }).click();
   /* Le retour dit les bulles reçues, puis revient là où le paiement a commencé (sans écran pour le dire : l’accueil) */
   await expect(page.getByRole("heading", { level: 1, name: "+30 bulles" })).toBeVisible();
@@ -61,8 +61,8 @@ test("refusé dans la feuille (la banque dit non) : la feuille le dit, rien n’
   const email = emailLibre(testInfo, "refus-feuille");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
-  await page.getByRole("dialog", { name: PAIEMENT }).getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
+  await page.getByRole("dialog", { name: PAIEMENT }).getByRole("button", { name: "Débloquer · 18,90\u00a0€" }).click();
   await payerParCarte(page, { refuser: true });
   const carte = page.getByRole("dialog", { name: CARTE });
   await expect(carte.getByText("Ta banque a dit non. Rien n’a été débité\u00a0: essaie une autre carte.")).toBeVisible();
@@ -100,7 +100,7 @@ test("l’offre ③ après le rapport seul : payée en un geste avec la carte ga
   await lectureFaite(page, testInfo, email);
   /* Le rapport payé dans la feuille, avec la carte de test : sa carte est gardée (pas une page de Whop, ouvrable par n’importe qui : SECA-3) */
   const rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
   const formule = page.getByRole("dialog", { name: PAIEMENT });
   await formule.getByRole("radio", { name: /^Le rapport/ }).click();
   await formule.getByRole("button", { name: /^Débloquer/ }).click();

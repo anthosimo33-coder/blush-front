@@ -23,13 +23,14 @@ import type { Avance } from "./ia/claude";
 import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
 import { rapportOuvertEnBase } from "./droits";
+import { signalerLesAchatsDUneAlerte } from "./achats";
 import { auMieux, journal, journalErreur } from "./journal";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import type { Etape } from "./pipeline";
 import { memoireDeSecours, remplacerLeSecours } from "./secours";
 import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
-import { entreeDe, type Tache } from "./taches";
+import { entreeDe, etatDesTaches, type Tache } from "./taches";
 import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
@@ -83,10 +84,10 @@ const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
   return (a: Avance) => ecrire(calcul(a));
 };
 
-async function verdict(story: LigneComplete, t: Tache) {
+/** Ce que le code sait d’une conv, sans le modèle : ses chiffres, son style, ses trouvailles (le contexte de la conv). */
+function contexteDuCode(story: LigneComplete) {
   const { h, lu, rendu } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
-  /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit */
   const contexte: Contexte = {
     chiffres: rendu.chiffres,
     style: profil(h, lu.messages).bloc,
@@ -94,7 +95,33 @@ async function verdict(story: LigneComplete, t: Tache) {
     dernier: lu.messages.at(-1)!.t,
     trouvailles: trouvailles(chiffres, h, lu.messages),
   };
-  /* Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
+  return { rendu, chiffres, contexte };
+}
+
+/**
+ * Le contexte d’une conv qui attend son paiement, écrit sans aucun appel au modèle : la lecture et le paywall montrent
+ * ses trouvailles avant que rien ne soit payé. Le verdict le récrit, le même, avant son appel.
+ */
+export async function ecrireLeContexte(storyId: string): Promise<void> {
+  const [story] = await db().select().from(schema.stories).where(eq(schema.stories.id, storyId));
+  if (!story?.conv) return;
+  const context = coffre.ecrire("stories.context", contexteDuCode(story).contexte);
+  await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
+}
+
+/**
+ * Ce que le paywall montre d’une conv qui attend son paiement, calculé par le code sans aucun appel au modèle : qui ouvre
+ * la journée, qui relance, qui répond vite (les mêmes lignes que le verdict). null : elle n’attend pas son paiement.
+ */
+export async function apercuAvantPaiement(storyId: string): Promise<ScoreRow[] | null> {
+  const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
+  if (!story?.conv || verdict?.status !== "paiement") return null;
+  return scores(contexteDuCode(story).chiffres);
+}
+
+async function verdict(story: LigneComplete, t: Tache) {
+  const { rendu, chiffres, contexte } = contexteDuCode(story);
+  /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit. Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
   const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, {
@@ -116,6 +143,8 @@ async function verdict(story: LigneComplete, t: Tache) {
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data, createdAt: new Date() } });
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
+  /* Payée avant d’être lue (le paywall d’abord), une conv en alerte est à rembourser : l’équipe est prévenue */
+  if (sortie.alerte) await auMieux(signalerLesAchatsDUneAlerte(story.id, sortie.alerte), "achats d’une alerte non signalés", { histoire: story.id });
 }
 
 /**

@@ -22,7 +22,7 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     const boutons = main.getByRole("link", { name: "Analyser ma conv" });
     await expect(boutons).toHaveCount(2);
     for (const bouton of await boutons.all()) await expect(bouton).toHaveAttribute("href", "/commencer");
-    await expect(main.getByText("Aperçu gratuit · Sans mot de passe")).toHaveCount(2);
+    await expect(main.getByText("Paiement unique · Sans mot de passe")).toHaveCount(2);
     await expect(main.getByRole("heading", { level: 2, name: "Ta conv a déjà la réponse." })).toBeVisible();
   });
 

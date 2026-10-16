@@ -76,7 +76,7 @@ export const telQuel = (titre: string) => titre.replace(/[.*+?^${}()|[\]\\]/g, "
 export const PAIEMENT = "La suite parle de vous deux\u00a0: toi et Maëlys.";
 
 /** Le titre de l’offre unique ① (la feuille du paiement fermée sans payer). */
-export const OFFRE_SUITE = "Ta suite à −30\u00a0%";
+export const OFFRE_SUITE = "Ta suite à −22\u00a0%";
 
 /** L’écran est-il un ordinateur ? Le sommaire y est une colonne à gauche (à partir de 1024 px, le point lg de Tailwind). */
 export const surOrdinateur = (page: Page) => (page.viewportSize()?.width ?? 0) >= 1024;

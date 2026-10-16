@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apresUnRate, attenteApresRates, RATES_MAX, refusDuLancement, useSuiviLecture } from "@/app/lecture/suivi";
+import { apresUnRate, attenteApresRates, avantPaiementA, DUREE_AVANT_PAIEMENT_MS, RATES_MAX, refusDuLancement, useSuiviLecture } from "@/app/lecture/suivi";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { connexionPuis } from "@/lib/suite";
 import { ErreurApi } from "@/types/erreurs-api";
@@ -62,6 +62,15 @@ describe("les règles du suivi", () => {
     expect(refusDuLancement("trop")).toBe("trop");
     expect(refusDuLancement("panne")).toBeNull();
     expect(refusDuLancement(null)).toBeNull();
+  });
+
+  it("la lecture d’une conv qui attend son paiement se déroule en quelques secondes : le compteur, les étapes, une trouvaille de plus par quart, puis la fin", () => {
+    const fin: AnalysisProgress = { progress: 1, messagesRead: 64, stepsDone: 4, discoveries: ["a", "b", "c"], done: false, paiement: true };
+    expect(DUREE_AVANT_PAIEMENT_MS).toBeLessThanOrEqual(6000);
+    expect(avantPaiementA(0, fin)).toMatchObject({ progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false, paiement: true });
+    expect(avantPaiementA(0.35, fin)).toMatchObject({ messagesRead: 32, stepsDone: 1, discoveries: ["a"], done: false });
+    expect(avantPaiementA(0.8, fin)).toMatchObject({ messagesRead: 64, stepsDone: 3, discoveries: ["a", "b", "c"], done: false });
+    expect(avantPaiementA(1.2, fin)).toMatchObject({ progress: 1, messagesRead: 64, stepsDone: 3, done: true });
   });
 });
 

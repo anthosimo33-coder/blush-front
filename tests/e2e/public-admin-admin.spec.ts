@@ -56,7 +56,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(page.getByRole("img", { name: /^Le payé par jour, sur 7\s+jours/ })).toBeAttached();
     await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(8);
     /* Les quatre coups de pouce, les trois gestes de l’équipe */
-    for (const offre of ["La suite à 6,90\u00a0€, 5 minutes", "Le mail «\u00a0Ta suite t’attend\u00a0»", "Premium pour 5\u00a0€ de plus", "+40 bulles, première recharge"])
+    for (const offre of ["La suite à 10,90\u00a0€, 5 minutes", "Le mail «\u00a0Ta suite t’attend\u00a0»", "Premium pour 5\u00a0€ de plus", "+40 bulles, première recharge"])
       await expect(page.getByText(offre, { exact: true })).toBeVisible();
     for (const geste of ["Donner des bulles", "Débloquer une conv", "Inviter la liste d’attente"]) await expect(page.getByRole("form", { name: geste })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Période" }).getByRole("link", { name: "7 jours" })).toHaveAttribute("aria-current", "page");

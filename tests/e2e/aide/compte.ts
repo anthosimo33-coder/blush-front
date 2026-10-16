@@ -39,6 +39,11 @@ export type Lecture = {
   ajout?: Ajout;
   /** « En couple » à « Qui es-tu ? » (et « Que ça aille mieux ») : le verdict passe à la température. */
   enCouple?: boolean;
+  /**
+   * Le verdict offert, comme pour un compte d’avant le paywall (16 octobre) : par défaut, pour les écrans de l’aperçu
+   * gratuit, qui restent ceux de ces comptes. Faux : la conv attend son paiement, rien n’est lu (le paywall d’abord).
+   */
+  verdictOffert?: boolean;
 };
 
 /**
@@ -49,7 +54,7 @@ export type Lecture = {
 export async function lireUneConvParApi(
   page: Page,
   testInfo: TestInfo,
-  { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false }: Lecture = {},
+  { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false, verdictOffert = true }: Lecture = {},
 ): Promise<string> {
   const conv = exportWhatsApp(testInfo, { personnes, ajout });
   await prouverHumain(page.request, testInfo);
@@ -67,7 +72,19 @@ export async function lireUneConvParApi(
     timeout: RESEAU,
   });
   expect(lecture.status(), `la lecture de la conv avec ${personnes.autre} part`).toBe(200);
+  if (verdictOffert) await offrirLeVerdict(page, testInfo, story.id);
   return story.id;
+}
+
+/**
+ * Le verdict d’une conv qui attend son paiement, lancé sans paiement, comme pour un compte d’avant le paywall
+ * (16 octobre) : sa tâche passe en attente, et le suivi de la lecture (GET /api/analyse) relance la chaîne. Rien à faire
+ * pour un rapport déjà ouvert (l’équipe), dont le verdict est parti tout de suite.
+ */
+async function offrirLeVerdict(page: Page, testInfo: TestInfo, histoire: string): Promise<void> {
+  await sql()`update tasks set status = 'attente', updated_at = now() where story_id = ${histoire} and status = 'paiement'`;
+  const suivi = await page.request.get("/api/analyse", { headers: origine(testInfo), timeout: RESEAU });
+  expect(suivi.status(), "le suivi de la lecture relance le verdict offert").toBe(200);
 }
 
 /**

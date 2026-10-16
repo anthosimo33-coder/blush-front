@@ -77,7 +77,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
   });
 
   await test.step("« Lire la suite », le rapport seul, « Débloquer », la carte payée dans la feuille : « C’est débloqué »", async () => {
-    await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
     await payerALecran(page, /^Le rapport/);
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
@@ -94,7 +94,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     const ecran = page.getByRole("main");
     const offre = ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" });
     await expect(offre).toBeVisible();
-    await expect(offre.getByText("80 bulles en plus, comme en Premium. Seules, elles coûtent 9,90\u00a0€.")).toBeVisible();
+    await expect(offre.getByText("80 bulles en plus, comme en Premium. Seules, elles coûtent 13,90\u00a0€.")).toBeVisible();
     await expect(offre.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();
     await expect(offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" })).toBeVisible();
     /* L’offre prend la place de la liste et du bouton du bas : « Non merci » continue la lecture */
@@ -143,7 +143,7 @@ test("Premium, choisie d’avance : payée à l’écran, 90 bulles ; le 2e rapp
   /* Le 2e rapport, en un geste : la carte gardée du paiement d’avant ; le tampon, puis la liste */
   const second = ecran.getByRole("region", { name: "Ton 2e rapport à −50\u00a0%" });
   await expect(second.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();
-  await second.getByRole("button", { name: "Je le prends · 4,95\u00a0€" }).click();
+  await second.getByRole("button", { name: "Je le prends · 6,95\u00a0€" }).click();
   await expect(ecran.getByText("1 rapport d’avance")).toBeVisible({ timeout: RESEAU });
   /* La liste seule, 32 px, sur ordinateur comme sur téléphone (le prototype, pas 40 sur ordinateur) */
   await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toHaveCSS("font-size", "32px");
@@ -158,13 +158,13 @@ test("Premium, choisie d’avance : payée à l’écran, 90 bulles ; le 2e rapp
   await expect(page).toHaveURL(/\/rapport#chapitre-2$/);
 });
 
-test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la suite à 6,90 € ; puis ③ sur « C’est débloqué » (les offres du merci suivent la suite)", async ({
+test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la suite à 10,90 € ; puis ③ sur « C’est débloqué » (les offres du merci suivent la suite)", async ({
   page,
 }, testInfo) => {
   const email = emailLibre(testInfo, "suite");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
   await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   await tientEnPetitEcran(page, "« Ta formule », Premium ouverte");
   await fermerLaFeuille(page);
@@ -177,10 +177,10 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
    */
   await page.mouse.move(0, 0);
 
-  await test.step("« Je la prends » (la renonciation dite juste sous lui) : la carte dans la feuille, à 6,90 €", async () => {
+  await test.step("« Je la prends » (la renonciation dite juste sous lui) : la carte dans la feuille, à 10,90 €", async () => {
     await expect(offre.getByText(texteRenonciation("rapport"))).toBeVisible();
-    await offre.getByRole("button", { name: "Je la prends · 6,90\u00a0€" }).click();
-    await expect(page.getByRole("dialog", { name: CARTE }).getByText("6,90\u00a0€", { exact: true })).toBeVisible();
+    await offre.getByRole("button", { name: "Je la prends · 10,90\u00a0€" }).click();
+    await expect(page.getByRole("dialog", { name: CARTE }).getByText("10,90\u00a0€", { exact: true })).toBeVisible();
     await payerParCarte(page);
   });
 
@@ -200,7 +200,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
   const email = emailLibre(testInfo, "suite-passee");
   await lectureFaite(page, testInfo, email);
   let rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
   await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
   await fermerLaFeuille(page);
   await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible();
@@ -208,7 +208,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
   await test.step("sa fin ramenée à quelques secondes (en base : le moyen de test), la page rechargée retrouve l’heure du serveur", async () => {
     await raccourcirLaSuite(email, 8);
     rapport = await ouvrirLeRapport(page);
-    await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await fermerLaFeuille(page);
     const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
@@ -221,7 +221,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
     const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre: "suite", renonciation: RENONCIATION } });
     expect([r.status(), await r.json()]).toEqual([422, { erreur: "offre" }]);
     /* La feuille refermée ne la remontre pas */
-    await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await rapport.getByRole("button", { name: "Lire la suite · 13,90\u00a0€" }).click();
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await fermerLaFeuille(page);
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeHidden();

@@ -11,6 +11,17 @@ export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
 
 export const READING_STEPS = ["Votre histoire, du premier au dernier message", "Qui relance, qui propose, qui s’ouvre", "Le moment où tout a basculé", "Ton verdict"];
 
+/**
+ * Les étapes de la lecture d’une conv pas encore payée (le paywall d’abord) : ce que le code compte vraiment, sans le
+ * modèle (les messages, qui ouvre et qui relance, les mots qui reviennent), puis le rapport prêt à s’écrire.
+ */
+export const READING_STEPS_AVANT_PAIEMENT = [
+  "Vos messages, du premier au dernier",
+  "Qui écrit, qui relance, qui répond vite",
+  "Ce qui revient le plus souvent",
+  "Ton rapport est prêt",
+];
+
 /** Étapes d’export par appli (iMessage ne s’exporte pas : on filme son écran). La version iPhone/Android est choisie selon l’appareil. */
 export const EXPORT_STEPS = {
   whatsapp: {
