@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { TESTIMONIALS } from "@/contenu/landing";
+import { AUTEURS_DES_TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
@@ -106,7 +106,8 @@ export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS
               <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px]">{sous}</p>
               <Preuves />
             </div>
-            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden" />}
+            {/* Sur un écran bas (375 × 667), le témoignage du haut pousserait le bouton qui paie hors de l’écran : il reste plus bas, avec les autres */}
+            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden [@media(max-height:799px)]:hidden" />}
             {scores.length > 0 && (
               <div className="hidden lg:block">
                 <ScoreCard rows={scores.slice(0, 3)} autre={autre.pronoun} />
@@ -421,9 +422,12 @@ function Temoignages({ items }: { items: Testimonial[] }) {
   const defiler = (sens: 1 | -1) => piste.current?.scrollBy({ left: sens * (piste.current.clientWidth * 0.8), behavior: "smooth" });
   return (
     <section aria-labelledby="temoignages" className="flex flex-col gap-4 pt-6 lg:items-center lg:gap-7 lg:pt-10">
-      <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
-        {PAYWALL.temoignages}
-      </h2>
+      <div className="flex flex-col items-center gap-1">
+        <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
+          {PAYWALL.temoignages}
+        </h2>
+        <p className="m-0 text-legende font-extrabold text-grey lg:text-note">{AUTEURS_DES_TEMOIGNAGES}</p>
+      </div>
       <div
         ref={piste}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"
