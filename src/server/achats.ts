@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { bullesDe, CATALOGUE, PREMIERE_RECHARGE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
+import { bullesDuLot, DUREE_DU_SECOND_GAGNE_MS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import type { OffreId } from "@/types";
 import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
@@ -14,6 +15,7 @@ import { auMieux } from "./journal";
 import type { Consentement } from "./juridique";
 import { offreValable } from "./offres-uniques";
 import { reparerLaChaine } from "./pipeline";
+import { lotValable } from "./roue";
 import { noterAchatAuFil } from "./visites";
 
 /*
@@ -72,8 +74,10 @@ export async function rechargeDejaPayee(userId: string): Promise<boolean> {
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
  * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable, et qu’aucune recharge n’a encore été payée. `renonciation` : la renonciation au délai de
- * rétractation donnée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
+ * montré et valable, et qu’aucune recharge n’a encore été payée. Une formule (le rapport, Premium) prend le lot de la
+ * roue gagné et encore valable (src/server/roue.ts) : son prix (prixAvecLot) et ses bulles (bullesDuLot), figés eux
+ * aussi, et le lot noté sur l’achat, pris à la livraison. `renonciation` : la renonciation au délai de rétractation
+ * donnée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
@@ -110,14 +114,18 @@ export async function commander(
   }
   /* ④ : montré et valable, et toujours la première recharge (un autre pack payé depuis l’a passée : la feuille ne le montre plus) */
   const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge")) && !(await rechargeDejaPayee(compte.id));
+  /* Le lot de la roue, sur une formule seulement (et Premium au prix du rapport, sur Premium seulement) */
+  const gagne = c.conv && !c.unique ? await lotValable(compte.id) : null;
+  const lot = gagne && lotSAppliqueA(gagne, offre) ? gagne : null;
   const [achat] = await db()
     .insert(a)
     .values({
       userId: compte.id,
       storyId: c.conv ? storyId : null,
       offre,
-      centimes: c.centimes,
-      bulles: bullesDe(offre, { premiereRecharge: premiere }),
+      centimes: prixAvecLot(offre, lot).centimes,
+      bulles: bullesDe(offre, { premiereRecharge: premiere }) + bullesDuLot(lot),
+      lotRoue: lot,
       offreUnique: c.unique ?? (premiere ? "premiere_recharge" : null),
       fournisseur,
       renonciationVersion: renonciation?.version ?? null,
@@ -179,6 +187,28 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
       if (!prise.length) {
         if (achat.offreUnique !== "premiere_recharge") return { effet: "offre", achat, debloquee: false };
         bulles = bullesDe(achat.offre);
+      }
+    }
+    /*
+     * Le lot de la roue dont il profite, pris ici, une fois, comme une offre unique. Déjà pris par un autre achat : des
+     * bulles en plus se livrent sans elles ; un prix réduit ne se livre pas (« offre », à rembourser). Le 2e rapport à
+     * −50 % gagné se garde 30 jours pour une autre conv (le −50 % gardé, ⑥), s’il ne l’est pas déjà.
+     */
+    if (userId && achat.lotRoue) {
+      const r = schema.roue;
+      const pris = await tx
+        .update(r)
+        .set({ priseLe: sql`now()`, achatId: achat.id })
+        .where(and(eq(r.userId, userId), eq(r.lot, achat.lotRoue), isNull(r.priseLe)))
+        .returning({ lot: r.lot });
+      if (!pris.length) {
+        if (bullesDuLot(achat.lotRoue) === 0 && achat.lotRoue !== "second50") return { effet: "offre", achat, debloquee: false };
+        bulles -= bullesDuLot(achat.lotRoue);
+      } else if (achat.lotRoue === "second50") {
+        await tx
+          .insert(o)
+          .values({ userId, offre: "garde_second", expireLe: sql`now() + make_interval(secs => ${DUREE_DU_SECOND_GAGNE_MS / 1000})` })
+          .onConflictDoNothing();
       }
     }
     /*

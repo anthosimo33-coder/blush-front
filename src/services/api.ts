@@ -14,6 +14,7 @@ import type {
   Fiche,
   FicheFact,
   FicheUpdate,
+  GesteDeLaRoue,
   Goal,
   Guess,
   IssueDuFauxWhop,
@@ -37,6 +38,7 @@ import type {
   HistoriqueChat,
   Moi,
   OffreUniqueMontree,
+  RoueDuCompte,
   PaiementCommence,
   ReponseErreur,
   ReportPayload,
@@ -557,6 +559,14 @@ export async function etatDuPaiement(achat: string, paiement: string | null): Pr
   const corps = await corpsDe<"GET /api/paiement/[achat]">(r);
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
   return corps;
+}
+
+/**
+ * La roue du paywall : la tourner (le serveur tire la case), ou n’en pas vouloir. Une fois par compte : rejouée, la même
+ * réponse revient.
+ */
+export async function jouerLaRoue(geste: GesteDeLaRoue): Promise<RoueDuCompte> {
+  return appel("POST /api/roue", { corps: { geste } });
 }
 
 /**

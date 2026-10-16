@@ -11,6 +11,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  smallint,
   text,
   timestamp,
   unique,
@@ -19,7 +20,19 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
-import { ETAPES_VISITE, EVENEMENTS_ECOUTE, FAMILLES_NAVIGATEUR, GENRES_FIL, METRIQUES_WEB, OFFRES, OFFRES_UNIQUES, SOURCES_VISITE, STATUTS_ACHAT, VOIX } from "../../types";
+import {
+  ETAPES_VISITE,
+  EVENEMENTS_ECOUTE,
+  FAMILLES_NAVIGATEUR,
+  GENRES_FIL,
+  LOTS_DE_LA_ROUE,
+  METRIQUES_WEB,
+  OFFRES,
+  OFFRES_UNIQUES,
+  SOURCES_VISITE,
+  STATUTS_ACHAT,
+  VOIX,
+} from "../../types";
 import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
 
 /*
@@ -475,8 +488,32 @@ export const achats = pgTable(
      * `storyId`, et la renonciation donnée à ce moment-là), ou null tant qu’il attend. Null pour toute autre offre.
      */
     utiliseLe: quand("utilise_le"),
+    /** Le lot de la roue dont il profite (src/contenu/roue.ts), figé à la commande et pris à la livraison, ou null. */
+    lotRoue: text("lot_roue", { enum: LOTS_DE_LA_ROUE }),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
+);
+
+/**
+ * La roue du paywall (src/server/roue.ts) : un tour par compte. La case tirée par le serveur et son lot, valable jusqu’à
+ * `expireLe`, pris par l’achat qui en profite (`priseLe`, `achatId`) ; ou la roue refusée (« Je ne veux pas de cadeau » :
+ * ni case, ni lot). Aucun contenu.
+ */
+export const roue = pgTable(
+  "roue",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** La case tirée (0 à 7, CASES_DE_LA_ROUE), ou null : la roue refusée. */
+    caseTiree: smallint("case_tiree"),
+    lot: text("lot", { enum: LOTS_DE_LA_ROUE }),
+    tireeLe: quand("tiree_le").notNull().defaultNow(),
+    expireLe: quand("expire_le"),
+    priseLe: quand("prise_le"),
+    achatId: uuid("achat_id").references(() => achats.id, { onDelete: "set null" }),
+  },
+  (t) => [index("roue_tiree_idx").on(t.tireeLe)],
 );
 
 /**

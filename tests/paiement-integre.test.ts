@@ -281,11 +281,12 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
 describe("ce que la feuille doit savoir (GET /api/paiement/feuille)", () => {
   it("comment payer dans la feuille : le faux Whop, Whop et son compte, ou rien ; sans avoirs pour commencer", async () => {
     await acheteur("feuille-mode");
-    expect(await feuille()).toEqual({ paiement: { mode: "factice" }, avance: null, garde: null });
+    expect(await feuille()).toEqual({ paiement: { mode: "factice" }, roue: { etat: "a_tourner" }, avance: null, garde: null });
     etat.mode = "whop";
-    expect(await feuille()).toEqual({ paiement: { mode: "whop", compte: WHOP.compte, bacASable: false }, avance: null, garde: null });
+    expect(await feuille()).toEqual({ paiement: { mode: "whop", compte: WHOP.compte, bacASable: false }, roue: { etat: "a_tourner" }, avance: null, garde: null });
+    /* Sans paiement branché, pas de roue : rien ne s’achèterait */
     etat.mode = null;
-    expect(await feuille()).toEqual({ paiement: { mode: null }, avance: null, garde: null });
+    expect(await feuille()).toEqual({ paiement: { mode: null }, roue: { etat: "aucune" }, avance: null, garde: null });
     etat.utilisateur = null;
     expect((await lireFeuille()).status).toBe(401);
   });

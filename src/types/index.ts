@@ -46,6 +46,16 @@ export type OffreUnique = (typeof OFFRES_UNIQUES)[number];
  */
 export const OFFRES_PROPOSEES = ["suite", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"] as const satisfies readonly OffreUnique[];
 export type OffreProposee = (typeof OFFRES_PROPOSEES)[number];
+/**
+ * Les lots de la roue du paywall (src/contenu/roue.ts, src/server/roue.ts), un tour par compte : des bulles en plus
+ * (10, 20, 30), une remise sur la formule (−10 %, −15 %), le 2e rapport à −50 % gardé 30 jours, ou Premium au prix du
+ * rapport. Chacun vaut 15 minutes, sur la formule payée ensuite.
+ */
+export const LOTS_DE_LA_ROUE = ["bulles10", "bulles20", "bulles30", "moins10", "moins15", "second50", "premium_prix"] as const;
+export type LotDeLaRoue = (typeof LOTS_DE_LA_ROUE)[number];
+/** Ce que le compte fait de la roue (POST /api/roue) : la tourner, ou n’en pas vouloir. */
+export const GESTES_DE_LA_ROUE = ["tourner", "refuser"] as const;
+export type GesteDeLaRoue = (typeof GESTES_DE_LA_ROUE)[number];
 /** Ce que le faux Whop (BLUSH_PAIEMENT_FACTICE, jamais en ligne) fait d’un achat : le payer, le refuser, ou le rembourser (un moyen de test). */
 export const ISSUES_DU_FAUX_WHOP = ["payer", "refuser", "rembourser"] as const;
 export type IssueDuFauxWhop = (typeof ISSUES_DU_FAUX_WHOP)[number];

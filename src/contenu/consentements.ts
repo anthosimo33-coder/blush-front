@@ -17,8 +17,11 @@
  * TODO(produit): à relire par un juriste (le consentement explicite que demande le RGPD, article 9, pour ce qui est intime).
  */
 export const CASE_IMPORT = {
-  /* Le 16 octobre : les conditions disent la lecture payée avant d’être écrite (plus de verdict offert), et la grille de prix du jour */
-  version: "2026-10-16",
+  /*
+   * Le 16 octobre : les conditions disent la lecture payée avant d’être écrite (plus de verdict offert), et la grille de
+   * prix du jour ; puis (« .2 ») le règlement de la roue
+   */
+  version: "2026-10-16.2",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",
