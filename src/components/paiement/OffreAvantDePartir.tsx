@@ -39,6 +39,7 @@ export function OffreAvantDePartir({
   onRefus,
   onPassee,
   onClosed,
+  textes,
 }: {
   fin: number;
   chapitres: number;
@@ -46,7 +47,10 @@ export function OffreAvantDePartir({
   onRefus: () => void;
   onPassee: () => void;
   onClosed: () => void;
+  /** D’autres textes que ceux de l’offre en ligne (les propositions de /apercu/paywall) ; `apres` suit la remise rose du titre. */
+  textes?: Partial<typeof OFFRE_SUITE> & { apres?: string };
 }) {
+  const t = { apres: "", ...OFFRE_SUITE, ...textes };
   const titre = useId();
   const idFin = useId();
   const [maintenant, setMaintenant] = useState(() => Date.now());
@@ -83,14 +87,15 @@ export function OffreAvantDePartir({
         <div className="relative">
           <BubbleLogo size={76} />
           <span className="absolute -right-[58px] -top-1 rotate-[8deg] rounded-[16px] rounded-bl-[5px] bg-[linear-gradient(160deg,#FF9BCB,#E8358A)] px-3 py-1.5 font-sans text-detail font-bold text-white shadow-[0_10px_20px_-10px_rgba(232,53,138,0.8)]">
-            {OFFRE_SUITE.attends}
+            {t.attends}
           </span>
         </div>
         <h2 id={titre} className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em]">
-          {OFFRE_SUITE.avant}
-          <span className="text-elle-ink">{OFFRE_SUITE.remise}</span>
+          {t.avant}
+          <span className="text-elle-ink">{t.remise}</span>
+          {t.apres}
         </h2>
-        <p className="m-0 text-note font-extrabold text-soft">{OFFRE_SUITE.sousTitre}</p>
+        <p className="m-0 text-note font-extrabold text-soft">{t.sousTitre}</p>
       </div>
       <div className="flex flex-col gap-2.5 rounded-[22px] bg-ink px-4 py-3.5 text-white shadow-[0_18px_36px_-18px_rgba(17,17,20,0.7)]">
         <span className="flex items-center justify-between">
@@ -99,7 +104,7 @@ export function OffreAvantDePartir({
               <span className="absolute inset-0 animate-ping rounded-full bg-elle opacity-70" />
               <span className="relative size-2.5 rounded-full bg-elle" />
             </span>
-            <span id={idFin}>{OFFRE_SUITE.fin}</span>
+            <span id={idFin}>{t.fin}</span>
           </span>
           {/* Lu à la demande, pas à chaque seconde (aria-live="off") */}
           <span role="timer" aria-live="off" aria-labelledby={idFin} className="text-[30px] font-black leading-none tracking-[-0.02em] tabular-nums">
@@ -115,32 +120,32 @@ export function OffreAvantDePartir({
         </span>
       </div>
       <div className="flex items-center justify-center gap-3">
-        <span className="text-[50px] font-black leading-none tracking-[-0.03em]">{OFFRE_SUITE.prix}</span>
+        <span className="text-[50px] font-black leading-none tracking-[-0.03em]">{t.prix}</span>
         <span className="flex flex-col items-start gap-1">
           <s className="text-carte font-extrabold text-grey">
             <span className="sr-only">{FEUILLE_FORMULE.auLieuDe}</span>
-            {OFFRE_SUITE.barre}
+            {t.barre}
           </s>
-          <Tag tone="risque">{OFFRE_SUITE.economie}</Tag>
+          <Tag tone="risque">{t.economie}</Tag>
         </span>
       </div>
       <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
         <li>
           <Pastille>
             <Icon name="check" size={14} stroke={3} className="text-vrai-ink" />
-            {OFFRE_SUITE.chapitres(chapitres)}
+            {t.chapitres(chapitres)}
           </Pastille>
         </li>
         <li>
           <Pastille>
             <Icon name="check" size={14} stroke={3} className="text-vrai-ink" />
-            {OFFRE_SUITE.vocal}
+            {t.vocal}
           </Pastille>
         </li>
         <li>
           <Pastille rose>
             <Perle taille={15} />
-            {OFFRE_SUITE.contenu}
+            {t.contenu}
           </Pastille>
         </li>
       </ul>
@@ -149,7 +154,7 @@ export function OffreAvantDePartir({
           offre="suite"
           centimes={CATALOGUE.suite.centimes}
           titre={CATALOGUE.suite.titre}
-          libelle={OFFRE_SUITE.prendre}
+          libelle={t.prendre}
           quoi="rapport"
           suite={suite}
           /* Plus vendue (prise dans un autre onglet, ou passée côté serveur) : elle s’efface, comme à la fin du compte à rebours */
@@ -160,7 +165,7 @@ export function OffreAvantDePartir({
         />
         {!paye && !occupe && (
           <Button variant="link" onClick={refuser}>
-            {OFFRE_SUITE.non}
+            {t.non}
           </Button>
         )}
       </div>
