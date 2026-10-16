@@ -64,7 +64,7 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(premium).toContainText("+30 bulles offertes");
     await expect(premium).toHaveAttribute("aria-checked", "true");
     await expect(ecran.getByRole("button", { name: "Débloquer · 18,90\u00a0€" })).toBeVisible();
-    await expect(ecran.getByText(/^Tu économises 8,90\u00a0€ · Ton verdict arrive à \d\d\u00a0h\u00a0\d\d$/)).toBeVisible();
+    await expect(ecran.getByText(/Tu économises|Ton verdict arrive/)).toHaveCount(0);
     await expect(ecran.getByText(/4,8 · 654 avis · déjà 1,2\u00a0million de messages lus$/)).toBeVisible();
     await paieEnPetitEcran(page, "Débloquer · 18,90\u00a0€");
     expect(await verdictsEcrits(email)).toBe(0);

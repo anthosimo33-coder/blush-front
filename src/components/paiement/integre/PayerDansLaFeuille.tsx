@@ -66,6 +66,11 @@ type Proprietes = {
   livre?: (e: EtatAchat) => void;
   /** La flèche du bouton principal, comme celui qu’il remplace. */
   fleche?: boolean;
+  /**
+   * Sans la ligne de la carte gardée sous le portefeuille (le paywall, décidé le 16 octobre) : la feuille de la carte la
+   * dit toujours avant son bouton, et les conditions aussi.
+   */
+  sansCarteGardee?: boolean;
   className?: string;
 };
 
@@ -293,7 +298,7 @@ function Boutons({
         </Button>
       )}
       {p.quoi && <MentionRenonciation quoi={p.quoi} etat={parcours.renonciation} />}
-      {portefeuille && <p className="m-0 text-center text-micro font-extrabold leading-[1.45] text-pale">{DANS_LA_FEUILLE.garder}</p>}
+      {portefeuille && !p.sansCarteGardee && <p className="m-0 text-center text-micro font-extrabold leading-[1.45] text-pale">{DANS_LA_FEUILLE.garder}</p>}
     </div>
   );
 }

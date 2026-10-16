@@ -495,7 +495,7 @@ export const STATES = [
       await page.waitForTimeout(700);
     },
     note: "Le titre est une trouvaille du code qui nomme l’autre. La note des avis et les témoignages n’apparaissent qu’avec de vrais avis.",
-    changement: "Le paywall prime (G3)\u00a0: les cadeaux de Premium à 0\u00a0€, ce qu’on économise et l’heure du verdict, la note des avis.",
+    changement: "Le paywall prime (G3)\u00a0: les cadeaux de Premium à 0\u00a0€, la note des avis, la discrétion.",
   },
   {
     id: "P2b",
