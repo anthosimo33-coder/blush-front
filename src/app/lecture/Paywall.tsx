@@ -30,7 +30,7 @@ import type { Formule, OffreId, ScoreRow, Story } from "@/types";
  * Le paywall, avant toute lecture (décidé le 16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) : la
  * conv est importée, « Qui es-tu ? » rempli, et rien n’est encore parti au modèle. Vos prénoms, le chiffre qui frappe
  * (une trouvaille du code), le rapport fermé en une carte, puis les deux formules et le bouton qui paie, sans feuille.
- * Mobile : tout tient en 375 × 667 ; ordinateur : l’accroche à gauche (avec les lignes du code), le paiement à droite.
+ * Mobile : tout tient en 375 × 667 (resserré sous 700 px de haut) ; ordinateur : l’accroche à gauche (avec les lignes du code), le paiement à droite.
  * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans
  * payer (il n’y a plus de feuille à fermer). Payé, « C’est débloqué » mène à la vraie lecture (/lecture).
  */
@@ -59,13 +59,13 @@ export function Paywall({ story, scores, trouvailles }: { story: Story; scores: 
   const { titre, sous } = accroche(trouvailles, autre.name);
   const [bulle, setBulle] = useState(false);
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[1120px] flex-col gap-3 px-4 pb-4 pt-3 lg:justify-center lg:gap-8 lg:px-12 lg:py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-[1120px] flex-col gap-3 px-4 pb-4 pt-3 max-lg:[@media(max-height:700px)]:gap-2 max-lg:[@media(max-height:700px)]:pt-2 lg:justify-center lg:gap-8 lg:px-12 lg:py-10">
       <div className="flex items-center justify-center gap-1.5 lg:justify-start">
         <BubbleLogo size={16} />
         <span className="text-note font-black">askblush.com</span>
       </div>
-      <div className="flex flex-1 flex-col gap-3 lg:grid lg:flex-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-14">
-        <section className="flex flex-col gap-3 lg:gap-5">
+      <div className="flex flex-1 flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:grid lg:flex-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-14">
+        <section className="flex flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:gap-5">
           <div className="flex items-center gap-2.5">
             <AvatarPair me={moi.initial} other={autre.initial} size={36} />
             <div className="flex min-w-0 flex-col">
@@ -76,7 +76,9 @@ export function Paywall({ story, scores, trouvailles }: { story: Story; scores: 
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <h1 className="m-0 text-[27px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] lg:text-[46px]">{titre}</h1>
+            <h1 className="m-0 text-[27px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] max-lg:[@media(max-height:700px)]:text-[24px] lg:text-[46px]">
+              {titre}
+            </h1>
             <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-corps">{sous}</p>
           </div>
           {scores.length > 0 && (
@@ -102,7 +104,7 @@ function RapportFerme({ autre, expliquer }: { autre: string; expliquer: () => vo
   /* La bascule et l’autre : courts et parlants, sur une ligne même en 375 px */
   const montres = [titres[0]!, titres[3]!];
   return (
-    <div className="flex flex-col gap-2.5 rounded-card bg-white px-4 py-3.5 shadow-card">
+    <div className="flex flex-col gap-2.5 rounded-card bg-white px-4 py-3.5 shadow-card max-lg:[@media(max-height:700px)]:gap-2 max-lg:[@media(max-height:700px)]:py-3">
       <div className="flex items-center justify-between">
         <span className="text-legende font-black text-grey">{PAYWALL.chapitres(NB_CHAPITRES)}</span>
         <Icon name="lock" size={16} stroke={2.6} className="text-grey" />
@@ -154,10 +156,10 @@ function Paiement() {
   const relire = () => window.location.reload();
 
   return (
-    <section className="mt-auto flex flex-col gap-2.5 lg:mt-0 lg:gap-3 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
+    <section className="mt-auto flex flex-col gap-2.5 max-lg:[@media(max-height:700px)]:gap-2 lg:mt-0 lg:gap-3 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
       <span className={cn("hidden text-titre-3 font-black lg:block", paye && "lg:hidden")}>{PAYWALL.carte}</span>
       {!paye && (
-        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-2.5">
+        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-2.5 max-lg:[@media(max-height:700px)]:gap-2">
           {avoirs?.avance && (
             <Option
               on={choisie === "avance"}
