@@ -120,3 +120,16 @@ export async function tientEnPetitEcran(page: Page, quoi: string): Promise<void>
     if (avant) await page.setViewportSize(avant);
   }
 }
+
+/**
+ * L’onglet quitté puis retrouvé (un autre onglet, une autre appli), comme le navigateur le dit à la page : le paywall
+ * propose alors l’offre ① (src/app/lecture/Paywall.tsx), une fois.
+ */
+export async function quitterPuisRevenir(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const etat of ["hidden", "visible"]) {
+      Object.defineProperty(document, "visibilityState", { value: etat, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }
+  });
+}

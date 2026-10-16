@@ -326,7 +326,7 @@ export function FeuilleFormule({
  * la renonciation au délai de rétractation, que la ligne dessous dit, comme pour un paiement. Déjà débloqué ailleurs
  * (409 « deja ») : relu, la feuille se ferme (`deja`).
  */
-function DebloquerAvecLAvance({ suite, deja }: { suite?: string; deja: () => void }) {
+export function DebloquerAvecLAvance({ suite, deja }: { suite?: string; deja: () => void }) {
   const router = useRouter();
   const renonciation = useAccord();
   const [occupe, setOccupe] = useState(false);

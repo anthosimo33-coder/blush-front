@@ -208,7 +208,7 @@ export const LIMITES = {
  *   le quota des codes, ni la part des rapports et des alertes (qui les arrête aussi les premiers). Au-delà, on inscrit
  *   sans écrire. Les invitations de l’équipe (/admin) partent dans la même part. Sans la boîte des tests de bout en bout,
  *   dont les mails ne partent pas (comme les codes).
- * - Les relances (`relances`, 20 %, le mail « Ta suite t’attend », src/server/relances.ts) : aussi peu nécessaires que la
+ * - Les relances (`relances`, 20 %, le mail « Ton rapport t’attend », src/server/relances.ts) : aussi peu nécessaires que la
  *   liste d’attente, elles laissent comme elle 20 % de la part des autres mails. Au-delà, elles attendent le lendemain.
  * tests/unit/limites.test.ts y veille, au défaut comme relevé. Les fenêtres des compteurs ne commencent pas à minuit
  * comme le jour du prestataire : un jour du prestataire peut en voir deux, d’où la marge.
@@ -236,7 +236,7 @@ export function plafondsDesMails(parJour = env().BLUSH_MAILS_PAR_JOUR) {
     codes: { max: part(PARTS_DES_MAILS.codes), fenetreS: 86400, alerteA: 0.8 },
     /** Les mails de la liste d’attente (les inscriptions et les invitations de l’équipe), pour tous. */
     attente: { max: part(PARTS_DES_MAILS.attente), fenetreS: 86400 },
-    /** Les relances (« Ta suite t’attend »), pour tous. */
+    /** Les relances (« Ton rapport t’attend »), pour tous. */
     relances: { max: part(PARTS_DES_MAILS.relances), fenetreS: 86400 },
     laisse: { attente: part(laisse.attente), relance: part(laisse.relance), alerte: part(laisse.alerte), rapport: part(laisse.rapport) },
   } as const satisfies { parJour: number; codes: Limite & { alerteA: number }; attente: Limite; relances: Limite; laisse: Record<SorteDeMail, number> };

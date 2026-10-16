@@ -47,7 +47,7 @@ export const GROUPE_DE_L_OFFRE: Record<OffreId, GroupeDOffres> = {
   pack80: "bulles",
   pack200: "bulles",
 };
-export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Ta suite", second: "2e rapport", bulles: "Bulles" };
+export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Offre unique", second: "2e rapport", bulles: "Bulles" };
 
 /** Le nom d’une source de visiteurs ; null : un acheteur venu avant que les visites se comptent. */
 export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {

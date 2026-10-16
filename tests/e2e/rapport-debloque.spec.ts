@@ -172,14 +172,14 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
   await expect(offre).toBeVisible();
   await tientEnPetitEcran(page, "l’offre ①");
   /*
-   * La souris est restée où était « Lire la suite » : pile sur le bord bas de « Je la prends », qui se soulève au survol
+   * La souris est restée où était « Lire la suite » : pile sur le bord bas de « Je le prends », qui se soulève au survol
    * (lift), en sort, retombe, et y revient, sans jamais tenir en place. On l’écarte, comme une main qui bouge
    */
   await page.mouse.move(0, 0);
 
-  await test.step("« Je la prends » (la renonciation dite juste sous lui) : la carte dans la feuille, à 10,90 €", async () => {
+  await test.step("« Je le prends » (la renonciation dite juste sous lui) : la carte dans la feuille, à 10,90 €", async () => {
     await expect(offre.getByText(texteRenonciation("rapport"))).toBeVisible();
-    await offre.getByRole("button", { name: "Je la prends · 10,90\u00a0€" }).click();
+    await offre.getByRole("button", { name: "Je le prends · 10,90\u00a0€" }).click();
     await expect(page.getByRole("dialog", { name: CARTE }).getByText("10,90\u00a0€", { exact: true })).toBeVisible();
     await payerParCarte(page);
   });
@@ -212,7 +212,7 @@ test("l’offre ① passée : son compte à rebours (l’heure de fin du serveur
     await expect(page.getByRole("dialog", { name: PAIEMENT })).toBeVisible();
     await fermerLaFeuille(page);
     const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
-    await expect(offre.getByRole("timer", { name: "L’offre se termine dans" })).toHaveText(/^00:0[0-8]$/);
+    await expect(offre.getByRole("timer", { name: "Elle disparaît dans" })).toHaveText(/^00:0[0-8]$/);
   });
 
   await test.step("à zéro : elle se ferme, « L’offre est passée », et le serveur ne la vend plus", async () => {

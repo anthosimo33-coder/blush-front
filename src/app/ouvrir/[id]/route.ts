@@ -6,7 +6,7 @@ import { UUID } from "@/server/histoires";
 import { connexionPuis } from "@/lib/suite";
 
 /**
- * Le lien des mails « ton rapport est prêt » et « Ta suite t’attend » (la relance, `?paiement=1`) : il ouvre le rapport
+ * Le lien des mails « ton rapport est prêt » et « Ton rapport t’attend » (la relance, `?paiement=1`) : il ouvre le rapport
  * de cette conv-là (elle devient la conv ouverte), si elle est bien au compte connecté ; la relance, sur la feuille de
  * paiement. Pas connecté (le mail ouvert dans un autre navigateur) : la connexion, qui ramène ensuite à ce lien. Sinon,
  * le rapport habituel.

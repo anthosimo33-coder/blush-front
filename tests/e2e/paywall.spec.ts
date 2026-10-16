@@ -1,14 +1,28 @@
-import { attendreLecture, compteDe, dernierCode, emailLibre, expect, exportWhatsApp, jusquAuCode, payerParCarte, RESEAU, saisirCode, sql, tachesDe, test } from "./aide";
+import {
+  attendreLecture,
+  compteDe,
+  dernierCode,
+  emailLibre,
+  expect,
+  exportWhatsApp,
+  jusquAuCode,
+  OFFRE_SUITE,
+  payerParCarte,
+  quitterPuisRevenir,
+  RESEAU,
+  saisirCode,
+  sql,
+  tachesDe,
+  test,
+  tientEnPetitEcran,
+} from "./aide";
 
 /*
  * Le paywall avant toute lecture (décidé le 16 octobre), de bout en bout, comme un nouveau venu : l’import, « Qui
  * es-tu ? », le code reçu par email, puis la lecture, que le code déroule seul (rien ne part au modèle), « Voir mon
- * rapport », « Ta formule » ouverte d’emblée par-dessus le paywall, le paiement au faux Whop, « C’est débloqué » (le
- * rapport entier, huit chapitres), puis la vraie lecture, le verdict et le rapport.
+ * rapport », le paywall sur un seul écran (les deux formules et le bouton qui paie), l’offre ① au retour sur l’onglet,
+ * le paiement au faux Whop, « C’est débloqué » (le rapport entier, huit chapitres), puis la vraie lecture et le verdict.
  */
-
-/** Le titre de la feuille « Ta formule » ouverte depuis le paywall, sur la conv de Noé et Maëlys. */
-const FORMULE = "Ton rapport parle de vous deux\u00a0: toi et Maëlys.";
 
 /** Les verdicts écrits pour les convs de ce compte : aucun tant que rien n’est payé (le modèle n’a rien lu). */
 const verdictsEcrits = async (email: string) =>
@@ -29,39 +43,43 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
-  await test.step("« Voir mon rapport » : « Ta formule » ouverte d’emblée, aux prix du 16 octobre", async () => {
+  await test.step("« Voir mon rapport » : le paywall sur un écran, les deux formules aux prix du 16 octobre, Premium choisie d’avance", async () => {
     await page.getByRole("button", { name: "Voir mon rapport" }).click();
-    const feuille = page.getByRole("dialog", { name: FORMULE });
-    await expect(feuille).toBeVisible();
-    await expect(feuille.getByRole("radio", { name: /^Le rapport/ })).toContainText("13,90\u00a0€");
-    await expect(feuille.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toContainText("18,90\u00a0€");
-    await expect(feuille.getByText("8 chapitres")).toBeVisible();
-  });
-
-  await test.step("fermée sans payer, puis l’offre ① passée : le paywall, ses chiffres et ses huit chapitres fermés", async () => {
-    await page.keyboard.press("Escape");
-    const offre = page.getByRole("dialog", { name: /^Ta suite à/ });
-    await expect(offre).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
     const ecran = page.getByRole("main");
-    await expect(ecran.getByRole("heading", { level: 1, name: "Ton rapport sur toi et Maëlys n’attend que toi." })).toBeVisible();
-    await expect(ecran.getByText("Qui ouvre la journée")).toBeVisible();
-    await expect(ecran.getByRole("button", { name: /\(verrouillé\)$/ })).toHaveCount(8);
-    await expect(page.getByRole("button", { name: "Débloquer · 13,90\u00a0€" })).toBeVisible();
+    /* Le titre : la première trouvaille du code, qui nomme l’autre */
+    await expect(ecran.getByRole("heading", { level: 1 })).toContainText("Maëlys");
+    await expect(ecran.getByText("Ton rapport · 8 chapitres")).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(ecran.getByRole("radio", { name: /^Le rapport/ })).toContainText("13,90\u00a0€");
+    const premium = ecran.getByRole("radio", { name: /Rapport \+ 60 bulles/ });
+    await expect(premium).toContainText("18,90\u00a0€");
+    await expect(premium).toHaveAttribute("aria-checked", "true");
+    await expect(ecran.getByRole("button", { name: "Débloquer · 18,90\u00a0€" })).toBeVisible();
+    await tientEnPetitEcran(page, "le paywall");
     expect(await verdictsEcrits(email)).toBe(0);
   });
 
-  await test.step("le rapport seul, payé dans la feuille : « C’est débloqué », les huit chapitres", async () => {
-    await page.getByRole("button", { name: "Débloquer · 13,90\u00a0€" }).click();
-    const feuille = page.getByRole("dialog", { name: FORMULE });
-    await feuille.getByRole("radio", { name: /^Le rapport/ }).click();
-    await feuille.getByRole("button", { name: /^Débloquer/ }).click();
+  await test.step("l’onglet quitté puis retrouvé : l’offre ①, « Offre unique sur ton rapport », une fois ; « Non merci »", async () => {
+    await quitterPuisRevenir(page);
+    const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
+    await expect(offre).toBeVisible();
+    await expect(offre.getByRole("button", { name: "Je le prends · 10,90\u00a0€" })).toBeVisible();
+    await offre.getByRole("button", { name: "Non merci" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await quitterPuisRevenir(page);
+    await page.waitForTimeout(1000);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  await test.step("le rapport seul, payé sur l’écran : « C’est débloqué », les huit chapitres", async () => {
+    const ecran = page.getByRole("main");
+    await ecran.getByRole("radio", { name: /^Le rapport/ }).click();
+    await ecran.getByRole("button", { name: "Débloquer · 13,90\u00a0€" }).click();
     await payerParCarte(page);
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
-    const ecran = page.getByRole("main");
-    await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
-    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
+    const debloque = page.getByRole("main");
+    await expect(debloque.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
+    await expect(debloque.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
   });
 

@@ -127,7 +127,7 @@ describe("le direct, rendu", () => {
       expect(t, titre).toContain(titre);
     expect(t).toContain("Hors carte\u00a0: Montréal 1");
     expect(t).toContain("Lyon · a pris Premium");
-    expect(t).toContain("Ville inconnue · a pris Ta suite");
+    expect(t).toContain("Ville inconnue · a pris Le rapport, offre unique");
     expect(t).toContain("il y a 8\u00a0s");
     expect(html).toMatch(/aria-label="Carte des personnes en ligne\u00a0: Paris 6, Lyon 3/);
     expect(html).toContain('aria-pressed="true"');

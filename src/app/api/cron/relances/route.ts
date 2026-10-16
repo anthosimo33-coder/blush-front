@@ -5,7 +5,7 @@ import { reprendreLesChainesEnPlan } from "@/server/pipeline";
 import { envoyerLesRelances } from "@/server/relances";
 
 /**
- * Les relances par mail (« Ta suite t’attend », src/server/relances.ts), appelées toutes les 5 minutes par Vercel Cron
+ * Les relances par mail (« Ton rapport t’attend », src/server/relances.ts), appelées toutes les 5 minutes par Vercel Cron
  * (vercel.json), et en secours par la veille de GitHub (.github/workflows/veille.yml), avec le secret CRON_SECRET,
  * comparé à temps constant comme pour la purge. Chaque passage ne relance qu’une fois chaque compte : deux passages
  * proches ne font rien de plus. Et,

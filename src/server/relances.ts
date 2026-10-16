@@ -17,7 +17,7 @@ import type { PassageDesRelances } from "@/types/api";
 /*
  * La relance par mail (l’offre unique ②, « relance_mail ») : deux heures après une feuille de paiement fermée sans payer
  * (l’offre ① montrée, src/server/offres-uniques.ts) ou une commande restée en attente (src/server/achats.ts), un mail
- * « Ta suite t’attend » (src/server/mail-relance.ts) qui rouvre cette conv sur la feuille de paiement. Une seule fois par
+ * « Ton rapport t’attend » (src/server/mail-relance.ts) qui rouvre cette conv sur la feuille de paiement. Une seule fois par
  * compte (sa ligne dans offres_uniques, écrite avant le mail) ; jamais pour une conv dont le rapport est payé (ou offert),
  * ni pour une conv en alerte (le mode sobre), ni à l’équipe, ni à qui la bêta fermée ne laisse pas entrer, ni après la
  * désinscription (users.relances_coupees_le, le lien signé du mail). Dans la règle des 24 h entre deux offres montrées
