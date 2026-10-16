@@ -1,19 +1,24 @@
-import { relancerApres } from "@/server/pipeline";
+import { ecrireLeContexte } from "@/server/analyse";
+import { rapportOuvertEnBase } from "@/server/droits";
+import { lancerApresPaiement, relancerApres } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
-import { etatDesTaches, planifier } from "@/server/taches";
+import { attendreLePaiement, etatDesTaches, planifier } from "@/server/taches";
 import { lecturePayeeRefusee, rejouer, tournageDe, tournageDuNavigateur } from "@/server/tournage";
 import { ROUTES } from "@/types/api";
 
-/* Le verdict, puis (avec l’accès) le rapport et la mémoire s’enchaînent après la réponse */
+/* Le verdict (le rapport ouvert : payé, ou l’équipe), puis le rapport et la mémoire s’enchaînent après la réponse */
 export const maxDuration = 300;
 
 /**
- * Lance la lecture : « Qui es-tu ? » est rempli, le verdict part. Relancer ne refait rien de ce qui est fait.
+ * Lance la lecture : « Qui es-tu ? » est rempli. Le paywall passe avant toute lecture (décidé le 16 octobre) : sans le
+ * rapport ouvert (payé, ou un compte de l’équipe), le verdict attend son paiement, et rien ne part au modèle ; le code
+ * calcule seulement ce qu’il sait (les trouvailles), que la lecture et le paywall montrent. Le rapport ouvert, le verdict
+ * part. Relancer ne refait rien de ce qui est fait.
  * Avec les réponses de « Qui es-tu ? » (depuis /qui, ou le code reçu par email), c’est la conv en train d’être importée :
  * déjà connecté, elle rejoint ici le compte, et devient la conv ouverte. Sans (l’écran de lecture), c’est la conv qu’on
  * suit : un brouillon laissé en plan ne prend pas sa place.
@@ -74,16 +79,23 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
       await rejouer(story.id, tournage, utilisateur);
       return repondre("POST /api/analyse", { ok: true });
     }
+    /* Le rapport ouvert se lit en base, après le rattachement : un brouillon n’avait pas encore de compte */
+    if (!(await rapportOuvertEnBase(story.id))) {
+      await ecrireLeContexte(story.id);
+      await attendreLePaiement(story.id, "verdict");
+      return repondre("POST /api/analyse", { ok: true });
+    }
     await planifier(story.id, "verdict");
-  }
+  } else if (verdict.status === "paiement") await lancerApresPaiement(story, verdict.status);
   relancerApres(story.id);
   return repondre("POST /api/analyse", { ok: true });
 });
 
-/** La progression de la lecture. Relance au passage une tâche abandonnée. */
+/** La progression de la lecture. Relance au passage une tâche abandonnée, et le verdict d’un paiement que le webhook n’a pas encore lancé. */
 export const GET = route("GET /api/analyse", async () => {
   const g = await lecture({ session: "requise", histoire: true });
   if (g instanceof Response) return g;
+  await lancerApresPaiement(g.story);
   await relancer(g.story.id);
   return repondre("GET /api/analyse", await progression(g.story));
 });

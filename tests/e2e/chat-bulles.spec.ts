@@ -142,12 +142,12 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toBeVisible();
     const conseille = recharge.getByRole("radio", { name: /70 bulles/ });
     await expect(conseille).toHaveAttribute("aria-checked", "true");
-    await expect(conseille.getByText("120 bulles · 0,08\u00a0€ la bulle")).toBeVisible();
+    await expect(conseille.getByText("120 bulles · 0,12\u00a0€ la bulle")).toBeVisible();
     await expect(recharge.getByText("+ 50 bulles offertes")).toBeVisible();
   });
 
   await test.step("payer (pas de case : la renonciation dite sous le bouton), la carte dans la feuille, puis le chat", async () => {
-    const payer = recharge.getByRole("button", { name: "Payer · 9,90\u00a0€" });
+    const payer = recharge.getByRole("button", { name: "Payer · 13,90\u00a0€" });
     await expect(recharge.getByRole("checkbox")).toHaveCount(0);
     await expect(recharge.getByText("En payant, tu as tes bulles tout de suite et tu renonces au délai de rétractation.")).toBeVisible();
     await payer.click();
@@ -192,7 +192,7 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" }).getByRole("button", { name: "Recharger · il t’en reste 120" }).click();
     await expect(recharge.getByRole("radio", { name: /70 bulles/ })).toBeVisible();
     await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toHaveCount(0);
-    await expect(recharge.getByText("80 bulles · 0,12\u00a0€ la bulle")).toBeVisible();
+    await expect(recharge.getByText("80 bulles · 0,17\u00a0€ la bulle")).toBeVisible();
   });
 
   await test.step("Mon compte : le solde, et l’achat dans « Tes achats »", async () => {
@@ -202,7 +202,7 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     const achats = main.getByRole("region", { name: "Tes achats" });
     await expect(achats.getByText("80 bulles", { exact: true })).toBeVisible();
     await expect(achats.getByText(/ · \+120 bulles$/)).toBeVisible();
-    await expect(achats.getByText("9,90\u00a0€")).toBeVisible();
+    await expect(achats.getByText("13,90\u00a0€")).toBeVisible();
     await expect(achats.getByText("Payé")).toBeVisible();
   });
 });

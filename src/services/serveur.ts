@@ -1,8 +1,9 @@
 import "server-only";
 import type { Route } from "next";
-import type { ConvSummary, Fiche, Story } from "@/types";
+import type { ConvSummary, Fiche, ScoreRow, Story } from "@/types";
 import type { Account, AchatDuCompte, HistoriqueChat, ReportPayload } from "@/types/api";
 import { achatsDuCompte, convEnAlerte } from "@/server/achats";
+import { apercuAvantPaiement } from "@/server/analyse";
 import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
@@ -18,6 +19,15 @@ import { connexionPuis } from "@/lib/suite";
  * Les données des pages serveur. Elles viennent de la base, d’après les cookies de la requête. null : rien à montrer
  * (pas d’histoire, pas connecté, pas encore prêt).
  */
+
+/**
+ * Le paywall de la conv ouverte, quand elle attend son paiement (le paywall d’abord) : ce que le code a compté, sans le
+ * modèle. null : elle n’attend pas son paiement (payée, de l’équipe, ou pas encore passée par « Qui es-tu ? »).
+ */
+export async function getApercuAvantPaiement(): Promise<ScoreRow[] | null> {
+  const { story } = await contexte();
+  return story ? apercuAvantPaiement(story.id) : null;
+}
 
 /** `parcours` : les écrans de l’import, qui montrent la conv en train d’être importée (voir histoireOuverte). */
 export async function getStory({ parcours = false } = {}): Promise<Story | null> {

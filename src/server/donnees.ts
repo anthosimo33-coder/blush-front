@@ -130,6 +130,8 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
       done: false,
     };
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
+  /* Le paywall d’abord : la conv attend son paiement, le modèle n’a rien lu. Ce que le code a vu (les trouvailles) se montre déjà */
+  if (verdict?.status === "paiement") return { progress: 1, messagesRead: total, stepsDone: NB_ETAPES_DE_LECTURE, discoveries: decouvertes(story, 1), done: false, paiement: true };
   const fini = verdict?.status === "fini";
   const echec = verdict?.status === "echec";
   /* Le début de l’essai en cours : `prendre` met updatedAt à jour (le battement de cœur ne touche que heartbeatAt) */

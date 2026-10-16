@@ -7,22 +7,28 @@ import { useReducedMotion } from "@/lib/hooks";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { READING_STEPS } from "@/contenu/parcours";
+import { READING_STEPS, READING_STEPS_AVANT_PAIEMENT } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { DoneCheck, TypingDots } from "@/components/ui/feedback";
 import { Screen } from "@/components/shell/Screen";
+import type { ScoreRow, Story } from "@/types";
+import { Paywall } from "./Paywall";
 import { useSuiviLecture } from "./suivi";
 
 /*
  * Écran 08 — Lecture. Une seule composition centrée, du début à la fin :
  * le visuel (la bulle dans son anneau, puis la gerbe), le titre et son compteur, les découvertes.
- * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ».
+ * En bas, l’étape en cours laisse la place au bouton « Voir mon rapport ». Une conv qui attend son paiement (le paywall
+ * d’abord) : sa lecture, calculée par le code, se déroule en quelques secondes, puis « Voir mon rapport » mène au paywall
+ * (`apercu` : la conv et ce que le code a compté, lus par la page).
  */
-export function LectureScreen({ total }: { total: number }) {
+export function LectureScreen({ total, apercu }: { total: number; apercu?: { story: Story; scores: ScoreRow[] } | null }) {
   const reduced = useReducedMotion();
   /* La lecture lancée en arrivant, puis suivie jusqu’à son verdict (suivi.ts). `failed` : le serveur a tout essayé, on le dit et on propose de relancer */
-  const { p, phase, echec: failed, trop, enDirect: live, relancer: retry } = useSuiviLecture();
+  const { p, phase, echec: failed, trop, enDirect: live, relancer: retry, paiement } = useSuiviLecture();
+  /* « Voir mon rapport » touché, la conv attend son paiement : le paywall prend l’écran */
+  const [paywall, setPaywall] = useState(false);
   const heard = useRef(0);
   /* « Voir mon rapport » touché : le bouton le montre jusqu’au chargement du verdict (un vrai chargement, voulu) */
   const [enRoute, setEnRoute] = useState(false);
@@ -48,8 +54,11 @@ export function LectureScreen({ total }: { total: number }) {
   const done = phase === "done";
   /* Pourquoi la lecture a échoué, d’après le suivi : le refus du modèle, le budget de l’IA du jour, ou une panne */
   const raison = p.failReason;
-  const step = p.done ? READING_STEPS.length - 1 : Math.min(p.stepsDone, READING_STEPS.length - 1);
+  const etapes = paiement ? READING_STEPS_AVANT_PAIEMENT : READING_STEPS;
+  const step = p.done ? etapes.length - 1 : Math.min(p.stepsDone, etapes.length - 1);
   const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
+
+  if (paywall && apercu) return <Paywall story={apercu.story} scores={apercu.scores} trouvailles={p.discoveries} />;
 
   return (
     <Screen
@@ -69,6 +78,13 @@ export function LectureScreen({ total }: { total: number }) {
             <Button arrow onClick={retry}>
               Relancer la lecture
             </Button>
+          ) : done && paiement && apercu ? (
+            /* La conv attend son paiement : le paywall, sur place (rien à charger, la page l’a déjà) */
+            <div data-popin="" className="w-full" style={delai(0.15)}>
+              <Button arrow onClick={() => setPaywall(true)}>
+                Voir mon rapport
+              </Button>
+            </div>
           ) : done ? (
             /* Le bouton arrive juste après la gerbe (0,15 s) : l’anneau plein a déjà fait attendre */
             <div data-popin="" className="w-full" style={delai(0.15)}>
@@ -100,11 +116,11 @@ export function LectureScreen({ total }: { total: number }) {
                   {p.done ? <DoneCheck size={20} data-popin="" /> : <TypingDots size={5} />}
                 </span>
                 <span key={step} data-rise="">
-                  {READING_STEPS[step]}
+                  {etapes[step]}
                   <span className="sr-only">{p.done ? "\u00a0: fait" : "\u00a0: en cours"}</span>
                 </span>
               </div>
-              <p className={cn("m-0 text-legende font-extrabold text-grey", p.done && "invisible")}>Ça prend environ 40 secondes</p>
+              <p className={cn("m-0 text-legende font-extrabold text-grey", p.done && "invisible")}>{paiement ? "Quelques secondes" : "Ça prend environ 40 secondes"}</p>
             </div>
           )}
         </div>
@@ -235,7 +251,7 @@ const STICKERS: [Sticker, ...Sticker[]] = [
 ];
 
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
-function Discoveries({ items, className }: { items: string[]; className?: string }) {
+export function Discoveries({ items, className }: { items: string[]; className?: string }) {
   return (
     /* La place de deux lignes, réservée d’avance : le bloc centré ne remonte pas quand les découvertes passent à la ligne */
     <ul className={cn("m-0 flex min-h-[78px] list-none flex-wrap content-start justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">

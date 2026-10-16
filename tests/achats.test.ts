@@ -168,7 +168,7 @@ describe("commander", () => {
     await debloquerLaConv(id);
     expect(await commander(u, "rapport", { storyId: id, fournisseur: "factice" })).toBe("deja");
     /* Des bulles seules : sans conv, même donnée */
-    expect(await commande(u, "pack200", { storyId: id, fournisseur: "factice" })).toMatchObject({ storyId: null, centimes: 1990, bulles: 200 });
+    expect(await commande(u, "pack200", { storyId: id, fournisseur: "factice" })).toMatchObject({ storyId: null, centimes: 2390, bulles: 200 });
   });
 
   it("une offre unique seulement montrée et valable ; Premium pour 5 € de plus, seulement après un rapport payé", async () => {
@@ -179,7 +179,7 @@ describe("commander", () => {
     /* La suite montrée pour cette conv ne se prend pas pour une autre */
     expect(await commander(u, "suite", { storyId: await conv(u), fournisseur: "factice" })).toBe("offre");
     const suite = await commande(u, "suite", { storyId: id, fournisseur: "factice" });
-    expect(suite).toMatchObject({ centimes: 690, bulles: 10, offreUnique: "suite" });
+    expect(suite).toMatchObject({ centimes: 1090, bulles: 10, offreUnique: "suite" });
     expect(await commander(u, "premium_ajout", { fournisseur: "factice" })).toBe("offre");
     await livrer(suite.id);
     /*

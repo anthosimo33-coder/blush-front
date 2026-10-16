@@ -292,7 +292,7 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
     if (!s || s.debloqueLe) return rien;
     /* Une conv en alerte ne se vend pas (convEnAlerte) */
     if (await convEnAlerte(storyId)) return rien;
-    /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (4,95 €) ; ① (6,90 €) ne se montre pas */
+    /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (6,95 €) ; ① (10,90 €) ne se montre pas */
     const avoirs = await avoirsDuCompte(compte);
     if (avoirs.avance || avoirs.garde) return rien;
   } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {

@@ -161,19 +161,19 @@ describe("la recharge", () => {
     expect(within(packs[0]!).getByText("30 bulles")).toBeTruthy();
     expect(within(packs[1]!).getByText("70 bulles")).toBeTruthy();
     expect(within(packs[1]!).getByText("+10 offertes")).toBeTruthy();
-    expect(within(packs[1]!).getByText("80 bulles · 0,12 € la bulle")).toBeTruthy();
+    expect(within(packs[1]!).getByText("80 bulles · 0,17 € la bulle")).toBeTruthy();
     expect(within(packs[2]!).getByText("150 bulles")).toBeTruthy();
     expect(feuille.querySelector("[data-bonus]")).toBeNull();
     expect(within(feuille).getByText("Elles n’expirent jamais.")).toBeTruthy();
-    expect(within(feuille).getByRole("button", { name: "Payer · 9,90\u00a0€" })).toBeTruthy();
+    expect(within(feuille).getByRole("button", { name: "Payer · 13,90\u00a0€" })).toBeTruthy();
   });
 
-  it("le bonus ④, quand le serveur le montre : en tête, et sur le pack conseillé (120 bulles, 0,08 € la bulle)", async () => {
+  it("le bonus ④, quand le serveur le montre : en tête, et sur le pack conseillé (120 bulles, 0,12 € la bulle)", async () => {
     const { feuille } = await ouvrir(true);
     expect(within(feuille).getByText(`Ta 1re recharge : +${PREMIERE_RECHARGE.bonus} offertes`)).toBeTruthy();
     const conseille = within(feuille).getAllByRole("radio")[1]!;
     expect(within(conseille).getByText("+50 offertes")).toBeTruthy();
-    expect(within(conseille).getByText("120 bulles · 0,08 € la bulle")).toBeTruthy();
+    expect(within(conseille).getByText("120 bulles · 0,12 € la bulle")).toBeTruthy();
     expect(lePack("pack80", true).total).toBe(CATALOGUE.pack80.bulles + PREMIERE_RECHARGE.bonus);
   });
 
@@ -184,7 +184,7 @@ describe("la recharge", () => {
 
   it("payer : pas de case, la ligne de la renonciation sous le bouton ; le pack choisi part au premier toucher, et revient avec ses bulles", async () => {
     const { feuille, suite } = await ouvrir(true);
-    const bouton = within(feuille).getByRole("button", { name: "Payer · 9,90\u00a0€" });
+    const bouton = within(feuille).getByRole("button", { name: "Payer · 13,90\u00a0€" });
     expect(within(feuille).queryByRole("checkbox")).toBeNull();
     expect(bouton.nextElementSibling?.textContent).toBe(texteRenonciation("bulles"));
     expect(within(feuille).getByRole("link", { name: CASE_RENONCIATION.lien }).getAttribute("href")).toBe(CASE_RENONCIATION.ancre);
@@ -195,7 +195,7 @@ describe("la recharge", () => {
     fireEvent.keyDown(radios[1]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(radios[2]);
     expect(radios[2]!.getAttribute("aria-checked")).toBe("true");
-    await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: "Payer · 19,90\u00a0€" })));
+    await act(async () => fireEvent.click(within(feuille).getByRole("button", { name: "Payer · 23,90\u00a0€" })));
     expect(payer).toHaveBeenCalledOnce();
     expect(payer.mock.calls[0]![0]).toBe("pack200");
     expect(payer.mock.calls[0]![1]).toMatchObject({ renonciation: true, suite: "/app?recharge=200" });

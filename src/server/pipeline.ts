@@ -14,7 +14,7 @@ import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
 import { sousLaLimite } from "./limites";
 import { passerLaMain } from "./relais";
-import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, PERIME_S, planifier, prendre, type Tache } from "./taches";
+import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, paiementRecu, PERIME_S, planifier, prendre, type Tache } from "./taches";
 import { donneesMemoire } from "./depot";
 import type { DonneesMemoire, DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
@@ -99,6 +99,17 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
  * lit une fois pour tout). Vrai si une tâche vient d’être lancée. Une étape qui attend encore repart aussi après la
  * réponse, sans rien changer à ce qu’on montre (faux).
  */
+/**
+ * Le verdict d’une conv qui attendait son paiement (tasks.status « paiement ») part, si son rapport est maintenant ouvert
+ * (payé, ou un compte de l’équipe) : l’accès lu en base, jamais d’après l’appelant. Vrai s’il vient de partir ; la chaîne
+ * le prend ensuite (l’appelant la relance). `statut` : celui du verdict, déjà lu par l’appelant.
+ */
+export async function lancerApresPaiement(story: Pick<Ligne, "id" | "userId">, statut?: string): Promise<boolean> {
+  const lu = statut ?? (await etatDesTaches(story.id, ["verdict"])).verdict?.status;
+  if (lu !== "paiement" || !(await aAcces(story))) return false;
+  return (await paiementRecu(story.id)) > 0;
+}
+
 export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?: EtatChaine): Promise<boolean> {
   /*
    * Ce que le budget de l’IA a arrêté avant minuit repart d’abord : la chaîne le reprend, comme une étape planifiée.
@@ -106,6 +117,12 @@ export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?
    * requête de plus. Les mises à jour de la mémoire arrêtées (hors de la chaîne) repartent au suivi (cloreLesAbandons)
    */
   const lu = etat ?? (await lireEtat(story.id));
+  /* Le paiement (la livraison, un rapport d’avance) : le verdict qui l’attendait part, et la chaîne avec lui */
+  if (lu.taches.verdict?.status === "paiement") {
+    if (!(await lancerApresPaiement(story, "paiement"))) return false;
+    relancerApres(story.id);
+    return true;
+  }
   const arretee = Object.values(lu.taches).some((t) => t?.status === "echec" && (estBudget(t.error) || estBudgetVoix(t.error)));
   if (arretee && (await reprendreApresMinuit(story.id))) {
     relancerApres(story.id);

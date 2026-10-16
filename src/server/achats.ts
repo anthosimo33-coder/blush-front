@@ -234,6 +234,31 @@ async function ouvrirLaConv(tx: Transaction, userId: string, storyId: string): P
   return ouvertes.length > 0;
 }
 
+/**
+ * Le paywall passe avant la lecture (16 octobre) : une conv payée peut lever une alerte (danger, détresse, mineur), qui
+ * ne se vend jamais. Son rapport doux reste offert ; ses achats payés sont signalés à l’équipe, qui les rembourse chez
+ * Whop (le webhook du remboursement les reprend). Rien de la conv dans l’alerte : la tâche, l’achat, le montant.
+ * TODO(produit): rembourser tout seul par l’API de Whop, une fois son appel vérifié.
+ */
+export async function signalerLesAchatsDUneAlerte(storyId: string, alerte: string): Promise<void> {
+  const a = schema.achats;
+  const payes = await db()
+    .select({ id: a.id, offre: a.offre, centimes: a.centimes, fournisseur: a.fournisseur })
+    .from(a)
+    .where(and(eq(a.storyId, storyId), eq(a.statut, "paye")));
+  if (!payes.length) return;
+  await alerter(
+    "à rembourser : une conv payée lève une alerte",
+    [
+      `Histoire ${storyId}`,
+      `Alerte : ${alerte}`,
+      ...payes.map((p) => `Achat ${p.id} · ${p.offre} · ${(p.centimes / 100).toFixed(2)} € · ${p.fournisseur}`),
+      "À rembourser chez Whop : une alerte ne se vend pas.",
+    ],
+    { importante: true },
+  );
+}
+
 /** Le rapport (et la mémoire) de la conv qu’un achat vient d’ouvrir : planifiés, puis écrits après la réponse. */
 async function relancerLaChaine(achat: Achat, quoi: string): Promise<void> {
   if (!achat.storyId || !achat.userId) return;

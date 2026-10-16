@@ -42,6 +42,34 @@ export async function planifier(storyId: string, kind: Genre, input?: Echange): 
   throw new Error(`planification impossible : ${kind}`);
 }
 
+/**
+ * Le verdict d’une conv pas encore payée : sa tâche est posée, au statut `paiement`, que ni la chaîne ni le cron ne
+ * prennent (ils ne prennent que l’attente) ; le paiement la lance (lancerApresPaiement, src/server/pipeline.ts). La conv compte ainsi pour lue (la purge la garde, « Tes convs » la montre),
+ * sans que rien parte au modèle. Une seule par conv : une deuxième demande ne fait rien.
+ */
+export async function attendreLePaiement(storyId: string, kind: Genre): Promise<void> {
+  await db().transaction(async (tx) => {
+    /* Le verrou de la conv : deux onglets qui envoient « Qui es-tu ? » en même temps ne posent pas deux tâches */
+    await tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
+    const [deja] = await tx
+      .select({ id: schema.tasks.id })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, kind)))
+      .limit(1);
+    if (!deja) await tx.insert(schema.tasks).values({ storyId, kind, status: "paiement" });
+  });
+}
+
+/** Le paiement reçu (ou l’accès donné) : les tâches de la conv qui l’attendaient partent (en attente). Rend leur nombre. */
+export async function paiementRecu(storyId: string): Promise<number> {
+  const lancees = await db()
+    .update(schema.tasks)
+    .set({ status: "attente", updatedAt: new Date() })
+    .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.status, "paiement")))
+    .returning({ id: schema.tasks.id });
+  return lancees.length;
+}
+
 /* Une autre tâche de la même histoire tourne (son battement est frais) : la chaîne qui la tient enchaînera la suite */
 const autreEnCours = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."id" <> ${schema.tasks.id} and "autre"."status" = 'en_cours' and "autre"."heartbeat_at" >= now() - make_interval(secs => ${PERIME_S}))`;
 

@@ -24,6 +24,25 @@ const DEPART: AnalysisProgress = { progress: 0, messagesRead: 0, stepsDone: 0, d
 /** L’avancée se relit chaque seconde. */
 const INTERVALLE_SUIVI = 1000;
 
+/**
+ * La lecture d’une conv qui attend son paiement (le paywall d’abord) : rien ne part au modèle, le code a déjà tout
+ * compté. L’écran la déroule en ces quelques secondes, ses trouvailles une à une, avant le paywall.
+ */
+export const DUREE_AVANT_PAIEMENT_MS = 5000;
+
+/** Où en est la lecture déroulée d’une conv qui attend son paiement, à la part `t` (0 à 1) de sa durée, vers `fin` (ce que le serveur a compté). */
+export function avantPaiementA(t: number, fin: AnalysisProgress): AnalysisProgress {
+  const p = Math.min(1, Math.max(0, t));
+  return {
+    ...fin,
+    progress: p,
+    messagesRead: Math.round(Math.min(1, p / 0.7) * fin.messagesRead),
+    stepsDone: Math.min(3, Math.floor(p * 4)),
+    discoveries: fin.discoveries.slice(0, Math.min(3, Math.floor(p * 4))),
+    done: p >= 1,
+  };
+}
+
 /** Le suivi tient bon : un appel raté (l’iPhone a mis la page en veille, le réseau a sauté) se refait, de plus en plus espacé. Au-delà, l’échec. */
 export const RATES_MAX = 8;
 
@@ -58,6 +77,7 @@ type Phase = "reading" | "leaving" | "done";
  * Lance la lecture en arrivant, puis la suit (voir l’en-tête). `p` : où elle en est. `echec` : le serveur a tout essayé
  * (ou ne répond plus) ; `trop` : trop de relances aujourd’hui (chaque lecture coûte). `enDirect` : vrai dès qu’on voit la
  * lecture se faire (une lecture déjà finie à l’arrivée ne rejoue pas ses sons). `relancer` : « Relancer la lecture ».
+ * `paiement` : la conv attend son paiement ; sa lecture se déroule (lancée juste avant), puis l’écran mène au paywall.
  */
 export function useSuiviLecture() {
   const router = useRouter();
@@ -71,6 +91,11 @@ export function useSuiviLecture() {
   const [suivi, setSuivi] = useState<number | null>(null);
   /* La fin vue en direct : l’anneau plein et la coche, puis la gerbe (sinon, la fin s’affiche directement) */
   const [finAnimee, setFinAnimee] = useState(false);
+  /* La conv attend son paiement, et ce que le serveur a compté, que l’écran déroule (null : déjà déroulé, ou pas de paiement) */
+  const [paiement, setPaiement] = useState(false);
+  const [derouler, setDerouler] = useState<AnalysisProgress | null>(null);
+  /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) ou par ce lancement : sa lecture se déroule ; un rechargement va droit au paywall */
+  const vientDeLancer = useRef(false);
   const enDirect = useRef(false);
   const rates = useRef(0);
   const premier = useRef(true);
@@ -137,6 +162,7 @@ export function useSuiviLecture() {
         setEchec(true);
         return;
       }
+      vientDeLancer.current = deja || (lance === true && !rienARelancer && !avant?.paiement);
       rates.current = 0;
       premier.current = true;
       setSuivi(lancement);
@@ -179,6 +205,18 @@ export function useSuiviLecture() {
       setEchec(true);
       return false;
     }
+    /* Le paywall d’abord : rien à attendre du serveur, sa lecture se déroule ici (ou, déjà vue, la fin s’affiche) */
+    if (suite.paiement) {
+      setPaiement(true);
+      if (vientDeLancer.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setP(avantPaiementA(0, suite));
+        setDerouler(suite);
+      } else {
+        setP({ ...suite, done: true });
+        setPhase("done");
+      }
+      return false;
+    }
     if (!suite.done) {
       enDirect.current = true;
       return;
@@ -189,6 +227,22 @@ export function useSuiviLecture() {
     return false;
   };
   useSondage(tour, { actif: suivi !== null && suivi === lancement, intervalle: INTERVALLE_SUIVI, immediat: true });
+
+  /* La lecture d’une conv qui attend son paiement, déroulée en DUREE_AVANT_PAIEMENT_MS, puis la même fin qu’en direct */
+  useEffect(() => {
+    if (!derouler) return;
+    enDirect.current = true;
+    const debut = performance.now();
+    const minuteur = setInterval(() => {
+      const t = (performance.now() - debut) / DUREE_AVANT_PAIEMENT_MS;
+      setP(avantPaiementA(t, derouler));
+      if (t >= 1) {
+        clearInterval(minuteur);
+        setFinAnimee(true);
+      }
+    }, 100);
+    return () => clearInterval(minuteur);
+  }, [derouler]);
 
   /* Vue en direct, la fin laisse voir l’anneau plein et la coche « Ton verdict », puis la gerbe arrive. */
   useEffect(() => {
@@ -204,5 +258,5 @@ export function useSuiviLecture() {
     };
   }, [finAnimee]);
 
-  return { p, phase, echec, trop, enDirect, relancer };
+  return { p, phase, echec, trop, enDirect, relancer, paiement };
 }

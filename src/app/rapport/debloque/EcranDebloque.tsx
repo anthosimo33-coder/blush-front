@@ -424,7 +424,7 @@ export function EcranDebloque({
         {montree === null && (
           <div data-rise="" style={delai(0.45)} className="mt-6 w-full text-left">
             <InsetGroup>
-              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title={DEBLOQUE.restants(restants)} sub={DEBLOQUE.reprise(reprise)} />
+              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title={DEBLOQUE.restants(restants, restants === total)} sub={DEBLOQUE.reprise(reprise)} />
               <InsetRow
                 leading={
                   <RowIcon tone="elle">

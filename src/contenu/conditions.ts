@@ -92,7 +92,7 @@ const VENTE: readonly Section[] = [
     id: "offres",
     titre: "Ce que tu peux acheter",
     blocs: [
-      "Ton verdict et le premier chapitre de ton rapport sont gratuits. Le reste s’achète une fois\u00a0: pas d’abonnement.",
+      "Ta lecture (ton verdict et ton rapport) s’achète une fois, avant d’être écrite\u00a0: pas d’abonnement.",
       [
         `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${bulles(rapport.bulles)}.`,
         `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${bulles(premium.bulles)}.`,

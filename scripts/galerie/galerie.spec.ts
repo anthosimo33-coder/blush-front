@@ -137,6 +137,9 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       await verdictDAvantLesTitres(email);
       return { ...sans, histoire };
     }
+    case "paywall":
+      /* Le paywall d’abord : la conv attend son paiement, rien n’est lu par le modèle */
+      return { ...sans, histoire: await lectureFaite(page, testInfo, emailLibre(testInfo, "galerie-paywall"), { verdictOffert: false }) };
     case "lecture-en-cours": {
       const email = emailLibre(testInfo, "galerie-lecture");
       const histoire = await lectureFaite(page, testInfo, email);

@@ -99,7 +99,7 @@ test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqu�
     await expect(recharge).toBeVisible();
     await feuilleSurOrdinateur(page, recharge);
     await recharge.getByRole("radio", { name: /^30 bulles/ }).click();
-    await recharge.getByRole("button", { name: "Payer · 4,90\u00a0€" }).click();
+    await recharge.getByRole("button", { name: "Payer · 8,90\u00a0€" }).click();
     await payerParCarte(page);
     /* Payé dans la feuille, sans quitter Mon compte : le solde se relit une fois l’achat livré */
     await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible({ timeout: 2 * RESEAU });
@@ -110,7 +110,7 @@ test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqu�
     const achats = main.getByRole("region", { name: "Tes achats" });
     await expect(achats.getByText("30 bulles", { exact: true })).toBeVisible();
     await expect(achats.getByText(/^\d{1,2} \S+ \d{4} · \+30 bulles$/)).toBeVisible();
-    await expect(achats.getByText("4,90\u00a0€")).toBeVisible();
+    await expect(achats.getByText("8,90\u00a0€")).toBeVisible();
     await expect(achats.getByText("Payé")).toBeVisible();
     expect(await compteDe(email)).toMatchObject({ bulles: 40 });
   });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { DoneCheck, NoteIcone } from "@/components/ui/feedback";
-import { CATALOGUE } from "@/contenu/offres";
+import { CATALOGUE, prixDe } from "@/contenu/offres";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import type { Bulles, Chiffre, Montant, Periode, StatsAdmin, Ventes } from "@/server/stats";
@@ -411,11 +411,11 @@ function Entonnoir({ a, verdicts }: { a: StatsAdmin["achats"]; verdicts: number 
 
 /** Les offres uniques, dans l’ordre du parcours : leur numéro (① à ⑥ de la spécification, en chiffres : la police n’a pas les ronds) et leur nom. */
 export const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
-  suite: ["1", "La suite à 6,90\u00a0€, 5 minutes"],
+  suite: ["1", `La suite à ${prixDe("suite")}, 5 minutes`],
   relance_mail: ["2", "Le mail «\u00a0Ta suite t’attend\u00a0»"],
   premium_ajout: ["3", "Premium pour 5\u00a0€ de plus"],
   premiere_recharge: ["4", "+40 bulles, première recharge"],
-  second_rapport: ["5", "Le 2e rapport à 4,95\u00a0€"],
+  second_rapport: ["5", `Le 2e rapport à ${prixDe("second")}`],
   garde_second: ["6", "Le −50\u00a0% gardé 7 jours"],
 };
 

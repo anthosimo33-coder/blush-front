@@ -239,7 +239,7 @@ describe("les Elements de Whop", () => {
     whop.portefeuille = { applePay: true, googlePay: false };
     await ouvrir();
     fireEvent.click(within(formule()).getByRole("radio", { name: new RegExp(`^${FEUILLE_FORMULE.rapport.titre}`) }));
-    expect(whop.update).toHaveBeenLastCalledWith({ amount: 990, lineItems: [{ label: "Le rapport", amount: 990 }] });
+    expect(whop.update).toHaveBeenLastCalledWith({ amount: 1390, lineItems: [{ label: "Le rapport", amount: 1390 }] });
   });
 });
 
@@ -258,13 +258,13 @@ describe("les avoirs du compte, dans la feuille et sous l’aperçu", () => {
     expect(routeur.replace).toHaveBeenCalledWith("/rapport/debloque?achat=a9");
   });
 
-  it("le −50 % gardé : le rapport seul à 4,95 € (9,90 € barré, jusqu’à quand), payé comme rapport_garde", async () => {
+  it("le −50 % gardé : le rapport seul à 6,95 € (13,90 € barré, jusqu’à quand), payé comme rapport_garde", async () => {
     sait({ garde: { fin: "2026-10-20T12:00:00.000Z" } });
     await ouvrir();
     const rapport = within(formule()).getByRole("radio", { name: new RegExp(`^${FEUILLE_FORMULE.rapport.titre}`) });
     expect(within(rapport).getByText(tel(prixDe("rapport_garde")))).toBeTruthy();
     expect(within(rapport).getByText(tel(FEUILLE_FORMULE.garde(jourEnLettres("2026-10-20T12:00:00.000Z"))))).toBeTruthy();
-    /* Choisi d’avance, au prix que le bouton d’ouverture annonce (SUP16-1) : payer sans rien toucher paie 4,95 € */
+    /* Choisi d’avance, au prix que le bouton d’ouverture annonce (SUP16-1) : payer sans rien toucher paie 6,95 € */
     expect(rapport.getAttribute("aria-checked")).toBe("true");
     expect(within(formule()).getByRole("button", { name: FEUILLE_FORMULE.payer(prixDe("rapport_garde")) })).toBeTruthy();
     fireEvent.click(rapport);

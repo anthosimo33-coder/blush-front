@@ -9,7 +9,7 @@
  * Le compte préparé avant la capture (galerie.spec.ts, `preparer`). Sans : aucun compte, aucune conv.
  * - brouillon : une conv importée (POST /api/import), sans email ni compte ;
  * - code : un brouillon, et un code de connexion demandé pour l’email du parcours ;
- * - gratuit : un compte gratuit, sa conv lue (le verdict) ;
+ * - gratuit : un compte gratuit, sa conv lue (le verdict offert, comme avant le paywall du 16 octobre) ;
  * - gratuit-sans-titres : le même, son verdict gardé comme avant le 13 octobre, sans les titres des chapitres fermés ;
  * - lecture-en-cours : un compte gratuit dont la lecture est figée à mi-chemin ;
  * - rapport : le rapport complet acheté une fois (le plan « rapport »), tout écrit ;
@@ -17,7 +17,8 @@
  * - sobre : un compte gratuit dont la conv lève une alerte (le mode sobre) ;
  * - plusieurs : un compte de l’équipe avec trois convs lues ;
  * - couple : un compte de l’équipe dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
- * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
+ * - paywall : un compte dont la conv attend son paiement (le paywall d’abord, 16 octobre) : rien de lu par le modèle ;
+ * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
  */
 
 /**
@@ -53,6 +54,11 @@
 export const SECTIONS = [
   { id: "landing", title: "Landing", sub: "La page d’accueil du site (/), avant le parcours" },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de ta conv (écrans 01 à 08), avec une conv importée pour de vrai" },
+  {
+    id: "paywall",
+    title: "Paywall direct",
+    sub: "Le paywall avant toute lecture (16 octobre)\u00a0: la lecture calculée par le code, «\u00a0Ta formule\u00a0» ouverte d’emblée, puis le paiement",
+  },
   { id: "rapport", title: "Rapport", sub: "La révélation du verdict, l’aperçu gratuit, le paiement, le rapport complet, ta question, le mode sobre (09 à 12, 18 et 19)" },
   { id: "quotidien", title: "Au quotidien", sub: "Le rapport ouvert\u00a0: l’accueil, l’aide à chaque message, sa fiche, le compte (13, 16 et 20)" },
   { id: "convs", title: "Plusieurs convs", sub: "Un compte de l’équipe avec trois convs\u00a0: la liste «\u00a0Tes convs\u00a0» et le passage de l’une à l’autre" },
@@ -413,6 +419,107 @@ export const STATES = [
     wait: 2200,
     ref: "08-lecture",
     note: "À la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette).",
+  },
+
+  /* ———— Le paywall direct (16 octobre) ———— */
+  {
+    id: "P1",
+    section: "paywall",
+    title: "Paywall",
+    state: "La lecture finie, rien de payé",
+    route: "/lecture",
+    compte: "paywall",
+    wait: 1500,
+    note: "Rien n’est parti au modèle\u00a0: les trouvailles sont celles du code. Arrivée juste après «\u00a0Qui es-tu\u00a0?\u00a0», la lecture se déroule en 5 secondes avant ce bouton.",
+    changement: "Nouveau\u00a0: «\u00a0Voir mon rapport\u00a0» mène au paywall, plus au verdict.",
+  },
+  {
+    id: "P2",
+    section: "paywall",
+    title: "Paywall",
+    state: "Ta formule, ouverte d’emblée",
+    route: "/lecture",
+    compte: "paywall",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog").waitFor();
+      await page.waitForTimeout(900);
+    },
+    changement: "Nouveau\u00a0: les prix de la grille du 16 octobre (13,90\u00a0€, Premium 18,90\u00a0€), et le titre «\u00a0Ton rapport parle de vous deux\u00a0».",
+  },
+  {
+    id: "P3",
+    section: "paywall",
+    title: "Paywall",
+    state: "L’offre ①, la feuille fermée sans payer",
+    route: "/lecture",
+    compte: "paywall",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog").waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    id: "P4",
+    section: "paywall",
+    title: "Paywall",
+    state: "Sous la feuille",
+    route: "/lecture",
+    compte: "paywall",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog").waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "detached" });
+      await page.waitForTimeout(700);
+    },
+    note: "Ce que le code a compté (qui ouvre la journée, qui relance, qui répond vite) et ses trouvailles. Le bouton reste collé en bas de l’écran.",
+  },
+  {
+    id: "P4b",
+    section: "paywall",
+    title: "Paywall",
+    state: "Sous la feuille, les chapitres",
+    route: "/lecture",
+    compte: "paywall",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog").waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "detached" });
+      await page.getByText("Ton prochain pas").scrollIntoViewIfNeeded();
+      await page.waitForTimeout(700);
+    },
+    note: "Les huit chapitres fermés, avec leurs titres d’attente\u00a0: sans verdict, pas de titres écrits pour leur histoire. Chacun rouvre la feuille.",
+  },
+  {
+    id: "P5",
+    section: "paywall",
+    title: "Paywall",
+    state: "Payé : le rapport entier débloqué",
+    route: "/lecture",
+    compte: "paywall",
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog").waitFor();
+      await payerLaFormule(/^Rapport \+ 60 bulles/)(page);
+    },
+    note: "Payé au faux Whop. La lecture commence seulement maintenant\u00a0: «\u00a0Continuer\u00a0» mène à la vraie lecture, puis au verdict.",
   },
 
   /* ———— Rapport ———— */

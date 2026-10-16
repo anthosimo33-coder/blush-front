@@ -405,4 +405,6 @@ export type AnalysisProgress = {
   failed?: boolean;
   /** Pourquoi : « refus » (le modèle a refusé de lire cette conv, réessayer n’y changerait rien), « souffle » (le budget du jour, elle repart demain), sinon une panne. */
   failReason?: Echec;
+  /** La conv attend son paiement : rien n’est lu par le modèle avant (le paywall d’abord). L’écran montre ce que le code a vu, puis la feuille du paiement. */
+  paiement?: boolean;
 };

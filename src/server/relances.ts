@@ -10,6 +10,7 @@ import { entre } from "./invitations";
 import { journal, journalErreur } from "./journal";
 import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { mailRelance } from "./mail-relance";
+import { etatDesTaches } from "./taches";
 import { ECART_OFFRES_UNIQUES_MS } from "@/contenu/offres";
 import type { PassageDesRelances } from "@/types/api";
 
@@ -115,9 +116,13 @@ export async function envoyerLesRelances(): Promise<PassageDesRelances> {
       passage.retenues = dues.length - k;
       break;
     }
-    /* L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, une alerte n’appelle aucune vente */
+    /*
+     * L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, une alerte n’appelle aucune vente. Sans
+     * verdict, seule une conv qui attend son paiement (le paywall d’abord, rien de lu) est relancée
+     */
     const verdict = await donneesVerdict(c.storyId);
-    if (estEquipe(c) || !(await entre(c.email)) || !verdict || verdict.sortie.alerte || verdict.sortie.mode_sobre) {
+    const attendSonPaiement = !verdict && (await etatDesTaches(c.storyId, ["verdict"])).verdict?.status === "paiement";
+    if (estEquipe(c) || !(await entre(c.email)) || (!verdict && !attendSonPaiement) || verdict?.sortie.alerte || verdict?.sortie.mode_sobre) {
       passage.ecartees++;
       continue;
     }
