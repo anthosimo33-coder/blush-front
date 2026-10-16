@@ -106,6 +106,15 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { groupe: "suite", n: suite, centimes: suite * 690 },
       { groupe: "bulles", n: Math.round(bulles / 790), centimes: bulles },
     ],
+    /* Le haut du paywall : des vus et des payés inventés, un taux différent par titre */
+    hauts: [
+      { genre: "tendance", vus: 41, payes: 9 },
+      { genre: "toi", vus: 118, payes: 21 },
+      { genre: "elle", vus: 64, payes: 7 },
+      { genre: "contraste", vus: 152, payes: 31 },
+      { genre: "egalite", vus: 57, payes: 6 },
+      { genre: "aucun", vus: 12, payes: 1 },
+    ],
     iaDuJour: { dollars: 12.4, budget: 30 },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }

@@ -1,12 +1,13 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
+import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE } from "@/contenu/offres";
 import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
 import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
-import { PANNE } from "./compteurs";
+import { HAUT, PANNE } from "./compteurs";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
@@ -124,6 +125,12 @@ export type Pilotage = {
   sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
   /** Le payé par groupe d’offres (GROUPES_D_OFFRES), dans l’ordre des groupes, même vides. */
   mix: { groupe: GroupeDOffres; n: number; centimes: number }[];
+  /**
+   * Le haut du paywall (src/contenu/haut-du-paywall.ts) : pour chaque titre, dans l’ordre de GENRES_DU_HAUT, même vide,
+   * les convs arrivées au paywall avec lui et les rapports débloqués après lui, comptés par jour de Paris (counters,
+   * « haut:vu:<titre> », « haut:paye:<titre> ») : sur la période en jours entiers, comme les pannes.
+   */
+  hauts: { genre: GenreDuHaut; vus: number; payes: number }[];
   /** La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars. */
   iaDuJour: { dollars: number; budget: number };
   /**
@@ -343,7 +350,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
-  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi] = await Promise.all([
+  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi, hauts] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
@@ -392,6 +399,9 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           from counters where key like ${`${PANNE}%`}`,
     ),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from visites`),
+    lignes<{ key: string; n: string }>(
+      sql`select key, sum(count) as n from counters where key like ${`${HAUT}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -423,6 +433,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       .map(([source, l]) => ({ source, ...l }))
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
     mix: GROUPES_D_OFFRES.map((groupe) => ({ groupe, ...groupes.get(groupe)! })),
+    hauts: GENRES_DU_HAUT.map((genre) => ({
+      genre,
+      vus: n(hauts.find((h) => h.key === `${HAUT}vu:${genre}`)?.n),
+      payes: n(hauts.find((h) => h.key === `${HAUT}paye:${genre}`)?.n),
+    })),
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour },
     sante: {
       echecs: n(sante.echecs),

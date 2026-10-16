@@ -5,6 +5,7 @@ import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
+import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { formatCount, jourEnLettres } from "@/lib/format";
@@ -27,9 +28,9 @@ import { AvatarPair } from "@/components/ui/Avatar";
 import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
-import { ScoreCard } from "@/components/ui/progress";
 import { Toast } from "@/components/ui/surfaces";
-import type { Formule, LotDeLaRoue, OffreId, ScoreRow, Story, Testimonial } from "@/types";
+import { BulleDeBlush, CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
+import type { ApercuDuPaywall, Formule, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
 
 /*
@@ -37,11 +38,12 @@ import type { RoueDuCompte } from "@/types/api";
  * validées le 16 octobre) : la conv est importée, « Qui es-tu ? » rempli, et rien n’est encore parti au modèle.
  * D’abord la roue des cadeaux (FeuilleDeLaRoue), une fois par compte ; son lot gagné vaut 15 minutes, dans le bandeau
  * du haut et sur les formules (prixAvecLot, bullesDuLot : le serveur fait payer le même prix). Puis vos prénoms, le
- * chiffre qui frappe (une trouvaille du code), la note des avis (seulement de vrais avis), les deux formules (Premium
- * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), la discrétion. En descendant : les témoignages (de vrais clients seulement), un avant / après
- * (marqué « exemple ») et les questions ; sur téléphone, une barre en bas ramène au bouton qui paie quand il est sorti
- * de l’écran. Ordinateur : l’accroche, les preuves et l’avant / après à gauche, le paiement à droite, les témoignages
- * dessous.
+ * haut du paywall (« Le mix », validé le 16 octobre : un titre parmi cinq, tiré de ce que le code a compté, ses chiffres
+ * et la bulle de BLUSH, ./HautDuPaywall.tsx), la note des avis (seulement de vrais avis), les deux formules (Premium
+ * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), la discrétion. En
+ * descendant : les témoignages (de vrais clients seulement), un avant / après (marqué « exemple ») et les questions ; sur
+ * téléphone, une barre en bas ramène au bouton qui paie quand il est sorti de l’écran. Ordinateur : le titre, sa carte et
+ * l’avant / après à gauche, le paiement à droite, les témoignages dessous.
  * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet, ou après OFFRE_APRES_MS sans payer. Jamais avec un lot
  * de la roue (le serveur la refuse aussi), ni pendant que la roue attend. Payé, « C’est débloqué » mène à la vraie
  * lecture (/lecture).
@@ -50,26 +52,12 @@ import type { RoueDuCompte } from "@/types/api";
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
 const OFFRE_APRES_MS = 40_000;
 
-/** Une trouvaille du code qui nomme l’autre (« Elle ouvre la conv… » devient « Léa ouvre la conv… »), pour le titre. */
-export const nommer = (trouvaille: string, prenom: string) => trouvaille.replace(/^(Elle|Il) /, `${prenom} `);
-
-/** Une trouvaille qui dit un déséquilibre entre vous deux (« Elle ouvre… », « Tu relances… ») : la seule qui fasse un titre. */
-const desequilibre = (t: string) => /^(Elle|Il|Tu) /.test(t);
-
-/**
- * Le titre et la ligne dessous : le premier déséquilibre, qui nomme l’autre, puis la trouvaille suivante et la promesse.
- * Sans déséquilibre (une conv équilibrée, ou trop courte), le rapport qui l’attend, et la première trouvaille dessous.
- */
-export function accroche(trouvailles: string[], prenom: string): { titre: string; sous: string } {
-  const choc = trouvailles.find(desequilibre);
-  const autre = trouvailles.find((t) => t !== choc);
-  return { titre: choc ? `${nommer(choc, prenom)}.` : PAYWALL.titre(prenom), sous: autre ? `${autre}. ${PAYWALL.promesse}` : PAYWALL.promesse };
-}
-
-export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS }: { story: Story; scores: ScoreRow[]; trouvailles: string[]; temoignages?: Testimonial[] }) {
+export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: Story; apercu: ApercuDuPaywall; temoignages?: Testimonial[] }) {
   const { moi, autre } = moiEtAutre(story);
   const elle = autre.pronoun !== "il";
-  const { titre, sous } = accroche(trouvailles, autre.name);
+  const haut = hautDuPaywall(apercu, { nom: autre.name, il: !elle });
+  /* Sur téléphone, les cases (ou la courbe) disent ce que dit la phrase : elle ne reste que s’il n’y en a pas */
+  const preuve = haut.cases.length > 0 || !!haut.courbe;
   const feuille = useFeuilleDuPaiement();
   const roue = feuille.data?.roue ?? null;
   /* La roue s’ouvre une fois, à l’arrivée, si elle est à tourner ; ensuite, l’écran seul décide (elle reste ouverte le temps du tour) */
@@ -101,19 +89,13 @@ export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS
           <section className="flex flex-col gap-3 lg:gap-6">
             <div className="flex flex-col gap-1.5 pt-1 lg:gap-3">
               <span className="text-legende font-black text-grey lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
-              <h1 className="m-0 text-[27px] font-black leading-[1.07] tracking-[-0.03em] [text-wrap:balance] max-lg:[@media(max-height:700px)]:text-[24px] lg:text-[50px] lg:leading-[1.02]">
-                {titre}
-              </h1>
-              <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px]">{sous}</p>
+              <TitreDuHaut titre={haut.titre} />
+              {haut.sous && <p className={cn("m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px] lg:leading-[1.42]", preuve && "max-lg:hidden")}>{haut.sous}</p>}
               <Preuves />
             </div>
-            {/* Sur un écran bas (375 × 667), le témoignage du haut pousserait le bouton qui paie hors de l’écran : il reste plus bas, avec les autres */}
-            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden [@media(max-height:799px)]:hidden" />}
-            {scores.length > 0 && (
-              <div className="hidden lg:block">
-                <ScoreCard rows={scores.slice(0, 3)} autre={autre.pronoun} />
-              </div>
-            )}
+            <PreuveDuHaut haut={haut} className="lg:hidden" />
+            <BulleDeBlush question={haut.question} className="lg:hidden" />
+            <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement ref={paiement} lot={lot} sansOffre={roue?.etat === "a_tourner" || roue?.etat === "gagnee"} autre={autre.name} elle={elle} expliquer={() => setBulle(true)} />
@@ -389,30 +371,6 @@ function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; 
       )}
       <span className="text-elle-ink">{valeur}</span>
     </span>
-  );
-}
-
-/** Un témoignage (la maquette : son initiale, son prénom, sa situation, son histoire) ; `compact` : celui du premier écran, sur téléphone. */
-function Temoignage({ t, compact = false, className }: { t: Testimonial; compact?: boolean; className?: string }) {
-  return (
-    <figure className={cn("m-0 flex flex-col gap-2.5 rounded-[20px] bg-white shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)]", compact ? "p-3.5" : "p-5 lg:p-7", className)}>
-      <figcaption className="flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#C7B8FF,var(--flou)_55%,var(--color-flou-ink))] font-black text-white",
-            compact ? "size-[34px] text-note" : "size-[52px] text-titre-3 lg:size-[60px]",
-          )}
-        >
-          {t.name.slice(0, 1)}
-        </span>
-        <span className="flex flex-col">
-          <span className={cn("font-black", compact ? "text-note" : "text-carte")}>{t.name}</span>
-          <span className="text-legende font-extrabold text-grey">{t.label}</span>
-        </span>
-      </figcaption>
-      <blockquote className={cn("m-0 font-bold leading-[1.5] text-[#2A2A2E]", compact ? "text-legende" : "text-detail lg:text-corps")}>{t.text}</blockquote>
-    </figure>
   );
 }
 

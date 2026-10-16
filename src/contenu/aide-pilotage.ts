@@ -82,6 +82,17 @@ export const AIDES_DU_PILOTAGE = {
     repere: "La colonne orange est la plus grosse fuite, entre l’arrivée et l’achat\u00a0: c’est là qu’un changement rapporte le plus.",
     siCaBouge: "Change une seule chose à la fois, et compare avec la période d’après.",
   },
+  hauts: {
+    titre: "Le haut du paywall",
+    de: "le haut du paywall",
+    quoi: "Le titre que chaque conv voit en haut de son paywall, parmi cinq (la tendance, tout vient de toi, tout vient de l’autre, le contraste, l’égalité), et combien de rapports se débloquent après chacun.",
+    calcul:
+      "Le code choisit le titre d’après les chiffres de la conv, sans le modèle (src/contenu/haut-du-paywall.ts). «\u00a0Vus\u00a0»\u00a0: les convs arrivées au paywall avec ce titre, comptées le jour de leur arrivée. «\u00a0Payés\u00a0»\u00a0: les rapports de ces convs débloqués (payés, ou par un rapport d’avance), comptés le jour du paiement. Le titre d’une conv reste chiffré avec elle\u00a0: ici, seulement des comptes par jour.",
+    repere:
+      "Compare les taux d’un titre à l’autre, pas les nombres de vus\u00a0: chaque titre va à des convs différentes. Un taux se lit à partir de 30\u00a0vus. Un payé peut venir d’un vu de la période d’avant.",
+    siCaBouge:
+      "Un titre qui paie nettement moins que les autres\u00a0: réécris-le, ou change sa place dans la règle. Beaucoup de «\u00a0Sans assez de chiffres\u00a0»\u00a0: les convs arrivent trop courtes.",
+  },
   sources: {
     titre: "D’où ils viennent",
     de: "les sources",

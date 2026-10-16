@@ -7,9 +7,11 @@ import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
 import { mouvementDans } from "./bulles";
+import { compterLeHaut } from "./compteurs";
 import { donneesVerdict } from "./depot";
 import { db, schema } from "./db";
 import type { FournisseurPaiement } from "./db/enums";
+import { contexteDe } from "./histoires";
 import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
 import type { Consentement } from "./juridique";
@@ -240,7 +242,17 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
   /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
   if (r.effet === "livre" && r.achat) await noterAchatAuFil(r.achat);
   if (r.debloquee && r.achat) await relancerLaChaine(r.achat, "rapport non relancé après la livraison");
+  if (r.debloquee && r.achat?.storyId) await compterLeHautPaye(r.achat.storyId);
   return r;
+}
+
+/** Le titre du haut du paywall de cette conv (gardé dans son contexte), compté comme payé (/admin) ; rien sans lui. */
+async function compterLeHautPaye(storyId: string): Promise<void> {
+  await auMieux(async () => {
+    const [story] = await db().select({ context: schema.stories.context }).from(schema.stories).where(eq(schema.stories.id, storyId));
+    const genre = story ? contexteDe(story)?.accroche : undefined;
+    if (genre) await compterLeHaut(genre, "paye");
+  }, "titre du paywall non compté");
 }
 
 /**
@@ -347,7 +359,10 @@ export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, 
     await mouvementDans(tx, compte.id, RAPPORT_D_AVANCE.bulles, "achat", avance.id);
     return utilise!;
   });
-  if (typeof r !== "string") await relancerLaChaine(r, "rapport non relancé après le rapport d’avance");
+  if (typeof r !== "string") {
+    await relancerLaChaine(r, "rapport non relancé après le rapport d’avance");
+    await compterLeHautPaye(storyId);
+  }
   return r;
 }
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { cookies } from "next/headers";
+import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { cookieSecurise } from "./cookies";
 import { db, schema } from "./db";
 import { auMieux, journalErreur } from "./journal";
@@ -64,6 +65,27 @@ export async function compterUnePanne(lieu: string): Promise<number | null> {
     journalErreur("panne non comptée", e, { lieu });
     return null;
   }
+}
+
+/**
+ * Le début de la clé d’un compteur du haut du paywall (src/contenu/haut-du-paywall.ts) : « haut:vu:<titre> » quand une
+ * conv arrive au paywall avec ce titre, « haut:paye:<titre> » quand son rapport est débloqué. Des comptes par jour, sans
+ * la conv : le titre d’une conv, lui, reste chiffré avec elle (stories.context).
+ */
+export const HAUT = "haut:";
+
+/** Compte un titre du haut du paywall, vu ou payé, aujourd’hui (jour de Paris), sans rien faire échouer. */
+export async function compterLeHaut(genre: GenreDuHaut, quoi: "vu" | "paye"): Promise<void> {
+  const key = `${HAUT}${quoi}:${genre}`;
+  await auMieux(
+    () =>
+      db()
+        .insert(schema.counters)
+        .values({ day: sql`(now() at time zone 'Europe/Paris')::date`, key, count: 1 })
+        .onConflictDoUpdate({ target: [schema.counters.day, schema.counters.key], set: { count: sql`${schema.counters.count} + 1` } }),
+    "compteur non noté",
+    { cle: key },
+  );
 }
 
 /** Les robots qui ouvrent un lien pour en dessiner l’aperçu (WhatsApp, iMessage, Slack…) : pas des visites. */

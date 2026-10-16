@@ -37,9 +37,14 @@ import { progression } from "@/server/donnees";
 import { contexteDe } from "@/server/histoires";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import { etatDesTaches } from "@/server/taches";
+import { genreDuHaut } from "@/contenu/haut-du-paywall";
+import { HAUT } from "@/server/compteurs";
 import { compteDeTest, convRattachee, debloquerLaConv, ligneEnBase } from "./aide/fixtures";
 
 const APPLI = "http://localhost";
+
+/** Le compte du jour d’un compteur (un titre du haut du paywall, vu ou payé). */
+const compteDuJour = async (cle: string) => (await db().select().from(schema.counters).where(eq(schema.counters.key, cle)))[0]?.count ?? 0;
 const QUI = { me: "p0", pronom: "il", guess: "vus", goal: "ensemble" };
 
 afterEach(() => {
@@ -92,11 +97,18 @@ describe("le paywall avant toute lecture", () => {
     expect(await statutDuVerdict(conv)).toBe("paiement");
     expect(await appelsAuModele(conv)).toBe(0);
     expect(await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, conv))).toHaveLength(0);
-    /* Ce que le code sait : les trouvailles de la lecture, et les lignes du paywall (qui ouvre, qui relance, qui répond vite) */
+    /*
+     * Ce que le code sait : les trouvailles de la lecture, le haut du paywall (qui ouvre, reprend, relance, répond vite,
+     * écrit long, et la chute s’il y en a une), et son titre, gardé chiffré dans le contexte et compté vu une fois
+     */
     const ligne = await ligneEnBase(conv);
     expect(contexteDe(ligne)?.trouvailles.length).toBeGreaterThan(0);
     expect((await progression(ligne)).paiement).toBe(true);
-    expect((await apercuAvantPaiement(conv))?.map((s) => s.label)).toEqual(["Qui ouvre la journée", "Qui reprend après un silence", "Qui relance sans réponse", "Qui répond vite"]);
+    const apercu = await apercuAvantPaiement(conv);
+    expect(apercu?.signaux.map((s) => s.id).slice(0, 3)).toEqual(["ouvre", "reprend", "relance"]);
+    const genre = contexteDe(ligne)?.accroche;
+    expect(genre).toBe(genreDuHaut(apercu!));
+    expect(await compteDuJour(`${HAUT}vu:${genre}`)).toBeGreaterThan(0);
     /* Relancée (l’écran de lecture, un autre onglet) : une seule tâche, toujours en attente du paiement */
     expect((await lancerLaLecture(depuisLAppli("/api/analyse", {}))).status).toBe(200);
     expect(await db().select().from(schema.tasks).where(eq(schema.tasks.storyId, conv))).toHaveLength(1);
