@@ -292,7 +292,7 @@ type Reponses = {
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/chaine": Ok;
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "GET /api/cron/relances": PassageDesRelances & { chaines: number };
+  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number };
   "POST /api/desinscription": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;

@@ -4,7 +4,7 @@ import type { Devinette, Objectif, Pronom } from "@prompts/lib/conv";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { CATALOGUE } from "@/contenu/offres";
 import { NOM_TOURNAGE_MAX } from "@/lib/limites";
-import { renommer } from "@/lib/renommer";
+import { mentionne, renommer } from "@/lib/renommer";
 import type { RefusDuTournage, StatutDuTournage } from "@/types/api";
 import type { Utilisateur } from "./auth";
 import { crediter } from "./bulles";
@@ -20,6 +20,7 @@ import { estEquipe } from "./droits";
 import { verdictAffiche } from "./ecrans/rapport";
 import { env } from "./env";
 import { ErreurInvariant, estBudget } from "./erreurs";
+import { voixDisponible } from "./ia/voix";
 import { definirQui, histoiresDuCompte, importer, metaDe, personnesDe, supprimerHistoire, UUID, type Meta } from "./histoires";
 import type { Consentement } from "./juridique";
 import { reparerLaChaine, relancerApres } from "./pipeline";
@@ -34,7 +35,8 @@ import { etatDesTaches, planifier } from "./taches";
  *   de tournage (brouillonDeTournage) ; un export se lit comme d’habitude, sans modèle ;
  * - la lecture (POST /api/analyse) recopie le verdict, le rapport, la mémoire et le vocal déjà écrits (rejouer), et
  *   l’écran de lecture les rejoue en DUREE_RELECTURE_MS (avanceRejouee, src/server/avancement.ts) ;
- * - la chaîne des tâches ne lance plus rien pour cette conv (src/server/pipeline.ts, executer).
+ * - la chaîne des tâches ne lance plus rien pour cette conv (src/server/pipeline.ts, executer), sauf le vocal d’une prise
+ *   qui n’en a pas : celui de la source disait le prénom de sa créatrice (rejouer, renommerLesPrises).
  * Le rapport s’ouvre comme un rapport acheté, avec ses bulles, une fois par conv de tournage et par compte : le chat
  * reste le vrai (une réponse coûte une bulle, et un appel au modèle). Chaque nouvelle prise remplace la précédente de la
  * même conv de tournage dans le compte : « Tes convs » n’en garde qu’une par campagne.
@@ -427,6 +429,8 @@ const prenomDeMoi = (meta: Meta) => (meta.moi == null ? null : (meta.participant
 export async function rejouer(storyId: string, tournage: Tournage, utilisateur: Pick<Utilisateur, "id">): Promise<void> {
   const src = tournage.storyId;
   if (await manqueDe(src)) throw new ErreurInvariant("tournage:source_pas_prete");
+  /* Le vocal de la source disait l’ancien prénom, et aucune prise d’avant ne l’a refait : la chaîne le refait tout de suite */
+  let aRefaire = false;
   await db().transaction(async (tx) => {
     /* Une requête après l’autre : la transaction n’a qu’une connexion */
     const [source] = await tx.select({ meta: s.meta, messageCount: s.messageCount, nextMessage: s.nextMessage, context: s.context }).from(s).where(eq(s.id, src));
@@ -449,9 +453,22 @@ export async function rejouer(storyId: string, tournage: Tournage, utilisateur: 
     const aRenommer = !!ancien && !!nouveau && ancien !== nouveau;
     const recopie = <C extends coffre.Colonne>(colonne: C, octets: Buffer): Buffer =>
       aRenommer ? coffre.ecrire(colonne, renommer(coffre.lire(colonne, octets), ancien, nouveau)) : octets;
-    /* Un vocal qui dit l’ancien prénom : son audio le prononcerait, il ne suit pas */
-    const vocalDitLAncien =
-      !!vo && aRenommer && JSON.stringify(renommer(coffre.lire("vocals.data", vo.data), ancien, nouveau)) !== JSON.stringify(coffre.lire("vocals.data", vo.data));
+    /*
+     * Un vocal qui dit l’ancien prénom : son audio le prononcerait, il ne suit pas. Celui de sa prise d’avant de la même
+     * conv de tournage, déjà refait à son prénom, le remplace ; sinon la chaîne le refait (sans tâche « vocal » recopiée)
+     */
+    const vocalDitLAncien = !!vo && aRenommer && mentionne(coffre.lire("vocals.data", vo.data), ancien);
+    const [davant] = vocalDitLAncien
+      ? await tx
+          .select({ vocal: schema.vocals, meta: s.meta })
+          .from(schema.vocals)
+          .innerJoin(s, eq(s.id, schema.vocals.storyId))
+          .where(and(eq(s.userId, utilisateur.id), eq(s.tournageId, tournage.id), ne(s.id, storyId), isNotNull(s.tournageLe)))
+          .orderBy(desc(s.tournageLe))
+          .limit(1)
+      : [];
+    const refait = davant && prenomDeMoi(metaDe(davant)) === nouveau && !mentionne(coffre.lire("vocals.data", davant.vocal.data), ancien ?? "") ? davant.vocal : null;
+    const vocal = vocalDitLAncien ? refait : vo;
     await tx
       .update(s)
       .set({
@@ -472,12 +489,14 @@ export async function rejouer(storyId: string, tournage: Tournage, utilisateur: 
     await tx.insert(schema.memories).values({ storyId, data: recopie("memories.data", m.data) });
     /*
      * L’heure du vocal et celles des tâches restent les leurs : la chaîne (vocalTente) y lit ce qu’elle lisait chez la
-     * source. Sans le vocal (il disait l’ancien prénom), sa tâche finie suffit : rien ne le refait pour une prise
+     * source. Sans le vocal (il disait l’ancien prénom), pas de tâche « vocal » non plus : la chaîne le refait
      */
-    if (vo && !vocalDitLAncien) await tx.insert(schema.vocals).values({ ...vo, storyId });
-    if (taches.length)
+    if (vocal) await tx.insert(schema.vocals).values({ ...vocal, storyId });
+    const recopiees = vocal || !vo ? taches : taches.filter((x) => x.kind !== "vocal");
+    aRefaire = !!vo && !vocal;
+    if (recopiees.length)
       await tx.insert(schema.tasks).values(
-        taches.map(({ kind, status, attempts, error, progress, detail, createdAt, updatedAt }) => ({
+        recopiees.map(({ kind, status, attempts, error, progress, detail, createdAt, updatedAt }) => ({
           storyId,
           kind,
           status,
@@ -497,4 +516,89 @@ export async function rejouer(storyId: string, tournage: Tournage, utilisateur: 
     .where(and(eq(s.userId, utilisateur.id), eq(s.tournageId, tournage.id), ne(s.id, storyId)));
   for (const p of avant) await supprimerHistoire(p.id);
   await crediter(utilisateur.id, BULLES_DU_TOURNAGE, "tournage", `tournage:${tournage.id}:${utilisateur.id}`);
+  if (aRefaire && voixDisponible()) {
+    await planifier(storyId, "vocal");
+    relancerApres(storyId);
+  }
+}
+
+/**
+ * Une prise rejouée avant que rejouer ne renomme (le 16 octobre) : ce que le modèle a écrit pour la créatrice de la
+ * source prend le prénom de la sienne (renommer), et son vocal est refait par la chaîne s’il disait l’ancien prénom, ou
+ * si rejouer l’avait laissée sans vocal (sa tâche « vocal » recopiée, finie). Vrai si elle a changé ; rien à faire :
+ * faux, sans rien écrire.
+ */
+async function renommerLaPrise(prise: { id: string; userId: string | null; meta: Buffer }, source: { meta: Buffer; vocal: boolean }): Promise<boolean> {
+  const ancien = prenomDeMoi(metaDe(source));
+  const nouveau = prenomDeMoi(metaDe(prise));
+  if (!ancien || !nouveau || ancien === nouveau) return false;
+  const { renommee, vocal } = await db().transaction(async (tx) => {
+    const id = prise.id;
+    const [l] = await tx.select({ context: s.context }).from(s).where(eq(s.id, id));
+    const [v] = await tx.select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, id));
+    const [r] = await tx.select({ plan: schema.reports.plan, data: schema.reports.data }).from(schema.reports).where(eq(schema.reports.storyId, id));
+    const [m] = await tx.select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, id));
+    const [vo] = await tx.select({ data: schema.vocals.data }).from(schema.vocals).where(eq(schema.vocals.storyId, id));
+    const [tv] = await tx
+      .select({ status: schema.tasks.status })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "vocal")));
+    /* Une colonne qui dit encore l’ancien prénom, renommée ; null : rien à changer */
+    const nomme = <C extends coffre.Colonne>(colonne: C, octets: Buffer | null | undefined): Buffer | null => {
+      if (!octets) return null;
+      const lu = coffre.lire(colonne, octets);
+      return mentionne(lu, ancien) ? coffre.ecrire(colonne, renommer(lu, ancien, nouveau)) : null;
+    };
+    const [context, verdict, plan, rapport, memoire] = [
+      nomme("stories.context", l?.context),
+      nomme("verdicts.data", v?.data),
+      nomme("reports.plan", r?.plan),
+      nomme("reports.data", r?.data),
+      nomme("memories.data", m?.data),
+    ];
+    if (context) await tx.update(s).set({ context }).where(eq(s.id, id));
+    if (verdict) await tx.update(schema.verdicts).set({ data: verdict }).where(eq(schema.verdicts.storyId, id));
+    if (plan || rapport)
+      await tx
+        .update(schema.reports)
+        .set({ ...(plan && { plan }), ...(rapport && { data: rapport }) })
+        .where(eq(schema.reports.storyId, id));
+    if (memoire) await tx.update(schema.memories).set({ data: memoire }).where(eq(schema.memories.storyId, id));
+    const aRefaire = voixDisponible() && (vo ? mentionne(coffre.lire("vocals.data", vo.data), ancien) : source.vocal && tv?.status === "fini");
+    if (aRefaire) {
+      await tx.delete(schema.vocals).where(eq(schema.vocals.storyId, id));
+      await tx.delete(schema.tasks).where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "vocal")));
+    }
+    return { renommee: !!(context || verdict || plan || rapport || memoire), vocal: aRefaire };
+  });
+  /* La chaîne planifie le vocal qui manque (vocalAFaire, src/server/chaine.ts), et le lance après la réponse */
+  if (vocal) await reparerLaChaine({ id: prise.id, userId: prise.userId });
+  return renommee || vocal;
+}
+
+/* Les prises que ce processus a déjà vues sans rien à y faire : le passage suivant ne les relit pas */
+const prisesVues = new Set<string>();
+
+/**
+ * Les prises à renommer (renommerLaPrise), à chaque passage des 5 minutes (GET /api/cron/relances) : les prises d’avant
+ * le 16 octobre le sont au premier, sans que la créatrice refasse son import. Le nombre de prises changées.
+ */
+export async function renommerLesPrises(): Promise<number> {
+  const prises = (
+    await db().select({ id: s.id, userId: s.userId, meta: s.meta, source: t.storyId }).from(s).innerJoin(t, eq(t.id, s.tournageId)).where(isNotNull(s.tournageLe))
+  ).filter((p) => !prisesVues.has(p.id));
+  if (!prises.length) return 0;
+  const sources = await db()
+    .select({ id: s.id, meta: s.meta, vocal: schema.vocals.storyId })
+    .from(s)
+    .leftJoin(schema.vocals, eq(schema.vocals.storyId, s.id))
+    .where(inArray(s.id, [...new Set(prises.map((p) => p.source))]));
+  const parId = new Map(sources.map((x) => [x.id, { meta: x.meta, vocal: !!x.vocal }]));
+  let changees = 0;
+  for (const p of prises) {
+    const source = parId.get(p.source);
+    if (source && (await renommerLaPrise(p, source))) changees++;
+    else prisesVues.add(p.id);
+  }
+  return changees;
 }

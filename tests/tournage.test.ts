@@ -33,7 +33,7 @@ import { GET as getLien } from "@/app/tournage/[cle]/route";
 import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { nomDuCookie } from "@/lib/noms-cookies";
-import { renommer } from "@/lib/renommer";
+import { mentionne, renommer } from "@/lib/renommer";
 import { DUREE_RELECTURE_MS } from "@/server/avancement";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
@@ -51,6 +51,7 @@ import {
   convsCandidates,
   creerTournage,
   metaDeLaPrise,
+  renommerLesPrises,
   tournageDe,
   tournageDeLaCle,
   tournagesAffiches,
@@ -272,7 +273,8 @@ describe("une prise", () => {
 
   it("une nouvelle prise remplace la précédente, sans redonner les bulles", async () => {
     await navigateur(kelly, cle);
-    const premiere = (await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.userId, kelly.id)))[0]!.id;
+    /* Sa prise d’un test d’avant, ou une à elle : le test passe seul comme dans n’importe quel ordre */
+    const premiere = (await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.userId, kelly.id)))[0]?.id ?? (await prise());
     const seconde = await prise();
     const restent = await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.userId, kelly.id));
     expect(restent.map((s) => s.id)).toEqual([seconde]);
@@ -283,7 +285,7 @@ describe("une prise", () => {
 
   it("la chaîne ne lance jamais le modèle pour une prise, même une étape qu’elle croirait à refaire", async () => {
     await navigateur(kelly, cle);
-    const id = (await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.userId, kelly.id)))[0]!.id;
+    const id = (await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.userId, kelly.id)))[0]?.id ?? (await prise());
     await db()
       .delete(schema.tasks)
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "vocal")));
@@ -293,6 +295,87 @@ describe("une prise", () => {
     expect(appels.length).toBe(avant);
     const { vocal } = await etatDesTaches(id, ["vocal"]);
     expect(vocal).toMatchObject({ status: "echec", error: "tournage" });
+  });
+
+  /* Le prénom de la créatrice de la source, et le vocal d’une conv dont la première ligne le dit */
+  const ancienPrenom = async () => personnesDe(metaDe(await ligneEnBase(source))).moi.prenom;
+  const vocalDe = async (storyId: string) => (await db().select().from(schema.vocals).where(eq(schema.vocals.storyId, storyId)))[0];
+  const vocalQuiDit = async (storyId: string, prenom: string) => {
+    const lu = coffre.lire("vocals.data", (await vocalDe(storyId))!.data);
+    return coffre.ecrire("vocals.data", { ...lu, lignes: lu.lignes.map((l, k) => (k ? l : { ...l, texte: `${prenom}. ${l.texte}` })) });
+  };
+
+  it("le vocal de la source dit son prénom : la prise n’en garde pas, la chaîne lui en refait un, et sa prise suivante le reprend", async () => {
+    const nina = await compteDeTest("tournage-nina");
+    const ancien = await ancienPrenom();
+    const vocalSource = (await vocalDe(source))!.data;
+    await db()
+      .update(schema.vocals)
+      .set({ data: await vocalQuiDit(source, ancien) })
+      .where(eq(schema.vocals.storyId, source));
+    try {
+      await navigateur(nina, cle);
+      const apres = etat.apres.length;
+      const id = await prise();
+      expect(await vocalDe(id)).toBeUndefined();
+      /* Planifié, et lancé après la réponse : il se fait pendant la relecture */
+      expect((await etatDesTaches(id, ["vocal"])).vocal).toMatchObject({ status: "attente" });
+      expect(etat.apres.length).toBe(apres + 1);
+      const avant = appels.length;
+      await executerChaine(id);
+      /* Le script du vocal seul passe au modèle, sur la lecture déjà renommée */
+      expect(appels.length).toBe(avant + 1);
+      const refait = (await vocalDe(id))!;
+      expect(mentionne(coffre.lire("vocals.data", refait.data), ancien)).toBe(false);
+      const seconde = await prise();
+      expect(Buffer.compare(Buffer.from((await vocalDe(seconde))!.data), Buffer.from(refait.data))).toBe(0);
+      expect((await etatDesTaches(seconde, ["vocal"])).vocal).toMatchObject({ status: "fini" });
+      expect(appels.length).toBe(avant + 1);
+    } finally {
+      await db().update(schema.vocals).set({ data: vocalSource }).where(eq(schema.vocals.storyId, source));
+    }
+  });
+
+  it("une prise rejouée avant le renommage : le passage des 5 minutes lui donne son prénom et lui refait son vocal, une fois", async () => {
+    const zoe = await compteDeTest("tournage-zoe");
+    await navigateur(zoe, cle);
+    const id = await prise();
+    const ancien = await ancienPrenom();
+    /* Comme rejouer la laissait avant le 16 octobre : la lecture de la source telle quelle, et son vocal qui dit l’ancien prénom */
+    const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, source));
+    const [r] = await db().select().from(schema.reports).where(eq(schema.reports.storyId, source));
+    const [m] = await db().select().from(schema.memories).where(eq(schema.memories.storyId, source));
+    await db().update(schema.verdicts).set({ data: v!.data }).where(eq(schema.verdicts.storyId, id));
+    await db().update(schema.reports).set({ plan: r!.plan, data: r!.data }).where(eq(schema.reports.storyId, id));
+    await db().update(schema.memories).set({ data: m!.data }).where(eq(schema.memories.storyId, id));
+    await db()
+      .update(schema.vocals)
+      .set({ data: await vocalQuiDit(id, ancien) })
+      .where(eq(schema.vocals.storyId, id));
+    const avant = appels.length;
+    expect(await renommerLesPrises()).toBeGreaterThanOrEqual(1);
+    const memoire = async () => coffre.lire("memories.data", (await db().select().from(schema.memories).where(eq(schema.memories.storyId, id)))[0]!.data);
+    expect(await memoire()).toEqual(renommer(coffre.lire("memories.data", m!.data), ancien, "Kelly"));
+    expect(mentionne(await memoire(), ancien)).toBe(false);
+    /* Son vocal part, et la chaîne en planifie un autre (le cron, lui, n’appelle pas le modèle) */
+    expect(await vocalDe(id)).toBeUndefined();
+    expect((await etatDesTaches(id, ["vocal"])).vocal).toMatchObject({ status: "attente" });
+    expect(appels.length).toBe(avant);
+    /* Le passage suivant n’y change plus rien */
+    const lue = (await db().select().from(schema.memories).where(eq(schema.memories.storyId, id)))[0]!.data;
+    await renommerLesPrises();
+    expect(Buffer.compare(Buffer.from((await db().select().from(schema.memories).where(eq(schema.memories.storyId, id)))[0]!.data), Buffer.from(lue))).toBe(0);
+    expect((await etatDesTaches(id, ["vocal"])).vocal).toMatchObject({ status: "attente" });
+  });
+
+  it("une prise que rejouer avait laissée sans vocal (sa tâche recopiée, finie) : le passage des 5 minutes le fait refaire", async () => {
+    const lou = await compteDeTest("tournage-lou");
+    await navigateur(lou, cle);
+    const id = await prise();
+    await db().delete(schema.vocals).where(eq(schema.vocals.storyId, id));
+    expect((await etatDesTaches(id, ["vocal"])).vocal).toMatchObject({ status: "fini" });
+    expect(await renommerLesPrises()).toBeGreaterThanOrEqual(1);
+    expect((await etatDesTaches(id, ["vocal"])).vocal).toMatchObject({ status: "attente" });
   });
 
   it("un export importé avec le mode tournage se rejoue aussi, et sa conv brute s’efface", async () => {
