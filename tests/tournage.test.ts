@@ -33,10 +33,12 @@ import { GET as getLien } from "@/app/tournage/[cle]/route";
 import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { nomDuCookie } from "@/lib/noms-cookies";
+import { renommer } from "@/lib/renommer";
 import { DUREE_RELECTURE_MS } from "@/server/avancement";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
+import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { metaDe, personnesDe, type Meta } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
@@ -219,13 +221,34 @@ describe("une prise", () => {
     expect(ligne).toMatchObject({ userId: kelly.id, tournageId: tournage.id, conv: null });
     expect(ligne.tournageLe).toBeInstanceOf(Date);
     expect(ligne.debloqueLe).toBeInstanceOf(Date);
-    /* Le verdict, le rapport, la mémoire et le vocal de la source, octet pour octet */
-    for (const table of [schema.verdicts, schema.reports, schema.memories, schema.vocals]) {
-      const [a] = await db().select().from(table).where(eq(table.storyId, source));
-      const [b] = await db().select().from(table).where(eq(table.storyId, id));
+    /*
+     * Le verdict, le rapport et la mémoire de la source, avec le prénom de la créatrice là où le modèle avait écrit celui
+     * de la source (renommer) ; le vocal, octet pour octet s’il ne dit pas l’ancien prénom, sinon pas de vocal
+     */
+    const ancien = personnesDe(metaDe(await ligneEnBase(source))).moi.prenom;
+    expect(ancien).not.toBe("Kelly");
+    const prenomAncien = new RegExp(`(?<![\\p{L}])${ancien}(?![\\p{L}])`, "u");
+    const donnees = async (table: typeof schema.verdicts | typeof schema.reports | typeof schema.memories | typeof schema.vocals, storyId: string) =>
+      (await db().select().from(table).where(eq(table.storyId, storyId)))[0] as { data: Buffer } | undefined;
+    /* Les colonnes de la source où le modèle avait écrit l’ancien prénom : la mémoire du modèle factice, au moins */
+    const renommees: string[] = [];
+    for (const [colonne, table] of [
+      ["verdicts.data", schema.verdicts],
+      ["reports.data", schema.reports],
+      ["memories.data", schema.memories],
+    ] as const) {
+      const [a, b] = [await donnees(table, source), await donnees(table, id)];
       expect(b, "une table recopiée").toBeDefined();
-      expect(Buffer.compare(Buffer.from((b as { data: Buffer }).data), Buffer.from((a as { data: Buffer }).data))).toBe(0);
+      const recopie = coffre.lire(colonne, b!.data);
+      expect(recopie).toEqual(renommer(coffre.lire(colonne, a!.data), ancien, "Kelly"));
+      expect(JSON.stringify(recopie)).not.toMatch(prenomAncien);
+      if (prenomAncien.test(JSON.stringify(coffre.lire(colonne, a!.data)))) renommees.push(colonne);
     }
+    expect(renommees).toContain("memories.data");
+    const [vocalSource, vocalPrise] = [await donnees(schema.vocals, source), await donnees(schema.vocals, id)];
+    const ditLAncien = prenomAncien.test(JSON.stringify(coffre.lire("vocals.data", vocalSource!.data)));
+    if (ditLAncien) expect(vocalPrise).toBeUndefined();
+    else expect(Buffer.compare(Buffer.from(vocalPrise!.data), Buffer.from(vocalSource!.data))).toBe(0);
     /* Ses tâches de la chaîne, finies : rien à lancer */
     const taches = await etatDesTaches(id, ["verdict", "rapport_plan", "rapport_chapitres", "memoire"]);
     expect(Object.values(taches).map((t) => t.status)).toEqual(["fini", "fini", "fini", "fini"]);

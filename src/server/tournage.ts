@@ -4,6 +4,7 @@ import type { Devinette, Objectif, Pronom } from "@prompts/lib/conv";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { CATALOGUE } from "@/contenu/offres";
 import { NOM_TOURNAGE_MAX } from "@/lib/limites";
+import { renommer } from "@/lib/renommer";
 import type { RefusDuTournage, StatutDuTournage } from "@/types/api";
 import type { Utilisateur } from "./auth";
 import { crediter } from "./bulles";
@@ -410,13 +411,18 @@ export function metaDeLaPrise(source: Meta, prise: Meta): Meta {
   return { ...meta, participants };
 }
 
+/** Le prénom de celui qui importe (« Qui es-tu ? »), d’après une meta, ou null. */
+const prenomDeMoi = (meta: Meta) => (meta.moi == null ? null : (meta.participants[meta.moi]?.prenom ?? null));
+
 /**
  * La lecture d’une prise : tout ce que la conv de tournage a d’écrit est recopié dans cette conv (sa meta et ses
  * chiffres, avec l’import et le prénom de la créatrice : metaDeLaPrise ; le verdict, le rapport, la mémoire, le vocal, et ses tâches
  * telles qu’elles ont fini : la chaîne n’y voit rien à lancer), sa conv brute effacée (celle qu’elle a importée, s’il y
- * en a une), son rapport ouvert. Les autres octets chiffrés passent tels quels : la clé est la même, et rien n’y lie une
- * ligne. Puis ses prises d’avant de la même conv de tournage s’effacent, et ses bulles arrivent (une fois par conv de
- * tournage).
+ * en a une), son rapport ouvert. Ce que le modèle a écrit pour la créatrice de la source prend le prénom de celle-ci
+ * (renommer : le verdict, le rapport, la mémoire, les chiffres) ; un vocal qui dit l’ancien prénom n’est pas recopié (son
+ * audio le prononce : mieux vaut pas de vocal qu’un faux prénom). Sinon, les octets chiffrés passent tels quels : la clé
+ * est la même, et rien n’y lie une ligne. Puis ses prises d’avant de la même conv de tournage s’effacent, et ses bulles
+ * arrivent (une fois par conv de tournage).
  */
 export async function rejouer(storyId: string, tournage: Tournage, utilisateur: Pick<Utilisateur, "id">): Promise<void> {
   const src = tournage.storyId;
@@ -436,13 +442,23 @@ export async function rejouer(storyId: string, tournage: Tournage, utilisateur: 
     if (!source || !v || !r?.data || !m) throw new ErreurInvariant("tournage:source_pas_prete");
     if (!prise) throw new ErreurInvariant("tournage:prise_introuvable");
     const maintenant = new Date();
+    const meta = metaDeLaPrise(metaDe(source), metaDe(prise));
+    /* Le prénom de la créatrice de la source, puis celui de cette prise : là où le modèle l’a écrit, il change */
+    const ancien = prenomDeMoi(metaDe(source));
+    const nouveau = prenomDeMoi(meta);
+    const aRenommer = !!ancien && !!nouveau && ancien !== nouveau;
+    const recopie = <C extends coffre.Colonne>(colonne: C, octets: Buffer): Buffer =>
+      aRenommer ? coffre.ecrire(colonne, renommer(coffre.lire(colonne, octets), ancien, nouveau)) : octets;
+    /* Un vocal qui dit l’ancien prénom : son audio le prononcerait, il ne suit pas */
+    const vocalDitLAncien =
+      !!vo && aRenommer && JSON.stringify(renommer(coffre.lire("vocals.data", vo.data), ancien, nouveau)) !== JSON.stringify(coffre.lire("vocals.data", vo.data));
     await tx
       .update(s)
       .set({
-        meta: coffre.ecrire("stories.meta", metaDeLaPrise(metaDe(source), metaDe(prise))),
+        meta: coffre.ecrire("stories.meta", meta),
         messageCount: source.messageCount,
         nextMessage: source.nextMessage,
-        context: source.context,
+        context: source.context ? recopie("stories.context", source.context) : source.context,
         conv: null,
         convPurgedAt: maintenant,
         debloqueLe: maintenant,
@@ -451,11 +467,14 @@ export async function rejouer(storyId: string, tournage: Tournage, utilisateur: 
         updatedAt: maintenant,
       })
       .where(eq(s.id, storyId));
-    await tx.insert(schema.verdicts).values({ storyId, data: v.data });
-    await tx.insert(schema.reports).values({ storyId, plan: r.plan, data: r.data });
-    await tx.insert(schema.memories).values({ storyId, data: m.data });
-    /* L’heure du vocal et celles des tâches restent les leurs : la chaîne (vocalTente) y lit ce qu’elle lisait chez la source */
-    if (vo) await tx.insert(schema.vocals).values({ ...vo, storyId });
+    await tx.insert(schema.verdicts).values({ storyId, data: recopie("verdicts.data", v.data) });
+    await tx.insert(schema.reports).values({ storyId, plan: r.plan ? recopie("reports.plan", r.plan) : r.plan, data: recopie("reports.data", r.data) });
+    await tx.insert(schema.memories).values({ storyId, data: recopie("memories.data", m.data) });
+    /*
+     * L’heure du vocal et celles des tâches restent les leurs : la chaîne (vocalTente) y lit ce qu’elle lisait chez la
+     * source. Sans le vocal (il disait l’ancien prénom), sa tâche finie suffit : rien ne le refait pour une prise
+     */
+    if (vo && !vocalDitLAncien) await tx.insert(schema.vocals).values({ ...vo, storyId });
     if (taches.length)
       await tx.insert(schema.tasks).values(
         taches.map(({ kind, status, attempts, error, progress, detail, createdAt, updatedAt }) => ({
