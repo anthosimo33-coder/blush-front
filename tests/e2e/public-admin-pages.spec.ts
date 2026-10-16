@@ -1,4 +1,5 @@
 import { NB_CHAPITRES } from "../../src/contenu/chapitres";
+import { TEMOIGNAGES } from "../../src/contenu/landing";
 import { desactiverPartage, expect, partageIllisible, test } from "./aide";
 
 /*
@@ -33,7 +34,7 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(main.getByRole("listitem").filter({ hasText: "chapitres dans ton rapport" })).toContainText(`${NB_CHAPITRES}`);
     await expect(main.getByRole("listitem").filter({ hasText: "conv brute gardée après ton rapport" })).toContainText("0");
     await expect(main.getByText("message gardé après ton rapport")).toHaveCount(0);
-    await expect(main.getByRole("heading", { name: "Témoignages" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: TEMOIGNAGES.titre })).toBeVisible();
     for (const prenom of ["Mattheo", "Sonia", "Charlotte"]) await expect(main.getByText(prenom, { exact: true }).first()).toBeAttached();
   });
 

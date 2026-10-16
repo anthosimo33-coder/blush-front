@@ -66,7 +66,6 @@ export const PAYWALL = {
   gratuit: prixCourt(0),
   /** « Léa n’est jamais prévenue » : BLUSH n’écrit jamais à l’autre. */
   jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
-  temoignages: "Ce qu’ils en disent",
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",
   /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */
