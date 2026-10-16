@@ -35,22 +35,87 @@ export const PIED_GRATUIT = {
 };
 
 /**
- * Le paywall, avant toute lecture (décidé le 16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) : vos
- * prénoms, le chiffre qui frappe (une trouvaille du code, qui nomme l’autre), le rapport fermé en une carte, les deux
- * formules et le bouton qui paie, sans feuille.
+ * Le paywall, avant toute lecture (décidé le 16 octobre), en version « prime » (les maquettes G3 et G4 validées le 16
+ * octobre) : le bandeau du cadeau de la roue, vos prénoms et le chiffre qui frappe (une trouvaille du code, qui nomme
+ * l’autre), la note des avis, les deux formules (les cadeaux à 0 €), le bouton qui paie, ce qu’on économise et quand le
+ * verdict arrive, la discrétion ; en descendant, les témoignages, un avant / après et les questions.
  */
 export const PAYWALL = {
   /** Le titre sans trouvaille (une conv trop courte pour un déséquilibre net). */
   titre: (autre: string) => `Ton rapport sur toi et ${autre} n’attend que toi.`,
   /** Sous le titre : la trouvaille suivante, puis la promesse. */
   promesse: "BLUSH te dit ce que ça veut dire.",
-  chapitres: (n: number) => `Ton rapport · ${n} chapitres`,
-  verdict: "Le verdict",
-  vocal: "Ton vocal",
-  bulles: `${CATALOGUE.rapport.bulles} bulles offertes`,
-  /** Le titre de la carte du paiement, sur ordinateur. */
-  carte: "Débloque ton rapport",
+  /** Au-dessus du titre : la conv lue (« 5 872 »). */
+  conv: (messages: string) => `Ton rapport · ${messages} messages lus`,
+  /** La note des avis, et leur nombre (NOTE_DES_AVIS). */
+  avis: (nombre: string) => ` · ${nombre} avis`,
+  /** Tout ce que BLUSH a lu (MESSAGES_LUS). */
+  messagesLus: (n: string) => ` · déjà ${n} de messages lus`,
+  formule: "Ta formule",
+  cestQuoi: "C’est quoi une bulle\u00a0?",
+  rapport: {
+    titre: CATALOGUE.rapport.titre,
+    note: (bulles: number) => `${NB_CHAPITRES} chapitres, ton vocal, ${bulles} bulles`,
+  },
+  premium: {
+    titre: PREMIUM.titre,
+    note: (bulles: number) => `Tout le rapport, et BLUSH te répond ${bulles}\u00a0fois`,
+    offertes: `+${OFFERTES_PREMIUM} bulles offertes`,
+    /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
+    barreOffertes: prixDe("pack30"),
+  },
+  gratuit: prixCourt(0),
+  /** Sous le bouton : ce que la formule fait économiser (son prix barré moins son prix), et l’heure du verdict. */
+  economie: (prix: string) => `Tu économises ${prix}`,
+  verdict: (heure: string) => `Ton verdict arrive à ${heure}`,
+  /** « Léa n’est jamais prévenue » : BLUSH n’écrit jamais à l’autre. */
+  jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
+  temoignages: "Ce qu’ils en disent",
+  precedent: "Témoignage précédent",
+  suivant: "Témoignage suivant",
+  /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */
+  avantApres: {
+    exemple: "exemple",
+    message: "t’as disparu toi",
+    titre: (elle: boolean) => `${elle ? "Elle" : "Il"} t’écrit «\u00a0t’as disparu toi\u00a0»`,
+    sans: "Sans BLUSH",
+    sansReponse: "dsl j’étais occupé",
+    sansSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} répond «\u00a0ok\u00a0».`,
+    avec: "Avec BLUSH",
+    avecReponse: "je te laissais le temps de me manquer",
+    avecSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} relance.`,
+  },
+  /** Les questions, en bas : la discrétion, l’abonnement, un souci (le remboursement, sur un problème technique seulement : les conditions). */
+  questions: (autre: string, elle: boolean) => [
+    {
+      q: `${autre} sera prévenu${elle ? "e" : ""}\u00a0?`,
+      r: "Jamais. BLUSH ne lui écrit pas. Ta conv reste chiffrée, et tu peux tout effacer à tout moment.",
+    },
+    { q: "C’est un abonnement\u00a0?", r: "Non. Tu paies une fois, et c’est à toi." },
+    {
+      q: "Et si mon rapport ne s’écrit pas\u00a0?",
+      r: "Écris-nous à bonjour@askblush.com\u00a0: si un problème technique t’empêche de l’avoir, on le répare, ou on te rembourse.",
+    },
+  ],
+  /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
+  barre: "Débloquer",
+  barreAller: "Aller au paiement",
 };
+
+/**
+ * La note des avis et leur nombre, montrés sous le titre du paywall : de vrais avis seulement, jamais inventés (null :
+ * rien n’est montré). Ceux-ci viennent des tests de BLUSH menés dans des universités (16 octobre).
+ * TODO(produit): dire où les avis sont vérifiés (la directive Omnibus le demande à qui affiche des avis), et les tenir à jour.
+ */
+export const NOTE_DES_AVIS: { note: string; nombre: string } | null = { note: "4,8", nombre: "654" };
+
+/**
+ * Tous les messages que BLUSH a lus, à montrer sous le titre (« 1,2 million ») : un vrai chiffre, ou null (rien), celui
+ * des tests menés dans des universités (16 octobre). Le nombre de messages d’une conv n’est gardé que chiffré, dans la
+ * conv : il ne se compte pas d’une requête.
+ * TODO(produit): un total tenu à jour (un compteur à l’import), à la place de ce chiffre fixe.
+ */
+export const MESSAGES_LUS: string | null = "1,2\u00a0million";
 
 /** La feuille « Ta formule » (FeuilleFormule) : le rapport seul, ou Premium, choisie d’avance. */
 export const FEUILLE_FORMULE = {

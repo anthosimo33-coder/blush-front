@@ -7,7 +7,19 @@
  */
 import { z } from "zod";
 import { INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
-import { ETAPES_VISITE, EVENEMENTS_ECOUTE, GOALS, GUESSES, ISSUES_DU_FAUX_WHOP, METRIQUES_WEB, OFFRES, OFFRES_PROPOSEES, PRONOMS, SECTIONS_FICHE } from "@/types";
+import {
+  ETAPES_VISITE,
+  EVENEMENTS_ECOUTE,
+  GESTES_DE_LA_ROUE,
+  GOALS,
+  GUESSES,
+  ISSUES_DU_FAUX_WHOP,
+  METRIQUES_WEB,
+  OFFRES,
+  OFFRES_PROPOSEES,
+  PRONOMS,
+  SECTIONS_FICHE,
+} from "@/types";
 import type {
   AnalysisProgress,
   BlushAnswer,
@@ -16,6 +28,7 @@ import type {
   Fiche,
   FicheUpdate,
   GenreFil,
+  LotDeLaRoue,
   OffreId,
   OffreProposee,
   Report,
@@ -117,8 +130,15 @@ type PaiementDansLaFeuille = { mode: "whop"; compte: string; bacASable: boolean 
  */
 export type Avoirs = { avance: { fin: string } | null; garde: { fin: string } | null };
 
-/** Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille, et les avoirs du compte. */
-export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille } & Avoirs;
+/**
+ * La roue du paywall de ce compte (src/server/roue.ts) : à tourner, refusée, gagnée (la case et son lot, sa fin, une
+ * date ISO, le temps qu’il lui reste à l’heure du serveur, en millisecondes, et s’il vaut encore : ni pris, ni passé), ou
+ * « aucune » (l’équipe, pas de paiement branché, ou un compte qui a déjà mieux d’avance).
+ */
+export type RoueDuCompte = { etat: "a_tourner" | "refusee" | "aucune" } | { etat: "gagnee"; case: number; lot: LotDeLaRoue; fin: string; reste: number; valable: boolean };
+
+/** Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille, les avoirs du compte, et sa roue. */
+export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille; roue: RoueDuCompte } & Avoirs;
 
 /**
  * Un achat du compte, pour « Tes achats » (GET /api/achats) : son offre, son prix TTC (en centimes), les bulles qu’il a
@@ -324,6 +344,7 @@ type Reponses = {
   "POST /api/navigateur/erreur": Ok;
   "POST /api/navigateur/mesures": Ok;
   "GET /api/reveil": { ok: boolean };
+  "POST /api/roue": RoueDuCompte;
   /** L’audio du vocal du rapport (MP3). */
   "GET /api/vocal/audio": Blob;
   /** L’audio d’une réponse du chat dite en vocal (MP3). */
@@ -491,6 +512,8 @@ export const ROUTES = {
   /* `?moi=` : qui est toi pour l’écran, quand le serveur ne le sait pas */
   "GET /api/rapport/pdf": {},
   "GET /api/reveil": {},
+  /* Tourner la roue du paywall, ou n’en pas vouloir : une fois par compte */
+  "POST /api/roue": { corps: z.object({ geste: z.enum(GESTES_DE_LA_ROUE) }) },
   "GET /api/vocal/audio": {},
   "GET /api/vocal/chat/[id]": {},
   /* Un moment de l’écoute du vocal, et où elle en était (en secondes) */

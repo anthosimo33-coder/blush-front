@@ -1,38 +1,50 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
-import { CATALOGUE, enEuros, FORMULE_CHOISIE, prixDe } from "@/contenu/offres";
-import { FEUILLE_FORMULE, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
+import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { NB_CHAPITRES } from "@/contenu/chapitres";
+import { TESTIMONIALS } from "@/contenu/landing";
+import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
+import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
+import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { formatCount, jourEnLettres } from "@/lib/format";
-import { moiEtAutre, titreDuo } from "@/lib/participants";
+import { moiEtAutre } from "@/lib/participants";
 import { useAuPaiement } from "@/lib/presence";
+import { setQueryData } from "@/lib/query";
 import { useFeuilleDuPaiement } from "@/lib/requetes";
 import { proposerOffreUnique } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
 import { Perle } from "@/components/bulles/perles";
-import { Option } from "@/components/bulles/pieces";
+import { Option, RondACocher } from "@/components/bulles/pieces";
 import { PetitBillet } from "@/components/paiement/Billet";
 import { DebloquerAvecLAvance } from "@/components/paiement/FeuilleFormule";
 import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeuille";
-import { OffreAvantDePartir } from "@/components/paiement/OffreAvantDePartir";
+import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDePartir";
+import { FeuilleDeLaRoue } from "@/components/roue/FeuilleDeLaRoue";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { ScoreCard } from "@/components/ui/progress";
 import { Toast } from "@/components/ui/surfaces";
-import type { Formule, OffreId, ScoreRow, Story } from "@/types";
+import type { Formule, LotDeLaRoue, OffreId, ScoreRow, Story, Testimonial } from "@/types";
+import type { RoueDuCompte } from "@/types/api";
 
 /*
- * Le paywall, avant toute lecture (décidé le 16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) : la
- * conv est importée, « Qui es-tu ? » rempli, et rien n’est encore parti au modèle. Vos prénoms, le chiffre qui frappe
- * (une trouvaille du code), le rapport fermé en une carte, puis les deux formules et le bouton qui paie, sans feuille.
- * Mobile : tout tient en 375 × 667 (resserré sous 700 px de haut) ; ordinateur : l’accroche à gauche (avec les lignes du code), le paiement à droite.
- * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans
- * payer (il n’y a plus de feuille à fermer). Payé, « C’est débloqué » mène à la vraie lecture (/lecture).
+ * Le paywall, avant toute lecture (décidé le 16 octobre), en version « prime » (les maquettes G3, G4 et l’ordinateur,
+ * validées le 16 octobre) : la conv est importée, « Qui es-tu ? » rempli, et rien n’est encore parti au modèle.
+ * D’abord la roue des cadeaux (FeuilleDeLaRoue), une fois par compte ; son lot gagné vaut 15 minutes, dans le bandeau
+ * du haut et sur les formules (prixAvecLot, bullesDuLot : le serveur fait payer le même prix). Puis vos prénoms, le
+ * chiffre qui frappe (une trouvaille du code), la note des avis (seulement de vrais avis), les deux formules (Premium
+ * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), ce qu’on économise et
+ * l’heure du verdict, la discrétion. En descendant : les témoignages (de vrais clients seulement), un avant / après
+ * (marqué « exemple ») et les questions ; sur téléphone, une barre en bas ramène au bouton qui paie quand il est sorti
+ * de l’écran. Ordinateur : l’accroche, les preuves et l’avant / après à gauche, le paiement à droite, les témoignages
+ * dessous.
+ * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet, ou après OFFRE_APRES_MS sans payer. Jamais avec un lot
+ * de la roue (le serveur la refuse aussi), ni pendant que la roue attend. Payé, « C’est débloqué » mène à la vraie
+ * lecture (/lecture).
  */
 
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
@@ -54,95 +66,147 @@ export function accroche(trouvailles: string[], prenom: string): { titre: string
   return { titre: choc ? `${nommer(choc, prenom)}.` : PAYWALL.titre(prenom), sous: autre ? `${autre}. ${PAYWALL.promesse}` : PAYWALL.promesse };
 }
 
-export function Paywall({ story, scores, trouvailles }: { story: Story; scores: ScoreRow[]; trouvailles: string[] }) {
+/** L’heure où le verdict arrive si l’on paie maintenant, à Paris : dans deux minutes (« 21 h 34 »). */
+function heureDuVerdict(): string {
+  const [h, m] = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(Date.now() + 2 * 60_000).split(":");
+  return `${h}\u00a0h\u00a0${m}`;
+}
+
+export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS }: { story: Story; scores: ScoreRow[]; trouvailles: string[]; temoignages?: Testimonial[] }) {
   const { moi, autre } = moiEtAutre(story);
+  const elle = autre.pronoun !== "il";
   const { titre, sous } = accroche(trouvailles, autre.name);
+  const feuille = useFeuilleDuPaiement();
+  const roue = feuille.data?.roue ?? null;
+  /* La roue s’ouvre une fois, à l’arrivée, si elle est à tourner ; ensuite, l’écran seul décide (elle reste ouverte le temps du tour) */
+  const [vueRoue, setVueRoue] = useState<"attente" | "ouverte" | "fermee">("attente");
+  const roueOuverte = vueRoue === "ouverte" || (vueRoue === "attente" && roue?.etat === "a_tourner");
+  /* Le lot passé sous nos yeux (le minuteur à zéro) : les prix redeviennent ceux du catalogue */
+  const [passe, setPasse] = useState(false);
+  const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
   const [bulle, setBulle] = useState(false);
+  const paiement = useRef<HTMLElement>(null);
+
+  const joue = (r: RoueDuCompte) => {
+    setVueRoue((v) => (v === "fermee" ? v : "ouverte"));
+    if (feuille.data) setQueryData("feuille", { ...feuille.data, roue: r });
+  };
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[1120px] flex-col gap-3 px-4 pb-4 pt-3 max-lg:[@media(max-height:700px)]:gap-2 max-lg:[@media(max-height:700px)]:pt-2 lg:justify-center lg:gap-8 lg:px-12 lg:py-10">
-      <div className="flex items-center justify-center gap-1.5 lg:justify-start">
-        <BubbleLogo size={16} />
-        <span className="text-note font-black">askblush.com</span>
-      </div>
-      <div className="flex flex-1 flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:grid lg:flex-none lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-14">
-        <section className="flex flex-col gap-3 max-lg:[@media(max-height:700px)]:gap-2 lg:gap-5">
-          <div className="flex items-center gap-2.5">
-            <AvatarPair me={moi.initial} other={autre.initial} size={36} />
-            <div className="flex min-w-0 flex-col">
-              <span className="text-corps font-black leading-tight tracking-[-0.01em]">{titreDuo(story)}</span>
-              <span className="text-legende font-bold text-grey">
-                {formatCount(story.totalMessages)} messages · {story.period}
-              </span>
-            </div>
+    <main className="mx-auto flex min-h-dvh w-full flex-col">
+      {lot && roue?.etat === "gagnee" && <BandeauDuCadeau key={roue.fin} lot={lot} reste={roue.reste} onPasse={() => setPasse(true)} />}
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-3 px-4 pb-6 pt-3 lg:gap-8 lg:px-12 lg:py-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <BubbleLogo size={16} />
+            <span className="text-note font-black">askblush.com</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <h1 className="m-0 text-[27px] font-black leading-[1.08] tracking-[-0.025em] [text-wrap:balance] max-lg:[@media(max-height:700px)]:text-[24px] lg:text-[46px]">
-              {titre}
-            </h1>
-            <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-corps">{sous}</p>
-          </div>
-          {scores.length > 0 && (
-            <div className="hidden lg:block">
-              <ScoreCard rows={scores.slice(0, 3)} autre={autre.pronoun} />
+          <AvatarPair me={moi.initial} other={autre.initial} size={26} />
+        </div>
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-14">
+          <section className="flex flex-col gap-3 lg:gap-6">
+            <div className="flex flex-col gap-1.5 pt-1 lg:gap-3">
+              <span className="text-legende font-black text-grey lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
+              <h1 className="m-0 text-[27px] font-black leading-[1.07] tracking-[-0.03em] [text-wrap:balance] max-lg:[@media(max-height:700px)]:text-[24px] lg:text-[50px] lg:leading-[1.02]">
+                {titre}
+              </h1>
+              <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px]">{sous}</p>
+              <Preuves />
             </div>
-          )}
-          <RapportFerme autre={autre.name} expliquer={() => setBulle(true)} />
-        </section>
-        <Paiement />
+            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden" />}
+            {scores.length > 0 && (
+              <div className="hidden lg:block">
+                <ScoreCard rows={scores.slice(0, 3)} autre={autre.pronoun} />
+              </div>
+            )}
+            <AvantApres elle={elle} className="hidden lg:flex" />
+          </section>
+          <Paiement ref={paiement} lot={lot} sansOffre={roue?.etat === "a_tourner" || roue?.etat === "gagnee"} autre={autre.name} elle={elle} expliquer={() => setBulle(true)} />
+        </div>
+        <Temoignages items={temoignages} />
+        <AvantApres elle={elle} className="lg:hidden" />
+        <Questions autre={autre.name} elle={elle} />
       </div>
+      <BarreDuBas cible={paiement} lot={lot} />
       <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />
+      <FeuilleDeLaRoue open={roueOuverte} onJoue={joue} onFermer={() => setVueRoue("fermee")} />
     </main>
   );
 }
 
-/**
- * Le rapport fermé, en une carte : le verdict flouté (il s’écrit au paiement : des lignes vides, jamais un faux texte),
- * deux titres de chapitres sur une ligne et ce qu’il en reste, le vocal, et les bulles offertes (« C’est quoi une bulle ? »).
- */
-function RapportFerme({ autre, expliquer }: { autre: string; expliquer: () => void }) {
-  const titres = Array.from({ length: NB_CHAPITRES - 1 }, (_, k) => titreDAttente(k + 2, autre));
-  /* La bascule et l’autre : courts et parlants, sur une ligne même en 375 px */
-  const montres = [titres[0]!, titres[3]!];
+/** Le bandeau du haut : le lot gagné à la roue et son minuteur (sa fin tirée du temps qu’il lui restait à l’heure du serveur). */
+function BandeauDuCadeau({ lot, reste, onPasse }: { lot: LotDeLaRoue; reste: number; onPasse: () => void }) {
+  const [fin] = useState(() => Date.now() + reste);
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  const passe = useRef(false);
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const ms = Math.max(0, fin - maintenant);
+  useEffect(() => {
+    if (ms > 0 || passe.current) return;
+    passe.current = true;
+    onPasse();
+  }, [ms, onPasse]);
   return (
-    <div className="flex flex-col gap-2.5 rounded-card bg-white px-4 py-3.5 shadow-card max-lg:[@media(max-height:700px)]:gap-2 max-lg:[@media(max-height:700px)]:py-3">
-      <div className="flex items-center justify-between">
-        <span className="text-legende font-black text-grey">{PAYWALL.chapitres(NB_CHAPITRES)}</span>
-        <Icon name="lock" size={16} stroke={2.6} className="text-grey" />
-      </div>
-      <div className="flex items-center gap-2.5">
-        <span className="shrink-0 text-detail font-black">{PAYWALL.verdict}</span>
-        <span aria-hidden="true" className="h-2.5 flex-1 rounded-full bg-[#E9E5DD] blur-[1.5px]" />
-      </div>
-      <ul className="m-0 flex h-[26px] list-none flex-nowrap gap-1.5 overflow-hidden p-0" aria-label={PAYWALL.chapitres(NB_CHAPITRES)}>
-        {montres.map((t) => (
-          <li key={t} className="shrink-0 whitespace-nowrap rounded-full bg-plaque px-2.5 py-1 text-micro font-extrabold text-soft">
-            {t}
-          </li>
-        ))}
-        <li className="shrink-0 rounded-full bg-plaque px-2.5 py-1 text-micro font-extrabold text-soft">+{titres.length - montres.length}</li>
-      </ul>
-      <div className="flex items-center gap-3 text-legende font-extrabold">
-        <span className="flex items-center gap-1.5">
-          <Icon name="check" size={14} stroke={3} className="text-vrai-ink" />
-          {PAYWALL.vocal}
+    <div
+      role="status"
+      className="flex min-h-[34px] items-center justify-center gap-2 bg-[linear-gradient(90deg,#FF7AB6,#E8358A)] px-4 text-center text-legende font-black text-white lg:min-h-10 lg:text-note"
+    >
+      <Icon name="sparkle" size={14} stroke={2.4} />
+      <span>
+        {GAINS[lot].bandeau} · encore{" "}
+        <span role="timer" aria-live="off" className="tabular-nums" title={`${Math.round(DUREE_DU_CADEAU_MS / 60_000)} minutes en tout`}>
+          {restant(ms)}
         </span>
-        <button type="button" onClick={expliquer} aria-haspopup="dialog" className="flex items-center gap-1.5 text-elle-ink underline-offset-2 hover:underline">
-          <Perle taille={15} />
-          {PAYWALL.bulles}
-        </button>
-      </div>
+      </span>
     </div>
+  );
+}
+
+/** Sous le titre : la note des avis (de vrais avis seulement) et tout ce que BLUSH a lu ; rien tant qu’ils manquent. */
+function Preuves() {
+  if (!NOTE_DES_AVIS && !MESSAGES_LUS) return null;
+  return (
+    <p className="m-0 flex flex-wrap items-center gap-x-1.5 text-legende font-extrabold text-grey lg:text-note">
+      {NOTE_DES_AVIS && (
+        <>
+          <span aria-hidden="true" className="text-attente">
+            ★
+          </span>
+          <span className="font-black text-ink">{NOTE_DES_AVIS.note}</span>
+          {PAYWALL.avis(NOTE_DES_AVIS.nombre)}
+        </>
+      )}
+      {MESSAGES_LUS && PAYWALL.messagesLus(MESSAGES_LUS)}
+    </p>
   );
 }
 
 type Choix = Formule | "avance";
 
 /**
- * Le paiement, sur l’écran : les deux formules (Premium choisie d’avance), ou ce que le compte a d’avance (le rapport
- * d’avance, le −50 % gardé), puis le bouton qui paie (Apple Pay, Google Pay ou la carte, dans BLUSH). Payé : « C’est
- * payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient.
+ * Le paiement : les deux formules (Premium choisie d’avance, ses cadeaux à 0 €, le lot de la roue), ou ce que le compte a
+ * d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui paie (Apple Pay, Google Pay ou la carte, dans
+ * BLUSH), ce qu’on économise et l’heure du verdict, et la discrétion. Payé : « C’est payé », puis « C’est
+ * débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est gagné).
  */
-function Paiement() {
+function Paiement({
+  ref,
+  lot,
+  sansOffre,
+  autre,
+  elle,
+  expliquer,
+}: {
+  ref: Ref<HTMLElement>;
+  lot: LotDeLaRoue | null;
+  sansOffre: boolean;
+  autre: string;
+  elle: boolean;
+  expliquer: () => void;
+}) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
   const [choix, setChoix] = useState<Choix | null>(null);
@@ -151,73 +215,109 @@ function Paiement() {
   const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
   const [paye, setPaye] = useState(false);
   const [occupe, setOccupe] = useState(false);
-  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde, enRoute: paye || occupe });
+  const [heure] = useState(heureDuVerdict);
+  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || occupe });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
 
+  const rapport = garde ? { centimes: CATALOGUE.rapport_garde.centimes, barre: CATALOGUE.rapport.centimes } : prixAvecLot("rapport", lot);
+  const premium = prixAvecLot("premium", lot);
+  /* L’offre payée : Premium, ou le rapport (à son prix, au −50 % gardé, ou avec le lot) */
+  const prix = offre === "premium" ? premium : rapport;
+  const economie = prix.barre && prix.barre > prix.centimes ? prix.barre - prix.centimes : 0;
+  const lotSurRapport = !garde && lot && lotSAppliqueA(lot, "rapport") ? lot : null;
+  const lotSurPremium = lot && lotSAppliqueA(lot, "premium") ? lot : null;
+
   return (
-    <section className="mt-auto flex flex-col gap-2.5 max-lg:[@media(max-height:700px)]:gap-2 lg:mt-0 lg:gap-3 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
-      <span className={cn("hidden text-titre-3 font-black lg:block", paye && "lg:hidden")}>{PAYWALL.carte}</span>
+    <section ref={ref} className="flex scroll-mt-4 flex-col gap-3 lg:sticky lg:top-6 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
       {!paye && (
-        <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-2.5 max-lg:[@media(max-height:700px)]:gap-2">
-          {avoirs?.avance && (
-            <Option
-              on={choisie === "avance"}
-              choisir={() => setChoix("avance")}
-              titre={
-                <span className="flex items-center gap-2">
-                  <PetitBillet taille={18} />
-                  {FEUILLE_FORMULE.avance.titre}
-                </span>
+        <>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-legende font-black text-grey lg:text-titre-3 lg:text-ink">{PAYWALL.formule}</span>
+            <button type="button" onClick={expliquer} aria-haspopup="dialog" className="text-legende font-black text-soft underline underline-offset-2">
+              {PAYWALL.cestQuoi}
+            </button>
+          </div>
+          <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3.5">
+            {avoirs?.avance && (
+              <Option
+                on={choisie === "avance"}
+                choisir={() => setChoix("avance")}
+                titre={
+                  <span className="flex items-center gap-2">
+                    <PetitBillet taille={18} />
+                    {FEUILLE_FORMULE.avance.titre}
+                  </span>
+                }
+                note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note}</span>}
+                prix={FEUILLE_FORMULE.avance.prix}
+              />
+            )}
+            <Formule
+              on={choisie === "rapport"}
+              choisir={() => setChoix("rapport")}
+              titre={PAYWALL.rapport.titre}
+              note={
+                garde ? (
+                  <span className="text-elle-ink">{FEUILLE_FORMULE.garde(jourEnLettres(garde.fin))}</span>
+                ) : (
+                  PAYWALL.rapport.note(CATALOGUE.rapport.bulles + bullesDuLot(lotSurRapport))
+                )
               }
-              note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note}</span>}
-              prix={FEUILLE_FORMULE.avance.prix}
-            />
-          )}
-          <Option
-            on={choisie === "rapport"}
-            choisir={() => setChoix("rapport")}
-            titre={FEUILLE_FORMULE.rapport.titre}
-            note={<span className="text-elle-ink">{garde ? FEUILLE_FORMULE.garde(jourEnLettres(garde.fin)) : FEUILLE_FORMULE.rapport.note}</span>}
-            prix={prixDe(garde ? "rapport_garde" : "rapport")}
-            barre={garde ? prixDe("rapport") : undefined}
-          />
-          <Option
-            on={choisie === "premium"}
-            choisir={() => setChoix("premium")}
-            badge={<Tag tone="conseille" />}
-            titre={FEUILLE_FORMULE.premium.titre}
-            note={
-              <span className="text-grey">
-                <span className="text-elle-ink">{FEUILLE_FORMULE.premium.offertes}</span> · {FEUILLE_FORMULE.premium.note.replace(/^Soit /, "")}
-              </span>
-            }
-            prix={prixDe("premium")}
-            barre={enEuros(CATALOGUE.premium.barre!)}
-          />
-        </RadioGroup>
+              prix={enEuros(rapport.centimes)}
+              barre={rapport.barre && rapport.barre > rapport.centimes ? enEuros(rapport.barre) : undefined}
+            >
+              {lotSurRapport && <LigneCadeau lot={lotSurRapport} valeur={valeurDuLot(lotSurRapport, "rapport")} />}
+            </Formule>
+            <Formule
+              on={choisie === "premium"}
+              choisir={() => setChoix("premium")}
+              badge={<Tag tone="conseille" />}
+              titre={PAYWALL.premium.titre}
+              note={PAYWALL.premium.note(CATALOGUE.premium.bulles + bullesDuLot(lotSurPremium))}
+              prix={enEuros(premium.centimes)}
+              barre={premium.barre ? enEuros(premium.barre) : undefined}
+            >
+              <LigneCadeau perle titre={PAYWALL.premium.offertes} barre={PAYWALL.premium.barreOffertes} valeur={PAYWALL.gratuit} />
+              {lotSurPremium && <LigneCadeau lot={lotSurPremium} valeur={valeurDuLot(lotSurPremium, "premium")} />}
+            </Formule>
+          </RadioGroup>
+        </>
       )}
-      {choisie === "avance" ? (
-        <DebloquerAvecLAvance suite="/lecture" deja={relire} />
-      ) : (
-        <PayerDansLaFeuille
-          offre={offre}
-          centimes={CATALOGUE[offre].centimes}
-          titre={CATALOGUE[offre].titre}
-          libelle={FEUILLE_FORMULE.payer(prixDe(offre))}
-          quoi="rapport"
-          suite="/lecture"
-          quand={{ deja: relire }}
-          surPaye={setPaye}
-          surOccupe={setOccupe}
-          fleche
-        />
-      )}
+      <div className="flex flex-col gap-1">
+        {choisie === "avance" ? (
+          <DebloquerAvecLAvance suite="/lecture" deja={relire} />
+        ) : (
+          <PayerDansLaFeuille
+            offre={offre}
+            centimes={prix.centimes}
+            titre={CATALOGUE[offre].titre}
+            libelle={FEUILLE_FORMULE.payer(enEuros(prix.centimes))}
+            quoi="rapport"
+            suite="/lecture"
+            quand={{ deja: relire }}
+            surPaye={setPaye}
+            surOccupe={setOccupe}
+            fleche
+          />
+        )}
+      </div>
       {!paye && choisie !== "avance" && (
-        <p className="m-0 text-center text-micro font-extrabold text-grey">
-          <span className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</span>
-          {FEUILLE_FORMULE.pied.reste}
-        </p>
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <span className="text-note font-black">
+            {economie > 0 && `${PAYWALL.economie(enEuros(economie))} · `}
+            {PAYWALL.verdict(heure)}
+          </span>
+          <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-legende font-extrabold text-soft">
+            <span className="flex items-center gap-1">
+              <Icon name="lock" size={13} stroke={2.6} />
+              {PAYWALL.jamaisPrevenu(autre, elle)}
+            </span>
+          </span>
+          <span className="text-micro font-extrabold text-grey">
+            <span className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</span>
+          </span>
+        </div>
       )}
       {suiteMontree && <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} />}
       {passee && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{OFFRE_SUITE.passee}</Toast>}
@@ -225,10 +325,233 @@ function Paiement() {
   );
 }
 
+/** Ce qu’un lot vaut sur cette formule, à droite de sa ligne : la remise en euros, ou « 0 € » (des bulles, le 2e rapport). */
+function valeurDuLot(lot: LotDeLaRoue, offre: Formule): string {
+  const avant = CATALOGUE[offre].centimes;
+  const apres = prixAvecLot(offre, lot).centimes;
+  return apres < avant ? `−${enEuros(avant - apres)}` : PAYWALL.gratuit;
+}
+
+/**
+ * Une formule (la maquette G3) : son rond, son nom, sa ligne, son prix (barré à côté) et son badge sur le bord ; dessous,
+ * ses cadeaux, une ligne chacun (`children`), seulement quand elle est choisie.
+ */
+function Formule({
+  on,
+  choisir,
+  badge,
+  titre,
+  note,
+  prix,
+  barre,
+  children,
+}: {
+  on: boolean;
+  choisir: () => void;
+  badge?: ReactNode;
+  titre: string;
+  note: ReactNode;
+  prix: string;
+  barre?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      onClick={choisir}
+      className={cn("lift relative flex flex-col gap-2.5 rounded-[20px] bg-white px-4 py-3 text-left text-ink max-[399px]:px-3", on ? "shadow-selected" : "shadow-soft")}
+    >
+      {badge && <span className="absolute -top-[13px] right-4">{badge}</span>}
+      <span className="flex w-full items-center gap-3 max-[399px]:gap-2.5">
+        <RondACocher on={on} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-corps font-black leading-[1.25]">{titre}</span>
+          <span className="text-legende font-extrabold leading-[1.4] text-grey">{note}</span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end">
+          <span className="text-[20px] font-black leading-none tracking-[-0.01em] max-[399px]:text-[18px]">{prix}</span>
+          {barre && (
+            <s className="mt-1 text-micro font-extrabold text-grey">
+              <span className="sr-only">{FEUILLE_FORMULE.auLieuDe}</span>
+              {barre}
+            </s>
+          )}
+        </span>
+      </span>
+      {on && children && <span className="flex w-full flex-col gap-1.5">{children}</span>}
+    </button>
+  );
+}
+
+/** Un cadeau de la formule, sur fond rose : les bulles offertes (la perle, leur prix barré, « 0 € »), ou le lot de la roue. */
+function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; perle?: boolean; titre?: string; barre?: string; valeur: string }) {
+  return (
+    <span className="flex items-center gap-2.5 rounded-[11px] bg-[#FFF0F6] px-2.5 py-1.5 text-legende font-black">
+      {perle ? <Perle taille={14} /> : <Icon name="sparkle" size={14} stroke={2.4} className="text-elle-ink" />}
+      <span className="min-w-0 flex-1">{titre ?? (lot ? GAINS[lot].ligne : "")}</span>
+      {barre && (
+        <s className="text-micro font-extrabold text-grey">
+          <span className="sr-only">{FEUILLE_FORMULE.auLieuDe}</span>
+          {barre}
+        </s>
+      )}
+      <span className="text-elle-ink">{valeur}</span>
+    </span>
+  );
+}
+
+/** Un témoignage (la maquette : son initiale, son prénom, sa situation, son histoire) ; `compact` : celui du premier écran, sur téléphone. */
+function Temoignage({ t, compact = false, className }: { t: Testimonial; compact?: boolean; className?: string }) {
+  return (
+    <figure className={cn("m-0 flex flex-col gap-2.5 rounded-[20px] bg-white shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)]", compact ? "p-3.5" : "p-5 lg:p-7", className)}>
+      <figcaption className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#C7B8FF,var(--flou)_55%,var(--color-flou-ink))] font-black text-white",
+            compact ? "size-[34px] text-note" : "size-[52px] text-titre-3 lg:size-[60px]",
+          )}
+        >
+          {t.name.slice(0, 1)}
+        </span>
+        <span className="flex flex-col">
+          <span className={cn("font-black", compact ? "text-note" : "text-carte")}>{t.name}</span>
+          <span className="text-legende font-extrabold text-grey">{t.label}</span>
+        </span>
+      </figcaption>
+      <blockquote className={cn("m-0 font-bold leading-[1.5] text-[#2A2A2E]", compact ? "text-legende" : "text-detail lg:text-corps")}>{t.text}</blockquote>
+    </figure>
+  );
+}
+
+/** « Ce qu’ils en disent » : les témoignages qui défilent de côté (de vrais clients seulement : sans eux, rien). */
+function Temoignages({ items }: { items: Testimonial[] }) {
+  const piste = useRef<HTMLDivElement>(null);
+  if (!items.length) return null;
+  const defiler = (sens: 1 | -1) => piste.current?.scrollBy({ left: sens * (piste.current.clientWidth * 0.8), behavior: "smooth" });
+  return (
+    <section aria-labelledby="temoignages" className="flex flex-col gap-4 pt-6 lg:items-center lg:gap-7 lg:pt-10">
+      <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
+        {PAYWALL.temoignages}
+      </h2>
+      <div
+        ref={piste}
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"
+      >
+        {items.map((t) => (
+          <Temoignage key={t.name + t.label} t={t} className="w-[300px] shrink-0 snap-start lg:w-auto" />
+        ))}
+      </div>
+      {items.length > 1 && (
+        <div className="flex justify-center gap-4 lg:hidden">
+          <button
+            type="button"
+            aria-label={PAYWALL.precedent}
+            onClick={() => defiler(-1)}
+            className="flex size-11 items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_var(--color-track)]"
+          >
+            <Icon name="back" size={15} stroke={2.6} />
+          </button>
+          <button
+            type="button"
+            aria-label={PAYWALL.suivant}
+            onClick={() => defiler(1)}
+            className="flex size-11 items-center justify-center rounded-full bg-white shadow-[inset_0_0_0_1px_var(--color-track)]"
+          >
+            <Icon name="chevron" size={15} stroke={2.6} />
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** L’avant / après (un message inventé, marqué « exemple ») : la réponse sans BLUSH, puis avec. */
+function AvantApres({ elle, className }: { elle: boolean; className?: string }) {
+  const t = PAYWALL.avantApres;
+  return (
+    <div className={cn("flex-col gap-3 rounded-[22px] bg-white p-4 shadow-card lg:p-5", className ?? "flex")}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-detail font-black">{t.titre(elle)}</span>
+        <span className="text-micro font-extrabold text-muted">{t.exemple}</span>
+      </div>
+      <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3.5">
+        <div className="flex items-center gap-2.5 lg:flex-col lg:items-stretch lg:rounded-[16px] lg:bg-paper lg:p-3.5">
+          <span className="w-[74px] shrink-0 text-micro font-black text-grey lg:w-auto">{t.sans}</span>
+          <span className="flex-1 rounded-[16px] rounded-br-[5px] bg-segment px-3 py-2 font-message text-note lg:flex-none lg:self-end">{t.sansReponse}</span>
+          <span className="hidden text-legende font-extrabold text-muted lg:block">{t.sansSuite(elle)}</span>
+        </div>
+        <div className="flex items-center gap-2.5 lg:flex-col lg:items-stretch lg:rounded-[16px] lg:bg-[#FFF0F6] lg:p-3.5 lg:shadow-[inset_0_0_0_1.5px_#FFB3D4]">
+          <span className="w-[74px] shrink-0 text-micro font-black text-elle-ink lg:w-auto">{t.avec}</span>
+          <span className="flex-1 rounded-[16px] rounded-br-[5px] bg-bubble-me px-3 py-2 font-message text-note text-white lg:flex-none lg:self-end">{t.avecReponse}</span>
+          <span className="hidden text-legende font-extrabold text-elle-ink lg:block">{t.avecSuite(elle)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Les questions, en bas : la discrétion, l’abonnement, un souci (des volets qui s’ouvrent). */
+function Questions({ autre, elle }: { autre: string; elle: boolean }) {
+  return (
+    <div className="mt-2 flex flex-col rounded-[18px] bg-white px-4 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)] lg:mx-auto lg:w-full lg:max-w-[720px]">
+      {PAYWALL.questions(autre, elle).map(({ q, r }, k) => (
+        <details key={q} open={k === 0} className="group border-b border-sep py-3.5 last:border-b-0">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-note font-black [&::-webkit-details-marker]:hidden">
+            {q}
+            <Icon name="chevron" size={12} stroke={3} className="shrink-0 rotate-90 transition-transform group-open:-rotate-90" />
+          </summary>
+          <p className="m-0 mt-1.5 text-legende font-extrabold leading-[1.45] text-grey">{r}</p>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * La barre du bas, sur téléphone : quand le bouton qui paie est sorti de l’écran (plus bas, les témoignages), elle
+ * rappelle la formule et son prix, et y ramène. Jamais sur ordinateur (la carte du paiement y reste visible).
+ */
+function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot: LotDeLaRoue | null }) {
+  const [montree, setMontree] = useState(false);
+  useEffect(() => {
+    const el = cible.current;
+    if (!el) return;
+    const o = new IntersectionObserver(([e]) => setMontree(!!e && !e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 });
+    o.observe(el);
+    return () => o.disconnect();
+  }, [cible]);
+  if (!montree) return null;
+  const premium = prixAvecLot("premium", lot);
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-[rgba(244,242,237,0.96)] px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_24px_-16px_rgba(17,17,20,0.25)] lg:hidden">
+      <span className="flex flex-1 flex-col">
+        <span className="text-legende font-black">{PAYWALL.premium.titre}</span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-[20px] font-black">{enEuros(premium.centimes)}</span>
+          {premium.barre && <s className="text-micro font-extrabold text-grey">{enEuros(premium.barre)}</s>}
+        </span>
+      </span>
+      <button
+        type="button"
+        aria-label={PAYWALL.barreAller}
+        onClick={() => cible.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        className="lift lift-ink flex h-[50px] items-center gap-2 rounded-full [background:var(--btn-ink-bg)] px-6 text-corps font-black text-white shadow-ink"
+      >
+        {PAYWALL.barre}
+        <Icon name="arrow" size={16} stroke={2.6} />
+      </button>
+    </div>
+  );
+}
+
 /**
  * L’offre ① du paywall : demandée au serveur une fois (une fois par compte, jamais deux offres le même jour : il peut
  * refuser), au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans payer. `sans` : le compte a déjà
- * mieux (le rapport d’avance, le −50 % gardé) ; `enRoute` : un paiement est en cours ou fait.
+ * mieux (le rapport d’avance, le −50 % gardé), ou la roue attend, ou un lot est gagné ; `enRoute` : un paiement est en
+ * cours ou fait.
  */
 function useOffreSuite({ sans, enRoute }: { sans: boolean; enRoute: boolean }) {
   const [suiteMontree, setSuiteMontree] = useState<number | null>(null);

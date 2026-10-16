@@ -15,6 +15,7 @@ import { URL_SITE } from "../env";
 import { journalErreur } from "../journal";
 import { LIMITES, sousLaLimite } from "../limites";
 import { montrer, offreValable } from "../offres-uniques";
+import { aGagneALaRoue, roueDuCompte } from "../roue";
 import { webhookDeLIssue, type WebhookFactice } from "./factice";
 import { fournisseur, type Fournisseur } from "./fournisseur";
 import { livrerLePaiement, recevoirWebhook } from "./webhook";
@@ -295,6 +296,8 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
     /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (6,95 €) ; ① (10,90 €) ne se montre pas */
     const avoirs = await avoirsDuCompte(compte);
     if (avoirs.avance || avoirs.garde) return rien;
+    /* Un lot gagné à la roue remplace ① : jamais les deux */
+    if (await aGagneALaRoue(compte.id)) return rien;
   } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {
     /* ③ complète le rapport seul ; ⑤ suit tout rapport payé ; ⑥ garde le −50 % de ⑤, montrée et pas prise */
     if (!(await justeApresUnRapport(compte.id, achatId, offre === "premium_ajout" ? RAPPORTS_SEULS : RAPPORTS_PAYES))) return rien;
@@ -324,8 +327,9 @@ async function justeApresUnRapport(userId: string, achatId: string | null, offre
 
 /**
  * Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille (les Elements de
- * Whop, sur son compte, en ligne ou dans son bac à sable ; la feuille de test du faux Whop ; ou rien : « bientôt »), et
- * ce que le compte a d’avance pour une conv pas encore débloquée (avoirsDuCompte).
+ * Whop, sur son compte, en ligne ou dans son bac à sable ; la feuille de test du faux Whop ; ou rien : « bientôt »), ce
+ * que le compte a d’avance pour une conv pas encore débloquée (avoirsDuCompte), et sa roue (src/server/roue.ts ;
+ * « aucune » quand il a déjà mieux d’avance : la roue ne joue que sur les formules).
  */
 export async function feuilleDuPaiement(compte: Compte): Promise<FeuilleDuPaiement> {
   const f = fournisseur();
@@ -334,7 +338,9 @@ export async function feuilleDuPaiement(compte: Compte): Promise<FeuilleDuPaieme
     : f.mode === "factice"
       ? { mode: "factice" }
       : { mode: "whop", compte: f.compte, bacASable: f.whop.bacASable };
-  return { paiement, ...(await avoirsDuCompte(compte)) };
+  const avoirs = await avoirsDuCompte(compte);
+  const roue = avoirs.avance || avoirs.garde ? ({ etat: "aucune" } as const) : await roueDuCompte(compte);
+  return { paiement, roue, ...avoirs };
 }
 
 /**

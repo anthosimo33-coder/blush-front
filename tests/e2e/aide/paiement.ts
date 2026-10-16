@@ -133,3 +133,38 @@ export async function quitterPuisRevenir(page: Page): Promise<void> {
     }
   });
 }
+
+/** Le nom de la feuille de la roue, juste avant le paywall (son titre). */
+export const ROUE = "Avant ton rapport, tourne la roue";
+
+/** L’en-tête qui impose la case de la roue au serveur (le faux Whop seulement, src/app/api/roue/route.ts). */
+export const CASE_DE_LA_ROUE = "x-blush-roue-case";
+
+/** La roue, juste avant le paywall : « Je ne veux pas de cadeau ». Elle se ferme pour de bon. */
+export async function refuserLaRoue(page: Page): Promise<void> {
+  const roue = page.getByRole("dialog", { name: ROUE });
+  await expect(roue).toBeVisible({ timeout: RESEAU });
+  await roue.getByRole("button", { name: "Je ne veux pas de cadeau" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+}
+
+/**
+ * Le paywall en 375 × 667 : le bouton qui paie est dans l’écran, sans défiler (les témoignages, l’avant / après et les
+ * questions viennent dessous, la page défile pour eux).
+ */
+export async function paieEnPetitEcran(page: Page, nom: string | RegExp): Promise<void> {
+  const avant = page.viewportSize();
+  await page.setViewportSize({ width: 375, height: 667 });
+  try {
+    await page.waitForTimeout(500);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      window.scrollTo(0, 0);
+    });
+    const boite = await page.getByRole("button", { name: nom }).boundingBox();
+    expect(boite, "le bouton qui paie est à l’écran").not.toBeNull();
+    expect(boite!.y + boite!.height, `le bouton qui paie tient en 375 × 667 sans défiler (son bas à ${Math.round(boite!.y + boite!.height)} px)`).toBeLessThanOrEqual(667);
+  } finally {
+    if (avant) await page.setViewportSize(avant);
+  }
+}

@@ -2,6 +2,7 @@ import { URGENCES } from "./aide";
 import { texteRenonciation } from "./consentements";
 import { droitApplicable, EDITEUR, type Editeur } from "./mentions-legales";
 import { CATALOGUE, COUT_EN_BULLES, prixDe, RAPPORT_D_AVANCE } from "./offres";
+import { chancesDesLots, GROS_LOTS_PAR_JOUR } from "./roue";
 
 /*
  * Les conditions de BLUSH (la page /conditions) : les conditions d’utilisation, puis celles de la vente. Elles suivent
@@ -39,7 +40,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 13 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 16 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
@@ -102,6 +103,16 @@ const VENTE: readonly Section[] = [
       "Un rapport, c’est la lecture d’une conv\u00a0: une autre conv a son propre rapport.",
       "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, des bulles en plus après un achat ou à ta première recharge, ou ton prochain rapport moins cher, gardé quelques jours. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
       "Les prix sont en euros, toutes taxes comprises. Celui qui compte est le prix affiché au moment de payer.",
+    ],
+  },
+  {
+    id: "roue",
+    titre: "Le jeu de la roue",
+    blocs: [
+      "Avant ton premier rapport, BLUSH te propose de tourner une roue, une fois par compte. Tourner est gratuit, et tu gagnes à chaque fois un de ces lots, tiré au hasard par nos serveurs avec ces chances\u00a0:",
+      chancesDesLots().map((l) => `${l.titre}\u00a0: ${l.pourcent}`),
+      `Les gros lots (−15\u00a0% et Premium au prix du rapport) sont limités à ${GROS_LOTS_PAR_JOUR} par jour chacun\u00a0; au-delà, la case donne +10 bulles.`,
+      "Le lot vaut 15 minutes, sur le rapport ou Premium payé dans ce temps (Premium au prix du rapport\u00a0: sur Premium seulement). Il ne se cumule avec aucune autre offre, ne s’échange pas et ne se rembourse pas. Ton 2e rapport à −50\u00a0% vaut ensuite 30 jours, pour une autre conv.",
     ],
   },
   {

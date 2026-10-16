@@ -87,6 +87,10 @@ const J = { ...EXPORT, me: "p0", pronom: "il", guess: "flou", goal: "ensemble" }
 /* « En couple » choisi : les objectifs changent */
 const JC = { ...J, guess: "ensemble", goal: "mieux" };
 
+/** Le nom de la feuille de la roue, et l’en-tête qui impose sa case (le faux Whop seulement). */
+const ROUE = "Avant ton rapport, tourne la roue";
+const CASE_IMPOSEE = "x-blush-roue-case";
+
 const click =
   (name, opts = {}) =>
   async (page) => {
@@ -429,7 +433,7 @@ export const STATES = [
     note: "À la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette).",
   },
 
-  /* ———— Le paywall direct (16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) ———— */
+  /* ———— Le paywall direct (16 octobre), en version prime (la roue des cadeaux, les maquettes G1 à G4 validées le 16 octobre) ———— */
   {
     id: "P1",
     section: "paywall",
@@ -442,41 +446,94 @@ export const STATES = [
     changement: "«\u00a0Voir mon rapport\u00a0» mène au paywall, plus au verdict.",
   },
   {
-    id: "P2",
+    id: "P1b",
     section: "paywall",
     title: "Paywall",
-    state: "Sur un seul écran, Premium choisie d’avance",
+    state: "La roue des cadeaux, avant le paywall",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
     wait: 900,
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).waitFor();
+      await page.getByRole("dialog", { name: ROUE }).waitFor();
       await page.waitForTimeout(700);
     },
-    note: "Le titre est une trouvaille du code qui nomme l’autre. Le verdict flouté est fait de lignes vides\u00a0: il n’est pas encore écrit.",
-    changement:
-      "La maquette A\u00a0: vos prénoms, le chiffre qui frappe, le rapport fermé en une carte, les deux formules et le bouton qui paie, sans feuille. Tout tient en 375 × 667.",
+    note: "Une fois par compte. La case est tirée par le serveur, chacune avec sa chance (le règlement, dans les conditions).",
+    changement: "Nouveau (16 octobre)\u00a0: «\u00a0Découvrir mon cadeau\u00a0» ou «\u00a0Je ne veux pas de cadeau\u00a0».",
+  },
+  {
+    id: "P1c",
+    section: "paywall",
+    title: "Paywall",
+    state: "Gagné\u00a0: +20 bulles, gardées 15 minutes",
+    route: "/lecture",
+    compte: "paywall",
+    sheet: true,
+    wait: 900,
+    steps: async (page) => {
+      await page.setExtraHTTPHeaders({ [CASE_IMPOSEE]: "0" });
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog", { name: ROUE }).getByRole("button", { name: "Découvrir mon cadeau" }).click();
+      await page.getByText(/^Gagné/).waitFor({ timeout: 15_000 });
+      await page.waitForTimeout(700);
+    },
+    note: "La case imposée par la galerie (le faux Whop seulement)\u00a0; en ligne, le tirage du serveur.",
+  },
+  {
+    id: "P2",
+    section: "paywall",
+    title: "Paywall",
+    state: "La roue refusée\u00a0: Premium choisie d’avance",
+    route: "/lecture",
+    compte: "paywall",
+    wait: 900,
+    steps: async (page) => {
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog", { name: ROUE }).getByRole("button", { name: "Je ne veux pas de cadeau" }).click();
+      await page.getByRole("radio", { name: /Premium/ }).waitFor();
+      await page.waitForTimeout(700);
+    },
+    note: "Le titre est une trouvaille du code qui nomme l’autre. La note des avis et les témoignages n’apparaissent qu’avec de vrais avis.",
+    changement: "Le paywall prime (G3)\u00a0: les cadeaux de Premium à 0\u00a0€, ce qu’on économise et l’heure du verdict, la note des avis.",
+  },
+  {
+    id: "P2b",
+    section: "paywall",
+    title: "Paywall",
+    state: "Avec le cadeau de la roue (+20 bulles)",
+    route: "/lecture",
+    compte: "paywall",
+    wait: 900,
+    steps: async (page) => {
+      await page.setExtraHTTPHeaders({ [CASE_IMPOSEE]: "0" });
+      await click("Voir mon rapport")(page);
+      await page.getByRole("dialog", { name: ROUE }).getByRole("button", { name: "Découvrir mon cadeau" }).click();
+      await page.getByText(/^Gagné/).waitFor({ timeout: 15_000 });
+      await page.getByRole("dialog").getByRole("button", { name: "Voir mon rapport" }).click();
+      await page.getByRole("radio", { name: /Premium/ }).waitFor();
+      await page.waitForTimeout(900);
+    },
+    note: "Le bandeau et son minuteur\u00a0; le lot sur la formule (le serveur fait payer le même prix).",
   },
   {
     id: "P3",
     section: "paywall",
     title: "Paywall",
-    state: "L’offre ①, au retour sur l’onglet",
+    state: "L’offre ①, au retour sur l’onglet (la roue refusée)",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
     wait: 900,
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).waitFor();
+      await page.getByRole("dialog", { name: ROUE }).getByRole("button", { name: "Je ne veux pas de cadeau" }).click();
+      await page.getByRole("radio", { name: /Premium/ }).waitFor();
       await quitterPuisRevenir(page);
       await page.getByRole("dialog", { name: /^Offre unique/ }).waitFor();
       await page.waitForTimeout(900);
     },
-    note: "Une fois, au retour sur l’onglet après l’avoir quitté, ou après 40 secondes sans payer (il n’y a plus de feuille à fermer).",
-    changement: "«\u00a0Offre unique sur ton rapport\u00a0», à la place de «\u00a0Ta suite à −22\u00a0%\u00a0».",
+    note: "Une fois, au retour sur l’onglet après l’avoir quitté, ou après 40 secondes sans payer. Jamais après un lot gagné à la roue.",
   },
   {
     id: "P5",
@@ -487,7 +544,8 @@ export const STATES = [
     compte: "paywall",
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).click();
+      await page.getByRole("dialog", { name: ROUE }).getByRole("button", { name: "Je ne veux pas de cadeau" }).click();
+      await page.getByRole("radio", { name: /^Le rapport/ }).click();
       await page.getByRole("button", { name: /^Débloquer/ }).click();
       await payerParCarte(page);
       await page.waitForURL(/\/rapport\/debloque\?achat=/);
