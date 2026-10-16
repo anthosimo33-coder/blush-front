@@ -1,6 +1,6 @@
 /*
  * Les noms des cookies httpOnly du back-end, écrits une fois et sans server-only : le serveur les pose et les lit
- * (src/server/cookies.ts), src/proxy.ts et next.config.ts regardent seulement si la session est là. En https, ils portent
+ * (src/server/cookies.ts), src/proxy.ts regarde seulement si la session est là. En https, ils portent
  * le préfixe __Host- : le navigateur ne prend un tel cookie que Secure, pour tout le site (path /) et posé par le site
  * lui-même, sans Domain. Un sous-domaine (un CNAME oublié) ou une page en http ne peuvent donc pas en glisser un à la
  * place du nôtre, une session à eux par exemple (S-32 de l’audit de sécurité). En http (le dev, et le serveur des tests
@@ -30,5 +30,5 @@ export const nomDuCookie = (cookie: CookieDuServeur, securise: boolean) => (secu
 /** Les deux noms que peut avoir le cookie de session : sa seule présence choisit la variante d’une page. */
 export const NOMS_DE_SESSION = [nomDuCookie("session", true), nomDuCookie("session", false)] as const;
 
-/** Les deux noms que peut avoir le cookie du mode tournage : sa seule présence choisit la variante de l’export (next.config.ts). */
+/** Les deux noms que peut avoir le cookie du mode tournage : sa seule présence choisit la variante de l’export (src/proxy.ts). */
 export const NOMS_DU_TOURNAGE = [nomDuCookie("tournage", true), nomDuCookie("tournage", false)] as const;

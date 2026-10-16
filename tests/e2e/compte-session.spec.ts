@@ -1,4 +1,5 @@
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
+import { NOMS_DE_SESSION } from "../../src/lib/noms-cookies";
 import { CLE_PARCOURS, CLE_REPRISE } from "../../src/state/cles";
 import {
   attendreTaches,
@@ -115,6 +116,31 @@ test("qui revient connecté : la landing propose « Ouvrir BLUSH » et « Retrou
     await entete.getByRole("link", { name: "Ouvrir BLUSH" }).click();
     await expect(page).toHaveURL(/\/app$/);
     await expect(page.getByRole("link", { name: /^Maëlys, voir sa fiche/ })).toBeVisible();
+  });
+
+  await test.step("par la navigation dans l’appli aussi (un lien préchargé, ses données RSC) : la landing de qui revient, sans rien de sa session", async () => {
+    /* Le proxy sert /retour à l’adresse / d’après la seule présence du cookie (src/proxy.ts) : sa valeur, le secret httpOnly, ne revient pas */
+    const secret = (await page.context().cookies()).find((c) => (NOMS_DE_SESSION as readonly string[]).includes(c.name))?.value;
+    expect(secret, "le cookie de session").toBeTruthy();
+    /* Les données de / que demande le navigateur, lues en entier ici (une réponse que la page interrompt ne se lirait plus), puis rendues telles quelles */
+    const donnees: { url: string; page?: string; corps: string }[] = [];
+    const lire = async (route: Route) => {
+      if (route.request().headers()["rsc"] !== "1") return route.fallback();
+      const r = await route.fetch();
+      donnees.push({ url: route.request().url(), page: r.headers()["x-nextjs-rewritten-path"], corps: await r.text() });
+      await route.fulfill({ response: r });
+    };
+    await page.route((url) => url.pathname === "/", lire);
+    await page.goto("/une-adresse-qui-n-existe-pas");
+    await page.getByRole("link", { name: "Revenir à l’accueil" }).click();
+    await expect(entete.getByRole("link", { name: "Ouvrir BLUSH" })).toBeVisible();
+    await expect(page).toHaveURL(`${URL_APPLI}/`);
+    await page.unroute((url) => url.pathname === "/", lire);
+    expect(donnees.length, "les données de / demandées par le navigateur").toBeGreaterThan(0);
+    for (const { url, page: rendue, corps } of donnees) {
+      expect(rendue, url).toBe("/retour");
+      expect(corps, url).not.toContain(secret!);
+    }
   });
 });
 

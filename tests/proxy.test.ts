@@ -2,11 +2,14 @@ import { existsSync } from "node:fs";
 import { NextRequest, type NextResponse } from "next/server";
 import { getRewrittenUrl, isRewrite, unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NOMS_DE_SESSION, NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { config, proxy } from "@/proxy";
+import nextConfig from "../next.config";
 
 /*
  * Le proxy (src/proxy.ts) : les outils de l’équipe (et le faux Whop) introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
- * (src/server/drapeaux.ts), à ce poste seulement (src/lib/hote-local.ts), et les variantes de la bêta fermée, qui ne changent pas. Sans base ni serveur : la requête
+ * (src/server/drapeaux.ts), à ce poste seulement (src/lib/hote-local.ts), les variantes de la bêta fermée, qui ne changent pas, et
+ * celles de la session et du tournage, d’après la seule présence de leur cookie, jamais sa valeur. Sans base ni serveur : la requête
  * est construite ici, les variables posées par cas. (Le guide de Next appelle unstable_doesProxyMatch ce que cette
  * version exporte encore sous le nom unstable_doesMiddlewareMatch.)
  */
@@ -125,16 +128,72 @@ describe("la bêta fermée : ses variantes, inchangées", () => {
     }
   });
 
-  it("bêta fermée : chaque page sert sa variante « fermee », sur Vercel comme ailleurs ; /commencer passe pour qui est connecté", () => {
+  it("bêta fermée : chaque page sert sa variante « fermee », sur Vercel comme ailleurs ; à qui est connecté, /commencer sert la sienne", () => {
     vi.stubEnv("BLUSH_BETA_FERMEE", "1");
     for (const vercel of ["1", undefined]) {
       vi.stubEnv("VERCEL", vercel);
       for (const [url, variante] of Object.entries(VARIANTES)) expect(reecriteVers(proxy(requete(url))), url).toBe(variante);
       /* La session sous ses deux noms : __Host- en https, sans préfixe en http (src/lib/noms-cookies.ts) */
       for (const session of ["__Host-blush-session", "blush-session"]) {
-        expect(passe(proxy(requete("/commencer", { [session]: "une-session" }))), session).toBe(true);
+        expect(reecriteVers(proxy(requete("/commencer", { [session]: "une-session" }))), session).toBe("/commencer/connecte");
         expect(reecriteVers(proxy(requete("/email/code", { [session]: "une-session" }))), session).toBe("/email/code/fermee");
       }
     }
+  });
+});
+
+/** La valeur d’un cookie, reconnaissable : elle ne reparaît ni dans la destination, ni dans un en-tête de la réponse. */
+const SECRET = "valeur-du-cookie-a-ne-jamais-recopier";
+/** Les pages servies sous un cookie, ses deux noms (__Host- en https, sans préfixe en http) et leur variante. */
+const SOUS_UN_COOKIE = [
+  ["/", NOMS_DE_SESSION, "/retour"],
+  ["/commencer", NOMS_DE_SESSION, "/commencer/connecte"],
+  ["/connexion", NOMS_DE_SESSION, "/connexion/connecte"],
+  ["/importer/export", NOMS_DU_TOURNAGE, "/importer/export/tournage"],
+] as const;
+
+describe("la session et le tournage : leur variante d’après la présence du cookie, jamais sa valeur", () => {
+  it("le proxy passe par ces pages sous chacun des noms de leur cookie ; sans lui, /, /connexion et l’export ne passent pas par le proxy", () => {
+    for (const [url, noms] of SOUS_UN_COOKIE)
+      for (const nom of noms) expect(unstable_doesMiddlewareMatch({ config, url, cookies: { [nom]: SECRET } }), `${url} sous ${nom}`).toBe(true);
+    for (const url of ["/", "/connexion", "/importer/export"]) {
+      expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(false);
+      /* Un cookie qui n’est ni la session ni le tournage, ou leur nom à un caractère près */
+      for (const nom of ["blush-brouillon", "__Host-blush-humain", "blush-session-x", "Blush-Session"])
+        expect(unstable_doesMiddlewareMatch({ config, url, cookies: { [nom]: SECRET } }), `${url} sous ${nom}`).toBe(false);
+    }
+  });
+
+  it("chaque page sert sa variante, bêta ouverte comme fermée : la destination ne garde que la requête du navigateur", () => {
+    for (const beta of ["0", "1"]) {
+      vi.stubEnv("BLUSH_BETA_FERMEE", beta);
+      for (const [url, noms, variante] of SOUS_UN_COOKIE)
+        for (const nom of noms) {
+          const r = proxy(requete(`${url}?app=whatsapp`, { [nom]: SECRET }));
+          const qui = `${url} sous ${nom} (bêta ${beta})`;
+          expect(reecriteVers(r), qui).toBe(variante);
+          expect(new URL(getRewrittenUrl(r as NextResponse)!).search, qui).toBe("?app=whatsapp");
+          for (const [entete, valeur] of r.headers) expect(valeur, `${qui} : ${entete}`).not.toContain(SECRET);
+        }
+    }
+  });
+
+  it("le cookie de l’une ne sert pas la variante de l’autre ; sans cookie, la page elle-même", () => {
+    vi.stubEnv("BLUSH_BETA_FERMEE", "0");
+    for (const [url, noms] of SOUS_UN_COOKIE) {
+      const autres = noms === NOMS_DE_SESSION ? NOMS_DU_TOURNAGE : NOMS_DE_SESSION;
+      for (const nom of autres) expect(passe(proxy(requete(url, { [nom]: SECRET }))), `${url} sous ${nom}`).toBe(true);
+      expect(passe(proxy(requete(url))), url).toBe(true);
+    }
+  });
+
+  it("next.config.ts ne réécrit ni ne redirige d’après un cookie : Next en recopierait la valeur dans la destination", async () => {
+    const reecritures = await nextConfig.rewrites!();
+    const regles = [
+      ...(Array.isArray(reecritures) ? reecritures : [reecritures.beforeFiles, reecritures.afterFiles, reecritures.fallback].flatMap((phase) => phase ?? [])),
+      ...(await nextConfig.redirects!()),
+    ];
+    expect(regles.length).toBeGreaterThan(0);
+    for (const regle of regles) expect(regle.has ?? [], regle.source).not.toContainEqual(expect.objectContaining({ type: "cookie" }));
   });
 });

@@ -9,7 +9,7 @@ import { ConnexionScreen } from "../ConnexionScreen";
 export const metadata: Metadata = { title: "Se connecter" };
 
 /**
- * /connexion avec un cookie de session (next.config.ts sert cette page à la même adresse) : déjà connecté, son accueil
+ * /connexion avec un cookie de session (src/proxy.ts sert cette page à la même adresse) : déjà connecté, son accueil
  * (ou `?suite=`, la page où l’on allait). Sans cookie, personne n’est connecté : /connexion reste statique.
  */
 export default async function Page({ searchParams }: PageProps<"/connexion/connecte">) {
