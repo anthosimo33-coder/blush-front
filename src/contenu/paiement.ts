@@ -37,8 +37,7 @@ export const PIED_GRATUIT = {
 /**
  * Le paywall, avant toute lecture (décidé le 16 octobre), en version « prime » (les maquettes G3 et G4 validées le 16
  * octobre) : le bandeau du cadeau de la roue, vos prénoms et le chiffre qui frappe (une trouvaille du code, qui nomme
- * l’autre), la note des avis, les deux formules (les cadeaux à 0 €), le bouton qui paie, ce qu’on économise et quand le
- * verdict arrive, la discrétion ; en descendant, les témoignages, un avant / après et les questions.
+ * l’autre), la note des avis, les deux formules (les cadeaux à 0 €), le bouton qui paie, la discrétion ; en descendant, les témoignages, un avant / après et les questions.
  */
 export const PAYWALL = {
   /** Le titre sans trouvaille (une conv trop courte pour un déséquilibre net). */
@@ -65,9 +64,6 @@ export const PAYWALL = {
     barreOffertes: prixDe("pack30"),
   },
   gratuit: prixCourt(0),
-  /** Sous le bouton : ce que la formule fait économiser (son prix barré moins son prix), et l’heure du verdict. */
-  economie: (prix: string) => `Tu économises ${prix}`,
-  verdict: (heure: string) => `Ton verdict arrive à ${heure}`,
   /** « Léa n’est jamais prévenue » : BLUSH n’écrit jamais à l’autre. */
   jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
   temoignages: "Ce qu’ils en disent",

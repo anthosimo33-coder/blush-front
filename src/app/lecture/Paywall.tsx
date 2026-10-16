@@ -37,8 +37,7 @@ import type { RoueDuCompte } from "@/types/api";
  * D’abord la roue des cadeaux (FeuilleDeLaRoue), une fois par compte ; son lot gagné vaut 15 minutes, dans le bandeau
  * du haut et sur les formules (prixAvecLot, bullesDuLot : le serveur fait payer le même prix). Puis vos prénoms, le
  * chiffre qui frappe (une trouvaille du code), la note des avis (seulement de vrais avis), les deux formules (Premium
- * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), ce qu’on économise et
- * l’heure du verdict, la discrétion. En descendant : les témoignages (de vrais clients seulement), un avant / après
+ * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), la discrétion. En descendant : les témoignages (de vrais clients seulement), un avant / après
  * (marqué « exemple ») et les questions ; sur téléphone, une barre en bas ramène au bouton qui paie quand il est sorti
  * de l’écran. Ordinateur : l’accroche, les preuves et l’avant / après à gauche, le paiement à droite, les témoignages
  * dessous.
@@ -64,12 +63,6 @@ export function accroche(trouvailles: string[], prenom: string): { titre: string
   const choc = trouvailles.find(desequilibre);
   const autre = trouvailles.find((t) => t !== choc);
   return { titre: choc ? `${nommer(choc, prenom)}.` : PAYWALL.titre(prenom), sous: autre ? `${autre}. ${PAYWALL.promesse}` : PAYWALL.promesse };
-}
-
-/** L’heure où le verdict arrive si l’on paie maintenant, à Paris : dans deux minutes (« 21 h 34 »). */
-function heureDuVerdict(): string {
-  const [h, m] = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(Date.now() + 2 * 60_000).split(":");
-  return `${h}\u00a0h\u00a0${m}`;
 }
 
 export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS }: { story: Story; scores: ScoreRow[]; trouvailles: string[]; temoignages?: Testimonial[] }) {
@@ -113,7 +106,8 @@ export function Paywall({ story, scores, trouvailles, temoignages = TESTIMONIALS
               <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px]">{sous}</p>
               <Preuves />
             </div>
-            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden" />}
+            {/* Sur un écran bas (375 × 667), le témoignage du haut pousserait le bouton qui paie hors de l’écran : il reste plus bas, avec les autres */}
+            {temoignages[0] && <Temoignage t={temoignages[0]} compact className="lg:hidden [@media(max-height:799px)]:hidden" />}
             {scores.length > 0 && (
               <div className="hidden lg:block">
                 <ScoreCard rows={scores.slice(0, 3)} autre={autre.pronoun} />
@@ -189,7 +183,7 @@ type Choix = Formule | "avance";
 /**
  * Le paiement : les deux formules (Premium choisie d’avance, ses cadeaux à 0 €, le lot de la roue), ou ce que le compte a
  * d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui paie (Apple Pay, Google Pay ou la carte, dans
- * BLUSH), ce qu’on économise et l’heure du verdict, et la discrétion. Payé : « C’est payé », puis « C’est
+ * BLUSH), et la discrétion. Payé : « C’est payé », puis « C’est
  * débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est gagné).
  */
 function Paiement({
@@ -215,7 +209,6 @@ function Paiement({
   const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
   const [paye, setPaye] = useState(false);
   const [occupe, setOccupe] = useState(false);
-  const [heure] = useState(heureDuVerdict);
   const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || occupe });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
@@ -224,7 +217,6 @@ function Paiement({
   const premium = prixAvecLot("premium", lot);
   /* L’offre payée : Premium, ou le rapport (à son prix, au −50 % gardé, ou avec le lot) */
   const prix = offre === "premium" ? premium : rapport;
-  const economie = prix.barre && prix.barre > prix.centimes ? prix.barre - prix.centimes : 0;
   const lotSurRapport = !garde && lot && lotSAppliqueA(lot, "rapport") ? lot : null;
   const lotSurPremium = lot && lotSAppliqueA(lot, "premium") ? lot : null;
 
@@ -299,15 +291,12 @@ function Paiement({
             surPaye={setPaye}
             surOccupe={setOccupe}
             fleche
+            sansCarteGardee
           />
         )}
       </div>
       {!paye && choisie !== "avance" && (
         <div className="flex flex-col items-center gap-1.5 text-center">
-          <span className="text-note font-black">
-            {economie > 0 && `${PAYWALL.economie(enEuros(economie))} · `}
-            {PAYWALL.verdict(heure)}
-          </span>
           <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-legende font-extrabold text-soft">
             <span className="flex items-center gap-1">
               <Icon name="lock" size={13} stroke={2.6} />
@@ -433,9 +422,20 @@ function Temoignages({ items }: { items: Testimonial[] }) {
   const defiler = (sens: 1 | -1) => piste.current?.scrollBy({ left: sens * (piste.current.clientWidth * 0.8), behavior: "smooth" });
   return (
     <section aria-labelledby="temoignages" className="flex flex-col gap-4 pt-6 lg:items-center lg:gap-7 lg:pt-10">
-      <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
-        {PAYWALL.temoignages}
-      </h2>
+      <div className="flex flex-col items-center gap-1">
+        <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
+          {PAYWALL.temoignages}
+        </h2>
+        {NOTE_DES_AVIS && (
+          <p className="m-0 flex items-center gap-1.5 text-legende font-extrabold text-grey lg:text-note">
+            <span aria-hidden="true" className="text-attente">
+              ★
+            </span>
+            <span className="font-black text-ink">{NOTE_DES_AVIS.note}</span>
+            {PAYWALL.avis(NOTE_DES_AVIS.nombre)}
+          </p>
+        )}
+      </div>
       <div
         ref={piste}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"

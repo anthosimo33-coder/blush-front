@@ -26,14 +26,15 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(main.getByRole("heading", { level: 2, name: "Ta conv a déjà la réponse." })).toBeVisible();
   });
 
-  await test.step("les faits, et aucun avis tant qu’il n’y en a pas de vrais", async () => {
+  await test.step("les faits, et les témoignages des testeurs", async () => {
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { level: 2, name: "Rapide. Complet. Discret." })).toBeVisible();
     /* Les faits disent ce que dit la page Confidentialité : le nombre de chapitres de la règle, la conv brute effacée après le rapport (pas « 0 message ») */
     await expect(main.getByRole("listitem").filter({ hasText: "chapitres dans ton rapport" })).toContainText(`${NB_CHAPITRES}`);
     await expect(main.getByRole("listitem").filter({ hasText: "conv brute gardée après ton rapport" })).toContainText("0");
     await expect(main.getByText("message gardé après ton rapport")).toHaveCount(0);
-    await expect(main.getByRole("heading", { name: "Témoignages" })).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: "Témoignages" })).toBeVisible();
+    for (const prenom of ["Mattheo", "Sonia", "Charlotte"]) await expect(main.getByText(prenom, { exact: true }).first()).toBeAttached();
   });
 
   await test.step("l’en-tête et le pied de page : se connecter, commencer, la confidentialité", async () => {
