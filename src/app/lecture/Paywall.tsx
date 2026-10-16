@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { TESTIMONIALS } from "@/contenu/landing";
+import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
@@ -22,6 +22,7 @@ import { DebloquerAvecLAvance } from "@/components/paiement/FeuilleFormule";
 import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeuille";
 import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDePartir";
 import { FeuilleDeLaRoue } from "@/components/roue/FeuilleDeLaRoue";
+import { CarteTemoignage } from "@/components/temoignages/CarteTemoignage";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
@@ -415,21 +416,27 @@ function Temoignage({ t, compact = false, className }: { t: Testimonial; compact
   );
 }
 
-/** « Ce qu’ils en disent » : les témoignages qui défilent de côté (de vrais clients seulement : sans eux, rien). */
+/**
+ * Les témoignages (la maquette A1) : « Ils se posaient la même question. », la note des avis, puis leurs cartes, qui
+ * défilent de côté sur téléphone (de vrais clients seulement : sans eux, rien).
+ */
 function Temoignages({ items }: { items: Testimonial[] }) {
   const piste = useRef<HTMLDivElement>(null);
   if (!items.length) return null;
   const defiler = (sens: 1 | -1) => piste.current?.scrollBy({ left: sens * (piste.current.clientWidth * 0.8), behavior: "smooth" });
   return (
-    <section aria-labelledby="temoignages" className="flex flex-col gap-4 pt-6 lg:items-center lg:gap-7 lg:pt-10">
-      <div className="flex flex-col items-center gap-1">
-        <h2 id="temoignages" className="m-0 text-center text-[26px] font-black tracking-[-0.03em] lg:text-[44px]">
-          {PAYWALL.temoignages}
+    <section aria-labelledby="temoignages" className="flex flex-col gap-5 pt-8 lg:items-center lg:gap-11 lg:pt-14">
+      <div className="flex flex-col items-center gap-2 lg:gap-2.5">
+        <h2
+          id="temoignages"
+          className="m-0 text-center text-[30px] font-black leading-[1.06] tracking-[-0.03em] [text-wrap:balance] lg:text-[46px] lg:leading-[1.05] lg:tracking-[-0.035em]"
+        >
+          {TEMOIGNAGES.titre}
         </h2>
         {NOTE_DES_AVIS && (
-          <p className="m-0 flex items-center gap-1.5 text-legende font-extrabold text-grey lg:text-note">
+          <p className="m-0 flex items-center gap-1.5 text-legende font-extrabold text-grey lg:text-detail">
             <span aria-hidden="true" className="text-attente">
-              ★
+              ★★★★★
             </span>
             <span className="font-black text-ink">{NOTE_DES_AVIS.note}</span>
             {PAYWALL.avis(NOTE_DES_AVIS.nombre)}
@@ -438,10 +445,10 @@ function Temoignages({ items }: { items: Testimonial[] }) {
       </div>
       <div
         ref={piste}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0"
+        className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
       >
         {items.map((t) => (
-          <Temoignage key={t.name + t.label} t={t} className="w-[300px] shrink-0 snap-start lg:w-auto" />
+          <CarteTemoignage key={t.name + t.label} t={t} className="w-[312px] shrink-0 snap-start lg:w-auto" />
         ))}
       </div>
       {items.length > 1 && (

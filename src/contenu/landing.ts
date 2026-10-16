@@ -231,26 +231,45 @@ export const LANDING_CONVS: LandingConv[] = [
   },
 ];
 
+/** Les mots autour des témoignages (la maquette A1, choisie le 16 octobre) : le titre de leur section, sur chaque carte. */
+export const TEMOIGNAGES = {
+  titre: "Ils se posaient la même question.",
+  aVu: "BLUSH a vu",
+} as const;
+
 /**
  * Les témoignages, sur la landing et sous le paywall. Vide : la section n’apparaît pas. Uniquement de vrais avis, avec
  * l’accord écrit des personnes : jamais d’avis inventé. Ces trois-là sont ceux de testeurs de BLUSH, dans leurs mots,
- * donnés le 16 octobre.
+ * donnés le 16 octobre. Leur phrase en grand (`citation`) et le passage surligné (`surligne`) sont des morceaux de leur
+ * avis, mot pour mot (tests/unit/temoignages.test.ts) ; `vu` dit, en une ligne, ce que BLUSH a vu pour eux.
  * TODO(produit): garder leur accord écrit, et les remplacer par des avis de clients quand il y en aura.
  */
 export const TESTIMONIALS: Testimonial[] = [
   {
     name: "Mattheo",
     label: "Son crush",
+    teinte: "elle",
+    vu: "qui reprend après un silence",
+    citation: "aujourd’hui on est ensemble.",
+    surligne: "BLUSH m’a fait remarquer qu’elle reprenait toujours la conversation quand je laissais un blanc, mais qu’elle ne venait jamais me parler d’elle-même.",
     text: "Pendant 5 mois, je me suis demandé si elle était vraiment intéressée ou juste sympa avec moi. BLUSH m’a fait remarquer qu’elle reprenait toujours la conversation quand je laissais un blanc, mais qu’elle ne venait jamais me parler d’elle-même. J’ai arrêté de jouer au mec trop occupé, je lui ai proposé un resto quelques jours après, et aujourd’hui on est ensemble.",
   },
   {
     name: "Sonia",
     label: "En couple",
+    teinte: "vrai",
+    vu: "le moment où ça a changé",
+    citation: "pour la première fois depuis longtemps, on a réussi à parler de ce qui n’allait pas.",
+    surligne: "BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer.",
     text: "Je pensais qu’on s’éloignait sans vraiment savoir pourquoi. BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer. On a tout relu ensemble, on s’est reconnus dans certains passages, et pour la première fois depuis longtemps, on a réussi à parler de ce qui n’allait pas.",
   },
   {
     name: "Charlotte",
     label: "Situationship",
+    teinte: "flou",
+    vu: "qui relance sans réponse",
+    citation: "Ça m’a fait mal de le voir noir sur blanc",
+    surligne: "BLUSH m’a montré que c’était toujours moi qui relançais et que ses réponses ne menaient jamais nulle part.",
     text: "J’étais à deux doigts de lui renvoyer un message, comme d’habitude. BLUSH m’a montré que c’était toujours moi qui relançais et que ses réponses ne menaient jamais nulle part. Ça m’a fait mal de le voir noir sur blanc, mais j’ai fini par supprimer mon brouillon. Son dernier vocal\u00a0? Je l’ai écouté bien trop de fois avant d’en arriver là.",
   },
 ];

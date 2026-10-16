@@ -1,0 +1,40 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { CarteTemoignage, enCitation } from "@/components/temoignages/CarteTemoignage";
+import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
+
+describe("les témoignages (la maquette A1)", () => {
+  it("leur phrase en grand et le passage surligné sont des morceaux de leur avis, mot pour mot", () => {
+    expect(TESTIMONIALS.length).toBeGreaterThan(0);
+    for (const t of TESTIMONIALS) {
+      expect(t.text, `${t.name} : sa phrase en grand`).toContain(t.citation);
+      expect(t.text, `${t.name} : son passage surligné`).toContain(t.surligne);
+    }
+  });
+
+  it("la phrase en grand : une majuscule, un point au bout s’il manque, entre guillemets", () => {
+    expect(enCitation("aujourd’hui on est ensemble.")).toBe("«\u00a0Aujourd’hui on est ensemble.\u00a0»");
+    expect(enCitation("Ça m’a fait mal de le voir noir sur blanc")).toBe("«\u00a0Ça m’a fait mal de le voir noir sur blanc.\u00a0»");
+    expect(enCitation("tu l’as vu\u00a0?")).toBe("«\u00a0Tu l’as vu\u00a0?\u00a0»");
+  });
+
+  it("la carte : ce que BLUSH a vu, la phrase, l’avis entier avec son passage surligné, son prénom et sa situation", () => {
+    const t = TESTIMONIALS[0]!;
+    const { container } = render(<CarteTemoignage t={t} />);
+    expect(screen.getByText(TEMOIGNAGES.aVu)).toBeTruthy();
+    expect(screen.getByText(t.vu)).toBeTruthy();
+    /* Telle quelle, insécables comprises (sans la normalisation des espaces de getByText) */
+    expect(screen.getByText(enCitation(t.citation), { normalizer: (texte) => texte })).toBeTruthy();
+    expect(container.querySelector("blockquote")?.textContent).toBe(t.text);
+    expect(container.querySelector("mark")?.textContent).toBe(t.surligne);
+    expect(screen.getByText(t.name)).toBeTruthy();
+    expect(screen.getByText(t.label)).toBeTruthy();
+  });
+
+  it("un passage introuvable : l’avis reste tel quel, sans rien de surligné", () => {
+    const t = { ...TESTIMONIALS[0]!, surligne: "une phrase qu’elle n’a pas écrite" };
+    const { container } = render(<CarteTemoignage t={t} />);
+    expect(container.querySelector("blockquote")?.textContent).toBe(t.text);
+    expect(container.querySelector("mark")).toBeNull();
+  });
+});

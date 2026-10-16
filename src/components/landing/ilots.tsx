@@ -4,8 +4,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProp
 import { cn } from "@/lib/cn";
 import { flipFrom, prefersReducedMotion, snapshotTops, spring } from "@/lib/motion";
 import { Bell3D, BubbleLogo } from "@/components/brand/objects3d";
-import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
+import { CarteTemoignage } from "@/components/temoignages/CarteTemoignage";
 import type { Testimonial } from "@/types";
 
 /*
@@ -274,17 +274,8 @@ export function AvisDefilants({ items }: { items: Testimonial[] }) {
         className="m-0 mt-10 flex list-none snap-x snap-mandatory gap-4 overflow-x-auto px-[max(22px,calc((100vw_-_1056px)/2))] py-3 [scrollbar-width:none] lg:mt-14 [&::-webkit-scrollbar]:hidden"
       >
         {items.map((t, i) => (
-          <li key={i} className="flex w-[84vw] max-w-[420px] shrink-0 snap-center flex-col gap-5 rounded-[28px] bg-white p-6 shadow-card lg:p-8">
-            <div className="flex items-center gap-3.5">
-              <Avatar tone="elle" size={56}>
-                {t.name.charAt(0)}
-              </Avatar>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-carte font-black">{t.name}</span>
-                <span className="text-note font-extrabold text-grey">{t.label}</span>
-              </div>
-            </div>
-            <p className="m-0 text-accent font-extrabold leading-[1.6] text-ink">{t.text}</p>
+          <li key={i} className="flex w-[84vw] max-w-[420px] shrink-0 snap-center">
+            <CarteTemoignage t={t} className="w-full" />
           </li>
         ))}
       </ul>

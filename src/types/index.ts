@@ -269,11 +269,19 @@ export type LandingConv = {
   next: string;
 };
 
-/** Landing : un vrai avis, publié avec l’accord de la personne. */
+/** Landing et paywall : un vrai avis, publié avec l’accord de la personne. */
 export type Testimonial = {
   name: string;
   /** Sa situation (« Situationship »). */
   label: string;
+  /** La teinte de sa situation : son rond et son étiquette (rose : un crush, vert : en couple, violet : c’est flou). */
+  teinte: "elle" | "vrai" | "flou";
+  /** Ce que BLUSH a vu pour elle, sous « BLUSH a vu » (« qui relance sans réponse »). */
+  vu: string;
+  /** La phrase qui reste, en grand : un morceau de `text`, mot pour mot. */
+  citation: string;
+  /** Le passage sur BLUSH, surligné dans `text` : un morceau de `text`, mot pour mot. */
+  surligne: string;
   text: string;
 };
 
