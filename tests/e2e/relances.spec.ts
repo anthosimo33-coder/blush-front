@@ -1,13 +1,13 @@
 import { attendreMail, commencerPaiement, CRON_SECRET, emailLibre, expect, lectureFaite, mailsDepuis, sql, test } from "./aide";
 
 /*
- * La relance par mail (« Ta suite t’attend », l’offre unique ②) de bout en bout : une commande du rapport restée en
+ * La relance par mail (« Ton rapport t’attend », l’offre unique ②) de bout en bout : une commande du rapport restée en
  * attente deux heures (son heure reculée en base), la route que la veille de GitHub appelle, le mail dans la boîte des
  * tests (rien de la conv, le lien de la conv sur la feuille de paiement, le lien de désinscription), puis la
  * désinscription à l’écran, au clavier, qui coupe les relances du compte.
  */
 
-test("la relance : le mail « Ta suite t’attend », son lien vers la feuille de paiement, puis la désinscription", async ({ page, request, autreAppareil }, testInfo) => {
+test("la relance : le mail « Ton rapport t’attend », son lien vers la feuille de paiement, puis la désinscription", async ({ page, request, autreAppareil }, testInfo) => {
   const email = emailLibre(testInfo, "relance");
   const conv = await lectureFaite(page, testInfo, email);
   const { achat } = await commencerPaiement(page, "rapport");
@@ -21,7 +21,7 @@ test("la relance : le mail « Ta suite t’attend », son lien vers la feuille d
     const corps = (await r.json()) as Record<string, unknown>;
     expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "retenues"]);
     expect(JSON.stringify(corps)).not.toContain(email);
-    return attendreMail(email, { depuis, filtre: (m) => m.sujet === "Ta suite t’attend" });
+    return attendreMail(email, { depuis, filtre: (m) => m.sujet === "Ton rapport t’attend" });
   });
 
   await test.step("le mail : rien de la conv, le lien de cette conv sur la feuille de paiement, et de quoi se désinscrire", async () => {
