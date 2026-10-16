@@ -11,6 +11,7 @@ import type {
   BulleChat,
   EvenementChat,
   EvenementEcoute,
+  ExportApp,
   Fiche,
   FicheFact,
   FicheUpdate,
@@ -311,6 +312,20 @@ export async function uploadExport(
     if (id == null) throw new ErreurApi("annule", 0);
     fd.append("export", await pret.paquetDe(id), "export.json.gz");
   }
+  await passe;
+  return (await appel("POST /api/import", { corps: fd })).source;
+}
+
+/**
+ * Le mode tournage (src/server/tournage.ts) : l’export sans fichier. Le serveur prend la conv du lien ouvert sur ce
+ * navigateur, sous l’appli choisie à l’écran (`app`) ; rien ne part d’ici que l’accord de l’import. Rejette comme un
+ * export (« tournage » : son lien a été arrêté entre-temps).
+ */
+export async function importerLaConvDuTournage(app: ExportApp, consentement: string): Promise<Source> {
+  const passe = laissezPasser();
+  const fd = new FormData();
+  fd.append("consentement", consentement);
+  fd.append("tournage", app);
   await passe;
   return (await appel("POST /api/import", { corps: fd })).source;
 }

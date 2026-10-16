@@ -71,11 +71,17 @@ export const poserHumain = (valeur: string, expires: Date) => poser("humain", va
 /*
  * Le mode tournage (src/server/tournage.ts) : le secret du lien d’une conv de tournage, que ses routes relisent à
  * chaque import et à chaque lecture. Posé pour 30 jours par le lien (/tournage/<cle>), effacé par « Quitter le mode
- * tournage » ou quand on s’en va de l’appareil (oublierCetAppareil).
+ * tournage » ou quand on s’en va de l’appareil (oublierCetAppareil). Le prénom de la créatrice, quand son lien le porte,
+ * le suit : posé pour la même durée, effacé avec lui.
  */
 export const lireTournage = async () => (await cookies()).get(nom("tournage"))?.value;
 export const poserTournage = (cle: string) => poser("tournage", cle, new Date(Date.now() + 30 * 86400e3));
-export const effacerTournage = () => effacer("tournage");
+export const lirePrenomDuTournage = async () => (await cookies()).get(nom("prenomDuTournage"))?.value;
+export const poserPrenomDuTournage = (prenom: string) => poser("prenomDuTournage", prenom, new Date(Date.now() + 30 * 86400e3));
+export async function effacerTournage(): Promise<void> {
+  await effacer("tournage");
+  await effacer("prenomDuTournage");
+}
 
 /*
  * La conv choisie dans « Tes convs » : son identifiant, rien d’autre. Pas httpOnly : un toucher dans la liste l’écrit

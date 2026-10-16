@@ -70,6 +70,8 @@ const MESSAGES = {
   },
   /* Un export qui n’a pas pu partir (le fichier lui-même a son écran : erreurDeParcours) */
   export: {
+    /* Le mode tournage, sans fichier : son lien arrêté depuis l’ouverture de l’écran (src/server/tournage.ts) */
+    tournage: TOURNAGE_ARRETE,
     trop: "Beaucoup d’imports d’un coup. Réessaie dans une heure.",
     /* Le budget d’octets du jour, de son adresse ou de tous (S-02) : il repart à minuit, ou 24 h après le premier import de l’adresse. TODO(produit): texte nouveau */
     trop_jour: "Beaucoup de convs importées aujourd’hui. Réessaie demain.",

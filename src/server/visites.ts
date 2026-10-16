@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { EtapeVisite, GenreFil, OffreId, SourceVisite } from "@/types";
-import { nomDuCookie } from "@/lib/noms-cookies";
+import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
 import { ipDe } from "./limites";
@@ -153,11 +153,11 @@ function signeAdmis(req: Request, maintenant = Date.now()): boolean {
   return c.n <= SIGNES_PAR_IP.max;
 }
 
-/** Les deux noms du cookie du mode tournage (__Host- en https), lus dans la requête elle-même (src/server/cookies.ts le pose). */
-const COOKIES_DU_TOURNAGE = [nomDuCookie("tournage", true), nomDuCookie("tournage", false)];
-
-/** La requête vient-elle d’un navigateur en mode tournage ? Son cookie, quelle que soit sa valeur (un lien arrêté compris). */
-const enModeTournage = (req: Request) => (req.headers.get("cookie") ?? "").split(";").some((c) => COOKIES_DU_TOURNAGE.includes(c.split("=")[0]!.trim()));
+/**
+ * La requête vient-elle d’un navigateur en mode tournage ? Son cookie (sous l’un de ses deux noms, lu dans la requête
+ * elle-même : src/server/cookies.ts le pose), quelle que soit sa valeur (un lien arrêté compris).
+ */
+const enModeTournage = (req: Request) => (req.headers.get("cookie") ?? "").split(";").some((c) => (NOMS_DU_TOURNAGE as readonly string[]).includes(c.split("=")[0]!.trim()));
 
 /** Le signe d’un onglet (POST /api/presence) : son identifiant, l’écran, et d’où il vient (son premier signe compte la visite). */
 export type Signe = { onglet: string; etape: EtapeVisite; premier: boolean; utm?: string; referent?: string };
