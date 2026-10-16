@@ -96,6 +96,14 @@ const click =
       .click();
     await page.waitForTimeout(opts.wait ?? 700);
   };
+/** L’onglet quitté puis retrouvé (un autre onglet, une autre appli), comme le navigateur le dit à la page. */
+const quitterPuisRevenir = (page) =>
+  page.evaluate(() => {
+    for (const etat of ["hidden", "visible"]) {
+      Object.defineProperty(document, "visibilityState", { value: etat, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }
+  });
 /** Avance de `n` cartes dans la révélation du verdict. */
 const suivant = (n) => async (page) => {
   for (let i = 0; i < n; i++) await click("Suivant", { wait: i === n - 1 ? 500 : 400 })(page);
@@ -421,7 +429,7 @@ export const STATES = [
     note: "À la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette).",
   },
 
-  /* ———— Le paywall direct (16 octobre) ———— */
+  /* ———— Le paywall direct (16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) ———— */
   {
     id: "P1",
     section: "paywall",
@@ -431,81 +439,44 @@ export const STATES = [
     compte: "paywall",
     wait: 1500,
     note: "Rien n’est parti au modèle\u00a0: les trouvailles sont celles du code. Arrivée juste après «\u00a0Qui es-tu\u00a0?\u00a0», la lecture se déroule en 5 secondes avant ce bouton.",
-    changement: "Nouveau\u00a0: «\u00a0Voir mon rapport\u00a0» mène au paywall, plus au verdict.",
+    changement: "«\u00a0Voir mon rapport\u00a0» mène au paywall, plus au verdict.",
   },
   {
     id: "P2",
     section: "paywall",
     title: "Paywall",
-    state: "Ta formule, ouverte d’emblée",
+    state: "Sur un seul écran, Premium choisie d’avance",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
     wait: 900,
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("dialog").waitFor();
-      await page.waitForTimeout(900);
+      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).waitFor();
+      await page.waitForTimeout(700);
     },
-    changement: "Nouveau\u00a0: les prix de la grille du 16 octobre (13,90\u00a0€, Premium 18,90\u00a0€), et le titre «\u00a0Ton rapport parle de vous deux\u00a0».",
+    note: "Le titre est une trouvaille du code qui nomme l’autre. Le verdict flouté est fait de lignes vides\u00a0: il n’est pas encore écrit.",
+    changement:
+      "La maquette A\u00a0: vos prénoms, le chiffre qui frappe, le rapport fermé en une carte, les deux formules et le bouton qui paie, sans feuille. Tout tient en 375 × 667.",
   },
   {
     id: "P3",
     section: "paywall",
     title: "Paywall",
-    state: "L’offre ①, la feuille fermée sans payer",
+    state: "L’offre ①, au retour sur l’onglet",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
     wait: 900,
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("dialog").waitFor();
-      await page.keyboard.press("Escape");
-      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).waitFor();
+      await quitterPuisRevenir(page);
+      await page.getByRole("dialog", { name: /^Offre unique/ }).waitFor();
       await page.waitForTimeout(900);
     },
-  },
-  {
-    id: "P4",
-    section: "paywall",
-    title: "Paywall",
-    state: "Sous la feuille",
-    route: "/lecture",
-    compte: "paywall",
-    sheet: true,
-    wait: 900,
-    steps: async (page) => {
-      await click("Voir mon rapport")(page);
-      await page.getByRole("dialog").waitFor();
-      await page.keyboard.press("Escape");
-      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
-      await page.keyboard.press("Escape");
-      await page.getByRole("dialog").waitFor({ state: "detached" });
-      await page.waitForTimeout(700);
-    },
-    note: "Ce que le code a compté (qui ouvre la journée, qui relance, qui répond vite) et ses trouvailles. Le bouton reste collé en bas de l’écran.",
-  },
-  {
-    id: "P4b",
-    section: "paywall",
-    title: "Paywall",
-    state: "Sous la feuille, les chapitres",
-    route: "/lecture",
-    compte: "paywall",
-    sheet: true,
-    wait: 900,
-    steps: async (page) => {
-      await click("Voir mon rapport")(page);
-      await page.getByRole("dialog").waitFor();
-      await page.keyboard.press("Escape");
-      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
-      await page.keyboard.press("Escape");
-      await page.getByRole("dialog").waitFor({ state: "detached" });
-      await page.getByText("Ton prochain pas").scrollIntoViewIfNeeded();
-      await page.waitForTimeout(700);
-    },
-    note: "Les huit chapitres fermés, avec leurs titres d’attente\u00a0: sans verdict, pas de titres écrits pour leur histoire. Chacun rouvre la feuille.",
+    note: "Une fois, au retour sur l’onglet après l’avoir quitté, ou après 40 secondes sans payer (il n’y a plus de feuille à fermer).",
+    changement: "«\u00a0Offre unique sur ton rapport\u00a0», à la place de «\u00a0Ta suite à −22\u00a0%\u00a0».",
   },
   {
     id: "P5",
@@ -516,10 +487,13 @@ export const STATES = [
     compte: "paywall",
     steps: async (page) => {
       await click("Voir mon rapport")(page);
-      await page.getByRole("dialog").waitFor();
-      await payerLaFormule(/^Rapport \+ 60 bulles/)(page);
+      await page.getByRole("radio", { name: /Rapport \+ 60 bulles/ }).click();
+      await page.getByRole("button", { name: /^Débloquer/ }).click();
+      await payerParCarte(page);
+      await page.waitForURL(/\/rapport\/debloque\?achat=/);
+      await page.waitForTimeout(1600);
     },
-    note: "Payé au faux Whop. La lecture commence seulement maintenant\u00a0: «\u00a0Continuer\u00a0» mène à la vraie lecture, puis au verdict.",
+    note: "Payé au faux Whop, sur l’écran. La lecture commence seulement maintenant\u00a0: «\u00a0Continuer\u00a0» mène à la vraie lecture, puis au verdict.",
   },
 
   /* ———— Rapport ———— */
@@ -635,7 +609,7 @@ export const STATES = [
     wait: 900,
     steps: async (page) => {
       await page.keyboard.press("Escape");
-      await page.getByRole("dialog", { name: /^Ta suite à/ }).waitFor();
+      await page.getByRole("dialog", { name: /^Offre unique/ }).waitFor();
       await page.waitForTimeout(900);
     },
     note: "Le compte à rebours part de l’heure de fin donnée par le serveur (5 minutes)\u00a0; la case de renonciation, que le prototype n’avait pas, au-dessus de «\u00a0Je la prends\u00a0».",
@@ -659,7 +633,7 @@ export const STATES = [
     state: "Premium",
     route: "/rapport?paiement=1",
     compte: "gratuit",
-    steps: payerLaFormule(/^Rapport \+ 60 bulles/),
+    steps: payerLaFormule(/Rapport \+ 60 bulles/),
     note: "Payé au faux Whop. Animé (la gerbe). Les bulles reçues dans l’anneau rose de leur perle.",
   },
   {
@@ -1451,7 +1425,7 @@ export const STATES = [
     id: "R1",
     section: "equipe",
     title: "Mail de relance",
-    state: "«\u00a0Ta suite t’attend\u00a0»",
+    state: "«\u00a0Ton rapport t’attend\u00a0»",
     route: "/apercu/mail?type=relance",
     full: true,
     note: "Deux heures après une feuille de paiement fermée sans payer (une fois par compte). Ni prénom, ni rien de la conv. Texte à valider (et par un juriste\u00a0: la prospection).",

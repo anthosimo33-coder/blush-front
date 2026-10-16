@@ -81,16 +81,18 @@ describe("les textes du paiement, tirés du catalogue", () => {
     expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 18,90\u00a0€");
   });
 
-  it("l’offre ① : la suite à −22 %, 3 € de moins, 10 bulles offertes", () => {
+  it("l’offre ① : une offre unique sur le rapport, 3 € de moins, 10 bulles offertes", () => {
     expect(OFFRE_SUITE).toMatchObject({
-      titre: "Ta suite à −22\u00a0%",
+      titre: "Offre unique sur ton rapport",
+      sousTitre: "3\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 13,90\u00a0€.",
+      fin: "Elle disparaît dans",
       prix: "10,90\u00a0€",
       barre: "13,90\u00a0€",
       economie: "−3\u00a0€",
       contenu: "10 bulles offertes",
-      prendre: "Je la prends · 10,90\u00a0€",
+      prendre: "Je le prends · 10,90\u00a0€",
     });
-    expect(`${OFFRE_SUITE.avant}${OFFRE_SUITE.remise}`).toBe(OFFRE_SUITE.titre);
+    expect(`${OFFRE_SUITE.remise}${OFFRE_SUITE.apres}`).toBe(OFFRE_SUITE.titre);
   });
 
   it("l’offre ③ et « C’est débloqué »", () => {

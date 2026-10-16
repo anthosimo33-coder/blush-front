@@ -33,8 +33,8 @@ export const CATALOGUE: Record<OffreId, Offre> = {
   rapport: { id: "rapport", centimes: 1390, barre: null, bulles: 10, conv: true, unique: null, titre: "Le rapport" },
   /* Le prix barré : le rapport et le pack de 80 bulles, vendus à part (pour les mêmes 90 bulles) */
   premium: { id: "premium", centimes: 1890, barre: 2780, bulles: 90, conv: true, unique: null, titre: "Premium" },
-  /* ① : la suite moins chère, 5 minutes après avoir fermé la feuille sans payer */
-  suite: { id: "suite", centimes: 1090, barre: 1390, bulles: 10, conv: true, unique: "suite", titre: "Ta suite" },
+  /* ① : le rapport moins cher, une offre unique de 5 minutes (le paywall : 40 s sans payer, ou un retour sur l’onglet ; ailleurs, la feuille fermée sans payer) */
+  suite: { id: "suite", centimes: 1090, barre: 1390, bulles: 10, conv: true, unique: "suite", titre: "Le rapport, offre unique" },
   /* ⑥ : le rapport à −50 %, gardé 7 jours par le repli de « C’est débloqué » (le 2e rapport refusé), pour une autre conv */
   rapport_garde: { id: "rapport_garde", centimes: 695, barre: 1390, bulles: 10, conv: true, unique: "garde_second", titre: "Le rapport à −50\u00a0%" },
   /* ③ : Premium pour 5 € de plus, juste après avoir pris le rapport seul (ou la suite) */

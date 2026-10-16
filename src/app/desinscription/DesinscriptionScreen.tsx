@@ -8,7 +8,7 @@ import { NBSP } from "@/lib/format";
 import { couperLesRelances } from "@/services/api";
 
 /*
- * Couper les relances par mail, depuis le lien du mail « Ta suite t’attend ». Un bouton plutôt que le lien seul, comme
+ * Couper les relances par mail, depuis le lien du mail « Ton rapport t’attend ». Un bouton plutôt que le lien seul, comme
  * pour la liste d’attente : certaines messageries ouvrent les liens d’un mail pour les vérifier. Les mails qu’on demande
  * (le code de connexion, « ton rapport est prêt ») partent toujours.
  * TODO(produit): textes à valider.

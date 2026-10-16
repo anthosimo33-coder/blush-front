@@ -166,13 +166,13 @@ test("compte gratuit : le paiement, ses deux formules, la renonciation sous le b
     await feuilleSurOrdinateur(page, offre);
     await expect(offre.getByText("attends…")).toBeVisible();
     await expect(offre.getByText("attends…")).toHaveCSS("font-family", NUNITO);
-    await expect(offre.getByText("Rien que pour toi, et une seule fois.")).toBeVisible();
-    await expect(offre.getByRole("timer", { name: "L’offre se termine dans" })).toHaveText(/^0[45]:\d\d$/);
+    await expect(offre.getByText("3\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 13,90\u00a0€.")).toBeVisible();
+    await expect(offre.getByRole("timer", { name: "Elle disparaît dans" })).toHaveText(/^0[45]:\d\d$/);
     await expect(offre.getByText("10,90\u00a0€", { exact: true })).toBeVisible();
     await expect(offre.getByText("au lieu de 13,90\u00a0€", { exact: true })).toBeAttached();
     await expect(offre.getByText("−3\u00a0€", { exact: true })).toBeVisible();
     await expect(offre.getByRole("listitem")).toHaveText(["7 chapitres", "Ton vocal", "10 bulles offertes"]);
-    await expect(offre.getByRole("button", { name: "Je la prends · 10,90\u00a0€" })).toBeVisible();
+    await expect(offre.getByRole("button", { name: "Je le prends · 10,90\u00a0€" })).toBeVisible();
     await offre.getByRole("button", { name: "Non merci" }).click();
     await expect(offre).toBeHidden();
   });

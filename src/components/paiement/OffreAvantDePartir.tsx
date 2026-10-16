@@ -86,11 +86,12 @@ export function OffreAvantDePartir({
             {OFFRE_SUITE.attends}
           </span>
         </div>
-        <h2 id={titre} className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em]">
-          {OFFRE_SUITE.avant}
+        {/* Un écran bas (375 × 667) : le titre (deux lignes), sa ligne et le prix se resserrent pour tenir sans défiler */}
+        <h2 id={titre} className="m-0 text-[30px] font-black leading-[1.05] tracking-[-0.02em] [@media(max-height:700px)]:text-[25px]">
           <span className="text-elle-ink">{OFFRE_SUITE.remise}</span>
+          {OFFRE_SUITE.apres}
         </h2>
-        <p className="m-0 text-note font-extrabold text-soft">{OFFRE_SUITE.sousTitre}</p>
+        <p className="m-0 text-note font-extrabold text-soft [@media(max-height:700px)]:text-legende">{OFFRE_SUITE.sousTitre}</p>
       </div>
       <div className="flex flex-col gap-2.5 rounded-[22px] bg-ink px-4 py-3.5 text-white shadow-[0_18px_36px_-18px_rgba(17,17,20,0.7)]">
         <span className="flex items-center justify-between">
@@ -115,7 +116,7 @@ export function OffreAvantDePartir({
         </span>
       </div>
       <div className="flex items-center justify-center gap-3">
-        <span className="text-[50px] font-black leading-none tracking-[-0.03em]">{OFFRE_SUITE.prix}</span>
+        <span className="text-[50px] font-black leading-none tracking-[-0.03em] [@media(max-height:700px)]:text-[42px]">{OFFRE_SUITE.prix}</span>
         <span className="flex flex-col items-start gap-1">
           <s className="text-carte font-extrabold text-grey">
             <span className="sr-only">{FEUILLE_FORMULE.auLieuDe}</span>

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * Hors de Vercel seulement (src/proxy.ts) : un mail tel qu’il partira. Le code (par défaut) ; `?type=rapport` (`&sobre=1` :
  * le mode sobre), celui de l’histoire d’exemple (son prénom au chapitre 5 du sommaire) ; ou `?type=attente`, celui de la
  * liste d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
- * `?type=relance`, la relance « Ta suite t’attend ».
+ * `?type=relance`, la relance « Ton rapport t’attend ».
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);

@@ -251,7 +251,7 @@ const STICKERS: [Sticker, ...Sticker[]] = [
 ];
 
 /** Les découvertes, en autocollants qui arrivent avec un petit rebond. */
-export function Discoveries({ items, className }: { items: string[]; className?: string }) {
+function Discoveries({ items, className }: { items: string[]; className?: string }) {
   return (
     /* La place de deux lignes, réservée d’avance : le bloc centré ne remonte pas quand les découvertes passent à la ligne */
     <ul className={cn("m-0 flex min-h-[78px] list-none flex-wrap content-start justify-center gap-2.5 p-0", className)} aria-label="Ce que BLUSH remarque">

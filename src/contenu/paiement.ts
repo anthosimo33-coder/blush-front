@@ -35,21 +35,21 @@ export const PIED_GRATUIT = {
 };
 
 /**
- * Le paywall, avant toute lecture (décidé le 16 octobre) : à la fin de la lecture d’une conv pas encore payée, ce que le
- * code a compté (les chiffres, les trouvailles), les chapitres du rapport fermés, et le bouton qui ouvre « Ta formule ».
- * TODO(produit): textes nouveaux, à valider.
+ * Le paywall, avant toute lecture (décidé le 16 octobre), sur un seul écran (la maquette A, validée le 16 octobre) : vos
+ * prénoms, le chiffre qui frappe (une trouvaille du code, qui nomme l’autre), le rapport fermé en une carte, les deux
+ * formules et le bouton qui paie, sans feuille.
  */
 export const PAYWALL = {
-  surtitre: "Ta lecture est prête",
+  /** Le titre sans trouvaille (une conv trop courte pour un déséquilibre net). */
   titre: (autre: string) => `Ton rapport sur toi et ${autre} n’attend que toi.`,
-  vu: "Ce que BLUSH voit déjà",
+  /** Sous le titre : la trouvaille suivante, puis la promesse. */
+  promesse: "BLUSH te dit ce que ça veut dire.",
   chapitres: (n: number) => `Ton rapport · ${n} chapitres`,
-  /* Court, sur une ligne même sur un petit écran : comme le bouton de la feuille (« Débloquer · 18,90 € ») */
-  debloquer: `Débloquer · ${prixDe("rapport")}`,
-  debloquerGarde: `Débloquer · ${prixDe("rapport_garde")}`,
-  debloquerAvance: `Débloquer · ${prixCourt(0)}`,
-  /** Le titre de la feuille « Ta formule » ouverte depuis le paywall : le rapport entier, pas « la suite ». */
-  formule: (autre?: string) => (autre ? `Ton rapport parle de vous deux\u00a0: toi et ${autre}.` : "Ton rapport parle de vous deux."),
+  verdict: "Le verdict",
+  vocal: "Ton vocal",
+  bulles: `${CATALOGUE.rapport.bulles} bulles offertes`,
+  /** Le titre de la carte du paiement, sur ordinateur. */
+  carte: "Débloque ton rapport",
 };
 
 /** La feuille « Ta formule » (FeuilleFormule) : le rapport seul, ou Premium, choisie d’avance. */
@@ -99,26 +99,28 @@ export const FEUILLE_FORMULE = {
 
 /** Le prix de l’offre ①, barré : celui du rapport seul. */
 const BARRE_SUITE = CATALOGUE.suite.barre ?? CATALOGUE.rapport.centimes;
-/** Sa remise, en pourcentage (« −30 % »), en rose dans son titre. */
-const REMISE_SUITE = `−${Math.round(100 - (100 * CATALOGUE.suite.centimes) / BARRE_SUITE)}\u00a0%`;
 
 /** L’offre unique ① (OffreAvantDePartir) : la suite moins chère, pendant 5 minutes, la feuille fermée sans payer. */
 export const OFFRE_SUITE = {
   /** Ce que BLUSH lance, dans sa bulle, au-dessus du titre. */
   attends: "attends…",
-  titre: `Ta suite à ${REMISE_SUITE}`,
-  /** Le titre en deux morceaux : la remise se pose en rose. */
-  avant: "Ta suite à ",
-  remise: REMISE_SUITE,
-  sousTitre: "Rien que pour toi, et une seule fois.",
-  fin: "L’offre se termine dans",
+  /*
+   * Ce qu’elle est, dit d’abord : une offre unique, sur le rapport (décidé le 16 octobre : « Ta suite à −22 % » ne disait
+   * ni l’un ni l’autre)
+   */
+  titre: "Offre unique sur ton rapport",
+  /** Le titre en deux morceaux : « Offre unique » se pose en rose. */
+  remise: "Offre unique",
+  apres: " sur ton rapport",
+  sousTitre: `${prixCourt(BARRE_SUITE - CATALOGUE.suite.centimes)} de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à ${enEuros(BARRE_SUITE)}.`,
+  fin: "Elle disparaît dans",
   prix: prixDe("suite"),
   barre: enEuros(BARRE_SUITE),
   economie: `−${prixCourt(BARRE_SUITE - CATALOGUE.suite.centimes)}`,
   chapitres: (chapitres: number) => `${chapitres} chapitres`,
   vocal: "Ton vocal",
   contenu: `${CATALOGUE.suite.bulles} bulles offertes`,
-  prendre: `Je la prends · ${prixDe("suite")}`,
+  prendre: `Je le prends · ${prixDe("suite")}`,
   non: "Non merci",
   /** Le compte à rebours à zéro : elle disparaît pour de bon. */
   passee: "L’offre est passée",
