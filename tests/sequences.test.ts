@@ -8,6 +8,7 @@ import { db, schema } from "@/server/db";
 import { plafondsDesMails } from "@/server/limites";
 import { desinscrire, lienDesinscription } from "@/server/relances";
 import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, heureCalme } from "@/server/sequences";
+import type { LevelId } from "@/types";
 import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
 
 /*
@@ -54,13 +55,14 @@ const ilYa = (ms: number) => new Date(Date.now() - ms);
 const pour = (u: Utilisateur) => partis.filter((m) => m.pour === u.email);
 
 /* Une conv lue (son verdict, son rapport débloqué), que les convs des comptes du test recopient : la lire une fois suffit */
-let lu: { verdict: Buffer; rapport: Buffer; prochainPas: string };
+let lu: { verdict: Buffer; rapport: Buffer; memoire: Buffer; prochainPas: string };
 beforeAll(async () => {
   const lecteur = await compteDeTest("sequence-lecteur", "debloque");
   const conv = await histoireLue(lecteur, "01-a-deux-doigts.txt");
   const [v] = await db().select({ data: schema.verdicts.data }).from(schema.verdicts).where(eq(schema.verdicts.storyId, conv.id));
   const [r] = await db().select({ data: schema.reports.data }).from(schema.reports).where(eq(schema.reports.storyId, conv.id));
-  lu = { verdict: v!.data, rapport: r!.data!, prochainPas: coffre.lire("verdicts.data", v!.data).sortie.prochain_pas! };
+  const [m] = await db().select({ data: schema.memories.data }).from(schema.memories).where(eq(schema.memories.storyId, conv.id));
+  lu = { verdict: v!.data, rapport: r!.data!, memoire: m!.data, prochainPas: coffre.lire("verdicts.data", v!.data).sortie.prochain_pas! };
   await poserLeCompteur(0);
 }, 60_000);
 beforeEach(() => {
@@ -72,17 +74,25 @@ afterEach(() => poserLeCompteur(0));
 type Emoji = "🔥" | "🤏" | "🤔" | "🧊";
 
 /**
- * Un compte et sa conv (Hugo, il, parle de Sophie), son verdict (`emoji`, `alerte`) et son rapport écrits, débloquée il y
- * a `debloque`. `pronom` : celui de l’utilisateur.
+ * Un compte et sa conv (Hugo, il, parle de Sophie), son verdict (`emoji`, `alerte`, `niveau`) et son rapport écrits,
+ * débloquée il y a `debloque`. `pronom` : celui de l’utilisateur ; `bulles` : son solde.
  */
 async function client(
   prefixe: string,
-  { debloque = 25 * HEURE, emoji = "🤏", alerte = false, pronom = "il" }: { debloque?: number; emoji?: Emoji; alerte?: boolean; pronom?: "il" | "elle" } = {},
+  {
+    debloque = 25 * HEURE,
+    emoji = "🤏",
+    alerte = false,
+    pronom = "il",
+    niveau = "voit",
+    bulles = 0,
+  }: { debloque?: number; emoji?: Emoji; alerte?: boolean; pronom?: "il" | "elle"; niveau?: LevelId; bulles?: number } = {},
 ) {
   const u = await compteDeTest(prefixe);
   const conv = (await convPrete(u, "01-a-deux-doigts.txt", { moi: "Hugo", pronom })).id;
+  if (bulles) await db().update(schema.users).set({ bulles }).where(eq(schema.users.id, u.id));
   const v = coffre.lire("verdicts.data", lu.verdict);
-  const sortie = { ...v.sortie, emoji, ...(alerte && { alerte: "danger" as const, mode_sobre: true }) };
+  const sortie = { ...v.sortie, emoji, niveau, ...(alerte && { alerte: "danger" as const, mode_sobre: true }) };
   await db()
     .insert(schema.verdicts)
     .values({ storyId: conv, data: coffre.ecrire("verdicts.data", { ...v, sortie }) });
@@ -274,6 +284,139 @@ describe("S4 · les bulles", () => {
     await passer();
     expect(pour(lui.u).map((m) => m.sujet)).toEqual(["je t’ai pas oublié"]);
     expect(pour(elle.u).map((m) => m.sujet)).toEqual(["je t’ai pas oubliée"]);
+  });
+});
+
+describe("S5 · le chat endormi", () => {
+  it("7 jours sans un mot au chat, encore des bulles : leur niveau, trois réponses à une touche ; une fois par silence", async () => {
+    const { u, conv } = await client("sequence-j7", { debloque: 9 * 24 * HEURE, bulles: 5 });
+    await auChat(conv, 8 * 24 * HEURE);
+    await passer();
+    const [m, ...autres] = pour(u);
+    expect(autres).toEqual([]);
+    expect(m!.sujet).toBe("7 jours");
+    expect(m!.html).toContain("vous en êtes où, toi et Sophie");
+    expect(m!.html).toContain(`/ouvrir/${conv}?dire=on%20se%20l%E2%80%99est%20dit%C2%A0!%20`);
+    await db()
+      .update(schema.envoisMails)
+      .set({ envoyeLe: ilYa(2 * 24 * HEURE) })
+      .where(eq(schema.envoisMails.userId, u.id));
+    await passer();
+    expect(pour(u)).toHaveLength(1);
+  });
+
+  it("sans bulles, ou après un 🧊 : rien ; un couple à J+7 : pas ce mail-là (écarté)", async () => {
+    const sec = await client("sequence-j7-sec", { debloque: 9 * 24 * HEURE });
+    const glace = await client("sequence-j7-glace", { debloque: 9 * 24 * HEURE, emoji: "🧊", bulles: 5 });
+    const couple = await client("sequence-j7-couple", { debloque: 9 * 24 * HEURE, niveau: "va", bulles: 5 });
+    await passer();
+    expect([...pour(sec.u), ...pour(glace.u), ...pour(couple.u)]).toEqual([]);
+    expect(await envois(couple.u)).toEqual([{ cle: "s5_endormi", parti: false }]);
+  });
+
+  it("21 jours : « parfait, ou abandonné ? »", async () => {
+    const { u } = await client("sequence-j21", { debloque: 22 * 24 * HEURE, bulles: 3 });
+    await passer();
+    expect(pour(u).map((m) => m.sujet)).toEqual(["parfait, ou abandonné\u00a0?"]);
+    expect(pour(u)[0]!.html).toContain("t’as encore 3&nbsp;bulles");
+  });
+
+  it("un couple, un mois après son rapport : sa température d’alors", async () => {
+    const { u } = await client("sequence-couple", { debloque: 31 * 24 * HEURE, niveau: "coince", bulles: 3 });
+    await passer();
+    const [m] = pour(u);
+    expect(m!.sujet).toBe("un mois déjà");
+    expect(m!.html).toContain("vous étiez à «&nbsp;ça coince&nbsp;»");
+  });
+});
+
+describe("S6 · les offres gardées, S7 · après un 🧊", () => {
+  it("le −50 % gardé qui finit dans deux jours : son prix, sa fin, et la page d’une nouvelle conv", async () => {
+    const { u } = await client("sequence-garde", { debloque: 10 * 24 * HEURE });
+    await db()
+      .insert(schema.offresUniques)
+      .values({ userId: u.id, offre: "garde_second", montreeLe: ilYa(5 * 24 * HEURE), expireLe: new Date(Date.now() + 2 * 24 * HEURE) });
+    await passer();
+    const [m] = pour(u);
+    expect(m!.sujet).toMatch(/^ton −50\u00a0% saute (lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)$/);
+    expect(m!.html).toContain("6,95&nbsp;€");
+    expect(m!.html).toContain(`href="${new URL(lienDesinscription(u.id)).origin}/commencer"`);
+    expect(m!.html).toContain("Plus d’offres comme ça");
+  });
+
+  it("le rapport d’avance payé qui dort depuis une semaine : jusqu’à quand il vaut", async () => {
+    const { u } = await client("sequence-avance", { debloque: 10 * 24 * HEURE });
+    await db()
+      .insert(schema.achats)
+      .values({ userId: u.id, storyId: null, offre: "second", centimes: 695, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: ilYa(8 * 24 * HEURE) });
+    await passer();
+    const [m] = pour(u);
+    expect(m!.sujet).toBe("t’as un rapport payé qui dort");
+    expect(m!.html).toContain("Plus de rappels comme ça");
+    expect(m!.texte).toMatch(/jusqu’au \d{1,2} [a-zéû]+ \d{4}/);
+  });
+
+  it("trois semaines après un 🧊, sans nouvelle conv : rien de l’ancienne histoire ; avec une nouvelle conv, rien", async () => {
+    const glace = await client("sequence-s7", { debloque: 22 * 24 * HEURE, emoji: "🧊" });
+    const repartie = await client("sequence-s7-nouvelle", { debloque: 22 * 24 * HEURE, emoji: "🧊" });
+    await convPrete(repartie.u, "01-a-deux-doigts.txt", { moi: "Hugo" });
+    const chaud = await client("sequence-s7-chaud", { debloque: 22 * 24 * HEURE, emoji: "🔥" });
+    await passer();
+    const [m] = pour(glace.u);
+    expect(m!.sujet).toBe("trois semaines déjà");
+    expect(m!.html).not.toMatch(/Sophie|Hugo/);
+    expect([...pour(repartie.u), ...pour(chaud.u)]).toEqual([]);
+  });
+});
+
+describe("S8 · son anniversaire", () => {
+  /* La recherche des anniversaires, deux fois par jour au plus : remise à zéro pour chaque test */
+  const ANNIVERSAIRES = empreinte("limite:sequences:anniversaires");
+  beforeEach(() => db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, ANNIVERSAIRES)));
+
+  /** Sa fiche (la mémoire lue), un fait en plus. */
+  async function ficheAvec(conv: string, texte: string) {
+    const memoire = coffre.lire("memories.data", lu.memoire);
+    const faits = [...memoire.etat.fiche.faits, { section: "dates" as const, texte, preuves: [], statut: "nouveau" as const }];
+    await db()
+      .insert(schema.memories)
+      .values({ storyId: conv, data: coffre.ecrire("memories.data", { ...memoire, etat: { ...memoire.etat, fiche: { ...memoire.etat.fiche, faits } } }) });
+  }
+
+  /** Le jour et le mois à Paris, dans `jours` jours : « 23/10 ». */
+  const dansJours = (jours: number) => {
+    const [, m, j] = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(new Date(Date.now() + jours * 24 * HEURE))
+      .split("-");
+    return `${j}/${m}`;
+  };
+
+  it("dans trois jours, une date entière dans sa fiche : le rappel, une fois ; le bouton écrit sa demande", async () => {
+    const { u, conv } = await client("sequence-anniv", { debloque: 40 * 24 * HEURE, bulles: 4 });
+    await ficheAvec(conv, `Son anniversaire : ${dansJours(3)}`);
+    await passer();
+    const [m, ...autres] = pour(u);
+    expect(autres).toEqual([]);
+    expect(m!.sujet).toMatch(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche), t’as un truc à pas rater$/);
+    expect(m!.html).toContain("c’est l’anniv de Sophie 🎂");
+    expect(m!.html).toContain(`/ouvrir/${conv}?dire=${encodeURIComponent("écris-moi son message d’anniv 🎂")}`);
+    expect(m!.texte).not.toContain("Sophie");
+    await db()
+      .update(schema.envoisMails)
+      .set({ envoyeLe: ilYa(2 * 24 * HEURE) })
+      .where(eq(schema.envoisMails.userId, u.id));
+    await db().delete(schema.rateLimits).where(eq(schema.rateLimits.key, ANNIVERSAIRES));
+    await passer();
+    expect(pour(u)).toHaveLength(1);
+  });
+
+  it("dans dix jours, ou sans date entière : rien", async () => {
+    const loin = await client("sequence-anniv-loin", { debloque: 40 * 24 * HEURE });
+    await ficheAvec(loin.conv, `Son anniversaire : ${dansJours(10)}`);
+    const flou = await client("sequence-anniv-flou", { debloque: 40 * 24 * HEURE });
+    await ficheAvec(flou.conv, "Son anniv est en mars");
+    await passer();
+    expect([...pour(loin.u), ...pour(flou.u)]).toEqual([]);
   });
 });
 
