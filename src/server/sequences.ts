@@ -40,13 +40,14 @@ import { envoyerMail, refusDuPrestataire } from "./email";
 import { boiteAMails, env } from "./env";
 import { histoireDe, metaDe, quiRempli, type Meta } from "./histoires";
 import { entre } from "./invitations";
-import { journal, journalErreur } from "./journal";
-import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
+import { alerter } from "./alertes";
+import { auMieux, journal, journalErreur } from "./journal";
+import { LIMITES, rendre, sousLaLimite } from "./limites";
 import { mailDeSequence } from "./mail-sequence";
 import { montrer, rouvrirLaSuite } from "./offres-uniques";
 import { suiteVendable } from "./paiement/commande";
 import { lienDeParrainage } from "./parrainage";
-import { lienDesinscription, RELANCES_DU_JOUR } from "./relances";
+import { entetesDeDesinscription, lienDesinscription } from "./relances";
 import { rechargeDejaPayee } from "./achats";
 
 /*
@@ -83,8 +84,11 @@ import { rechargeDejaPayee } from "./achats";
  * - jamais à l’équipe, ni à qui la bêta fermée ne laisse pas entrer, ni sur une conv en alerte (le mode sobre), ni sans
  *   « Qui es-tu ? » rempli (ni prénom ni pronom à accorder) ;
  * - les conseils s’arrêtent à users.conseils_coupes_le, les offres à users.relances_coupees_le (le lien de leur pied) ;
- * - dans le plafond des relances du jour, qu’ils partagent avec la relance (passée avant eux, au même passage), puis dans
- *   le quota des mails (sorte « relance »).
+ * - un garde-fou de LIMITES.sequencesParJour (300) par 24 h, contre un envoi anormal (l’équipe prévenue), puis le quota
+ *   des mails du prestataire (sorte « relance ») ; plus le plafond de la relance (décidé le 17 octobre : s’il en faut 60,
+ *   il en part 60) ;
+ * - la désinscription en un clic dans leurs en-têtes (List-Unsubscribe, entetesDeDesinscription), que Gmail et Yahoo
+ *   montrent à côté de l’expéditeur : moins de signalements de spam, la délivrabilité du domaine gardée.
  * Envoyés par GET /api/cron/relances (Vercel Cron, toutes les 5 minutes), juste après les relances.
  * TODO(produit): à relire par un juriste : des mails commerciaux (S4, S6, S7) à des clients, pour des services analogues
  * (article L34-5 du Code des postes et des communications électroniques), et leur lien de désinscription.
@@ -96,8 +100,11 @@ const HEURES_CALMES = { de: 23, a: 8 } as const;
 /** Entre deux mails des séquences au même compte, au moins ce temps : un par jour, à quelques heures près. */
 export const ECART_ENTRE_DEUX_MAILS_MS = 20 * 3600e3;
 
-/** Au plus, les mails des séquences partis d’un passage (le plafond du jour les arrête souvent avant). */
+/** Au plus, les mails des séquences partis d’un passage des 5 minutes : les suivants partent au passage d’après. */
 const MAILS_PAR_PASSAGE = 50;
+
+/* Le compteur des mails des séquences partis en 24 h : le garde-fou LIMITES.sequencesParJour */
+const SEQUENCES_DU_JOUR = "sequences:mails";
 
 const HEURE = 3600e3;
 const JOUR = 24 * HEURE;
@@ -715,8 +722,8 @@ function liensDe(c: Candidat, m: MailDeSequence) {
 /**
  * Envoie les mails des séquences dus (voir l’en-tête), un par compte au plus, et dit ce qu’il a fait en nombres
  * seulement. Un compte a un seul mail par passage : la réponse prête d’abord, puis S3, son anniversaire (S8), les
- * bulles, les offres gardées (S6), le chat endormi (S5), et après un 🧊 (S7). Le plafond du
- * jour atteint, ou le quota des mails, arrête le passage : le mail non parti est oublié, il repartira au passage suivant
+ * bulles, les offres gardées (S6), le chat endormi (S5), et après un 🧊 (S7). Le garde-fou du jour atteint, ou le quota
+ * des mails, arrête le passage : le mail non parti est oublié, il repartira au passage suivant
  * (tant que sa fenêtre est ouverte). De même quand le prestataire le refuse sans regarder l’adresse (refusDuPrestataire).
  * Une adresse refusée, ou un mail perdu en route (il a pu partir), compte comme fait. `maintenant` : pour les heures
  * calmes (les tests).
@@ -774,15 +781,28 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
       passage.ecartes++;
       continue;
     }
-    if (!boite && !(await sousLaLimite(RELANCES_DU_JOUR, plafondsDesMails().relances))) {
-      await rendre(RELANCES_DU_JOUR);
+    /* Le garde-fou du jour : au-delà, un envoi anormal (un bug qui écrirait à toute la base), l’équipe prévenue une fois */
+    if (!boite && !(await sousLaLimite(SEQUENCES_DU_JOUR, LIMITES.sequencesParJour))) {
+      await rendre(SEQUENCES_DU_JOUR);
       await oublierLEnvoi(c.userId, c.cle, c.occasion);
       passage.retenus = dus.length - k;
+      await auMieux(
+        () =>
+          alerter("garde-fou des séquences atteint", [
+            `${LIMITES.sequencesParJour.max} mails des séquences sont partis en 24 h : les suivants attendent.`,
+            "Un volume normal ? Relève LIMITES.sequencesParJour (src/server/limites.ts).",
+          ]),
+        "alerte du garde-fou non envoyée",
+      );
       break;
     }
     let parti: boolean;
     try {
-      parti = await envoyerMail(c.email, mailDeSequence(mail, { base: env().BLUSH_URL, liens: liensDe(c, mail) }), { sorte: "relance" });
+      parti = await envoyerMail(
+        c.email,
+        { ...mailDeSequence(mail, { base: env().BLUSH_URL, liens: liensDe(c, mail) }), entetes: entetesDeDesinscription(c.userId, MAILS[c.cle]) },
+        { sorte: "relance" },
+      );
     } catch (e) {
       journalErreur("séquence : mail refusé", e);
       if (refusDuPrestataire(e)) parti = false;
@@ -793,7 +813,7 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
     }
     if (!parti) {
       await oublierLEnvoi(c.userId, c.cle, c.occasion);
-      if (!boite) await rendre(RELANCES_DU_JOUR);
+      if (!boite) await rendre(SEQUENCES_DU_JOUR);
       passage.retenus = dus.length - k;
       break;
     }
