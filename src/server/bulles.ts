@@ -22,7 +22,7 @@ import { reponseDuCompte } from "./historique";
  */
 
 /** Une transaction de drizzle, ou la base : de quoi écrire un mouvement dans la transaction d’un autre (livrer, reprendre). */
-type Executeur = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+export type Executeur = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 
 /** Le compte d’une dépense : son id, et son email (l’équipe ne paie pas). */
 type Compte = Pick<Utilisateur, "id" | "email">;

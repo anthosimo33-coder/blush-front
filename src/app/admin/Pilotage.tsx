@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
+import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
@@ -125,6 +126,7 @@ export function Pilotage({
           <ChiffresCles s={s} />
           <Tunnel p={p} jours={s.jours} />
           <HautsDuPaywall p={p} />
+          <MailsDesSequences p={p} />
 
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Sources p={p} />
@@ -575,6 +577,72 @@ function HautsDuPaywall({ p }: { p: Chiffres }) {
         </div>
       ) : (
         <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun paywall vu sur la période.</p>
+      )}
+    </Bloc>
+  );
+}
+
+/* ———— Les mails des séquences ———— */
+
+function MailsDesSequences({ p }: { p: Chiffres }) {
+  const envoyes = p.mails.reduce((t, m) => t + m.envoyes, 0);
+  const lignes = p.mails.filter((m) => m.envoyes || m.clics || m.payes);
+  const maxEnvoyes = Math.max(1, ...lignes.map((m) => m.envoyes));
+  return (
+    <Bloc
+      id="mails"
+      titre="Les mails des séquences"
+      sous="Partis, touchés, et payés dans les 3 jours"
+      aide={{ cle: "mails", valeur: pluriel(envoyes, "mail parti", "mails partis"), contexte: "sur la période" }}
+    >
+      {lignes.length ? (
+        <div role="region" aria-label="Les mails des séquences, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[560px] border-collapse text-left">
+            <caption className="sr-only">Les mails des séquences, leurs envois, leurs clics et les paiements qui ont suivi</caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 font-black">
+                  Mail
+                </th>
+                <th scope="col" className="w-[26%] pb-2.5 font-black">
+                  Envoyés
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Clics
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Payés
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Taux de clic
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((m) => {
+                const taux = rapport(m.clics, m.envoyes);
+                return (
+                  <tr key={m.cle} className="border-t border-sep text-detail font-extrabold">
+                    <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                      {NOMS_DES_MAILS[m.cle]}
+                    </th>
+                    <td className="py-3 pr-3">
+                      <span className="flex items-center gap-2.5">
+                        <Barre part={m.envoyes / maxEnvoyes} couleur="var(--elle)" />
+                        <span className="min-w-[40px] text-right tabular-nums">{nombre(m.envoyes)}</span>
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(m.clics)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(m.payes)}</td>
+                    <td className="py-3 text-right tabular-nums">{taux === null ? "—" : pourcent(taux * 100)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun mail des séquences parti sur la période.</p>
       )}
     </Bloc>
   );

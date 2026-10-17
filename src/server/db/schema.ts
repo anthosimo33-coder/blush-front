@@ -76,6 +76,16 @@ export const users = pgTable("users", {
    */
   conseilsCoupesLe: quand("conseils_coupes_le"),
   /**
+   * Son code de parrainage (src/server/parrainage.ts) : le lien /p/<code> qu’elle donne à une amie. Créé la première fois
+   * qu’on le lui montre ; rien de la conv, rien de son email.
+   */
+  codeParrainage: text("code_parrainage").unique(),
+  /**
+   * La marraine : le compte dont le lien de parrainage a mené à la création de ce compte (le cookie de /p/<code>), ou
+   * null. Au premier rapport payé de ce compte, chacune reçoit ses bulles (src/server/parrainage.ts).
+   */
+  parrainId: uuid("parrain_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  /**
    * D’où il est venu (SOURCES_VISITE) : la source de sa visite du jour, retrouvée à la création du compte par l’empreinte
    * anonyme de sa connexion (src/server/visites.ts). null : un compte d’avant le suivi des visites, ou sa visite pas
    * retrouvée. Le tableau de bord en tire les ventes par source.

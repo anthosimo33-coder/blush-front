@@ -96,6 +96,12 @@ export const ECART_OFFRES_UNIQUES_MS = 24 * 3600 * 1000;
  */
 export const COUT_EN_BULLES = { reponse: 1, vocal: 2, ajout: 3 } as const;
 
+/**
+ * Le parrainage (src/server/parrainage.ts) : au premier rapport payé de la filleule (venue par le lien de sa marraine),
+ * chacune reçoit ces bulles, une fois (décidé le 17 octobre : 10 bulles chacune).
+ */
+export const PARRAINAGE = { bulles: 10 } as const;
+
 /** Les bulles données aux testeurs de la bêta (users.plan « rapport », ou l’ancien accès au chat), une fois. */
 export const BULLES_DE_LA_BETA = 100;
 

@@ -5,6 +5,8 @@ import { POST as postPresence } from "@/app/api/presence/route";
 import { db, schema } from "@/server/db";
 import { direct } from "@/server/direct";
 import { purger } from "@/server/purge";
+import { compterUnClicDeMail } from "@/server/compteurs";
+import { CLES_DES_MAILS } from "@/server/sequences";
 import { statsAdmin } from "@/server/stats";
 import { aujourdhuiParis } from "@/server/temps";
 import { noterAchatAuFil, noterAuFil, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
@@ -188,5 +190,33 @@ describe("la purge garde peu", () => {
         .from(schema.selsDesVisites)
         .where(and(eq(schema.selsDesVisites.jour, aujourdhuiParis().iso), gte(schema.selsDesVisites.jour, "2001-01-02"))),
     ).toHaveLength(1);
+  });
+});
+
+describe("les mails des séquences (/admin)", () => {
+  it("par mail : partis (sans les écartés), boutons touchés, et payés dans les 3 jours", async () => {
+    const avant = (await statsAdmin(7)).pilotage.mails;
+    const u = await compteDeTest("pilotage-mails");
+    const autre = await compteDeTest("pilotage-mails-autre");
+    const ilYa = (heures: number) => new Date(Date.now() - heures * 3600e3);
+    await db()
+      .insert(schema.envoisMails)
+      .values([
+        { userId: u.id, cle: "s3_repondre", occasion: "a", envoyeLe: ilYa(30) },
+        { userId: autre.id, cle: "s3_repondre", occasion: "b", envoyeLe: ilYa(30) },
+        { userId: autre.id, cle: "s3_pas", occasion: "c", parti: false, envoyeLe: ilYa(30) },
+      ]);
+    /* Le premier paie le lendemain du mail ; l’autre, rien */
+    await db()
+      .insert(schema.achats)
+      .values({ userId: u.id, offre: "pack80", centimes: 1390, bulles: 80, fournisseur: "factice", statut: "paye", payeLe: ilYa(10) });
+    await compterUnClicDeMail("s3_repondre");
+    const apres = (await statsAdmin(7)).pilotage.mails;
+    const de = (cle: string, l: typeof avant) => l.find((m) => m.cle === cle)!;
+    expect(apres.map((m) => m.cle)).toEqual(CLES_DES_MAILS);
+    expect(de("s3_repondre", apres).envoyes - de("s3_repondre", avant).envoyes).toBe(2);
+    expect(de("s3_repondre", apres).payes - de("s3_repondre", avant).payes).toBe(1);
+    expect(de("s3_repondre", apres).clics - de("s3_repondre", avant).clics).toBe(1);
+    expect(de("s3_pas", apres).envoyes - de("s3_pas", avant).envoyes).toBe(0);
   });
 });

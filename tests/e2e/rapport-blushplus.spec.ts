@@ -15,6 +15,7 @@ import {
   suivreLeDefilement,
   surOrdinateur,
   test,
+  sql,
   titreDuChapitre,
   URL_APPLI,
 } from "./aide";
@@ -26,6 +27,9 @@ import {
  */
 
 const SUJET_PRET = "📖 ton rapport est prêt. j’ai pas été tendre";
+
+/** Les boutons du mail « prochain pas » touchés aujourd’hui (counters, « mail:s3_pas ») : d’autres tests en ajoutent aussi. */
+const clicsDuMail = async () => Number((await sql()<{ n: string | null }[]>`select sum(count) as n from counters where key = 'mail:s3_pas'`)[0]?.n ?? 0);
 
 test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question sont à portée, et le mail « prêt » mène au rapport", async ({ page, autreAppareil }, testInfo) => {
   const email = await lectureComplete(page, testInfo);
@@ -98,8 +102,11 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
   });
 
   await test.step("un bouton à une touche des mails des séquences : le chat, le texte déjà tapé, jamais envoyé seul", async () => {
-    await page.goto(`${lien}?dire=${encodeURIComponent("c’est fait\u00a0! ")}`);
+    const avant = await clicsDuMail();
+    await page.goto(`${lien}?m=s3_pas&dire=${encodeURIComponent("c’est fait\u00a0! ")}`);
     await expect(page).toHaveURL(/\/app$/);
+    /* Le bouton du mail est compté (/admin) ; l’autre navigateur, en même temps, peut en compter un aussi */
+    expect(await clicsDuMail()).toBeGreaterThanOrEqual(avant + 1);
     await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toHaveValue("c’est fait\u00a0! ");
   });
 

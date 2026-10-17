@@ -26,6 +26,8 @@ export const CLES = {
   importPartage: "import_partage",
   /** Une image « Partager en image » (une réponse du chat, la chute d’un chapitre). */
   imagePartagee: "image_partagee",
+  /** Le lien de parrainage d’une amie ouvert (/p/<code>, src/server/parrainage.ts). */
+  lienParrainage: "parrainage_lien",
 } as const;
 export type Cle = (typeof CLES)[keyof typeof CLES];
 
@@ -77,6 +79,26 @@ export const HAUT = "haut:";
 /** Compte un titre du haut du paywall, vu ou payé, aujourd’hui (jour de Paris), sans rien faire échouer. */
 export async function compterLeHaut(genre: GenreDuHaut, quoi: "vu" | "paye"): Promise<void> {
   const key = `${HAUT}${quoi}:${genre}`;
+  await auMieux(
+    () =>
+      db()
+        .insert(schema.counters)
+        .values({ day: sql`(now() at time zone 'Europe/Paris')::date`, key, count: 1 })
+        .onConflictDoUpdate({ target: [schema.counters.day, schema.counters.key], set: { count: sql`${schema.counters.count} + 1` } }),
+    "compteur non noté",
+    { cle: key },
+  );
+}
+
+/**
+ * Le début de la clé d’un compteur des mails des séquences (src/server/sequences.ts) : « mail:<clé du mail> », un bouton
+ * de ce mail touché (son lien porte `?m=<clé>`, lu par /ouvrir/<conv> et /commencer). Des comptes par jour, sans le compte.
+ */
+export const MAIL = "mail:";
+
+/** Compte un bouton touché d’un mail des séquences (`mail` : sa clé, déjà vérifiée), aujourd’hui (jour de Paris), sans rien faire échouer. */
+export async function compterUnClicDeMail(mail: string): Promise<void> {
+  const key = `${MAIL}${mail}`;
   await auMieux(
     () =>
       db()

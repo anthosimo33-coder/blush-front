@@ -120,6 +120,8 @@ async function candidates(): Promise<Candidate[]> {
  */
 export async function envoyerLesRelances(): Promise<PassageDesRelances> {
   const passage: PassageDesRelances = { dues: 0, envoyees: 0, ecartees: 0, retenues: 0, echecs: 0 };
+  /* Les mails aux prospects allumés : S1 (src/server/sequences.ts) remplace la relance, deux heures après le paywall */
+  if (env().BLUSH_MAILS_PROSPECTS) return passage;
   const boite = boiteAMails();
   const o = schema.offresUniques;
   const dues = await candidates();
