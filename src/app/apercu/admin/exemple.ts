@@ -131,7 +131,14 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { cle: "s6_avance", envoyes: 3, clics: 1, payes: 1 },
       { cle: "s7_glace", envoyes: 5, clics: 1, payes: 0 },
       { cle: "s8_anniv", envoyes: 2, clics: 2, payes: 0 },
+      { cle: "s1_haut", envoyes: 140, clics: 41, payes: 12 },
+      { cle: "s1_chapitres", envoyes: 96, clics: 22, payes: 5 },
+      { cle: "s1_derniere", envoyes: 38, clics: 14, payes: 6 },
+      { cle: "s2_heure", envoyes: 52, clics: 11, payes: 2 },
+      { cle: "s2_peur", envoyes: 40, clics: 6, payes: 1 },
+      { cle: "s2_question", envoyes: 31, clics: 5, payes: 0 },
     ],
+    abDerniere: { avec: { n: 38, payes: 6 }, sans: { n: 41, payes: 3 } },
     iaDuJour: { dollars: 12.4, budget: 30 },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }

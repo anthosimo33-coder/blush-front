@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import {
   mailAnniversaire,
@@ -7,6 +8,7 @@ import {
   mailEndormi,
   mailGarde,
   mailChapitres,
+  mailDerniereChance,
   mailGlace,
   mailHautDuPaywall,
   mailParfait,
@@ -41,7 +43,8 @@ import { entre } from "./invitations";
 import { journal, journalErreur } from "./journal";
 import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { mailDeSequence } from "./mail-sequence";
-import { montrer } from "./offres-uniques";
+import { montrer, rouvrirLaSuite } from "./offres-uniques";
+import { suiteVendable } from "./paiement/commande";
 import { lienDeParrainage } from "./parrainage";
 import { lienDesinscription, RELANCES_DU_JOUR } from "./relances";
 import { rechargeDejaPayee } from "./achats";
@@ -60,9 +63,9 @@ import { rechargeDejaPayee } from "./achats";
  * - S1, le paywall vu sans payer : H+2 le titre de son paywall et ses chiffres, J+1 ses 8 chapitres. Ils remplacent la
  *   relance ② (src/server/relances.ts), qui s’arrête quand ils s’allument. Des offres.
  * - S2, un compte sans conv : H+1, J+1, J+4, vers une nouvelle conv. Des offres.
+ *   J+6, la « dernière fois », en A/B (groupeDuJ6) : la moitié reçoit la one time offer ① rouverte jusqu’à après-demain
+ *   minuit (rouvrirLaSuite), l’autre rien (le témoin).
  * S1 J+3, une réponse offerte, est abandonnée (le 17 octobre : pas rentable).
- * TODO(produit): S1 J+6, le rapport à −3 € deux jours en A/B : rouvrir la ① (src/server/offres-uniques.ts, 5 minutes une
- * seule fois) jusqu’à sa fin, l’écran de paiement qui la montre dès le lien du mail, son compte à rebours en jours.
  * Le lot 2 :
  * - S5, le chat endormi, sur la dernière conv débloquée, à qui il reste des bulles : 7 jours sans un mot au chat (leur
  *   niveau, avant d’être ensemble), 21 jours (« parfait, ou abandonné ? »), et un couple chaque mois depuis le rapport
@@ -121,6 +124,7 @@ const MAILS = {
   s8_anniv: "conseils",
   s1_haut: "offres",
   s1_chapitres: "offres",
+  s1_derniere: "offres",
   s2_heure: "offres",
   s2_peur: "offres",
   s2_question: "offres",
@@ -586,7 +590,14 @@ async function candidatsS8(): Promise<Candidat[]> {
 }
 
 /** Les fenêtres de S1, depuis son arrivée au paywall, et de S2, depuis la création du compte. */
-const FENETRES_S1 = { s1_haut: [2 * HEURE, 2 * JOUR], s1_chapitres: [1 * JOUR, 3 * JOUR] } as const;
+const FENETRES_S1 = { s1_haut: [2 * HEURE, 2 * JOUR], s1_chapitres: [1 * JOUR, 3 * JOUR], s1_derniere: [6 * JOUR, 8 * JOUR] } as const;
+
+/**
+ * L’A/B de S1 J+6 (décidé le 17 octobre) : la moitié des comptes, tirée une fois pour toutes de leur identifiant, reçoit
+ * la « dernière fois » (la ① rouverte deux jours) ; l’autre moitié, le groupe témoin, rien. /admin compare leurs achats.
+ */
+export const groupeDuJ6 = (userId: string): "avec" | "sans" =>
+  Number.parseInt(createHash("sha256").update(`ab:s1_derniere:${userId}`).digest("hex").slice(0, 8), 16) % 2 === 0 ? "avec" : "sans";
 const FENETRES_S2 = { s2_heure: [1 * HEURE, 1 * JOUR], s2_peur: [1 * JOUR, 3 * JOUR], s2_question: [4 * JOUR, 6 * JOUR] } as const;
 
 /**
@@ -599,11 +610,11 @@ async function candidatsS1(): Promise<Candidat[]> {
   const { rows } = await db().execute<{ user_id: string; email: string; story_id: string; age_ms: number; envoyes: string }>(sql`
     select distinct on (u.id) u.id as user_id, u.email, s.id as story_id,
       (extract(epoch from now() - t.updated_at) * 1000)::float8 as age_ms,
-      coalesce((select string_agg(e.cle, ',') from ${e} e where e.user_id = u.id and e.occasion = s.id::text), '') as envoyes
+      coalesce((select string_agg(e.cle, ',') from ${e} e where e.user_id = u.id and e.occasion in (s.id::text, s.id::text || ':temoin')), '') as envoyes
     from ${s} s
     join ${u0} u on u.id = s.user_id
     join ${t} t on t.story_id = s.id and t.kind = 'verdict' and t.status = 'paiement'
-    where s.debloque_le is null and t.updated_at <= now() - interval '2 hours' and t.updated_at > now() - interval '3 days'
+    where s.debloque_le is null and t.updated_at <= now() - interval '2 hours' and t.updated_at > now() - interval '8 days'
       and u.relances_coupees_le is null and not ${MAIL_RECENT}
       and not exists (select 1 from ${a} a where a.story_id = s.id and a.statut = 'paye')
     order by u.id, t.updated_at desc`);
@@ -623,6 +634,21 @@ async function candidatsS1(): Promise<Candidat[]> {
         },
       });
     if (dans("s1_chapitres")) candidats.push({ ...base, cle: "s1_chapitres", ecrire: async (p) => mailChapitres(p) });
+    /* J+6 : le groupe « avec » reçoit la ① rouverte ; le groupe témoin est noté (écarté), pour que /admin compare */
+    if (dans("s1_derniere")) {
+      const avec = groupeDuJ6(l.user_id) === "avec";
+      candidats.push({
+        ...base,
+        cle: "s1_derniere",
+        occasion: avec ? l.story_id : `${l.story_id}:temoin`,
+        ecrire: async (p) => {
+          const compte = { id: l.user_id, email: l.email };
+          if (!avec || !(await suiteVendable(compte, l.story_id))) return null;
+          const fin = await rouvrirLaSuite(compte, l.story_id);
+          return fin ? mailDerniereChance(p, { jour: aParis(fin).jour }) : null;
+        },
+      });
+    }
     return candidats;
   });
 }
@@ -678,7 +704,8 @@ function liensDe(c: Candidat, m: MailDeSequence) {
     if (c.cle === "s3_vocal") return ouvrir;
     if (VERS_UNE_NOUVELLE_CONV.includes(c.cle)) return `${ouvrir}&nouvelle=1`;
     if (c.cle === "s3_parrainage") return `${ouvrir}&parrainage=1`;
-    if (c.cle === "s1_haut" || c.cle === "s1_chapitres") return `${ouvrir}&paiement=1`;
+    if (c.cle === "s1_derniere") return `${ouvrir}&paywall=1&offre=1`;
+    if (c.cle === "s1_haut" || c.cle === "s1_chapitres") return `${ouvrir}&paywall=1`;
     if (MAILS[c.cle] === "offres") return `${ouvrir}&recharger=1`;
     return `${ouvrir}&dire=${encodeURIComponent(b.dire ?? "")}`;
   });

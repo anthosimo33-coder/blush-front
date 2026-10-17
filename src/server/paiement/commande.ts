@@ -285,19 +285,7 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
   const rien = { offre: null } as const;
   if (!f) return rien;
   if (offre === "suite") {
-    if (!storyId) return rien;
-    const [s] = await db()
-      .select({ debloqueLe: schema.stories.debloqueLe })
-      .from(schema.stories)
-      .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
-    if (!s || s.debloqueLe) return rien;
-    /* Une conv en alerte ne se vend pas (convEnAlerte) */
-    if (await convEnAlerte(storyId)) return rien;
-    /* Le compte a déjà mieux pour cette conv : son rapport d’avance (0 €) ou le −50 % gardé (6,95 €) ; ① (10,90 €) ne se montre pas */
-    const avoirs = await avoirsDuCompte(compte);
-    if (avoirs.avance || avoirs.garde) return rien;
-    /* Un lot gagné à la roue remplace ① : jamais les deux */
-    if (await aGagneALaRoue(compte.id)) return rien;
+    if (!storyId || !(await suiteVendable(compte, storyId))) return rien;
   } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {
     /* ③ complète le rapport seul ; ⑤ suit tout rapport payé ; ⑥ garde le −50 % de ⑤, montrée et pas prise */
     if (!(await justeApresUnRapport(compte.id, achatId, offre === "premium_ajout" ? RAPPORTS_SEULS : RAPPORTS_PAYES))) return rien;
@@ -311,6 +299,24 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
   const enUnGesteGarde = (offre === "premium_ajout" || offre === "second_rapport") && !!(await moyenGarde(compte.id, f.mode));
   const fin = montree.expireLe;
   return { offre, fin: fin?.toISOString() ?? null, reste: fin ? Math.max(0, fin.getTime() - Date.now()) : null, enUnGeste: enUnGesteGarde };
+}
+
+/**
+ * L’offre ① peut-elle se vendre pour cette conv du compte ? Pas débloquée, pas en alerte, et le compte n’a pas mieux
+ * (son rapport d’avance à 0 €, le −50 % gardé à 6,95 €, un lot de la roue : jamais les deux). Le paywall la demande
+ * (proposerOffreUnique) ; le mail J+6 de S1 la rouvre (src/server/sequences.ts).
+ */
+export async function suiteVendable(compte: Compte, storyId: string): Promise<boolean> {
+  const [s] = await db()
+    .select({ debloqueLe: schema.stories.debloqueLe })
+    .from(schema.stories)
+    .where(and(eq(schema.stories.id, storyId), eq(schema.stories.userId, compte.id)));
+  if (!s || s.debloqueLe) return false;
+  /* Une conv en alerte ne se vend pas (convEnAlerte) */
+  if (await convEnAlerte(storyId)) return false;
+  const avoirs = await avoirsDuCompte(compte);
+  if (avoirs.avance || avoirs.garde) return false;
+  return !(await aGagneALaRoue(compte.id));
 }
 
 /** L’achat `achatId` de ce compte est-il un de ces rapports, payé il y a moins de 15 minutes (DUREE_AJOUT_MS) : « C’est débloqué », juste après le paiement ? */

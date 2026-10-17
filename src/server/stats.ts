@@ -138,6 +138,11 @@ export type Pilotage = {
    * période en jours entiers), et ceux après lesquels le compte a payé quelque chose dans les 3 jours.
    */
   mails: { cle: CleDeMail; envoyes: number; clics: number; payes: number }[];
+  /**
+   * L’A/B de S1 J+6 (groupeDuJ6, src/server/sequences.ts) : les comptes arrivés à J+6 sur la période, avec la one time
+   * offer rouverte (le mail parti) ou sans (le témoin), et ceux qui ont payé un rapport dans les 3 jours.
+   */
+  abDerniere: { avec: { n: number; payes: number }; sans: { n: number; payes: number } };
   /** La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars. */
   iaDuJour: { dollars: number; budget: number };
   /**
@@ -357,7 +362,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
-  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi, hauts, envois, clics] = await Promise.all([
+  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi, hauts, envois, clics, ab] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
@@ -418,6 +423,12 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ key: string; n: string }>(
       sql`select key, sum(count) as n from counters where key like ${`${MAIL}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
+    lignes<{ temoin: boolean; n: string; payes: string }>(
+      sql`select e.occasion like '%:temoin' as temoin, count(*) as n,
+            count(*) filter (where exists (select 1 from achats a where a.user_id = e.user_id and a.statut = 'paye' and a.story_id is not null
+              and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
+          from envois_mails e where e.cle = 's1_derniere' and (e.parti or e.occasion like '%:temoin') and ${W("e.envoye_le")} group by 1`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -458,6 +469,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       const e = envois.find((l) => l.cle === cle);
       return { cle, envoyes: n(e?.envoyes), clics: n(clics.find((c) => c.key === `${MAIL}${cle}`)?.n), payes: n(e?.payes) };
     }),
+    abDerniere: {
+      avec: { n: n(ab.find((l) => !l.temoin)?.n), payes: n(ab.find((l) => !l.temoin)?.payes) },
+      sans: { n: n(ab.find((l) => l.temoin)?.n), payes: n(ab.find((l) => l.temoin)?.payes) },
+    },
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour },
     sante: {
       echecs: n(sante.echecs),

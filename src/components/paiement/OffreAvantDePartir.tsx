@@ -12,11 +12,19 @@ import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { PayerDansLaFeuille } from "./integre/PayerDansLaFeuille";
 
-/** Le temps qu’il reste, en minutes et secondes (« 04:59 »). */
+/**
+ * Le temps qu’il reste, en minutes et secondes (« 04:59 ») ; plus d’une heure (la ① rouverte deux jours par le mail J+6
+ * de S1), en heures (« 13 h 05 ») ou en jours (« 1 j 14 h »).
+ */
 export function restant(ms: number) {
   const s = Math.max(0, Math.ceil(ms / 1000));
+  if (s >= 86400) return `${Math.floor(s / 86400)}\u00a0j ${Math.floor((s % 86400) / 3600)}\u00a0h`;
+  if (s >= 3600) return `${Math.floor(s / 3600)}\u00a0h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
+
+/** Le jour d’une heure de fin, à Paris (« jeudi ») : une ① rouverte jusqu’à ce jour-là, minuit. */
+const jourDe = (fin: number) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", timeZone: "Europe/Paris" }).format(fin);
 
 /** Toutes les combien l’horloge avance (le compte à rebours, sa barre). */
 const PAS_MS = 250;
@@ -50,6 +58,9 @@ export function OffreAvantDePartir({
   const titre = useId();
   const idFin = useId();
   const [maintenant, setMaintenant] = useState(() => Date.now());
+  /* Sa durée à l’ouverture : 5 minutes, ou deux jours quand le mail J+6 de S1 l’a rouverte (la barre et la phrase suivent) */
+  const [duree] = useState(() => Math.max(DUREE_SUITE_MS, fin - Date.now()));
+  const longue = duree > DUREE_SUITE_MS + 60_000;
   /* Fermée par « Non merci », le voile ou Échap ; passée (le compte à rebours à zéro, ou le serveur qui ne la vend plus) */
   const [fermee, setFermee] = useState(false);
   const [vendue, setVendue] = useState(true);
@@ -91,7 +102,9 @@ export function OffreAvantDePartir({
           <span className="text-elle-ink">{OFFRE_SUITE.remise}</span>
           {OFFRE_SUITE.apres}
         </h2>
-        <p className="m-0 text-note font-extrabold text-soft [@media(max-height:700px)]:text-legende">{OFFRE_SUITE.sousTitre}</p>
+        <p className="m-0 text-note font-extrabold text-soft [@media(max-height:700px)]:text-legende">
+          {longue ? OFFRE_SUITE.sousTitreJusqua(jourDe(fin)) : OFFRE_SUITE.sousTitre}
+        </p>
       </div>
       <div className="flex flex-col gap-2.5 rounded-[22px] bg-ink px-4 py-3.5 text-white shadow-[0_18px_36px_-18px_rgba(17,17,20,0.7)]">
         <span className="flex items-center justify-between">
@@ -111,7 +124,7 @@ export function OffreAvantDePartir({
           <span
             data-barre=""
             className="block h-full rounded-full bg-[linear-gradient(90deg,#FF9BCB,#E8358A)] transition-[width] duration-300 ease-linear"
-            style={{ width: `${Math.min(100, (100 * reste) / DUREE_SUITE_MS)}%` }}
+            style={{ width: `${Math.min(100, (100 * reste) / duree)}%` }}
           />
         </span>
       </div>

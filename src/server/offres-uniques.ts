@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gt, notInArray, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, notInArray, sql } from "drizzle-orm";
 import { DUREE_AJOUT_MS, DUREE_GARDE_MS, DUREE_SUITE_MS, ECART_OFFRES_UNIQUES_MS } from "@/contenu/offres";
 import type { OffreUnique } from "@/types";
 import type { Utilisateur } from "./auth";
@@ -91,6 +91,33 @@ export async function montrer(compte: Pick<Utilisateur, "id" | "email">, offre: 
       .values({ userId: compte.id, offre, storyId, expireLe: duree === null ? null : sql`now() + make_interval(secs => ${duree / 1000})` })
       .returning(colonnes);
     return montree ?? null;
+  });
+}
+
+/**
+ * Rouvre l’offre ① de ce compte pour cette conv, jusqu’à après-demain minuit (heure de Paris) : le mail J+6 de S1, la
+ * « dernière fois » (src/server/sequences.ts). La seule exception à « une fois, 5 minutes » : décidée le 17 octobre, en
+ * A/B. Pas si elle est déjà prise, ni si une autre offre unique a été montrée dans les 24 h ; sa ligne se crée si elle
+ * n’avait jamais été montrée. Rend sa nouvelle fin, ou null. À l’appelant de vérifier qu’elle se vend pour cette conv
+ * (suiteVendable, src/server/paiement/commande.ts).
+ */
+export async function rouvrirLaSuite(compte: Pick<Utilisateur, "id" | "email">, storyId: string): Promise<Date | null> {
+  if (estEquipe(compte)) return null;
+  return db().transaction(async (tx) => {
+    await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, compte.id)).for("update");
+    const [recente] = await tx
+      .select({ offre: o.offre })
+      .from(o)
+      .where(and(eq(o.userId, compte.id), notInArray(o.offre, ["suite"]), gt(o.montreeLe, sql`now() - make_interval(secs => ${ECART_OFFRES_UNIQUES_MS / 1000})`)))
+      .limit(1);
+    if (recente) return null;
+    const fin = sql`((date_trunc('day', now() at time zone 'Europe/Paris') + interval '3 days' - interval '1 second') at time zone 'Europe/Paris')`;
+    const [rouverte] = await tx
+      .insert(o)
+      .values({ userId: compte.id, offre: "suite", storyId, expireLe: fin })
+      .onConflictDoUpdate({ target: [o.userId, o.offre], set: { storyId, montreeLe: sql`now()`, expireLe: fin }, setWhere: isNull(o.priseLe) })
+      .returning({ expireLe: o.expireLe });
+    return rouverte?.expireLe ?? null;
   });
 }
 

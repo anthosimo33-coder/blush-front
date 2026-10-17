@@ -219,4 +219,23 @@ describe("les mails des séquences (/admin)", () => {
     expect(de("s3_repondre", apres).clics - de("s3_repondre", avant).clics).toBe(1);
     expect(de("s3_pas", apres).envoyes - de("s3_pas", avant).envoyes).toBe(0);
   });
+
+  it("l’A/B de S1 J+6 : avec l’offre (le mail parti) ou sans (le témoin), et leurs rapports payés dans les 3 jours", async () => {
+    const avant = (await statsAdmin(7)).pilotage.abDerniere;
+    const avec = await compteDeTest("pilotage-ab-avec");
+    const sans = await compteDeTest("pilotage-ab-sans");
+    const conv = await convRattachee(avec, "01-a-deux-doigts.txt");
+    const ilYa = (heures: number) => new Date(Date.now() - heures * 3600e3);
+    await db()
+      .insert(schema.envoisMails)
+      .values([
+        { userId: avec.id, cle: "s1_derniere", occasion: conv.id, envoyeLe: ilYa(30) },
+        { userId: sans.id, cle: "s1_derniere", occasion: "x:temoin", parti: false, envoyeLe: ilYa(30) },
+      ]);
+    await db()
+      .insert(schema.achats)
+      .values({ userId: avec.id, storyId: conv.id, offre: "suite", centimes: 1090, bulles: 10, fournisseur: "factice", statut: "paye", payeLe: ilYa(5) });
+    const apres = (await statsAdmin(7)).pilotage.abDerniere;
+    expect([apres.avec.n - avant.avec.n, apres.avec.payes - avant.avec.payes, apres.sans.n - avant.sans.n, apres.sans.payes - avant.sans.payes]).toEqual([1, 1, 1, 0]);
+  });
 });
