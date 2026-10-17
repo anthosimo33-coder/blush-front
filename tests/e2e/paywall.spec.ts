@@ -62,7 +62,8 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     const premium = ecran.getByRole("radio", { name: /Premium/ });
     await expect(premium).toContainText("18,90\u00a0€");
     /* La formule « après » (17 octobre) : l’écart avec le rapport seul, sans prix barré, ses réponses dont les offertes */
-    await expect(premium).toContainText("5\u00a0€ de plus");
+    await expect(premium).toContainText("+80 réponses");
+    await expect(premium).toContainText("pour 5\u00a0€");
     await expect(premium).not.toContainText("27,80");
     await expect(premium).toContainText("90 réponses, dont 30 offertes");
     await expect(ecran.getByText("Ton rapport sur Maëlys", { exact: true })).toBeVisible();

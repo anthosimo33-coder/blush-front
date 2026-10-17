@@ -67,8 +67,11 @@ export const PAYWALL = {
     offertes: (reponses: number) => `${reponses} réponses, dont ${OFFERTES_PREMIUM} offertes`,
     /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
     barreOffertes: prixDe("pack30"),
-    /** Sous son prix : ce qu’elle coûte de plus que le rapport seul (« 5 € de plus »). */
-    ecart: (centimes: number) => `${prixCourt(centimes)} de plus`,
+    /**
+     * Sous son prix, en deux lignes : ce qu’elle donne de plus que le rapport seul, puis ce que ça coûte (« +80 réponses »,
+     * « pour 5 € ») : le gain d’abord, l’écart de prix ensuite (décidé le 17 octobre : « 5 € de plus » se lisait comme une dépense).
+     */
+    ecart: { reponses: (n: number) => `+${n} réponses`, prix: (centimes: number) => `pour ${prixCourt(centimes)}` },
     /**
      * Son badge quand elle s’est vraiment payée plus souvent que le rapport seul ces 30 derniers jours (le serveur le
      * compte : premiumLePlusChoisi) ; sinon, « Conseillé ».
