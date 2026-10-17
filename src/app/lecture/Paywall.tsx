@@ -162,8 +162,7 @@ type Choix = Formule | "avance";
 
 /**
  * Le paiement (la maquette « La formule · après », 17 octobre) : « Ton rapport sur Léa », les deux formules (Premium
- * choisie d’avance, ce qu’elle donne de plus que le rapport seul et pour combien, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi »
- * seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
+ * choisie d’avance, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi » seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
  * paie (Apple Pay, Google Pay ou la carte, dans BLUSH), et une ligne : paiement unique, l’autre jamais prévenu. Payé :
  * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
  * gagné).
@@ -187,10 +186,8 @@ function Paiement({ ref, lot, sansOffre, autre, elle }: { ref: Ref<HTMLElement>;
   const prix = offre === "premium" ? premium : rapport;
   const lotSurRapport = !garde && lot && lotSAppliqueA(lot, "rapport") ? lot : null;
   const lotSurPremium = lot && lotSAppliqueA(lot, "premium") ? lot : null;
-  /* Premium : barrée seulement par un vrai ancien prix (celui d’avant le lot de la roue), et ce qu’elle donne de plus que le rapport seul, pour combien */
+  /* Premium : barrée seulement par un vrai ancien prix (celui d’avant le lot de la roue) */
   const barrePremium = lotSurPremium && premium.centimes < CATALOGUE.premium.centimes ? CATALOGUE.premium.centimes : null;
-  const ecart = premium.centimes - rapport.centimes;
-  const reponsesEnPlus = CATALOGUE.premium.bulles + bullesDuLot(lotSurPremium) - (CATALOGUE.rapport.bulles + bullesDuLot(lotSurRapport));
 
   return (
     <section ref={ref} className="flex scroll-mt-4 flex-col gap-3 lg:sticky lg:top-6 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
@@ -236,7 +233,6 @@ function Paiement({ ref, lot, sansOffre, autre, elle }: { ref: Ref<HTMLElement>;
               note={PAYWALL.premium.note(autre)}
               prix={enEuros(premium.centimes)}
               barre={barrePremium ? enEuros(barrePremium) : undefined}
-              ecart={ecart > 0 && reponsesEnPlus > 0 ? [PAYWALL.premium.ecart.reponses(reponsesEnPlus), PAYWALL.premium.ecart.prix(ecart)] : undefined}
             >
               <LigneCadeau perle titre={PAYWALL.premium.offertes(CATALOGUE.premium.bulles)} barre={PAYWALL.premium.barreOffertes} valeur={PAYWALL.gratuit} />
               {lotSurPremium && <LigneCadeau lot={lotSurPremium} valeur={valeurDuLot(lotSurPremium, "premium")} />}
@@ -285,8 +281,8 @@ function valeurDuLot(lot: LotDeLaRoue, offre: Formule): string {
 }
 
 /**
- * Une formule (la maquette G3) : son rond, son nom, sa ligne, son prix (barré à côté, et son écart avec l’autre formule)
- * et son badge sur le bord ; dessous, ses cadeaux, une ligne chacun (`children`), seulement quand elle est choisie.
+ * Une formule (la maquette G3) : son rond, son nom, sa ligne, son prix (barré à côté) et son badge sur le bord ; dessous,
+ * ses cadeaux, une ligne chacun (`children`), seulement quand elle est choisie.
  */
 function Formule({
   on,
@@ -296,7 +292,6 @@ function Formule({
   note,
   prix,
   barre,
-  ecart,
   children,
 }: {
   on: boolean;
@@ -306,8 +301,6 @@ function Formule({
   note: ReactNode;
   prix: string;
   barre?: string;
-  /** Sous le prix, en rose, sur deux lignes : ce qu’elle donne de plus que l’autre formule, et pour combien (« +80 réponses », « pour 5 € »). */
-  ecart?: [string, string];
   children?: ReactNode;
 }) {
   return (
@@ -332,12 +325,6 @@ function Formule({
               <span className="sr-only">{FEUILLE_FORMULE.auLieuDe}</span>
               {barre}
             </s>
-          )}
-          {ecart && (
-            <span className="mt-1 flex flex-col items-end whitespace-nowrap text-micro font-black leading-[1.25] text-elle-ink">
-              <span>{ecart[0]}</span>
-              <span>{ecart[1]}</span>
-            </span>
           )}
         </span>
       </span>
