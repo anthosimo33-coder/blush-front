@@ -55,12 +55,14 @@ import { rechargeDejaPayee } from "./achats";
  *   🔥 seulement, J+5 le parrainage (src/server/parrainage.ts) : une offre.
  * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, 2 bulles ou moins, puis à zéro depuis 3 jours.
  *   Des offres.
- * Le lot 3, éteint tant que BLUSH_MAILS_PROSPECTS ne vaut pas « 1 » (l’accord de prospection, l’avis du juriste) :
+ * Le lot 3, allumé par BLUSH_MAILS_PROSPECTS (« 1 » en production depuis le 17 octobre : le juriste l’a validé sans case
+ * d’accord à l’inscription) :
  * - S1, le paywall vu sans payer : H+2 le titre de son paywall et ses chiffres, J+1 ses 8 chapitres. Ils remplacent la
  *   relance ② (src/server/relances.ts), qui s’arrête quand ils s’allument. Des offres.
  * - S2, un compte sans conv : H+1, J+1, J+4, vers une nouvelle conv. Des offres.
- * TODO(produit): S1 J+3 (une réponse offerte, écrite au clic : il faut un prompt qui lise une conv pas encore payée) et
- * S1 J+6 (le rapport à −3 € deux jours, en A/B : une offre de plus au paiement) attendent leur décision.
+ * S1 J+3, une réponse offerte, est abandonnée (le 17 octobre : pas rentable).
+ * TODO(produit): S1 J+6, le rapport à −3 € deux jours en A/B : rouvrir la ① (src/server/offres-uniques.ts, 5 minutes une
+ * seule fois) jusqu’à sa fin, l’écran de paiement qui la montre dès le lien du mail, son compte à rebours en jours.
  * Le lot 2 :
  * - S5, le chat endormi, sur la dernière conv débloquée, à qui il reste des bulles : 7 jours sans un mot au chat (leur
  *   niveau, avant d’être ensemble), 21 jours (« parfait, ou abandonné ? »), et un couple chaque mois depuis le rapport
