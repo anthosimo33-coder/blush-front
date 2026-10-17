@@ -1,6 +1,28 @@
 import "server-only";
 import { and, eq, sql, type SQL } from "drizzle-orm";
-import { mailGlace, mailPeuDeBulles, mailProchainPas, mailRepondre, mailReponsePrete, mailVocal, mailZeroBulle, type MailDeSequence, type Personnes } from "@/contenu/mails";
+import {
+  mailAnniversaire,
+  mailApresGlace,
+  mailAvance,
+  mailEndormi,
+  mailGarde,
+  mailGlace,
+  mailParfait,
+  mailPeuDeBulles,
+  mailProchainPas,
+  mailRepondre,
+  mailReponsePrete,
+  mailTemperature,
+  mailVocal,
+  mailZeroBulle,
+  NIVEAUX_A_FRANCHIR,
+  type MailDeSequence,
+  type Personnes,
+} from "@/contenu/mails";
+import { scaleOf } from "@/contenu/niveaux";
+import { RAPPORT_D_AVANCE } from "@/contenu/offres";
+import type { LevelId } from "@/types";
+import { dateDAnniversaire, prochainAnniversaire } from "./anniversaires";
 import { db, schema } from "./db";
 import { donneesMemoire, donneesVerdict } from "./depot";
 import { estEquipe } from "./droits";
@@ -23,6 +45,15 @@ import { rechargeDejaPayee } from "./achats";
  *   (🔥 🤏 🤔), ou après un 🧊, « comment tu vas, vraiment ? » (rien à vendre, le 3114). Des conseils.
  * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, 2 bulles ou moins, puis à zéro depuis 3 jours.
  *   Des offres.
+ * Le lot 2 :
+ * - S5, le chat endormi, sur la dernière conv débloquée, à qui il reste des bulles : 7 jours sans un mot au chat (leur
+ *   niveau, avant d’être ensemble), 21 jours (« parfait, ou abandonné ? »), et un couple chaque mois depuis le rapport
+ *   (sa température). Jamais après un 🧊. Des conseils.
+ * - S6, les offres gardées : le −50 % gardé (⑥) un à trois jours avant sa fin, le rapport d’avance (⑤) payé qui dort
+ *   depuis une semaine. Des offres.
+ * - S7, trois semaines après un 🧊, sans nouvelle conv depuis : rien de l’ancienne histoire. Une offre.
+ * - S8, son anniversaire dans deux ou trois jours, quand un fait de sa fiche en dit la date entière
+ *   (src/server/anniversaires.ts) : cherché deux fois par jour au plus (il faut lire les fiches). Un conseil.
  * Les règles, pour tous :
  * - jamais la nuit (HEURES_CALMES, à Paris), et un mail des séquences par jour au plus (aucun s’il en est parti un, ou la
  *   relance ②, dans les ECART_ENTRE_DEUX_MAILS_MS) ;
@@ -34,7 +65,7 @@ import { rechargeDejaPayee } from "./achats";
  * - dans le plafond des relances du jour, qu’ils partagent avec la relance (passée avant eux, au même passage), puis dans
  *   le quota des mails (sorte « relance »).
  * Envoyés par GET /api/cron/relances (Vercel Cron, toutes les 5 minutes), juste après les relances.
- * TODO(produit): à relire par un juriste : des mails commerciaux (S4) à des clients, pour des services analogues
+ * TODO(produit): à relire par un juriste : des mails commerciaux (S4, S6, S7) à des clients, pour des services analogues
  * (article L34-5 du Code des postes et des communications électroniques), et leur lien de désinscription.
  */
 
@@ -62,11 +93,24 @@ const MAILS = {
   s4_prete: "offres",
   s4_peu: "offres",
   s4_zero: "offres",
+  s5_endormi: "conseils",
+  s5_parfait: "conseils",
+  s5_couple: "conseils",
+  s6_garde: "offres",
+  s6_avance: "offres",
+  s7_glace: "offres",
+  s8_anniv: "conseils",
 } as const satisfies Record<string, "conseils" | "offres" | null>;
 export type CleDeMail = keyof typeof MAILS;
 
 /** Les fenêtres de S3, depuis le déblocage de la conv : chaque mail part dedans, ou jamais (une veille arrêtée ne les envoie pas à contretemps). */
 const FENETRES_S3 = { s3_repondre: [1 * JOUR, 3 * JOUR], s3_vocal: [2 * JOUR, 4 * JOUR], s3_pas: [4 * JOUR, 6 * JOUR] } as const;
+
+/** Les fenêtres de S5, depuis son dernier mot au chat (ou le déblocage) : 7 et 21 jours, une semaine chacune ; un couple, chaque mois (30 jours) depuis le déblocage. */
+const FENETRES_S5 = { s5_endormi: [7 * JOUR, 14 * JOUR], s5_parfait: [21 * JOUR, 28 * JOUR], mois: 30 * JOUR, semaine: 7 * JOUR } as const;
+
+/** La recherche des anniversaires (S8) : au plus une fois dans ce temps, elle lit les fiches de toutes les convs débloquées. */
+const ANNIVERSAIRES = { cle: "sequences:anniversaires", limite: { max: 1, fenetreS: 12 * 3600 } } as const;
 
 /** Est-ce une heure calme à Paris (rien ne part) ? */
 export function heureCalme(maintenant = new Date()): boolean {
@@ -291,11 +335,229 @@ async function candidatsS4(): Promise<Candidat[]> {
   ];
 }
 
-/** Les liens d’un mail : chaque bouton ouvre la conv dont il parle (le chat, son texte déjà tapé ; le rapport pour le vocal ; la recharge pour S4). */
+/** Leur niveau d’aujourd’hui : celui que la mémoire tient à jour au fil du chat, sinon celui du verdict. */
+async function niveauDe(storyId: string, verdict: { niveau: LevelId | null }): Promise<LevelId | null> {
+  return (await donneesMemoire(storyId))?.etat.niveau?.niveau ?? verdict.niveau;
+}
+
+/** Une date à Paris, dite comme dans un mail : son jour (« vendredi »), son heure (« 18 h 12 »), sa date (« 17 octobre 2027 »). */
+function aParis(d: Date) {
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", ...o }).format(d);
+  const [h, m] = f({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).split(":");
+  return { jour: f({ weekday: "long" }), heure: `${Number(h)}\u00a0h\u00a0${m}`, date: f({ day: "numeric", month: "long", year: "numeric" }) };
+}
+
+/* La dernière conv débloquée du compte, dans une requête où il s’appelle `u` : la conv dont parlent S6 et ses prénoms */
+const DERNIERE_DEBLOQUEE = sql`(select s.id from ${schema.stories} s where s.user_id = u.id and s.debloque_le is not null order by s.debloque_le desc limit 1)`;
+
+/**
+ * S5 : la dernière conv débloquée de chaque compte à qui il reste des bulles, et le temps depuis son dernier mot au chat
+ * (ou depuis le déblocage). Un couple (sa température) chaque mois ; sinon 7 jours (leur niveau, à franchir), puis 21.
+ * L’occasion : son dernier mot (un nouveau silence, un nouveau mail), ou le mois pour un couple. Le niveau, chiffré dans
+ * la mémoire, se lit en écrivant : un mail qui ne lui va pas est écarté, le suivant passe au passage d’après.
+ */
+async function candidatsS5(): Promise<Candidat[]> {
+  const { stories: s, users: u0, chatMessages: m, envoisMails: e } = schema;
+  const { rows } = await db().execute<{
+    user_id: string;
+    email: string;
+    bulles: number;
+    story_id: string;
+    depuis_ms: number;
+    silence_ms: number;
+    dernier: string;
+    envoyes: string;
+  }>(sql`
+    select distinct on (u.id) u.id as user_id, u.email, u.bulles, s.id as story_id,
+      (extract(epoch from now() - s.debloque_le) * 1000)::float8 as depuis_ms,
+      (extract(epoch from now() - coalesce(d.created_at, s.debloque_le)) * 1000)::float8 as silence_ms,
+      coalesce(d.id::text, 'achat') as dernier,
+      coalesce((select string_agg(e.cle || '|' || e.occasion, ',') from ${e} e where e.user_id = u.id and e.story_id = s.id), '') as envoyes
+    from ${s} s
+    join ${u0} u on u.id = s.user_id
+    left join lateral (select m.id, m.created_at from ${m} m where m.story_id = s.id and m.role = 'toi' order by m.created_at desc limit 1) d on true
+    where s.debloque_le <= now() - interval '7 days' and u.bulles > 0 and u.conseils_coupes_le is null and not ${MAIL_RECENT}
+    order by u.id, s.debloque_le desc`);
+  return rows.flatMap((l): Candidat[] => {
+    const envoyes = new Set(l.envoyes.split(","));
+    const base = { userId: l.user_id, email: l.email, storyId: l.story_id };
+    const sansGlace = async () => {
+      const verdict = await verdictSansAlerte(l.story_id);
+      return verdict && verdict.emoji !== "🧊" ? verdict : null;
+    };
+    const candidats: Candidat[] = [];
+    const mois = Math.floor(l.depuis_ms / FENETRES_S5.mois);
+    const couple = `${l.story_id}:m${mois}`;
+    if (mois >= 1 && l.depuis_ms - mois * FENETRES_S5.mois < FENETRES_S5.semaine && l.silence_ms >= FENETRES_S5.semaine && !envoyes.has(`s5_couple|${couple}`))
+      candidats.push({
+        ...base,
+        cle: "s5_couple",
+        occasion: couple,
+        ecrire: async (p) => {
+          const verdict = await sansGlace();
+          const niveau = verdict && (await niveauDe(l.story_id, verdict));
+          return niveau && scaleOf(niveau).temperature ? mailTemperature(p, { niveau, mois }) : null;
+        },
+      });
+    const silence = `${l.story_id}:${l.dernier}`;
+    const dans = (cle: "s5_endormi" | "s5_parfait") => !envoyes.has(`${cle}|${silence}`) && l.silence_ms >= FENETRES_S5[cle][0] && l.silence_ms < FENETRES_S5[cle][1];
+    if (dans("s5_endormi"))
+      candidats.push({
+        ...base,
+        cle: "s5_endormi",
+        occasion: silence,
+        ecrire: async (p) => {
+          const verdict = await sansGlace();
+          const niveau = verdict && (await niveauDe(l.story_id, verdict));
+          return niveau && NIVEAUX_A_FRANCHIR.includes(niveau) ? mailEndormi(p, { niveau, bulles: l.bulles }) : null;
+        },
+      });
+    if (dans("s5_parfait"))
+      candidats.push({
+        ...base,
+        cle: "s5_parfait",
+        occasion: silence,
+        ecrire: async (p) => {
+          const verdict = await sansGlace();
+          const niveau = verdict && (await niveauDe(l.story_id, verdict));
+          return verdict && !(niveau && scaleOf(niveau).temperature) ? mailParfait(p, { bulles: l.bulles }) : null;
+        },
+      });
+    return candidats;
+  });
+}
+
+/**
+ * S6 : le −50 % gardé (⑥) qui finit dans 6 heures à 3 jours (montré il y a un jour au moins), une fois ; le rapport
+ * d’avance (⑤) payé il y a une semaine à deux mois et pas encore utilisé, une fois par achat. Ils parlent de la dernière
+ * conv débloquée du compte (ses prénoms) ; en alerte, rien.
+ */
+async function candidatsS6(): Promise<Candidat[]> {
+  const { users: u0, offresUniques: o, achats: a, envoisMails: e } = schema;
+  const garde = await db().execute<{ user_id: string; email: string; story_id: string | null; expire_le: string }>(sql`
+    select u.id as user_id, u.email, ${DERNIERE_DEBLOQUEE} as story_id, o.expire_le
+    from ${o} o join ${u0} u on u.id = o.user_id
+    where o.offre = 'garde_second' and o.prise_le is null and o.montree_le <= now() - interval '1 day'
+      and o.expire_le > now() + interval '6 hours' and o.expire_le <= now() + interval '3 days'
+      and u.relances_coupees_le is null and not ${MAIL_RECENT}
+      and not exists (select 1 from ${e} e where e.user_id = u.id and e.cle = 's6_garde')`);
+  const avance = await db().execute<{ user_id: string; email: string; story_id: string | null; achat: string; paye_le: string }>(sql`
+    select u.id as user_id, u.email, ${DERNIERE_DEBLOQUEE} as story_id, a.id::text as achat, a.paye_le
+    from ${a} a join ${u0} u on u.id = a.user_id
+    where a.offre = 'second' and a.statut = 'paye' and a.utilise_le is null
+      and a.paye_le <= now() - interval '7 days' and a.paye_le > now() - interval '60 days'
+      and u.relances_coupees_le is null and not ${MAIL_RECENT}
+      and not exists (select 1 from ${e} e where e.user_id = u.id and e.cle = 's6_avance' and e.occasion = a.id::text)`);
+  return [
+    ...garde.rows.flatMap((l): Candidat[] =>
+      l.story_id
+        ? [
+            {
+              userId: l.user_id,
+              email: l.email,
+              storyId: l.story_id,
+              cle: "s6_garde",
+              occasion: "garde",
+              ecrire: async (p) => ((await verdictSansAlerte(l.story_id!)) ? mailGarde(p, aParis(new Date(l.expire_le))) : null),
+            },
+          ]
+        : [],
+    ),
+    ...avance.rows.flatMap((l): Candidat[] => {
+      if (!l.story_id) return [];
+      const fin = new Date(new Date(l.paye_le).getTime() + RAPPORT_D_AVANCE.dureeMs);
+      const mois = Math.max(1, Math.round((fin.getTime() - Date.now()) / (30.44 * JOUR)));
+      return [
+        {
+          userId: l.user_id,
+          email: l.email,
+          storyId: l.story_id,
+          cle: "s6_avance",
+          occasion: l.achat,
+          ecrire: async () => ((await verdictSansAlerte(l.story_id!)) ? mailAvance({ jusqua: aParis(fin).date, mois }) : null),
+        },
+      ];
+    }),
+  ];
+}
+
+/** S7 : la dernière conv débloquée, il y a trois à quatre semaines, sans nouvelle conv importée depuis ; seulement après un 🧊. */
+async function candidatsS7(): Promise<Candidat[]> {
+  const { stories: s, users: u0, envoisMails: e } = schema;
+  const { rows } = await db().execute<{ user_id: string; email: string; story_id: string }>(sql`
+    select distinct on (u.id) u.id as user_id, u.email, s.id as story_id
+    from ${s} s join ${u0} u on u.id = s.user_id
+    where s.debloque_le <= now() - interval '21 days' and s.debloque_le > now() - interval '28 days'
+      and u.relances_coupees_le is null and not ${MAIL_RECENT}
+      and not exists (select 1 from ${s} s2 where s2.user_id = u.id and s2.id <> s.id and s2.created_at > s.debloque_le)
+      and not exists (select 1 from ${e} e where e.user_id = u.id and e.cle = 's7_glace' and e.occasion = s.id::text)
+    order by u.id, s.debloque_le desc`);
+  return rows.map((l): Candidat => ({
+    userId: l.user_id,
+    email: l.email,
+    storyId: l.story_id,
+    cle: "s7_glace",
+    occasion: l.story_id,
+    ecrire: async () => ((await verdictSansAlerte(l.story_id))?.emoji === "🧊" ? mailApresGlace() : null),
+  }));
+}
+
+/**
+ * S8 : les convs débloquées dont la fiche dit la date entière d’un anniversaire qui tombe dans deux ou trois jours (deux
+ * passages pour qu’il parte, un jour de silence pour l’autre mail du jour). Une fois par an et par conv. Il faut lire
+ * les fiches, chiffrées : deux fois par jour au plus (ANNIVERSAIRES).
+ */
+async function candidatsS8(): Promise<Candidat[]> {
+  if (!(await sousLaLimite(ANNIVERSAIRES.cle, ANNIVERSAIRES.limite))) return [];
+  const { stories: s, users: u0, memories: mem, envoisMails: e } = schema;
+  const { rows } = await db().execute<{ user_id: string; email: string; bulles: number; story_id: string; envoyes: string }>(sql`
+    select u.id as user_id, u.email, u.bulles, s.id as story_id,
+      coalesce((select string_agg(e.occasion, ',') from ${e} e where e.user_id = u.id and e.cle = 's8_anniv'), '') as envoyes
+    from ${s} s join ${u0} u on u.id = s.user_id
+    where s.debloque_le is not null and u.conseils_coupes_le is null and not ${MAIL_RECENT}
+      and exists (select 1 from ${mem} mem where mem.story_id = s.id)`);
+  const candidats: Candidat[] = [];
+  for (const l of rows) {
+    const faits = (await donneesMemoire(l.story_id))?.etat.fiche.faits ?? [];
+    const date = faits.map((f) => dateDAnniversaire(f.texte)).find((d) => d !== null);
+    if (!date) continue;
+    const prochain = prochainAnniversaire(date);
+    const occasion = `${l.story_id}:${prochain.annee}`;
+    if (prochain.dans < 2 || prochain.dans > 3 || l.envoyes.split(",").includes(occasion)) continue;
+    /* Ce qu’il ou elle aime, une ligne de sa fiche, courte */
+    const aime = faits.find((f) => f.section === "aime")?.texte ?? null;
+    candidats.push({
+      userId: l.user_id,
+      email: l.email,
+      storyId: l.story_id,
+      cle: "s8_anniv",
+      occasion,
+      ecrire: async (p) =>
+        (await verdictSansAlerte(l.story_id))
+          ? mailAnniversaire(p, {
+              jour: prochain.jour,
+              date: prochain.date,
+              aime: aime && aime.length > 60 ? `${aime.slice(0, 59).trimEnd()}…` : aime,
+              bulles: Math.max(0, l.bulles),
+            })
+          : null,
+    });
+  }
+  return candidats;
+}
+
+/** Les mails qui mènent à une nouvelle conv (S6, S7) : la page où l’on commence. */
+const VERS_UNE_NOUVELLE_CONV: readonly CleDeMail[] = ["s6_garde", "s6_avance", "s7_glace"];
+
+/**
+ * Les liens d’un mail : chaque bouton ouvre la conv dont il parle (le chat, son texte déjà tapé ; le rapport pour le
+ * vocal ; la recharge pour S4), ou la page d’une nouvelle conv (S6, S7).
+ */
 function liensDe(c: Candidat, m: MailDeSequence) {
   const ouvrir = `${env().BLUSH_URL}/ouvrir/${c.storyId}`;
   const boutons = m.boutons.map((b) => {
     if (c.cle === "s3_vocal") return ouvrir;
+    if (VERS_UNE_NOUVELLE_CONV.includes(c.cle)) return `${env().BLUSH_URL}/commencer`;
     if (MAILS[c.cle] === "offres") return `${ouvrir}?recharger=1`;
     return `${ouvrir}?dire=${encodeURIComponent(b.dire ?? "")}`;
   });
@@ -304,7 +566,8 @@ function liensDe(c: Candidat, m: MailDeSequence) {
 
 /**
  * Envoie les mails des séquences dus (voir l’en-tête), un par compte au plus, et dit ce qu’il a fait en nombres
- * seulement. Un compte a un seul mail par passage : la réponse prête d’abord, puis S3, puis les bulles. Le plafond du
+ * seulement. Un compte a un seul mail par passage : la réponse prête d’abord, puis S3, son anniversaire (S8), les
+ * bulles, les offres gardées (S6), le chat endormi (S5), et après un 🧊 (S7). Le plafond du
  * jour atteint, ou le quota des mails, arrête le passage : le mail non parti est oublié, il repartira au passage suivant
  * (tant que sa fenêtre est ouverte). De même quand le prestataire le refuse sans regarder l’adresse (refusDuPrestataire).
  * Une adresse refusée, ou un mail perdu en route (il a pu partir), compte comme fait. `maintenant` : pour les heures
@@ -316,8 +579,9 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
   const boite = boiteAMails();
   /* Un par compte, dans l’ordre des priorités */
   const parCompte = new Map<string, Candidat>();
-  const [s3, s4] = await Promise.all([candidatsS3(), candidatsS4()]);
-  for (const c of [...s4.filter((c) => c.cle === "s4_prete"), ...s3, ...s4.filter((c) => c.cle !== "s4_prete")]) if (!parCompte.has(c.userId)) parCompte.set(c.userId, c);
+  const [s3, s4, s5, s6, s7, s8] = await Promise.all([candidatsS3(), candidatsS4(), candidatsS5(), candidatsS6(), candidatsS7(), candidatsS8()]);
+  const prete = s4.filter((c) => c.cle === "s4_prete");
+  for (const c of [...prete, ...s3, ...s8, ...s4.filter((c) => c.cle !== "s4_prete"), ...s6, ...s5, ...s7]) if (!parCompte.has(c.userId)) parCompte.set(c.userId, c);
   const dus = [...parCompte.values()];
   passage.dues = dus.length;
   for (const [k, c] of dus.entries()) {

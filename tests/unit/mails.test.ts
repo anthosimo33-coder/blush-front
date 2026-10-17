@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { mailGlace, mailPeuDeBulles, mailProchainPas, mailRepondre, mailReponsePrete, mailVocal, mailZeroBulle, type MailDeSequence, type Personnes } from "@/contenu/mails";
+import {
+  mailAnniversaire,
+  mailApresGlace,
+  mailAvance,
+  mailEndormi,
+  mailGarde,
+  mailGlace,
+  mailParfait,
+  mailPeuDeBulles,
+  mailProchainPas,
+  mailRepondre,
+  mailReponsePrete,
+  mailTemperature,
+  mailVocal,
+  mailZeroBulle,
+  type MailDeSequence,
+  type Personnes,
+} from "@/contenu/mails";
 import { mailDeSequence } from "@/server/mail-sequence";
 
 /*
@@ -21,6 +38,11 @@ const tous = (p: Personnes): [string, MailDeSequence][] => [
   ["peu", mailPeuDeBulles(p, { bulles: 2, bonus: true, actif: true })],
   ["prete", mailReponsePrete(p, { bonus: false })],
   ["zero", mailZeroBulle(p, { faits: 12, messages: 4365, echanges: 23 })],
+  ["endormi", mailEndormi(p, { niveau: "voit", bulles: 9 })],
+  ["parfait", mailParfait(p, { bulles: 9 })],
+  ["couple", mailTemperature(p, { niveau: "va", mois: 2 })],
+  ["garde", mailGarde(p, { jour: "vendredi", heure: "18\u00a0h\u00a012" })],
+  ["anniv", mailAnniversaire(p, { jour: "jeudi", date: "jeudi 23", aime: "Le ciné", bulles: 9 })],
 ];
 
 const liens = {
@@ -29,7 +51,8 @@ const liens = {
 };
 
 describe("les mails des séquences", () => {
-  it.each(tous(INES))("%s : les prénoms dans le corps seulement, rien d’oublié", (_, m) => {
+  it.each(tous(INES))("%s : les prénoms dans le corps seulement (ni dans ce que tapent ses boutons), rien d’oublié", (_, m) => {
+    expect(m.boutons.map((b) => b.dire ?? "").join(" ")).not.toMatch(/Inès|Lucas/);
     const d = mailDeSequence(m, { base: "https://www.askblush.com", liens });
     expect(`${d.sujet}\n${m.apercu}\n${d.texte}`).not.toMatch(/Inès|Lucas/);
     expect(d.html).toMatch(/Inès|Lucas/);
@@ -85,5 +108,45 @@ describe("les mails des séquences", () => {
     const glace = mailGlace(INES);
     expect(glace.mini).toContain("3114");
     expect([glace.titre, glace.corps, ...glace.bulles, glace.mini, glace.ps, ...glace.boutons.map((b) => b.libelle)].join(" ")).not.toMatch(/bulle|recharg|€/i);
+  });
+
+  it("S5 : leur niveau et le suivant à franchir, trois réponses à une touche ; un couple, sa température d’il y a un mois", () => {
+    const sept = mailEndormi(INES, { niveau: "voit", bulles: 1 });
+    expect(sept.niveaux).toEqual({ noms: ["On se parle", "On se voit", "On se le dit", "On est ensemble"], ici: 1, etiquette: "t’en étais là", etapes: true });
+    expect(sept.corps).toContain("passer à «\u00a0on se le dit\u00a0»");
+    expect(sept.boutons.map((b) => b.libelle)).toEqual(["On se l’est dit", "Toujours pareil", "Ça s’est refroidi"]);
+    expect(sept.ps).toBe("ps\u00a0: il te reste 1\u00a0bulle. une occasion de bien jouer");
+    expect(mailEndormi(LUCAS, { niveau: "parle", bulles: 9 }).bulles[1]).toContain("trop occupé à être heureux");
+    const couple = mailTemperature(INES, { niveau: "coince", mois: 1 });
+    expect(couple.sujet).toBe("un mois déjà");
+    expect(couple.bulles[1]).toBe("la dernière fois, vous étiez à «\u00a0ça coince\u00a0»");
+    expect(couple.niveaux?.etapes).toBe(false);
+    expect(mailTemperature(INES, { niveau: "soudes", mois: 3 }).sujet).toBe("3 mois déjà");
+  });
+
+  it("S6, S7 : l’offre gardée à son prix, le rapport d’avance sans prénom, rien de l’ancienne histoire après un 🧊", () => {
+    const garde = mailGarde(INES, { jour: "vendredi", heure: "18\u00a0h\u00a012" });
+    expect(garde.offre).toMatchObject({ prix: "6,95\u00a0€", barre: "13,90\u00a0€", jusqua: "Jusqu’à vendredi, 18\u00a0h\u00a012" });
+    expect(garde.sujet).toBe("ton −50\u00a0% saute vendredi");
+    for (const m of [mailAvance({ jusqua: "17 octobre 2027", mois: 11 }), mailApresGlace()]) {
+      const d = mailDeSequence(m, { base: "x", liens });
+      for (const morceau of ["undefined", "null", "Inès", "Lucas"]) expect(`${d.sujet}${d.texte}${d.html}`).not.toContain(morceau);
+    }
+    expect(mailAvance({ jusqua: "17 octobre 2027", mois: 11 }).apercu).toBe("valable encore 11 mois. mais pourquoi attendre\u00a0?");
+    /* Après un 🧊 : ni « Ce mail ne cite… » (rien à citer), son lien de désinscription à lui */
+    const apres = mailDeSequence(mailApresGlace(), { base: "x", liens });
+    expect(apres.html).toContain(">Plus de mails comme ça</a>");
+    expect(apres.html).not.toContain("Ce mail ne cite");
+  });
+
+  it("S8 : son anniversaire, ce qu’il ou elle aime, et le message à écrire d’une touche", () => {
+    const anniv = mailAnniversaire(LUCAS, { jour: "samedi", date: "samedi 4", aime: null, bulles: 0 });
+    expect(anniv.bulles[1]).toBe("samedi, c’est l’anniv d’Inès 🎂");
+    expect(mailAnniversaire(INES, { jour: "samedi", date: "samedi 4", aime: null, bulles: 0 }).bulles[1]).toBe("samedi, c’est l’anniv de Lucas 🎂");
+    expect(anniv.fiche).toEqual([{ rubrique: "Dates à retenir", texte: "samedi 4 · son anniv" }]);
+    expect(anniv.corps).toContain("tout ce que je sais d’elle.");
+    expect(anniv.boutons[0]!.dire).toBe("écris-moi son message d’anniv 🎂");
+    expect(anniv.mini).toBe("1 bulle");
+    expect(`${anniv.sujet}${anniv.apercu}${anniv.texte}`).not.toContain("Inès");
   });
 });
