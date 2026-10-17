@@ -75,7 +75,8 @@ const avance = vi.mocked(utiliserAvance);
 const { getAnimations } = Element.prototype;
 
 /** Ce que la feuille sait, pour ce test. */
-const sait = (f: Partial<FeuilleDuPaiement>) => lireFeuille.mockResolvedValue({ paiement: { mode: "factice" }, roue: { etat: "aucune" }, avance: null, garde: null, ...f });
+const sait = (f: Partial<FeuilleDuPaiement>) =>
+  lireFeuille.mockResolvedValue({ paiement: { mode: "factice" }, roue: { etat: "aucune" }, premiumPlusChoisi: false, avance: null, garde: null, ...f });
 
 beforeEach(() => {
   vi.spyOn(window, "matchMedia").mockImplementation(

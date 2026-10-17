@@ -15,7 +15,6 @@ import { setQueryData } from "@/lib/query";
 import { useFeuilleDuPaiement } from "@/lib/requetes";
 import { proposerOffreUnique } from "@/services/api";
 import { BubbleLogo } from "@/components/brand/objects3d";
-import { FeuilleBulle } from "@/components/bulles/FeuilleBulle";
 import { Perle } from "@/components/bulles/perles";
 import { Option, RondACocher } from "@/components/bulles/pieces";
 import { PetitBillet } from "@/components/paiement/Billet";
@@ -66,7 +65,6 @@ export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: 
   /* Le lot passé sous nos yeux (le minuteur à zéro) : les prix redeviennent ceux du catalogue */
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
-  const [bulle, setBulle] = useState(false);
   const paiement = useRef<HTMLElement>(null);
 
   const joue = (r: RoueDuCompte) => {
@@ -98,14 +96,13 @@ export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: 
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
-          <Paiement ref={paiement} lot={lot} sansOffre={roue?.etat === "a_tourner" || roue?.etat === "gagnee"} autre={autre.name} elle={elle} expliquer={() => setBulle(true)} />
+          <Paiement ref={paiement} lot={lot} sansOffre={roue?.etat === "a_tourner" || roue?.etat === "gagnee"} autre={autre.name} elle={elle} />
         </div>
         <Temoignages items={temoignages} />
         <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} elle={elle} />
       </div>
       <BarreDuBas cible={paiement} lot={lot} />
-      <FeuilleBulle open={bulle} onClose={() => setBulle(false)} />
       <FeuilleDeLaRoue open={roueOuverte} onJoue={joue} onFermer={() => setVueRoue("fermee")} />
     </main>
   );
@@ -164,26 +161,14 @@ function Preuves() {
 type Choix = Formule | "avance";
 
 /**
- * Le paiement : les deux formules (Premium choisie d’avance, ses cadeaux à 0 €, le lot de la roue), ou ce que le compte a
- * d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui paie (Apple Pay, Google Pay ou la carte, dans
- * BLUSH), et la discrétion. Payé : « C’est payé », puis « C’est
- * débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est gagné).
+ * Le paiement (la maquette « La formule · après », 17 octobre) : « Ton rapport sur Léa », les deux formules (Premium
+ * choisie d’avance, son écart avec le rapport seul, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi »
+ * seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
+ * paie (Apple Pay, Google Pay ou la carte, dans BLUSH), et une ligne : paiement unique, l’autre jamais prévenu. Payé :
+ * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
+ * gagné).
  */
-function Paiement({
-  ref,
-  lot,
-  sansOffre,
-  autre,
-  elle,
-  expliquer,
-}: {
-  ref: Ref<HTMLElement>;
-  lot: LotDeLaRoue | null;
-  sansOffre: boolean;
-  autre: string;
-  elle: boolean;
-  expliquer: () => void;
-}) {
+function Paiement({ ref, lot, sansOffre, autre, elle }: { ref: Ref<HTMLElement>; lot: LotDeLaRoue | null; sansOffre: boolean; autre: string; elle: boolean }) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
   const [choix, setChoix] = useState<Choix | null>(null);
@@ -202,17 +187,15 @@ function Paiement({
   const prix = offre === "premium" ? premium : rapport;
   const lotSurRapport = !garde && lot && lotSAppliqueA(lot, "rapport") ? lot : null;
   const lotSurPremium = lot && lotSAppliqueA(lot, "premium") ? lot : null;
+  /* Premium : barrée seulement par un vrai ancien prix (celui d’avant le lot de la roue), et ce qu’elle coûte de plus que le rapport seul */
+  const barrePremium = lotSurPremium && premium.centimes < CATALOGUE.premium.centimes ? CATALOGUE.premium.centimes : null;
+  const ecart = premium.centimes - rapport.centimes;
 
   return (
     <section ref={ref} className="flex scroll-mt-4 flex-col gap-3 lg:sticky lg:top-6 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
       {!paye && (
         <>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-legende font-black text-grey lg:text-titre-3 lg:text-ink">{PAYWALL.formule}</span>
-            <button type="button" onClick={expliquer} aria-haspopup="dialog" className="text-legende font-black text-soft underline underline-offset-2">
-              {PAYWALL.cestQuoi}
-            </button>
-          </div>
+          <span className="pt-1 text-legende font-black text-grey lg:text-titre-3 lg:text-ink">{PAYWALL.formule(autre)}</span>
           <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3.5">
             {avoirs?.avance && (
               <Option
@@ -247,13 +230,14 @@ function Paiement({
             <Formule
               on={choisie === "premium"}
               choisir={() => setChoix("premium")}
-              badge={<Tag tone="conseille" />}
+              badge={<Tag tone="conseille">{avoirs?.premiumPlusChoisi ? PAYWALL.premium.plusChoisi : undefined}</Tag>}
               titre={PAYWALL.premium.titre}
-              note={PAYWALL.premium.note(CATALOGUE.premium.bulles + bullesDuLot(lotSurPremium))}
+              note={PAYWALL.premium.note(autre)}
               prix={enEuros(premium.centimes)}
-              barre={premium.barre ? enEuros(premium.barre) : undefined}
+              barre={barrePremium ? enEuros(barrePremium) : undefined}
+              ecart={ecart > 0 ? PAYWALL.premium.ecart(ecart) : undefined}
             >
-              <LigneCadeau perle titre={PAYWALL.premium.offertes} barre={PAYWALL.premium.barreOffertes} valeur={PAYWALL.gratuit} />
+              <LigneCadeau perle titre={PAYWALL.premium.offertes(CATALOGUE.premium.bulles)} barre={PAYWALL.premium.barreOffertes} valeur={PAYWALL.gratuit} />
               {lotSurPremium && <LigneCadeau lot={lotSurPremium} valeur={valeurDuLot(lotSurPremium, "premium")} />}
             </Formule>
           </RadioGroup>
@@ -279,17 +263,12 @@ function Paiement({
         )}
       </div>
       {!paye && choisie !== "avance" && (
-        <div className="flex flex-col items-center gap-1.5 text-center">
-          <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-legende font-extrabold text-soft">
-            <span className="flex items-center gap-1">
-              <Icon name="lock" size={13} stroke={2.6} />
-              {PAYWALL.jamaisPrevenu(autre, elle)}
-            </span>
+        <p className="m-0 flex items-center justify-center gap-1 text-center text-legende font-extrabold text-soft">
+          <Icon name="lock" size={13} stroke={2.6} className="shrink-0" />
+          <span>
+            <span className="font-black text-ink">{PAYWALL.paiementUnique}</span> · {PAYWALL.jamaisPrevenu(autre, elle)}
           </span>
-          <span className="text-micro font-extrabold text-grey">
-            <span className="font-black text-ink">{FEUILLE_FORMULE.pied.gras}</span>
-          </span>
-        </div>
+        </p>
       )}
       {suiteMontree && <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} />}
       {passee && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{OFFRE_SUITE.passee}</Toast>}
@@ -305,8 +284,8 @@ function valeurDuLot(lot: LotDeLaRoue, offre: Formule): string {
 }
 
 /**
- * Une formule (la maquette G3) : son rond, son nom, sa ligne, son prix (barré à côté) et son badge sur le bord ; dessous,
- * ses cadeaux, une ligne chacun (`children`), seulement quand elle est choisie.
+ * Une formule (la maquette G3) : son rond, son nom, sa ligne, son prix (barré à côté, et son écart avec l’autre formule)
+ * et son badge sur le bord ; dessous, ses cadeaux, une ligne chacun (`children`), seulement quand elle est choisie.
  */
 function Formule({
   on,
@@ -316,6 +295,7 @@ function Formule({
   note,
   prix,
   barre,
+  ecart,
   children,
 }: {
   on: boolean;
@@ -325,6 +305,8 @@ function Formule({
   note: ReactNode;
   prix: string;
   barre?: string;
+  /** Sous le prix, en rose : ce qu’elle coûte de plus que l’autre formule (« 5 € de plus »). */
+  ecart?: string;
   children?: ReactNode;
 }) {
   return (
@@ -350,6 +332,7 @@ function Formule({
               {barre}
             </s>
           )}
+          {ecart && <span className="mt-1 whitespace-nowrap text-micro font-black text-elle-ink">{ecart}</span>}
         </span>
       </span>
       {on && children && <span className="flex w-full flex-col gap-1.5">{children}</span>}
