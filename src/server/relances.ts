@@ -41,8 +41,8 @@ export const FRAICHEUR_RELANCE_MS = 48 * 3600e3;
  */
 const RELANCES_PAR_PASSAGE = 50;
 
-/* Le compteur du jour des relances parties : plafondsDesMails().relances, partagé avec les mails des séquences (src/server/sequences.ts) */
-export const RELANCES_DU_JOUR = "relances:mails";
+/* Le compteur du jour des relances parties : plafondsDesMails().relances */
+const RELANCES_DU_JOUR = "relances:mails";
 
 /**
  * Le lien signé d’un mail pour couper ce genre de mails à ce compte (`quoi` : les offres, dont la relance, ou les conseils

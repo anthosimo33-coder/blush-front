@@ -27,21 +27,23 @@ vi.mock("@/server/env", async (original) => {
   return { ...m, env: () => ({ ...m.env(), BLUSH_MAILS_PROSPECTS: PROSPECTS.on }), accesLibre: (email: string) => email === EQUIPE.email || m.accesLibre(email) };
 });
 
-/* Les mails partis : à qui, et ce qu’ils disent */
+/* Les mails partis : à qui, et ce qu’ils disent ; ceux que le quota du prestataire retient (`retenus` : leurs adresses) */
 const partis = vi.hoisted(() => [] as { pour: string; sujet: string; texte: string; html: string }[]);
+const retenus = vi.hoisted(() => new Set<string>());
 vi.mock("@/server/email", async (original) => {
   const m = await original<typeof import("@/server/email")>();
   return {
     ...m,
     envoyerMail: async (...args: Parameters<typeof m.envoyerMail>) => {
       const [pour, mail] = args;
+      if (retenus.has(String(pour))) return false;
       partis.push({ pour: String(pour), sujet: mail.sujet, texte: mail.texte, html: mail.html ?? "" });
       return m.envoyerMail(...args);
     },
   };
 });
 
-/* Le plafond du jour, partagé avec les relances : la base des tests le garde d’un lancement à l’autre */
+/* Le plafond du jour des relances : la base des tests le garde d’un lancement à l’autre (il n’arrête pas les séquences) */
 const RELANCES_DU_JOUR = empreinte("limite:relances:mails");
 const poserLeCompteur = (count: number) =>
   db()
@@ -554,14 +556,24 @@ describe("pour tous", () => {
     }
   });
 
-  it("le plafond du jour atteint : rien ne part, le mail oublié repartira", async () => {
-    const { u } = await client("sequence-plafond");
+  it("aucun plafond par jour : celui des relances atteint, les séquences partent quand même", async () => {
+    const { u } = await client("sequence-sans-plafond");
     await poserLeCompteur(plafondsDesMails().relances.max);
-    const passage = await passer();
-    expect(passage.retenus).toBeGreaterThanOrEqual(1);
-    expect(pour(u)).toEqual([]);
-    expect(await envois(u)).toEqual([]);
-    await poserLeCompteur(0);
+    await passer();
+    expect(pour(u)).toHaveLength(1);
+  });
+
+  it("le quota du prestataire atteint : rien ne part, le mail oublié repartira", async () => {
+    const { u } = await client("sequence-quota");
+    retenus.add(u.email);
+    try {
+      const passage = await passer();
+      expect(passage.retenus).toBeGreaterThanOrEqual(1);
+      expect(pour(u)).toEqual([]);
+      expect(await envois(u)).toEqual([]);
+    } finally {
+      retenus.delete(u.email);
+    }
     await passer();
     expect(pour(u)).toHaveLength(1);
   });

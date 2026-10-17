@@ -37,16 +37,16 @@ import { db, schema } from "./db";
 import { donneesMemoire, donneesVerdict } from "./depot";
 import { estEquipe } from "./droits";
 import { envoyerMail, refusDuPrestataire } from "./email";
-import { boiteAMails, env } from "./env";
+import { env } from "./env";
 import { histoireDe, metaDe, quiRempli, type Meta } from "./histoires";
 import { entre } from "./invitations";
 import { journal, journalErreur } from "./journal";
-import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
+import { sousLaLimite } from "./limites";
 import { mailDeSequence } from "./mail-sequence";
 import { montrer, rouvrirLaSuite } from "./offres-uniques";
 import { suiteVendable } from "./paiement/commande";
 import { lienDeParrainage } from "./parrainage";
-import { lienDesinscription, RELANCES_DU_JOUR } from "./relances";
+import { lienDesinscription } from "./relances";
 import { rechargeDejaPayee } from "./achats";
 
 /*
@@ -83,8 +83,9 @@ import { rechargeDejaPayee } from "./achats";
  * - jamais à l’équipe, ni à qui la bêta fermée ne laisse pas entrer, ni sur une conv en alerte (le mode sobre), ni sans
  *   « Qui es-tu ? » rempli (ni prénom ni pronom à accorder) ;
  * - les conseils s’arrêtent à users.conseils_coupes_le, les offres à users.relances_coupees_le (le lien de leur pied) ;
- * - dans le plafond des relances du jour, qu’ils partagent avec la relance (passée avant eux, au même passage), puis dans
- *   le quota des mails (sorte « relance »).
+ * - aucun plafond par jour à eux (décidé le 17 octobre : s’il en faut 60, il en part 60) : seulement le quota des mails
+ *   du prestataire (BLUSH_MAILS_PAR_JOUR, sorte « relance »), qui garde une part pour « ton rapport est prêt » et les
+ *   alertes, et au plus MAILS_PAR_PASSAGE par passage des 5 minutes.
  * Envoyés par GET /api/cron/relances (Vercel Cron, toutes les 5 minutes), juste après les relances.
  * TODO(produit): à relire par un juriste : des mails commerciaux (S4, S6, S7) à des clients, pour des services analogues
  * (article L34-5 du Code des postes et des communications électroniques), et leur lien de désinscription.
@@ -96,7 +97,7 @@ const HEURES_CALMES = { de: 23, a: 8 } as const;
 /** Entre deux mails des séquences au même compte, au moins ce temps : un par jour, à quelques heures près. */
 export const ECART_ENTRE_DEUX_MAILS_MS = 20 * 3600e3;
 
-/** Au plus, les mails des séquences partis d’un passage (le plafond du jour les arrête souvent avant). */
+/** Au plus, les mails des séquences partis d’un passage des 5 minutes : les suivants partent au passage d’après. */
 const MAILS_PAR_PASSAGE = 50;
 
 const HEURE = 3600e3;
@@ -715,8 +716,8 @@ function liensDe(c: Candidat, m: MailDeSequence) {
 /**
  * Envoie les mails des séquences dus (voir l’en-tête), un par compte au plus, et dit ce qu’il a fait en nombres
  * seulement. Un compte a un seul mail par passage : la réponse prête d’abord, puis S3, son anniversaire (S8), les
- * bulles, les offres gardées (S6), le chat endormi (S5), et après un 🧊 (S7). Le plafond du
- * jour atteint, ou le quota des mails, arrête le passage : le mail non parti est oublié, il repartira au passage suivant
+ * bulles, les offres gardées (S6), le chat endormi (S5), et après un 🧊 (S7). Le quota des mails du prestataire atteint
+ * arrête le passage : le mail non parti est oublié, il repartira au passage suivant
  * (tant que sa fenêtre est ouverte). De même quand le prestataire le refuse sans regarder l’adresse (refusDuPrestataire).
  * Une adresse refusée, ou un mail perdu en route (il a pu partir), compte comme fait. `maintenant` : pour les heures
  * calmes (les tests).
@@ -724,7 +725,6 @@ function liensDe(c: Candidat, m: MailDeSequence) {
 export async function envoyerLesSequences({ maintenant = new Date() }: { maintenant?: Date } = {}): Promise<PassageDesSequences> {
   const passage: PassageDesSequences = { dues: 0, envoyes: 0, ecartes: 0, retenus: 0, echecs: 0 };
   if (heureCalme(maintenant)) return passage;
-  const boite = boiteAMails();
   /* Un par compte, dans l’ordre des priorités */
   const parCompte = new Map<string, Candidat>();
   const prospects = env().BLUSH_MAILS_PROSPECTS;
@@ -774,12 +774,6 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
       passage.ecartes++;
       continue;
     }
-    if (!boite && !(await sousLaLimite(RELANCES_DU_JOUR, plafondsDesMails().relances))) {
-      await rendre(RELANCES_DU_JOUR);
-      await oublierLEnvoi(c.userId, c.cle, c.occasion);
-      passage.retenus = dus.length - k;
-      break;
-    }
     let parti: boolean;
     try {
       parti = await envoyerMail(c.email, mailDeSequence(mail, { base: env().BLUSH_URL, liens: liensDe(c, mail) }), { sorte: "relance" });
@@ -793,7 +787,6 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
     }
     if (!parti) {
       await oublierLEnvoi(c.userId, c.cle, c.occasion);
-      if (!boite) await rendre(RELANCES_DU_JOUR);
       passage.retenus = dus.length - k;
       break;
     }
