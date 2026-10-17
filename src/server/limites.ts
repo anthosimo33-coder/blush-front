@@ -125,6 +125,12 @@ export const LIMITES = {
    */
   relanceParCompte: { max: 20, fenetreS: 86400 },
   /**
+   * Les mails des séquences (src/server/sequences.ts), pour tous, par 24 h : un garde-fou contre un envoi anormal (un
+   * bug qui écrirait à toute la base d’un coup), pas un plafond de tous les jours (décidé le 17 octobre : 300). Atteint,
+   * l’équipe est prévenue. À relever quand le volume normal s’en approche.
+   */
+  sequencesParJour: { max: 300, fenetreS: 86400 },
+  /**
    * Les alertes par mail à l’équipe (S-19), par jour : les `reserveImportantes` dernières sont gardées pour les alertes
    * importantes (le budget de l’IA, l’échec d’une lecture ou d’un rapport) : une alerte ordinaire s’arrête avant. Elles
    * partent aussi dans le quota des mails (plafondsDesMails : chaque destinataire compte), qui les arrête avant les rapports.

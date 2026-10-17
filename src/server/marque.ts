@@ -71,10 +71,13 @@ export const DOUX_SOMBRE = "#B9B6AF";
 /** L’adresse du site telle qu’on l’écrit (c’est elle qu’on retient). */
 export const SITE_AFFICHE = "askblush.com";
 
-/** Un mail : son sujet, sa version texte, et sa version HTML (une alerte de l’équipe n’en a pas). */
-export type Mail = { sujet: string; texte: string; html?: string };
+/**
+ * Un mail : son sujet, sa version texte, et sa version HTML (une alerte de l’équipe n’en a pas) ; `entetes` : des
+ * en-têtes en plus (la désinscription en un clic des mails des séquences et de la relance, List-Unsubscribe).
+ */
+export type Mail = { sujet: string; texte: string; html?: string; entetes?: Record<string, string> };
 /** Un mail dessiné par le gabarit : il a toujours sa version HTML. */
-export type MailDessine = Required<Mail>;
+export type MailDessine = Required<Pick<Mail, "sujet" | "texte" | "html">> & Pick<Mail, "entetes">;
 
 /** Une valeur d’attribut HTML (un lien) : ses `&` et ses guillemets échappés. */
 export const attribut = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
