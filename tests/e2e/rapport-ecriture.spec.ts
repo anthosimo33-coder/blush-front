@@ -85,7 +85,7 @@ test("le rapport débloqué après le verdict : le rapport s’écrit sous tes y
         ["vocal", "fini"],
       ].sort(),
     );
-    await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });
+    await attendreMail(email, { filtre: (m) => m.sujet === "📖 ton rapport est prêt. j’ai pas été tendre" });
   });
 });
 

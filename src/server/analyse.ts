@@ -30,6 +30,7 @@ import { signalerLesAchatsDUneAlerte } from "./achats";
 import { auMieux, journal, journalErreur } from "./journal";
 import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
+import { aPrisPremium, noterLEnvoi, personnesDe } from "./sequences";
 import type { Etape } from "./pipeline";
 import { memoireDeSecours, remplacerLeSecours } from "./secours";
 import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
@@ -337,23 +338,32 @@ async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, strin
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { data, partiel: null, updatedAt: new Date() } });
   /* La première fois seulement (pas à une relance) : le mail « ton rapport est prêt » */
-  if (!avant?.pret) await prevenirRapportPret(story, donnees, h.autre.prenom);
+  if (!avant?.pret) await prevenirRapportPret(story, donnees);
 }
 
 /**
- * Le mail « ton rapport est prêt », avec le lien qui ouvre cette conv-là. Un mail raté ne fait pas échouer le rapport.
- * `autre` : le prénom de l’autre, le titre de son chapitre dans le sommaire, comme dans le rapport.
+ * Le mail « ton rapport est prêt » (S3 J0 des séquences), avec le lien qui ouvre cette conv-là : leurs prénoms, et ce
+ * qu’elle a pris (le rapport, ou Premium). Parti, il est noté (src/server/sequences.ts) : il compte pour le mail du jour,
+ * et « il t’a répondu ? » vient le lendemain. Un mail raté ne fait pas échouer le rapport.
  */
-async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport, autre: string) {
-  if (!story.userId) return;
+async function prevenirRapportPret(story: Ligne, donnees: DonneesRapport) {
+  const personnes = personnesDe(metaDe(story));
+  if (!story.userId || !personnes) return;
   try {
     const [u] = await db().select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, story.userId));
     if (!u) return;
     const base = env().BLUSH_URL;
-    await envoyerMail(
-      u.email,
-      mailRapport({ base, lien: `${base}/ouvrir/${story.id}`, chapitres: donnees.chapitres.length, lecture: donnees.lecture.full, autre, sobre: !!donnees.sobre }),
-    );
+    const premium = await aPrisPremium(story.id, story.userId);
+    const mail = mailRapport({
+      base,
+      lien: `${base}/ouvrir/${story.id}`,
+      chapitres: donnees.chapitres.length,
+      lecture: donnees.lecture.full,
+      personnes,
+      premium,
+      sobre: !!donnees.sobre,
+    });
+    if (await envoyerMail(u.email, mail)) await noterLEnvoi(story.userId, "s3_rapport", story.id, story.id);
   } catch (e) {
     journalErreur("mail du rapport non envoyé", e, { histoire: story.id });
   }

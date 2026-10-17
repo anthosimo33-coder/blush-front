@@ -12,7 +12,7 @@ test("le lien du mail « ton rapport est prêt », ouvert dans un autre navigate
   const { id } = (await histoiresDe(email))[0]!;
 
   const lien = await test.step("le mail porte le lien de cette conv", async () => {
-    const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });
+    const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 ton rapport est prêt. j’ai pas été tendre" });
     const lien = mail.texte.match(/https?:\/\/\S+\/ouvrir\/\S+/)?.[0];
     expect(lien).toBe(`${testInfo.project.use.baseURL}/ouvrir/${id}`);
     return lien!;

@@ -19,7 +19,7 @@ test("la relance : le mail « Ton rapport t’attend », son lien vers la feuill
     const r = await request.get("/api/cron/relances", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
     expect(r.status()).toBe(200);
     const corps = (await r.json()) as Record<string, unknown>;
-    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "prises", "retenues"]);
+    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "prises", "retenues", "sequences"]);
     expect(JSON.stringify(corps)).not.toContain(email);
     return attendreMail(email, { depuis, filtre: (m) => m.sujet === "Ton rapport t’attend" });
   });
@@ -45,7 +45,7 @@ test("la relance : le mail « Ton rapport t’attend », son lien vers la feuill
     const lien = /(https?:\/\/\S+\/desinscription\?\S+)/.exec(mail.texte)![1]!;
     const ailleurs = await autreAppareil();
     await ailleurs.goto(new URL(lien).pathname + new URL(lien).search);
-    await expect(ailleurs.getByRole("heading", { level: 1, name: "Plus de relances\u00a0?" })).toBeVisible();
+    await expect(ailleurs.getByRole("heading", { level: 1, name: "Plus d’offres\u00a0?" })).toBeVisible();
     const bouton = ailleurs.getByRole("button", { name: "Me désinscrire" });
     await bouton.focus();
     await ailleurs.keyboard.press("Enter");

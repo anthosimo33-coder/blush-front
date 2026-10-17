@@ -70,6 +70,12 @@ export const users = pgTable("users", {
    */
   relancesCoupeesLe: quand("relances_coupees_le"),
   /**
+   * Le lien de désinscription d’un mail de conseils (les séquences après l’achat, src/server/sequences.ts : « il t’a
+   * répondu ? », le vocal, le prochain pas, le chat endormi) touché : l’heure. Plus aucun conseil ne part à ce compte ;
+   * les offres et les relances suivent `relancesCoupeesLe`, et les mails qu’il demande partent toujours.
+   */
+  conseilsCoupesLe: quand("conseils_coupes_le"),
+  /**
    * D’où il est venu (SOURCES_VISITE) : la source de sa visite du jour, retrouvée à la création du compte par l’empreinte
    * anonyme de sa connexion (src/server/visites.ts). null : un compte d’avant le suivi des visites, ou sa visite pas
    * retrouvée. Le tableau de bord en tire les ventes par source.
@@ -555,6 +561,29 @@ export const offresUniques = pgTable(
     priseLe: quand("prise_le"),
   },
   (t) => [primaryKey({ columns: [t.userId, t.offre] }), index("offres_uniques_montree_idx").on(t.montreeLe)],
+);
+
+/**
+ * Les mails des séquences (src/server/sequences.ts) partis : à qui, lequel (`cle`, MAILS : « s3_repondre »…), pour quelle
+ * occasion (la conv d’un mail d’une fois par conv, les bulles reçues d’un mail qui revient à chaque recharge, la réponse
+ * prête), et quand. Écrite avant le mail (deux passages du cron n’en envoient qu’un, l’index unique y veille), effacée si
+ * le mail n’est pas parti. `parti` faux : écarté au moment de l’écrire (une alerte, un 🧊), gardé pour ne pas repasser,
+ * sans compter pour le mail du jour. Rien de la conv : ni prénom, ni texte.
+ */
+export const envoisMails = pgTable(
+  "envois_mails",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+    cle: text("cle").notNull(),
+    occasion: text("occasion").notNull(),
+    parti: boolean("parti").notNull().default(true),
+    envoyeLe: quand("envoye_le").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("envois_mails_occasion_idx").on(t.userId, t.cle, t.occasion), index("envois_mails_compte_idx").on(t.userId, t.envoyeLe)],
 );
 
 /** Les webhooks de paiement déjà traités, par leur `webhook-id` : un webhook rejoué est ignoré. Aucun contenu. */

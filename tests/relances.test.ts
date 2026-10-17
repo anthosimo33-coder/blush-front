@@ -330,7 +330,7 @@ describe("la relance par mail (②)", () => {
     log.mockRestore();
     expect(r.status).toBe(200);
     const corps = (await r.json()) as Record<string, unknown>;
-    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "prises", "retenues"]);
+    expect(Object.keys(corps).sort()).toEqual(["chaines", "dues", "ecartees", "echecs", "envoyees", "prises", "retenues", "sequences"]);
     expect(Object.values(corps).every((v) => typeof v === "number")).toBe(true);
     expect(corps.envoyees).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(corps)).not.toContain(u.email);

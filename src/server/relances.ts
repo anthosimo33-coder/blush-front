@@ -12,6 +12,7 @@ import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { mailRelance } from "./mail-relance";
 import { etatDesTaches } from "./taches";
 import { ECART_OFFRES_UNIQUES_MS } from "@/contenu/offres";
+import type { Desinscription } from "@/types";
 import type { PassageDesRelances } from "@/types/api";
 
 /*
@@ -40,23 +41,35 @@ export const FRAICHEUR_RELANCE_MS = 48 * 3600e3;
  */
 const RELANCES_PAR_PASSAGE = 50;
 
-/* Le compteur du jour des relances parties : plafondsDesMails().relances */
-const RELANCES_DU_JOUR = "relances:mails";
-
-/** Le lien signé du mail pour couper les relances de ce compte : son id, et son empreinte (personne ne peut en désinscrire un autre). */
-export const lienDesinscription = (userId: string) => `${env().BLUSH_URL}/desinscription?id=${userId}&cle=${empreinte(`desinscription:${userId}`)}`;
+/* Le compteur du jour des relances parties : plafondsDesMails().relances, partagé avec les mails des séquences (src/server/sequences.ts) */
+export const RELANCES_DU_JOUR = "relances:mails";
 
 /**
- * Coupe les relances du compte, depuis le lien de son mail. Faux si le lien n’est pas le bon ; vrai sinon, même déjà
- * coupées ou le compte effacé depuis (le lien ne dit rien de plus).
+ * Le lien signé d’un mail pour couper ce genre de mails à ce compte (`quoi` : les offres, dont la relance, ou les conseils
+ * des séquences, src/server/sequences.ts) : son id, et son empreinte (personne ne peut en désinscrire un autre). La
+ * signature ne dépend que du compte : sur la page, il peut aussi tout couper.
  */
-export async function desinscrire(id: string, cle: string): Promise<boolean> {
+export const lienDesinscription = (userId: string, quoi: Exclude<Desinscription, "tout"> = "offres") =>
+  `${env().BLUSH_URL}/desinscription?id=${userId}&cle=${empreinte(`desinscription:${userId}`)}${quoi === "offres" ? "" : `&quoi=${quoi}`}`;
+
+/**
+ * Coupe ce genre de mails au compte, depuis le lien de son mail : les offres (users.relances_coupees_le), les conseils
+ * (users.conseils_coupes_le), ou les deux. Faux si le lien n’est pas le bon ; vrai sinon, même déjà coupés ou le compte
+ * effacé depuis (le lien ne dit rien de plus).
+ */
+export async function desinscrire(id: string, cle: string, quoi: Desinscription = "offres"): Promise<boolean> {
   if (!memeEmpreinte(`desinscription:${id}`, cle)) return false;
   const u = schema.users;
-  await db()
-    .update(u)
-    .set({ relancesCoupeesLe: sql`now()` })
-    .where(and(eq(u.id, id), isNull(u.relancesCoupeesLe)));
+  if (quoi !== "conseils")
+    await db()
+      .update(u)
+      .set({ relancesCoupeesLe: sql`now()` })
+      .where(and(eq(u.id, id), isNull(u.relancesCoupeesLe)));
+  if (quoi !== "offres")
+    await db()
+      .update(u)
+      .set({ conseilsCoupesLe: sql`now()` })
+      .where(and(eq(u.id, id), isNull(u.conseilsCoupesLe)));
   return true;
 }
 

@@ -76,6 +76,7 @@ export function Composer({
   arriving,
   logo,
   bandeau,
+  texteDeDepart,
   children,
 }: {
   formRef: RefObject<HTMLFormElement | null>;
@@ -105,10 +106,12 @@ export function Composer({
   bandeau?: ReactNode;
   /** Ce qui vit dans la barre sans en faire partie (la feuille « Partager en image »). */
   children?: ReactNode;
+  /** Le texte déjà tapé à l’ouverture (un bouton d’un mail, `/app?dire=`) : jamais envoyé seul. */
+  texteDeDepart?: string;
 }) {
   const shots = useFilePicker();
   const exp = useFilePicker();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(texteDeDepart ?? "");
   const [menu, setMenu] = useState(false);
   const typed = text.trim().length > 0;
   /* Les questions toutes prêtes se masquent d’un geste, et reviennent par « Idées de questions » (retenu sur cet appareil) */

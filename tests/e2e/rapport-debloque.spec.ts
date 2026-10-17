@@ -125,7 +125,7 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
   });
 
   await test.step("le mail « ton rapport est prêt » : son sommaire garde les titres d’attente (rien de la conv), le prénom de Maëlys compris", async () => {
-    const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 Ton rapport BLUSH est prêt" });
+    const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 ton rapport est prêt. j’ai pas été tendre" });
     expect(sommaireDuMail(mail.html)).toEqual(["Le verdict", ...CHAPITRES_D_ATTENTE].map((titre, k) => `${k + 1} ${titre}`));
   });
 });

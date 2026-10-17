@@ -34,18 +34,20 @@ describe("les chapitres du rapport : seul le chapitre 1 est offert", () => {
     expect(() => titreDAttente(NB_CHAPITRES + 1, "Maëlys")).toThrow(RangeError);
   });
 
+  /* Le prénom de l’autre, et le sien (Hugo) */
+  const avec = (autre: string) => ({ moi: { prenom: "Hugo", elle: false }, autre: { prenom: autre, il: false } });
   /* Le sommaire du mail, lu dans son HTML : la pastille du numéro, puis le titre */
   const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => [Number(m[1]), m[2]]);
 
   it("le sommaire du mail : les titres du rapport, dans l’ordre, le 5 au prénom de l’autre", () => {
-    const { html } = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 8, lecture: "9 min", autre: "Maëlys", sobre: false });
+    const { html } = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 8, lecture: "9 min", personnes: avec("Maëlys"), premium: false, sobre: false });
     expect(sommaireDuMail(html)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => [n, titreDAttente(n, "Maëlys")]));
     /* Le mode sobre n’a pas de sommaire : aucun prénom */
-    expect(sommaireDuMail(mailRapport({ base: "x", lien: "x", chapitres: 1, lecture: "2 min", autre: "Maëlys", sobre: true }).html)).toEqual([]);
+    expect(sommaireDuMail(mailRapport({ base: "x", lien: "x", chapitres: 1, lecture: "2 min", personnes: avec("Maëlys"), premium: false, sobre: true }).html)).toEqual([]);
   });
 
   it("le prénom de l’autre reste du texte dans le HTML du mail", () => {
-    const { html } = mailRapport({ base: "x", lien: "x", chapitres: 8, lecture: "9 min", autre: "<b>Léa & Zoé</b>", sobre: false });
+    const { html } = mailRapport({ base: "x", lien: "x", chapitres: 8, lecture: "9 min", personnes: avec("<b>Léa & Zoé</b>"), premium: false, sobre: false });
     expect(sommaireDuMail(html)[4]).toEqual([5, "&lt;b&gt;Léa &amp; Zoé&lt;/b&gt;"]);
     expect(html).not.toContain("<b>Léa");
   });
