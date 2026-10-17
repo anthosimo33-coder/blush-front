@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import {
+  DESINSCRIPTIONS,
   ETAPES_VISITE,
   EVENEMENTS_ECOUTE,
   GESTES_DE_LA_ROUE,
@@ -316,7 +317,7 @@ type Reponses = {
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/chaine": Ok;
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number };
+  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number; sequences: number };
   "POST /api/desinscription": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
@@ -439,8 +440,8 @@ export const ROUTES = {
   "GET /api/cron/chaine": {},
   "GET /api/cron/purge": {},
   "GET /api/cron/relances": {},
-  /* Le lien signé de la relance */
-  "POST /api/desinscription": { corps: z.object({ id: z.string(), cle: z.string() }) },
+  /* Le lien signé d’un mail, et ce qu’il coupe (les liens d’avant les séquences : les offres) */
+  "POST /api/desinscription": { corps: z.object({ id: z.string(), cle: z.string(), quoi: z.enum(DESINSCRIPTIONS).default("offres") }) },
   "GET /api/fiche": {},
   /* Sa fiche corrigée : la liste entière de ses faits */
   "PUT /api/fiche": {

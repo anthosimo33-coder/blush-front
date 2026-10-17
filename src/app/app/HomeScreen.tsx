@@ -109,6 +109,12 @@ export function HomeScreen(p: {
    * achetées. La réponse prête se lit tout de suite, et un mot le dit.
    */
   recharge?: number;
+  /**
+   * Arrivé par un bouton d’un mail (/ouvrir/<conv>, src/server/sequences.ts) : le texte qu’il tape d’avance dans le champ
+   * (`?dire=`, jamais envoyé seul), ou la recharge ouverte (`?recharger=1`). L’adresse les perd aussitôt.
+   */
+  dire?: string;
+  recharger?: boolean;
 }) {
   const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
@@ -155,7 +161,8 @@ export function HomeScreen(p: {
   });
   const solde = soldeAffiche(compte);
   const expliquees = useDrapeau(BULLES_EXPLIQUEES);
-  const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(null);
+  /* Arrivé par un bouton d’un mail des bulles (`?recharger=1`) : la recharge ouverte d’emblée (pas pour l’équipe, sans solde) */
+  const [feuille, setFeuille] = useState<"bulle" | "recharge" | null>(() => (p.recharger && solde !== null ? "recharge" : null));
   const rechargePrete = useChargeAuRepos(chargerLaRecharge, { ouverte: feuille === "recharge" });
   const [mot, setMot] = useState<string | null>(null);
   /** Ce qu’une réponse dit des bulles : ce qu’il en reste (le compteur, Mon compte), ou qu’il n’y en a plus (la recharge). */
@@ -230,6 +237,15 @@ export function HomeScreen(p: {
       setMot(apresLaRecharge(recharge, lue));
     })();
   }, [recharge, conv]);
+  /* Arrivé par un bouton d’un mail : l’adresse perd son `?dire=` et son `?recharger=1` (un rechargement ne les redit pas) */
+  const { dire, recharger } = p;
+  useEffect(() => {
+    if (dire === undefined && !recharger) return;
+    const ici = new URL(window.location.href);
+    ici.searchParams.delete("dire");
+    ici.searchParams.delete("recharger");
+    window.history.replaceState(window.history.state, "", `${ici.pathname}${ici.search}${ici.hash}`);
+  }, [dire, recharger]);
   useEffect(() => {
     if (!mot) return;
     const t = setTimeout(() => setMot(null), MOT_DE_LA_RECHARGE_MS);
@@ -319,6 +335,7 @@ export function HomeScreen(p: {
             {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
             <Composer
               {...envois}
+              texteDeDepart={dire}
               formRef={composer}
               inputRef={input}
               quick={idees.quick}

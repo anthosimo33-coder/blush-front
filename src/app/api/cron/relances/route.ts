@@ -3,10 +3,12 @@ import { env } from "@/server/env";
 import { erreur, repondre, route } from "@/server/http";
 import { reprendreLesChainesEnPlan } from "@/server/pipeline";
 import { envoyerLesRelances } from "@/server/relances";
+import { envoyerLesSequences } from "@/server/sequences";
 import { renommerLesPrises } from "@/server/tournage";
 
 /**
- * Les relances par mail (« Ton rapport t’attend », src/server/relances.ts), appelées toutes les 5 minutes par Vercel Cron
+ * Les relances par mail (« Ton rapport t’attend », src/server/relances.ts), puis les mails des séquences
+ * (src/server/sequences.ts : `sequences`, ceux partis), appelées toutes les 5 minutes par Vercel Cron
  * (vercel.json), et en secours par la veille de GitHub (.github/workflows/veille.yml), avec le secret CRON_SECRET,
  * comparé à temps constant comme pour la purge. Chaque passage ne relance qu’une fois chaque compte : deux passages
  * proches ne font rien de plus. Et,
@@ -18,6 +20,8 @@ import { renommerLesPrises } from "@/server/tournage";
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const secret = env().CRON_SECRET;
   if (!secret || !memeEmpreinte(req.headers.get("authorization") ?? "", empreinte(`Bearer ${secret}`))) return erreur("interdit");
-  const [relances, chaines, prises] = await Promise.all([envoyerLesRelances(), reprendreLesChainesEnPlan(), renommerLesPrises()]);
-  return repondre("GET /api/cron/relances", { ...relances, chaines, prises });
+  /* Les séquences après les relances : la relance d’abord, dans le plafond du jour qu’elles partagent */
+  const mails = envoyerLesRelances().then(async (relances) => ({ relances, sequences: await envoyerLesSequences() }));
+  const [{ relances, sequences }, chaines, prises] = await Promise.all([mails, reprendreLesChainesEnPlan(), renommerLesPrises()]);
+  return repondre("GET /api/cron/relances", { ...relances, chaines, prises, sequences: sequences.envoyes });
 });

@@ -72,6 +72,12 @@ export type Voix = (typeof VOIX)[number];
 export const EVENEMENTS_ECOUTE = ["debut", "fin", "reecoute", "ferme"] as const;
 export type EvenementEcoute = (typeof EVENEMENTS_ECOUTE)[number];
 /**
+ * Ce que coupe le lien de désinscription d’un mail (/desinscription?quoi=…) : les conseils (les séquences après l’achat,
+ * users.conseils_coupes_le), les offres (les relances et les mails des bulles, users.relances_coupees_le), ou tout.
+ */
+export const DESINSCRIPTIONS = ["conseils", "offres", "tout"] as const;
+export type Desinscription = (typeof DESINSCRIPTIONS)[number];
+/**
  * L’écran où se trouve un visiteur en ce moment (presences.etape, /admin en direct), d’après son adresse : l’accueil, un
  * verdict partagé (/v/…), l’import, le verdict, le rapport, le paiement, le chat, son compte, ou ailleurs (src/lib/presence.ts).
  */

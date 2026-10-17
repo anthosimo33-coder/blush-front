@@ -21,16 +21,32 @@ describe("les robots d’aperçu ne sont pas des visites", () => {
 });
 
 describe("le mail « ton rapport est prêt »", () => {
-  it("son prénom au sommaire seulement (ni le sujet, ni l’aperçu, ni le texte brut), et sobre en mode sobre", () => {
-    const m = mailRapport({ base: "https://www.askblush.com", lien: "https://www.askblush.com/ouvrir/abc", chapitres: 8, lecture: "9 min", autre: "Maëlys", sobre: false });
+  it("leurs prénoms dans le corps seulement (ni le sujet, ni l’aperçu, ni le texte brut), et sobre en mode sobre", () => {
+    const personnes = { moi: { prenom: "Hugo", elle: false }, autre: { prenom: "Maëlys", il: false } };
+    const m = mailRapport({
+      base: "https://www.askblush.com",
+      lien: "https://www.askblush.com/ouvrir/abc",
+      chapitres: 8,
+      lecture: "9 min",
+      personnes,
+      premium: false,
+      sobre: false,
+    });
     expect(m.html).toContain("https://www.askblush.com/ouvrir/abc");
-    expect(m.html.match(/Maëlys/g)).toEqual(["Maëlys"]);
+    /* Sa bulle, le titre et son chapitre au sommaire ; son prénom à lui dans la première bulle */
+    expect(m.html.match(/Maëlys/g)).toHaveLength(3);
     expect(m.html).toContain(">Maëlys</td>");
-    expect(`${m.sujet}\n${m.texte}`).not.toContain("Maëlys");
+    expect(m.html).toContain("Hugo, j’ai fini");
+    expect(`${m.sujet}\n${m.texte}`).not.toMatch(/Maëlys|Hugo/);
     expect(m.texte).toContain("8 chapitres, 9 min de lecture");
-    const s = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 0, lecture: "2 min", autre: "Maëlys", sobre: true });
+    /* Ce qu’il a pris : le rapport (10 réponses), ou Premium (90, dont 30 offertes) */
+    expect(m.html).toContain("Et 10 réponses de BLUSH d’avance<");
+    const premium = mailRapport({ base: "x", lien: "x", chapitres: 8, lecture: "9 min", personnes, premium: true, sobre: false });
+    expect(premium.html).toContain("Et 90 réponses de BLUSH d’avance, dont 30 offertes");
+    expect(premium.html).toContain("message après message");
+    const s = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 0, lecture: "2 min", personnes, premium: false, sobre: true });
     expect(s.html).not.toContain("tendre");
-    expect(s.html).not.toContain("Maëlys");
+    expect(s.html).not.toMatch(/Maëlys|Hugo|réponses de BLUSH/);
     expect(s.sujet).not.toContain("📖");
   });
 
@@ -48,7 +64,7 @@ describe("le mail « ton rapport est prêt »", () => {
       await planifier(imp.id, "verdict");
       await executerChaine(imp.id);
       const mails = () => log.mock.calls.filter(([l]) => String(l).startsWith("[dev] mail") && String(l).includes(u.email));
-      expect(mails().map(([l]) => l)).toEqual([`[dev] mail « 📖 Ton rapport BLUSH est prêt » pour ${u.email}`]);
+      expect(mails().map(([l]) => l)).toEqual([`[dev] mail « 📖 ton rapport est prêt. j’ai pas été tendre » pour ${u.email}`]);
 
       /* L’écriture relancée, la conv encore là : elle réécrit le rapport (sans échec, sans pause), et le mail ne repart pas */
       await db().update(schema.stories).set({ conv, convPurgedAt: null }).where(eq(schema.stories.id, imp.id));

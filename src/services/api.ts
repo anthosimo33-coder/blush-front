@@ -9,6 +9,7 @@ import type {
   AppKind,
   BlushAnswer,
   BulleChat,
+  Desinscription,
   EvenementChat,
   EvenementEcoute,
   ExportApp,
@@ -832,10 +833,10 @@ export async function retirerDeLaListe(lien: { id: string; cle: string }): Promi
 /* ———— Les relances par mail ———— */
 
 /**
- * Couper les relances par mail de son compte, depuis le lien signé de la relance : `coupees`, `lien` (il ne mène à rien :
- * 404) ou `echec` (le réseau, le serveur : on peut réessayer).
+ * Couper un genre de mails de son compte (les offres, les conseils, ou tout), depuis le lien signé d’un mail : `coupees`,
+ * `lien` (il ne mène à rien : 404) ou `echec` (le réseau, le serveur : on peut réessayer).
  */
-export async function couperLesRelances(lien: { id: string; cle: string }): Promise<"coupees" | "lien" | "echec"> {
+export async function couperLesRelances(lien: { id: string; cle: string; quoi: Desinscription }): Promise<"coupees" | "lien" | "echec"> {
   try {
     await appel("POST /api/desinscription", { corps: lien });
     return "coupees";

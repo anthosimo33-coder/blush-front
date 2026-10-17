@@ -88,7 +88,7 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === "Ton rapport BLUSH est prêt" });
     expect(mail.texte).toContain("Il est court, et il t’aide à y voir clair. Prends le temps de le lire au calme");
     expect(mail.texte).not.toContain("chapitres");
-    expect(mailsPour(email).map((m) => m.sujet)).not.toContain("📖 Ton rapport BLUSH est prêt");
+    expect(mailsPour(email).map((m) => m.sujet)).not.toContain("📖 ton rapport est prêt. j’ai pas été tendre");
   });
 
   await test.step("jamais vendue (SUP22-1) : l’accueil ramène au rapport doux sans paiement, et le serveur refuse de la faire payer (409 « sobre »)", async () => {

@@ -25,7 +25,7 @@ import {
  * prêt », le vocal de BLUSH, et la reprise de la lecture.
  */
 
-const SUJET_PRET = "📖 Ton rapport BLUSH est prêt";
+const SUJET_PRET = "📖 ton rapport est prêt. j’ai pas été tendre";
 
 test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question sont à portée, et le mail « prêt » mène au rapport", async ({ page, autreAppareil }, testInfo) => {
   const email = await lectureComplete(page, testInfo);
@@ -75,7 +75,7 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
     expect(histoire.convGardee).toBe(false);
   });
 
-  await test.step("le mail « ton rapport est prêt » est arrivé une fois, avec le lien de ce rapport, et de la conv seulement son prénom", async () => {
+  await test.step("le mail « ton rapport est prêt » est arrivé une fois, avec le lien de ce rapport, et de la conv seulement leurs prénoms", async () => {
     /* L’invité repart d’une boîte vide (nouvelInvite) : tous ses mails viennent de ce test */
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === SUJET_PRET });
     expect(mailsPour(email).filter((m) => m.sujet === SUJET_PRET)).toHaveLength(1);
@@ -83,17 +83,24 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
     expect(mail.texte).toContain(lien);
     expect(mail.html).toContain(`href="${lien}"`);
     expect(mail.html).toContain("Lire mon rapport");
-    /* Ni verdict, ni message, ni ton prénom ; le sien une fois, au sommaire (le titre de son chapitre, comme dans le rapport) */
-    for (const prive of ["Noé", "Vous êtes à deux doigts", "esquivé", "marché aux puces"]) expect(`${mail.sujet}\n${mail.texte}\n${mail.html}`).not.toContain(prive);
-    expect(mail.html.match(/Maëlys/g)).toHaveLength(1);
+    /* Ni verdict, ni message ; ton prénom dans la première bulle, le sien dans une bulle, le titre et au sommaire (le titre de son chapitre) */
+    for (const prive of ["Vous êtes à deux doigts", "esquivé", "marché aux puces"]) expect(`${mail.sujet}\n${mail.texte}\n${mail.html}`).not.toContain(prive);
+    expect(mail.html).toContain("Noé, j’ai fini");
+    expect(mail.html.match(/Maëlys/g)).toHaveLength(3);
     /* Ce que montre l’écran verrouillé (le sujet, le texte brut) ne dit aucun prénom */
-    expect(`${mail.sujet}\n${mail.texte}`).not.toContain("Maëlys");
+    expect(`${mail.sujet}\n${mail.texte}`).not.toMatch(/Maëlys|Noé/);
   });
 
   await test.step("le lien du mail ouvre le rapport", async () => {
     await page.goto(lien);
     await expect(page).toHaveURL(/\/rapport$/);
     await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Noé & Maëlys" })).toBeVisible();
+  });
+
+  await test.step("un bouton à une touche des mails des séquences : le chat, le texte déjà tapé, jamais envoyé seul", async () => {
+    await page.goto(`${lien}?dire=${encodeURIComponent("c’est fait\u00a0! ")}`);
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByRole("textbox", { name: "Écris à BLUSH, ou colle sa réponse", exact: true })).toHaveValue("c’est fait\u00a0! ");
   });
 
   await test.step("ouvert sur un autre appareil, sans session : la connexion d’abord, puis le rapport", async () => {

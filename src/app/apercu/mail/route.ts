@@ -1,25 +1,60 @@
 import { NB_CHAPITRES } from "@/contenu/chapitres";
+import { mailGlace, mailPeuDeBulles, mailProchainPas, mailRepondre, mailReponsePrete, mailVocal, mailZeroBulle, type MailDeSequence, type Personnes } from "@/contenu/mails";
 import { mailAttente } from "@/server/mail-attente";
 import { mailCode } from "@/server/mail-code";
 import { mailRapport } from "@/server/mail-rapport";
 import { mailRelance } from "@/server/mail-relance";
+import { mailDeSequence } from "@/server/mail-sequence";
 import { AUTRE } from "../ecriture/exemple";
 
 export const dynamic = "force-dynamic";
 
+/** Les mails des séquences (src/server/sequences.ts), par leur `?type=` : leur texte pour ces personnes, et ce qu’ils sont pour la désinscription. */
+const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: "conseils" | "offres" }> = {
+  repondre: { mail: (p) => mailRepondre(p, { bulles: 10 }), quoi: "conseils" },
+  vocal: { mail: (p) => mailVocal(p, { secondes: 28 }), quoi: "conseils" },
+  pas: { mail: (p) => mailProchainPas(p, { emoji: "🤏", pas: "Jeudi, propose-lui le ciné dont il t’a parlé, avec une heure.", bulles: 9 }), quoi: "conseils" },
+  glace: { mail: (p) => mailGlace(p), quoi: "conseils" },
+  peu: { mail: (p) => mailPeuDeBulles(p, { bulles: 2, bonus: true, actif: true }), quoi: "offres" },
+  prete: { mail: (p) => mailReponsePrete(p, { bonus: true }), quoi: "offres" },
+  zero: { mail: (p) => mailZeroBulle(p, { faits: 12, messages: 4365, echanges: 23 }), quoi: "offres" },
+};
+
 /**
  * Hors de Vercel seulement (src/proxy.ts) : un mail tel qu’il partira. Le code (par défaut) ; `?type=rapport` (`&sobre=1` :
- * le mode sobre), celui de l’histoire d’exemple (son prénom au chapitre 5 du sommaire) ; ou `?type=attente`, celui de la
- * liste d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
- * `?type=relance`, la relance « Ton rapport t’attend ».
+ * le mode sobre, `&premium=1` : Premium pris), celui de l’histoire d’exemple ; ou `?type=attente`, celui de la liste
+ * d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
+ * `?type=relance`, la relance « Ton rapport t’attend » ; ou un mail des séquences (`?type=repondre`, `vocal`, `pas`,
+ * `glace`, `peu`, `prete`, `zero`). Pour ceux qui ont des prénoms : `&il=1`, c’est lui qui écrit (elle, l’autre) ;
+ * `&anonyme=1`, sans prénoms.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const p = url.searchParams;
-  const type = p.get("type");
-  const html =
-    type === "rapport"
-      ? mailRapport({ base: url.origin, lien: `${url.origin}/rapport`, chapitres: NB_CHAPITRES, lecture: "9 min", autre: AUTRE, sobre: p.get("sobre") === "1" }).html
+  const type = p.get("type") ?? "";
+  const lui = p.get("il") === "1";
+  const anonyme = p.get("anonyme") === "1";
+  const personnes: Personnes = {
+    moi: { prenom: anonyme ? null : lui ? "Lucas" : "Inès", elle: !lui },
+    autre: { prenom: anonyme ? null : lui ? AUTRE : "Lucas", il: !lui },
+  };
+  const exemple = `${url.origin}/ouvrir/exemple`;
+  const sequence = SEQUENCES[type];
+  const html = sequence
+    ? mailDeSequence(sequence.mail(personnes), {
+        base: url.origin,
+        liens: { boutons: [`${exemple}?dire=`, `${exemple}?dire=`], desinscription: { lien: `${url.origin}/desinscription?id=exemple&cle=exemple`, quoi: sequence.quoi } },
+      }).html
+    : type === "rapport"
+      ? mailRapport({
+          base: url.origin,
+          lien: `${url.origin}/rapport`,
+          chapitres: NB_CHAPITRES,
+          lecture: "9 min",
+          personnes,
+          premium: p.get("premium") === "1",
+          sobre: p.get("sobre") === "1",
+        }).html
       : type === "attente"
         ? mailAttente({
             base: url.origin,
