@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
+import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -338,9 +338,9 @@ export async function feuilleDuPaiement(compte: Compte): Promise<FeuilleDuPaieme
     : f.mode === "factice"
       ? { mode: "factice" }
       : { mode: "whop", compte: f.compte, bacASable: f.whop.bacASable };
-  const avoirs = await avoirsDuCompte(compte);
+  const [avoirs, premiumPlusChoisi] = await Promise.all([avoirsDuCompte(compte), premiumLePlusChoisi()]);
   const roue = avoirs.avance || avoirs.garde ? ({ etat: "aucune" } as const) : await roueDuCompte(compte);
-  return { paiement, roue, ...avoirs };
+  return { paiement, roue, premiumPlusChoisi, ...avoirs };
 }
 
 /**

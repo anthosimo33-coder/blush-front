@@ -137,8 +137,12 @@ export type Avoirs = { avance: { fin: string } | null; garde: { fin: string } | 
  */
 export type RoueDuCompte = { etat: "a_tourner" | "refusee" | "aucune" } | { etat: "gagnee"; case: number; lot: LotDeLaRoue; fin: string; reste: number; valable: boolean };
 
-/** Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille, les avoirs du compte, et sa roue. */
-export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille; roue: RoueDuCompte } & Avoirs;
+/**
+ * Ce que la feuille du paiement doit savoir (GET /api/paiement/feuille) : comment payer dans la feuille, les avoirs du
+ * compte, sa roue, et si Premium s’est payée plus souvent que le rapport seul ces 30 derniers jours (le badge « Le plus
+ * choisi » du paywall ne le dit que si c’est vrai).
+ */
+export type FeuilleDuPaiement = { paiement: PaiementDansLaFeuille; roue: RoueDuCompte; premiumPlusChoisi: boolean } & Avoirs;
 
 /**
  * Un achat du compte, pour « Tes achats » (GET /api/achats) : son offre, son prix TTC (en centimes), les bulles qu’il a

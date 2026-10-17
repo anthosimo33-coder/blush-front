@@ -19,7 +19,7 @@ vi.mock("@/server/alertes", async (original) => ({
 }));
 
 import { CATALOGUE, DUREE_SUITE_MS, PREMIERE_RECHARGE } from "@/contenu/offres";
-import { commander, livrer, marquerEchoue, offrirLeRapport, reprendre, uneFoisParEvenement, type Achat } from "@/server/achats";
+import { commander, livrer, marquerEchoue, offrirLeRapport, premiumLePlusChoisi, reprendre, uneFoisParEvenement, ventesDesFormules, type Achat } from "@/server/achats";
 import type { Utilisateur } from "@/server/auth";
 import { crediter, debiter, deverrouiller, refDuMessage, rendre, reponseVerrouillee, soldeDe } from "@/server/bulles";
 import * as coffre from "@/server/coffre";
@@ -408,5 +408,26 @@ describe("les offres uniques", () => {
       .from(schema.offresUniques)
       .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "relance_mail")));
     expect(l?.priseLe).not.toBeNull();
+  });
+});
+
+describe("« Le plus choisi » sur Premium (le badge du paywall)", () => {
+  it("compte les rapports payés ces 30 derniers jours, Premium et le rapport seul ; un remboursé ou un vieux ne compte plus", async () => {
+    /* La base des tests est partagée : on lit l’écart que nos achats y ajoutent, pas des totaux */
+    const avant = await ventesDesFormules();
+    const u = await compteDeTest("plus-choisi");
+    const premium = await commande(u, "premium", { storyId: await conv(u), fournisseur: "factice" });
+    await livrer(premium.id);
+    const seul = await commande(u, "rapport", { storyId: await conv(u), fournisseur: "factice" });
+    await livrer(seul.id);
+    expect(await ventesDesFormules()).toEqual({ premium: avant.premium + 1, seuls: avant.seuls + 1 });
+    /* Remboursé : il ne compte plus ; payé il y a 31 jours non plus */
+    await reprendre(seul.id, "rembourse");
+    await db()
+      .update(schema.achats)
+      .set({ payeLe: sql`now() - interval '31 days'` })
+      .where(eq(schema.achats.id, premium.id));
+    expect(await ventesDesFormules()).toEqual(avant);
+    expect(await premiumLePlusChoisi()).toBe(avant.premium > avant.seuls);
   });
 });

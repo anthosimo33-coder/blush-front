@@ -50,21 +50,34 @@ export const PAYWALL = {
   avis: (nombre: string) => ` · ${nombre} avis`,
   /** Tout ce que BLUSH a lu (MESSAGES_LUS). */
   messagesLus: (n: string) => ` · déjà ${n} de messages lus`,
-  formule: "Ta formule",
-  cestQuoi: "C’est quoi une bulle\u00a0?",
+  /**
+   * Les formules (la maquette « La formule · après », validée le 17 octobre) : ce qu’on y gagne plutôt que ce qu’elles
+   * contiennent, en « réponses de BLUSH » plutôt qu’en bulles (le mot n’apparaît qu’après l’achat, avec le compteur du
+   * chat), l’écart de prix avec le rapport seul plutôt qu’un prix barré, et une ligne sous le bouton.
+   */
+  formule: (autre: string) => `Ton rapport sur ${autre}`,
   rapport: {
     titre: CATALOGUE.rapport.titre,
-    note: (bulles: number) => `${NB_CHAPITRES} chapitres, ton vocal, ${bulles} bulles`,
+    note: (bulles: number) => `${NB_CHAPITRES} chapitres sur vous deux, ton vocal, ${bulles} réponses de BLUSH`,
   },
   premium: {
     titre: PREMIUM.titre,
-    note: (bulles: number) => `Tout le rapport, et BLUSH te répond ${bulles}\u00a0fois`,
-    offertes: `+${OFFERTES_PREMIUM} bulles offertes`,
+    note: (autre: string) => `Le rapport, puis BLUSH t’aide à répondre à ${autre}`,
+    /** Ses réponses, dont celles offertes (les bulles d’un lot de la roue ont leur ligne à elles). */
+    offertes: (reponses: number) => `${reponses} réponses, dont ${OFFERTES_PREMIUM} offertes`,
     /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
     barreOffertes: prixDe("pack30"),
+    /** Sous son prix : ce qu’elle coûte de plus que le rapport seul (« 5 € de plus »). */
+    ecart: (centimes: number) => `${prixCourt(centimes)} de plus`,
+    /**
+     * Son badge quand elle s’est vraiment payée plus souvent que le rapport seul ces 30 derniers jours (le serveur le
+     * compte : premiumLePlusChoisi) ; sinon, « Conseillé ».
+     */
+    plusChoisi: "Le plus choisi",
   },
   gratuit: prixCourt(0),
-  /** « Léa n’est jamais prévenue » : BLUSH n’écrit jamais à l’autre. */
+  /** Sous le bouton qui paie, en une ligne : pas d’abonnement, et « Léa n’est jamais prévenue » (BLUSH n’écrit jamais à l’autre). */
+  paiementUnique: "Paiement unique",
   jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",

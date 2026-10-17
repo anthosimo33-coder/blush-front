@@ -256,6 +256,30 @@ async function compterLeHautPaye(storyId: string): Promise<void> {
 }
 
 /**
+ * Les rapports payés ces 30 derniers jours, Premium d’un côté, le rapport seul (le rapport, la suite, le −50 % gardé)
+ * de l’autre ; remboursés et contestés ôtés.
+ */
+export async function ventesDesFormules(): Promise<{ premium: number; seuls: number }> {
+  const [v] = await db()
+    .select({
+      premium: sql<number>`count(*) filter (where ${eq(a.offre, "premium")})::int`,
+      seuls: sql<number>`count(*) filter (where ${inArray(a.offre, [...RAPPORTS_SEULS])})::int`,
+    })
+    .from(a)
+    .where(and(eq(a.statut, "paye"), gt(a.payeLe, sql`now() - interval '30 days'`)));
+  return { premium: v?.premium ?? 0, seuls: v?.seuls ?? 0 };
+}
+
+/**
+ * « Le plus choisi » sur Premium (le badge du paywall) : vrai seulement si, ces 30 derniers jours, Premium s’est payée
+ * plus souvent que le rapport seul. Sans vente, faux : le badge reste « Conseillé ».
+ */
+export async function premiumLePlusChoisi(): Promise<boolean> {
+  const { premium, seuls } = await ventesDesFormules();
+  return premium > seuls;
+}
+
+/**
  * Débloque le rapport de cette conv du compte, dans la transaction d’une livraison ou d’un rapport d’avance utilisé : la
  * conv verrouillée (verrouillerLaConv), ouverte si elle ne l’était pas, et le mail de relance de cette conv, s’il a été
  * envoyé, compté comme pris. Vrai si elle vient de s’ouvrir.
