@@ -174,7 +174,7 @@ describe("les mails des séquences", () => {
     expect(haut.sujet).toBe("t’as vu le chiffre\u00a0?");
     expect(haut.boutons[0]!.libelle).toBe("Voir pourquoi il revient");
     expect(haut.encart?.gras).toBe("Ton rapport sur Lucas");
-    expect(haut.pied).toContain("t’as dit oui aux nouvelles de BLUSH");
+    expect(haut.pied).toContain("Tu le reçois parce que t’as un compte BLUSH.");
     const chapitres = mailChapitres(LUCAS);
     expect(chapitres.fiche?.[4]).toEqual({ rubrique: "5 · Inès", texte: "ce qu’elle montre, ce qu’elle cache" });
     for (const m of [mailSansConv({ heure: "1\u00a0h\u00a012 du mat’" }), mailSansConvPeur(), mailSansConvQuestion()]) {

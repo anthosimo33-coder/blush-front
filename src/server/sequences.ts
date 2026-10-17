@@ -55,7 +55,8 @@ import { rechargeDejaPayee } from "./achats";
  *   🔥 seulement, J+5 le parrainage (src/server/parrainage.ts) : une offre.
  * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, 2 bulles ou moins, puis à zéro depuis 3 jours.
  *   Des offres.
- * Le lot 3, éteint tant que BLUSH_MAILS_PROSPECTS ne vaut pas « 1 » (l’accord de prospection, l’avis du juriste) :
+ * Le lot 3, allumé par BLUSH_MAILS_PROSPECTS (« 1 » en production depuis le 17 octobre : le juriste l’a validé sans case
+ * d’accord à l’inscription) :
  * - S1, le paywall vu sans payer : H+2 le titre de son paywall et ses chiffres, J+1 ses 8 chapitres. Ils remplacent la
  *   relance ② (src/server/relances.ts), qui s’arrête quand ils s’allument. Des offres.
  * - S2, un compte sans conv : H+1, J+1, J+4, vers une nouvelle conv. Des offres.

@@ -450,9 +450,9 @@ export function mailAnniversaire(p: Personnes, { jour, date, aime, bulles }: { j
   };
 }
 
-/* ———— S1 · Le paywall vu, rien payé (des prospects : éteints tant que leur accord n’est pas demandé) ———— */
+/* ———— S1 · Le paywall vu, rien payé (BLUSH_MAILS_PROSPECTS) ———— */
 
-const PROSPECT = "Ce mail ne cite aucun de vos messages. Tu le reçois parce que t’as dit oui aux nouvelles de BLUSH.";
+const PROSPECT = "Ce mail ne cite aucun de vos messages. Tu le reçois parce que t’as un compte BLUSH.";
 
 /** Ce que dit S1 H+2 selon le titre de son paywall : son sujet, son aperçu, son bouton, son ps. */
 const S1_SELON_LE_HAUT: Record<GenreDuHaut, { sujet: string; apercu: string; bouton: (il: string) => string; ps: string }> = {
@@ -552,10 +552,10 @@ export function mailChapitres(p: Personnes): MailDeSequence {
   };
 }
 
-/* ———— S2 · Un compte, aucune conv (des prospects : éteints tant que leur accord n’est pas demandé) ———— */
+/* ———— S2 · Un compte, aucune conv (BLUSH_MAILS_PROSPECTS) ———— */
 
 /* Sans conv, ni prénom ni pronom : une écriture neutre */
-const PROSPECT_SANS_CONV = "Tu le reçois parce que t’as dit oui aux nouvelles de BLUSH.";
+const PROSPECT_SANS_CONV = "Tu le reçois parce que t’as un compte BLUSH.";
 
 /** S2 H+1 : l’heure de son compte, quand c’était la nuit (« 1 h 12 du mat’ »), et l’export de WhatsApp en quatre gestes. */
 export function mailSansConv({ heure }: { heure: string | null }): MailDeSequence {

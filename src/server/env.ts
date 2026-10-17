@@ -148,7 +148,7 @@ export const Env = z.object({
   /**
    * Les mails aux prospects (S1, le paywall vu sans payer ; S2, un compte sans conv : src/server/sequences.ts), et la
    * relance ② qu’ils remplacent : « 1 » les envoie (et coupe la relance), « 0 » (le défaut) les garde éteints.
-   * TODO(produit): ne l’allumer qu’après l’accord de prospection (une case à l’inscription) et l’avis du juriste.
+   * « 1 » en production depuis le 17 octobre : le juriste l’a validé sans case d’accord à l’inscription.
    */
   BLUSH_MAILS_PROSPECTS: z
     .enum(["0", "1"])
