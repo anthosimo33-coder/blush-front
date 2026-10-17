@@ -53,7 +53,9 @@ export const PAYWALL = {
   /**
    * Les formules (la maquette « La formule · après », validée le 17 octobre) : ce qu’on y gagne plutôt que ce qu’elles
    * contiennent, en « réponses de BLUSH » plutôt qu’en bulles (le mot n’apparaît qu’après l’achat, avec le compteur du
-   * chat), l’écart de prix avec le rapport seul plutôt qu’un prix barré, et une ligne sous le bouton.
+   * chat), sans prix barré ni écart écrit (les deux prix côte à côte le disent, et la ligne des réponses offertes dit le
+   * gain ; « 5 € de plus » puis « +80 réponses pour 5 € » se lisaient comme une dépense, retirés le 17 octobre), et une
+   * ligne sous le bouton.
    */
   formule: (autre: string) => `Ton rapport sur ${autre}`,
   rapport: {
@@ -67,11 +69,6 @@ export const PAYWALL = {
     offertes: (reponses: number) => `${reponses} réponses, dont ${OFFERTES_PREMIUM} offertes`,
     /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
     barreOffertes: prixDe("pack30"),
-    /**
-     * Sous son prix, en deux lignes : ce qu’elle donne de plus que le rapport seul, puis ce que ça coûte (« +80 réponses »,
-     * « pour 5 € ») : le gain d’abord, l’écart de prix ensuite (décidé le 17 octobre : « 5 € de plus » se lisait comme une dépense).
-     */
-    ecart: { reponses: (n: number) => `+${n} réponses`, prix: (centimes: number) => `pour ${prixCourt(centimes)}` },
     /**
      * Son badge quand elle s’est vraiment payée plus souvent que le rapport seul ces 30 derniers jours (le serveur le
      * compte : premiumLePlusChoisi) ; sinon, « Conseillé ».
