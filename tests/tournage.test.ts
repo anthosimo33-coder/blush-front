@@ -25,6 +25,7 @@ vi.mock("@/server/env", async (original) => {
 /* after() de Next ne vit que dans une requête : ce qui devait partir après la réponse attend ici */
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => void etat.apres.push(f) }));
 
+import { NextRequest } from "next/server";
 import { POST as postAdmin } from "@/app/api/admin/route";
 import { GET as getAnalyse, POST as postAnalyse } from "@/app/api/analyse/route";
 import { POST as postCaptures } from "@/app/api/captures/route";
@@ -37,6 +38,7 @@ import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { nomDuCookie, NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { mentionne, renommer } from "@/lib/renommer";
+import { proxy } from "@/proxy";
 import { DUREE_RELECTURE_MS } from "@/server/avancement";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
@@ -62,7 +64,6 @@ import {
   type Tournage,
 } from "@/server/tournage";
 import { STORY_COOKIE } from "@/services/session";
-import nextConfig from "../next.config";
 import { compteDeTest, convPrete, convRattachee, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 
 const SESSION = nomDuCookie("session", false);
@@ -570,11 +571,20 @@ describe("l’export sans fichier", () => {
     expect([etat.cookies.has(TOURNAGE), etat.cookies.has(PRENOM)]).toEqual([false, false]);
   });
 
-  it("l’écran de l’export : sa variante est servie à la même adresse sous le cookie du mode tournage, et vérifie son lien", async () => {
-    const reecritures = await nextConfig.rewrites!();
-    const avantLesPages = Array.isArray(reecritures) ? reecritures : reecritures.beforeFiles;
-    for (const key of NOMS_DU_TOURNAGE)
-      expect(avantLesPages).toContainEqual({ source: "/importer/export", has: [{ type: "cookie", key }], destination: "/importer/export/tournage" });
+  it("l’écran de l’export : sa variante est servie à la même adresse sous le cookie du mode tournage, sans sa clé, et vérifie son lien", async () => {
+    /*
+     * Le proxy (src/proxy.ts), sous chacun des noms du cookie : la destination garde ?app=, et rien de la clé du lien. Elle
+     * se lit dans l’en-tête qu’écrit NextResponse.rewrite (ce que lit getRewrittenUrl de next/experimental/testing/server,
+     * qui ne se charge pas sous les simulations de next/server de ce fichier ; tests/proxy.test.ts s’en sert).
+     */
+    for (const nom of NOMS_DU_TOURNAGE) {
+      const demande = new NextRequest("https://www.askblush.com/importer/export?app=whatsapp");
+      demande.cookies.set(nom, cle);
+      const destination = new URL(proxy(demande).headers.get("x-middleware-rewrite") ?? "https://www.askblush.com/");
+      expect(destination.pathname, nom).toBe("/importer/export/tournage");
+      expect(destination.search, nom).toBe("?app=whatsapp");
+      expect(destination.href, nom).not.toContain(cle);
+    }
     const variante = async () => ((await PageExportTournage()) as ReactElement<{ children: ReactElement<{ tournage: boolean }> }>).props.children.props.tournage;
     await ouvrirLeLien();
     expect(await variante()).toBe(true);
