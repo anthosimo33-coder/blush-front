@@ -60,8 +60,9 @@ import { rechargeDejaPayee } from "./achats";
  * - S1, le paywall vu sans payer : H+2 le titre de son paywall et ses chiffres, J+1 ses 8 chapitres. Ils remplacent la
  *   relance ② (src/server/relances.ts), qui s’arrête quand ils s’allument. Des offres.
  * - S2, un compte sans conv : H+1, J+1, J+4, vers une nouvelle conv. Des offres.
- * TODO(produit): S1 J+3 (une réponse offerte, écrite au clic : il faut un prompt qui lise une conv pas encore payée) et
- * S1 J+6 (le rapport à −3 € deux jours, en A/B : une offre de plus au paiement) attendent leur décision.
+ * S1 J+3, une réponse offerte, est abandonnée (le 17 octobre : pas rentable).
+ * TODO(produit): S1 J+6, le rapport à −3 € deux jours en A/B : rouvrir la ① (src/server/offres-uniques.ts, 5 minutes une
+ * seule fois) jusqu’à sa fin, l’écran de paiement qui la montre dès le lien du mail, son compte à rebours en jours.
  * Le lot 2 :
  * - S5, le chat endormi, sur la dernière conv débloquée, à qui il reste des bulles : 7 jours sans un mot au chat (leur
  *   niveau, avant d’être ensemble), 21 jours (« parfait, ou abandonné ? »), et un couple chaque mois depuis le rapport
