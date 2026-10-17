@@ -6,7 +6,7 @@ import { db, schema } from "@/server/db";
 import { empreinte } from "@/server/chiffrement";
 import { plafondsDesMails } from "@/server/limites";
 import { mailRelance } from "@/server/mail-relance";
-import { DELAI_RELANCE_MS, desinscrire, envoyerLesRelances, FRAICHEUR_RELANCE_MS, lienDesinscription } from "@/server/relances";
+import { DELAI_RELANCE_MS, desinscrire, entetesDeDesinscription, envoyerLesRelances, FRAICHEUR_RELANCE_MS, lienDesinscription, lienDesinscriptionUnClic } from "@/server/relances";
 import { compteDeTest, convRattachee, debloquerLaConv, histoireLue } from "./aide/fixtures";
 
 /*
@@ -43,6 +43,7 @@ vi.mock("@/server/email", async (original) => {
 });
 
 import { GET as getRelances } from "@/app/api/cron/relances/route";
+import { POST as unClic } from "@/app/api/desinscription/un-clic/route";
 
 /* Le compteur des relances du jour (plafondsDesMails().relances) : la base des tests le garde d’un lancement à l’autre */
 const RELANCES_DU_JOUR = empreinte("limite:relances:mails");
@@ -335,6 +336,31 @@ describe("la relance par mail (②)", () => {
     expect(corps.envoyees).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(corps)).not.toContain(u.email);
     expect(await relanceNotee(u)).toEqual({ storyId: conv });
+  });
+});
+
+describe("la désinscription en un clic (RFC 8058)", () => {
+  it("la messagerie l’appelle elle-même, sans notre origine : le lien signé coupe ce genre de mails ; un lien faux, rien", async () => {
+    const u = await compteDeTest("relance-un-clic");
+    const appel = (lien: string) =>
+      unClic(new Request(lien, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "List-Unsubscribe=One-Click" }));
+    const coupes = async () =>
+      (await db().select({ offres: schema.users.relancesCoupeesLe, conseils: schema.users.conseilsCoupesLe }).from(schema.users).where(eq(schema.users.id, u.id)))[0]!;
+    const faux = lienDesinscriptionUnClic(u.id).replace(/cle=[^&]+/, "cle=pas-la-bonne");
+    expect([(await appel(faux)).status, await coupes()]).toEqual([404, { offres: null, conseils: null }]);
+    expect((await appel(lienDesinscriptionUnClic(u.id, "conseils"))).status).toBe(200);
+    expect(await coupes()).toEqual({ offres: null, conseils: expect.any(Date) });
+    expect((await appel(lienDesinscriptionUnClic(u.id, "offres"))).status).toBe(200);
+    expect(await coupes()).toEqual({ offres: expect.any(Date), conseils: expect.any(Date) });
+    /* « tout » n’est jamais dans un en-tête : refusé */
+    expect((await appel(lienDesinscriptionUnClic(u.id).replace("quoi=offres", "quoi=tout"))).status).toBe(404);
+  });
+
+  it("la relance porte ses en-têtes : les offres", () => {
+    expect(entetesDeDesinscription("u1", "offres")).toEqual({
+      "List-Unsubscribe": `<${lienDesinscriptionUnClic("u1", "offres")}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
   });
 });
 

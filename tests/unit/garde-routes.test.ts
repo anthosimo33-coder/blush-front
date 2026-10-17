@@ -82,7 +82,15 @@ const SANS_COMPTE = new Set<CleRoute>([
  * des créatrices, un serveur lui aussi).
  */
 const API_DU_TOURNAGE = ["POST /api/admin/tournage", "GET /api/admin/tournage/[id]", "POST /api/admin/tournage/[id]/arreter"] as const satisfies CleRoute[];
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/chaine", "GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop", ...API_DU_TOURNAGE]);
+const HORS_GARDE = new Set<CleRoute>([
+  "GET /api/cron/chaine",
+  "GET /api/cron/purge",
+  "GET /api/cron/relances",
+  "GET /api/reveil",
+  "POST /api/paiement/whop",
+  "POST /api/desinscription/un-clic",
+  ...API_DU_TOURNAGE,
+]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
