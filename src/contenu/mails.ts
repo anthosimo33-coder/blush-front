@@ -518,6 +518,36 @@ export function mailHautDuPaywall(p: Personnes, haut: HautDuPaywall): MailDeSequ
   };
 }
 
+/**
+ * S1 J+6, la « dernière fois » (le groupe « avec » de l’A/B) : la one time offer ① rouverte, à son prix, jusqu’à
+ * après-demain minuit (`jour` : « jeudi »). Après, plus aucun mail de S1.
+ */
+export function mailDerniereChance(p: Personnes, { jour }: { jour: string }): MailDeSequence {
+  const { nom } = lAutre(p);
+  const remise = `−${((CATALOGUE.rapport.centimes - CATALOGUE.suite.centimes) / 100).toLocaleString("fr-FR")}\u00a0€`;
+  return {
+    sujet: "dernière fois que je t’en parle",
+    apercu: "après je te laisse tranquille. promis.",
+    texte: `Ton rapport à ${prixDe("suite")} au lieu de ${prixDe("rapport")}, jusqu’à ${jour} minuit. Après, plus de relance.`,
+    bulles: ["ok dernière fois", `je te garde ton rapport à ${prixDe("suite")} jusqu’à ${jour} minuit`, "après, je te relance plus. c’est pas mon genre"],
+    titre: `${prixDe("suite")}. Moins qu’un cocktail.`,
+    corps: "Tu peux continuer à relire ses messages à 1\u00a0h du mat’ en te demandant ce qu’ils veulent dire. Ou tu sais. Ce soir.",
+    offre: {
+      prix: prixDe("suite"),
+      barre: prixDe("rapport"),
+      remise,
+      inclus: `${NB_CHAPITRES} chapitres sur toi et ${nom}, ton vocal, et ${CATALOGUE.suite.bulles} réponses de BLUSH`,
+      jusqua: `Jusqu’à ${jour}, 23\u00a0h\u00a059`,
+      sous: `Après, ${prixDe("rapport")}. Comme tout le monde.`,
+    },
+    boutons: [{ libelle: `Savoir ce soir · ${prixDe("suite")}` }],
+    mini: "Paiement unique · Apple Pay ou carte",
+    ps: `ps\u00a0: ${jour} minuit, ça repasse à ${prixDe("rapport")}. et je reviens plus t’embêter`,
+    pied: PROSPECT,
+    desinscription: "Plus de relances",
+  };
+}
+
 /** Ce que dit chaque chapitre, sous son titre d’attente (S1 J+1). */
 const CE_QUE_DIT_LE_CHAPITRE = [
   "où vous en êtes, en une phrase",
@@ -634,6 +664,7 @@ export const NOMS_DES_MAILS = {
   s8_anniv: "S8 · son anniversaire",
   s1_haut: "S1 H+2 · le titre de son paywall",
   s1_chapitres: "S1 J+1 · les 8 chapitres",
+  s1_derniere: "S1 J+6 · dernière fois, la one time offer (A/B)",
   s2_heure: "S2 H+1 · l’heure de son compte",
   s2_peur: "S2 J+1 · la peur de la réponse",
   s2_question: "S2 J+4 · vous en êtes où\u00a0?",

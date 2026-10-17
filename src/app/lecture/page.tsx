@@ -7,10 +7,11 @@ import { PageDeConv } from "@/components/shell/PageDeConv";
 
 export const metadata: Metadata = { title: "BLUSH analyse votre histoire" };
 
-export default async function Page() {
+export default async function Page({ searchParams }: PageProps<"/lecture">) {
   /* L’heure du rendu, avant les lectures : le compte posé par PageDeConv en part */
   const rendu = heureDuRendu();
-  const [story, haut] = await Promise.all([getStory(), getApercuAvantPaiement()]);
+  /* Arrivé par un mail de S1 : le paywall tout de suite (`?paywall=1`), et la one time offer rouverte (`&offre=1`, J+6) */
+  const [story, haut, { paywall, offre }] = await Promise.all([getStory(), getApercuAvantPaiement(), searchParams]);
   /*
    * Les gardes sont dans layout.tsx (une vraie 307) : celle-ci ne sert qu’au type, et à une navigation qui ne rejoue pas
    * le layout (la même page, d’autres paramètres)
@@ -19,7 +20,7 @@ export default async function Page() {
   return (
     <PageDeConv rendu={rendu}>
       {/* Une conv qui attend son paiement (le paywall d’abord) : la lecture mène au paywall, avec ce que le code a compté */}
-      <LectureScreen total={story.totalMessages} apercu={haut ? { story, haut } : null} />
+      <LectureScreen total={story.totalMessages} apercu={haut ? { story, haut } : null} paywallDirect={paywall === "1"} offreDirecte={paywall === "1" && offre === "1"} />
     </PageDeConv>
   );
 }

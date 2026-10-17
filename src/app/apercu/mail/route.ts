@@ -4,6 +4,7 @@ import {
   mailApresGlace,
   mailAvance,
   mailChapitres,
+  mailDerniereChance,
   mailEndormi,
   mailGarde,
   mailGlace,
@@ -68,6 +69,7 @@ const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: 
     quoi: "offres",
   },
   chapitres: { mail: (p) => mailChapitres(p), quoi: "offres" },
+  derniere: { mail: (p) => mailDerniereChance(p, { jour: "jeudi" }), quoi: "offres" },
   "sans-conv": { mail: () => mailSansConv({ heure: "1\u00a0h\u00a012 du mat’" }), quoi: "offres" },
   peur: { mail: () => mailSansConvPeur(), quoi: "offres" },
   question: { mail: () => mailSansConvQuestion(), quoi: "offres" },
@@ -79,7 +81,7 @@ const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: 
  * d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
  * `?type=relance`, la relance « Ton rapport t’attend » ; ou un mail des séquences (`?type=repondre`, `vocal`, `pas`,
  * `glace`, `peu`, `prete`, `zero`, `endormi`, `parfait`, `couple`, `garde`, `avance`, `apres`, `anniv`, `parrainage`, `haut`,
- * `chapitres`, `sans-conv`, `peur`, `question`). Pour ceux qui ont des prénoms : `&il=1`, c’est lui qui écrit (elle, l’autre) ;
+ * `chapitres`, `derniere`, `sans-conv`, `peur`, `question`). Pour ceux qui ont des prénoms : `&il=1`, c’est lui qui écrit (elle, l’autre) ;
  * `&anonyme=1`, sans prénoms.
  */
 export async function GET(req: Request) {

@@ -4,6 +4,7 @@ import {
   mailApresGlace,
   mailAvance,
   mailChapitres,
+  mailDerniereChance,
   mailEndormi,
   mailGarde,
   mailGlace,
@@ -183,6 +184,19 @@ describe("les mails des séquences", () => {
     }
     expect(mailSansConv({ heure: null }).sujet).toBe("t’as créé ton compte, puis t’as filé");
     expect(mailSansConvQuestion().boutons).toHaveLength(4);
+  });
+
+  it("S1 J+6 : la one time offer à son prix, jusqu’à après-demain minuit, et plus de relance après", () => {
+    const m = mailDerniereChance(INES, { jour: "jeudi" });
+    expect(m.offre).toEqual({
+      prix: "10,90\u00a0€",
+      barre: "13,90\u00a0€",
+      remise: "−3\u00a0€",
+      inclus: "8 chapitres sur toi et Lucas, ton vocal, et 10 réponses de BLUSH",
+      jusqua: "Jusqu’à jeudi, 23\u00a0h\u00a059",
+      sous: "Après, 13,90\u00a0€. Comme tout le monde.",
+    });
+    expect(`${m.sujet}${m.apercu}${m.texte}`).not.toContain("Lucas");
   });
 
   it("le parrainage : l’amie de son genre, son lien, et ce que chacune y gagne", () => {

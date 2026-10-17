@@ -231,6 +231,8 @@ describe("l’offre ① et son compte à rebours", () => {
 
   it("le temps qu’il reste, en minutes et secondes, arrondi à la seconde au-dessus ; jamais négatif", () => {
     expect([restant(DUREE_SUITE_MS), restant(61_000), restant(59_001), restant(0), restant(-5)]).toEqual(["05:00", "01:01", "01:00", "00:00", "00:00"]);
+    /* Rouverte deux jours par le mail J+6 de S1 : en heures, puis en jours */
+    expect([restant(3_600_000), restant(13 * 3_600_000 + 5 * 60_000), restant(38 * 3_600_000)]).toEqual(["1\u00a0h 00", "13\u00a0h 05", "1\u00a0j 14\u00a0h"]);
   });
 
   it("il part de l’heure de fin du serveur, se vide chaque seconde (la barre aussi), et se lit à la demande", () => {

@@ -51,7 +51,18 @@ import type { RoueDuCompte } from "@/types/api";
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
 const OFFRE_APRES_MS = 40_000;
 
-export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: Story; apercu: ApercuDuPaywall; temoignages?: Testimonial[] }) {
+export function Paywall({
+  story,
+  apercu,
+  temoignages = TESTIMONIALS,
+  offreDirecte = false,
+}: {
+  story: Story;
+  apercu: ApercuDuPaywall;
+  temoignages?: Testimonial[];
+  /** Arrivé par le mail J+6 de S1 (`/lecture?paywall=1&offre=1`) : la one time offer, rouverte, se demande tout de suite. */
+  offreDirecte?: boolean;
+}) {
   const { moi, autre } = moiEtAutre(story);
   const elle = autre.pronoun !== "il";
   const haut = hautDuPaywall(apercu, { nom: autre.name, il: !elle });
@@ -61,7 +72,8 @@ export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: 
   const roue = feuille.data?.roue ?? null;
   /* La roue s’ouvre une fois, à l’arrivée, si elle est à tourner ; ensuite, l’écran seul décide (elle reste ouverte le temps du tour) */
   const [vueRoue, setVueRoue] = useState<"attente" | "ouverte" | "fermee">("attente");
-  const roueOuverte = vueRoue === "ouverte" || (vueRoue === "attente" && roue?.etat === "a_tourner");
+  /* Arrivé par le mail J+6 de S1 : la one time offer promise passe d’abord, la roue ne s’ouvre pas d’elle-même */
+  const roueOuverte = vueRoue === "ouverte" || (vueRoue === "attente" && roue?.etat === "a_tourner" && !offreDirecte);
   /* Le lot passé sous nos yeux (le minuteur à zéro) : les prix redeviennent ceux du catalogue */
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
@@ -96,7 +108,14 @@ export function Paywall({ story, apercu, temoignages = TESTIMONIALS }: { story: 
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
-          <Paiement ref={paiement} lot={lot} sansOffre={roue?.etat === "a_tourner" || roue?.etat === "gagnee"} autre={autre.name} elle={elle} />
+          <Paiement
+            ref={paiement}
+            lot={lot}
+            sansOffre={(roue?.etat === "a_tourner" && !offreDirecte) || roue?.etat === "gagnee"}
+            offreDirecte={offreDirecte}
+            autre={autre.name}
+            elle={elle}
+          />
         </div>
         <Temoignages items={temoignages} />
         <AvantApres elle={elle} className="lg:hidden" />
@@ -167,7 +186,21 @@ type Choix = Formule | "avance";
  * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
  * gagné).
  */
-function Paiement({ ref, lot, sansOffre, autre, elle }: { ref: Ref<HTMLElement>; lot: LotDeLaRoue | null; sansOffre: boolean; autre: string; elle: boolean }) {
+function Paiement({
+  ref,
+  lot,
+  sansOffre,
+  offreDirecte,
+  autre,
+  elle,
+}: {
+  ref: Ref<HTMLElement>;
+  lot: LotDeLaRoue | null;
+  sansOffre: boolean;
+  offreDirecte: boolean;
+  autre: string;
+  elle: boolean;
+}) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
   const [choix, setChoix] = useState<Choix | null>(null);
@@ -176,7 +209,7 @@ function Paiement({ ref, lot, sansOffre, autre, elle }: { ref: Ref<HTMLElement>;
   const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
   const [paye, setPaye] = useState(false);
   const [occupe, setOccupe] = useState(false);
-  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || occupe });
+  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || occupe, directe: offreDirecte });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
 
@@ -490,11 +523,12 @@ function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot:
 
 /**
  * L’offre ① du paywall : demandée au serveur une fois (une fois par compte, jamais deux offres le même jour : il peut
- * refuser), au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans payer. `sans` : le compte a déjà
+ * refuser), au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans payer ; tout de suite (`directe`)
+ * quand le mail J+6 de S1 l’a rouverte. `sans` : le compte a déjà
  * mieux (le rapport d’avance, le −50 % gardé), ou la roue attend, ou un lot est gagné ; `enRoute` : un paiement est en
  * cours ou fait.
  */
-function useOffreSuite({ sans, enRoute }: { sans: boolean; enRoute: boolean }) {
+function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boolean; directe: boolean }) {
   const [suiteMontree, setSuiteMontree] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
   const demandee = useRef(false);
@@ -515,7 +549,7 @@ function useOffreSuite({ sans, enRoute }: { sans: boolean; enRoute: boolean }) {
         () => {},
       );
     };
-    const minuteur = setTimeout(proposer, OFFRE_APRES_MS);
+    const minuteur = setTimeout(proposer, directe ? 0 : OFFRE_APRES_MS);
     let partie = false;
     const vu = () => {
       if (document.visibilityState === "hidden") partie = true;
@@ -527,7 +561,7 @@ function useOffreSuite({ sans, enRoute }: { sans: boolean; enRoute: boolean }) {
       clearTimeout(minuteur);
       document.removeEventListener("visibilitychange", vu);
     };
-  }, [sans]);
+  }, [sans, directe]);
   useEffect(() => {
     if (!passee) return;
     const t = setTimeout(() => setPassee(false), 2600);

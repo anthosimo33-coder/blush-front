@@ -186,6 +186,9 @@ export const OFFRE_SUITE = {
   remise: "Offre unique",
   apres: " sur ton rapport",
   sousTitre: `${prixCourt(BARRE_SUITE - CATALOGUE.suite.centimes)} de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à ${enEuros(BARRE_SUITE)}.`,
+  /** Rouverte deux jours par le mail J+6 de S1 (la « dernière fois ») : jusqu’à quand, à la place des 5 minutes. */
+  sousTitreJusqua: (jour: string) =>
+    `${prixCourt(BARRE_SUITE - CATALOGUE.suite.centimes)} de moins, rien que pour toi. Jusqu’à ${jour} minuit, puis il repasse à ${enEuros(BARRE_SUITE)}.`,
   fin: "Elle disparaît dans",
   prix: prixDe("suite"),
   barre: enEuros(BARRE_SUITE),

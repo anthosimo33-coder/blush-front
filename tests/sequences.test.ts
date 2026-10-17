@@ -7,7 +7,7 @@ import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { plafondsDesMails } from "@/server/limites";
 import { desinscrire, envoyerLesRelances, lienDesinscription } from "@/server/relances";
-import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, heureCalme } from "@/server/sequences";
+import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, groupeDuJ6, heureCalme } from "@/server/sequences";
 import type { LevelId } from "@/types";
 import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
 
@@ -457,7 +457,7 @@ describe("S1, S2 · les prospects (éteints par défaut)", () => {
     expect(pour(u)).toEqual([]);
   });
 
-  it("allumés : H+2 le titre de son paywall et ses chiffres, vers la feuille de paiement ; la relance ② s’arrête", async () => {
+  it("allumés : H+2 le titre de son paywall et ses chiffres, vers son paywall tout de suite ; la relance ② s’arrête", async () => {
     PROSPECTS.on = true;
     try {
       const { u, conv } = await auPaywall("sequence-s1");
@@ -467,10 +467,56 @@ describe("S1, S2 · les prospects (éteints par défaut)", () => {
         m!.sujet,
       );
       expect(m!.html).toContain("Ton rapport sur Sophie");
-      expect(m!.html).toContain(`/ouvrir/${conv}?m=s1_haut&amp;paiement=1`);
+      expect(m!.html).toContain(`/ouvrir/${conv}?m=s1_haut&amp;paywall=1`);
       expect(m!.html).toContain("Plus de relances");
       expect(`${m!.sujet}${m!.texte}`).not.toMatch(/Sophie|Hugo/);
       expect(await envoyerLesRelances()).toEqual({ dues: 0, envoyees: 0, ecartees: 0, retenues: 0, echecs: 0 });
+    } finally {
+      PROSPECTS.on = false;
+    }
+  });
+
+  /** Un compte au paywall depuis `depuis`, tiré dans ce groupe de l’A/B de J+6 (le tirage suit son identifiant). */
+  async function auPaywallDansLeGroupe(prefixe: string, groupe: "avec" | "sans", depuis: number) {
+    for (let k = 0; k < 40; k++) {
+      const c = await auPaywall(`${prefixe}-${k}`, depuis);
+      if (groupeDuJ6(c.u.id) === groupe) return c;
+    }
+    throw new Error(`aucun compte tiré dans le groupe ${groupe}`);
+  }
+
+  it("allumés : J+6, la moitié reçoit la one time offer rouverte jusqu’à après-demain minuit ; l’autre, rien (le témoin)", async () => {
+    PROSPECTS.on = true;
+    try {
+      const avec = await auPaywallDansLeGroupe("sequence-j6-avec", "avec", 6.5 * 24 * HEURE);
+      const sans = await auPaywallDansLeGroupe("sequence-j6-sans", "sans", 6.5 * 24 * HEURE);
+      /* H+2 et J+1 sont déjà partis (deux jours avant) */
+      for (const c of [avec, sans])
+        for (const cle of ["s1_haut", "s1_chapitres"] as const)
+          await db()
+            .insert(schema.envoisMails)
+            .values({ userId: c.u.id, storyId: c.conv, cle, occasion: c.conv, envoyeLe: ilYa(2 * 24 * HEURE) });
+      await passer();
+      const [m] = pour(avec.u);
+      expect(m!.sujet).toBe("dernière fois que je t’en parle");
+      expect(m!.html).toContain("10,90&nbsp;€");
+      expect(m!.html).toContain(`/ouvrir/${avec.conv}?m=s1_derniere&amp;paywall=1&amp;offre=1`);
+      const [suite] = await db()
+        .select({ expireLe: schema.offresUniques.expireLe, storyId: schema.offresUniques.storyId })
+        .from(schema.offresUniques)
+        .where(and(eq(schema.offresUniques.userId, avec.u.id), eq(schema.offresUniques.offre, "suite")));
+      expect(suite!.storyId).toBe(avec.conv);
+      /* Après-demain, 23 h 59 59 à Paris : entre 2 et 3 jours d’ici */
+      const dans = suite!.expireLe!.getTime() - Date.now();
+      expect(dans).toBeGreaterThan(24 * HEURE);
+      expect(dans).toBeLessThan(3 * 24 * HEURE);
+      expect(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(suite!.expireLe!)).toBe("23:59");
+      expect(pour(sans.u)).toEqual([]);
+      const temoin = await db()
+        .select({ occasion: schema.envoisMails.occasion, parti: schema.envoisMails.parti })
+        .from(schema.envoisMails)
+        .where(and(eq(schema.envoisMails.userId, sans.u.id), eq(schema.envoisMails.cle, "s1_derniere")));
+      expect(temoin).toEqual([{ occasion: `${sans.conv}:temoin`, parti: false }]);
     } finally {
       PROSPECTS.on = false;
     }

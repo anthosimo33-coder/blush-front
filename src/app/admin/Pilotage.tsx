@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
+import { prixDe } from "@/contenu/offres";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
@@ -644,7 +645,23 @@ function MailsDesSequences({ p }: { p: Chiffres }) {
       ) : (
         <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun mail des séquences parti sur la période.</p>
       )}
+      <ABDeLaDerniere ab={p.abDerniere} />
     </Bloc>
+  );
+}
+
+/** L’A/B de S1 J+6 : avec la one time offer rouverte, ou sans (le témoin), et leurs rapports payés dans les 3 jours. */
+function ABDeLaDerniere({ ab }: { ab: Chiffres["abDerniere"] }) {
+  if (!ab.avec.n && !ab.sans.n) return null;
+  const taux = (g: { n: number; payes: number }) => {
+    const t = rapport(g.payes, g.n);
+    return t === null ? "—" : pourcent(t * 100);
+  };
+  return (
+    <p className="m-0 mt-4 text-note font-bold text-soft">
+      <span className="font-black text-ink">A/B · S1 J+6 à {prixDe("suite")}.</span> Avec l’offre{NBSP}: {nombre(ab.avec.n)} comptes, {nombre(ab.avec.payes)} payés ({taux(ab.avec)}
+      ). Sans{NBSP}: {nombre(ab.sans.n)} comptes, {nombre(ab.sans.payes)} payés ({taux(ab.sans)}).
+    </p>
   );
 }
 

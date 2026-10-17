@@ -23,12 +23,23 @@ import { useSuiviLecture } from "./suivi";
  * d’abord) : sa lecture, calculée par le code, se déroule en quelques secondes, puis « Voir mon rapport » mène au paywall
  * (`apercu` : la conv et ce que le code a compté, lus par la page).
  */
-export function LectureScreen({ total, apercu }: { total: number; apercu?: { story: Story; haut: ApercuDuPaywall } | null }) {
+export function LectureScreen({
+  total,
+  apercu,
+  paywallDirect = false,
+  offreDirecte = false,
+}: {
+  total: number;
+  apercu?: { story: Story; haut: ApercuDuPaywall } | null;
+  /** Arrivé par un mail de S1 (`/lecture?paywall=1`) : le paywall tout de suite, sans rejouer la lecture ; `offreDirecte` : la one time offer aussi (J+6). */
+  paywallDirect?: boolean;
+  offreDirecte?: boolean;
+}) {
   const reduced = useReducedMotion();
   /* La lecture lancée en arrivant, puis suivie jusqu’à son verdict (suivi.ts). `failed` : le serveur a tout essayé, on le dit et on propose de relancer */
   const { p, phase, echec: failed, trop, enDirect: live, relancer: retry, paiement } = useSuiviLecture();
   /* « Voir mon rapport » touché, la conv attend son paiement : le paywall prend l’écran */
-  const [paywall, setPaywall] = useState(false);
+  const [paywall, setPaywall] = useState(paywallDirect);
   const heard = useRef(0);
   /* « Voir mon rapport » touché : le bouton le montre jusqu’au chargement du verdict (un vrai chargement, voulu) */
   const [enRoute, setEnRoute] = useState(false);
@@ -58,7 +69,7 @@ export function LectureScreen({ total, apercu }: { total: number; apercu?: { sto
   const step = p.done ? etapes.length - 1 : Math.min(p.stepsDone, etapes.length - 1);
   const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
 
-  if (paywall && apercu) return <Paywall story={apercu.story} apercu={apercu.haut} />;
+  if (paywall && apercu) return <Paywall story={apercu.story} apercu={apercu.haut} offreDirecte={offreDirecte} />;
 
   return (
     <Screen

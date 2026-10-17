@@ -14,6 +14,8 @@ const DIRE_MAX = 200;
  * Le lien des mails : il ouvre cette conv-là (elle devient la conv ouverte), si elle est bien au compte connecté, puis :
  * - son rapport (« ton rapport est prêt », le vocal des séquences) ;
  * - la feuille de paiement (la relance « Ton rapport t’attend », `?paiement=1`) ;
+ * - le paywall d’une conv qui attend son paiement, tout de suite (S1 : `?paywall=1`), la one time offer déjà ouverte
+ *   (S1 J+6 : `&offre=1`) ;
  * - le chat, un texte déjà tapé dans le champ (les boutons à une touche des séquences, `?dire=…`, jamais envoyé seul) ;
  * - le chat, la recharge ouverte (les mails des bulles, `?recharger=1`) ;
  * - la page d’une nouvelle conv (les offres gardées, après un 🧊 : `?nouvelle=1`) ;
@@ -31,15 +33,19 @@ export async function GET(req: Request, { params }: RouteContext<"/ouvrir/[id]">
   const suite =
     p.get("paiement") === "1"
       ? "/rapport?paiement=1"
-      : p.get("nouvelle") === "1"
-        ? "/commencer"
-        : p.get("parrainage") === "1"
-          ? "/parrainage"
-          : p.get("recharger") === "1"
-            ? "/app?recharger=1"
-            : dire !== null && dire.length <= DIRE_MAX
-              ? `/app?dire=${encodeURIComponent(dire)}`
-              : "/rapport";
+      : p.get("paywall") === "1"
+        ? p.get("offre") === "1"
+          ? "/lecture?paywall=1&offre=1"
+          : "/lecture?paywall=1"
+        : p.get("nouvelle") === "1"
+          ? "/commencer"
+          : p.get("parrainage") === "1"
+            ? "/parrainage"
+            : p.get("recharger") === "1"
+              ? "/app?recharger=1"
+              : dire !== null && dire.length <= DIRE_MAX
+                ? `/app?dire=${encodeURIComponent(dire)}`
+                : "/rapport";
   /* Vers une nouvelle conv (S2 : un compte sans conv, peut-être ouvert ailleurs) : pas besoin d’être connecté */
   if (suite === "/commencer") {
     if (estUnMail(mail)) await compterUnClicDeMail(mail);
