@@ -20,6 +20,8 @@ const NOMS = {
   tournage: "blush-tournage",
   /** Le prénom de la créatrice qui filme, quand son lien de tournage le porte (`?prenom=`, src/server/tournage.ts). */
   prenomDuTournage: "blush-tournage-prenom",
+  /** Le code de parrainage du lien d’une amie (/p/<code>), jusqu’à la création du compte (src/server/parrainage.ts). */
+  parrain: "blush-parrain",
 } as const;
 
 export type CookieDuServeur = keyof typeof NOMS;

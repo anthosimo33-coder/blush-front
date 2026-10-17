@@ -3,20 +3,27 @@ import {
   mailAnniversaire,
   mailApresGlace,
   mailAvance,
+  mailChapitres,
   mailEndormi,
   mailGarde,
   mailGlace,
+  mailHautDuPaywall,
   mailParfait,
+  mailParrainage,
   mailPeuDeBulles,
   mailProchainPas,
   mailRepondre,
   mailReponsePrete,
+  mailSansConv,
+  mailSansConvPeur,
+  mailSansConvQuestion,
   mailTemperature,
   mailVocal,
   mailZeroBulle,
   type MailDeSequence,
   type Personnes,
 } from "@/contenu/mails";
+import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { mailAttente } from "@/server/mail-attente";
 import { mailCode } from "@/server/mail-code";
 import { mailRapport } from "@/server/mail-rapport";
@@ -42,6 +49,28 @@ const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: 
   avance: { mail: () => mailAvance({ jusqua: "17 octobre 2027", mois: 11 }), quoi: "offres" },
   apres: { mail: () => mailApresGlace(), quoi: "offres" },
   anniv: { mail: (p) => mailAnniversaire(p, { jour: "jeudi", date: "jeudi 23", aime: "Le ciné, les ramen", bulles: 9 }), quoi: "conseils" },
+  parrainage: { mail: (p) => mailParrainage(p, { lien: "https://www.askblush.com/p/abcdefg" }), quoi: "offres" },
+  haut: {
+    mail: (p) =>
+      mailHautDuPaywall(
+        p,
+        hautDuPaywall(
+          {
+            signaux: [
+              { id: "ouvre", cote: "toi", toi: 7, elle: 3 },
+              { id: "reprend", cote: "elle", toi: 2, elle: 8 },
+            ],
+            tendance: null,
+          },
+          { nom: p.autre.prenom ?? "lui", il: p.autre.il },
+        ),
+      ),
+    quoi: "offres",
+  },
+  chapitres: { mail: (p) => mailChapitres(p), quoi: "offres" },
+  "sans-conv": { mail: () => mailSansConv({ heure: "1\u00a0h\u00a012 du mat’" }), quoi: "offres" },
+  peur: { mail: () => mailSansConvPeur(), quoi: "offres" },
+  question: { mail: () => mailSansConvQuestion(), quoi: "offres" },
 };
 
 /**
@@ -49,7 +78,8 @@ const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: 
  * le mode sobre, `&premium=1` : Premium pris), celui de l’histoire d’exemple ; ou `?type=attente`, celui de la liste
  * d’attente (`&place=prete` : un email déjà invité, `&conv=1` : la conv importée qui n’a pas été gardée) ; ou
  * `?type=relance`, la relance « Ton rapport t’attend » ; ou un mail des séquences (`?type=repondre`, `vocal`, `pas`,
- * `glace`, `peu`, `prete`, `zero`, `endormi`, `parfait`, `couple`, `garde`, `avance`, `apres`, `anniv`). Pour ceux qui ont des prénoms : `&il=1`, c’est lui qui écrit (elle, l’autre) ;
+ * `glace`, `peu`, `prete`, `zero`, `endormi`, `parfait`, `couple`, `garde`, `avance`, `apres`, `anniv`, `parrainage`, `haut`,
+ * `chapitres`, `sans-conv`, `peur`, `question`). Pour ceux qui ont des prénoms : `&il=1`, c’est lui qui écrit (elle, l’autre) ;
  * `&anonyme=1`, sans prénoms.
  */
 export async function GET(req: Request) {
@@ -68,7 +98,7 @@ export async function GET(req: Request) {
     ? mailDeSequence(sequence.mail(personnes), {
         base: url.origin,
         liens: {
-          boutons: [`${exemple}?dire=`, `${exemple}?dire=`, `${exemple}?dire=`],
+          boutons: [`${exemple}?dire=`, `${exemple}?dire=`, `${exemple}?dire=`, `${exemple}?dire=`],
           desinscription: { lien: `${url.origin}/desinscription?id=exemple&cle=exemple`, quoi: sequence.quoi },
         },
       }).html

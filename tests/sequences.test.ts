@@ -6,7 +6,7 @@ import { empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { plafondsDesMails } from "@/server/limites";
-import { desinscrire, lienDesinscription } from "@/server/relances";
+import { desinscrire, envoyerLesRelances, lienDesinscription } from "@/server/relances";
 import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, heureCalme } from "@/server/sequences";
 import type { LevelId } from "@/types";
 import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
@@ -20,9 +20,11 @@ import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
  */
 
 const EQUIPE = { email: "" };
+/* Les mails aux prospects (S1, S2), éteints par défaut, allumés le temps d’un test */
+const PROSPECTS = vi.hoisted(() => ({ on: false }));
 vi.mock("@/server/env", async (original) => {
   const m = await original<typeof import("@/server/env")>();
-  return { ...m, accesLibre: (email: string) => email === EQUIPE.email || m.accesLibre(email) };
+  return { ...m, env: () => ({ ...m.env(), BLUSH_MAILS_PROSPECTS: PROSPECTS.on }), accesLibre: (email: string) => email === EQUIPE.email || m.accesLibre(email) };
 });
 
 /* Les mails partis : à qui, et ce qu’ils disent */
@@ -146,7 +148,7 @@ describe("S3 · après l’achat", () => {
     expect(m!.sujet).toBe("alors\u00a0?");
     expect(m!.html).toContain("Sophie t’a répondu");
     expect(`${m!.sujet}${m!.texte}`).not.toMatch(/Sophie|Hugo/);
-    expect(m!.html).toContain(`/ouvrir/${conv}?dire=son%20dernier%20message%C2%A0%3A%20`);
+    expect(m!.html).toContain(`/ouvrir/${conv}?m=s3_repondre&amp;dire=son%20dernier%20message%C2%A0%3A%20`);
     expect(m!.html).toContain("Plus de conseils comme ça");
     expect(m!.texte).toContain(lienDesinscription(u.id, "conseils"));
     expect(await envois(u)).toEqual([{ cle: "s3_repondre", parti: true }]);
@@ -186,7 +188,7 @@ describe("S3 · après l’achat", () => {
     const vocal = pour(u)[1]!;
     expect(vocal.sujet).toBe("t’as pas écouté ce que j’ai dit sur toi");
     expect(vocal.html).toContain("28 secondes sur toi et Sophie");
-    expect(vocal.html).toContain(`/ouvrir/${conv}"`);
+    expect(vocal.html).toContain(`/ouvrir/${conv}?m=s3_vocal"`);
 
     const ecoute = await client("sequence-vocal-ecoute", { debloque: 50 * HEURE });
     await auChat(ecoute.conv, 40 * HEURE);
@@ -205,8 +207,8 @@ describe("S3 · après l’achat", () => {
     const [pas] = pour(feu.u);
     expect(pas!.sujet).toBe("alors, ce plan\u00a0?");
     expect(pas!.html).toContain(lu.prochainPas.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
-    expect(pas!.html).toContain(`/ouvrir/${feu.conv}?dire=c%E2%80%99est%20fait%C2%A0!%20`);
-    expect(pas!.html).toContain(`/ouvrir/${feu.conv}?dire=j%E2%80%99ai%20pas%20os%C3%A9%E2%80%A6`);
+    expect(pas!.html).toContain(`/ouvrir/${feu.conv}?m=s3_pas&amp;dire=c%E2%80%99est%20fait%C2%A0!%20`);
+    expect(pas!.html).toContain(`/ouvrir/${feu.conv}?m=s3_pas&amp;dire=j%E2%80%99ai%20pas%20os%C3%A9%E2%80%A6`);
     const [doux] = pour(glace.u);
     expect(doux!.sujet).toBe("comment tu vas, vraiment\u00a0?");
     expect(doux!.html).toContain("3114");
@@ -247,7 +249,7 @@ describe("S4 · les bulles", () => {
     expect(autres).toEqual([]);
     expect(m!.sujet).toBe("ta réponse est prête");
     expect(m!.html).toContain("Pour Sophie · prête");
-    expect(m!.html).toContain(`/ouvrir/${conv}?recharger=1`);
+    expect(m!.html).toContain(`/ouvrir/${conv}?m=s4_prete&amp;recharger=1`);
     expect(m!.html).toContain("avec ta 1re recharge");
     expect(m!.html).toContain("Plus d’offres comme ça");
     const [quatre] = await db()
@@ -296,7 +298,7 @@ describe("S5 · le chat endormi", () => {
     expect(autres).toEqual([]);
     expect(m!.sujet).toBe("7 jours");
     expect(m!.html).toContain("vous en êtes où, toi et Sophie");
-    expect(m!.html).toContain(`/ouvrir/${conv}?dire=on%20se%20l%E2%80%99est%20dit%C2%A0!%20`);
+    expect(m!.html).toContain(`/ouvrir/${conv}?m=s5_endormi&amp;dire=on%20se%20l%E2%80%99est%20dit%C2%A0!%20`);
     await db()
       .update(schema.envoisMails)
       .set({ envoyeLe: ilYa(2 * 24 * HEURE) })
@@ -332,7 +334,7 @@ describe("S5 · le chat endormi", () => {
 
 describe("S6 · les offres gardées, S7 · après un 🧊", () => {
   it("le −50 % gardé qui finit dans deux jours : son prix, sa fin, et la page d’une nouvelle conv", async () => {
-    const { u } = await client("sequence-garde", { debloque: 10 * 24 * HEURE });
+    const { u, conv } = await client("sequence-garde", { debloque: 10 * 24 * HEURE });
     await db()
       .insert(schema.offresUniques)
       .values({ userId: u.id, offre: "garde_second", montreeLe: ilYa(5 * 24 * HEURE), expireLe: new Date(Date.now() + 2 * 24 * HEURE) });
@@ -340,7 +342,7 @@ describe("S6 · les offres gardées, S7 · après un 🧊", () => {
     const [m] = pour(u);
     expect(m!.sujet).toMatch(/^ton −50\u00a0% saute (lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)$/);
     expect(m!.html).toContain("6,95&nbsp;€");
-    expect(m!.html).toContain(`href="${new URL(lienDesinscription(u.id)).origin}/commencer"`);
+    expect(m!.html).toContain(`/ouvrir/${conv}?m=s6_garde&amp;nouvelle=1"`);
     expect(m!.html).toContain("Plus d’offres comme ça");
   });
 
@@ -399,7 +401,7 @@ describe("S8 · son anniversaire", () => {
     expect(autres).toEqual([]);
     expect(m!.sujet).toMatch(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche), t’as un truc à pas rater$/);
     expect(m!.html).toContain("c’est l’anniv de Sophie 🎂");
-    expect(m!.html).toContain(`/ouvrir/${conv}?dire=${encodeURIComponent("écris-moi son message d’anniv 🎂")}`);
+    expect(m!.html).toContain(`/ouvrir/${conv}?m=s8_anniv&amp;dire=${encodeURIComponent("écris-moi son message d’anniv 🎂")}`);
     expect(m!.texte).not.toContain("Sophie");
     await db()
       .update(schema.envoisMails)
@@ -417,6 +419,79 @@ describe("S8 · son anniversaire", () => {
     await ficheAvec(flou.conv, "Son anniv est en mars");
     await passer();
     expect([...pour(loin.u), ...pour(flou.u)]).toEqual([]);
+  });
+});
+
+describe("S3 J+5 · le parrainage", () => {
+  it("après un 🔥 : son lien, et le bouton vers sa page ; pas après un 🤏", async () => {
+    const feu = await client("sequence-parrainage", { debloque: 5.5 * 24 * HEURE, emoji: "🔥" });
+    const tiede = await client("sequence-parrainage-tiede", { debloque: 5.5 * 24 * HEURE, emoji: "🤏" });
+    /* Le prochain pas (J+4) est déjà parti, il y a deux jours */
+    for (const c of [feu, tiede])
+      await db()
+        .insert(schema.envoisMails)
+        .values({ userId: c.u.id, storyId: c.conv, cle: "s3_pas", occasion: c.conv, envoyeLe: ilYa(2 * 24 * HEURE) });
+    await passer();
+    const [m] = pour(feu.u);
+    expect(m!.sujet).toBe("tu connais quelqu’un qui relit ses messages à 1\u00a0h du mat’\u00a0?");
+    expect(m!.html).toMatch(/\/p\/[a-z2-9]{7}</);
+    expect(m!.html).toContain(`/ouvrir/${feu.conv}?m=s3_parrainage&amp;parrainage=1`);
+    expect(pour(tiede.u)).toEqual([]);
+  });
+});
+
+describe("S1, S2 · les prospects (éteints par défaut)", () => {
+  /** Un compte, sa conv au paywall (sa lecture attend son paiement) depuis `depuis`, rien de payé. */
+  async function auPaywall(prefixe: string, depuis = 3 * HEURE) {
+    const u = await compteDeTest(prefixe);
+    const conv = (await convPrete(u, "01-a-deux-doigts.txt", { moi: "Hugo" })).id;
+    await db()
+      .insert(schema.tasks)
+      .values({ storyId: conv, kind: "verdict", status: "paiement", updatedAt: ilYa(depuis) });
+    return { u, conv };
+  }
+
+  it("éteints : rien, et la relance ② part comme avant", async () => {
+    const { u } = await auPaywall("sequence-s1-eteint");
+    await passer();
+    expect(pour(u)).toEqual([]);
+  });
+
+  it("allumés : H+2 le titre de son paywall et ses chiffres, vers la feuille de paiement ; la relance ② s’arrête", async () => {
+    PROSPECTS.on = true;
+    try {
+      const { u, conv } = await auPaywall("sequence-s1");
+      await passer();
+      const [m] = pour(u);
+      expect(["j’ai vu une date dans ta conv", "question honnête", "t’as remarqué\u00a0?", "t’as vu le chiffre\u00a0?", "50/50", "t’as fermé juste avant le meilleur"]).toContain(
+        m!.sujet,
+      );
+      expect(m!.html).toContain("Ton rapport sur Sophie");
+      expect(m!.html).toContain(`/ouvrir/${conv}?m=s1_haut&amp;paiement=1`);
+      expect(m!.html).toContain("Plus de relances");
+      expect(`${m!.sujet}${m!.texte}`).not.toMatch(/Sophie|Hugo/);
+      expect(await envoyerLesRelances()).toEqual({ dues: 0, envoyees: 0, ecartees: 0, retenues: 0, echecs: 0 });
+    } finally {
+      PROSPECTS.on = false;
+    }
+  });
+
+  it("allumés : un compte sans conv, H+1, vers une nouvelle conv sans connexion", async () => {
+    PROSPECTS.on = true;
+    try {
+      const u = await compteDeTest("sequence-s2");
+      await db()
+        .update(schema.users)
+        .set({ createdAt: ilYa(2 * HEURE) })
+        .where(eq(schema.users.id, u.id));
+      await passer();
+      const [m] = pour(u);
+      expect(m!.html).toContain("Envoie la conv. Je te montre qui court après qui.");
+      expect(m!.html).toContain("/ouvrir/nouvelle?m=s2_heure&amp;nouvelle=1");
+      expect(m!.html).toContain("Plus de mails comme ça");
+    } finally {
+      PROSPECTS.on = false;
+    }
   });
 });
 

@@ -3,20 +3,27 @@ import {
   mailAnniversaire,
   mailApresGlace,
   mailAvance,
+  mailChapitres,
   mailEndormi,
   mailGarde,
   mailGlace,
+  mailHautDuPaywall,
   mailParfait,
+  mailParrainage,
   mailPeuDeBulles,
   mailProchainPas,
   mailRepondre,
   mailReponsePrete,
+  mailSansConv,
+  mailSansConvPeur,
+  mailSansConvQuestion,
   mailTemperature,
   mailVocal,
   mailZeroBulle,
   type MailDeSequence,
   type Personnes,
 } from "@/contenu/mails";
+import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { mailDeSequence } from "@/server/mail-sequence";
 
 /*
@@ -43,7 +50,19 @@ const tous = (p: Personnes): [string, MailDeSequence][] => [
   ["couple", mailTemperature(p, { niveau: "va", mois: 2 })],
   ["garde", mailGarde(p, { jour: "vendredi", heure: "18\u00a0h\u00a012" })],
   ["anniv", mailAnniversaire(p, { jour: "jeudi", date: "jeudi 23", aime: "Le ciné", bulles: 9 })],
+  ["parrainage", mailParrainage(p, { lien: "https://www.askblush.com/p/abcdefg" })],
+  ["haut", mailHautDuPaywall(p, hautDuPaywall(CONTRASTE, { nom: p.autre.prenom ?? "lui", il: p.autre.il }))],
+  ["chapitres", mailChapitres(p)],
 ];
+
+/* Un paywall au titre « contraste » : tu ouvres la conv, il revient après tes silences */
+const CONTRASTE = {
+  signaux: [
+    { id: "ouvre" as const, cote: "toi" as const, toi: 7, elle: 3 },
+    { id: "reprend" as const, cote: "elle" as const, toi: 2, elle: 8 },
+  ],
+  tendance: null,
+};
 
 const liens = {
   boutons: ["https://www.askblush.com/ouvrir/c1?dire=oui", "https://www.askblush.com/ouvrir/c1?dire=non"],
@@ -148,5 +167,31 @@ describe("les mails des séquences", () => {
     expect(anniv.boutons[0]!.dire).toBe("écris-moi son message d’anniv 🎂");
     expect(anniv.mini).toBe("1 bulle");
     expect(`${anniv.sujet}${anniv.apercu}${anniv.texte}`).not.toContain("Inès");
+  });
+
+  it("S1, S2 : les prospects ; le titre de son paywall, ses chapitres, et sans conv, ni prénom ni pronom", () => {
+    const haut = mailHautDuPaywall(INES, hautDuPaywall(CONTRASTE, { nom: "Lucas", il: true }));
+    expect(haut.sujet).toBe("t’as vu le chiffre\u00a0?");
+    expect(haut.boutons[0]!.libelle).toBe("Voir pourquoi il revient");
+    expect(haut.encart?.gras).toBe("Ton rapport sur Lucas");
+    expect(haut.pied).toContain("t’as dit oui aux nouvelles de BLUSH");
+    const chapitres = mailChapitres(LUCAS);
+    expect(chapitres.fiche?.[4]).toEqual({ rubrique: "5 · Inès", texte: "ce qu’elle montre, ce qu’elle cache" });
+    for (const m of [mailSansConv({ heure: "1\u00a0h\u00a012 du mat’" }), mailSansConvPeur(), mailSansConvQuestion()]) {
+      const d = mailDeSequence(m, { base: "x", liens });
+      for (const morceau of ["undefined", "null", "Inès", "Lucas", " il ", " elle "]) expect(`${d.sujet}${d.texte}${d.html}`).not.toContain(morceau);
+    }
+    expect(mailSansConv({ heure: null }).sujet).toBe("t’as créé ton compte, puis t’as filé");
+    expect(mailSansConvQuestion().boutons).toHaveLength(4);
+  });
+
+  it("le parrainage : l’amie de son genre, son lien, et ce que chacune y gagne", () => {
+    const elle = mailParrainage(INES, { lien: "https://www.askblush.com/p/abcdefg" });
+    expect(elle.titre).toBe("Ta pote mérite de savoir aussi.");
+    expect(elle.encart?.ligne).toBe("askblush.com/p/abcdefg");
+    expect(elle.corps).toBe("Elle importe sa conv avec ton lien\u00a0: elle a 10 réponses de BLUSH en plus avec son rapport, et toi 10 bulles offertes.");
+    const lui = mailParrainage(LUCAS, { lien: "https://www.askblush.com/p/abcdefg" });
+    expect(lui.titre).toBe("Ton pote mérite de savoir aussi.");
+    expect(lui.apercu).toBe("envoie-moi ton pote. vous y gagnez tous les deux.");
   });
 });

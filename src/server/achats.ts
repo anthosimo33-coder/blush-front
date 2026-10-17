@@ -16,6 +16,7 @@ import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
 import type { Consentement } from "./juridique";
 import { offreValable } from "./offres-uniques";
+import { recompenserLeParrainage, reprendreLeParrainage } from "./parrainage";
 import { reparerLaChaine } from "./pipeline";
 import { lotValable } from "./roue";
 import { noterAchatAuFil } from "./visites";
@@ -237,6 +238,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
     if (!userId) return { effet: "livre", achat: paye!, debloquee: false };
     const debloquee = storyId ? await ouvrirLaConv(tx, userId, storyId) : false;
     if (bulles > 0) await mouvementDans(tx, userId, bulles, "achat", achat.id);
+    /* Son premier rapport payé, venue par le lien d’une amie : les bulles du parrainage, à elle et à sa marraine */
+    if (debloquee) await recompenserLeParrainage(tx, userId);
     return { effet: "livre", achat: paye!, debloquee };
   });
   /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
@@ -425,6 +428,8 @@ export async function reprendre(achatId: string, statut: "rembourse" | "conteste
         .where(and(eq(s.id, storyId), sql`not exists (${autre})`));
     }
     if (userId && achat.bulles > 0) await mouvementDans(tx, userId, -achat.bulles, "remboursement", achat.id);
+    /* Son rapport repris : les bulles du parrainage aussi, s’il ne lui en reste aucun de payé */
+    if (userId && storyId) await reprendreLeParrainage(tx, userId);
     return { effet: "repris", achat: repris! };
   });
   if (r.effet === "repris" && r.achat)

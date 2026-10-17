@@ -93,6 +93,15 @@ export const AIDES_DU_PILOTAGE = {
     siCaBouge:
       "Un titre qui paie nettement moins que les autres\u00a0: réécris-le, ou change sa place dans la règle. Beaucoup de «\u00a0Sans assez de chiffres\u00a0»\u00a0: les convs arrivent trop courtes.",
   },
+  mails: {
+    titre: "Les mails des séquences",
+    de: "les mails des séquences",
+    quoi: "Les mails que BLUSH envoie tout seul après l’achat (S3), pour les bulles (S4), quand le chat dort (S5), pour une offre gardée (S6), après un 🧊 (S7) et pour un anniversaire (S8)\u00a0: combien sont partis, combien de boutons ont été touchés, et combien de comptes ont payé dans les 3 jours.",
+    calcul:
+      "«\u00a0Envoyés\u00a0»\u00a0: les mails partis sur la période (envois_mails), sans ceux écartés au moment de les écrire (une alerte, un 🧊). «\u00a0Clics\u00a0»\u00a0: les boutons du mail touchés, comptés par jour (un même compte peut toucher deux fois). «\u00a0Payés\u00a0»\u00a0: les mails après lesquels le compte a payé quelque chose (un rapport, une recharge) dans les 3 jours, que ce soit grâce au mail ou non.",
+    repere: "Le taux de clic se lit à partir de 30\u00a0envoyés. «\u00a0Payés\u00a0» compte aussi qui aurait payé sans le mail\u00a0: compare les mails entre eux, pas à zéro.",
+    siCaBouge: "Un mail que personne ne touche\u00a0: réécris son sujet (il se lit avant tout le reste). Beaucoup de désinscriptions après un mail\u00a0: espace-le, ou retire-le.",
+  },
   sources: {
     titre: "D’où ils viennent",
     de: "les sources",

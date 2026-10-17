@@ -1,6 +1,8 @@
 import type { LevelId } from "@/types";
+import { NB_CHAPITRES, titreDAttente } from "./chapitres";
+import type { GenreDuHaut, HautDuPaywall } from "./haut-du-paywall";
 import { scaleOf } from "./niveaux";
-import { CATALOGUE, COUT_EN_BULLES, prixDe, RAPPORT_D_AVANCE } from "./offres";
+import { CATALOGUE, COUT_EN_BULLES, PARRAINAGE, prixDe, RAPPORT_D_AVANCE } from "./offres";
 import { lePack, PACK_CONSEILLE } from "./recharge";
 
 /*
@@ -177,6 +179,30 @@ export function mailGlace(p: Personnes): MailDeSequence {
     mini: "Si ça pèse vraiment trop, parles-en à quelqu’un de confiance, ou appelle le 3114, jour et nuit.",
     ps: "ps\u00a0: t’as le droit de pas répondre. je bouge pas",
     pied: PIED,
+  };
+}
+
+/**
+ * S3 J+5, le parrainage, après un 🔥 : son lien (src/server/parrainage.ts), et ce que chacune y gagne. L’amie est dite
+ * du même genre qu’elle (« ta pote », « ton pote ») : un mot, pas une règle.
+ */
+export function mailParrainage(p: Personnes, { lien }: { lien: string }): MailDeSequence {
+  const { nom } = lAutre(p);
+  const pote = accord(p, "ta pote", "ton pote");
+  const elle = accord(p, "elle", "il");
+  return {
+    sujet: "tu connais quelqu’un qui relit ses messages à 1\u00a0h du mat’\u00a0?",
+    apercu: `envoie-moi ${pote}. vous y gagnez ${accord(p, "toutes", "tous")} les deux.`,
+    texte: `Envoie BLUSH à ${pote}\u00a0: ${PARRAINAGE.bulles} réponses de BLUSH en plus avec son rapport, et ${PARRAINAGE.bulles} bulles offertes pour toi.`,
+    bulles: ["ton verdict, c’était 🔥", `t’as forcément ${accord(p, "une pote", "un pote")} qui tourne en rond avec quelqu’un`, "envoie-lui BLUSH"],
+    titre: `${pote.replace(/^t/, "T")} mérite de savoir aussi.`,
+    corps: `${elle.replace(/^./, (c) => c.toUpperCase())} importe sa conv avec ton lien\u00a0: ${elle} a ${PARRAINAGE.bulles} réponses de BLUSH en plus avec son rapport, et toi ${PARRAINAGE.bulles} bulles offertes.`,
+    encart: { gras: "Ton lien", ligne: lien.replace(/^https?:\/\/(www\.)?/, "") },
+    boutons: [{ libelle: "Partager mon lien" }],
+    mini: `${elle.replace(/^./, (c) => c.toUpperCase())} ne voit rien de ta conv. Jamais.`,
+    ps: `ps\u00a0: promis, je lui dis rien de toi et ${nom}`,
+    pied: PIED,
+    desinscription: "Plus de mails comme ça",
   };
 }
 
@@ -423,6 +449,195 @@ export function mailAnniversaire(p: Personnes, { jour, date, aime, bulles }: { j
     desinscription: "Plus de rappels comme ça",
   };
 }
+
+/* ———— S1 · Le paywall vu, rien payé (des prospects : éteints tant que leur accord n’est pas demandé) ———— */
+
+const PROSPECT = "Ce mail ne cite aucun de vos messages. Tu le reçois parce que t’as dit oui aux nouvelles de BLUSH.";
+
+/** Ce que dit S1 H+2 selon le titre de son paywall : son sujet, son aperçu, son bouton, son ps. */
+const S1_SELON_LE_HAUT: Record<GenreDuHaut, { sujet: string; apercu: string; bouton: (il: string) => string; ps: string }> = {
+  tendance: {
+    sujet: "j’ai vu une date dans ta conv",
+    apercu: "à partir de là, tout change.",
+    bouton: () => "Voir ce qui a changé",
+    ps: "ps\u00a0: une courbe qui baisse, ça se lit mieux tôt que tard",
+  },
+  toi: {
+    sujet: "question honnête",
+    apercu: "c’est toujours toi qui écris en premier\u00a0?",
+    bouton: (il) => `Savoir si ${il} tient à moi`,
+    ps: "ps\u00a0: si la réponse est non, tu le sauras aussi. c’est toujours mieux que de tout porter",
+  },
+  elle: {
+    sujet: "t’as remarqué\u00a0?",
+    apercu: "c’est pas toi qui cours, dans cette histoire.",
+    bouton: (il) => `Voir ce qu’${il} attend`,
+    ps: "ps\u00a0: quelqu’un qui relance autant finit par se lasser. pas tout de suite. mais ça arrive",
+  },
+  contraste: {
+    sujet: "t’as vu le chiffre\u00a0?",
+    apercu: "celui qui t’a fait tilter. je sais ce qu’il veut dire.",
+    bouton: (il) => `Voir pourquoi ${il} revient`,
+    ps: "ps\u00a0: je lis tout dès que tu dis go. ton rapport est prêt en quelques minutes",
+  },
+  egalite: {
+    sujet: "50/50",
+    apercu: "sur le papier, vous êtes à égalité. sur le papier.",
+    bouton: () => "Voir ce qui se joue",
+    ps: "ps\u00a0: les convs «\u00a0parfaites\u00a0» cachent souvent le truc le plus intéressant",
+  },
+  aucun: {
+    sujet: "t’as fermé juste avant le meilleur",
+    apercu: "ta conv est prête à être lue. il ne manque que toi.",
+    bouton: () => "Lire mon rapport",
+    ps: "ps\u00a0: je lis tout dès que tu dis go. ton rapport est prêt en quelques minutes",
+  },
+};
+
+/**
+ * S1 H+2 : le titre que son paywall lui a montré (src/contenu/haut-du-paywall.ts), ses chiffres comptés par le code,
+ * jamais par le modèle (rien n’est encore lu), et le rapport à son prix.
+ */
+export function mailHautDuPaywall(p: Personnes, haut: HautDuPaywall): MailDeSequence {
+  const { il, nom } = lAutre(p);
+  const selon = S1_SELON_LE_HAUT[haut.genre];
+  return {
+    sujet: selon.sujet,
+    apercu: selon.apercu,
+    texte: `Ton rapport t’attend\u00a0: ${NB_CHAPITRES} chapitres, ton vocal, et ${CATALOGUE.rapport.bulles} réponses de BLUSH, pour ${prixDe("rapport")}.`,
+    bulles: [haut.question.replace(/^BLUSH t’écrit /, "je t’écris "), "t’as pas envie de savoir pourquoi\u00a0?"],
+    ...(haut.cases.length && { fiche: haut.cases.map((c) => ({ rubrique: c.texte, texte: `${c.valeur}${c.unite}` })) }),
+    titre: haut.titre.join(" "),
+    corps: haut.sous || "Ton rapport la met noir sur blanc\u00a0: ce que ça dit de vous deux, et quoi faire maintenant. Vos messages en preuves.",
+    encart: { gras: `Ton rapport sur ${nom}`, ligne: `${NB_CHAPITRES} chapitres, ton vocal, ${CATALOGUE.rapport.bulles} réponses de BLUSH · ${prixDe("rapport")}` },
+    boutons: [{ libelle: selon.bouton(il) }],
+    mini: "Paiement unique · Apple Pay ou carte",
+    ps: selon.ps,
+    pied: PROSPECT,
+    desinscription: "Plus de relances",
+  };
+}
+
+/** Ce que dit chaque chapitre, sous son titre d’attente (S1 J+1). */
+const CE_QUE_DIT_LE_CHAPITRE = [
+  "où vous en êtes, en une phrase",
+  "le jour exact, avec ses messages",
+  "du premier message à aujourd’hui",
+  "ce qui bloque, de son côté et du tien",
+  "ce qu’il montre, ce qu’il cache",
+  "ce que tu fais sans le voir",
+  "ce qui marche entre vous",
+  "quoi faire, et quand",
+];
+
+/** S1 J+1 : les huit chapitres de son rapport, le 5 à son prénom. */
+export function mailChapitres(p: Personnes): MailDeSequence {
+  const { il, nom } = lAutre(p);
+  return {
+    sujet: `${NB_CHAPITRES} chapitres sur vous deux`,
+    apercu: "et j’ai pas encore écrit le premier mot.",
+    texte: `Ton rapport tient en ${NB_CHAPITRES} chapitres. Je l’écris dès que tu dis go.`,
+    bulles: [`ton rapport tient en ${NB_CHAPITRES} chapitres`, "je l’écris dès que tu dis go", "le 5 porte son prénom"],
+    fiche: Array.from({ length: NB_CHAPITRES }, (_, k) => ({
+      rubrique: `${k + 1} · ${titreDAttente(k + 1, nom)}`,
+      texte: CE_QUE_DIT_LE_CHAPITRE[k]!.replace(/\bil\b/g, il),
+    })),
+    titre: "Un chapitre entier porte son prénom.",
+    corps: `Ce qu’${il} montre, ce qu’${il} cache, ce qu’${il} attend. Tout ce que tu te demandes à 1\u00a0h du mat’, ses messages en preuves.`,
+    boutons: [{ libelle: `Débloquer mes ${NB_CHAPITRES} chapitres · ${prixDe("rapport")}` }],
+    mini: "Paiement unique · Apple Pay ou carte",
+    ps: "ps\u00a0: y a aussi un vocal de 30 secondes où je te dis tout. sans filtre",
+    pied: PROSPECT,
+    desinscription: "Plus de relances",
+  };
+}
+
+/* ———— S2 · Un compte, aucune conv (des prospects : éteints tant que leur accord n’est pas demandé) ———— */
+
+/* Sans conv, ni prénom ni pronom : une écriture neutre */
+const PROSPECT_SANS_CONV = "Tu le reçois parce que t’as dit oui aux nouvelles de BLUSH.";
+
+/** S2 H+1 : l’heure de son compte, quand c’était la nuit (« 1 h 12 du mat’ »), et l’export de WhatsApp en quatre gestes. */
+export function mailSansConv({ heure }: { heure: string | null }): MailDeSequence {
+  return {
+    sujet: heure ?? "t’as créé ton compte, puis t’as filé",
+    apercu: "t’as créé ton compte, puis t’as filé. je sais ce que ça veut dire.",
+    texte: "T’as créé ton compte, puis t’as filé. Envoie la conv\u00a0: je te montre qui court après qui.",
+    bulles: [...(heure ? [heure] : []), "t’as créé ton compte, puis t’as filé", "laisse-moi deviner\u00a0: y a quelqu’un dans ta tête 👀"],
+    titre: "Envoie la conv. Je te montre qui court après qui.",
+    corps: "Je compte tout\u00a0: qui ouvre la journée, qui relance, qui répond vite, et si quelque chose a changé. Ça, c’est offert. Le rapport complet, tu décides après.",
+    fiche: [
+      { rubrique: "Sur WhatsApp · 1", texte: "Ouvre votre conv" },
+      { rubrique: "2", texte: "Touche son nom en haut" },
+      { rubrique: "3", texte: "Exporter la discussion, sans médias" },
+      { rubrique: "4", texte: "Donne-moi le fichier" },
+    ],
+    boutons: [{ libelle: "Envoyer ma conv" }],
+    mini: `Ce que je compte est offert · le rapport complet, ${prixDe("rapport")}`,
+    ps: "ps\u00a0: sur WhatsApp, l’export prend 30 secondes. le plus dur, c’est de choisir la conv 😏",
+    pied: PROSPECT_SANS_CONV,
+    desinscription: "Plus de mails comme ça",
+  };
+}
+
+/** S2 J+1 : la peur de la réponse, et les captures. */
+export function mailSansConvPeur(): MailDeSequence {
+  return {
+    sujet: "t’as toujours pas envoyé la conv",
+    apercu: "je crois savoir pourquoi.",
+    texte: "Le pire, c’est pas un non. C’est de pas savoir. Quelques captures suffisent.",
+    bulles: ["t’as toujours pas envoyé la conv", "je crois que t’as peur de la réponse", "normal"],
+    puces: ["Relire ses messages dix fois", "Écrire, effacer, réécrire", "Guetter un «\u00a0vu\u00a0»"],
+    titre: "Le pire, c’est pas un non. C’est de pas savoir.",
+    corps: "Quelques captures suffisent. Je te montre tout de suite qui court après qui, offert. Et personne n’est jamais prévenu.",
+    boutons: [{ libelle: "Envoyer mes captures" }],
+    mini: "Ou l’export, si t’as le fichier.",
+    ps: "ps\u00a0: et si c’est réciproque, tu vas t’en vouloir d’avoir attendu",
+    pied: PROSPECT_SANS_CONV,
+    desinscription: "Plus de mails comme ça",
+  };
+}
+
+/** S2 J+4 : « vous en êtes où, d’après toi ? », quatre réponses, toutes vers une nouvelle conv. */
+export function mailSansConvQuestion(): MailDeSequence {
+  return {
+    sujet: "question rapide",
+    apercu: "vous en êtes où, d’après toi\u00a0?",
+    texte: "Vous en êtes où, d’après toi\u00a0? Envoie-moi la conv, je te dis si t’as raison.",
+    bulles: ["dernier mail, promis", "vous en êtes où, d’après toi\u00a0?"],
+    titre: "Touche ta réponse. Je te dis si t’as raison.",
+    corps: "Tu choisis, tu m’envoies la conv, et je compare avec ce que vos messages montrent vraiment. On se trompe souvent. Dans les deux sens.",
+    boutons: [{ libelle: "On se parle" }, { libelle: "On s’est vus" }, { libelle: "C’est flou" }, { libelle: "En couple" }],
+    mini: "Ce que je compte est offert.",
+    ps: "ps\u00a0: la personne à qui t’as pensé en lisant la question\u00a0? c’est sa conv qu’il me faut",
+    pied: PROSPECT_SANS_CONV,
+    desinscription: "Plus de mails comme ça",
+  };
+}
+
+/** Les mails des séquences, par leur clé (envois_mails.cle, src/server/sequences.ts), et leur nom dans /admin. */
+export const NOMS_DES_MAILS = {
+  s3_rapport: "S3 · ton rapport est prêt",
+  s3_repondre: "S3 J+1 · il t’a répondu\u00a0?",
+  s3_vocal: "S3 J+2 · le vocal",
+  s3_pas: "S3 J+4 · le prochain pas (ou 🧊)",
+  s3_parrainage: "S3 J+5 · le parrainage",
+  s4_prete: "S4 · ta réponse est prête",
+  s4_peu: "S4 · 2 bulles ou moins",
+  s4_zero: "S4 · à zéro depuis 3 jours",
+  s5_endormi: "S5 J+7 · t’en es où\u00a0?",
+  s5_parfait: "S5 J+21 · parfait, ou abandonné\u00a0?",
+  s5_couple: "S5 · la température du mois",
+  s6_garde: "S6 · le −50\u00a0% gardé",
+  s6_avance: "S6 · le rapport d’avance",
+  s7_glace: "S7 · trois semaines après un 🧊",
+  s8_anniv: "S8 · son anniversaire",
+  s1_haut: "S1 H+2 · le titre de son paywall",
+  s1_chapitres: "S1 J+1 · les 8 chapitres",
+  s2_heure: "S2 H+1 · l’heure de son compte",
+  s2_peur: "S2 J+1 · la peur de la réponse",
+  s2_question: "S2 J+4 · vous en êtes où\u00a0?",
+} as const;
 
 /** La désinscription en pied, selon ce qu’est le mail : un conseil (S3, S5, S8) ou une offre (S4, S6, S7). */
 export const DESINSCRIPTION = { conseils: "Plus de conseils comme ça", offres: "Plus d’offres comme ça" } as const;

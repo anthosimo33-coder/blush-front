@@ -6,19 +6,27 @@ import {
   mailAvance,
   mailEndormi,
   mailGarde,
+  mailChapitres,
   mailGlace,
+  mailHautDuPaywall,
   mailParfait,
+  mailParrainage,
   mailPeuDeBulles,
   mailProchainPas,
   mailRepondre,
   mailReponsePrete,
+  mailSansConv,
+  mailSansConvPeur,
+  mailSansConvQuestion,
   mailTemperature,
   mailVocal,
   mailZeroBulle,
   NIVEAUX_A_FRANCHIR,
+  NOMS_DES_MAILS,
   type MailDeSequence,
   type Personnes,
 } from "@/contenu/mails";
+import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { scaleOf } from "@/contenu/niveaux";
 import { RAPPORT_D_AVANCE } from "@/contenu/offres";
 import type { LevelId } from "@/types";
@@ -34,6 +42,7 @@ import { journal, journalErreur } from "./journal";
 import { plafondsDesMails, rendre, sousLaLimite } from "./limites";
 import { mailDeSequence } from "./mail-sequence";
 import { montrer } from "./offres-uniques";
+import { lienDeParrainage } from "./parrainage";
 import { lienDesinscription, RELANCES_DU_JOUR } from "./relances";
 import { rechargeDejaPayee } from "./achats";
 
@@ -42,9 +51,16 @@ import { rechargeDejaPayee } from "./achats";
  * src/contenu/mails.ts, leur gabarit dans src/server/mail-sequence.ts). Le lot 1 :
  * - S3, après l’achat, sur la dernière conv débloquée du compte : J0 « ton rapport est prêt » (src/server/analyse.ts,
  *   noté ici), J+1 « il t’a répondu ? » (rien dit au chat depuis), J+2 le vocal (pas encore écouté), J+4 son prochain pas
- *   (🔥 🤏 🤔), ou après un 🧊, « comment tu vas, vraiment ? » (rien à vendre, le 3114). Des conseils.
+ *   (🔥 🤏 🤔), ou après un 🧊, « comment tu vas, vraiment ? » (rien à vendre, le 3114). Des conseils. Puis, après un
+ *   🔥 seulement, J+5 le parrainage (src/server/parrainage.ts) : une offre.
  * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, 2 bulles ou moins, puis à zéro depuis 3 jours.
  *   Des offres.
+ * Le lot 3, éteint tant que BLUSH_MAILS_PROSPECTS ne vaut pas « 1 » (l’accord de prospection, l’avis du juriste) :
+ * - S1, le paywall vu sans payer : H+2 le titre de son paywall et ses chiffres, J+1 ses 8 chapitres. Ils remplacent la
+ *   relance ② (src/server/relances.ts), qui s’arrête quand ils s’allument. Des offres.
+ * - S2, un compte sans conv : H+1, J+1, J+4, vers une nouvelle conv. Des offres.
+ * TODO(produit): S1 J+3 (une réponse offerte, écrite au clic : il faut un prompt qui lise une conv pas encore payée) et
+ * S1 J+6 (le rapport à −3 € deux jours, en A/B : une offre de plus au paiement) attendent leur décision.
  * Le lot 2 :
  * - S5, le chat endormi, sur la dernière conv débloquée, à qui il reste des bulles : 7 jours sans un mot au chat (leur
  *   niveau, avant d’être ensemble), 21 jours (« parfait, ou abandonné ? »), et un couple chaque mois depuis le rapport
@@ -90,6 +106,7 @@ const MAILS = {
   s3_repondre: "conseils",
   s3_vocal: "conseils",
   s3_pas: "conseils",
+  s3_parrainage: "offres",
   s4_prete: "offres",
   s4_peu: "offres",
   s4_zero: "offres",
@@ -100,11 +117,22 @@ const MAILS = {
   s6_avance: "offres",
   s7_glace: "offres",
   s8_anniv: "conseils",
-} as const satisfies Record<string, "conseils" | "offres" | null>;
+  s1_haut: "offres",
+  s1_chapitres: "offres",
+  s2_heure: "offres",
+  s2_peur: "offres",
+  s2_question: "offres",
+} as const satisfies Record<keyof typeof NOMS_DES_MAILS, "conseils" | "offres" | null>;
 export type CleDeMail = keyof typeof MAILS;
 
+/** Les clés des mails des séquences, dans l’ordre des séquences (/admin). */
+export const CLES_DES_MAILS = Object.keys(NOMS_DES_MAILS) as CleDeMail[];
+
+/** Est-ce la clé d’un mail des séquences (le `?m=` de leurs liens, compté par /ouvrir/<conv>) ? */
+export const estUnMail = (m: string | null): m is CleDeMail => m !== null && Object.hasOwn(MAILS, m);
+
 /** Les fenêtres de S3, depuis le déblocage de la conv : chaque mail part dedans, ou jamais (une veille arrêtée ne les envoie pas à contretemps). */
-const FENETRES_S3 = { s3_repondre: [1 * JOUR, 3 * JOUR], s3_vocal: [2 * JOUR, 4 * JOUR], s3_pas: [4 * JOUR, 6 * JOUR] } as const;
+const FENETRES_S3 = { s3_repondre: [1 * JOUR, 3 * JOUR], s3_vocal: [2 * JOUR, 4 * JOUR], s3_pas: [4 * JOUR, 6 * JOUR], s3_parrainage: [5 * JOUR, 7 * JOUR] } as const;
 
 /** Les fenêtres de S5, depuis son dernier mot au chat (ou le déblocage) : 7 et 21 jours, une semaine chacune ; un couple, chaque mois (30 jours) depuis le déblocage. */
 const FENETRES_S5 = { s5_endormi: [7 * JOUR, 14 * JOUR], s5_parfait: [21 * JOUR, 28 * JOUR], mois: 30 * JOUR, semaine: 7 * JOUR } as const;
@@ -155,15 +183,13 @@ async function oublierLEnvoi(userId: string, cle: CleDeMail, occasion: string, {
   else await db().delete(e).where(ce);
 }
 
-/** Un mail des séquences à envoyer : le compte, la conv dont il parle, son occasion, et ce qu’il faut pour l’écrire. */
-type Candidat = {
-  userId: string;
-  email: string;
-  storyId: string;
-  cle: Exclude<CleDeMail, "s3_rapport">;
-  occasion: string;
-  ecrire: (p: Personnes) => Promise<MailDeSequence | null>;
-};
+/**
+ * Un mail des séquences à envoyer : le compte, la conv dont il parle, son occasion, et ce qu’il faut pour l’écrire. Sans
+ * conv (S2, un compte qui n’en a pas encore), ni prénom ni pronom : `storyId` null, écrit sans eux.
+ */
+type Candidat = { userId: string; email: string; cle: Exclude<CleDeMail, "s3_rapport">; occasion: string } & (
+  { storyId: string; ecrire: (p: Personnes) => Promise<MailDeSequence | null> } | { storyId: null; ecrire: () => Promise<MailDeSequence | null> }
+);
 
 /** Ce qu’un passage des séquences a fait : des nombres seulement (les logs de la veille sont publics). */
 export type PassageDesSequences = { dues: number; envoyes: number; ecartes: number; retenus: number; echecs: number };
@@ -198,6 +224,7 @@ async function candidatsS3(): Promise<Candidat[]> {
     ecrit_24h: boolean;
     vocal_ms: number | null;
     ecoute: boolean;
+    offres_coupees: boolean;
     envoyes: string;
   }>(sql`
     select distinct on (u.id) u.id as user_id, u.email, u.bulles, s.id as story_id,
@@ -206,10 +233,11 @@ async function candidatsS3(): Promise<Candidat[]> {
       exists (select 1 from ${m} m where m.story_id = s.id and m.role = 'toi' and m.created_at > now() - interval '24 hours') as ecrit_24h,
       (select v.duree_ms from ${v} v where v.story_id = s.id) as vocal_ms,
       exists (select 1 from ${ve} ve where ve.story_id = s.id and ve.evenement <> 'ferme') as ecoute,
+      u.relances_coupees_le is not null as offres_coupees,
       coalesce((select string_agg(e.cle, ',') from ${e} e where e.user_id = u.id and e.occasion = s.id::text), '') as envoyes
     from ${s} s
     join ${u0} u on u.id = s.user_id
-    where s.debloque_le <= now() - interval '1 day' and s.debloque_le > now() - interval '6 days'
+    where s.debloque_le <= now() - interval '1 day' and s.debloque_le > now() - interval '7 days'
       and u.conseils_coupes_le is null
       and exists (select 1 from ${r} r where r.story_id = s.id and r.data is not null)
       and not ${MAIL_RECENT}
@@ -241,6 +269,15 @@ async function candidatsS3(): Promise<Candidat[]> {
             if (!verdict?.emoji) return null;
             return verdict.emoji === "🧊" ? mailGlace(p) : mailProchainPas(p, { emoji: verdict.emoji, pas: verdict.prochain_pas, bulles: Math.max(0, l.bulles) });
           },
+        },
+      ];
+    /* Le parrainage, après un 🔥 seulement : une offre, que coupe sa désinscription des offres */
+    if (dans("s3_parrainage") && !l.offres_coupees)
+      return [
+        {
+          ...base,
+          cle: "s3_parrainage",
+          ecrire: async (p) => ((await verdictSansAlerte(l.story_id))?.emoji === "🔥" ? mailParrainage(p, { lien: await lienDeParrainage(l.user_id) }) : null),
         },
       ];
     return [];
@@ -546,20 +583,102 @@ async function candidatsS8(): Promise<Candidat[]> {
   return candidats;
 }
 
-/** Les mails qui mènent à une nouvelle conv (S6, S7) : la page où l’on commence. */
-const VERS_UNE_NOUVELLE_CONV: readonly CleDeMail[] = ["s6_garde", "s6_avance", "s7_glace"];
+/** Les fenêtres de S1, depuis son arrivée au paywall, et de S2, depuis la création du compte. */
+const FENETRES_S1 = { s1_haut: [2 * HEURE, 2 * JOUR], s1_chapitres: [1 * JOUR, 3 * JOUR] } as const;
+const FENETRES_S2 = { s2_heure: [1 * HEURE, 1 * JOUR], s2_peur: [1 * JOUR, 3 * JOUR], s2_question: [4 * JOUR, 6 * JOUR] } as const;
 
 /**
- * Les liens d’un mail : chaque bouton ouvre la conv dont il parle (le chat, son texte déjà tapé ; le rapport pour le
- * vocal ; la recharge pour S4), ou la page d’une nouvelle conv (S6, S7).
+ * S1 (les prospects, BLUSH_MAILS_PROSPECTS) : la dernière conv du compte arrivée au paywall (sa lecture attend son
+ * paiement) il y a 2 heures à 3 jours, ni débloquée ni payée. H+2 : le titre de son paywall et ses chiffres, comptés par
+ * le code (rien n’est lu avant le paiement) ; J+1 : ses 8 chapitres. Ils remplacent la relance ②.
+ */
+async function candidatsS1(): Promise<Candidat[]> {
+  const { stories: s, users: u0, tasks: t, achats: a, envoisMails: e } = schema;
+  const { rows } = await db().execute<{ user_id: string; email: string; story_id: string; age_ms: number; envoyes: string }>(sql`
+    select distinct on (u.id) u.id as user_id, u.email, s.id as story_id,
+      (extract(epoch from now() - t.updated_at) * 1000)::float8 as age_ms,
+      coalesce((select string_agg(e.cle, ',') from ${e} e where e.user_id = u.id and e.occasion = s.id::text), '') as envoyes
+    from ${s} s
+    join ${u0} u on u.id = s.user_id
+    join ${t} t on t.story_id = s.id and t.kind = 'verdict' and t.status = 'paiement'
+    where s.debloque_le is null and t.updated_at <= now() - interval '2 hours' and t.updated_at > now() - interval '3 days'
+      and u.relances_coupees_le is null and not ${MAIL_RECENT}
+      and not exists (select 1 from ${a} a where a.story_id = s.id and a.statut = 'paye')
+    order by u.id, t.updated_at desc`);
+  return rows.flatMap((l): Candidat[] => {
+    const envoyes = new Set(l.envoyes.split(","));
+    const dans = (cle: keyof typeof FENETRES_S1) => !envoyes.has(cle) && l.age_ms >= FENETRES_S1[cle][0] && l.age_ms < FENETRES_S1[cle][1];
+    const base = { userId: l.user_id, email: l.email, storyId: l.story_id, occasion: l.story_id };
+    const candidats: Candidat[] = [];
+    if (dans("s1_haut"))
+      candidats.push({
+        ...base,
+        cle: "s1_haut",
+        ecrire: async (p) => {
+          /* Le titre de son paywall, recompté par le code sur sa conv (src/server/analyse.ts), comme l’écran */
+          const apercu = await (await import("./analyse")).apercuAvantPaiement(l.story_id);
+          return apercu ? mailHautDuPaywall(p, hautDuPaywall(apercu, { nom: p.autre.prenom ?? (p.autre.il ? "lui" : "elle"), il: p.autre.il })) : null;
+        },
+      });
+    if (dans("s1_chapitres")) candidats.push({ ...base, cle: "s1_chapitres", ecrire: async (p) => mailChapitres(p) });
+    return candidats;
+  });
+}
+
+/** L’heure de la création du compte, à Paris, quand c’était la nuit (« 1 h 12 du mat’ », « 23 h 40 ») ; sinon rien. */
+function heureDeLaNuit(d: Date): string | null {
+  const [h, m] = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d).split(":").map(Number) as [
+    number,
+    number,
+  ];
+  const dite = `${h}\u00a0h\u00a0${String(m).padStart(2, "0")}`;
+  if (h < 6) return `${dite} du mat’`;
+  return h >= 22 ? dite : null;
+}
+
+/**
+ * S2 (les prospects, BLUSH_MAILS_PROSPECTS) : un compte créé il y a 1 heure à 6 jours, sans aucune conv. H+1 : l’heure
+ * de son compte (la nuit) et l’export ; J+1 : la peur de la réponse ; J+4 : « vous en êtes où ? ». Sans conv, ni prénom
+ * ni pronom.
+ */
+async function candidatsS2(): Promise<Candidat[]> {
+  const { stories: s, users: u0, envoisMails: e } = schema;
+  const { rows } = await db().execute<{ user_id: string; email: string; cree_le: string; age_ms: number; envoyes: string }>(sql`
+    select u.id as user_id, u.email, u.created_at as cree_le,
+      (extract(epoch from now() - u.created_at) * 1000)::float8 as age_ms,
+      coalesce((select string_agg(e.cle, ',') from ${e} e where e.user_id = u.id), '') as envoyes
+    from ${u0} u
+    where u.created_at <= now() - interval '1 hour' and u.created_at > now() - interval '6 days'
+      and u.relances_coupees_le is null and not ${MAIL_RECENT}
+      and not exists (select 1 from ${s} s where s.user_id = u.id)`);
+  return rows.flatMap((l): Candidat[] => {
+    const envoyes = new Set(l.envoyes.split(","));
+    const dans = (cle: keyof typeof FENETRES_S2) => !envoyes.has(cle) && l.age_ms >= FENETRES_S2[cle][0] && l.age_ms < FENETRES_S2[cle][1];
+    const base = { userId: l.user_id, email: l.email, storyId: null, occasion: l.user_id };
+    if (dans("s2_heure")) return [{ ...base, cle: "s2_heure", ecrire: async () => mailSansConv({ heure: heureDeLaNuit(new Date(l.cree_le)) }) }];
+    if (dans("s2_peur")) return [{ ...base, cle: "s2_peur", ecrire: async () => mailSansConvPeur() }];
+    if (dans("s2_question")) return [{ ...base, cle: "s2_question", ecrire: async () => mailSansConvQuestion() }];
+    return [];
+  });
+}
+
+/** Les mails qui mènent à une nouvelle conv (S2, S6, S7) : la page où l’on commence. */
+const VERS_UNE_NOUVELLE_CONV: readonly CleDeMail[] = ["s6_garde", "s6_avance", "s7_glace", "s2_heure", "s2_peur", "s2_question"];
+
+/**
+ * Les liens d’un mail : chaque bouton passe par /ouvrir/<conv> (qui compte le clic, `?m=<clé>`), puis ouvre la conv dont
+ * il parle (le chat, son texte déjà tapé ; le rapport pour le vocal ; la recharge pour S4), ou la page d’une nouvelle conv
+ * (S6, S7).
  */
 function liensDe(c: Candidat, m: MailDeSequence) {
-  const ouvrir = `${env().BLUSH_URL}/ouvrir/${c.storyId}`;
+  const ouvrir = `${env().BLUSH_URL}/ouvrir/${c.storyId ?? "nouvelle"}?m=${c.cle}`;
   const boutons = m.boutons.map((b) => {
     if (c.cle === "s3_vocal") return ouvrir;
-    if (VERS_UNE_NOUVELLE_CONV.includes(c.cle)) return `${env().BLUSH_URL}/commencer`;
-    if (MAILS[c.cle] === "offres") return `${ouvrir}?recharger=1`;
-    return `${ouvrir}?dire=${encodeURIComponent(b.dire ?? "")}`;
+    if (VERS_UNE_NOUVELLE_CONV.includes(c.cle)) return `${ouvrir}&nouvelle=1`;
+    if (c.cle === "s3_parrainage") return `${ouvrir}&parrainage=1`;
+    if (c.cle === "s1_haut" || c.cle === "s1_chapitres") return `${ouvrir}&paiement=1`;
+    if (MAILS[c.cle] === "offres") return `${ouvrir}&recharger=1`;
+    return `${ouvrir}&dire=${encodeURIComponent(b.dire ?? "")}`;
   });
   return { boutons, desinscription: { lien: lienDesinscription(c.userId, MAILS[c.cle]), quoi: MAILS[c.cle] } };
 }
@@ -579,9 +698,19 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
   const boite = boiteAMails();
   /* Un par compte, dans l’ordre des priorités */
   const parCompte = new Map<string, Candidat>();
-  const [s3, s4, s5, s6, s7, s8] = await Promise.all([candidatsS3(), candidatsS4(), candidatsS5(), candidatsS6(), candidatsS7(), candidatsS8()]);
+  const prospects = env().BLUSH_MAILS_PROSPECTS;
+  const [s1, s2, s3, s4, s5, s6, s7, s8] = await Promise.all([
+    prospects ? candidatsS1() : [],
+    prospects ? candidatsS2() : [],
+    candidatsS3(),
+    candidatsS4(),
+    candidatsS5(),
+    candidatsS6(),
+    candidatsS7(),
+    candidatsS8(),
+  ]);
   const prete = s4.filter((c) => c.cle === "s4_prete");
-  for (const c of [...prete, ...s3, ...s8, ...s4.filter((c) => c.cle !== "s4_prete"), ...s6, ...s5, ...s7]) if (!parCompte.has(c.userId)) parCompte.set(c.userId, c);
+  for (const c of [...prete, ...s3, ...s8, ...s4.filter((c) => c.cle !== "s4_prete"), ...s1, ...s6, ...s5, ...s7, ...s2]) if (!parCompte.has(c.userId)) parCompte.set(c.userId, c);
   const dus = [...parCompte.values()];
   passage.dues = dus.length;
   for (const [k, c] of dus.entries()) {
@@ -589,15 +718,24 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
       passage.retenus = dus.length - k;
       break;
     }
-    const [story] = await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, c.storyId));
-    const personnes = story ? personnesDe(metaDe(story)) : null;
-    if (estEquipe(c) || !personnes || !(await entre(c.email))) {
+    /* Leurs prénoms et leurs pronoms, pour un mail sur une conv ; sans conv (S2), écrit sans eux */
+    let ecrire: () => Promise<MailDeSequence | null>;
+    if (c.storyId !== null) {
+      const [story] = await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, c.storyId));
+      const personnes = story ? personnesDe(metaDe(story)) : null;
+      if (!personnes) {
+        passage.ecartes++;
+        continue;
+      }
+      ecrire = () => c.ecrire(personnes);
+    } else ecrire = () => c.ecrire();
+    if (estEquipe(c) || !(await entre(c.email))) {
       passage.ecartes++;
       continue;
     }
     /* Noté d’abord : un autre passage en même temps ne l’envoie pas une seconde fois */
     if (!(await noterLEnvoi(c.userId, c.cle, c.occasion, c.storyId))) continue;
-    const mail = await c.ecrire(personnes).catch((e: unknown) => {
+    const mail = await ecrire().catch((e: unknown) => {
       journalErreur("séquence : mail non écrit", e);
       return null;
     });

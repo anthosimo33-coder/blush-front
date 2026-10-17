@@ -145,6 +145,15 @@ export const Env = z.object({
     .enum(["0", "1"])
     .default("0")
     .transform((v) => v === "1"),
+  /**
+   * Les mails aux prospects (S1, le paywall vu sans payer ; S2, un compte sans conv : src/server/sequences.ts), et la
+   * relance ② qu’ils remplacent : « 1 » les envoie (et coupe la relance), « 0 » (le défaut) les garde éteints.
+   * TODO(produit): ne l’allumer qu’après l’accord de prospection (une case à l’inscription) et l’avis du juriste.
+   */
+  BLUSH_MAILS_PROSPECTS: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((v) => v === "1"),
   /** Tests de bout en bout (tests/e2e) : les mails sont écrits dans ce dossier au lieu de partir. Avec le modèle factice seulement. */
   BLUSH_BOITE_MAILS: z.string().min(1).optional(),
 });

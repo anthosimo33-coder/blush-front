@@ -115,6 +115,23 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { genre: "egalite", vus: 57, payes: 6 },
       { genre: "aucun", vus: 12, payes: 1 },
     ],
+    mails: [
+      { cle: "s3_rapport", envoyes: 124, clics: 98, payes: 4 },
+      { cle: "s3_repondre", envoyes: 61, clics: 22, payes: 9 },
+      { cle: "s3_vocal", envoyes: 38, clics: 17, payes: 2 },
+      { cle: "s3_pas", envoyes: 44, clics: 19, payes: 6 },
+      { cle: "s3_parrainage", envoyes: 12, clics: 5, payes: 0 },
+      { cle: "s4_prete", envoyes: 27, clics: 15, payes: 11 },
+      { cle: "s4_peu", envoyes: 33, clics: 9, payes: 7 },
+      { cle: "s4_zero", envoyes: 19, clics: 4, payes: 2 },
+      { cle: "s5_endormi", envoyes: 22, clics: 8, payes: 1 },
+      { cle: "s5_parfait", envoyes: 9, clics: 3, payes: 0 },
+      { cle: "s5_couple", envoyes: 4, clics: 2, payes: 1 },
+      { cle: "s6_garde", envoyes: 6, clics: 3, payes: 2 },
+      { cle: "s6_avance", envoyes: 3, clics: 1, payes: 1 },
+      { cle: "s7_glace", envoyes: 5, clics: 1, payes: 0 },
+      { cle: "s8_anniv", envoyes: 2, clics: 2, payes: 0 },
+    ],
     iaDuJour: { dollars: 12.4, budget: 30 },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }

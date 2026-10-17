@@ -104,3 +104,11 @@ export async function oublierCetAppareil(): Promise<void> {
   await effacerNavigateur();
   await effacerTournage();
 }
+
+/*
+ * Le parrainage (src/server/parrainage.ts) : le code du lien d’une amie (/p/<code>), gardé 30 jours, lu à la création du
+ * compte puis effacé. Rien d’autre qu’un code : ni compte, ni email.
+ */
+export const lireParrain = async () => (await cookies()).get(nom("parrain"))?.value;
+export const poserParrain = (code: string) => poser("parrain", code, new Date(Date.now() + 30 * 86400e3));
+export const effacerParrain = () => effacer("parrain");
