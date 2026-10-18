@@ -8,6 +8,7 @@ import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { PROMESSE_CONV } from "@/contenu/confidentialite";
+import { useJalon } from "@/lib/jalons";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
 import { NBSP } from "@/lib/format";
@@ -24,6 +25,8 @@ const TILES: { app: AppKind; title: string; subtitle: string; href: Route; wide?
 ];
 
 export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {
+  /* Le tunnel d’/admin (src/lib/jalons.ts) : arrivé au choix de l’appli. La bêta fermée (la liste d’attente) n’en est pas un */
+  useJalon(fermee ? null : "commencer");
   /* Choisir une appli, c’est commencer une nouvelle conv : les réponses de la précédente (qui est qui, ce que tu veux) repartent de zéro. L’email reste */
   const nouvelleConv = (app: AppKind) => {
     const { email } = readJourney();

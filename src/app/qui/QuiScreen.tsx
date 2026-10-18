@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { PRENOM_MAX } from "@/lib/limites";
+import { marquerJalon } from "@/lib/jalons";
 import { messageErreur } from "@/lib/messages-erreur";
 import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
@@ -71,6 +72,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   }, [router, connecte]);
 
   const next = async () => {
+    marquerJalon("qui");
     if (!connecte) return router.push("/email");
     if (busy || !quiComplet(j, { captures })) return;
     setBusy(true);
@@ -82,6 +84,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
        * donne aussi `me`
        */
       await startAnalysis(reponsesQui(j, { captures }));
+      marquerJalon("lecture");
       retenirLecture();
       router.push("/lecture");
     } catch (e) {

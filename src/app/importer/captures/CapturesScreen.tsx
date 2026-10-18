@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
+import { marquerJalon, useJalon } from "@/lib/jalons";
 import { ACCEPT_IMAGES, CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
@@ -84,6 +85,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const monte = useMonte();
   /* L’accord de l’import : la ligne au-dessus du bouton le dit, « Continuer » le donne (refusé par le serveur, plus rien ne part) */
   const accord = useAccord();
+  /* Le tunnel d’/admin : une appli choisie (cet écran), puis les captures, l’envoi raté ou réussi (src/lib/jalons.ts) */
+  useJalon("appli");
   const captureApp = app ?? journey.app ?? "instagram";
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
@@ -113,6 +116,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const echec = (code: ErreurParcours) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
   const handle = (picked: File[], video: boolean) => {
+    if (picked.length) marquerJalon("fichier");
     /* Un enregistrement garde son fichier en aperçu (la balise vidéo le lit) ; une capture attend sa vignette */
     const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: video ? apercus.creer(file) : null }));
     /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
@@ -184,6 +188,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       /* Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom (vientDeCaptures) */
       setJourney({ ...(addMode ? { capturesAdded: true } : { app: captureApp, exportFileName: null }), me: "p0" });
       setResult({ count: items.length, messages: r.messagesRead, video });
+      marquerJalon("importee");
       router.push(next);
     } catch (e) {
       if (!monte.current) return;
@@ -193,6 +198,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       setAvance(null);
       /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger, les captures restent là */
       if (codeDe(e) === "consentement") return accord.perimer();
+      marquerJalon("envoi_rate");
       /*
        * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit : son écran d’erreur, comme
        * sur l’export. Rien ne se lit, c’est « capture », ou « fichier » quand le serveur refuse les images ou ne sait pas

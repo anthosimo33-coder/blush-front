@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { play } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
+import { marquerJalon, useJalon } from "@/lib/jalons";
 import { messageErreur } from "@/lib/messages-erreur";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
@@ -43,6 +44,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   /* Autre chose qu’un mauvais code : trop d’essais, pas de réseau */
   const [souci, setSouci] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  /* Le tunnel d’/admin (src/lib/jalons.ts) : le code demandé (cet écran, après l’email), validé, puis la lecture lancée ; pas à la connexion */
+  useJalon(connexion ? null : "email");
   const email = j.email.trim();
   /* Revenir changer d’email garde la page où l’on allait */
   const retour = !connexion ? "/email" : suite === "/app" ? "/connexion" : connexionPuis(suite);
@@ -69,6 +72,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
       return;
     }
     play(ok ? "oui" : "non");
+    if (ok && !connexion) marquerJalon("code");
     if (!ok) {
       setBusy(false);
       setWrong(true);
@@ -114,6 +118,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
        * l’écran de lecture le reprend tel quel : pas de second POST avant de suivre la lecture (src/state/lecture.ts)
        */
       await startAnalysis(reponsesQui(j, { captures }));
+      marquerJalon("lecture");
       retenirLecture();
       router.push("/lecture");
     } catch (e) {

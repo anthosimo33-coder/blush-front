@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { POST as postJalon } from "@/app/api/jalon/route";
 import { POST as postPresence } from "@/app/api/presence/route";
+import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { direct } from "@/server/direct";
 import { purger } from "@/server/purge";
@@ -9,7 +11,7 @@ import { compterUnClicDeMail } from "@/server/compteurs";
 import { CLES_DES_MAILS } from "@/server/sequences";
 import { statsAdmin } from "@/server/stats";
 import { aujourdhuiParis } from "@/server/temps";
-import { noterAchatAuFil, noterAuFil, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
+import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
 import type { OffreId } from "@/types";
 import { compteDeTest, convRattachee } from "./aide/fixtures";
 
@@ -79,6 +81,44 @@ describe("le signe des onglets (POST /api/presence)", () => {
     );
     expect(mal.status).toBe(422);
     expect(await visitesDuJour()).toBe(visites);
+  });
+});
+
+describe("les jalons du tunnel (POST /api/jalon)", () => {
+  const jalon = (ip: string, corps: unknown, entetes: Record<string, string> = {}) =>
+    postJalon(requete(ip, SAFARI, entetes, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) }));
+
+  it("compte une fois par jour et par connexion, et le pilotage les lit, chaque jalon à part", async () => {
+    const avant = (await statsAdmin(1)).pilotage.jalons;
+    const ip = ipNeuve();
+    expect(await (await jalon(ip, { jalon: "fichier" })).json()).toEqual({ ok: true });
+    /* La même connexion repasse (une page rechargée) : rien de plus */
+    await jalon(ip, { jalon: "fichier" });
+    await jalon(ip, { jalon: "importee" });
+    /* Une autre connexion : une personne de plus */
+    await jalon(ipNeuve(), { jalon: "fichier" });
+    const p = (await statsAdmin(1)).pilotage;
+    expect(p.jalons.fichier - avant.fichier).toBe(2);
+    expect(p.jalons.importee - avant.importee).toBe(1);
+    expect(p.jalons.paye - avant.paye).toBe(0);
+    expect(p.jalonsDepuis).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(Object.keys(p.jalons)).toHaveLength(Object.keys(avant).length);
+  });
+
+  it("refuse un jalon inconnu, et ignore le mode tournage sans le dire", async () => {
+    const avant = (await statsAdmin(1)).pilotage.jalons;
+    expect((await jalon(ipNeuve(), { jalon: "inconnu" })).status).toBe(422);
+    expect((await jalon(ipNeuve(), { jalon: "paye", en_plus: 1 })).status).toBe(422);
+    const tournage = await jalon(ipNeuve(), { jalon: "paye" }, { cookie: `${NOMS_DU_TOURNAGE[0]}=lien` });
+    expect(await tournage.json()).toEqual({ ok: true });
+    expect((await statsAdmin(1)).pilotage.jalons.paye - avant.paye).toBe(0);
+  });
+
+  it("noterJalon note sans jamais faire échouer, même deux fois en même temps", async () => {
+    const ip = ipNeuve();
+    const avant = (await statsAdmin(1)).pilotage.jalons.whop;
+    await Promise.all([noterJalon(requete(ip, SAFARI), "whop"), noterJalon(requete(ip, SAFARI), "whop")]);
+    expect((await statsAdmin(1)).pilotage.jalons.whop - avant).toBe(1);
   });
 });
 
@@ -167,7 +207,7 @@ describe("le pilotage (/admin)", () => {
 });
 
 describe("la purge garde peu", () => {
-  it("les signes et le fil deux jours, les visites 90 jours, le sel jusqu’au surlendemain", async () => {
+  it("les signes et le fil deux jours, les visites et les jalons 90 jours, le sel jusqu’au surlendemain", async () => {
     const vieux = new Date(Date.now() - 3 * 86400e3);
     const onglet = randomUUID();
     await db().insert(schema.presences).values({ onglet, minute: vieux, vuLe: vieux, etape: "accueil", source: "direct" });
@@ -177,11 +217,19 @@ describe("la purge garde peu", () => {
     await db()
       .insert(schema.visites)
       .values({ jour: tresVieux.toISOString().slice(0, 10), empreinte, source: "direct", arriveLe: tresVieux });
+    await db()
+      .insert(schema.jalons)
+      .values([
+        { jour: tresVieux.toISOString().slice(0, 10), empreinte, jalon: "paywall", le: tresVieux },
+        { jour: aujourdhuiParis().iso, empreinte, jalon: "paywall" },
+      ]);
     await db().insert(schema.selsDesVisites).values({ jour: "2001-01-01", sel: "x" }).onConflictDoNothing();
     await purger();
     expect(await db().select().from(schema.presences).where(eq(schema.presences.onglet, onglet))).toEqual([]);
     expect(await db().select().from(schema.filDirect).where(eq(schema.filDirect.id, fil!.id))).toEqual([]);
     expect(await db().select().from(schema.visites).where(eq(schema.visites.empreinte, empreinte))).toEqual([]);
+    /* Le jalon de plus de 90 jours part, celui du jour reste */
+    expect((await db().select().from(schema.jalons).where(eq(schema.jalons.empreinte, empreinte))).map((l) => l.jour)).toEqual([aujourdhuiParis().iso]);
     expect(await db().select().from(schema.selsDesVisites).where(eq(schema.selsDesVisites.jour, "2001-01-01"))).toEqual([]);
     /* Le sel du jour reste */
     expect(

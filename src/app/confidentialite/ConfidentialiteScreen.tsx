@@ -17,6 +17,8 @@ import { NBSP } from "@/lib/format";
  * « Les visites, sans cookie » (la mesure d’audience d’/admin, src/server/visites.ts) : ligne ajoutée et validée le
  * 13 octobre 2026.
  * TODO(produit): ligne « Les erreurs et la vitesse de l’appli » ajoutée le 14 octobre 2026 (src/server/navigateur.ts), à valider.
+ * TODO(produit): phrase des jalons du tunnel (« jusqu’où tu vas dans BLUSH », src/lib/jalons.ts) ajoutée le 18 octobre 2026
+ * à « Les visites, sans cookie », à valider, puis à reporter dans le PDF de confidentialité de Whop.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -56,11 +58,12 @@ export function ConfidentialiteScreen() {
           Si tu ouvres le paiement sans aller au bout, BLUSH peut t’envoyer un mail deux heures après, une seule fois. Rien de ta conv, aucun prénom, et un lien pour ne plus en
           recevoir.
         </Ligne>
-        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour) */}
+        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour, les jalons du tunnel) */}
         <Ligne icone="people" titre="Les visites, sans cookie">
           Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
-          sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Si tu
-          crées un compte, il garde seulement d’où tu es venu.
+          sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Avec ce
+          même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}: 90 jours au plus. Si tu crées un compte, il
+          garde seulement d’où tu es venu.
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
         <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">

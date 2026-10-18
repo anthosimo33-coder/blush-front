@@ -20,6 +20,7 @@ import type {
   Goal,
   Guess,
   IssueDuFauxWhop,
+  Jalon,
   OffreId,
   OffreProposee,
   Pronom,
@@ -521,6 +522,12 @@ export function noterEcouteVocal(evenement: EvenementEcoute, position: number): 
 export function faireSigne(corps: Routes["POST /api/presence"]["corps"]): void {
   /* keepalive : le signe d’un changement d’écran part même si la page se ferme juste après */
   void appel("POST /api/presence", { corps, keepalive: true }).catch((e: unknown) => tracer("presence", e));
+}
+
+/** Un jalon du tunnel (src/lib/jalons.ts). Sans réponse attendue : un jalon raté ne se voit pas. */
+export function envoyerJalon(jalon: Jalon): void {
+  /* keepalive : le jalon d’un bouton qui change de page (ou la quitte, vers Whop) part quand même */
+  void appel("POST /api/jalon", { corps: { jalon }, keepalive: true }).catch((e: unknown) => tracer("jalon", e));
 }
 
 /** Une erreur du navigateur, pour l’équipe (src/lib/sentinelle.tsx). keepalive : elle part même si la page se ferme ; ratée, rien ne se dit (une erreur de plus ne s’annonce pas). */

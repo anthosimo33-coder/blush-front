@@ -83,6 +83,47 @@ export type Desinscription = (typeof DESINSCRIPTIONS)[number];
  */
 export const ETAPES_VISITE = ["accueil", "partage", "import", "verdict", "rapport", "paiement", "chat", "compte", "autre"] as const;
 export type EtapeVisite = (typeof ETAPES_VISITE)[number];
+/**
+ * Les jalons du tunnel (jalons, /admin « L’import, écran par écran » et « Le paywall, jusqu’au paiement ») : ce qu’un
+ * visiteur a fait, compté une fois par personne et par jour (src/lib/jalons.ts, src/server/visites.ts).
+ * L’import : l’écran « Choisis ton appli » (`commencer`), une appli choisie (`appli` : l’écran de l’export ou des
+ * captures), un fichier choisi (`fichier`), l’envoi raté (`envoi_rate` : un fichier illisible, une conv trop courte, le
+ * réseau) ou réussi (`importee`), « Qui es-tu ? » rempli (`qui`), le code demandé (`email`) puis validé (`code`), la
+ * lecture lancée (`lecture`).
+ * Le paywall : arrivé (`paywall`), les offres, les avis, les questions et le bas de l’écran vus, la carte du rapport ou
+ * de Premium touchée, le bouton qui paie touché (`payer`, et `payer_premium` avec Premium choisie).
+ * Le paiement du paywall : la feuille de la carte ouverte (`carte`), le formulaire de Whop affiché ou Apple Pay ouvert
+ * (`whop`), le paiement envoyé (`envoye`), payé (`paye`), refusé par la banque (`refuse`), la carte refermée ou Apple
+ * Pay annulé sans payer (`ferme`), parti payer sur la page de Whop (`page_whop`, quand la feuille n’est pas possible).
+ */
+export const JALONS = [
+  "commencer",
+  "appli",
+  "fichier",
+  "envoi_rate",
+  "importee",
+  "qui",
+  "email",
+  "code",
+  "lecture",
+  "paywall",
+  "offres",
+  "avis",
+  "questions",
+  "bas",
+  "touche_rapport",
+  "touche_premium",
+  "payer",
+  "payer_premium",
+  "carte",
+  "whop",
+  "envoye",
+  "paye",
+  "refuse",
+  "ferme",
+  "page_whop",
+] as const;
+export type Jalon = (typeof JALONS)[number];
 
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;

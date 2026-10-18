@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE } from "@/contenu/offres";
 import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
-import { OFFRES, OFFRES_UNIQUES, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
+import { JALONS, OFFRES, OFFRES_UNIQUES, type Jalon, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
@@ -119,6 +119,14 @@ export type Pilotage = {
    * d’entre eux qui ont payé au moins deux achats (depuis toujours).
    */
   tunnel: { visiteurs: number; imports: number; verdicts: number; acheteurs: number; racheteurs: number };
+  /**
+   * Les jalons du tunnel (src/server/visites.ts, noterJalon) : pour chacun, les personnes qui l’ont passé sur la période,
+   * une fois par jour (comme les visiteurs : la même personne revenue un autre jour compte une fois de plus). Tous les
+   * jalons, même à 0.
+   */
+  jalons: Record<Jalon, number>;
+  /** Le premier jour où les jalons se comptent (AAAA-MM-JJ), ou null : aucun encore. */
+  jalonsDepuis: string | null;
   /**
    * Les sources : leurs visiteurs, et les acheteurs (et leur payé) d’après la source de leur compte (users.source).
    * `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
@@ -362,7 +370,26 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
-  const [parCase, argent, visiteurs, dollars, tunnel, visiteursParSource, achatsParSource, parOffre, iaDuJour, sante, pannes, suivi, hauts, envois, clics, ab] = await Promise.all([
+  const [
+    parCase,
+    argent,
+    visiteurs,
+    dollars,
+    tunnel,
+    jalons,
+    jalonsDepuis,
+    visiteursParSource,
+    achatsParSource,
+    parOffre,
+    iaDuJour,
+    sante,
+    pannes,
+    suivi,
+    hauts,
+    envois,
+    clics,
+    ab,
+  ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
@@ -392,6 +419,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             (select count(*) from (select user_id from achats where paye_le is not null and user_id in (select user_id from achats where ${W("paye_le")})
               group by user_id having count(*) >= 2) as r) as racheteurs`,
     ),
+    lignes<{ jalon: Jalon; n: string }>(sql`select jalon, count(*) as n from jalons where ${W("le")} group by jalon`),
+    ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from jalons`),
     lignes<{ source: SourceVisite; n: string }>(sql`select source, count(*) as n from visites where ${W("arrive_le")} group by source`),
     lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
       sql`select u.source, count(distinct a.user_id) as acheteurs, sum(a.centimes) as centimes
@@ -456,6 +485,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     centimesPayes: { valeur: m(argent.payes_c), avant: m(argent.payes_av_c) },
     dollars: { valeur: n(dollars.a) / 1e6, avant: n(dollars.b) / 1e6 },
     tunnel: { visiteurs: n(visiteurs.a), imports: n(tunnel.imports), verdicts: n(tunnel.verdicts), acheteurs: n(argent.acheteurs), racheteurs: n(tunnel.racheteurs) },
+    jalons: Object.fromEntries(JALONS.map((j) => [j, n(jalons.find((l) => l.jalon === j)?.n)])) as Record<Jalon, number>,
+    jalonsDepuis: jalonsDepuis.depuis,
     sources: [...parSource]
       .map(([source, l]) => ({ source, ...l }))
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),

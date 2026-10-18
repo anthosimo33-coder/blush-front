@@ -25,6 +25,7 @@ import {
   EVENEMENTS_ECOUTE,
   FAMILLES_NAVIGATEUR,
   GENRES_FIL,
+  JALONS,
   LOTS_DE_LA_ROUE,
   METRIQUES_WEB,
   OFFRES,
@@ -637,6 +638,22 @@ export const visites = pgTable(
     arriveLe: quand("arrive_le").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.jour, t.empreinte] }), index("visites_arrive_idx").on(t.arriveLe)],
+);
+
+/**
+ * Les jalons du tunnel (src/server/visites.ts, noterJalon) : une ligne par personne, par jour (de Paris) et par jalon,
+ * avec l’empreinte de sa connexion ce jour-là (celle des visites : son sel s’efface le surlendemain) et l’heure de la
+ * première fois. Ni compte, ni conv, ni adresse IP. Gardés VISITES_GARDEES_JOURS, comme les visites.
+ */
+export const jalons = pgTable(
+  "jalons",
+  {
+    jour: date("jour").notNull(),
+    empreinte: text("empreinte").notNull(),
+    jalon: text("jalon", { enum: JALONS }).notNull(),
+    le: quand("le").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.jour, t.empreinte, t.jalon] }), index("jalons_le_idx").on(t.le)],
 );
 
 /** Le sel du jour (de Paris) des empreintes des visites : tiré au hasard, effacé le surlendemain (la purge). */
