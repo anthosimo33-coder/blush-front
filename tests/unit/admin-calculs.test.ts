@@ -9,6 +9,9 @@ import {
   euros,
   fuiteDuTunnel,
   graduations,
+  JALONS_DE_L_IMPORT,
+  JALONS_DU_PAYWALL,
+  plusGrossePerte,
   ilYa,
   nomsDeLaCase,
   pluriel,
@@ -128,6 +131,27 @@ describe("les graphiques", () => {
     expect(pointsDeLaCourbe([1, null, 3])).toBe("0.0,33.0 100.0,3.0");
     expect(pointsDeLaCourbe([2, 2])).toBe("0.0,18.0 100.0,18.0");
     expect(pointsDeLaCourbe([Number.NaN, 1, 2])).toBe("50.0,33.0 100.0,3.0");
+  });
+});
+
+describe("les jalons du tunnel", () => {
+  it("la plus grosse perte : l’étape d’arrivée au plus petit taux de passage, la première à égalité", () => {
+    expect(plusGrossePerte([1000, 800, 640, 190, 146])).toEqual({ etape: 3, taux: 190 / 640 });
+    expect(plusGrossePerte([100, 50, 25])).toEqual({ etape: 1, taux: 0.5 });
+  });
+
+  it("rien à comparer (une étape vide), ou rien qui se perd (une étape qui compte plus que l’autre) : null", () => {
+    expect(plusGrossePerte([])).toBeNull();
+    expect(plusGrossePerte([12])).toBeNull();
+    expect(plusGrossePerte([0, 0, 0])).toBeNull();
+    expect(plusGrossePerte([10, 10, 12])).toBeNull();
+    /* Une étape vide avant : on ne divise pas par zéro, la perte se cherche plus loin */
+    expect(plusGrossePerte([0, 5, 2])).toEqual({ etape: 2, taux: 0.4 });
+  });
+
+  it("chaque jalon montré une fois, dans un seul des deux blocs", () => {
+    const cles = [...JALONS_DE_L_IMPORT, ...JALONS_DU_PAYWALL].map(([cle]) => cle);
+    expect(new Set(cles).size).toBe(cles.length);
   });
 });
 

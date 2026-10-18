@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { EtapeVisite, GenreFil, OffreId, SourceVisite } from "@/types";
+import type { EtapeVisite, GenreFil, Jalon, OffreId, SourceVisite } from "@/types";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
@@ -16,7 +16,9 @@ import { aujourdhuiParis } from "./temps";
  * - chaque onglet ouvert fait signe toutes les 40 secondes tant qu’il est visible (src/lib/presence.ts) : l’écran où il
  *   est, d’où il vient, et la ville de sa connexion (celle que donne l’hébergeur, à la ville près) ;
  * - le fil du direct note une ville et un geste (une arrivée, un import, un paiement, un achat, un partage), jamais un
- *   compte ni une conv.
+ *   compte ni une conv ;
+ * - les jalons du tunnel (un fichier choisi, le paywall vu jusqu’aux avis, le formulaire de Whop affiché…) se comptent
+ *   une fois par jour par la même empreinte que la visite : la même personne ne compte qu’une fois à chaque jalon.
  * Rien de tout ça ne fait échouer ce qu’il compte (auMieux).
  */
 
@@ -188,6 +190,25 @@ export async function noterSigne(req: Request, signe: Signe): Promise<void> {
       .onConflictDoUpdate({ target: [p.onglet, p.minute], set: { vuLe: sql`now()`, etape: signe.etape } }),
     signe.premier ? compterLaVisite(req, source, lieu.ville) : null,
   ]);
+}
+
+/**
+ * Note un jalon du tunnel (POST /api/jalon) : une fois par jour par l’empreinte de la connexion, comme la visite. Ni un
+ * navigateur en mode tournage, ni au-delà du garde-fou des signes (les jalons comptent avec eux). Rien ne fait échouer.
+ */
+export async function noterJalon(req: Request, jalon: Jalon): Promise<void> {
+  if (!signeAdmis(req) || enModeTournage(req)) return;
+  await auMieux(
+    async () => {
+      const jour = aujourdhuiParis().iso;
+      await db()
+        .insert(schema.jalons)
+        .values({ jour, empreinte: await empreinteDe(req, jour), jalon })
+        .onConflictDoNothing();
+    },
+    "jalon non noté",
+    { jalon },
+  );
 }
 
 /** Compte la visite du jour de cette connexion, une fois ; la première du jour va au fil. */

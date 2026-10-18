@@ -15,6 +15,7 @@ import {
   GOALS,
   GUESSES,
   ISSUES_DU_FAUX_WHOP,
+  JALONS,
   METRIQUES_WEB,
   OFFRES,
   OFFRES_PROPOSEES,
@@ -345,6 +346,8 @@ type Reponses = {
   "GET /api/rapport/pdf": Blob;
   /** `{ ok: false }` en 503 : la base ne répond pas. */
   "POST /api/presence": Ok;
+  /** Toujours `{ ok: true }` : un jalon ignoré (la limite d’une adresse, le mode tournage) ne se dit pas. */
+  "POST /api/jalon": Ok;
   /** Toujours `{ ok: true }` : une erreur ignorée (la limite d’une adresse) ne se dit pas. */
   "POST /api/navigateur/erreur": Ok;
   "POST /api/navigateur/mesures": Ok;
@@ -497,6 +500,8 @@ export const ROUTES = {
       referent: z.string().max(200).optional(),
     }),
   },
+  /** Un jalon du tunnel (src/lib/jalons.ts) : ce que le visiteur vient de faire (un fichier choisi, le paywall vu jusqu’aux avis…), rien d’autre */
+  "POST /api/jalon": { corps: z.strictObject({ jalon: z.enum(JALONS) }) },
   /** Une erreur du navigateur (src/lib/sentinelle.tsx) : son nom, son message, d’où elle vient, et l’écran. Bornés : le serveur masque le reste. */
   "POST /api/navigateur/erreur": {
     corps: z.strictObject({

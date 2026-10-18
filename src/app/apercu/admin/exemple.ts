@@ -87,6 +87,39 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   const rapport = Math.round(acheteurs * 0.31);
   const suite = Math.round(acheteurs * 0.17);
   const bulles = paye - premium * 1490 - rapport * 990 - suite * 690;
+  /* Les jalons : une part des visiteurs, puis des imports et du paywall ; rien tant que les visites ne se comptent pas */
+  const v = (part: number) => (suivi ? Math.round(visiteurs * part) : 0);
+  const i = (part: number) => (suivi ? Math.round(imports * part) : 0);
+  const paywall = i(0.7);
+  const pw = (part: number) => Math.round(paywall * part);
+  const payer = pw(0.31);
+  const jalons: Pilotage["jalons"] = {
+    commencer: v(0.42),
+    appli: v(0.33),
+    fichier: v(0.19),
+    envoi_rate: v(0.024),
+    importee: i(1),
+    qui: i(0.93),
+    email: i(0.84),
+    code: i(0.71),
+    lecture: i(0.74),
+    paywall,
+    offres: pw(0.97),
+    avis: pw(0.46),
+    questions: pw(0.28),
+    bas: pw(0.21),
+    touche_rapport: pw(0.19),
+    touche_premium: pw(0.08),
+    payer,
+    payer_premium: Math.round(payer * 0.6),
+    carte: pw(0.21),
+    whop: pw(0.27),
+    envoye: pw(0.2),
+    paye: pw(0.16),
+    refuse: pw(0.02),
+    ferme: pw(0.07),
+    page_whop: 0,
+  };
   return {
     pas: jours === 1 ? "heure" : "jour",
     cases,
@@ -99,6 +132,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     centimesPayes: { valeur: paye, avant: Math.round(paye * 0.76) },
     dollars: { valeur: dollars, avant: Math.round(dollars * 71) / 100 },
     tunnel: { visiteurs, imports, verdicts: Math.round(imports * 0.86), acheteurs, racheteurs: Math.round(acheteurs * 0.145) },
+    jalons,
+    jalonsDepuis: suivi ? "2026-10-18" : null,
     sources,
     mix: [
       { groupe: "premium", n: premium, centimes: premium * 1490 },

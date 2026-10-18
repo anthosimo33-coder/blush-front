@@ -8,6 +8,7 @@ import type { AchatImmediat } from "@/contenu/consentements";
 import { enEuros } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE } from "@/contenu/paiement";
 import { cn } from "@/lib/cn";
+import { marquerJalon } from "@/lib/jalons";
 import { codeDe } from "@/lib/messages-erreur";
 import { apresLaLivraison, attendreLaLivraison, noterLaSuite, versLeRetour } from "@/lib/paiement";
 import { apresDeblocage, useCompte, useFeuilleDuPaiement } from "@/lib/requetes";
@@ -18,7 +19,7 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { Alert, TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
-import type { OffreId } from "@/types";
+import type { Jalon, OffreId } from "@/types";
 import type { EtatAchat } from "@/types/api";
 import { usePaiement, type QuandRefuse } from "../usePaiement";
 import { APPARENCE, chargerWhop } from "./whop";
@@ -36,6 +37,8 @@ import { APPARENCE, chargerWhop } from "./whop";
  * Le faux Whop (BLUSH_PAIEMENT_FACTICE, en local et dans les tests) a sa carte de test, au même endroit. Sans paiement
  * dans la feuille (pas de Whop, son script qui ne se charge pas, un compte sans email), le bouton d’avant : la page de
  * Whop (usePaiement).
+ * Le paywall y suit son tunnel pour /admin (`jalons`, src/lib/jalons.ts) : le bouton touché, la feuille de la carte, le
+ * formulaire de Whop affiché (ou Apple Pay ouvert), le paiement envoyé, payé, refusé, ou refermé sans payer.
  * TODO(produit): à revoir après le premier vrai paiement (le bouton d’Apple Pay sur askblush.com : le domaine vérifié
  * chez Whop ; la carte gardée après un paiement par Apple Pay).
  */
@@ -71,6 +74,8 @@ type Proprietes = {
    * dit toujours avant son bouton, et les conditions aussi.
    */
   sansCarteGardee?: boolean;
+  /** Les jalons du tunnel d’/admin (src/lib/jalons.ts), du bouton touché à l’issue du paiement : seulement le paywall. */
+  jalons?: boolean;
   className?: string;
 };
 
@@ -79,6 +84,13 @@ type Portefeuille = { type: "apple_pay" | "google_pay"; art: WalletButtonArt["li
 
 /** Pourquoi rien n’est payé, quand l’écran le dit : la banque a dit non, le paiement pas branché, ou le reste. */
 type Refus = "carte" | "bientot" | "souci";
+
+/* Les jalons du paiement, seulement là où l’écran les demande (le paywall) */
+const jalonSi = (oui: boolean | undefined, ...jalons: Jalon[]) => {
+  if (oui) for (const j of jalons) marquerJalon(j);
+};
+/* Le bouton qui paie touché (avec Premium choisie, elle aussi), et ce qu’il ouvre */
+const jalonsDuBouton = (p: Pick<Proprietes, "jalons" | "offre">, ouvre: Jalon) => jalonSi(p.jalons, "payer", ...(p.offre === "premium" ? (["payer_premium"] as const) : []), ouvre);
 
 /** L’erreur d’une feuille fermée par l’acheteur (le portefeuille, la fenêtre de PayPal) : une annulation, pas un refus. */
 const estAnnule = (e: unknown) => e instanceof Error && e.message === "payment_request_cancelled";
@@ -124,8 +136,9 @@ function useParcours({
   surPaye,
   surOccupe,
   livre,
+  jalons,
   finirEtape,
-}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "surOccupe" | "livre"> & { finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse"> }) {
+}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "surOccupe" | "livre" | "jalons"> & { finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse"> }) {
   const router = useRouter();
   const renonciation = useAccord();
   const [etat, setEtat] = useState<"pret" | "envoi" | "paye">("pret");
@@ -148,6 +161,7 @@ function useParcours({
   }, [etat]);
 
   const revenir = (r: Refus | null) => {
+    if (r === "carte") jalonSi(jalons, "refuse");
     setEtat("pret");
     setRefus(r);
     surPaye?.(false);
@@ -155,6 +169,7 @@ function useParcours({
 
   /** « C’est payé », puis la livraison attendue (le webhook, ou la vérification du serveur avec le paiement de Whop), puis la suite. */
   const suivreLaLivraison = async (achat: string, paiement: string | null) => {
+    jalonSi(jalons, "paye");
     setEtat("paye");
     surPaye?.(true);
     const signal = fin.current?.signal;
@@ -194,7 +209,12 @@ function useParcours({
     setRefus(null);
     try {
       const j = await jeton;
-      if (!j) return revenir(null);
+      /* Le portefeuille (ou la fenêtre de la banque) refermé sans payer */
+      if (!j) {
+        jalonSi(jalons, "ferme");
+        return revenir(null);
+      }
+      jalonSi(jalons, "envoye");
       /* La renonciation part avec le geste, sauf pour une offre livrée à son usage */
       const r = await commencerPaiement(offre, quoi !== null, { jeton: j });
       noterLaSuite(r.achat, suite);
@@ -214,8 +234,10 @@ function useParcours({
       const code = codeDe(e);
       revenir(null);
       if (code === "renonciation") renonciation.perimer();
-      else if (code === "carte" || code === "bientot") setRefus(code);
-      else if (code === "deja" && quand.deja) {
+      else if (code === "carte" || code === "bientot") {
+        if (code === "carte") jalonSi(jalons, "refuse");
+        setRefus(code);
+      } else if (code === "deja" && quand.deja) {
         /* Un autre onglet l’a déjà payé : le rapport et le compte se relisent, rien n’est à payer */
         apresDeblocage();
         router.refresh();
@@ -413,6 +435,7 @@ function AvecWhop({ compte, email, ...p }: Proprietes & { compte: string; email:
   const payerAvecLePortefeuille = () => {
     const d = demande.current;
     if (!d || !portefeuille || !parcours.renonciation.exiger()) return;
+    jalonsDuBouton(p, "whop");
     const jeton = d.show(portefeuille.type, { email }).then(
       (r) => r.ctok,
       (e: unknown) => {
@@ -423,12 +446,22 @@ function AvecWhop({ compte, email, ...p }: Proprietes & { compte: string; email:
     void parcours.payer(jeton);
   };
 
+  const ouvrirLaCarte = () => {
+    jalonsDuBouton(p, "carte");
+    setCarte(true);
+  };
+  /* Refermée sans payer (pas pendant un paiement en route : la feuille reste alors ouverte d’elle-même) */
+  const refermerLaCarte = () => {
+    if (!parcours.occupe) jalonSi(p.jalons, "ferme");
+    setCarte(false);
+  };
+
   return (
     <>
-      <Boutons p={p} parcours={parcours} portefeuille={portefeuille} payerAvecLePortefeuille={payerAvecLePortefeuille} ouvrirLaCarte={() => setCarte(true)} />
-      <FeuilleDeLaCarte open={carte && parcours.etat !== "paye"} onClose={() => setCarte(false)} titre={p.titre} centimes={p.centimes}>
+      <Boutons p={p} parcours={parcours} portefeuille={portefeuille} payerAvecLePortefeuille={payerAvecLePortefeuille} ouvrirLaCarte={ouvrirLaCarte} />
+      <FeuilleDeLaCarte open={carte && parcours.etat !== "paye"} onClose={refermerLaCarte} titre={p.titre} centimes={p.centimes}>
         <Payments accountId={compte} currency="eur" amount={p.centimes} setupFutureUsage="on_session" analytics={false}>
-          <CarteDeWhop email={email} quoi={p.quoi} centimes={p.centimes} parcours={parcours} />
+          <CarteDeWhop email={email} quoi={p.quoi} centimes={p.centimes} parcours={parcours} jalons={p.jalons} />
         </Payments>
       </FeuilleDeLaCarte>
     </>
@@ -438,9 +471,21 @@ function AvecWhop({ compte, email, ...p }: Proprietes & { compte: string; email:
 /**
  * La carte de Whop (PaymentElement : ses champs dans ses cadres, sans Apple Pay ni Google Pay, que le bouton du
  * portefeuille montre déjà), la mention de Whop vendeur en titre (BrandingElement : sans elle, rien ne se paie), et
- * notre bouton, prêt quand la carte est complète.
+ * notre bouton, prêt quand la carte est complète. Affichée (onReady) : le jalon « whop » du paywall.
  */
-function CarteDeWhop({ email, quoi, centimes, parcours }: { email: string; quoi: AchatImmediat | null; centimes: number; parcours: Parcours }) {
+function CarteDeWhop({
+  email,
+  quoi,
+  centimes,
+  parcours,
+  jalons,
+}: {
+  email: string;
+  quoi: AchatImmediat | null;
+  centimes: number;
+  parcours: Parcours;
+  jalons: boolean | undefined;
+}) {
   const payments = usePayments();
   const [complete, setComplete] = useState(false);
   const payer = () => {
@@ -456,7 +501,7 @@ function CarteDeWhop({ email, quoi, centimes, parcours }: { email: string; quoi:
   };
   return (
     <>
-      <PaymentElement wallets={{ applePay: "never", googlePay: "never" }} onChange={(e) => setComplete(e.complete)} />
+      <PaymentElement wallets={{ applePay: "never", googlePay: "never" }} onChange={(e) => setComplete(e.complete)} onReady={() => jalonSi(jalons, "whop")} />
       <BrandingElement />
       <div className="flex flex-col gap-2 lg:w-[400px] lg:self-center">
         <LeRefus refus={parcours.refus} />
@@ -480,10 +525,20 @@ function AvecLeFauxWhop(p: Proprietes) {
     if (!parcours.renonciation.exiger()) return;
     void parcours.payer(Promise.resolve(`ctok_faux_${issue}`));
   };
+  /* Sa carte de test s’affiche d’un coup : la feuille ouverte, le formulaire est là */
+  const ouvrirLaCarte = () => {
+    jalonsDuBouton(p, "carte");
+    jalonSi(p.jalons, "whop");
+    setCarte(true);
+  };
+  const refermerLaCarte = () => {
+    if (!parcours.occupe) jalonSi(p.jalons, "ferme");
+    setCarte(false);
+  };
   return (
     <>
-      <Boutons p={p} parcours={parcours} portefeuille={null} payerAvecLePortefeuille={() => {}} ouvrirLaCarte={() => setCarte(true)} />
-      <FeuilleDeLaCarte open={carte && parcours.etat !== "paye"} onClose={() => setCarte(false)} titre={p.titre} centimes={p.centimes}>
+      <Boutons p={p} parcours={parcours} portefeuille={null} payerAvecLePortefeuille={() => {}} ouvrirLaCarte={ouvrirLaCarte} />
+      <FeuilleDeLaCarte open={carte && parcours.etat !== "paye"} onClose={refermerLaCarte} titre={p.titre} centimes={p.centimes}>
         <p className="m-0 flex items-center gap-3 rounded-[18px] bg-white px-4 py-4 text-corps font-extrabold text-soft shadow-soft [font-variant-numeric:tabular-nums]">
           <Icon name="lock" size={16} stroke={2.4} className="text-soft" />
           4242 4242 4242 4242 · 12/34 · 123
@@ -507,12 +562,16 @@ function AvecLeFauxWhop(p: Proprietes) {
 /* ———— Sans paiement dans la feuille : la page de Whop ———— */
 
 /** Le bouton d’avant : il part payer sur la page de Whop (ou dit « bientôt » sans paiement branché). */
-function SurLaPageDeWhop({ offre, libelle, quoi, suite, quand, fleche, className }: Proprietes) {
+function SurLaPageDeWhop({ offre, libelle, quoi, suite, quand, fleche, jalons, className }: Proprietes) {
   const paiement = usePaiement({ suite, quand });
+  const payer = () => {
+    jalonsDuBouton({ jalons, offre }, "page_whop");
+    void paiement.payer(offre);
+  };
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <LeRefus refus={paiement.refus} />
-      <Button arrow={fleche} loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={() => void paiement.payer(offre)}>
+      <Button arrow={fleche} loading={paiement.occupe} loadingLabel="Paiement en cours" onClick={payer}>
         {libelle}
       </Button>
       {quoi && <MentionRenonciation quoi={quoi} etat={paiement.renonciation} />}

@@ -17,6 +17,8 @@ import { Beta, Journal, NOMS_OFFRES_UNIQUES } from "./AdminScreen";
 import {
   COULEURS_DES_GROUPES,
   ETAPES_DU_TUNNEL,
+  JALONS_DE_L_IMPORT,
+  JALONS_DU_PAYWALL,
   caseNommee,
   dollars,
   ecartEnPoints,
@@ -27,6 +29,7 @@ import {
   graduations,
   nombre,
   nomsDeLaCase,
+  plusGrossePerte,
   pluriel,
   pointsDeLaCourbe,
   pourcent,
@@ -44,7 +47,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons) ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -126,6 +129,10 @@ export function Pilotage({
 
           <ChiffresCles s={s} />
           <Tunnel p={p} jours={s.jours} />
+          <div className="flex flex-wrap gap-4 md:gap-6">
+            <ImportEcranParEcran p={p} jours={s.jours} />
+            <PaywallJusquAuPaiement p={p} jours={s.jours} />
+          </div>
           <HautsDuPaywall p={p} />
           <MailsDesSequences p={p} />
 
@@ -517,6 +524,139 @@ function Tunnel({ p, jours }: { p: Chiffres; jours: Periode }) {
         <Icon name={texte ? "alert" : "clock"} size={20} stroke={2.4} style={{ marginTop: 1 }} />
         <span>{texte ? `${texte.titre}. ${texte.texte}` : "Pas encore de fuite à comparer\u00a0: il faut du monde à deux étapes qui se suivent."}</span>
       </p>
+    </Bloc>
+  );
+}
+
+/* ———— Les jalons : l’import, écran par écran, et le paywall, jusqu’au paiement ———— */
+
+/** Une étape d’une suite de jalons : sa clé, son nom, ses personnes. */
+type EtapeDeLaSuite = { cle: string; nom: string; n: number };
+
+/**
+ * Une suite d’étapes, en lignes : le nom, ce qui passe de l’étape d’avant, le nombre, et une barre à la mesure de la plus
+ * grande ; la plus grosse perte en orange, dite dessous.
+ */
+function SuiteDEtapes({ etapes, nom }: { etapes: EtapeDeLaSuite[]; nom: string }) {
+  const reference = Math.max(1, ...etapes.map((e) => e.n));
+  const perte = plusGrossePerte(etapes.map((e) => e.n));
+  const avantLaPerte = perte ? etapes[perte.etape - 1] : undefined;
+  const laPerte = perte ? etapes[perte.etape] : undefined;
+  return (
+    <>
+      <ol aria-label={nom} className="m-0 mt-[18px] flex list-none flex-col gap-3 p-0">
+        {etapes.map((e, k) => {
+          const taux = k > 0 ? rapport(e.n, etapes[k - 1]?.n ?? 0) : null;
+          const estLaPerte = perte?.etape === k;
+          return (
+            <li key={e.cle} className="flex flex-col gap-1.5">
+              <span className="flex items-baseline justify-between gap-3 text-detail font-extrabold">
+                <span className="min-w-0">{e.nom}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {k > 0 && (
+                    <span
+                      className={cn(
+                        "whitespace-nowrap rounded-full px-[9px] py-[2px] text-legende font-black tabular-nums",
+                        estLaPerte ? "bg-[#e08600]/16 text-[#8a4a00]" : "bg-sep text-soft",
+                      )}
+                    >
+                      {taux === null ? "—" : `→ ${pourcent(taux * 100, 0)}`}
+                    </span>
+                  )}
+                  <span className="min-w-[44px] text-right font-black tabular-nums">{nombre(e.n)}</span>
+                </span>
+              </span>
+              {/* La barre s’étire en largeur (flex-1) : dans sa ligne, pas dans la colonne, où elle n’aurait pas de hauteur */}
+              <span className="flex">
+                <Barre part={e.n / reference} couleur={estLaPerte ? ORANGE : ROSE} />
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {perte && avantLaPerte && laPerte && (
+        <p className="m-0 mt-4 rounded-[16px] bg-[#e08600]/10 px-4 py-3 text-note font-extrabold leading-[1.4] text-[#5c3300]">
+          {`La plus grosse perte\u00a0: ${pourcent((1 - perte.taux) * 100, 0)} entre «\u00a0${avantLaPerte.nom}\u00a0» et «\u00a0${laPerte.nom}\u00a0».`}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Une part, en pourcentage (« — » sans rien à diviser). */
+const part = (n: number, sur: number) => {
+  const t = rapport(n, sur);
+  return t === null ? "—" : pourcent(t * 100, 0);
+};
+
+/** Le bloc vide d’une suite de jalons : avant le premier jalon compté, ou rien sur la période. */
+function SansJalons({ depuis }: { depuis: string | null }) {
+  return (
+    <p className="m-0 mt-[18px] text-note font-bold text-grey">
+      {depuis ? "Personne n’est passé par là sur la période." : "Les jalons se comptent depuis cette version\u00a0: les premières visites rempliront ce bloc."}
+    </p>
+  );
+}
+
+function ImportEcranParEcran({ p, jours }: { p: Chiffres; jours: Periode }) {
+  const j = p.jalons;
+  const etapes: EtapeDeLaSuite[] = [{ cle: "visiteurs", nom: "Visiteurs", n: p.tunnel.visiteurs }, ...JALONS_DE_L_IMPORT.map(([cle, nom]) => ({ cle, nom, n: j[cle] }))];
+  const rien = JALONS_DE_L_IMPORT.every(([cle]) => j[cle] === 0);
+  return (
+    <Bloc
+      id="import"
+      titre="L’import, écran par écran"
+      sous={`De l’arrivée à la lecture lancée · ${PERIODES[jours].sur}`}
+      aide={{ cle: "import", valeur: part(j.lecture, p.tunnel.visiteurs), contexte: "des visiteurs lancent la lecture" }}
+      className="grow basis-[480px]"
+    >
+      {rien ? (
+        <SansJalons depuis={p.jalonsDepuis} />
+      ) : (
+        <>
+          <SuiteDEtapes etapes={etapes} nom="L’import, écran par écran" />
+          <p className="m-0 mt-4 text-note font-bold text-soft">
+            <span className="font-black text-ink">{pluriel(j.envoi_rate, "envoi raté", "envois ratés")}</span> ({part(j.envoi_rate, j.fichier)} de ceux qui ont choisi un fichier)
+            {NBSP}: un fichier illisible, une conv trop courte ou de groupe, le réseau.
+          </p>
+        </>
+      )}
+    </Bloc>
+  );
+}
+
+function PaywallJusquAuPaiement({ p, jours }: { p: Chiffres; jours: Periode }) {
+  const j = p.jalons;
+  const etapes: EtapeDeLaSuite[] = JALONS_DU_PAYWALL.map(([cle, nom]) => ({ cle, nom, n: j[cle] }));
+  const lignes: [string, ReactNode][] = [
+    ["Jusqu’où ils descendent", `les avis ${part(j.avis, j.paywall)}, les questions ${part(j.questions, j.paywall)}, tout en bas ${part(j.bas, j.paywall)}`],
+    ["La formule", `Premium au bouton ${part(j.payer_premium, j.payer)} · cartes touchées\u00a0: Le rapport ${nombre(j.touche_rapport)}, Premium ${nombre(j.touche_premium)}`],
+    ["Sans payer", `${pluriel(j.ferme, "refermé", "refermés")}, ${pluriel(j.refuse, "refus", "refus")} de la banque, ${pluriel(j.page_whop, "parti", "partis")} payer chez Whop`],
+    ["La carte de Whop", `${pluriel(j.carte, "feuille ouverte", "feuilles ouvertes")}`],
+  ];
+  return (
+    <Bloc
+      id="paywall"
+      titre="Le paywall, jusqu’au paiement"
+      sous={`De l’arrivée au paywall au paiement · ${PERIODES[jours].sur}`}
+      aide={{ cle: "paywall", valeur: part(j.paye, j.paywall), contexte: "des arrivés au paywall paient" }}
+      className="grow basis-[480px]"
+    >
+      {j.paywall === 0 ? (
+        <SansJalons depuis={p.jalonsDepuis} />
+      ) : (
+        <>
+          <SuiteDEtapes etapes={etapes} nom="Le paywall, jusqu’au paiement" />
+          <dl className="m-0 mt-4 flex flex-col gap-2 text-note">
+            {lignes.map(([titre, valeur]) => (
+              <div key={titre} className="flex flex-wrap gap-x-2">
+                <dt className="font-black text-ink">{titre}</dt>
+                <dd className="m-0 font-bold text-soft">{valeur}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
     </Bloc>
   );
 }

@@ -1,12 +1,12 @@
 import { CATALOGUE, prixDe } from "@/contenu/offres";
 import { NOMS_DES_SOURCES, type GroupeDOffres } from "@/contenu/pilotage";
 import type { Pilotage } from "@/server/stats";
-import { ETAPES_VISITE, type EtapeVisite, type SourceVisite } from "@/types";
+import { ETAPES_VISITE, type EtapeVisite, type Jalon, type SourceVisite } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
 
 /*
  * Les calculs du pilotage (/admin), purs : les formats des nombres, les écarts avec la période d’avant, les graduations et
- * les étiquettes des graphiques, la plus grosse fuite du tunnel, le texte d’un geste du fil. Jamais de division par zéro :
+ * les étiquettes des graphiques, la plus grosse fuite du tunnel et la plus grosse perte de ses jalons, le texte d’un geste du fil. Jamais de division par zéro :
  * un rapport sans dénominateur rend null, et l’écran écrit « — » (tests/unit/admin-calculs.test.ts).
  */
 
@@ -179,6 +179,44 @@ export function texteDeLaFuite(f: Fuite): { titre: string; texte: string } {
     titre: `${perte} des verdicts ne finissent pas en achat`,
     texte: `C’est la plus grosse fuite du tunnel (${pluriel(f.vers, "acheteur")} pour ${pluriel(f.depuis, "verdict")}). Le verdict doit donner envie de la suite\u00a0: regarde la feuille du paiement et les coups de pouce.`,
   };
+}
+
+/* ———— Les jalons du tunnel ———— */
+
+/** L’import, écran par écran : les jalons après les visiteurs, dans l’ordre du parcours, et leurs noms. */
+export const JALONS_DE_L_IMPORT = [
+  ["commencer", "Ouvrent le choix de l’appli"],
+  ["appli", "Choisissent leur appli"],
+  ["fichier", "Choisissent leur fichier"],
+  ["importee", "Conv bien reçue"],
+  ["qui", "Disent qui ils sont"],
+  ["email", "Demandent leur code"],
+  ["code", "Valident leur code"],
+  ["lecture", "Lancent la lecture"],
+] as const satisfies readonly (readonly [Jalon, string])[];
+
+/** Le paywall, de l’arrivée au paiement : les jalons dans l’ordre, et leurs noms. */
+export const JALONS_DU_PAYWALL = [
+  ["paywall", "Arrivent au paywall"],
+  ["offres", "Voient les formules"],
+  ["payer", "Touchent le bouton qui paie"],
+  ["whop", "Voient le formulaire de Whop"],
+  ["envoye", "Envoient le paiement"],
+  ["paye", "Ont payé"],
+] as const satisfies readonly (readonly [Jalon, string])[];
+
+/**
+ * La plus grosse perte d’une suite d’étapes (leurs nombres, dans l’ordre) : l’étape d’arrivée (son indice, 1 ou plus)
+ * au plus petit taux de passage depuis celle d’avant, parmi celles dont l’étape d’avant n’est pas vide. null : rien à
+ * comparer, ou rien ne se perd (une étape qui compte plus que celle d’avant n’est pas une perte).
+ */
+export function plusGrossePerte(n: readonly number[]): { etape: number; taux: number } | null {
+  let pire: { etape: number; taux: number } | null = null;
+  for (let etape = 1; etape < n.length; etape++) {
+    const taux = rapport(n[etape] ?? 0, n[etape - 1] ?? 0);
+    if (taux !== null && taux < 1 && (!pire || taux < pire.taux)) pire = { etape, taux };
+  }
+  return pire;
 }
 
 /* ———— Ce qui se vend ———— */

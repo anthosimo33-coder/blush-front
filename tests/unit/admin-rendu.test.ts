@@ -34,11 +34,16 @@ describe("le pilotage, rendu", () => {
     expect(t).not.toMatch(SALE);
     for (const titre of ["Pilotage", "À regarder", "Chiffre d’affaires", "En direct", "Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge après IA", "Le tunnel"])
       expect(t, titre).toContain(titre);
+    /* Le détail du tunnel : l’import et le paywall, jalon par jalon, leur plus grosse perte, et ce qu’il y a autour */
+    for (const titre of ["L’import, écran par écran", "Le paywall, jusqu’au paiement", "Choisissent leur fichier", "Voient le formulaire de Whop", "Premium au bouton"])
+      expect(t, titre).toContain(titre);
+    expect(t).toMatch(/La plus grosse perte\u00a0: \d+\u00a0% entre «\u00a0[^»]+\u00a0» et «\u00a0[^»]+\u00a0»\./);
+    expect(t).toMatch(/\d+\u00a0envois ratés/);
     for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
-    for (const cle of ["ca", "live", "visiteurs", "conversion", "panier", "marge", "tunnel", "sources", "mix", "coups", "couts", "sante"] as const)
+    for (const cle of ["ca", "live", "visiteurs", "conversion", "panier", "marge", "tunnel", "import", "paywall", "sources", "mix", "coups", "couts", "sante"] as const)
       expect(html, cle).toContain(`aria-label="Comment lire ${AIDES_DU_PILOTAGE[cle].de}"`);
     /* La période en liens, celle-ci marquée */
     const marques = html.match(/<a [^>]*aria-current="page"[^>]*>/g) ?? [];
@@ -65,6 +70,8 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Les visiteurs se comptent depuis la mise en ligne de ce tableau de bord");
     expect(t).toContain("pas encore comptés");
     expect(t).toContain("Avant le suivi");
+    /* Les jalons pas encore comptés : les deux blocs le disent */
+    expect(t.match(/Les jalons se comptent depuis cette version/g)).toHaveLength(2);
     /* Le direct pas encore lu : des points de suspension, pas une erreur */
     expect(t).toContain("Lecture du direct…");
     expect(t).toContain("Tout tourne");

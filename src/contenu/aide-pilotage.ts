@@ -82,6 +82,28 @@ export const AIDES_DU_PILOTAGE = {
     repere: "La colonne orange est la plus grosse fuite, entre l’arrivée et l’achat\u00a0: c’est là qu’un changement rapporte le plus.",
     siCaBouge: "Change une seule chose à la fois, et compare avec la période d’après.",
   },
+  import: {
+    titre: "L’import, écran par écran",
+    de: "l’import, écran par écran",
+    quoi: "Où les visiteurs lâchent entre l’arrivée et la lecture lancée\u00a0: le choix de l’appli, le tuto de l’export, le fichier, «\u00a0Qui es-tu\u00a0?\u00a0», l’email et son code.",
+    calcul:
+      "Chaque étape compte les personnes qui l’ont passée sur la période, une fois par jour, par la même empreinte sans cookie que les visiteurs (src/lib/jalons.ts). «\u00a0Conv bien reçue\u00a0»\u00a0: l’envoi a marché. «\u00a0Envois ratés\u00a0»\u00a0: un fichier illisible, une conv trop courte ou de groupe, le réseau. Le pourcentage se fait sur l’étape d’avant.",
+    repere:
+      "La ligne orange est la plus grosse perte. Un compte déjà connecté passe de «\u00a0Qui es-tu\u00a0?\u00a0» à la lecture sans email ni code\u00a0: ces deux étapes peuvent compter moins que la suivante. Un taux se lit à partir de 30\u00a0personnes.",
+    siCaBouge:
+      "Beaucoup choisissent leur appli mais pas de fichier\u00a0: le tuto de l’export est trop dur, revois sa vidéo. Beaucoup demandent un code sans le valider\u00a0: le mail arrive mal (les spams, le délai).",
+  },
+  paywall: {
+    titre: "Le paywall, jusqu’au paiement",
+    de: "le paywall, jusqu’au paiement",
+    quoi: "Ce qui se passe entre l’arrivée au paywall et le paiement\u00a0: jusqu’où l’on descend, la formule touchée, le bouton qui paie, le formulaire de Whop et ce qu’il devient.",
+    calcul:
+      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs). «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici, ni la feuille du rapport, ni les recharges, ni l’offre ①.",
+    repere:
+      "Plus de feuilles de carte ouvertes que de formulaires affichés\u00a0: la carte de Whop charge mal. «\u00a0Premium au bouton\u00a0» se compare à «\u00a0Ce qui se vend\u00a0». Un taux se lit à partir de 30\u00a0personnes.",
+    siCaBouge:
+      "Peu de monde descend jusqu’aux avis\u00a0: remonte une preuve. Beaucoup voient le formulaire sans envoyer\u00a0: le prix ou la confiance coince au dernier moment. Beaucoup de refus\u00a0: regarde Whop.",
+  },
   hauts: {
     titre: "Le haut du paywall",
     de: "le haut du paywall",

@@ -9,6 +9,7 @@ import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { formatCount, jourEnLettres } from "@/lib/format";
+import { marquerJalon, useJalon, useJalonEnVue } from "@/lib/jalons";
 import { moiEtAutre } from "@/lib/participants";
 import { useAuPaiement } from "@/lib/presence";
 import { setQueryData } from "@/lib/query";
@@ -46,6 +47,8 @@ import type { RoueDuCompte } from "@/types/api";
  * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet, ou après OFFRE_APRES_MS sans payer. Jamais avec un lot
  * de la roue (le serveur la refuse aussi), ni pendant que la roue attend. Payé, « C’est débloqué » mène à la vraie
  * lecture (/lecture).
+ * Le tunnel d’/admin (src/lib/jalons.ts) : le paywall arrivé, jusqu’où l’on descend (les offres, les avis, les questions,
+ * le bas), la formule touchée, puis le bouton qui paie et la feuille de Whop (PayerDansLaFeuille, `jalons`).
  */
 
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
@@ -78,6 +81,8 @@ export function Paywall({
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
   const paiement = useRef<HTMLElement>(null);
+  useJalon("paywall");
+  useJalonEnVue(paiement, "offres");
 
   const joue = (r: RoueDuCompte) => {
     setVueRoue((v) => (v === "fermee" ? v : "ouverte"));
@@ -120,6 +125,7 @@ export function Paywall({
         <Temoignages items={temoignages} />
         <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} elle={elle} />
+        <FinDuPaywall />
       </div>
       <BarreDuBas cible={paiement} lot={lot} />
       <FeuilleDeLaRoue open={roueOuverte} onJoue={joue} onFermer={() => setVueRoue("fermee")} />
@@ -244,7 +250,10 @@ function Paiement({
             )}
             <Formule
               on={choisie === "rapport"}
-              choisir={() => setChoix("rapport")}
+              choisir={() => {
+                setChoix("rapport");
+                marquerJalon("touche_rapport");
+              }}
               titre={PAYWALL.rapport.titre}
               note={
                 garde ? (
@@ -260,7 +269,10 @@ function Paiement({
             </Formule>
             <Formule
               on={choisie === "premium"}
-              choisir={() => setChoix("premium")}
+              choisir={() => {
+                setChoix("premium");
+                marquerJalon("touche_premium");
+              }}
               badge={<Tag tone="conseille">{avoirs?.premiumPlusChoisi ? PAYWALL.premium.plusChoisi : undefined}</Tag>}
               titre={PAYWALL.premium.titre}
               note={PAYWALL.premium.note(autre)}
@@ -289,6 +301,7 @@ function Paiement({
             surOccupe={setOccupe}
             fleche
             sansCarteGardee
+            jalons
           />
         )}
       </div>
@@ -389,10 +402,12 @@ function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; 
  */
 function Temoignages({ items }: { items: Testimonial[] }) {
   const piste = useRef<HTMLDivElement>(null);
+  const section = useRef<HTMLElement>(null);
+  useJalonEnVue(section, "avis");
   if (!items.length) return null;
   const defiler = (sens: 1 | -1) => piste.current?.scrollBy({ left: sens * (piste.current.clientWidth * 0.8), behavior: "smooth" });
   return (
-    <section aria-labelledby="temoignages" className="flex flex-col gap-5 pt-8 lg:items-center lg:gap-11 lg:pt-14">
+    <section ref={section} aria-labelledby="temoignages" className="flex flex-col gap-5 pt-8 lg:items-center lg:gap-11 lg:pt-14">
       <div className="flex flex-col items-center gap-2 lg:gap-2.5">
         <h2
           id="temoignages"
@@ -469,8 +484,10 @@ function AvantApres({ elle, className }: { elle: boolean; className?: string }) 
 
 /** Les questions, en bas : la discrétion, l’abonnement, un souci (des volets qui s’ouvrent). */
 function Questions({ autre, elle }: { autre: string; elle: boolean }) {
+  const volets = useRef<HTMLDivElement>(null);
+  useJalonEnVue(volets, "questions");
   return (
-    <div className="mt-2 flex flex-col rounded-[18px] bg-white px-4 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)] lg:mx-auto lg:w-full lg:max-w-[720px]">
+    <div ref={volets} className="mt-2 flex flex-col rounded-[18px] bg-white px-4 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)] lg:mx-auto lg:w-full lg:max-w-[720px]">
       {PAYWALL.questions(autre, elle).map(({ q, r }, k) => (
         <details key={q} open={k === 0} className="group border-b border-sep py-3.5 last:border-b-0">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-note font-black [&::-webkit-details-marker]:hidden">
@@ -482,6 +499,13 @@ function Questions({ autre, elle }: { autre: string; elle: boolean }) {
       ))}
     </div>
   );
+}
+
+/** Le bas du paywall, sous les questions : pour le tunnel d’/admin, ceux qui sont descendus jusque-là. */
+function FinDuPaywall() {
+  const fin = useRef<HTMLDivElement>(null);
+  useJalonEnVue(fin, "bas", "0px");
+  return <div ref={fin} aria-hidden="true" className="h-px" />;
 }
 
 /**

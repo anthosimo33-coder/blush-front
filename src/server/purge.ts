@@ -21,8 +21,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - les webhooks de paiement déjà traités (evenements_paiement) de plus de 90 jours (EVENEMENTS_PAIEMENT_GARDES_JOURS) :
  *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien ;
  * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
- *   (PRESENCES_GARDEES_JOURS), les visites de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel des empreintes dès le
- *   surlendemain : plus rien ne relie alors une empreinte à une connexion ;
+ *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
+ *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
  * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
  * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base.
  */
@@ -101,6 +101,11 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.visites)
       .where(lt(schema.visites.arriveLe, il_y_a(VISITES_GARDEES_JOURS)));
+  });
+  await etape("jalons du tunnel", async () => {
+    await db()
+      .delete(schema.jalons)
+      .where(lt(schema.jalons.le, il_y_a(VISITES_GARDEES_JOURS)));
   });
   await etape("registre des effacements", async () => {
     await db()

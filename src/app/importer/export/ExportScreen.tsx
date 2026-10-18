@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useDevice, useFilePicker } from "@/lib/hooks";
+import { marquerJalon, useJalon } from "@/lib/jalons";
 import { ACCEPT_EXPORT } from "@/lib/limites";
 import { useMonte } from "@/lib/useMonte";
 import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
@@ -56,6 +57,8 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
+  /* Le tunnel d’/admin : une appli choisie (cet écran), puis le fichier, l’envoi raté ou réussi (src/lib/jalons.ts) */
+  useJalon("appli");
   const fermerChoix = (id: string | null) => {
     choix?.repondre(id);
     setChoix(null);
@@ -73,6 +76,7 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
      * rapport à l’envers
      */
     setJourney({ exportApp: app, app, exportFileName: fichier, capturesAdded: false, me: null });
+    marquerJalon("importee");
     router.push("/importer/ok");
   };
 
@@ -85,6 +89,7 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
     if (codeDe(e) === "annule") return;
     /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger */
     if (codeDe(e) === "consentement") return accord.perimer();
+    marquerJalon("envoi_rate");
     /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu */
     const parcours = erreurDeParcours("export", e);
     if (parcours) {
@@ -121,6 +126,7 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
     if (!file) return;
     /* L’accord refusé par le serveur pendant que le choix du fichier était ouvert : rien ne repart avant la page rechargée */
     if (!accord.exiger()) return;
+    marquerJalon("fichier");
     setBusy(true);
     setSouci(null);
     setAvance(null);
