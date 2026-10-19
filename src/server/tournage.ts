@@ -6,13 +6,13 @@ import { CATALOGUE } from "@/contenu/offres";
 import { NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import { mentionne, renommer } from "@/lib/renommer";
 import type { ExportApp } from "@/types";
-import type { RefusDuTournage, StatutDuTournage } from "@/types/api";
+import type { RappelDuTournage, RefusDuTournage, StatutDuTournage } from "@/types/api";
 import type { Utilisateur } from "./auth";
 import { crediter } from "./bulles";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
 import * as coffre from "./coffre";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
-import { lirePrenomDuTournage, lireTournage } from "./cookies";
+import { effacerTournage, lirePrenomDuTournage, lireTournage } from "./cookies";
 import { db, schema, uneLigne } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
 import { donneesVerdict } from "./depot";
@@ -316,15 +316,39 @@ export async function etatDuTournage(id: string): Promise<EtatDuTournage | null>
 
 /* ———— Le garde-fou des créatrices ———— */
 
-/** Un compte qui a déjà fait une prise, ou commencé (un brouillon de tournage) : une créatrice. L’équipe n’en est jamais une. */
+/**
+ * Un compte qui a fait une prise, ou commencé (un brouillon de tournage), depuis la dernière fois qu’il a quitté le mode
+ * tournage connecté (`users.tournage_quitte_le`, quitterLeTournage) : une créatrice. Ses prises d’avant n’y comptent plus :
+ * qui a quitté le mode ne filme plus, et ses vraies convs se lisent. L’équipe n’en est jamais une.
+ */
 async function estCreatrice(compte: Pick<Utilisateur, "id" | "email">): Promise<boolean> {
   if (estEquipe(compte)) return false;
+  const u = schema.users;
   const [l] = await db()
     .select({ id: s.id })
     .from(s)
-    .where(and(eq(s.userId, compte.id), or(isNotNull(s.tournageId), isNotNull(s.tournageLe))))
+    .innerJoin(u, eq(u.id, s.userId))
+    .where(
+      and(
+        eq(s.userId, compte.id),
+        or(isNotNull(s.tournageId), isNotNull(s.tournageLe)),
+        /* Une prise a l’heure de sa relecture ; un brouillon de tournage pas encore relu, celle de son import */
+        or(isNull(u.tournageQuitteLe), sql`coalesce(${s.tournageLe}, ${s.createdAt}) > ${u.tournageQuitteLe}`),
+      ),
+    )
     .limit(1);
   return !!l;
+}
+
+/**
+ * « Quitter le mode tournage » (POST /tournage/fin) : ce navigateur oublie son lien (son cookie, et le prénom qui le
+ * suit), et le compte connecté, s’il y en a un, ne compte plus ses prises d’avant pour celles d’une créatrice
+ * (estCreatrice) : ses vraies convs se lisent de nouveau, sur ce téléphone comme ailleurs. Ses prises restent dans ses
+ * histoires. Une nouvelle prise le refait créatrice.
+ */
+export async function quitterLeTournage(compte: Pick<Utilisateur, "id"> | null): Promise<void> {
+  await effacerTournage();
+  if (compte) await db().update(schema.users).set({ tournageQuitteLe: new Date() }).where(eq(schema.users.id, compte.id));
 }
 
 /**
@@ -471,6 +495,20 @@ export async function tournagePourLaCreatrice(): Promise<{ nom: string; prenom: 
   if (!tournage) return null;
   const [prenom, [source]] = await Promise.all([utilisateurCourant().then(prenomDeLaCreatrice), db().select({ meta: s.meta }).from(s).where(eq(s.id, tournage.storyId))]);
   return { nom: nomPourLaCreatrice(tournage.nom, source ? prenomDeMoi(metaDe(source)) : null, prenom), prenom };
+}
+
+/**
+ * Le rappel du mode tournage dans « Mon compte » (src/app/compte/CompteScreen.tsx, RappelDuTournage) : ce navigateur
+ * garde le cookie d’un lien de tournage (`telephone`), ou le compte a fait une prise depuis sa dernière sortie
+ * (`compte`, estCreatrice) : dans les deux cas, ses vraies convs ne se lisent pas. Pour tout le monde, créatrices
+ * comprises : « Mon compte » ne se filme pas. Qui a ouvert un lien pour essayer, sous un compte qui n’est pas de
+ * BLUSH_ADMINS (sans le repère des écrans de l’import), y apprend pourquoi ses nouvelles convs rejouent toujours la
+ * même, ou sont refusées, et le quitte. null : rien de tout ça.
+ */
+export async function rappelDuTournage(): Promise<RappelDuTournage | null> {
+  if (await lireTournage()) return { sur: "telephone", nom: (await tournagePourLaCreatrice())?.nom ?? null };
+  const compte = await utilisateurCourant();
+  return compte && (await estCreatrice(compte)) ? { sur: "compte" } : null;
 }
 
 /**

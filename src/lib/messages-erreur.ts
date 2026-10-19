@@ -49,8 +49,12 @@ const ESSAIS_DU_JOUR = "Trop d’essais pour aujourd’hui avec cet email. Rées
  */
 const CAPTCHA = "On n’a pas pu vérifier que tu n’es pas un robot. Réessaie dans un instant (et coche la case si elle apparaît).";
 
-/** Le mode tournage arrêté : son lien a changé, ou ce compte de créatrice n’a plus le sien (src/server/tournage.ts). */
-const TOURNAGE_ARRETE = "Ce lien de tournage a été arrêté. Rouvre le nouveau lien de ta mission sur ce téléphone, puis recommence la prise.";
+/**
+ * Le mode tournage arrêté : son lien a changé, ou ce compte de créatrice n’a plus le sien (src/server/tournage.ts). Qui ne
+ * filme pas (l’équipe, qui a essayé un lien) le quitte dans « Mon compte ». TODO(produit): la seconde phrase, à valider.
+ */
+const TOURNAGE_ARRETE =
+  "Ce lien de tournage a été arrêté. Rouvre le nouveau lien de ta mission sur ce téléphone, puis recommence la prise. Tu ne filmes pas\u00a0? Quitte le mode tournage dans «\u00a0Mon compte\u00a0».";
 
 const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */

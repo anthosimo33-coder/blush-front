@@ -57,6 +57,7 @@ import {
   metaDeLaPrise,
   nomPourLaCreatrice,
   prenomDuLien,
+  rappelDuTournage,
   renommerLesPrises,
   tournageDe,
   tournageDeLaCle,
@@ -192,6 +193,53 @@ describe("le lien d’une conv de tournage", () => {
     const fin = await postFin(requete("/tournage/fin", { method: "POST" }));
     expect([fin.status, fin.headers.get("location")]).toEqual([303, "/"]);
     expect(etat.cookies.has(TOURNAGE)).toBe(false);
+  });
+
+  it("« Quitter » depuis « Mon compte » y revient ; tout autre retour demandé mène à l’accueil", async () => {
+    const quitter = async (retour: string) => {
+      etat.cookies.clear();
+      etat.cookies.set(TOURNAGE, cle);
+      const fd = new FormData();
+      fd.append("retour", retour);
+      const fin = await postFin(requete("/tournage/fin", { method: "POST", body: fd }));
+      expect(etat.cookies.has(TOURNAGE)).toBe(false);
+      return [fin.status, fin.headers.get("location")];
+    };
+    expect(await quitter("/compte")).toEqual([303, "/compte"]);
+    for (const ailleurs of ["https://ailleurs.test", "//ailleurs.test", "/admin", "/compte/../admin", ""]) expect(await quitter(ailleurs)).toEqual([303, "/"]);
+  });
+});
+
+describe("le rappel du mode tournage, dans « Mon compte »", () => {
+  it("nomme le lien de ce navigateur, à tous (créatrices comprises) ; un lien arrêté le dit ; sans cookie ni prise, rien", async () => {
+    const t = await creerTournage({ conv: source, nom: "G · Le rappel", par: equipe });
+    if (!("id" in t)) throw new Error("conv de tournage refusée");
+    const cleG = await cleDe(t.id);
+    const mila = await compteDeTest("tournage-mila");
+    await navigateur(mila);
+    expect(await rappelDuTournage()).toBeNull();
+    await navigateur(mila, cleG);
+    expect(await rappelDuTournage()).toEqual({ sur: "telephone", nom: "G · Le rappel" });
+    /* Sans compte aussi (la page demande la connexion, mais le rappel ne dépend pas d’elle) */
+    etat.cookies.delete(SESSION);
+    expect(await rappelDuTournage()).toEqual({ sur: "telephone", nom: "G · Le rappel" });
+    await arreterTournage(t.id);
+    expect(await rappelDuTournage()).toEqual({ sur: "telephone", nom: null });
+    etat.cookies.set(TOURNAGE, "x".repeat(43));
+    expect(await rappelDuTournage()).toEqual({ sur: "telephone", nom: null });
+  });
+
+  it("sans cookie, le compte qui a fait une prise : ses vraies lectures sont refusées, jusqu’à ce qu’il quitte le mode", async () => {
+    const lou = await compteDeTest("tournage-lou");
+    await navigateur(lou, cle);
+    await prise();
+    etat.cookies.delete(TOURNAGE);
+    expect(await rappelDuTournage()).toEqual({ sur: "compte" });
+    await postFin(requete("/tournage/fin", { method: "POST" }));
+    expect(await rappelDuTournage()).toBeNull();
+    /* Un compte sans prise (celui de l’équipe, qui a lu la conv de la campagne) : pas de rappel sans le cookie */
+    await navigateur(equipe);
+    expect(await rappelDuTournage()).toBeNull();
   });
 });
 

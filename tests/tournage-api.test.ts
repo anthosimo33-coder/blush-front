@@ -32,6 +32,7 @@ import { POST as postTournage } from "@/app/api/admin/tournage/route";
 import { POST as postAnalyse } from "@/app/api/analyse/route";
 import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postPresence } from "@/app/api/presence/route";
+import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { nomDuCookie } from "@/lib/noms-cookies";
 import type { Utilisateur } from "@/server/auth";
@@ -214,6 +215,45 @@ describe("une créatrice sans son lien", () => {
     expect((await captures()).status).toBe(409);
     expect(appels.length).toBe(avant);
     expect(etat.apres).toEqual([]);
+  });
+
+  it("« Quitter le mode tournage » connectée : ses prises d’avant ne comptent plus, elle lit partout ; une nouvelle prise la refait créatrice", async () => {
+    const quitte = await compteDeTest("tournage-api-quitte");
+    const prise = async () =>
+      db()
+        .insert(schema.stories)
+        .values({ userId: quitte.id, messageCount: 1, meta: (await ligneEnBase((await convRattachee(quitte, FICHIER)).id)).meta, tournageLe: new Date() });
+    await prise();
+    const premiere = await convRattachee(quitte, "02-reciproque.txt");
+    await navigateur(quitte);
+    etat.cookies.set(STORY_COOKIE, premiere.id);
+    expect((await lancer()).status).toBe(409);
+    /* Le formulaire de « Mon compte », ce navigateur connecté : le cookie part, et le compte n’est plus une créatrice */
+    const fd = new FormData();
+    fd.append("retour", "/compte");
+    const fin = await postFin(requete("/tournage/fin", { method: "POST", body: fd, api: null }));
+    expect([fin.status, fin.headers.get("location")]).toEqual([303, "/compte"]);
+    expect((await db().select({ le: schema.users.tournageQuitteLe }).from(schema.users).where(eq(schema.users.id, quitte.id)))[0]!.le).toBeInstanceOf(Date);
+    const avant = appels.length;
+    expect((await lancer()).status).toBe(200);
+    etat.apres.length = 0;
+    expect(appels.length).toBe(avant);
+    /* Sur un autre navigateur aussi : c’est le compte qui est sorti */
+    const seconde = await convRattachee(quitte, "03-elle-s-eloigne.txt");
+    await navigateur(quitte);
+    etat.cookies.set(STORY_COOKIE, seconde.id);
+    expect((await captures()).status).not.toBe(409);
+    /* Une nouvelle prise, après la sortie : de nouveau une créatrice */
+    await prise();
+    expect([(await lancer()).status, (await captures()).status]).toEqual([409, 409]);
+    etat.apres.length = 0;
+  });
+
+  it("« Quitter » sans compte : le cookie part, rien d’autre ne change", async () => {
+    await navigateur(null, "x".repeat(43));
+    const fin = await postFin(requete("/tournage/fin", { method: "POST", api: null }));
+    expect([fin.status, fin.headers.get("location")]).toEqual([303, "/"]);
+    expect(etat.cookies.has(TOURNAGE)).toBe(false);
   });
 
   it("un navigateur qui garde un lien arrêté ne fait rien lire non plus, même sans compte", async () => {
