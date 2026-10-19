@@ -42,6 +42,8 @@ const ENTETES = {
 const WEBHOOK = "/api/paiement/whop";
 /** L’API du mode tournage, hors de la garde commune elle aussi : l’outil des créatrices est un serveur, seule sa clé compte. */
 const API_DU_TOURNAGE = ["/api/admin/tournage", "/api/admin/tournage/[id]/arreter"];
+/** La désinscription en un clic (RFC 8058), hors de la garde commune : la messagerie l’appelle de ses serveurs, seul le lien signé compte. */
+const UN_CLIC = "/api/desinscription/un-clic";
 
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
@@ -65,8 +67,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
   await test.step("les 35 routes gardées de la table du contrat (le signe des onglets, les jalons du tunnel et ce que remontent les navigateurs compris), depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(38);
-    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && !API_DU_TOURNAGE.includes(c))) {
+    expect(MUTATIONS).toHaveLength(39);
+    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && c !== UN_CLIC && !API_DU_TOURNAGE.includes(c))) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
         const qui = `${methode} ${chemin} depuis ${origine ?? "nulle part"}`;
@@ -81,6 +83,17 @@ test("une route qui modifie refuse (403) une requête venue d’un autre site, d
       const r = await request.post(WEBHOOK, { headers: origine ? { origin: origine } : {}, data: { type: "payment.succeeded", data: {} } });
       expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
       expect.soft(await r.json()).toEqual({ erreur: "interdit" });
+    }
+  });
+
+  await test.step("la désinscription en un clic, d’où qu’elle vienne : sans le bon lien signé, 404 « lien »", async () => {
+    for (const origine of [PIRATE, URL_APPLI, null]) {
+      const r = await request.post(`${UN_CLIC}?id=00000000-0000-0000-0000-000000000000&cle=pas-la-bonne&quoi=offres`, {
+        headers: { "content-type": "application/x-www-form-urlencoded", ...(origine ? { origin: origine } : {}) },
+        data: "List-Unsubscribe=One-Click",
+      });
+      expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(404);
+      expect.soft(await r.json()).toEqual({ erreur: "lien" });
     }
   });
 

@@ -49,11 +49,11 @@ export class ErreurResend extends Error {
 export const refusDuPrestataire = (e: unknown): boolean => e instanceof ErreurResend && (e.statut === 429 || e.statut === 401 || e.statut === 403 || e.statut >= 500);
 
 /* Poste un mail chez le prestataire, avec la clé `cle` et l’expéditeur `de` : rejette avec ErreurResend s’il le refuse */
-async function poster(pour: string[], { sujet, texte, html }: Mail, { cle, de }: { cle: string; de: string }): Promise<void> {
+async function poster(pour: string[], { sujet, texte, html, entetes }: Mail, { cle, de }: { cle: string; de: string }): Promise<void> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${cle}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: de, to: pour, subject: sujet, text: texte, ...(html !== undefined && { html }) }),
+    body: JSON.stringify({ from: de, to: pour, subject: sujet, text: texte, ...(html !== undefined && { html }), ...(entetes && { headers: entetes }) }),
     signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
   if (!r.ok) throw new ErreurResend(r.status);
@@ -71,7 +71,7 @@ export async function envoyerMail(destinataires: string | string[], mail: Mail, 
   if (!pour.length) return true;
   const boite = boiteAMails();
   if (boite) {
-    await deposer(boite, pour, { sujet: mail.sujet, texte: mail.texte, ...(mail.html !== undefined && { html: mail.html }) });
+    await deposer(boite, pour, { sujet: mail.sujet, texte: mail.texte, ...(mail.html !== undefined && { html: mail.html }), ...(mail.entetes && { entetes: mail.entetes }) });
     return true;
   }
   const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM } = env();

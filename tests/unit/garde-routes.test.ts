@@ -82,7 +82,15 @@ const SANS_COMPTE = new Set<CleRoute>([
  * des créatrices, un serveur lui aussi).
  */
 const API_DU_TOURNAGE = ["POST /api/admin/tournage", "GET /api/admin/tournage/[id]", "POST /api/admin/tournage/[id]/arreter"] as const satisfies CleRoute[];
-const HORS_GARDE = new Set<CleRoute>(["GET /api/cron/chaine", "GET /api/cron/purge", "GET /api/cron/relances", "GET /api/reveil", "POST /api/paiement/whop", ...API_DU_TOURNAGE]);
+const HORS_GARDE = new Set<CleRoute>([
+  "GET /api/cron/chaine",
+  "GET /api/cron/purge",
+  "GET /api/cron/relances",
+  "GET /api/reveil",
+  "POST /api/paiement/whop",
+  "POST /api/desinscription/un-clic",
+  ...API_DU_TOURNAGE,
+]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
 const mutations = cles.filter((c) => estMutation(c.split(" ")[0]!));
@@ -96,8 +104,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 38 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(38);
+  it("la table compte 39 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(39);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 

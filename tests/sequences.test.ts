@@ -5,8 +5,8 @@ import type { Utilisateur } from "@/server/auth";
 import { empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
-import { plafondsDesMails } from "@/server/limites";
-import { desinscrire, envoyerLesRelances, lienDesinscription } from "@/server/relances";
+import { LIMITES, plafondsDesMails } from "@/server/limites";
+import { desinscrire, envoyerLesRelances, lienDesinscription, lienDesinscriptionUnClic } from "@/server/relances";
 import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, groupeDuJ6, heureCalme } from "@/server/sequences";
 import type { LevelId } from "@/types";
 import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
@@ -28,26 +28,31 @@ vi.mock("@/server/env", async (original) => {
 });
 
 /* Les mails partis : à qui, et ce qu’ils disent */
-const partis = vi.hoisted(() => [] as { pour: string; sujet: string; texte: string; html: string }[]);
+const partis = vi.hoisted(() => [] as { pour: string; sujet: string; texte: string; html: string; entetes?: Record<string, string> }[]);
 vi.mock("@/server/email", async (original) => {
   const m = await original<typeof import("@/server/email")>();
   return {
     ...m,
     envoyerMail: async (...args: Parameters<typeof m.envoyerMail>) => {
       const [pour, mail] = args;
-      partis.push({ pour: String(pour), sujet: mail.sujet, texte: mail.texte, html: mail.html ?? "" });
+      partis.push({ pour: String(pour), sujet: mail.sujet, texte: mail.texte, html: mail.html ?? "", ...(mail.entetes && { entetes: mail.entetes }) });
       return m.envoyerMail(...args);
     },
   };
 });
 
-/* Le plafond du jour, partagé avec les relances : la base des tests le garde d’un lancement à l’autre */
+/* Les compteurs du jour (le garde-fou des séquences, le plafond de la relance) : la base des tests les garde d’un lancement à l’autre */
+const SEQUENCES_DU_JOUR = empreinte("limite:sequences:mails");
 const RELANCES_DU_JOUR = empreinte("limite:relances:mails");
-const poserLeCompteur = (count: number) =>
+const poser = (key: string, count: number) =>
   db()
     .insert(schema.rateLimits)
-    .values({ key: RELANCES_DU_JOUR, windowStart: new Date(), count })
+    .values({ key, windowStart: new Date(), count })
     .onConflictDoUpdate({ target: schema.rateLimits.key, set: { count, windowStart: new Date() } });
+const poserLeCompteur = async (count: number) => {
+  await poser(SEQUENCES_DU_JOUR, count);
+  await poser(RELANCES_DU_JOUR, 0);
+};
 
 /* Midi à Paris : hors des heures calmes */
 const MIDI = new Date("2026-10-17T10:00:00Z");
@@ -151,6 +156,8 @@ describe("S3 · après l’achat", () => {
     expect(m!.html).toContain(`/ouvrir/${conv}?m=s3_repondre&amp;dire=son%20dernier%20message%C2%A0%3A%20`);
     expect(m!.html).toContain("Plus de conseils comme ça");
     expect(m!.texte).toContain(lienDesinscription(u.id, "conseils"));
+    /* La désinscription en un clic, dans les en-têtes (RFC 8058) : les conseils, signée */
+    expect(m!.entetes).toEqual({ "List-Unsubscribe": `<${lienDesinscriptionUnClic(u.id, "conseils")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
     expect(await envois(u)).toEqual([{ cle: "s3_repondre", parti: true }]);
     /* Noté : un autre passage ne le renvoie pas */
     await passer();
@@ -554,9 +561,16 @@ describe("pour tous", () => {
     }
   });
 
-  it("le plafond du jour atteint : rien ne part, le mail oublié repartira", async () => {
+  it("le plafond de la relance ne compte plus : atteint, les séquences partent quand même", async () => {
+    const { u } = await client("sequence-sans-plafond");
+    await poser(RELANCES_DU_JOUR, plafondsDesMails().relances.max);
+    await passer();
+    expect(pour(u)).toHaveLength(1);
+  });
+
+  it("le garde-fou de 300 par jour atteint : rien ne part, le mail oublié repartira", async () => {
     const { u } = await client("sequence-plafond");
-    await poserLeCompteur(plafondsDesMails().relances.max);
+    await poserLeCompteur(LIMITES.sequencesParJour.max);
     const passage = await passer();
     expect(passage.retenus).toBeGreaterThanOrEqual(1);
     expect(pour(u)).toEqual([]);

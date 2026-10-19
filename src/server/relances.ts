@@ -41,8 +41,8 @@ export const FRAICHEUR_RELANCE_MS = 48 * 3600e3;
  */
 const RELANCES_PAR_PASSAGE = 50;
 
-/* Le compteur du jour des relances parties : plafondsDesMails().relances, partagé avec les mails des séquences (src/server/sequences.ts) */
-export const RELANCES_DU_JOUR = "relances:mails";
+/* Le compteur du jour des relances parties : plafondsDesMails().relances */
+const RELANCES_DU_JOUR = "relances:mails";
 
 /**
  * Le lien signé d’un mail pour couper ce genre de mails à ce compte (`quoi` : les offres, dont la relance, ou les conseils
@@ -51,6 +51,24 @@ export const RELANCES_DU_JOUR = "relances:mails";
  */
 export const lienDesinscription = (userId: string, quoi: Exclude<Desinscription, "tout"> = "offres") =>
   `${env().BLUSH_URL}/desinscription?id=${userId}&cle=${empreinte(`desinscription:${userId}`)}${quoi === "offres" ? "" : `&quoi=${quoi}`}`;
+
+/**
+ * L’adresse de la désinscription en un clic (RFC 8058) de ce genre de mails pour ce compte : celle des en-têtes
+ * List-Unsubscribe, que la messagerie (Gmail, Yahoo…) appelle elle-même en POST quand on touche « Se désabonner » à côté
+ * de l’expéditeur (POST /api/desinscription/un-clic). Signée comme le lien du pied.
+ */
+export const lienDesinscriptionUnClic = (userId: string, quoi: Exclude<Desinscription, "tout"> = "offres") =>
+  `${env().BLUSH_URL}/api/desinscription/un-clic?id=${userId}&cle=${empreinte(`desinscription:${userId}`)}&quoi=${quoi}`;
+
+/**
+ * Les en-têtes de la désinscription en un clic d’un mail des séquences ou de la relance : List-Unsubscribe (l’adresse
+ * signée) et List-Unsubscribe-Post, sans lesquels Gmail et Yahoo ne montrent pas « Se désabonner » et comptent plus de
+ * signalements de spam (leurs règles des envois en nombre, février 2024).
+ */
+export const entetesDeDesinscription = (userId: string, quoi: Exclude<Desinscription, "tout">): Record<string, string> => ({
+  "List-Unsubscribe": `<${lienDesinscriptionUnClic(userId, quoi)}>`,
+  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+});
 
 /**
  * Coupe ce genre de mails au compte, depuis le lien de son mail : les offres (users.relances_coupees_le), les conseils
@@ -155,7 +173,11 @@ export async function envoyerLesRelances(): Promise<PassageDesRelances> {
     const lien = `${env().BLUSH_URL}/ouvrir/${c.storyId}?paiement=1`;
     let partie: boolean;
     try {
-      partie = await envoyerMail(c.email, mailRelance({ base: env().BLUSH_URL, lien, desinscription: lienDesinscription(c.userId) }), { sorte: "relance" });
+      partie = await envoyerMail(
+        c.email,
+        { ...mailRelance({ base: env().BLUSH_URL, lien, desinscription: lienDesinscription(c.userId) }), entetes: entetesDeDesinscription(c.userId, "offres") },
+        { sorte: "relance" },
+      );
     } catch (e) {
       journalErreur("relance : mail refusé", e);
       if (refusDuPrestataire(e)) partie = false;
