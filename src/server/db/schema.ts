@@ -92,6 +92,11 @@ export const users = pgTable("users", {
    * retrouvée. Le tableau de bord en tire les ventes par source.
    */
   source: text("source", { enum: SOURCES_VISITE }),
+  /**
+   * « Quitter le mode tournage » touché, connecté à ce compte : l’heure. Ses prises d’avant ne font plus de lui le compte
+   * d’une créatrice, à qui une vraie lecture est refusée (src/server/tournage.ts, estCreatrice) ; une nouvelle prise, si.
+   */
+  tournageQuitteLe: quand("tournage_quitte_le"),
   createdAt: quand("created_at").notNull().defaultNow(),
 });
 

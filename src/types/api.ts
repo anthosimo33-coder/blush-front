@@ -196,6 +196,14 @@ export type ConvDeTournage = { id: string; nom: string; statut: StatutDuTournage
 export type RefusDuTournage = "aucune" | "pas_lue" | "en_cours" | "sans_rapport" | "sans_memoire";
 
 /**
+ * Le rappel du mode tournage dans « Mon compte » (rappelDuTournage, src/server/tournage.ts). `telephone` : ce navigateur
+ * garde le cookie d’un lien, `nom` son nom tel que le lit la créatrice ("" s’il ne disait que le prénom d’une autre),
+ * null si le lien est arrêté. `compte` : plus de cookie, mais le compte a fait une prise depuis sa dernière sortie, et
+ * ses vraies lectures sont refusées.
+ */
+export type RappelDuTournage = { sur: "telephone"; nom: string | null } | { sur: "compte" };
+
+/**
  * Ce qu’un geste de l’équipe a fait (POST /api/admin), en nombres : le nouveau solde de bulles, les convs débloquées
  * (null : aucun compte pour cet email), ou un lot d’invitations (les mails partis, ceux qui restent à inviter, si le
  * plafond des mails du jour l’a arrêté, les adresses refusées par le prestataire des mails, et s’il l’a arrêté : LotInvite,

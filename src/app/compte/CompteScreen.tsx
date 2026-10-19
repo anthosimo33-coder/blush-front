@@ -2,14 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { changerDeConv, useAchats, useCompte } from "@/lib/requetes";
 import { useChargeAuRepos } from "@/lib/repos";
 import { play, setSoundsEnabled, useSoundsEnabled } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { deleteAccount, deleteStory, seDeconnecter } from "@/services/api";
-import type { Account, AchatDuCompte } from "@/types/api";
+import type { Account, AchatDuCompte, RappelDuTournage } from "@/types/api";
 import { ETAT_ACHAT, TES_ACHATS, TES_BULLES } from "@/contenu/achats";
 import { PROMESSE_CONV, PROMESSE_DONNEES, PROMESSE_EFFACEMENT, PROMESSE_LIEU } from "@/contenu/confidentialite";
 import { EDITEUR } from "@/contenu/mentions-legales";
@@ -48,6 +48,22 @@ const RIEN_N_EST_EFFACE = "Tes histoires restent gardées\u00a0: ton email et un
 /** Le jour d’un achat, à l’heure de Paris, au rendu serveur comme dans le navigateur (« 12 oct. 2026 »). */
 const JOUR_D_ACHAT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short", year: "numeric" });
 
+/**
+ * Le rappel du mode tournage (RappelDuTournage) : ce qui l’a posé, et ce qu’il fait des nouvelles convs. Un lien encore
+ * valable les rejoue ; un lien arrêté, ou un compte qui a fait une prise, les refuse. TODO(produit): textes nouveaux, à valider.
+ */
+function texteDuTournage(rappel: RappelDuTournage): { titre: string; sous: string; pied: string } {
+  if (rappel.sur === "compte")
+    return { titre: "Ton compte est en mode tournage", sous: "Tu y as fait une prise", pied: "Tant que tu ne le quittes pas, BLUSH refuse de lire tes nouvelles convs." };
+  const titre = "Ce téléphone est en mode tournage";
+  if (rappel.nom === null) return { titre, sous: "Son lien est arrêté", pied: "Tant que tu ne le quittes pas, BLUSH refuse de lire tes nouvelles convs." };
+  return {
+    titre,
+    sous: rappel.nom || "Le lien d’une campagne",
+    pied: "Tant que tu ne le quittes pas, BLUSH ne lit pas tes nouvelles convs\u00a0: il rejoue celle du lien.",
+  };
+}
+
 /** La feuille des bulles ouverte : « C’est quoi une bulle ? », ou la recharge. */
 type FeuilleDesBulles = "bulle" | "recharge" | null;
 export type NomsDuCompte = { me: Person; other: Person; period: string };
@@ -56,18 +72,22 @@ export type NomsDuCompte = { me: Person; other: Person; period: string };
  * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).
  * `compte`, `achats` : le compte et ses achats lus par la page serveur à l’heure `rendu` : ses bulles et ses achats sont
  * là dès l’affichage, rien ne descend ensuite, et ils ne sont pas relus tout de suite.
+ * `tournage` : le mode tournage de ce navigateur ou de ce compte (rappelDuTournage, src/server/tournage.ts), à quitter
+ * d’ici. « Mon compte » ne se filme pas : une créatrice le voit aussi.
  */
 export function CompteScreen({
   noms,
   convs = [],
   compte,
   achats: achatsRendus,
+  tournage = null,
   rendu,
 }: {
   noms: NomsDuCompte | null;
   convs?: ConvSummary[];
   compte?: Account | null;
   achats?: AchatDuCompte[];
+  tournage?: RappelDuTournage | null;
   rendu?: number;
 }) {
   const router = useRouter();
@@ -82,6 +102,10 @@ export function CompteScreen({
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   const sons = useSoundsEnabled();
+  /* « Quitter le mode tournage » : le formulaire de /tournage/fin, qui revient ici par un chargement neuf (sa route le dit) */
+  const sortieDuTournage = useRef<HTMLFormElement>(null);
+  const [quitte, setQuitte] = useState(false);
+  const rappel = tournage && texteDuTournage(tournage);
 
   /* La page d’avant ; ouvert d’ailleurs (un lien, un nouvel onglet, un retour du système), l’accueil, comme versAccueil */
   const retourSinon = useRetourSinon("/app", { scroll: false });
@@ -131,8 +155,41 @@ export function CompteScreen({
         {account?.email && <div className="mt-1.5 text-note font-extrabold text-grey">{account.email}</div>}
       </div>
 
+      {/* Le mode tournage, en tête : tant qu’il dure, une nouvelle histoire n’est pas lue. Le quitter revient ici */}
+      {rappel && (
+        <>
+          <InsetGroup title="Mode tournage" id="tournage" className="mt-7" footer={rappel.pied}>
+            <InsetRow
+              leading={
+                <RowIcon tone="danger">
+                  <span className="size-2.5 rounded-full bg-danger" />
+                </RowIcon>
+              }
+              title={rappel.titre}
+              sub={rappel.sous}
+            />
+            <InsetRow
+              leading={<RowIcon icon="close" tone="danger" />}
+              title={<span className="text-toi-ink">Quitter le mode tournage</span>}
+              sub="Tes prises restent dans tes histoires"
+              onClick={() => {
+                if (quitte) return;
+                setQuitte(true);
+                sortieDuTournage.current?.submit();
+              }}
+              trailing={quitte ? <TypingDots size={5} label="Sortie du mode tournage" /> : undefined}
+              chevron={!quitte}
+            />
+          </InsetGroup>
+          {/* Hors du groupe, qui borde chacune de ses lignes */}
+          <form ref={sortieDuTournage} method="post" action="/tournage/fin" hidden>
+            <input type="hidden" name="retour" value="/compte" />
+          </form>
+        </>
+      )}
+
       {/* Tes histoires : celle en cours (ou toutes, s’il y en a plusieurs), et de quoi en commencer une autre */}
-      <InsetGroup title="Tes histoires" id="histoires" className="mt-7">
+      <InsetGroup title="Tes histoires" id="histoires" className={rappel ? "mt-6" : "mt-7"}>
         {convs.length > 1 &&
           convs.map((c) => (
             <InsetRow
