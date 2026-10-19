@@ -1,8 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apresUnRate, attenteApresRates, avantPaiementA, DUREE_AVANT_PAIEMENT_MS, RATES_MAX, refusDuLancement, useSuiviLecture } from "@/app/lecture/suivi";
+import { apresUnRate, attenteApresRates, DUREE_AVANT_PAIEMENT_MS, DUREE_DE_LA_PRISE_MS, lectureDerouleeA, RATES_MAX, refusDuLancement, useSuiviLecture } from "@/app/lecture/suivi";
 import { getAnalysisProgress, resumeAnalysis } from "@/services/api";
 import { connexionPuis } from "@/lib/suite";
+import { retenirLecture } from "@/state/lecture";
 import { ErreurApi } from "@/types/erreurs-api";
 import type { AnalysisProgress } from "@/types";
 
@@ -67,10 +68,10 @@ describe("les règles du suivi", () => {
   it("la lecture d’une conv qui attend son paiement se déroule en quelques secondes : le compteur, les étapes, une trouvaille de plus par quart, puis la fin", () => {
     const fin: AnalysisProgress = { progress: 1, messagesRead: 64, stepsDone: 4, discoveries: ["a", "b", "c"], done: false, paiement: true };
     expect(DUREE_AVANT_PAIEMENT_MS).toBeLessThanOrEqual(6000);
-    expect(avantPaiementA(0, fin)).toMatchObject({ progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false, paiement: true });
-    expect(avantPaiementA(0.35, fin)).toMatchObject({ messagesRead: 32, stepsDone: 1, discoveries: ["a"], done: false });
-    expect(avantPaiementA(0.8, fin)).toMatchObject({ messagesRead: 64, stepsDone: 3, discoveries: ["a", "b", "c"], done: false });
-    expect(avantPaiementA(1.2, fin)).toMatchObject({ progress: 1, messagesRead: 64, stepsDone: 3, done: true });
+    expect(lectureDerouleeA(0, fin)).toMatchObject({ progress: 0, messagesRead: 0, stepsDone: 0, discoveries: [], done: false, paiement: true });
+    expect(lectureDerouleeA(0.35, fin)).toMatchObject({ messagesRead: 32, stepsDone: 1, discoveries: ["a"], done: false });
+    expect(lectureDerouleeA(0.8, fin)).toMatchObject({ messagesRead: 64, stepsDone: 3, discoveries: ["a", "b", "c"], done: false });
+    expect(lectureDerouleeA(1.2, fin)).toMatchObject({ progress: 1, messagesRead: 64, stepsDone: 3, done: true });
   });
 });
 
@@ -101,6 +102,35 @@ describe("useSuiviLecture", () => {
 
   it("déjà finie à l’arrivée : la fin tout de suite, sans la rejouer en direct", async () => {
     suivi.mockResolvedValue(finie);
+    const { result } = renderHook(() => useSuiviLecture());
+    await arriver();
+    expect(result.current.phase).toBe("done");
+    expect(result.current.enDirect.current).toBe(false);
+  });
+
+  it("une prise du mode tournage, lancée juste avant : sa lecture, déjà finie, se déroule en deux secondes, puis la fin vue en direct", async () => {
+    suivi.mockResolvedValue({ ...finie, discoveries: ["a", "b", "c"], rejouee: true });
+    retenirLecture();
+    const { result } = renderHook(() => useSuiviLecture());
+    await arriver();
+    /* « Qui es-tu ? » l’a lancée : pas de second POST, et l’écran part de zéro */
+    expect(relance).not.toHaveBeenCalled();
+    expect(result.current.p).toMatchObject({ progress: 0, messagesRead: 0, discoveries: [], done: false });
+    await avancer(DUREE_DE_LA_PRISE_MS / 2);
+    expect(result.current.p).toMatchObject({ messagesRead: 86, stepsDone: 2, discoveries: ["a", "b"], done: false });
+    expect(result.current.enDirect.current).toBe(true);
+    await avancer(DUREE_DE_LA_PRISE_MS / 2);
+    expect(result.current.p).toMatchObject({ progress: 1, messagesRead: 120, discoveries: ["a", "b", "c"], done: true });
+    expect(result.current.phase).toBe("reading");
+    /* L’anneau plein et la coche, puis la gerbe */
+    await avancer(1000);
+    expect(result.current.phase).toBe("done");
+    /* Rien de plus à relire : le serveur l’avait dite finie */
+    expect(suivi).toHaveBeenCalledTimes(1);
+  });
+
+  it("une prise rouverte (un rechargement) : la fin tout de suite, sans la dérouler de nouveau", async () => {
+    suivi.mockResolvedValue({ ...finie, rejouee: true });
     const { result } = renderHook(() => useSuiviLecture());
     await arriver();
     expect(result.current.phase).toBe("done");

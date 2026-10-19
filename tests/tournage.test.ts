@@ -39,7 +39,6 @@ import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { nomDuCookie, NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { mentionne, renommer } from "@/lib/renommer";
-import { DUREE_RELECTURE_MS } from "@/server/avancement";
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
@@ -269,14 +268,8 @@ describe("une prise", () => {
     expect(personnesDe(meta).autre).toEqual(personnesDe(metaSource).autre);
     expect(meta).toMatchObject({ appli: "instagram", captures: 2, moi: metaSource.moi, pronom: metaSource.pronom, resume: metaSource.resume });
     expect(await soldeDe(kelly.id)).toBe(BULLES_DU_TOURNAGE);
-    /* L’écran de lecture la rejoue, puis la dit finie */
-    const lire = async () => (await (await getAnalyse()).json()) as { done: boolean; progress: number };
-    expect(await lire()).toMatchObject({ done: false });
-    await db()
-      .update(schema.stories)
-      .set({ tournageLe: new Date(Date.now() - DUREE_RELECTURE_MS - 1000) })
-      .where(eq(schema.stories.id, id));
-    expect(await lire()).toMatchObject({ done: true, progress: 1 });
+    /* Sa lecture est déjà finie : l’écran qui vient de la lancer la déroule lui-même (src/app/lecture/suivi.ts) */
+    expect(await (await getAnalyse()).json()).toMatchObject({ done: true, progress: 1, rejouee: true });
     expect(appels.length).toBe(avant);
   });
 

@@ -36,7 +36,7 @@ import { etatDesTaches, planifier } from "./taches";
  *   de tournage (brouillonDeTournage) ; l’export ne demande aucun fichier : « Choisir le fichier enregistré » prend la
  *   conv du lien (brouillonDExportDeTournage), avec le prénom de la créatrice (prenomDeLaCreatrice) ;
  * - la lecture (POST /api/analyse) recopie le verdict, le rapport, la mémoire et le vocal déjà écrits (rejouer), et
- *   l’écran de lecture les rejoue en DUREE_RELECTURE_MS (avanceRejouee, src/server/avancement.ts) ;
+ *   l’écran de lecture les déroule en DUREE_DE_LA_PRISE_MS (src/app/lecture/suivi.ts) ;
  * - la chaîne des tâches ne lance plus rien pour cette conv (src/server/pipeline.ts, executer), sauf le vocal d’une prise
  *   qui n’en a pas : celui de la source disait le prénom de sa créatrice (rejouer, renommerLesPrises).
  * Le rapport s’ouvre comme un rapport acheté, avec ses bulles, une fois par conv de tournage et par compte : le chat
