@@ -31,6 +31,7 @@ import { POST as postCaptures } from "@/app/api/captures/route";
 import { POST as postLot } from "@/app/api/captures/lot/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postImport } from "@/app/api/import/route";
+import { GET as getRepere } from "@/app/api/tournage/repere/route";
 import PageExportTournage from "@/app/importer/export/tournage/page";
 import { GET as getLien } from "@/app/tournage/[cle]/route";
 import { POST as postFin } from "@/app/tournage/fin/route";
@@ -619,6 +620,51 @@ describe("une conv de tournage arrêtée, ou effacée", () => {
     const r = await lancer();
     expect([r.status, await r.json()]).toEqual([404, { erreur: "aucune" }]);
     expect(appels.length).toBe(avant);
+  });
+});
+
+describe("le repère du mode tournage, pour l’équipe seulement", () => {
+  /** Ce que GET /api/tournage/repere répond à ce navigateur (etat.cookies). */
+  const repere = async () => (await (await getRepere()).json()) as { nom: string | null };
+
+  it("nomme le lien d’un navigateur en mode tournage, pour un compte de BLUSH_ADMINS", async () => {
+    etat.admins.add(equipe.email);
+    try {
+      await navigateur(equipe, cle);
+      const r = await getRepere();
+      expect([r.status, r.headers.get("cache-control")]).toEqual([200, "no-store"]);
+      expect(await r.json()).toEqual({ nom: "A · Il répond plus pareil" });
+    } finally {
+      etat.admins.clear();
+    }
+  });
+
+  it("ne dit rien à une créatrice ni à un visiteur sans compte, qui filment ces écrans : la même réponse que sans le mode", async () => {
+    const lina = await compteDeTest("tournage-lina");
+    await navigateur(lina, cle);
+    expect(await repere()).toEqual({ nom: null });
+    etat.cookies.clear();
+    etat.cookies.set(TOURNAGE, cle);
+    expect(await repere()).toEqual({ nom: null });
+  });
+
+  it("ne dit rien à l’équipe hors du mode tournage : sans le cookie, un cookie faux, ou le lien arrêté", async () => {
+    const t = await creerTournage({ conv: source, nom: "F · Le repère arrêté", par: equipe });
+    if (!("id" in t)) throw new Error("conv de tournage refusée");
+    const cleF = await cleDe(t.id);
+    etat.admins.add(equipe.email);
+    try {
+      await navigateur(equipe);
+      expect(await repere()).toEqual({ nom: null });
+      await navigateur(equipe, "x".repeat(43));
+      expect(await repere()).toEqual({ nom: null });
+      await navigateur(equipe, cleF);
+      expect(await repere()).toEqual({ nom: "F · Le repère arrêté" });
+      await arreterTournage(t.id);
+      expect(await repere()).toEqual({ nom: null });
+    } finally {
+      etat.admins.clear();
+    }
   });
 });
 

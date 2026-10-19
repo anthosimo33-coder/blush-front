@@ -348,6 +348,8 @@ type Reponses = {
   "POST /api/presence": Ok;
   /** Toujours `{ ok: true }` : un jalon ignoré (la limite d’une adresse, le mode tournage) ne se dit pas. */
   "POST /api/jalon": Ok;
+  /** Le nom du lien de tournage de ce navigateur, pour un compte de BLUSH_ADMINS seulement ; null pour tous les autres. */
+  "GET /api/tournage/repere": { nom: string | null };
   /** Toujours `{ ok: true }` : une erreur ignorée (la limite d’une adresse) ne se dit pas. */
   "POST /api/navigateur/erreur": Ok;
   "POST /api/navigateur/mesures": Ok;
@@ -502,6 +504,7 @@ export const ROUTES = {
   },
   /** Un jalon du tunnel (src/lib/jalons.ts) : ce que le visiteur vient de faire (un fichier choisi, le paywall vu jusqu’aux avis…), rien d’autre */
   "POST /api/jalon": { corps: z.strictObject({ jalon: z.enum(JALONS) }) },
+  "GET /api/tournage/repere": {},
   /** Une erreur du navigateur (src/lib/sentinelle.tsx) : son nom, son message, d’où elle vient, et l’écran. Bornés : le serveur masque le reste. */
   "POST /api/navigateur/erreur": {
     corps: z.strictObject({

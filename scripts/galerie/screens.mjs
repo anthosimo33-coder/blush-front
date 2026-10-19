@@ -18,7 +18,10 @@
  * - plusieurs : un compte de l’équipe avec trois convs lues ;
  * - couple : un compte de l’équipe dont la conv est lue « En couple », toute la suite écrite, le verdict à « Ça coince ».
  * - paywall : un compte dont la conv attend son paiement (le paywall d’abord, 16 octobre) : rien de lu par le modèle ;
- * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple"} Compte
+ * - tournage : un compte de BLUSH_ADMINS en mode tournage (le lien de sa conv de tournage ouvert ici), une prise commencée
+ *   par l’export sans fichier ; tournage-lu : la même, sa lecture rejouée ;
+ * - tournage-creatrice : le même lien, ouvert par une créatrice (un compte ordinaire), sans prise.
+ * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
  */
 
 /**
@@ -65,6 +68,11 @@ export const SECTIONS = [
   { id: "couple", title: "En couple", sub: "Un compte de l’équipe lu «\u00a0En couple\u00a0» (écran 06)\u00a0: la température à la place des étapes" },
   { id: "etats", title: "États", sub: "Le paiement par-dessus, écrans d’erreur, survol à la souris" },
   { id: "equipe", title: "L’équipe et les relances", sub: "Le tableau de bord (/admin, des chiffres d’exemple), la relance par mail et sa désinscription" },
+  {
+    id: "tournage",
+    title: "Le mode tournage",
+    sub: "Un lien de tournage ouvert sur ce navigateur\u00a0: le repère que voit l’équipe sur les écrans de l’import, et ce que voit une créatrice (rien)",
+  },
   { id: "ds", title: "Design system", sub: "La page /styleguide, à comparer aux planches" },
 ];
 
@@ -1505,6 +1513,59 @@ export const STATES = [
     state: "Un lien qui ne marche pas",
     route: "/desinscription",
     changement: "Nouveau.",
+  },
+
+  /* ———— Le mode tournage ———— */
+  {
+    id: "T1",
+    section: "tournage",
+    title: "Captures",
+    state: "Mode tournage, vu par l’équipe",
+    route: "/importer/captures?app=instagram",
+    compte: "tournage",
+    note: "Un compte de BLUSH_ADMINS dont le navigateur garde le lien d’une conv de tournage\u00a0: le repère du haut nomme le lien et mène à /tournage, où on quitte le mode. Ses captures ne seront pas lues\u00a0: la lecture rejouera la conv du lien.",
+    changement: "Nouveau (19 octobre)\u00a0: le repère «\u00a0Mode tournage\u00a0», pour l’équipe seulement.",
+  },
+  {
+    id: "T2",
+    section: "tournage",
+    title: "Exporter",
+    state: "Mode tournage, vu par l’équipe",
+    route: "/importer/export?app=whatsapp",
+    compte: "tournage",
+    note: "La variante du mode tournage\u00a0: «\u00a0Choisir le fichier enregistré\u00a0» prend la conv du lien, sans fichier.",
+    changement: "Nouveau (19 octobre)\u00a0: le repère «\u00a0Mode tournage\u00a0», pour l’équipe seulement.",
+  },
+  {
+    id: "T3",
+    section: "tournage",
+    title: "Qui est qui",
+    state: "Mode tournage, vu par l’équipe",
+    route: "/qui",
+    compte: "tournage",
+    journey: EXPORT,
+    changement: "Nouveau (19 octobre)\u00a0: le repère «\u00a0Mode tournage\u00a0», pour l’équipe seulement.",
+  },
+  {
+    id: "T4",
+    section: "tournage",
+    title: "Analyse",
+    state: "Mode tournage, vu par l’équipe",
+    route: "/lecture",
+    compte: "tournage-lu",
+    motion: true,
+    wait: 1500,
+    note: "La lecture rejouée de la conv du lien (40 secondes), capturée en route.",
+    changement: "Nouveau (19 octobre)\u00a0: le repère «\u00a0Mode tournage\u00a0», pour l’équipe seulement.",
+  },
+  {
+    id: "T5",
+    section: "tournage",
+    title: "Captures",
+    state: "Mode tournage, vu par une créatrice",
+    route: "/importer/captures?app=instagram",
+    compte: "tournage-creatrice",
+    note: "Le même lien ouvert par une créatrice (un compte ordinaire)\u00a0: aucun repère, l’écran qu’elle filme est celui de tout le monde.",
   },
 
   /* ———— Design system ———— */

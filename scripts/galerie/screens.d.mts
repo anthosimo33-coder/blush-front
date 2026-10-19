@@ -8,7 +8,21 @@
 import type { Page } from "@playwright/test";
 
 /** Le compte préparé avant la capture (galerie.spec.ts, `preparer`) : voir screens.mjs. Sans : aucun compte, aucune conv. */
-export type Compte = "brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple";
+export type Compte =
+  | "brouillon"
+  | "code"
+  | "gratuit"
+  | "gratuit-sans-titres"
+  | "lecture-en-cours"
+  | "paywall"
+  | "rapport"
+  | "equipe"
+  | "sobre"
+  | "plusieurs"
+  | "couple"
+  | "tournage"
+  | "tournage-lu"
+  | "tournage-creatrice";
 
 /** Ce que les gestes reçoivent : l’écran (m ou d), l’histoire ouverte, et un code faux pour l’email du parcours. */
 export type Contexte = { ecran: "m" | "d"; histoire: string | null; codeFaux: string | null };

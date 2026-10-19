@@ -16,10 +16,10 @@ import { lirePrenomDuTournage, lireTournage } from "./cookies";
 import { db, schema, uneLigne } from "./db";
 import { GENRES_CHAINE } from "./db/enums";
 import { donneesVerdict } from "./depot";
-import { relancer } from "./donnees";
+import { relancer, utilisateurCourant } from "./donnees";
 import { estEquipe } from "./droits";
 import { verdictAffiche } from "./ecrans/rapport";
-import { env } from "./env";
+import { env, estAdmin } from "./env";
 import { ErreurInvariant, estBudget } from "./erreurs";
 import { voixDisponible } from "./ia/voix";
 import { definirQui, histoiresDuCompte, importer, metaDe, personnesDe, supprimerHistoire, UUID, type Meta } from "./histoires";
@@ -74,6 +74,20 @@ export async function tournageDeLaCle(cle: string | undefined): Promise<Tournage
 
 /** Le mode tournage de ce navigateur : la conv de tournage de son cookie, si elle n’est pas arrêtée. */
 export const tournageDuNavigateur = async () => tournageDeLaCle(await lireTournage());
+
+/**
+ * Le repère du mode tournage sur les écrans de l’import (src/components/shell/RepereTournage.tsx) : le nom de la conv
+ * de tournage de ce navigateur, pour un compte de BLUSH_ADMINS seulement, qui l’a ouvert pour essayer et ne s’attend pas
+ * à voir ses captures ignorées. Jamais pour une créatrice ni pour un visiteur sans compte : elles filment ces écrans.
+ * Sans le cookie (presque tout le monde), ni la session ni la base ne sont lues. null : pas de repère.
+ */
+export async function repereDuTournage(): Promise<string | null> {
+  const cle = await lireTournage();
+  if (!cle) return null;
+  const compte = await utilisateurCourant();
+  if (!compte || !estAdmin(compte.email)) return null;
+  return (await tournageDeLaCle(cle))?.nom ?? null;
+}
 
 /** Une conv de tournage par son id (celle d’un brouillon de tournage), même arrêtée : le brouillon a été fait avant. */
 export async function tournageDe(id: string): Promise<Tournage | null> {

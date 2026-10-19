@@ -47,3 +47,10 @@ const WORKERS_MAX = 16;
  * qui les prend (aide/emails.ts) : jamais deux tests en même temps sur le même compte. Tout autre email paie.
  */
 export const INVITES = Array.from({ length: WORKERS_MAX }, (_, w) => [0, 1].map((k) => `invite-${w}-${k}@${DOMAINE}`)).flat();
+/**
+ * L’équipe du mode tournage (BLUSH_ADMINS, hors de BLUSH_ACCES_LIBRE) : une par worker (tournage-<worker>@e2e.blush.test),
+ * effacée au début de chaque test qui la prend (aide/tournage.ts). Elle fait des prises : son compte devient celui d’une
+ * créatrice, qui ne lance plus de vraie lecture hors du mode tournage (lecturePayeeRefusee). Jamais ADMIN, que d’autres
+ * tests font lire en même temps.
+ */
+export const ADMINS_DU_TOURNAGE = Array.from({ length: WORKERS_MAX }, (_, w) => `tournage-${w}@${DOMAINE}`);
