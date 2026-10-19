@@ -53,6 +53,12 @@ const SITE = "https://www.askblush.com";
 const nextConfig: NextConfig = {
   /* Les liens et les navigations (next/link, useRouter, redirect) ne visent qu’une route qui existe : tsc le vérifie */
   typedRoutes: true,
+  /*
+   * Les requêtes de PostHog finissent par « / » (« /ingest/e/ ») : Next les renverrait ailleurs (308) avant que le
+   * proxy ne les relaie. Il ne le fait plus ; le proxy le fait à sa place pour les pages qu’il aiguille (src/proxy.ts),
+   * les autres s’ouvrent avec ou sans la barre
+   */
+  skipTrailingSlashRedirect: true,
   async redirects() {
     return [
       /* L’écran 14 (son message) vit désormais dans le chat de l’accueil ; l’écran 15 (relire ma réponse) a été retiré */

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { hoteLocal } from "@/lib/hote-local";
-import { NOMS_DE_SESSION } from "@/lib/noms-cookies";
+import { NOMS_DE_SESSION, NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
+import { cleDePostHog } from "@/lib/publique";
 import { betaFermee, outilsDeLEquipe } from "@/server/drapeaux";
 
 /*
@@ -40,8 +41,43 @@ const estUnOutil = (chemin: string) => /^\/(apercu|styleguide|paiement\/factice|
 /** Aucune page à cette adresse, hors du matcher (tests/proxy.test.ts le vérifie) : Next y répond par sa page introuvable. */
 const INTROUVABLE = "/introuvable";
 
+/** Le relais de PostHog (src/lib/analytique.ts) : ses requêtes passent par une adresse de BLUSH, que les bloqueurs laissent passer. */
+const RELAIS = /^\/ingest(?=\/|$)/;
+
+/**
+ * Une requête de PostHog, passée à son serveur européen (ses fichiers, /ingest/static/…, à celui de ses fichiers),
+ * sans nos cookies (la session ne sort jamais de BLUSH) ni autorisation. L’adresse IP de la connexion passe (Vercel la
+ * pose dans x-forwarded-for) : PostHog en tire son empreinte sans cookie, et l’oublie (le réglage « Discard client IP
+ * data » du projet). Une créatrice en mode tournage n’est pas une visite : rien ne part, sans le dire (la réponse de
+ * PostHog, 200 : toute autre, il la réessaierait dix fois). Sans la clé de PostHog, le relais n’existe pas (404).
+ */
+function versPostHog(request: NextRequest): NextResponse {
+  if (!cleDePostHog()) return NextResponse.rewrite(new URL(INTROUVABLE, request.url));
+  if (NOMS_DU_TOURNAGE.some((nom) => request.cookies.has(nom))) return NextResponse.json({ status: 1 });
+  const chemin = request.nextUrl.pathname.replace(RELAIS, "") || "/";
+  const hote = chemin.startsWith("/static/") ? "eu-assets.i.posthog.com" : "eu.i.posthog.com";
+  const entetes = new Headers(request.headers);
+  entetes.set("host", hote);
+  entetes.delete("cookie");
+  entetes.delete("authorization");
+  return NextResponse.rewrite(new URL(`${chemin}${request.nextUrl.search}`, `https://${hote}`), { request: { headers: entetes } });
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (RELAIS.test(pathname)) return versPostHog(request);
+  /*
+   * Une adresse du matcher qui finit par « / » (« /commencer/ » : le matcher de Next ne regarde pas la barre finale) :
+   * vers la même sans, comme Next le faisait seul avant skipTrailingSlashRedirect (next.config.ts, pour que les requêtes
+   * de PostHog, « /ingest/e/ », passent telles quelles). Sans quoi « /commencer/ » échapperait à sa variante de la bêta
+   * fermée. Les autres pages s’ouvrent avec ou sans la barre, sans rien qui en dépende
+   */
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    /* Une URL simple : celle de Next (nextUrl) remettrait la barre qu’elle a vue en arrivant */
+    const url = new URL(request.url);
+    url.pathname = pathname.replace(/\/+$/, "") || "/";
+    return NextResponse.redirect(url, 308);
+  }
   if (estUnOutil(pathname)) return outilsDeLEquipe() && hoteLocal(request.headers) ? NextResponse.next() : NextResponse.rewrite(new URL(INTROUVABLE, request.url));
   const variante = VARIANTES[pathname];
   if (!variante || !betaFermee()) return NextResponse.next();
@@ -53,5 +89,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/commencer", "/email/code", "/connexion/code", "/importer/captures", "/apercu/:path*", "/styleguide", "/paiement/factice", "/api/paiement/factice"],
+  matcher: ["/commencer", "/email/code", "/connexion/code", "/importer/captures", "/apercu/:path*", "/styleguide", "/paiement/factice", "/api/paiement/factice", "/ingest/:path*"],
 };

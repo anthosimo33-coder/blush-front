@@ -2,10 +2,11 @@ import { existsSync } from "node:fs";
 import { NextRequest, type NextResponse } from "next/server";
 import { getRewrittenUrl, isRewrite, unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { config, proxy } from "@/proxy";
 
 /*
- * Le proxy (src/proxy.ts) : les outils de l’équipe (et le faux Whop) introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
+ * Le proxy (src/proxy.ts) : le relais de PostHog et les adresses qui finissent par « / », les outils de l’équipe (et le faux Whop) introuvables sur Vercel et ouverts ailleurs, d’après un seul critère
  * (src/server/drapeaux.ts), à ce poste seulement (src/lib/hote-local.ts), et les variantes de la bêta fermée, qui ne changent pas. Sans base ni serveur : la requête
  * est construite ici, les variables posées par cas. (Le guide de Next appelle unstable_doesProxyMatch ce que cette
  * version exporte encore sous le nom unstable_doesMiddlewareMatch.)
@@ -135,6 +136,64 @@ describe("la bêta fermée : ses variantes, inchangées", () => {
         expect(passe(proxy(requete("/commencer", { [session]: "une-session" }))), session).toBe(true);
         expect(reecriteVers(proxy(requete("/email/code", { [session]: "une-session" }))), session).toBe("/email/code/fermee");
       }
+    }
+  });
+});
+
+describe("le relais de PostHog (/ingest)", () => {
+  /** L’en-tête que le proxy pose sur la requête relayée (NextResponse.rewrite, `request.headers`), ou null s’il l’a retiré. */
+  const enTeteRelaye = (r: Response, nom: string) => {
+    const poses = (r.headers.get("x-middleware-override-headers") ?? "").split(",");
+    return poses.includes(nom) ? r.headers.get(`x-middleware-request-${nom}`) : null;
+  };
+
+  it("le proxy passe par lui (sa barre finale comprise), et pas par une adresse qui commence pareil", () => {
+    for (const url of ["/ingest", "/ingest/e/", "/ingest/i/v0/e/", "/ingest/static/array.js"]) expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(true);
+    for (const url of ["/", "/ingestion", "/_next/static/chunks/a.js"]) expect(unstable_doesMiddlewareMatch({ config, url }), url).toBe(false);
+  });
+
+  it("avec la clé : vers le serveur européen de PostHog (ses fichiers à part), sa requête gardée, sans nos cookies", () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", "phc_essai");
+    const r = proxy(
+      requete("/ingest/i/v0/e/?ip=0&ver=1.435.8", { "__Host-blush-session": "secret", "blush-autre": "x" }, "www.askblush.com", {
+        authorization: "Bearer x",
+        "x-forwarded-for": "203.0.113.7",
+      }),
+    );
+    expect(isRewrite(r as NextResponse)).toBe(true);
+    expect(getRewrittenUrl(r as NextResponse)).toBe("https://eu.i.posthog.com/i/v0/e/?ip=0&ver=1.435.8");
+    expect(enTeteRelaye(r, "host")).toBe("eu.i.posthog.com");
+    expect(enTeteRelaye(r, "cookie")).toBeNull();
+    expect(enTeteRelaye(r, "authorization")).toBeNull();
+    /* L’adresse IP passe : PostHog en tire son empreinte sans cookie */
+    expect(enTeteRelaye(r, "x-forwarded-for")).toBe("203.0.113.7");
+    expect(getRewrittenUrl(proxy(requete("/ingest/static/array.js")) as NextResponse)).toBe("https://eu-assets.i.posthog.com/static/array.js");
+  });
+
+  it("en mode tournage, rien ne part (200, comme PostHog, pour qu’il ne réessaie pas) ; sans la clé, le relais n’existe pas", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", "phc_essai");
+    for (const nom of NOMS_DU_TOURNAGE) {
+      const r = proxy(requete("/ingest/e/", { [nom]: "un-lien" }));
+      expect(r.status, nom).toBe(200);
+      expect(await r.json()).toEqual({ status: 1 });
+      expect(isRewrite(r as NextResponse)).toBe(false);
+    }
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", undefined);
+    expect(reecriteVers(proxy(requete("/ingest/e/")))).toBe("/introuvable");
+  });
+
+  it("une adresse du matcher qui finit par « / » : vers la même sans (308), sa requête gardée, avant sa variante de la bêta fermée", () => {
+    vi.stubEnv("BLUSH_BETA_FERMEE", "1");
+    expect(unstable_doesMiddlewareMatch({ config, url: "/commencer/" })).toBe(true);
+    for (const [url, vers] of [
+      ["/commencer/", "/commencer"],
+      ["/email/code//", "/email/code"],
+      ["/importer/captures/?app=hinge", "/importer/captures?app=hinge"],
+    ]) {
+      const r = proxy(requete(url!));
+      expect(r.status, url).toBe(308);
+      const location = new URL(r.headers.get("location")!);
+      expect(`${location.pathname}${location.search}`, url).toBe(vers);
     }
   });
 });

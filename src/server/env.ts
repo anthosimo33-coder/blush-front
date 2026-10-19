@@ -140,6 +140,15 @@ export const Env = z.object({
    * src/lib/publique.ts) : relue ici pour vérifier qu’elle va avec la clé secrète.
    */
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  /**
+   * La clé du projet PostHog, écrite dans les pages au build (NEXT_PUBLIC_, lue par le navigateur dans
+   * src/lib/publique.ts) : la mesure d’audience de src/lib/analytique.ts. Seulement une clé de projet (« phc_… »,
+   * publique par nature) : une clé personnelle (« phx_… ») est secrète, et ne doit jamais finir dans les pages.
+   */
+  NEXT_PUBLIC_POSTHOG_CLE: z
+    .string()
+    .regex(/^phc_\w+$/, "une clé de projet PostHog (phc_…), jamais une clé personnelle")
+    .optional(),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])

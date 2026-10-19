@@ -3,6 +3,7 @@
 import { useEffect, type RefObject } from "react";
 import { envoyerJalon } from "@/services/api";
 import type { Jalon } from "@/types";
+import { mesurer } from "./analytique";
 import { etapeDe } from "./presence";
 
 /*
@@ -10,7 +11,8 @@ import { etapeDe } from "./presence";
  * visiteur vient de faire, un fichier choisi, le paywall vu jusqu’aux avis, le formulaire de Whop affiché. Le nom du
  * jalon, seul : ni contenu, ni cookie, ni rien de gardé dans le navigateur. Envoyé une fois par page chargée ; le
  * serveur, lui, ne le compte qu’une fois par jour et par personne (src/server/visites.ts, noterJalon). Jamais depuis
- * les outils de l’équipe (/admin, /apercu, /styleguide). Un jalon raté ne se voit pas.
+ * les outils de l’équipe (/admin, /apercu, /styleguide). Un jalon raté ne se voit pas. Le même part chez PostHog
+ * (« jalon_<nom> », src/lib/analytique.ts), quand sa clé est là.
  */
 
 /* Les jalons déjà envoyés par cette page */
@@ -21,6 +23,7 @@ export function marquerJalon(jalon: Jalon): void {
   if (typeof window === "undefined" || envoyes.has(jalon) || etapeDe(window.location.pathname) === null) return;
   envoyes.add(jalon);
   envoyerJalon(jalon);
+  mesurer(`jalon_${jalon}`);
 }
 
 /** Marque un jalon à l’arrivée de l’écran qui le pose (null : pas ici). */
