@@ -498,4 +498,6 @@ export type AnalysisProgress = {
   failReason?: Echec;
   /** La conv attend son paiement : rien n’est lu par le modèle avant (le paywall d’abord). L’écran montre ce que le code a vu, puis la feuille du paiement. */
   paiement?: boolean;
+  /** Une prise du mode tournage : sa lecture, recopiée de la conv de tournage, est déjà finie. L’écran qui vient de la lancer la déroule en quelques secondes. */
+  rejouee?: boolean;
 };

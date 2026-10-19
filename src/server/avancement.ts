@@ -153,32 +153,6 @@ export const etapeDeLecture = (p: number) => {
 };
 
 /*
- * La relecture d’une prise du mode tournage (src/server/tournage.ts) : la lecture est déjà faite, l’écran la rejoue au
- * rythme d’une vraie (« Ça prend environ 40 secondes »), par les mêmes phases : le modèle lit la conv, réfléchit, puis
- * écrit le verdict. Rien n’attend le modèle : la même prise rejouée deux fois avance pareil.
- */
-/** La durée de la relecture d’une prise. */
-export const DUREE_RELECTURE_MS = 40_000;
-/** Les points de la relecture : la part du temps écoulé, et l’avancée de l’écran à ce moment. */
-const RELECTURE: readonly (readonly [number, number])[] = [
-  [0, LECTURE_DEPART],
-  [0.1, LECTURE_MAX],
-  [0.7, VERDICT_REFLEXION / 100],
-  [0.95, PLAFOND / 100],
-  [1, PLAFOND / 100],
-];
-
-/** L’avancée de la relecture (0 à 1) au bout de `ecouleMs` : 1 une fois DUREE_RELECTURE_MS passée, la lecture finie. */
-export function avanceRejouee(ecouleMs: number): number {
-  const x = Math.max(0, ecouleMs) / DUREE_RELECTURE_MS;
-  if (x >= 1) return 1;
-  const k = RELECTURE.findIndex(([part]) => part > x);
-  const [x0, y0] = RELECTURE[k - 1]!;
-  const [x1, y1] = RELECTURE[k]!;
-  return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
-}
-
-/*
  * L’écriture du rapport : le plan compte pour PART_DU_PLAN de l’avancée, les deux moitiés des chapitres pour le reste.
  * L’écran ne dit jamais « fini » avant que le rapport le soit.
  */

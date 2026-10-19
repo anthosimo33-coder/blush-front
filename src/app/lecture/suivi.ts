@@ -30,8 +30,14 @@ const INTERVALLE_SUIVI = 1000;
  */
 export const DUREE_AVANT_PAIEMENT_MS = 5000;
 
-/** Où en est la lecture déroulée d’une conv qui attend son paiement, à la part `t` (0 à 1) de sa durée, vers `fin` (ce que le serveur a compté). */
-export function avantPaiementA(t: number, fin: AnalysisProgress): AnalysisProgress {
+/**
+ * La lecture d’une prise du mode tournage (src/server/tournage.ts) : recopiée de la conv de tournage, elle est finie
+ * avant même l’écran. Il la déroule en ces deux secondes, à partir de son arrivée : un téléphone lent n’en perd rien.
+ */
+export const DUREE_DE_LA_PRISE_MS = 2000;
+
+/** Où en est une lecture déroulée par l’écran (en attente de paiement, ou une prise), à la part `t` (0 à 1) de sa durée, vers `fin` (ce que le serveur a compté). */
+export function lectureDerouleeA(t: number, fin: AnalysisProgress): AnalysisProgress {
   const p = Math.min(1, Math.max(0, t));
   return {
     ...fin,
@@ -91,10 +97,11 @@ export function useSuiviLecture() {
   const [suivi, setSuivi] = useState<number | null>(null);
   /* La fin vue en direct : l’anneau plein et la coche, puis la gerbe (sinon, la fin s’affiche directement) */
   const [finAnimee, setFinAnimee] = useState(false);
-  /* La conv attend son paiement, et ce que le serveur a compté, que l’écran déroule (null : déjà déroulé, ou pas de paiement) */
+  /* La conv attend son paiement */
   const [paiement, setPaiement] = useState(false);
-  const [derouler, setDerouler] = useState<AnalysisProgress | null>(null);
-  /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) ou par ce lancement : sa lecture se déroule ; un rechargement va droit au paywall */
+  /* Ce que le serveur a compté, que l’écran déroule, et en combien de temps (null : déjà déroulé, ou rien à dérouler) */
+  const [derouler, setDerouler] = useState<{ fin: AnalysisProgress; duree: number } | null>(null);
+  /* Lancée juste avant d’arriver (« Qui es-tu ? », le code) ou par ce lancement : sa lecture se déroule ; un rechargement va droit au paywall, ou à la fin d’une prise */
   const vientDeLancer = useRef(false);
   const enDirect = useRef(false);
   const rates = useRef(0);
@@ -162,7 +169,7 @@ export function useSuiviLecture() {
         setEchec(true);
         return;
       }
-      vientDeLancer.current = deja || (lance === true && !rienARelancer && !avant?.paiement);
+      vientDeLancer.current = deja || (lance === true && !rienARelancer && !avant?.paiement && !avant?.rejouee);
       rates.current = 0;
       premier.current = true;
       setSuivi(lancement);
@@ -209,12 +216,18 @@ export function useSuiviLecture() {
     if (suite.paiement) {
       setPaiement(true);
       if (vientDeLancer.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        setP(avantPaiementA(0, suite));
-        setDerouler(suite);
+        setP(lectureDerouleeA(0, suite));
+        setDerouler({ fin: suite, duree: DUREE_AVANT_PAIEMENT_MS });
       } else {
         setP({ ...suite, done: true });
         setPhase("done");
       }
+      return false;
+    }
+    /* Une prise du mode tournage, lancée juste avant : sa lecture est déjà finie, elle se déroule ici (rechargée, la fin s’affiche) */
+    if (suite.rejouee && vientDeLancer.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setP(lectureDerouleeA(0, suite));
+      setDerouler({ fin: suite, duree: DUREE_DE_LA_PRISE_MS });
       return false;
     }
     if (!suite.done) {
@@ -228,14 +241,14 @@ export function useSuiviLecture() {
   };
   useSondage(tour, { actif: suivi !== null && suivi === lancement, intervalle: INTERVALLE_SUIVI, immediat: true });
 
-  /* La lecture d’une conv qui attend son paiement, déroulée en DUREE_AVANT_PAIEMENT_MS, puis la même fin qu’en direct */
+  /* La lecture déroulée par l’écran (en attente de paiement, ou une prise), puis la même fin qu’en direct */
   useEffect(() => {
     if (!derouler) return;
     enDirect.current = true;
     const debut = performance.now();
     const minuteur = setInterval(() => {
-      const t = (performance.now() - debut) / DUREE_AVANT_PAIEMENT_MS;
-      setP(avantPaiementA(t, derouler));
+      const t = (performance.now() - debut) / derouler.duree;
+      setP(lectureDerouleeA(t, derouler.fin));
       if (t >= 1) {
         clearInterval(minuteur);
         setFinAnimee(true);

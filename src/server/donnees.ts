@@ -7,7 +7,7 @@ import type { Account, ReportPayload } from "@/types/api";
 import type { AnalysisProgress, ConvSummary, Fiche } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
-import { avanceRejouee, etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
+import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { compteAffiche, rapportOuvert } from "./droits";
@@ -119,16 +119,6 @@ export async function relancer(storyId: string): Promise<void> {
  */
 export async function progression(story: Ligne): Promise<AnalysisProgress> {
   const total = story.messageCount;
-  /* Une prise du mode tournage : sa lecture, déjà faite, se rejoue à partir de sa copie (src/server/tournage.ts) */
-  const rejouee = story.tournageLe ? avanceRejouee(Date.now() - story.tournageLe.getTime()) : 1;
-  if (rejouee < 1)
-    return {
-      progress: rejouee,
-      messagesRead: Math.round(Math.min(1, rejouee / (VERDICT_REFLEXION / 100)) * total),
-      stepsDone: etapeDeLecture(rejouee),
-      discoveries: decouvertes(story, rejouee),
-      done: false,
-    };
   const { verdict } = await etatDesTaches(story.id, ["verdict"]);
   /* Le paywall d’abord : la conv attend son paiement, le modèle n’a rien lu. Ce que le code a vu (les trouvailles) se montre déjà */
   if (verdict?.status === "paiement") return { progress: 1, messagesRead: total, stepsDone: NB_ETAPES_DE_LECTURE, discoveries: decouvertes(story, 1), done: false, paiement: true };
@@ -145,6 +135,8 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
     discoveries: decouvertes(story, p),
     done: fini,
     ...(echec ? { failed: true, failReason: echecDe(verdict?.error) } : {}),
+    /* Une prise du mode tournage : sa lecture, recopiée (src/server/tournage.ts), est finie ; l’écran qui vient de la lancer la déroule lui-même */
+    ...(story.tournageLe ? { rejouee: true } : {}),
   };
 }
 
