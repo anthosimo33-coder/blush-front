@@ -74,3 +74,4 @@ export * from "./parcours";
 export * from "./partage";
 export * from "./public-admin";
 export * from "./rapport";
+export * from "./tournage";

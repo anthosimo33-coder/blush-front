@@ -543,6 +543,9 @@ export function envoyerMesuresDuNavigateur(corps: Routes["POST /api/navigateur/m
 /** /admin en direct, à cet instant (réservé à l’équipe). */
 export const lireLeDirect = (signal?: AbortSignal) => appel("GET /api/admin/direct", signal ? { signal } : {});
 
+/** Le repère du mode tournage (src/components/shell/RepereTournage.tsx) : le nom du lien, pour l’équipe ; null pour tous les autres. */
+export const lireLeRepereDuTournage = (signal: AbortSignal) => appel("GET /api/tournage/repere", { signal });
+
 /* ———— Le paiement (Whop, ou le faux Whop en local) ———— */
 
 /**

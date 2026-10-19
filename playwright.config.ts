@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
-import { ADMIN, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, TURNSTILE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
+import { ADMIN, ADMINS_DU_TOURNAGE, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL, INVITES, PORT, PORT_BETA, RACINE, TURNSTILE, URL_APPLI, URL_BETA } from "./tests/e2e/reglages";
 
 /*
  * Les tests de bout en bout (tests/e2e) : les vrais parcours, dans un vrai navigateur, contre le back-end, avec le
@@ -40,7 +40,7 @@ const serveur = (port: number, betaFermee: boolean) => ({
     BLUSH_URL: `http://localhost:${port}`,
     BLUSH_ACCES_LIBRE: INVITES.join(","),
     BLUSH_ALERTES: ADMIN,
-    BLUSH_ADMINS: ADMIN,
+    BLUSH_ADMINS: [ADMIN, ...ADMINS_DU_TOURNAGE].join(","),
     CRON_SECRET,
     BLUSH_BETA_FERMEE: betaFermee ? "1" : "0",
     BLUSH_BOITE_MAILS: BOITE_MAILS,

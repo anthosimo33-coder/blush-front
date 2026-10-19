@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getApercuAvantPaiement, getStory, sansHistoire } from "@/services/serveur";
 import { LectureScreen } from "./LectureScreen";
 import { PageDeConv } from "@/components/shell/PageDeConv";
+import { RepereTournage } from "@/components/shell/RepereTournage";
 
 export const metadata: Metadata = { title: "BLUSH analyse votre histoire" };
 
@@ -21,6 +22,8 @@ export default async function Page({ searchParams }: PageProps<"/lecture">) {
     <PageDeConv rendu={rendu}>
       {/* Une conv qui attend son paiement (le paywall d’abord) : la lecture mène au paywall, avec ce que le code a compté */}
       <LectureScreen total={story.totalMessages} apercu={haut ? { story, haut } : null} paywallDirect={paywall === "1"} offreDirecte={paywall === "1" && offre === "1"} />
+      {/* Le mode tournage, pour l’équipe seulement (son layout est une garde, qui rend la page telle quelle) */}
+      <RepereTournage />
     </PageDeConv>
   );
 }

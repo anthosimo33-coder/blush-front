@@ -50,8 +50,10 @@ beforeEach(() => {
 const APPLI = "http://localhost";
 
 /**
- * Les routes qui ne demandent pas de compte : l’import avant l’email (un brouillon), la connexion, la liste d’attente, et
- * la conv du parcours (celle qu’on importe, ou un brouillon à supprimer). Toutes les autres répondent 401 sans session.
+ * Les routes qui ne demandent pas de compte : l’import avant l’email (un brouillon), la connexion, la liste d’attente,
+ * la conv du parcours (celle qu’on importe, ou un brouillon à supprimer), et le repère du mode tournage (la même réponse
+ * pour tous, sauf l’équipe : rien ne dit à une créatrice sans compte qu’elle est en mode tournage). Toutes les autres
+ * répondent 401 sans session.
  */
 const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/attente",
@@ -71,6 +73,7 @@ const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/import",
   "GET /api/histoire",
   "DELETE /api/histoire",
+  "GET /api/tournage/repere",
 ]);
 /**
  * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, les relances

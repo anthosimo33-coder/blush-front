@@ -7,7 +7,9 @@ import {
   autreCode,
   chiffrer,
   connecterParApi,
+  convDeTournage,
   dechiffrer,
+  deconnecterParApi,
   debloquerLaConv,
   dernierCode,
   donnerDesBulles,
@@ -18,17 +20,21 @@ import {
   expect,
   exportWhatsApp,
   histoiresDe,
+  lancerLaPrise,
   lectureComplete,
   lectureFaite,
   lireUneConvParApi,
+  nouvelAdminDuTournage,
   nouvelInvite,
   oublierEmail,
+  ouvrirLeLienDuTournage,
   origine,
   fauxCloudflare,
   pageAuRepos,
   poserLaReprise,
   prouverHumain,
   poserLeParcours,
+  priseDuTournage,
   rapportCommeLeVraiModele,
   RESEAU,
   sql,
@@ -109,6 +115,9 @@ async function comptePayant(page: Page, testInfo: TestInfo, compte: "rapport" | 
   return email;
 }
 
+/** Le nom de la conv de tournage des états du mode tournage (inventé, comme les campagnes : « A · Il répond plus pareil »). */
+const NOM_DU_TOURNAGE = "A · Il répond plus pareil";
+
 /** Prépare le compte de l’état (screens.mjs, `compte`) : rien, un brouillon, ou un compte et ses convs. */
 async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" | "d"): Promise<Prepare> {
   const sans: Prepare = { histoire: null, codeFaux: null };
@@ -172,6 +181,23 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       await commeLeVraiModele(email);
       return { ...sans, histoire };
     }
+    case "tournage":
+    case "tournage-lu": {
+      /* Un compte de BLUSH_ADMINS crée sa conv de tournage, ouvre son lien ici, puis commence une prise (l’export sans fichier), lancée pour « tournage-lu » */
+      const email = await nouvelAdminDuTournage(testInfo);
+      await ouvrirLeLienDuTournage(page, await convDeTournage(page, testInfo, email, NOM_DU_TOURNAGE));
+      const histoire = await priseDuTournage(page, testInfo);
+      if (etat.compte === "tournage-lu") await lancerLaPrise(page, testInfo);
+      return { ...sans, histoire };
+    }
+    case "tournage-creatrice": {
+      /* La conv de tournage de l’équipe, faite dans ce navigateur, puis la déconnexion (qui quitte aussi le mode) : la créatrice ouvre le lien */
+      const cle = await convDeTournage(page, testInfo, await nouvelAdminDuTournage(testInfo), NOM_DU_TOURNAGE);
+      expect(await deconnecterParApi(page, testInfo)).toBe(200);
+      await connecterParApi(page, testInfo, emailLibre(testInfo, "galerie-creatrice"));
+      await ouvrirLeLienDuTournage(page, cle);
+      return sans;
+    }
     case "couple": {
       /* « En couple » à « Qui es-tu ? », de l’équipe, puis le verdict à « Ça coince », comme le vrai modèle l’écrirait */
       const email = await lectureComplete(page, testInfo, { enCouple: true });
@@ -208,8 +234,8 @@ for (const etat of STATES) {
   test(`${etat.id} · ${etat.title}${etat.state ? ` · ${etat.state}` : ""}`, async ({ browser, extraHTTPHeaders }, testInfo) => {
     const ecran = testInfo.project.metadata.ecran as "m" | "d";
     test.skip(!!etat.only && etat.only !== ecran, `seulement en ${etat.only === "m" ? "mobile" : "ordinateur"}`);
-    /* Un compte de l’équipe et trois convs lues : de la marge sur une machine chargée */
-    if (etat.compte === "plusieurs" || etat.compte === "equipe" || etat.compte === "rapport" || etat.compte === "couple") test.slow();
+    /* Un compte de l’équipe et trois convs lues, ou une conv de tournage : de la marge sur une machine chargée */
+    if (etat.compte === "plusieurs" || etat.compte === "equipe" || etat.compte === "rapport" || etat.compte === "couple" || etat.compte?.startsWith("tournage")) test.slow();
     const { viewport, deviceScaleFactor = 1 } = testInfo.project.use;
     if (!viewport) throw new Error(`le projet ${testInfo.project.name} n’a pas d’écran (playwright.config.ts)`);
     /* `touch` : le mobile est capturé comme un vrai écran tactile (pas de survol, pointeur grossier) */
