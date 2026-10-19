@@ -422,7 +422,7 @@ export function prenomDuLien(brut: string | null): string | null {
 }
 
 /** Le prénom que le lien de tournage ouvert sur ce navigateur portait (son cookie), ou null. */
-export const prenomDuNavigateur = async () => prenomDuLien((await lirePrenomDuTournage()) ?? null);
+const prenomDuNavigateur = async () => prenomDuLien((await lirePrenomDuTournage()) ?? null);
 
 /**
  * Le prénom de la créatrice qui filme, que l’export sans fichier lui donne à « Qui es-tu ? » : les liens se partagent
@@ -441,6 +441,36 @@ export async function prenomDeLaCreatrice(compte: Pick<Utilisateur, "id"> | null
     .limit(1);
   const prenom = derniere ? prenomDeMoi(metaDe(derniere)) : null;
   return prenom && prenom !== "Moi" ? prenom : null;
+}
+
+/**
+ * Le nom d’une conv de tournage tel que la créatrice le lit sur /tournage. Les liens se partagent entre créatrices, et
+ * l’outil des créatrices les nomme au prénom de celle dont le fichier a été lu (`source`, « Léa · A1 · Le vu de
+ * minuit ») : les autres y lisaient « Léa ». Les morceaux du nom (entre les « · ») qui ne sont que ce prénom tombent ;
+ * ailleurs, il devient celui de la créatrice (`prenom`), s’il est connu, sinon le nom ne s’affiche pas (""), plutôt que
+ * de montrer le prénom d’une autre.
+ */
+export function nomPourLaCreatrice(nom: string, source: string | null, prenom: string | null): string {
+  if (!source || source === "Moi") return nom;
+  const reste = nom
+    .split("·")
+    .map((m) => m.trim())
+    .filter((m) => m && sansAccent(m) !== sansAccent(source))
+    .join(" · ");
+  if (prenom) return renommer(reste, source, prenom);
+  return mentionne(reste, source) ? "" : reste;
+}
+
+/**
+ * Ce que /tournage montre à la créatrice : le nom de la conv de tournage de ce navigateur, sans le prénom d’une autre
+ * (nomPourLaCreatrice), et le sien (prenomDeLaCreatrice : celui de son lien, sinon celui de sa dernière prise). null :
+ * pas de mode tournage (pas de lien, ou un lien arrêté).
+ */
+export async function tournagePourLaCreatrice(): Promise<{ nom: string; prenom: string | null } | null> {
+  const tournage = await tournageDuNavigateur();
+  if (!tournage) return null;
+  const [prenom, [source]] = await Promise.all([utilisateurCourant().then(prenomDeLaCreatrice), db().select({ meta: s.meta }).from(s).where(eq(s.id, tournage.storyId))]);
+  return { nom: nomPourLaCreatrice(tournage.nom, source ? prenomDeMoi(metaDe(source)) : null, prenom), prenom };
 }
 
 /**

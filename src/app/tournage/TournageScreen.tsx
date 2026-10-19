@@ -7,7 +7,8 @@ import { NBSP } from "@/lib/format";
 /*
  * La page du mode tournage, où mène le lien d’une conv de tournage (src/server/tournage.ts) : pour la créatrice, jamais
  * filmée. Ce que fait le mode, comment filmer, et le quitter (un formulaire : POST /tournage/fin). `nom` : le nom de la
- * conv de tournage (sa campagne), ou null : pas de mode tournage sur ce navigateur. `prenom` : celui que son lien porte.
+ * conv de tournage (sa campagne) sans le prénom d’une autre créatrice, "" s’il ne disait que lui, ou null : pas de mode
+ * tournage sur ce navigateur. `prenom` : le sien, s’il est connu.
  * Les étapes, relues le 16 octobre : l’outil des créatrices recopie les mêmes dans ses missions, à changer ensemble.
  */
 
@@ -20,7 +21,7 @@ const ETAPES = [
 ];
 
 export function TournageScreen({ nom, prenom = null }: { nom: string | null; prenom?: string | null }) {
-  if (!nom)
+  if (nom === null)
     return (
       <Screen
         mobileTop={<MobileTopBar back="/" />}
@@ -55,10 +56,17 @@ export function TournageScreen({ nom, prenom = null }: { nom: string | null; pre
             {NBSP}?
           </ScreenTitle>
           <Lead size={15} weight={800}>
-            Pour «{NBSP}
-            {nom}
-            {NBSP}», BLUSH rejoue sur ce téléphone une lecture déjà faite{NBSP}: le même verdict et le même rapport à chaque prise. Rien ne se paie, et rien de ce mode ne s’affiche
-            pendant que tu filmes.
+            {nom ? (
+              <>
+                Pour «{NBSP}
+                {nom}
+                {NBSP}», BLUSH rejoue
+              </>
+            ) : (
+              "BLUSH rejoue"
+            )}{" "}
+            sur ce téléphone une lecture déjà faite{NBSP}: le même verdict et le même rapport à chaque prise. Rien ne se paie, et rien de ce mode ne s’affiche pendant que tu
+            filmes.
           </Lead>
         </>
       }
