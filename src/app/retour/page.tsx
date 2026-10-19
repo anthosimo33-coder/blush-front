@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 /*
- * La landing pour qui revient : next.config.ts sert cette page à la place de / quand le cookie de session est là
+ * La landing pour qui revient : src/proxy.ts sert cette page à la place de / quand le cookie de session est là
  * (l’adresse reste /). Connecté avec une conv, les boutons mènent à son accueil (ou à « Tes convs », getRetourDeLaLanding) ;
  * sinon, c’est la landing de toujours.
  * La landing elle-même reste statique : les nouveaux visiteurs ne paient pas cette lecture.

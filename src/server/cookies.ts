@@ -17,7 +17,7 @@ const nom = (cookie: CookieDuServeur) => nomDuCookie(cookie, cookieSecurise());
 const attributs = () => ({ httpOnly: true, secure: cookieSecurise(), sameSite: "lax" as const, path: "/" });
 /*
  * En https, le cookie sous son ancien nom, sans préfixe, posé avant le préfixe __Host- (la session, pour 90 jours) :
- * plus lu, mais src/proxy.ts et next.config.ts le prennent encore pour une session. Effacé à la pose comme à
+ * plus lu, mais src/proxy.ts le prend encore pour une session. Effacé à la pose comme à
  * l’effacement du nouveau, s’il est là : une fois suffit, le navigateur ne le renvoie plus.
  */
 const oublierLAncien = async (cookie: CookieDuServeur) => {

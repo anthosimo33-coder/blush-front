@@ -1,4 +1,5 @@
 import { CASE_IMPORT } from "../../src/contenu/consentements";
+import { NOMS_DE_SESSION, NOMS_DU_TOURNAGE } from "../../src/lib/noms-cookies";
 import {
   compteDe,
   connecterParApi,
@@ -23,9 +24,9 @@ import {
 } from "./aide";
 
 /*
- * Ce qui protège BLUSH sans se voir : les en-têtes de sécurité de chaque réponse (next.config.ts), le refus des
- * requêtes qui modifient quelque chose et ne viennent pas de l’appli (la garde commune, src/server/requete.ts), et la
- * purge de la nuit, réservée à Vercel Cron (CRON_SECRET).
+ * Ce qui protège BLUSH sans se voir : les en-têtes de sécurité de chaque réponse (next.config.ts), les cookies httpOnly
+ * jamais recopiés dans une page (src/proxy.ts), le refus des requêtes qui modifient quelque chose et ne viennent pas de
+ * l’appli (la garde commune, src/server/requete.ts), et la purge de la nuit, réservée à Vercel Cron (CRON_SECRET).
  */
 
 /** Les en-têtes de next.config.ts, sur toutes les pages et toutes les routes /api. */
@@ -60,6 +61,49 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
   ]) {
     const entetes = (await request.get(chemin)).headers();
     for (const [nom, valeur] of Object.entries(ENTETES)) expect.soft(entetes[nom], `${nom} sur ${chemin}`).toBe(valeur);
+  }
+});
+
+/** La valeur d’un cookie qui choisit une variante (src/proxy.ts), reconnaissable : elle ne doit reparaître nulle part. */
+const VALEUR_DU_COOKIE = "valeur-du-cookie-a-ne-jamais-recopier";
+
+test("la valeur d’un cookie qui choisit une variante ne revient ni dans la page, ni dans ses données, ni dans leurs en-têtes", async ({ request }) => {
+  /* Une réécriture de next.config.ts sous un cookie (`has`) la recopiait dans la requête de la page : lisible par son JavaScript */
+  const cas = [
+    ["/", NOMS_DE_SESSION, "/retour"],
+    ["/commencer", NOMS_DE_SESSION, "/commencer/connecte"],
+    ["/connexion?suite=%2Fcompte", NOMS_DE_SESSION, "/connexion/connecte"],
+    ["/importer/export?app=whatsapp", NOMS_DU_TOURNAGE, "/importer/export/tournage"],
+  ] as const;
+  /* La page entière, puis ce que demande la navigation dans l’appli (les données RSC) et son préchargement */
+  const demandes = { page: {}, navigation: { rsc: "1" }, préchargement: { rsc: "1", "next-router-prefetch": "1" } } satisfies Record<string, Record<string, string>>;
+  /**
+   * Les réponses à `chemin`, avec ces en-têtes. Next renvoie (307) une demande de données sans son `_rsc` (ce qui garde
+   * les caches de mélanger les réponses) vers la même adresse avec lui ; Playwright la suivrait sans le cookie : on la
+   * suit ici, avec.
+   */
+  const reponses = async (chemin: string, headers: Record<string, string>) => {
+    const r = await request.get(chemin, { headers, maxRedirects: 0 });
+    const avecRsc = r.status() === 307 && r.headers().location?.includes("_rsc") ? r.headers().location : undefined;
+    return avecRsc ? [r, await request.get(avecRsc, { headers, maxRedirects: 0 })] : [r];
+  };
+  for (const [chemin, noms, variante] of cas) {
+    /* Sans cookie, la page elle-même : rien n’est réécrit */
+    expect.soft((await reponses(chemin, demandes.navigation)).at(-1)!.headers()["x-nextjs-rewritten-path"], chemin).toBeUndefined();
+    /* Sous ses deux noms : __Host- (https) passe ici en clair dans l’en-tête, le serveur n’en lit que le nom */
+    for (const nom of noms)
+      for (const [quoi, entetes] of Object.entries(demandes)) {
+        const suite = await reponses(chemin, { ...entetes, cookie: `${nom}=${VALEUR_DU_COOKIE}` });
+        const qui = `${quoi} de ${chemin} sous ${nom}`;
+        for (const r of suite) {
+          expect.soft(await r.text(), qui).not.toContain(VALEUR_DU_COOKIE);
+          for (const [entete, valeur] of Object.entries(r.headers())) expect.soft(valeur, `${qui} : ${entete}`).not.toContain(VALEUR_DU_COOKIE);
+        }
+        const finale = suite.at(-1)!;
+        expect.soft(finale.status(), qui).toBe(200);
+        /* Les données disent quelle page les a rendues : la variante, servie à la même adresse */
+        if (quoi !== "page") expect.soft(finale.headers()["x-nextjs-rewritten-path"], qui).toBe(variante);
+      }
   }
 });
 

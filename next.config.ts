@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { NOMS_DE_SESSION, NOMS_DU_TOURNAGE } from "./src/lib/noms-cookies";
 
 /* Les en-têtes de sécurité, sur toutes les pages et toutes les routes /api */
 const SECURITE = [
@@ -15,19 +14,6 @@ const SECURITE = [
    */
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
 ];
-
-/*
- * Le cookie de session (src/server/cookies.ts) : sa seule présence choisit la variante d’une page, sans le vérifier. Il a
- * deux noms (__Host- en https : src/lib/noms-cookies.ts) ; `has` ne sait pas dire « l’un ou l’autre », d’où une règle
- * par nom.
- */
-const avecSession = (source: string, destination: string) => NOMS_DE_SESSION.map((key) => ({ source, has: [{ type: "cookie" as const, key }], destination }));
-
-/*
- * De même, le cookie du mode tournage (src/server/tournage.ts) : sa présence sert à la même adresse la variante de
- * l’export, rendue à la demande, qui vérifie son lien (un lien arrêté y voit l’écran de tout le monde).
- */
-const avecTournage = (source: string, destination: string) => NOMS_DU_TOURNAGE.map((key) => ({ source, has: [{ type: "cookie" as const, key }], destination }));
 
 /**
  * Le fichier qui fait vérifier askblush.com chez Apple, pour Apple Pay dans nos pages (les Elements de Whop) : servi à
@@ -70,22 +56,14 @@ const nextConfig: NextConfig = {
     ];
   },
   /*
-   * Qui revient connecté (cookie de session) voit la landing de src/app/retour, à la même adresse : ses boutons mènent à
-   * son accueil. Sans le cookie, / reste la page statique.
-   * Les pages du parcours d’arrivée sont statiques aussi (servies et préchargées tout de suite) ; ce qui y dépend de la
-   * session est une variante servie à la même adresse : /commencer sans la liste d’attente, /connexion qui renvoie qui est
-   * connecté vers son accueil ; et l’export du mode tournage, qui ne demande aucun fichier. Ce qui dépend de la bêta
-   * fermée, lue à l’exécution et non au build, est servi par src/proxy.ts, avant ces réécritures.
+   * Aucune réécriture d’après un cookie : Next ajoute la valeur d’un `has` aux paramètres de la destination, que la page
+   * relit (le secret de la session y devenait lisible par son JavaScript). Les variantes servies à la même adresse
+   * (connecté, mode tournage, bêta fermée) sont choisies par src/proxy.ts ; tests/proxy.test.ts refuse ici tout `has` sur
+   * un cookie.
    */
   async rewrites() {
     return {
-      beforeFiles: [
-        ...avecSession("/", "/retour"),
-        ...avecSession("/commencer", "/commencer/connecte"),
-        ...avecSession("/connexion", "/connexion/connecte"),
-        ...avecTournage("/importer/export", "/importer/export/tournage"),
-        FICHIER_APPLE_PAY,
-      ],
+      beforeFiles: [FICHIER_APPLE_PAY],
       afterFiles: [],
       fallback: [],
     };
