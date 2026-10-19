@@ -39,6 +39,17 @@ export const FICHIER_APPLE_PAY = {
   destination: "https://whop.com/.well-known/apple-platform-integrator/apple-developer-merchantid-domain-association",
 };
 
+/*
+ * Les anciennes adresses de Vercel, encore servies (un favori, un lien d’avant askblush.com) : leurs pages mènent au site.
+ * Le CAPTCHA (Turnstile) et Apple Pay ne connaissent que askblush.com : ailleurs, le widget ne rend aucun jeton (erreur
+ * 110200, « domaine inconnu ») et un visiteur sans compte ne peut rien importer. Les routes /api et les fichiers de Next
+ * y restent servis : un cron, un webhook ou une page déjà ouverte qui les appelle n’a pas à suivre une redirection.
+ * Temporaire (307) : rien ne reste en cache chez le visiteur si une de ces adresses doit resservir.
+ */
+export const ANCIENNES_ADRESSES = ["crush-front.vercel.app", "blush-front.vercel.app"];
+/** Le site, où mènent les anciennes adresses : SITE_EN_LIGNE de src/server/env.ts (que ce fichier ne peut pas importer). */
+const SITE = "https://www.askblush.com";
+
 const nextConfig: NextConfig = {
   /* Les liens et les navigations (next/link, useRouter, redirect) ne visent qu’une route qui existe : tsc le vérifie */
   typedRoutes: true,
@@ -49,6 +60,13 @@ const nextConfig: NextConfig = {
       { source: "/app/brouillon", destination: "/app", permanent: false },
       /* iMessage ne s’exporte pas (Messages sur Mac n’a pas de commande pour ça) : on filme son écran. ?app=imessage suit */
       { source: "/importer/export", has: [{ type: "query", key: "app", value: "imessage" }], destination: "/importer/captures", permanent: false },
+      /* Les pages des anciennes adresses, vers le site (voir ANCIENNES_ADRESSES) ; la requête (?…) suit */
+      ...ANCIENNES_ADRESSES.map((value) => ({
+        source: "/:chemin((?!api/|_next/).*)",
+        has: [{ type: "host" as const, value }],
+        destination: `${SITE}/:chemin`,
+        permanent: false,
+      })),
     ];
   },
   /*
