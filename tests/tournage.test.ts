@@ -33,6 +33,7 @@ import { POST as postVideo } from "@/app/api/captures/video/route";
 import { POST as postImport } from "@/app/api/import/route";
 import { GET as getRepere } from "@/app/api/tournage/repere/route";
 import PageExportTournage from "@/app/importer/export/tournage/page";
+import PageTournage from "@/app/tournage/page";
 import { GET as getLien } from "@/app/tournage/[cle]/route";
 import { POST as postFin } from "@/app/tournage/fin/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
@@ -55,6 +56,7 @@ import {
   convsCandidates,
   creerTournage,
   metaDeLaPrise,
+  nomPourLaCreatrice,
   prenomDuLien,
   renommerLesPrises,
   tournageDe,
@@ -620,6 +622,43 @@ describe("une conv de tournage arrêtée, ou effacée", () => {
     const r = await lancer();
     expect([r.status, await r.json()]).toEqual([404, { erreur: "aucune" }]);
     expect(appels.length).toBe(avant);
+  });
+});
+
+describe("le nom du lien, sur la page de la créatrice", () => {
+  it("perd le prénom de la créatrice dont le fichier a été lu, ou prend le sien ; sans le sien, ne s’affiche pas plutôt que de le montrer", () => {
+    expect(nomPourLaCreatrice("Léa · A1 · Le vu de minuit", "Léa", "Nina")).toBe("A1 · Le vu de minuit");
+    expect(nomPourLaCreatrice("Léa · A1 · Le vu de minuit", "Léa", null)).toBe("A1 · Le vu de minuit");
+    expect(nomPourLaCreatrice("LÉA · C1 · Tu recommences", "Léa", null)).toBe("C1 · Tu recommences");
+    expect(nomPourLaCreatrice("C1 · La dispute de Léa", "Léa", "Zoé")).toBe("C1 · La dispute de Zoé");
+    expect(nomPourLaCreatrice("C1 · La dispute de Léa", "Léa", null)).toBe("");
+    expect(nomPourLaCreatrice("Léa", "Léa", null)).toBe("");
+    /* Un nom sans elle, ou une source sans prénom (des captures : « Moi ») : tel quel */
+    expect(nomPourLaCreatrice("A · Il répond plus pareil", "Léa", "Zoé")).toBe("A · Il répond plus pareil");
+    expect(nomPourLaCreatrice("Léandre · A1", "Léa", null)).toBe("Léandre · A1");
+    expect(nomPourLaCreatrice("Moi · A1", "Moi", null)).toBe("Moi · A1");
+    expect(nomPourLaCreatrice("Léa · A1", null, null)).toBe("Léa · A1");
+  });
+
+  it("un lien partagé, nommé au prénom de la source : chaque créatrice lit le nom de l’histoire, et le sien s’il est connu", async () => {
+    const { participants, moi } = metaDe(await ligneEnBase(source));
+    const lue = participants[moi!]!.prenom;
+    const t = await creerTournage({ conv: source, nom: `${lue} · A1 · Le vu de minuit`, par: equipe });
+    if (!("id" in t)) throw new Error("conv de tournage refusée");
+    const cleA = await cleDe(t.id);
+    /** Ce que la page /tournage montre à ce navigateur, après le lien (avec ou sans `?prenom=`). */
+    const page = async (prenom?: string) => {
+      etat.cookies.clear();
+      await getLien(requete(`/tournage/${cleA}${prenom ? `?prenom=${prenom}` : ""}`), { params: Promise.resolve({ cle: cleA }) });
+      return ((await PageTournage()) as ReactElement<{ nom: string | null; prenom: string | null }>).props;
+    };
+    expect(await page("Nina")).toEqual({ nom: "A1 · Le vu de minuit", prenom: "Nina" });
+    expect(await page()).toEqual({ nom: "A1 · Le vu de minuit", prenom: null });
+    /* L’équipe, elle, garde le nom entier dans /admin et sur son repère */
+    expect((await tournageDe(t.id))?.nom).toBe(`${lue} · A1 · Le vu de minuit`);
+    /* Sans mode tournage : la page dit que le lien ne marche plus */
+    await arreterTournage(t.id);
+    expect(await page()).toEqual({ nom: null, prenom: null });
   });
 });
 
