@@ -4,13 +4,16 @@ import type { CaptureResult } from "posthog-js";
 /*
  * La mesure d’audience chez PostHog (src/lib/analytique.ts) : ce qui part, et ce qui n’en part jamais. Les adresses
  * sans requête (sauf les utm_), sans identifiant, sans titre de page, le site d’avant réduit à son nom ; rien depuis les
- * outils de l’équipe ; PostHog chargé seulement avec sa clé, une fois la page prête, avec ses réglages sans cookie, et les
- * jalons gardés le temps qu’il arrive. posthog-js est simulé : rien ne part.
+ * outils de l’équipe ; l’enregistrement des visites sans rien de lisible (les attributs, l’adresse de ses morceaux) ;
+ * PostHog chargé seulement avec sa clé, une fois la page prête, avec ses réglages sans cookie et son enregistrement
+ * masqué, et les jalons gardés le temps qu’il arrive. posthog-js est simulé : rien ne part.
  */
 
 const init = vi.fn();
 const capture = vi.fn();
 vi.mock("posthog-js", () => ({ default: { init, capture } }));
+/* L’enregistreur : dans le vrai code, il se pose sur window.__PosthogExtensions__ */
+vi.mock("posthog-js/dist/posthog-recorder", () => ({}));
 
 const ORIGINE = "https://www.askblush.com";
 const ici = (chemin: string) => new URL(chemin, ORIGINE) as unknown as Location;
@@ -78,6 +81,36 @@ describe("ce qui part chez PostHog", () => {
     expect(e?.$set_once).toEqual({ $initial_current_url: `${ORIGINE}/p/:id`, $initial_pathname: "/p/:id" });
   });
 
+  it("les attributs de l’enregistrement : les textes lisibles masqués, les adresses nettoyées, les uuid remplacés", async () => {
+    const { attributSur } = await page("/");
+    for (const nom of ["aria-label", "title", "alt", "placeholder", "value", "download"]) expect(attributSur(nom, "Ouvrir la fiche de Léa", ORIGINE), nom).toBe("***");
+    expect(attributSur("href", "/v/Ab3dE9xYz?ref=x#haut", ORIGINE)).toBe("/v/:id");
+    expect(attributSur("href", `${ORIGINE}/ouvrir/abc123def456?m=s3_rapport&utm_source=mail`, ORIGINE)).toBe(`${ORIGINE}/ouvrir/:id?utm_source=mail`);
+    expect(attributSur("href", "https://www.tiktok.com/@une.createrice", ORIGINE)).toBe("https://www.tiktok.com");
+    expect(attributSur("src", "blob:https://www.askblush.com/9b2f", ORIGINE)).toBe("");
+    expect(attributSur("src", "data:image/png;base64,AAAA", ORIGINE)).toBe("");
+    expect(attributSur("href", "mailto:bonjour@askblush.com", ORIGINE)).toBe("mailto:bonjour@askblush.com");
+    expect(attributSur("id", "chapitre-1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed", ORIGINE)).toBe("chapitre-:id");
+    expect(attributSur("class", "flex items-center", ORIGINE)).toBe("flex items-center");
+    expect(attributSur("data-state", "open", ORIGINE)).toBe("open");
+  });
+
+  it("les morceaux d’un enregistrement : l’adresse de la page nettoyée, le reste intact", async () => {
+    const { nettoyer } = await page("/");
+    const morceaux = [
+      { type: 4, data: { href: `${ORIGINE}/v/Ab3dE9xYz?prenom=Lea`, width: 390, height: 844 }, timestamp: 1 },
+      { type: 5, data: { tag: "$pageview", payload: { href: `${ORIGINE}/p/LEA42?prenom=Lea` } }, timestamp: 2 },
+      { type: 3, data: { source: 2, x: 10, y: 20 }, timestamp: 3 },
+    ];
+    const e = nettoyer(evenement({ $snapshot_data: morceaux, $session_id: "s" }, { event: "$snapshot" }), ici("/v/Ab3dE9xYz"));
+    expect(e?.properties.$snapshot_data).toEqual([
+      { type: 4, data: { href: `${ORIGINE}/v/:id`, width: 390, height: 844 }, timestamp: 1 },
+      { type: 5, data: { tag: "$pageview", payload: { href: `${ORIGINE}/p/:id` } }, timestamp: 2 },
+      { type: 3, data: { source: 2, x: 10, y: 20 }, timestamp: 3 },
+    ]);
+    expect(e?.properties.$session_id).toBe("s");
+  });
+
   it("rien depuis les outils de l’équipe", async () => {
     const { nettoyer } = await page("/");
     for (const chemin of ["/admin", "/admin/direct", "/apercu/admin", "/styleguide"]) expect(nettoyer(evenement({ $pathname: chemin }), ici(chemin)), chemin).toBeNull();
@@ -95,7 +128,7 @@ describe("le chargement de PostHog", () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
-  it("avec sa clé, une fois la page prête : ses réglages sans cookie, puis les jalons qui attendaient, puis les suivants", async () => {
+  it("avec sa clé, une fois la page prête : ses réglages sans cookie, son enregistrement masqué, puis les jalons qui attendaient, puis les suivants", async () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", "phc_essai");
     vi.stubGlobal("requestIdleCallback", (f: () => void) => {
       f();
@@ -108,18 +141,31 @@ describe("le chargement de PostHog", () => {
     await vi.dynamicImportSettled();
     expect(init).toHaveBeenCalledTimes(1);
     const [cle, reglages] = init.mock.calls[0]!;
+    /* Pas le mode sans cookie de PostHog : il n’enregistre rien sans identifiant de visite (gardé ici en mémoire) */
+    expect(reglages.cookieless_mode).toBeUndefined();
     expect(cle).toBe("phc_essai");
     expect(reglages).toMatchObject({
       api_host: "/ingest",
-      cookieless_mode: "always",
       persistence: "memory",
       person_profiles: "never",
       autocapture: false,
-      disable_session_recording: true,
-      advanced_disable_flags: true,
+      disable_session_recording: false,
+      enable_recording_console_log: false,
+      capture_performance: false,
       disable_external_dependency_loading: true,
+      session_recording: {
+        maskAllInputs: true,
+        maskTextSelector: "*",
+        blockSelector: expect.stringContaining("img"),
+        maskAttributeFn: expect.any(Function),
+        recordHeaders: false,
+        recordBody: false,
+        compress_events: false,
+      },
       before_send: expect.any(Function),
     });
+    expect(reglages.session_recording.blockSelector.split(", ")).toEqual(expect.arrayContaining(["img", "video", "canvas", "iframe"]));
+    expect(reglages.session_recording.maskAttributeFn("aria-label", "Ta conv avec Léa")).toBe("***");
     expect(capture.mock.calls).toEqual([["jalon_appli"]]);
     mesurer("jalon_fichier");
     expect(capture.mock.calls).toEqual([["jalon_appli"], ["jalon_fichier"]]);

@@ -45,7 +45,8 @@ const INTROUVABLE = "/introuvable";
 const RELAIS = /^\/ingest(?=\/|$)/;
 
 /**
- * Une requête de PostHog, passée à son serveur européen (ses fichiers, /ingest/static/…, à celui de ses fichiers),
+ * Une requête de PostHog, passée à son serveur européen (ses fichiers et ses réglages, /ingest/static/… et
+ * /ingest/array/…, à celui de ses fichiers),
  * sans nos cookies (la session ne sort jamais de BLUSH) ni autorisation. L’adresse IP de la connexion passe (Vercel la
  * pose dans x-forwarded-for) : PostHog en tire son empreinte sans cookie, et l’oublie (le réglage « Discard client IP
  * data » du projet). Une créatrice en mode tournage n’est pas une visite : rien ne part, sans le dire (la réponse de
@@ -55,7 +56,8 @@ function versPostHog(request: NextRequest): NextResponse {
   if (!cleDePostHog()) return NextResponse.rewrite(new URL(INTROUVABLE, request.url));
   if (NOMS_DU_TOURNAGE.some((nom) => request.cookies.has(nom))) return NextResponse.json({ status: 1 });
   const chemin = request.nextUrl.pathname.replace(RELAIS, "") || "/";
-  const hote = chemin.startsWith("/static/") ? "eu-assets.i.posthog.com" : "eu.i.posthog.com";
+  /* Ses fichiers et ses réglages (/static/…, /array/<clé>/config) viennent de son serveur de fichiers */
+  const hote = /^\/(static|array)\//.test(chemin) ? "eu-assets.i.posthog.com" : "eu.i.posthog.com";
   const entetes = new Headers(request.headers);
   entetes.set("host", hote);
   entetes.delete("cookie");
