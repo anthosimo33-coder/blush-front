@@ -18,7 +18,7 @@ import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { GUESS_LABELS } from "@/contenu/parcours";
 import { useJourney } from "@/state/journey";
-import { quiComplet, reponsesQui } from "@/state/parcours";
+import { aideDuPrenom, quiComplet, reponsesQui } from "@/state/parcours";
 import { retenirLecture } from "@/state/lecture";
 import type { Goal, Guess, Person } from "@/types";
 
@@ -118,7 +118,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       {captures ? (
         /* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
         <label className="flex flex-col gap-2">
-          <span className="text-legende font-black text-grey">Ton prénom (sur tes captures avec {people[1].name}, tu es à droite)</span>
+          <span className="text-legende font-black text-grey">{aideDuPrenom(people[1].name)}</span>
           <input
             value={j.prenom}
             onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}

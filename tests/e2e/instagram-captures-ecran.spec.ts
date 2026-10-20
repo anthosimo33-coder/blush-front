@@ -186,7 +186,7 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
     await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
     await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" })).toHaveCount(0);
-    const prenom = page.getByLabel("Ton prénom (sur tes captures avec Elias, tu es à droite)");
+    const prenom = page.getByLabel("Ton prénom (dans votre conv avec Elias, tu es à droite)");
     await expect(prenom).toBeVisible();
     const continuer = page.getByRole("button", { name: "Continuer" });
     await page.getByRole("radio", { name: "Une fille" }).click();

@@ -18,6 +18,16 @@ type QuiRempli = JourneyState & { me: string; pronom: Pronom; guess: Guess; goal
 export const vientDeCaptures = (j: Pick<JourneyState, "exportFileName">) => !j.exportFileName;
 
 /**
+ * Sur des captures (ou un enregistrement), ce qui aide à se retrouver au-dessus de « Ton prénom » : l’autre nommé quand
+ * la lecture a lu son nom en haut de la conv. Sans lui, la lecture l’appelle « Elle » (versTexteCaptures,
+ * prompts/lib/captures.ts), et un contact que le téléphone ne connaît pas n’a qu’un numéro : la phrase ne le nomme pas.
+ */
+export function aideDuPrenom(autre: string): string {
+  const lu = autre !== "Elle" && /\p{L}/u.test(autre);
+  return `Ton prénom (dans votre conv${lu ? ` avec ${autre}` : ""}, tu es à droite)`;
+}
+
+/**
  * « Qui es-tu ? » est-il complet ? Qui est toi, ton pronom, ta devinette et ce que tu veux ; et sur des captures (où tu
  * n’es que « Moi »), ton prénom.
  */

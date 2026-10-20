@@ -34,7 +34,7 @@ test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules
     /* Regarder la vidéo pas à pas, puis la lecture des écrans par lots : plus long qu’un export */
     await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
     await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
-    await expect(page.getByLabel("Ton prénom (sur tes captures avec Elias, tu es à droite)")).toBeVisible();
+    await expect(page.getByLabel("Ton prénom (dans votre conv avec Elias, tu es à droite)")).toBeVisible();
   });
 
   await test.step("ce qui est parti : des images JPEG par lots, puis leur lecture ; jamais la vidéo", async () => {
