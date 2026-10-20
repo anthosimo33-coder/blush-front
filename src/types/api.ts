@@ -275,6 +275,8 @@ const Qui = z.object({
   goal: z.enum(GOALS),
   /** Des captures : son prénom (il n’y est que « Moi ») */
   prenom: z.string().trim().min(1).max(PRENOM_MAX).optional(),
+  /** Des captures dont la lecture n’a pas lu le nom de l’autre : le sien */
+  prenomAutre: z.string().trim().min(1).max(PRENOM_MAX).optional(),
 });
 
 /** Qui tu es dans la conv : l’`id` de l’un de ses deux participants (Story.participants), « p0 » ou « p1 ». */

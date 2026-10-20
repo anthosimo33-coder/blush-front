@@ -21,6 +21,8 @@ export type JourneyState = {
   pronom: Pronom | null;
   /** Des captures : son prénom (il n’y apparaît que comme « Moi »). */
   prenom: string;
+  /** Des captures dont la lecture n’a pas lu le nom de l’autre : son prénom, demandé par « Qui es-tu ? ». */
+  prenomAutre: string;
   guess: Guess | null;
   goal: Goal | null;
   email: string;
@@ -34,6 +36,7 @@ const JOURNEY_DEFAULTS: JourneyState = {
   me: null,
   pronom: null,
   prenom: "",
+  prenomAutre: "",
   guess: null,
   goal: null,
   email: "",
@@ -59,6 +62,7 @@ const CHAMPS: { [K in keyof JourneyState]: (v: unknown) => v is JourneyState[K] 
   me: ouNull(estTexte),
   pronom: ouNull(dans(PRONOMS)),
   prenom: estTexte,
+  prenomAutre: estTexte,
   guess: ouNull(dans(GUESSES)),
   goal: ouNull(dans(GOALS)),
   email: estTexte,
@@ -80,6 +84,7 @@ function valider(brut: Record<string, unknown>): JourneyState {
     me: champ("me"),
     pronom: champ("pronom"),
     prenom: champ("prenom"),
+    prenomAutre: champ("prenomAutre"),
     guess: champ("guess"),
     goal: champ("goal"),
     email: champ("email"),

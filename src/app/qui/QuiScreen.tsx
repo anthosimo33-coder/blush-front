@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
+import { nomLu } from "@/lib/participants";
 import { NBSP } from "@/lib/format";
 import { PRENOM_MAX } from "@/lib/limites";
 import { marquerJalon } from "@/lib/jalons";
@@ -44,6 +45,10 @@ const COUPLE_GOALS: GoalTile[] = [
 ];
 const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS : GOALS);
 
+/** Un prénom à écrire (le tien, le sien) : le champ blanc, cerclé d’encre au focus. */
+const CHAMP_PRENOM =
+  "h-[60px] rounded-field bg-white px-[18px] text-accent font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_var(--ink)]";
+
 /* Écran 06 — Qui est qui, la devinette, ce que tu veux. */
 /**
  * `captures` : la conv vient de captures, où l’utilisateur n’est que « Moi » (à droite) : on lui demande son prénom.
@@ -60,7 +65,9 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   /* Les titres des trois groupes de tuiles, qui les nomment */
   const titres = { pronom: useId(), guess: useId(), goal: useId() };
   const goals = goalsFor(j.guess);
-  const ready = quiComplet(j, { captures });
+  /* Des captures dont la lecture n’a pas lu le nom de l’autre (nomLu) : on demande aussi le sien */
+  const sonPrenom = captures && !nomLu(people[1].name);
+  const ready = quiComplet(j, { captures, sonPrenom });
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
   /* Arrivé sans le parcours de cet onglet (importée dans un autre, puis ouverte par une connexion) : d’après la conv */
@@ -77,7 +84,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const next = async () => {
     marquerJalon("qui");
     if (!connecte) return router.push("/email");
-    if (busy || !quiComplet(j, { captures })) return;
+    if (busy || !quiComplet(j, { captures, sonPrenom })) return;
     setBusy(true);
     setProblem(null);
     try {
@@ -116,18 +123,34 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
       }
     >
       {captures ? (
-        /* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */
-        <label className="flex flex-col gap-2">
-          <span className="text-legende font-black text-grey">{aideDuPrenom(people[1].name)}</span>
-          <input
-            value={j.prenom}
-            onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}
-            autoComplete="given-name"
-            maxLength={PRENOM_MAX}
-            placeholder="Ton prénom"
-            className="h-[60px] rounded-field bg-white px-[18px] text-accent font-extrabold text-ink shadow-[inset_0_0_0_1px_rgba(17,17,20,0.09),0_1px_2px_rgba(17,17,20,0.04)] outline-none focus:shadow-[inset_0_0_0_2px_var(--ink)]"
-          />
-        </label>
+        <>
+          {/* Absent des maquettes, relu le 8 octobre. Sur des captures, l’utilisateur est à droite : il ne reste que son prénom */}
+          <label className="flex flex-col gap-2">
+            <span className="text-legende font-black text-grey">{aideDuPrenom(people[1].name)}</span>
+            <input
+              value={j.prenom}
+              onChange={(e) => set({ prenom: e.target.value, me: people[0].id })}
+              autoComplete="given-name"
+              maxLength={PRENOM_MAX}
+              placeholder="Ton prénom"
+              className={CHAMP_PRENOM}
+            />
+          </label>
+          {/* Son nom n’a pas été lu : sans son prénom, tout le rapport l’appellerait « Elle », ou par un numéro */}
+          {sonPrenom && (
+            <label className="flex flex-col gap-2">
+              <span className="text-legende font-black text-grey">Son prénom (on ne l’a pas trouvé dans votre conv)</span>
+              <input
+                value={j.prenomAutre}
+                onChange={(e) => set({ prenomAutre: e.target.value })}
+                autoComplete="off"
+                maxLength={PRENOM_MAX}
+                placeholder="Son prénom"
+                className={CHAMP_PRENOM}
+              />
+            </label>
+          )}
+        </>
       ) : (
         <RadioGroup label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
           {people.map((p, i) => {

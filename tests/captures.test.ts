@@ -36,6 +36,38 @@ describe("des captures à l’histoire", () => {
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
   });
 
+  it("le prénom de l’autre, demandé par « Qui es-tu ? », ne remplace que le nom que la lecture n’a pas lu", async () => {
+    const qui = { moi: 0 as const, pronom: "il" as const, devinette: "parle" as const, objectif: "comprendre" as const, prenom: "Tom", prenomAutre: "Léa" };
+    const lue = (autre: string | null) =>
+      versTexteCaptures(
+        captures({
+          appli: "imessage",
+          autre,
+          blocs: [{ repere: { date: "2026-09-08", heure: "21:00" }, messages: Array.from({ length: 40 }, (_, k) => msg(k % 2 ? "moi" : "autre", `message ${k + 1}`)) }],
+        }),
+        {
+          aujourdhui: "2026-09-13",
+        },
+      );
+    const ids: string[] = [];
+    try {
+      /* Pas lu (« Elle »), ou un numéro : le prénom de l’écran le remplace, jusque dans ce que lit le modèle */
+      for (const autre of [null, "+33 6 12 34 56 78"]) {
+        const { id } = await importerCaptures({ appli: "imessage", t: lue(autre), consentement: accordDeTest() });
+        ids.push(id);
+        const meta = await definirQui(id, qui);
+        expect(histoireDe(meta).autre).toMatchObject({ prenom: "Léa", nomExport: meta.participants[1].nom });
+        expect(histoireDe(meta).utilisateur.prenom).toBe("Tom");
+      }
+      /* Lu en haut de la conv : il reste, même si un prénom traîne dans le parcours */
+      const { id } = await importerCaptures({ appli: "imessage", t: lue("Inès"), consentement: accordDeTest() });
+      ids.push(id);
+      expect(histoireDe(await definirQui(id, qui)).autre.prenom).toBe("Inès");
+    } finally {
+      for (const id of ids) await db().delete(schema.stories).where(eq(schema.stories.id, id));
+    }
+  });
+
   it("sans repère au début, le premier bloc prend le jour du premier repère", () => {
     const c = captures({
       appli: null,

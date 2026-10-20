@@ -73,7 +73,14 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
     }
     await poserChoisie(story.id);
     if (qui)
-      await definirQui(story.id, { moi: qui.me === "p0" ? 0 : 1, pronom: qui.pronom, devinette: qui.guess, objectif: qui.goal, ...(qui.prenom ? { prenom: qui.prenom } : {}) });
+      await definirQui(story.id, {
+        moi: qui.me === "p0" ? 0 : 1,
+        pronom: qui.pronom,
+        devinette: qui.guess,
+        objectif: qui.goal,
+        ...(qui.prenom ? { prenom: qui.prenom } : {}),
+        ...(qui.prenomAutre ? { prenomAutre: qui.prenomAutre } : {}),
+      });
     /* Une prise : sa lecture recopiée (avec son prénom, que « Qui es-tu ? » vient d’écrire), que l’écran de lecture rejoue */
     if (tournage) {
       await rejouer(story.id, tournage, utilisateur);
