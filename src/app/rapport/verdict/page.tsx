@@ -31,7 +31,10 @@ export default async function Page() {
   if (initial.sober || initial.alerte) redirect("/rapport");
   return (
     <PageDeConv rendu={rendu}>
-      <VerdictReveal initial={initial} story={story} rendu={rendu} />
+      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+      <div data-prive="" className="contents">
+        <VerdictReveal initial={initial} story={story} rendu={rendu} />
+      </div>
     </PageDeConv>
   );
 }

@@ -12,9 +12,9 @@ import { PoseConv } from "./PoseConv";
  * tard. tests/unit/pages-de-conv.test.ts vérifie que chaque page d’une conv passe par lui.
  */
 export async function PageDeConv({ rendu, children }: { rendu: number; children: ReactNode }) {
-  const { id, compte } = await pageDeConv();
+  const { id, compte, secrets } = await pageDeConv();
   return (
-    <PoseConv id={id} compte={compte} rendu={rendu}>
+    <PoseConv id={id} compte={compte} rendu={rendu} secrets={secrets}>
       {children}
     </PoseConv>
   );

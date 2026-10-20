@@ -54,6 +54,7 @@ import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
+import { retenirSecrets } from "@/lib/secrets";
 import { tracer } from "@/lib/tracer";
 import { preparerCaptures } from "./preparer-captures";
 import type { ConvInstagram } from "./preparer-export";
@@ -139,7 +140,19 @@ async function appel<K extends CleJson & CleFixe>(cle: K, ...[options]: Argument
   const r = await requete(cle, options);
   const corps = await corpsDe<K>(r);
   if (!r.ok) throw new ErreurApi(corps.erreur ?? "erreur", r.status);
+  retenirLesPrenoms(corps);
   return corps;
+}
+
+/*
+ * Une conv tout juste importée (l’export, des captures) : ses prénoms, que l’enregistrement des visites masque partout
+ * dès l’écran d’après (src/lib/secrets.ts), avant même qu’une page de la conv ne les donne
+ */
+function retenirLesPrenoms(corps: unknown): void {
+  if (!corps || typeof corps !== "object" || !("story" in corps)) return;
+  const story = corps.story;
+  if (story && typeof story === "object" && "participants" in story && Array.isArray(story.participants))
+    retenirSecrets(story.participants.map((p: unknown) => (p && typeof p === "object" && "name" in p && typeof p.name === "string" ? p.name : null)));
 }
 
 /**

@@ -25,7 +25,10 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
   if (!initial) redirect("/lecture");
   return (
     <PageDeConv rendu={rendu}>
-      <ReportScreen initial={initial} story={story} openPaywall={paiement === "1"} rendu={rendu} />
+      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+      <div data-prive="" className="contents">
+        <ReportScreen initial={initial} story={story} openPaywall={paiement === "1"} rendu={rendu} />
+      </div>
     </PageDeConv>
   );
 }

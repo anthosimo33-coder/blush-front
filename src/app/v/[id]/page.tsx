@@ -73,7 +73,8 @@ export default async function Page({ params }: PageProps<"/v/[id]">) {
       <div className="mt-10 flex w-full max-w-[520px] flex-col lg:mt-16">
         {v ? (
           <>
-            <section aria-labelledby="verdict-titre" className="flex flex-col items-start">
+            {/* data-prive : le verdict d’une conv, masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+            <section data-prive="" aria-labelledby="verdict-titre" className="flex flex-col items-start">
               <div className="flex flex-col items-start gap-2">
                 <Bulle angle={-1.5}>j’ai lu toute leur conv 👀</Bulle>
                 <Bulle angle={1.2}>verdict{NBSP}:</Bulle>

@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { MontageDeLaPage } from "@/lib/query";
+import { retenirSecrets } from "@/lib/secrets";
 import { poserConvDeLaPage } from "@/services/session";
 import type { Account } from "@/types/api";
 import { CompteRendu, type CompteDeLaPage } from "./compte-de-la-page";
@@ -10,9 +11,24 @@ import { CompteRendu, type CompteDeLaPage } from "./compte-de-la-page";
  * La page d’une conv, côté navigateur (rendue par PageDeConv) : elle pose sa conv avant les premiers appels de ses écrans,
  * et leur donne le compte rendu par le serveur (useCompteDeLaPage, ./compte-de-la-page.ts). Chaque montage a son objet
  * (MontageDeLaPage, src/lib/query.ts) : les écrans montés ensemble partagent ce qui vient d’être rendu, une page revue par
- * l’historique le relit.
+ * l’historique le relit. `secrets` : les prénoms de la conv et l’email du compte, que l’enregistrement des visites
+ * masque partout (src/lib/secrets.ts), retenus avant que les écrans ne s’affichent.
  */
-export function PoseConv({ id, compte, rendu, children }: { id: string | null; compte: Account | null; rendu: number; children: ReactNode }) {
+export function PoseConv({
+  id,
+  compte,
+  rendu,
+  secrets = [],
+  children,
+}: {
+  id: string | null;
+  compte: Account | null;
+  rendu: number;
+  secrets?: readonly string[];
+  children: ReactNode;
+}) {
+  /* Pendant le rendu : l’enregistreur lit le DOM juste après qu’il change, ils doivent déjà être là */
+  retenirSecrets(secrets);
   const [montage] = useState(() => ({}));
   const page = useMemo<CompteDeLaPage>(() => ({ compte, rendu }), [compte, rendu]);
   return (

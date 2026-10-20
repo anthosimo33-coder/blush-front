@@ -53,26 +53,29 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
        * La liste garde sa hauteur dans la zone qui défile (shrink-0) : sinon elle se tassait à la hauteur de la zone, et ses
        * dernières convs étaient coupées au lieu de défiler.
        */}
-      <InsetGroup
-        footer={!cherche.trim() && convs.length > visibles.length ? `Les ${visibles.length} plus longues. Cherche un prénom pour voir les autres.` : undefined}
-        className={cn(convs.length > 4 ? "h-[min(52dvh,440px)]" : "max-h-[52dvh]", "overflow-y-auto lg:max-h-[420px] [&>*]:shrink-0")}
-      >
-        {visibles.map((c) => (
-          <InsetRow
-            key={c.id}
-            leading={
-              <Avatar tone={c.groupe ? "toi" : "elle"} size={40} fontSize={16}>
-                {c.groupe ? <Icon name="people" size={18} stroke={2.2} className="text-white" /> : (c.nom.match(/\p{L}/u)?.[0]?.toUpperCase() ?? "?")}
-              </Avatar>
-            }
-            title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
-            sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}\u00a0messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
-            chevron={!c.groupe}
-            onClick={c.groupe ? undefined : () => onChoisir(c.id)}
-          />
-        ))}
-        {!visibles.length && <p className="m-0 px-4 py-4 text-note font-extrabold text-grey">Aucune conv à ce nom.</p>}
-      </InsetGroup>
+      {/* data-prive : les prénoms de tes contacts, masqués dans l’enregistrement des visites (src/lib/secrets.ts) */}
+      <div data-prive="" className="contents">
+        <InsetGroup
+          footer={!cherche.trim() && convs.length > visibles.length ? `Les ${visibles.length} plus longues. Cherche un prénom pour voir les autres.` : undefined}
+          className={cn(convs.length > 4 ? "h-[min(52dvh,440px)]" : "max-h-[52dvh]", "overflow-y-auto lg:max-h-[420px] [&>*]:shrink-0")}
+        >
+          {visibles.map((c) => (
+            <InsetRow
+              key={c.id}
+              leading={
+                <Avatar tone={c.groupe ? "toi" : "elle"} size={40} fontSize={16}>
+                  {c.groupe ? <Icon name="people" size={18} stroke={2.2} className="text-white" /> : (c.nom.match(/\p{L}/u)?.[0]?.toUpperCase() ?? "?")}
+                </Avatar>
+              }
+              title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
+              sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}\u00a0messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
+              chevron={!c.groupe}
+              onClick={c.groupe ? undefined : () => onChoisir(c.id)}
+            />
+          ))}
+          {!visibles.length && <p className="m-0 px-4 py-4 text-note font-extrabold text-grey">Aucune conv à ce nom.</p>}
+        </InsetGroup>
+      </div>
     </Sheet>
   );
 }

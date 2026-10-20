@@ -358,6 +358,8 @@ function Story({
       aria-modal="true"
       aria-label="Le vocal de BLUSH"
       data-vocal-story=""
+      /* Un portail sur body, hors de la page (privée) : son texte masqué dans l’enregistrement des visites */
+      data-prive=""
       /* La story vit hors du rapport (portail) : elle pose elle-même Figtree, pour les messages cités */
       className={cn("fixed inset-0 z-[80] flex flex-col text-white", figtree.variable)}
       style={{

@@ -7,6 +7,7 @@ import { NBSP } from "@/lib/format";
 import { PRENOM_MAX } from "@/lib/limites";
 import { marquerJalon } from "@/lib/jalons";
 import { messageErreur } from "@/lib/messages-erreur";
+import { retenirSecrets } from "@/lib/secrets";
 import { startAnalysis } from "@/services/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,8 @@ const goalsFor = (guess: Guess | null) => (guess === "ensemble" ? COUPLE_GOALS :
  * `connecte` : déjà un compte (une autre conv) : pas d’écran email, la lecture part d’ici.
  */
 export function QuiScreen({ people, captures = false, connecte = false }: { people: [Person, Person]; captures?: boolean; connecte?: boolean }) {
+  /* Leurs prénoms : masqués dans l’enregistrement des visites (src/lib/secrets.ts), retenus avant l’affichage */
+  retenirSecrets(people.map((p) => p.name));
   const router = useRouter();
   const [j, set] = useJourney();
   const [busy, setBusy] = useState(false);

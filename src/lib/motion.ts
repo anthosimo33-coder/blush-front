@@ -87,6 +87,8 @@ export function flyText(text: string, from: Box, to: Box, a: BubbleLook, b: Bubb
   const fade = { duration: Math.round(sp.duration * 0.45), easing: "ease-out", fill: "both" as const };
   const root = document.createElement("span");
   root.className = "flight";
+  /* Posé sur body, hors de la page (privée) : son texte, celui d’une bulle, masqué dans l’enregistrement des visites */
+  root.dataset.prive = "";
   Object.assign(root.style, { left: "0px", top: "0px", width: "0px", height: "0px" });
   const layer = (look: BubbleLook, on: boolean) => {
     const bg = document.createElement("span");

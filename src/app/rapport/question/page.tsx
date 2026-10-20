@@ -16,7 +16,10 @@ export default async function Page() {
   if (!story) redirect(await sansHistoire("/rapport/question"));
   return (
     <PageDeConv rendu={rendu}>
-      <QuestionChat ideas={ideas} story={story} ferme={!debloque} />
+      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+      <div data-prive="" className="contents">
+        <QuestionChat ideas={ideas} story={story} ferme={!debloque} />
+      </div>
     </PageDeConv>
   );
 }

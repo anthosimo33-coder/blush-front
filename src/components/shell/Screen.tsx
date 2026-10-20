@@ -83,6 +83,8 @@ export function AccountPill({ initial }: { initial?: string }) {
     >
       <span
         aria-hidden="true"
+        /* L’initiale de ton email : masquée dans l’enregistrement des visites (src/lib/secrets.ts) */
+        data-prive=""
         className="flex size-8 items-center justify-center rounded-full text-note font-black text-white"
         style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), var(--toi)" }}
       >

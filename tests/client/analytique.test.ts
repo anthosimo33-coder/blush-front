@@ -166,6 +166,11 @@ describe("le chargement de PostHog", () => {
     });
     expect(reglages.session_recording.blockSelector.split(", ")).toEqual(expect.arrayContaining(["img", "video", "canvas", "iframe"]));
     expect(reglages.session_recording.maskAttributeFn("aria-label", "Ta conv avec Léa")).toBe("***");
+    /* Le texte passe par masquerTexte (src/lib/secrets.ts) : l’interface se lit, une zone privée non */
+    document.body.innerHTML = `<p id="i">Choisis ton fichier</p><div data-prive=""><p id="c">tu me manques</p></div>`;
+    expect(reglages.session_recording.maskTextFn("Choisis ton fichier", document.querySelector("#i"))).toBe("Choisis ton fichier");
+    expect(reglages.session_recording.maskTextFn("tu me manques", document.querySelector("#c"))).toBe("** ** *******");
+    document.body.innerHTML = "";
     expect(capture.mock.calls).toEqual([["jalon_appli"]]);
     mesurer("jalon_fichier");
     expect(capture.mock.calls).toEqual([["jalon_appli"], ["jalon_fichier"]]);

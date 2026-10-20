@@ -29,6 +29,7 @@ import { MobileTopBar } from "@/components/shell/Screen";
 import { resetJourney } from "@/state/journey";
 import type { ConvSummary, Person } from "@/types";
 import { useRetourSinon } from "@/lib/navigation";
+import { retenirSecrets } from "@/lib/secrets";
 
 /* La recharge (et le paiement de Whop qu’elle porte) n’arrive pas avec la page : chargée au repos, ou à la demande */
 const FeuilleRecharge = dynamic(() => import("@/components/bulles/FeuilleRecharge").then((m) => m.FeuilleRecharge), { ssr: false });
@@ -92,6 +93,8 @@ export function CompteScreen({
 }) {
   const router = useRouter();
   const { data: account } = useCompte(compte ?? undefined, { rendu, frais: FRAIS_DU_RENDU });
+  /* Les prénoms de toutes tes convs et ton email : masqués dans l’enregistrement des visites (src/lib/secrets.ts) */
+  retenirSecrets([noms?.me.name, noms?.other.name, ...convs.map((c) => c.person.name), account?.email]);
   const { data: achats = [] } = useAchats(achatsRendus, { rendu, frais: FRAIS_DU_RENDU });
   const [bulles, setBulles] = useState<FeuilleDesBulles>(null);
   const recharge = useChargeAuRepos(chargerLaRecharge, { ouverte: bulles === "recharge" });
@@ -146,6 +149,8 @@ export function CompteScreen({
       <div className="flex flex-col items-center pt-2 text-center">
         <span
           aria-hidden="true"
+          /* Ton initiale : masquée dans l’enregistrement des visites (src/lib/secrets.ts) */
+          data-prive=""
           className="flex size-[76px] items-center justify-center rounded-full text-titre-2 font-black text-white"
           style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%), var(--toi)" }}
         >
