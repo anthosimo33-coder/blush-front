@@ -175,9 +175,12 @@ export async function getRetourDeLaLanding(): Promise<{ destination: Route } | {
  * désignent, voir ENTETE_CONV dans src/services/session.ts), et le compte, que la coque des écrans lit pour ses droits.
  * Sans requête de plus : le contexte de la requête est déjà lu pour la page (contexte, mémorisé le temps du rendu).
  */
-export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null }> {
+export async function pageDeConv(): Promise<{ id: string | null; compte: Account | null; secrets: string[] }> {
   const { story } = await contexte();
-  return { id: story?.id ?? null, compte: await getCompte() };
+  const compte = await getCompte();
+  /* Les prénoms de la conv et l’email du compte : l’enregistrement des visites les masque partout (src/lib/secrets.ts) */
+  const prenoms = story ? storyAffichee(story.id, metaDe(story)).participants.map((p) => p.name) : [];
+  return { id: story?.id ?? null, compte, secrets: [...prenoms, ...(compte?.email ? [compte.email] : [])] };
 }
 
 /**

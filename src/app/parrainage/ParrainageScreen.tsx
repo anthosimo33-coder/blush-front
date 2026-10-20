@@ -57,7 +57,10 @@ export function ParrainageScreen({ lien }: { lien: string }) {
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="break-all rounded-2xl bg-white px-4 py-3 text-corps font-black text-ink shadow-soft">{lien.replace(/^https?:\/\/(www\.)?/, "")}</p>
+        {/* data-prive : ton lien porte ton code, masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+        <p data-prive="" className="break-all rounded-2xl bg-white px-4 py-3 text-corps font-black text-ink shadow-soft">
+          {lien.replace(/^https?:\/\/(www\.)?/, "")}
+        </p>
         <p className="text-detail font-extrabold text-soft">{T.promesse}</p>
         <p className="text-detail font-extrabold text-soft">{T.quand}</p>
       </div>

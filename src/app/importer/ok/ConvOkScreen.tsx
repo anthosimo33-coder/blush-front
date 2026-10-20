@@ -40,7 +40,8 @@ export function ConvOkScreen({ source }: { source: Source }) {
       <div className="flex flex-col rounded-[24px] bg-white shadow-card">
         <div className="flex items-center gap-3 px-5 pb-4 pt-5">
           <AppBadge app={j.exportApp} size={46} />
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          {/* data-prive : le nom du fichier (souvent le prénom) et sa période, masqués dans l’enregistrement des visites */}
+          <span data-prive="" className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-corps font-black">{fileName}</span>
             <span className="text-legende font-extrabold text-grey">{source.period}</span>
           </span>

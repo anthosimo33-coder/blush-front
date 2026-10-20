@@ -23,7 +23,8 @@ export default async function Page() {
   return (
     <PageDeConv rendu={rendu}>
       <ViewTransition enter={{ "nav-forward": "push-in", default: "none" }} exit={{ "nav-back": "pop-out", default: "none" }} default="none">
-        <div className="[background:var(--paper-light)]">
+        {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+        <div data-prive="" className="[background:var(--paper-light)]">
           {/* L’heure du rendu : préchargée, la page peut dater de plusieurs minutes (voir FicheScreen) */}
           <FicheScreen initial={fiche} storyId={storyId} rendu={rendu} />
         </div>

@@ -30,7 +30,8 @@ export type HabillageAlerte = keyof typeof HABILLAGES;
  */
 export function Alert({ children, variant = "texte", className, ...rest }: { children: ReactNode; variant?: HabillageAlerte; className?: string } & AttributsLibres) {
   return (
-    <p role="alert" className={cn(HABILLAGES[variant], className)} {...rest}>
+    /* data-public : une erreur se lit dans l’enregistrement des visites, même dans une zone privée (src/lib/secrets.ts) */
+    <p role="alert" data-public="" className={cn(HABILLAGES[variant], className)} {...rest}>
       {children}
     </p>
   );

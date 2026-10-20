@@ -28,6 +28,8 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
+      /* Une initiale dit un prénom : masquée dans l’enregistrement des visites (src/lib/secrets.ts) */
+      data-prive=""
       className={cn("flex shrink-0 items-center justify-center rounded-full font-black text-white", className)}
       style={{
         width: size,

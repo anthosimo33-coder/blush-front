@@ -2,6 +2,7 @@
 
 import type { CaptureResult, PostHog, PostHogConfig, Properties } from "posthog-js";
 import { etapeDe } from "./presence";
+import { masquerTexte } from "./secrets";
 import { cleDePostHog } from "./publique";
 
 /*
@@ -16,12 +17,14 @@ import { cleDePostHog } from "./publique";
  * - l’adresse des pages sans ce qui pourrait dire qui l’on est : ni sa requête (sauf les utm_ des créatrices), ni ses
  *   identifiants (une conv, un lien partagé, un code de parrainage, un lien de tournage deviennent « :id »), ni le titre
  *   de la page ; d’un autre site, seulement son nom (nettoyer) ;
- * - l’enregistrement des visites sans rien de lisible : tout le texte et toutes les saisies masqués (« *** »), les
- *   images, les vidéos et les cadres bloqués (un rectangle vide : les captures d’une conv, l’enregistrement d’écran, la
- *   carte de Whop), les attributs qui peuvent dire un prénom masqués (aria-label, title, alt…), les liens et l’adresse
- *   des pages nettoyés comme le reste, ni la console, ni le réseau. On y voit la forme des pages, les gestes et les
- *   défilements ; jamais ce qui est écrit. L’enregistreur est dans le code (posthog-recorder) : aucun script chargé
- *   depuis PostHog ;
+ * - l’enregistrement des visites montre les écrans de BLUSH tels qu’ils s’affichent (les titres, les boutons, les
+ *   messages d’erreur : décidé le 20 octobre, tout masqué ne servait à rien), jamais la conv ni qui l’on est
+ *   (masquerTexte) : tout le texte d’une zone marquée `data-prive` (le chat, le rapport, la fiche, la lecture, le haut
+ *   du paywall, les avatars…), les prénoms et l’email retenus de la conv ouverte (retenirSecrets, partout ailleurs), tout
+ *   email, le titre de la page, et toutes les saisies masqués (« *** ») ; les images, les vidéos et les cadres bloqués
+ *   (un rectangle vide : les captures d’une conv, l’enregistrement d’écran, la carte de Whop), les attributs qui peuvent
+ *   dire un prénom masqués (aria-label, title, alt…), les liens et l’adresse des pages nettoyés comme le reste, ni la
+ *   console, ni le réseau. L’enregistreur est dans le code (posthog-recorder) : aucun script chargé depuis PostHog ;
  * - ni clics automatiques, ni sondages, ni heatmaps, ni web vitals, ni exceptions : coupés ici, ils le restent quoi que
  *   dise le tableau de bord de PostHog, dont on lit les réglages (il le faut pour l’enregistrement : sa part des
  *   visites enregistrées, sa durée minimale) ;
@@ -76,6 +79,8 @@ const ATTRIBUTS_LISIBLES = new Set([
   "value",
   "content",
   "download",
+  /* La citation d’une bulle de BLUSH (src/app/app/accueil/bulles.tsx) */
+  "data-quote",
 ]);
 /** Les attributs qui portent une adresse : nettoyés comme celle de la page. */
 const ATTRIBUTS_ADRESSE = new Set(["href", "src", "srcset", "action", "formaction", "poster", "xlink:href", "cite", "data"]);
@@ -164,7 +169,9 @@ const REGLAGES: Partial<PostHogConfig> = {
   enable_recording_console_log: false,
   session_recording: {
     maskAllInputs: true,
+    /* Chaque texte passe par masquerTexte, qui décide : l’interface lisible, la conv et qui l’on est masqués */
     maskTextSelector: "*",
+    maskTextFn: (texte, element) => masquerTexte(texte, element),
     blockSelector: "img, picture, video, canvas, iframe, object, embed",
     maskAttributeFn: (nom, valeur) => attributSur(nom, valeur),
     slimDOMOptions: "all",
