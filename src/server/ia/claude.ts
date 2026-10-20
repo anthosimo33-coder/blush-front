@@ -22,6 +22,12 @@ import { TEXTES } from "./textes.generated";
  * budget, l’échéance, la lecture et le refus. Le coût de chaque vrai appel est noté par src/server/ia/usage.ts.
  */
 const MODELE = "claude-opus-5-5";
+/**
+ * Le modèle d’une tâche, quand ce n’est pas MODELE. Lire des captures (et les écrans d’un enregistrement) est une
+ * transcription, pas une écriture : à l’essai du 20 octobre (scripts/essai-video-modeles.mts, deux convs de test
+ * filmées comme iMessage), Sonnet 5.5 en a lu autant mot pour mot qu’Opus 5.5, deux fois moins cher et plus vite.
+ */
+const MODELE_DE: Partial<Record<Tache, string>> = { "01-captures": "claude-sonnet-5-5" };
 
 /** Prix au million de tokens : entrée, sortie, écriture et lecture du cache. */
 type Prix = { entree: number; sortie: number; ecritureCache: number; lectureCache: number };
@@ -202,7 +208,7 @@ function formatDeSortie(schema: z.ZodType) {
 function parametres(req: Requete, schema: z.ZodType) {
   const reglage = REGLAGES[req.tache];
   return {
-    model: MODELE,
+    model: MODELE_DE[req.tache] ?? MODELE,
     max_tokens: reglage.maxTokens,
     /*
      * La réflexion résumée : sur notre modèle, elle arrive vide par défaut (« omitted »), et les jauges de lecture et

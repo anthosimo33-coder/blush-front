@@ -23,7 +23,7 @@ export const maxDuration = 30;
 /*
  * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
  * contenir, pour qu’un envoi forgé ne coûte pas des secondes de calcul ni des Mo en base. Un enregistrement réel en
- * est loin (seize lots de six écrans au plus, un peu plus quand des écrans lourds les font couper).
+ * est loin (trente-deux lots de six écrans au plus, un peu plus quand des écrans lourds les font couper).
  */
 const MESSAGES_MAX = 3000;
 /* Un lot : six écrans d’une vingtaine de messages, qui se recouvrent */

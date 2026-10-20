@@ -35,7 +35,8 @@
     "essai:vrai-modele": "tsx --conditions=react-server scripts/essai-vrai-modele.mts",
     "essai:memoire": "tsx --conditions=react-server scripts/essai-memoire.mts",
     "essai:ajouts": "tsx --conditions=react-server scripts/essai-ajouts.mts",
-    "essai:captures": "tsx --conditions=react-server scripts/essai-captures.mts"
+    "essai:captures": "tsx --conditions=react-server scripts/essai-captures.mts",
+    "essai:video": "tsx --conditions=react-server scripts/essai-video-modeles.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
