@@ -21,6 +21,8 @@ import { NBSP } from "@/lib/format";
  * à « Les visites, sans cookie », à valider, puis à reporter dans le PDF de confidentialité de Whop.
  * TODO(produit): PostHog (src/lib/analytique.ts) ajouté le 19 octobre 2026 : une phrase dans « Les visites, sans cookie »,
  * sa ligne dans « Nos prestataires » et la date de mise à jour, à valider, puis à reporter dans le PDF de Whop.
+ * TODO(produit): l’enregistrement des visites (src/lib/analytique.ts, validé par l’avocat le 19 octobre 2026, sans
+ * demande d’accord) : sa phrase dans « Les visites, sans cookie » et la ligne de PostHog, à relire, puis le PDF de Whop.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -65,8 +67,9 @@ export function ConfidentialiteScreen() {
           Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
           sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Avec ce
           même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}: 90 jours au plus. Ces pages vues et ces
-          étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien de ta conv. Si tu crées un compte, il
-          garde seulement d’où tu es venu.
+          étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien de ta conv. PostHog enregistre aussi
+          comment tu te sers du site (où tu touches, jusqu’où tu fais défiler), avec tous les textes, tout ce que tu tapes et toutes les images masqués{NBSP}: il voit la forme des
+          pages, jamais ce qui y est écrit. Si tu crées un compte, il garde seulement d’où tu es venu.
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
         <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">
@@ -151,7 +154,7 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, le rappel d’un paiement, la liste d’attente)" />
         {/* La mesure d’audience (src/lib/analytique.ts) : son serveur européen, sans cookie ni compte, les adresses nettoyées */}
-        <InsetRow title="PostHog" sub="La mesure d’audience, sans cookie, en Allemagne" />
+        <InsetRow title="PostHog" sub="La mesure d’audience et l’enregistrement des visites (textes et images masqués), sans cookie, en Allemagne" />
         {/* TODO(produit): vérifier où Whop et Cloudflare traitent ces données (leurs conditions) */}
         <InsetRow title="Whop" sub="Le paiement, qu’il encaisse en son nom (vendeur en titre), aux États-Unis" />
         {/* Le CAPTCHA (src/server/captcha.ts) : Cloudflare voit l’adresse IP et le navigateur, jamais la conv (« Pas de robots », plus haut) */}

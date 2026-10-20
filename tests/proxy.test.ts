@@ -168,6 +168,9 @@ describe("le relais de PostHog (/ingest)", () => {
     /* L’adresse IP passe : PostHog en tire son empreinte sans cookie */
     expect(enTeteRelaye(r, "x-forwarded-for")).toBe("203.0.113.7");
     expect(getRewrittenUrl(proxy(requete("/ingest/static/array.js")) as NextResponse)).toBe("https://eu-assets.i.posthog.com/static/array.js");
+    /* Ses réglages (le projet, l’enregistrement) : de son serveur de fichiers aussi */
+    expect(getRewrittenUrl(proxy(requete("/ingest/array/phc_essai/config")) as NextResponse)).toBe("https://eu-assets.i.posthog.com/array/phc_essai/config");
+    expect(getRewrittenUrl(proxy(requete("/ingest/s/?ver=1")) as NextResponse)).toBe("https://eu.i.posthog.com/s/?ver=1");
   });
 
   it("en mode tournage, rien ne part (200, comme PostHog, pour qu’il ne réessaie pas) ; sans la clé, le relais n’existe pas", async () => {

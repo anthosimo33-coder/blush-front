@@ -6,14 +6,25 @@ import { cleDePostHog } from "./publique";
 
 /*
  * La mesure d’audience chez PostHog (son serveur européen, à Francfort), en plus d’/admin : des tunnels et des cohortes
- * à la volée, sur les pages vues et les jalons du tunnel (src/lib/jalons.ts). Ce qu’il reçoit, et rien d’autre :
- * - sans cookie ni rien de gardé dans le navigateur (cookieless_mode : PostHog reconnaît un visiteur du jour par une
- *   empreinte qu’il calcule chez lui) ; ni compte, ni email, ni prénom : jamais d’identify, ni de profil ;
+ * à la volée, sur les pages vues et les jalons du tunnel (src/lib/jalons.ts), et l’enregistrement des visites (validé
+ * par l’avocat le 19 octobre, sans demande d’accord, sur tout le site). Ce qu’il reçoit, et rien d’autre :
+ * - sans cookie ni rien de gardé dans le navigateur (persistence « memory ») : un identifiant tiré au hasard au
+ *   chargement de la page, oublié en la quittant, comme le signe de présence (src/lib/presence.ts) ; une page
+ *   rechargée est un nouveau visiteur pour PostHog (/admin, lui, compte juste). Pas le mode sans cookie de PostHog
+ *   (cookieless_mode) : sans identifiant de visite, il n’enregistre rien (choix du 19 octobre). Ni compte, ni email, ni
+ *   prénom : jamais d’identify, ni de profil ;
  * - l’adresse des pages sans ce qui pourrait dire qui l’on est : ni sa requête (sauf les utm_ des créatrices), ni ses
  *   identifiants (une conv, un lien partagé, un code de parrainage, un lien de tournage deviennent « :id »), ni le titre
  *   de la page ; d’un autre site, seulement son nom (nettoyer) ;
- * - ni clics automatiques, ni enregistrements, ni sondages, ni réglages lus chez PostHog (advanced_disable_flags) : rien
- *   ne peut s’allumer depuis son tableau de bord sans passer par ce fichier ;
+ * - l’enregistrement des visites sans rien de lisible : tout le texte et toutes les saisies masqués (« *** »), les
+ *   images, les vidéos et les cadres bloqués (un rectangle vide : les captures d’une conv, l’enregistrement d’écran, la
+ *   carte de Whop), les attributs qui peuvent dire un prénom masqués (aria-label, title, alt…), les liens et l’adresse
+ *   des pages nettoyés comme le reste, ni la console, ni le réseau. On y voit la forme des pages, les gestes et les
+ *   défilements ; jamais ce qui est écrit. L’enregistreur est dans le code (posthog-recorder) : aucun script chargé
+ *   depuis PostHog ;
+ * - ni clics automatiques, ni sondages, ni heatmaps, ni web vitals, ni exceptions : coupés ici, ils le restent quoi que
+ *   dise le tableau de bord de PostHog, dont on lit les réglages (il le faut pour l’enregistrement : sa part des
+ *   visites enregistrées, sa durée minimale) ;
  * - par une adresse de BLUSH (/ingest, src/proxy.ts), qui retire nos cookies avant de passer la requête à PostHog, et
  *   ne passe rien en mode tournage.
  * Chargé une fois la page prête, jamais sur les outils de l’équipe, et seulement avec sa clé (NEXT_PUBLIC_POSTHOG_CLE) :
@@ -49,6 +60,65 @@ export function adresseSure(valeur: string, origine: string): string {
   return `${url.origin}${cheminSur(url.pathname)}${utm.length ? `?${new URLSearchParams(utm)}` : ""}`;
 }
 
+/** Un uuid, où qu’il soit dans un texte. */
+const UUIDS = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/gi;
+/** Les attributs qui portent un texte lisible (un prénom dans une étiquette, un nom de fichier) : masqués dans l’enregistrement. */
+const ATTRIBUTS_LISIBLES = new Set([
+  "aria-label",
+  "aria-description",
+  "aria-valuetext",
+  "aria-placeholder",
+  "aria-roledescription",
+  "title",
+  "alt",
+  "placeholder",
+  "label",
+  "value",
+  "content",
+  "download",
+]);
+/** Les attributs qui portent une adresse : nettoyés comme celle de la page. */
+const ATTRIBUTS_ADRESSE = new Set(["href", "src", "srcset", "action", "formaction", "poster", "xlink:href", "cite", "data"]);
+
+/**
+ * Un attribut d’un élément, tel qu’il part dans l’enregistrement (maskAttributeFn) : un texte lisible masqué, une
+ * adresse nettoyée (sans requête ni identifiant ; d’un autre site, son nom ; un fichier du navigateur, rien), et
+ * partout ailleurs les uuid remplacés.
+ */
+export function attributSur(nom: string, valeur: string, origine: string = window.location.origin): string {
+  if (ATTRIBUTS_LISIBLES.has(nom)) return "***";
+  if (ATTRIBUTS_ADRESSE.has(nom)) {
+    if (/^(blob|data):/i.test(valeur)) return "";
+    if (/^(mailto|tel):/i.test(valeur)) return valeur;
+    try {
+      const url = new URL(valeur, origine);
+      const sure = adresseSure(url.href, origine);
+      /* Une adresse relative le reste */
+      return url.origin === origine && !/^[a-z][a-z\d+.-]*:/i.test(valeur) ? sure.slice(origine.length) || "/" : sure;
+    } catch {
+      return "";
+    }
+  }
+  return valeur.replace(UUIDS, ":id");
+}
+
+/*
+ * Les morceaux d’un enregistrement ($snapshot) : l’adresse de la page qu’ils portent (l’événement « meta » de rrweb,
+ * et celle des événements de PostHog qu’il y glisse), nettoyée comme les autres. Le reste (le DOM) l’est déjà par
+ * l’enregistreur (maskTextSelector, blockSelector, attributSur).
+ */
+function morceauxSurs(morceaux: unknown, origine: string): unknown {
+  if (!Array.isArray(morceaux)) return morceaux;
+  return morceaux.map((m: unknown) => {
+    if (!m || typeof m !== "object" || !("data" in m) || !m.data || typeof m.data !== "object") return m;
+    const data: Record<string, unknown> = { ...(m.data as Record<string, unknown>) };
+    if (typeof data.href === "string") data.href = adresseSure(data.href, origine);
+    if (data.payload && typeof data.payload === "object" && "href" in data.payload && typeof data.payload.href === "string")
+      data.payload = { ...data.payload, href: adresseSure(data.payload.href, origine) };
+    return { ...m, data };
+  });
+}
+
 /** Le titre de la page, sous ses deux noms (« title » pour une page vue) : il peut dire un prénom, il ne part jamais. */
 const TITRES = new Set(["title", "$title"]);
 
@@ -57,7 +127,8 @@ function proprietesSures(p: Properties, origine: string): Properties {
   const sures: Properties = {};
   for (const [cle, valeur] of Object.entries(p)) {
     if (TITRES.has(cle)) continue;
-    if (typeof valeur !== "string") sures[cle] = valeur;
+    if (cle === "$snapshot_data") sures[cle] = morceauxSurs(valeur, origine);
+    else if (typeof valeur !== "string") sures[cle] = valeur;
     else if (/(url|referrer)$/i.test(cle)) sures[cle] = adresseSure(valeur, origine);
     else if (/pathname$/i.test(cle)) sures[cle] = cheminSur(valeur);
     else sures[cle] = valeur;
@@ -81,7 +152,6 @@ const REGLAGES: Partial<PostHogConfig> = {
   api_host: "/ingest",
   ui_host: "https://eu.posthog.com",
   defaults: "2026-01-30",
-  cookieless_mode: "always",
   persistence: "memory",
   person_profiles: "never",
   autocapture: false,
@@ -90,13 +160,27 @@ const REGLAGES: Partial<PostHogConfig> = {
   capture_heatmaps: false,
   capture_exceptions: false,
   capture_performance: false,
-  disable_session_recording: true,
+  disable_session_recording: false,
+  enable_recording_console_log: false,
+  session_recording: {
+    maskAllInputs: true,
+    maskTextSelector: "*",
+    blockSelector: "img, picture, video, canvas, iframe, object, embed",
+    maskAttributeFn: (nom, valeur) => attributSur(nom, valeur),
+    slimDOMOptions: "all",
+    recordHeaders: false,
+    recordBody: false,
+    recordCrossOriginIframes: false,
+    captureJsonLd: false,
+    collectFonts: false,
+    /* Les morceaux partent tels quels (la requête, elle, reste compressée) : before_send peut en nettoyer l’adresse */
+    compress_events: false,
+  },
   disable_surveys: true,
   disable_product_tours: true,
   disable_conversations: true,
   disable_web_experiments: true,
   disable_external_dependency_loading: true,
-  advanced_disable_flags: true,
   mask_all_text: true,
   mask_all_element_attributes: true,
   before_send: (e) => nettoyer(e),
@@ -116,9 +200,10 @@ export function demarrerLaMesure(): void {
   const cle = cleDePostHog();
   if (demarre || !cle || typeof window === "undefined" || etapeDe(window.location.pathname) === null) return;
   demarre = true;
+  /* L’enregistreur avec PostHog : il se pose sur la page (window.__PosthogExtensions__), qu’aucun script ne vienne de chez PostHog */
   const charger = () =>
-    void import("posthog-js").then(
-      ({ default: ph }) => {
+    void Promise.all([import("posthog-js"), import("posthog-js/dist/posthog-recorder")]).then(
+      ([{ default: ph }]) => {
         ph.init(cle, REGLAGES);
         posthog = ph;
         for (const evenement of enAttente.splice(0)) ph.capture(evenement);
