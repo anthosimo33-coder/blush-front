@@ -480,11 +480,18 @@ const estMoi = (id: string): id is Moi => id === "p0" || id === "p1";
  * « Qui es-tu ? » rempli : la lecture part. `me` vient du parcours (l’`id` d’un participant, une chaîne) : un autre que
  * p0 ou p1 ne part pas, et c’est « Qui es-tu ? » à refaire, comme le serveur le dirait (« qui »).
  */
-export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null }): Promise<void> {
+export async function startAnalysis(input: { me: string; guess: Guess; goal: Goal; pronom?: Pronom | null; prenom?: string | null; prenomAutre?: string | null }): Promise<void> {
   const { me } = input;
   if (!estMoi(me)) throw new ErreurApi("qui", 422);
   return void (await appel("POST /api/analyse", {
-    corps: { me, guess: input.guess, goal: input.goal, pronom: input.pronom ?? "il", ...(input.prenom ? { prenom: input.prenom } : {}) },
+    corps: {
+      me,
+      guess: input.guess,
+      goal: input.goal,
+      pronom: input.pronom ?? "il",
+      ...(input.prenom ? { prenom: input.prenom } : {}),
+      ...(input.prenomAutre ? { prenomAutre: input.prenomAutre } : {}),
+    },
   }));
 }
 

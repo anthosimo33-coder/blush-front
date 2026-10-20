@@ -15,5 +15,12 @@ export function moiEtAutre(story: Pick<Story, "participants" | "me">, repli?: Pe
   return (story.me ?? repli) === b.id ? { moi: b, autre: a } : { moi: a, autre: b };
 }
 
+/**
+ * Sur des captures (ou un enregistrement), le nom de l’autre a-t-il été lu en haut de la conv ? Sans lui, la lecture
+ * l’appelle « Elle » (versTexteCaptures, prompts/lib/captures.ts), et un contact que le téléphone ne connaît pas n’a
+ * qu’un numéro : « Qui es-tu ? » demande alors son prénom (src/app/qui), que le serveur pose à sa place (definirQui).
+ */
+export const nomLu = (nom: string) => nom !== "Elle" && /\p{L}/u.test(nom);
+
 /** Le titre du duo (« Tom & Léa ») : les deux prénoms dans l’ordre de l’export, quel que soit qui est toi. */
 export const titreDuo = (story: Pick<Story, "participants">) => `${story.participants[0].name} & ${story.participants[1].name}`;

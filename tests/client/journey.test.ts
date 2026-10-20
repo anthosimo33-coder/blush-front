@@ -32,6 +32,7 @@ describe("l’état du parcours relu de l’onglet", () => {
       me: "p0",
       pronom: null,
       prenom: "",
+      prenomAutre: "",
       guess: "flou",
       goal: null,
       email: "a@b.test",

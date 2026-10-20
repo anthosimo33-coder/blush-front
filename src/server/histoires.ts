@@ -16,6 +16,7 @@ import {
 import { prenomDe } from "@prompts/lib/ajouts";
 import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
+import { nomLu } from "@/lib/participants";
 import { pronomOppose } from "@/lib/pronom";
 import { empreinte, jeton } from "./chiffrement";
 import * as coffre from "./coffre";
@@ -303,10 +304,20 @@ export function histoireDe(meta: Meta): Histoire {
   };
 }
 
-export async function definirQui(id: string, { prenom, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string }): Promise<Meta> {
+export async function definirQui(
+  id: string,
+  { prenom, prenomAutre, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string; prenomAutre?: string },
+): Promise<Meta> {
   const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories:qui_est_qui"));
-  /* Des captures : l’utilisateur est « Moi », son prénom vient de l’écran */
-  const renomme = (p: Participant, k: 0 | 1): Participant => (prenom && k === qui.moi ? { ...p, prenom: prenomDe(prenom) } : p);
+  /*
+   * Des captures : l’utilisateur est « Moi », son prénom vient de l’écran. L’autre garde le nom lu en haut de la conv ;
+   * s’il n’a pas été lu (« Elle », un numéro : nomLu), le prénom que l’écran a demandé le remplace
+   */
+  const renomme = (p: Participant, k: 0 | 1): Participant => {
+    if (prenom && k === qui.moi) return { ...p, prenom: prenomDe(prenom) };
+    if (prenomAutre && k !== qui.moi && avant.format === "captures" && !nomLu(p.nom)) return { ...p, prenom: prenomDe(prenomAutre) };
+    return p;
+  };
   const participants: Meta["participants"] = [renomme(avant.participants[0], 0), renomme(avant.participants[1], 1)];
   const meta = { ...avant, ...qui, participants };
   await db()

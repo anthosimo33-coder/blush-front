@@ -11,6 +11,7 @@ const EXPORT: JourneyState = {
   me: "p1",
   pronom: "il",
   prenom: "",
+  prenomAutre: "",
   guess: "vus",
   goal: "ensemble",
   email: "tom@e2e.blush.test",
@@ -30,6 +31,13 @@ describe("« Qui es-tu ? » complet (quiComplet)", () => {
     expect(quiComplet({ ...CAPTURES, prenom: "Tom" }, { captures: true })).toBe(true);
   });
 
+  it("sur des captures dont la lecture n’a pas lu son nom : son prénom en plus", () => {
+    const tom = { ...CAPTURES, prenom: "Tom" };
+    expect(quiComplet(tom, { captures: true, sonPrenom: true })).toBe(false);
+    expect(quiComplet({ ...tom, prenomAutre: " " }, { captures: true, sonPrenom: true })).toBe(false);
+    expect(quiComplet({ ...tom, prenomAutre: "Léa" }, { captures: true, sonPrenom: true })).toBe(true);
+  });
+
   it("après le code, une conv de captures sans prénom renvoie à « Qui es-tu ? », comme l’écran", () => {
     expect(vientDeCaptures(CAPTURES)).toBe(true);
     expect(quiComplet(CAPTURES, { captures: vientDeCaptures(CAPTURES) })).toBe(false);
@@ -44,14 +52,15 @@ describe("les réponses qui lancent la lecture (reponsesQui)", () => {
   it("reprennent le parcours, le prénom seulement s’il est écrit", () => {
     const captures = { ...CAPTURES, prenom: " Tom " };
     if (!quiComplet(captures, { captures: true }) || !quiComplet(EXPORT, { captures: false })) throw new Error("parcours incomplet");
-    expect(reponsesQui(captures, { captures: true })).toEqual({ me: "p0", pronom: "il", guess: "vus", goal: "ensemble", prenom: "Tom" });
-    expect(reponsesQui(EXPORT, { captures: false })).toEqual({ me: "p1", pronom: "il", guess: "vus", goal: "ensemble", prenom: null });
+    expect(reponsesQui(captures, { captures: true })).toEqual({ me: "p0", pronom: "il", guess: "vus", goal: "ensemble", prenom: "Tom", prenomAutre: null });
+    expect(reponsesQui({ ...captures, prenomAutre: " Léa " }, { captures: true })).toMatchObject({ prenom: "Tom", prenomAutre: "Léa" });
+    expect(reponsesQui(EXPORT, { captures: false })).toEqual({ me: "p1", pronom: "il", guess: "vus", goal: "ensemble", prenom: null, prenomAutre: null });
   });
 
   it("un export après des captures, dans le même onglet : le prénom resté ne part pas", () => {
-    const apres: JourneyState = { ...EXPORT, prenom: "Tom" };
+    const apres: JourneyState = { ...EXPORT, prenom: "Tom", prenomAutre: "Léa" };
     if (!quiComplet(apres, { captures: vientDeCaptures(apres) })) throw new Error("parcours incomplet");
-    expect(reponsesQui(apres, { captures: vientDeCaptures(apres) })).toMatchObject({ me: "p1", prenom: null });
+    expect(reponsesQui(apres, { captures: vientDeCaptures(apres) })).toMatchObject({ me: "p1", prenom: null, prenomAutre: null });
   });
 });
 
