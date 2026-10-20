@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JourneyState } from "@/state/journey";
-import { quiComplet, reponsesQui, vientDeCaptures } from "@/state/parcours";
+import { aideDuPrenom, quiComplet, reponsesQui, vientDeCaptures } from "@/state/parcours";
 
 /* Le parcours d’un onglet, « Qui es-tu ? » rempli sur un export */
 const EXPORT: JourneyState = {
@@ -52,5 +52,16 @@ describe("les réponses qui lancent la lecture (reponsesQui)", () => {
     const apres: JourneyState = { ...EXPORT, prenom: "Tom" };
     if (!quiComplet(apres, { captures: vientDeCaptures(apres) })) throw new Error("parcours incomplet");
     expect(reponsesQui(apres, { captures: vientDeCaptures(apres) })).toMatchObject({ me: "p1", prenom: null });
+  });
+});
+
+describe("l’aide au-dessus de « Ton prénom », sur des captures (aideDuPrenom)", () => {
+  it("nomme l’autre quand son nom a été lu, pour des captures comme pour un enregistrement", () => {
+    expect(aideDuPrenom("Elias")).toBe("Ton prénom (dans votre conv avec Elias, tu es à droite)");
+  });
+
+  it("ne nomme personne quand le nom n’a pas été lu (« Elle ») ou n’est qu’un numéro", () => {
+    expect(aideDuPrenom("Elle")).toBe("Ton prénom (dans votre conv, tu es à droite)");
+    expect(aideDuPrenom("+33 6 12 34 56 78")).toBe("Ton prénom (dans votre conv, tu es à droite)");
   });
 });
