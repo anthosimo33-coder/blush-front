@@ -33,6 +33,8 @@ beforeEach(() => {
   vi.stubEnv("RESEND_API_KEY", undefined);
   vi.stubEnv("RESEND_API_KEY_CODES", undefined);
   vi.stubEnv("BLUSH_EMAIL_FROM_CODES", undefined);
+  vi.stubEnv("BLUSH_EMAIL_FROM", undefined);
+  vi.stubEnv("BLUSH_EMAIL_FROM_MARKETING", undefined);
   vi.stubEnv("VERCEL", undefined);
   vi.stubEnv("BLUSH_IA_FACTICE", "1");
   vi.stubEnv("ANTHROPIC_API_KEY", undefined);
@@ -140,6 +142,42 @@ describe("la boîte à mails des tests de bout en bout", () => {
     /* Les lignes du journal (du JSON) */
     const lignes = journal.mock.calls.map(([l]) => String(l)).filter((l) => l.startsWith("{"));
     expect(lignes.map((l) => JSON.parse(l) as Record<string, unknown>)).toEqual([expect.objectContaining({ evenement: "mail retenu", sorte: "attente", destinataires: 1 })]);
+  });
+});
+
+describe("l’expéditeur de chaque mail, et son tag pour la délivrabilité", () => {
+  it("expediteurDe : les relances (séquences, relance ②) partent du sous-domaine, la réponse au domaine principal ; tous les autres du domaine principal", async () => {
+    const { expediteurDe } = await charger();
+    const reglages = { BLUSH_EMAIL_FROM: "BLUSH <bonjour@askblush.com>", BLUSH_EMAIL_FROM_MARKETING: "BLUSH <bonjour@news.askblush.com>" };
+    expect(expediteurDe("relance", reglages)).toEqual({ de: "BLUSH <bonjour@news.askblush.com>", repondreA: "bonjour@askblush.com" });
+    for (const sorte of ["rapport", "alerte", "attente"] as const) expect(expediteurDe(sorte, reglages), sorte).toEqual({ de: "BLUSH <bonjour@askblush.com>" });
+    /* Sans la variable (avant que le sous-domaine existe) : tout part du domaine principal, sans reply_to */
+    expect(expediteurDe("relance", { BLUSH_EMAIL_FROM: "BLUSH <bonjour@askblush.com>", BLUSH_EMAIL_FROM_MARKETING: undefined })).toEqual({ de: "BLUSH <bonjour@askblush.com>" });
+    /* Un expéditeur sans nom : l’adresse telle quelle */
+    expect(expediteurDe("relance", { BLUSH_EMAIL_FROM: "bonjour@askblush.com", BLUSH_EMAIL_FROM_MARKETING: "news@news.askblush.com" })).toEqual({
+      de: "news@news.askblush.com",
+      repondreA: "bonjour@askblush.com",
+    });
+  });
+
+  it("chez Resend : la relance part de BLUSH_EMAIL_FROM_MARKETING avec reply_to, le rapport et le code du domaine principal ; chacun avec son tag « sorte »", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-cle-fictive");
+    vi.stubEnv("RESEND_API_KEY", "re_cle_fictive");
+    vi.stubEnv("BLUSH_EMAIL_FROM_MARKETING", "BLUSH <bonjour@news.askblush.com>");
+    const envoi = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }));
+    const { envoyerCodeParEmail, envoyerMail } = await charger();
+    await envoyerMail("noe@e2e.blush.test", { sujet: "S1", texte: "Le titre de ton paywall" }, { sorte: "relance", suivi: "sequence-s1_haut" });
+    await envoyerMail("noe@e2e.blush.test", { sujet: "Relance", texte: "Ton rapport t’attend" }, { sorte: "relance" });
+    await envoyerMail("noe@e2e.blush.test", { sujet: "Rapport", texte: "Ton rapport est prêt" });
+    await envoyerCodeParEmail("noe@e2e.blush.test", "042917");
+    const corps = envoi.mock.calls.map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+    expect(corps.map((c) => [c.from, c.reply_to, c.tags])).toEqual([
+      ["BLUSH <bonjour@news.askblush.com>", "bonjour@askblush.com", [{ name: "sorte", value: "sequence-s1_haut" }]],
+      ["BLUSH <bonjour@news.askblush.com>", "bonjour@askblush.com", [{ name: "sorte", value: "relance" }]],
+      ["BLUSH <bonjour@askblush.com>", undefined, [{ name: "sorte", value: "rapport" }]],
+      ["BLUSH <bonjour@askblush.com>", undefined, [{ name: "sorte", value: "code" }]],
+    ]);
   });
 });
 

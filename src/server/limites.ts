@@ -197,6 +197,8 @@ export const LIMITES = {
   mesuresParIp: { max: 120, fenetreS: 3600 },
   /** Les alertes d’une erreur de navigateur jamais vue du jour, pour tous et par jour : les suivantes ne se lisent que dans /admin. */
   alertesNavigateurParJour: { max: 10, fenetreS: 86400 },
+  /** L’alerte d’un seuil de délivrabilité franchi (src/server/delivrabilite.ts) : une par jour au plus, le détail est dans /admin. */
+  alertesDelivrabiliteParJour: { max: 1, fenetreS: 86400 },
 } as const;
 
 /*

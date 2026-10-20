@@ -329,6 +329,8 @@ type Reponses = {
   "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number; sequences: number };
   "POST /api/desinscription": Ok;
   "POST /api/desinscription/un-clic": Ok;
+  /** Le webhook de Resend (ce qui arrive aux mails), hors de la garde commune : sa signature (401 « interdit » sinon). */
+  "POST /api/mails/resend": Ok;
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
   "POST /api/fiche": FicheUpdate;
@@ -458,6 +460,8 @@ export const ROUTES = {
   "POST /api/desinscription": { corps: z.object({ id: z.string(), cle: z.string(), quoi: z.enum(DESINSCRIPTIONS).default("offres") }) },
   /* La messagerie elle-même (RFC 8058) : le lien signé est dans l’adresse, le corps ne dit rien */
   "POST /api/desinscription/un-clic": {},
+  /* Resend lui-même : le corps se lit brut (la signature porte sur ses octets), src/server/delivrabilite.ts le lit */
+  "POST /api/mails/resend": {},
   "GET /api/fiche": {},
   /* Sa fiche corrigée : la liste entière de ses faits */
   "PUT /api/fiche": {

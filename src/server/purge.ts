@@ -3,6 +3,7 @@ import { and, isNotNull, isNull, lt, not, or } from "drizzle-orm";
 import { alerter } from "./alertes";
 import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
+import { EVENEMENTS_MAILS_GARDES_JOURS } from "./delivrabilite";
 import { PREDICATS } from "./depot";
 import { journalErreur } from "./journal";
 import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
@@ -20,6 +21,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - les inscriptions à la liste d’attente de plus d’un an (ATTENTE_GARDEE_JOURS, src/server/attente.ts) ;
  * - les webhooks de paiement déjà traités (evenements_paiement) de plus de 90 jours (EVENEMENTS_PAIEMENT_GARDES_JOURS) :
  *   Whop ne rejoue un webhook que quelques jours, au-delà son `webhook-id` ne sert plus à rien ;
+ * - les événements des mails que Resend nous rend (evenements_mails) de plus de 30 jours (EVENEMENTS_MAILS_GARDES_JOURS,
+ *   src/server/delivrabilite.ts) : /admin n’en lit que les 7 derniers jours ;
  * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
  *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
  *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
@@ -85,6 +88,11 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.evenementsPaiement)
       .where(lt(schema.evenementsPaiement.recuLe, il_y_a(EVENEMENTS_PAIEMENT_GARDES_JOURS)));
+  });
+  await etape("événements des mails", async () => {
+    await db()
+      .delete(schema.evenementsMails)
+      .where(lt(schema.evenementsMails.le, il_y_a(EVENEMENTS_MAILS_GARDES_JOURS)));
   });
   await etape("liste d’attente", () => purgerLaListe(maintenant));
   await etape("signes des onglets", async () => {

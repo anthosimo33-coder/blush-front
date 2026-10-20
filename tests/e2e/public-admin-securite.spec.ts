@@ -44,6 +44,8 @@ const WEBHOOK = "/api/paiement/whop";
 const API_DU_TOURNAGE = ["/api/admin/tournage", "/api/admin/tournage/[id]/arreter"];
 /** La désinscription en un clic (RFC 8058), hors de la garde commune : la messagerie l’appelle de ses serveurs, seul le lien signé compte. */
 const UN_CLIC = "/api/desinscription/un-clic";
+/** Le webhook de Resend (ce qui arrive aux mails), hors de la garde commune : Resend n’a pas notre origine, seule sa signature compte. */
+const WEBHOOK_RESEND = "/api/mails/resend";
 
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
@@ -67,8 +69,8 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
   await test.step("les 35 routes gardées de la table du contrat (le signe des onglets, les jalons du tunnel et ce que remontent les navigateurs compris), depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(39);
-    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && c !== UN_CLIC && !API_DU_TOURNAGE.includes(c))) {
+    expect(MUTATIONS).toHaveLength(40);
+    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && c !== WEBHOOK_RESEND && c !== UN_CLIC && !API_DU_TOURNAGE.includes(c))) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
         const qui = `${methode} ${chemin} depuis ${origine ?? "nulle part"}`;
@@ -81,6 +83,14 @@ test("une route qui modifie refuse (403) une requête venue d’un autre site, d
   await test.step("le webhook de Whop, d’où qu’il vienne : sans signature, 401 « interdit »", async () => {
     for (const origine of [PIRATE, URL_APPLI, null]) {
       const r = await request.post(WEBHOOK, { headers: origine ? { origin: origine } : {}, data: { type: "payment.succeeded", data: {} } });
+      expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
+      expect.soft(await r.json()).toEqual({ erreur: "interdit" });
+    }
+  });
+
+  await test.step("le webhook de Resend, d’où qu’il vienne : sans signature, 401 « interdit »", async () => {
+    for (const origine of [PIRATE, URL_APPLI, null]) {
+      const r = await request.post(WEBHOOK_RESEND, { headers: origine ? { origin: origine } : {}, data: { type: "email.complained", data: { to: ["quelquun@blush.test"] } } });
       expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
       expect.soft(await r.json()).toEqual({ erreur: "interdit" });
     }

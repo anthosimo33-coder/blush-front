@@ -72,6 +72,8 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(direct).toHaveAttribute("href", "/admin/direct");
     await expect(direct).toContainText(/^En direct\s*\d+\s*en ligne$/);
     await expect(rubriques.getByRole("link", { name: "Outils" })).toHaveAttribute("href", "#outils");
+    /* La délivrabilité des mails : sans RESEND_WEBHOOK_SECRET (le serveur des tests), le bloc dit que le webhook n’est pas branché */
+    await expect(page.getByRole("region", { name: "Délivrabilité", exact: true })).toContainText("Le webhook de Resend n’est pas branché");
     /* Les invités de BLUSH_ACCES_LIBRE : ceux des tests */
     await expect(page.getByText(new RegExp(`^Invités\\s*BLUSH_ACCES_LIBRE\\s*${INVITES.length}$`))).toBeVisible();
     await expect(page.getByText("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.")).toBeVisible();

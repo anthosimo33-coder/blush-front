@@ -34,7 +34,18 @@ import {
   STATUTS_ACHAT,
   VOIX,
 } from "../../types";
-import { ACTIONS_EQUIPE, FOURNISSEURS_PAIEMENT, GENRES, GENRES_CHAINE, RAISONS_BULLES, ROLES_CHAT, SOURCES_ATTENTE, STATUTS_TACHE, type DetailEcriture } from "./enums";
+import {
+  ACTIONS_EQUIPE,
+  FOURNISSEURS_PAIEMENT,
+  GENRES,
+  GENRES_CHAINE,
+  RAISONS_BULLES,
+  ROLES_CHAT,
+  SOURCES_ATTENTE,
+  STATUTS_TACHE,
+  TYPES_EVENEMENTS_MAILS,
+  type DetailEcriture,
+} from "./enums";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -764,4 +775,22 @@ export const filDirect = pgTable(
     ref: text("ref"),
   },
   (t) => [index("fil_direct_le_idx").on(t.le), index("fil_direct_ref_idx").on(t.ref)],
+);
+
+/**
+ * Ce qui arrive aux mails, que Resend nous rend par son webhook (src/server/delivrabilite.ts) : leur sorte (le tag posé
+ * à l’envoi, SorteSuivie dans src/server/email.ts, ou « inconnue »), l’événement, quand, et le compte du destinataire
+ * s’il en a un (null sinon, ou effacé depuis). Ni adresse, ni sujet, ni contenu. `id` : l’identifiant de l’envoi du
+ * webhook (svix-id), le même à chaque nouvel essai : un événement ne compte qu’une fois. Gardé EVENEMENTS_MAILS_GARDES_JOURS.
+ */
+export const evenementsMails = pgTable(
+  "evenements_mails",
+  {
+    id: text("id").primaryKey(),
+    le: quand("le").notNull().defaultNow(),
+    type: text("type", { enum: TYPES_EVENEMENTS_MAILS }).notNull(),
+    sorte: text("sorte").notNull(),
+    compteId: uuid("compte_id").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("evenements_mails_le_idx").on(t.le)],
 );
