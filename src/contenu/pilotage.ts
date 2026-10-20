@@ -73,3 +73,17 @@ export const NOMS_DES_ETAPES: Record<EtapeVisite, string> = {
   compte: "Sur leur compte",
   autre: "Ailleurs",
 };
+
+/**
+ * Les seuils de la délivrabilité des mails (le bloc « Délivrabilité », src/server/delivrabilite.ts), en part de 1.
+ * Resend : rebonds sous 4 % des mails partis, plaintes sous 0,08 % des mails remis (au-delà, il peut suspendre l’envoi).
+ * Gmail : signalements comme spam sous 0,1 %, jamais 0,3 % (ses règles des envois en nombre, février 2024) ; mais Gmail
+ * ne rend pas ses plaintes à Resend : elles se lisent dans Google Postmaster Tools, pas ici.
+ */
+export const SEUILS_DELIVRABILITE = { rebonds: 0.04, plaintes: 0.0008, spamGmail: 0.001, spamGmailJamais: 0.003 } as const;
+
+/** Sous ce nombre de mails partis sur 7 jours, le taux de rebonds ne se juge pas (un rebond sur dix mails ferait 10 %) ; les plaintes, toujours. */
+export const VOLUME_MIN_DES_REBONDS = 50;
+
+/** Une sorte de mail (SorteSuivie, src/server/email.ts) du sous-domaine des relances : la relance ②, ou un mail des séquences. */
+export const estUneRelance = (sorte: string) => sorte === "relance" || sorte.startsWith("sequence-");

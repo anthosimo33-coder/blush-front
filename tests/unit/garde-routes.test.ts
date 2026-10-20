@@ -78,8 +78,8 @@ const SANS_COMPTE = new Set<CleRoute>([
 /**
  * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, les relances
  * que la veille de GitHub appelle, et le relais de la chaîne), le réveil qui ne dit rien, le webhook de Whop (sa
- * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine), et l’API du mode tournage (la clé de l’outil
- * des créatrices, un serveur lui aussi).
+ * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine), celui de Resend (sa signature aussi), la
+ * désinscription en un clic (le lien signé), et l’API du mode tournage (la clé de l’outil des créatrices, un serveur lui aussi).
  */
 const API_DU_TOURNAGE = ["POST /api/admin/tournage", "GET /api/admin/tournage/[id]", "POST /api/admin/tournage/[id]/arreter"] as const satisfies CleRoute[];
 const HORS_GARDE = new Set<CleRoute>([
@@ -89,6 +89,7 @@ const HORS_GARDE = new Set<CleRoute>([
   "GET /api/reveil",
   "POST /api/paiement/whop",
   "POST /api/desinscription/un-clic",
+  "POST /api/mails/resend",
   ...API_DU_TOURNAGE,
 ]);
 
@@ -104,8 +105,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 39 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(39);
+  it("la table compte 40 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(40);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 

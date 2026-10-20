@@ -88,7 +88,10 @@ import { rechargeDejaPayee } from "./achats";
  *   des mails du prestataire (sorte « relance ») ; plus le plafond de la relance (décidé le 17 octobre : s’il en faut 60,
  *   il en part 60) ;
  * - la désinscription en un clic dans leurs en-têtes (List-Unsubscribe, entetesDeDesinscription), que Gmail et Yahoo
- *   montrent à côté de l’expéditeur : moins de signalements de spam, la délivrabilité du domaine gardée.
+ *   montrent à côté de l’expéditeur : moins de signalements de spam, la délivrabilité du domaine gardée ;
+ * - ils partent du sous-domaine des relances (BLUSH_EMAIL_FROM_MARKETING, expediteurDe dans src/server/email.ts) : leurs
+ *   plaintes n’entraînent pas les codes de connexion. Les rebonds et les plaintes de chacun se lisent dans /admin
+ *   (src/server/delivrabilite.ts).
  * Envoyés par GET /api/cron/relances (Vercel Cron, toutes les 5 minutes), juste après les relances.
  * TODO(produit): à relire par un juriste : des mails commerciaux (S4, S6, S7) à des clients, pour des services analogues
  * (article L34-5 du Code des postes et des communications électroniques), et leur lien de désinscription.
@@ -801,7 +804,8 @@ export async function envoyerLesSequences({ maintenant = new Date() }: { mainten
       parti = await envoyerMail(
         c.email,
         { ...mailDeSequence(mail, { base: env().BLUSH_URL, liens: liensDe(c, mail) }), entetes: entetesDeDesinscription(c.userId, MAILS[c.cle]) },
-        { sorte: "relance" },
+        /* Du sous-domaine des relances (expediteurDe), suivi par sa clé (le bloc « Délivrabilité » d’/admin) */
+        { sorte: "relance", suivi: `sequence-${c.cle}` },
       );
     } catch (e) {
       journalErreur("séquence : mail refusé", e);

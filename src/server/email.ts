@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { boiteAMails, env } from "./env";
+import { boiteAMails, env, type Env } from "./env";
 import { delaiAppel } from "./echeance";
 import { auMieux, enLocal, journal } from "./journal";
 import { dansLeQuotaDesMails, rendreAuQuotaDesMails, type SorteDeMail } from "./limites";
@@ -48,12 +48,53 @@ export class ErreurResend extends Error {
  */
 export const refusDuPrestataire = (e: unknown): boolean => e instanceof ErreurResend && (e.statut === 429 || e.statut === 401 || e.statut === 403 || e.statut >= 500);
 
-/* Poste un mail chez le prestataire, avec la clé `cle` et l’expéditeur `de` : rejette avec ErreurResend s’il le refuse */
-async function poster(pour: string[], { sujet, texte, html, entetes }: Mail, { cle, de }: { cle: string; de: string }): Promise<void> {
+/**
+ * Ce qu’est un mail pour le suivi de la délivrabilité : son tag « sorte » chez Resend, que ses webhooks nous rendent
+ * (src/server/delivrabilite.ts). Le code de connexion, une sorte du quota (SorteDeMail), ou un mail des séquences par sa
+ * clé (« sequence-s1_haut ») : des lettres, des chiffres, « _ » et « - », comme Resend l’exige d’un tag.
+ */
+export type SorteSuivie = "code" | SorteDeMail | `sequence-${string}`;
+
+/** L’adresse seule d’un expéditeur : « bonjour@askblush.com » pour « BLUSH <bonjour@askblush.com> ». */
+const adresseDe = (expediteur: string) => /<([^<>]+)>\s*$/.exec(expediteur)?.[1]?.trim() ?? expediteur.trim();
+
+/**
+ * L’expéditeur d’un mail de cette sorte (du quota). Les mails qu’on envoie sans qu’on les demande, la sorte « relance »
+ * (les séquences, la relance ②), partent de BLUSH_EMAIL_FROM_MARKETING s’il est posé (un sous-domaine : leurs plaintes
+ * pour spam n’entraînent pas le domaine des codes), et la réponse va à l’adresse de BLUSH_EMAIL_FROM (`repondreA`, le
+ * reply_to de Resend). Tous les autres (« ton rapport est prêt », la liste d’attente, les alertes), et les relances tant
+ * que la variable manque, partent de BLUSH_EMAIL_FROM. Les codes ont le leur (envoyerCodeParEmail).
+ */
+export function expediteurDe(
+  sorte: SorteDeMail,
+  { BLUSH_EMAIL_FROM, BLUSH_EMAIL_FROM_MARKETING }: Pick<Env, "BLUSH_EMAIL_FROM" | "BLUSH_EMAIL_FROM_MARKETING">,
+): { de: string; repondreA?: string } {
+  if (sorte !== "relance" || !BLUSH_EMAIL_FROM_MARKETING) return { de: BLUSH_EMAIL_FROM };
+  return { de: BLUSH_EMAIL_FROM_MARKETING, repondreA: adresseDe(BLUSH_EMAIL_FROM) };
+}
+
+/**
+ * Poste un mail chez le prestataire, avec la clé `cle`, l’expéditeur `de` (et l’adresse de la réponse, `repondreA`) et
+ * son tag « sorte » (`suivi`) : rejette avec ErreurResend s’il le refuse.
+ */
+async function poster(
+  pour: string[],
+  { sujet, texte, html, entetes }: Mail,
+  { cle, de, repondreA, suivi }: { cle: string; de: string; repondreA?: string; suivi: SorteSuivie },
+): Promise<void> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${cle}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: de, to: pour, subject: sujet, text: texte, ...(html !== undefined && { html }), ...(entetes && { headers: entetes }) }),
+    body: JSON.stringify({
+      from: de,
+      to: pour,
+      subject: sujet,
+      text: texte,
+      ...(html !== undefined && { html }),
+      ...(entetes && { headers: entetes }),
+      ...(repondreA && { reply_to: repondreA }),
+      tags: [{ name: "sorte", value: suivi }],
+    }),
     signal: AbortSignal.timeout(delaiAppel(DELAI_MAIL_MS, 2_000)),
   });
   if (!r.ok) throw new ErreurResend(r.status);
@@ -62,11 +103,16 @@ async function poster(pour: string[], { sujet, texte, html, entetes }: Mail, { c
 /**
  * Envoie un mail qui n’est pas un code, sa version texte et sa version HTML s’il en a une (une alerte de l’équipe n’en a
  * pas), à un ou plusieurs destinataires, avec RESEND_API_KEY. `sorte` : ce qu’il est pour le quota du prestataire
- * (plafondsDesMails, src/server/limites.ts : « rapport » par défaut, « alerte », « attente ») ; au-delà de sa part, il ne part
- * pas, le journal le dit, et la réponse est false. Sans clé (dev), seul son sujet s’affiche dans les logs. Rejette avec
- * ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
+ * (plafondsDesMails, src/server/limites.ts : « rapport » par défaut, « alerte », « attente », « relance ») ; au-delà de sa
+ * part, il ne part pas, le journal le dit, et la réponse est false. Elle choisit aussi son expéditeur (expediteurDe).
+ * `suivi` : son tag pour la délivrabilité, sa sorte au défaut. Sans clé (dev), seul son sujet s’affiche dans les logs.
+ * Rejette avec ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
  */
-export async function envoyerMail(destinataires: string | string[], mail: Mail, { sorte = "rapport" }: { sorte?: SorteDeMail } = {}): Promise<boolean> {
+export async function envoyerMail(
+  destinataires: string | string[],
+  mail: Mail,
+  { sorte = "rapport", suivi = sorte }: { sorte?: SorteDeMail; suivi?: SorteSuivie } = {},
+): Promise<boolean> {
   const pour = typeof destinataires === "string" ? [destinataires] : destinataires;
   if (!pour.length) return true;
   const boite = boiteAMails();
@@ -74,7 +120,7 @@ export async function envoyerMail(destinataires: string | string[], mail: Mail, 
     await deposer(boite, pour, { sujet: mail.sujet, texte: mail.texte, ...(mail.html !== undefined && { html: mail.html }), ...(mail.entetes && { entetes: mail.entetes }) });
     return true;
   }
-  const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM } = env();
+  const { RESEND_API_KEY, RESEND_API_KEY_CODES } = env();
   if (!RESEND_API_KEY) {
     enLocal(`[dev] mail « ${mail.sujet} » pour ${pour.join(", ")}`);
     return true;
@@ -85,7 +131,7 @@ export async function envoyerMail(destinataires: string | string[], mail: Mail, 
     return false;
   }
   try {
-    await poster(pour, mail, { cle: RESEND_API_KEY, de: BLUSH_EMAIL_FROM });
+    await poster(pour, mail, { cle: RESEND_API_KEY, ...expediteurDe(sorte, env()), suivi });
   } catch (e) {
     /* Refusé, il n’a rien pris au prestataire : il rend sa place. Perdu en route, il a pu partir : il la garde */
     if (e instanceof ErreurResend) await auMieux(rendreAuQuotaDesMails(pour.length), "quota des mails non rendu");
@@ -108,5 +154,5 @@ export async function envoyerCodeParEmail(email: string, code: string): Promise<
     return;
   }
   /* Leur part du quota se compte avant (plafondsDesMails().codes, src/server/auth.ts : envoyerCode) */
-  await poster([email], mailCode(code, BLUSH_URL), { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM });
+  await poster([email], mailCode(code, BLUSH_URL), { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM, suivi: "code" });
 }

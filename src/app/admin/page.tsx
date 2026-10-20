@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { delivrabilite } from "@/server/delivrabilite";
 import { direct } from "@/server/direct";
 import { estAdmin } from "@/server/env";
 import { journalErreur } from "@/server/journal";
@@ -23,7 +24,7 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
   const jours: Periode = p === 1 || p === 30 ? p : 7;
   if (q.version === "actuelle") return <AdminScreen s={await statsAdmin(jours)} />;
   /* Le direct n’empêche jamais le pilotage : lu ici pour le premier rendu, il se relit seul dans la page en cas d’échec */
-  const [s, d, n] = await Promise.all([
+  const [s, d, n, m] = await Promise.all([
     statsAdmin(jours),
     direct().catch((e: unknown) => {
       journalErreur("admin:direct", e);
@@ -34,6 +35,11 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
       journalErreur("admin:navigateurs", e);
       return null;
     }),
+    /* Ni la délivrabilité des mails (toujours sur 7 jours : la fenêtre de ses seuils) */
+    delivrabilite(7).catch((e: unknown) => {
+      journalErreur("admin:delivrabilite", e);
+      return null;
+    }),
   ]);
-  return <Pilotage s={s} direct={d} navigateurs={n} />;
+  return <Pilotage s={s} direct={d} navigateurs={n} delivrabilite={m} />;
 }

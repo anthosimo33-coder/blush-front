@@ -25,7 +25,8 @@ import type { PassageDesRelances } from "@/types/api";
  * (src/server/offres-uniques.ts), seule la ① ne la retient pas : elle la suit de deux heures, par définition. Une ③ ou
  * une ④ montrée dans les 24 h la fait attendre (tant qu’elle reste fraîche). Envoyée par GET /api/cron/relances (Vercel
  * Cron, toutes les 5 minutes), dans le plafond des relances du jour puis dans le quota des mails (sorte
- * « relance », parmi les premières retenues).
+ * « relance », parmi les premières retenues), du sous-domaine des relances (BLUSH_EMAIL_FROM_MARKETING, expediteurDe dans
+ * src/server/email.ts) comme les séquences.
  */
 
 /** Le délai avant la relance : deux heures après la feuille fermée ou la commande laissée en attente. */

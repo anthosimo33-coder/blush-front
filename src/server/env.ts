@@ -51,6 +51,27 @@ export const Env = z.object({
    * ce compte aussi, sinon le prestataire refuse chaque code.
    */
   BLUSH_EMAIL_FROM_CODES: z.string().min(1).optional(),
+  /**
+   * Facultatif : l’expéditeur des mails qu’on envoie sans qu’on les demande (les séquences, la relance ② : la sorte
+   * « relance », src/server/email.ts), sur un sous-domaine vérifié chez Resend (news.askblush.com) : leurs plaintes pour
+   * spam n’entraînent pas les codes et les rapports, qui gardent le domaine de BLUSH_EMAIL_FROM. On leur répond à
+   * l’adresse de BLUSH_EMAIL_FROM (reply_to). Sans lui, ils partent de BLUSH_EMAIL_FROM, comme avant.
+   */
+  BLUSH_EMAIL_FROM_MARKETING: z.string().min(1).optional(),
+  /**
+   * Facultatif : le secret du webhook de Resend (« whsec_… », src/server/delivrabilite.ts), ou plusieurs séparés par des
+   * virgules (un par compte Resend : celui des codes, s’il est à part). Sans lui, le webhook refuse tout (401), et le
+   * bloc « Délivrabilité » d’/admin reste vide.
+   */
+  RESEND_WEBHOOK_SECRET: z
+    .string()
+    .default("")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   /** L’adresse du site : les images des mails viennent de là. */
   BLUSH_URL: z.string().url().default(SITE_EN_LIGNE),
   /**

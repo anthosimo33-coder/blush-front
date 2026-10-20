@@ -1,5 +1,6 @@
 import type { CaseDuPilotage, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { Direct, GesteDuFil } from "@/types/api";
+import type { Delivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
 
 /*
@@ -361,5 +362,46 @@ export function navigateursDExemple({ calme = false }: { calme?: boolean } = {})
           { nom: "Rejet", message: "AbortError: The operation was aborted.", source: null, etape: "rapport", famille: "android", fois: 3, derniere: "2026-10-14T08:40:00.000Z" },
         ],
     totalErreurs: calme ? 0 : 17,
+  };
+}
+
+/**
+ * La délivrabilité d’exemple, sur 7 jours : des codes et des rapports bien remis, une relance ② avec une plainte (au-delà
+ * des 0,08 % de Resend) et des séquences avec quelques rebonds ; `calme` : aucun rebond ni aucune plainte.
+ */
+export function delivrabiliteDExemple({ calme = false }: { calme?: boolean } = {}): Delivrabilite {
+  const ligne = (sorte: string, partis: number, rebonds: number, plaintes: number, retards = 0, bloques = 0) => ({
+    sorte,
+    partis,
+    delivres: partis - rebonds - bloques,
+    rebonds,
+    plaintes,
+    retards,
+    bloques,
+  });
+  const sortes = [
+    ligne("code", 412, calme ? 0 : 6, 0, 2, calme ? 0 : 1),
+    ligne("rapport", 96, 0, 0),
+    ligne("sequence-s1_haut", 188, calme ? 0 : 3, 0, 1),
+    ligne("sequence-s2_heure", 141, calme ? 0 : 5, 0),
+    ligne("relance", 64, calme ? 0 : 1, calme ? 0 : 1),
+    ligne("attente", 22, 0, 0),
+    ligne("alerte", 9, 0, 0),
+  ];
+  const somme = (lignes: typeof sortes) => {
+    const t = { partis: 0, delivres: 0, rebonds: 0, plaintes: 0, retards: 0, bloques: 0 };
+    for (const l of lignes) for (const k of Object.keys(t) as (keyof typeof t)[]) t[k] += l[k];
+    return t;
+  };
+  const relances = sortes.filter((s) => s.sorte === "relance" || s.sorte.startsWith("sequence-"));
+  return {
+    jours: 7,
+    sortes,
+    principal: somme(sortes.filter((s) => !relances.includes(s))),
+    relances: somme(relances),
+    total: somme(sortes),
+    domaines: { principal: "askblush.com", relances: "news.askblush.com" },
+    branche: true,
+    dernier: iso(MAINTENANT - 4 * 60e3),
   };
 }

@@ -7,6 +7,7 @@ import { prixDe } from "@/contenu/offres";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
+import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
 import type { OffreUnique } from "@/types";
@@ -38,6 +39,7 @@ import {
   type Ecart,
 } from "./calculs";
 import { CarteEnDirect } from "./CarteEnDirect";
+import { Delivrabilite } from "./Delivrabilite";
 import { EnTete, type BaseDeLAdmin } from "./EnTete";
 import { GestesDeLEquipe } from "./GestesDeLEquipe";
 import { Navigateurs } from "./Navigateurs";
@@ -47,7 +49,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons) ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons) ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -95,6 +97,7 @@ export function Pilotage({
   s,
   direct,
   navigateurs = null,
+  delivrabilite = null,
   base = "/admin",
   sonder = true,
 }: {
@@ -102,6 +105,8 @@ export function Pilotage({
   direct: Direct | null;
   /** Les erreurs et la vitesse chez les visiteurs (src/server/navigateur.ts) ; null : pas lues. */
   navigateurs?: SanteDesNavigateurs | null;
+  /** Ce que Resend dit des mails sur 7 jours (src/server/delivrabilite.ts) ; null : pas lue. */
+  delivrabilite?: ChiffresDeDelivrabilite | null;
   base?: BaseDeLAdmin;
   sonder?: boolean;
 }) {
@@ -135,6 +140,7 @@ export function Pilotage({
           </div>
           <HautsDuPaywall p={p} />
           <MailsDesSequences p={p} />
+          {delivrabilite && <Delivrabilite d={delivrabilite} />}
 
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Sources p={p} />

@@ -55,3 +55,11 @@ export type RaisonBulles = (typeof RAISONS_BULLES)[number];
  */
 export const ACTIONS_EQUIPE = ["bulles", "debloquer", "inviter", "tournage", "tournage_arret"] as const;
 export type ActionEquipe = (typeof ACTIONS_EQUIPE)[number];
+
+/**
+ * Ce que Resend dit d’un mail par son webhook (evenements_mails.type, src/server/delivrabilite.ts) : parti chez lui,
+ * remis à la messagerie, refusé pour de bon (un rebond), signalé comme spam (une plainte), retardé, ou pas envoyé parce
+ * que l’adresse est sur sa liste de suppression (après un rebond ou une plainte).
+ */
+export const TYPES_EVENEMENTS_MAILS = ["sent", "delivered", "bounced", "complained", "delivery_delayed", "suppressed"] as const;
+export type TypeEvenementMail = (typeof TYPES_EVENEMENTS_MAILS)[number];
