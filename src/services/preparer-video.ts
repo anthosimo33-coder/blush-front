@@ -9,12 +9,12 @@ import { COTE_IMAGE_MAX } from "@/lib/limites";
 import { toileEnJpeg } from "./preparer-captures";
 
 export class VideoIllisible extends Error {
-  constructor(readonly code: "video" | "longue") {
+  constructor(readonly code: "video") {
     super(code);
   }
 }
 
-/** Au-delà, l’enregistrement est trop long pour une lecture (et pour son coût). */
+/** Au-delà, l’enregistrement est trop long pour une lecture (et pour son coût) : BLUSH en lit la partie la plus récente. */
 export const IMAGES_MAX = 80;
 /* La mesure du défilement : la zone de la conv (sans la barre du haut ni le champ du bas), en tout petit */
 const MESURE_L = 24;
@@ -55,6 +55,21 @@ export function decalage(a: Mesure, b: Mesure): { d: number; saut: boolean } {
     if (e < mieux.e) mieux = { d, e };
   }
   return { d: mieux.d, saut: mieux.e > ECART_SAUT };
+}
+
+/**
+ * Plus de IMAGES_MAX écrans : on garde ceux de la partie la plus récente de la conv, comme pour un export trop long.
+ * Quand on la remonte (`remonte`), les premiers écrans sont les plus récents : on garde ceux-là, et on s’arrête (rend
+ * true), la suite ne montrerait que du plus ancien. Quand on la descend, on oublie les plus anciens, et on continue.
+ */
+export function garderLesPlusRecents<T>(images: T[], remonte: boolean): boolean {
+  if (images.length <= IMAGES_MAX) return false;
+  if (remonte) {
+    images.length = IMAGES_MAX;
+    return true;
+  }
+  images.splice(0, images.length - IMAGES_MAX);
+  return false;
 }
 
 const attendre = (cible: EventTarget, ok: string, ms: number) =>
@@ -159,14 +174,15 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
           }
         }
       }
-      if (images.length > IMAGES_MAX) throw new VideoIllisible("longue");
+      /* Une conv trop longue pour une lecture : sa partie la plus récente (on la remonte : c’est fini, la suite est plus ancienne) */
+      if (garderLesPlusRecents(images, sens > 0)) break;
       avant = m;
       tAvant = t;
       onAvance?.(Math.min(1, (t - debut) / Math.max(0.01, duree - debut)));
     }
     /* La fin de la conv, si elle a encore défilé depuis le dernier écran gardé */
     if (parcouru > MESURE_H * 0.12) images.push(await photo());
-    if (images.length > IMAGES_MAX) throw new VideoIllisible("longue");
+    garderLesPlusRecents(images, sens > 0);
     /* On a remonté la conv (le contenu descend) : les écrans vont du plus récent au plus ancien, on les remet dans l’ordre */
     return sens > 0 ? images.reverse() : images;
   } finally {
