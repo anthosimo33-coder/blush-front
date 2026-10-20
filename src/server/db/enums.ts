@@ -63,3 +63,10 @@ export type ActionEquipe = (typeof ACTIONS_EQUIPE)[number];
  */
 export const TYPES_EVENEMENTS_MAILS = ["sent", "delivered", "bounced", "complained", "delivery_delayed", "suppressed"] as const;
 export type TypeEvenementMail = (typeof TYPES_EVENEMENTS_MAILS)[number];
+
+/**
+ * mcp_clients.methode : comment un client de l’OAuth du serveur MCP (Claude) prouve qui il est à /api/oauth/jeton
+ * (RFC 7591 §2) : sans secret (un client public, PKCE seul), son secret dans le formulaire, ou en Basic.
+ */
+export const METHODES_CLIENT_OAUTH = ["none", "client_secret_post", "client_secret_basic"] as const;
+export type MethodeClientOAuth = (typeof METHODES_CLIENT_OAUTH)[number];

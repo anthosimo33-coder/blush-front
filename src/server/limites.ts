@@ -111,6 +111,13 @@ export const LIMITES = {
    */
   tournageApiParJour: { max: 40, fenetreS: 86400 },
   /**
+   * Les clients que Claude enregistre pour lire /admin (POST /api/oauth/enregistrement, src/server/mcp/acces.ts), pour
+   * tous et par heure : un par connexion de l’équipe suffit, une boucle d’enregistrements s’arrête là.
+   */
+  mcpEnregistrementsParHeure: { max: 50, fenetreS: 3600 },
+  /** Les échanges et rafraîchissements de jetons du serveur MCP (POST /api/oauth/jeton), par adresse IP et par heure. */
+  mcpJetonParIp: { max: 120, fenetreS: 3600 },
+  /**
    * Les mêmes lectures depuis une adresse IP, tous comptes confondus : ouvrir des comptes à la chaîne d’une même box ne
    * multiplie pas les verdicts. Large, pour un Wi-Fi partagé ou le NAT d’un opérateur (relevé pour l’ouverture, le
    * CAPTCHA arrête les robots).

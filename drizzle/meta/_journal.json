@@ -197,6 +197,13 @@
       "when": 1792510749848,
       "tag": "0027_evenements_mails",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792514382911,
+      "tag": "0028_mcp_oauth",
+      "breakpoints": true
     }
   ]
 }

@@ -39,6 +39,17 @@ export const FICHIER_APPLE_PAY = {
   destination: "https://whop.com/.well-known/apple-platform-integrator/apple-developer-merchantid-domain-association",
 };
 
+/**
+ * Les métadonnées de l’OAuth du serveur MCP (src/server/mcp/oauth.ts), aux adresses où Claude les cherche : celles de la
+ * ressource (RFC 9728, avec le chemin de /api/mcp, puis à la racine) et celles du serveur d’autorisation (RFC 8414,
+ * l’émetteur étant la racine du site). Les routes /api qui les servent restent la seule source.
+ */
+export const METADONNEES_OAUTH = [
+  { source: "/.well-known/oauth-protected-resource/api/mcp", destination: "/api/mcp/metadonnees" },
+  { source: "/.well-known/oauth-protected-resource", destination: "/api/mcp/metadonnees" },
+  { source: "/.well-known/oauth-authorization-server", destination: "/api/oauth/metadonnees" },
+];
+
 /*
  * Les anciennes adresses de Vercel, encore servies (un favori, un lien d’avant askblush.com) : leurs pages mènent au site.
  * Le CAPTCHA (Turnstile) et Apple Pay ne connaissent que askblush.com : ailleurs, le widget ne rend aucun jeton (erreur
@@ -91,6 +102,7 @@ const nextConfig: NextConfig = {
         ...avecSession("/connexion", "/connexion/connecte"),
         ...avecTournage("/importer/export", "/importer/export/tournage"),
         FICHIER_APPLE_PAY,
+        ...METADONNEES_OAUTH,
       ],
       afterFiles: [],
       fallback: [],

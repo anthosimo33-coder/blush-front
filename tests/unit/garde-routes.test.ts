@@ -74,14 +74,18 @@ const SANS_COMPTE = new Set<CleRoute>([
   "GET /api/histoire",
   "DELETE /api/histoire",
   "GET /api/tournage/repere",
+  "GET /api/mcp/metadonnees",
+  "GET /api/oauth/metadonnees",
 ]);
 /**
  * Les routes qui ont leur propre garde, hors de la garde commune : le secret de Vercel Cron (la purge, les relances
  * que la veille de GitHub appelle, et le relais de la chaîne), le réveil qui ne dit rien, le webhook de Whop (sa
  * signature : Whop n’est pas l’appli, sa requête n’a pas notre origine), celui de Resend (sa signature aussi), la
- * désinscription en un clic (le lien signé), et l’API du mode tournage (la clé de l’outil des créatrices, un serveur lui aussi).
+ * désinscription en un clic (le lien signé), l’API du mode tournage (la clé de l’outil des créatrices, un serveur lui aussi),
+ * et le serveur MCP avec son OAuth (Claude appelle de ses serveurs : seul son jeton compte, src/server/mcp).
  */
 const API_DU_TOURNAGE = ["POST /api/admin/tournage", "GET /api/admin/tournage/[id]", "POST /api/admin/tournage/[id]/arreter"] as const satisfies CleRoute[];
+const DE_CLAUDE = ["POST /api/mcp", "POST /api/oauth/enregistrement", "POST /api/oauth/jeton", "POST /api/oauth/revocation"] as const satisfies CleRoute[];
 const HORS_GARDE = new Set<CleRoute>([
   "GET /api/cron/chaine",
   "GET /api/cron/purge",
@@ -91,6 +95,7 @@ const HORS_GARDE = new Set<CleRoute>([
   "POST /api/desinscription/un-clic",
   "POST /api/mails/resend",
   ...API_DU_TOURNAGE,
+  ...DE_CLAUDE,
 ]);
 
 const cles = Object.keys(ROUTES) as CleRoute[];
@@ -105,8 +110,8 @@ async function appeler(cle: CleRoute, entetes: Record<string, string> = {}): Pro
 }
 
 describe("chaque route de la table", () => {
-  it("la table compte 40 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
-    expect(mutations).toHaveLength(40);
+  it("la table compte 45 mutations, et chaque route y est classée : avec compte, sans compte, ou hors de la garde", () => {
+    expect(mutations).toHaveLength(45);
     for (const c of [...SANS_COMPTE, ...HORS_GARDE]) expect(cles, c).toContain(c);
   });
 
@@ -141,6 +146,21 @@ describe("chaque route de la table", () => {
       const r = await appeler(cle, origine);
       expect([r.status, await r.json()], JSON.stringify(origine)).toEqual([401, { erreur: "interdit" }]);
     }
+    expect(etat.comptees).toEqual([]);
+  });
+
+  it.each(DE_CLAUDE)("%s, le serveur MCP et son OAuth : d’où qu’elle vienne, sans jeton ni corps, ni 403 ni 401 « connexion » (la session n’est pas lue)", async (cle) => {
+    for (const origine of [{ origin: "https://claude.ai", host: "localhost" }, { host: "localhost" }, { origin: APPLI, host: "localhost" }] as Record<string, string>[]) {
+      const r = await appeler(cle, origine);
+      expect(r.status, JSON.stringify(origine)).not.toBe(403);
+      expect(await r.json(), JSON.stringify(origine)).not.toEqual({ erreur: "connexion" });
+    }
+  });
+
+  it("POST /api/mcp sans jeton : 401 « interdit », et le défi qui mène Claude à l’OAuth ; ni limite comptée", async () => {
+    const r = await appeler("POST /api/mcp", { host: "localhost" });
+    expect([r.status, await r.json()]).toEqual([401, { erreur: "interdit" }]);
+    expect(r.headers.get("www-authenticate")).toMatch(/^Bearer realm="blush", resource_metadata="[^"]+\/\.well-known\/oauth-protected-resource\/api\/mcp"/);
     expect(etat.comptees).toEqual([]);
   });
 
