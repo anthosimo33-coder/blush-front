@@ -15,7 +15,7 @@ export class VideoIllisible extends Error {
 }
 
 /** Au-delà, l’enregistrement est trop long pour une lecture (et pour son coût) : BLUSH en lit la partie la plus récente. */
-export const IMAGES_MAX = 80;
+export const IMAGES_MAX = 160;
 /* La mesure du défilement : la zone de la conv (sans la barre du haut ni le champ du bas), en tout petit */
 const MESURE_L = 24;
 const MESURE_H = 240;

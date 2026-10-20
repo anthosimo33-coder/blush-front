@@ -154,10 +154,11 @@ export const LIMITES = {
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
    * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six écrans (douze avant),
-   * jusqu’à seize pour un long enregistrement. Les plafonds des lots ont doublé avec eux : autant d’enregistrements
-   * qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer plusieurs), pour à peu près autant d’images lues.
+   * jusqu’à trente-deux pour un long enregistrement (seize avant le 20 octobre). Les plafonds des lots ont doublé à
+   * chaque fois : autant d’enregistrements qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer
+   * plusieurs), pour à peu près la même dépense (un lot lu par Sonnet coûte moitié moins qu’avec Opus).
    */
-  lotParIp: { max: 600, fenetreS: 3600 },
+  lotParIp: { max: 1200, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**
@@ -167,10 +168,10 @@ export const LIMITES = {
    * (BUDGET_IA.anonyme) tient la facture.
    */
   capturesAnonymesParJour: { max: 1000, fenetreS: 86400 },
-  lotsAnonymesParJour: { max: 8000, fenetreS: 86400 },
+  lotsAnonymesParJour: { max: 16000, fenetreS: 86400 },
   /** Les mêmes lectures pour un compte connecté, par jour (un compte gratuit suffirait sinon à passer outre le plafond). */
   capturesParCompte: { max: 30, fenetreS: 86400 },
-  lotsParCompte: { max: 300, fenetreS: 86400 },
+  lotsParCompte: { max: 600, fenetreS: 86400 },
   /** Les corrections de sa fiche : chacune réécrit la mémoire, que le chat envoie ensuite au modèle à chaque message. */
   ficheParCompte: { max: 60, fenetreS: 86400 },
   /**
@@ -194,10 +195,10 @@ export const LIMITES = {
   /*
    * Ce qu’un laissez-passer du CAPTCHA permet (src/server/captcha.ts), pendant ses 20 minutes : un import, un envoi de
    * captures ou la fin d’un enregistrement (et un nouvel essai après une coupure du réseau), et les lots d’un
-   * enregistrement (seize au plus pour un long, quarante pour le serveur, chacun avec son nouvel essai).
+   * enregistrement (trente-deux au plus pour un long, quarante pour le serveur, chacun avec son nouvel essai).
    */
   laissezPasserBrouillons: { max: 2, fenetreS: 20 * 60 },
-  laissezPasserLots: { max: 80, fenetreS: 20 * 60 },
+  laissezPasserLots: { max: 160, fenetreS: 20 * 60 },
   /** Les erreurs qu’un navigateur remonte (POST /api/navigateur/erreur), par adresse IP : une page qui boucle sur une erreur n’inonde pas la base. */
   erreurNavigateurParIp: { max: 30, fenetreS: 3600 },
   /** Les envois de mesures de vitesse (POST /api/navigateur/mesures, un par page quittée), par adresse IP. */

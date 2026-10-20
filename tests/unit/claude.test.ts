@@ -219,6 +219,13 @@ describe("appeler : l’envoi", () => {
     expect(envois[0]![0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
   });
 
+  it("lit les captures avec Sonnet (une transcription), et le reste avec Opus", async () => {
+    const envois = faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
+    await appeler({ tache: "01-captures", blocs: [{ texte: "les captures" }] }, Format);
+    await appeler(VERDICT, Format);
+    expect(envois.map((e) => e[0].params.model)).toEqual(["claude-sonnet-5-5", "claude-opus-5-5"]);
+  });
+
   it("demande la réflexion résumée : par défaut, notre modèle l’envoie vide, et les jauges qui avancent sur sa longueur resteraient figées (IA-3)", async () => {
     const envois = faux(rend(message([texte('{"ok":true}')])));
     await appeler(VERDICT, Format);

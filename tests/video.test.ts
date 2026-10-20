@@ -102,13 +102,13 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
       [15, 20],
       [20, 25],
     ]);
-    /* IMAGES_MAX (80) : seize lots, sous les 40 que /api/captures/video accepte */
+    /* IMAGES_MAX (160) : trente-deux lots, sous les 40 que /api/captures/video accepte */
     expect(
       lotsDe(
-        Array.from({ length: 80 }, (_, k) => k),
+        Array.from({ length: IMAGES_MAX }, (_, k) => k),
         6,
       ),
-    ).toHaveLength(16);
+    ).toHaveLength(32);
   });
 
   it("un enregistrement trop long : la partie la plus récente de la conv, plutôt qu’un refus", () => {

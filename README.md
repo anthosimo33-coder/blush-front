@@ -120,4 +120,5 @@ DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:vrai-modele  
 npm run essai:memoire -- <résultat 07 .json> <echanges .json> <cas .json>     # les mises à jour de la mémoire, échange par échange, et leur coût
 npm run essai:ajouts -- <résultat 07 .json> <suite .txt> [ligne de profil…]   # des messages ajoutés après l’import : la réponse du chat, puis la mémoire
 npm run essai:captures -- <dossier des captures> [ordre]                        # la lecture des captures (prompt 01), comparée à sa vérité s’il y en a une
+npm run essai:video -- <cas> <messages> <modèle[:effort]>…                      # un enregistrement iMessage d’une conv de test, lu par lots, modèle contre modèle
 ```
