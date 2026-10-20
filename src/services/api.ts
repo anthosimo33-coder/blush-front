@@ -872,3 +872,6 @@ export async function couperLesRelances(lien: { id: string; cle: string; quoi: D
 
 /** Un geste de l’équipe depuis /admin (POST /api/admin) : ce qu’il a fait, ou une ErreurApi. */
 export const gesteDeLEquipe = (geste: Routes["POST /api/admin"]["corps"]) => appel("POST /api/admin", { corps: geste });
+
+/** La page de consentement (/admin/connecter) autorise Claude à lire /admin (POST /api/oauth/autoriser) : où renvoyer le navigateur, ou une ErreurApi. */
+export const autoriserLaConnexion = (demande: Routes["POST /api/oauth/autoriser"]["corps"]) => appel("POST /api/oauth/autoriser", { corps: demande });

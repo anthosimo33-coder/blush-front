@@ -28,11 +28,12 @@ const GENERES = new Set(["src/server/ia/textes.generated.ts"]);
 /*
  * Les fichiers du serveur dont les textes ne s’affichent ni dans l’appli ni dans un mail : le rapport de la veille à
  * l’équipe (alertes.ts), ce que lit et écrit le modèle (ia/, modèle factice compris ; chat.ts et analyse.ts, qui lui
- * écrivent, la demande du chat telle qu’on l’a testée sur les évals) et env.ts, dont les messages vont aux logs. Les
+ * écrivent, la demande du chat telle qu’on l’a testée sur les évals ; mcp/, ce que Claude lit des chiffres de /admin) et
+ * env.ts, dont les messages vont aux logs. Les
  * alertes et les lignes du journal écrites d’ailleurs (`alerter(…)`, `journal(…)`…) se reconnaissent à l’appel
  * (horsDesTextes).
  */
-const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts|veille\.ts|ia\/)/;
+const HORS_DES_TEXTES = /^src\/server\/(alertes\.ts|analyse\.ts|chat\.ts|env\.ts|veille\.ts|ia\/|mcp\/)/;
 
 /**
  * La règle des insécables vaut pour tout ce que quelqu’un lit : src, l’appli, ses images de partage (carte-*.tsx), ses

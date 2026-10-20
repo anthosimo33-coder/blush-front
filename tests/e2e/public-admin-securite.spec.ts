@@ -47,6 +47,9 @@ const UN_CLIC = "/api/desinscription/un-clic";
 /** Le webhook de Resend (ce qui arrive aux mails), hors de la garde commune : Resend n’a pas notre origine, seule sa signature compte. */
 const WEBHOOK_RESEND = "/api/mails/resend";
 
+/** Le serveur MCP et son OAuth, hors de la garde commune : Claude appelle de ses serveurs, seul son jeton compte (src/server/mcp). */
+const DE_CLAUDE = ["/api/mcp", "/api/oauth/enregistrement", "/api/oauth/jeton", "/api/oauth/revocation"];
+
 /** Un site qui n’est pas BLUSH (le domaine .test n’existe pas : le test sert lui-même sa page). */
 const PIRATE = "http://site-pirate.test";
 
@@ -68,15 +71,24 @@ test("les en-têtes de sécurité sur les pages, la page introuvable, les routes
 });
 
 test("une route qui modifie refuse (403) une requête venue d’un autre site, d’un autre port, ou sans origine", async ({ request }) => {
-  await test.step("les 35 routes gardées de la table du contrat (le signe des onglets, les jalons du tunnel et ce que remontent les navigateurs compris), depuis quatre origines qui ne sont pas l’appli", async () => {
-    expect(MUTATIONS).toHaveLength(40);
-    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && c !== WEBHOOK_RESEND && c !== UN_CLIC && !API_DU_TOURNAGE.includes(c))) {
+  await test.step("les 36 routes gardées de la table du contrat (le signe des onglets, les jalons du tunnel, ce que remontent les navigateurs et le consentement de l’OAuth compris), depuis quatre origines qui ne sont pas l’appli", async () => {
+    expect(MUTATIONS).toHaveLength(45);
+    for (const [methode, chemin] of MUTATIONS.filter(([, c]) => c !== WEBHOOK && c !== WEBHOOK_RESEND && c !== UN_CLIC && !API_DU_TOURNAGE.includes(c) && !DE_CLAUDE.includes(c))) {
       for (const origine of [PIRATE, URL_BETA, "null", null]) {
         const r = await request.fetch(chemin, { method: methode, headers: origine ? { origin: origine } : {}, data: {} });
         const qui = `${methode} ${chemin} depuis ${origine ?? "nulle part"}`;
         expect.soft(r.status(), qui).toBe(403);
         expect.soft(await r.json(), qui).toEqual({ erreur: "origine" });
       }
+    }
+  });
+
+  await test.step("le serveur MCP, d’où qu’il soit appelé : sans jeton, 401 « interdit » et le défi de l’OAuth", async () => {
+    for (const origine of [PIRATE, URL_APPLI, null]) {
+      const r = await request.post("/api/mcp", { headers: origine ? { origin: origine } : {}, data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+      expect.soft(r.status(), `depuis ${origine ?? "nulle part"}`).toBe(401);
+      expect.soft(await r.json()).toEqual({ erreur: "interdit" });
+      expect.soft(r.headers()["www-authenticate"]).toContain("/.well-known/oauth-protected-resource/api/mcp");
     }
   });
 

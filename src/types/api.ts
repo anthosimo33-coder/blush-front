@@ -41,6 +41,8 @@ import type {
   Story,
   VocalRapport,
 } from "@/types";
+import type { MethodeClientOAuth } from "@/server/db/enums";
+import type { metadonneesDeLaRessource, metadonneesDuServeur, reponseDeJeton } from "@/server/mcp/oauth";
 import type { CodeErreur } from "./erreurs-api";
 
 /* ———— Ce qui passe sur le réseau ———— */
@@ -287,6 +289,39 @@ const Cible = z.discriminatedUnion("type", [
 ]);
 export type CibleImage = z.input<typeof Cible>;
 
+/* ———— Le serveur MCP et son OAuth (src/server/mcp) : Claude lit /admin ———— */
+
+/** Une réponse JSON-RPC du serveur MCP (POST /api/mcp) : son résultat, ou son erreur. */
+export type ReponseRpc = { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string } };
+/** Un refus de l’OAuth (RFC 6749 §5.2, RFC 7591 §3.2.2) : son code et sa description, la forme que Claude attend. */
+type ErreurOAuth = { error: string; error_description: string };
+/** Un client enregistré (RFC 7591) : son secret, cette seule fois (aucun pour un client public). */
+export type ClientOAuth = {
+  client_id: string;
+  client_id_issued_at: number;
+  client_secret?: string;
+  client_secret_expires_at?: 0;
+  client_name: string;
+  redirect_uris: string[];
+  token_endpoint_auth_method: MethodeClientOAuth;
+  grant_types: ["authorization_code", "refresh_token"];
+  response_types: ["code"];
+};
+/** Les jetons de /api/oauth/jeton. */
+export type JetonOAuth = ReturnType<typeof reponseDeJeton>;
+
+/** Les paramètres d’une demande d’autorisation, tels que la page de consentement (/admin/connecter) les a reçus. */
+const ParametresDAutorisation = z.strictObject({
+  response_type: z.string().max(40).optional(),
+  client_id: z.string().max(200).optional(),
+  redirect_uri: z.string().max(2048).optional(),
+  code_challenge: z.string().max(200).optional(),
+  code_challenge_method: z.string().max(20).optional(),
+  state: z.string().max(2048).optional(),
+  scope: z.string().max(400).optional(),
+  resource: z.string().max(2048).optional(),
+});
+
 /* ———— La table des routes ———— */
 
 /**
@@ -364,6 +399,19 @@ type Reponses = {
   /** Toujours `{ ok: true }` : une erreur ignorée (la limite d’une adresse) ne se dit pas. */
   "POST /api/navigateur/erreur": Ok;
   "POST /api/navigateur/mesures": Ok;
+  /** Le serveur MCP : une réponse JSON-RPC (202 sans corps pour une notification), ou 401 « interdit » et son défi OAuth. */
+  "POST /api/mcp": ReponseRpc;
+  /** Les métadonnées de la ressource (RFC 9728), aussi à /.well-known/oauth-protected-resource (next.config.ts). */
+  "GET /api/mcp/metadonnees": ReturnType<typeof metadonneesDeLaRessource>;
+  /** Les métadonnées du serveur d’autorisation (RFC 8414), aussi à /.well-known/oauth-authorization-server. */
+  "GET /api/oauth/metadonnees": ReturnType<typeof metadonneesDuServeur>;
+  /** Un client enregistré, en 201 ; un refus de l’OAuth en 400 (ou 429 : trop d’enregistrements). */
+  "POST /api/oauth/enregistrement": ClientOAuth | ErreurOAuth;
+  "POST /api/oauth/jeton": JetonOAuth | ErreurOAuth;
+  /** Toujours `{}` en 200 pour une demande bien formée (RFC 7009 : rien ne dit si le jeton existait). */
+  "POST /api/oauth/revocation": Record<string, never> | ErreurOAuth;
+  /** La page de consentement autorise : où renvoyer le navigateur (le retour du client, avec son code). */
+  "POST /api/oauth/autoriser": { redirection: string };
   "GET /api/reveil": { ok: boolean };
   "POST /api/roue": RoueDuCompte;
   /** L’audio du vocal du rapport (MP3). */
@@ -539,6 +587,17 @@ export const ROUTES = {
   },
   /* `?moi=` : qui est toi pour l’écran, quand le serveur ne le sait pas */
   "GET /api/rapport/pdf": {},
+  /* Un message JSON-RPC (un objet : les lots ont quitté le protocole), lu par le protocole (src/server/mcp/protocole.ts) */
+  "POST /api/mcp": { corps: z.looseObject({}) },
+  "GET /api/mcp/metadonnees": {},
+  "GET /api/oauth/metadonnees": {},
+  /* Les métadonnées du client (RFC 7591), vérifiées par validerEnregistrement (src/server/mcp/oauth.ts) */
+  "POST /api/oauth/enregistrement": { corps: z.looseObject({}) },
+  /* RFC 6749 : en application/x-www-form-urlencoded, lu par formData() */
+  "POST /api/oauth/jeton": { formulaire: true },
+  "POST /api/oauth/revocation": { formulaire: true },
+  /* Les paramètres de la demande, tels que la page les a reçus : la route la relit avant d’accorder quoi que ce soit */
+  "POST /api/oauth/autoriser": { corps: ParametresDAutorisation },
   "GET /api/reveil": {},
   /* Tourner la roue du paywall, ou n’en pas vouloir : une fois par compte */
   "POST /api/roue": { corps: z.object({ geste: z.enum(GESTES_DE_LA_ROUE) }) },

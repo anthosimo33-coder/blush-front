@@ -39,6 +39,7 @@ import {
   FOURNISSEURS_PAIEMENT,
   GENRES,
   GENRES_CHAINE,
+  METHODES_CLIENT_OAUTH,
   RAISONS_BULLES,
   ROLES_CHAT,
   SOURCES_ATTENTE,
@@ -793,4 +794,72 @@ export const evenementsMails = pgTable(
     compteId: uuid("compte_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("evenements_mails_le_idx").on(t.le)],
+);
+
+/*
+ * L’OAuth du serveur MCP (src/server/mcp/acces.ts) : Claude lit les chiffres de /admin au nom d’un compte de
+ * BLUSH_ADMINS. Que des empreintes (empreinte, src/server/chiffrement.ts) : aucun secret ni jeton en clair.
+ */
+
+/**
+ * Un client enregistré par Claude (RFC 7591) : son identifiant (public), l’empreinte de son secret (null : un client
+ * public, PKCE seul), le nom qu’il s’est donné et ses retours. Un client sans accès part après MCP_CLIENTS_GARDES_JOURS.
+ */
+export const mcpClients = pgTable(
+  "mcp_clients",
+  {
+    id: text("id").primaryKey(),
+    secretHash: text("secret_hash"),
+    methode: text("methode", { enum: METHODES_CLIENT_OAUTH }).notNull(),
+    nom: text("nom").notNull(),
+    retours: jsonb("retours").$type<string[]>().notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("mcp_clients_cree_idx").on(t.creeLe)],
+);
+
+/** Un code d’autorisation, le temps de l’échanger (dix minutes, une fois) : à qui, pour quel retour, et son défi PKCE. */
+export const mcpCodes = pgTable("mcp_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => mcpClients.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  retour: text("retour").notNull(),
+  defi: text("defi").notNull(),
+  portee: text("portee").notNull(),
+  ressource: text("ressource"),
+  expireLe: quand("expire_le").notNull(),
+});
+
+/**
+ * Un accès accordé à Claude par un compte de l’équipe : son jeton d’accès (une heure) et son jeton de rafraîchissement
+ * (glissant), par leurs empreintes. `precedentHash` : le jeton de rafraîchissement d’avant la dernière rotation, qui vaut
+ * encore une fois (une réponse perdue en route ne déconnecte pas Claude). `hote` : l’hôte du retour (claude.ai), montré
+ * à l’équipe. `utiliseLe` : le dernier appel, écrit toutes les cinq minutes au plus.
+ */
+export const mcpAcces = pgTable(
+  "mcp_acces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => mcpClients.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    nom: text("nom").notNull(),
+    hote: text("hote").notNull(),
+    portee: text("portee").notNull(),
+    accesHash: text("acces_hash").notNull().unique(),
+    accesExpireLe: quand("acces_expire_le").notNull(),
+    rafraichissementHash: text("rafraichissement_hash").notNull().unique(),
+    precedentHash: text("precedent_hash").unique(),
+    rafraichissementExpireLe: quand("rafraichissement_expire_le").notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+    utiliseLe: quand("utilise_le"),
+  },
+  (t) => [index("mcp_acces_user_idx").on(t.userId)],
 );

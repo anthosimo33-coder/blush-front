@@ -6,6 +6,7 @@ import { db, schema } from "./db";
 import { EVENEMENTS_MAILS_GARDES_JOURS } from "./delivrabilite";
 import { PREDICATS } from "./depot";
 import { journalErreur } from "./journal";
+import { purgerLOAuth } from "./mcp/acces";
 import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
 import { aujourdhuiParis } from "./temps";
 import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
@@ -27,6 +28,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
  *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
  * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
+ * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
+ *   expiré, et les clients restés sans accès ;
  * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base.
  */
 
@@ -128,6 +131,7 @@ export async function purger(maintenant = new Date()) {
       .delete(schema.mesuresNavigateur)
       .where(lt(schema.mesuresNavigateur.le, il_y_a(NAVIGATEUR_GARDE_JOURS)));
   });
+  await etape("accès de Claude à /admin", () => purgerLOAuth(maintenant));
   /* Le sel d’hier sert encore (sourceDeLaVisite retrouve la visite de la veille) ; celui d’avant-hier, plus rien */
   await etape("sels des visites", async () => {
     await db()
