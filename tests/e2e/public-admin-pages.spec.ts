@@ -171,6 +171,16 @@ test("la confidentialité : « Retour » ramène d’où l’on vient, et à la 
     await expect(page).toHaveURL(/\/confidentialite$/);
   });
 
+  /* Avant, le lien du desktop visait la landing quelle que soit la page d’avant : « Comment ça marche » de l’import y menait */
+  await test.step("venue d’un écran de l’import (« Comment ça marche ») : le retour y revient, pas à la landing", async () => {
+    await page.goto("/commencer");
+    await page.getByRole("link", { name: "Comment ça marche" }).click();
+    await expect(page).toHaveURL(/\/confidentialite$/);
+    await retour.click();
+    await expect(page).toHaveURL(/\/commencer$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
+  });
+
   await test.step("ouverte directement (un lien, un nouvel onglet) : le retour mène à la landing, sans quitter BLUSH", async () => {
     await page.goto("/confidentialite");
     await expect(retour).toHaveAttribute("href", "/");

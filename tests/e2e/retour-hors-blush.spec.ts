@@ -45,11 +45,12 @@ test.describe("sur un téléphone", () => {
 test.describe("sur un ordinateur", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "l’API Navigation est celle de Chromium : WebKit ne l’a pas encore");
 
-  test("un « Retour » vers une adresse fixe (la confidentialité, vers la landing) ne revient pas en arrière hors de BLUSH", async ({ page }) => {
+  test("le « Retour » de la confidentialité (la page d’avant, sinon la landing) ne revient pas en arrière hors de BLUSH", async ({ page }) => {
     /*
-     * Le « Retour » du haut de la page vise une adresse ("/") : ouverte en premier dans l’onglet, la page le suit ; le
-     * retour du système revient ici avec "/" en page d’avant, mais rien de BLUSH en arrière (revenirVers). Avant, ce
-     * second « Retour » revenait en arrière depuis la première entrée de l’onglet : il ne se passait rien.
+     * Le « Retour » du haut de la page revient à la page d’avant, sinon mène à la landing (useRetourSinon) : ouverte en
+     * premier dans l’onglet, la page mène à "/" ; le retour du système revient ici avec "/" en page d’avant, mais rien de
+     * BLUSH en arrière. Avant, ce second « Retour » revenait en arrière depuis la première entrée de l’onglet : il ne se
+     * passait rien.
      */
     await page.setViewportSize({ width: 1280, height: 900 });
     const retour = page.getByRole("link", { name: "Retour", exact: true });

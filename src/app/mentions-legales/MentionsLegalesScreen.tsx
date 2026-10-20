@@ -18,7 +18,7 @@ const valeur = (texte: string | null) => texte ?? <span className="italic">{A_CO
 export function MentionsLegalesScreen() {
   const mediateur = EDITEUR.mediateur.trim();
   return (
-    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title={MENTIONS.titre} />} desktopBack={{ target: "/" }} mainWidth={640}>
+    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title={MENTIONS.titre} />} desktopBack={{ target: { repli: "/" } }} mainWidth={640}>
       <EnTeteJuridique icone="list" titre={MENTIONS.titre} sous={MENTIONS.sous} />
 
       <InsetGroup title="L’éditeur" id="editeur">

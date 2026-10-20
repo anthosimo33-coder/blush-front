@@ -34,7 +34,7 @@ function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIc
 /** La page, rendue sur le serveur : seul son « Retour » tourne dans le navigateur (la page d’avant, ou la landing). */
 export function ConfidentialiteScreen() {
   return (
-    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title="Confidentialité" />} desktopBack={{ target: "/" }} mainWidth={640}>
+    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title="Confidentialité" />} desktopBack={{ target: { repli: "/" } }} mainWidth={640}>
       <HeroHeader
         visual={
           <span className="flex size-16 items-center justify-center rounded-full bg-ink shadow-[0_14px_30px_-14px_rgba(17,17,20,0.6)]">

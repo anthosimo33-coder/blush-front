@@ -14,7 +14,7 @@ import { NBSP } from "@/lib/format";
 /** La page : deux parties (utiliser BLUSH, acheter), chacune de ses sections en carte, puis qui l’édite et où nous écrire. */
 export function ConditionsScreen() {
   return (
-    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title={CONDITIONS.titre} />} desktopBack={{ target: "/" }} mainWidth={640}>
+    <Screen mobileTop={<MobileTopBar back={{ repli: "/" }} title={CONDITIONS.titre} />} desktopBack={{ target: { repli: "/" } }} mainWidth={640}>
       <EnTeteJuridique icone="file" titre={CONDITIONS.titre} sous={CONDITIONS.sous} />
 
       {PARTIES_CONDITIONS.map((partie, k) => (
