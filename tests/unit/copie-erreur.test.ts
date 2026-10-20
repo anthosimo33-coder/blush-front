@@ -19,7 +19,7 @@ describe("copieDe", () => {
   });
 
   it("sans autre paramètre que l’erreur : l’écran seul, sans « ? » qui traîne", () => {
-    for (const kind of ["capture", "video", "longue"] as const) {
+    for (const kind of ["capture", "video"] as const) {
       const c = copieDe(kind, "/importer/captures", params("erreur=" + kind));
       expect(c.href).toBe("/importer/captures");
       expect(c.back).toBe("/importer/captures");

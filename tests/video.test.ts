@@ -6,7 +6,7 @@ import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
-import { decalage, lotsDe } from "@/services/preparer-video";
+import { decalage, garderLesPlusRecents, IMAGES_MAX, lotsDe } from "@/services/preparer-video";
 import { captures, msg } from "./aide/fabriques";
 import { accordDeTest } from "./aide/fixtures";
 
@@ -109,6 +109,21 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
         6,
       ),
     ).toHaveLength(16);
+  });
+
+  it("un enregistrement trop long : la partie la plus récente de la conv, plutôt qu’un refus", () => {
+    /* On remonte la conv : les premiers écrans sont les plus récents, on les garde et on s’arrête */
+    const remonte = Array.from({ length: IMAGES_MAX + 1 }, (_, k) => k);
+    expect(garderLesPlusRecents(remonte, true)).toBe(true);
+    expect(remonte).toEqual(Array.from({ length: IMAGES_MAX }, (_, k) => k));
+    /* On la descend : les derniers sont les plus récents, on oublie les premiers et on continue */
+    const descend = Array.from({ length: IMAGES_MAX + 2 }, (_, k) => k);
+    expect(garderLesPlusRecents(descend, false)).toBe(false);
+    expect(descend).toEqual(Array.from({ length: IMAGES_MAX }, (_, k) => k + 2));
+    /* Sous la borne : rien ne change */
+    const court = [1, 2, 3];
+    expect(garderLesPlusRecents(court, true)).toBe(false);
+    expect(court).toEqual([1, 2, 3]);
   });
 
   it("mesure de combien la conv a défilé, et voit quand elle a sauté", () => {

@@ -47,13 +47,6 @@ const ERROR_COPY: Record<ErreurParcours, { title: string; text: string; action: 
     href: "/importer/captures",
     back: "/importer/captures",
   },
-  longue: {
-    title: "Ton enregistrement est trop long.",
-    text: "Refais-le plus court\u00a0: remonte un peu plus vite, ou arrête-toi là où votre histoire commence vraiment.",
-    action: "Refaire un enregistrement",
-    href: "/importer/captures",
-    back: "/importer/captures",
-  },
 };
 
 /** Ce que dit un écran d’erreur du parcours : son titre, sa phrase, son action (et où elle mène), et son « Retour ». */
@@ -81,6 +74,6 @@ export function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchP
       back: ici,
     };
   if (kind === "courte") return { ...c, href: app ? `/importer/captures?app=${encodeURIComponent(app)}` : c.href, back: ici };
-  if (kind === "fichier" || kind === "capture" || kind === "video" || kind === "longue") return { ...c, href: ici, back: ici };
+  if (kind === "fichier" || kind === "capture" || kind === "video") return { ...c, href: ici, back: ici };
   return c;
 }

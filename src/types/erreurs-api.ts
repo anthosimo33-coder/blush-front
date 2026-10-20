@@ -114,10 +114,10 @@ export type CodeErreur = keyof typeof ERREURS_API;
 
 /**
  * Les codes qu’une ErreurApi reçoit dans le navigateur, sans réponse du serveur : « erreur », une réponse sans code (un
- * serveur qui tombe, une page d’erreur) ; « annule », on a fermé « Quelle conv ? » sans choisir ; « video » et « longue »,
- * un enregistrement illisible ou trop long (src/services/preparer-video.ts) ; « image », l’image à partager n’est pas venue.
+ * serveur qui tombe, une page d’erreur) ; « annule », on a fermé « Quelle conv ? » sans choisir ; « video », un
+ * enregistrement illisible (src/services/preparer-video.ts) ; « image », l’image à partager n’est pas venue.
  */
-type CodeLocal = "erreur" | "annule" | "video" | "longue" | "image";
+type CodeLocal = "erreur" | "annule" | "video" | "image";
 
 /** Le code d’une ErreurApi. */
 export type CodeApi = CodeErreur | CodeLocal;

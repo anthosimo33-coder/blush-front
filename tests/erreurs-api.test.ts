@@ -179,7 +179,7 @@ describe("les écrans", () => {
     /* Le budget d’octets du jour (S-02) ne promet pas « dans une heure » : il dure jusqu’au lendemain */
     expect(erreurDeParcours("export", api("trop_jour"))).toBeNull();
     expect(messageErreur("export", api("trop_jour"))).toBe("Beaucoup de convs importées aujourd’hui. Réessaie demain.");
-    expect(erreurDeParcours("captures", new ErreurApi("longue", 422))).toBe("longue");
+    expect(erreurDeParcours("captures", new ErreurApi("video", 422))).toBe("video");
     /* Des captures : un « fichier » n’a pas d’écran à lui, l’écran des captures dit qu’elles sont illisibles */
     expect(erreurDeParcours("captures", api("fichier"))).toBeNull();
     expect(erreurDeParcours("captures", new Error("réseau"))).toBeNull();

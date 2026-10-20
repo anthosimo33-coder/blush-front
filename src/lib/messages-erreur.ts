@@ -158,7 +158,7 @@ export function messageErreur<A extends Action>(action: A, e: unknown): TexteDe<
  * dans src/lib/copie-erreur.ts. « lecture » n’est pas un code de l’API : plus aucun écran ne la pose (l’échec de la lecture se dit
  * sur /lecture), on n’y arrive qu’en tapant l’adresse.
  */
-export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video", "longue"] as const satisfies readonly (CodeApi | "lecture")[];
+export const ERREURS_PARCOURS = ["fichier", "groupe", "courte", "lecture", "capture", "video"] as const satisfies readonly (CodeApi | "lecture")[];
 export type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
 
 /*
@@ -167,7 +167,7 @@ export type ErreurParcours = (typeof ERREURS_PARCOURS)[number];
  */
 const PARCOURS = {
   export: ["fichier", "groupe", "courte"],
-  captures: ["courte", "groupe", "video", "longue"],
+  captures: ["courte", "groupe", "video"],
 } as const satisfies Record<string, readonly ErreurParcours[]>;
 
 /** L’écran d’erreur prévu pour cette erreur d’un import, ou null (elle se dit sur l’écran). */
