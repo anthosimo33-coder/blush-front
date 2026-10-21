@@ -2,16 +2,20 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 /*
- * L’échéance d’une exécution : une fonction Vercel est coupée au bout de son `maxDuration` (300 s au plus, plan
- * gratuit). Les appels lents (le modèle, la voix, les mails) s’arrêtent avant, au lieu d’être coupés en plein milieu (un
+ * L’échéance d’une exécution : une fonction Vercel est coupée au bout de son `maxDuration` (800 s au plus avec l’offre
+ * Pro et le Fluid compute, vercel.json ; au-delà, seulement en bêta). Les appels lents (le modèle, la voix, les mails) s’arrêtent avant, au lieu d’être coupés en plein milieu (un
  * appel payé pour rien, une tâche laissée « en cours »). Sans échéance (un script, les tests), rien ne change.
  * Une route garde son littéral `export const maxDuration` (Next le lit tel quel au build) et pose son échéance avec
  * `avecEcheance(echeancePour(maxDuration), …)` : changer l’un change l’autre (tests/echeance.test.ts y veille).
  */
 const echeances = new AsyncLocalStorage<number>();
 
-/** Ce que vit une fonction Vercel au plus (plan gratuit), en secondes : le `maxDuration` des routes qui lancent la chaîne des tâches. */
-export const DUREE_FONCTION_S = 300;
+/**
+ * Ce que vit une fonction Vercel au plus (l’offre Pro, avec le Fluid compute), en secondes : le `maxDuration` des
+ * routes qui lancent la chaîne des tâches. 300 s jusqu’au 21 octobre : une lecture entière (verdict, plan, chapitres,
+ * mémoire, environ 5 min) passait par un relais, et des chapitres coupés à l’échéance étaient payés pour rien.
+ */
+export const DUREE_FONCTION_S = 800;
 
 /** L’échéance d’une fonction qui vit `maxDuration` secondes, en millisecondes : `marge` avant que Vercel la coupe, pour finir proprement. */
 export const echeancePour = (maxDuration: number, marge = 15_000) => maxDuration * 1000 - marge;

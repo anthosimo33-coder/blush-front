@@ -3,7 +3,9 @@ import { env } from "./env";
 import { journal, journalErreur } from "./journal";
 
 /*
- * Le relais de la chaîne des tâches. Une fonction Vercel vit 300 s : quand la prochaine étape d’une histoire ne
+ * Le relais de la chaîne des tâches. Une fonction Vercel vit DUREE_FONCTION_S (800 s, src/server/echeance.ts) : une
+ * lecture entière y tient d’habitude, et le relais ne sert plus qu’aux convs très longues, à une chaîne lancée tard dans
+ * une fonction déjà entamée (le chat après sa réponse) et aux essais qui se répètent. Quand la prochaine étape d’une histoire ne
  * finirait pas avant l’échéance (la mémoire, après le rapport écrit dans la fonction qui a livré l’achat), la chaîne
  * passe la main à une nouvelle fonction (GET /api/cron/chaine, avec le secret CRON_SECRET), qui la reprend aussitôt,
  * avec tout son temps. Sans lui, l’étape attendait qu’un écran vienne la chercher, et la fiche d’une conv payée restait

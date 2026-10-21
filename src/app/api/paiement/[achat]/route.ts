@@ -3,7 +3,7 @@ import { etatDeLAchat } from "@/server/paiement/commande";
 import { garde } from "@/server/requete";
 
 /* Un achat livré ici (vérifié chez Whop quand le webhook tarde) relance la chaîne du rapport après la réponse (after) : elle a la durée d’une fonction de la chaîne */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Où en est un achat du compte (la page du retour du paiement le relit chaque seconde). `?paiement=pay_…` : le paiement

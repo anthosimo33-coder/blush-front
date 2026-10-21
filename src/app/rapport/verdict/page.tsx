@@ -15,7 +15,7 @@ export const viewport: Viewport = { themeColor: ENCRE };
  * La page lit le rapport par getReport, qui lance ce qui manque à la chaîne (le rapport, le vocal) et le laisse tourner
  * après la réponse : la durée de la fonction est celle de /api/rapport, pour que la chaîne ne soit pas coupée en route.
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /* La révélation du verdict, juste après l’analyse ; elle mène au rapport (/rapport), qui ne change pas. */
 export default async function Page() {

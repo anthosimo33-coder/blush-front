@@ -6,6 +6,7 @@ import { repondEnVocal, reserverEchange, type Reglement } from "./chat";
 import { reponseDeLEnvoi } from "./historique";
 import { auMieux } from "./journal";
 import { rendre as rendreALaLimite, sousLaLimite } from "./limites";
+import { DUREE_FONCTION_S } from "./echeance";
 
 /*
  * Le paiement d’une réponse du chat en bulles (POST /api/chat), décidé avant tout appel au modèle : le débit, l’attente
@@ -34,7 +35,7 @@ type Decision = Paiement | { deja: EnvoiDejaFait } | "bulles" | "occupe";
  */
 const placeVerrouillee = (userId: string) => `chat:verrouillee:${userId}`;
 /* Sa durée : celle de la route du chat (maxDuration, src/app/api/chat/route.ts), qu’une fonction coupée ne dépasse pas */
-const PLACE_VERROUILLEE = { max: 1, fenetreS: 300 };
+const PLACE_VERROUILLEE = { max: 1, fenetreS: DUREE_FONCTION_S };
 
 /** Combien de temps un envoi attend celui de la même clé qui s’écrit encore (un double toucher, « Réessayer » trop tôt). */
 const ATTENTE_DE_L_ENVOI_MS = 90_000;

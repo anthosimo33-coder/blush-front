@@ -5,11 +5,11 @@ import { repondre, route } from "@/server/http";
 import { journalErreur } from "@/server/journal";
 
 /*
- * La durée du chat et du rapport (leurs routes et leurs pages vivent 300 s) : Vercel regroupe dans une même fonction les
+ * La durée du chat et du rapport (leurs routes et leurs pages vivent 800 s, DUREE_FONCTION_S) : Vercel regroupe dans une même fonction les
  * routes de même réglage, et c’est celle-là qu’il faut réveiller. Une page qui appelle le réveil vient d’être servie,
  * sa propre fonction est déjà chaude ; avec la durée par défaut, il ne réveillait que celle-là, pas le chat ni le rapport.
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /*
  * Le réveil : une requête minuscule qui démarre une instance et réveille la base (Neon s’endort après quelques minutes

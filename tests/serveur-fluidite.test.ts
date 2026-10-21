@@ -17,7 +17,7 @@ import { avecEcheance } from "@/server/echeance";
 import { historique } from "@/server/historique";
 import { histoireOuverte, histoiresDuCompte } from "@/server/histoires";
 import { versionImage } from "@/server/partages";
-import { executerChaine, reprendreLesChainesEnPlan, tempsPourCommencer } from "@/server/pipeline";
+import { ECHEANCE_CHAINE_MS, executerChaine, reprendreLesChainesEnPlan, tempsPourCommencer } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { audioDuCompte } from "@/server/vocal";
 import { compteDeTest, convPrete, debloquerLaConv } from "./aide/fixtures";
@@ -185,7 +185,12 @@ describe("la chaîne", () => {
 
   it("donne à chaque étape le temps de finir avant que Vercel coupe la fonction", () => {
     expect(tempsPourCommencer("rapport_chapitres")).toBeGreaterThan(tempsPourCommencer("rapport_plan"));
-    expect(tempsPourCommencer("rapport_chapitres")).toBeLessThan(285_000);
+    expect(tempsPourCommencer("rapport_chapitres")).toBeLessThan(ECHEANCE_CHAINE_MS);
+  });
+
+  it("une lecture entière (verdict, plan, chapitres, mémoire) tient dans une fonction, sans relais", () => {
+    const genres = ["verdict", "rapport_plan", "rapport_chapitres", "memoire"] as const;
+    expect(genres.reduce((n, g) => n + tempsPourCommencer(g), 0)).toBeLessThan(ECHEANCE_CHAINE_MS);
   });
 });
 

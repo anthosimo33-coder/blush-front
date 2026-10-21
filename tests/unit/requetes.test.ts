@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEMANDE_PLAN, demandeMoitie, requeteChat, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, type Requete } from "@prompts/lib/contextes";
+import {
+  DEMANDE_PLAN,
+  demandeMoitie,
+  requeteChat,
+  requeteMemoireCreation,
+  requeteMemoireMaj,
+  requeteRapport,
+  requeteVerdict,
+  requeteVocal,
+  type Requete,
+} from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
 import { Plan05, Sortie04 } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -433,6 +443,22 @@ describe("le montage partagé : la conv en cache une fois pour le verdict, le ra
         },
       }
     `);
+  });
+
+  it("le vocal : la consigne d’abord, puis ce qu’il dit, le même texte qu’avec le montage d’origine ; rien en cache (le socle, lui, l’est par le système)", () => {
+    const args = { h, aujourdhui: Date.UTC(2026, 9, 1), verdict, rapport: { plan }, messages: [...rendu.lignes.values()].slice(0, 3) };
+    const partage = requeteVocal({ ...args, consigne: "consigne du vocal" });
+    const origine = requeteVocal(args);
+    expect(partage.partage).toBe(true);
+    expect(origine.partage).toBeUndefined();
+    expect(origine.blocs).toHaveLength(1);
+    expect(partage.blocs.some((b) => "cache" in b && b.cache)).toBe(false);
+    expect(textes(partage)[0]).toContain("consigne du vocal");
+    expect(textes(partage)[1]).toBe(textes(origine)[0]);
+    expect(structure(partage).blocs.map((b) => ("balises" in b ? b.balises : []))).toEqual([
+      ["consigne", "format"],
+      ["histoire", "verdict", "rapport", "messages"],
+    ]);
   });
 
   it("sans consigne, rien ne change : le montage d’origine", () => {

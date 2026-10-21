@@ -35,8 +35,8 @@ const echeancesPosees = (texte: string) => [...texte.matchAll(/\bavecEcheance\((
 
 describe("l’échéance d’une fonction", () => {
   it("echeancePour : 15 s avant que Vercel coupe la fonction, par défaut", () => {
-    expect(DUREE_FONCTION_S).toBe(300);
-    expect(echeancePour(DUREE_FONCTION_S)).toBe(285_000);
+    expect(DUREE_FONCTION_S).toBe(800);
+    expect(echeancePour(DUREE_FONCTION_S)).toBe(785_000);
     expect(echeancePour(180)).toBe(165_000);
     expect(echeancePour(60, 5_000)).toBe(55_000);
   });
@@ -84,6 +84,11 @@ describe("l’échéance d’une fonction", () => {
     );
     expect(routes.length).toBeGreaterThanOrEqual(6);
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);
+  });
+
+  it("le réveil a la durée du chat et du rapport (Vercel regroupe les routes de même réglage dans une fonction)", () => {
+    const reveil = sources("src/app").find((f) => f.chemin === "src/app/api/reveil/route.ts")!;
+    expect(maxDurationDe(reveil.texte)).toBe(DUREE_FONCTION_S);
   });
 
   it("avecEcheance : tempsRestant la suit, la plus proche l’emporte, et le délai d’un appel s’y plie", async () => {

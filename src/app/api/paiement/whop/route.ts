@@ -2,7 +2,7 @@ import { erreur, repondre, route } from "@/server/http";
 import { recevoirWebhook } from "@/server/paiement/webhook";
 
 /* Un paiement livré relance la chaîne du rapport après la réponse (after) : elle a la durée d’une fonction de la chaîne */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /** Un webhook de Whop ne pèse que quelques Ko : au-delà, il n’en est pas un. */
 const CORPS_MAX = 256 * 1024;

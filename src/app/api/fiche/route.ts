@@ -10,7 +10,7 @@ import { avecEcheance, echeancePour } from "@/server/echeance";
 import { ROUTES } from "@/types/api";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Sa fiche, et si une mise à jour de la mémoire tourne (ficheEtMaj, src/server/ajouts.ts). Comme la corriger ou y ajouter

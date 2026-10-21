@@ -399,7 +399,15 @@ async function vocal(
 ) {
   if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
   if (await voixBloquee(story.id, "rapport")) throw new ErreurTache("voix_budget");
-  const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
+  /* Dans le montage partagé, son système est le socle seul, relu dans le cache du verdict (consigneDuMontage) */
+  const req = requeteVocal({
+    h: histoireDe(metaDe(story)),
+    aujourdhui: aujourdhuiParis().t,
+    verdict,
+    rapport,
+    messages: [...lignes.values()],
+    consigne: consigneDuMontage("06-vocal"),
+  });
   const script = await appelVerifie(req, Sortie06, { preuves: preuvesVocal, lignes, storyId: story.id, etiquette: "vocal" });
   if (script.alerte) return;
   try {

@@ -192,18 +192,22 @@ const SYSTEMES: Record<Tache, string> = {
 /** Les textes système, pour le garde-fou anti-fuite (src/server/ia/garde.ts). */
 export const textesSysteme = () => Object.values(SYSTEMES);
 
-/** Le système du montage partagé (prompts/lib/contextes.ts) : le socle seul, le même pour le verdict, le rapport et la mémoire. */
+/** Le système du montage partagé (prompts/lib/contextes.ts) : le socle seul, le même pour le verdict, le rapport, le vocal et la mémoire. */
 const SOCLE = TEXTES.socle.trim();
 
-/** Les tâches qui lisent la conv entière, et peuvent passer par le montage partagé. */
-export type TacheDeLaConv = "04-verdict" | "05-rapport" | "07-memoire";
+/**
+ * Les tâches du montage partagé : celles qui lisent la conv entière, et le vocal, qui ne la lit pas mais relit le socle
+ * mis en cache par le verdict. Elles ne le relisent qu’avec les mêmes réglages : le modèle, la réflexion et l’effort
+ * font partie du préfixe en cache (tests/unit/claude.test.ts le vérifie).
+ */
+export type TacheDuMontage = "04-verdict" | "05-rapport" | "06-vocal" | "07-memoire";
 
 /**
- * La consigne d’une tâche qui lit la conv, à passer à sa requête dans le montage partagé (BLUSH_MONTAGE=partage) :
- * son prompt, qui part alors dans le message après la conv, au lieu du système. Rien dans le montage d’origine. Le
- * prompt ne sort pas du serveur : il revient ici dans la requête, comme les autres.
+ * La consigne d’une tâche du montage partagé, à passer à sa requête (BLUSH_MONTAGE=partage) : son prompt, qui part alors
+ * dans le message (après la conv, ou devant ce que dit le vocal), au lieu du système. Rien dans le montage d’origine.
+ * Le prompt ne sort pas du serveur : il revient ici dans la requête, comme les autres.
  */
-export const consigneDuMontage = (tache: TacheDeLaConv): string | undefined => (env().BLUSH_MONTAGE === "partage" ? TEXTES[tache] : undefined);
+export const consigneDuMontage = (tache: TacheDuMontage): string | undefined => (env().BLUSH_MONTAGE === "partage" ? TEXTES[tache] : undefined);
 
 /**
  * Le format de sortie demandé : le schéma JSON tiré du schéma zod, sans la lecture que le SDK y attache (`parse`). Avec

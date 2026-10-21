@@ -5,7 +5,7 @@ import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /* Une mise à jour de la mémoire restée en plan repart après la réponse (ficheEtMaj, relancerApres) : 20 à 60 s, trois essais au plus */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Le pronom de l’autre, corrigé sur sa fiche (« Il » ou « Elle ») : la conv ne le disait pas, ou pas bien. Le chat, sa

@@ -233,6 +233,15 @@ describe("appeler : l’envoi", () => {
     expect(d!.output_config).toMatchObject({ effort: "medium", format: { type: "json_schema" } });
   });
 
+  it("les tâches du montage partagé relisent le socle du verdict : même système, modèle, réflexion et effort", async () => {
+    const taches = ["04-verdict", "05-rapport", "06-vocal", "07-memoire"] as const;
+    const envois = faux(...taches.map(() => rend(message([texte('{"ok":true}')]))));
+    for (const tache of taches) await appeler({ tache, partage: true, blocs: [{ texte: "x" }] }, Format);
+    const [v, ...autres] = envois.map((e) => e[0].params);
+    /* Comparés par égalité (un booléen) : un échec n’affiche pas le socle dans les journaux de la CI, qui sont publics */
+    for (const p of autres) for (const cle of ["model", "system", "thinking", "output_config"] as const) expect(JSON.stringify(p![cle]) === JSON.stringify(v![cle])).toBe(true);
+  });
+
   it("lit les captures avec Sonnet (une transcription), et le reste avec Opus", async () => {
     const envois = faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
     await appeler({ tache: "01-captures", blocs: [{ texte: "les captures" }] }, Format);

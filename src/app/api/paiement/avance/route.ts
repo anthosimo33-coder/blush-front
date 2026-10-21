@@ -5,7 +5,7 @@ import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /* Un achat livré ici relance la chaîne du rapport après la réponse (after) : elle a la durée d’une fonction de la chaîne */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Utiliser le rapport d’avance du compte (le 2e rapport à −50 %, payé sur « C’est débloqué ») pour la conv du corps
