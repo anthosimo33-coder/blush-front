@@ -192,6 +192,19 @@ const SYSTEMES: Record<Tache, string> = {
 /** Les textes système, pour le garde-fou anti-fuite (src/server/ia/garde.ts). */
 export const textesSysteme = () => Object.values(SYSTEMES);
 
+/** Le système du montage partagé (prompts/lib/contextes.ts) : le socle seul, le même pour le verdict, le rapport et la mémoire. */
+const SOCLE = TEXTES.socle.trim();
+
+/** Les tâches qui lisent la conv entière, et peuvent passer par le montage partagé. */
+export type TacheDeLaConv = "04-verdict" | "05-rapport" | "07-memoire";
+
+/**
+ * La consigne d’une tâche qui lit la conv, à passer à sa requête dans le montage partagé (BLUSH_MONTAGE=partage) :
+ * son prompt, qui part alors dans le message après la conv, au lieu du système. Rien dans le montage d’origine. Le
+ * prompt ne sort pas du serveur : il revient ici dans la requête, comme les autres.
+ */
+export const consigneDuMontage = (tache: TacheDeLaConv): string | undefined => (env().BLUSH_MONTAGE === "partage" ? TEXTES[tache] : undefined);
+
 /**
  * Le format de sortie demandé : le schéma JSON tiré du schéma zod, sans la lecture que le SDK y attache (`parse`). Avec
  * elle, le SDK lit lui-même chaque texte d’une réponse en flux, et lève une erreur sans nom ni code (« Error ») devant un
@@ -216,8 +229,9 @@ function parametres(req: Requete, schema: z.ZodType) {
      * premiers mots. Le résumé ne coûte rien de plus (la réflexion est facturée pareil), et son texte ne sort pas d’ici
      */
     thinking: { type: "adaptive" as const, display: "summarized" as const },
-    output_config: { effort: req.effort ?? reglage.effort, format: formatDeSortie(schema) },
-    system: [{ type: "text" as const, text: SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
+    /* Le montage partagé n’impose aucun format : un format imposé passe avant le système dans le préfixe en cache (lireMessage vérifie la réponse) */
+    output_config: req.partage ? { effort: req.effort ?? reglage.effort } : { effort: req.effort ?? reglage.effort, format: formatDeSortie(schema) },
+    system: [{ type: "text" as const, text: req.partage ? SOCLE : SYSTEMES[req.tache], cache_control: { type: "ephemeral" as const } }],
     messages: [
       {
         role: "user" as const,
@@ -283,7 +297,8 @@ function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { ap
     .join("");
   let sortie: z.infer<S> | null = null;
   try {
-    const ok = schema.safeParse(JSON.parse(texte));
+    /* Sans format imposé (le montage partagé), l’objet peut arriver dans un bloc de code : on le prend de la première accolade à la dernière */
+    const ok = schema.safeParse(JSON.parse(texte.slice(texte.indexOf("{"), texte.lastIndexOf("}") + 1)));
     if (ok.success) sortie = ok.data;
   } catch {
     /* un texte qui n’est pas du JSON : pas de sortie */

@@ -22,7 +22,7 @@ import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rap
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
 import { aujourdhuiParis } from "./temps";
-import type { Avance } from "./ia/claude";
+import { consigneDuMontage, type Avance } from "./ia/claude";
 import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
 import { rapportOuvertEnBase } from "./droits";
@@ -138,7 +138,7 @@ async function verdict(story: LigneComplete, t: Tache) {
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit. Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  const brute = await appelVerifie(requeteVerdict(rendu), Sortie04, {
+  const brute = await appelVerifie(requeteVerdict(rendu, consigneDuMontage("04-verdict")), Sortie04, {
     preuves: preuvesVerdict,
     lignes: rendu.lignes,
     storyId: story.id,
@@ -174,7 +174,7 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
   const v = await donneesVerdict(story.id);
   if (!v) throw new ErreurTache("verdict_absent");
   if (v.sortie.mode_sobre) {
-    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null), Sortie05, {
+    const r = await appelVerifie(requeteRapport(rendu, v.sortie, null, consigneDuMontage("05-rapport")), Sortie05, {
       preuves: preuvesRapport,
       lignes: rendu.lignes,
       storyId: story.id,
@@ -186,7 +186,7 @@ async function rapportPlan(story: LigneComplete, t: Tache) {
     await garderRapport(story, { ...r, chapitres: null }, rendu.lignes, v.scores);
     return;
   }
-  const sortiePlan = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN), Etape05, {
+  const sortiePlan = await appelVerifie(requeteRapport(rendu, v.sortie, DEMANDE_PLAN, consigneDuMontage("05-rapport")), Etape05, {
     preuves: (e) => (e.plan ? preuvesPlan(e.plan) : []),
     lignes: rendu.lignes,
     storyId: story.id,
@@ -275,7 +275,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
-    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels)), Etape05, {
+    appelVerifie(requeteRapport(rendu, v.sortie, demandeMoitie(plan, quels), consigneDuMontage("05-rapport")), Etape05, {
       preuves: (e) => preuvesChapitres(e.chapitres),
       lignes: rendu.lignes,
       storyId: story.id,
@@ -444,7 +444,12 @@ async function memoire(story: LigneComplete) {
   const ligne = await ligneRapport(story.id);
   if (!v || !ligne?.data) throw new ErreurTache("rapport_absent");
   const r = coffre.lire("reports.data", ligne.data).sortie;
-  const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r), Sortie07, { preuves: preuvesMemoire, lignes: rendu.lignes, storyId: story.id, etiquette: "memoire" });
+  const etat = await appelVerifie(requeteMemoireCreation(rendu, v.sortie, r, consigneDuMontage("07-memoire")), Sortie07, {
+    preuves: preuvesMemoire,
+    lignes: rendu.lignes,
+    storyId: story.id,
+    etiquette: "memoire",
+  });
   if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
   const donnees = { etat, lignes: lignesGardees(etat, rendu.lignes), suivant: lu.messages.length + 1 };
   const [neuve] = await db()

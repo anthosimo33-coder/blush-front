@@ -219,6 +219,20 @@ describe("appeler : l’envoi", () => {
     expect(envois[0]![0]).toMatchObject({ requete: VERDICT, partie: "plan", params: { model: expect.any(String), messages: [{ role: "user" }] } });
   });
 
+  it("le montage partagé : le socle seul en système, aucun format imposé, et la sortie lue même dans un bloc de code", async () => {
+    const envois = faux(rend(message([texte('Voilà :\n```json\n{"ok":true}\n```')])), rend(message([texte('{"ok":true}')])));
+    const partage: Requete = { ...VERDICT, partage: true };
+    expect((await appeler(partage, Format)).sortie).toEqual({ ok: true });
+    await appeler(VERDICT, Format);
+    const [p, d] = envois.map((e) => e[0].params);
+    /* Le même socle en tête des deux systèmes ; le montage d’origine y ajoute le prompt de la tâche */
+    const [sp, sd] = [p!.system, d!.system].map((x) => (x as { text: string }[])[0]!.text) as [string, string];
+    expect(sd.startsWith(sp)).toBe(true);
+    expect(sd.length).toBeGreaterThan(sp.length);
+    expect(p!.output_config).toEqual({ effort: "medium" });
+    expect(d!.output_config).toMatchObject({ effort: "medium", format: { type: "json_schema" } });
+  });
+
   it("lit les captures avec Sonnet (une transcription), et le reste avec Opus", async () => {
     const envois = faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
     await appeler({ tache: "01-captures", blocs: [{ texte: "les captures" }] }, Format);
