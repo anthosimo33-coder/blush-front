@@ -138,24 +138,24 @@ test("la roue tournée : « Gagné », le lot (−10 %) sur les prix du paywall 
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  await test.step("le paywall : le bandeau du cadeau, Premium à 17,01 € ; l’onglet quitté puis retrouvé, pas d’offre ①", async () => {
+  await test.step("le paywall : le bandeau du cadeau, Premium à 13,41 € ; l’onglet quitté puis retrouvé, pas d’offre ①", async () => {
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("status").filter({ hasText: "Ton cadeau\u00a0: −10\u00a0% sur ta formule" })).toBeVisible();
     const premium = ecran.getByRole("radio", { name: /Premium/ });
-    await expect(premium).toContainText("17,01\u00a0€");
-    await expect(premium).toContainText("−1,89\u00a0€");
+    await expect(premium).toContainText("13,41\u00a0€");
+    await expect(premium).toContainText("−1,49\u00a0€");
     await quitterPuisRevenir(page);
     await page.waitForTimeout(1000);
     await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
   });
 
-  await test.step("payé au prix du lot : 17,01 €, 90 bulles, le lot pris", async () => {
-    await page.getByRole("main").getByRole("button", { name: "Débloquer · 17,01\u00a0€" }).click();
+  await test.step("payé au prix du lot : 13,41 €, 90 bulles, le lot pris", async () => {
+    await page.getByRole("main").getByRole("button", { name: "Débloquer · 13,41\u00a0€" }).click();
     await payerParCarte(page);
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
     expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 90 });
     const achats = await sql()<{ centimes: number; lot_roue: string | null }[]>`
       select a.centimes, a.lot_roue from achats a join users u on u.id = a.user_id where u.email = ${email.toLowerCase()} and a.statut = 'paye'`;
-    expect(achats).toEqual([{ centimes: 1701, lot_roue: "moins10" }]);
+    expect(achats).toEqual([{ centimes: 1341, lot_roue: "moins10" }]);
   });
 });
