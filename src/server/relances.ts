@@ -151,7 +151,8 @@ export async function envoyerLesRelances(): Promise<PassageDesRelances> {
       break;
     }
     /*
-     * L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, une alerte n’appelle aucune vente. Sans
+     * L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, une alerte n’appelle aucun mail (danger
+     * compris, qui se vend dans l’appli depuis le 21 octobre 2026 : sa boîte peut être lue par l’autre). Sans
      * verdict, seule une conv qui attend son paiement (le paywall d’abord, rien de lu) est relancée
      */
     const verdict = await donneesVerdict(c.storyId);

@@ -89,11 +89,11 @@ describe("les titres des chapitres fermés", () => {
     expect(await titresAffiches(u, imp.id)).toEqual({ titres: attente, sommaire: attente, fermes: true });
   });
 
-  it("une alerte : aucun titre gardé, ni montré", async () => {
+  it("une alerte du mode sobre (détresse) : aucun titre gardé, ni montré", async () => {
     const u = await compteDeTest("titres-alerte");
     /* Le modèle lève une alerte, mais écrit quand même des titres : le code les retire. Le rapport doux suit (FACTICE.alerte) */
     const alerte = (req: Requete) => {
-      if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as Verdict), alerte: "danger" };
+      if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as Verdict), alerte: "detresse" };
       return fournisseurFactice({ ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] });
     };
     const imp = await avecFactice(alerte, () => histoireLue(u, "06-elle-hesite.txt"));

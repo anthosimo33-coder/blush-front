@@ -71,10 +71,10 @@ describe("le rapport pendant son écriture", () => {
 const blocs = [{ type: "chute", texte: "La chute du chapitre caché.", preuves: [], titre: null, niveau: null, items: null }];
 const sobreAvecChapitres = (req: Requete) => {
   const s = fournisseurFactice(req);
-  if (req.tache === "04-verdict") return { ...(s as object), alerte: "danger" };
+  if (req.tache === "04-verdict") return { ...(s as object), alerte: "detresse" };
   if (req.tache !== "05-rapport") return s;
   return {
-    alerte: "danger",
+    alerte: "detresse",
     mode_sobre: true,
     decouvertes: [],
     these: "Ce que tu vis compte.",

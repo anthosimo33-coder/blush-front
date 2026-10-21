@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { alerteSobre } from "@prompts/lib/titres";
 import { bullesDe, CATALOGUE, PREMIERE_RECHARGE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import { bullesDuLot, DUREE_DU_SECOND_GAGNE_MS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import type { OffreId } from "@/types";
@@ -40,13 +41,14 @@ const RETRACTATION_MS = 14 * 24 * 3600e3;
 export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
 
 /**
- * La conv est-elle en alerte (danger, détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un mineur) ? Son
- * rapport est alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport d’avance
- * (« une alerte n’appelle aucune vente », comme les relances). Sans verdict encore écrit : pas en alerte.
+ * La conv est-elle en mode sobre (une alerte détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un
+ * mineur) ? Son rapport est alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport
+ * d’avance. Une alerte « danger » n’y met plus depuis le 21 octobre 2026 (alerteSobre) : son rapport complet se vend
+ * comme les autres. Un verdict « danger » gardé avant reste sobre (`mode_sobre`). Sans verdict encore écrit : non.
  */
 export async function convEnAlerte(storyId: string): Promise<boolean> {
   const v = await donneesVerdict(storyId);
-  return !!v && (!!v.sortie.alerte || v.sortie.mode_sobre);
+  return !!v && (v.sortie.mode_sobre || alerteSobre(v.sortie.alerte));
 }
 
 /**
@@ -304,8 +306,8 @@ async function ouvrirLaConv(tx: Transaction, userId: string, storyId: string): P
 }
 
 /**
- * Le paywall passe avant la lecture (16 octobre) : une conv payée peut lever une alerte (danger, détresse, mineur), qui
- * ne se vend jamais. Son rapport doux reste offert ; ses achats payés sont signalés à l’équipe, qui les rembourse chez
+ * Le paywall passe avant la lecture (16 octobre) : une conv payée peut lever une alerte qui la met en mode sobre
+ * (détresse, mineur ; « danger » se vend depuis le 21 octobre 2026), et le mode sobre ne se vend jamais. Son rapport doux reste offert ; ses achats payés sont signalés à l’équipe, qui les rembourse chez
  * Whop (le webhook du remboursement les reprend). Rien de la conv dans l’alerte : la tâche, l’achat, le montant.
  * TODO(produit): rembourser tout seul par l’API de Whop, une fois son appel vérifié.
  */

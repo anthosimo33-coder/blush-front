@@ -12,10 +12,14 @@ export const FACTICE = {
    * Les déclencheurs : des marqueurs inventés, que personne n’écrit dans une vraie conv, écrits dans une conv (ou un
    * message au chat) par les tests pour faire prendre au modèle factice un chemin qu’il ne prend jamais sinon. Le modèle
    * factice n’existe pas sur Vercel (src/server/env.ts) : la production ne les lit jamais.
-   * `alerte` : dans la conv, le verdict lève une alerte (danger), et le rapport passe en mode sobre (src/server/analyse.ts).
+   * `alerte` : dans la conv, le verdict lève une alerte qui met en mode sobre (détresse), et le rapport passe en mode
+   * sobre (src/server/analyse.ts).
+   * `danger` : dans la conv, le verdict lève une alerte « danger », qui ne met plus en mode sobre (21 octobre 2026) : le
+   * verdict et le rapport sont complets, et se vendent.
    * `refus` : dans la conv, le modèle refuse de la lire (le verdict) ; dans un message au chat, il refuse d’y répondre.
    */
   alerte: "#factice-alerte",
+  danger: "#factice-danger",
   refus: "#factice-refus",
   /** Les messages qu’il lit dans des captures, quelles qu’elles soient : deux soirées de 12. */
   messagesCaptures: 24,

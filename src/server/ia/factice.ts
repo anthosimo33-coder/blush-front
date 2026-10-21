@@ -91,10 +91,10 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
   const demande = textes(req).at(-1)!;
   const tout = textes(req).join("\n");
   if (req.tache === "04-verdict" && tout.includes(FACTICE.refus)) return REFUS_FACTICE;
-  /* Une alerte : pas d’emoji, pas de niveau, un pas pour soi (prompts/04-verdict.md, « La sécurité d’abord ») */
+  /* Une alerte qui met en mode sobre (la détresse) : pas d’emoji, pas de niveau, un pas pour soi (prompts/04-verdict.md, « La sécurité d’abord ») */
   if (req.tache === "04-verdict" && tout.includes(FACTICE.alerte))
     return {
-      alerte: "danger",
+      alerte: "detresse",
       mode_sobre: true,
       emoji: null,
       court: null,
@@ -110,10 +110,10 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       devinette: null,
       titres: null,
     } satisfies Verdict;
-  /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec une alerte ») */
+  /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec le mode sobre ») */
   if (req.tache === "05-rapport" && tout.includes(FACTICE.alerte))
     return {
-      alerte: "danger",
+      alerte: "detresse",
       mode_sobre: true,
       decouvertes: [],
       these: "Ce que tu vis compte.",
@@ -128,9 +128,11 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         brouillon: "J’ai besoin de temps pour moi.",
       },
     } satisfies Rapport;
+  /* Une alerte « danger » ne met plus en mode sobre : le verdict et le rapport sont complets, l’alerte notée (FACTICE.danger) */
+  const danger = tout.includes(FACTICE.danger) ? ("danger" as const) : null;
   if (req.tache === "04-verdict")
     return {
-      alerte: null,
+      alerte: danger,
       mode_sobre: false,
       emoji: "🤏",
       court: "À deux doigts",
@@ -150,7 +152,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
   if (req.tache === "05-rapport" && req.partie === "plan")
     return {
       plan: {
-        alerte: null,
+        alerte: danger,
         mode_sobre: false,
         these: "Vous jouez à cache-cache.",
         decouvertes: [1, 2, 3].map((k) => ({ texte: `Découverte ${k}`, preuves: [preuve(k)] })),

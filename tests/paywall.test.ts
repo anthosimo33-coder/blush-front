@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Requete } from "@prompts/lib/contextes";
 
 /*
  * Le paywall avant toute lecture (décidé le 16 octobre), avec la base : « Qui es-tu ? » rempli (POST /api/analyse), le
@@ -29,17 +30,20 @@ vi.mock("@/server/env", async (original) => ({ ...(await original<typeof import(
 vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string) => void etat.alertes.push(sujet) }));
 
 import { GET as suivreLaLecture, POST as lancerLaLecture } from "@/app/api/analyse/route";
-import { signalerLesAchatsDUneAlerte } from "@/server/achats";
+import { convEnAlerte, signalerLesAchatsDUneAlerte } from "@/server/achats";
 import { apercuAvantPaiement } from "@/server/analyse";
 import type { Utilisateur } from "@/server/auth";
+import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
+import { fournisseurFactice } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { progression } from "@/server/donnees";
 import { contexteDe } from "@/server/histoires";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import { etatDesTaches } from "@/server/taches";
 import { genreDuHaut } from "@/contenu/haut-du-paywall";
 import { HAUT } from "@/server/compteurs";
-import { compteDeTest, convRattachee, debloquerLaConv, ligneEnBase } from "./aide/fixtures";
+import { avecFactice, compteDeTest, convRattachee, debloquerLaConv, ligneEnBase } from "./aide/fixtures";
 
 const APPLI = "http://localhost";
 
@@ -160,5 +164,49 @@ describe("une conv payée qui lève une alerte", () => {
     await db()
       .delete(schema.achats)
       .where(and(eq(schema.achats.userId, u.id), eq(schema.achats.storyId, conv)));
+  });
+
+  /** Le modèle factice, son verdict avec cette alerte ; en détresse, son rapport doux suit (FACTICE.alerte). */
+  const avecAlerte = (alerte: "danger" | "detresse") => (req: Requete) => {
+    if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as object), alerte };
+    return fournisseurFactice(alerte === "detresse" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
+  };
+
+  /** Une conv payée (un achat « paye »), puis sa chaîne entière, son verdict levant cette alerte. Rend la conv et son verdict gardé. */
+  async function payeeAvec(prefixe: string, alerte: "danger" | "detresse") {
+    const { u, conv } = await lectureLancee(prefixe);
+    await db().insert(schema.achats).values({ userId: u.id, storyId: conv, offre: "rapport", centimes: 990, bulles: 10, fournisseur: "factice", statut: "paye" });
+    await debloquerLaConv(conv);
+    await reparerLaChaine({ id: conv, userId: u.id });
+    await avecFactice(avecAlerte(alerte), async () => {
+      await apresLaReponse();
+      await executerChaine(conv);
+    });
+    const [v] = await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, conv));
+    const nettoyer = () =>
+      db()
+        .delete(schema.achats)
+        .where(and(eq(schema.achats.userId, u.id), eq(schema.achats.storyId, conv)));
+    return { conv, sortie: coffre.lire("verdicts.data", v!.data).sortie, nettoyer };
+  }
+
+  it("une alerte danger (21 octobre 2026) : le verdict et le rapport complets, rien à rembourser", async () => {
+    etat.alertes.length = 0;
+    const { conv, sortie, nettoyer } = await payeeAvec("paywall-danger", "danger");
+    expect(sortie).toMatchObject({ alerte: "danger", mode_sobre: false });
+    expect(sortie.titres).not.toBeNull();
+    expect(await convEnAlerte(conv)).toBe(false);
+    expect((await etatDesTaches(conv, ["rapport_chapitres"])).rapport_chapitres?.status).toBe("fini");
+    expect(etat.alertes).not.toContain("à rembourser : une conv payée lève une alerte");
+    await nettoyer();
+  });
+
+  it("une alerte détresse : le mode sobre, et l’équipe prévenue de rembourser", async () => {
+    etat.alertes.length = 0;
+    const { conv, sortie, nettoyer } = await payeeAvec("paywall-detresse", "detresse");
+    expect(sortie).toMatchObject({ alerte: "detresse", mode_sobre: true, titres: null });
+    expect(await convEnAlerte(conv)).toBe(true);
+    expect(etat.alertes).toContain("à rembourser : une conv payée lève une alerte");
+    await nettoyer();
   });
 });
