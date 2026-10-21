@@ -57,7 +57,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(8);
     /* Les quatre coups de pouce, les trois gestes de l’équipe */
     for (const offre of [
-      "Le rapport à 10,90\u00a0€, offre unique de 5 minutes",
+      "Le rapport à 6,90\u00a0€, offre unique de 5 minutes",
       "Le mail «\u00a0Ton rapport t’attend\u00a0»",
       "Premium pour 5\u00a0€ de plus",
       "+40 bulles, première recharge",

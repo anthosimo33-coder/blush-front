@@ -10,9 +10,9 @@ import { FORMULES, OFFRES } from "@/types";
  */
 describe("le catalogue", () => {
   it.each<[string, number, number | null, number, boolean, string | null]>([
-    ["rapport", 1390, null, 10, true, null],
-    ["premium", 1890, 2780, 90, true, null],
-    ["suite", 1090, 1390, 10, true, "suite"],
+    ["rapport", 990, null, 10, true, null],
+    ["premium", 1490, 2380, 90, true, null],
+    ["suite", 690, 990, 10, true, "suite"],
     ["premium_ajout", 500, 1390, 80, false, "premium_ajout"],
     ["pack30", 890, null, 30, false, null],
     ["pack80", 1390, null, 80, false, null],
@@ -39,7 +39,7 @@ describe("le catalogue", () => {
   it("les prix s’écrivent à la française, l’insécable avant €", () => {
     expect(enEuros(990)).toBe("9,90\u00a0€");
     expect(enEuros(500)).toBe("5,00\u00a0€");
-    expect(prixDe("premium")).toBe("18,90\u00a0€");
+    expect(prixDe("premium")).toBe("14,90\u00a0€");
   });
 
   it("la feuille « Ta formule » : le rapport seul, puis Premium, choisie d’avance", () => {
@@ -55,8 +55,8 @@ describe("le catalogue", () => {
 describe("les textes du paiement, tirés du catalogue", () => {
   it("le bas de l’aperçu gratuit", () => {
     expect(PIED_GRATUIT).toEqual({
-      lire: "Lire la suite · 13,90\u00a0€",
-      lireGarde: "Lire la suite · 6,95\u00a0€",
+      lire: "Lire la suite · 9,90\u00a0€",
+      lireGarde: "Lire la suite · 4,95\u00a0€",
       lireAvance: "Lire la suite · 0\u00a0€",
       offertes: "10 bulles offertes avec ton rapport",
       regle: "1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux",
@@ -78,19 +78,19 @@ describe("les textes du paiement, tirés du catalogue", () => {
       gratuit: "0\u00a0€",
       economie: "Économise 8,90\u00a0€ · la bulle à 0,06\u00a0€",
     });
-    expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 18,90\u00a0€");
+    expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 14,90\u00a0€");
   });
 
   it("l’offre ① : une offre unique sur le rapport, 3 € de moins, 10 bulles offertes", () => {
     expect(OFFRE_SUITE).toMatchObject({
       titre: "Offre unique sur ton rapport",
-      sousTitre: "3\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 13,90\u00a0€.",
+      sousTitre: "3\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 9,90\u00a0€.",
       fin: "Elle disparaît dans",
-      prix: "10,90\u00a0€",
-      barre: "13,90\u00a0€",
+      prix: "6,90\u00a0€",
+      barre: "9,90\u00a0€",
       economie: "−3\u00a0€",
       contenu: "10 bulles offertes",
-      prendre: "Je le prends · 10,90\u00a0€",
+      prendre: "Je le prends · 6,90\u00a0€",
     });
     expect(`${OFFRE_SUITE.remise}${OFFRE_SUITE.apres}`).toBe(OFFRE_SUITE.titre);
   });

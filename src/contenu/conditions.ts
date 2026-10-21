@@ -40,7 +40,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 16 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 21 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */

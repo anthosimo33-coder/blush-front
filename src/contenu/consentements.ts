@@ -19,9 +19,10 @@
 export const CASE_IMPORT = {
   /*
    * Le 16 octobre : les conditions disent la lecture payée avant d’être écrite (plus de verdict offert), et la grille de
-   * prix du jour ; puis (« .2 ») le règlement de la roue
+   * prix du jour ; puis (« .2 ») le règlement de la roue. Le 21 octobre : la grille redescend (le rapport à 9,90 €,
+   * Premium à 14,90 €)
    */
-  version: "2026-10-16.2",
+  version: "2026-10-21.1",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",

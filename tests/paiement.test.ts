@@ -179,7 +179,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
       userId: u.id,
       storyId: conv,
       offre: "premium",
-      centimes: 1890,
+      centimes: 1490,
       bulles: 90,
       statut: "en_attente",
       fournisseur: "factice",
@@ -214,7 +214,7 @@ describe("commencer un paiement (POST /api/paiement)", () => {
     const { status, corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     expect([status, corps.url, corps.checkout]).toEqual([200, "https://whop.com/checkout/ch_whop_1/", "ch_whop_1"]);
     expect(corpsEnvoyes).toEqual([expect.objectContaining({ metadata: { achat: corps.achat }, redirect_url: `https://www.askblush.com/paiement/retour?achat=${corps.achat}` })]);
-    expect(await achatEnBase(corps.achat)).toMatchObject({ fournisseur: "whop", checkoutId: "ch_whop_1", centimes: 1390 });
+    expect(await achatEnBase(corps.achat)).toMatchObject({ fournisseur: "whop", checkoutId: "ch_whop_1", centimes: 990 });
     /* Ce que Whop voit : l’achat et son prix, ni l’email, ni la conv */
     expect(JSON.stringify(corpsEnvoyes)).not.toContain(u.email);
 
@@ -270,7 +270,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     const { u } = await acheteur("hook-signature");
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const w = await issue(corps.achat, "payer");
-    const touche = { corps: w.corps.replace('"13.90"', '"0.01"'), entetes: w.entetes };
+    const touche = { corps: w.corps.replace('"9.90"', '"0.01"'), entetes: w.entetes };
     for (const faux of [touche, { corps: w.corps, entetes: { ...w.entetes, "webhook-signature": "v1,AAAA" } }, { corps: w.corps, entetes: {} }]) {
       const r = await poster(faux);
       expect([r.status, await r.json()]).toEqual([401, { erreur: "interdit" }]);
@@ -290,7 +290,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
     for (const faux of [
       { ...data, total: { amount: "0.99", currency: "eur" } },
-      { ...data, total: { amount: "13.90", currency: "usd" }, currency: "usd" },
+      { ...data, total: { amount: "9.90", currency: "usd" }, currency: "usd" },
     ])
       expect((await poster(webhookFactice("payment.succeeded", faux))).status).toBe(200);
     /* Signé du bon secret, mais d’un autre compte : ignoré sans bruit */
@@ -327,7 +327,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect(etat.alertes).toEqual(["paiement remboursé"]);
     /* Remboursé, il ne se livre plus : le paiement rejoué ne rouvre rien */
     expect(
-      (await poster(webhookFactice("payment.succeeded", { id: (await achatEnBase(achat)).paiementId, status: "paid", metadata: { achat }, total: 13.9, currency: "eur" }))).status,
+      (await poster(webhookFactice("payment.succeeded", { id: (await achatEnBase(achat)).paiementId, status: "paid", metadata: { achat }, total: 9.9, currency: "eur" }))).status,
     ).toBe(200);
     expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
   });
@@ -343,12 +343,12 @@ describe("le webhook (POST /api/paiement/whop)", () => {
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect(await soldeDe(u.id)).toBe(10);
     expect(etat.alertes).toEqual(["paiement : remboursement partiel"]);
-    /* Le reste rendu ensuite : le paiement a tout rendu (13,90 €), l’achat est repris */
+    /* Le reste rendu ensuite : le paiement a tout rendu (9,90 €), l’achat est repris */
     etat.alertes.length = 0;
     expect(
       (
         await poster(
-          webhookFactice("refund.created", { id: "rfnd_p2", status: "succeeded", payment_id: paiementId, amount: 10.9, payment: { id: paiementId, refunded_amount: 13.9 } }),
+          webhookFactice("refund.created", { id: "rfnd_p2", status: "succeeded", payment_id: paiementId, amount: 6.9, payment: { id: paiementId, refunded_amount: 9.9 } }),
         )
       ).status,
     ).toBe(200);
@@ -369,7 +369,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
       vi.fn(async (url: string) =>
         url.endsWith("/checkout_configurations")
           ? Response.json({ id: "ch_1", purchase_url: "https://whop.com/checkout/ch_1/" })
-          : Response.json({ id: url.split("/").pop(), status: "paid", metadata: { achat: achatAttendu }, total: 13.9, currency: "eur" }),
+          : Response.json({ id: url.split("/").pop(), status: "paid", metadata: { achat: achatAttendu }, total: 9.9, currency: "eur" }),
       ),
     );
     const signe = (type: string, data: unknown) => {
@@ -380,7 +380,7 @@ describe("le webhook (POST /api/paiement/whop)", () => {
       id,
       status: "paid",
       metadata: { achat },
-      total: { amount: "13.90", currency: "eur" },
+      total: { amount: "9.90", currency: "eur" },
       currency: "eur",
       member_id: "mber_w",
       payment_method_id: null,
@@ -415,7 +415,7 @@ const signeWhop = (type: string, data: unknown) => {
 };
 
 /** Un paiement de Whop de cet achat, à ce prix, avec le moyen de paiement gardé de l’acheteur. */
-const paiementDeWhop = (achat: string, id: string, montant = "13.90") => ({
+const paiementDeWhop = (achat: string, id: string, montant = "9.90") => ({
   id,
   status: "paid",
   metadata: { achat },
@@ -521,7 +521,7 @@ describe("payé deux fois", () => {
     const { u, conv } = await acheteur("taxe-ajoutee");
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
-    const taxe = { ...data, total: { amount: "16.68", currency: "eur" }, subtotal: { amount: "13.90", currency: "eur" } };
+    const taxe = { ...data, total: { amount: "11.88", currency: "eur" }, subtotal: { amount: "9.90", currency: "eur" } };
     expect((await poster(webhookFactice("payment.succeeded", taxe))).status).toBe(200);
     /* Le même paiement, rejoué (la vérification du retour, puis le webhook) : déjà livré, pas de seconde alerte */
     expect((await poster(webhookFactice("payment.succeeded", taxe))).status).toBe(200);
@@ -536,7 +536,7 @@ describe("payé deux fois", () => {
     const { u, conv } = await acheteur("remise");
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     const data = (JSON.parse((await issue(corps.achat, "payer")).corps) as { data: Record<string, unknown> }).data;
-    const remise = { ...data, total: { amount: "0.00", currency: "eur" }, subtotal: { amount: "13.90", currency: "eur" } };
+    const remise = { ...data, total: { amount: "0.00", currency: "eur" }, subtotal: { amount: "9.90", currency: "eur" } };
     expect((await poster(webhookFactice("payment.succeeded", remise))).status).toBe(200);
     await apresLaReponse();
     expect(etat.alertes).toEqual(["paiement : montant inattendu"]);
@@ -576,9 +576,9 @@ describe("le retour (GET /api/paiement/[achat])", () => {
     );
     const { corps } = await payer({ offre: "rapport", renonciation: CASE_RENONCIATION.version });
     /* Le paiement d’un autre achat, ou pas encore encaissé : rien */
-    paiementChezWhop = { id: "pay_r", status: "paid", metadata: { achat: "0b7e3f4c-0000-4000-8000-000000000001" }, total: 13.9, currency: "eur" };
+    paiementChezWhop = { id: "pay_r", status: "paid", metadata: { achat: "0b7e3f4c-0000-4000-8000-000000000001" }, total: 9.9, currency: "eur" };
     expect((await etatDe(corps.achat, "pay_r")).corps.statut).toBe("en_attente");
-    paiementChezWhop = { id: "pay_r", status: "pending", metadata: { achat: corps.achat }, total: 13.9, currency: "eur" };
+    paiementChezWhop = { id: "pay_r", status: "pending", metadata: { achat: corps.achat }, total: 9.9, currency: "eur" };
     expect((await etatDe(corps.achat, "pay_r")).corps.statut).toBe("en_attente");
     paiementChezWhop = { ...paiementChezWhop, status: "paid" };
     expect((await etatDe(corps.achat, "pay_r")).corps.statut).toBe("paye");
@@ -703,7 +703,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(await soldeDe(u.id)).toBe(110);
   });
 
-  it("① la suite : montrée pour la conv de la page (5 minutes), puis payée 10,90 € ; jamais sans prestataire", async () => {
+  it("① la suite : montrée pour la conv de la page (5 minutes), puis payée 6,90 € ; jamais sans prestataire", async () => {
     await acheteur("offre-suite");
     etat.mode = null;
     expect(await montrer("suite")).toEqual({ offre: null });
@@ -720,7 +720,7 @@ describe("les offres uniques et le paiement en un geste", () => {
     expect(Math.abs(dit - reste)).toBeLessThan(5_000);
     const { status, corps } = await payer({ offre: "suite", renonciation: CASE_RENONCIATION.version });
     expect(status).toBe(200);
-    expect(await achatEnBase(corps.achat)).toMatchObject({ offre: "suite", centimes: 1090, bulles: 10 });
+    expect(await achatEnBase(corps.achat)).toMatchObject({ offre: "suite", centimes: 690, bulles: 10 });
   });
 
   it("③ après le rapport seul : montrée, payée en un geste avec le moyen gardé (le webhook suit), +80 bulles ; pas deux fois", async () => {
@@ -898,7 +898,7 @@ describe("« Tes achats » (GET /api/achats)", () => {
     const { corps } = await achats();
     expect(corps.achats!.map(({ id, offre, centimes, bulles, statut }) => ({ id, offre, centimes, bulles, statut }))).toEqual([
       { id: recharge, offre: "pack80", centimes: 1390, bulles: 80, statut: "rembourse" },
-      { id: rapport, offre: "rapport", centimes: 1390, bulles: 10, statut: "paye" },
+      { id: rapport, offre: "rapport", centimes: 990, bulles: 10, statut: "paye" },
     ]);
     expect(corps.achats!.every((a) => !Number.isNaN(Date.parse(a.le)))).toBe(true);
     /* Rien de la conv */
