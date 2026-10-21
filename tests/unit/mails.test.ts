@@ -146,7 +146,7 @@ describe("les mails des séquences", () => {
 
   it("S6, S7 : l’offre gardée à son prix, le rapport d’avance sans prénom, rien de l’ancienne histoire après un 🧊", () => {
     const garde = mailGarde(INES, { jour: "vendredi", heure: "18\u00a0h\u00a012" });
-    expect(garde.offre).toMatchObject({ prix: "6,95\u00a0€", barre: "13,90\u00a0€", jusqua: "Jusqu’à vendredi, 18\u00a0h\u00a012" });
+    expect(garde.offre).toMatchObject({ prix: "4,95\u00a0€", barre: "9,90\u00a0€", jusqua: "Jusqu’à vendredi, 18\u00a0h\u00a012" });
     expect(garde.sujet).toBe("ton −50\u00a0% saute vendredi");
     for (const m of [mailAvance({ jusqua: "17 octobre 2027", mois: 11 }), mailApresGlace()]) {
       const d = mailDeSequence(m, { base: "x", liens });
@@ -189,12 +189,12 @@ describe("les mails des séquences", () => {
   it("S1 J+6 : la one time offer à son prix, jusqu’à après-demain minuit, et plus de relance après", () => {
     const m = mailDerniereChance(INES, { jour: "jeudi" });
     expect(m.offre).toEqual({
-      prix: "10,90\u00a0€",
-      barre: "13,90\u00a0€",
+      prix: "6,90\u00a0€",
+      barre: "9,90\u00a0€",
       remise: "−3\u00a0€",
       inclus: "8 chapitres sur toi et Lucas, ton vocal, et 10 réponses de BLUSH",
       jusqua: "Jusqu’à jeudi, 23\u00a0h\u00a059",
-      sous: "Après, 13,90\u00a0€. Comme tout le monde.",
+      sous: "Après, 9,90\u00a0€. Comme tout le monde.",
     });
     expect(`${m.sujet}${m.apercu}${m.texte}`).not.toContain("Lucas");
   });

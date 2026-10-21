@@ -52,7 +52,7 @@ type Proprietes = {
   centimes: number;
   /** Ce qu’on paie, en une ligne : sous le total du portefeuille, et au-dessus de la carte (« Premium »). */
   titre: string;
-  /** Le bouton qui paie sans portefeuille (il ouvre la carte), et sur la page de Whop : « Débloquer · 18,90 € ». */
+  /** Le bouton qui paie sans portefeuille (il ouvre la carte), et sur la page de Whop : « Débloquer · 14,90 € ». */
   libelle: string;
   /** La ligne de la renonciation sous le bouton : le rapport, ou des bulles ; null pour une offre livrée à son usage (le rapport d’avance), sans renonciation. */
   quoi: AchatImmediat | null;

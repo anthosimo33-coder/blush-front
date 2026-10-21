@@ -25,22 +25,23 @@ export type Offre = {
 };
 
 /*
- * La grille du 16 octobre : +4 € sur le rapport, Premium et les recharges (décidé : le paywall passe avant toute lecture,
- * plus de verdict offert). Les offres définies par une remise la gardent vraie : le −50 % (⑤, ⑥) reste la moitié du
- * rapport, et ③ reste « Premium pour 5 € de plus » (Premium − le rapport) ; ① monte de 4 € comme le rapport.
+ * La grille du 21 octobre : le rapport redescend à 9,90 € et Premium à 14,90 € (décidé après une semaine sans vente au
+ * paywall direct) ; les recharges gardent les prix du 16 octobre. Les offres définies par une remise la gardent vraie :
+ * le −50 % (⑤, ⑥) reste la moitié du rapport, ③ reste « Premium pour 5 € de plus » (Premium − le rapport), ① redescend
+ * à 6,90 € comme le rapport, et le prix barré de Premium reste le rapport et le pack de 80 bulles achetés à part.
  */
 export const CATALOGUE: Record<OffreId, Offre> = {
-  rapport: { id: "rapport", centimes: 1390, barre: null, bulles: 10, conv: true, unique: null, titre: "Le rapport" },
+  rapport: { id: "rapport", centimes: 990, barre: null, bulles: 10, conv: true, unique: null, titre: "Le rapport" },
   /* Le prix barré : le rapport et le pack de 80 bulles, vendus à part (pour les mêmes 90 bulles) */
-  premium: { id: "premium", centimes: 1890, barre: 2780, bulles: 90, conv: true, unique: null, titre: "Premium" },
+  premium: { id: "premium", centimes: 1490, barre: 2380, bulles: 90, conv: true, unique: null, titre: "Premium" },
   /* ① : le rapport moins cher, une offre unique de 5 minutes (le paywall : 40 s sans payer, ou un retour sur l’onglet ; ailleurs, la feuille fermée sans payer) */
-  suite: { id: "suite", centimes: 1090, barre: 1390, bulles: 10, conv: true, unique: "suite", titre: "Le rapport, offre unique" },
+  suite: { id: "suite", centimes: 690, barre: 990, bulles: 10, conv: true, unique: "suite", titre: "Le rapport, offre unique" },
   /* ⑥ : le rapport à −50 %, gardé 7 jours par le repli de « C’est débloqué » (le 2e rapport refusé), pour une autre conv */
-  rapport_garde: { id: "rapport_garde", centimes: 695, barre: 1390, bulles: 10, conv: true, unique: "garde_second", titre: "Le rapport à −50\u00a0%" },
+  rapport_garde: { id: "rapport_garde", centimes: 495, barre: 990, bulles: 10, conv: true, unique: "garde_second", titre: "Le rapport à −50\u00a0%" },
   /* ③ : Premium pour 5 € de plus, juste après avoir pris le rapport seul (ou la suite) */
   premium_ajout: { id: "premium_ajout", centimes: 500, barre: 1390, bulles: 80, conv: false, unique: "premium_ajout", titre: "80 bulles en plus" },
   /* ⑤ : le 2e rapport à −50 %, juste après un rapport payé : un rapport d’avance, sans conv ni bulles à l’achat (RAPPORT_D_AVANCE) */
-  second: { id: "second", centimes: 695, barre: 1390, bulles: 0, conv: false, unique: "second_rapport", titre: "Ton 2e rapport" },
+  second: { id: "second", centimes: 495, barre: 990, bulles: 0, conv: false, unique: "second_rapport", titre: "Ton 2e rapport" },
   pack30: { id: "pack30", centimes: 890, barre: null, bulles: 30, conv: false, unique: null, titre: "30 bulles" },
   /* Le pack conseillé : 70 + 10 offertes, et +40 à la première recharge (④) */
   pack80: { id: "pack80", centimes: 1390, barre: null, bulles: 80, conv: false, unique: null, titre: "80 bulles" },

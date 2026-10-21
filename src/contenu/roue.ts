@@ -5,7 +5,9 @@ import { CATALOGUE, enEuros } from "./offres";
  * La roue du paywall (décidée le 16 octobre, façon e-commerce) : juste avant le paywall, un tour par compte, et on gagne à
  * chaque fois. Huit cases, chacune avec sa chance, réglées pour que chaque lot reste rentable (le calcul du 16 octobre :
  * TVA 20 %, frais de Whop 10 %, 1,50 € d’IA par rapport, la bulle à 0,05 € toutes utilisées au pire : la pire marge
- * reste 30 %, le gros lot ; un tour coûte 0,30 € en moyenne, 0,64 € au pire). Le tirage se fait sur le serveur
+ * reste 30 %, le gros lot ; un tour coûte 0,30 € en moyenne, 0,64 € au pire). Aux prix du 21 octobre (le rapport à
+ * 9,90 €), le gros lot « Premium au prix du rapport » n’a presque plus de marge quand toutes ses bulles servent : il reste
+ * plafonné par GROS_LOTS_PAR_JOUR. Le tirage se fait sur le serveur
  * (src/server/roue.ts), jamais dans le navigateur, et les chances sont écrites dans le règlement (les conditions, « Le
  * jeu de la roue »). Le lot vaut DUREE_DU_CADEAU_MS, sur la formule payée ensuite (prixAvecLot, bullesDuLot) ; le serveur
  * le fige dans l’achat à la commande, comme le prix (src/server/achats.ts).
