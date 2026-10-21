@@ -1,6 +1,6 @@
 import "server-only";
-import { pronomOppose } from "@/lib/pronom";
 import { APPLIS, type Source, type Story } from "@/types";
+import { pronomDeLAutre } from "./accords";
 import type { Meta } from "./histoires";
 import { dureeLisible, joursCouverts } from "./temps";
 
@@ -24,8 +24,9 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
   const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
   const jours = joursCouverts(debut, fin);
   const [a, b] = meta.participants;
-  /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre l’opposé */
-  const pronom = (k: 0 | 1) => (meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomOppose(meta.pronom) });
+  /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre celui de pronomDeLAutre */
+  const pronom = (k: 0 | 1) =>
+    meta.moi == null || !meta.pronom ? {} : { pronoun: k === meta.moi ? meta.pronom : pronomDeLAutre(meta, { moi: meta.participants[meta.moi], autre: meta.participants[k] }) };
   const source: Source = meta.captures
     ? {
         id: "s1",

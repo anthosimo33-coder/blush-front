@@ -83,7 +83,7 @@ const objet = <T>() => z.custom<T>((v) => typeof v === "object" && v !== null &&
  * es-tu ? »), et ses unions élargies (l’appli, le format). On vérifie les participants, que tout le code lit, et les
  * champs ajoutés quand ils sont là ; leurs valeurs sont vérifiées à l’écriture (les routes).
  */
-const participantGarde = z.looseObject({ nom: z.string(), prenom: z.string() });
+const participantGarde = z.looseObject({ nom: z.string(), prenom: z.string(), pronomLu: z.string().optional() });
 const MetaGardee = z
   .looseObject({
     /* Toujours deux (l’import n’en écrit jamais d’autre nombre) : les lecteurs prennent l’un et l’autre sans vérifier */
@@ -94,6 +94,7 @@ const MetaGardee = z
     pronom: z.string().optional(),
     devinette: z.string().optional(),
     objectif: z.string().optional(),
+    pronomAutre: z.string().optional(),
   })
   .pipe(z.custom<Meta>());
 

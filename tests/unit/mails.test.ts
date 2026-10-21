@@ -100,9 +100,12 @@ describe("les mails des séquences", () => {
     expect(mailVocal(LUCAS, { secondes: 28 }).corps).toContain("ton meilleur pote");
     expect(mailGlace(INES).corps).toContain("Pas pour le faire revenir");
     expect(mailGlace(LUCAS).corps).toContain("Pas pour la faire revenir");
-    /* L’exemple d’échange : une fille tend une perche, un garçon propose */
+    /* L’exemple d’échange : une fille qui parle à un garçon tend une perche ; un garçon, ou une fille qui parle à une fille, propose */
     expect(mailRepondre(INES, { bulles: 10 }).exemple?.oui).toContain("tu proposes quoi");
     expect(mailRepondre(LUCAS, { bulles: 10 }).exemple?.oui).toContain("samedi");
+    const deuxFilles: Personnes = { moi: { prenom: "Inès", elle: true }, autre: { prenom: "Léa", il: false } };
+    expect(mailRepondre(deuxFilles, { bulles: 10 }).exemple?.oui).toContain("samedi");
+    expect(mailRepondre(deuxFilles, { bulles: 10 }).bulles[1]).toBe("Léa t’a répondu\u00a0?");
   });
 
   it("les bulles : le pack conseillé, son bonus de 1re recharge s’il vaut, et une réponse au singulier", () => {

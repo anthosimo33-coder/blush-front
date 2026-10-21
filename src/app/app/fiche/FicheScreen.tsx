@@ -13,18 +13,25 @@ import { ecritDepuis, FRAIS_DU_RENDU, invalidate, setQueryData, useQuery } from 
 import { play } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { messageAjoutFiche, messageErreur } from "@/lib/messages-erreur";
-import { addToFiche, getFiche, prechargerExport, updateFiche } from "@/services/api";
+import { addToFiche, getFiche, prechargerExport, updateFiche, updatePronom } from "@/services/api";
 import { rubriquesDeLaFiche, titreDeRubrique } from "@/contenu/fiche";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
+import { Segmented } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { FileInput } from "@/components/ui/FileInput";
 import { Icon } from "@/components/ui/icons";
 import { AppScreen } from "@/components/shell/AppScreen";
-import type { Fiche, FicheFact, FicheUpdate } from "@/types";
+import type { Fiche, FicheFact, FicheUpdate, Pronom } from "@/types";
 
 /** Largeur de la fiche sur desktop ; l’en-tête (logo, « Mon compte ») s’aligne dessus. */
 const CARD_W = 600;
+
+/** Son pronom, en mode Modifier. */
+const PRONOMS_DE_LA_FICHE: { value: Pronom; label: string }[] = [
+  { value: "il", label: "Il" },
+  { value: "elle", label: "Elle" },
+];
 
 /** Ce que la fiche accepte : des captures (images) ou un export de votre conv (WhatsApp .zip ou .txt, Instagram .html ou .json). */
 const ACCEPT = `${ACCEPT_IMAGES},${ACCEPT_EXPORT}`;
@@ -147,20 +154,19 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
   }, [majEnCours, fiche]);
 
   /*
-   * La fiche change tout de suite à l’écran, puis part au serveur. Les enregistrements partent l’un après l’autre (deux
-   * retraits rapides arrivent dans l’ordre) ; un enregistrement raté le dit, et la fiche revient à ce que le serveur garde.
+   * La fiche change tout de suite à l’écran, puis part au serveur. Les enregistrements (ses faits, son pronom) partent
+   * l’un après l’autre (deux retraits rapides arrivent dans l’ordre) ; un enregistrement raté le dit, et la fiche revient
+   * à ce que le serveur garde.
    */
   const [souci, setSouci] = useState<string | null>(null);
   const file = useRef<Promise<unknown>>(Promise.resolve());
   const dernier = useRef(0);
-  const save = (facts: FicheFact[]) => {
-    setQueryData(key, { ...fiche, facts });
+  const enregistrer = (affichee: Fiche, envoyer: () => Promise<Fiche>) => {
+    setQueryData(key, affichee);
     setSouci(null);
-    /* Ce que tu écris toi-même pendant une mise à jour n’est pas « arrivé » : pas de point rose */
-    facts.forEach((f) => suivi.current?.avant.add(f.text));
     const n = ++dernier.current;
     enVol.current += 1;
-    const envoi = file.current.then(() => updateFiche(facts)).finally(() => (enVol.current -= 1));
+    const envoi = file.current.then(envoyer).finally(() => (enVol.current -= 1));
     /* La file ne s’arrête pas sur un échec : il est dit plus bas (souci, la fiche relue), pas une seconde fois ici */
     file.current = envoi.catch(() => {});
     return envoi.then(
@@ -173,6 +179,15 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
         invalidate(key);
       },
     );
+  };
+  const save = (facts: FicheFact[]) => {
+    /* Ce que tu écris toi-même pendant une mise à jour n’est pas « arrivé » : pas de point rose */
+    facts.forEach((f) => suivi.current?.avant.add(f.text));
+    return enregistrer({ ...fiche, facts }, () => updateFiche(facts));
+  };
+  /* Son pronom : « Elle aime » devient « Il aime » tout de suite, le chat et les mails le suivent ensuite */
+  const changerPronom = (pronoun: Pronom) => {
+    if (pronoun !== (fiche.person.pronoun ?? "elle")) void enregistrer({ ...fiche, person: { ...fiche.person, pronoun } }, () => updatePronom(pronoun));
   };
 
   const add = async (picked: File[]) => {
@@ -320,6 +335,16 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
 
       {/* Ce que BLUSH sait d’elle : une liste par rubrique, la source de chaque info à droite */}
       <div className="mt-7 flex flex-col gap-6">
+        {/* En mode Modifier, d’abord son pronom : la conv ne le disait pas, ou pas bien (deux filles, deux garçons) */}
+        {editing && (
+          <section aria-labelledby="sec-pronom" className="flex flex-col gap-2">
+            <h2 id="sec-pronom" className="m-0 pl-4 text-legende font-black text-grey">
+              Son pronom
+            </h2>
+            <Segmented label="Son pronom" options={PRONOMS_DE_LA_FICHE} value={fiche.person.pronoun ?? "elle"} onChange={changerPronom} />
+            <p className="m-0 px-4 text-legende font-extrabold text-grey">Le chat et sa fiche le suivent. Ton rapport, déjà écrit, reste tel quel.</p>
+          </section>
+        )}
         {rubriquesDeLaFiche(fiche.person.pronoun).map((sec) => {
           const items = fiche.facts.filter((f) => f.section === sec.id);
           if (items.length === 0 && !editing) return null;

@@ -2,10 +2,10 @@ import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { cache } from "react";
-import { pronomOppose } from "@/lib/pronom";
 import type { Account, ReportPayload } from "@/types/api";
 import type { AnalysisProgress, ConvSummary, Fiche } from "@/types";
 import { ENTETE_CONV } from "@/services/session";
+import { pronomDeLAutre } from "./accords";
 import { utilisateurDeSession, type Utilisateur } from "./auth";
 import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_RYTHME_S, NB_ETAPES_DE_LECTURE, VERDICT_REFLEXION } from "./avancement";
 import * as coffre from "./coffre";
@@ -237,8 +237,8 @@ export const memoireDe = cache(donneesMemoire);
  */
 export async function ficheDe(story: Ligne): Promise<Fiche> {
   const meta = metaDe(story);
-  const { autre } = personnesDe(meta);
-  const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomOppose(meta.pronom) };
+  const { moi, autre } = personnesDe(meta);
+  const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomDeLAutre(meta, { moi, autre }) };
   const m = await memoireDe(story.id);
   if (!m || (m.secours && !m.etat.fiche.faits.length)) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
   return ficheAffichee(person, m.etat, new Map(m.lignes));

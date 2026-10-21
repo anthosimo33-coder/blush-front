@@ -760,6 +760,11 @@ export async function updateFiche(facts: FicheFact[]): Promise<Fiche> {
   return appel("PUT /api/fiche", { corps: { facts } });
 }
 
+/** Le pronom de l’autre, corrigé sur sa fiche : la conv ne le disait pas, ou pas bien. */
+export async function updatePronom(pronom: Pronom): Promise<Fiche> {
+  return appel("PUT /api/fiche/pronom", { corps: { pronom } });
+}
+
 /**
  * Des captures ou un export pour sa fiche : BLUSH y trouve des infos sur elle et les range lui-même, dans la bonne rubrique.
  * Ce qu’il savait déjà n’est pas doublé (sa nouvelle source s’ajoute). Rien n’est cherché ailleurs. La réponse part dès

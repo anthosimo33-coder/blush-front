@@ -186,7 +186,7 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
         </RadioGroup>
       )}
 
-      {/* BLUSH accompagne un garçon qui parle à une fille, ou l’inverse. Absent des maquettes, relu le 8 octobre */}
+      {/* Ton pronom seulement : celui de l’autre se lit dans la conv, ou se corrige sur sa fiche (src/server/accords.ts). Absent des maquettes, relu le 8 octobre */}
       <div id={titres.pronom} className="text-legende font-black text-grey">
         Tu es
       </div>
