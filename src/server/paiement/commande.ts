@@ -310,7 +310,7 @@ export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, 
 
 /**
  * L’offre ① peut-elle se vendre pour cette conv du compte ? Pas débloquée, pas en alerte, et le compte n’a pas mieux
- * (son rapport d’avance à 0 €, le −50 % gardé à 6,95 €, un lot de la roue : jamais les deux). Le paywall la demande
+ * (son rapport d’avance à 0 €, le −50 % gardé à 4,95 €, un lot de la roue : jamais les deux). Le paywall la demande
  * (proposerOffreUnique) ; le mail J+6 de S1 la rouvre (src/server/sequences.ts).
  */
 export async function suiteVendable(compte: Compte, storyId: string): Promise<boolean> {

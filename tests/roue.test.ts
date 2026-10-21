@@ -179,7 +179,7 @@ describe("tourner la roue (POST /api/roue)", () => {
 });
 
 describe("le lot dans la commande, puis à la livraison", () => {
-  it("−10 % : Premium payé 17,01 € avec ses 90 bulles ; le lot pris par cet achat, une fois", async () => {
+  it("−10 % : Premium payé 13,41 € avec ses 90 bulles ; le lot pris par cet achat, une fois", async () => {
     const { u } = await joueur("roue-moins10");
     await jouer("tourner", caseDe("moins10"));
     const achat = await payee("premium");

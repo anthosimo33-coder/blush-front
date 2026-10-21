@@ -78,7 +78,7 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
 
   await test.step("l’onglet quitté puis retrouvé pendant qu’on remplit sa carte : l’offre ① attend, et vient une fois la carte refermée sans payer", async () => {
     /* Le 21 octobre, elle couvrait la carte 19 s après « Débloquer » : jamais pendant le paiement */
-    await page.getByRole("main").getByRole("button", { name: "Débloquer · 18,90\u00a0€" }).click();
+    await page.getByRole("main").getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
     await quitterPuisRevenir(page);
