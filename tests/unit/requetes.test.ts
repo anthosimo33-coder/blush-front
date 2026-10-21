@@ -108,7 +108,8 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
     for (const r of Object.values(requetes)) for (const t of textes(r)) expect(bienFermees(t)).toBe(true);
     /* Le bloc en cache porte toute la conv rendue et ses chiffres, tels que lib/conv les rend (comparés à eux-mêmes, pas figés) */
     const enCache = textes(requetes.plan)[0];
-    for (const l of rendu.lignes.values()) expect(enCache).toContain(l);
+    expect(enCache).toContain(rendu.conversation);
+    for (const id of rendu.lignes.keys()) expect(enCache).toContain(id);
     expect(enCache).toContain(rendu.chiffres);
   });
 
@@ -329,7 +330,8 @@ describe("le montage partagé : la conv en cache une fois pour le verdict, le ra
     for (const b of autres) expect(b).toEqual(premier);
     for (const r of Object.values(requetes)) expect(r.partage).toBe(true);
     const enCache = textes(requetes.verdict)[0]!;
-    for (const l of rendu.lignes.values()) expect(enCache).toContain(l);
+    expect(enCache).toContain(rendu.conversation);
+    for (const id of rendu.lignes.keys()) expect(enCache).toContain(id);
     expect(enCache).not.toContain(c04);
     expect(textes(requetes.verdict)[1]).toContain(c04);
     expect(textes(requetes.memoire)[1]).toContain(c07);

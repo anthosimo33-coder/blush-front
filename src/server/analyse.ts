@@ -325,7 +325,14 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   }
 }
 
-async function garderRapport(story: Ligne, r: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
+/**
+ * Les découvertes qu’un rapport garde, au plus : le prompt 05 en demande trois, et le modèle en écrit parfois une de
+ * plus (la conv compacte, cas 10 du banc, deux fois sur deux, le 21 octobre). Les premières sont gardées.
+ */
+const DECOUVERTES_MAX = 3;
+
+async function garderRapport(story: Ligne, brut: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
+  const r: Rapport = { ...brut, decouvertes: brut.decouvertes.slice(0, DECOUVERTES_MAX) };
   const h = histoireDe(metaDe(story));
   const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, h.utilisateur.prenom), lignesScores);
   const donnees: DonneesRapport = {

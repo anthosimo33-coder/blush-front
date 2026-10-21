@@ -55,7 +55,7 @@ describe("les lignes de la conv, à l’octet", () => {
   it("la conv rendue au modèle", () => {
     const lu = lire(texte, h, { autresEnTexte: true });
     const r = rendre(h, lu);
-    expect(empreinte(r.texte)).toBe("ddce5a16c2a4082f");
+    expect(empreinte(r.texte)).toBe("6175a3feab796d10");
     expect(empreinte([...r.lignes])).toBe("ebf8fd27ca9faa58");
   });
 
@@ -75,7 +75,7 @@ describe("les lignes de la conv, à l’octet", () => {
     );
     const hc: Histoire = { ...h, format: "captures", utilisateur: { ...h.utilisateur, nomExport: "Moi" }, autre: { ...h.autre, nomExport: c.autre } };
     const r = rendre(hc, lire(c.texte, hc));
-    expect(empreinte(r.texte)).toBe("a1a479768a67f07b");
+    expect(empreinte(r.texte)).toBe("87db259738762116");
   });
 
   it("les messages ajoutés, son profil, et le bloc <nouveau> du chat", () => {

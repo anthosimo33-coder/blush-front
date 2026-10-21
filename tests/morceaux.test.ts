@@ -135,17 +135,20 @@ describe("une conv en plusieurs morceaux", () => {
     expect(lu.messages[0]).toMatchObject({ texte: "capture 0", role: "toi", approx: "heure" });
     expect(lu.messages[1]).toMatchObject({ texte: "capture 1", role: "autre" });
     expect(lu.messages.at(-1)).toMatchObject({ texte: "message 99", approx: false });
-    /* Ce que lit le modèle : les captures en « ~21:00 », puis l’export à la minute */
+    /* Ce que lit le modèle (la conv compacte, le jour écrit une fois) : les captures en « ~21:00 », puis l’export à la minute */
     const rendu = rendre({ ...h, aujourdhui: "2026-10-22" }, lu);
-    expect(rendu.conversation).toContain("m0001 2026-08-20 jeu. ~21:00 Hugo : capture 0");
-    expect(rendu.conversation).toContain("m0025 2026-09-01 mar. 10:00 Hugo : message 0");
+    expect(rendu.conversation).toContain("# jeu. 2026-08-20\nm0001 ~21:00 Hugo : capture 0");
+    expect(rendu.conversation).toContain("# mar. 2026-09-01\nm0025 10:00 Hugo : message 0");
+    /* La banque des preuves garde la ligne entière */
+    expect(rendu.lignes.get("m0001")).toBe("m0001 2026-08-20 jeu. ~21:00 Hugo : capture 0");
+    expect(rendu.lignes.get("m0025")).toBe("m0025 2026-09-01 mar. 10:00 Hugo : message 0");
     expect(rendu.chiffres).toContain("24 messages lus sur des captures");
     /* Chaque message garde son morceau (dans l’ordre d’import) : le modèle lit d’où vient chacun, du plus ancien au plus récent */
     expect([lu.messages[0]!.morceau, lu.messages[24]!.morceau, lu.messages.at(-1)!.morceau]).toEqual([1, 0, 2]);
     const reunie = rendre({ ...h, aujourdhui: "2026-10-22" }, lu, { morceaux: provenancesDe(apres) }).conversation.split("\n");
     expect(reunie[0]).toContain(`appli="instagram, whatsapp" source="morceaux" morceaux="3"`);
     expect(reunie[1]).toContain("3 morceaux importés à part : Instagram (captures) le 2026-08-20, WhatsApp (export) le 2026-09-01, WhatsApp (export) le 2026-09-01.");
-    expect(reunie[2]).toBe("m0001 2026-08-20 jeu. ~21:00 Hugo : capture 0");
+    expect(reunie.slice(2, 4)).toEqual(["# jeu. 2026-08-20", "m0001 ~21:00 Hugo : capture 0"]);
     /* Une conv d’un seul morceau : rien de plus */
     expect(provenancesDe(await meta((await brouillon(exportWhatsapp("2026-09-01T10:00", 60))).id))).toEqual([]);
   });
