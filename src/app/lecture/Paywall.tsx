@@ -8,6 +8,7 @@ import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } fr
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
+import { useMomentVenu } from "@/lib/hooks";
 import { formatCount, jourEnLettres } from "@/lib/format";
 import { marquerJalon, useJalon, useJalonEnVue } from "@/lib/jalons";
 import { moiEtAutre } from "@/lib/participants";
@@ -36,10 +37,12 @@ import type { RoueDuCompte } from "@/types/api";
 /*
  * Le paywall, avant toute lecture (décidé le 16 octobre), en version « prime » (les maquettes G3, G4 et l’ordinateur,
  * validées le 16 octobre) : la conv est importée, « Qui es-tu ? » rempli, et rien n’est encore parti au modèle.
- * D’abord la roue des cadeaux (FeuilleDeLaRoue), une fois par compte ; son lot gagné vaut 15 minutes, dans le bandeau
- * du haut et sur les formules (prixAvecLot, bullesDuLot : le serveur fait payer le même prix). Puis vos prénoms, le
- * haut du paywall (« Le mix », validé le 16 octobre : un titre parmi cinq, tiré de ce que le code a compté, ses chiffres
- * et la bulle de BLUSH, ./HautDuPaywall.tsx), la note des avis (seulement de vrais avis), les deux formules (Premium
+ * La roue des cadeaux (FeuilleDeLaRoue), une fois par compte, s’ouvre par-dessus : pas à l’arrivée, mais au premier
+ * des deux, la moitié de la page défilée ou ROUE_APRES_MS sur le paywall (décidé le 21 octobre), et jamais sur la carte
+ * qu’on remplit (elle attend qu’on en sorte sans payer, comme l’offre ①). Son lot gagné vaut 15 minutes, dans le
+ * bandeau du haut et sur les formules (prixAvecLot, bullesDuLot : le serveur fait payer le même prix).
+ * Sur la page : vos prénoms, le haut du paywall (« Le mix », validé le 16 octobre : un titre parmi cinq, tiré de ce que
+ * le code a compté, ses chiffres et la bulle de BLUSH, ./HautDuPaywall.tsx), la note des avis (seulement de vrais avis), les deux formules (Premium
  * choisie d’avance, ses cadeaux à 0 €), le bouton qui paie (Apple Pay ou la carte, dans BLUSH), la discrétion. En
  * descendant : les témoignages (de vrais clients seulement), un avant / après (marqué « exemple ») et les questions ; sur
  * téléphone, une barre en bas ramène au bouton qui paie quand il est sorti de l’écran. Ordinateur : le titre, sa carte et
@@ -55,8 +58,12 @@ import type { RoueDuCompte } from "@/types/api";
 
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
 const OFFRE_APRES_MS = 40_000;
-/** Retenue pendant le paiement, l’offre ① arrive ce temps après qu’on en est sorti : la feuille de la carte a fini de descendre. */
+/** Retenue pendant le paiement, l’offre ① (ou la roue) arrive ce temps après qu’on en est sorti : la feuille de la carte a fini de descendre. */
 const OFFRE_APRES_LE_PAIEMENT_MS = 600;
+/** La roue s’ouvre d’elle-même au bout de ce temps sur le paywall, ou avant si la page est défilée jusqu’à ROUE_A_LA_PART. */
+const ROUE_APRES_MS = 5_000;
+/** La part de la page défilée (0,5 : la moitié) qui ouvre la roue avant ROUE_APRES_MS. */
+const ROUE_A_LA_PART = 0.5;
 
 export function Paywall({
   story,
@@ -77,10 +84,15 @@ export function Paywall({
   const preuve = haut.cases.length > 0 || !!haut.courbe;
   const feuille = useFeuilleDuPaiement();
   const roue = feuille.data?.roue ?? null;
-  /* La roue s’ouvre une fois, à l’arrivée, si elle est à tourner ; ensuite, l’écran seul décide (elle reste ouverte le temps du tour) */
+  /* La roue s’ouvre une fois, son moment venu (la moitié de la page ou ROUE_APRES_MS), si elle est à tourner ; ensuite,
+     l’écran seul décide (elle reste ouverte le temps du tour) */
   const [vueRoue, setVueRoue] = useState<"attente" | "ouverte" | "fermee">("attente");
+  const momentDeLaRoue = useMomentVenu(ROUE_APRES_MS, ROUE_A_LA_PART);
+  /* Dans le paiement (la carte ouverte, Apple Pay, un paiement en route) ou payé : la roue attend d’en être sortie sans payer */
+  const [enRoute, setEnRoute] = useState(false);
+  const horsDuPaiement = useHorsDuPaiement(enRoute);
   /* Arrivé par le mail J+6 de S1 : la one time offer promise passe d’abord, la roue ne s’ouvre pas d’elle-même */
-  const roueOuverte = vueRoue === "ouverte" || (vueRoue === "attente" && roue?.etat === "a_tourner" && !offreDirecte);
+  const roueOuverte = vueRoue === "ouverte" || (vueRoue === "attente" && momentDeLaRoue && horsDuPaiement && roue?.etat === "a_tourner" && !offreDirecte);
   /* Le lot passé sous nos yeux (le minuteur à zéro) : les prix redeviennent ceux du catalogue */
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
@@ -125,6 +137,7 @@ export function Paywall({
             offreDirecte={offreDirecte}
             autre={autre.name}
             elle={elle}
+            surEnRoute={setEnRoute}
           />
         </div>
         <Temoignages items={temoignages} />
@@ -195,7 +208,7 @@ type Choix = Formule | "avance";
  * choisie d’avance, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi » seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
  * paie (Apple Pay, Google Pay ou la carte, dans BLUSH), et une ligne : paiement unique, l’autre jamais prévenu. Payé :
  * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
- * gagné).
+ * gagné). `surEnRoute` : dans le paiement ou payé, ou plus (la roue du paywall attend d’en être sortie).
  */
 function Paiement({
   ref,
@@ -204,6 +217,7 @@ function Paiement({
   offreDirecte,
   autre,
   elle,
+  surEnRoute,
 }: {
   ref: Ref<HTMLElement>;
   lot: LotDeLaRoue | null;
@@ -211,6 +225,7 @@ function Paiement({
   offreDirecte: boolean;
   autre: string;
   elle: boolean;
+  surEnRoute: (enRoute: boolean) => void;
 }) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
@@ -221,7 +236,9 @@ function Paiement({
   const [paye, setPaye] = useState(false);
   /* Dans le paiement : la carte ouverte, Apple Pay, un paiement en route (PayerDansLaFeuille, surOuvert) */
   const [ouvert, setOuvert] = useState(false);
-  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || ouvert, directe: offreDirecte });
+  const enRoute = paye || ouvert;
+  useEffect(() => surEnRoute(enRoute), [enRoute, surEnRoute]);
+  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute, directe: offreDirecte });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
 
@@ -568,14 +585,7 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
   const [suiteMontree, setSuiteMontree] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
   const [retenue, setRetenue] = useState(false);
-  /* Hors du paiement depuis OFFRE_APRES_LE_PAIEMENT_MS au moins : l’offre peut se montrer. Rentrer dans le paiement le
-     retire pendant le rendu même (pas un rendu plus tard, dans un effet) */
-  const [libre, setLibre] = useState(!enRoute);
-  const [dedans, setDedans] = useState(enRoute);
-  if (dedans !== enRoute) {
-    setDedans(enRoute);
-    if (enRoute) setLibre(false);
-  }
+  const libre = useHorsDuPaiement(enRoute);
   const demandee = useRef(false);
   const occupe = useRef(enRoute);
   /* La demande au serveur, posée par l’effet qui l’arme : l’offre retenue la refait une fois le paiement refermé */
@@ -621,14 +631,29 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
     return () => clearTimeout(t);
   }, [retenue, enRoute]);
   useEffect(() => {
-    if (enRoute || libre) return;
-    const t = setTimeout(() => setLibre(true), OFFRE_APRES_LE_PAIEMENT_MS);
-    return () => clearTimeout(t);
-  }, [enRoute, libre]);
-  useEffect(() => {
     if (!passee) return;
     const t = setTimeout(() => setPassee(false), 2600);
     return () => clearTimeout(t);
   }, [passee]);
-  return { suiteMontree: libre && !enRoute ? suiteMontree : null, passee, setPassee, fermer: () => setSuiteMontree(null) };
+  return { suiteMontree: libre ? suiteMontree : null, passee, setPassee, fermer: () => setSuiteMontree(null) };
+}
+
+/**
+ * Hors du paiement depuis OFFRE_APRES_LE_PAIEMENT_MS au moins (la feuille de la carte a fini de descendre) : ce qui
+ * vient de soi-même par-dessus le paywall (l’offre ①, la roue) peut se montrer. Rentrer dans le paiement le retire
+ * pendant le rendu même (pas un rendu plus tard, dans un effet) ; payé, `enRoute` reste vrai.
+ */
+function useHorsDuPaiement(enRoute: boolean): boolean {
+  const [libre, setLibre] = useState(!enRoute);
+  const [dedans, setDedans] = useState(enRoute);
+  if (dedans !== enRoute) {
+    setDedans(enRoute);
+    if (enRoute) setLibre(false);
+  }
+  useEffect(() => {
+    if (enRoute || libre) return;
+    const t = setTimeout(() => setLibre(true), OFFRE_APRES_LE_PAIEMENT_MS);
+    return () => clearTimeout(t);
+  }, [enRoute, libre]);
+  return libre && !enRoute;
 }

@@ -134,13 +134,13 @@ export async function quitterPuisRevenir(page: Page): Promise<void> {
   });
 }
 
-/** Le nom de la feuille de la roue, juste avant le paywall (son titre). */
+/** Le nom de la feuille de la roue, par-dessus le paywall (son titre). */
 export const ROUE = "Avant ton rapport, tourne la roue";
 
 /** L’en-tête qui impose la case de la roue au serveur (le faux Whop seulement, src/app/api/roue/route.ts). */
 export const CASE_DE_LA_ROUE = "x-blush-roue-case";
 
-/** La roue, juste avant le paywall : « Je ne veux pas de cadeau ». Elle se ferme pour de bon. */
+/** La roue, par-dessus le paywall (au bout de 5 s, ou à la moitié de la page) : « Je ne veux pas de cadeau ». Elle se ferme pour de bon. */
 export async function refuserLaRoue(page: Page): Promise<void> {
   const roue = page.getByRole("dialog", { name: ROUE });
   await expect(roue).toBeVisible({ timeout: RESEAU });
