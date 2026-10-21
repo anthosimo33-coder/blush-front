@@ -17,7 +17,7 @@ export type JourneyState = {
   /** Des captures ont été ajoutées après l’export : l’histoire est réunie (écran 05). */
   capturesAdded: boolean;
   me: string | null;
-  /** Tu es un garçon (il) ou une fille (elle) : les prompts en ont besoin ; l’autre est l’opposé. */
+  /** Tu es un garçon (il) ou une fille (elle) : les prompts en ont besoin. Celui de l’autre se lit dans la conv (src/server/accords.ts). */
   pronom: Pronom | null;
   /** Des captures : son prénom (il n’y apparaît que comme « Moi »). */
   prenom: string;

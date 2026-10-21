@@ -96,10 +96,10 @@ test("sa fiche : lue par rubrique, une info corrigée (retirée puis réécrite)
     await expect(page.getByText("Rien n’est cherché sur Internet")).toBeVisible();
   });
 
-  await test.step("« Modifier » : chaque rubrique s’ouvre pour ajouter, « Complète sa fiche » attend", async () => {
+  await test.step("« Modifier » : son pronom, puis chaque rubrique s’ouvre pour ajouter, « Complète sa fiche » attend", async () => {
     await page.getByRole("button", { name: "Modifier" }).click();
     await expect(page.getByRole("button", { name: "OK", exact: true, pressed: true })).toBeVisible();
-    await expect(rubriques(page)).toHaveText(["À savoir", "Elle aime", "Les gens de sa vie", "Dates à retenir", "Tes notes"]);
+    await expect(rubriques(page)).toHaveText(["Son pronom", "À savoir", "Elle aime", "Les gens de sa vie", "Dates à retenir", "Tes notes"]);
     await expect(page.getByRole("button", { name: /^Complète sa fiche/ })).toBeDisabled();
   });
 
@@ -133,6 +133,38 @@ test("sa fiche : lue par rubrique, une info corrigée (retirée puis réécrite)
     await expect(rubriques(page)).toHaveText(["Elle aime", "Les gens de sa vie"]);
     await expect(elleAime.getByRole("listitem")).toHaveText([new RegExp(`^${correction}\\s*d’après toi$`)]);
     await expect(gens.getByRole("listitem")).toHaveText([new RegExp(`^${ajout}\\s*d’après toi$`)]);
+  });
+});
+
+test("son pronom, corrigé en mode « Modifier » : « Il aime » tout de suite, et après un rechargement", async ({ page }, testInfo) => {
+  const pronom = page.getByRole("radiogroup", { name: "Son pronom" });
+
+  await test.step("un compte de l’équipe dont la lecture et la mémoire sont faites", async () => {
+    await lectureComplete(page, testInfo);
+    await ouvrir(page, "/app/fiche");
+    await expect(rubriques(page)).toHaveText(["Elle aime"]);
+  });
+
+  await test.step("« Modifier » : son pronom est « Elle » (l’opposé du tien, la conv ne disait rien d’autre)", async () => {
+    await page.getByRole("button", { name: "Modifier" }).click();
+    await expect(pronom.getByRole("radio", { name: "Elle" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText("Le chat et sa fiche le suivent. Ton rapport, déjà écrit, reste tel quel.")).toBeVisible();
+  });
+
+  await test.step("« Il » : la rubrique devient « Il aime » tout de suite, et part au serveur", async () => {
+    const enregistre = page.waitForResponse((r) => r.url().endsWith("/api/fiche/pronom") && r.request().method() === "PUT");
+    await pronom.getByRole("radio", { name: "Il" }).click();
+    await expect(page.getByRole("region", { name: "Il aime" })).toBeVisible();
+    expect((await enregistre).ok()).toBe(true);
+    await page.getByRole("button", { name: "OK", exact: true }).click();
+    await expect(rubriques(page)).toHaveText(["Il aime"]);
+  });
+
+  await test.step("rechargée, la fiche garde « Il »", async () => {
+    await ouvrir(page);
+    await expect(rubriques(page)).toHaveText(["Il aime"]);
+    await page.getByRole("button", { name: "Modifier" }).click();
+    await expect(pronom.getByRole("radio", { name: "Il" })).toHaveAttribute("aria-checked", "true");
   });
 });
 

@@ -371,6 +371,7 @@ type Reponses = {
   "GET /api/fiche": Fiche;
   "PUT /api/fiche": Fiche;
   "POST /api/fiche": FicheUpdate;
+  "PUT /api/fiche/pronom": Fiche;
   "GET /api/histoire": Story;
   "DELETE /api/histoire": Ok;
   "POST /api/import": ConvImportee;
@@ -518,6 +519,8 @@ export const ROUTES = {
     corps: z.object({ facts: z.array(z.object({ section: z.enum(SECTIONS_FICHE), text: z.string().trim().min(1).max(200) }).passthrough()).max(60) }),
   },
   "POST /api/fiche": { formulaire: true },
+  /* Le pronom de l’autre, corrigé sur sa fiche */
+  "PUT /api/fiche/pronom": { corps: z.object({ pronom: z.enum(PRONOMS) }) },
   "GET /api/histoire": {},
   "DELETE /api/histoire": {},
   "POST /api/import": { formulaire: true },

@@ -17,7 +17,7 @@ import { prenomDe } from "@prompts/lib/ajouts";
 import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
 import { nomLu } from "@/lib/participants";
-import { pronomOppose } from "@/lib/pronom";
+import { pronomDeLAutre, pronomsLus } from "./accords";
 import { empreinte, jeton } from "./chiffrement";
 import * as coffre from "./coffre";
 import { db, schema, uneLigne } from "./db";
@@ -35,8 +35,11 @@ import type { Consentement } from "./juridique";
 /** Le nom d’un des deux participants, tel que l’export l’écrit. */
 const NOM_MAX = 100;
 
-/** L’un des deux participants d’une conv : son prénom, son nom dans l’export, combien de messages il y a écrits. */
-export type Participant = { nom: string; prenom: string; messages: number };
+/**
+ * L’un des deux participants d’une conv : son prénom, son nom dans l’export, combien de messages il y a écrits, et le
+ * pronom que ses accords laissent lire, quand la conv le dit nettement (pronomsLus, src/server/accords.ts).
+ */
+export type Participant = { nom: string; prenom: string; messages: number; pronomLu?: Pronom };
 
 /** Ce qu’on sait d’une histoire, chiffré dans `stories.meta`. */
 export type Meta = {
@@ -60,6 +63,8 @@ export type Meta = {
   pronom?: Pronom;
   devinette?: Devinette;
   objectif?: Objectif;
+  /** Choisi sur sa fiche : le pronom de l’autre, qui passe devant celui que la conv laisse lire (pronomDeLAutre, src/server/accords.ts). */
+  pronomAutre?: Pronom;
 };
 
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
@@ -124,15 +129,22 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
   /* Un nom de contact est court : un nom démesuré (ou fait de caractères de contrôle) gonflerait ce qu’on garde de la conv */
   if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
   const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
-  const participant = ({ nom, messages }: { nom: string; messages: number }): Participant => ({ nom, prenom: prenomDe(nom), messages });
+  const participant = ({ nom, messages }: { nom: string; messages: number }, pronomLu?: Pronom): Participant => ({
+    nom,
+    prenom: prenomDe(nom),
+    messages,
+    ...(pronomLu ? { pronomLu } : {}),
+  });
   const lu = lire(texte, { utilisateur: personne(premier), autre: personne(second), format }, { autresEnTexte: true });
   const err = erreurImport(lu);
   if (err) throw new ErreurImport(err);
+  /* Le premier participant est lu en « toi », le second en « autre » */
+  const lus = pronomsLus(lu.messages);
   const meta: Meta = {
     appli,
     format,
     fichier: nom.slice(0, 200),
-    participants: [participant(premier), participant(second)],
+    participants: [participant(premier, lus.toi), participant(second, lus.autre)],
     resume: resumeDe(lu.messages),
     ...(coupe ? { coupe: true } : {}),
   };
@@ -159,14 +171,15 @@ export async function importerCaptures({
   const err = erreurImport(lu, "captures");
   if (err) throw new ErreurImport(err);
   const compte = (nom: string) => lu.messages.filter((m) => m.nom === nom).length;
+  const lus = pronomsLus(lu.messages);
   const meta: Meta = {
     appli,
     format: "captures",
     fichier: `${t.captures} captures`,
     captures: t.captures,
     participants: [
-      { nom: "Moi", prenom: "Moi", messages: compte("Moi") },
-      { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre) },
+      { nom: "Moi", prenom: "Moi", messages: compte("Moi"), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
+      { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre), ...(lus.autre ? { pronomLu: lus.autre } : {}) },
     ],
     resume: resumeDe(lu.messages),
     moi: 0,
@@ -290,13 +303,16 @@ export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Pa
   return meta.moi === 1 ? { moi: b, autre: a } : { moi: a, autre: b };
 }
 
-/** Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom opposé (BLUSH : un garçon et une fille). */
+/**
+ * Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom choisi sur sa fiche, sinon celui que la conv laisse
+ * lire, sinon l’opposé du tien (pronomDeLAutre) : un garçon et une fille, deux filles ou deux garçons.
+ */
 export function histoireDe(meta: Meta): Histoire {
   if (!quiRempli(meta)) throw new Error("« Qui es-tu ? » n’est pas rempli");
   const { moi, autre } = personnesDe(meta);
   return {
     utilisateur: { prenom: moi.prenom, pronom: meta.pronom, nomExport: moi.nom },
-    autre: { prenom: autre.prenom, pronom: pronomOppose(meta.pronom), nomExport: autre.nom },
+    autre: { prenom: autre.prenom, pronom: pronomDeLAutre(meta, { moi, autre }), nomExport: autre.nom },
     devinette: meta.devinette,
     objectif: meta.objectif,
     appli: meta.appli,
@@ -324,6 +340,17 @@ export async function definirQui(
     .update(schema.stories)
     .set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() })
     .where(eq(schema.stories.id, id));
+  return meta;
+}
+
+/**
+ * Le pronom de l’autre, choisi sur sa fiche : il passe devant celui que la conv laisse lire (pronomDeLAutre). Rend la
+ * meta écrite (chiffrée), pour relire sa fiche sans relire la ligne.
+ */
+export async function definirPronomAutre(id: string, pronomAutre: Pronom): Promise<Ligne["meta"]> {
+  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories:pronom_autre"));
+  const meta = coffre.ecrire("stories.meta", { ...avant, pronomAutre });
+  await db().update(schema.stories).set({ meta, updatedAt: new Date() }).where(eq(schema.stories.id, id));
   return meta;
 }
 

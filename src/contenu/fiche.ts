@@ -9,7 +9,7 @@ const TITRES: Record<Exclude<FicheFact["section"], "aime">, string> = {
   notes: "Tes notes",
 };
 
-/** Le titre d’une rubrique de sa fiche : « Elle aime », ou « Il aime » quand c’est une fille qui utilise BLUSH (son `pronom`). */
+/** Le titre d’une rubrique de sa fiche : « Elle aime », ou « Il aime » quand l’autre est un garçon (son `pronom`). */
 export const titreDeRubrique = (id: FicheFact["section"], pronom?: Pronom) => (id === "aime" ? `${IlOuElle(pronom)} aime` : TITRES[id]);
 
 /** Les rubriques de sa fiche, dans l’ordre, avec leur titre (« Elle aime » ou « Il aime », d’après son `pronom`). */

@@ -96,23 +96,24 @@ export function mailRapportPret(p: Personnes, { chapitres, premium }: { chapitre
   };
 }
 
-/** S3 J+1, « il t’a répondu ? » : rien dit au chat depuis l’achat. L’exemple suit son pronom à elle (ou à lui). */
+/** S3 J+1, « il t’a répondu ? » : rien dit au chat depuis l’achat. L’exemple suit leurs deux pronoms. */
 export function mailRepondre(p: Personnes, { bulles }: { bulles: number }): MailDeSequence {
   const { il } = lAutre(p);
-  /* Une fille tend une perche pour qu’il propose ; un garçon propose, avec un jour et une heure */
-  const exemple = p.moi.elle
-    ? {
-        recu: "tu fais quoi ce week-end\u00a0?",
-        non: "rien de spécial et toi\u00a0?? 😊",
-        conseil: "ça, non. attends 20 min, puis\u00a0:",
-        oui: "ça dépend, tu proposes quoi\u00a0?",
-      }
-    : {
-        recu: "tu fais quoi ce week-end\u00a0?",
-        non: "rien de spécial et toi\u00a0?? 😊",
-        conseil: "ça, non. propose, avec un jour\u00a0:",
-        oui: "samedi 20 h, un verre\u00a0? je connais un spot",
-      };
+  /* Une fille qui parle à un garçon tend une perche pour qu’il propose ; sinon (un garçon, deux filles), on propose, avec un jour et une heure */
+  const exemple =
+    p.moi.elle && p.autre.il
+      ? {
+          recu: "tu fais quoi ce week-end\u00a0?",
+          non: "rien de spécial et toi\u00a0?? 😊",
+          conseil: "ça, non. attends 20 min, puis\u00a0:",
+          oui: "ça dépend, tu proposes quoi\u00a0?",
+        }
+      : {
+          recu: "tu fais quoi ce week-end\u00a0?",
+          non: "rien de spécial et toi\u00a0?? 😊",
+          conseil: "ça, non. propose, avec un jour\u00a0:",
+          oui: "samedi 20 h, un verre\u00a0? je connais un spot",
+        };
   return {
     sujet: "alors\u00a0?",
     apercu: "colle-moi son dernier message. je te dis quoi répondre.",

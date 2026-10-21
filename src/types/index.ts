@@ -150,7 +150,7 @@ export type Guess = (typeof GUESSES)[number];
 /** Avant d’être ensemble : ensemble, reciproque, comprendre. En couple : mieux, point, comprendre. */
 export const GOALS = ["ensemble", "reciproque", "comprendre", "mieux", "point"] as const;
 export type Goal = (typeof GOALS)[number];
-/** Le pronom d’une personne (BLUSH accompagne un garçon qui parle à une fille, ou l’inverse). */
+/** Le pronom d’une personne : un garçon et une fille, deux filles ou deux garçons, jamais « iel ». */
 export const PRONOMS = ["il", "elle"] as const;
 export type Pronom = (typeof PRONOMS)[number];
 /** Les rubriques de sa fiche, dans l’ordre (leurs titres : src/contenu/fiche.ts). « notes » : ce que tu ajoutes toi-même. */
