@@ -212,7 +212,7 @@ describe("le vocal tenté depuis le dernier fait", () => {
 
 describe("les durées des étapes", () => {
   it("chaque étape a le temps de finir avant l’échéance de la chaîne, 15 s avant que Vercel coupe la fonction", () => {
-    expect(ECHEANCE_CHAINE_MS).toBe(285_000);
+    expect(ECHEANCE_CHAINE_MS).toBe(785_000);
     for (const g of GENRES) {
       expect(DUREES_MS[g]).toBeGreaterThan(0);
       expect(tempsPourCommencer(g)).toBeGreaterThan(DUREES_MS[g]);
