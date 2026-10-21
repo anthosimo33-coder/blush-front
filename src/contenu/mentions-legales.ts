@@ -46,7 +46,7 @@ export const EDITEUR: Editeur = {
   statut: "",
   adresse: "",
   pays: "",
-  immatriculation: "SIRET\u00a0: 901\u00a0329\u00a0169\u00a000014",
+  immatriculation: "SIRET\u00a0: 901\u00a0129\u00a0168\u00a000013",
   telephone: "",
   directeurPublication: "",
   mediateur: "",
