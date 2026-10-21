@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { champsDErreur } from "@/lib/tracer";
-import { lirePaiementWhop, lireWebhook, montantJuste } from "@/server/paiement/evenements";
+import { lirePaiementWhop, lireWebhook, montantJuste, raisonDuRefus } from "@/server/paiement/evenements";
 import { signerWebhook, TOLERANCE_WEBHOOK_S, verifierWebhook } from "@/server/paiement/signature";
 import { creerConfiguration, ErreurWhop, lirePaiement, payerAvecJeton, payerEnUnGeste, VERSION_API_WHOP, type ConfigWhop } from "@/server/paiement/whop";
 
@@ -102,7 +102,28 @@ describe("ce que dit un paiement de Whop", () => {
       membreId: "mber_1",
       moyenId: "payt_1",
       autoRembourse: false,
+      raison: null,
     });
+  });
+
+  it("refusé : pourquoi, en une ligne pour le journal (le moyen, le code de la banque, son message sans email, la 3-D Secure)", () => {
+    const refuse = paiement({
+      status: "open",
+      substatus: "failed",
+      payment_method_type: "apple_pay",
+      decline_code: "insufficient_funds",
+      failure_message: "Your card has insufficient funds. Receipt to marie@exemple.fr",
+      three_ds_verified: false,
+      card_last4: "4242",
+      billing_address: { name: "Marie Exemple", country: "FR" },
+    });
+    expect(lirePaiementWhop(refuse)?.raison).toBe("apple_pay · failed · insufficient_funds · Your card has insufficient funds. Receipt to ‹email› · sans 3DS");
+    /* Ni le nom, ni la carte, ni l’adresse ; un message trop long est coupé */
+    expect(raisonDuRefus(refuse)).not.toMatch(/4242|Marie|FR/);
+    expect(raisonDuRefus({ failure_message: "x".repeat(500) })).toHaveLength(200);
+    expect(raisonDuRefus({ three_ds_verified: true })).toBe("3DS faite");
+    expect(raisonDuRefus({ decline_code: 12 })).toBeNull();
+    expect(raisonDuRefus(null)).toBeNull();
   });
 
   it("d’une autre forme de l’API : des nombres, la devise sur le total, le membre en objet ; un achat qui n’est pas un uuid est ignoré", () => {
@@ -287,7 +308,7 @@ describe("le client de l’API de Whop, sur un faux fetch", () => {
   it("le paiement dans la feuille : le jeton des Elements, le prix en ligne, l’achat en métadonnées, l’email du compte, le retour ; la clé d’idempotence vient du jeton", async () => {
     repondre(200, { id: "pay_4", status: "open", substatus: "pending", client_secret: "pay_4_secret_v1_x" });
     const demande = { achat: "a1", centimes: 1490, titre: "Premium", jeton: "ctok_abc", email: "toi@example.com", retour: "https://www.askblush.com/paiement/retour?achat=a1" };
-    expect(await payerAvecJeton(config, demande)).toEqual({ id: "pay_4", statut: "open", sousStatut: "pending", secret: "pay_4_secret_v1_x" });
+    expect(await payerAvecJeton(config, demande)).toEqual({ id: "pay_4", statut: "open", sousStatut: "pending", secret: "pay_4_secret_v1_x", raison: "pending" });
     expect(appels[0]).toMatchObject({
       url: "https://api.whop.com/api/v1/payments",
       corps: {

@@ -45,14 +45,18 @@ import type { RoueDuCompte } from "@/types/api";
  * téléphone, une barre en bas ramène au bouton qui paie quand il est sorti de l’écran. Ordinateur : le titre, sa carte et
  * l’avant / après à gauche, le paiement à droite, les témoignages dessous.
  * L’offre ① vient d’elle-même, une fois : au retour sur l’onglet, ou après OFFRE_APRES_MS sans payer. Jamais avec un lot
- * de la roue (le serveur la refuse aussi), ni pendant que la roue attend. Payé, « C’est débloqué » mène à la vraie
- * lecture (/lecture).
+ * de la roue (le serveur la refuse aussi), ni pendant que la roue attend, ni sur la carte qu’on remplit : son moment venu
+ * pendant le paiement (la carte ouverte, Apple Pay), elle attend qu’on en sorte sans payer. Payé, « C’est débloqué »
+ * mène à la vraie lecture (/lecture).
  * Le tunnel d’/admin (src/lib/jalons.ts) : le paywall arrivé, jusqu’où l’on descend (les offres, les avis, les questions,
- * le bas), la formule touchée, puis le bouton qui paie et la feuille de Whop (PayerDansLaFeuille, `jalons`).
+ * le bas), la formule touchée, puis le bouton qui paie et la feuille de Whop (PayerDansLaFeuille, `jalons`), celle de
+ * l’offre ① comprise.
  */
 
 /** Sans payer, l’offre ① arrive au bout de ce temps (ou au retour sur l’onglet, si c’est avant). */
 const OFFRE_APRES_MS = 40_000;
+/** Retenue pendant le paiement, l’offre ① arrive ce temps après qu’on en est sorti : la feuille de la carte a fini de descendre. */
+const OFFRE_APRES_LE_PAIEMENT_MS = 600;
 
 export function Paywall({
   story,
@@ -215,8 +219,9 @@ function Paiement({
   const choisie: Choix = choix ?? (avoirs?.avance ? "avance" : garde ? "rapport" : FORMULE_CHOISIE);
   const offre: OffreId = choisie === "rapport" && garde ? "rapport_garde" : choisie === "avance" ? "rapport" : choisie;
   const [paye, setPaye] = useState(false);
-  const [occupe, setOccupe] = useState(false);
-  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || occupe, directe: offreDirecte });
+  /* Dans le paiement : la carte ouverte, Apple Pay, un paiement en route (PayerDansLaFeuille, surOuvert) */
+  const [ouvert, setOuvert] = useState(false);
+  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute: paye || ouvert, directe: offreDirecte });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
 
@@ -299,7 +304,7 @@ function Paiement({
             suite="/lecture"
             quand={{ deja: relire }}
             surPaye={setPaye}
-            surOccupe={setOccupe}
+            surOuvert={setOuvert}
             fleche
             sansCarteGardee
             jalons
@@ -314,7 +319,9 @@ function Paiement({
           </span>
         </p>
       )}
-      {suiteMontree && <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} />}
+      {suiteMontree && (
+        <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} jalons />
+      )}
       {passee && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{OFFRE_SUITE.passee}</Toast>}
     </section>
   );
@@ -550,22 +557,28 @@ function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot:
  * L’offre ① du paywall : demandée au serveur une fois (une fois par compte, jamais deux offres le même jour : il peut
  * refuser), au retour sur l’onglet après l’avoir quitté, ou après OFFRE_APRES_MS sans payer ; tout de suite (`directe`)
  * quand le mail J+6 de S1 l’a rouverte. `sans` : le compte a déjà
- * mieux (le rapport d’avance, le −50 % gardé), ou la roue attend, ou un lot est gagné ; `enRoute` : un paiement est en
- * cours ou fait.
+ * mieux (le rapport d’avance, le −50 % gardé), ou la roue attend, ou un lot est gagné ; `enRoute` : l’acheteur est dans
+ * le paiement (la carte ouverte, Apple Pay, un paiement en route) ou a payé. Son moment venu pendant le paiement, elle
+ * est retenue : elle ne couvre pas la carte qu’on remplit (le 21 octobre, elle est arrivée 19 s après « Débloquer »), et
+ * vient OFFRE_APRES_LE_PAIEMENT_MS après qu’on en est sorti sans payer.
  */
 function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boolean; directe: boolean }) {
   const [suiteMontree, setSuiteMontree] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
+  const [retenue, setRetenue] = useState(false);
   const demandee = useRef(false);
   const occupe = useRef(enRoute);
+  /* La demande au serveur, posée par l’effet qui l’arme : l’offre retenue la refait une fois le paiement refermé */
+  const proposer = useRef(() => {});
   useEffect(() => {
     occupe.current = enRoute;
   }, [enRoute]);
   useEffect(() => {
     if (sans) return;
     let vivant = true;
-    const proposer = () => {
-      if (demandee.current || occupe.current) return;
+    proposer.current = () => {
+      if (demandee.current) return;
+      if (occupe.current) return setRetenue(true);
       demandee.current = true;
       proposerOffreUnique("suite").then(
         (o) => {
@@ -574,19 +587,29 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
         () => {},
       );
     };
-    const minuteur = setTimeout(proposer, directe ? 0 : OFFRE_APRES_MS);
+    const minuteur = setTimeout(() => proposer.current(), directe ? 0 : OFFRE_APRES_MS);
     let partie = false;
     const vu = () => {
       if (document.visibilityState === "hidden") partie = true;
-      else if (partie) proposer();
+      else if (partie) proposer.current();
     };
     document.addEventListener("visibilitychange", vu);
     return () => {
       vivant = false;
+      proposer.current = () => {};
       clearTimeout(minuteur);
       document.removeEventListener("visibilitychange", vu);
     };
   }, [sans, directe]);
+  /* Retenue pendant le paiement : elle vient une fois qu’on en est sorti sans payer (payé, enRoute reste vrai) */
+  useEffect(() => {
+    if (!retenue || enRoute) return;
+    const t = setTimeout(() => {
+      setRetenue(false);
+      proposer.current();
+    }, OFFRE_APRES_LE_PAIEMENT_MS);
+    return () => clearTimeout(t);
+  }, [retenue, enRoute]);
   useEffect(() => {
     if (!passee) return;
     const t = setTimeout(() => setPassee(false), 2600);

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { lirePaiementWhop, type PaiementWhop } from "./evenements";
+import { lirePaiementWhop, raisonDuRefus, type PaiementWhop } from "./evenements";
 
 /*
  * Le client de l’API REST de Whop, par fetch, sans leur bibliothèque (@whop/sdk : trop récente, et quatre appels
@@ -188,10 +188,11 @@ const PaiementDuJeton = z.looseObject({
 
 /**
  * Un paiement créé dans la feuille : son id (pay_…), son statut chez Whop (« paid » : payé ; le reste : une étape attend
- * l’acheteur, ou la banque décide encore), son sous-statut (« failed », « blocked »… : refusé pour de bon), et la clé qui
- * laisse le navigateur finir l’étape (une 3-D Secure : handleNextAction des Elements), ou null.
+ * l’acheteur, ou la banque décide encore), son sous-statut (« failed », « blocked »… : refusé pour de bon), la clé qui
+ * laisse le navigateur finir l’étape (une 3-D Secure : handleNextAction des Elements), ou null, et ce que Whop dit de
+ * son issue (raisonDuRefus : écrit au journal quand il est refusé), ou null.
  */
-export type PaiementDansLaFeuille = { id: string; statut: string; sousStatut: string | null; secret: string | null };
+export type PaiementDansLaFeuille = { id: string; statut: string; sousStatut: string | null; secret: string | null; raison: string | null };
 
 /**
  * Le paiement dans la feuille (POST /payments, avec le jeton de confirmation ctok_… que les Elements de Whop ont donné au
@@ -219,5 +220,11 @@ export async function payerAvecJeton(
   });
   const p = PaiementDuJeton.safeParse(brut);
   if (!p.success) throw new ErreurWhop("illisible");
-  return { id: p.data.id, statut: (p.data.status ?? "").toLowerCase(), sousStatut: p.data.substatus?.toLowerCase() ?? null, secret: p.data.client_secret ?? null };
+  return {
+    id: p.data.id,
+    statut: (p.data.status ?? "").toLowerCase(),
+    sousStatut: p.data.substatus?.toLowerCase() ?? null,
+    secret: p.data.client_secret ?? null,
+    raison: raisonDuRefus(brut),
+  };
 }

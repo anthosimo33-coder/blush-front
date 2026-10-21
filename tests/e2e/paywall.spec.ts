@@ -1,5 +1,6 @@
 import {
   attendreLecture,
+  CARTE,
   compteDe,
   dernierCode,
   emailLibre,
@@ -75,8 +76,21 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     expect(await verdictsEcrits(email)).toBe(0);
   });
 
-  await test.step("l’onglet quitté puis retrouvé : l’offre ①, « Offre unique sur ton rapport », une fois ; « Non merci »", async () => {
+  await test.step("l’onglet quitté puis retrouvé pendant qu’on remplit sa carte : l’offre ① attend, et vient une fois la carte refermée sans payer", async () => {
+    /* Le 21 octobre, elle couvrait la carte 19 s après « Débloquer » : jamais pendant le paiement */
+    await page.getByRole("main").getByRole("button", { name: "Débloquer · 18,90\u00a0€" }).click();
+    const carte = page.getByRole("dialog", { name: CARTE });
+    await expect(carte).toBeVisible();
     await quitterPuisRevenir(page);
+    await page.waitForTimeout(1000);
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await expect(carte).toBeVisible();
+    await carte.getByRole("button", { name: "Revenir" }).click();
+    await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible();
+    await expect(carte).toHaveCount(0);
+  });
+
+  await test.step("l’offre ①, « Offre unique sur ton rapport », une fois ; « Non merci »", async () => {
     const offre = page.getByRole("dialog", { name: OFFRE_SUITE });
     await expect(offre).toBeVisible();
     await expect(offre.getByRole("button", { name: "Je le prends · 10,90\u00a0€" })).toBeVisible();

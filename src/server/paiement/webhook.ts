@@ -264,6 +264,8 @@ export async function recevoirWebhook(corps: string, entetes: Headers): Promise<
       ),
     );
   const effet = await uneFoisParEvenement(v.id, lu.type, () => appliquer(f, lu.action));
-  journal("webhook de paiement", { id: v.id, type: lu.type, effet: lu.action.faire === "rien" ? lu.action.pourquoi : effet });
+  /* Un paiement refusé dit pourquoi (raisonDuRefus) : la carte, la banque, la 3-D Secure, sans ouvrir le tableau de bord de Whop */
+  const raison = lu.action.faire === "echouer" ? lu.action.paiement.raison : null;
+  journal("webhook de paiement", { id: v.id, type: lu.type, effet: lu.action.faire === "rien" ? lu.action.pourquoi : effet, ...(raison && { raison }) });
   return "ok";
 }
