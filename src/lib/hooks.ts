@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { basDePage } from "@/lib/defilement";
 import type { Repere } from "@/lib/repere";
 import { play } from "@/lib/sound";
 
@@ -97,6 +98,29 @@ export function useEnVue(repere: Repere): boolean {
     };
   }, [el]);
   return !!el && vu;
+}
+
+/**
+ * Vrai au premier des deux, et le reste : `apresMs` passées depuis l’arrivée sur l’écran, ou la page défilée jusqu’à
+ * `part` de sa course (0,5 : la moitié). Une page trop courte pour défiler n’attend que le temps.
+ */
+export function useMomentVenu(apresMs: number, part: number): boolean {
+  const [venu, setVenu] = useState(false);
+  useEffect(() => {
+    if (venu) return;
+    const vient = () => setVenu(true);
+    const minuteur = setTimeout(vient, apresMs);
+    const defile = () => {
+      const course = basDePage();
+      if (course > 0 && window.scrollY >= course * part) vient();
+    };
+    window.addEventListener("scroll", defile, { passive: true });
+    return () => {
+      clearTimeout(minuteur);
+      window.removeEventListener("scroll", defile);
+    };
+  }, [venu, apresMs, part]);
+  return venu;
 }
 
 /**

@@ -457,7 +457,7 @@ export const STATES = [
     id: "P1b",
     section: "paywall",
     title: "Paywall",
-    state: "La roue des cadeaux, avant le paywall",
+    state: "La roue des cadeaux, par-dessus le paywall",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
@@ -467,7 +467,7 @@ export const STATES = [
       await page.getByRole("dialog", { name: ROUE }).waitFor();
       await page.waitForTimeout(700);
     },
-    note: "Une fois par compte. La case est tirée par le serveur, chacune avec sa chance (le règlement, dans les conditions).",
+    note: "Une fois par compte, au bout de 5 secondes sur le paywall ou à la moitié de la page (jamais sur la carte qu’on remplit). La case est tirée par le serveur, chacune avec sa chance (le règlement, dans les conditions).",
     changement: "Nouveau (16 octobre)\u00a0: «\u00a0Découvrir mon cadeau\u00a0» ou «\u00a0Je ne veux pas de cadeau\u00a0».",
   },
   {

@@ -14,8 +14,8 @@ import type { RoueDuCompte } from "@/types/api";
 import { angleDeLaCase, DUREE_DU_TOUR_MS, Roue } from "./Roue";
 
 /*
- * La roue, juste avant le paywall (les maquettes G1 et G2 validées le 16 octobre) : « Avant ton rapport, tourne la
- * roue ». « Découvrir mon cadeau » la fait tourner : le serveur tire la case (POST /api/roue), la roue s’y arrête, puis
+ * La roue, par-dessus le paywall (les maquettes G1 et G2 validées le 16 octobre ; son moment, la moitié de la page ou
+ * quelques secondes, se décide dans src/app/lecture/Paywall.tsx) : « Avant ton rapport, tourne la roue ». « Découvrir mon cadeau » la fait tourner : le serveur tire la case (POST /api/roue), la roue s’y arrête, puis
  * « Gagné » dit le lot et son minuteur (15 minutes, l’heure de fin tirée du temps qu’il lui reste à l’heure du serveur).
  * « Je ne veux pas de cadeau » la refuse pour de bon. Fermée autrement (le voile, Échap), rien n’est noté : elle revient
  * au prochain passage. Pendant le tour, elle ne se ferme pas. Sur ordinateur, une fenêtre large : le texte à gauche, la

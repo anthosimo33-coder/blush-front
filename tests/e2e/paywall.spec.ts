@@ -26,9 +26,9 @@ import { CASES_DE_LA_ROUE } from "../../src/contenu/roue";
 /*
  * Le paywall avant toute lecture (décidé le 16 octobre), de bout en bout, comme un nouveau venu : l’import, « Qui
  * es-tu ? », le code reçu par email, puis la lecture, que le code déroule seul (rien ne part au modèle), « Voir mon
- * rapport », la roue des cadeaux (refusée, ou tournée), le paywall prime (les deux formules et le bouton qui paie), l’offre
- * ① au retour sur l’onglet (seulement sans lot gagné), le paiement au faux Whop, « C’est débloqué » (le rapport entier),
- * puis la vraie lecture et le verdict.
+ * rapport », le paywall prime (les deux formules et le bouton qui paie) et sa roue des cadeaux par-dessus (au bout de 5 s
+ * ou à la moitié de la page, jamais sur la carte ; refusée, ou tournée), l’offre ① au retour sur l’onglet (seulement
+ * sans lot gagné), le paiement au faux Whop, « C’est débloqué » (le rapport entier), puis la vraie lecture et le verdict.
  */
 
 /** Les verdicts écrits pour les convs de ce compte : aucun tant que rien n’est payé (le modèle n’a rien lu). */
@@ -50,11 +50,25 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   });
 
-  await test.step("« Voir mon rapport » : la roue d’abord, refusée ; puis le paywall prime, les deux formules aux prix du 16 octobre, Premium choisie d’avance", async () => {
+  await test.step("« Voir mon rapport » : le paywall prime, sans la roue ; ses 5 s passées sur la carte qu’on remplit, elle attend qu’on en sorte, puis refusée", async () => {
     await page.getByRole("button", { name: "Voir mon rapport" }).click();
+    const ecran = page.getByRole("main");
+    await expect(ecran.getByRole("heading", { level: 1 })).toBeVisible({ timeout: RESEAU });
+    /* Le 21 octobre : plus à l’arrivée, mais au bout de 5 s (ou à la moitié de la page), et jamais sur la carte */
+    await expect(page.getByRole("dialog", { name: ROUE })).toHaveCount(0);
+    await ecran.getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
+    const carte = page.getByRole("dialog", { name: CARTE });
+    await expect(carte).toBeVisible();
+    await page.waitForTimeout(6_000);
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await carte.getByRole("button", { name: "Revenir" }).click();
     await expect(page.getByRole("dialog", { name: ROUE })).toBeVisible({ timeout: RESEAU });
+    await expect(carte).toHaveCount(0);
     await tientEnPetitEcran(page, "la roue");
     await refuserLaRoue(page);
+  });
+
+  await test.step("le paywall prime : les deux formules aux prix du 16 octobre, Premium choisie d’avance", async () => {
     const ecran = page.getByRole("main");
     /* Le titre : la première trouvaille du code, qui nomme l’autre */
     await expect(ecran.getByRole("heading", { level: 1 })).toContainText("Maëlys");
@@ -140,9 +154,13 @@ test("la roue tournée : « Gagné », le lot (−10 %) sur les prix du paywall 
   expect(await saisirCode(page, await dernierCode(email, { depuis }))).toBe(true);
   expect(await attendreLecture(page, { paywall: "garder" })).toBe("paywall");
 
-  await test.step("« Découvrir mon cadeau » : la roue tourne, s’arrête sur −10 %, « Gagné » et son minuteur", async () => {
+  await test.step("la page descendue à moitié : la roue sans attendre ses 5 s ; « Découvrir mon cadeau », elle s’arrête sur −10 %, « Gagné » et son minuteur", async () => {
     await page.getByRole("button", { name: "Voir mon rapport" }).click();
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible({ timeout: RESEAU });
     const roue = page.getByRole("dialog", { name: ROUE });
+    await expect(roue).toHaveCount(0);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(roue).toBeVisible({ timeout: 2_000 });
     await roue.getByRole("button", { name: "Découvrir mon cadeau" }).click();
     await expect(page.getByText(/^Gagné/)).toBeVisible({ timeout: RESEAU });
     await expect(page.getByRole("dialog").getByRole("heading", { name: "−10\u00a0%" })).toBeVisible();
