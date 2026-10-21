@@ -37,7 +37,8 @@ const PAS_MS = 250;
  * se ferme pour de bon (`onPassee` : l’écran le dit). Fermée par « Non merci », le voile ou Échap : `onRefus`.
  * `onClosed` : sa sortie finie. `chapitres` : ceux qu’elle ouvre ; `suite` : où reprendre après le paiement. Sur
  * ordinateur, son voile couvre tout l’écran, en-tête compris (belowHeader faux). « attends… » est dans la police de
- * l’appli (Nunito), comme dans le prototype, pas dans celle des messages.
+ * l’appli (Nunito), comme dans le prototype, pas dans celle des messages. `jalons` : son paiement compte dans le tunnel
+ * d’/admin (le paywall seulement : src/lib/jalons.ts).
  * TODO(produit): une réduction, ou un ajout (+20 bulles) ? (la question du prototype)
  */
 export function OffreAvantDePartir({
@@ -47,6 +48,7 @@ export function OffreAvantDePartir({
   onRefus,
   onPassee,
   onClosed,
+  jalons,
 }: {
   fin: number;
   chapitres: number;
@@ -54,6 +56,7 @@ export function OffreAvantDePartir({
   onRefus: () => void;
   onPassee: () => void;
   onClosed: () => void;
+  jalons?: boolean;
 }) {
   const titre = useId();
   const idFin = useId();
@@ -171,6 +174,7 @@ export function OffreAvantDePartir({
           surPaye={setPaye}
           surOccupe={setOccupe}
           fleche
+          jalons={jalons}
         />
         {!paye && !occupe && (
           <Button variant="link" onClick={refuser}>

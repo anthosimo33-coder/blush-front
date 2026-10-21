@@ -60,7 +60,37 @@ export type PaiementWhop = {
   moyenId: string | null;
   /** Remboursé d’office par Whop (une alerte de litige) : rien à livrer. */
   autoRembourse: boolean;
+  /** Ce que Whop dit de son issue (raisonDuRefus), écrit au journal quand il est refusé ; ou null. */
+  raison: string | null;
 };
+
+/** Ce que Whop dit d’un paiement refusé (seulement ce qu’on en écrit au journal). */
+const RefusBrut = z.looseObject({
+  payment_method_type: z.string().nullish(),
+  substatus: z.string().nullish(),
+  decline_code: z.string().nullish(),
+  failure_message: z.string().nullish(),
+  three_ds_verified: z.boolean().nullish(),
+});
+
+/** La longueur du message de refus gardé au journal. */
+const MESSAGE_DE_REFUS_MAX = 200;
+
+/**
+ * Pourquoi Whop a refusé un paiement, en une ligne pour le journal (le seul endroit où le lire sans son tableau de bord) :
+ * le moyen (« card », « apple_pay »), le sous-statut, le code de la banque (« insufficient_funds », « suspected_fraud »),
+ * son message (sans adresse email, borné), et la 3-D Secure (« 3DS faite » ou « sans 3DS », quand Whop le dit). Jamais
+ * le nom, la carte ni l’adresse de l’acheteur. Null : Whop n’en dit rien.
+ */
+export function raisonDuRefus(data: unknown): string | null {
+  const r = RefusBrut.safeParse(data);
+  if (!r.success) return null;
+  const { payment_method_type, substatus, decline_code, failure_message, three_ds_verified } = r.data;
+  const message = failure_message?.replace(/[^\s@]+@[^\s@]+/g, "‹email›").slice(0, MESSAGE_DE_REFUS_MAX);
+  const troisDS = three_ds_verified === true ? "3DS faite" : three_ds_verified === false ? "sans 3DS" : null;
+  const morceaux = [payment_method_type, substatus, decline_code, message, troisDS].filter((m): m is string => typeof m === "string" && m !== "");
+  return morceaux.length > 0 ? morceaux.join(" · ") : null;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,6 +112,7 @@ export function lirePaiementWhop(data: unknown): PaiementWhop | null {
     membreId: d.member_id ?? d.member?.id ?? null,
     moyenId: d.payment_method_id ?? d.payment_method?.id ?? null,
     autoRembourse: d.auto_refunded === true,
+    raison: raisonDuRefus(data),
   };
 }
 
