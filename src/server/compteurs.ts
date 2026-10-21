@@ -28,6 +28,8 @@ export const CLES = {
   imagePartagee: "image_partagee",
   /** Le lien de parrainage d’une amie ouvert (/p/<code>, src/server/parrainage.ts). */
   lienParrainage: "parrainage_lien",
+  /** Une réponse du chat sortie en alerte (danger, détresse, mineur) : la santé de /admin les compte (src/server/stats.ts). */
+  alerteChat: "chat_alerte",
 } as const;
 export type Cle = (typeof CLES)[keyof typeof CLES];
 

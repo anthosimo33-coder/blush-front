@@ -1028,7 +1028,7 @@ function Sante({ s }: { s: StatsAdmin }) {
     ["Tâches en échec", x.echecs, s.sante.echecs.map((e) => ({ cle: e.code, n: e.n }))],
     ["Tâches bloquées en ce moment", x.bloquees, []],
     ["Paiements refusés", x.paiementsEchoues, []],
-    ["Réponses en alerte danger", x.alertes, []],
+    ["Réponses en alerte", x.alertes, []],
     ["Pannes du serveur", x.pannes, s.sante.pannes.map((p) => ({ cle: p.lieu, n: p.n }))],
   ];
   const calme = lignes.every(([, n]) => n === 0);

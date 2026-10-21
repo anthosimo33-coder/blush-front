@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
 
@@ -37,6 +37,7 @@ import { commander, livrer } from "@/server/achats";
 import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { coutDe, crediter, refDuMessage, reponseVerrouillee, soldeDe } from "@/server/bulles";
 import * as coffre from "@/server/coffre";
+import { CLES } from "@/server/compteurs";
 import { db, schema } from "@/server/db";
 import { compteDe, compter, LIMITES } from "@/server/limites";
 import { cleDeLimiteDuCompte } from "@/server/email-canonique";
@@ -126,6 +127,15 @@ const journalDe = (userId: string) =>
     .where(and(eq(schema.mouvementsBulles.userId, userId), ne(schema.mouvementsBulles.raison, "equipe")))
     .orderBy(schema.mouvementsBulles.id);
 
+/** Les réponses du chat sorties en alerte aujourd’hui (jour de Paris), comptées pour la santé de /admin. */
+const alertesDuJour = async () => {
+  const [l] = await db()
+    .select({ n: schema.counters.count })
+    .from(schema.counters)
+    .where(and(eq(schema.counters.key, CLES.alerteChat), eq(schema.counters.day, sql`(now() at time zone 'Europe/Paris')::date`)));
+  return l?.n ?? 0;
+};
+
 /** La dernière réponse de BLUSH gardée pour cette conv : son id, son coût, verrouillée ou non. */
 const derniereReponse = async (storyId: string) =>
   (
@@ -214,17 +224,16 @@ describe("POST /api/chat, avec des bulles", () => {
     expect(await soldeDe(u.id)).toBe(2);
   });
 
-  it("une réponse qui sort en alerte de danger est offerte : ses bulles rendues, la réponse le dit", async () => {
+  it("une réponse qui sort en alerte se paie comme les autres (21 octobre 2026), et /admin la compte", async () => {
     const { u } = await parleur("bulles-alerte", 2);
+    const avant = await alertesDuJour();
     chat = (req) => ({ ...(fournisseurFactice(req) as object), alerte: "detresse", mode: "sobre" });
     const r = reponseDu((await fluxDe(await envoyer("j’en peux plus"))).evenements);
     await lancerApres();
-    expect(r.bulles).toEqual({ depensees: 0, restantes: 2 });
+    expect(r.bulles).toEqual({ depensees: 1, restantes: 1 });
     expect(r.verrouillee).toBeUndefined();
-    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([
-      ["reponse", -1],
-      ["rendu", 1],
-    ]);
+    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([["reponse", -1]]);
+    expect(await alertesDuJour()).toBe(avant + 1);
   });
 
   it("en vocal : 2 bulles ; avec une seule, la réponse s’écrit pour 1, sans voix", async () => {
@@ -562,25 +571,29 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect(gardees.filter((m) => m.verrouillee).length).toBe(1);
   });
 
-  it("un solde négatif (après un remboursement) bloque comme 0 ; une alerte de danger, elle, n’est jamais verrouillée", async () => {
+  it("un solde négatif (après un remboursement) bloque comme 0 ; une alerte aussi, mais les numéros d’urgence se lisent en clair", async () => {
     const { u } = await parleur("verrou-negatif", 0);
     await crediter(u.id, -4, "remboursement", `remboursement:test:${u.id}`);
     expect(await soldeDe(u.id)).toBe(-4);
     chat = (req) => ({ ...(fournisseurFactice(req) as object), alerte: "detresse", mode: "sobre" });
     const alerte = reponseDu((await fluxDe(await envoyer("j’en peux plus"))).evenements);
     await lancerApres();
-    expect(alerte.verrouillee).toBeUndefined();
-    expect(alerte.bulles).toEqual({ depensees: 0, restantes: -4 });
-    expect(alerte.bubbles.length).toBeGreaterThan(0);
-    expect(await reponseVerrouillee(u.id)).toBeNull();
-    chat = null;
-    const r = reponseDu((await fluxDe(await envoyer("et là ?"))).evenements);
-    await lancerApres();
-    expect(r.verrouillee).toBeDefined();
+    expect(alerte.verrouillee).toBeDefined();
+    expect(alerte.bubbles).toEqual([{ text: URGENCES }]);
+    expect(await reponseVerrouillee(u.id)).not.toBeNull();
     expect(await soldeDe(u.id)).toBe(-4);
+    /* Rouvert plus tard : l’historique la montre de même, les numéros en clair, le reste masqué */
+    const gardee = (await historique()).echanges.at(-1)!.answer;
+    expect(gardee.verrouillee).toBeDefined();
+    expect(gardee.bubbles).toEqual([{ text: URGENCES }]);
+    /* Le message suivant n’appelle pas le modèle : « bulles », avec les numéros d’aide */
+    chat = null;
+    const r = await envoyer("et là ?");
+    expect(r.status).toBe(402);
+    expect(await r.json()).toEqual(SANS_BULLES);
     /* Un don qui ne remonte pas au-dessus du coût : toujours pas de quoi la lire */
     await donnerDesBulles(u, 4);
-    expect((await lire(r.verrouillee!.message)).status).toBe(402);
+    expect((await lire(alerte.verrouillee!.message)).status).toBe(402);
   });
 
   it("rechargé sans la lire, la réponse suivante ne la reçoit pas dans son fil : BLUSH ne peut pas la redire pour moins cher", async () => {

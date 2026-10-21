@@ -92,8 +92,8 @@ export const ECART_OFFRES_UNIQUES_MS = 24 * 3600 * 1000;
 
 /**
  * Ce que coûte une réponse de BLUSH, en bulles : écrite, en vocal, ou à un message qui joint des captures ou un export
- * (pas cumulé avec l’écrite). Le reste est offert : le verdict, le rapport, la fiche, et une réponse qui sort en alerte
- * danger (rendue). Les bulles n’expirent jamais.
+ * (pas cumulé avec l’écrite). Le reste est offert : le verdict, le rapport, la fiche et les numéros d’urgence. Une
+ * réponse qui sort en alerte se paie comme les autres (décidé le 21 octobre 2026). Les bulles n’expirent jamais.
  */
 export const COUT_EN_BULLES = { reponse: 1, vocal: 2, ajout: 3 } as const;
 

@@ -94,7 +94,7 @@ async function debiterDans(tx: Executeur, compte: Compte, cout: number, ref: str
 /**
  * Débite `cout` bulles pour une réponse de BLUSH (`ref` : la sienne, une par réponse), atomiquement, sans jamais passer
  * sous zéro : « insuffisant » si le solde ne le couvre pas (rien n’est écrit), « deja » si cette réponse est déjà payée,
- * « equipe » pour un compte de l’équipe (rien n’est débité). Une réponse qui échoue, ou qui sort en alerte danger, se
+ * « equipe » pour un compte de l’équipe (rien n’est débité). Une réponse qui échoue, ou que le garde-fou remplace, se
  * rend (rendre).
  */
 export async function debiter(compte: Compte, cout: number, ref: string): Promise<Debit> {
@@ -107,7 +107,7 @@ export async function debiter(compte: Compte, cout: number, ref: string): Promis
 }
 
 /**
- * Rend les bulles d’une réponse débitée (`ref`, celle du débit) : la réponse a échoué, ou elle est sortie en alerte danger
+ * Rend les bulles d’une réponse débitée (`ref`, celle du débit) : la réponse a échoué, ou le garde-fou l’a remplacée
  * (offerte). `n` : une partie seulement, jamais plus que le débit (une réponse attendue en vocal, restée écrite). Une
  * fois par réponse : vrai si elles sont rendues, faux s’il n’y avait rien à rendre (jamais débitée, l’équipe) ou si
  * c’était déjà fait.
@@ -183,7 +183,7 @@ async function rechargeDepuis(tx: Pick<Executeur, "select">, userId: string, mes
 /**
  * Débloque une réponse verrouillée de ce compte, dans une transaction. Une recharge payée depuis qu’elle s’est écrite
  * la paie (le prototype validé des bulles : rechargé, le solde devient l’ancien plus les bulles achetées, et la réponse
- * prête est là) : « offerte », sans débit, son coût passe à null (offerte, comme une alerte), et une seule réponse en
+ * prête est là) : « offerte », sans débit, son coût passe à null (offerte, comme le garde-fou), et une seule réponse en
  * profite (il n’y en a qu’une en attente par compte, et la suivante s’écrit après cette recharge). Sinon (des bulles
  * données, un rapport payé), son coût est débité : « deverrouillee », ou « insuffisant » (le solde ne couvre toujours
  * pas : rien ne change). « aucune » : pas de réponse verrouillée de ce compte sous cet id (déjà débloquée, ou pas la

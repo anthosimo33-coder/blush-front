@@ -34,8 +34,11 @@ import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesV
  */
 /** Ton message au chat : ce que BLUSH a lu, les lignes jointes, ce que l’historique réaffiche, et la clé de l’envoi (« Réessayer »). */
 type MessageToi = { texte: string; lignes?: string[]; affiche?: string; cle?: string };
-/** La réponse de BLUSH au chat, et son résumé (ce que le fil des échanges suivants en garde). */
-type MessageBlush = { reponse: BlushAnswer; resume: string };
+/**
+ * La réponse de BLUSH au chat, et son résumé (ce que le fil des échanges suivants en garde). `alerte` : elle est sortie en
+ * alerte ; verrouillée, elle montre alors les numéros d’urgence en clair (reponseMasquee). Absent avant le 21 octobre 2026.
+ */
+type MessageBlush = { reponse: BlushAnswer; resume: string; alerte?: true };
 
 /**
  * Le registre : pour chaque colonne chiffrée, la forme de ce qu’elle garde. `chat_messages.data` garde ton message ou

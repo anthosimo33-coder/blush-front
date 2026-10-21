@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
+import { URGENCES } from "@/contenu/aide";
 import type { BlushAnswer } from "@/types";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -19,26 +20,28 @@ const longueur = (texte: string) => Array.from(texte).length;
  * seule la forme de la réponse à envoyer part (VerrouDeLaReponse, « reponse »). Sans réponse à envoyer (une question,
  * un geste, une lecture seule), rien ne la distingue de ce qui se paie : elle se verrouille en entier, et seule la forme
  * de ses bulles part (« tout »). Le reste (un niveau franchi, son vocal) attend aussi. Avec de quoi la lire une fois
- * payée (son message, son coût) et le mode vocal du chat.
+ * payée (son message, son coût) et le mode vocal du chat. `alerte` : la réponse est sortie en alerte (danger, détresse,
+ * mineur) ; elle se paie comme les autres, mais les numéros d’urgence (URGENCES) se lisent en clair, avant elle.
  */
-export function reponseMasquee(message: number, cout: number, reponse: BlushAnswer, modeVocal?: boolean): BlushAnswer {
+export function reponseMasquee(message: number, cout: number, reponse: BlushAnswer, modeVocal?: boolean, alerte = false): BlushAnswer {
   const envoi = reponse.send?.filter(Boolean) ?? [];
   const avecVocal = modeVocal === undefined ? {} : { modeVocal };
+  const aide = alerte ? [{ text: URGENCES }] : [];
   if (envoi.length)
     return {
       kind: "bubbles",
-      bubbles: reponse.bubbles.map(({ text, messages }) => ({ text, ...(messages ? { messages } : {}) })),
+      bubbles: [...aide, ...reponse.bubbles.map(({ text, messages }) => ({ text, ...(messages ? { messages } : {}) }))],
       verrouillee: { message, cout, cache: { quoi: "reponse", lignes: envoi.map(longueur) } },
       ...avecVocal,
     };
   const tout = [...reponse.bubbles.map((b) => b.text), reponse.ask ?? "", reponse.react ?? ""].filter(Boolean);
-  return { kind: "bubbles", bubbles: [], verrouillee: { message, cout, cache: { quoi: "tout", lignes: tout.map(longueur) } }, ...avecVocal };
+  return { kind: "bubbles", bubbles: aide, verrouillee: { message, cout, cache: { quoi: "tout", lignes: tout.map(longueur) } }, ...avecVocal };
 }
 
 /** Une réponse de BLUSH telle qu’elle quitte le serveur : en entier, ou masquée si elle est verrouillée (reponseMasquee). */
 function reponseAffichee(blush: { id: number; data: Buffer; cout: number | null; verrouillee: boolean }): BlushAnswer {
-  const { reponse } = coffre.lire("chat_messages.data:blush", blush.data);
-  return blush.verrouillee ? reponseMasquee(blush.id, blush.cout ?? 1, reponse) : reponse;
+  const { reponse, alerte } = coffre.lire("chat_messages.data:blush", blush.data);
+  return blush.verrouillee ? reponseMasquee(blush.id, blush.cout ?? 1, reponse, undefined, !!alerte) : reponse;
 }
 
 /** Un échange avec BLUSH, tel que l’accueil le réaffiche : `id` (celui de ton message) sert à charger ceux d’avant. */
