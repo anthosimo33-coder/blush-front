@@ -118,10 +118,17 @@ describe("le mode sobre", () => {
     expect(await plans(id)).toHaveLength(0);
   });
 
-  it("suit toujours une alerte, même si le modèle l’oublie (le rapport doux, offert)", async () => {
-    const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: false, alerte: "danger" }, refuserRapport: true }), () => lue("05-insiste-apres-un-non.txt"));
+  it("suit toujours une alerte détresse ou mineur, même si le modèle l’oublie (le rapport doux, offert)", async () => {
+    const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: false, alerte: "detresse" }, refuserRapport: true }), () => lue("05-insiste-apres-un-non.txt"));
     expect((await sortie(id)).mode_sobre).toBe(true);
     expect(await plans(id)).toHaveLength(1);
+  });
+
+  it("n’existe plus pour une alerte danger, même si le modèle le demande (21 octobre 2026 : le rapport complet, payant)", async () => {
+    const id = await avecFactice(facticeAvec({ verdict: { mode_sobre: true, alerte: "danger" } }), () => lue("04-ghosting.txt"));
+    expect(await sortie(id)).toMatchObject({ alerte: "danger", mode_sobre: false });
+    /* Compte gratuit : pas de rapport offert */
+    expect(await plans(id)).toHaveLength(0);
   });
 });
 

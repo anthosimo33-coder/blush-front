@@ -153,8 +153,11 @@ async function verdict(story: LigneComplete, t: Tache) {
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.verdicts.storyId, set: { data, createdAt: new Date() } });
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
-  /* Payée avant d’être lue (le paywall d’abord), une conv en alerte est à rembourser : l’équipe est prévenue */
-  if (sortie.alerte) await auMieux(signalerLesAchatsDUneAlerte(story.id, sortie.alerte), "achats d’une alerte non signalés", { histoire: story.id });
+  /*
+   * Payée avant d’être lue (le paywall d’abord), une conv en mode sobre (détresse, mineur) est à rembourser : l’équipe
+   * est prévenue. Une alerte « danger » se vend depuis le 21 octobre 2026 : son rapport complet s’écrit, rien à rembourser
+   */
+  if (sortie.alerte && sortie.mode_sobre) await auMieux(signalerLesAchatsDUneAlerte(story.id, sortie.alerte), "achats d’une alerte non signalés", { histoire: story.id });
 }
 
 /**

@@ -216,7 +216,11 @@ const MAIL_RECENT = sql`(
   or exists (select 1 from ${schema.offresUniques} r where r.user_id = u.id and r.offre = 'relance_mail' and r.montree_le > now() - make_interval(secs => ${ECART_ENTRE_DEUX_MAILS_MS / 1000}))
 )`;
 
-/** Le prochain pas, l’emoji et l’alerte du verdict de cette conv, ou null : pas de verdict, ou une alerte (le mode sobre : rien ne part). */
+/**
+ * Le prochain pas, l’emoji et l’alerte du verdict de cette conv, ou null : pas de verdict, ou une alerte, quelle qu’elle
+ * soit (rien ne part). Une alerte « danger » se vend dans l’appli (21 octobre 2026), mais aucun mail sur leur histoire
+ * ne part : sa boîte mail peut être lue par l’autre (« son téléphone exigé ou fouillé », le socle des prompts).
+ */
 async function verdictSansAlerte(storyId: string) {
   const v = await donneesVerdict(storyId);
   if (!v || v.sortie.alerte || v.sortie.mode_sobre) return null;
