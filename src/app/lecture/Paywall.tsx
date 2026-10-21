@@ -560,12 +560,22 @@ function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot:
  * mieux (le rapport d’avance, le −50 % gardé), ou la roue attend, ou un lot est gagné ; `enRoute` : l’acheteur est dans
  * le paiement (la carte ouverte, Apple Pay, un paiement en route) ou a payé. Son moment venu pendant le paiement, elle
  * est retenue : elle ne couvre pas la carte qu’on remplit (le 21 octobre, elle est arrivée 19 s après « Débloquer »), et
- * vient OFFRE_APRES_LE_PAIEMENT_MS après qu’on en est sorti sans payer.
+ * vient OFFRE_APRES_LE_PAIEMENT_MS après qu’on en est sorti sans payer. Ce que le serveur rend pendant le paiement (la
+ * demande partie juste avant la carte, ou pendant que `enRoute` arrive de l’enfant) attend de même : `suiteMontree` ne
+ * vaut rien tant qu’on est dedans, ni dans les OFFRE_APRES_LE_PAIEMENT_MS qui suivent.
  */
 function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boolean; directe: boolean }) {
   const [suiteMontree, setSuiteMontree] = useState<number | null>(null);
   const [passee, setPassee] = useState(false);
   const [retenue, setRetenue] = useState(false);
+  /* Hors du paiement depuis OFFRE_APRES_LE_PAIEMENT_MS au moins : l’offre peut se montrer. Rentrer dans le paiement le
+     retire pendant le rendu même (pas un rendu plus tard, dans un effet) */
+  const [libre, setLibre] = useState(!enRoute);
+  const [dedans, setDedans] = useState(enRoute);
+  if (dedans !== enRoute) {
+    setDedans(enRoute);
+    if (enRoute) setLibre(false);
+  }
   const demandee = useRef(false);
   const occupe = useRef(enRoute);
   /* La demande au serveur, posée par l’effet qui l’arme : l’offre retenue la refait une fois le paiement refermé */
@@ -611,9 +621,14 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
     return () => clearTimeout(t);
   }, [retenue, enRoute]);
   useEffect(() => {
+    if (enRoute || libre) return;
+    const t = setTimeout(() => setLibre(true), OFFRE_APRES_LE_PAIEMENT_MS);
+    return () => clearTimeout(t);
+  }, [enRoute, libre]);
+  useEffect(() => {
     if (!passee) return;
     const t = setTimeout(() => setPassee(false), 2600);
     return () => clearTimeout(t);
   }, [passee]);
-  return { suiteMontree, passee, setPassee, fermer: () => setSuiteMontree(null) };
+  return { suiteMontree: libre && !enRoute ? suiteMontree : null, passee, setPassee, fermer: () => setSuiteMontree(null) };
 }
