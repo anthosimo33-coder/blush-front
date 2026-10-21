@@ -5,7 +5,8 @@
  * (un écran gardé tous les 40 % de hauteur, réduit comme dans le navigateur), lue lot par lot (cinq à la fois), puis
  * les lots sont rassemblés comme en ligne (fusionnerLots) et comparés mot pour mot à la conv.
  *   DATABASE_URL=… BLUSH_CLE=… ANTHROPIC_API_KEY=… npm run essai:video -- <cas> <n messages> <modèle[:effort]>…
- * Sans modèle : les écrans seulement, dans ESSAI_ECRANS. ESSAI_FLOU (px) et ESSAI_QUALITE (JPEG) les dégradent.
+ * Sans modèle : les écrans seulement, dans ESSAI_ECRANS. ESSAI_FLOU (px) et ESSAI_QUALITE (JPEG) les dégradent. ESSAI_LOT :
+ * le nombre d’écrans par lot (6, comme l’import).
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
@@ -138,10 +139,11 @@ if (!variantes.length) {
   process.exit(0);
 }
 
-/* Les lots de l’import : six écrans, chacun reprenant le dernier du précédent */
+/* Les lots de l’import : six écrans (ESSAI_LOT pour en essayer d’autres), chacun reprenant le dernier du précédent */
+const LOT = +(process.env.ESSAI_LOT ?? 6);
 const lots: Buffer[][] = [];
 for (let i = 0; i < ecrans.length;) {
-  const j = Math.min(ecrans.length, i + 6);
+  const j = Math.min(ecrans.length, i + LOT);
   lots.push(ecrans.slice(i, j));
   if (j >= ecrans.length) break;
   i = j - 1;

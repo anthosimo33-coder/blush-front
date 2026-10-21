@@ -5,7 +5,7 @@ import "client-only";
  * (deux écrans gardés se recouvrent : aucun message ne tombe entre les deux). La vidéo ne quitte jamais l’appareil :
  * seules ces images partent, réduites comme des captures.
  */
-import { COTE_IMAGE_MAX } from "@/lib/limites";
+import { COTE_IMAGE_MAX, ECRANS_PAR_LOT } from "@/lib/limites";
 import { toileEnJpeg } from "./preparer-captures";
 
 export class VideoIllisible extends Error {
@@ -192,6 +192,16 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
     URL.revokeObjectURL(url);
   }
 }
+
+/**
+ * Combien d’écrans par lot, pour `lecteurs` lots lus en même temps : assez pour que tout parte en un seul tour quand
+ * c’est possible (chaque lot reprend le dernier écran du précédent : `lecteurs` lots de `t` écrans en couvrent
+ * lecteurs × (t − 1) + 1), entre six et douze (ECRANS_PAR_LOT). Un plus grand lot coûte moins (moins d’écrans relus
+ * aux jointures, moins de fois le prompt) : à l’essai du 21 octobre (Sonnet 5.5, deux convs de test filmées comme
+ * iMessage, scripts/essai-video-modeles.mts), des lots de douze ont lu autant de messages mot pour mot que des lots
+ * de six, pour 20 à 25 % de moins. Une longue vidéo finit aussi plus tôt : moins de tours de lecture.
+ */
+export const tailleDesLots = (ecrans: number, lecteurs: number) => Math.min(ECRANS_PAR_LOT.max, Math.max(ECRANS_PAR_LOT.min, Math.ceil((ecrans - 1) / lecteurs) + 1));
 
 /**
  * Les lots à lire : une douzaine d’images, chaque lot reprenant la dernière image du précédent (pour recoller les

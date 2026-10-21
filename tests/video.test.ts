@@ -6,7 +6,7 @@ import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
-import { decalage, garderLesPlusRecents, IMAGES_MAX, lotsDe } from "@/services/preparer-video";
+import { decalage, garderLesPlusRecents, IMAGES_MAX, lotsDe, tailleDesLots } from "@/services/preparer-video";
 import { captures, msg } from "./aide/fabriques";
 import { accordDeTest } from "./aide/fixtures";
 
@@ -90,7 +90,7 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
     expect(lotsDe(Array.from({ length: 12 }, (_, k) => k))).toHaveLength(1);
   });
 
-  it("des lots de six (ce que l’import envoie, lus cinq à la fois) : l’ordre et le recouvrement tiennent, et l’enregistrement le plus long reste sous la borne du serveur", () => {
+  it("des lots de six (une courte vidéo) : l’ordre et le recouvrement tiennent, et même un long enregistrement en lots de six reste sous la borne du serveur", () => {
     const lots = lotsDe(
       Array.from({ length: 26 }, (_, k) => k),
       6,
@@ -102,13 +102,30 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
       [15, 20],
       [20, 25],
     ]);
-    /* IMAGES_MAX (160) : trente-deux lots, sous les 40 que /api/captures/video accepte */
+    /* Des lots de six : trente-deux pour IMAGES_MAX (160), sous les 40 que /api/captures/video accepte */
     expect(
       lotsDe(
         Array.from({ length: IMAGES_MAX }, (_, k) => k),
         6,
       ),
     ).toHaveLength(32);
+  });
+
+  it("la taille des lots (ce que l’import envoie, lus cinq à la fois) : six pour une courte vidéo, en un seul tour ; jusqu’à douze pour une longue", () => {
+    expect([11, 26, 40, 160].map((n) => tailleDesLots(n, 5))).toEqual([6, 6, 9, 12]);
+    /* 40 écrans : cinq lots de neuf, un seul tour ; 160 : quinze lots de douze, sous les 40 que /api/captures/video accepte */
+    expect(
+      lotsDe(
+        Array.from({ length: 40 }, (_, k) => k),
+        tailleDesLots(40, 5),
+      ),
+    ).toHaveLength(5);
+    expect(
+      lotsDe(
+        Array.from({ length: IMAGES_MAX }, (_, k) => k),
+        tailleDesLots(IMAGES_MAX, 5),
+      ),
+    ).toHaveLength(15);
   });
 
   it("un enregistrement trop long : la partie la plus récente de la conv, plutôt qu’un refus", () => {

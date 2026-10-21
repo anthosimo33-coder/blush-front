@@ -393,7 +393,7 @@ export async function uploadRecording(
   { ajout = false }: { ajout?: boolean } = {},
 ): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
-  const { imagesDeLaVideo, lotsDe, VideoIllisible } = await pVideo();
+  const { imagesDeLaVideo, lotsDe, tailleDesLots, VideoIllisible } = await pVideo();
   let images: Blob[];
   try {
     images = await imagesDeLaVideo(file, (p) => onAvance?.({ etape: "video", p }));
@@ -401,12 +401,11 @@ export async function uploadRecording(
     throw new ErreurApi(e instanceof VideoIllisible ? e.code : "video", 422);
   }
   /*
-   * Des lots de six écrans, et de 4 Mo au plus (des écrans sombres ou des photos pèsent plus lourd). La lecture d’un
-   * lot dure environ 9 s plus 0,45 s par message : des lots de six, lus cinq à la fois, finissent bien plus tôt que des
-   * lots de douze lus trois à la fois (environ 35 s au lieu de 49 pour 45 s de vidéo), pour un peu plus d’images lues
-   * deux fois (celles qui recollent deux lots).
+   * Des lots de six à douze écrans (tailleDesLots : une courte vidéo part en un seul tour de cinq lecteurs, une longue
+   * en lots de douze, moins chers et en moins de tours), et de 4 Mo au plus (des écrans sombres ou des photos pèsent
+   * plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six en 15 s environ (21 octobre).
    */
-  const lots = lotsDe(images, 6, (b) => b.size, ENVOI_IMAGES_MAX);
+  const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS), (b) => b.size, ENVOI_IMAGES_MAX);
   /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
   await passe;
   const lus: unknown[] = new Array(lots.length);
