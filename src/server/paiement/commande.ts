@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
+import { champsDErreur } from "@/lib/tracer";
 import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
 import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
@@ -12,7 +13,7 @@ import { cleDeLimiteDuCompte } from "../email-canonique";
 import { UUID } from "../histoires";
 import type { Consentement } from "../juridique";
 import { URL_SITE } from "../env";
-import { journalErreur } from "../journal";
+import { journal, journalErreur } from "../journal";
 import { LIMITES, sousLaLimite } from "../limites";
 import { montrer, offreValable } from "../offres-uniques";
 import { aGagneALaRoue, roueDuCompte } from "../roue";
@@ -181,12 +182,18 @@ async function dansLaFeuille(f: Fournisseur, compte: Compte, achat: Achat, jeton
     });
   } catch (e) {
     /* Whop dit 402 (le paiement refusé) : la carte ; tout autre refus net est le nôtre (un champ, une clé), une panne à voir */
-    if (e instanceof ErreurWhop && e.statut === 402) return "carte";
+    if (e instanceof ErreurWhop && e.statut === 402) {
+      journal("paiement dans la feuille refusé par Whop", { achat: achat.id, ...champsDErreur(e) });
+      return "carte";
+    }
     /* Sans réponse sûre, le paiement a pu partir : on attend son webhook au lieu de dire « panne » (aVerifier) */
     if (e instanceof ErreurWhop && !refusNet(e)) return aVerifier(achat, e);
     throw e;
   }
-  if (p.sousStatut && REFUSE_PAR_WHOP.has(p.sousStatut)) return "carte";
+  if (p.sousStatut && REFUSE_PAR_WHOP.has(p.sousStatut)) {
+    journal("paiement dans la feuille refusé par Whop", { achat: achat.id, paiement: p.id, ...(p.raison && { raison: p.raison }) });
+    return "carte";
+  }
   return { achat: achat.id, checkout: null, url: null, paiement: { id: p.id, statut: p.statut, secret: p.secret } };
 }
 
