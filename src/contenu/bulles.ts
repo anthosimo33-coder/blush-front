@@ -44,7 +44,7 @@ export const FEUILLE_BULLE = {
   blush: "BLUSH\u00a0: ",
   /** Pour un lecteur d’écran, après le nombre de bulles d’une ligne. */
   unite: (n: number) => (n > 1 ? "\u00a0bulles" : "\u00a0bulle"),
-  offert: { quoi: "Rapport, fiche, alerte danger", prix: "Offert" },
+  offert: { quoi: "Rapport, fiche, numéros d’aide", prix: "Offert" },
   recharger: (solde: number) => `Recharger · il t’en reste ${solde}`,
   compris: "Compris",
 };

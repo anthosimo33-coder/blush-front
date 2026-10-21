@@ -163,7 +163,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "la santé",
     quoi: "Ce qui coince côté technique\u00a0: l’IA qui échoue, une tâche bloquée, un paiement refusé, une route ou une page qui plante.",
     calcul:
-      "Les tâches passées en échec sur la période (avec leurs codes), celles bloquées en ce moment, les paiements refusés sur la période, les réponses de BLUSH sorties en alerte danger (leurs bulles rendues), et les pannes du serveur\u00a0: une route /api qui répond «\u00a0panne\u00a0» ou une page qui plante, comptées par route ou par page et par jour (sur 24\u00a0h, celles d’aujourd’hui). Un paiement resté en attente n’y est pas\u00a0: c’est surtout un panier abandonné. Une personne qui quitte une page avant la fin de son chargement n’est pas une panne.",
+      "Les tâches passées en échec sur la période (avec leurs codes), celles bloquées en ce moment, les paiements refusés sur la période, les réponses de BLUSH sorties en alerte (danger, détresse ou mineur), comptées depuis le 21\u00a0octobre 2026, et les pannes du serveur\u00a0: une route /api qui répond «\u00a0panne\u00a0» ou une page qui plante, comptées par route ou par page et par jour (sur 24\u00a0h, celles d’aujourd’hui). Un paiement resté en attente n’y est pas\u00a0: c’est surtout un panier abandonné. Une personne qui quitte une page avant la fin de son chargement n’est pas une panne.",
     repere:
       "Vert\u00a0: rien à faire. La carte passe en orange dès qu’un chiffre bouge. La première panne du jour d’une route ou d’une page part aussi par mail à l’équipe (le nom et le code de l’erreur, jamais son message)\u00a0; les suivantes ne se voient qu’ici.",
     siCaBouge:

@@ -7,7 +7,7 @@ import { JALONS, OFFRES, OFFRES_UNIQUES, type Jalon, type OffreId, type OffreUni
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
-import { HAUT, MAIL, PANNE } from "./compteurs";
+import { CLES, HAUT, MAIL, PANNE } from "./compteurs";
 import { CLES_DES_MAILS, type CleDeMail } from "./sequences";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
@@ -432,7 +432,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select (select count(*) from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${W("updated_at")}) as echecs,
             (select count(*) from tasks where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
             (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
-            (select count(*) from mouvements_bulles where raison = 'rendu' and ${W("cree_le")}) as alertes`,
+            (select coalesce(sum(count), 0) from counters where key = ${CLES.alerteChat} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as alertes`,
     ),
     ligne<{ periode: string | null; jour: string | null }>(
       sql`select sum(count) filter (where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as periode,

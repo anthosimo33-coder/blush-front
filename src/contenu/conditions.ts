@@ -125,7 +125,7 @@ const VENTE: readonly Section[] = [
         `Une réponse en vocal\u00a0: ${bulles(COUT_EN_BULLES.vocal)}.`,
         `Une réponse à un message avec des captures ou un export\u00a0: ${bulles(COUT_EN_BULLES.ajout)}.`,
       ],
-      "Sans bulle\u00a0: ton verdict, ton rapport, sa fiche, et les alertes quand BLUSH s’inquiète pour toi (une réponse du chat qui en devient une t’est rendue).",
+      "Sans bulle\u00a0: ton verdict, ton rapport, sa fiche, et les numéros d’urgence et d’écoute quand BLUSH s’inquiète pour toi.",
       "Tes bulles n’ont pas de date de fin. Elles ne s’échangent pas contre de l’argent et ne passent pas d’un compte à un autre.",
       "À zéro bulle, BLUSH écrit quand même sa réponse\u00a0: elle t’attend, et se lit après une recharge.",
     ],

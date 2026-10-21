@@ -15,6 +15,7 @@ import { ErreurInvariant, ErreurPublique, ErreurTache } from "./erreurs";
 import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
+import { CLES, compter } from "./compteurs";
 import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { reponseMasquee } from "./historique";
@@ -101,7 +102,7 @@ export async function reserverEchange(): Promise<IdsDeLEchange> {
  * `ids` : ceux de l’échange (le débit porte celui de la réponse). `verrouillee` : le solde ne la couvre pas, elle s’écrit
  * mais reste en base (ni ses bulles en flux, ni ce qui se paie, ni son vocal ne partent), au coût `cout`. `ecrit` :
  * sans voix (le solde ne couvrait pas un vocal, ou elle est verrouillée). `regler` : la réponse validée part, avec ce
- * qu’elle coûte vraiment (0 : offerte, une alerte de danger) ; il rend le trop-perçu et dit ce qu’il reste (rien pour
+ * qu’elle coûte vraiment (0 : offerte, la réponse remplacée par le garde-fou) ; il rend le trop-perçu et dit ce qu’il reste (rien pour
  * l’équipe).
  * `paye` : ce qui a été débité jusque-là. `ajouterVocal` : la réponse part en vocal alors qu’elle a été payée comme écrite
  * (« parle-moi en vocal », dans ce message même) : la bulle de plus, faux si le solde ne la couvre pas (elle reste alors
@@ -193,8 +194,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
  * `differer` : ce qui peut attendre la fin de la réponse (le suivi des coûts) passe après elle.
  * `reglement` : ce qu’elle coûte en bulles (Reglement). Une réponse verrouillée part masquée (reponseMasquee : sa
  * lecture, et la forme de la réponse à envoyer), d’un bloc à la fin (rien en route : on ne sait pas encore ce qui se
- * paiera), sans échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une alerte de danger ne se
- * verrouille jamais (offerte). Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
+ * paiera), sans échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une réponse en alerte se paie comme
+ * les autres (décidé le 21 octobre 2026), mais verrouillée, elle montre les numéros d’urgence en clair. Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
  * l’envoi, gardée avec ton message (« Réessayer » retrouve sa réponse : reponseDeLEnvoi, src/server/historique.ts).
  */
 export async function repondre(
@@ -272,8 +273,14 @@ export async function repondre(
   /* Le mode vocal après cette réponse : il l’a demandé, ou il a demandé à revenir à l’écrit */
   const modeVocal = fuite ? story.chatVocal : sortie.mode_vocal === "activer" ? true : sortie.mode_vocal === "arreter" ? false : story.chatVocal;
   if (modeVocal !== story.chatVocal) await db().update(schema.stories).set({ chatVocal: modeVocal }).where(eq(schema.stories.id, story.id));
-  /* Une alerte de danger (ou la réponse remplacée par le garde-fou) est offerte : jamais verrouillée, ses bulles rendues */
-  const offerte = fuite || !!sortie.alerte;
+  /*
+   * La réponse remplacée par le garde-fou (notre faute) est offerte : jamais verrouillée, ses bulles rendues. Une réponse en
+   * alerte (danger, détresse, mineur) se paie comme les autres depuis le 21 octobre 2026 : offerte, une conv en alerte
+   * parlait sans fin aux frais de BLUSH. Les numéros d’urgence, eux, restent gratuits (reponseMasquee, l’erreur « bulles »)
+   */
+  const offerte = fuite;
+  const alerte = !fuite && !!sortie.alerte;
+  if (alerte) await compter(CLES.alerteChat);
   const verrouillee = verrouAttendu && !offerte;
   const voixVoulue = !sansVoix && !fuite && (parVocal || modeVocal) && sortie.mode_vocal !== "arreter" && vocalPossible(sortie);
   /*
@@ -314,7 +321,7 @@ export async function repondre(
       ...(reglement ? { id: reglement.ids.blush } : {}),
       storyId: story.id,
       role: "blush" as const,
-      data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde }),
+      data: coffre.ecrire("chat_messages.data:blush", { reponse, resume: resumeGarde, ...(alerte ? { alerte: true as const } : {}) }),
       cout,
       verrouillee,
     },
@@ -343,7 +350,7 @@ export async function repondre(
    */
   const avecEchange = echangeId === undefined ? {} : { echange: echangeId };
   const montree: BlushAnswer = verrouillee
-    ? { ...reponseMasquee(blushId, cout ?? 1, reponse, modeVocal), ...avecEchange }
+    ? { ...reponseMasquee(blushId, cout ?? 1, reponse, modeVocal, alerte), ...avecEchange }
     : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange };
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
@@ -366,7 +373,7 @@ export async function repondre(
   if (vocal)
     await db()
       .update(schema.chatMessages)
-      .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde }) })
+      .set({ data: coffre.ecrire("chat_messages.data:blush", { reponse: { ...reponse, vocal }, resume: resumeGarde, ...(alerte ? { alerte: true as const } : {}) }) })
       .where(eq(schema.chatMessages.id, blushId));
   /*
    * La voix a échoué : la réponse reste écrite, et coûte ce que coûte une réponse écrite (le reste est rendu). L’événement

@@ -65,7 +65,7 @@ async function attendreLEnvoi(storyId: string, cle: string, userId: string, ref:
  * s’écrira verrouillée, sauf si une autre attend déjà d’être payée (une par compte) ou s’écrit en ce moment
  * (placeVerrouillee) : « bulles », la route répond sans appel au modèle. L’équipe n’est jamais débitée.
  * `rendreSiPasReglee` : la réponse a échoué avant de partir, ses bulles reviennent (une fois) ; partie, elle est réglée
- * (Reglement.regler : le trop-perçu d’une alerte ou d’un vocal resté écrit est rendu, et la réponse dit ce qu’il reste).
+ * (Reglement.regler : le trop-perçu d’une réponse du garde-fou ou d’un vocal resté écrit est rendu, et la réponse dit ce qu’il reste).
  * Une voix que le débit n’a pas comptée (« parle-moi en vocal » dans ce message) se paie quand elle part
  * (Reglement.ajouterVocal : la bulle de plus, sous sa propre référence).
  */
@@ -135,7 +135,7 @@ export async function payer(
       regler: async (reel) => {
         reglee = true;
         if (debit === "equipe") return undefined;
-        /* Verrouillée d’avance mais sortie en alerte de danger (offerte, jamais verrouillée) : rien n’a été débité */
+        /* Verrouillée d’avance mais remplacée par le garde-fou (offerte, jamais verrouillée) : rien n’a été débité */
         if (debit !== "debite") return { depensees: 0, restantes: await soldeDe(utilisateur.id) };
         const paye = cout + supplement;
         /* Le trop-perçu revient : la bulle de la voix d’abord (sa référence), puis le reste */
