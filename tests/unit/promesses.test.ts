@@ -35,10 +35,10 @@ describe("la feuille « En savoir plus » du rapport", () => {
     expect(TITRES_DE_LA_PAGE.length).toBeGreaterThan(5);
     for (const l of lignes) {
       expect(TITRES_DE_LA_PAGE, l.titre).toContain(l.page);
-      /* « Chiffrée, lue seulement par l’IA » : « Chiffrée » ; la suite redit « Une IA, et seulement elle » */
+      /* « Chiffrée, lue seulement par BLUSH » : « Chiffrée » ; la suite redit « BLUSH, et seulement lui » */
       expect(l.page.toLowerCase(), l.titre).toContain(l.titre.split(",")[0]!.toLowerCase());
     }
-    expect(TITRES_DE_LA_PAGE).toContain("Une IA, et seulement elle");
+    expect(TITRES_DE_LA_PAGE).toContain("BLUSH, et seulement lui");
   });
 
   it("le partage dit le lien comme l’image, et ne dit plus « seul ton verdict part » ; l’image dit ta question", () => {
