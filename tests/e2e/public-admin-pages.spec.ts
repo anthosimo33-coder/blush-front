@@ -190,19 +190,18 @@ test("la confidentialité : « Retour » ramène d’où l’on vient, et à la 
   });
 });
 
-test("/commencer : cinq applis, chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
+test("/commencer : trois applis et « Captures ou vidéo », chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
   const reponse = await page.goto("/commencer");
   expect(reponse?.status()).toBe(200);
   await expect(page).toHaveTitle("Vous vous parlez où ? · BLUSH");
   await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
   const applis = page.getByRole("navigation", { name: "Ton appli" });
-  await expect(applis.getByRole("link")).toHaveCount(5);
+  await expect(applis.getByRole("link")).toHaveCount(4);
   const attendues: [string, string][] = [
     ["WhatsApp", "/importer/export?app=whatsapp"],
     ["iMessage", "/importer/captures?app=imessage"],
     ["Instagram", "/importer/export?app=instagram"],
-    ["Hinge", "/importer/captures?app=hinge"],
-    ["Autre appli", "/importer/captures?app=autre"],
+    ["Captures ou vidéo", "/importer/captures?app=autre"],
   ];
   for (const [nom, href] of attendues) await expect(applis.getByRole("link", { name: nom })).toHaveAttribute("href", href);
   await expect(page.getByRole("link", { name: "Comment ça marche" })).toHaveAttribute("href", "/confidentialite");

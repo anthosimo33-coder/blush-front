@@ -116,7 +116,7 @@ describe("l’import de captures en échec", () => {
 });
 
 describe("ce que l’écran des captures dit d’abord", () => {
-  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit ; une autre, BLUSH n’en lit pas l’export", () => {
+  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit ; « Captures ou vidéo » : n’importe quelle appli", () => {
     const { unmount } = render(<CapturesScreen app="instagram" addMode={false} />);
     expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
     expect(screen.getByText("Les captures suffisent aussi : on reconnaît les messages, les dates et qui parle.")).toBeTruthy();
@@ -124,10 +124,10 @@ describe("ce que l’écran des captures dit d’abord", () => {
     render(<CapturesScreen app="hinge" addMode={false} />);
     expect(screen.getByText("Hinge ne permet pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
     cleanup();
-    /* Une autre appli s’exporte parfois (Telegram, Messenger) : l’écran dit seulement que BLUSH ne lit pas cet export */
+    /* La tuile « Captures ou vidéo » : n’importe quelle appli, Instagram et WhatsApp compris, sans rien dire de leur export */
     render(<CapturesScreen app="autre" addMode={false} />);
     expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
-    expect(screen.getByText("BLUSH ne lit pas encore l’export de ton appli : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
+    expect(screen.getByText("Des captures de n’importe quelle appli suffisent : on reconnaît les messages, les dates et qui parle.")).toBeTruthy();
   });
 
   it("iMessage : « Comment filmer » est une carte, sa liste hors de tout bouton, et la carte un bouton nommé comme celui du pied", () => {

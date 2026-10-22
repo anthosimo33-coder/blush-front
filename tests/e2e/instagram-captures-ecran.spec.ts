@@ -34,10 +34,10 @@ test("captures : choisir, en ajouter, en retirer ; la grille les numérote et en
   const fichiers = capturesPng(testInfo, 22);
   const [c1, c2, c3, c4, c5] = auMoins(fichiers, 5);
 
-  await test.step("la tuile Hinge mène aux captures", async () => {
+  await test.step("la tuile « Captures ou vidéo » mène aux captures", async () => {
     await page.goto("/commencer");
-    await page.getByRole("link", { name: "Hinge Captures d’écran" }).click();
-    await expect(page).toHaveURL(/\/importer\/captures\?app=hinge$/);
+    await page.getByRole("link", { name: "Captures ou vidéo Hinge, Tinder… toutes les applis" }).click();
+    await expect(page).toHaveURL(/\/importer\/captures\?app=autre$/);
     await expect(page.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeVisible();
   });
 
@@ -172,9 +172,9 @@ test("captures : des fichiers glissés sur la zone d’ajout, seules les images 
 test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » demande le prénom, le rapport est celui de Jade et Elias", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "captures");
 
-  await test.step("« Autre appli » : trois captures, lues au clic sur Continuer", async () => {
+  await test.step("« Captures ou vidéo » : trois captures, lues au clic sur Continuer", async () => {
     await page.goto("/commencer");
-    await page.getByRole("link", { name: "Autre appli Messenger, Tinder, Bumble… par captures d’écran" }).click();
+    await page.getByRole("link", { name: "Captures ou vidéo Hinge, Tinder… toutes les applis" }).click();
     await expect(page).toHaveURL(/\/importer\/captures\?app=autre$/);
     await choisirFichier(page, capturesPng(testInfo, 3), "Choisir mes captures");
     await expect(page.getByText("3 captures prêtes")).toBeVisible();
