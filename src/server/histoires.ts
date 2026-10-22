@@ -4,6 +4,8 @@ import {
   detecterFormat,
   erreurImport,
   lire,
+  MIN_MESSAGES,
+  MIN_MESSAGES_CAPTURES,
   participantsDe,
   principaux,
   type Devinette,
@@ -23,9 +25,22 @@ import * as coffre from "./coffre";
 import { db, schema, uneLigne } from "./db";
 import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
-import { ErreurInvariant } from "./erreurs";
-import { borner, ErreurImport } from "./import";
+import { ErreurInvariant, ErreurPublique } from "./erreurs";
+import { borner, ErreurImport, TEXTE_LU_MAX_CARACTERES } from "./import";
 import type { Consentement } from "./juridique";
+import {
+  contactDuFichier,
+  lectureReunie,
+  MOI,
+  MORCEAUX_MAX,
+  ErreurMorceau,
+  relier,
+  type ConvEnMorceaux,
+  type Identite,
+  type Morceau,
+  type MorceauRecu,
+  type QuiLit,
+} from "./morceaux";
 
 /*
  * Les histoires en base : le brouillon d’un import, la conv ouverte, « Qui es-tu ? », l’effacement. L’import d’un export
@@ -65,7 +80,24 @@ export type Meta = {
   objectif?: Objectif;
   /** Choisi sur sa fiche : le pronom de l’autre, qui passe devant celui que la conv laisse lire (pronomDeLAutre, src/server/accords.ts). */
   pronomAutre?: Pronom;
+  /**
+   * L’autre personne, quand un nom la désigne avant « Qui es-tu ? » : le haut des captures, le nom du fichier WhatsApp
+   * (« Discussion WhatsApp avec Léa »). Un morceau ajouté doit être avec elle (src/server/morceaux.ts, relier).
+   */
+  contact?: 0 | 1;
+  /**
+   * Une conv réunie de plusieurs morceaux (src/server/morceaux.ts), dans l’ordre de leur import : ce que chacun contenait,
+   * pour l’écran de l’histoire réunie. La conv brute les garde un à un. `appli`, `fichier` et `format` sont alors ceux de
+   * la conv entière : l’appli et le fichier du premier morceau, et « captures » dès qu’un morceau en est (la lecture
+   * compte alors à partir de MIN_MESSAGES_CAPTURES), sinon le format du premier export. `resume` compte la conv réunie.
+   */
+  morceaux?: MorceauMeta[];
+  /** Plusieurs morceaux : les messages vus dans deux morceaux, gardés une fois. */
+  doublons?: number;
 };
+
+/** Ce que la meta dit d’un morceau : d’où il vient (des captures : combien), et ce qu’il contenait, doublons compris. */
+export type MorceauMeta = Pick<Meta, "appli" | "fichier" | "resume"> & Pick<Meta, "captures" | "coupe">;
 
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
@@ -113,11 +145,8 @@ async function creerBrouillon(meta: Meta, texte: string, secret: string, consent
   return { id: ligne.id, meta, secret };
 }
 
-/**
- * Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. Le texte est
- * borné ici aussi (import.ts, borner) : depuisFichier et depuisPaquet l’ont fait, un autre appelant n’y échappe pas.
- */
-export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
+/** Un export lu, prêt à devenir une conv ou l’un de ses morceaux : son texte borné, son format, ses deux participants (le plus bavard d’abord). */
+function exportLu(recu: ExportLu & { nom: string; coupe?: boolean }) {
   const { nom, appli, texte, coupe } = borner(recu);
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
@@ -128,6 +157,19 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
   if (!premier || !second) throw new ErreurImport("courte");
   /* Un nom de contact est court : un nom démesuré (ou fait de caractères de contrôle) gonflerait ce qu’on garde de la conv */
   if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
+  /* « Discussion WhatsApp avec Léa » : le nom du fichier désigne l’autre (Instagram nomme le compte, pas la conv) */
+  const contact = appli === "whatsapp" ? contactDuFichier(nom, [premier.nom, second.nom]) : undefined;
+  return { nom, appli, texte, coupe, format, premier, second, contact };
+}
+
+/**
+ * Lit l’export et crée une histoire brouillon (avant l’email). `secret` part dans le cookie du brouillon. Le texte est
+ * borné ici aussi (import.ts, borner) : depuisFichier et depuisPaquet l’ont fait, un autre appelant n’y échappe pas.
+ * Une conv courte reste un brouillon : on peut lui ajouter le début (ajouterUnExport, ajouterDesCaptures), et sa lecture
+ * ne part qu’assez longue (tropCourte, POST /api/analyse).
+ */
+export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
+  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
   const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
   const participant = ({ nom, messages }: { nom: string; messages: number }, pronomLu?: Pronom): Participant => ({
     nom,
@@ -136,8 +178,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     ...(pronomLu ? { pronomLu } : {}),
   });
   const lu = lire(texte, { utilisateur: personne(premier), autre: personne(second), format }, { autresEnTexte: true });
-  const err = erreurImport(lu);
-  if (err) throw new ErreurImport(err);
+  if (erreurImport(lu) === "groupe") throw new ErreurImport("groupe");
   /* Le premier participant est lu en « toi », le second en « autre » */
   const lus = pronomsLus(lu.messages);
   const meta: Meta = {
@@ -147,6 +188,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     participants: [participant(premier, lus.toi), participant(second, lus.autre)],
     resume: resumeDe(lu.messages),
     ...(coupe ? { coupe: true } : {}),
+    ...(contact === undefined ? {} : { contact: contact === premier.nom ? 0 : 1 }),
   };
   return creerBrouillon(meta, texte, jeton(), consentement);
 }
@@ -167,9 +209,9 @@ export async function importerCaptures({
   consentement: Consentement;
 }): Promise<{ id: string; meta: Meta; secret: string }> {
   const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
-  const lu = lire(t.texte, { utilisateur: personne("Moi"), autre: personne(t.autre), format: "captures" });
-  const err = erreurImport(lu, "captures");
-  if (err) throw new ErreurImport(err);
+  const lu = lire(t.texte, { utilisateur: personne(MOI), autre: personne(t.autre), format: "captures" });
+  /* Courtes, elles restent un brouillon, comme un export : on peut leur ajouter un morceau (tropCourte) */
+  if (erreurImport(lu, "captures") === "groupe") throw new ErreurImport("groupe");
   const compte = (nom: string) => lu.messages.filter((m) => m.nom === nom).length;
   const lus = pronomsLus(lu.messages);
   const meta: Meta = {
@@ -178,13 +220,159 @@ export async function importerCaptures({
     fichier: `${t.captures} captures`,
     captures: t.captures,
     participants: [
-      { nom: "Moi", prenom: "Moi", messages: compte("Moi"), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
+      { nom: MOI, prenom: MOI, messages: compte(MOI), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
       { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre), ...(lus.autre ? { pronomLu: lus.autre } : {}) },
     ],
     resume: resumeDe(lu.messages),
     moi: 0,
   };
   return creerBrouillon(meta, t.texte, secret, consentement);
+}
+
+/* ———— Une conv en plusieurs morceaux ———— */
+
+/** Le minimum de messages d’une conv pour sa lecture : moins sur des captures, qui en montrent moins (prompts/lib/conv.ts). */
+const minimumDe = (meta: Pick<Meta, "format">) => (meta.format === "captures" ? MIN_MESSAGES_CAPTURES : MIN_MESSAGES);
+/** Une conv encore trop courte pour sa lecture : elle reste un brouillon, qu’un morceau ajouté peut compléter. */
+export const tropCourte = (meta: Pick<Meta, "format" | "resume">) => meta.resume.total < minimumDe(meta);
+
+/** La conv d’un seul morceau, devenue le premier de ses morceaux : ses noms, dans l’ordre de ses participants. */
+const premierMorceau = (meta: Meta, texte: string): Morceau => ({
+  format: meta.format,
+  texte,
+  noms: [meta.participants[0].nom, meta.participants[1].nom],
+  empreinte: empreinte(texte),
+});
+
+/** La meta d’une conv d’un seul morceau, devenue celle de son premier morceau. */
+const morceauMetaDe = ({ appli, fichier, resume, captures, coupe }: Meta): MorceauMeta => ({
+  appli,
+  fichier,
+  resume,
+  ...(captures ? { captures } : {}),
+  ...(coupe ? { coupe } : {}),
+});
+
+/** Ce que la meta sait de qui est qui : les noms des participants, celui qui importe (des captures seules), l’autre (désigné par un nom). */
+const identiteDe = (meta: Meta): Identite => ({
+  noms: [meta.participants[0].nom, meta.participants[1].nom],
+  ...(meta.moi != null && meta.format === "captures" && !meta.morceaux?.some((m) => !m.captures) ? { moi: meta.moi } : {}),
+  ...(meta.contact === undefined ? {} : { contact: meta.contact }),
+});
+
+/**
+ * La meta d’une conv réunie : ses morceaux relus ensemble (lectureReunie), toi au participant `qui.k`. Les participants
+ * prennent les noms de l’identité, gardent le prénom qu’on leur connaissait (celui de « Qui es-tu ? », sur des
+ * captures), et se recomptent ; le résumé et les doublons sont ceux de la conv réunie. `morceaux` reste celui de
+ * `avant` (l’ajout y met le nouveau). Rend aussi ce que chaque morceau apporte (`gardes`) et ses messages lus (`parMorceau`).
+ */
+function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit) {
+  const personne = (nom: string) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
+  const lu = lectureReunie(conv, { utilisateur: personne(id.noms[qui.k]), autre: personne(id.noms[qui.k === 0 ? 1 : 0]) }, qui);
+  const lus = pronomsLus(lu.messages);
+  const participant = (k: 0 | 1): Participant => {
+    const nom = id.noms[k];
+    const role = k === qui.k ? "toi" : "autre";
+    const pronomLu = lus[role];
+    return {
+      nom,
+      prenom: avant.participants.find((p) => p.nom === nom)?.prenom ?? prenomDe(nom),
+      messages: lu.messages.filter((m) => m.role === role).length,
+      ...(pronomLu ? { pronomLu } : {}),
+    };
+  };
+  /* Ce qu’une conv d’un seul morceau dit d’elle-même, que ses morceaux disent désormais un à un (ou que l’identité redit) */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- écartés, puis redits plus bas
+  const { captures, coupe, moi, contact, ...reste } = avant;
+  const meta: Meta = {
+    ...reste,
+    format: conv.morceaux.some((m) => m.format === "captures") ? "captures" : conv.morceaux[0]!.format,
+    participants: [participant(0), participant(1)],
+    resume: resumeDe(lu.messages),
+    ...(avant.morceaux?.some((m) => m.coupe) ? { coupe: true } : {}),
+    ...(id.moi === undefined ? {} : { moi: id.moi }),
+    ...(id.contact === undefined ? {} : { contact: id.contact }),
+    doublons: lu.doublons,
+  };
+  return { meta, gardes: lu.gardes, parMorceau: lu.parMorceau };
+}
+
+/**
+ * Un morceau de plus pour le brouillon du cookie (`secret`) : relié à sa conv (relier, src/server/morceaux.ts, qui refuse
+ * un morceau avec quelqu’un d’autre), puis la conv réunie se recompte. Avant « Qui es-tu ? » seulement : un brouillon
+ * sans compte, qui a sa conv brute (pas un brouillon du mode tournage). Le même texte, ou le même envoi (`cle`, un
+ * nouvel essai après une coupure), ne s’ajoute pas deux fois : la conv revient telle quelle. Au-delà de MORCEAUX_MAX, ou
+ * de TEXTE_LU_MAX_CARACTERES pour tous les morceaux ensemble : « trop » ; un morceau qui n’apporte aucun message nouveau
+ * (tout y est déjà) : « rien_de_neuf ».
+ */
+async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<MorceauMeta, "resume">): Promise<{ id: string; meta: Meta }> {
+  return db().transaction(async (tx) => {
+    /* Deux ajouts en même temps : l’un après l’autre, chacun sur la conv que l’autre a laissée */
+    const [ligne] = await tx.select().from(schema.stories).where(duBrouillon(secret)).for("update");
+    if (!ligne?.conv || ligne.tournageId) throw new ErreurPublique("aucune");
+    const avant = metaDe(ligne);
+    const brute = coffre.lire("stories.conv", ligne.conv);
+    const conv: ConvEnMorceaux = typeof brute === "string" ? { morceaux: [premierMorceau(avant, brute)] } : brute;
+    if (conv.morceaux.some((m) => m.empreinte === recu.empreinte || (recu.cle && m.cle === recu.cle))) return { id: ligne.id, meta: avant };
+    /* Cinq morceaux au plus, et pas plus de texte, ensemble, qu’un seul export au plus gros : la lecture les relit tous à chaque étape */
+    const texte = conv.morceaux.reduce((n, m) => n + m.texte.length, recu.texte.length);
+    if (conv.morceaux.length >= MORCEAUX_MAX || texte > TEXTE_LU_MAX_CARACTERES) throw new ErreurMorceau("trop");
+    const { morceaux, identite } = relier(conv, identiteDe(avant), recu);
+    const reunie: ConvEnMorceaux = { morceaux };
+    /* Avant « Qui es-tu ? » : toi est le participant 0, comme à l’import d’un seul morceau */
+    const { meta: lue, parMorceau, gardes } = metaReunie(avant, reunie, identite, { k: 0, connu: false });
+    if (!gardes.at(-1)) throw new ErreurMorceau("rien_de_neuf");
+    const metas = [...(avant.morceaux ?? [morceauMetaDe(avant)]), { ...info, resume: resumeDe(parMorceau.at(-1)!) }];
+    const meta: Meta = { ...lue, morceaux: metas, ...(metas.some((m) => m.coupe) ? { coupe: true } : {}) };
+    await tx
+      .update(schema.stories)
+      .set({ meta: coffre.ecrire("stories.meta", meta), conv: coffre.ecrire("stories.conv", reunie), messageCount: meta.resume.total, updatedAt: new Date() })
+      .where(eq(schema.stories.id, ligne.id));
+    return { id: ligne.id, meta };
+  });
+}
+
+/** Un autre export de leur conv, ajouté au brouillon du cookie (ajouterMorceau) : lu et borné comme un premier import. */
+export async function ajouterUnExport(secret: string, recu: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta }> {
+  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
+  const morceau: MorceauRecu = { format, texte, noms: [premier.nom, second.nom], empreinte: empreinte(texte), ...(contact ? { contact } : {}) };
+  return ajouterMorceau(secret, morceau, { appli, fichier: nom.slice(0, 200), ...(coupe ? { coupe: true } : {}) });
+}
+
+/**
+ * Des captures (ou un enregistrement d’écran) ajoutées au brouillon du cookie (ajouterMorceau), déjà lues par le prompt
+ * 01. `cle` : celle de l’envoi, qu’un nouvel essai retrouve. Le nom lu en haut de la conv désigne l’autre.
+ */
+export async function ajouterDesCaptures(secret: string, { appli, t, cle }: { appli: Meta["appli"]; t: TexteCaptures; cle?: string | null }): Promise<{ id: string; meta: Meta }> {
+  const morceau: MorceauRecu = {
+    format: "captures",
+    texte: t.texte,
+    noms: [MOI, t.autre],
+    empreinte: empreinte(t.texte),
+    ...(cle ? { cle: empreinte(`ajout:${cle}`) } : {}),
+    ...(nomLu(t.autre) ? { contact: t.autre } : {}),
+  };
+  return ajouterMorceau(secret, morceau, { appli, fichier: `${t.captures} captures`, captures: t.captures });
+}
+
+/**
+ * Le morceau que cet envoi (`cle`) a déjà ajouté au brouillon (ajouterDesCaptures), et combien de messages il avait :
+ * un nouvel essai après une coupure le retrouve (unSeulAjout, src/server/captures.ts). null : pas encore ajouté.
+ */
+export async function morceauDejaAjoute(secret: string, cle: string): Promise<{ id: string; meta: Meta; secret: string; messages: number } | null> {
+  const [ligne] = await db().select({ id: schema.stories.id, meta: schema.stories.meta, conv: schema.stories.conv }).from(schema.stories).where(duBrouillon(secret));
+  const brute = ligne?.conv ? coffre.lire("stories.conv", ligne.conv) : null;
+  if (!ligne || !brute || typeof brute === "string") return null;
+  const k = brute.morceaux.findIndex((m) => m.cle === empreinte(`ajout:${cle}`));
+  const meta = metaDe(ligne);
+  const morceau = meta.morceaux?.[k];
+  return morceau ? { id: ligne.id, meta, secret, messages: morceau.resume.total } : null;
+}
+
+/** Les morceaux de la conv du brouillon déjà là (un, sans en avoir ajouté), et si l’on peut encore en ajouter un. */
+export function morceauxDe(ligne: Pick<LigneEcran, "meta" | "aConv" | "tournageId" | "userId">): { nombre: number; ajout: boolean } {
+  const nombre = metaDe(ligne).morceaux?.length ?? 1;
+  return { nombre, ajout: ligne.aConv && !ligne.tournageId && !ligne.userId && nombre < MORCEAUX_MAX };
 }
 
 /**
@@ -288,6 +476,7 @@ export async function rattacherBrouillon(utilisateur: Utilisateur, secret: strin
 
 export const metaDe = (ligne: Pick<Ligne, "meta">) => coffre.lire("stories.meta", ligne.meta);
 export const contexteDe = (ligne: Pick<Ligne, "context">) => (ligne.context ? coffre.lire("stories.context", ligne.context) : null);
+/** La conv brute : son texte tel qu’importé, ou ses morceaux (src/server/morceaux.ts). */
 export const convDe = (ligne: LigneComplete) => (ligne.conv ? coffre.lire("stories.conv", ligne.conv) : null);
 
 /** « Qui es-tu ? » est rempli (en base) : la lecture peut partir sans le parcours du navigateur. */
@@ -324,7 +513,13 @@ export async function definirQui(
   id: string,
   { prenom, prenomAutre, ...qui }: Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> & { prenom?: string; prenomAutre?: string },
 ): Promise<Meta> {
-  const avant = metaDe(uneLigne(await db().select({ meta: schema.stories.meta }).from(schema.stories).where(eq(schema.stories.id, id)), "stories:qui_est_qui"));
+  const ligne = uneLigne(await db().select({ meta: schema.stories.meta, conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, id)), "stories:qui_est_qui");
+  const brute = ligne.conv ? coffre.lire("stories.conv", ligne.conv) : null;
+  /*
+   * Plusieurs morceaux : ils se relisent avec le bon « Moi » (sur des captures, c’est lui), qu’on n’avait que deviné.
+   * Les doublons et les comptes de la conv réunie sont alors ceux que lira la chaîne (relire, src/server/analyse.ts)
+   */
+  const avant = brute && typeof brute !== "string" ? metaReunie(metaDe(ligne), brute, identiteDe(metaDe(ligne)), { k: qui.moi, connu: true }).meta : metaDe(ligne);
   /*
    * Des captures : l’utilisateur est « Moi », son prénom vient de l’écran. L’autre garde le nom lu en haut de la conv ;
    * s’il n’a pas été lu (« Elle », un numéro : nomLu), le prénom que l’écran a demandé le remplace
@@ -338,7 +533,7 @@ export async function definirQui(
   const meta = { ...avant, ...qui, participants };
   await db()
     .update(schema.stories)
-    .set({ meta: coffre.ecrire("stories.meta", meta), updatedAt: new Date() })
+    .set({ meta: coffre.ecrire("stories.meta", meta), messageCount: meta.resume.total, updatedAt: new Date() })
     .where(eq(schema.stories.id, id));
   return meta;
 }

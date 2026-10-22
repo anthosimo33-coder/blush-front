@@ -2,10 +2,10 @@ import { z } from "zod";
 import { utilisateurDeSession } from "@/server/auth";
 import { humainRefuse } from "@/server/captcha";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
-import { lireSession, lireTournage, poserBrouillon } from "@/server/cookies";
+import { lireBrouillon, lireSession, lireTournage, poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
-import { importer } from "@/server/histoires";
+import { ajouterUnExport, importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
 import { consentementImport, type Consentement } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
@@ -25,6 +25,10 @@ export const maxDuration = 60;
  * En mode tournage (son cookie), l’écran de l’export n’envoie aucun fichier mais `tournage` (l’appli choisie à l’écran) :
  * le brouillon vient de la conv du lien (src/server/tournage.ts, brouillonDExportDeTournage). Son lien arrêté entre-temps :
  * 409 `tournage`. Sans le cookie, une requête sans fichier reste un 422 `fichier`.
+ * `mode=ajout` : un autre export de leur conv, ajouté au brouillon du cookie (une conv en plusieurs morceaux,
+ * src/server/morceaux.ts) plutôt qu’une nouvelle conv. Sans brouillon où l’ajouter (ni en mode tournage) : 404 `aucune` ;
+ * un export avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau dedans : 422 `rien_de_neuf` ; un morceau de
+ * trop : 429 `trop`. Ni import du direct, ni import venu d’un partage : c’est la même conv.
  */
 export const POST = route("POST /api/import", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
@@ -33,6 +37,10 @@ export const POST = route("POST /api/import", async (req: Request) => {
   const paquet = fd?.get("export");
   const fichier = fd?.get("fichier");
   const recu = paquet instanceof File ? paquet : fichier instanceof File ? fichier : null;
+  /* Un morceau de plus pour la conv qu’on importe : son brouillon, d’abord (rien n’est lu ni compté sans lui) */
+  const ajout = fd?.get("mode") === "ajout";
+  const brouillon = ajout ? await lireBrouillon() : null;
+  if (ajout && (!brouillon || (await lireTournage()))) return erreur("aucune");
   /* Le mode tournage (son cookie) : pas de fichier, l’appli choisie à l’écran (ExportScreen). Sans lui, rien ne change */
   const appliDuTournage = recu || !(await lireTournage()) ? null : AppliDuTournage.safeParse(fd?.get("tournage")).data;
   if (!recu && !appliDuTournage) return erreur("fichier");
@@ -52,7 +60,18 @@ export const POST = route("POST /api/import", async (req: Request) => {
   /* Et ses octets (S-02) : la taille reçue, avant de la lire, dans le budget du jour de l’adresse et de tous */
   const place = await octetsDansLeBudget(req, recu.size);
   if (!place) return erreur("trop_jour");
-  const lire = async () => importer(recu === paquet ? await depuisPaquet(recu) : await depuisFichier(recu), consentement);
+  const lu = async () => (recu === paquet ? depuisPaquet(recu) : depuisFichier(recu));
+  if (brouillon) {
+    const { id, meta } = await lu()
+      .then((e) => ajouterUnExport(brouillon, e))
+      .catch(async (e: unknown) => {
+        await place.rendre();
+        throw e;
+      });
+    const { story, source } = storyEtSource(id, meta);
+    return repondre("POST /api/import", { source, story });
+  }
+  const lire = async () => importer(await lu(), consentement);
   /* Rien n’entre en base (un fichier illisible, un groupe, une conv courte) : sa place revient à tous, l’adresse garde son compte */
   const { id, meta, secret } = await lire().catch(async (e: unknown) => {
     await place.rendre();

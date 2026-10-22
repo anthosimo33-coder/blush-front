@@ -5,6 +5,7 @@ import {
   ALERTE_FACTICE,
   attendreTaches,
   autreCode,
+  capturesPng,
   chiffrer,
   connecterParApi,
   convDeTournage,
@@ -65,17 +66,47 @@ type Prepare = { histoire: string | null; codeFaux: string | null };
 /** L’email du parcours (07c, 07d) : un par état et par écran, et le code demandé pour lui. */
 const emailDuParcours = (id: string, ecran: "m" | "d") => `noe-${id.toLowerCase()}-${ecran}@${DOMAINE}`;
 
-/** Une conv importée sans compte (POST /api/import), comme à l’écran de l’export : le brouillon tient par son cookie. */
-async function importerUnBrouillon(page: Page, testInfo: TestInfo): Promise<string> {
-  const conv = exportWhatsApp(testInfo);
+/**
+ * Une conv importée sans compte (POST /api/import), comme à l’écran de l’export : le brouillon tient par son cookie.
+ * `ajout` : un autre export, ajouté à ce brouillon (une conv en plusieurs morceaux, src/server/morceaux.ts).
+ */
+async function importerUnBrouillon(page: Page, testInfo: TestInfo, conv = exportWhatsApp(testInfo), { ajout = false } = {}): Promise<string> {
   await prouverHumain(page.request, testInfo);
   const envoi = await page.request.post("/api/import", {
     headers: origine(testInfo),
-    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
+    multipart: {
+      fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) },
+      consentement: CASE_IMPORT.version,
+      ...(ajout ? { mode: "ajout" } : {}),
+    },
     timeout: RESEAU,
   });
   expect(envoi.status(), "l’export de la conv est importé").toBe(200);
   return ((await envoi.json()) as { story: { id: string } }).story.id;
+}
+
+/*
+ * Noé et Elias : Elias est le nom que le modèle factice lit en haut de toutes les captures (src/server/ia/factice.ts),
+ * une conv en morceaux passe donc la vérification de la même personne
+ */
+const NOE_ET_ELIAS = { toi: "Noé", autre: "Elias" };
+
+/** Une conv en trois morceaux : un export court (30 messages), deux captures, puis le même export en entier (64 messages, 30 en double). */
+async function brouillonEnMorceaux(page: Page, testInfo: TestInfo): Promise<string> {
+  const histoire = await importerUnBrouillon(page, testInfo, exportWhatsApp(testInfo, { personnes: NOE_ET_ELIAS, n: 30 }));
+  const captures = await page.request.post("/api/captures", {
+    headers: origine(testInfo),
+    multipart: {
+      captures: { name: "capture-1.png", mimeType: "image/png", buffer: readFileSync(capturesPng(testInfo, 1)[0]!) },
+      app: "instagram",
+      mode: "add",
+      consentement: CASE_IMPORT.version,
+    },
+    timeout: RESEAU,
+  });
+  expect(captures.status(), "les captures rejoignent la conv").toBe(200);
+  await importerUnBrouillon(page, testInfo, exportWhatsApp(testInfo, { personnes: NOE_ET_ELIAS, n: 64 }), { ajout: true });
+  return histoire;
 }
 
 /**
@@ -126,6 +157,11 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       return sans;
     case "brouillon":
       return { ...sans, histoire: await importerUnBrouillon(page, testInfo) };
+    case "brouillon-court":
+      /* 30 messages : gardés, mais trop courts pour la lecture (src/server/histoires.ts, tropCourte) */
+      return { ...sans, histoire: await importerUnBrouillon(page, testInfo, exportWhatsApp(testInfo, { personnes: NOE_ET_ELIAS, n: 30 })) };
+    case "morceaux":
+      return { ...sans, histoire: await brouillonEnMorceaux(page, testInfo) };
     case "code": {
       /* L’email du parcours, puis « Recevoir mon code » : un vrai code, dans la boîte à mails des tests */
       const email = emailDuParcours(etat.id, ecran);

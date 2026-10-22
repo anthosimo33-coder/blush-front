@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatCount } from "@/lib/format";
+import { nombreDApplis } from "@/lib/morceaux";
 import { titreDuo } from "@/lib/participants";
 import { AvatarPair } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/cards";
@@ -17,17 +18,18 @@ type Chiffre = { valeur: string; nom: string; pastille: ReactNode };
 /** Les chiffres de la conv, une fois pour les deux mises en page : les messages, les applis, les vocaux, le temps de lecture. */
 function chiffresDuRapport(story: Story, report: Report, entier: boolean): Chiffre[] {
   const messages = formatCount(story.totalMessages);
-  const applis = story.sources.length === 1 ? "appli" : "applis";
+  const n = nombreDApplis(story);
+  const applis = n === 1 ? "appli" : "applis";
   const vocaux = story.voiceCount === 1 ? "vocal" : "vocaux";
   const lecture = entier ? report.readingTime.full : report.readingTime.free;
   return [
     { valeur: messages, nom: "messages", pastille: <>{messages} messages</> },
     {
-      valeur: String(story.sources.length),
+      valeur: String(n),
       nom: applis,
       pastille: (
         <>
-          {story.sources.length} {applis}
+          {n} {applis}
         </>
       ),
     },

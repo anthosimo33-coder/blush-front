@@ -7,6 +7,7 @@ import type { BlushAnswer, Chapter, ScoreRow, SoberReport, VocalLigne } from "@/
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { ErreurInvariant } from "./erreurs";
 import type { Meta } from "./histoires";
+import type { ConvEnMorceaux } from "./morceaux";
 import type { VerdictPartage } from "./partages";
 import type { Contexte, DonneesMemoire, DonneesRapport, DonneesVerdict, DonneesVocal } from "./stockage/types";
 
@@ -46,8 +47,8 @@ type MessageBlush = { reponse: BlushAnswer; resume: string; alerte?: true };
  */
 export type Formes = {
   "stories.meta": Meta;
-  /** La conv brute, telle qu’importée (effacée une fois la mémoire écrite). */
-  "stories.conv": string;
+  /** La conv brute, telle qu’importée (effacée une fois la mémoire écrite) : son texte, ou ses morceaux (src/server/morceaux.ts). */
+  "stories.conv": string | ConvEnMorceaux;
   "stories.context": Contexte;
   "verdicts.data": DonneesVerdict;
   /** Le plan du rapport (prompt 05, première étape), le temps que les chapitres s’écrivent. */
@@ -95,6 +96,10 @@ const MetaGardee = z
     devinette: z.string().optional(),
     objectif: z.string().optional(),
     pronomAutre: z.string().optional(),
+    contact: z.literal([0, 1]).optional(),
+    /* Une conv en plusieurs morceaux (src/server/morceaux.ts, depuis le 22 octobre) : leur résumé, que l’écran de l’histoire réunie lit */
+    morceaux: z.array(z.looseObject({ appli: z.string(), fichier: z.string(), resume: z.looseObject({ debut: z.string(), fin: z.string(), total: z.number() }) })).optional(),
+    doublons: z.number().optional(),
   })
   .pipe(z.custom<Meta>());
 

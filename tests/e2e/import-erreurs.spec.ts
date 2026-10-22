@@ -1,31 +1,30 @@
 import { choisirFichier, expect, exportGroupeWhatsApp, exportWhatsApp, ouvrirExportWhatsApp, reponseAuGeste, test, texteQuiNEstPasUneConv, zipAbime } from "./aide";
 
 /*
- * Les fichiers que l’import refuse, et ce que l’écran propose alors : une conv trop courte, une conv de groupe, un
- * fichier illisible (refusé par le navigateur, ou par le serveur). Et un envoi qui n’a pas pu partir, qu’on réessaie.
+ * Les fichiers que l’import refuse, et ce que l’écran propose alors : une conv de groupe, un fichier illisible (refusé
+ * par le navigateur, ou par le serveur). Une conv trop courte est gardée, pour qu’on lui ajoute un morceau. Et un envoi
+ * qui n’a pas pu partir, qu’on réessaie.
  * Chaque refus est un écran d’erreur (un alertdialog, ?erreur= dans l’adresse) avec une seule action.
  */
 
-test("49 messages : trop courte, l’écran propose des captures ; 50 messages : acceptée", async ({ page }, testInfo) => {
+test("49 messages : gardée, mais trop courte, l’écran fait ajouter un morceau ; 50 messages : la lecture peut partir", async ({ page }, testInfo) => {
   const courte = exportWhatsApp(testInfo, { n: 49, format: "txt" });
   const juste = exportWhatsApp(testInfo, { n: 50 });
 
-  await test.step("49 messages : l’écran « trop courte », qui dit pourquoi", async () => {
+  await test.step("49 messages : la conv est gardée, l’écran dit qu’il en faut 50 et fait ajouter le début", async () => {
     await ouvrirExportWhatsApp(page);
     await choisirFichier(page, courte.chemin);
-    const erreur = page.getByRole("alertdialog", { name: "Votre conv est encore trop courte." });
-    await expect(erreur).toBeVisible();
-    await expect(page).toHaveURL(/\/importer\/export\?app=whatsapp&erreur=courte$/);
-    await expect(erreur).toContainText(
-      "Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours.",
-    );
+    await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
+    await expect(page.getByText("49", { exact: true })).toBeVisible();
+    await expect(page.getByText(/C’est encore court pour une lecture juste\s:\sil faut au moins 50 messages/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Ajouter un morceau" }).click();
+    await expect(page.getByRole("dialog", { name: "Ajoute un morceau" })).toBeVisible();
   });
 
-  await test.step("« Envoyer des captures » mène aux captures de WhatsApp", async () => {
-    await page.getByRole("alertdialog").getByRole("link", { name: "Envoyer des captures" }).click();
-    await expect(page).toHaveURL(/\/importer\/captures\?app=whatsapp$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeVisible();
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await test.step("« Qui es-tu ? » attend : sa lecture ne partirait pas, l’adresse ramène à la conv reçue", async () => {
+    await page.goto("/qui");
+    await expect(page).toHaveURL(/\/importer\/ok$/);
   });
 
   await test.step("50 messages : la conv passe", async () => {
@@ -33,6 +32,7 @@ test("49 messages : trop courte, l’écran propose des captures ; 50 messages :
     await choisirFichier(page, juste.chemin);
     await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
     await expect(page.getByText("50", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continuer" })).toBeVisible();
   });
 });
 

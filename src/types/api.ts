@@ -487,10 +487,17 @@ export const ROUTES = {
   /*
    * Les lots lus (/api/captures/lot), rendus tels quels : le serveur les revérifie, appli comprise. `cle` : celle de
    * l’envoi, pour qu’un nouvel essai après une coupure retrouve l’histoire déjà créée. `consentement` : la version de la
-   * case de l’import cochée (src/server/juridique.ts) ; sans elle, 422 `consentement`
+   * case de l’import cochée (src/server/juridique.ts) ; sans elle, 422 `consentement`. `mode: "ajout"` : un morceau de
+   * plus pour la conv qu’on importe (src/server/morceaux.ts)
    */
   "POST /api/captures/video": {
-    corps: z.object({ app: z.string(), lots: z.array(z.unknown()), cle: z.string().max(64).optional(), consentement: z.string().max(40).optional() }),
+    corps: z.object({
+      app: z.string(),
+      lots: z.array(z.unknown()),
+      cle: z.string().max(64).optional(),
+      consentement: z.string().max(40).optional(),
+      mode: z.literal("ajout").optional(),
+    }),
   },
   "GET /api/achats": {},
   "GET /api/chat": {},

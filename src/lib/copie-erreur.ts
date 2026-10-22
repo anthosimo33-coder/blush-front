@@ -55,7 +55,8 @@ type Copie = (typeof ERROR_COPY)[ErreurParcours];
 /**
  * Le texte et les liens d’une erreur, d’après l’écran où elle arrive : réessayer garde son appli (`?app=`) et son mode.
  * Une conv trop courte : sur des captures, en choisir plus (il en faut moins : MIN_MESSAGES_CAPTURES) ; sur un export,
- * passer aux captures (réunir un export et des captures arrive plus tard).
+ * passer aux captures. Un morceau ajouté à la conv qu’on importe (`?mode=ajout`, src/server/morceaux.ts) : les captures
+ * restent un morceau ajouté, et une conv de groupe ramène à la conv, pas au début d’une autre.
  */
 export function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchParams): Copie {
   const c = ERROR_COPY[kind];
@@ -73,7 +74,13 @@ export function copieDe(kind: ErreurParcours, chemin: string, params: URLSearchP
       href: ici,
       back: ici,
     };
-  if (kind === "courte") return { ...c, href: app ? `/importer/captures?app=${encodeURIComponent(app)}` : c.href, back: ici };
+  const ajout = params.get("mode") === "ajout";
+  /* TODO(produit): texte nouveau, absent de la maquette (un morceau de groupe, ajouté à la conv) */
+  if (kind === "groupe" && ajout) return { ...c, action: "Revenir à votre histoire", href: "/importer/ok", back: ici };
+  if (kind === "courte") {
+    const captures = [app ? `app=${encodeURIComponent(app)}` : "", ajout ? "mode=ajout" : ""].filter(Boolean).join("&");
+    return { ...c, href: captures ? `/importer/captures?${captures}` : c.href, back: ici };
+  }
   if (kind === "fichier" || kind === "capture" || kind === "video") return { ...c, href: ici, back: ici };
   return c;
 }

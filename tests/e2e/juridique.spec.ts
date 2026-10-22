@@ -170,7 +170,7 @@ test("les captures : aucune case, la ligne de lâ€™accord au-dessus du bouton ; Â
   await selecteur.setFiles(capturesPng(testInfo, 2));
   expect(envois).toEqual([]);
   await page.getByRole("button", { name: "Continuer" }).click();
-  await expect(page).toHaveURL(/\/qui$/, { timeout: 45_000 });
+  await expect(page).toHaveURL(/\/importer\/ok$/, { timeout: 45_000 });
   expect(envois).toEqual(["POST"]);
 });
 

@@ -8,7 +8,7 @@ import { ficheEtMaj } from "@/server/ajouts";
 import { historique } from "@/server/historique";
 import { compteDe, contactDe, convsDe, ficheDe, finDeLecture, ouvrirLeRapport, questionsDe, utilisateurCourant } from "@/server/donnees";
 import { rapportOuvert } from "@/server/droits";
-import { histoiresDuCompte, metaDe, quiRempli } from "@/server/histoires";
+import { histoiresDuCompte, metaDe, morceauxDe, quiRempli } from "@/server/histoires";
 import { storyAffichee } from "@/server/conv-affichee";
 import { achatDuFauxWhop, achatPaye } from "@/server/paiement/commande";
 import { contexte } from "@/server/requete";
@@ -34,6 +34,15 @@ export async function getApercuAvantPaiement(): Promise<ApercuDuPaywall | null> 
 export async function getStory({ parcours = false } = {}): Promise<Story | null> {
   const { story } = await contexte({ parcours });
   return story ? storyAffichee(story.id, metaDe(story)) : null;
+}
+
+/**
+ * La conv qu’on importe peut-elle recevoir un morceau de plus (une conv en plusieurs morceaux, src/server/morceaux.ts) :
+ * un brouillon, avec sa conv brute (pas celui du mode tournage), sous MORCEAUX_MAX (morceauxDe).
+ */
+export async function ajoutDUnMorceau(): Promise<boolean> {
+  const { story } = await contexte({ parcours: true });
+  return !!story && morceauxDe(story).ajout;
 }
 
 /**

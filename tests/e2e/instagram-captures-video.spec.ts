@@ -31,8 +31,10 @@ test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules
 
   await test.step("Continuer : la vidéo est lue, puis « Qui es-tu ? » demande le prénom, face à Elias", async () => {
     await page.getByRole("button", { name: "Continuer" }).click();
-    /* Regarder la vidéo pas à pas, puis la lecture des écrans par lots : plus long qu’un export */
-    await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
+    /* Regarder la vidéo pas à pas, puis la lecture des écrans par lots : plus long qu’un export. Puis la conv reçue */
+    await expect(page).toHaveURL(/\/importer\/ok$/, { timeout: LECTURE_DES_CAPTURES });
+    await page.getByRole("link", { name: "Continuer" }).click();
+    await expect(page).toHaveURL(/\/qui$/);
     await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     await expect(page.getByLabel("Ton prénom (dans votre conv avec Elias, tu es à droite)")).toBeVisible();
   });

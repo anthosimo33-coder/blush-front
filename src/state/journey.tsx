@@ -14,7 +14,7 @@ export type JourneyState = {
   app: AppKind | null;
   exportApp: ExportApp;
   exportFileName: string | null;
-  /** Des captures ont été ajoutées après l’export : l’histoire est réunie (écran 05). */
+  /** Un morceau a été ajouté à la conv (des captures, une vidéo, un autre export) : l’histoire est réunie (écran 05). */
   capturesAdded: boolean;
   me: string | null;
   /** Tu es un garçon (il) ou une fille (elle) : les prompts en ont besoin. Celui de l’autre se lit dans la conv (src/server/accords.ts). */

@@ -13,8 +13,9 @@ type QuiRempli = JourneyState & { me: string; pronom: Pronom; guess: Guess; goal
 
 /**
  * La conv de cet onglet vient-elle de captures ? Son dernier import le dit : un export laisse son nom de fichier dans le
- * parcours, des captures l’effacent (src/app/importer/captures). Des captures ajoutées à un export le gardent : la conv
- * reste un export. L’écran qui reçoit la conv du serveur (QuiScreen) se fie à elle plutôt qu’à ceci.
+ * parcours, des captures l’effacent (src/app/importer/captures). Un morceau ajouté (src/server/morceaux.ts) : des
+ * captures ajoutées à un export le gardent, un export ajouté à des captures le pose ; la conv a alors deux noms, on
+ * choisit le sien. L’écran qui reçoit la conv du serveur (QuiScreen) se fie à elle plutôt qu’à ceci.
  */
 export const vientDeCaptures = (j: Pick<JourneyState, "exportFileName">) => !j.exportFileName;
 

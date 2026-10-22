@@ -222,6 +222,13 @@ export type Story = {
   updatedLabel: string;
   /** Qui est l’utilisateur (une fois « Qui es-tu ? » rempli). Sans, l’écran se fie au parcours de l’onglet. */
   me?: Person["id"];
+  /**
+   * Avant « Qui es-tu ? », l’autre personne, quand un nom la désigne (le haut des captures, le nom du fichier WhatsApp) :
+   * un morceau ajouté doit être avec elle.
+   */
+  other?: Person["id"];
+  /** Une conv réunie de plusieurs morceaux (`sources`, du plus ancien au plus récent) : les messages vus deux fois, gardés une fois. */
+  duplicatesRemoved?: number;
 };
 
 export type ScoreRow = {

@@ -12,7 +12,8 @@ export default async function Page() {
   if (!story) redirect("/commencer");
   return (
     <>
-      <QuiScreen people={story.participants} captures={story.sources[0]?.mode === "captures"} connecte={connecte} />
+      {/* Des captures seules : on n’y est que « Moi ». Un export parmi les morceaux donne les deux noms, on choisit le sien */}
+      <QuiScreen people={story.participants} captures={story.sources.every((s) => s.mode === "captures")} connecte={connecte} />
       {/* Le mode tournage, pour l’équipe seulement (son layout est une garde, qui rend la page telle quelle) */}
       <RepereTournage />
     </>

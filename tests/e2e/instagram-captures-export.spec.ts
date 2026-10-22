@@ -186,7 +186,7 @@ test("Instagram : l’export complet fait choisir la conv, cherche sans accents,
   });
 });
 
-test("Instagram : une conv trop courte choisie dans l’export complet, l’écran d’erreur propose les captures", async ({ page }, testInfo) => {
+test("Instagram : une conv trop courte choisie dans l’export complet est gardée, et l’écran fait ajouter un morceau", async ({ page }, testInfo) => {
   const conv = exportInstagramComplet(testInfo);
   await page.goto("/importer/export?app=instagram");
   await choisirFichier(page, conv.chemin);
@@ -194,14 +194,11 @@ test("Instagram : une conv trop courte choisie dans l’export complet, l’écr
   /* Zoé : 30 messages, il en faut 50 pour un export */
   await feuille.getByRole("button", { name: /Zoé\s*30\smessages/ }).click();
 
-  const erreur = page.getByRole("alertdialog", { name: "Votre conv est encore trop courte." });
-  await expect(erreur).toBeVisible();
-  await expect(
-    erreur.getByText("Un export doit avoir au moins 50 messages pour un verdict juste. En captures, 20 suffisent : envoie celles de votre conv, ou reviens dans quelques jours."),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/importer\/export\?app=instagram&erreur=courte$/);
-  await erreur.getByRole("link", { name: "Envoyer des captures" }).click();
-  await expect(page).toHaveURL(/\/importer\/captures\?app=instagram$/);
+  await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
+  await expect(page.getByText(/C’est encore court pour une lecture juste\s:\sil faut au moins 50 messages/)).toBeVisible();
+  await page.getByRole("button", { name: "Ajouter un morceau" }).click();
+  await page.getByRole("dialog", { name: "Ajoute un morceau" }).getByRole("link", { name: "Captures ou vidéo Hinge, Tinder… toutes les applis" }).click();
+  await expect(page).toHaveURL(/\/importer\/captures\?app=autre&mode=ajout$/);
   await expect(page.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeVisible();
 });
 
