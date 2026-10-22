@@ -173,6 +173,30 @@ export async function unSeulAjout(cle: string | null, brouillon: string, ajouter
   return lecture;
 }
 
+/*
+ * Les captures lues pour un ajout refusé (« autre_conv »), par envoi, sur cette instance : « Ajouter quand même » renvoie
+ * le même envoi (sa clé), et le morceau s’ajoute sans relire les images ni repayer le modèle. Sur une autre instance,
+ * elles se relisent.
+ */
+const LUES = new Map<string, { t: TexteCaptures; jusqua: number }>();
+
+/**
+ * Les captures d’un envoi d’ajout (`cle`, au brouillon `brouillon`), lues une seule fois par `lire` : un nouvel envoi
+ * des mêmes captures (« Ajouter quand même ») reprend la lecture déjà faite, tant qu’elle est gardée ici. Sans clé, une
+ * lecture.
+ */
+export async function lectureDeLAjout(cle: string | null, brouillon: string, lire: () => Promise<TexteCaptures>): Promise<TexteCaptures> {
+  if (!cle) return lire();
+  const k = empreinte(`lue:${brouillon}:${cle}`);
+  const maintenant = Date.now();
+  for (const [c, l] of LUES) if (l.jusqua < maintenant) LUES.delete(c);
+  const deja = LUES.get(k);
+  if (deja) return deja.t;
+  const t = await lire();
+  LUES.set(k, { t, jusqua: maintenant + GARDE_MS });
+  return t;
+}
+
 async function dejaCree(secret: string): Promise<Brouillon | null> {
   const ligne = await brouillonDe(secret);
   return ligne ? { id: ligne.id, meta: metaDe(ligne), secret, messages: ligne.messageCount } : null;

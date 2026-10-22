@@ -27,8 +27,9 @@ export const maxDuration = 60;
  * 409 `tournage`. Sans le cookie, une requête sans fichier reste un 422 `fichier`.
  * `mode=ajout` : un autre export de leur conv, ajouté au brouillon du cookie (une conv en plusieurs morceaux,
  * src/server/morceaux.ts) plutôt qu’une nouvelle conv. Sans brouillon où l’ajouter (ni en mode tournage) : 404 `aucune` ;
- * un export avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau dedans : 422 `rien_de_neuf` ; un morceau de
- * trop : 429 `trop`. Ni import du direct, ni import venu d’un partage : c’est la même conv.
+ * un export avec quelqu’un d’autre : 422 `autre_conv` (`forcer=1`, « Ajouter quand même » : ajouté quand même) ; rien
+ * de nouveau dedans : 422 `rien_de_neuf` ; un morceau de trop : 422 `morceaux`. Ni import du direct, ni import venu
+ * d’un partage : c’est la même conv.
  */
 export const POST = route("POST /api/import", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
@@ -63,7 +64,7 @@ export const POST = route("POST /api/import", async (req: Request) => {
   const lu = async () => (recu === paquet ? depuisPaquet(recu) : depuisFichier(recu));
   if (brouillon) {
     const { id, meta } = await lu()
-      .then((e) => ajouterUnExport(brouillon, e))
+      .then((e) => ajouterUnExport(brouillon, e, { forcer: fd?.get("forcer") === "1" }))
       .catch(async (e: unknown) => {
         await place.rendre();
         throw e;

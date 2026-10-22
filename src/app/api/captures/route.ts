@@ -1,6 +1,6 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { humainRefuse } from "@/server/captcha";
-import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture, unSeulAjout } from "@/server/captures";
+import { cleEnvoi, imagesDe, LectureRefusee, lectureDeLAjout, lecturePermise, lireCaptures, uneSeuleLecture, unSeulAjout } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { lireBrouillon, poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
@@ -28,7 +28,9 @@ const Appli = AppliCaptures;
  * (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne (l’enveloppe `route`, src/server/http.ts).
  * `mode=add` : un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), lu puis ajouté à son brouillon,
  * une seule fois par envoi (unSeulAjout). Sans brouillon où l’ajouter (ni en mode tournage) : 404 `aucune` ; des
- * captures avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau : 422 `rien_de_neuf` ; un morceau de trop : 429 `trop`.
+ * captures avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau : 422 `rien_de_neuf` ; un morceau de trop : 422
+ * `morceaux`. `forcer=1` (« Ajouter quand même », le même envoi) : ajoutées même avec quelqu’un d’autre, sans les relire
+ * si cette instance garde leur lecture (lectureDeLAjout).
  */
 async function traiter(req: Request) {
   const g = await garde(req, { session: "aucune" });
@@ -67,10 +69,13 @@ async function traiter(req: Request) {
       cle,
       brouillon,
       async () => {
-        const permis = await lecturePermise("captures");
-        if (permis !== "ok") throw new LectureRefusee(permis);
-        const t = await lireCaptures(images, app);
-        return { ...(await ajouterDesCaptures(brouillon, { appli: app, t, cle })), secret: brouillon, messages: t.messages };
+        const t = await lectureDeLAjout(cle, brouillon, async () => {
+          const permis = await lecturePermise("captures");
+          if (permis !== "ok") throw new LectureRefusee(permis);
+          return lireCaptures(images, app);
+        });
+        const forcer = fd?.get("forcer") === "1";
+        return { ...(await ajouterDesCaptures(brouillon, { appli: app, t, cle, forcer })), secret: brouillon, messages: t.messages };
       },
       () => (cle ? morceauDejaAjoute(brouillon, cle) : Promise.resolve(null)),
     );

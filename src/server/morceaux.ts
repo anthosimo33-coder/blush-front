@@ -50,8 +50,8 @@ export type MorceauRecu = Omit<Morceau, "noms"> & {
   contact?: string;
 };
 
-/** Un ajout refusé : un morceau avec quelqu’un d’autre, ou qui n’apporte aucun message nouveau. */
-export class ErreurMorceau extends ErreurPublique<Extract<CodeErreur, "autre_conv" | "rien_de_neuf" | "trop">> {}
+/** Un ajout refusé : un morceau avec quelqu’un d’autre, qui n’apporte aucun message nouveau, ou un morceau de trop. */
+export class ErreurMorceau extends ErreurPublique<Extract<CodeErreur, "autre_conv" | "rien_de_neuf" | "morceaux">> {}
 
 /* ———— Les noms ———— */
 
@@ -197,15 +197,19 @@ const NEUTRES: Pick<Histoire, "utilisateur" | "autre"> = { utilisateur: { prenom
  * en commun : deux noms qui désignent l’autre (le haut des captures, le nom du fichier WhatsApp) sans être le même
  * prénom, ou un export dont aucun nom ne se retrouve, ou un seul, quand l’autre côté est (peut-être) l’autre personne.
  * Un nom illisible (un numéro, « Elle »), un surnom d’un seul côté, ne bloquent pas : le doute profite à l’ajout.
+ * `forcer` : il a dit que c’est bien la même personne (« Ajouter quand même », un surnom d’un côté, son prénom de
+ * l’autre) : rien n’est refusé, le morceau prend la place que ses noms et ses messages lui donnent.
  */
-export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): { morceaux: Morceau[]; identite: Identite } {
+export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu, { forcer = false } = {}): { morceaux: Morceau[]; identite: Identite } {
   const { contact: designe, ...morceau } = recu;
   /* Chaque morceau lu une fois, toi au participant 0 : ce qu’ils ont en commun se compte en croisant les rôles, sans relire */
   const existants = conv.morceaux.map((m) => lireMorceau(m, NEUTRES, { k: 0, connu: false }));
   const nouveau = lireMorceau(recu, NEUTRES, { k: 0, connu: false });
   const base = reunir(existants).doublons;
   const communs = (croise: boolean, avec = existants) => reunir([...avec, croise ? inverser(nouveau) : nouveau]).doublons - base;
-  const autreConv = () => new ErreurMorceau("autre_conv");
+  const refuser = () => {
+    if (!forcer) throw new ErreurMorceau("autre_conv");
+  };
   const capturesSeules = conv.morceaux.every((m) => m.format === "captures");
   const ajoute = (noms: [string, string]) => [...conv.morceaux, { ...morceau, noms }];
 
@@ -214,14 +218,14 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
     /* Des captures de plus, sur des captures : « Moi » y est le participant 0. Deux noms lus de deux prénoms : quelqu’un d’autre */
     if (capturesSeules) {
       const lu = id.noms[1];
-      if (vraiNom(lu) && vraiNom(autre) && !memePrenom(lu, autre) && communs(false) < COMMUNS_MIN) throw autreConv();
+      if (vraiNom(lu) && vraiNom(autre) && !memePrenom(lu, autre) && communs(false) < COMMUNS_MIN) refuser();
       return { morceaux: ajoute([MOI, autre]), identite: { noms: [MOI, vraiNom(lu) ? lu : autre], moi: 0, contact: 1 } };
     }
     /* Des captures, sur des exports : l’autre est celui qu’un nom a désigné, sinon le même prénom, sinon celui des messages en commun, sinon le second */
     const parNom = ([0, 1] as const).find((k) => memePrenom(id.noms[k], autre));
     const k = id.contact ?? parNom ?? (communs(true) > communs(false) ? 0 : 1);
     const noms = croiser([MOI, autre], k === 0);
-    if (id.contact !== undefined && vraiNom(autre) && vraiNom(id.noms[k]) && !memePrenom(autre, id.noms[k]) && communs(k === 0) < COMMUNS_MIN) throw autreConv();
+    if (id.contact !== undefined && vraiNom(autre) && vraiNom(id.noms[k]) && !memePrenom(autre, id.noms[k]) && communs(k === 0) < COMMUNS_MIN) refuser();
     return { morceaux: ajoute(noms), identite: { ...id, ...(parNom === undefined ? {} : { contact: id.contact ?? parNom }) } };
   }
 
@@ -231,8 +235,8 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
   if (capturesSeules) {
     const lu = id.noms[1];
     const parNom = ([0, 1] as const).find((k) => memePrenom(recu.noms[k], lu));
-    if (parNom !== undefined && parFichier !== undefined && parNom !== parFichier) throw autreConv();
-    if (parNom === undefined && parFichier !== undefined && vraiNom(lu) && communs(false, parFichier === 0 ? existants.map(inverser) : existants) < COMMUNS_MIN) throw autreConv();
+    if (parNom !== undefined && parFichier !== undefined && parNom !== parFichier) refuser();
+    if (parNom === undefined && parFichier !== undefined && vraiNom(lu) && communs(false, parFichier === 0 ? existants.map(inverser) : existants) < COMMUNS_MIN) refuser();
     const contact = parNom ?? parFichier;
     /* Rien ne dit qui est l’autre : les messages en commun, sinon le second, comme sur les écrans */
     const moi = contact !== undefined ? (contact === 0 ? 1 : 0) : communs(false, existants.map(inverser)) > communs(false) ? 1 : 0;
@@ -256,15 +260,15 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
   if ((croise ? croises : tels).communs < COMMUNS_MIN) {
     const memes = ([0, 1] as const).filter((j) => noms[j] === id.noms[j] || memePrenom(noms[j], id.noms[j]));
     /* Aucun nom ne se retrouve : une autre conv */
-    if (!memes.length) throw autreConv();
+    if (!memes.length) refuser();
     /*
      * Un seul : l’autre côté a changé de nom. Si c’est l’autre personne (d’après la conv, sinon le nom du fichier), ou que
      * rien ne dit qui elle est, c’est quelqu’un d’autre ; si c’est celui qui importe, il a changé de nom
      */
     const change = ([0, 1] as const).find((j) => !memes.includes(j));
-    if (change !== undefined && vraiNom(noms[change]) && vraiNom(id.noms[change]) && (id.contact ?? k ?? change) === change) throw autreConv();
+    if (change !== undefined && vraiNom(noms[change]) && vraiNom(id.noms[change]) && (id.contact ?? k ?? change) === change) refuser();
     /* Les deux fichiers désignent l’autre, chacun à une place différente : l’un des deux parle avec quelqu’un d’autre */
-    if (k !== undefined && id.contact !== undefined && k !== id.contact) throw autreConv();
+    if (k !== undefined && id.contact !== undefined && k !== id.contact) refuser();
   }
   return { morceaux: ajoute(noms), identite: { ...id, ...(id.contact === undefined && k !== undefined ? { contact: k } : {}) } };
 }

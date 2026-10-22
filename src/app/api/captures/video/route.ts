@@ -63,7 +63,8 @@ const Envoi = ROUTES["POST /api/captures/video"].corps.extend({ app: AppliCaptur
 /**
  * Un enregistrement d’écran, lu lot par lot (/api/captures/lot) : les lectures sont rassemblées (sans les messages
  * vus deux fois au bord de deux lots), puis la conv devient une histoire brouillon, comme des captures. `mode: "ajout"` :
- * un morceau de plus pour la conv qu’on importe, comme des captures ajoutées (POST /api/captures, `mode=add`).
+ * un morceau de plus pour la conv qu’on importe, comme des captures ajoutées (POST /api/captures, `mode=add`) ;
+ * `forcer: true`, « Ajouter quand même » (les mêmes lots, renvoyés sans être relus).
  */
 export const POST = route("POST /api/captures/video", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
@@ -104,7 +105,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
       async () => {
         const t = enTexte(fusionnerLots(lots, app));
         const place = await dansLeBudget(t);
-        const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c }).catch(async (e: unknown) => {
+        const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c, forcer: envoi.forcer === true }).catch(async (e: unknown) => {
           await place.rendre();
           throw e;
         });

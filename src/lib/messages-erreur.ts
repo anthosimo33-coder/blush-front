@@ -58,14 +58,21 @@ const TOURNAGE_ARRETE =
 
 /*
  * Un morceau ajouté à la conv qu’on importe (une conv en plusieurs morceaux, src/server/morceaux.ts), que le serveur
- * n’ajoute pas : rien de nouveau dedans, ou la conv (son brouillon) qui n’est plus là. Avec quelqu’un d’autre :
- * pasLaMemePersonne, qui la nomme. TODO(produit): textes nouveaux, absents de la maquette.
+ * n’ajoute pas : rien de nouveau dedans, la conv (son brouillon) qui n’est plus là, un morceau de trop. Avec quelqu’un
+ * d’autre : pasLaMemePersonne, qui la nomme, et AJOUTER_QUAND_MEME. TODO(produit): textes nouveaux, absents de la maquette.
  */
 const AJOUT_D_UN_MORCEAU = {
   rien_de_neuf: "BLUSH a déjà tous ces messages\u00a0: rien de nouveau dans ce morceau.",
   aucune: "Ta conv n’est plus là\u00a0: recommence depuis le début.",
   autre_conv: "Ce morceau n’est pas avec la même personne.",
+  morceaux: "Votre histoire a déjà tous ses morceaux\u00a0: BLUSH ne peut pas en réunir plus.",
 } as const;
+
+/**
+ * Sous un morceau refusé comme celui de quelqu’un d’autre : c’est peut-être la même personne sous un surnom (« Bébé »
+ * dans WhatsApp, son prénom sur Instagram). Le bouton qui suit l’ajoute quand même.
+ */
+export const AJOUTER_QUAND_MEME = { phrase: "C’est la même personne, sous un autre nom\u00a0? Tu peux l’ajouter quand même.", bouton: "Ajouter quand même" } as const;
 
 /** Un morceau ajouté avec quelqu’un d’autre (« autre_conv ») : la personne de la conv, par son prénom quand on sait qui c’est. */
 export const pasLaMemePersonne = (prenom: string | null) => (prenom ? `Ce morceau n’est pas avec ${prenom}.` : AJOUT_D_UN_MORCEAU.autre_conv);

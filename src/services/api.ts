@@ -311,13 +311,28 @@ export async function uploadExport(
   consentement: string,
   choisir?: (convs: ConvInstagram[]) => Promise<string | null>,
   onAvance?: (part: number) => void,
-  { ajout = false }: { ajout?: boolean } = {},
+  { ajout = false, forcer = false }: { ajout?: boolean; forcer?: boolean } = {},
 ): Promise<Routes["POST /api/import"]["reponse"]> {
   const passe = laissezPasser();
   const fd = new FormData();
   fd.append("consentement", consentement);
-  /* Un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), pas une nouvelle conv */
+  /* Un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), pas une nouvelle conv ; `forcer`, même refusé comme celui de quelqu’un d’autre */
   if (ajout) fd.append("mode", "ajout");
+  if (ajout && forcer) fd.append("forcer", "1");
+  fd.append("export", await paquetDe(file, { choisir, onAvance, reprendre: forcer }), "export.json.gz");
+  await passe;
+  return appel("POST /api/import", { corps: fd });
+}
+
+/* Le paquet du dernier export envoyé : « Ajouter quand même » le renvoie sans relire le fichier ni redemander la conv */
+let dernierPaquet: { fichier: File; paquet: Blob } | null = null;
+
+/** Le paquet d’un export : lu et réduit dans le navigateur (`reprendre` : celui du même fichier, déjà prêt). */
+async function paquetDe(
+  file: File,
+  { choisir, onAvance, reprendre }: { choisir?: (convs: ConvInstagram[]) => Promise<string | null>; onAvance?: (part: number) => void; reprendre: boolean },
+): Promise<Blob> {
+  if (reprendre && dernierPaquet?.fichier === file) return dernierPaquet.paquet;
   const { analyserExport } = await pExport();
   let pret: Awaited<ReturnType<typeof analyserExport>>;
   try {
@@ -326,14 +341,15 @@ export async function uploadExport(
     tracer("import:export-illisible", e);
     throw new ErreurApi("fichier", 422);
   }
-  if (pret.type === "un") fd.append("export", pret.paquet, "export.json.gz");
+  let paquet: Blob;
+  if (pret.type === "un") paquet = pret.paquet;
   else {
     const id = choisir ? await choisir(pret.convs) : null;
     if (id == null) throw new ErreurApi("annule", 0);
-    fd.append("export", await pret.paquetDe(id), "export.json.gz");
+    paquet = await pret.paquetDe(id);
   }
-  await passe;
-  return appel("POST /api/import", { corps: fd });
+  dernierPaquet = { fichier: file, paquet };
+  return paquet;
 }
 
 /**
@@ -353,13 +369,16 @@ export async function importerLaConvDuTournage(app: ExportApp, consentement: str
 /** La conv qu’on importe (GET /api/histoire, celle du parcours) : ses participants et ses morceaux. */
 export const lireLHistoire = () => appel("GET /api/histoire");
 
+/* Les captures du dernier envoi, et sa clé : « Ajouter quand même » renvoie le même envoi */
+let dernierEnvoi: { fichiers: File[]; cle: string } | null = null;
+
 /**
  * Les captures, réduites dans le navigateur, puis lues par BLUSH (une seule fois, pour toutes). `onAvance` ne dit
  * que la reprise, si le réseau coupe pendant la lecture. `consentement` : la version de la case de l’import cochée.
  */
 export async function uploadScreenshots(
   files: File[],
-  opts: { app: AppKind; mode: "first" | "add"; consentement: string; onAvance?: (a: AvanceVideo) => void },
+  opts: { app: AppKind; mode: "first" | "add"; consentement: string; onAvance?: (a: AvanceVideo) => void; forcer?: boolean },
 ): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
   const fd = new FormData();
@@ -372,7 +391,15 @@ export async function uploadScreenshots(
   fd.append("app", opts.app);
   fd.append("mode", opts.mode);
   fd.append("consentement", opts.consentement);
-  fd.append("cle", cleEnvoi());
+  /*
+   * « Ajouter quand même » (`forcer`) : les mêmes captures, sous la clé de leur envoi, que le serveur reconnaît (il les
+   * a déjà lues : rien n’est relu ni repayé). Un autre envoi a sa clé à lui
+   */
+  const memes = opts.forcer && dernierEnvoi?.fichiers.length === files.length && files.every((f, k) => dernierEnvoi?.fichiers[k] === f);
+  const cle = memes && dernierEnvoi ? dernierEnvoi.cle : cleEnvoi();
+  dernierEnvoi = { fichiers: files, cle };
+  fd.append("cle", cle);
+  if (opts.mode === "add" && opts.forcer) fd.append("forcer", "1");
   await passe;
   return avecReprise(
     () => appel("POST /api/captures", { corps: fd }),
@@ -381,7 +408,7 @@ export async function uploadScreenshots(
 }
 
 /**
- * Un enregistrement d’écran de la conv (sa première importation) : le navigateur en tire les écrans de la conv (la vidéo
+ * Un enregistrement d’écran de la conv (sa première importation, ou un morceau ajouté : `ajout`) : le navigateur en tire les écrans de la conv (la vidéo
  * ne part pas), BLUSH les lit par lots (cinq à la fois), puis les lectures sont rassemblées en une histoire brouillon,
  * comme des captures. `consentement` : la version de la case de l’import cochée, envoyée avec chaque lot et avec leur fin.
  */
@@ -390,9 +417,27 @@ export async function uploadRecording(
   app: AppKind,
   consentement: string,
   onAvance?: (a: AvanceVideo) => void,
-  { ajout = false }: { ajout?: boolean } = {},
+  { ajout = false, forcer = false }: { ajout?: boolean; forcer?: boolean } = {},
 ): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
+  /* « Ajouter quand même » (`forcer`) : les lots du même enregistrement, déjà lus, repartent tels quels (rien n’est relu ni repayé) */
+  const deja = forcer && dernierEnregistrement?.fichier === file && dernierEnregistrement.app === app ? dernierEnregistrement.lus : null;
+  const lus = deja ?? (await lotsLus(file, app, consentement, passe, onAvance));
+  dernierEnregistrement = { fichier: file, app, lus };
+  await passe;
+  /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
+  const corps = { app, lots: lus, cle: cleEnvoi(), consentement, ...(ajout ? { mode: "ajout" as const, ...(forcer ? { forcer: true as const } : {}) } : {}) };
+  return avecReprise(
+    () => appel("POST /api/captures/video", { corps }),
+    () => onAvance?.({ etape: "reprise" }),
+  );
+}
+
+/* Les lots lus du dernier enregistrement : « Ajouter quand même » les renvoie */
+let dernierEnregistrement: { fichier: File; app: AppKind; lus: unknown[] } | null = null;
+
+/** Les écrans d’un enregistrement, tirés dans le navigateur, puis lus par BLUSH, lot par lot (cinq à la fois). */
+async function lotsLus(file: File, app: AppKind, consentement: string, passe: Promise<unknown>, onAvance?: (a: AvanceVideo) => void): Promise<unknown[]> {
   const { imagesDeLaVideo, lotsDe, VideoIllisible } = await pVideo();
   let images: Blob[];
   try {
@@ -444,12 +489,7 @@ export async function uploadRecording(
     }
   };
   await Promise.all(Array.from({ length: Math.min(LECTEURS, lots.length) }, lecteur));
-  /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
-  const corps = { app, lots: lus, cle: cleEnvoi(), consentement, ...(ajout ? { mode: "ajout" as const } : {}) };
-  return avecReprise(
-    () => appel("POST /api/captures/video", { corps }),
-    () => onAvance?.({ etape: "reprise" }),
-  );
+  return lus;
 }
 
 /* ———— Compte et analyse ———— */

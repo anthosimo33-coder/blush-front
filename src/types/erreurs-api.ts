@@ -90,6 +90,8 @@ export const ERREURS_API = {
   autre_conv: 422,
   /** Un ajout sans rien de nouveau. */
   rien_de_neuf: 422,
+  /** Un morceau de trop pour une conv en plusieurs morceaux : cinq au plus, et pas plus de texte, ensemble, qu’un export au plus gros (src/server/morceaux.ts). */
+  morceaux: 422,
   /** Un vocal trop lourd, ou trop long. */
   vocal: 422,
   /** Un vocal vide, qui ne dure rien, ou où la transcription n’entend rien. */
