@@ -107,11 +107,11 @@ function keepInView(e: FocusEvent<HTMLButtonElement>) {
   if (el.matches(":focus-visible")) requestAnimationFrame(() => el.scrollIntoView({ block: "nearest", inline: "center" }));
 }
 
-/** L’icône de l’appli, ou l’initiale en rose (le rose, c’est l’autre personne). */
+/** L’icône de l’appli, ou sa photo (sinon l’initiale, en rose : le rose, c’est l’autre personne). */
 function ConvAvatar({ conv, size }: { conv: LandingConv; size: number }) {
   if (conv.avatar === "app") return <AppBadge app={conv.app} size={size} radius={size / 2} />;
   return (
-    <Avatar tone="elle" size={size}>
+    <Avatar tone="elle" size={size} photo={conv.photo}>
       {conv.name.charAt(0)}
     </Avatar>
   );

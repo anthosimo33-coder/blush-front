@@ -14,6 +14,7 @@ export function Avatar({
   tone,
   size = 40,
   fontSize,
+  photo,
   children,
   className,
   style,
@@ -21,6 +22,8 @@ export function Avatar({
   tone: keyof typeof AVATAR_BG;
   size?: number;
   fontSize?: number;
+  /** Une photo carrée de public/ (un avis, une conv d’exemple de la landing) : à la place de l’initiale, sur sa couleur le temps qu’elle arrive. */
+  photo?: string;
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -30,7 +33,7 @@ export function Avatar({
       aria-hidden="true"
       /* Une initiale dit un prénom : masquée dans l’enregistrement des visites (src/lib/secrets.ts) */
       data-prive=""
-      className={cn("flex shrink-0 items-center justify-center rounded-full font-black text-white", className)}
+      className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-full font-black text-white", className)}
       style={{
         width: size,
         height: size,
@@ -40,7 +43,13 @@ export function Avatar({
         ...style,
       }}
     >
-      {children}
+      {photo ? (
+        /* Déjà à la bonne taille (256 px pour un rond de 44 au plus) : servie telle quelle, sans passer par l’optimiseur */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photo} alt="" width={size} height={size} loading="lazy" decoding="async" className="block size-full object-cover" />
+      ) : (
+        children
+      )}
     </span>
   );
 }

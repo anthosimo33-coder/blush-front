@@ -334,6 +334,8 @@ export type LandingConv = {
   app: AppKind;
   /** La pastille : l’icône de l’appli, ou l’initiale (rose : l’autre personne). */
   avatar: "app" | "initial";
+  /** Une pastille « initiale » : sa photo à la place, carrée, dans public/convs/ (« /convs/lea.webp »). */
+  photo?: string;
   verdict: Pick<Verdict, "emoji" | "title" | "subtitle">;
   /** La preuve : un de ses messages, daté. */
   proof: { text: string; caption: string };
