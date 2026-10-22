@@ -87,6 +87,8 @@ export const PAYWALL = {
     vocal: (autre: string) => `Ton vocal sur toi et ${autre}`,
     duree: "30\u00a0s",
   },
+  /** La zone des avis qui défile, pour un lecteur d’écran. */
+  lesAvis: "Les avis",
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",
   /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */

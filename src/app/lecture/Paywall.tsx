@@ -469,12 +469,11 @@ function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; 
   );
 }
 
-/** Sur ordinateur, une rangée d’avis (le premier, celui qui ressemble au titre du haut, et les deux suivants) ; sur téléphone, tous, en carrousel. */
-const AVIS_SUR_ORDINATEUR = 3;
-
 /**
- * Les témoignages (la maquette A1) : « Ils se posaient la même question. », la note des avis, puis leurs cartes, qui
- * défilent de côté sur téléphone (de vrais clients seulement : sans eux, rien).
+ * Les témoignages (la maquette A1) : « Ils se posaient la même question. », la note des avis, puis leurs cartes, en
+ * carrousel sur téléphone comme sur ordinateur (demandé le 22 octobre 2026 ; sur ordinateur, la troisième carte dépasse :
+ * il y en a d’autres), au doigt, aux flèches du clavier ou par leurs deux boutons (de vrais clients seulement : sans
+ * eux, rien).
  */
 function Temoignages({ items }: { items: Testimonial[] }) {
   const piste = useRef<HTMLDivElement>(null);
@@ -501,16 +500,19 @@ function Temoignages({ items }: { items: Testimonial[] }) {
           </p>
         )}
       </div>
+      {/* Zone qui défile : atteignable au clavier (ses flèches la font glisser) */}
       <div
         ref={piste}
-        className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
+        tabIndex={0}
+        aria-label={PAYWALL.lesAvis}
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] lg:mx-0 lg:w-full lg:gap-5 lg:px-0 [&::-webkit-scrollbar]:hidden"
       >
-        {items.map((t, i) => (
-          <CarteTemoignage key={t.name + t.label} t={t} className={cn("w-[312px] shrink-0 snap-start lg:w-auto", i >= AVIS_SUR_ORDINATEUR && "lg:hidden")} />
+        {items.map((t) => (
+          <CarteTemoignage key={t.name + t.label} t={t} className="w-[312px] shrink-0 snap-start lg:w-[400px]" />
         ))}
       </div>
       {items.length > 1 && (
-        <div className="flex justify-center gap-4 lg:hidden">
+        <div className="flex justify-center gap-4">
           <button
             type="button"
             aria-label={PAYWALL.precedent}
