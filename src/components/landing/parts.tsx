@@ -23,7 +23,8 @@ export function Container({ children, className }: { children: ReactNode; classN
   return <div className={cn("mx-auto w-full max-w-[1120px] px-[22px] lg:px-8", className)}>{children}</div>;
 }
 
-export function CtaButton({ retour, className }: { retour: Retour; className?: string }) {
+/** Le bouton principal de la landing : noir sur le papier, ou `blanc` sur le rose du pied de page. */
+export function CtaButton({ retour, blanc = false, className }: { retour: Retour; blanc?: boolean; className?: string }) {
   const cta = ctaDe(retour);
   return (
     <Link
@@ -31,33 +32,39 @@ export function CtaButton({ retour, className }: { retour: Retour; className?: s
       prefetch={cta.prefetch}
       scroll={cta.scroll}
       className={cn(
-        "arrow-nudge lift lift-ink lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-carte font-black text-white no-underline shadow-ink [background:var(--btn-ink-bg)]",
+        "arrow-nudge lift lift-sm inline-flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] px-9 text-carte font-black no-underline",
+        blanc
+          ? "lift-rose bg-white text-ink shadow-[0_1px_2px_rgba(110,0,50,0.16),0_18px_36px_-14px_rgba(110,0,50,0.55)]"
+          : "lift-ink text-white shadow-ink [background:var(--btn-ink-bg)]",
         className,
       )}
     >
       {cta.label}
-      <Icon name="arrow" size={19} stroke={2.6} className="arrow text-white" />
+      <Icon name="arrow" size={19} stroke={2.6} className={cn("arrow", blanc ? "text-ink" : "text-white")} />
     </Link>
   );
 }
 
 /**
  * Sous le bouton principal : la note des avis et la ligne qui rassure (qui découvre), ou le lien pour analyser une autre
- * conv (qui revient).
+ * conv (qui revient). `surRose` : sous le bouton blanc du pied de page, en blanc, sans la note (le pied a la sienne).
  */
-export function SousLeBouton({ retour }: { retour: Retour }) {
+export function SousLeBouton({ retour, surRose = false }: { retour: Retour; surRose?: boolean }) {
   const cta = ctaDe(retour);
   if (!cta.autre)
     return (
       <>
-        <NoteDesAvis />
-        <span className={cn("text-note font-extrabold text-grey", NOTE_DES_AVIS ? "mt-1.5" : "mt-3.5")}>{cta.note}</span>
+        {!surRose && <NoteDesAvis />}
+        <span className={cn("text-note font-extrabold", surRose ? "text-white" : "text-grey", NOTE_DES_AVIS && !surRose ? "mt-1.5" : "mt-3.5")}>{cta.note}</span>
       </>
     );
   return (
     <Link
       href={cta.autre.href}
-      className="mt-1 inline-flex h-11 items-center px-3 text-note font-black text-ink underline decoration-[rgba(17,17,20,0.25)] underline-offset-2 transition-colors hover:decoration-ink"
+      className={cn(
+        "mt-1 inline-flex h-11 items-center px-3 text-note font-black underline underline-offset-2 transition-colors",
+        surRose ? "text-white decoration-white/50 hover:decoration-white" : "text-ink decoration-[rgba(17,17,20,0.25)] hover:decoration-ink",
+      )}
     >
       {cta.autre.label}
     </Link>
@@ -102,11 +109,15 @@ function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string;
   );
 }
 
-/** L’habillage d’une landing : la barre du haut, le contenu, le pied de page. `retour` : qui revient (cta.ts). */
-export function LandingFrame({ retour, children }: { retour: Retour; children: ReactNode }) {
+/**
+ * L’habillage d’une landing : la barre du haut, le contenu, puis `pied`, son pied de page (PiedDePage.tsx, qui importe
+ * le bouton d’ici). `retour` : qui revient (cta.ts).
+ */
+export function LandingFrame({ retour, pied, children }: { retour: Retour; pied: ReactNode; children: ReactNode }) {
   const cta = ctaDe(retour);
   return (
-    <div className={cn("min-h-dvh overflow-x-clip", figtree.variable)}>
+    /* Son propre papier, celui du body : le body passe au rose sous le pied de page (PiedEnVue), la page reste crème */
+    <div className={cn("isolate min-h-dvh overflow-x-clip [background:var(--paper-light)]", figtree.variable)}>
       <header className="sticky top-0 z-40 border-b border-[rgba(17,17,20,0.05)] bg-[rgba(244,242,237,0.82)] backdrop-blur-xl">
         <Container className="flex h-16 items-center justify-between">
           <LogoIlot size={30} fontSize={22} href="/" />
@@ -137,31 +148,7 @@ export function LandingFrame({ retour, children }: { retour: Retour; children: R
         </Container>
       </header>
       <main>{children}</main>
-      <footer className="border-t border-[rgba(17,17,20,0.06)] py-10">
-        <Container className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <LogoIlot size={26} fontSize={19} href="/" />
-            <span className="text-legende font-extrabold text-grey">© 2026</span>
-          </div>
-          <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-note font-extrabold">
-            <Link href={cta.href} scroll={cta.scroll} className="text-soft no-underline hover:text-ink">
-              {cta.label}
-            </Link>
-            <Link href={retour ? "/compte" : "/connexion"} className="text-soft no-underline hover:text-ink">
-              {retour ? "Mon compte" : "Se connecter"}
-            </Link>
-            <Link href="/confidentialite" className="text-soft no-underline hover:text-ink">
-              Confidentialité
-            </Link>
-            <Link href="/conditions" className="text-soft no-underline hover:text-ink">
-              Conditions
-            </Link>
-            <Link href="/mentions-legales" className="text-soft no-underline hover:text-ink">
-              Mentions légales
-            </Link>
-          </nav>
-        </Container>
-      </footer>
+      {pied}
     </div>
   );
 }
@@ -388,21 +375,5 @@ function FactTile({ index, children }: { index: number; children: ReactNode }) {
     >
       {children}
     </li>
-  );
-}
-
-/* ———— Le dernier appel ———— */
-export function FinalCta({ retour }: { retour: Retour }) {
-  return (
-    <section className="pb-20 pt-6 lg:pb-28 lg:pt-10">
-      <Container>
-        <div data-reveal="" className="flex flex-col items-center text-center">
-          <LogoBulle size={68} animated />
-          <h2 className="m-0 mt-6 max-w-[640px] text-titre-1 font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance] lg:text-affiche">Ta conv a déjà la réponse.</h2>
-          <CtaButton retour={retour} className="mt-8" />
-          <SousLeBouton retour={retour} />
-        </div>
-      </Container>
-    </section>
   );
 }
