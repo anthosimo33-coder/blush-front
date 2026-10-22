@@ -71,6 +71,7 @@ const tache = (status: Tache["status"], autres: Partial<Tache> = {}): Tache => (
   progress: 0,
   detail: null,
   heartbeatAt: null,
+  pasAvant: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
   ...autres,

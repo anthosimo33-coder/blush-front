@@ -119,7 +119,10 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
   },
   "chat_messages.data:toi": { texte: "elle m’a répondu ok", lignes: ["m0221 2026-03-11 mar. 09:12 Léa : ok"], affiche: "(1 capture) elle m’a répondu ok" },
   "chat_messages.data:blush": { reponse: { kind: "bubbles", bubbles: [{ text: "Un « ok » le matin, c’est bon signe." }] }, resume: "Un « ok » le matin, c’est bon signe." },
-  "tasks.input": { date: "2026-03-11", dit: "elle m’a répondu ok", reponse: ["Un « ok » le matin, c’est bon signe."] },
+  "tasks.input": [
+    { date: "2026-03-11", dit: "elle m’a répondu ok", reponse: ["Un « ok » le matin, c’est bon signe."] },
+    { date: "2026-03-11", dit: "et là elle like ma story" },
+  ],
   "shares.data": { emoji: "🔥", title: "Elle attend que tu proposes", subtitle: "L. relance, Tom hésite." },
   "vocals.data": { sobre: false, lignes: [{ texte: "Elle relance.", punch: true, debut: 0, fin: 1.2, mots: [{ t: "Elle", debut: 0 }] }], version: 2 },
   "waitlist.email": "tom@exemple.fr",
@@ -173,6 +176,9 @@ describe("le coffre", () => {
     delete verdictDAvant.titres;
     const scores = EXEMPLES["verdicts.data"].scores;
     expect(coffre.lire("verdicts.data", chiffrer({ sortie: verdictDAvant, scores }))).toEqual({ sortie: { ...VERDICT, titres: null }, scores });
+    /* L’entrée d’une mise à jour de la mémoire avant le 22 octobre 2026 : un seul échange, qui se relit en liste d’un */
+    const [premier] = EXEMPLES["tasks.input"];
+    expect(coffre.lire("tasks.input", chiffrer(premier))).toEqual([premier]);
   });
 
   it("garde les champs qu’il ne connaît pas (écrits par une version plus récente), jusque dans les objets imbriqués", () => {

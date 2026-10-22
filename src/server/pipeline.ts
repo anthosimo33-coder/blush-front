@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 import { alerter } from "./alertes";
 import * as coffre from "./coffre";
@@ -272,7 +272,7 @@ async function suspendre(t: Tache, code: ArretDuBudget = "budget"): Promise<void
  * Une étape de la chaîne ne repart que si elle est la dernière de son genre, et qu’aucune autre du même genre n’attend
  * ni ne tourne : une lecture relancée le jour même (POST /api/analyse) a pu laisser deux verdicts arrêtés par le budget,
  * et l’index unique des étapes en cours (tasks_une_par_etape) refuserait d’en remettre deux en attente. Les mises à jour
- * de la mémoire (memoire_maj), elles, repartent toutes : chacune porte son échange, et l’index ne les compte pas. La
+ * de la mémoire (memoire_maj), elles, repartent toutes : chacune porte ses échanges, et l’index ne les compte pas. La
  * chaîne les reprend dans l’ordre où elles sont arrivées (aRelancer), une nouvelle planifiée depuis après elles.
  */
 const repartPourDeBon = or(
@@ -484,13 +484,15 @@ async function reprendreLesEchecsPassagers(): Promise<string[]> {
 }
 
 /**
- * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes qu’un essai peut encore faire ; une étape
- * abandonnée (son battement de cœur perdu), même à son dernier essai : la chaîne relancée la clôt et prévient l’équipe
- * (cloreLesAbandons), sans attendre qu’un écran revienne ; et, pour un rapport payé, une étape arrêtée par le budget
- * d’un jour passé (la chaîne relancée la remet en attente, reprendreApresMinuit) : le rapport s’écrit et son mail part
- * sans que la personne revienne. Le passage des 5 minutes (GET /api/cron/relances) les reprend, chacune dans sa propre
- * fonction (passerLaMain) : le filet du relais, qu’un réseau coupé ou un déploiement peut rater. Les plus récemment
- * arrêtées d’abord (celles qu’on attend sans doute encore). Rend le nombre de chaînes reprises.
+ * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes qu’un essai peut encore faire ; une mise
+ * à jour de la mémoire dont le chat s’est calmé (son heure venue : src/server/memoire-groupee.ts ; c’est ce passage qui
+ * la lance, 10 à 15 minutes après le dernier échange) ; une étape abandonnée (son battement de cœur perdu), même à son
+ * dernier essai : la chaîne relancée la clôt et prévient l’équipe (cloreLesAbandons), sans attendre qu’un écran
+ * revienne ; et, pour un rapport payé, une étape arrêtée par le budget d’un jour passé (la chaîne relancée la remet en
+ * attente, reprendreApresMinuit) : le rapport s’écrit et son mail part sans que la personne revienne. Le passage des 5
+ * minutes (GET /api/cron/relances) les reprend, chacune dans sa propre fonction (passerLaMain) : le filet du relais,
+ * qu’un réseau coupé ou un déploiement peut rater. Les plus récemment arrêtées d’abord (celles qu’on attend sans doute
+ * encore). Rend le nombre de chaînes reprises.
  */
 export async function reprendreLesChainesEnPlan(): Promise<number> {
   const t = schema.tasks;
@@ -501,7 +503,11 @@ export async function reprendreLesChainesEnPlan(): Promise<number> {
     .from(t)
     .where(
       or(
-        and(lt(t.attempts, ESSAIS_MAX), eq(t.status, "attente"), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)),
+        and(
+          lt(t.attempts, ESSAIS_MAX),
+          eq(t.status, "attente"),
+          or(and(isNull(t.pasAvant), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)), lte(t.pasAvant, sql`now()`)),
+        ),
         and(eq(t.status, "en_cours"), lt(t.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
         and(
           eq(t.status, "echec"),

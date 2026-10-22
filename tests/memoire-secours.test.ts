@@ -19,6 +19,7 @@ import { fusionnerFaits } from "@/server/fiche";
 import { fournisseurFactice, refusFactice, type RequeteFactice } from "@/server/ia/factice";
 import { executerChaine, memoireAssuree, RELANCES_MEMOIRE_MAX } from "@/server/pipeline";
 import { planifier } from "@/server/taches";
+import { retenir, sansAttendre } from "@/server/memoire-groupee";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -78,7 +79,9 @@ describe("la vraie mémoire en échec", () => {
     /* Le chat répond sur elle, avec des preuves de la conv ; sa mise à jour la garde de secours */
     const { reponse, majMemoire } = await repondre(await ligneEnBase(imp.id), secours, "on s’est vus hier, c’était trop bien");
     expect(reponse.kind).toBe("bubbles");
-    expect(majMemoire).toBe(true);
+    /* Elle attend que le chat se calme ; ici, elle part sans attendre */
+    expect(majMemoire).toBe(false);
+    expect(await sansAttendre(imp.id)).toBe(true);
     /* Trop tôt pour relancer la vraie (la pause) : seule la mise à jour du chat part */
     await executerChaine(imp.id);
     expect(await tachesMemoire(imp.id)).toHaveLength(1);
@@ -159,7 +162,7 @@ describe("le chat avant la vraie mémoire", () => {
     const u = await compteDeTest("secours-maj", "debloque");
     const imp = await avecFactice(memoireEnPanne, () => histoireLue(u, "06-elle-hesite.txt"));
     await db().delete(schema.memories).where(eq(schema.memories.storyId, imp.id));
-    await planifier(imp.id, "memoire_maj", echange(1, { dit: "on se voit samedi" }));
+    await retenir(imp.id, echange(1, { dit: "on se voit samedi" }), { neuf: true, maintenant: true });
     await executerChaine(imp.id);
     const maj = await db()
       .select({ status: schema.tasks.status })

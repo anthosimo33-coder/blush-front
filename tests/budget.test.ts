@@ -32,6 +32,7 @@ import { fournisseurFactice } from "@/server/ia/factice";
 import { noterCout } from "@/server/ia/usage";
 import { cloreLesAbandons, executerChaine } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
+import { retenir } from "@/server/memoire-groupee";
 import { aujourdhuiParis } from "@/server/temps";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, convPrete, histoireLue, ligneEnBase } from "./aide/fixtures";
@@ -242,9 +243,9 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
     expect((await etatDesTaches(id, ["memoire"])).memoire?.status).toBe("fini");
     /* Le jour J : deux échanges du chat, chacun arrêté par le budget (la chaîne s’arrête au premier) */
     await depense(payeur, BUDGET_IA.compte);
-    await planifier(id, "memoire_maj", echange(1));
+    await retenir(id, echange(1), { neuf: true, maintenant: true });
     await executerChaine(id);
-    await planifier(id, "memoire_maj", echange(2));
+    await retenir(id, echange(2), { neuf: true, maintenant: true });
     await executerChaine(id);
     const majs = async () =>
       db()
@@ -259,7 +260,7 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
 
     /* Le lendemain, un message du chat planifie une troisième mise à jour avant que la chaîne reprenne les deux autres */
     await lendemain(id);
-    await planifier(id, "memoire_maj", echange(3));
+    await retenir(id, echange(3), { neuf: true, maintenant: true });
     const lus: number[] = [];
     const modele = (req: Requete) => {
       if (req.tache === "07-memoire") {

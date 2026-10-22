@@ -429,7 +429,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     expect(await momentAPartager(await ligneEnBase(id), true, { type: "reponse", echange: echange.id })).toBe("introuvable");
     /* La mise à jour de la mémoire n’apprend que ce qu’il a dit */
     const majs = (await tachesDe(id)).filter((t) => t.kind === "memoire_maj");
-    for (const t of majs) expect(coffre.lire("tasks.input", t.input!).reponse).toEqual([]);
+    for (const t of majs) for (const e of coffre.lire("tasks.input", t.input!)) expect(e.reponse).toEqual([]);
 
     /* Pas de quoi la lire : rien ne change */
     const sansBulles = await lire(v.id);
@@ -495,7 +495,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     const sorti = [brut, JSON.stringify(avant), JSON.stringify(encore)].join("\n");
     for (const t of payants) expect(sorti.includes(t), "un texte payant de la réponse verrouillée est sorti").toBe(false);
     /* La mise à jour de la mémoire n’apprend que ce qu’il a dit */
-    for (const t of (await tachesDe(id)).filter((t) => t.kind === "memoire_maj")) expect(coffre.lire("tasks.input", t.input!).reponse).toEqual([]);
+    for (const t of (await tachesDe(id)).filter((t) => t.kind === "memoire_maj")) for (const e of coffre.lire("tasks.input", t.input!)) expect(e.reponse).toEqual([]);
   });
 
   it("rechargé (un pack payé après elle) : elle se lit sans débit, elle a coûté 0 et le solde reste l’ancien plus les bulles achetées ; une seule fois", async () => {
